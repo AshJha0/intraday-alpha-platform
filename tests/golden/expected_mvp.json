@@ -1,19 +1,19 @@
 {
   "by_algo": {
-    "IS": 43,
-    "POV": 88,
-    "TWAP": 104
+    "IS": 40,
+    "POV": 82,
+    "TWAP": 109
   },
   "by_rule": {
-    "ALLOW": 348
+    "ALLOW": 347
   },
   "by_venue": {
     "XV1": 1628,
-    "XV2": 765,
-    "XV3": 5836
+    "XV2": 929,
+    "XV3": 5738
   },
   "config_path": "configs/mvp/mvp.json",
-  "config_version": "439bbad5e4aacd0996649e571ee9aca73410777417e272bce1026705264bb191",
+  "config_version": "190747e01a3c582f475a3e9d376d1d05e1b661f0b74ce5d20ff040fabc6563f5",
   "data_version": "0e0fe161016eea4327083e697510885768fe33620f95b814fa5703f6ac3d4a7b",
   "description": "MVP golden (python -m iap.mvp run on configs/mvp/mvp.json): the seeded feed, the full loop (book -> features -> EQ01/EQ03/EQ06 ensemble -> portfolio -> hard risk -> TWAP/POV/IS -> SOR -> simulator -> TCA -> attribution -> trace) and its report. Ports reproduce every value: integers and hashes exactly, floats at abs/rel 1e-9. Regenerate only on a deliberate, versioned change: PYTHONPATH=src python3 tools/make_golden_mvp.py --force.",
   "events_iap1_sha256": "0e0fe161016eea4327083e697510885768fe33620f95b814fa5703f6ac3d4a7b",
@@ -33,92 +33,92 @@
     "daa06b67278b3716e2e67104c77204e4"
   ],
   "last_ts": 1787579100004000000,
-  "model_version": "4857d32510c5232b5ee629da04306d7993f11f073e7658922c8d16411b4d61b0",
+  "model_version": "c01e499c226f70a7b8c89822cb3efd0a0238164dfca9ecc62c08a775bc81c3f5",
   "n_events": 15805,
   "n_traces": 800,
   "report": {
     "alpha": {
-      "contribution_bps_notional_weighted": 0.022071468889691873,
-      "cost_bps_notional_weighted": -0.4100383655659972,
+      "contribution_bps_notional_weighted": 0.02448042594743956,
+      "cost_bps_notional_weighted": -0.43669869834448194,
       "cost_negative": true,
       "ensemble": {
         "alpha_id": "EQ01-EQ03-EQ06",
         "horizon": "1s",
-        "model_version": "4857d32510c5232b5ee629da04306d7993f11f073e7658922c8d16411b4d61b0",
+        "model_version": "c01e499c226f70a7b8c89822cb3efd0a0238164dfca9ecc62c08a775bc81c3f5",
         "n_ic_samples": 790,
         "n_signals": 799,
-        "realized_ic": 0.10365316237459454,
-        "realized_ic_cost": -0.0031348118530839597,
-        "realized_ic_shifted": 0.11136828570610335
+        "realized_ic": 0.10283974199227312,
+        "realized_ic_cost": -0.0020231124231700967,
+        "realized_ic_shifted": 0.11129774809128408
       },
       "ic_definition": "Pearson(expected_return, label) over confidence > 0 decisions; label = iap.labels.compute_labels at the decision timestamps on the feature-engine book-refresh mid series (mid-to-mid and cost-adjusted half-spread at both ends; valid only when observed through t+h, tradable anchor, fresh tradable forward sample, no stale/halt/auction/one-sided refresh inside (t, t+h]); ic_shifted = signal lagged one confidence > 0 decision; ic_gap = |at_research_horizon.ic - research_ic| (the registry IC is measured at the alpha's fitted horizon)",
-      "net_bps_notional_weighted": -0.38796689667630535,
+      "net_bps_notional_weighted": -0.4122182723970424,
       "per_alpha": {
         "EQ01": {
           "at_research_horizon": {
             "horizon": "1s",
             "n_ic_samples": 790,
             "n_signals": 799,
-            "realized_ic": 0.217006223664882,
-            "realized_ic_cost": -0.023643067352093042,
-            "realized_ic_shifted": 0.14874228379923876
+            "realized_ic": 0.2170062236648818,
+            "realized_ic_cost": -0.023643067352093067,
+            "realized_ic_shifted": 0.1487422837992385
           },
-          "beta": 5.84449379264817e-08,
+          "beta": 1.1068831705729134e-07,
           "horizon": "1s",
-          "ic_gap": 0.20648640820730263,
+          "ic_gap": 0.20499847120514345,
           "lifecycle_state": "CANDIDATE",
           "n_ic_samples": 790,
           "n_signals": 799,
-          "params_version": "914738f686548929fa22e5c5ec7db7d05c311d032424007d8ef4a733a22108a6",
-          "realized_ic": 0.217006223664882,
-          "realized_ic_cost": -0.023643067352093042,
-          "realized_ic_shifted": 0.14874228379923876,
+          "params_version": "f7767a16089a9827b34b8a1c145925b91b3e695dd463e927a34c92e9b60888a8",
+          "realized_ic": 0.2170062236648818,
+          "realized_ic_cost": -0.023643067352093067,
+          "realized_ic_shifted": 0.1487422837992385,
           "research_horizon": "1s",
-          "research_ic": 0.010519815457579376
+          "research_ic": 0.012007752459738345
         },
         "EQ03": {
           "at_research_horizon": {
             "horizon": "5s",
             "n_ic_samples": 677,
             "n_signals": 715,
-            "realized_ic": 0.14695470641211839,
-            "realized_ic_cost": 0.0673475041155793,
-            "realized_ic_shifted": 0.06976178073621275
+            "realized_ic": 0.1466507251080985,
+            "realized_ic_cost": 0.06901541834499196,
+            "realized_ic_shifted": 0.06971044477362846
           },
-          "beta": 2.3843836063294293e-06,
+          "beta": 2.169274885144194e-06,
           "horizon": "1s",
-          "ic_gap": 0.12810423239733687,
+          "ic_gap": 0.1278276565360434,
           "lifecycle_state": "CANDIDATE",
           "n_ic_samples": 707,
           "n_signals": 715,
-          "params_version": "afba16e3b521ac30021c73444482d0dc5c74d59bc85bbbeef35f00bf786bf86b",
-          "realized_ic": 0.10965106803672689,
-          "realized_ic_cost": -0.029374956272870734,
-          "realized_ic_shifted": 0.11574778193926108,
+          "params_version": "5acf17bf5fefd1b6e5305da687e89a7c6d290ff3434c8ea01cba9cf476e8e83b",
+          "realized_ic": 0.10926577660731074,
+          "realized_ic_cost": -0.028930739693838088,
+          "realized_ic_shifted": 0.1162045071070138,
           "research_horizon": "5s",
-          "research_ic": 0.018850474014781526
+          "research_ic": 0.018823068572055134
         },
         "EQ06": {
           "at_research_horizon": {
             "horizon": "10s",
             "n_ic_samples": 301,
             "n_signals": 360,
-            "realized_ic": -0.12982186879832658,
-            "realized_ic_cost": 0.03336887736630263,
-            "realized_ic_shifted": -0.0981884632648179
+            "realized_ic": -0.1298218687983267,
+            "realized_ic_cost": 0.03336887736630281,
+            "realized_ic_shifted": -0.09818846326481788
           },
-          "beta": 6.08312181431125e-06,
+          "beta": 7.1646711756799976e-06,
           "horizon": "1s",
-          "ic_gap": 0.15753492476969083,
+          "ic_gap": 0.16322994846754652,
           "lifecycle_state": "CANDIDATE",
           "n_ic_samples": 354,
           "n_signals": 360,
-          "params_version": "fe519a986e7690eb93c530897fcfe6adaa66f5066076bae88e0adf6078c9d2b1",
-          "realized_ic": -0.07855979996547957,
-          "realized_ic_cost": 0.07937864351368037,
-          "realized_ic_shifted": -0.047367420692846336,
+          "params_version": "d22a48821401a8e438c446738322979a5190076c537d7f29e605d6f87ceaf0f9",
+          "realized_ic": -0.07855979996547975,
+          "realized_ic_cost": 0.07937864351368047,
+          "realized_ic_shifted": -0.04736742069284652,
           "research_horizon": "10s",
-          "research_ic": 0.027713055971364267
+          "research_ic": 0.03340807966921983
         }
       }
     },
@@ -130,30 +130,30 @@
       "min_slice_interval_ns": 500000000,
       "participation_blocked": 0,
       "participation_capped": 2,
-      "slice_interval_blocked": 159
+      "slice_interval_blocked": 149
     },
     "counts": {
       "counters": {
-        "child_orders_generated": 507,
-        "child_orders_submitted": 348,
+        "child_orders_generated": 496,
+        "child_orders_submitted": 347,
         "decisions": 800,
-        "decisions_flat": 396,
+        "decisions_flat": 400,
         "decisions_parent_live": 0,
         "decisions_window_beyond_session": 0,
         "decisions_without_covariance": 169,
         "events": 15805,
         "feed_recoveries": 8,
-        "fills": 169,
+        "fills": 163,
         "latency_budget_blocked": 0,
-        "parent_orders": 235,
-        "parents_finalised": 235,
+        "parent_orders": 231,
+        "parents_finalised": 231,
         "parents_without_tca": 0,
         "participation_blocked": 0,
         "participation_capped": 2,
-        "risk_allowed": 348,
+        "risk_allowed": 347,
         "risk_rejected": 0,
         "sequence_gaps": 8,
-        "slice_interval_blocked": 159,
+        "slice_interval_blocked": 149,
         "sor_no_route": 0,
         "timeline_crossed_skipped": 0
       },
@@ -162,14 +162,14 @@
         "ts_regressions_dropped": 0,
         "vectors_emitted": 800
       },
-      "fill_rate": 0.1512572604955518,
-      "n_child_orders_generated": 507,
-      "n_child_orders_submitted": 348,
+      "fill_rate": 0.1543973941368078,
+      "n_child_orders_generated": 496,
+      "n_child_orders_submitted": 347,
       "n_decisions": 800,
       "n_events": 15805,
       "n_events_generated": 15805,
-      "n_fills": 169,
-      "n_parent_orders": 235,
+      "n_fills": 163,
+      "n_parent_orders": 231,
       "qc_totals": {
         "duplicates": 31,
         "events_in": 15846,
@@ -183,91 +183,91 @@
         "ts_regression_dropped": 0
       },
       "simulator": {
-        "expired_orders": 184,
-        "overlay_thinned_fills": 123,
+        "expired_orders": 190,
+        "overlay_thinned_fills": 119,
         "reopen_touch_fills": 0,
         "user_cancels": 0,
         "venue_not_trading_cancels": 0
       }
     },
     "execution": {
-      "attribution_residual_bps_mean": -0.19162039636309391,
+      "attribution_residual_bps_mean": -0.17647150678221704,
       "delay_cost_bps_qty_weighted": 0.0,
-      "fees_bps_qty_weighted": 0.020429100018302077,
-      "fill_rate": 0.1512572604955518,
-      "impact_bps_qty_weighted": 0.0034828229846817988,
+      "fees_bps_qty_weighted": 0.02089718163704432,
+      "fill_rate": 0.1543973941368078,
+      "impact_bps_qty_weighted": 0.004477148820094985,
       "implementation_shortfall_bps": {
-        "mean": 0.06853178081682652,
-        "qty_weighted": 0.06325814684077927
+        "mean": 0.07008068100222989,
+        "qty_weighted": 0.06515498716645332
       },
       "latency_decision_to_arrival_ns": {
-        "count": 348,
-        "max": 598633,
-        "mean": 442790.3706896552,
-        "min": 350389,
-        "p50": 394167,
+        "count": 347,
+        "max": 598841,
+        "mean": 440327.30259365996,
+        "min": 350137,
+        "p50": 391052,
         "p99": 597292
       },
-      "n_orders_with_tca": 235,
-      "n_parent_orders": 235,
-      "opportunity_cost_bps_qty_weighted": 0.003748933802250895,
-      "participation_rate_mean": 0.07976054737224961,
+      "n_orders_with_tca": 231,
+      "n_parent_orders": 231,
+      "opportunity_cost_bps_qty_weighted": 0.002767593374146674,
+      "participation_rate_mean": 0.07875612086326383,
       "per_algo": {
         "IS": {
-          "fill_rate": 0.7293563243011674,
-          "filled_qty": 6810,
-          "implementation_shortfall_bps_qty_weighted": 0.29124534247831657,
-          "n_orders": 43,
-          "qty": 9337,
-          "slippage_bps_filled_weighted": 0.39931832051685684
+          "fill_rate": 0.7780394795872588,
+          "filled_qty": 6937,
+          "implementation_shortfall_bps_qty_weighted": 0.32256102519669977,
+          "n_orders": 40,
+          "qty": 8916,
+          "slippage_bps_filled_weighted": 0.41458182220751194
         },
         "POV": {
-          "fill_rate": 0.06332517163570023,
-          "filled_qty": 1319,
-          "implementation_shortfall_bps_qty_weighted": 0.02696274178015503,
-          "n_orders": 88,
-          "qty": 20829,
-          "slippage_bps_filled_weighted": 0.41281327972809423
+          "fill_rate": 0.06652564780539397,
+          "filled_qty": 1258,
+          "implementation_shortfall_bps_qty_weighted": 0.020708221048577703,
+          "n_orders": 82,
+          "qty": 18910,
+          "slippage_bps_filled_weighted": 0.3991477610263374
         },
         "TWAP": {
-          "fill_rate": 0.004125752949913359,
+          "fill_rate": 0.003861152940267964,
           "filled_qty": 100,
-          "implementation_shortfall_bps_qty_weighted": 0.00662313348736957,
-          "n_orders": 104,
-          "qty": 24238,
+          "implementation_shortfall_bps_qty_weighted": 0.008992823075613889,
+          "n_orders": 109,
+          "qty": 25899,
           "slippage_bps_filled_weighted": -0.2631925253320412
         }
       },
-      "qty_filled": 8229,
-      "qty_target": 54404,
-      "realized_bps_filled_weighted": -0.5149669022777462,
-      "slippage_bps_filled_weighted": 0.39343045645253955,
-      "spread_cost_bps_qty_weighted": 0.056292444230180455,
-      "timing_cost_bps_qty_weighted": -0.0002660541763339303,
-      "trading_cost_bps_qty_weighted": 0.05950921303852838
+      "qty_filled": 8295,
+      "qty_target": 53725,
+      "realized_bps_filled_weighted": -0.5264858370137698,
+      "slippage_bps_filled_weighted": 0.4040702509332659,
+      "spread_cost_bps_qty_weighted": 0.05825314104460388,
+      "timing_cost_bps_qty_weighted": -0.00034289607239225444,
+      "trading_cost_bps_qty_weighted": 0.06238739379230665
     },
     "pnl": {
-      "equity": -81.5313962475484,
-      "execution_cost": 82.96139624758744,
-      "fees": 21.315999999999995,
-      "fees_net": 21.115999999999996,
+      "equity": -82.83733311021933,
+      "execution_cost": 85.42233311024351,
+      "fees": 21.530199999999994,
+      "fees_net": 21.330199999999994,
       "final_mark": 190.005,
       "final_position": 495,
-      "gross": 1.430000000016662,
-      "identity_abs_diff": 6.81268375046784e-11,
-      "identity_lhs_risk_daily": -60.35499999995932,
-      "identity_rhs_gross_minus_spread": -60.355000000027445,
-      "impact": 0.060396247543333295,
-      "max_drawdown": 83.99389466420689,
-      "realized": -56.02448509352624,
+      "gross": 2.585000000019278,
+      "identity_abs_diff": 5.7696070143720135e-12,
+      "identity_lhs_risk_daily": -61.445000000036686,
+      "identity_rhs_gross_minus_spread": -61.445000000030916,
+      "impact": 0.062133110193333285,
+      "max_drawdown": 85.29983152687782,
+      "realized": -56.4881386565248,
       "rebates": 0.2,
       "reporting_ccy": "USD",
-      "risk_daily": -60.35499999995932,
+      "risk_daily": -61.445000000036686,
       "session_volume": 395100,
-      "spread_cost": 61.78500000004411,
-      "total": -81.53139624750266,
-      "traded_qty": 8229,
-      "unrealized": -4.330514906433081
+      "spread_cost": 64.0300000000502,
+      "total": -82.83733311023,
+      "traded_qty": 8295,
+      "unrealized": -4.956861343511889
     },
     "portfolio": {
       "bars": 13,
@@ -277,10 +277,10 @@
       "solves": 631
     },
     "risk": {
-      "allowed": 348,
-      "audit_events": 348,
+      "allowed": 347,
+      "audit_events": 347,
       "decisions_by_rule": {
-        "ALLOW": 348
+        "ALLOW": 347
       },
       "feed_recoveries": 8,
       "final_position": 495,
@@ -295,13 +295,13 @@
       "no_route": 0,
       "venue_fill_qty": {
         "XV1": 1628,
-        "XV2": 765,
-        "XV3": 5836
+        "XV2": 929,
+        "XV3": 5738
       },
       "venue_shares": {
-        "XV1": 0.19783691821606514,
-        "XV2": 0.0929639081297849,
-        "XV3": 0.70919917365415
+        "XV1": 0.19626280892103676,
+        "XV2": 0.11199517781796263,
+        "XV3": 0.6917420132610006
       }
     },
     "run": {
@@ -310,7 +310,7 @@
         "EQ03",
         "EQ06"
       ],
-      "config_version": "439bbad5e4aacd0996649e571ee9aca73410777417e272bce1026705264bb191",
+      "config_version": "190747e01a3c582f475a3e9d376d1d05e1b661f0b74ce5d20ff040fabc6563f5",
       "data_version": "0e0fe161016eea4327083e697510885768fe33620f95b814fa5703f6ac3d4a7b",
       "decision_cadence_ns": 1000000000,
       "events_sha256": "7e57c1afd1763c22f71f3e0a2523edaae052360546fe47a58907f3d2ddae1056",
@@ -320,13 +320,13 @@
       "instrument": "SYN.EQ.AAPL",
       "instrument_id": 12,
       "last_ts": 1787579100004000000,
-      "model_version": "4857d32510c5232b5ee629da04306d7993f11f073e7658922c8d16411b4d61b0",
+      "model_version": "c01e499c226f70a7b8c89822cb3efd0a0238164dfca9ecc62c08a775bc81c3f5",
       "n_traces": 800,
       "run_id": "58a10f2194a3c81c",
       "seed": 12345,
       "session_id": "mvp-58a10f2194a3c81c",
       "strategy_id": "MVP",
-      "trace_digest": "20d4ff76af0b631c53c488a1cc504c1bbf8d8488dd5c210a947f96d63e734a45",
+      "trace_digest": "e5a1b6881f9cd639dbaee0323307918dd711c8ed0c4509e7e5e2b8bcbab6933d",
       "venues": [
         "XV1",
         "XV2",
@@ -334,7 +334,7 @@
       ]
     },
     "trace": {
-      "digest": "20d4ff76af0b631c53c488a1cc504c1bbf8d8488dd5c210a947f96d63e734a45",
+      "digest": "e5a1b6881f9cd639dbaee0323307918dd711c8ed0c4509e7e5e2b8bcbab6933d",
       "first_trace_ids": [
         "403020d9da592210fad79613f87ffa19",
         "79968f20da6647bb7a4fd9325850a2f1",
@@ -352,6 +352,6 @@
   "run_id": "58a10f2194a3c81c",
   "seed": 12345,
   "session_id": "mvp-58a10f2194a3c81c",
-  "trace_digest": "20d4ff76af0b631c53c488a1cc504c1bbf8d8488dd5c210a947f96d63e734a45",
+  "trace_digest": "e5a1b6881f9cd639dbaee0323307918dd711c8ed0c4509e7e5e2b8bcbab6933d",
   "x-version": 1
 }
