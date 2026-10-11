@@ -19,7 +19,12 @@
             0.07293147930912235
           ],
           "source": "data/real/multi7/research/alpha_reports/EQ01.json",
-          "source_sha256": "9f2cf9085da0d30b17814bc076bdbc77025e36c742d117bd36960550427d0a78"
+          "source_sha256": "9f2cf9085da0d30b17814bc076bdbc77025e36c742d117bd36960550427d0a78",
+          "oos_ic_by_symbol": {
+            "AAPL": 0.06291434712404667,
+            "MSFT": 0.12494985496000272,
+            "QQQ": 0.1788851435899864
+          }
         },
         "holdout_v18": {
           "sessions": 2,
@@ -45,7 +50,12 @@
             0.03025938089747166
           ],
           "source": "data/real/multi7/research/alpha_reports/EQ02.json",
-          "source_sha256": "e6e7826c43a7865518f0adb54397c628ba3b6c0f6bd33b4144e3ae269c5d0796"
+          "source_sha256": "e6e7826c43a7865518f0adb54397c628ba3b6c0f6bd33b4144e3ae269c5d0796",
+          "oos_ic_by_symbol": {
+            "AAPL": 0.021019547933400565,
+            "MSFT": 0.04956083398679266,
+            "QQQ": 0.06517497830943467
+          }
         },
         "holdout_v18": {
           "sessions": 2,
@@ -71,7 +81,12 @@
             0.020664814965620542
           ],
           "source": "data/real/multi7/research/alpha_reports/EQ04.json",
-          "source_sha256": "15e54e49e67e43630bd7511cd332768fef1a842c10e662c5a7e5dd6151333adb"
+          "source_sha256": "15e54e49e67e43630bd7511cd332768fef1a842c10e662c5a7e5dd6151333adb",
+          "oos_ic_by_symbol": {
+            "AAPL": 0.015381050806636749,
+            "MSFT": 0.02193070096136917,
+            "QQQ": 0.0034644892367344375
+          }
         },
         "holdout_v18": {
           "sessions": 2,
@@ -97,7 +112,12 @@
             0.05481397641646657
           ],
           "source": "data/real/multi7/research/alpha_reports/EQ05.json",
-          "source_sha256": "73f756b4cb77f5fec11d610b949f7cfe4e1f8afeeec580b369f1ea2ea68021c4"
+          "source_sha256": "73f756b4cb77f5fec11d610b949f7cfe4e1f8afeeec580b369f1ea2ea68021c4",
+          "oos_ic_by_symbol": {
+            "AAPL": 0.06534938842202932,
+            "MSFT": 0.07184044554966644,
+            "QQQ": 0.04357796639841531
+          }
         },
         "holdout_v18": {
           "sessions": 2,
@@ -123,7 +143,12 @@
             -0.03004217027734025
           ],
           "source": "data/real/multi7/research/alpha_reports/EQ07.json",
-          "source_sha256": "a63bdaafc94a994436e0559bdb2ca6611637cb3a7f242012fdaa6216774c0ee7"
+          "source_sha256": "a63bdaafc94a994436e0559bdb2ca6611637cb3a7f242012fdaa6216774c0ee7",
+          "oos_ic_by_symbol": {
+            "AAPL": -0.014059262970926243,
+            "MSFT": -0.01838078668234497,
+            "QQQ": 0.0017174236171390734
+          }
         },
         "holdout_v18": {
           "sessions": 2,
@@ -149,7 +174,11 @@
             0.07420601105641893
           ],
           "source": "data/real/multi7/research/alpha_reports/EQ10.json",
-          "source_sha256": "62325321910501b223e03ebf2b05c86eeeb03029678129ed98ea7d46bb3ec7e9"
+          "source_sha256": "62325321910501b223e03ebf2b05c86eeeb03029678129ed98ea7d46bb3ec7e9",
+          "oos_ic_by_symbol": {
+            "AAPL": 0.07604592250581715,
+            "MSFT": 0.0752713916576521
+          }
         },
         "holdout_v18": {
           "sessions": 2,

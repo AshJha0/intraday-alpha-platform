@@ -382,3 +382,228 @@ def render_markdown(res: dict) -> str:
             )
     L += ["", f"Recommendation: **{h1['recommendation']}**.", ""]
     return "\n".join(L)
+
+
+# ---------------------------------------------------------------------------
+# Cross-sectional design (v1.15 multi-symbol plan): N symbols x S sessions.
+# ---------------------------------------------------------------------------
+
+#: Symbols in the in-sample artefacts the session sd is calibrated on.
+REF_SYMBOLS = 3
+MULTI_N = (3, 8, 16)
+MULTI_RHO = (0.2, 0.5, 0.8)
+MULTI_ALPHAS = ("EQ01", "EQ02", "EQ04")
+
+
+def cross_section_var_ratio(n: int, rho: float, n_ref: int = REF_SYMBOLS) -> float:
+    """Variance of an equal-weight N-symbol pooled per-session IC relative to
+    the ``n_ref``-symbol pool, when every symbol's per-session IC deviation
+    has the same variance and pairwise correlation ``rho`` (a common market
+    factor): ``Var_N = sigma_1^2 (rho + (1 - rho) / N)``.  With ``rho = 1``
+    more symbols add nothing; with ``rho = 0`` the variance falls as 1/N."""
+    if not 0.0 <= rho <= 1.0:
+        raise ValueError("rho must be in [0, 1]")
+    if n < 1 or n_ref < 1:
+        raise ValueError("symbol counts must be >= 1")
+    return (rho + (1.0 - rho) / n) / (rho + (1.0 - rho) / n_ref)
+
+
+def multi_symbol_cell(
+    mu: float,
+    sigma_ref: float,
+    se1_ref: float,
+    n_symbols: int,
+    rho: float,
+    sessions: int,
+    thr: float,
+    n_trials: int,
+    n_ref: int = REF_SYMBOLS,
+) -> dict:
+    """Power / MDE of the drafted gate for the pooled IC over ``n_symbols``.
+
+    ``sigma_ref`` and ``se1_ref`` are the per-session sd and the one-session
+    within-session HAC SE measured on the ``n_ref``-symbol pool; both are
+    rescaled by ``sqrt(cross_section_var_ratio)`` (the same ``rho`` is assumed
+    for the between-session and the within-session bucket noise).  ``mu`` is
+    the pooled IC of the N-symbol universe."""
+    f = math.sqrt(cross_section_var_ratio(n_symbols, rho, n_ref))
+    c = _cell(mu, sigma_ref * f, se1_ref * f, sessions, thr, n_trials)
+    c.update({"n_symbols": n_symbols, "rho": rho, "sd_scale": f, "sigma_session": sigma_ref * f})
+    return c
+
+
+def breakeven_rho(
+    mu: float,
+    sigma_ref: float,
+    se1_ref: float,
+    n_symbols: int,
+    sessions: int,
+    thr: float,
+    n_trials: int,
+    power: float = TARGET_POWER,
+) -> float | None:
+    """Largest ``rho`` at which the joint (upper-bound) power at ``n_symbols``
+    reaches ``power``; ``None`` if not even ``rho = 0`` reaches it."""
+
+    def ok(r: float) -> bool:
+        c = multi_symbol_cell(mu, sigma_ref, se1_ref, n_symbols, r, sessions, thr, n_trials)
+        return c["joint_upper"] >= power
+
+    if not ok(0.0):
+        return None
+    if ok(1.0):
+        return 1.0
+    lo, hi = 0.0, 1.0
+    for _ in range(60):
+        mid = 0.5 * (lo + hi)
+        if ok(mid):
+            lo = mid
+        else:
+            hi = mid
+    return lo
+
+
+def symbol_dispersion(ic_by_symbol: dict[str, float]) -> dict:
+    v = list(ic_by_symbol.values())
+    return {
+        "by_symbol": dict(sorted(ic_by_symbol.items())),
+        "mean": sum(v) / len(v),
+        "sd": stdev(v) if len(v) > 1 else float("nan"),
+        "min": min(v),
+        "max": max(v),
+    }
+
+
+def _h4_scales(ins: dict) -> tuple[float, float]:
+    k = (ins["sessions"] - 1) / ins["test_folds"]
+    sigma_s = stdev(ins["fold_ic"]) * math.sqrt(k)
+    se1 = abs(ins["gate_ic"] / ins["gate_t"]) * math.sqrt(ins["sessions"])
+    return sigma_s, se1
+
+
+def analyse_multi_symbol(
+    inputs: dict,
+    gate: dict,
+    alphas: tuple[str, ...] = MULTI_ALPHAS,
+    ns: tuple[int, ...] = MULTI_N,
+    rhos: tuple[float, ...] = MULTI_RHO,
+    sessions: int = TIER1_SESSIONS,
+) -> dict:
+    thr, n_tr = gate["t_threshold"], gate["dsr_n_trials"]
+    out: dict = {
+        "version": R7_POWER_VERSION,
+        "gate": gate,
+        "sessions": sessions,
+        "ref_symbols": REF_SYMBOLS,
+        "ns": list(ns),
+        "rhos": list(rhos),
+        "dsr_mde_sr": dsr_mde_sr(sessions, n_tr),
+        "alphas": {},
+    }
+    for a in alphas:
+        v = inputs["H4"]["alphas"][a]
+        ins = v["insample"]
+        sigma_s, se1 = _h4_scales(ins)
+        disp = ins.get("oos_ic_by_symbol")
+        row: dict = {
+            "horizon": v["horizon"],
+            "sigma_session_ref": sigma_s,
+            "se_hac_1session_ref": se1,
+            "dispersion": symbol_dispersion(disp) if disp else None,
+        }
+        for label, mu in (("insample", ins["gate_ic"]), ("v18_holdout", v["holdout_v18"]["ic"])):
+            cells = [
+                multi_symbol_cell(mu, sigma_s, se1, n, rho, sessions, thr, n_tr)
+                for rho in rhos
+                for n in ns
+            ]
+            row[label] = {
+                "effect": mu,
+                "cells": cells,
+                "breakeven_rho": {
+                    n: breakeven_rho(mu, sigma_s, se1, n, sessions, thr, n_tr) for n in ns
+                },
+                "rho0_max_n": multi_symbol_cell(
+                    mu, sigma_s, se1, max(ns), 0.0, sessions, thr, n_tr
+                ),
+            }
+        out["alphas"][a] = row
+    return out
+
+
+def render_multi_symbol_markdown(res: dict) -> str:
+    g, s, nref = res["gate"], res["sessions"], res["ref_symbols"]
+    L = [
+        "# R7 multi-symbol power (cross-sectional design)",
+        "",
+        "Generated by `tools/r7_power.py --multi-symbol` (`iap.research.r7_power`, "
+        f"version {res['version']}); rerun it, do not edit the tables by hand. Same "
+        "inputs and gate as `R7_POWER.md`; no market data read. The plan and the "
+        "recommendation are in `R7_MULTI_SYMBOL_PLAN.md`.",
+        "",
+        f"Gate: HAC t >= {g['t_threshold']:.3f} AND deflated Sharpe > {DSR_LEVEL} "
+        f"(N = {g['dsr_n_trials']}) on the per-session pooled IC series, S = {s} "
+        f"holdout sessions. On {s} sessions the DSR leg alone needs a per-session "
+        f"Sharpe (mean / sd of the pooled IC) of {res['dsr_mde_sr']:.2f} for 80 % power.",
+        "",
+        "Model: IC of symbol i in session s = mu + c_s + e_is with Var(c_s + e_is) = "
+        "sigma_1^2 and correlation rho across symbols (common market factor). The "
+        "N-symbol pooled per-session series has sd sigma_N = sigma_ref * sqrt((rho + "
+        f"(1-rho)/N) / (rho + (1-rho)/{nref})), calibrated on the measured {nref}-symbol "
+        "(AAPL, MSFT, QQQ) fold sd; the within-session HAC SE is rescaled the same way. "
+        "mu (the pooled IC of the new universe) is set to the 3-symbol value; the "
+        "dispersion table shows how far a single symbol can sit from it.",
+        "",
+        "## Cross-symbol dispersion (in-sample 2019-20, OOS IC per symbol)",
+        "",
+        "| alpha | AAPL | MSFT | QQQ | mean | sd across symbols |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for a, r in res["alphas"].items():
+        d = r["dispersion"]
+        if d is None:
+            continue
+        b = d["by_symbol"]
+        L.append(
+            f"| {a} @{r['horizon']} | "
+            + " | ".join(f"{b.get(k, float('nan')):+.4f}" for k in ("AAPL", "MSFT", "QQQ"))
+            + f" | {d['mean']:+.4f} | {d['sd']:.4f} |"
+        )
+    L += [
+        "",
+        f"## Power and MDE on {s} sessions",
+        "",
+        "| alpha | effect (IC) | rho | N | sd/session | power HAC | power DSR | joint <= "
+        "| MDE joint |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for a, r in res["alphas"].items():
+        for label, tag in (("insample", "in-sample"), ("v18_holdout", "v1.8 decayed")):
+            blk = r[label]
+            for c in blk["cells"]:
+                L.append(
+                    f"| {a} @{r['horizon']} | {tag} {blk['effect']:+.4f} | {c['rho']:.1f} | "
+                    f"{c['n_symbols']} | {c['sigma_session']:.4f} | {_p(c['power_hac'])} | "
+                    f"{_p(c['power_dsr'])} | {_p(c['joint_upper'])} | {c['mde_joint']:.4f} |"
+                )
+    nmax = max(res["ns"])
+    L += [
+        "",
+        "## Break-even rho (largest rho at which joint power reaches 0.80)",
+        "",
+        "| alpha | effect (IC) | "
+        + " | ".join(f"N = {n}" for n in res["ns"])
+        + f" | joint at N = {nmax}, rho = 0 |",
+        "|---|---|" + "---:|" * (len(res["ns"]) + 1),
+    ]
+    for a, r in res["alphas"].items():
+        for label, tag in (("insample", "in-sample"), ("v18_holdout", "v1.8 decayed")):
+            blk = r[label]
+            be = [blk["breakeven_rho"][n] for n in res["ns"]]
+            L.append(
+                f"| {a} @{r['horizon']} | {tag} {blk['effect']:+.4f} | "
+                + " | ".join("never" if x is None else f"{x:.2f}" for x in be)
+                + f" | {_p(blk['rho0_max_n']['joint_upper'])} |"
+            )
+    L.append("")
+    return "\n".join(L)
