@@ -706,9 +706,19 @@ data:
   prereg__v2.json: |
     {
       "x-version": 1,
-      "description": "v2 pre-registration config: realism opt-ins that are OFF in code defaults (v1 numbers unchanged) and ON for v2 preregistered runs. v1.15 X-P1-1 adds the dated SEC Section 31 + FINRA TAF schedule (configs/reference/regulatory_fee_schedule.json); R-P0-2 extends this file with the other realism opt-ins. Read with iap.execution.regulatory.prereg_wants_regulatory_fees and passed as load_exec_config(..., regulatory_fees=True).",
+      "description": "v2 pre-registration config: realism opt-ins that are OFF in code defaults (v1 numbers unchanged) and ON for v2 preregistered runs. v1.15 X-P1-1 adds the dated SEC Section 31 + FINRA TAF schedule (configs/reference/regulatory_fee_schedule.json); R-P0-2 adds execution_realism: the v1.14 execution-realism opt-ins, read with iap.execution.realism.load_prereg (RealismOptIns.maker_config / quoting_config / simulator_kwargs / calibration_kwargs / exec_config_kwargs). Read with iap.execution.regulatory.prereg_wants_regulatory_fees and passed as load_exec_config(..., regulatory_fees=True).",
       "methods": "v2",
-      "regulatory_fees": true
+      "regulatory_fees": true,
+      "execution_realism": {
+        "description": "v1.14 options, OFF in code defaults, ON for v2. feed_latency_ns is an assumed market-data feed leg (real ITCH has exchange timestamps only), not a measurement. modify_queue_credit has no switch (always on since v1.14) and is recorded for completeness.",
+        "modify_queue_credit": true,
+        "feed_latency_ns": 100000,
+        "exit_route": "sim",
+        "flatten_route": "sim",
+        "hidden_print_fills": true,
+        "markout_unit": "touch_order",
+        "amend_size_down": true
+      }
     }
   reference__auction_entry_cutoffs.json: |
     {
