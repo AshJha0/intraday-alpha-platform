@@ -45,7 +45,7 @@ from iap.agents.broker import BrokerError, WriteBroker, sign
 from iap.agents.mcp_server import FREE_TEXT
 from iap.agents.prereg_gate import PreregistrationError, require
 from iap.agents.workflow import Workflow, WorkflowError
-from iap.llm import verify
+from iap.llm import summary_check, verify
 from iap.llm.budget import DEFAULT_MODEL, Budget, BudgetExceeded
 from iap.llm.envfile import redact
 from iap.llm.runners import PLANTED_DATASET, T_THRESHOLD, Runner, verdict
@@ -506,6 +506,8 @@ def run_session(
     log.append("transcript.jsonl", {"t": clock(), "role": "user", "content": task})
     status = "max_turns"
     served_models: set[str] = set()  # resp.model of every call (G-P2-12)
+    tool_log: list[dict[str, Any]] = []
+    closing_text = ""  # the model's last plain-text output
     for turn in range(max_turns):
         try:
             session.budget.check_model_call(model)
@@ -528,6 +530,11 @@ def run_session(
             served_models.add(str(served))
         session.budget.charge(model, resp.usage)
         content = list(resp.content)
+        texts = [
+            str(getattr(b, "text", "") or "") for b in content if getattr(b, "type", None) == "text"
+        ]
+        if any(texts):
+            closing_text = " ".join(t for t in texts if t)
         log.append(
             "transcript.jsonl",
             {
@@ -574,6 +581,7 @@ def run_session(
                     }
                 )
             log.append("tool_log.jsonl", rec)
+            tool_log.append(rec)
         messages.append({"role": "user", "content": results})
         log.append("transcript.jsonl", {"t": clock(), "role": "user", "content": results})
         if session.finished is not None:
@@ -597,5 +605,13 @@ def run_session(
         "rejected_findings": session.rejected,
         "finish_summary": session.finished,
     }
+    # A-P1-4: the closing summary may claim only what the tool log shows
+    closing = " \n ".join(t for t in (session.finished or "", closing_text) if t)
+    check = summary_check.check_summary(closing, tool_log, session.workspace, session.session_id)
+    summary["summary_claims_verified"] = check["summary_claims_verified"]
+    summary["unsupported_claims"] = check["unsupported_claims"]
+    summary["summary_verdict"] = (
+        "verified" if check["summary_claims_verified"] else "unsupported_claims"
+    )
     log.write("session.json", summary)
     return summary
