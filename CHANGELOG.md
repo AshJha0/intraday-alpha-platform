@@ -26,6 +26,7 @@ regenerated statistic is a new look.
 - Per-instrument scaling before pooling (QQQ no longer dominates).
 - Time-shift leakage detector (applicable where the row shift is vacuous).
 - One ledger look per gate decision (2 per experiment, was 84).
+- Parity counts from CI: python 2343 (2041 in `python` + 302 in `python-slow`), +16 (mostly `tests/test_research_stats_v114.py`). FX11 fails the new time-shift leakage detector and stays in RESEARCH (23 CANDIDATE).
 
 ## v1.13.0 — 2026-10-11
 
