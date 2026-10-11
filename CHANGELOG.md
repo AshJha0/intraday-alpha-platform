@@ -141,6 +141,34 @@ number, golden, fixture or report changes.
 - **E-P2-4** no change needed on main: the `load_events` fallback that caught
   `ValueError` lives only on the research branches.
 
+### Execution realism (quality review 2026-10-11, X-* items; Python only)
+
+Defaults, goldens (including the C++-pinned fills golden) and published
+numbers are unchanged except where marked. API_TRADING.md §2.11.
+
+- X-P1-2: SEC Section 31 (`sell_notional_fee_bps`) and FINRA TAF
+  (`per_share_fee_all`, `per_share_fee_cap`, `per_share_fee_sell_only`) in
+  `VenueSpec` (simulator rule 5) and `CostModel`; default 0. Sourced values
+  for 2019 and 2026 in `configs/templates/regulatory_fees.json`.
+- X-P1-4 (research default changed): maker / quoting markout reference is
+  the mid before the first event of the fill's `exchange_ts`. COOKBOOK 39 and
+  40 spread / AS columns moved; fills and net unchanged.
+- X-P1-5 (default changed): `iap.auction` refuses a cross exit at or after
+  the MOC / MOO entry cutoff (dated, cited table in
+  `configs/reference/auction_entry_cutoffs.json`) and prices it as a taker
+  exit; `--no-entry-cutoff` restores the old rule. COOKBOOK 42 updated;
+  REAL_DATA §3.3 carries the caveat on the in-sample `C-300s` +19.4 bp (the
+  recorded numbers are unchanged).
+- X-P1-3: `QuotingConfig.skew_mode="ticks"`, `h_min_ticks`,
+  `inv_skew_ticks`; quoting summary adds `ticks_behind_touch_*` and
+  `frac_decisions_skew_changed_quote`.
+- X-P2-8: passive-exit fill probability from the fill-hazard model at
+  `exit_timeout_ns`, else a TTL-censored calibration cell
+  (`estimate_calibration(fill_within_ns=...)`), else as before.
+- X-P2-13: `estimate_volume_curves(tz="America/New_York")` / `--tz`.
+- X-P2-15: `ac_params_from_calibration(adv_per_day=..., horizon_s=...)`;
+  ambiguous unit combinations are refused.
+
 ## v1.12.0 — 2026-10-10
 
 Honest Sharpe, better passive fills, new features, measured latency and

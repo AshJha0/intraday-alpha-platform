@@ -70,8 +70,42 @@ class VenueSpec:
     commission_per_million: float = 0.0
     latency_mean_ns: int = 0
     latency_jitter_ns: int = 0
+    #: v1.13 opt-in (X-P1-2): SEC Section 31 transaction fee on the NOTIONAL
+    #: of every SELL fill, in bps (``$20.70`` per million = 0.207 bps).
+    #: Default 0 keeps rule 5 byte-identical. Equity venues only.
+    sell_notional_fee_bps: float = 0.0
+    #: v1.13 opt-in (X-P1-2): a per-share fee charged on fills regardless of
+    #: liquidity (FINRA TAF: per share SOLD — see ``per_share_fee_sell_only``).
+    per_share_fee_all: float = 0.0
+    #: cap on ``per_share_fee_all`` per fill (a fill stands in for a "trade";
+    #: FINRA TAF caps per trade). ``0`` = no cap.
+    per_share_fee_cap: float = 0.0
+    #: charge ``per_share_fee_all`` on SELL fills only (FINRA TAF applies to
+    #: covered sales); ``False`` charges both sides.
+    per_share_fee_sell_only: bool = True
+
+    def regulatory_fee(self, side: int, qty: float, notional: float) -> float:
+        """X-P1-2 regulatory fees of one equity fill (0.0 at the defaults).
+
+        ``side`` 0 = buy / 1 = sell; ``notional`` in quote currency.
+        """
+        fee = 0.0
+        if side == 1 and self.sell_notional_fee_bps:
+            fee += self.sell_notional_fee_bps * 1e-4 * notional
+        if self.per_share_fee_all and (side == 1 or not self.per_share_fee_sell_only):
+            per = self.per_share_fee_all * qty
+            if self.per_share_fee_cap > 0.0:
+                per = min(per, self.per_share_fee_cap)
+            fee += per
+        return fee
 
     def __post_init__(self) -> None:
+        if (
+            self.sell_notional_fee_bps < 0
+            or self.per_share_fee_all < 0
+            or self.per_share_fee_cap < 0
+        ):
+            raise ValueError(f"venue {self.venue_id}: regulatory fees must be >= 0")
         if not (0 <= self.venue_id <= 0xFFFF):
             raise ValueError(f"venue_id must be u16, got {self.venue_id}")
         if self.latency_mean_ns < 0 or self.latency_jitter_ns < 0:

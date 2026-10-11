@@ -218,13 +218,14 @@ def test_auction_orientation_is_the_registered_sign_by_default(tmp_path):
     stream = AuctionStream.concat(parts)
     lab = auction_targets(auction_features(stream.noii, "C"), stream.crosses)
     n_thr = len(DEFAULT_THRESHOLDS)
-    fade = walk_forward(lab, AuctionStrategyConfig(decision_s=300, orientation=-1), n_folds=4)
+    # orientation logic only: keep the pre-v1.13 cross exit at 300 s so the
+    # X-P1-5 MOC-cutoff taker repricing does not change what the fit selects
+    cfg = {"decision_s": 300, "orientation": -1, "enforce_entry_cutoff": False}
+    fade = walk_forward(lab, AuctionStrategyConfig(**cfg), n_folds=4)
     assert all(f["orientation"] in (-1, None) for f in fade.folds)
     assert fade.looks_consumed == 4 * n_thr
     assert fade.to_dict()["looks_consumed"] == 4 * n_thr
-    fitted = walk_forward(
-        lab, AuctionStrategyConfig(decision_s=300, orientation=-1), n_folds=4, fit_orientation=True
-    )
+    fitted = walk_forward(lab, AuctionStrategyConfig(**cfg), n_folds=4, fit_orientation=True)
     assert all(f["orientation"] == 1 for f in fitted.folds)
     assert fitted.looks_consumed == 4 * 2 * n_thr
 

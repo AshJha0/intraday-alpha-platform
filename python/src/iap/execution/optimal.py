@@ -56,14 +56,17 @@ class ACParams:
 def ac_params_from_calibration(
     *,
     sigma: float,
-    adv: float,
+    adv: float | None = None,
     price: float,
-    horizon: float = 1.0,
+    horizon: float | None = None,
     risk_aversion: float = 1e-6,
     calibration: ExecCalibration | None = None,
     config: ExecConfig | None = None,
     permanent_fraction: float = 0.0,
     eps: float = 0.0,
+    adv_per_day: float | None = None,
+    horizon_s: float | None = None,
+    session_s: float = 23_400.0,
 ) -> ACParams:
     """Map the simulator's linear impact coefficient to ``eta``.
 
@@ -73,9 +76,40 @@ def ac_params_from_calibration(
     / adv``. ``coeff`` comes from ``calibration`` when it carries an estimated
     slope, else from ``config.impact_coeff_bps_per_pct_adv``, else the
     ``ExecConfig`` default. ``gamma = permanent_fraction * eta``.
+
+    **Units (v1.13, X-P2-15).** ``eta`` scales as ``1 / adv``, so ``adv`` must
+    be in shares per the SAME time unit as ``horizon`` and ``sigma`` (an
+    ``adv`` in shares/day with a horizon in seconds is off by 23,400x).
+    Two forms are accepted, never mixed:
+
+    * legacy: ``adv`` and ``horizon`` in one caller-chosen time unit
+      (``horizon`` defaults to 1);
+    * explicit: ``adv_per_day`` (shares per trading day) and ``horizon_s``
+      (seconds); the time unit is then one trading day of ``session_s``
+      seconds (23,400 = 6.5 h), ``horizon = horizon_s / session_s`` and
+      ``sigma`` must be per sqrt(trading day).
+
+    Anything else (both ``adv`` and ``adv_per_day``, ``horizon_s`` with
+    ``adv`` or with ``horizon``, ``adv_per_day`` without ``horizon_s``, or no
+    ADV) raises ``ValueError``.
     """
     from iap.execution.config import ExecConfig
 
+    if adv_per_day is not None or horizon_s is not None:
+        if adv is not None or horizon is not None:
+            raise ValueError(
+                "ambiguous units: pass either (adv, horizon) in one time unit or "
+                "(adv_per_day, horizon_s), not a mix"
+            )
+        if adv_per_day is None or horizon_s is None:
+            raise ValueError("adv_per_day and horizon_s must be given together")
+        if horizon_s <= 0 or session_s <= 0:
+            raise ValueError("horizon_s and session_s must be > 0")
+        adv, horizon = float(adv_per_day), float(horizon_s) / float(session_s)
+    if adv is None:
+        raise ValueError("adv (or adv_per_day with horizon_s) is required")
+    if horizon is None:
+        horizon = 1.0
     if adv <= 0 or price <= 0:
         raise ValueError("adv and price must be > 0")
     coeff = calibration.impact_coeff_bps_per_pct_adv if calibration is not None else None

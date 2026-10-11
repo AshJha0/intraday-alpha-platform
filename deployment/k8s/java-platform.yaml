@@ -216,6 +216,8 @@ spec:
                 path: mvp/mvp_tiny.json
               - key: mvp__venues.json
                 path: mvp/venues.json
+              - key: reference__auction_entry_cutoffs.json
+                path: reference/auction_entry_cutoffs.json
               - key: reference__event_calendar.json
                 path: reference/event_calendar.json
               - key: risk__risk.json
@@ -226,6 +228,8 @@ spec:
                 path: strategies/lifecycle.json
               - key: strategies__strategies.json
                 path: strategies/strategies.json
+              - key: templates__regulatory_fees.json
+                path: templates/regulatory_fees.json
               - key: venues__venues.json
                 path: venues/venues.json
         - name: data

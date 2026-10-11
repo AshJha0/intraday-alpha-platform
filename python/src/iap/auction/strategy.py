@@ -13,6 +13,18 @@ imbalance, ``-1`` fades it) and exits
 * ``exit="taker"`` - with a taker trade at the last mid before the cross:
   earns ``into_cross_drift_bps``, pays a taker cost on both legs.
 
+**Entry cutoff (v1.13, X-P1-5).** A cross exit needs a market-on-close /
+on-open order, which Nasdaq accepts only before its entry cutoff (closing:
+15:55 ET since October 2018, i.e. 300 s before the cross; opening: 09:28 ET,
+120 s; dated table :data:`DEFAULT_ENTRY_CUTOFFS`, mirrored in
+``configs/reference/auction_entry_cutoffs.json`` with sources). With
+``enforce_entry_cutoff=True`` (the default) a decision row at
+``time_to_cross_s <= cutoff_s`` cannot exit in the cross, so ``exit="cross"``
+falls back to ``exit="taker"`` pricing for that row (column ``exit_used``),
+whatever the orientation (imbalance-only orders after the cutoff are not
+modelled). ``enforce_entry_cutoff=False`` reproduces the pre-v1.13 rule (the
+recorded AUC01 run, which used ``decision_s=300`` with a cross exit).
+
 Taker legs are priced with :meth:`iap.backtest.costs.CostModel.cost_components`
 (spread + fee + impact, with the model's multiplier).  The half-spread is
 the label frame's ``half_spread_t`` when known, else
@@ -29,8 +41,10 @@ out-of-sample daily net P&L.
 
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import asdict, dataclass, field, replace
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -44,6 +58,43 @@ EXITS = ("cross", "taker")
 NS_S = 1_000_000_000
 #: Threshold grid the walk-forward fits over (pinned).
 DEFAULT_THRESHOLDS = (0.05, 0.1, 0.2, 0.3, 0.5)
+#: Nasdaq entry cutoffs for the cross-exit order, seconds before the cross:
+#: ``{cross_type: ((valid_from ISO date, cutoff_s), ...)}`` ascending by date.
+#: Mirrors ``configs/reference/auction_entry_cutoffs.json`` (sources there).
+DEFAULT_ENTRY_CUTOFFS: dict[str, tuple[tuple[str, float], ...]] = {
+    "C": (("1900-01-01", 600.0), ("2018-10-01", 300.0)),
+    "O": (("1900-01-01", 120.0),),
+}
+
+
+def load_entry_cutoffs(path) -> dict[str, tuple[tuple[str, float], ...]]:
+    """Read ``configs/reference/auction_entry_cutoffs.json`` into the
+    :data:`DEFAULT_ENTRY_CUTOFFS` shape."""
+    doc = json.loads(Path(path).read_text(encoding="utf-8"))
+    out: dict[str, list[tuple[str, float]]] = {}
+    for row in doc["cutoffs"]:
+        out.setdefault(str(row["cross_type"]), []).append(
+            (str(row["valid_from"]), float(row["cutoff_s"]))
+        )
+    return {k: tuple(sorted(v)) for k, v in out.items()}
+
+
+def entry_cutoff_s(
+    cross_type: str,
+    date: str,
+    table: dict[str, tuple[tuple[str, float], ...]] | None = None,
+) -> float:
+    """Seconds before the cross after which a cross-exit order is refused."""
+    rows = (table or DEFAULT_ENTRY_CUTOFFS).get(cross_type)
+    if not rows:
+        raise ValueError(f"no entry cutoff for cross_type {cross_type!r}")
+    out = None
+    for valid_from, cut in rows:
+        if valid_from <= str(date)[:10]:
+            out = cut
+    if out is None:
+        raise ValueError(f"no entry cutoff for {cross_type!r} on {date}")
+    return out
 
 
 @dataclass(frozen=True)
@@ -57,6 +108,11 @@ class AuctionStrategyConfig:
     adv_shares: float = 5_000_000.0
     default_half_spread_bps: float = 1.0
     cross_fee_per_share: float = 0.0010
+    #: v1.13 (X-P1-5): refuse a cross exit at/after the dated entry cutoff
+    #: (falls back to taker pricing per row); False = pre-v1.13 rule
+    enforce_entry_cutoff: bool = True
+    #: override of the dated cutoff, seconds before the cross (None = table)
+    entry_cutoff_s: float | None = None
 
     def __post_init__(self) -> None:
         if self.exit not in EXITS:
@@ -141,21 +197,34 @@ def _trade_frame(
     hs = dec["half_spread_t"].to_numpy(float)
     hs = np.where(np.isfinite(hs) & (hs >= 0), hs, mid * cfg.default_half_spread_bps * 1e-4)
     entry = _taker_bps(cm, cfg.qty, mid, hs, cfg.adv_shares)
-    if cfg.exit == "cross":
-        gross_long = dec["cross_vs_mid_bps"].to_numpy(float)
+    use_cross = np.full(mid.shape, cfg.exit == "cross")
+    if cfg.exit == "cross" and cfg.enforce_entry_cutoff and len(dec):
+        ttc = dec["time_to_cross_s"].to_numpy(float)
+        if cfg.entry_cutoff_s is not None:
+            cut = np.full(mid.shape, float(cfg.entry_cutoff_s))
+        else:
+            cut = np.array([entry_cutoff_s(cfg.cross_type, d) for d in dec["date"]], dtype=float)
+        use_cross = ttc > cut
+    gross_long = np.full(mid.shape, np.nan)
+    exit_bps = np.full(mid.shape, np.nan)
+    if use_cross.any():
         with np.errstate(divide="ignore", invalid="ignore"):
-            exit_bps = 1e4 * cm.multiplier * cfg.cross_fee_per_share / mid
-    else:
-        gross_long = dec["into_cross_drift_bps"].to_numpy(float)
+            gross_long[use_cross] = dec["cross_vs_mid_bps"].to_numpy(float)[use_cross]
+            exit_bps[use_cross] = (1e4 * cm.multiplier * cfg.cross_fee_per_share / mid)[use_cross]
+    tk = ~use_cross
+    if tk.any():
         pre = dec["mid_pre_cross"].to_numpy(float)
-        hs_pre = hs / mid * pre
-        exit_bps = _taker_bps(cm, cfg.qty, pre, hs_pre, cfg.adv_shares)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            hs_pre = hs / mid * pre
+            gross_long[tk] = dec["into_cross_drift_bps"].to_numpy(float)[tk]
+            exit_bps[tk] = _taker_bps(cm, cfg.qty, pre, hs_pre, cfg.adv_shares)[tk]
     cost = entry + exit_bps
     valid = np.isfinite(mid) & (mid > 0) & np.isfinite(gross_long) & np.isfinite(cost)
     frame = dec[["date", "symbol", "cross_type", "ts", "imbalance_ratio"]].copy()
     frame["mid_t"] = mid
     frame["gross_long_bps"] = gross_long
     frame["cost_bps"] = cost
+    frame["exit_used"] = np.where(use_cross, "cross", "taker")
     return frame, valid
 
 

@@ -708,6 +708,57 @@ minimum earned markout). Then `stand_down` posts nothing for `cooldown_ns`
 feedback=...)` applies both to two-sided quoting (stand-down pulls both
 quotes). COOKBOOK recipe 61.
 
+### 2.11 Execution realism (v1.13.0, Python only; quality review X-*)
+
+Every item is opt-in or default-off unless marked; the execution goldens
+(including the C++-pinned fills golden) are unchanged.
+
+- **Regulatory fees (X-P1-2).** `VenueSpec` gains `sell_notional_fee_bps`
+  (SEC Section 31, on the notional of SELL fills), `per_share_fee_all`,
+  `per_share_fee_cap` (per fill, standing in for FINRA TAF's per-trade cap)
+  and `per_share_fee_sell_only` (default `True`); all fees default 0 and are
+  read from optional venue-row keys by `load_venues`. Simulator rule 5 adds
+  them to equity fills; at the defaults the rule-5 arithmetic is not touched.
+  `CostModel` has the same four fields (`with_regulatory_fees(...)`), charged
+  in `cost_components` on rows with `qty < 0` and, per leg on average, in
+  `round_trip_cost_return`. Documented values with sources (2019: $20.70 per
+  million = 0.207 bp and TAF $0.000119/share capped at $5.95; 2026: $20.60
+  per million from 2026-04-04 and TAF $0.000195 capped at $9.79) are in
+  `configs/templates/regulatory_fees.json`; no shipped config sets them.
+- **Markout reference (X-P1-4, default changed, research paths only).** The
+  maker and quoting backtesters measure a MAKER fill's adverse selection
+  from the mid before the FIRST event of its `exchange_ts`, the rule of
+  `tca/markout.py` and `calibration.estimate_calibration`. This moves the
+  spread / AS (markout) columns, not fills or net P&L (COOKBOOK 39, 40).
+- **Auction entry cutoff (X-P1-5, default changed).**
+  `AuctionStrategyConfig(enforce_entry_cutoff=True)`: `exit="cross"` only
+  for decision rows with `time_to_cross_s > cutoff` (closing 300 s since
+  October 2018, opening 120 s; `strategy.DEFAULT_ENTRY_CUTOFFS`, mirrored by
+  `configs/reference/auction_entry_cutoffs.json`); other rows are priced as
+  a taker exit (`exit_used`). `enforce_entry_cutoff=False` / CLI
+  `--no-entry-cutoff` is the pre-v1.13 rule. `entry_cutoff_s=` overrides.
+- **Quoting in ticks (X-P1-3).** `QuotingConfig(skew_mode="ticks",
+  h_min_ticks=..., inv_skew_ticks=...)` (rule 8): quotes anchored on the
+  touch, `skew_ticks = round(alpha_weight * er * mid / tick)`, inventory skew
+  in ticks. `skew_mode="as_dollars"` (default) is rule 2; `h_min_ticks` then
+  only adds a floor. The summary always reports
+  `ticks_behind_touch_{mean,median,max}` and
+  `frac_decisions_skew_changed_quote`.
+- **Passive-exit probability (X-P2-8).** With `passive_exit_fill_prob=None`
+  the maker gate uses `fill_hazard.p_fill_within(x, exit_timeout_ns)` for
+  the exit side when a `FillHazardModel` is given, else the calibration's
+  TTL-censored `fill_rates.all.p_fill_within[str(exit_timeout_ns)]` cell
+  (written only by `estimate_calibration(..., fill_within_ns=(...))`), else
+  the old `p_any_fill`, else 0.5.
+- **Volume-curve sessions (X-P2-13).** `estimate_volume_curves(...,
+  tz="America/New_York")` (CLI `--tz`) bins the session in exchange-local
+  time via `zoneinfo` (default session 09:30-16:00 local), following DST.
+  `tz=None` is the UTC-fixed v1.10 rule.
+- **A-C units (X-P2-15).** `ac_params_from_calibration(adv_per_day=...,
+  horizon_s=..., session_s=23_400)` makes the time unit a trading day;
+  mixing it with `adv` / `horizon` or omitting either raises `ValueError`.
+  The legacy `(adv, horizon)` call is unchanged.
+
 ## 3. Where the rules live
 
 | rule set | normative text | Python port entry |

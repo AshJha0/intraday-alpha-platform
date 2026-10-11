@@ -1,0 +1,28 @@
+{
+  "x-version": 1,
+  "description": "Nasdaq cross order-entry cutoffs (v1.13, X-P1-5), as seconds BEFORE the cross. A market-on-close / on-open order (the AUC01 exit=\"cross\" leg) is only accepted while time_to_cross_s > cutoff_s. Rows are dated: the row with the latest valid_from <= the session date applies. iap.auction.strategy.DEFAULT_ENTRY_CUTOFFS mirrors this file (a test pins the two equal).",
+  "venue": "XNAS",
+  "cutoffs": [
+    {
+      "cross_type": "C",
+      "valid_from": "1900-01-01",
+      "cutoff_et": "15:50:00",
+      "cutoff_s": 600,
+      "source": "Pre-October-2018 rule: MOC/LOC cutoff and NOII start 3:50 p.m. ET, as described in SEC Release 34-85292 (https://www.sec.gov/files/rules/sro/nasdaq/2019/34-85292.pdf)"
+    },
+    {
+      "cross_type": "C",
+      "valid_from": "2018-10-01",
+      "cutoff_et": "15:55:00",
+      "cutoff_s": 300,
+      "source": "SEC Release 34-85292 (https://www.sec.gov/files/rules/sro/nasdaq/2019/34-85292.pdf): in October 2018 Nasdaq moved the Closing Cross cutoff (MOC entry) and NOII start to 3:55 p.m. ET; Nasdaq Closing Cross FAQ (https://www.nasdaqtrader.com/content/productsservices/Trading/ClosingCrossfaq.pdf): MOC accepted until 3:55 p.m. ET"
+    },
+    {
+      "cross_type": "O",
+      "valid_from": "1900-01-01",
+      "cutoff_et": "09:28:00",
+      "cutoff_s": 120,
+      "source": "Nasdaq Opening/Closing Cross quick guide (https://www.nasdaqtrader.com/content/technicalsupport/specifications/TradingProducts/openclosequickguide.pdf): MOO/LOO orders accepted until 9:28 a.m. ET"
+    }
+  ]
+}
