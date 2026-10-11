@@ -1504,3 +1504,12 @@ The v1.13 feature store is rebuilt exactly by
 `python -m iap.features --same-ts per_event --label-freshness whole_day
 --cross-prints omit` (`python/tests/test_legacy_methods.py` does so to keep
 reproducing the v1.4.0 alpha reports byte for byte).
+
+**Golden tolerance, one residue rule.** Feature goldens compare at
+abs 1e-9 + rel 1e-9. One documented exception, shared by the snapshot-burst
+checks, the pyo3 parity test and (since v1.14) the `expected_features.json`
+checkpoint comparisons of the Rust, C++ and Java ports: when the golden
+`rvol_w1m_v1` is <= 1e-9 (or invalid), `vol_regime_ratio_v1` is compared at
+an extra `1e-9 / (rvol_w5m + 1e-12)` — a zero 1-minute volatility leaves
+~1e-12 of float residue in one engine and an exact 0 in another, and the
+division amplifies it (coalesced FX checkpoint 800: 7.8e-8 vs 0).
