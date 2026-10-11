@@ -119,9 +119,11 @@ pub fn group_ends(events: &[MarketEvent]) -> Vec<bool> {
     let mut out = vec![true; events.len()];
     let mut next: BTreeMap<u32, i64> = BTreeMap::new();
     for (i, ev) in events.iter().enumerate().rev() {
-        out[i] = next
-            .get(&ev.instrument_id)
-            .is_none_or(|&ts| ts != ev.exchange_ts);
+        // `Option::is_none_or` needs Rust 1.82; MSRV is 1.75.
+        out[i] = match next.get(&ev.instrument_id) {
+            Some(&ts) => ts != ev.exchange_ts,
+            None => true,
+        };
         next.insert(ev.instrument_id, ev.exchange_ts);
     }
     out
