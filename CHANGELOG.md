@@ -15,6 +15,8 @@ engines, pinned by the regenerated risk goldens and the differential-fuzz
 corpus (PLATFORM_CONVENTIONS.md §11.1; schemas/MIGRATIONS.md lists every
 golden that moved). No existing golden decision, rule id or reason changed.
 
+Parity counts from CI (v1.14 risk branch): python 2331 (2029 in `python` + 302 in `python-slow`) / cpp 302 / rust 362 / java 575, golden 193 / 72 / 71 / 124.
+
 - **G-P0-1 tamper-evident audit.** Every `RiskEvent` carries `seq` and
   `prev_sha256` (SHA-256 of the previous JSONL line): the audit log is a hash
   chain (`risk_event.schema.json` x-version 2). `audit_chain_head()` is the

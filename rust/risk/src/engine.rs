@@ -12,11 +12,12 @@
 //! 13. `FAT_FINGER_NOTIONAL`  14. `PRICE_BAND`  15. `RATE_THROTTLE`
 //! 16. `SELF_MATCH`  17. `POSITION_LIMIT`  18. `INSTRUMENT_NOTIONAL`
 //! 19. `GROSS_NOTIONAL`  20. `NET_NOTIONAL`  21. `DAILY_LOSS`
-//! 22. `STRATEGY_LOSS`, then the SEC 15c3-5 set (each off unless its
-//! `pre_trade` key is configured): 23. `RESTRICTED_INSTRUMENT`
-//! 24. `MAX_OPEN_ORDERS`  25. `MAX_OPEN_NOTIONAL`  26. `STRATEGY_POSITION`
-//! 27. `PARTICIPATION`  28. `CANCEL_RATE`  29. `VENUE_MESSAGE_RATE`
-//! — else `ALLOW`. Check 7 also rejects `STATE_CAPACITY` when a bounded
+//! 22. `STRATEGY_LOSS`  23. `RESTRICTED_INSTRUMENT`  24. `MAX_OPEN_ORDERS`
+//! 25. `MAX_OPEN_NOTIONAL`  26. `STRATEGY_POSITION`  27. `PARTICIPATION`
+//! 28. `CANCEL_RATE`  29. `VENUE_MESSAGE_RATE` — else `ALLOW`.
+//!
+//! Checks 23-29 are the SEC 15c3-5 set, each off unless its `pre_trade` key
+//! is configured. Check 7 also rejects `STATE_CAPACITY` when a bounded
 //! state map is full (`pre_trade.max_tracked_keys`).
 //!
 //! Audit chain (G-P0-1): every record carries `seq` and `prev_sha256`

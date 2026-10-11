@@ -223,8 +223,8 @@ public class RiskGoldenTest {
         assertEquals(nOrders + nNotif, a.lines().count());
         a.lines().forEach(line -> {
             Map<String, Object> ev = Json.object(Json.parse(line));
-            assertEquals(List.of("decision", "reason", "rule_id", "scope",
-                    "scope_id", "severity", "timestamp"),
+            assertEquals(List.of("decision", "prev_sha256", "reason", "rule_id", "scope",
+                    "scope_id", "seq", "severity", "timestamp"),
                     List.copyOf(ev.keySet()));
         });
     }
