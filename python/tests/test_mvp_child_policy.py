@@ -18,6 +18,10 @@ from iap.mvp.feed import generate_feed
 from iap.mvp.session import run_session
 from iap.tca.markout import build_gated_timeline
 
+# E-P2-7: one of the slowest test files (CI --durations); run by the
+# python-slow CI job, deselected from the PR python job (-m 'not slow').
+pytestmark = pytest.mark.slow
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "python" / "tools"))
 TINY_CONFIG = REPO_ROOT / "configs" / "mvp" / "mvp_tiny.json"

@@ -39,11 +39,8 @@ import com.iap.monitoring.Gauge;
 import com.iap.monitoring.Histogram;
 import com.iap.monitoring.MetricsRegistry;
 import com.iap.orderbook.OrderBook;
-import com.iap.portfolio.Constraints;
 import com.iap.portfolio.EwmaCovariance;
 import com.iap.portfolio.PgdResult;
-import com.iap.portfolio.PortfolioOptimizer;
-import com.iap.portfolio.SolverParams;
 import com.iap.risk.OrderRequest;
 import com.iap.risk.RiskDecision;
 import com.iap.risk.RiskEngine;
@@ -519,7 +516,7 @@ public final class PaperTrading {
             risk = RiskEngine.fromConfig(cfg.riskDoc(), cfg.riskInstruments(),
                     reg);
         }
-        exportRiskLimits(reg, limits);
+        PaperTradingMetrics.exportRiskLimits(reg, limits);
 
         // portfolio sizing state (1-minute bars -> EWMA variance -> weight)
         final class Sizing {
@@ -536,7 +533,7 @@ public final class PaperTrading {
                 (double) risk.position(opts.instrumentId) / opts.maxPos;
         BacktestEngine[] engineHolder = new BacktestEngine[1];
         PaperTraces[] tracesHolder = new PaperTraces[1];
-        final String portfolioVersion = sizingProblemVersion(opts.maxPos);
+        final String portfolioVersion = PaperTradingSizer.sizingProblemVersion(opts.maxPos);
         final String featureVersion = PaperTraces.engineFeatureVersion();
 
         // Adaptability monitoring (spec §20 step 13 / API_ADAPTIVE.md):
@@ -628,7 +625,7 @@ public final class PaperTrading {
                         }
                         sizing.lastMid = sizing.barMid;
                         if (sizing.barReturns.size() >= 22) {
-                            sizing.lastSolve = solveWeight(sizing.barReturns,
+                            sizing.lastSolve = PaperTradingSizer.solveWeight(sizing.barReturns,
                                     sig.expectedReturn(), sizing.positionWeight);
                             sizing.weightScale = sizing.lastSolve.feasible()
                                     ? Math.min(Math.abs(sizing.lastSolve.weights()[0]), 1.0)
@@ -674,7 +671,7 @@ public final class PaperTrading {
                 .withRouting(exec, cfg.sorOptions(), engineHolder);
         wiring.riskOrderSeq = st.riskOrderSeq;
         double unit = exec.instrument(opts.instrumentId).qtyUnit();
-        ExecMetrics execMetrics = new ExecMetrics(wiring, reg, engineHolder,
+        PaperTradingMetrics.ExecMetrics execMetrics = new PaperTradingMetrics.ExecMetrics(wiring, reg, engineHolder,
                 exec);
         PaperTraces traces = new PaperTraces(traceSink, execMetrics, exec,
                 cfg.sorOptions(), opts.instrumentId, opts.alphaId, dataVersion,
@@ -779,7 +776,7 @@ public final class PaperTrading {
             Runtime.getRuntime().addShutdownHook(hook0);
             res.state = SessionState.RUNNING;
             gSessionState.set(SessionState.RUNNING.code());
-            markSessionExit(store, SessionState.RUNNING, progress[0]);
+            PaperTradingSession.markSessionExit(store, SessionState.RUNNING, progress[0]);
             // Between pacing slices the idle loop still applies admin
             // commands, so a kill is recorded while the feed is quiet.
             Runnable idle = () -> {
@@ -840,7 +837,7 @@ public final class PaperTrading {
                 // Sequence gaps / duplicates are exported on EVERY event
                 // (§12.6): max_sequence_gap_before_halt = 1, so a single gap
                 // must be visible on the very next scrape.
-                sampleBookHealth(cGaps, cDups, gStale, engine, opts.instrumentId,
+                PaperTradingMetrics.sampleBookHealth(cGaps, cDups, gStale, engine, opts.instrumentId,
                         bookHealth);
                 if (opts.checkpointEveryEvents > 0
                         && progress[0] % opts.checkpointEveryEvents == 0) {
@@ -849,8 +846,8 @@ public final class PaperTrading {
                     st.riskOrderSeq = wiring.riskOrderSeq;
                     st.fillCount = execMetrics.fills();
                     st.ordersSubmitted = execMetrics.submitted();
-                    bookPnl(st, engine, basePnl, baseGross);
-                    auditCursor[0] = checkpoint(store, risk, st,
+                    PaperTradingSession.bookPnl(st, engine, basePnl, baseGross);
+                    auditCursor[0] = PaperTradingSession.checkpoint(store, risk, st,
                             auditBase, auditCursor[0], equityPeak[0], traceSink);
                 }
             }
@@ -863,8 +860,8 @@ public final class PaperTrading {
                 st.fillCount = execMetrics.fills();
                 st.ordersSubmitted = execMetrics.submitted();
                 st.configSha256 = res.configSha256;
-                bookPnl(st, engine, basePnl, baseGross);
-                auditCursor[0] = checkpoint(store, risk, st, auditBase,
+                PaperTradingSession.bookPnl(st, engine, basePnl, baseGross);
+                auditCursor[0] = PaperTradingSession.checkpoint(store, risk, st, auditBase,
                         auditCursor[0], equityPeak[0], traceSink);
                 res.eventsProcessed = progress[0];
                 res.fillCount = st.fillCount;
@@ -880,12 +877,12 @@ public final class PaperTrading {
                 res.traceCount = traceSink.count();
                 res.state = SessionState.STOPPED;
                 gSessionState.set(SessionState.STOPPED.code());
-                markSessionExit(store, SessionState.STOPPED, progress[0]);
+                PaperTradingSession.markSessionExit(store, SessionState.STOPPED, progress[0]);
                 return res;
             }
             BacktestEngine.Summary summary = engine.finish();
             traces.finish();
-            sampleBookHealth(cGaps, cDups, gStale, engine, opts.instrumentId,
+            PaperTradingMetrics.sampleBookHealth(cGaps, cDups, gStale, engine, opts.instrumentId,
                     bookHealth);
             gc.sample();
             res.eventsProcessed = progress[0];
@@ -932,14 +929,14 @@ public final class PaperTrading {
             st.fillCount = res.fillCount;
             st.ordersSubmitted = res.ordersSubmitted;
             st.configSha256 = res.configSha256;
-            checkpoint(store, risk, st, auditBase, auditCursor[0],
+            PaperTradingSession.checkpoint(store, risk, st, auditBase, auditCursor[0],
                     equityPeak[0], traceSink);
             res.traceDigest = traceSink.digest().hexDigest();
             res.traceCount = traceSink.count();
             res.state = SessionState.FINISHED;
             gSessionState.set(SessionState.FINISHED.code());
-            markSessionExit(store, SessionState.FINISHED, progress[0]);
-            res.reportJson = reportJson(res, opts, reg, store);
+            PaperTradingSession.markSessionExit(store, SessionState.FINISHED, progress[0]);
+            res.reportJson = PaperTradingReports.reportJson(res, opts, reg, store);
             if (opts.reportPath != null) {
                 Files.createDirectories(
                         opts.reportPath.toAbsolutePath().getParent());
@@ -950,7 +947,7 @@ public final class PaperTrading {
             res.state = SessionState.FAILED;
             res.failureReason = String.valueOf(e.getMessage());
             gSessionState.set(SessionState.FAILED.code());
-            markSessionExit(store, SessionState.FAILED, progress[0]);
+            PaperTradingSession.markSessionExit(store, SessionState.FAILED, progress[0]);
             throw e;
         } finally {
             loopExited.countDown();
@@ -967,70 +964,6 @@ public final class PaperTrading {
             }
         }
         return res;
-    }
-
-    /**
-     * Record how the session left the state directory
-     * ({@link SessionStore#SESSION_EXIT}) for an exporter that outlives this
-     * process (PLATFORM_CONVENTIONS.md §12.3). Called on the trading thread
-     * AFTER the checkpoint it describes is committed, so it can never weaken
-     * the checkpoint. Best effort: a failure to write the marker is reported
-     * on stderr and never changes the session's outcome.
-     */
-    private static void markSessionExit(SessionStore store, SessionState state,
-            long eventCursor) {
-        try {
-            store.writeSessionExit(state.label().toUpperCase(Locale.ROOT),
-                    state.code(), eventCursor,
-                    System.currentTimeMillis() / 1000L);
-        } catch (RuntimeException e) {
-            System.err.println("session marker not written: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Persist one checkpoint (§12.3). Called ONLY on the trading thread. The
-     * audit and trace lines are appended first; the risk snapshot and
-     * {@code session_state.json} are then committed as one unit by
-     * {@link SessionStore#commitCheckpoint}: the state file is the single
-     * commit point and records the snapshot's sha256, so a crash at any
-     * instant leaves either the previous or the new (cursor, risk state)
-     * pair — never a cursor beside a risk snapshot of another instant.
-     *
-     * @return the new audit-line cursor
-     */
-    private static long checkpoint(SessionStore store, RiskEngine risk,
-            SessionStore.State st, long auditBase, long auditCursor,
-            double equityPeak, JsonlTraceSink traces) {
-        List<RiskEvent> audit = risk.audit();
-        StringBuilder sb = new StringBuilder(256);
-        for (int i = (int) auditCursor; i < audit.size(); i++) {
-            sb.append(audit.get(i).toJsonLine()).append('\n');
-        }
-        store.appendJsonl(SessionStore.RISK_AUDIT, sb.toString());
-        st.auditLines = auditBase + audit.size();
-        traces.flush();
-        st.traceLines = traces.count();
-        st.equityPeak = equityPeak;
-        store.commitCheckpoint(st, risk.snapshot());
-        return audit.size();
-    }
-
-    /**
-     * Session-cumulative P&amp;L for a checkpoint taken mid-session: the
-     * carried-in bases plus this leg's live account totals (the same sums
-     * {@code BacktestEngine.finish} reports at the end).
-     */
-    private static void bookPnl(SessionStore.State st, BacktestEngine engine,
-            double basePnl, double baseGross) {
-        double total = 0.0;
-        double gross = 0.0;
-        for (BacktestEngine.Account a : engine.accounts().values()) {
-            total += a.pnlReporting;
-            gross += a.grossPnl;
-        }
-        st.totalPnl = basePnl + total;
-        st.grossPnl = baseGross + gross;
     }
 
     /**
@@ -1125,18 +1058,6 @@ public final class PaperTrading {
                 + " working child orders; new orders are stopped";
     }
 
-    /** Export the live risk limits as gauges so alerts never hard-code them. */
-    private static void exportRiskLimits(MetricsRegistry reg, RiskLimits l) {
-        reg.gauge(MetricsRegistry.labeled("risk_limit", "limit",
-                "max_daily_loss")).set(l.maxDailyLoss());
-        reg.gauge(MetricsRegistry.labeled("risk_limit", "limit",
-                "max_strategy_daily_loss")).set(l.strategyMaxDailyLoss());
-        reg.gauge(MetricsRegistry.labeled("risk_limit", "limit",
-                "max_gross_notional")).set(l.maxGrossNotional());
-        reg.gauge(MetricsRegistry.labeled("risk_limit", "limit",
-                "max_net_notional")).set(l.maxNetNotional());
-    }
-
     // ------------------------------------------------------------- probes --
 
     /**
@@ -1149,7 +1070,7 @@ public final class PaperTrading {
         SessionState state = res.state;
         if (state == SessionState.FAILED) {
             return new MetricsServer.HttpResult(503,
-                    "{\"reason\":\"" + esc(res.failureReason)
+                    "{\"reason\":\"" + PaperTradingReports.esc(res.failureReason)
                             + "\",\"status\":\"failed\"}");
         }
         if (state == SessionState.RUNNING && res.eventsPending > 0
@@ -1433,84 +1354,6 @@ public final class PaperTrading {
     }
 
     /**
-     * Execution observability decorator (PLATFORM_CONVENTIONS.md §12.6):
-     * delegates every callback to the pinned {@link RiskWiring} unchanged and
-     * additionally exports the platform's OWN execution counters —
-     * {@code exec_orders_submitted_total}, {@code exec_fills_total} and the
-     * {@code exec_slippage_bps} histogram (|fill − mark| in basis points,
-     * integer-scaled ×100). These replace the venue simulator's counters,
-     * which described a component the deployment never ran.
-     */
-    static final class ExecMetrics implements BacktestEngine.ExecutionListener {
-        private final RiskWiring inner;
-        private final Counter submitted;
-        private final Counter fills;
-        private final Histogram slippage;
-        private final BacktestEngine[] engineHolder;
-        private final ExecConfig exec;
-
-        ExecMetrics(RiskWiring inner, MetricsRegistry reg,
-                BacktestEngine[] engineHolder, ExecConfig exec) {
-            this.inner = inner;
-            this.submitted = reg.counter("exec_orders_submitted_total");
-            this.fills = reg.counter("exec_fills_total");
-            this.slippage = reg.histogram("exec_slippage_bps");
-            this.engineHolder = engineHolder;
-            this.exec = exec;
-            reg.counter("exec_child_orders_rejected_total");
-        }
-
-        /** Seed the counters of a resumed session (§12.3). */
-        void counters(long ordersSubmitted, long fillCount) {
-            submitted.add(ordersSubmitted);
-            fills.add(fillCount);
-        }
-
-        long submitted() {
-            return submitted.get();
-        }
-
-        long fills() {
-            return fills.get();
-        }
-
-        @Override
-        public void onFill(Fill f) {
-            inner.onFill(f);
-            fills.inc();
-            BacktestEngine eng = engineHolder[0];
-            if (eng == null) {
-                return;
-            }
-            BacktestEngine.Account a = eng.accounts().get(f.instrumentId());
-            if (a == null || !a.markValid || a.mark <= 0.0) {
-                return;
-            }
-            double price = (double) f.priceTicks()
-                    * exec.instrument(f.instrumentId()).tickSize();
-            double bps = Math.abs(price - a.mark) / a.mark * 10_000.0;
-            slippage.record(Math.round(bps * 100.0));
-        }
-
-        @Override
-        public void onOrderSubmitted(com.iap.execution.ChildOrder o) {
-            inner.onOrderSubmitted(o);
-            submitted.inc();
-        }
-
-        @Override
-        public void onOrderTerminal(com.iap.execution.ChildOrder o) {
-            inner.onOrderTerminal(o);
-        }
-
-        @Override
-        public void onMarket(MarketEvent ev,
-                com.iap.orderbook.ConsolidatedBook book) {
-            inner.onMarket(ev, book);
-        }
-    }
-
-    /**
      * FX converter for the backtest accounts: the rate of a quote currency
      * is the consolidated mid of the conversion pair named in
      * configs/risk/risk.json {@code currency.conversion}, read from the
@@ -1545,89 +1388,6 @@ public final class PaperTrading {
     }
 
     /**
-     * Single-asset portfolio solve: |weight| in [0, 1] from EWMA variance.
-     * An infeasible problem (API_PORTFOLIO_TCA.md §1.3) holds the previous
-     * weight scale: the optimizer returns w_prev with {@code feasible ==
-     * false} and the caller must not act on it.
-     */
-    private static PgdResult solveWeight(List<Double> barReturns,
-            double expectedReturn, double positionWeight) {
-        double[][] rets = new double[barReturns.size()][1];
-        for (int i = 0; i < barReturns.size(); i++) {
-            rets[i][0] = barReturns.get(i);
-        }
-        double[][] sigma = EwmaCovariance.estimate(rets);
-        Constraints cons = new Constraints(new double[] {-1.0},
-                new double[] {1.0});
-        cons.participation = new double[] {SIZING_PARTICIPATION};
-        cons.volTarget = SIZING_VOL_TARGET;
-        return PortfolioOptimizer.solve(
-                new double[] {expectedReturn}, sigma,
-                new double[] {positionWeight}, SIZING_RISK_AVERSION,
-                new double[] {SIZING_COST_BPS}, cons,
-                new SolverParams(null, SIZING_STEP_DECAY, SIZING_ITERS,
-                        SIZING_PROJ_PASSES, SIZING_FEAS_TOL));
-    }
-
-    // The pinned single-asset sizing problem (PLATFORM_CONVENTIONS.md §12,
-    // "Portfolio sizing"); its content hash is the traces' portfolio_version.
-    private static final double SIZING_PARTICIPATION = 0.5;
-    private static final double SIZING_VOL_TARGET = 5e-4; // per-bar vol target
-    private static final double SIZING_RISK_AVERSION = 6.0;
-    private static final double SIZING_COST_BPS = 1e-4;
-    // Named after the SolverParams components they feed (eta0 is auto):
-    // stepDecay, iters, projPasses — not a step size / patience.
-    private static final double SIZING_STEP_DECAY = 0.01;
-    private static final int SIZING_ITERS = 100;
-    private static final int SIZING_PROJ_PASSES = 4;
-    private static final double SIZING_FEAS_TOL = 1e-7;
-
-    /** {@code portfolio_version}: content hash of the sizing problem (constraints + solver). */
-    static String sizingProblemVersion(long maxPos) {
-        Map<String, Object> problem = new TreeMap<>();
-        problem.put("box", List.of(-1.0, 1.0));
-        problem.put("participation", SIZING_PARTICIPATION);
-        problem.put("vol_target", SIZING_VOL_TARGET);
-        problem.put("risk_aversion", SIZING_RISK_AVERSION);
-        problem.put("cost_bps", SIZING_COST_BPS);
-        problem.put("step_decay", SIZING_STEP_DECAY);
-        problem.put("iters", (long) SIZING_ITERS);
-        problem.put("proj_passes", (long) SIZING_PROJ_PASSES);
-        problem.put("feas_tol", SIZING_FEAS_TOL);
-        problem.put("covariance", "ewma_1min_bars");
-        problem.put("max_pos", maxPos);
-        return com.iap.contracts.CanonicalJson.contentHash(problem);
-    }
-
-    /**
-     * Export book-health counters. Called on EVERY event (§12.6): the risk
-     * config halts after ONE sequence gap, so a gap must be visible on the
-     * next scrape rather than at the next 1,024-event sampling point.
-     */
-    private static void sampleBookHealth(Counter gaps, Counter dups,
-            Gauge stale, BacktestEngine engine, long instrumentId,
-            long[] lastSeen) {
-        long g = 0;
-        long d = 0;
-        boolean anyStale = false;
-        for (OrderBook b : engine.simulator().instrumentBook(instrumentId)
-                .venues().values()) {
-            g += b.gapsDetected();
-            d += b.duplicatesDropped();
-            anyStale |= b.isStale();
-        }
-        if (g > lastSeen[0]) {
-            gaps.add(g - lastSeen[0]);
-            lastSeen[0] = g;
-        }
-        if (d > lastSeen[1]) {
-            dups.add(d - lastSeen[1]);
-            lastSeen[1] = d;
-        }
-        stale.set(anyStale ? 1.0 : 0.0);
-    }
-
-    /**
      * Realtime pacing: sleep {@code ns} in slices of at most
      * {@link #IDLE_SLICE_NS}, running {@code idle} (admin drain) before each
      * slice and returning early once a stop is requested.
@@ -1653,191 +1413,16 @@ public final class PaperTrading {
         }
     }
 
-    private static String esc(String s) {
-        return s == null ? "" : s.replace("\\", "\\\\").replace("\"", "\\\"")
-                .replace("\n", "\\n").replace("\r", "\\r");
-    }
-
     /**
      * The {@code /status} body (§12.5): sorted keys, live progress, and the
      * fields runbooks tell operators to read.
      */
     public static String statusJson(Result res, Options opts) {
-        return "{\"alpha_id\":\"" + esc(opts.alphaId)
-                + "\",\"component\":\"paper_trading\""
-                + ",\"config_sha256\":\"" + esc(res.configSha256)
-                + "\",\"events_pending\":" + res.eventsPending
-                + ",\"events_processed\":" + res.eventsProcessed
-                + ",\"instrument_id\":" + opts.instrumentId
-                + ",\"kill_switch_engaged\":" + res.halted
-                + ",\"last_event_ts\":" + res.lastEventTs
-                + ",\"last_event_wallclock\":" + res.lastEventWallUnix
-                + ",\"lifecycle\":\"" + res.lifecycle
-                + "\",\"mode\":\"" + (opts.realtime ? "realtime" : "asap")
-                + "\",\"restarts\":" + res.restarts
-                + ",\"status\":\"" + res.state.label()
-                + "\",\"trace_count\":" + res.traceCount
-                + ",\"trace_digest\":\"" + res.traceDigest + "\"}";
-    }
-
-    private static String pct(MetricsRegistry reg, String name) {
-        Histogram h = reg.histogramRef(name);
-        if (h == null || h.count() == 0) {
-            return "{\"count\":0}";
-        }
-        long[] p = h.p50p99p999();
-        return "{\"count\":" + h.count() + ",\"p50\":" + p[0] + ",\"p99\":"
-                + p[1] + ",\"p999\":" + p[2] + "}";
-    }
-
-    /** Finite double as JSON number, NaN as JSON {@code null}. */
-    private static String numOrNull(double v) {
-        return Double.isNaN(v) ? "null" : Double.toString(v);
-    }
-
-    private static String reportJson(Result res, Options opts,
-            MetricsRegistry reg, SessionStore store) {
-        StringBuilder sb = new StringBuilder(768);
-        sb.append("{\"adaptive\":{\"drift_psi\":")
-                .append(numOrNull(res.driftPsi))
-                .append(",\"lifecycle\":\"").append(res.lifecycle)
-                .append("\",\"lifecycle_code\":").append(res.lifecycle.code())
-                .append(",\"rolling_ic\":").append(numOrNull(res.rollingIc))
-                .append("},\"alpha_id\":\"").append(esc(opts.alphaId))
-                .append("\",\"config_sha256\":\"").append(esc(res.configSha256))
-                .append("\",\"events_processed\":").append(res.eventsProcessed)
-                .append(",\"execution\":{\"fills\":")
-                .append(reg.counterValue("exec_fills_total"))
-                .append(",\"latency_budget_blocked\":")
-                .append(res.counters.latencyBudgetBlocked)
-                .append(",\"orders_submitted\":")
-                .append(reg.counterValue("exec_orders_submitted_total"))
-                .append(",\"participation_blocked\":").append(res.counters.participationBlocked)
-                .append(",\"participation_capped\":").append(res.counters.participationCapped)
-                .append(",\"rejected_pre_trade\":")
-                .append(reg.counterValue("exec_child_orders_rejected_total"))
-                .append(",\"slice_interval_blocked\":").append(res.counters.sliceIntervalBlocked)
-                .append(",\"sor_no_route\":").append(res.counters.sorNoRoute)
-                .append("},\"fills\":").append(res.fillCount)
-                .append(",\"instrument_id\":").append(opts.instrumentId)
-                .append(",\"kill_switch_engaged\":").append(res.killSwitchEngaged)
-                .append(",\"latency_ns\":{\"book_update\":")
-                .append(pct(reg, "book_update_latency_ns"))
-                .append(",\"decode\":").append(pct(reg, "decode_latency_ns"))
-                .append(",\"order_path\":").append(pct(reg, "order_path_latency_ns"))
-                .append("},\"mode\":\"").append(opts.realtime ? "realtime" : "asap")
-                .append("\",\"orders_submitted\":").append(res.ordersSubmitted)
-                .append(",\"pnl\":{\"fees_net\":").append(res.feesNet)
-                .append(",\"gross\":").append(res.grossPnl)
-                .append(",\"impact\":").append(res.impact)
-                .append(",\"spread_cost\":").append(res.spreadCost)
-                .append(",\"total\":").append(res.totalPnl)
-                .append("},\"restarts\":").append(res.restarts)
-                .append(",\"risk\":{\"allowed\":").append(res.riskAllowed)
-                .append(",\"audit_jsonl\":\"")
-                .append(esc(store.file(SessionStore.RISK_AUDIT).toString()))
-                .append("\",\"audit_sha256\":\"")
-                .append(com.iap.codec.Sha256.hex(store.read(
-                        SessionStore.RISK_AUDIT).getBytes(StandardCharsets.UTF_8)))
-                .append("\",\"decisions\":").append(res.riskDecisions)
-                .append(",\"events\":").append(res.riskEvents)
-                .append(",\"rejected\":").append(res.riskRejected)
-                .append(",\"rejected_stale\":").append(res.riskRejectedStale)
-                .append("},\"state_dir\":\"")
-                .append(esc(store.dir().toString()))
-                .append("\",\"status\":\"").append(res.state.label())
-                .append("\",\"trace\":{\"count\":").append(res.traceCount)
-                .append(",\"digest\":\"").append(res.traceDigest)
-                .append("\",\"jsonl\":\"")
-                .append(esc(store.file(SessionStore.DECISION_TRACES).toString()))
-                .append("\"},\"x-version\":3}");
-        return sb.toString();
+        return PaperTradingReports.statusJson(res, opts);
     }
 
     /** CLI: see java/paper.sh for the flags. */
     public static void main(String[] args) throws IOException {
-        Options opts = new Options();
-        Path explicitConfigs = null;
-        opts.reportPath = Paths.get("out", "paper_session_report.json");
-        for (int i = 0; i < args.length; i++) {
-            String a = args[i];
-            switch (a) {
-                case "--configs" -> explicitConfigs = Paths.get(need(args, ++i, a));
-                case "--events" -> opts.eventsFile = Paths.get(need(args, ++i, a));
-                case "--instrument" ->
-                        opts.instrumentId = parseLong(need(args, ++i, a), a);
-                case "--alpha" -> opts.alphaId = need(args, ++i, a);
-                case "--mode" -> opts.realtime = switch (need(args, ++i, a)) {
-                    case "realtime" -> true;
-                    case "asap" -> false;
-                    default -> throw new IllegalArgumentException(
-                            "--mode must be asap|realtime");
-                };
-                case "--speed" -> opts.speed = parseDouble(need(args, ++i, a), a);
-                case "--max-events" ->
-                        opts.maxEvents = parseLong(need(args, ++i, a), a);
-                case "--port" -> {
-                    String v = need(args, ++i, a);
-                    opts.port = "config".equals(v) ? -2 : (int) parseLong(v, a);
-                }
-                case "--report" -> opts.reportPath = Paths.get(need(args, ++i, a));
-                case "--baselines" ->
-                        opts.baselinesDir = Paths.get(need(args, ++i, a));
-                case "--state-dir" -> opts.stateDir = Paths.get(need(args, ++i, a));
-                case "--resume" -> opts.resume = true;
-                case "--checkpoint-every" -> opts.checkpointEveryEvents =
-                        parseLong(need(args, ++i, a), a);
-                default -> throw new IllegalArgumentException(
-                        "unknown argument " + a);
-            }
-        }
-        // Config directory: --configs, else $IAP_CONFIG_DIR, else the default
-        // (PLATFORM_CONVENTIONS.md §12.2).
-        opts.configsDir = ConfigService.resolveDir(explicitConfigs,
-                System.getenv(), opts.configsDir);
-        if (opts.stateDir == null) {
-            String env = System.getenv("IAP_STATE_DIR");
-            if (env != null && !env.isBlank()) {
-                opts.stateDir = Paths.get(env.trim());
-            }
-        }
-        if (opts.port == -2) { // sentinel: from config
-            opts.port = new ConfigService(opts.configsDir).monitoringPort();
-        }
-        validate(opts);
-        Result res = run(opts);
-        System.out.println(String.format(Locale.ROOT,
-                "paper session: events=%d orders=%d fills=%d pnl=%.6f "
-                        + "risk[allowed=%d rejected=%d] status=%s "
-                        + "port=%d state=%s report=%s",
-                res.eventsProcessed, res.ordersSubmitted, res.fillCount,
-                res.totalPnl, res.riskAllowed, res.riskRejected,
-                res.state.label().toUpperCase(Locale.ROOT), res.httpPort,
-                res.stateDir, opts.reportPath));
-    }
-
-    private static String need(String[] args, int i, String flag) {
-        if (i >= args.length) {
-            throw new IllegalArgumentException(flag + " needs a value");
-        }
-        return args[i];
-    }
-
-    private static long parseLong(String v, String flag) {
-        try {
-            return Long.parseLong(v);
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(
-                    flag + " must be an integer, got " + v);
-        }
-    }
-
-    private static double parseDouble(String v, String flag) {
-        try {
-            return Double.parseDouble(v);
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(
-                    flag + " must be a number, got " + v);
-        }
+        PaperTradingCli.main(args);
     }
 }

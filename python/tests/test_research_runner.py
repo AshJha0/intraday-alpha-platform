@@ -55,6 +55,10 @@ from iap.validation.methods import METHODS_LEGACY, METHODS_V2, methods
 from iap.validation.metrics import HORIZONS_NS
 from iap.validation.splits import Fold
 
+# E-P2-7: one of the slowest test files (CI --durations); run by the
+# python-slow CI job, deselected from the PR python job (-m 'not slow').
+pytestmark = pytest.mark.slow
+
 TOL = 1e-9
 FEATURES_DIR = REPO_ROOT / "data" / "features"
 REPORTS_DIR = REPO_ROOT / "research" / "alpha_reports"

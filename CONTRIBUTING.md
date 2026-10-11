@@ -67,6 +67,39 @@ under a minute. (The Python run is the exception under CI's coverage
 instrumentation: 306-359 s with `-n auto` for the 1988 tests of v1.5.0; see
 `docs/BUILD_NOTES.md`.)
 
+### 2.1 The `slow` marker and the two Python CI jobs (v1.13)
+
+The ten slowest test files (by CI `--durations`) carry
+`pytestmark = pytest.mark.slow` (marker registered in `python/pyproject.toml`).
+CI splits the suite: the `python` job (a 3.11 + 3.12 matrix; the 3.11 entry
+keeps the check name `python`, the 3.12 entry is `python-312`) runs `-m "not slow"` without coverage, and the
+`python-slow` job runs `-m slow` with `--cov` in parallel. Locally,
+`pytest -m "not slow"` is the quick loop; run the whole suite (no `-m`)
+before asking for review. Mark a file `slow` only when its tests take tens of
+seconds; a new marked file must still be green in `python-slow`.
+
+### 2.2 Static typing (advisory, v1.13)
+
+`cd python && python -m mypy` (config: `[tool.mypy]` in `python/pyproject.toml`)
+checks `iap.core`, `iap.orderbook`, `iap.execution`, `iap.backtest` and
+`iap.features`. The CI step is `continue-on-error` and writes the error count
+to the job summary (baseline at introduction: 87 errors in 13 files). Path to
+blocking: (1) do not add new errors in touched files; (2) burn the baseline
+down package by package (`attr-defined` / `union-attr` first); (3) when the
+count is 0, drop `continue-on-error` and add the `mypy` step to the required
+checks; (4) then widen `files` to the rest of `iap`.
+
+### 2.3 Hashed requirements (v1.13)
+
+`python/requirements-ci.txt` (CI) and `python/requirements-image.txt`
+(`Dockerfile.python`) pin every file by sha256 and are installed with
+`--require-hashes`. Edit the `.in` file, then regenerate with
+`pip-compile --generate-hashes --allow-unsafe --strip-extras --no-header
+--annotation-style=line -o requirements-ci.txt requirements-ci.in` (pip-tools
+7.x; same for `requirements-image`, which is constrained to the CI set).
+Extra packages a job installs on top (maturin, xgboost, mypy) go in a separate
+`pip install` command, because hash mode applies to a whole command.
+
 ## 3. The parity harness
 
 ```bash
@@ -85,8 +118,8 @@ fills are exact integers; features, alphas, portfolio and TCA compare at
 abs and rel 1e-9; adaptive PSI/KS at 1e-10 with exact refit booleans and
 lifecycle state sequences; canonical-JSON lines, trace digests, the risk
 audit / snapshot and the lifecycle registry are byte-identical; the 7-state
-lifecycle golden is compared exactly, field by field. The v1.12.0 table
-(2026-10-10, counts from CI) reads python 2250 / cpp 302 / rust 358 /
+lifecycle golden is compared exactly, field by field. The v1.13.0 table
+(2026-10-11, counts from CI) reads python 2327 / cpp 302 / rust 358 /
 java 571 (golden 193/72/71/124), `integration` 35, `replay` 6.
 
 ## 4. Golden regeneration protocol

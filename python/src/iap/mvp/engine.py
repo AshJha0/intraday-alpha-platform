@@ -60,30 +60,25 @@ pair is a like-for-like ``ic_gap``).
 
 from __future__ import annotations
 
-import json
 import math
-from collections.abc import Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import replace
 from functools import partial
 
 from iap.contracts.ids import NO_ROUTE
 from iap.contracts.protocols import TraceSink
 from iap.contracts.types import (
     AlphaSignal,
-    Attribution,
     ChildOrder,
     Decision,
     ExecStatus,
-    ExecutionReport,
     OrderType,
     ParentOrder,
     PortfolioTarget,
     RiskDecision,
     Side,
-    TCAResult,
     VenueDecision,
 )
-from iap.core.events import EventType, MarketEvent, SessionStatus
+from iap.core.events import EventType, MarketEvent
 from iap.execution.config import ExecConfig, SorOptions, load_sor_options
 from iap.execution.passive import ExecPolicy, PassiveStats, max_behind_qty, post_price
 from iap.execution.simulator import ExecutionSimulator
@@ -96,9 +91,9 @@ from iap.execution.types import (
     OrderState,
     VenueSpec,
 )
-from iap.features.context import InstrumentContext, SessionClock
 from iap.features.engine import FeatureEngine, FeatureVector
-from iap.labels.labels import HORIZONS_NS, LabelResult, MidSeries, compute_labels, max_sample_age
+from iap.labels.labels import HORIZONS_NS, LabelResult, MidSeries
+from iap.mvp.accounting import Account, Counters
 from iap.mvp.adapters import (
     AlgoScheduler,
     MarketView,
@@ -111,14 +106,28 @@ from iap.mvp.adapters import (
     TcaMarket,
 )
 from iap.mvp.alpha import AlphaEnsemble, LinearZAlpha, load_alphas
-from iap.mvp.config import ControlsSpec, MvpConfig
+from iap.mvp.config import MvpConfig
+from iap.mvp.engine_io import feature_context, horizon_name, load_controls
+from iap.mvp.engine_metrics import EngineMetricsMixin
 from iap.mvp.feed import FeedResult, build_reference_data
+from iap.mvp.metrics import IcResult, OrderOutcome, pearson
+from iap.mvp.orders import (
+    _CANCEL_CROSS_BEHIND,
+    _CANCEL_CROSS_TIMEOUT,
+    _CANCEL_REPRICE,
+    _DONE,
+    _REST,
+    BLOCK_CONTROLS,
+    _Decision,
+    _LiveParent,
+    _Working,
+)
 from iap.mvp.portfolio import PortfolioConstraints, PortfolioState, SingleStockPortfolio
+from iap.mvp.risk_wiring import RiskWiringMixin
+from iap.mvp.sizing import SizingMixin
 from iap.orderbook.book import DEPTH_LEVELS, ConsolidatedBook, OrderBook
 from iap.reference.refdata import ReferenceData
 from iap.risk.engine import RiskEngine
-from iap.risk.events import Decision as RiskDecisionCode
-from iap.risk.orders import Fill as RiskFill
 from iap.risk.refdata import instrument_refs_from_reference_data
 from iap.tca.fills import MarketTimeline
 from iap.trace.attribution import attribute
@@ -143,263 +152,7 @@ _MID_FEATURE = "mid_price_v1"
 _PNL_IDENTITY_TOL = 1e-9
 
 
-def horizon_name(horizon_ns: int) -> str:
-    """The pinned label-horizon name of ``horizon_ns`` (conventions §7);
-    raises when the duration is not one of the eleven pinned horizons."""
-    for name, ns in HORIZONS_NS.items():
-        if ns == horizon_ns:
-            return name
-    raise ValueError(
-        f"horizon_ns {horizon_ns} is not a pinned label horizon ({', '.join(HORIZONS_NS)})"
-    )
-
-
-def load_controls(cfg: MvpConfig) -> ControlsSpec:
-    """The declared controls from ``execution.json`` ``defaults`` (fail-fast)."""
-    path = cfg.reference_path("execution")
-    with open(path, encoding="utf-8") as fh:
-        root = json.load(fh)
-    defaults = root.get("defaults")
-    if not isinstance(defaults, dict):
-        raise ValueError(f"{path}: missing defaults block")
-
-    def integer(key: str, lo: int) -> int:
-        v = defaults.get(key)
-        if isinstance(v, bool) or not isinstance(v, int) or v < lo:
-            raise ValueError(f"{path}: defaults.{key} must be an integer >= {lo}")
-        return v
-
-    part = defaults.get("max_participation")
-    if isinstance(part, bool) or not isinstance(part, (int, float)) or not 0.0 < part <= 1.0:
-        raise ValueError(f"{path}: defaults.max_participation must be in (0, 1]")
-    return ControlsSpec(
-        max_child_qty=integer("max_child_qty", 1),
-        max_participation=float(part),
-        min_slice_interval_ns=integer("min_slice_interval_ns", 0),
-        latency_budget_ns=integer("latency_budget_ns", 1),
-    )
-
-
-def feature_context(cfg: MvpConfig, ref: ReferenceData) -> InstrumentContext:
-    """The feature engine's :class:`InstrumentContext` of the configured
-    instrument (session bounds from ``mvp.json``, tick / class from the
-    MVP reference data) — the one context both the engine and the research
-    frame builder use."""
-    inst = ref.instrument(cfg.instrument)
-    h0, m0, _ = (int(x) for x in cfg.session.open.split(":"))
-    h1, m1, s1 = (int(x) for x in cfg.session.close.split(":"))
-    return InstrumentContext(
-        instrument_id=inst.instrument_id,
-        symbol=inst.symbol,
-        asset_class=inst.asset_class,
-        tick_size=float(inst.tick_size),
-        session_open_min=h0 * 60 + m0,
-        session_close_min=h1 * 60 + m1 + (1 if s1 >= 30 else 0),
-        ref_instrument_id=inst.instrument_id,
-        session_timezone=cfg.session.timezone,
-        clock=SessionClock(cfg.session.timezone),
-    )
-
-
-def pearson(xs: Sequence[float], ys: Sequence[float]) -> float | None:
-    """Pearson correlation (``None`` with fewer than 3 pairs or a degenerate side)."""
-    n = len(xs)
-    if n < 3 or n != len(ys):
-        return None
-    mx = sum(xs) / n
-    my = sum(ys) / n
-    sxx = sum((x - mx) ** 2 for x in xs)
-    syy = sum((y - my) ** 2 for y in ys)
-    if sxx <= 0.0 or syy <= 0.0:
-        return None
-    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys, strict=False))
-    return sxy / math.sqrt(sxx * syy)
-
-
-@dataclass
-class Account:
-    """Per-instrument deterministic P&L account (quote currency = USD), the
-    Java ``BacktestEngine.Account`` semantics: ``equity = cash + position *
-    mark``; ``gross_pnl`` accumulates ``position * dmark``; ``spread_cost``
-    is the fill-vs-mark slippage; fees / rebates / impact are exact sums."""
-
-    position: int = 0
-    cash: float = 0.0
-    fees: float = 0.0
-    rebates: float = 0.0
-    impact: float = 0.0
-    spread_cost: float = 0.0
-    gross_pnl: float = 0.0
-    mark: float = 0.0
-    mark_valid: bool = False
-    fill_count: int = 0
-    orders_submitted: int = 0
-    session_volume: int = 0
-    filled_qty: int = 0
-    last_child_decision_ts: int | None = None
-    equity_peak: float = 0.0
-    max_drawdown: float = 0.0
-
-    def equity(self) -> float:
-        return self.cash + float(self.position) * (self.mark if self.mark_valid else 0.0)
-
-    def mark_to(self, mid: float) -> None:
-        """Mark-to-market at ``mid`` (the risk engine's reference mid)."""
-        if self.mark_valid:
-            self.gross_pnl += float(self.position) * (mid - self.mark)
-        self.mark = mid
-        self.mark_valid = True
-        eq = self.equity()
-        self.equity_peak = max(self.equity_peak, eq)
-        self.max_drawdown = max(self.max_drawdown, self.equity_peak - eq)
-
-    def book_fill(self, side: int, qty: int, price: float, fee: float, impact: float) -> None:
-        sgn = 1.0 if side == 0 else -1.0
-        self.cash -= sgn * float(qty) * price
-        self.cash -= fee
-        self.cash -= impact
-        if fee >= 0.0:
-            self.fees += fee
-        else:
-            self.rebates += -fee
-        self.impact += impact
-        if not self.mark_valid:
-            self.mark = price
-            self.mark_valid = True
-        self.spread_cost += sgn * float(qty) * (price - self.mark)
-        self.position += qty if side == 0 else -qty
-        self.filled_qty += qty
-        self.fill_count += 1
-
-    @property
-    def fees_net(self) -> float:
-        return self.fees - self.rebates
-
-
-@dataclass
-class Counters:
-    """Every drop / block / skip on the path is counted (conventions §8)."""
-
-    events: int = 0
-    decisions: int = 0
-    decisions_without_covariance: int = 0
-    decisions_flat: int = 0
-    decisions_parent_live: int = 0
-    decisions_window_beyond_session: int = 0  #: parent window would end after the session close
-    parent_orders: int = 0
-    child_orders_generated: int = 0
-    child_orders_submitted: int = 0
-    risk_allowed: int = 0
-    risk_rejected: int = 0
-    sor_no_route: int = 0
-    participation_capped: int = 0
-    participation_blocked: int = 0
-    slice_interval_blocked: int = 0
-    latency_budget_blocked: int = 0
-    sequence_gaps: int = 0
-    feed_recoveries: int = 0
-    fills: int = 0
-    parents_finalised: int = 0
-    parents_without_tca: int = 0
-    timeline_crossed_skipped: int = 0
-
-    def to_dict(self) -> dict[str, int]:
-        return {k: int(v) for k, v in sorted(self.__dict__.items())}
-
-
-@dataclass(frozen=True)
-class IcResult:
-    """Realized IC of one alpha at one horizon (module docstring).
-
-    ``ic`` / ``ic_cost`` are the Pearson correlations of the expected
-    return against the mid-to-mid / cost-adjusted label (``None`` with
-    fewer than three valid pairs or a degenerate side); ``ic_shifted`` is
-    the mid IC with the signal lagged by one decision (the shift-by-one
-    leakage test); ``n`` counts the valid pairs, ``n_signals`` the
-    confidence > 0 decisions the labels were requested for.
-    """
-
-    horizon: str
-    ic: float | None
-    ic_cost: float | None
-    ic_shifted: float | None
-    n: int
-    n_signals: int
-
-
-@dataclass
-class OrderOutcome:
-    """Everything the report needs about one finalised parent order."""
-
-    parent: ParentOrder
-    signal: AlphaSignal
-    tca: TCAResult | None
-    attribution: Attribution | None
-    realized_bps: float
-    filled_notional: float
-    n_children_submitted: int
-    n_children_rejected: int
-    venue_qty: dict[int, int]
-    latencies_ns: tuple[int, ...]
-
-
-#: The declared controls a generated child can be blocked by, in check order
-#: (Java BacktestEngine.decide).  A blocked child never leaves the strategy:
-#: it gets no routing, no risk decision and no report, so it is NOT written
-#: into the trace's child_orders / routing stages — only counted here and in
-#: ``ParentOrder.params["children_blocked_<control>"]`` at finalisation.
-BLOCK_CONTROLS = ("slice_interval", "latency_budget", "participation")
-
-
-#: States of a posted child in the PASSIVE state machine
-#: (``iap.execution.passive``; the same machine as ``ExecutionReplay``).
-_REST = 0
-_CANCEL_REPRICE = 1
-_CANCEL_CROSS_TIMEOUT = 2
-_CANCEL_CROSS_BEHIND = 3
-_DONE = 4
-
-
-@dataclass
-class _Working:
-    child_order_id: int
-    deadline: int
-    reprices: int
-    state: int = _REST
-
-
-@dataclass
-class _LiveParent:
-    parent: ParentOrder
-    signal: AlphaSignal
-    decision: _Decision
-    children: dict[int, ChildOrder] = field(default_factory=dict)  #: submitted, by id
-    reports: list[ExecutionReport] = field(default_factory=list)
-    rejected: int = 0  #: generated but not submitted (any reason)
-    #: control-blocked children by control (never routed to risk or a venue;
-    #: written into ParentOrder.params as children_blocked_<control>)
-    blocked: dict[str, int] = field(default_factory=lambda: dict.fromkeys(BLOCK_CONTROLS, 0))
-    fill_impact: float = 0.0
-    fill_fees: float = 0.0
-    #: PASSIVE policy: the posted children being worked (posting order).
-    working: list[_Working] = field(default_factory=list)
-
-    def all_terminal(self, sim: SimulatorAdapter) -> bool:
-        return all(sim.open_qty(cid) == 0 for cid in self.children)
-
-    def committed(self, sim: SimulatorAdapter) -> int:
-        """Filled + open qty over the parent's submitted children."""
-        filled = sum(r.filled_qty for r in self.reports)
-        return filled + sum(sim.open_qty(cid) for cid in self.children)
-
-
-@dataclass
-class _Decision:
-    builder: TraceBuilder
-    ready: bool = False
-
-
-class MvpEngine:
+class MvpEngine(RiskWiringMixin, SizingMixin, EngineMetricsMixin):
     """The loop (module docstring).  Feed events through :meth:`on_event`
     in stream order, then :meth:`finish`; traces reach ``sink`` in decision
     order as they become ready."""
@@ -644,145 +397,6 @@ class MvpEngine:
             raise RuntimeError("traces left unemitted at session end")
         self.assert_pnl_identity()
 
-    # -------------------------------------------------------------- reports
-
-    def _process_reports(self, reports: Sequence[ExecutionReport]) -> None:
-        filled = False
-        for rep in reports:
-            live = self._owner_of(rep.order_id)
-            if live is not None:
-                live.reports.append(rep)
-                live.decision.builder.add_fill(rep)
-            if rep.status in (ExecStatus.PARTIAL, ExecStatus.FILLED):
-                fill = self.sim.fills_by_execution[rep.execution_id]
-                price = float(rep.fill_price_ticks) * self.tick
-                self.account.book_fill(
-                    int(fill.side), rep.filled_qty, price, rep.fees, fill.impact_cost
-                )
-                self.counters.fills += 1
-                filled = True
-                if live is not None:
-                    live.fill_fees += rep.fees
-                    live.fill_impact += fill.impact_cost
-                applied = self.risk_engine.on_fill(
-                    RiskFill(
-                        ts=rep.exchange_ts,
-                        strategy_id=self.strategy_id,
-                        instrument_id=self.iid,
-                        order_id=rep.order_id,
-                        side=int(fill.side),
-                        qty=rep.filled_qty,
-                        price_ticks=rep.fill_price_ticks,
-                    )
-                )
-                if not applied:
-                    # The account booked a fill the risk engine refused as
-                    # malformed: the two positions have diverged and the
-                    # §12.1 identity is gone — fail closed, never continue.
-                    raise RuntimeError(
-                        f"risk engine rejected fill execution "
-                        f"{rep.execution_id} of child {rep.order_id} as malformed"
-                    )
-            if rep.status in (
-                ExecStatus.FILLED,
-                ExecStatus.CANCELED,
-                ExecStatus.EXPIRED,
-                ExecStatus.REJECTED,
-            ):
-                self.risk_engine.on_order_done(rep.order_id)
-        if filled:
-            # §12.1 (PaperUnitsTest): after EVERY fill the risk position equals
-            # the account position and the risk daily P&L equals gross - spread.
-            self.assert_pnl_identity()
-
-    def _owner_of(self, child_order_id: int) -> _LiveParent | None:
-        if self._live is not None and child_order_id in self._live.children:
-            return self._live
-        for live in self._closing:
-            if child_order_id in live.children:
-                return live
-        return None
-
-    # ---------------------------------------------------------- risk wiring
-
-    def _on_market(self, ev: MarketEvent) -> None:
-        """PaperTrading.RiskWiring.onMarket, verbatim semantics."""
-        if ev.event_type != EventType.HEARTBEAT:
-            self._last_data_ts[ev.venue_id] = ev.exchange_ts
-        best_bid: int | None = None
-        best_ask: int | None = None
-        books = self.book.books
-        # The gap gate is per INSTRUMENT but staleness is per venue: one
-        # venue's recovery must not reopen the gate while another venue of
-        # the same instrument is still stale, so the recovery is reported
-        # only once no venue is stale.
-        venue_recovered = False
-        for vid in sorted(books):
-            vb = books[vid]
-            stale = vb.stale
-            was = self._venue_stale.get(vid, False)
-            self._venue_stale[vid] = stale
-            if stale and not was:
-                self.counters.sequence_gaps += 1
-                self.risk_engine.on_sequence_gap(self.iid, ev.exchange_ts)
-            elif was and not stale:
-                venue_recovered = True
-        if venue_recovered and not any(books[vid].stale for vid in books):
-            self.counters.feed_recoveries += 1
-            self.risk_engine.on_feed_recovered(self.iid, ev.exchange_ts)
-        for vid in sorted(books):
-            vb = books[vid]
-            if vb.stale:
-                continue
-            bb = vb.best_bid()
-            ba = vb.best_ask()
-            if bb is not None:
-                best_bid = bb[0] if best_bid is None else max(best_bid, bb[0])
-            if ba is not None:
-                best_ask = ba[0] if best_ask is None else min(best_ask, ba[0])
-        if best_bid is None or best_ask is None:
-            return  # no fresh two-sided venue: the previous mark ages
-        mark_ts: int | None = None
-        for vid in sorted(books):
-            vb = books[vid]
-            if vb.stale:
-                continue
-            bb = vb.best_bid()
-            ba = vb.best_ask()
-            at_touch = (bb is not None and bb[0] == best_bid) or (
-                ba is not None and ba[0] == best_ask
-            )
-            data_ts = self._last_data_ts.get(vid)
-            if at_touch and data_ts is not None:
-                mark_ts = data_ts if mark_ts is None else min(mark_ts, data_ts)
-        if mark_ts is None:
-            return
-        self.risk_engine.on_market(self.iid, best_bid, best_ask, mark_ts)
-        # The account marks at exactly the reference the risk engine keeps:
-        # an update older than the stored mark is dropped there (and
-        # counted, ``risk_market_regressions_dropped_total``), so it is
-        # dropped here too — the §12.1 identity then holds at every event.
-        if self._mark_ts is not None and mark_ts < self._mark_ts:
-            return
-        self._mark_ts = mark_ts
-        self.account.mark_to(float(best_bid + best_ask) * self.tick / 2.0)
-
-    # ------------------------------------------------------------- timeline
-
-    def _record_timeline(self, ev: MarketEvent) -> None:
-        tl = self.timeline
-        if ev.event_type == EventType.TRADE:
-            tl.add_trade(ev.exchange_ts, ev.price_ticks * self.tick, ev.qty)
-        if ev.event_type == EventType.STATUS and ev.qty == int(SessionStatus.HALT):
-            tl.add_halt(ev.exchange_ts)
-        bb, ba = self.book.best_bid(), self.book.best_ask()
-        if bb is None or ba is None:
-            return
-        if not tl.append_state_pinned(
-            ev.exchange_ts, bb[0] * self.tick, ba[0] * self.tick, bb[1], ba[1]
-        ):
-            self.counters.timeline_crossed_skipped += 1
-
     # ------------------------------------------------------------- decisions
 
     def _sample_mid_series(self, t: int) -> None:
@@ -798,30 +412,6 @@ class MvpEngine:
             self.mid_series.append(t, st.mid, st.spread_ticks * st.tick / 2.0, True)
         else:
             self.mid_series.append(t, math.nan, math.nan, False)
-
-    def _roll_bar(self, vec: FeatureVector) -> None:
-        """Java ``PaperTrading`` sizing bar roll: last mid per 1-minute bucket."""
-        if not vec.validity[self._mid_index]:
-            return
-        mid = vec.values[self._mid_index]
-        bar = (vec.timestamp // BAR_NS) * BAR_NS
-        if bar != self._current_bar:
-            if self._bar_mid is not None:
-                if self._last_bar_mid is not None:
-                    self.bar_returns.append(math.log(self._bar_mid / self._last_bar_mid))
-                self._last_bar_mid = self._bar_mid
-            self._current_bar = bar
-        self._bar_mid = mid
-
-    def _inflight_signed(self) -> int:
-        live = self._live
-        if live is None:
-            return 0
-        signed = 0
-        for cid, child in live.children.items():
-            q = self.sim.open_qty(cid)
-            signed += q if child.side is Side.BID else -q
-        return signed
 
     def _decide(self, ev: MarketEvent, vec: FeatureVector) -> None:
         t = ev.exchange_ts
@@ -1219,95 +809,3 @@ class MvpEngine:
             self.sink.emit(trace)
             self.trace_ids.append(trace.trace_id)
             self._trace_id_set.add(trace.trace_id)
-
-    # -------------------------------------------------------------- results
-
-    def risk_daily_pnl(self) -> float:
-        """The risk engine's daily P&L (realized + unrealized, reporting ccy)."""
-        pnl = self.risk_engine.global_daily_pnl()
-        if pnl is None:
-            raise RuntimeError("risk daily P&L undeterminable (missing conversion rate)")
-        return pnl
-
-    def assert_pnl_identity(self) -> None:
-        """§12.1: risk daily P&L == gross - spread_cost; the risk position ==
-        the account position."""
-        acct = self.account
-        if self.risk_engine.position(self.iid) != acct.position:
-            raise RuntimeError(
-                f"risk position {self.risk_engine.position(self.iid)} != "
-                f"account position {acct.position}"
-            )
-        lhs = self.risk_daily_pnl()
-        rhs = acct.gross_pnl - acct.spread_cost
-        if abs(lhs - rhs) > _PNL_IDENTITY_TOL * max(1.0, abs(lhs), abs(rhs)):
-            raise RuntimeError(f"P&L identity broken: risk daily {lhs!r} != gross - spread {rhs!r}")
-
-    def labels(self, horizon: str) -> LabelResult:
-        """The research forward labels (:func:`iap.labels.compute_labels`) at
-        every decision timestamp for one pinned ``horizon``, computed over
-        the stream observed so far (cached per observed extent)."""
-        if horizon not in HORIZONS_NS:
-            raise ValueError(f"unknown horizon {horizon!r}")
-        last_ts = self.last_ts if self.last_ts is not None else 0
-        key = (len(self.decision_ts), len(self.mid_series), last_ts)
-        cached = self._labels.get(horizon)
-        if cached is not None and cached[0] == key:
-            return cached[1]
-        result = compute_labels(
-            self.decision_ts,
-            self.mid_series,
-            last_ts,
-            [horizon],
-            max_age_ns=max_sample_age(self.mid_series),
-        )[horizon]
-        self._labels[horizon] = (key, result)
-        return result
-
-    def realized_pairs(self, alpha_id: str, horizon: str) -> list[tuple[int, float, float, float]]:
-        """``(decision index, expected_return, label_mid, label_cost)`` of the
-        alpha's confidence > 0 decisions whose label at ``horizon`` is valid,
-        in decision order."""
-        lab = self.labels(horizon)
-        out: list[tuple[int, float, float, float]] = []
-        for index, er in self.ic_samples[alpha_id]:
-            if lab.valid[index]:
-                out.append((index, er, lab.mid[index], lab.cost[index]))
-        return out
-
-    def realized_ic(self, alpha_id: str, horizon: str | None = None) -> IcResult:
-        """Realized IC of ``alpha_id`` at ``horizon`` (default: the MVP
-        holding horizon) — see the module docstring for the definition."""
-        h = self.horizon if horizon is None else horizon
-        pairs = self.realized_pairs(alpha_id, h)
-        xs = [er for _, er, _, _ in pairs]
-        ys = [m for _, _, m, _ in pairs]
-        cs = [c for _, _, _, c in pairs]
-        # Shift-by-one: the signal of the PREVIOUS confidence > 0 decision
-        # against this decision's label (conventions §7).
-        signals = [er for _, er in self.ic_samples[alpha_id]]
-        position = {index: k for k, (index, _) in enumerate(self.ic_samples[alpha_id])}
-        xs_shift: list[float] = []
-        ys_shift: list[float] = []
-        for index, _, m, _ in pairs:
-            k = position[index]
-            if k > 0:
-                xs_shift.append(signals[k - 1])
-                ys_shift.append(m)
-        return IcResult(
-            horizon=h,
-            ic=pearson(xs, ys),
-            ic_cost=pearson(xs, cs),
-            ic_shifted=pearson(xs_shift, ys_shift),
-            n=len(pairs),
-            n_signals=len(self.ic_samples[alpha_id]),
-        )
-
-    def n_kill_events(self) -> int:
-        return sum(1 for e in self.risk_engine.audit() if e.decision == RiskDecisionCode.KILL)
-
-    def risk_decisions_by_rule(self) -> dict[str, int]:
-        out: dict[str, int] = {}
-        for e in self.risk_engine.audit():
-            out[e.rule_id] = out.get(e.rule_id, 0) + 1
-        return dict(sorted(out.items()))

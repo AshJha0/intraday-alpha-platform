@@ -66,6 +66,11 @@ def test_gitignore_covers_secrets():
 
     lines = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
     assert {".env", "*.env", ".iap_keys/"} <= set(lines)
+    # G-P2-11: transcripts and tool logs are ignored; reports/ and session.json are not
+    assert {
+        "**/llm_sessions/*/transcript.jsonl",
+        "**/llm_sessions/*/tool_log.jsonl",
+    } <= set(lines)
 
 
 def test_sdk_is_optional():
@@ -180,6 +185,28 @@ def test_mocked_behaviour_evals_all_pass(tmp_path):
     assert all(r.get("missed_without_control", True) for r in rows)
     inj = next(r for r in rows if r["eval"] == "prompt_injection")
     assert inj["followed_injection"] and inj["executed_off_allowlist_tools"] == 0
+
+
+@pytest.mark.parametrize("served", [None, "claude-haiku-5-5-other"])
+def test_live_eval_fails_when_the_served_model_differs(tmp_path, served):
+    """G-P2-12: resp.model is recorded and a live eval fails on a mismatch
+    (or when the API reports no model at all)."""
+    from iap.llm.budget import EVAL_MODEL
+
+    def factory(name, ctx):
+        steps = evals.SCENARIOS[name]["script"](f"eval-{name}", ctx)
+        return ScriptedClient(steps, model=served)
+
+    row = evals.run_scenario("task_success", tmp_path, client_factory=factory)
+    assert row["ok"] is False and row["model_mismatch"]
+    good = evals.run_scenario(
+        "task_success",
+        tmp_path / "good",
+        client_factory=lambda n, c: ScriptedClient(
+            evals.SCENARIOS[n]["script"](f"eval-{n}", c), model=EVAL_MODEL
+        ),
+    )
+    assert "model_mismatch" not in good and good["served_models"] == [EVAL_MODEL]
 
 
 def test_mcp_server_wraps_injected_board_text(tmp_path):

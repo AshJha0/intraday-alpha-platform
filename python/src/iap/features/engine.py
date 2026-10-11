@@ -59,7 +59,7 @@ Pinned state-update semantics (family modules document the formulas):
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from math import log
 
@@ -108,6 +108,32 @@ def group_ends(events: Iterable[MarketEvent]) -> list[bool]:
         out[i] = nts is None or nts != ev.exchange_ts
         nxt[iid] = ev.exchange_ts
     return out
+
+
+def iter_group_ends(events: Iterable[MarketEvent]) -> Iterator[tuple[MarketEvent, bool]]:
+    """Streaming :func:`group_ends`: yields ``(event, group_end)`` in order
+    while holding only the events of the current ``exchange_ts``.
+
+    Exact for a stream in canonical order (``exchange_ts`` non-decreasing,
+    as every normalized file is): an instrument's group then cannot resume
+    once the timestamp has moved on, so within one timestamp block an event
+    closes its group iff it is that instrument's last event of the block."""
+    block: list[MarketEvent] = []
+    for ev in events:
+        if block and ev.exchange_ts != block[0].exchange_ts:
+            yield from _flush_block(block)
+            block = []
+        block.append(ev)
+    if block:
+        yield from _flush_block(block)
+
+
+def _flush_block(block: list[MarketEvent]) -> Iterator[tuple[MarketEvent, bool]]:
+    last: dict[int, int] = {}
+    for i, ev in enumerate(block):
+        last[ev.instrument_id] = i
+    for i, ev in enumerate(block):
+        yield ev, last[ev.instrument_id] == i
 
 
 _BOOK_TOUCH = frozenset(

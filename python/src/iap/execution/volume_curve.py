@@ -8,6 +8,15 @@ is shrunk toward the pinned U-shape ``1 + x^2`` with weight
 ``k / (days + k)``. The result is written as a versioned JSON document
 (``iap.volume_curve`` v1).
 
+**Exchange-local sessions (v1.13, X-P2-13, opt-in).** The default session
+is fixed in UTC (13:30-20:00), which is the New York session only during
+EDT; in EST (November-March) the open is 14:30 UTC and every bin is
+shifted by an hour. ``tz="America/New_York"`` interprets
+``session`` as offsets from LOCAL midnight in that zone (``zoneinfo``, so
+the UTC offset follows DST per event) and groups days by local date; with
+``tz`` set and no ``session``, the session is :data:`NY_SESSION`
+(09:30-16:00 local). ``tz=None`` (the default) is the v1.10 rule.
+
 A ``ParentOrder`` with ``volume_curve`` set uses it for VWAP slice weights
 (see ``curve_slice_weights``); with the default ``None`` the pinned
 ``1 + x^2`` curve (cross-language contract) is unchanged.
@@ -21,7 +30,9 @@ import argparse
 import json
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from iap.core.events import EventType, MarketEvent
 
@@ -30,6 +41,21 @@ VERSION = 1
 DAY_NS = 86_400 * 1_000_000_000
 #: US equities regular session in UTC (13:30-20:00, no DST adjustment).
 DEFAULT_SESSION = (int(13.5 * 3600e9), 20 * 3600 * 1_000_000_000)
+#: US equities regular session in exchange-local time (09:30-16:00), v1.13.
+NY_SESSION = (int(9.5 * 3600e9), 16 * 3600 * 1_000_000_000)
+NY_TZ = "America/New_York"
+_HOUR_NS = 3600 * 1_000_000_000
+
+
+def _local_offset_ns(zone: ZoneInfo, ts_ns: int, cache: dict[int, int]) -> int:
+    """UTC offset of ``zone`` at ``ts_ns`` (cached per UTC hour; DST changes
+    happen on the hour)."""
+    h = ts_ns // _HOUR_NS
+    off = cache.get(h)
+    if off is None:
+        d = datetime.fromtimestamp(h * 3600, tz=UTC).astimezone(zone).utcoffset()
+        off = cache[h] = int(d.total_seconds()) * 1_000_000_000 if d is not None else 0
+    return off
 
 
 def u_shape(n_bins: int) -> list[float]:
@@ -47,11 +73,20 @@ def estimate_volume_curves(
     events: Iterable[MarketEvent],
     *,
     n_bins: int = 26,
-    session: tuple[int, int] = DEFAULT_SESSION,
+    session: tuple[int, int] | None = None,
     shrinkage: float = 5.0,
     day_ns: int = DAY_NS,
+    tz: str | None = None,
 ) -> dict:
-    """Estimate per-instrument curves; returns the ``iap.volume_curve`` doc."""
+    """Estimate per-instrument curves; returns the ``iap.volume_curve`` doc.
+
+    ``session`` defaults to :data:`DEFAULT_SESSION` (UTC) or, with ``tz``,
+    :data:`NY_SESSION` in local time (module docstring).
+    """
+    if session is None:
+        session = DEFAULT_SESSION if tz is None else NY_SESSION
+    zone = ZoneInfo(tz) if tz is not None else None
+    off_cache: dict[int, int] = {}
     start, end = session
     if not 0 <= start < end <= day_ns:
         raise ValueError("session must satisfy 0 <= start < end <= day_ns")
@@ -62,7 +97,10 @@ def estimate_volume_curves(
     for ev in events:
         if ev.event_type != EventType.TRADE or ev.qty <= 0:
             continue
-        day, off = divmod(ev.exchange_ts, day_ns)
+        t = ev.exchange_ts
+        if zone is not None:
+            t += _local_offset_ns(zone, t, off_cache)
+        day, off = divmod(t, day_ns)
         if not start <= off < end:
             continue
         b = min(int((off - start) // width), n_bins - 1)
@@ -87,6 +125,7 @@ def estimate_volume_curves(
         "version": VERSION,
         "n_bins": n_bins,
         "session_ns": [start, end],
+        **({"tz": tz} if tz is not None else {}),
         "shrinkage": shrinkage,
         "prior": "u_shape_1_plus_x2",
         "curves": curves,
@@ -142,8 +181,13 @@ def main(argv: Iterable[str] | None = None) -> int:
     ap.add_argument("--out", required=True)
     ap.add_argument("--bins", type=int, default=26)
     ap.add_argument("--shrinkage", type=float, default=5.0)
-    ap.add_argument("--session-start-ns", type=int, default=DEFAULT_SESSION[0])
-    ap.add_argument("--session-end-ns", type=int, default=DEFAULT_SESSION[1])
+    ap.add_argument("--session-start-ns", type=int, default=None)
+    ap.add_argument("--session-end-ns", type=int, default=None)
+    ap.add_argument(
+        "--tz",
+        default=None,
+        help=f"exchange time zone for the session bins (e.g. {NY_TZ}); default: UTC (v1.10)",
+    )
     args = ap.parse_args(list(argv) if argv is not None else None)
     events: list[MarketEvent] = []
     for p in args.events:
@@ -151,8 +195,20 @@ def main(argv: Iterable[str] | None = None) -> int:
     doc = estimate_volume_curves(
         events,
         n_bins=args.bins,
-        session=(args.session_start_ns, args.session_end_ns),
+        session=(
+            None
+            if args.session_start_ns is None and args.session_end_ns is None
+            else (
+                args.session_start_ns
+                if args.session_start_ns is not None
+                else (DEFAULT_SESSION if args.tz is None else NY_SESSION)[0],
+                args.session_end_ns
+                if args.session_end_ns is not None
+                else (DEFAULT_SESSION if args.tz is None else NY_SESSION)[1],
+            )
+        ),
         shrinkage=args.shrinkage,
+        tz=args.tz,
     )
     doc["source"] = {"files": [Path(p).name for p in args.events]}
     write_volume_curves(doc, args.out)

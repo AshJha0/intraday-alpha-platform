@@ -42,6 +42,10 @@ from iap.research.__main__ import main as research_main
 from itch50_encoder import Itch50Encoder, build_session, hms_ns
 from lobster_fixture import write_lobster
 
+# E-P2-7: one of the slowest test files (CI --durations); run by the
+# python-slow CI job, deselected from the PR python job (-m 'not slow').
+pytestmark = pytest.mark.slow
+
 SYMBOLS = ("AAPL", "MSFT", "QQQ")
 D1, D2 = "2019-12-30", "2019-12-31"
 

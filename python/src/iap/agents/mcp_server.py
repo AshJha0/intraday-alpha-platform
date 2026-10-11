@@ -18,6 +18,7 @@ import argparse
 import json
 import re
 import sys
+from collections import deque
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,8 @@ PROTOCOL = "2024-11-05"
 _ID = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
 FREE_TEXT = frozenset({"description", "reason", "hypothesis", "text", "title", "note", "notes"})
 MAX_ROWS = 200
+#: v1.13: a JSON document larger than this is refused rather than parsed
+MAX_READ_BYTES = 8 * 1024 * 1024
 
 
 class ToolError(ValueError):
@@ -43,7 +46,23 @@ def _ident(value: Any, name: str) -> str:
 def _read_json(path: Path) -> Any:
     if not path.is_file():
         raise ToolError(f"not found: {path.name}")
+    if path.stat().st_size > MAX_READ_BYTES:
+        raise ToolError(f"too large: {path.name} exceeds {MAX_READ_BYTES} bytes")
     return json.loads(path.read_text(encoding="utf-8", errors="replace"))
+
+
+def _tail_lines(path: Path, n: int) -> tuple[int, list[str]]:
+    """``(total non-blank lines, the last n of them)`` streaming the file, so a
+    large JSONL log is never held in memory whole (v1.13)."""
+    tail: deque[str] = deque(maxlen=n)
+    total = 0
+    with path.open("rb") as fh:
+        for raw in fh:
+            ln = raw.decode("utf-8", errors="replace").rstrip("\r\n")
+            if ln.strip():
+                total += 1
+                tail.append(ln)
+    return total, list(tail)
 
 
 class Tools:
@@ -97,15 +116,11 @@ class Tools:
         path = self.research / "lifecycle_transitions.jsonl"
         if not path.is_file():
             raise ToolError("not found: lifecycle log")
-        lines = [
-            ln
-            for ln in path.read_text(encoding="utf-8", errors="replace").splitlines()
-            if ln.strip()
-        ]
         n = max(1, min(int(tail), MAX_ROWS))
-        first = len(lines) - min(n, len(lines)) + 1
-        rows = [{"line": first + i, **json.loads(ln)} for i, ln in enumerate(lines[-n:])]
-        return self._out("lifecycle_log", {"total": len(lines), "rows": rows}, "lifecycle")
+        total, lines = _tail_lines(path, n)
+        first = total - len(lines) + 1
+        rows = [{"line": first + i, **json.loads(ln)} for i, ln in enumerate(lines)]
+        return self._out("lifecycle_log", {"total": total, "rows": rows}, "lifecycle")
 
     def alpha_report(self, alpha_id: str) -> dict[str, Any]:
         path = self.research / "alpha_reports" / f"{_ident(alpha_id, 'alpha_id')}.json"

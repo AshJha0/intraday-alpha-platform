@@ -200,3 +200,38 @@ def test_flatten_lead_stops_quoting_early(events):
     assert b.counters["flatten_start_ts"] >= end + 1 - lead
     _identity(a)
     _identity(b)
+
+
+# ---- v1.13 X-P1-3: quoting in ticks, inert-skew diagnostics -------------------
+
+
+def test_inert_skew_is_visible_in_the_summary(events):
+    # a tiny score (0.01 bp) cannot move a dollar-priced quote by a tick
+    sc = make_scores(events, skill=0.0).assign(expected_return=1e-6)
+    s = QuotingBacktester(exec_config(), QuotingConfig()).run_instrument(events, sc, INS).summary()
+    # (only decisions whose dollar reservation price sits within 0.01 tick
+    # of a rounding boundary can move)
+    assert s["frac_decisions_skew_changed_quote"] < 0.1
+    assert s["ticks_behind_touch_mean"] is not None and s["ticks_behind_touch_max"] >= 0
+
+
+def test_ticks_mode_moves_quotes(events):
+    sc = make_scores(events, skill=0.0).assign(expected_return=1e-6)
+    # one tick of skew: alpha_weight * er * mid / tick = 1 at the median mid
+    mid = float(np.median(mid_series(events)[1]))
+    w = TICK / (1e-6 * mid)
+    cfg = QuotingConfig(skew_mode="ticks", alpha_weight=w, h_min_ticks=1, as_floor=False)
+    s = QuotingBacktester(exec_config(), cfg).run_instrument(events, sc, INS).summary()
+    assert s["frac_decisions_skew_changed_quote"] > 0.5
+    flat = QuotingConfig(skew_mode="ticks", alpha_weight=0.0, h_min_ticks=1, as_floor=False)
+    s0 = QuotingBacktester(exec_config(), flat).run_instrument(events, sc, INS).summary()
+    assert s0["frac_decisions_skew_changed_quote"] == 0.0
+    # h_min_ticks=1 quotes one tick behind the touch (the no-cross clamp aside)
+    assert s0["ticks_behind_touch_median"] == 1.0
+
+
+def test_ticks_mode_validation():
+    with pytest.raises(ValueError):
+        QuotingConfig(skew_mode="dollars")
+    with pytest.raises(ValueError):
+        QuotingConfig(h_min_ticks=-1)

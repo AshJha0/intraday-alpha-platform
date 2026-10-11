@@ -15,6 +15,12 @@ board unchanged and v1.9 entries (no ``auth``) verify under v1.10: no
 migration is needed.  A plain hash chain can be rebuilt by anyone with
 write access (re-chaining); :meth:`Blackboard.verify_signatures` and
 :mod:`iap.agents.anchor` (G3) are the external checks that catch it.
+
+v1.13 (G-P2-1): :meth:`Blackboard.append` verifies and appends under an
+exclusive :class:`iap.experiment.locking.FileLock` on ``<board>.lock``, so
+two writers can no longer both verify the same head and write two entries
+with the same ``seq``.  ``ts`` must be non-decreasing along the board; an
+append stamped earlier than the head entry is refused.
 """
 
 from __future__ import annotations
@@ -56,8 +62,9 @@ def _mac(key: bytes, agent: str, op: Any, args_digest: Any, nonce: Any) -> str:
 
 
 class Blackboard:
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, lock_timeout_s: float = 30.0) -> None:
         self.path = Path(path)
+        self.lock_timeout_s = float(lock_timeout_s)
 
     def entries(self) -> list[dict[str, Any]]:
         if not self.path.is_file():
@@ -121,16 +128,33 @@ class Blackboard:
         body: dict[str, Any],
         auth: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Broker-only.  Verifies the chain first so a tampered log is never extended."""
+        """Broker-only.  Verifies the chain first so a tampered log is never
+        extended; verify and append run under one exclusive file lock (v1.13)."""
+        from iap.experiment.locking import FileLock
+
         if kind not in KINDS:
             raise BlackboardError(f"unknown kind {kind!r}")
-        n = self.verify()
-        prev = self.entries()[-1]["hash"] if n else GENESIS
-        entry = {"seq": n + 1, "prev": prev, "kind": kind, "agent": agent, "ts": ts, "body": body}
-        if auth is not None:
-            entry["auth"] = auth
-        entry["hash"] = digest(entry)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("a", encoding="ascii", newline="\n") as fh:
-            fh.write(canonical(entry) + "\n")
+        with FileLock(self.path, timeout_s=self.lock_timeout_s):
+            n = self.verify()
+            last = self.entries()[-1] if n else None
+            prev = last["hash"] if last is not None else GENESIS
+            if last is not None and int(ts) < int(last.get("ts", 0)):
+                raise BlackboardError(
+                    f"ts {ts} is earlier than the head entry's ts {last.get('ts')} "
+                    "(ts must be non-decreasing)"
+                )
+            entry = {
+                "seq": n + 1,
+                "prev": prev,
+                "kind": kind,
+                "agent": agent,
+                "ts": ts,
+                "body": body,
+            }
+            if auth is not None:
+                entry["auth"] = auth
+            entry["hash"] = digest(entry)
+            with self.path.open("a", encoding="ascii", newline="\n") as fh:
+                fh.write(canonical(entry) + "\n")
         return entry

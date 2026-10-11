@@ -1,0 +1,28 @@
+{
+  "x-version": 1,
+  "description": "TEMPLATE (v1.13, X-P1-2): documented US equity regulatory fee values for the opt-in VenueSpec / CostModel fields sell_notional_fee_bps, per_share_fee_all, per_share_fee_cap, per_share_fee_sell_only. Nothing loads this file by default; copy the block for the period you replay into a venue row (configs/venues) or pass it to CostModel.with_regulatory_fees. Defaults everywhere stay 0.",
+  "periods": [
+    {
+      "label": "2019 (Nasdaq TotalView-ITCH sample days)",
+      "valid_from": "2019-04-16",
+      "sell_notional_fee_bps": 0.207,
+      "sec_section31_usd_per_million": 20.70,
+      "sec_source": "https://www.sec.gov/news/press-release/2019-30 (Fee Rate Advisory #2 FY2019: $20.70 per million for charge dates on/after 2019-04-16; $13.00 before)",
+      "per_share_fee_all": 0.000119,
+      "per_share_fee_cap": 5.95,
+      "per_share_fee_sell_only": true,
+      "finra_source": "FINRA By-Laws Schedule A Section 1 (Trading Activity Fee, covered equity sales): $0.000119 per share, max $5.95 per trade, in force in 2019; see https://www.finra.org/rules-guidance/rule-filings/sr-finra-2024-019/fee-adjustment-schedule for the schedule history"
+    },
+    {
+      "label": "current (2026)",
+      "valid_from": "2026-04-04",
+      "sell_notional_fee_bps": 0.206,
+      "sec_section31_usd_per_million": 20.60,
+      "sec_source": "https://www.sec.gov/rules-regulations/fee-rate-advisories/2026-2 (FY2026: $0.00 per million through 2026-04-03, $20.60 per million on/after 2026-04-04)",
+      "per_share_fee_all": 0.000195,
+      "per_share_fee_cap": 9.79,
+      "per_share_fee_sell_only": true,
+      "finra_source": "https://www.finra.org/rules-guidance/rule-filings/sr-finra-2024-019/fee-adjustment-schedule (TAF covered equity sales 2026: $0.000195 per share, max $9.79 per trade)"
+    }
+  ]
+}

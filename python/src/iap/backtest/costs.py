@@ -8,6 +8,9 @@ and half-spread ``hs`` (all in price units of the instrument):
     spread_cost = |q| * unit * hs               (taker crosses the spread)
     fee_cost    = |q| * fee_per_share             (EQUITY/ETF)
                 = notional * commission_per_million / 1e6   (FX)
+                + v1.13 opt-in regulatory fees (EQUITY/ETF, default 0):
+                  sell_notional_fee_bps * 1e-4 * notional on sells (SEC §31)
+                  + min(|q| * per_share_fee_all, per_share_fee_cap) (FINRA TAF)
     impact_cost = impact_bps * 1e-4 * |q| * unit * m
     impact_bps  = impact_coeff_bps_per_pct_adv * (|q| * unit / adv * 100)
 
@@ -73,8 +76,19 @@ class CostModel:
     impact_model: str = DEFAULT_IMPACT_MODEL
     #: impact in bps of trading one full ADV (``impact_model="sqrt"`` only)
     sqrt_impact_coeff_bps: float = DEFAULT_SQRT_IMPACT_COEFF_BPS
+    #: v1.13 opt-in (X-P1-2), EQUITY/ETF only: SEC Section 31 fee on the
+    #: notional of SELL executions (qty < 0), in bps. Default 0.
+    sell_notional_fee_bps: float = 0.0
+    #: v1.13 opt-in (X-P1-2), EQUITY/ETF only: per-share fee (FINRA TAF),
+    #: capped per execution row at ``per_share_fee_cap`` (0 = no cap); on
+    #: sells only unless ``per_share_fee_sell_only`` is False. Default 0.
+    per_share_fee_all: float = 0.0
+    per_share_fee_cap: float = 0.0
+    per_share_fee_sell_only: bool = True
 
     def __post_init__(self) -> None:
+        if min(self.sell_notional_fee_bps, self.per_share_fee_all, self.per_share_fee_cap) < 0:
+            raise ValueError("regulatory fees must be >= 0")
         if self.impact_model not in IMPACT_MODELS:
             raise ValueError(f"unknown impact_model {self.impact_model!r}; known: {IMPACT_MODELS}")
         if self.sqrt_impact_coeff_bps < 0.0:
@@ -108,6 +122,34 @@ class CostModel:
             sqrt_impact_coeff_bps=float(
                 cm.get("sqrt_impact_coeff_bps", DEFAULT_SQRT_IMPACT_COEFF_BPS)
             ),
+        )
+
+    def _regulatory_fee(self, qty: np.ndarray, mid: np.ndarray) -> np.ndarray:
+        """X-P1-2: Section 31 + per-share (TAF) fee per row; qty signed."""
+        aq = np.abs(qty)
+        sell = qty < 0
+        fee = np.where(sell, self.sell_notional_fee_bps * 1e-4 * aq * mid, 0.0)
+        per = aq * self.per_share_fee_all
+        if self.per_share_fee_cap > 0.0:
+            per = np.minimum(per, self.per_share_fee_cap)
+        if self.per_share_fee_sell_only:
+            per = np.where(sell, per, 0.0)
+        return fee + per
+
+    def with_regulatory_fees(
+        self,
+        sell_notional_fee_bps: float,
+        per_share_fee_all: float,
+        per_share_fee_cap: float = 0.0,
+        per_share_fee_sell_only: bool = True,
+    ) -> CostModel:
+        """This model with the X-P1-2 regulatory fees (SEC Section 31 / FINRA TAF)."""
+        return replace(
+            self,
+            sell_notional_fee_bps=float(sell_notional_fee_bps),
+            per_share_fee_all=float(per_share_fee_all),
+            per_share_fee_cap=float(per_share_fee_cap),
+            per_share_fee_sell_only=bool(per_share_fee_sell_only),
         )
 
     def with_multiplier(self, multiplier: float) -> CostModel:
@@ -146,6 +188,8 @@ class CostModel:
         if asset_class in ("EQUITY", "ETF"):
             unit = 1.0
             fee_cost = aq * self.equity_taker_fee_per_share
+            if self.sell_notional_fee_bps or self.per_share_fee_all:
+                fee_cost = fee_cost + self._regulatory_fee(np.asarray(qty, dtype=float), mid)
         elif asset_class == "FX":
             unit = float(lot_size)
             notional = aq * unit * mid
@@ -183,6 +227,11 @@ class CostModel:
         hs = np.asarray(half_spread, dtype=float)
         if asset_class in ("EQUITY", "ETF"):
             fee = np.full(mid.shape, self.equity_taker_fee_per_share)
+            if self.sell_notional_fee_bps or self.per_share_fee_all:
+                # one of the two legs is a sale: half the regulatory fee per
+                # leg (size-free, so the per-trade cap is not applied)
+                per_share = self.per_share_fee_all * (0.5 if self.per_share_fee_sell_only else 1.0)
+                fee = fee + 0.5 * self.sell_notional_fee_bps * 1e-4 * mid + per_share
         elif asset_class == "FX":
             fee = mid * self.fx_commission_per_million / 1e6
         else:

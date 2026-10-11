@@ -64,7 +64,10 @@ this module is self-contained:
 5. **Fees.** Equity: ``taker_fee_per_share * qty`` (taker), ``-
    maker_rebate_per_share * qty`` (maker). FX: ``commission_per_million *
    notional / 1e6`` on every fill, ``notional = qty * qty_unit *
-   price_ticks * tick_size``.
+   price_ticks * tick_size``. v1.13 opt-in (default 0, X-P1-2), equity
+   only: plus ``sell_notional_fee_bps * 1e-4 * notional`` on SELL fills (SEC
+   Section 31) and ``min(per_share_fee_all * qty, per_share_fee_cap)`` (FINRA
+   TAF; sells only unless ``per_share_fee_sell_only`` is false).
 6. **Linear impact** (taker fills only; the ``impact_model = "linear"`` rule
    of ``iap.backtest.costs``, whose research default is the square root
    since v1.5.0 — this simulator rule did not change):
@@ -312,9 +315,18 @@ class ExecutionSimulator:
             ins = self._instrument(o.instrument_id)
             notional = float(qty) * ins.qty_unit * float(price_ticks) * ins.tick_size
             return v.commission_per_million * notional / 1e6
-        if liq == Liquidity.TAKER:
-            return v.taker_fee_per_share * float(qty)
-        return -v.maker_rebate_per_share * float(qty)
+        base = (
+            v.taker_fee_per_share * float(qty)
+            if liq == Liquidity.TAKER
+            else -v.maker_rebate_per_share * float(qty)
+        )
+        if v.sell_notional_fee_bps or v.per_share_fee_all:
+            # v1.13 opt-in regulatory fees (X-P1-2); skipped at the defaults
+            # so the pinned fee arithmetic stays byte-identical.
+            ins = self._instrument(o.instrument_id)
+            notional = float(qty) * ins.qty_unit * float(price_ticks) * ins.tick_size
+            base += v.regulatory_fee(o.side, float(qty), notional)
+        return base
 
     def _emit_fill(
         self, o: ChildOrder, price_ticks: int, qty: int, ts: int, liq: Liquidity
@@ -666,10 +678,7 @@ class ExecutionSimulator:
         # The book's own record of the order an EXECUTE names (side, price, qty).
         exec_order: tuple[int, int, int] | None = None
         if self._resting and pre_open and et == EventType.EXECUTE:
-            for boid, bside, bprice, bqty in pre.resting_orders():
-                if boid == ev.order_id:
-                    exec_order = (bside, bprice, bqty)
-                    break
+            exec_order = pre.order(ev.order_id)
         level_before: list[tuple[int, int]] = []
         if self._resting and et in (EventType.CANCEL, EventType.MODIFY):
             level_before = self._level_before(ev, pre)

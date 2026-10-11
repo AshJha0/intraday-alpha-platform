@@ -33,7 +33,10 @@ Pinned rules (``MakerBacktester.run_instrument``):
    linear impact for ``exit="taker"``, 0 for ``exit="mid"`` (a mark-to-mid
    diagnostic, not a tradable exit), and for ``exit="passive"`` the
    expectation ``p * (-half_spread - rebate) + (1 - p) * taker_exit_cost``
-   with ``p`` = ``passive_exit_fill_prob``, else the calibration's touch
+   with ``p`` = ``passive_exit_fill_prob``, else (v1.13 X-P2-8) the
+   ``fill_hazard`` model's ``P(fill within exit_timeout_ns)`` for the exit
+   side at decision time, else the calibration's TTL-censored
+   ``fill_rates.all.p_fill_within[exit_timeout_ns]`` cell, else the touch
    ``p_any_fill``, else 0.5. ``adverse_selection`` is the
    calibration's measured maker markout at ``as_horizon`` (per instrument
    when available), else ``MakerConfig.adverse_selection_bps``, else 0
@@ -141,8 +144,9 @@ class MakerConfig:
     exit_timeout_ns: int = 1_000_000_000
     #: reposts at the new touch after a timeout before crossing the remainder
     exit_reprices: int = 0
-    #: P(passive exit fills) the gate assumes; None = the calibration's
-    #: touch ``p_any_fill``, else 0.5
+    #: P(passive exit fills) the gate assumes; None = hazard model at
+    #: exit_timeout_ns, else the TTL-censored calibration cell, else the
+    #: calibration's touch ``p_any_fill``, else 0.5 (rule 3)
     passive_exit_fill_prob: float | None = None
     # ---- M4 tail conditions (None / 0 = off) ----
     min_spread_ticks: int = 1
@@ -438,11 +442,20 @@ class MakerBacktester:
         # passive-exit ledger of the current trip
         xl: dict[str, Any] = {"qty": 0, "px_sum": 0.0, "fees": 0.0, "reprices": 0}
         p_exit = cfg.passive_exit_fill_prob
+        # v1.13 X-P2-8: with no explicit probability, the passive exit uses
+        # the hazard model's P(fill within exit_timeout_ns | state) when a
+        # fill_hazard is given (per decision, below), else the calibration's
+        # TTL-censored cell at exit_timeout_ns when present, else the
+        # pre-v1.13 horizon-free touch p_any_fill, else 0.5.
+        hazard_exit = p_exit is None and cfg.exit == "passive" and self.fill_hazard is not None
         if p_exit is None:
             p_any = None
             if self.calibration is not None:
                 fr = (self.calibration.doc.get("fill_rates") or {}).get("all") or {}
-                p_any = fr.get("p_any_fill")
+                cell = (fr.get("p_fill_within") or {}).get(str(int(cfg.exit_timeout_ns)))
+                p_any = cell.get("p") if isinstance(cell, dict) else None
+                if p_any is None:
+                    p_any = fr.get("p_any_fill")
             p_exit = float(p_any) if p_any is not None else 0.5
         entry: dict[str, Any] = {}
         seen_fills = 0
@@ -462,7 +475,7 @@ class MakerBacktester:
                 return -venue.commission_per_million / 100.0
             return 1e4 * venue.maker_rebate_per_share / mid
 
-        def exit_cost_bps(mid: float, hs: float) -> float:
+        def exit_cost_bps(mid: float, hs: float, p_x: float | None = None) -> float:
             if cfg.exit == "mid":
                 return 0.0
             fee = (
@@ -475,10 +488,11 @@ class MakerBacktester:
             if cfg.exit == "passive":
                 # expected: earn the half-spread + rebate when the post fills,
                 # cross as a taker otherwise
-                return p_exit * (-1e4 * hs / mid - rebate_bps(mid)) + (1.0 - p_exit) * taker
+                p = p_exit if p_x is None else p_x
+                return p * (-1e4 * hs / mid - rebate_bps(mid)) + (1.0 - p) * taker
             return taker
 
-        def p_fill(side: int, bs, t: int) -> float:
+        def p_fill(side: int, bs, t: int, within_ns: int | None = None) -> float:
             (bpx, bq), (apx, aq) = bs
             ours, far = (bq, aq) if side == 0 else (aq, bq)
             dep = (
@@ -493,7 +507,8 @@ class MakerBacktester:
                 depletion_per_s=dep,
                 ts_ns=t,
             )
-            return float(self.fill_hazard.p_fill_within(x, cfg.ttl_ns))
+            horizon = cfg.ttl_ns if within_ns is None else within_ns
+            return float(self.fill_hazard.p_fill_within(x, horizon))
 
         def submit_entry(t: int, side: int, qty: int, limit: int) -> None:
             oid = sim.submit(
@@ -607,7 +622,9 @@ class MakerBacktester:
             if not tail_ok:
                 c["tail_out"] += 1
                 return
-            edge = 1e4 * abs(e) + 1e4 * hs / mid + rebate_bps(mid) - exit_cost_bps(mid, hs)
+            # X-P2-8: the exit post rests on the other side for exit_timeout_ns
+            p_x = p_fill(1 - side, bs, int(ts[r]), cfg.exit_timeout_ns) if hazard_exit else None
+            edge = 1e4 * abs(e) + 1e4 * hs / mid + rebate_bps(mid) - exit_cost_bps(mid, hs, p_x)
             if not edge > as_bps + cfg.margin_bps:
                 c["gated_out"] += 1
                 return
@@ -753,6 +770,7 @@ class MakerBacktester:
 
         r = 0
         n = int(ts.size)
+        ts_ref: list = [None, None]  # [exchange_ts, mid before its first event]
         for ev in events:
             if ev.instrument_id != instrument_id:
                 continue
@@ -776,6 +794,14 @@ class MakerBacktester:
             pre_mid = None if bs is None else 0.5 * (bs[0][0] + bs[1][0]) * tick
             if pre_mid is not None:
                 last_mid[0] = pre_mid
+            if t != ts_ref[0]:
+                # v1.13 (X-P1-4): the AS / markout reference of a MAKER fill
+                # is the mid before the FIRST event of its exchange_ts — the
+                # rule of tca/markout.py and execution/calibration.py
+                # (``prevailing(ts - 1)``), not the mid before the fill's own
+                # event inside a same-timestamp burst.
+                ts_ref[0] = t
+                ts_ref[1] = pre_mid
             sim.on_event(ev)
             fills = sim.fills
             while seen_fills < len(fills):
@@ -792,7 +818,7 @@ class MakerBacktester:
                 if f.order_id != st["order"]:
                     continue
                 if st["pos"] == 0:
-                    ref = pre_mid if f.liquidity == Liquidity.MAKER else None
+                    ref = ts_ref[1] if f.liquidity == Liquidity.MAKER else None
                     if ref is None:
                         ref = last_mid[0] if last_mid[0] is not None else f.price_ticks * tick
                     entry.clear()

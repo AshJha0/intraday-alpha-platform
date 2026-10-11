@@ -370,6 +370,14 @@ def run_scenario(
         client, session, spec["task"](ctx), model=model, effort="low", secret=secret
     )
     row = spec["check"](ws, sid, summary, ctx)
+    if mode == "live":
+        # G-P2-12: the API must serve exactly the pinned id that was requested.
+        served = summary.get("served_models", [])
+        mismatch = [m for m in served if m != model]
+        row["served_models"] = served
+        if mismatch or not served:
+            row["model_mismatch"] = mismatch or ["<none reported>"]
+            row["ok"] = False
     row.update(
         {
             "eval": name,

@@ -583,6 +583,18 @@ ratio is what a caller that needs only the native slots saves. It is not a
 pipeline speed-up: `--engine rust` still runs the Python engine for the
 other families.
 
+Pipeline memory (`python -m iap.features`, v1.13.0, plan item E5). The
+build no longer holds a day as Python objects: events are streamed from the
+IAP1 file (`iap.core.codec.iter_iap1`, CRC checked before the first event),
+the label mid series is a `CompactMidSeries` (typed arrays, same values),
+row timestamps and validity are typed arrays, and the float64 row values
+are spooled to a temporary file under `--out-dir` and read back one
+instrument at a time when its row group is written. The output is
+byte-identical (parquet and summary) for every option combination. On a
+3-day synthetic set the serial peak RSS fell from 672 MB to 234 MB
+(`tools/bench_feature_memory.py`; docs/REAL_DATA.md §10). The spool needs
+free disk of about rows x features x 8 bytes for the largest day.
+
 ## 8. Extended feature set and event-time sampling (opt-in, v1.12.0)
 
 `iap.features.extended` adds Python-only features and a second row clock.

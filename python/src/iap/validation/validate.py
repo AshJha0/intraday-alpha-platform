@@ -183,7 +183,10 @@ the ledger debits exactly that.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -259,7 +262,7 @@ GATES = {
 }
 
 #: PROMOTE t-stat threshold policies (module docs): default, then legacy.
-TSTAT_THRESHOLD_POLICIES = ("ledger", "fixed")
+TSTAT_THRESHOLD_POLICIES = ("ledger", "fixed", "prereg")
 DEFAULT_TSTAT_THRESHOLD = "ledger"
 LEGACY_TSTAT_THRESHOLD = "fixed"
 
@@ -381,6 +384,23 @@ def effective_gates(
         )
     if tstat_threshold == "fixed":
         return GATES
+    if tstat_threshold == "prereg":
+        # v1.13 (R-P1-2): the threshold is a number written in the
+        # pre-registration before the run, NOT the running ledger count, so
+        # a holdout's verdict does not depend on the order its hypotheses
+        # ran in.  The caller passes it as ``ledger_t_threshold``.
+        if (
+            ledger_t_threshold is None
+            or not np.isfinite(ledger_t_threshold)
+            or ledger_t_threshold <= 0.0
+        ):
+            raise ValueError(
+                "tstat_threshold='prereg' needs the finite positive t threshold fixed in "
+                "the pre-registration (passed as ledger_t_threshold / prereg_t_threshold)"
+            )
+        gates = dict(GATES)
+        gates["min_nw_tstat"] = max(float(GATES["min_nw_tstat"]), float(ledger_t_threshold))
+        return gates
     if (
         ledger_t_threshold is None
         or not np.isfinite(ledger_t_threshold)
@@ -570,6 +590,9 @@ def validate_alpha(
     cpcv_test_groups: int = DEFAULT_CPCV_TEST_GROUPS,
     deflated_sharpe: bool = False,
     deflated_sharpe_trials: int | None = None,
+    deflated_sharpe_trials_basis: str = "distinct_configurations",
+    frozen_params: Mapping[str, Any] | None = None,
+    prereg_t_threshold: float | None = None,
 ) -> dict:
     """Full validation of one alpha.  ``model_factory()`` returns a fresh
     unfitted model (a fresh instance per fold — no state bleeds across).
@@ -579,7 +602,18 @@ def validate_alpha(
     rule is named.  ``backtester`` is used with the alpha's label horizon set
     (:meth:`Backtester.for_horizon`).  ``seed`` seeds the P&L bootstrap
     (pass ``ExperimentSpec.seed``); ``ledger_looks`` is recorded beside the
-    threshold it produced."""
+    threshold it produced.
+
+    v1.13 (R-P1-2), both opt-in and absent from the report when unused:
+    ``frozen_params`` (a :meth:`AlphaModel.params` blob fitted elsewhere)
+    additionally scores EVERY row of ``frames`` with those parameters and
+    no refit, reported as ``frozen_ic`` / ``frozen_t`` (and a ``frozen``
+    block) beside the refit walk-forward statistics; ``prereg_t_threshold``
+    sets ``tstat_threshold="prereg"``: the gate t threshold is that number,
+    fixed in the pre-registration, not the ledger count."""
+    if prereg_t_threshold is not None:
+        tstat_threshold = "prereg"
+        ledger_t_threshold = float(prereg_t_threshold)
     gates = effective_gates(tstat_threshold, ledger_t_threshold)
     if significance not in SIGNIFICANCE_STATISTICS:
         raise ValueError(f"unknown significance {significance!r}; known: {SIGNIFICANCE_STATISTICS}")
@@ -908,8 +942,19 @@ def validate_alpha(
             _daily_pnl(results_1x),
             int(deflated_sharpe_trials),
             n_looks=None if ledger_looks is None else int(ledger_looks),
+            trials_basis=deflated_sharpe_trials_basis,
         )
-    if tstat_threshold != "fixed":
+    if frozen_params is not None:
+        frozen = frozen_params_block(
+            model_factory, uframes, frozen_params, horizon, horizon_ns, ic_rows, single_venue
+        )
+        extras["frozen"] = frozen
+        extras["frozen_ic"] = frozen["frozen_ic"]
+        extras["frozen_t"] = frozen["frozen_t"]
+    if tstat_threshold == "prereg":
+        extras["tstat_threshold_policy"] = tstat_threshold
+        extras["prereg_t_threshold"] = float(ledger_t_threshold)
+    elif tstat_threshold != "fixed":
         extras["tstat_threshold_policy"] = tstat_threshold
         extras["ledger_t_threshold"] = float(ledger_t_threshold)
         extras["ledger_looks"] = None if ledger_looks is None else int(ledger_looks)
@@ -982,6 +1027,10 @@ def validate_alpha(
         "ic_bucket_pairs_uncrossed": bucket_size_summary(bcounts_unc),
         "fold_sign_consistency": _fnum(sign_consistency),
         "hypothesis_confirmed": hypothesis_confirmed,
+        # v1.13 (R-P2-1), additive: the share of folds whose fitted beta is
+        # positive.  ``hypothesis_confirmed`` above still reads the last
+        # fold only (v1.14 makes it read this).
+        "beta_sign_consistency": beta_sign_consistency(fold_rows),
         "leakage": leak,
         "decay_ic_by_horizon": decay_out,
         "turnover_flips_per_hour": _fnum(turnover),
@@ -1000,6 +1049,57 @@ def validate_alpha(
         # alpha fails (the verdict is PROMOTE iff all are true).
         "promote_gates": promote_gates,
         "verdict": verdict,
+    }
+
+
+def beta_sign_consistency(fold_rows) -> float | None:
+    """Fraction of folds whose fitted ``beta_fit`` is > 0 (``None`` when no
+    fold reports a finite one).  Additive in v1.13 (R-P2-1)."""
+    betas = []
+    for r in fold_rows:
+        b = r.get("beta_fit")
+        if b is not None and np.isfinite(float(b)):
+            betas.append(float(b))
+    if not betas:
+        return None
+    return float(sum(1 for b in betas if b > 0.0) / len(betas))
+
+
+def frozen_params_block(
+    model_factory,
+    frames: Mapping[int, pd.DataFrame],
+    params,
+    horizon: str,
+    horizon_ns: int,
+    ic_rows: str = DEFAULT_IC_ROWS,
+    single_venue: bool = False,
+) -> dict:
+    """Score ``frames`` with ``params`` loaded into a fresh model, NO refit
+    (v1.13, R-P1-2).  The IC and pooled-slope HAC t are computed on the
+    standardized signal over the same (uncrossed) rows the gate reads."""
+
+    model = model_factory()
+    model.load_params(dict(params))
+    scores = model.score(frames)
+    ts, er, y, crossed = _pooled_arrays(scores, frames, horizon, ic_rows)
+    if single_venue:
+        crossed = np.zeros_like(crossed)
+    beta = float(model.params().get("beta", 0.0) or 0.0)
+    z = er / beta if beta != 0.0 else er
+    unc = ~crossed
+    lags = nw_lags(horizon_ns)
+    f_ic = ic(z[unc], y[unc])
+    f_t = pooled_slope_hac_tstat(ts[unc], z[unc], y[unc], lags=lags)
+    return {
+        "mode": "frozen_params",
+        "refit": False,
+        "frozen_ic": _fnum(f_ic),
+        "frozen_t": _fnum(f_t),
+        "n_pairs": int(np.sum(np.isfinite(z[unc]) & np.isfinite(y[unc]))),
+        "beta": _fnum(beta),
+        "params_sha256": hashlib.sha256(
+            json.dumps(dict(params), sort_keys=True, default=str).encode()
+        ).hexdigest(),
     }
 
 

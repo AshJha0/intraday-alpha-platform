@@ -59,9 +59,11 @@ manifest.
 
 ## 2. Obtaining data
 
-Nothing is bundled and nothing is downloaded by any code in this repository
+Nothing is bundled, and the library downloads nothing
 (`python/tests/test_import_policy.py` forbids network clients in
-`iap.marketdata`). You obtain the files, under the provider's terms:
+`iap.marketdata`); the one downloader, `tools/r7_download.py` (v1.13),
+refuses to run without `--i-have-approval` and fetches only allowlisted
+hosts. You obtain the files, under the provider's terms:
 
 - **Nasdaq TotalView-ITCH 5.0** — historical daily files are a Nasdaq data
   product; the vendor also publishes sample files of the same format. One
@@ -81,6 +83,28 @@ data/real/       ingest writes dataset directories here
 
 Both are in `.gitignore`. A dataset directory can live anywhere else; these
 are only the places that are safe by default.
+
+### 2.1 Data source and terms (v1.13)
+
+- **Source.** Every real session used here is a Nasdaq TotalView-ITCH 5.0
+  sample file from the public directory at `emi.nasdaq.com`. The directory
+  showed no licence or terms text as of 2026-10-11.
+- **Never redistributed.** Raw files, normalized datasets and feature stores
+  stay under the git-ignored `data/vendor/` and `data/real/`; none of them is
+  committed or published.
+- **What is published.** Only aggregate derived statistics (ICs,
+  t-statistics, P&L summaries, counts, per-symbol summary statistics) that
+  cannot be used to reconstruct the underlying data, which is how the
+  Nasdaq Data Policies (v2.6) define "Derived Data".
+- **Limits.** Commercial use of the data would need a Nasdaq Global Data
+  Agreement. Historical TotalView-ITCH is listed as "Not Eligible" for
+  delayed redistribution, so this repository does not redistribute it in
+  any form.
+- **Stale dataset.** `data/real/ds_20191230` was ingested before the
+  tick-size fix (§4.1; tick 0.0001) and is being replaced by a correct
+  re-ingest. Do not use it; the examples below use the `ds3_*` datasets.
+
+This is a description of what the repository does, not legal advice.
 
 ## 3. From a downloaded file to an alpha report
 
@@ -148,7 +172,7 @@ and treated an ingested ETF as a constituent.
 ```bash
 # single-day datasets ingested separately (in parallel processes if you like)
 # -> one multi-day dataset, without parsing the source files again
-PYTHONPATH=src python3 -m iap.marketdata merge     ../data/real/ds_20190130 ../data/real/ds_20190327 ../data/real/ds_20191230     --out ../data/real/multi
+PYTHONPATH=src python3 -m iap.marketdata merge     ../data/real/ds3_20190130 ../data/real/ds3_20190327 ../data/real/ds3_20190730     --out ../data/real/multi
 
 # all 24 alphas, the day-1-fit / day-2 backtest and the ensembles
 # (--out-dir is required: research/alpha_reports stays the synthetic record)
@@ -241,12 +265,27 @@ hypotheses were written on `research/agents/blackboard.jsonl` and pushed
 feature existed; each names alpha, horizon, expected sign and the pass rule.
 Data: the two full XNAS ITCH days merged (`dataset_version d7f7ffd1…`), same
 universe (AAPL, MSFT, QQQ) and the same feature registry (`585dd7b9…`) as the
-2019–20 sessions; parameters, cost model and methods frozen at v1.7.2.
+2019–20 sessions.
+
+**What was frozen, and what was not (wording corrected in v1.13, review
+R-P1-2; the numbers below are unchanged).** Frozen at the v1.7.2 tree: the
+alpha definitions (features, functional form, sign rationale), the
+horizons, the universe, the cost model and the `v2` method bundle. The
+fitted model parameters were **not** frozen: the runner's walk-forward
+refits each alpha's `mu`, `sigma` and `beta` per fold on the 2026 rows
+themselves (earlier 2026 folds train, later 2026 folds test), so every IC
+and t in the table is an out-of-time test of the *specification*, not of
+the 2019–20 fitted coefficients. v1.13 adds a no-refit scoring mode
+(`frozen_params`, reported as `frozen_ic` / `frozen_t`) for future holdouts.
 
 **Pass rule (registered):** leakage passes, the gate IC has the registered
 sign and the gate t reaches the run's Bonferroni threshold on the holdout
-dataset's own, fresh ledger (84 looks per run, so the threshold rises from
-3.43 to 3.89 in run order). A positive IC below the threshold is "weaker, not
+dataset's own, fresh ledger. That threshold depended on run order: each run
+added 84 looks, so it rose from 3.43 (first run, EQ01) to 3.89 (last run,
+EQ04), and the same statistic could pass or fail depending on when its
+hypothesis ran. Future holdouts use a threshold fixed as a number in the
+pre-registration (`threshold_policy="prereg"`, v1.13), not the running
+ledger count. A positive IC below the threshold is "weaker, not
 confirmed". Statistical only: no P&L claim was registered.
 
 | Hypothesis | Role | 2019–20 gate IC (t) | 2026 gate IC | 2026 t | Threshold | Outcome |
@@ -318,6 +357,19 @@ primary cell, on two days. An interval that spans zero by hundreds of basis
 points is not evidence of an edge and not evidence against one: the study
 is underpowered (LEARN.md §42). The opening cell's narrower interval rests
 on two sessions. No look beyond the registered cells was taken.
+
+**Caveat: MOC entry cutoff (v1.13, quality review X-P1-5).** The `C-300s`
+cell exits in the closing cross from a decision 300 s before the close, at
+15:55 ET. That is exactly Nasdaq's market-on-close entry cutoff (15:55 ET
+since October 2018; `configs/reference/auction_entry_cutoffs.json` cites
+the sources), so the exit order would not have been accepted, and the
+in-sample +19.4 bp prices an exit that was not available. The recorded
+numbers above are left as they were run; they were computed under the
+pre-v1.13 rule. From v1.13 `iap.auction` refuses a cross exit at
+`time_to_cross_s <= cutoff` and prices that row as a taker exit
+(`exit_used = taker`); `--no-entry-cutoff` reproduces the recorded run. The
+`O-300s` cell (09:25 ET, before the 09:28 MOO cutoff) is not affected. The
+holdout verdict does not change: it made no trade.
 
 **2026 holdout: running.** Declared in the pre-registration before any 2026
 auction data was extracted, with the `C-300s` fit frozen from the in-sample
@@ -393,7 +445,18 @@ publishes it within the inside quotes, but it is a proxy; the report says
 `mid_source`). Pass `--mids mids.csv` (`symbol,ts,mid[,half_spread]`, epoch
 ns, dollars) exported from the normalized book for a true mid and spread.
 With two sessions the walk-forward has one test day; it needs the 9+ days on
-disk to say anything.
+disk to say anything. Since v1.13 `--exit cross` at `--decision-s 300` on the closing
+cross falls back to taker pricing (the MOC cutoff caveat above); add
+`--no-entry-cutoff` to reproduce a pre-v1.13 report.
+
+### 3.4 More sessions and symbols: the R7 data plan (v1.13, DRAFT)
+
+The free unseen ITCH days on Nasdaq's sample directory (10 sessions,
+88.75 GB, 2019-10-18 to 2026-06-12), a seeded tier-2 draw, the A2 symbol
+list, disk/time estimates and the files awaiting the owner's approval are in
+[R7_DATA_PLAN.md](R7_DATA_PLAN.md). `python -m iap.marketdata plan-ingest`
+writes a resumable batch ingest from that manifest; nothing downloads
+without `tools/r7_download.py --i-have-approval` (COOKBOOK recipe 66).
 
 ## 4. Mapping to canonical events
 
@@ -816,6 +879,48 @@ normalisation; per-symbol parallelism of pass 2 and a Rust decoder (backlog
 XD07) are the larger steps. The Python feature engine still uses the
 reference book and is the slow stage on a liquid name.
 
+**Feature build memory (v1.13.0, plan item E5).** A 2026 day used about
+10 GB of 16 GB in `python -m iap.features`, and with `--workers` every
+worker holds a day. The same pattern as the v1.8.0 ingest fix now applies
+to the feature build: events are streamed from the IAP1 file 65,536
+records at a time (`iter_iap1`; magic, size and CRC-32 are checked before
+the first event), the per-refresh label mid series is held in typed arrays
+(`CompactMidSeries`, 25 bytes a sample instead of four boxed list entries),
+row timestamps / validity / the parallel build's profile log are typed
+arrays, and the float64 row values -- rows x features x 8 bytes, the
+largest part of a day -- are spooled to a file under `--out-dir/.spool_<pid>`
+and read back one instrument at a time when its row group is written. The
+Rust overlay and the parallel norm_* patch are recorded per column and
+applied at that point, in the old order. Labels keep the same two-pointer
+sweep. Parquet bytes and the summary (except `runtime_seconds`) are
+identical to v1.12.0 for the default build, `--workers 2/3`,
+`--label-freshness trailing`, `--feature-set extended`, `--sampling
+events:N` / `volume:N` and `--engine rust` (checked against the v1.12.0
+tree; `test_feature_memory.py` and `test_feature_parallel.py` keep the
+pieces pinned). Measured with `tools/bench_feature_memory.py` (serial
+build, 3 synthetic days, `--slots 6000`, 100 ms cadence, 200 MB of
+normalized input, Windows laptop, Python 3.12):
+
+| Build | Peak RSS | Wall time |
+|---|---:|---:|
+| v1.12.0 | 672 MB | 192.5 s |
+| v1.13.0 (E5) | 234 MB | 184.9 s |
+
+2.9x less peak memory, no slower. What remains resident is one day's engine
+state, the per-instrument timestamps, validity and mid series, and one
+instrument's row group while it is written. The spool needs free disk of
+about rows x features x 8 bytes for the day in flight. Not yet re-measured
+on a real day (two real-data jobs were using the machine); the validation
+command, expected to go from ~10 GB to roughly a third of that:
+
+    PYTHONPATH=python/src python -m iap.features --data-dir <real normalized dir> \
+        --out-dir <scratch out> --files <one 2026 day>.normalized.iap1 --workers 1
+
+reading peak working set from Task Manager / `/usr/bin/time -v`, then
+comparing the parquet bytes with the v1.12.0 store of that day.
+`--worker-mem-gb` keeps its default of 5 until that measurement; on a
+16 GB machine 3 workers should then fit where 2 did.
+
 **On synthesised input** (`test_parser_throughput_smoke_and_bounded_memory`
 prints the figures of its own run; it asserts only a generous lower bound):
 
@@ -830,8 +935,8 @@ orders of the universe; mapped events go to a fixed-width spool file, not a
 list (3.2 MB peak traced while streaming an 8.4 MB file, independent of
 file size). Pass 2 and the normaliser then hold one session's universe
 events in memory (about 2.7 GB for the 5.4 million events above), as the
-normaliser does for synthetic data, and so does the feature pipeline —
-that, not the reader, bounds the size of a universe.
+normaliser does for synthetic data; the feature pipeline streams them
+since v1.13.0 (above).
 
 ## 11. Known limitations
 

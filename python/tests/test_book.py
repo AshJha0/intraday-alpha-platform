@@ -336,3 +336,14 @@ def test_consolidated_trade_flow_and_checkpoint():
     restored = ConsolidatedBook.restore(cp)
     assert restored.checkpoint() == cp
     assert restored.trade_flow() == 70
+
+
+def test_order_lookup_matches_resting_orders_scan():
+    """E-P1-1: O(1) ``order(id)`` agrees with the ``resting_orders()`` scan."""
+    b = _seeded()
+    b.apply(mkev(6, EventType.EXECUTE, Side.BID, 2449, 40, order_id=11))
+    scan = {oid: (s, p, q) for oid, s, p, q in b.resting_orders()}
+    for oid in (11, 12, 13, 21, 22):
+        assert b.order(oid) == scan[oid]
+    assert b.order(11) == (int(Side.BID), 2449, 60)
+    assert b.order(999) is None

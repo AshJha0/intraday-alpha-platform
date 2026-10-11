@@ -37,6 +37,13 @@ from test_maker_economics import INS, T0, VEN, exec_config, make_scores, synth_e
 # (origin/main) before any X4 change.
 DEFAULT_FINGERPRINT = "03acb089cf6d9ffcc1d38ec6580527bdd41432f709ebf673e60ce6beb657ae84"
 
+V113_QUOTING_DIAGNOSTICS = (
+    "ticks_behind_touch_mean",
+    "ticks_behind_touch_median",
+    "ticks_behind_touch_max",
+    "frac_decisions_skew_changed_quote",
+)
+
 
 @pytest.fixture(scope="module")
 def events():
@@ -54,7 +61,12 @@ def test_default_outputs_byte_identical(events):
         h.update(json.dumps(r.summary(), sort_keys=True, default=str).encode())
     q = QuotingBacktester(exec_config()).run_instrument(events, sc, INS)
     h.update(q.fills.to_csv(lineterminator="\n").encode())
-    h.update(json.dumps(q.summary(), sort_keys=True, default=str).encode())
+    # v1.13 X-P1-3 ADDS diagnostic keys to the quoting summary (rule 8); they
+    # are excluded here so the pin still proves every pre-existing output is
+    # byte-identical (X-P1-4's markout reference does not move this vector:
+    # no maker fill lands inside a same-timestamp burst).
+    qs = {k: v for k, v in q.summary().items() if k not in V113_QUOTING_DIAGNOSTICS}
+    h.update(json.dumps(qs, sort_keys=True, default=str).encode())
     assert h.hexdigest() == DEFAULT_FINGERPRINT
 
 

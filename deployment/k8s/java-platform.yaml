@@ -68,8 +68,8 @@ spec:
       containers:
         - name: java-platform
           # Release step: pin by digest from release-manifest.json
-          # (ghcr.io/ashjha0/intraday-alpha-platform-java:v1.12.0@sha256:...).
-          image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.12.0
+          # (ghcr.io/ashjha0/intraday-alpha-platform-java:v1.13.0@sha256:...).
+          image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.13.0
           imagePullPolicy: IfNotPresent
           ports:
             - name: metrics
@@ -155,7 +155,7 @@ spec:
         # (and so the java-platform Service) is still driven by the trading
         # container alone, which stays not-Ready while stopped.
         - name: session-state
-          image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.12.0
+          image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.13.0
           imagePullPolicy: IfNotPresent
           command: ["java", "-Xmx64m", "-XX:-UsePerfData", "-cp", "/app/classes", "com.iap.platform.SessionStateExporter", "--state-dir", "/data/state", "--port", "9102"]
           ports:
@@ -216,6 +216,10 @@ spec:
                 path: mvp/mvp_tiny.json
               - key: mvp__venues.json
                 path: mvp/venues.json
+              - key: reference__auction_entry_cutoffs.json
+                path: reference/auction_entry_cutoffs.json
+              - key: reference__event_calendar.json
+                path: reference/event_calendar.json
               - key: risk__risk.json
                 path: risk/risk.json
               - key: strategies__alpha_params.json
@@ -224,6 +228,8 @@ spec:
                 path: strategies/lifecycle.json
               - key: strategies__strategies.json
                 path: strategies/strategies.json
+              - key: templates__regulatory_fees.json
+                path: templates/regulatory_fees.json
               - key: venues__venues.json
                 path: venues/venues.json
         - name: data
