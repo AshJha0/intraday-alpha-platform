@@ -1,0 +1,37 @@
+# Input for python/requirements-ci.txt (hashed).  The exact versions the CI
+# python/integration/golden/deployment jobs install: the direct dependencies
+# of python/pyproject.toml plus the dev tools plus every transitive package.
+# Dependabot bumps the pins here; regenerate the hashed file with
+# (see CONTRIBUTING.md "Hashed requirements"):
+#   pip-compile --generate-hashes --allow-unsafe --strip-extras --no-header \
+#     --annotation-style=line -o requirements-ci.txt requirements-ci.in
+attrs==26.1.0
+cffi==2.1.1
+cloudpickle==3.1.2
+coverage==7.16.2
+cryptography==50.0.1
+execnet==2.1.2
+iniconfig==2.3.1
+joblib==1.6.0
+jsonschema-specifications==2025.9.1
+jsonschema==4.26.0
+narwhals==2.26.0
+numpy==2.4.6
+packaging==26.3
+pandas==3.0.6
+pluggy==1.6.0
+pycparser==3.0
+pyarrow==25.0.1
+pygments==2.21.0
+pytest-cov==7.1.0
+pytest-xdist==3.8.0
+pytest==9.1.1
+python-dateutil==2.9.0.post0
+pyyaml==6.0.3
+referencing==0.37.0
+rpds-py==2026.9.1
+scikit-learn==1.9.1
+scipy==1.17.1
+six==1.17.0
+threadpoolctl==3.7.0
+typing-extensions==4.16.0

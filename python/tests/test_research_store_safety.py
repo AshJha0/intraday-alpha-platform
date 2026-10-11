@@ -906,3 +906,13 @@ def test_store_sql_refuses_several_statements_cleanly(store_db, capsys):
     assert store_main(["sql", *db, "SELECT 1 AS one; DROP TABLE alphas"]) == 1
     assert "exactly one statement" in capsys.readouterr().err
     assert store_main(["sql", *db, "SELECT COUNT(*) AS n FROM alphas"]) == 0  # intact
+
+
+def test_atomic_write_defaults_to_lf_on_every_os(tmp_path):
+    """E-P0-1: the default must not translate to CRLF (Windows) -- hashes of
+    ledgers and study files have to match across operating systems."""
+    path = tmp_path / "doc.md"
+    atomic_write_text(path, "a\nb\n")
+    data = path.read_bytes()
+    assert b"\r" not in data
+    assert data == b"a\nb\n"

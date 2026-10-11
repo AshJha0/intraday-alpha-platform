@@ -46,6 +46,7 @@ class Response:
     content: list[Block]
     stop_reason: str
     usage: Usage = field(default_factory=Usage)
+    model: str | None = None  # the id the "API" reports serving (G-P2-12)
 
 
 _counter = [0]
@@ -81,17 +82,20 @@ class _Messages:
         o = self.owner
         o.requests.append(kw)
         if o.i >= len(o.steps):
-            return Response([text("done")], "end_turn", o._usage())
+            return Response([text("done")], "end_turn", o._usage(), o.model)
         step = o.steps[o.i]
         o.i += 1
         blocks = step(last_results(kw["messages"])) if callable(step) else list(step)
         stop = "tool_use" if any(b.type == "tool_use" for b in blocks) else "end_turn"
-        return Response(blocks, stop, o._usage())
+        return Response(blocks, stop, o._usage(), o.model)
 
 
 class ScriptedClient:
-    def __init__(self, steps: Sequence[Step], usage: Usage | None = None) -> None:
+    def __init__(
+        self, steps: Sequence[Step], usage: Usage | None = None, model: str | None = None
+    ) -> None:
         self.steps = list(steps)
+        self.model = model
         self.i = 0
         self.requests: list[dict[str, Any]] = []
         self.usage = usage or Usage()

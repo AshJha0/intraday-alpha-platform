@@ -1,0 +1,15 @@
+# Runtime dependencies of the Dockerfile.python image (python/pyproject.toml
+# `dependencies`) plus setuptools to build the local package, constrained to
+# the CI set.  Compile with (see CONTRIBUTING.md "Hashed requirements"):
+#   pip-compile --generate-hashes --allow-unsafe --strip-extras --no-header \
+#     --annotation-style=line -o requirements-image.txt requirements-image.in
+-c requirements-ci.in
+numpy
+pandas
+scipy
+scikit-learn
+pyarrow
+jsonschema
+referencing
+cryptography
+setuptools>=84

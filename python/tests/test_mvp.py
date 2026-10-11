@@ -61,6 +61,10 @@ from iap.store.db import Store
 from iap.trace.digest import TraceDigest
 from iap.trace.sinks import MemoryTraceSink
 
+# E-P2-7: one of the slowest test files (CI --durations); run by the
+# python-slow CI job, deselected from the PR python job (-m 'not slow').
+pytestmark = pytest.mark.slow
+
 TINY_CONFIG = REPO_ROOT / "configs" / "mvp" / "mvp_tiny.json"
 GOLDEN_DIR = REPO_ROOT / "tests" / "golden"
 

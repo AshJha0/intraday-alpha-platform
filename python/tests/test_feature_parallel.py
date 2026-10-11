@@ -12,6 +12,10 @@ from iap.features import __main__ as pipeline
 from iap.marketdata.generator import MarketDataGenerator
 from iap.marketdata.normalize import normalize_run
 
+# E-P2-7: one of the slowest test files (CI --durations); run by the
+# python-slow CI job, deselected from the PR python job (-m 'not slow').
+pytestmark = pytest.mark.slow
+
 CFG = {
     "seed": 4242,
     "sessions": 3,
