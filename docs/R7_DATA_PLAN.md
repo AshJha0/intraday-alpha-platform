@@ -13,7 +13,7 @@ blackboard or in any ledger. Checked on **2026-10-11**.
 |---|---|---|---|
 | Nasdaq public sample directory `https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/` | a handful of whole-market ITCH 5.0 days, gzip | free download; Nasdaq sample-data terms apply (read them; nothing derived is committed, §2 of REAL_DATA.md) | native: `--format itch50` |
 | LOBSTER (Humboldt-Universität zu Berlin, lobsterdata.com) | per-symbol reconstructed books from Nasdaq ITCH, June 2007 onward, level 1-200 | academic only; a university page reports ~300 EUR/year plus prepaid stock-day credits (secondary, undated source; confirm with LOBSTER) | native: `--format lobster` |
-| Databento `XNAS.ITCH` (databento.com/pricing) | Nasdaq TotalView-ITCH from 2018-05-01, MBO schema | usage-based $/GB of uncompressed DBN (rate only shown in their estimator), USD 125 free credit for new accounts; Standard plan USD 199/month covers only the last month of L3 history; Unlimited USD 4,500/month for 16+ years | DBN MBO, not ITCH binary: needs a new reader (not in this release) |
+| Databento `XNAS.ITCH` (databento.com/pricing) | Nasdaq TotalView-ITCH from 2018-05-01, MBO schema | usage-based $/GB of uncompressed DBN (rate only shown in their estimator), USD 125 free credit for new accounts; Standard plan USD 199/month covers only the last month of L3 history; Unlimited USD 4,500/month for 16+ years | DBN MBO: `--format dbn-mbo` (v1.15, §7) |
 
 Directory listing of the Nasdaq source on 2026-10-11 (sizes from the
 listing, confirmed by a HEAD request for `S061226-v50.txt.gz`:
@@ -155,6 +155,7 @@ python ../tools/r7_download.py --manifest ... --vendor-dir ... [--date D] --i-ha
 2. Where they go (external disk, or waves with the gzip archived after each).
 3. Optionally, tier 2: a Databento (or LOBSTER, if eligible) account and a
    cost estimate from their estimator, and a DBN reader as a later item.
+   **Approved by the owner for v1.15 (code only); see §7.**
 
 ## 6. Pre-registration template (DRAFT: not registered, not on the blackboard)
 
@@ -201,3 +202,53 @@ gate:          HAC t >= ledger threshold in force; deflated Sharpe > 0.95 (H3);
                reported with and without FOMC / holiday-thin sessions
 decision:      a failure is final for that hypothesis on these sessions
 ```
+
+## 8. Tier 2 from Databento (v1.15: code ready, nothing bought)
+
+The owner approved tier 2 (the 40 sessions of §2) from Databento
+`XNAS.ITCH`, schema MBO. v1.15 ships the code only; no account, key,
+payment or download was made.
+
+- **Date list**: `research/r7/r7_tier2_dates.json` (the 40 dates of §2,
+  symbols AAPL, MSFT, QQQ, role holdout). Validated: weekdays, unique,
+  none spent.
+- **Cost estimate first** (`metadata.get_cost`, free). With the key in the
+  environment, never on the command line:
+
+  ```
+  pip install "iap[databento]"           # the Databento client, tools only
+  set DATABENTO_API_KEY=...               # PowerShell: $env:DATABENTO_API_KEY = "..."
+  python tools/r7_databento_fetch.py     # prints per-day and total USD, downloads nothing
+  python tools/r7_databento_fetch.py --date 2025-01-15   # one day
+  ```
+
+  Each session is the New York calendar day of the date (UTC 04:00/05:00
+  to the next day), the same window the reader keeps.
+- **Download** only with both flags and only when the estimate is within
+  the ceiling (exit 3 otherwise):
+
+  ```
+  python tools/r7_databento_fetch.py --vendor-dir ../data/vendor/dbn --i-have-approval
+      --max-cost-usd 150 --manifest-out research/r7/r7_tier2_candidates.json   (one line)
+  ```
+
+  Files land as `xnas-itch-<yyyymmdd>.mbo.dbn.zst` via `.part`; one already
+  present is skipped. `--manifest-out` writes a candidate manifest
+  (`format: dbn-mbo`, bytes, sha256) that `verify-download` checks and
+  `plan-ingest` turns into the resumable batch (the batch calls
+  `ingest --format dbn-mbo`; a candidate day without `format` stays
+  `itch50`). The key is read from `DATABENTO_API_KEY` only and scrubbed
+  from every error message.
+- **Ingest**: `python -m iap.marketdata ingest --format dbn-mbo --input
+  FILE --date D --symbols AAPL,MSFT,QQQ --out DIR [--defer-normalize]`;
+  needs `pip install "iap[dbn]"` (the `databento-dbn` codec, no network).
+  Mapping: REAL_DATA.md §4.4. First run a smoke ingest with
+  `--limit-messages 5000000` on one day and read the manifest's
+  `messages.dbn` counters (paired trades/fills, unpaired fills, crosses)
+  before the batch.
+- **Known differences from the ITCH path**: no trading-action / halt
+  records in MBO (a halt is invisible), no match numbers (synthetic trade
+  ids), cross type inferred from time, directory facts synthesised (round
+  lot 100, ETP from a fixed list). The DBN sessions are therefore tagged by
+  their format in the manifest; a study mixing ITCH and DBN sessions should
+  report the split.

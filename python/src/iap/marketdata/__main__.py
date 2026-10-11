@@ -10,7 +10,7 @@ data/normalized/ (*.normalized.jsonl, *.normalized.iap1, events.parquet,
 qc_report.json). Prints run stats as JSON on stdout. Fully deterministic for
 a given seed/config.
 
-    python3 -m iap.marketdata ingest --format {itch50,lobster} --input FILE...
+    python3 -m iap.marketdata ingest --format {itch50,dbn-mbo,lobster} --input FILE...
                               --date YYYY-MM-DD --symbols A,B --out DATASET
 
 ingests REAL historical files the owner obtained (``iap.marketdata.ingest``,
