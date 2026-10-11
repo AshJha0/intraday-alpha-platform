@@ -1029,7 +1029,7 @@ def test_adaptive_backtest_runs_the_default_research_rules(toy_deployment, adapt
     v1.5.0 defaults, with the alpha's label horizon set."""
     cfg = toy_deployment.backtester.config
     assert cfg.position_policy == "cost_aware" and cfg.cap_fills_at_l1
-    assert cfg.block_rows_label() == "scored_rows:1s" and cfg.horizon_ns == NS_S
+    assert cfg.block_rows_label() == "causal" and cfg.horizon_ns == NS_S  # v1.14.0
     assert toy_deployment.backtester.cost_model.impact_model == "sqrt"
     res = toy_deployment.run(build_policy("static", adaptive_cfg))
     for r in res.backtest.per_instrument.values():

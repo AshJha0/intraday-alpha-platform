@@ -12,6 +12,8 @@ impl RiskEngine {
     pub fn on_venue_disconnect(&mut self, venue_id: u16, ts: i64) {
         self.venues_down.insert(venue_id, true);
         self.emit(RiskEvent {
+            seq: 0,
+            prev_sha256: String::new(),
             timestamp: ts,
             scope: Scope::Venue,
             scope_id: venue_id.to_string(),
@@ -26,6 +28,8 @@ impl RiskEngine {
     pub fn on_venue_reconnect(&mut self, venue_id: u16, ts: i64) {
         self.venues_down.insert(venue_id, false);
         self.emit(RiskEvent {
+            seq: 0,
+            prev_sha256: String::new(),
             timestamp: ts,
             scope: Scope::Venue,
             scope_id: venue_id.to_string(),
@@ -64,6 +68,8 @@ impl RiskEngine {
                 Self::scope_name(scope)
             );
             self.emit(RiskEvent {
+                seq: 0,
+                prev_sha256: String::new(),
                 timestamp: ts,
                 scope,
                 scope_id: scope_id.to_string(),
@@ -75,6 +81,8 @@ impl RiskEngine {
             return Err(IapError::InvalidArgument(why));
         }
         self.emit(RiskEvent {
+            seq: 0,
+            prev_sha256: String::new(),
             timestamp: ts,
             scope,
             scope_id: scope_id.to_string(),
@@ -106,6 +114,8 @@ impl RiskEngine {
                 Self::scope_name(scope)
             );
             self.emit(RiskEvent {
+                seq: 0,
+                prev_sha256: String::new(),
                 timestamp: ts,
                 scope,
                 scope_id: scope_id.to_string(),
@@ -117,6 +127,8 @@ impl RiskEngine {
             return Err(IapError::InvalidArgument(why));
         }
         self.emit(RiskEvent {
+            seq: 0,
+            prev_sha256: String::new(),
             timestamp: ts,
             scope,
             scope_id: scope_id.to_string(),
@@ -131,7 +143,13 @@ impl RiskEngine {
     /// Raise (or lower) the effective daily loss limit of the GLOBAL or a
     /// STRATEGY scope with written approval. Audited; never clears a
     /// latched kill switch. Errors on a non-positive/non-finite limit or an
-    /// unsupported scope (nothing changes).
+    /// unsupported scope (nothing changes). Bounded and multi-party
+    /// (G-P2-3): with `overrides.min_approvers` the comma-separated
+    /// `approver` list must name that many distinct (space-trimmed,
+    /// non-empty) approvers, and with `overrides.max_loss_override_multiple`
+    /// the new limit may not exceed that multiple of the configured limit;
+    /// a refused override changes nothing, is audited
+    /// `LOSS_LIMIT_OVERRIDE_REJECTED` and returns an error.
     pub fn override_loss_limit(
         &mut self,
         scope: Scope,
@@ -145,11 +163,62 @@ impl RiskEngine {
                 "loss limit override must be finite and > 0, got {new_limit}"
             )));
         }
-        let Some(limits) = self.limits.as_ref() else {
+        let Some(limits) = self.limits.clone() else {
             return Err(IapError::InvalidArgument(
                 "engine is fail-closed (no limits)".to_string(),
             ));
         };
+        let base = match scope {
+            Scope::Global => limits.max_daily_loss,
+            Scope::Strategy => limits.strategy_max_daily_loss,
+            _ => {
+                return Err(IapError::InvalidArgument(
+                    "loss limits exist at GLOBAL and STRATEGY scope only".to_string(),
+                ))
+            }
+        };
+        let mut why: Option<String> = None;
+        if let Some(min) = limits.min_approvers {
+            let names: std::collections::BTreeSet<&str> = approver
+                .split(',')
+                .map(|p| p.trim_matches(' '))
+                .filter(|p| !p.is_empty())
+                .collect();
+            if (names.len() as i64) < min {
+                why = Some(format!(
+                    "loss limit override needs {min} distinct approvers, got {}: {approver}",
+                    names.len()
+                ));
+            }
+        }
+        if why.is_none() {
+            if let Some(mult) = limits.max_loss_override_multiple {
+                let cap = base * mult;
+                if new_limit > cap {
+                    why = Some(format!(
+                        "loss limit override {} exceeds cap {} ({}x the configured {})",
+                        fmt_fixed(new_limit, 2),
+                        fmt_fixed(cap, 2),
+                        fmt_fixed(mult, 2),
+                        fmt_fixed(base, 2)
+                    ));
+                }
+            }
+        }
+        if let Some(why) = why {
+            self.emit(RiskEvent {
+                seq: 0,
+                prev_sha256: String::new(),
+                timestamp: ts,
+                scope,
+                scope_id: scope_id.to_string(),
+                rule_id: rules::LOSS_LIMIT_OVERRIDE_REJECTED.to_string(),
+                severity: Severity::Breach as u8,
+                decision: Decision::Reject as u8,
+                reason: why.clone(),
+            });
+            return Err(IapError::InvalidArgument(why));
+        }
         let old = match scope {
             Scope::Global => {
                 let old = self.loss_override_global.unwrap_or(limits.max_daily_loss);
@@ -173,6 +242,8 @@ impl RiskEngine {
             }
         };
         self.emit(RiskEvent {
+            seq: 0,
+            prev_sha256: String::new(),
             timestamp: ts,
             scope,
             scope_id: scope_id.to_string(),
@@ -207,8 +278,12 @@ impl RiskEngine {
         }
         self.loss_override_global = None;
         self.loss_override_strategy.clear();
+        self.market_volume.clear();
+        self.executed.clear();
         self.refresh_pnl_gauges();
         self.emit(RiskEvent {
+            seq: 0,
+            prev_sha256: String::new(),
             timestamp: ts,
             scope: Scope::Global,
             scope_id: String::new(),

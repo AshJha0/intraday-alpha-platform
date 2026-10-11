@@ -77,6 +77,19 @@ Contents:
 66. [Plan the R7 data load: candidate days, a resumable ingest, a seeded draw (v1.13)](#66-plan-the-r7-data-load-candidate-days-a-resumable-ingest-a-seeded-draw-v113)
 67. [Price a round trip with regulatory fees (v1.13)](#67-price-a-round-trip-with-regulatory-fees-v113)
 68. [Run the governance checks locally (v1.13)](#68-run-the-governance-checks-locally-v113)
+69. [Verify a risk audit log's hash chain (v1.14)](#69-verify-a-risk-audit-logs-hash-chain-v114)
+70. [Read and tighten the SEC 15c3-5 pre-trade controls (v1.14)](#70-read-and-tighten-the-sec-15c3-5-pre-trade-controls-v114)
+71. [Rebuild a v1.13 feature store next to a v1.14 one (v1.14)](#71-rebuild-a-v113-feature-store-next-to-a-v114-one-v114)
+72. [Reproduce a v1.13 statistic under the `*_v113` bundles (v1.14)](#72-reproduce-a-v113-statistic-under-the-_v113-bundles-v114)
+73. [Count adverse selection per touch order, not per message (v1.14)](#73-count-adverse-selection-per-touch-order-not-per-message-v114)
+74. [Add a maintainer trust root and verify the board against main (v1.14)](#74-add-a-maintainer-trust-root-and-verify-the-board-against-main-v114)
+
+Where to start: if you are new, run recipes 1, 2, 3, 4 and 22 in that
+order. They generate the data, show a book, build features, validate one
+alpha and run the whole loop on one instrument. Then read 29 and 35 (what
+a gate threshold is, and when a result counts as evidence) before any
+recipe whose number you might quote. Recipes 69 to 74 cover v1.14; each
+says what moved and which flag gives the old behaviour back.
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -393,8 +406,8 @@ PYTHONPATH=python/src python3 research/alpha_reports/run_all.py \
 (Neither line was re-run for this page — the first rewrites the committed
 reports — and the figures below are read from the committed
 `REPORT.md`.) Outputs of the first: `research/alpha_reports/REPORT.md`
-(the honest master table — 0 PROMOTE / 11 ITERATE / 13 REJECT on the
-bundled data; at 1× costs 18 alphas make no trade, 6 trade and lose, none
+(the honest master table — 0 PROMOTE / 12 ITERATE / 12 REJECT on the
+bundled data at v1.14.0; at 1× costs 18 alphas make no trade, 6 trade and lose, none
 ends above zero), one JSON of full
 evidence per alpha, the appending multiple-testing ledger
 `research/experiments.json`, and refreshed day-1-fitted
@@ -775,8 +788,8 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. The v1.13.0 counts (CI): python 2344 / cpp 302 /
-rust 358 / java 571 tests passed (golden groups 193/72/71/124), plus
+the first line. The v1.14.0 counts (CI): python 2385 / cpp 302 /
+rust 362 / java 575 tests passed (golden groups 193/72/71/124), plus
 `integration` (35) and `replay` (6) rows for the repo-level pytest suites, a
 `deployment` row (26 structural checks passed in CI, where `promtool` and
 `kubeconform` are installed; a machine without them reports those checks as
@@ -1078,7 +1091,9 @@ was judged at, not a re-judgement: `legacy_v1` rows read the fixed 3.0,
 `v2` rows `max(3.0, Bonferroni |t| at gate_looks)`, where `gate_looks`
 counts every look the ledger held at the time, across datasets;
 `scope_bonferroni_t` is what the scope alone would demand. The ledger total
-(5,156 looks over 216 entries) is the sum of the three scopes: 1,068 on the
+(a total of 5,156 over 216 entries in the output above, captured at v1.5.0; 5,358
+over 293 at v1.14.0, which adds a fourth scope for the v1.14 statistics
+revision) is the sum of the three scopes: 1,068 on the
 v1.3.0 dataset, 852 on the current dataset under the old rules, and 3,236
 under the default rules (24 × 84 for the promotion report, 5 × 84 for the
 runner experiments, 40 adaptive deployments, 8 × 95 for the signal-combination
@@ -1159,7 +1174,7 @@ synthetic equity `SYN.EQ.AAPL` and writes every artefact under
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.mvp run                       # configs/mvp/mvp.json, seed 12345
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=20d4ff76af0b631c... out=.../data/mvp/58a10f2194a3c81c
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=231 children=347 fills=163 pnl=-82.837333 USD digest=6fdb3a2ce2d31481... out=.../data/mvp/58a10f2194a3c81c
 PYTHONPATH=src python3 -m iap.mvp run --seed 7 --out /tmp/mvp7          # another seed, explicit directory
 PYTHONPATH=src python3 -m iap.mvp verify                                  # run twice from scratch, compare digest/report/stream
 cat ../data/mvp/58a10f2194a3c81c/report.md                                # the honest numbers (cost-negative)
@@ -1179,14 +1194,18 @@ itself is not touched). The golden `tests/golden/expected_mvp.json` pins
 the run above. The run id is the same as in v1.3.0 because `mvp.json` and
 the seed are unchanged; the session is not — the v1.4.0 generator spreads
 the flow over the whole 15-minute session, the three alphas were refitted,
-and the loop makes 800 decisions (355 before) and loses 81.53 USD (22.65
-before): +0.022 bps of alpha against −0.41 bps of cost on filled notional.
-v1.5.0 changed none of that. The loop does not use the research
+and the loop makes 800 decisions (355 before) and, at v1.14.0, loses
+82.84 USD on 8,295 shares: +0.0245 bps of alpha against −0.4367 bps of cost
+on filled notional. v1.5.0 changed none of the v1.4.0 numbers. The loop does not use the research
 backtester, so its events, decisions, parents, children, fills and P&L are
 identical to v1.4.0; what moved is `config_version` (`439bbad5…`, was
 `f293e7e7…`), which hashes `execution.json` and `alpha_params.json`, and
-with it the trace digest printed above (`f51890da…` in v1.4.0), because
-every trace carries `config_version`. The summary line was re-run for this
+with it the trace digest (`f51890da…` in v1.4.0, `2affe409…` in v1.5.0,
+`20d4ff76…` in v1.13.0), because every trace carries `config_version`. In v1.14.0 the
+counts and P&L moved slightly (231 parents, 347 children submitted, 163
+fills, −82.84 USD; it was 235 / 348 / 169 / −81.53) and the digest became
+`6fdb3a2c…` with `config_version` `62d78a3b…`: `alpha_params.json` and the
+risk configuration are hashed, and both changed in the v1.14 regeneration. The summary line was re-run for this
 page with `--out` pointing at a scratch directory; `replay` (recipe 23)
 and `explain` (recipe 24) were re-run against that directory.
 Outside the checkout (the Python image bakes `configs/` and
@@ -2808,7 +2827,7 @@ nonce). What the new entry holds:
                   "deps": {"numpy": "...", "pandas": "...", "scipy": "..."}}}
 ```
 
-`ledger_total` is 5157: the committed 5,156 looks plus this one. Now edit
+`ledger_total` is 5157: the 5,156 committed when this output was captured (v1.5.0; 5,358 at v1.14.0) plus this one. Now edit
 the hypothesis text of that last entry and verify again:
 
 ```bash
@@ -4158,3 +4177,267 @@ prefix of this one: research branches are merged, never rebased, and
 ledgers are combined with `tools/merge_ledger.py` (GOVERNANCE.md §2c). In CI
 a pull request is compared with its base branch and a push with the
 previous commit.
+
+## 69. Verify a risk audit log's hash chain (v1.14)
+
+**Goal:** prove that nobody edited, dropped or reordered a line of a
+`risk_audit.jsonl` after the engine wrote it.
+
+Since v1.14 every `RiskEvent` carries `seq` (1, 2, 3, ...) and
+`prev_sha256`, the SHA-256 of the previous JSONL line (64 zeros for the
+first). The golden audit log is a chain like any other:
+
+```bash
+PYTHONPATH=python/src python - <<'PY'
+from pathlib import Path
+from iap.risk.events import verify_audit_chain
+text = Path("tests/golden/expected_risk_audit.jsonl").read_text(encoding="utf-8")
+print(verify_audit_chain(text))
+lines = text.split("\n")
+lines[3] = lines[3].replace('"seq":4', '"seq":4 ')   # one extra space
+try:
+    verify_audit_chain("\n".join(lines))
+except ValueError as e:
+    print("ERR", e)
+PY
+```
+
+Output:
+
+```text
+(77, 'fdec66b3bb52912d9c9e0aa98015c458f497dd8342122d87ed76dfe102a11c43')
+ERR audit chain broken at line 5: prev_sha256 mismatch
+```
+
+The first call returns `(last seq, head hash)`. The edit is on line 4, but
+the error names line 5: line 4 still parses and still has the right `seq`;
+what breaks is the hash that line 5 recorded for it. Lines are split on LF
+only, so a log rewritten with CRLF fails too.
+
+What the chain does not do. It detects edits; it does not prevent them.
+Someone who can rewrite the whole file can recompute every hash. The
+protection is to copy the head somewhere the writer cannot reach: a live
+engine exposes it as `engine.audit_chain_head()`, and the Java paper
+session stores it in `session_state.json`. A restore continues the chain
+(`RiskEngine.restore(..., chain=engine.audit_chain_head())` in Python,
+`restore_chained` in Rust and Java), so one log stays one chain across
+restarts. The head is deliberately not part of the snapshot: an engine
+that never stopped and one that was restored must produce the same
+snapshot bytes.
+
+## 70. Read and tighten the SEC 15c3-5 pre-trade controls (v1.14)
+
+**Goal:** see which of the seven v1.14 pre-trade checks are on, and watch
+some of them fire.
+
+The checks live in the `pre_trade` block of `configs/risk/risk.json`
+(x-version 4). Every key is optional; an absent key or `null` means off.
+
+```bash
+python -c "import json; d=json.load(open('configs/risk/risk.json')); print(json.dumps(d['pre_trade'], indent=1)); print(d['overrides'])"
+```
+
+```text
+{
+ "restricted_instruments": [],
+ "max_open_orders": 1000,
+ "max_open_notional": 5000000.0,
+ "max_strategy_position_qty": 100000,
+ "max_cancels_per_sec": 1000.0,
+ "cancel_burst": 100.0,
+ "max_venue_msgs_per_sec": 1000.0,
+ "venue_msg_burst": 100.0,
+ "max_tracked_keys": 1000000
+}
+{'max_loss_override_multiple': 2.0, 'min_approvers': 2}
+```
+
+| check | rule id | fed by |
+|---|---|---|
+| 23 | `RESTRICTED_INSTRUMENT` | the order |
+| 24 | `MAX_OPEN_ORDERS` | open orders per strategy |
+| 25 | `MAX_OPEN_NOTIONAL` | open orders |
+| 26 | `STRATEGY_POSITION` | fills |
+| 27 | `PARTICIPATION` | `on_market_trade` (market prints) |
+| 28 | `CANCEL_RATE` | `on_cancel_request` (token bucket per strategy) |
+| 29 | `VENUE_MESSAGE_RATE` | orders and cancels (token bucket per venue) |
+
+Why they run last: checks 1 to 22 are pinned by goldens in Rust, Java and
+Python. Putting the new checks after them meant no existing rule id or
+decision moved, which is what let the old goldens prove the ports. The
+cost is that an order breaking both an old and a new limit is reported
+under the old rule.
+
+Participation is the only one left off in the repo config: it needs the
+market's trade prints, which only a live gateway feed provides. The other
+values are loose on purpose so that they never bind before the legacy
+limits; a desk would set them per strategy. `max_tracked_keys` bounds every
+per-key map: an order that would grow a full map is rejected
+`STATE_CAPACITY` rather than let memory grow without limit.
+
+To watch them fire, run the tests that drive them with tight limits:
+
+```bash
+cd python
+PYTHONPATH=src python -m pytest -q tests/test_risk_rules.py -k "cancel_requests or override or audit_chain or x_version_4"
+```
+
+`test_cancel_requests_spend_strategy_and_venue_budgets` sets a burst of 1
+cancel per second and sends one cancel; the next order from that strategy
+is rejected `CANCEL_RATE` while another strategy's order is allowed, and a
+third strategy then hits the shared venue bucket (`VENUE_MESSAGE_RATE`).
+`test_loss_override_is_bounded_and_two_party` shows the other v1.14 rule:
+a loss-limit override needs two distinct approvers (`"cro,cfo"`, not
+`"cro"` or `"cro, cro"`) and may not exceed 2.00x the configured limit. A
+refused override is itself audited, as `LOSS_LIMIT_OVERRIDE_REJECTED`.
+
+## 71. Rebuild a v1.13 feature store next to a v1.14 one (v1.14)
+
+**Goal:** compare features under the old and new event semantics, or
+reproduce a report published before v1.14.
+
+v1.14 changed three defaults of `python -m iap.features`. Each has a flag
+that restores the old behaviour:
+
+| flag | v1.14 default | v1.13 value | what it changes |
+|---|---|---|---|
+| `--same-ts` | `coalesce` | `per_event` | events of one instrument with the same `exchange_ts` are one state change: one refresh and one row, at the group's last event |
+| `--label-freshness` | `trailing` | `whole_day` | the label freshness bound uses only past quote gaps |
+| `--cross-prints` | `fold` | `omit` | opening, closing and halt crosses count in volume, never in signed flow |
+
+```bash
+PYTHONPATH=python/src python -m iap.features --out-dir data/features_v114
+PYTHONPATH=python/src python -m iap.features --out-dir data/features_v113 \
+    --same-ts per_event --label-freshness whole_day --cross-prints omit
+```
+
+Expect fewer rows in the v1.14 store. On the synthetic golden vectors the
+equity rows went from 2,000 to 1,591 and FX from 800 to 426. An ITCH `E`
+(execute) arrives as EXECUTE + TRADE and a `U` (replace) as CANCEL + ADD,
+each pair with one timestamp, and the old engine sampled the half-applied
+state between them. That phantom state is why the time-of-day norms,
+volatility and OFI sums moved most.
+
+`python/tests/test_legacy_methods.py` builds the v1.13 store this way and
+checks that the v1.4.0 alpha reports still come out byte for byte, so the
+legacy path cannot rot unnoticed. The streaming MVP stays per-event on
+purpose: on a live stream you cannot know that an event closes its group
+without waiting for the next one.
+
+## 72. Reproduce a v1.13 statistic under the `*_v113` bundles (v1.14)
+
+**Goal:** see how much of a change in an alpha's verdict comes from the
+v1.14 statistics revision rather than from the data.
+
+The bundle names did not change, so experiment ids did not change either:
+`--methods v2` now means the v1.14 rules. The v1.13 rules are kept as
+`v2_v113`, `v3_v113` and `v4_v113`:
+
+```bash
+cp research/experiments.json /tmp/ledger_scratch.json
+PYTHONPATH=python/src python -m iap.research run --alpha EQ01 --horizon 1s \
+    --no-prereg --dry-run --ledger /tmp/ledger_scratch.json
+PYTHONPATH=python/src python -m iap.research run --alpha EQ01 --horizon 1s \
+    --no-prereg --dry-run --ledger /tmp/ledger_scratch.json --methods v2_v113
+```
+
+Use a scratch ledger. `--dry-run` writes no experiment directory, but it
+still debits the looks, and the committed ledger is a hash chain
+(x-version 4) that `check_ledger_monotone.py` will not let shrink. Both
+runs need `data/features/` (recipes 1 and 3).
+
+What differs between the two outputs:
+
+| | `v2` (v1.14) | `v2_v113` |
+|---|---|---|
+| backtest row block | `causal`: only what was known at decision time | the rows the IC scores, which peeks at label validity |
+| HAC bandwidth | automatic, never below the horizon rule, no lag product across days | fixed by the horizon rule (L = 2) |
+| fewer than 4 sessions | a `few_sessions` reading: sign and replication, not a t | t as usual |
+| `hypothesis_confirmed` | at least 70 % of folds confirm | last fold only |
+| feature scaling | per instrument, per fold | pooled |
+| leakage | row shift plus a time-shift detector (`time_shift_ok`, `null` when not applicable) | row shift only |
+| looks charged | 2 per experiment (one per gate decision) | every report statistic |
+
+A v2 report still carries the old net P&L as
+`net_pnl_1x_cost_label_block`, next to the causal one, so the size of the
+look-ahead is visible without a second run. Ledger entries now carry
+`stats_revision: "v1.14"`, so a rerun under the new rules is a new look and
+never silently replaces an old one.
+
+## 73. Count adverse selection per touch order, not per message (v1.14)
+
+**Goal:** calibrate maker adverse selection with one observation per
+resting order instead of one per execution message.
+
+```bash
+for u in message touch_order; do
+  PYTHONPATH=python/src python -m iap.execution.calibration \
+      --events tests/golden/events_eq_mbo.jsonl --tick 1=0.01 \
+      --markout-unit $u --out /tmp/cal_$u.json
+done
+python -c "import json; [print(u, json.load(open(f'/tmp/cal_{u}.json'))['markouts']['all']['1s']) for u in ('message','touch_order')]"
+```
+
+On the 2,000-event golden vector:
+
+| unit | n (1 s) | mean AS at 1 s | standard error |
+|---|---|---|---|
+| `message` | 233 | 0.80 bp | 0.21 bp |
+| `touch_order` | 117 | 0.58 bp | 0.22 bp |
+
+Half the observations disappear. A touch order filled by three executions
+used to be counted three times, and those three markouts share almost the
+same future mid, so they are not independent. The standard error barely
+moves although the sample halves, which is what you expect when the
+dropped observations were near-duplicates. The default stays `message` so
+that existing calibrations and goldens do not move; the v2 maker
+pre-registration is where `touch_order` will be switched on.
+
+The other v1.14 execution options work the same way: off by default and
+named in the config. `MakerConfig(feed_latency_ns=...)` adds the
+market-data leg to every decision timestamp. `exit_route="sim"` (maker)
+and `flatten_route="sim"` (quoting) send exits through the simulator as
+MARKET children instead of filling them at the touch.
+`ExecutionSimulator(hidden_prints=True)` lets a TRADE with no matching
+EXECUTE advance queue position. `amend_size_down` shrinks a quote without
+losing priority. The one change that is on by default is the MODIFY queue
+credit: an order ahead of yours that shrinks now moves you up, as a cancel
+always did. It changed no golden, because none of the 189 MODIFY events in
+the golden vector shrinks a level where a child rests.
+
+## 74. Add a maintainer trust root and verify the board against main (v1.14)
+
+**Goal:** make the agent key registry trustworthy. Since v1.14 a non-empty
+`research/agents/agent_pubkeys.json` counts only if a maintainer listed in
+`research/agents/trust_roots.json` has signed it.
+
+```bash
+PYTHONPATH=python/src python -m iap.agents.cli maintainer-keygen \
+    --maintainer alice --keyfile ~/.iap/alice.key
+# add or change agent keys in research/agents/agent_pubkeys.json, then:
+PYTHONPATH=python/src python -m iap.agents.cli sign-registry \
+    --maintainer alice --keyfile ~/.iap/alice.key
+git fetch origin main
+PYTHONPATH=python/src python -m iap.agents.cli verify-board --trust-ref origin/main
+```
+
+`maintainer-keygen` writes the private key to `--keyfile` and adds the
+public key to `trust_roots.json`. Keep the key file out of the repository.
+`sign-registry` writes `agent_pubkeys.sig.json`.
+
+Why `--trust-ref origin/main`: CI reads the trust roots from `main`, not
+from the branch under review. A pull request that adds a maintainer and
+signs a registry with that maintainer's key in the same change would be
+vouching for itself, so a new root only counts once someone has merged it.
+The same flag makes `verify-board` require every anchor commit to be an
+ancestor of `origin/main`, and the board on `main` to be a prefix of the
+current board.
+
+Today both files are empty, so nothing needs a signature, and the last
+command reports `"ok": true` with 6 anchored entries. Two related v1.14
+rules: new signed requests use the `ed25519-v2` scheme, which binds the
+board head (`prev`) and the board id, so a signature cannot be replayed
+onto another board or position; and `research/experiments.json` is now a
+hash chain (`chain_head`, `chain_length`), so an edited ledger fails on
+load with `LedgerIntegrityError` before any Bonferroni threshold is
+computed from it.

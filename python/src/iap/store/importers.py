@@ -262,15 +262,14 @@ def import_reference(
 def ledger_entry_scope(entry: Mapping[str, Any]) -> tuple[str, str]:
     """``(dataset_version, methods)`` of a ledger entry (module docs, Scope)."""
     from iap.validation.ledger import ExperimentLedger
+    from iap.validation.methods import ledger_bundle
 
-    config = entry.get("config") or {}
     dataset = ExperimentLedger.entry_dataset_version(dict(entry))
-    bundle = config.get("methods")
-    if bundle is None:
-        bundle = (config.get("configuration") or {}).get("methods")
+    # v1.14.0: an entry recorded under v2 / v3 / v4 before the statistics
+    # revision is scoped to the frozen ``*_v113`` bundle it was computed at.
     return (
         UNSTAMPED if dataset is None else dataset,
-        LEGACY_METHODS if bundle is None else str(bundle),
+        ledger_bundle(entry.get("config")),
     )
 
 
@@ -438,7 +437,22 @@ _REPORT_V19_METHOD_FIELDS = {
     # v1.12 (``v4``): the report-only R7 blocks.
     "cpcv": False,
     "deflated_sharpe": False,
+    # v1.14.0 statistics revision: a report written before it states none
+    # of these, and was computed at the v1.13.0 values.
+    "hac_bandwidth": "horizon",
+    "hac_day_separated": False,
+    "hypothesis_rule": "last_fold",
+    "standardisation": "pooled",
+    "leakage_time_shift": False,
 }
+
+
+def _report_row_block(block: Mapping[str, Any]) -> str:
+    """``methods.row_block`` of a report; one written before v1.14.0 states
+    only the ``block_rows`` label (``None`` = every row traded)."""
+    if "row_block" in block:
+        return str(block["row_block"])
+    return "none" if block.get("block_rows") is None else "label_valid"
 
 
 def _report_methods(report: Mapping[str, Any], ledger_entry: Mapping[str, Any] | None) -> str:
@@ -456,9 +470,13 @@ def _report_methods(report: Mapping[str, Any], ledger_entry: Mapping[str, Any] |
     if isinstance(block, str):
         return block
     for name, bundle in sorted(METHODS.items()):
-        if all(block.get(key) == getattr(bundle, key) for key in _REPORT_METHOD_FIELDS) and all(
-            block.get(key, default) == getattr(bundle, key)
-            for key, default in _REPORT_V19_METHOD_FIELDS.items()
+        if (
+            all(block.get(key) == getattr(bundle, key) for key in _REPORT_METHOD_FIELDS)
+            and all(
+                block.get(key, default) == getattr(bundle, key)
+                for key, default in _REPORT_V19_METHOD_FIELDS.items()
+            )
+            and _report_row_block(block) == bundle.row_block
         ):
             return name
     raise ValueError("the report's methods block matches no known bundle")

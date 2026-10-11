@@ -55,7 +55,7 @@ from iap.backtest.adaptive import AdaptiveDeployment  # noqa: E402
 from iap.experiment.tracker import data_version  # noqa: E402
 from iap.research.runner import load_instrument_meta  # noqa: E402
 from iap.validation import ExperimentLedger  # noqa: E402
-from iap.validation.methods import DEFAULT_METHODS, methods  # noqa: E402
+from iap.validation.methods import DEFAULT_METHODS, ledger_config, methods  # noqa: E402
 
 REPORTS_DIR = REPO / "research" / "adaptive_reports"
 ALPHA_REPORTS_DIR = REPO / "research" / "alpha_reports"
@@ -159,13 +159,16 @@ def run_alpha(aid: str, frames, cfg, backtester, lc_cfg, log, ledger) -> dict:
             # The identity names the rules the deployment was replayed under
             # (v1.5.0): the same policy under another drift z, retirement
             # rule or backtest bundle is another look, not a rerun.
-            config={
-                "policy": pname,
-                **res.policy,
-                "ic_z_method": str(cfg["ic_z_method"]),
-                "breach_rule": lc_cfg.breach_rule,
-                "methods": DEFAULT_METHODS,
-            },
+            config=ledger_config(
+                {
+                    "policy": pname,
+                    **res.policy,
+                    "ic_z_method": str(cfg["ic_z_method"]),
+                    "breach_rule": lc_cfg.breach_rule,
+                    "methods": DEFAULT_METHODS,
+                },
+                methods(DEFAULT_METHODS),
+            ),
             result={
                 "net_pnl": m.total_pnl,
                 "refits": res.refit_count,

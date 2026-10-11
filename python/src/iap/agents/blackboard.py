@@ -94,6 +94,7 @@ class Blackboard:
         self,
         pubkeys: dict[str, str],
         legacy_hmac_keys: dict[str, bytes] | None = None,
+        board_id: str | None = None,
     ) -> list[str]:
         """Problems with the signed requests on the board (G4); ``[]`` = all good.
 
@@ -103,7 +104,9 @@ class Blackboard:
         carries an ``auth`` is checked: ``ed25519`` against ``pubkeys``,
         legacy ``hmac-sha256`` against ``legacy_hmac_keys``.  Entries by other
         writers without ``auth`` (v1.9 entries, the operator, trusted
-        writers) are not checked here."""
+        writers) are not checked here.  An ``ed25519-v2`` record must also
+        carry the entry's own ``prev`` and, when ``board_id`` is given, that
+        board id (G-P1-4)."""
         from iap.agents import signing
 
         problems: list[str] = []
@@ -116,9 +119,20 @@ class Blackboard:
                     problems.append(f"entry {e.get('seq')}: unsigned write by keyed agent {agent}")
                 continue
             why = signing.verify(a, agent, pubkeys, legacy)
+            if why is None and a.get("scheme") == signing.ED25519_V2:
+                # G-P1-4: the signed head must be the head the entry was chained on
+                if a.get("prev") != e.get("prev"):
+                    why = "signed prev is not the entry's prev (replayed request)"
+                elif board_id is not None and a.get("board") != board_id:
+                    why = f"signed for board {a.get('board')!r}, not {board_id!r}"
             if why is not None:
                 problems.append(f"entry {e.get('seq')}: {why}")
         return problems
+
+    def head(self) -> str:
+        """Hash of the last entry (``GENESIS`` for an empty board)."""
+        n = self.verify()
+        return self.entries()[-1]["hash"] if n else GENESIS
 
     def append(
         self,
@@ -127,9 +141,12 @@ class Blackboard:
         ts: int,
         body: dict[str, Any],
         auth: dict[str, Any] | None = None,
+        expect_prev: str | None = None,
     ) -> dict[str, Any]:
         """Broker-only.  Verifies the chain first so a tampered log is never
-        extended; verify and append run under one exclusive file lock (v1.13)."""
+        extended; verify and append run under one exclusive file lock (v1.13).
+        ``expect_prev`` (G-P1-4): refuse unless the head is still that hash
+        (the head a bound request was signed against)."""
         from iap.experiment.locking import FileLock
 
         if kind not in KINDS:
@@ -139,6 +156,10 @@ class Blackboard:
             n = self.verify()
             last = self.entries()[-1] if n else None
             prev = last["hash"] if last is not None else GENESIS
+            if expect_prev is not None and expect_prev != prev:
+                raise BlackboardError(
+                    "the board head moved since the request was signed (stale prev); re-sign"
+                )
             if last is not None and int(ts) < int(last.get("ts", 0)):
                 raise BlackboardError(
                     f"ts {ts} is earlier than the head entry's ts {last.get('ts')} "

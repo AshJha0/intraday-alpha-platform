@@ -31,6 +31,8 @@ from iap.risk import (
     Scope,
     fmt_fixed,
     instrument_refs_from_golden,
+    unchained_line,
+    verify_audit_chain,
 )
 
 _NOTIFICATION_RULES = frozenset(
@@ -134,6 +136,10 @@ def apply(eng: RiskEngine, i: int, step: dict[str, Any], check: bool) -> None:
         )
     elif kind == "roll_session":
         eng.roll_session(ts, step.get("reason", ""))
+    elif kind == "trade":
+        eng.on_market_trade(step["instrument_id"], step["qty"], ts)
+    elif kind == "cancel_request":
+        eng.on_cancel_request(step["strategy_id"], step["venue_id"], ts)
     elif kind == "order":
         order = parse_order(step["order"])
         d = eng.check_order(order)
@@ -198,6 +204,7 @@ def test_golden_audit_log_matches_byte_for_byte(golden, config, golden_dir):
     assert a == b, "audit must be deterministic"
     want = (golden_dir / "expected_risk_audit.jsonl").read_bytes()
     assert a.encode("utf-8") == want, "audit JSONL must be byte-identical to the golden"
+    assert verify_audit_chain(a)[0] == len(a.splitlines()), "the golden audit is one chain"
     # one audit line per decision + one per pinned notification event
     n_notif = len(golden["expected_notification_events"])
     assert len(a.splitlines()) == _n_orders(golden) + n_notif
@@ -231,16 +238,20 @@ def test_golden_snapshot_restore_reproduces_the_audit_tail(golden, config, golde
     # 2. restoring the golden snapshot and replaying the rest reproduces
     #    the unbroken run's audit tail exactly (after the STATE_RESTORED line)
     limits = RiskLimits.from_json(config)
+    head = eng.audit_chain_head()
     restored = RiskEngine.restore(
-        limits, instrument_refs_from_golden(golden["instruments"]), want, 0
+        limits, instrument_refs_from_golden(golden["instruments"]), want, 0, chain=head
     )
     assert restored.audit_len() == 1
     assert restored.audit()[0].rule_id == "STATE_RESTORED"
     for i in range(k + 1, len(steps)):
         apply(restored, i, steps[i], check=True)
         apply(eng, i, steps[i], check=True)
-    full_lines = eng.audit_jsonl().splitlines()
-    tail = restored.audit_jsonl().splitlines()[1:]
+    # the restored engine continues the unbroken engine's audit chain
+    verify_audit_chain(eng.audit_jsonl())
+    verify_audit_chain(restored.audit_jsonl(), head[0] + 1, head[1])
+    full_lines = [unchained_line(x) for x in eng.audit_jsonl().splitlines()]
+    tail = [unchained_line(x) for x in restored.audit_jsonl().splitlines()[1:]]
     assert tail == full_lines[len(full_lines) - len(tail) :]
     assert restored.snapshot() == eng.snapshot(), "state converges"
     assert restored.snapshot_json() == eng.snapshot_json()
@@ -257,12 +268,13 @@ def test_golden_restore_from_every_step_is_bit_identical(golden, config):
     for i, step in enumerate(steps):
         apply(unbroken, i, step, check=True)
         snapshots.append((i, unbroken.snapshot_json()))
-    full_audit = unbroken.audit_jsonl().splitlines()
+    full_audit = [unchained_line(x) for x in unbroken.audit_jsonl().splitlines()]
     for cut, snap_json in snapshots[::7]:
         restored = RiskEngine.restore(limits, refs, json.loads(snap_json), 0)
         for i in range(cut + 1, len(steps)):
             apply(restored, i, steps[i], check=True)
-        tail = restored.audit_jsonl().splitlines()[1:]
+        verify_audit_chain(restored.audit_jsonl())
+        tail = [unchained_line(x) for x in restored.audit_jsonl().splitlines()[1:]]
         assert tail == full_audit[len(full_audit) - len(tail) :], f"cut at step {cut}"
         assert restored.snapshot_json() == unbroken.snapshot_json(), f"cut at step {cut}"
 
@@ -297,7 +309,7 @@ def _must_fail(call, *args) -> None:
         call(*args)
     except ValueError:
         return
-    raise AssertionError("a malformed kill command must fail")
+    raise AssertionError("a malformed kill / override command must fail")
 
 
 def replay_edge(
@@ -313,6 +325,8 @@ def replay_edge(
         if "config_remove" in sc:
             section, key = sc["config_remove"]
             del doc[section][key]
+        for section, key, value in sc.get("config_set", []):
+            doc[section][key] = copy.deepcopy(value)
         eng = RiskEngine.from_config(doc, refs)
         if sc.get("require_bootstrap", False):
             eng.require_bootstrap()
@@ -334,12 +348,25 @@ def replay_edge(
                     step["ts"],
                     step.get("reason", ""),
                 )
+            elif kind == "bad_override":
+                _must_fail(
+                    eng.override_loss_limit,
+                    Scope.parse(step["scope"]),
+                    step["scope_id"],
+                    step["new_limit"],
+                    step["ts"],
+                    step.get("approver", ""),
+                )
             elif kind == "bootstrap":
                 eng.bootstrap_positions([_parse_fill(f) for f in step["fills"]], step["ts"])
             elif kind == "restore":
                 out.append(eng.audit_jsonl())
                 eng = RiskEngine.restore(
-                    RiskLimits.from_json(doc), refs, eng.snapshot(), step["ts"]
+                    RiskLimits.from_json(doc),
+                    refs,
+                    eng.snapshot(),
+                    step["ts"],
+                    chain=eng.audit_chain_head(),
                 )
             elif kind == "order" and fill_expect:
                 d = eng.check_order(parse_order(step["order"]))
@@ -361,7 +388,7 @@ def edge(golden_dir: Path) -> dict[str, Any]:
 
 
 def test_golden_edge_decisions_match(edge, config):
-    assert edge["x-version"] == 1
+    assert edge["x-version"] == 2
     assert len(edge["scenarios"]) >= 8
     replay_edge(edge, config, check=True)
 

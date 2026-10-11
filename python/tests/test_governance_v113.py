@@ -51,7 +51,14 @@ def test_committed_registry_passes():
 
 
 def _ledger(entries):
-    return {"total_experiments": sum(e["count"] for e in entries), "entries": entries}
+    from iap.validation.ledger import chain_head
+
+    return {
+        "total_experiments": sum(e["count"] for e in entries),
+        "entries": entries,
+        "chain_head": chain_head(entries),  # v1.14 (G-P1-5)
+        "chain_length": len(entries),
+    }
 
 
 def test_ledger_monotone_rules():
@@ -63,7 +70,7 @@ def test_ledger_monotone_rules():
     assert any("missing" in p for p in shrunk)
     # same total, but an entry replaced: identity lost
     swapped = monotone.compare_ledger(_ledger([a]), _ledger([{"key": "c", "count": 2}]))
-    assert swapped and all("missing" in p for p in swapped)
+    assert any("missing" in p for p in swapped) and any("descend" in p for p in swapped)
     assert monotone.compare_models_ledger({"experiment_count": 5}, {"experiment_count": 4})
 
 
@@ -128,9 +135,12 @@ def test_merge_ledger_by_identity(tmp_path):
     # merge is idempotent, and merging a ledger with itself changes nothing
     led, rep = merge_ledger.merge(out, out)
     assert rep["appended_entries"] == 0 and led._render() == out.read_text()
-    # the merged ledger is monotone against both inputs
-    for src in (ours.path, theirs.path):
-        assert monotone.compare_ledger(json.loads(src.read_text()), merged) == []
+    # the merged ledger loses nothing from either input; it DESCENDS from
+    # ours (main, the CI base) only - v1.14 G-P1-5: theirs' entries are
+    # appended after main's, so the branch chain is not a prefix
+    assert monotone.compare_ledger(json.loads(ours.path.read_text()), merged) == []
+    vs_theirs = monotone.compare_ledger(json.loads(theirs.path.read_text()), merged)
+    assert vs_theirs and all("does not descend" in p for p in vs_theirs)
 
 
 # -- G-P1-3: lifecycle CLI needs an approval -----------------------------------

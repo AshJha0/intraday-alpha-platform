@@ -28,6 +28,7 @@ from iap.marketdata.__main__ import main as marketdata_main
 from iap.marketdata.feederrors import BookDivergenceError, IngestError
 from iap.marketdata.ingest import (
     _BookCheck,
+    config_version,
     ingest,
     load_manifest,
     real_dataset_version,
@@ -92,7 +93,7 @@ def test_ingest_writes_the_generator_layout_and_a_manifest(tmp_path, capsys):
         "reference/security_master.json",
     }
     manifest = load_manifest(out)
-    assert manifest["kind"] == "real" and manifest["x-version"] == 1
+    assert manifest["kind"] == "real" and manifest["x-version"] == 2
     assert manifest["source"] == {"format": "itch50", "venue": "XNAS", "venue_id": 101}
     assert [u["symbol"] for u in manifest["universe"]] == list(SYMBOLS)
     assert [u["instrument_id"] for u in manifest["universe"]] == [1, 2, 3]
@@ -157,7 +158,10 @@ def test_same_input_gives_identical_output_bytes(tmp_path, capsys):
 def test_output_bytes_of_a_seeded_dataset_are_pinned(tmp_path, capsys):
     """Known-answer pin (the dataset of COOKBOOK recipe 36): the hashes were
     recorded BEFORE the pass-2 / normaliser performance work, so any change
-    to the output bytes — by an optimisation or by a platform — fails here."""
+    to the output bytes — by an optimisation or by a platform — fails here.
+    Re-pinned once in v1.14 (deliberate rule change, CHANGELOG): 119 midpoint
+    prints of 2019-12-30 now round half to even (D-P1-3) and the dataset
+    version domain is ``iap.real-dataset.v2``."""
     out = tmp_path / "ds"
     for seed, date in ((7, D1), (8, D2)):
         src = _day(
@@ -167,17 +171,88 @@ def test_output_bytes_of_a_seeded_dataset_are_pinned(tmp_path, capsys):
     capsys.readouterr()
     manifest = load_manifest(out)
     assert manifest["dataset_version"] == (
-        "70ddb405e78c2356c2a6f15a85f8dfe520cc27bf427ec2532d4257c480e8e29e"
+        "8ae6f26fab7396727f0a7d66a58052faebbad3059fb0e6188214e322e31bb871"
+    )
+    assert manifest["sessions"][D1]["raw"]["trade_price_residue_histogram"] == {"50": 119}
+    assert (
+        manifest["config_version"] == config_version(out) and len(manifest["config_version"]) == 64
     )
     assert manifest["sessions"][D1]["raw"]["sha256"] == (
-        "104ceb7f631d8356133eb486152547d6929c8a628caadc550d2f62fed9abdab2"
+        "6060224180a376cffa22a78804353bea8fd6d866f9b4964e7d630cca05dea9c7"
     )
     assert manifest["normalized"]["files"] == {
-        "eq_20191230.normalized.iap1": "a1c8a4f4b293913b19b3947a3ec32a7d235b061b90249cadf4d814bcba24611a",
-        "eq_20191230.normalized.jsonl": "104ceb7f631d8356133eb486152547d6929c8a628caadc550d2f62fed9abdab2",
-        "eq_20191231.normalized.iap1": "27b440e07cc1ca984fe819cefd7b50b7c548c02d4aea4c219316fbaa8c3a6f53",
-        "eq_20191231.normalized.jsonl": "30933784970dd485f31a0863b533c38ee7354073946a77995c1b2d7045f5e09f",
+        "eq_20191230.normalized.iap1": "2622ac5cdb9fe6374d0efaa0cb0b7298fbec26aa64dfb1ae6236c984e8b2eafc",
+        "eq_20191230.normalized.jsonl": "6060224180a376cffa22a78804353bea8fd6d866f9b4964e7d630cca05dea9c7",
+        "eq_20191231.normalized.iap1": "ae68cbb7e562da18568e9a75b26d6363c64f9b0f76bdb80d21e1b66470d7fad4",
+        "eq_20191231.normalized.jsonl": "af4e4c4e3d703cab3ca0b88615608d32f410d0f8e6d733266c126d6530d9f267",
     }
+
+
+def test_pre_rule_manifest_is_refused_with_a_clear_message(tmp_path, capsys):
+    """v1.14 (D-P1-4): a dataset ingested under the pre-v1.14 rules
+    (manifest x-version 1: tick-rule hidden prints, half-up midpoints, the
+    0.0001-tick decision of ds_20191230) is refused, not silently used."""
+    out = tmp_path / "ds"
+    assert _ingest_cli(_day(tmp_path, 7, "d.itch"), D1, out) == 0
+    capsys.readouterr()
+    doc = json.loads((out / "dataset.json").read_text(encoding="utf-8"))
+    doc["x-version"] = 1
+    (out / "dataset.json").write_text(json.dumps(doc), encoding="utf-8")
+    with pytest.raises(IngestError, match="pre-v1.14 rules.*re-ingest"):
+        load_manifest(out)
+    # ... and an ingest into it, or a merge of it, is refused the same way
+    assert _ingest_cli(_day(tmp_path, 8, "d8.itch"), D2, out) == 1
+    assert "pre-v1.14 rules" in capsys.readouterr().err
+
+
+def test_config_version_pins_configs_and_reference(tmp_path, capsys):
+    """v1.14 (D-P2-9): ``config_version`` hashes configs/** + reference/**;
+    the dataset version (normalized events only) does not see a config edit."""
+    out = tmp_path / "ds"
+    assert _ingest_cli(_day(tmp_path, 7, "d.itch"), D1, out) == 0
+    capsys.readouterr()
+    manifest = load_manifest(out)
+    before = config_version(out)
+    assert manifest["config_version"] == before
+    venues = out / "configs" / "venues" / "venues.json"
+    venues.write_text(venues.read_text(encoding="utf-8").replace("0.003", "0.0029"), "utf-8")
+    assert config_version(out) != before
+    assert real_dataset_version(out / "normalized") == manifest["dataset_version"]
+
+
+def _half_penny_day(tmp_path: Path, n: int) -> Path:
+    enc = Itch50Encoder()
+    enc.system_event(hms_ns(3), "O")
+    enc.stock_directory(1, hms_ns(3, 0, 1), "HALFP")
+    enc.system_event(hms_ns(9, 30), "Q")
+    t = hms_ns(9, 30, 1)
+    for i in range(n):  # $20.0050, $20.0100, ...: every other order on the half-penny grid
+        enc.add(1, t + i, 100 + i, "B", 100, "HALFP", 200_000 + 50 * (i % 2) + 100 * (i // 2))
+    return enc.write(tmp_path / "halfp.itch")
+
+
+def test_half_penny_grid_selects_the_half_penny_tick(tmp_path):
+    """v1.14 (D-P2-10): an instrument quoted on the $0.005 grid is given the
+    half-penny tick (auto) instead of having half its orders rejected; a
+    forced cent tick is refused with the reason; a handful of half-penny
+    orders below the guard's minimum keeps the cent tick."""
+    src = _half_penny_day(tmp_path, 400)
+    manifest = ingest("itch50", [src], D1, ["HALFP"], tmp_path / "a", configs_dir=CONFIGS_DIR)
+    (entry,) = manifest["universe"]
+    assert (entry["tick_size"], entry["tick_size_e4"]) == (0.005, 50)
+    per = manifest["sessions"][D1]["per_symbol"]["HALFP"]
+    assert per["displayed_orders_on_half_penny"] == 200 and per["off_tick_orders_rejected"] == 0
+    with pytest.raises(IngestError, match="half-penny grid"):
+        ingest(
+            "itch50", [src], D1, ["HALFP"], tmp_path / "b",
+            configs_dir=CONFIGS_DIR, tick_size="0.01",
+        )  # fmt: skip
+    few = ingest(
+        "itch50", [_half_penny_day(tmp_path, 20)], D1, ["HALFP"], tmp_path / "c",
+        configs_dir=CONFIGS_DIR,
+    )  # fmt: skip
+    assert few["universe"][0]["tick_size_e4"] == 100
+    assert few["sessions"][D1]["per_symbol"]["HALFP"]["off_tick_orders_rejected"] == 10
 
 
 def test_dataset_version_is_content_pinned_and_disjoint_from_synthetic(tmp_path, capsys):
@@ -363,7 +438,8 @@ def test_tick_size_follows_the_displayed_prices(tmp_path):
     assert ticks == {"BIGCO": (0.01, 100), "PENNY": (0.0001, 1)}
     raw = read_jsonl(out / "raw" / "eq_20191230.jsonl")
     prices = {(ev.instrument_id, ev.event_type): ev.price_ticks for ev in raw if ev.price_ticks}
-    assert prices[(1, int(EventType.ADD))] == 15_001 and prices[(1, int(EventType.TRADE))] == 15_001
+    assert prices[(1, int(EventType.ADD))] == 15_001
+    assert prices[(1, int(EventType.TRADE))] == 15_000  # 150.005: half to even (D-P1-3)
     assert prices[(2, int(EventType.EXECUTE))] == 4_321  # exact: one tick is 1/10000 dollar
     assert manifest["sessions"][D1]["raw"]["trade_prices_rounded_to_tick"] == 1
     assert manifest["sessions"][D1]["per_symbol"]["PENNY"]["ref_price_source"] == "first_trade"
@@ -695,6 +771,27 @@ def test_research_runs_on_an_ingested_dataset_by_path(tmp_path, capsys):
     assert spec["feature_version"] == summary["registry_hash"]
     ledger = json.loads((out / "research" / "experiments.json").read_text())
     assert [d["dataset_version"] for d in ledger["datasets"]] == [version]
+    manifest = load_manifest(out)
+    # v1.14: the ledger entries carry the configs/reference hash (D-P2-9) ...
+    assert {e.get("config_version") for e in ledger["entries"]} == {manifest["config_version"]}
+    # ... the store records its version and label freshness (D-P2-13) and the
+    # side-less opening / closing crosses were folded into volume (D-P2-6)
+    assert summary["store_version"] == 2 and summary["label_freshness"] == "trailing"
+    n_crosses = sum(
+        len(per["crosses"])
+        for s in manifest["sessions"].values()
+        for per in s["per_symbol"].values()
+    )
+    assert summary["cross_prints"] == {"mode": "fold", "folded": n_crosses} and n_crosses > 0
+    # per-session reference values (D-P2-8): each session priced at its own
+    # open, the second session's ADV is the first session's volume (as of)
+    rows = json.loads((out / "configs" / "instruments" / "instruments.json").read_text())
+    aapl = next(r for r in rows["instruments"] if r["symbol"] == "AAPL")
+    vols = [manifest["sessions"][d]["per_symbol"]["AAPL"]["volume"] for d in (D1, D2)]
+    assert aapl["adv_by_session"] == {D1: vols[0], D2: vols[0]}
+    assert set(aapl["ref_price_by_session"]) == {D1, D2}
+    master = SecurityMaster.load(out / "reference" / "security_master.json")
+    assert master.as_of("AAPL", D2).adv == vols[0]
     assert (
         research_main(
             ["run", "--no-prereg", "--alpha", "EQ03", "--dataset-dir", str(tmp_path / "nope")]

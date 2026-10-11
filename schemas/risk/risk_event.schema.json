@@ -2,8 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://iap.example/schemas/risk/risk_event.schema.json",
   "title": "RiskEvent",
-  "description": "Hard-risk decision record (spec sections 6, 16). Fail-closed, auditable, replayable. severity: INFO=1 WARN=2 BREACH=3; decision: ALLOW=1 REJECT=2 KILL=3.",
-  "x-version": 1,
+  "description": "Hard-risk decision record (spec sections 6, 16). Fail-closed, auditable, replayable. severity: INFO=1 WARN=2 BREACH=3; decision: ALLOW=1 REJECT=2 KILL=3. x-version 2 (v1.14, G-P0-1): every record an engine emits carries seq (1, 2, 3, ... per engine, continued across a chained restore) and prev_sha256 (lowercase hex SHA-256 of the previous record's JSONL line, 64 zeros for the first), so the audit log is a hash chain.",
+  "x-version": 2,
   "type": "object",
   "properties": {
     "timestamp": {
@@ -45,6 +45,17 @@
     },
     "reason": {
       "type": "string"
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615,
+      "description": "Position in the engine's audit chain (1-based)."
+    },
+    "prev_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 of the previous record's JSONL line; 64 zeros for the first record."
     }
   },
   "required": [
@@ -54,7 +65,9 @@
     "rule_id",
     "severity",
     "decision",
-    "reason"
+    "reason",
+    "seq",
+    "prev_sha256"
   ],
   "additionalProperties": false
 }

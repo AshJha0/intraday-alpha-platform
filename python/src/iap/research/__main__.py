@@ -231,11 +231,15 @@ def _dataset_versions(args: argparse.Namespace) -> tuple[str | None, str | None]
     the spec, the experiment id and the ledger entries carry the REAL
     dataset's version and its looks are never pooled with synthetic ones.
     """
+    args.config_version = None
     if args.dataset_dir is None:
         return None, None
     root = Path(args.dataset_dir)
     try:
-        dataset_version = json.loads((root / "dataset.json").read_text())["dataset_version"]
+        manifest = json.loads((root / "dataset.json").read_text())
+        dataset_version = manifest["dataset_version"]
+        # v1.14 (D-P2-9): the configs/reference hash, stamped on ledger entries
+        args.config_version = manifest.get("config_version")
         feature_version = json.loads((root / "features" / "features_summary.json").read_text())[
             "registry_hash"
         ]
@@ -360,6 +364,7 @@ def _run(args: argparse.Namespace) -> int:
         normalized_dir=args.normalized_dir,
         gate=_runner_gate(args, prereg_entry),
         exploratory=bool(args.no_prereg),
+        config_version=getattr(args, "config_version", None),
     )
     configuration = _parse_config(args.config)
     if args.methods is not None:
@@ -566,6 +571,7 @@ def _combine(args: argparse.Namespace) -> int:
             progress=lambda line: print(line, file=sys.stderr),
             dataset_version=dataset_version,
             feature_version=feature_version,
+            config_version=getattr(args, "config_version", None),
             gate=_combine_gate(args),
         )
     except ValueError as exc:

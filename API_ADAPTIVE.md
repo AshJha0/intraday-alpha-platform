@@ -509,3 +509,21 @@ Brier/ECE, allowed counts, P&L of each side's would-be decisions and the
 delta, agreement). `promotion_decision(comparison, evidence, config=None,
 to_state="ACTIVE")` promotes only when the candidate is better in shadow AND
 every gate of the lifecycle PROMOTION edge into `to_state` passes.
+
+### 9.1 Content hash (v1.14)
+
+`model_id` and `record_hash` cover the record as written, which includes
+library versions. Two fits with the same class, parameters and fitted
+arrays under different scikit-learn versions therefore had different ids
+and no way to say they were the same model. Since v1.14 the registry also
+writes a `content.json` sidecar with `content_sha256(model)`: a hash of
+the class, the parameters and the fitted arrays only. `record.json`,
+`model_id` and `record_hash` are byte-unchanged.
+
+- `ModelRegistry.find_by_content(digest, name=None)` lists records with
+  that content.
+- `ModelRegistry.verify_content(model_id)` recomputes it, and backfills
+  the sidecar for a record written before v1.14.
+
+Use the content hash to ask "is this the same model?" and `model_id` to
+ask "is this the same record?". Neither proves the model is any good.

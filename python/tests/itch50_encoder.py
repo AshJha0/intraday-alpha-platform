@@ -109,6 +109,11 @@ class Itch50Encoder:
         tail = self._stock(symbol) + state.encode() + b" " + reason.encode().ljust(4, b" ")
         self._msg("H", locate, ts, tail)
 
+    def operational_halt(
+        self, locate: int, ts: int, symbol: str, market: str = "Q", action: str = "H"
+    ) -> None:
+        self._msg("h", locate, ts, self._stock(symbol) + market.encode() + action.encode())
+
     def reg_sho(self, locate: int, ts: int, symbol: str, action: str = "0") -> None:
         self._msg("Y", locate, ts, self._stock(symbol) + action.encode())
 

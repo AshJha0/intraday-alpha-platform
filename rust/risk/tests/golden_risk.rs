@@ -114,6 +114,16 @@ fn apply(eng: &mut RiskEngine, i: usize, step: &serde_json::Value, check: bool) 
             )
             .unwrap(),
         "roll_session" => eng.roll_session(ts(), step["reason"].as_str().unwrap_or("")),
+        "trade" => eng.on_market_trade(
+            step["instrument_id"].as_u64().unwrap() as u32,
+            step["qty"].as_i64().unwrap(),
+            ts(),
+        ),
+        "cancel_request" => eng.on_cancel_request(
+            step["strategy_id"].as_str().unwrap(),
+            step["venue_id"].as_u64().unwrap() as u16,
+            ts(),
+        ),
         "order" => {
             let order = parse_order(&step["order"]);
             let d = eng.check_order(&order);
@@ -233,6 +243,8 @@ fn audit_log_matches_golden_byte_for_byte() {
     assert_eq!(a, b, "audit must be deterministic");
     let want = std::fs::read_to_string(repo_path("tests/golden/expected_risk_audit.jsonl")).unwrap();
     assert_eq!(a, want, "audit JSONL must be byte-identical to the golden");
+    let (last, _) = risk::verify_audit_chain(&a, 1, risk::GENESIS_SHA256).expect("one chain");
+    assert_eq!(last as usize, a.lines().count());
     // one audit line per decision + one per pinned notification event
     let n_orders = golden["steps"]
         .as_array()
@@ -261,7 +273,10 @@ fn snapshot_restore_reproduces_the_audit_tail() {
     //    the unbroken run's audit tail exactly (after the STATE_RESTORED line)
     let config = load_json(golden["config"].as_str().unwrap());
     let limits = RiskLimits::from_json(&config).unwrap();
-    let mut restored = RiskEngine::restore(limits, instruments(&golden), &want, 0).unwrap();
+    let head = eng.audit_chain_head();
+    let mut restored =
+        RiskEngine::restore_chained(limits, instruments(&golden), &want, 0, Some(head.clone()))
+            .unwrap();
     assert_eq!(restored.audit().len(), 1);
     assert_eq!(restored.audit()[0].rule_id, "STATE_RESTORED");
     for (i, step) in steps.iter().enumerate().skip(k + 1) {
@@ -270,10 +285,13 @@ fn snapshot_restore_reproduces_the_audit_tail() {
     }
     let full = eng.audit_jsonl();
     let restored_audit = restored.audit_jsonl();
-    let tail: Vec<&str> = restored_audit.lines().skip(1).collect();
-    let full_lines: Vec<&str> = full.lines().collect();
+    // the restored engine continues the unbroken engine's audit chain
+    risk::verify_audit_chain(&full, 1, risk::GENESIS_SHA256).expect("unbroken chain");
+    risk::verify_audit_chain(&restored_audit, head.0 + 1, &head.1).expect("continued chain");
+    let tail: Vec<String> = restored_audit.lines().skip(1).map(risk::unchained_line).collect();
+    let full_lines: Vec<String> = full.lines().map(risk::unchained_line).collect();
     let expected_tail = &full_lines[full_lines.len() - tail.len()..];
-    assert_eq!(tail, expected_tail);
+    assert_eq!(&tail[..], expected_tail);
     assert_eq!(restored.snapshot(), eng.snapshot(), "state converges");
 }
 
@@ -320,6 +338,11 @@ fn replay_edge(golden: &serde_json::Value, check: bool) -> String {
                 .unwrap()
                 .remove(rm[1].as_str().unwrap());
         }
+        if let Some(sets) = sc["config_set"].as_array() {
+            for set in sets {
+                doc[set[0].as_str().unwrap()][set[1].as_str().unwrap()] = set[2].clone();
+            }
+        }
         let mut eng = RiskEngine::from_config(&doc, instruments(golden));
         if sc["require_bootstrap"].as_bool() == Some(true) {
             eng.require_bootstrap();
@@ -338,6 +361,17 @@ fn replay_edge(golden: &serde_json::Value, check: bool) -> String {
                     eng.clear_kill(scope(), scope_id(), ts(), reason()).is_err(),
                     "step {i}: a malformed kill command must fail"
                 ),
+                "bad_override" => assert!(
+                    eng.override_loss_limit(
+                        scope(),
+                        scope_id(),
+                        step["new_limit"].as_f64().unwrap(),
+                        ts(),
+                        step["approver"].as_str().unwrap_or(""),
+                    )
+                    .is_err(),
+                    "step {i}: a refused override must fail"
+                ),
                 "bootstrap" => {
                     let fills: Vec<Fill> =
                         step["fills"].as_array().unwrap().iter().map(parse_fill).collect();
@@ -347,7 +381,9 @@ fn replay_edge(golden: &serde_json::Value, check: bool) -> String {
                     out.push_str(&eng.audit_jsonl());
                     let limits = RiskLimits::from_json(&doc).unwrap();
                     let snap = eng.snapshot();
-                    eng = RiskEngine::restore(limits, instruments(golden), &snap, ts()).unwrap();
+                    let chain = Some(eng.audit_chain_head());
+                    eng = RiskEngine::restore_chained(limits, instruments(golden), &snap, ts(), chain)
+                        .unwrap();
                 }
                 _ => apply(&mut eng, i, step, check),
             }
@@ -360,8 +396,8 @@ fn replay_edge(golden: &serde_json::Value, check: bool) -> String {
 #[test]
 fn golden_edge_decisions_match() {
     let golden = load_json("tests/golden/expected_risk_edge_decisions.json");
-    assert_eq!(golden["x-version"].as_u64(), Some(1));
-    assert!(golden["scenarios"].as_array().unwrap().len() >= 8);
+    assert_eq!(golden["x-version"].as_u64(), Some(2));
+    assert!(golden["scenarios"].as_array().unwrap().len() >= 12);
     replay_edge(&golden, true);
 }
 

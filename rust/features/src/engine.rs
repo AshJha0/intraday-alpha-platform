@@ -27,6 +27,15 @@
 //! - Warmup: a windowed feature is invalid until `t - first_event_ts >= w`.
 //! - Cadence 0 emits one vector after every event of the instrument;
 //!   otherwise at most one vector per cadence interval (pure event time).
+//! - Same-timestamp coalescing (v1.14, D-P1-1): [`FeatureEngine::apply_grouped`]
+//!   with `group_end == false` applies an event to the book and folds its
+//!   trade flow but defers the refresh / samples / emission to the event
+//!   that closes the instrument's `(instrument, exchange_ts)` group
+//!   ([`group_ends`]); the closing refresh re-reads every venue the group
+//!   touched (ascending venue id) and a venue that went stale at any point
+//!   of the group counts as a stale->fresh recovery when none is stale at
+//!   the close. [`FeatureEngine::apply`] is `apply_grouped(ev, true)`: the
+//!   per-event legacy semantics.
 //!
 //! Validity: NaN never appears with `valid == true` — every value flows
 //! through a single funnel that forces invalid on non-finite input.
@@ -103,6 +112,23 @@ impl FeatureVector {
 /// One side's cached top-10 depth: `(price_ticks, size)` best-first.
 type Depth = Vec<(i64, i64)>;
 
+/// `group_end` flag of every event of a stream (pinned, D-P1-1): an event
+/// closes its group when the NEXT event of the same instrument has a
+/// different `exchange_ts`, or there is none.
+pub fn group_ends(events: &[MarketEvent]) -> Vec<bool> {
+    let mut out = vec![true; events.len()];
+    let mut next: BTreeMap<u32, i64> = BTreeMap::new();
+    for (i, ev) in events.iter().enumerate().rev() {
+        // `Option::is_none_or` needs Rust 1.82; MSRV is 1.75.
+        out[i] = match next.get(&ev.instrument_id) {
+            Some(&ts) => ts != ev.exchange_ts,
+            None => true,
+        };
+        next.insert(ev.instrument_id, ev.exchange_ts);
+    }
+    out
+}
+
 /// Per-instrument rolling state (mirrors `_InstState` in the reference).
 struct InstState {
     tick: f64,
@@ -112,8 +138,19 @@ struct InstState {
     warm_ts: Option<i64>,
     /// stale->fresh recoveries so far (rolling-state resets)
     recoveries: u64,
-    /// sorted ids of this instrument's venues whose book is stale
+    /// sorted ids of this instrument's venues whose book is stale, as of
+    /// the last group close
     stale_venues: Vec<u16>,
+    /// the same set after the latest event (inside an open group)
+    stale_running: Vec<u16>,
+    /// an event of the open group changed the stale set
+    stale_touched: bool,
+    /// a venue was stale after some event of the open group
+    stale_seen: bool,
+    /// an applied book-touching event is waiting for the group close
+    pending_refresh: bool,
+    /// venues whose depth cache the closing refresh re-reads (sorted)
+    pending_venues: Vec<u16>,
     /// monotone count of merged-view refreshes (label sampling hook)
     refresh_seq: u64,
     /// last seen exchange_ts (timestamp-regression guard)
@@ -167,6 +204,11 @@ impl InstState {
             warm_ts: None,
             recoveries: 0,
             stale_venues: Vec::new(),
+            stale_running: Vec::new(),
+            stale_touched: false,
+            stale_seen: false,
+            pending_refresh: false,
+            pending_venues: Vec::new(),
             refresh_seq: 0,
             last_ts: 0,
             t: 0,
@@ -350,8 +392,20 @@ impl FeatureEngine {
         })
     }
 
-    /// Apply one event; returns the emitted vector, if any.
+    /// Apply one event; returns the emitted vector, if any (per-event
+    /// legacy semantics: every event closes its own group).
     pub fn apply(&mut self, ev: &MarketEvent) -> Result<Option<FeatureVector>, IapError> {
+        self.apply_grouped(ev, true)
+    }
+
+    /// Apply one event of a coalesced stream (D-P1-1, module docs):
+    /// `group_end == false` defers the refresh, the samples and the emission
+    /// to the event that closes the instrument's timestamp group.
+    pub fn apply_grouped(
+        &mut self,
+        ev: &MarketEvent,
+        group_end: bool,
+    ) -> Result<Option<FeatureVector>, IapError> {
         let tick = *self.ticks.get(&ev.instrument_id).ok_or_else(|| {
             IapError::InvalidArgument(format!(
                 "no tick_size configured for instrument {}",
@@ -390,18 +444,18 @@ impl FeatureEngine {
             .filter(|(_, b)| b.stale)
             .map(|(&v, _)| v)
             .collect();
-        let stale_changed = stale_now != st.stale_venues;
-        let just_recovered = !st.stale_venues.is_empty() && stale_now.is_empty();
-        st.stale_venues = stale_now;
+        if stale_now != st.stale_running {
+            Self::mark_venue(st, ev.venue_id);
+            st.stale_running = stale_now;
+            st.stale_touched = true;
+        }
+        if !st.stale_running.is_empty() {
+            st.stale_seen = true;
+        }
 
         if status != ApplyStatus::Applied {
             self.events_dropped += 1;
-            if stale_changed
-                && Self::refresh_book(st, ev.venue_id, t, just_recovered, false)
-            {
-                self.oversized_depth_skipped += 1;
-            }
-            return Ok(self.emit_if_due(ev.instrument_id, t));
+            return Ok(self.close_group(ev.instrument_id, t, group_end));
         }
 
         let et = EventType::from_u8(ev.event_type);
@@ -426,18 +480,49 @@ impl FeatureEngine {
                 | Some(EventType::Execute)
                 | Some(EventType::Quote)
         ) || (et == Some(EventType::Snapshot) && ev.trade_id == 0);
-        let oversized_depth = if touches {
-            Self::refresh_book(st, ev.venue_id, t, just_recovered, true)
+        if touches {
+            st.pending_refresh = true;
+            Self::mark_venue(st, ev.venue_id);
+        }
+        Ok(self.close_group(ev.instrument_id, t, group_end))
+    }
+
+    /// Record a venue for the closing refresh (sorted, unique).
+    fn mark_venue(st: &mut InstState, venue_id: u16) {
+        if let Err(pos) = st.pending_venues.binary_search(&venue_id) {
+            st.pending_venues.insert(pos, venue_id);
+        }
+    }
+
+    /// Close the instrument's timestamp group (D-P1-1): one refresh over the
+    /// venues the group touched, then the emission check. With
+    /// `group_end == false` the group stays open and nothing is emitted.
+    fn close_group(&mut self, instrument_id: u32, t: i64, group_end: bool) -> Option<FeatureVector> {
+        if !group_end {
+            return None;
+        }
+        let st = self.states.get_mut(&instrument_id)?;
+        let stale_changed = st.stale_touched;
+        let just_recovered = (!st.stale_venues.is_empty() || st.stale_seen)
+            && st.stale_running.is_empty();
+        st.stale_venues = st.stale_running.clone();
+        st.stale_touched = false;
+        st.stale_seen = false;
+        let venues = std::mem::take(&mut st.pending_venues);
+        let oversized_depth = if st.pending_refresh {
+            Self::refresh_book(st, &venues, t, just_recovered, true)
         } else if stale_changed {
-            Self::refresh_book(st, ev.venue_id, t, just_recovered, false)
+            Self::refresh_book(st, &venues, t, just_recovered, false)
         } else {
             false
         };
+        st.pending_refresh = false;
+        st.pending_venues = venues;
+        st.pending_venues.clear();
         if oversized_depth {
             self.oversized_depth_skipped += 1;
         }
-
-        Ok(self.emit_if_due(ev.instrument_id, t))
+        self.emit_if_due(instrument_id, t)
     }
 
     /// Cadence check (pure event time); emits at most one vector.
@@ -469,7 +554,7 @@ impl FeatureEngine {
     /// OFI / depth / mid sample is recorded.
     fn refresh_book(
         st: &mut InstState,
-        venue_id: u16,
+        venue_ids: &[u16],
         t: i64,
         just_recovered: bool,
         samples: bool,
@@ -478,9 +563,11 @@ impl FeatureEngine {
         if just_recovered {
             st.reset_rolling(t);
         }
-        if let Some(vb) = st.cons.books.get(&venue_id) {
-            st.venue_cache
-                .insert(venue_id, (vb.depth(0, 10), vb.depth(1, 10)));
+        for &venue_id in venue_ids {
+            if let Some(vb) = st.cons.books.get(&venue_id) {
+                st.venue_cache
+                    .insert(venue_id, (vb.depth(0, 10), vb.depth(1, 10)));
+            }
         }
         st.agg_b.clear();
         st.agg_a.clear();

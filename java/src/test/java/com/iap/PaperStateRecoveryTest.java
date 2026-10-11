@@ -18,6 +18,7 @@ import com.iap.config.ConfigService;
 import com.iap.platform.PaperTrading;
 import com.iap.platform.SessionStore;
 import com.iap.risk.RiskEngine;
+import com.iap.risk.RiskEvent;
 
 /**
  * State recovery across a restart (PLATFORM_CONVENTIONS.md §12.3) — the fix
@@ -157,6 +158,19 @@ public class PaperStateRecoveryTest {
                 (int) st1.auditLines);
         assertTrue("the restart itself is audited",
                 audit2.get((int) st1.auditLines).contains("STATE_RESTORED"));
+        // G-P0-1: the resumed engine continues the hash chain, so the whole
+        // file across the restart is ONE chain (seq 1..n, each line linked
+        // to the SHA-256 of the line before)
+        String prev = RiskEvent.GENESIS_SHA256;
+        for (int i = 0; i < audit2.size(); i++) {
+            Map<String, Object> doc = PaperFixtures.json(audit2.get(i));
+            assertEquals("seq of line " + i, (long) (i + 1),
+                    ((Number) doc.get("seq")).longValue());
+            assertEquals("prev_sha256 of line " + i, prev, doc.get("prev_sha256"));
+            prev = RiskEvent.lineSha256(audit2.get(i));
+        }
+        assertEquals(st2.riskAuditHeadSha256, prev);
+        assertEquals(st2.riskAuditSeq, audit2.size());
     }
 
     /**

@@ -116,7 +116,8 @@ def test_python_backend_matches_golden_checkpoints(python_frames):
         doc = golden[side]
         frame = python_frames[(doc["vector"], 0)]
         for cp, exp in doc["checkpoints"].items():
-            row = int(cp) - 1
+            # coalesced rows (D-P1-1): the row emitted by checkpoint event cp
+            (row,) = np.flatnonzero(frame.event_index == int(cp) - 1)
             assert frame.timestamp[row] == exp["timestamp"]
             for k, name in enumerate(NATIVE_NAMES):
                 if name not in exp["features"]:

@@ -6,6 +6,291 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## v1.14.0 — 2026-10-11
+
+Correctness release of the 2026-10-11 quality review: data mapping and
+same-timestamp coalescing (#83), behaviour-preserving engineering (#84),
+execution-simulator realism (#86), governance trust roots, chained ledger and
+blocking supply-chain audits (#87) and the SEC 15c3-5 pre-trade risk set
+(#89), and the research statistics revision: causal backtest row block,
+automatic HAC with day separation, time-shift leakage gate (#88).
+
+Parity counts from CI (v1.14.0): python 2385 (2080 in `python` + 305 in `python-slow`) / cpp 302 / rust 362 / java 575, golden 193/72/71/124: 3,624 green.
+
+### Numbers that changed
+
+All read from the committed artefacts of this release.
+
+- **Verdicts:** still 0 PROMOTE; 0 / 11 / 13 → 0 / 12 / 12 (PROMOTE /
+  ITERATE / REJECT, `research/alpha_reports/REPORT.md`). EQ01's gate t
+  1.59 → 6.54 (automatic, day-separated HAC); it now fails only the cost
+  gate. The PROMOTE t threshold is 4.426 at the run's look count.
+- **Lifecycle:** 24 → 23 CANDIDATE, 0 beyond. FX11 fails the time-shift
+  leakage test and is held in RESEARCH for review.
+- **Ledger:** 5,156 → 5,358 looks, 216 → 293 distinct configurations;
+  Bonferroni |t| 4.424 → 4.432, expected max |t| under the null 4.135 →
+  4.144. Every regenerated statistic is a new look (`stats_revision`).
+- **Backtest golden** (`expected_backtest.json`, default rules): 96 → 138
+  trades, P&L −7.10 → −39.15 (the synthetic feature store moved with
+  same-timestamp coalescing); the legacy run 385 → 386 trades.
+- **MVP golden** (`expected_mvp.json`): 235 → 231 parents, 348 → 347
+  children submitted, 169 → 163 fills, P&L −81.53 → −82.84 USD; 800
+  decisions and 15,805 events unchanged; trace digest `6fdb3a2c…`,
+  `config_version` `62d78a3b…`.
+- **Feature goldens:** see "Data mapping and feature store" below for the
+  row and checkpoint counts.
+
+### Execution realism is opt-in
+
+The execution-realism options of #86 (feed latency `feed_latency_ns`,
+simulator-routed exits `exit_route='sim'` / `flatten_route='sim'`, hidden
+prints `hidden_prints`, per-touch-order adverse selection
+`markout_unit='touch_order'`, and `amend_down` / `amend_size_down`) default
+off in code: the default runs and every golden are byte-identical. They will
+be switched on in the v2 pre-registrations, not retroactively.
+
+### Data mapping and feature store (#83)
+
+Correctness release, data half (IAP_Quality_Review_2026-10-11 D-items:
+D-P1-1..4, D-P2-6, D-P2-8..10, D-P2-12, D-P2-13). Unlike v1.12, defaults
+change **deliberately**: synthetic feature goldens, the seeded feature store
+and every artefact computed from it, and every real `dataset_version` move.
+PLATFORM_CONVENTIONS §17 is the normative summary; every moved number is
+listed below. **No real-data store was rebuilt by this change** (the
+release owner re-ingests: REAL_DATA §4 and the commands in the PR).
+
+#### Same-timestamp coalescing (D-P1-1) — all feature engines
+
+- The events of one instrument sharing an `exchange_ts` (ITCH `E` → EXECUTE
+  + TRADE, `U` → CANCEL + ADD, a two-sided FX quote) are one state change:
+  every event is applied to the book and its flow folded, then ONE refresh /
+  sample / emission at the group's last event (`group_ends`). A trade's
+  effective spread is measured against the pre-group mid; a venue stale at
+  any point of the group is a stale→fresh recovery. API_FEATURES §2.3.
+- Ported identically to the canonical Rust (`apply_grouped`, `group_ends`,
+  pyo3 `replay_*(coalesce=True)`) and C++ (`apply(ev, out, group_end)`,
+  `group_ends`, `run(..., coalesce)`) engines and to the frozen Java engine
+  (`POLYGLOT-OVERRIDE: bug fix only`, overloads of the existing `apply` /
+  `run`, no new method name, type or constructor).
+- Kept per-event (documented): the streaming MVP (no lookahead on a live
+  stream), the alpha golden frames (`build_golden_frame`) and every port test that
+  drives `apply(ev)` alone. `python -m iap.features --same-ts per_event
+  --label-freshness whole_day --cross-prints omit` rebuilds a v1.13 store;
+  `test_legacy_methods.py` uses it to keep reproducing the v1.4.0 alpha
+  reports byte for byte.
+- **Moved numbers (synthetic goldens, cadence 0).** Rows: EQ golden vector
+  2,000 → 1,591 (−409), FX 800 → 426 (−374), EQ anomalies 1,379 → 1,034
+  (−345), FX anomalies 544 → 303 (−241). Of the rows that remain, 1,567 of
+  1,591 (EQ) / 396 of 426 (FX) / 959 of 1,034 / 289 of 303 differ in at
+  least one of the 205 features, 1,061 / 377 / 616 / 281 in a native-45
+  slot (time-of-day norms, volatility, depth averages and the OFI sums
+  move most: they no longer sample phantom states). `expected_features.json`:
+  EQ checkpoints 500 / 1500 → 501 / 1501 (the events closing their groups),
+  24 of 188 EQ and 9 of 94 FX checkpoint values changed.
+  `expected_features_anomalies.json`: FX checkpoint 240 → 241; 12 of 360 EQ
+  and 42 of 270 FX values changed; drop counters, regression counts and
+  recoveries (EQ 6, FX 2) unchanged. `expected_features_snapshot_burst.json`:
+  192 → 123 EQ and 25 → 19 FX checkpoints (only group-closing events emit),
+  184 of 5,535 and 47 of 855 remaining values changed.
+  `test_feature_pipeline`: 2,000 → 1,591 rows.
+
+#### ITCH mapping and ingest rules (manifest x-version 2)
+
+- **Hidden prints signed by the quote rule (D-P1-2).** A post-2014 `P` print
+  is signed against the mapper's own best bid / ask (Lee–Ready: above the
+  mid buy, below sell); the tick rule only at the mid or without a
+  two-sided uncrossed quote. New counter `hidden_trades_signed_by_quote_rule`;
+  `hidden_trades_signed_by_tick_rule` now counts the fallbacks only. The
+  level book (`itch50.LevelBook`) is the lazy-heap best price the ingest
+  consistency check already used (`_CheckState` now inherits it).
+- **Midpoint prints round half to even (D-P1-3)**, not half up; residues in
+  `raw.trade_price_residue_histogram`. Pinned seeded dataset of
+  `test_output_bytes_of_a_seeded_dataset_are_pinned`: 119 midpoint prints of
+  2019-12-30 (histogram `{"50": 119}`), dataset_version `70ddb405…` →
+  `8ae6f26f…` (also the v2 domain prefix below), raw sha `104ceb7f…` →
+  `6060224…`.
+- **Pre-rule datasets refused (D-P1-4).** `MANIFEST_VERSION` 2,
+  `ingest_rules_version` 2; `load_manifest` refuses x-version 1 (the
+  `ds_20191230` dataset with its 0.0001 tick, and every dataset ingested
+  before v1.14) with the reason, so ingest-into, merge, feature builds and
+  `--dataset-dir` runs all stop. `dataset_version` domain
+  `iap.real-dataset.v1` → `v2`: every real dataset version changes.
+- **Half-penny tick (D-P2-10).** `--tick-size auto` picks 0.005 when at
+  least 100 and more than 1 % of the displayed orders at or above $1.00 are
+  on the $x.xx50 grid; a forced 0.01 is refused; per symbol
+  `displayed_orders_on_half_penny`.
+- **Operational halts (D-P2-12).** ITCH `h` (21 bytes) is decoded; a halt of
+  market `Q` maps to `STATUS HALT` until resumed (independent of `H`);
+  counters `operational_halt_messages`, `operational_halts_other_markets`,
+  `unknown_operational_halt_actions`.
+- **`config_version` (D-P2-9)**: sha256 over the dataset's `configs/**` +
+  `reference/**`, in the manifest, the ingest summary and on every new
+  ledger entry of a `--dataset-dir` run (`ExperimentLedger(config_version=)`;
+  provenance only, the experiment key is unchanged).
+
+#### Feature store and consumers
+
+- **Cross prints in volume, not in signed flow (D-P2-6).**
+  `FeatureEngine.on_cross_print` + `python -m iap.features --cross-prints
+  fold` (default; `omit` = v1.13) fold the side-less opening / closing /
+  halt crosses of `dataset.json` into `traded_volume_*`, `participation_*`,
+  the volume profile, the impact proxy and the `volume:N` clock; signed
+  volume, trade imbalance, trade counts and effective spread never see them.
+  The native-45 slots do not change (no native slot reads volume). No
+  effect on synthetic data (no crosses).
+- **Per-session reference values (D-P2-8).** `instruments.json` rows of an
+  ingested dataset add `ref_price_by_session` / `adv_by_session` (as-of: the
+  mean volume of EARLIER sessions; the first session's own volume for the
+  first); security-master records carry `ref_price` / `adv`
+  (`SecurityRecord`, written only when set). The backtester's impact cost
+  reads each trade's own session ADV; the capacity proxy the mean of
+  `adv × ref_price` over the sessions. Synthetic configs have no per-session
+  values: their numbers are unchanged.
+- **Trailing label freshness by default (D-P2-13 / R-P1-1).**
+  `--label-freshness trailing` is the store default (`whole_day` = legacy);
+  `features_summary.json` records `store_version` 2, `label_freshness` and
+  `same_ts` (and `cross_prints` on an ingested dataset).
+
+#### Moved research artefacts (seeded synthetic dataset)
+
+Regenerated by the CI `regenerate` job (`regenerate_allow_rerun=true`: the
+synthetic `data_version` is unchanged, so the report pipelines' ledger
+entries are reruns of the same identities); see the PR for the run.
+The five runner experiments of the default (`v2`) methods on the synthetic
+dataset — `research/experiments/00ebeb2b537b5155`, `6e4a3431a3acf8a5`,
+`838e0c2d75de4db6`, `9d895cf7148c4a8d`, `d87e34a9c67c1891` — were deleted
+deliberately and rewritten by the job (same spec, new store: the runner
+refuses a rerun with different evidence otherwise). The legacy-method
+experiment directories were computed on the pre-v1.14 (per-event,
+whole-day) store and are kept as they were. Port golden checks now apply the
+documented `vol_regime_ratio_v1` residue rule at the `expected_features.json`
+checkpoints too (PLATFORM_CONVENTIONS §17). Moved research numbers (regenerate
+run 38129763007, committed as produced on Linux):
+
+- `configs/strategies/alpha_params.json` is refit on the coalesced store
+  (e.g. EQ01 sigma 1.4335 → 1.4450, n_train 80,238 → 80,263), so every
+  golden that embeds the params moves although its frames are per-event:
+  `expected_alpha.json` (all six alphas' cases; FX05 additionally because
+  its cases come from the bundled day-2 store: first case −1.060e-6 →
+  −9.79e-7, IC window 0.00178 → 0.00142), `expected_backtest.json`
+  (default rules: 96 → 138 trades, total P&L −7.10 → −39.15),
+  `expected_mvp.json` (235 → 231 parents, 169 → 163 fills, P&L −81.53 →
+  −82.84 USD, digest `e5a1b688…`), `expected_adaptive.json`, the alpha,
+  adaptive, baseline and combination reports.
+- The five v2 runner experiments keep their ids and thresholds but are now
+  exploratory (`--no-prereg` in the regenerate chain, not gate evidence).
+
+### Risk engine (#89; Rust normative, Java and Python ports)
+
+Quality-review items G-P0-1, G-P0-2, G-P2-3, G-P2-6, G-P2-7, in all three
+engines, pinned by the regenerated risk goldens and the differential-fuzz
+corpus (PLATFORM_CONVENTIONS.md §11.1; schemas/MIGRATIONS.md lists every
+golden that moved). No existing golden decision, rule id or reason changed.
+
+- **G-P0-1 tamper-evident audit.** Every `RiskEvent` carries `seq` and
+  `prev_sha256` (SHA-256 of the previous JSONL line): the audit log is a hash
+  chain (`risk_event.schema.json` x-version 2). `audit_chain_head()` is the
+  value to anchor; a chained restore continues the chain, and the Java paper
+  session records the head in `session_state.json` so `risk_audit.jsonl` is
+  one chain across restarts. `verify_audit_chain` in Python and Rust.
+- **G-P0-2 SEC 15c3-5 pre-trade set** (`risk.json` x-version 4, `pre_trade`,
+  every key optional): restricted list, max open orders and open notional
+  per strategy, per-strategy position, participation of session market
+  volume (`on_market_trade`), per-strategy cancel rate and per-venue message
+  rate (`on_cancel_request`) — checks 23-29, after every legacy check.
+- **G-P2-3** loss-limit overrides are bounded (`overrides.max_loss_override_multiple`
+  x the configured limit) and need `overrides.min_approvers` distinct
+  approvers; a refused override is audited `LOSS_LIMIT_OVERRIDE_REJECTED`.
+- **G-P2-6** reference-price sanity gate: crossed books are dropped, and a
+  mark that jumps more than `market_data.max_mid_jump_ratio` (10x in the repo
+  config) against the stored one is dropped.
+- **G-P2-7** bounded per-key state: `pre_trade.max_tracked_keys` caps the
+  seen-order, open-order, strategy, market and cancel-bucket maps
+  (`STATE_CAPACITY`, fail-closed).
+
+### Execution simulator (#86)
+
+- **X-P1-1** a MODIFY that shrinks an order ahead of a resting child credits its queue position like a CANCEL (C++ reference, Java and Python ports; replay-fills goldens byte-identical).
+- **X-P1-6** `feed_latency_ns`; taker exits / flatten rounds routed through the simulator (`exit_route='sim'`, `flatten_route='sim'`).
+- **X-P2-7** `ExecutionSimulator(hidden_prints=True)`: non-displayed executions against the resting side.
+- **X-P2-9** `estimate_calibration(markout_unit='touch_order')` (CLI `--markout-unit`).
+- **X-P2-12** `ExecutionSimulator.amend_down` and `QuotingConfig.amend_size_down` (priority-keeping size decrease).
+
+### Governance (#87)
+
+Quality review G-P1-4, G-P1-5 and the rest of G-P1-7. No published number,
+golden or ledger total changed; `research/experiments.json` gains
+`chain_head` / `chain_length` (x-version 4).
+
+- **Trust roots (G-P1-4).** A non-empty agent key registry is used only
+  when a maintainer in `research/agents/trust_roots.json` has signed it
+  (`agent_pubkeys.sig.json`; `cli maintainer-keygen` / `sign-registry`,
+  `iap.agents.trust`); CI reads the trust roots from `origin/main`. New
+  agent requests are `ed25519-v2`, binding the board head and board id
+  (`WriteBroker.request_context`); a stale head or another board is
+  refused. `prereg` refuses an unsigned write by a keyed agent;
+  `verify-board --trust-ref origin/main` checks anchors and the board
+  against `origin/main`.
+- **Chained ledger (G-P1-5).** `ExperimentLedger` chains every entry's
+  immutable identity and refuses to load a ledger whose `chain_head` does
+  not match (so Bonferroni never reads an edited ledger); each prereg
+  records `ledger_head`; `check_ledger_monotone.py` requires the head ledger
+  to descend from the base and every prereg head to be on the chain.
+- **Blocking supply-chain audits (G-P1-7).** New `supply-chain` CI job:
+  pip-audit (both requirement files), cargo audit (workspace and
+  `features_py`), cargo deny (`rust/deny.toml`), trivy fs + config; trivy
+  image scan in `images`; CodeQL for Rust. Ignores only through
+  `.github/audit-ignores.json` with a reason and an expiry
+  (`tools/audit_ignores.py`). Rust crates declare `license = "MIT"`,
+  `publish = false`. The new cargo audit of `rust/features_py` found
+  RUSTSEC-2025-0020 and RUSTSEC-2026-0177 in pyo3 0.22.6: bumped to pyo3
+  0.29.3 / numpy 0.29.0 (`PyDict::new`, `into_pyarray`, `Python::detach`).
+
+### Engineering (#84)
+
+Behaviour-preserving engineering items of the 2026-10-11 quality review. No
+published number, golden, digest, model id or record hash changes.
+
+- **E-P1-3** `iap.research.events`: `EventColumns` keeps a session's events as
+  twelve `int64` numpy columns and is a `Sequence[MarketEvent]` whose
+  iteration is a chunked cursor (same Python-int `MarketEvent`s, one chunk
+  alive at a time); `read_event_columns` reads row group by row group with
+  `pyarrow.compute` and never imports `pyarrow.dataset`.
+- **E-P1-2** `iap.research.replay`: `SharedReplay` prepares one instrument's
+  stream once (filter, venue) and replays it for every maker configuration
+  of a unit (`run_grid`); results equal independent `run_instrument` calls.
+  `iap.backtest.maker` is not edited; one event loop per configuration
+  remains until the Rust/pyo3 simulator.
+- **E-P1-4** `iap.research.study`: `StudyBase` (pre-registration + SHA,
+  blackboard check, ordered checkpointed unit loop, atomic canonical unit
+  files) and the shared helpers (`cluster_stats`, `peak_rss_gb`, `log`,
+  `unit_name`, `file_sha256`) for the study drivers.
+- **E-P2-5** `iap.mlops.registry`: `content_sha256` hashes the fitted
+  model's state (class, params, fitted arrays; the `_sklearn_version` stamp
+  dropped), stable across joblib/pickle/scikit-learn versions; written to a
+  `content.json` sidecar so `record.json`, `model_id` and `record_hash` are
+  unchanged; `find_by_content`, `verify_content` (backfills older records).
+
+### Research statistics (#88; R-P0-1, R-P1-3, R-P2-1..4)
+
+The `v2` / `v3` / `v4` bundles move to the v1.14.0 statistics revision;
+the v1.13.0 rules are frozen as `v2_v113` / `v3_v113` / `v4_v113`
+(schemas/MIGRATIONS.md). Bundle names, and therefore experiment ids, are
+unchanged; the ledger identity gains `stats_revision`, so every
+regenerated statistic is a new look.
+
+- Causal backtest row block (decision-time state only) is the default; the
+  label-valid block is reported beside it (`net_pnl_1x_cost_label_block`).
+  Every net P&L, bootstrap interval and capacity figure moves.
+- Automatic HAC bandwidth and no lag product across a session day in the
+  gate t; `v2` carries the `validity` block; holdouts of fewer than four
+  sessions are read by sign and replication (`few_sessions`).
+- `hypothesis_confirmed` = >= 70 % of folds confirm (was: the last fold).
+- Per-instrument scaling before pooling (QQQ no longer dominates).
+- Time-shift leakage detector (applicable where the row shift is vacuous).
+- One ledger look per gate decision (2 per experiment, was 84).
+- Parity counts from CI: python 2343 (2041 in `python` + 302 in `python-slow`), +16 (mostly `tests/test_research_stats_v114.py`). FX11 fails the new time-shift leakage detector and stays in RESEARCH (23 CANDIDATE).
+
 ## v1.13.0 — 2026-10-11
 
 The hygiene-and-hardening release that follows the consolidated quality

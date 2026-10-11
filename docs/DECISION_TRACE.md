@@ -117,7 +117,7 @@ lowercase SHA-256 over everything hashed so far. Known answers
 | the golden `DecisionTrace` example, one line (5627 bytes, line sha256 `8ecadebd…`) | `bf60a300d151c9cea462e339b0dac407c595fdc5e3c59efd588d5aada8455162` |
 | the same trace twice | `e6f6ea54e5d5ff314dc11d235efc4caa4065e3604756101dbdce215502e053ca` |
 | empty stream | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
-| the MVP golden session (800 traces, seed 12345; v1.4.0 dataset, v1.5.0 configuration documents) | `20d4ff76af0b631c53c488a1cc504c1bbf8d8488dd5c210a947f96d63e734a45` (`expected_mvp.json`; `f51890da…` at v1.4.0 — every trace carries `config_version`) |
+| the MVP golden session (800 traces, seed 12345; v1.14.0) | `6fdb3a2ce2d31481246a799112923b67ba8fdf043c4c4138ba75457e34d1cba5` (`expected_mvp.json`; `f51890da…` at v1.4.0, `2affe409…` at v1.5.0, `20d4ff76…` at v1.13.0 — every trace carries `config_version`) |
 
 `TraceDigest.of_jsonl(path)` re-canonicalises a file line by line and must
 equal the digest the emitting sink reported; same seed ⇒ same digest; any
@@ -198,6 +198,25 @@ reproduce the digest from the captured stream; `explain` and
 `v_order_chain` locate the decision; the engine is a plain object you can
 step; the fix shows up as a digest diff; the captured stream + expected
 digest become a golden.
+
+## 8a. What v1.14 changed for traces
+
+The trace format did not change. Two things around it did:
+
+- A risk rejection can now carry the rule ids of the SEC 15c3-5 checks
+  (`rule_index` 23-29). The `RiskDecision` contract already allowed those
+  indices, so old readers parse new traces.
+- The risk audit log a trace points to is a hash chain. When an incident
+  replay reproduces the trace digest, check the audit chain too
+  (RUNBOOK_incident_kill_switch.md §6): a matching trace digest with a
+  broken audit chain means the log was touched after the run.
+
+The MVP trace digest moved during v1.14 for two reasons. Config files that
+are hashed into it changed (the risk config), which moves the digest with
+every decision the same; and `alpha_params.json` was refitted on the
+regenerated feature store, which also moved a few decisions (231 parents
+and 163 fills, was 235 and 169). A digest is a statement about inputs as
+well as outputs.
 
 ## 9. Pinned in
 

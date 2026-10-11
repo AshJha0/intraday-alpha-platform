@@ -1,6 +1,7 @@
 package com.iap.features;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
@@ -72,8 +73,17 @@ public final class FeatureEngine {
         long warmTs = -1;
         long lastTs;
         long recoveries;
-        /** sorted ids of this instrument's venues whose book is stale. */
+        /** sorted ids of this instrument's venues whose book is stale (last group close). */
         List<Integer> staleVenues = new ArrayList<>();
+        /** the same set after the latest event (inside an open timestamp group). */
+        List<Integer> staleRunning = new ArrayList<>();
+        /** an event of the open group changed the stale set / left a venue stale. */
+        boolean staleTouched;
+        boolean staleSeen;
+        /** an applied book-touching event awaits the group close (D-P1-1). */
+        boolean pendingRefresh;
+        /** venues the closing refresh re-reads (sorted, unique). */
+        List<Integer> pendingVenues = new ArrayList<>();
         long lastEmit = -1;
         // merged top-10 view (refreshed on book-touching events)
         boolean bookOk;
@@ -178,6 +188,11 @@ public final class FeatureEngine {
             o.lastTs = lastTs;
             o.recoveries = recoveries;
             o.staleVenues = new ArrayList<>(staleVenues);
+            o.staleRunning = new ArrayList<>(staleRunning);
+            o.staleTouched = staleTouched;
+            o.staleSeen = staleSeen;
+            o.pendingRefresh = pendingRefresh;
+            o.pendingVenues = new ArrayList<>(pendingVenues);
             o.lastEmit = lastEmit;
             o.bookOk = bookOk;
             System.arraycopy(bidP, 0, o.bidP, 0, DEPTH);
@@ -338,8 +353,20 @@ public final class FeatureEngine {
     /**
      * Apply one event. Returns true when a vector was emitted; the emitted
      * vector is written into {@code out} (caller-owned, no allocation).
+     * Per-event legacy semantics: every event closes its own group.
      */
     public boolean apply(MarketEvent ev, FeatureVector out) {
+        return apply(ev, out, true);
+    }
+
+    /**
+     * Apply one event of a coalesced stream (v1.14, D-P1-1, ported from the
+     * canonical engines): {@code groupEnd == false} applies the event to the
+     * book and folds its trade flow but defers the refresh, the samples and
+     * the emission to the event that closes the instrument's
+     * (instrument, exchange_ts) group.
+     */
+    public boolean apply(MarketEvent ev, FeatureVector out, boolean groupEnd) {
         InstState st = state(ev.instrumentId);
         long t = ev.exchangeTs;
         if (st.firstTs >= 0 && t < st.lastTs) {
@@ -366,21 +393,22 @@ public final class FeatureEngine {
                 staleNow.add(e.getKey());
             }
         }
-        boolean staleChanged = !staleNow.equals(st.staleVenues);
-        boolean justRecovered = !st.staleVenues.isEmpty() && staleNow.isEmpty();
-        st.staleVenues = staleNow;
-
-        if (status != ApplyStatus.APPLIED) {
-            eventsDropped++;
-            if (staleChanged
-                    && refreshBook(st, ev.venueId, t, justRecovered, false)) {
-                oversizedDepthSkipped++;
+        if (!staleNow.equals(st.staleRunning)) {
+            int pos = Collections.binarySearch(st.pendingVenues, ev.venueId);
+            if (pos < 0) {
+                st.pendingVenues.add(-pos - 1, ev.venueId);
             }
-            return emitIfDue(st, ev.instrumentId, t, out);
+            st.staleRunning = staleNow;
+            st.staleTouched = true;
+        }
+        if (!st.staleRunning.isEmpty()) {
+            st.staleSeen = true;
         }
 
         int et = ev.eventType;
-        if (ev.qty > FEATURE_MAX_QTY) {
+        if (status != ApplyStatus.APPLIED) {
+            eventsDropped++;
+        } else if (ev.qty > FEATURE_MAX_QTY) {
             // Oversized quantity (pinned section 2.2): the book may hold it,
             // but no rolling window folds it in — an int64 window sum stays
             // exact. The merged view is still refreshed.
@@ -401,16 +429,37 @@ public final class FeatureEngine {
                 || et == EventType.CANCEL || et == EventType.EXECUTE
                 || et == EventType.QUOTE
                 || (et == EventType.SNAPSHOT && ev.tradeId == 0);
-        if (bookTouch) {
-            if (refreshBook(st, ev.venueId, t, justRecovered, true)) {
+        if (status == ApplyStatus.APPLIED && bookTouch) {
+            st.pendingRefresh = true;
+            int pos = Collections.binarySearch(st.pendingVenues, ev.venueId);
+            if (pos < 0) {
+                st.pendingVenues.add(-pos - 1, ev.venueId);
+            }
+        }
+        if (!groupEnd) {
+            return false;
+        }
+
+        // Close the timestamp group: one refresh over the venues it touched.
+        // A venue that went stale at any point of the group is a recovery
+        // when none is stale at the close (a message was lost).
+        boolean staleChanged = st.staleTouched;
+        boolean justRecovered = (!st.staleVenues.isEmpty() || st.staleSeen)
+                && st.staleRunning.isEmpty();
+        st.staleVenues = st.staleRunning;
+        st.staleTouched = false;
+        st.staleSeen = false;
+        if (st.pendingRefresh) {
+            if (refreshBook(st, st.pendingVenues, t, justRecovered, true)) {
                 oversizedDepthSkipped++;
             }
         } else if (staleChanged) {
-            if (refreshBook(st, ev.venueId, t, justRecovered, false)) {
+            if (refreshBook(st, st.pendingVenues, t, justRecovered, false)) {
                 oversizedDepthSkipped++;
             }
         }
-
+        st.pendingRefresh = false;
+        st.pendingVenues.clear();
         return emitIfDue(st, ev.instrumentId, t, out);
     }
 
@@ -438,12 +487,33 @@ public final class FeatureEngine {
         return false;
     }
 
-    /** Apply a stream; collect a deep copy of every emitted vector. */
+    /** Apply a stream (per-event legacy semantics); copy every emitted vector. */
     public List<FeatureVector> run(Iterable<MarketEvent> events) {
+        return run(events, false);
+    }
+
+    /**
+     * Apply a stream; with {@code coalesce} an event closes its group when the
+     * next event of the same instrument has another exchange_ts (or there is
+     * none) — the pinned group_ends rule of D-P1-1.
+     */
+    public List<FeatureVector> run(Iterable<MarketEvent> events, boolean coalesce) {
+        List<MarketEvent> evs = new ArrayList<>();
+        for (MarketEvent ev : events) {
+            evs.add(ev);
+        }
+        boolean[] ends = new boolean[evs.size()];
+        Map<Long, Long> next = new TreeMap<>();
+        for (int i = evs.size() - 1; i >= 0; i--) {
+            MarketEvent ev = evs.get(i);
+            Long nts = next.get(ev.instrumentId);
+            ends[i] = !coalesce || nts == null || nts != ev.exchangeTs;
+            next.put(ev.instrumentId, ev.exchangeTs);
+        }
         List<FeatureVector> out = new ArrayList<>();
         FeatureVector vec = new FeatureVector();
-        for (MarketEvent ev : events) {
-            if (apply(ev, vec)) {
+        for (int i = 0; i < evs.size(); i++) {
+            if (apply(evs.get(i), vec, ends[i])) {
                 out.add(vec.copy());
             }
         }
@@ -552,15 +622,17 @@ public final class FeatureEngine {
      *
      * @return true when the merged depth was oversized (view unusable)
      */
-    private boolean refreshBook(InstState st, int venueId, long t,
+    private boolean refreshBook(InstState st, List<Integer> venueIds, long t,
             boolean justRecovered, boolean samples) {
         if (justRecovered) {
             st.resetRolling(t);
         }
-        OrderBook vb = st.cons.venues().get(venueId);
-        if (vb != null) {
-            st.venueCache.put(venueId, new long[][][] {
-                vb.depth(Side.BID, DEPTH), vb.depth(Side.ASK, DEPTH)});
+        for (int venueId : venueIds) {
+            OrderBook vb = st.cons.venues().get(venueId);
+            if (vb != null) {
+                st.venueCache.put(venueId, new long[][][] {
+                    vb.depth(Side.BID, DEPTH), vb.depth(Side.ASK, DEPTH)});
+            }
         }
         // Save the previous merged view (copy into the prev arrays).
         System.arraycopy(st.bidP, 0, st.prevBidP, 0, DEPTH);

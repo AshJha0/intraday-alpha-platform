@@ -133,7 +133,7 @@ public class PlatformSafetyTest {
         assertTrue(empty, empty.contains("\"market\":{}"));
         String text = empty
                 .replace("\"open\":{}", "\"open\":{\"7\":{\"instrument_id\":1,"
-                        + "\"price_ticks\":0,\"qty\":10,\"side\":0}}")
+                        + "\"price_ticks\":0,\"qty\":10,\"side\":0,\"strategy_id\":\"S1\"}}")
                 .replace("\"positions\":{}", "\"positions\":{\"1\":300}")
                 .replace("\"market\":{}", "\"market\":{\"1\":{\"ask_ticks\":10002,"
                         + "\"bid_ticks\":10000,\"gaps\":0,\"gated\":false,\"ts\":5}}");

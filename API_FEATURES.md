@@ -125,6 +125,52 @@ Rationale: integer window sums must remain exactly representable as int64 in
 every port (2^40 leaves ≥ 2^23 samples of headroom per window). A feed
 sending 2^63 quantities is malformed, not a market.
 
+### 2.3 Same-timestamp coalescing (pinned, v1.14, D-P1-1)
+
+One exchange message often becomes several canonical events with ONE
+`exchange_ts`: ITCH `E` is EXECUTE + TRADE, `U` is CANCEL + ADD, a FX LP
+quote update touches both sides. Refreshed one by one they made the merged
+book pass through states that never existed (an ask level gone before its
+replacement arrived, a one-sided book between a cancel and an add), and
+each of those phantom states was sampled (mid, vol, OFI, depth averages)
+and emitted as a row. A **group** is a maximal run of one instrument's
+events with the same `exchange_ts`, taken over that instrument's
+sub-stream (other instruments' events in between do not split it):
+
+```
+group_end(e_i) = the NEXT event of e_i's instrument has another exchange_ts,
+                 or there is none
+```
+
+`apply(ev, group_end)` in every port (`group_ends(events)` computes the
+flags; Python `FeatureEngine.apply(ev, group_end)` / `run(events)`, Rust
+`apply_grouped` / `group_ends`, C++ `apply(ev, out, group_end)` /
+`group_ends`, Java `apply(ev, out, groupEnd)` / `run(events, true)`):
+
+1. every event of the group goes through step 0 (timestamp guard) and step 1
+   (the book) and folds its FLOW at once: trade windows, event counts,
+   venue-update counts (only APPLIED events, as §2);
+2. a trade's effective spread is measured against the merged mid as of the
+   previous group close, i.e. **before** the group: a trade is never
+   measured against the book its own EXECUTE already moved;
+3. the event closing the group runs ONE refresh: it re-reads the depth cache
+   of every venue whose event in the group was book-touching or changed the
+   stale set (ascending venue_id), records the samples once, and runs the
+   emission check once. With no book-touching event the refresh is a
+   staleness refresh (§2) when the stale set changed inside the group;
+4. a venue that was stale after ANY event of the group and none stale at the
+   close is a stale→fresh recovery (§2.1): a sequence gap repaired by a
+   SNAPSHOT in the same nanosecond still lost a message.
+
+Every event closing its own group (`apply(ev)` alone) is exactly the
+per-event semantics of v1.13: the streaming MVP and the alpha golden frames
+(`build_golden_frame`) keep it; the feature store
+(`python -m iap.features --same-ts coalesce`, default; `per_event` rebuilds
+a v1.13 store), the native frames (`compute_native(..., coalesce=True)`, the
+pyo3 `replay_*`) and the feature goldens coalesce. On the golden vectors at
+cadence 0: EQ 2,000 events -> 1,591 rows, FX 800 -> 426, EQ anomalies 1,403
+-> 1,034, FX anomalies 561 -> 303.
+
 **Windows** are half-open event-time intervals `(t - w, t]` on
 `exchange_ts`: a sample stamped exactly `t - w` is OUT, one stamped `t` is
 IN. Integer quantities keep integer window sums (exact); only genuinely
@@ -137,7 +183,7 @@ instrument's first event of the session, or the last stale→fresh recovery
 mean features additionally need >= 1 sample.
 
 **Cadence**: `cadence_ns = 0` emits one vector after every event of the
-instrument; otherwise at most one vector per instrument per cadence
+instrument (after every GROUP when coalescing, §2.3); otherwise at most one vector per instrument per cadence
 interval, evaluated when that instrument's events arrive (`t - last_emit
 >= cadence_ns`). No wall clock, ever. Golden checkpoints use cadence 0.
 A dropped event still runs the cadence check (the vector stream stays
@@ -327,8 +373,11 @@ writing. Regeneration requires a MIGRATIONS.md entry.
 
 - Vectors: `events_eq_mbo.jsonl` (instrument 1, tick 0.01) and
   `events_fx_quote.jsonl` (instrument 101 = EUR/USD, tick 1e-05).
-- Engine cadence: every event. Checkpoints: the FeatureVector emitted
-  after events 500/1000/1500/2000 (EQ) and 400/800 (FX), 1-based.
+- Engine cadence: every event, same-timestamp groups coalesced (§2.3,
+  since v1.14). Checkpoints: the FeatureVector emitted by events
+  501/1000/1501/2000 (EQ) and 400/800 (FX), 1-based — every checkpoint is
+  the event closing its timestamp group (500 and 1500 until v1.13; the
+  anomaly golden's FX checkpoint 240 is 241 for the same reason).
 - For every listed feature name: `valid` must match exactly; when valid,
   `|got - want| <= 1e-9 + 1e-9 * |want|`.
 - The file also pins `registry_hash` (= feature_version) and
@@ -391,7 +440,18 @@ when ALL of:
    invalidates the label, so a pre-halt signal is never credited with the
    reopen jump.
 
-`max_age_ns` = `max(5 s, 2 × median gap between DISTINCT sample
+**Freshness bound.** The feature store's default is the causal
+**trailing** bound since v1.14 (D-P2-13, `--label-freshness trailing`):
+sample `k` is judged against `max(5 s, 2 × median of the last 256 gaps
+between distinct sample timestamps at or before k)`, so no label uses a
+sample after its row to decide what "fresh" means. `--label-freshness
+whole_day` is the v1.13 store, kept for the stores published before
+v1.14 (the paragraph below describes it); `features_summary.json` records
+the mode (`label_freshness`) and the store version (`store_version` 2).
+`compute_labels`' own argument default stays `whole_day` (its callers pass
+an explicit `max_age_ns`).
+
+Whole-day bound: `max_age_ns` = `max(5 s, 2 × median gap between DISTINCT sample
 timestamps of that instrument)`: a fixed floor for dense equity books,
 scaled up for sparse FX streams where a 15 s gap between LP quotes is the
 normal cadence, not an outage. The value used is recorded per instrument in
@@ -475,7 +535,7 @@ emission on the benchmark hardware (2 CPUs — methodology per
 ### 7.1 The Rust engine from Python (pyo3, v1.11.0)
 
 `rust/features_py` wraps the `features` crate in a pyo3 extension module,
-`iap_features_rs` (pyo3 0.22.6, numpy 0.22.1, maturin 1.7.8, one abi3 wheel
+`iap_features_rs` (pyo3 0.29.3, numpy 0.29.0, maturin 1.7.8, one abi3 wheel
 for CPython >= 3.10). It is a standalone package outside the `rust/`
 workspace, so the workspace builds, tests and lints without libpython. It
 is optional: nothing in the Python package requires it.

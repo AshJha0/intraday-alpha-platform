@@ -1,8 +1,7 @@
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000000099000000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000000142533000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000000142533000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000000155533000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000000155533000}
-{"decision":2,"reason":"qty 9223372036854775806 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000002155533000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000002214533000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000002249533000}
+{"decision":1,"prev_sha256":"0000000000000000000000000000000000000000000000000000000000000000","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","seq":1,"severity":1,"timestamp":1700000000099000000}
+{"decision":1,"prev_sha256":"f97a22ca6a34d0e63b4b05e568d4b19ef8b7dbea69359d2b1c318d4db7b92c22","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","seq":2,"severity":1,"timestamp":1700000000142533000}
+{"decision":1,"prev_sha256":"d4d0251445f904c7b801d6af0bfc0b853cae70a384ecd529bee2be8df85a0cf0","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","seq":3,"severity":1,"timestamp":1700000000142533000}
+{"decision":1,"prev_sha256":"4ac659dfbb37a09d2cc548dd34c19adb51708c6394974c984f8090522f7629cf","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","seq":4,"severity":1,"timestamp":1700000000155533000}
+{"decision":1,"prev_sha256":"8ad40ade2006e4d94d14688ff14ca8fb1dac7a6b204e6ac1f95150eea197289c","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","seq":5,"severity":1,"timestamp":1700000000155533000}
+{"decision":2,"prev_sha256":"6eafa2a6ef68646604e572b4fb4bf4fa9ecc7ff3c5041906fd2442f7241b6034","reason":"qty 9223372036854775806 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"2","seq":6,"severity":2,"timestamp":1700000002155533000}
+{"decision":1,"prev_sha256":"99211b65994439423c603325d9bc8c97b40b53003d88f39813ac1a0bf9d49638","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","seq":7,"severity":1,"timestamp":1700000002214533000}

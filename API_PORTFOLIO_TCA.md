@@ -446,3 +446,14 @@ cpu_count, machine, system, python}` — plus `metrics.json` and `model.pkl`.
   whose trades lose before costs, has capacity 0. `"participation"`, the
   legacy rule: `max_participation × ADV × price`, the same for an alpha
   with a 5 bp edge and one with none.
+
+## 5. Markout units (v1.14)
+
+The TCA markout (`tca/markout.py`) measures every fill. The maker
+calibration used for simulator inputs can since v1.14 count adverse
+selection once per resting touch order instead of once per execution
+message (`estimate_calibration(markout_unit="touch_order")`, CLI
+`--markout-unit`). An order filled by three executions used to give three
+nearly identical observations; on the golden vector the 1 s sample halves
+and the standard error barely moves (COOKBOOK recipe 73). The default is
+still `message`, so no TCA report or golden changed.

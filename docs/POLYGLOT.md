@@ -192,7 +192,7 @@ golden harness. Every duplicated copy fails that test:
 - the two RETIRE candidates (Rust `alpha`, Rust `lifecycle`) have no runtime
   consumer, but each is the only Rust proof of a golden contract
   (`golden_alpha.rs`, `golden_lifecycle.rs` — the registry byte-parity check)
-  and is counted in the README parity table (`rust 358`). Deleting them would
+  and is counted in the README parity table (`rust 362`). Deleting them would
   remove golden evidence and change the published counts, which the brief
   rules out;
 - the reserved C++ risk paths in `CODEOWNERS` (`cpp/include/iap/risk/`,
@@ -200,6 +200,25 @@ golden harness. Every duplicated copy fails that test:
 
 So the drift risk is reduced by **freezing** — 24 paths that can no longer
 grow silently — not by deletion.
+
+### 3.1 Overrides used in v1.14
+
+v1.14 changed frozen Java copies three times, each with its override line
+and with the canonical copy and goldens changed in the same pull request:
+
+- #83 `POLYGLOT-OVERRIDE: bug fix only`: same-timestamp coalescing in the
+  frozen Java feature engine, as overloads of the existing `apply` / `run`
+  (no new method name, type or constructor).
+- #86 `POLYGLOT-OVERRIDE: new-api`: the MODIFY queue credit in the Java
+  `ExecutionSimulator`; the fills goldens were regenerated and came out
+  byte-identical.
+- #89 `POLYGLOT-OVERRIDE: new-api`: the audit chain, checks 23-29, the
+  bounded override, the sanity gate and bounded state in `com.iap.risk`,
+  proven by the regenerated risk goldens and fuzz corpus.
+
+The policy held up: each port was proven by goldens rather than by review
+alone. It also cost something real: none of the three pull requests could
+build C++, Rust or Java locally, so CI was the only cross-language proof.
 
 ## 4. How to change a FROZEN copy
 

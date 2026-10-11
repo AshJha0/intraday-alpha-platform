@@ -83,7 +83,10 @@ class OrderType(IntEnum): MARKET=1 LIMIT=2 IOC=3 FOK=4 PEG=5 MID=6
 class Scope(Enum): GLOBAL STRATEGY INSTRUMENT VENUE;   class Severity(IntEnum): INFO=1 WARN=2 BREACH=3
 class Decision(IntEnum): ALLOW=1 REJECT=2 KILL=3
 class Rules: KILL_GLOBAL ... STRATEGY_LOSS, FX_RATE_MISSING, NOT_BOOTSTRAPPED, ALLOW, CONFIG_MISSING, ...; CHECK_ORDER (23-tuple)
-@dataclass(frozen=True) class RiskEvent(timestamp, scope, scope_id, rule_id, severity, decision, reason)
+@dataclass(frozen=True) class RiskEvent(timestamp, scope, scope_id, rule_id, severity, decision, reason,
+                                        seq=0, prev_sha256="")   # v1.14: hash-chained audit (x-version 2)
+GENESIS_SHA256 = "0" * 64                             # prev_sha256 of the first record of a chain
+verify_audit_chain(text, first_seq=1, prev_sha256=GENESIS_SHA256) -> (last_seq, head)   # ValueError names the line
     to_json_line() -> str                             # sorted keys, no newline (serde_json bytes)
     @classmethod from_json_line(line) -> RiskEvent
 fmt_fixed(v: float, decimals: int) -> str             # = rust fmt_fixed (half-away, saturating i64, NaN -> 0)
@@ -93,7 +96,11 @@ fmt_fixed(v: float, decimals: int) -> str             # = rust fmt_fixed (half-a
 class RiskEngine:
     __init__(limits: RiskLimits, instruments: Mapping[int, InstrumentRef])
     @classmethod with_ticks / fail_closed(reason) / from_config(doc, instruments) / from_config_ticks(doc, ticks)
-    @classmethod restore(limits, instruments, snap, ts) -> RiskEngine     # ValueError("risk snapshot: bad <field>")
+    @classmethod restore(limits, instruments, snap, ts, chain=None) -> RiskEngine
+                                              # ValueError("risk snapshot: bad <field>"); chain=(seq, head) continues the audit chain
+    audit_chain_head() -> (seq, sha256)       # v1.14: the value to anchor outside the log
+    on_market_trade(instrument_id, qty, ts)   # v1.14: market volume for the participation cap (check 27)
+    on_cancel_request(strategy_id, venue_id, ts)   # v1.14: spends cancel (28) and venue message (29) tokens; never refused
     require_bootstrap(); is_bootstrapped(); bootstrap_positions(fills, ts) -> int
     on_market(instrument_id, bid_ticks, ask_ticks, ts); on_sequence_gap(iid, ts); on_feed_recovered(iid, ts)
     on_venue_disconnect(venue_id, ts); on_venue_reconnect(venue_id, ts)
@@ -759,11 +766,48 @@ Every item is opt-in or default-off unless marked; the execution goldens
   mixing it with `adv` / `horizon` or omitting either raises `ValueError`.
   The legacy `(adv, horizon)` call is unchanged.
 
+### 2.12 Execution realism (v1.14.0; quality review X-*)
+
+One change is on by default; everything else is opt-in and off, so the
+default runs and every execution golden are byte-identical. The opt-ins are
+meant to be switched on in the v2 maker and quoting pre-registrations, not
+retroactively.
+
+- **MODIFY queue credit (X-P1-1, default, C++ / Python / Java).** A MODIFY
+  that shrinks an order known to be ahead of a resting child reduces
+  `ahead_qty` by the removed displayed size, as a CANCEL does; the order
+  keeps its priority. Simulator rule 4 in `execution.hpp` and §11.2 carry
+  the text. No golden moved: none of the 189 MODIFY events in the golden
+  vector shrinks a level where a child rests, so the pinned unit test
+  (`ahead 60 -> 10 -> 0`) is the proof.
+- **Feed latency (X-P1-6).** `MakerConfig.feed_latency_ns` /
+  `QuotingConfig.feed_latency_ns` add the market-data leg:
+  `decision_ts = t + feed_latency_ns`. Real ITCH data has no capture
+  timestamps, so the value is an assumption you state, not a measurement.
+- **Simulator-routed exits (X-P1-6).** `MakerConfig.exit_route="sim"` and
+  `QuotingConfig.flatten_route="sim"` send taker exits and flatten rounds
+  through the simulator as MARKET children, so they pay the walk, latency
+  and fees instead of filling at the touch (`"book"`, the default).
+- **Hidden prints (X-P2-7).** `ExecutionSimulator(hidden_prints=True)`: a
+  TRADE that is not the print of the EXECUTE immediately before it is a
+  hidden execution, and it advances rule-4 queue tracking on the resting
+  side.
+- **Per-touch-order adverse selection (X-P2-9).**
+  `estimate_calibration(markout_unit="touch_order")` (CLI
+  `python -m iap.execution.calibration --markout-unit touch_order`): one
+  maker AS observation per touch order, at its first execution, instead of
+  one per execution message. On the golden vector the 1 s sample halves
+  (233 to 117) and the mean moves from 0.80 to 0.58 bp (COOKBOOK 73).
+- **Size amends (X-P2-12).** `ExecutionSimulator.amend_down(order_id,
+  new_qty, amend_ts)`: a priority-keeping size decrease on the cancel
+  latency path; `QuotingConfig.amend_size_down` uses it instead of
+  cancel-and-replace.
+
 ## 3. Where the rules live
 
 | rule set | normative text | Python port entry |
 |---|---|---|
-| pinned risk check order 0..22, money, marks, projections, loss limits, throttle, re-arm precedence, snapshot / restore, audit parity, the v1.3.0 fail-closed branches | PLATFORM_CONVENTIONS.md §11.1 | `iap.risk.engine.RiskEngine.check_order` and friends |
+| pinned risk check order 0..22 and, since v1.14, the SEC 15c3-5 checks 23..29 after them; money, marks, projections, loss limits, throttle, re-arm precedence, snapshot / restore, audit parity, the v1.3.0 fail-closed branches | PLATFORM_CONVENTIONS.md §11.1 | `iap.risk.engine.RiskEngine.check_order` and friends |
 | simulator rules 1–9 (latency, activation, aggressive walk, overlay, queue position, fees, impact, cancels / expiry, venue gate, processing order) | `cpp/include/iap/execution/execution.hpp`; §11.2 | `iap.execution.simulator.ExecutionSimulator` |
 | SOR eligibility + tie-break ladder; algo slicing, child split, `expire_ts`, POV deficit | §11.3 | `iap.execution.sor`, `iap.execution.algos`, `iap.execution.replay` |
 | paper / backtest wiring (incl. the per-instrument gap gate: `on_feed_recovered` only when no venue of the instrument is stale) | §11.4 (Java `BacktestEngine`, `PaperTrading.RiskWiring`) | `iap.mvp.engine.MvpEngine` (docs/MVP.md §4, row by row) |

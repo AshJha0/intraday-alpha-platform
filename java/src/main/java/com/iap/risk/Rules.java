@@ -83,6 +83,28 @@ public final class Rules {
     public static final String BOOTSTRAP_COMPLETE = "BOOTSTRAP_COMPLETE";
     /** Engine state restored from a snapshot (audit record). */
     public static final String STATE_RESTORED = "STATE_RESTORED";
+    /**
+     * A loss-limit override was refused: too few distinct approvers, or above
+     * {@code overrides.max_loss_override_multiple} x the configured limit
+     * (audit record; the call throws).
+     */
+    public static final String LOSS_LIMIT_OVERRIDE_REJECTED = "LOSS_LIMIT_OVERRIDE_REJECTED";
+    /** Check 23: instrument on {@code pre_trade.restricted_instruments}. */
+    public static final String RESTRICTED_INSTRUMENT = "RESTRICTED_INSTRUMENT";
+    /** Check 24: the strategy would exceed {@code pre_trade.max_open_orders}. */
+    public static final String MAX_OPEN_ORDERS = "MAX_OPEN_ORDERS";
+    /** Check 25: the strategy's open notional would exceed the cap. */
+    public static final String MAX_OPEN_NOTIONAL = "MAX_OPEN_NOTIONAL";
+    /** Check 26: the strategy's projected position would exceed the cap. */
+    public static final String STRATEGY_POSITION = "STRATEGY_POSITION";
+    /** Check 27: the firm's projected session quantity exceeds the participation cap. */
+    public static final String PARTICIPATION = "PARTICIPATION";
+    /** Check 28: the strategy's cancel budget is spent. */
+    public static final String CANCEL_RATE = "CANCEL_RATE";
+    /** Check 29: the venue's message budget is spent. */
+    public static final String VENUE_MESSAGE_RATE = "VENUE_MESSAGE_RATE";
+    /** Check 7: a bounded per-key state map is full ({@code pre_trade.max_tracked_keys}). */
+    public static final String STATE_CAPACITY = "STATE_CAPACITY";
 
     private Rules() {
     }

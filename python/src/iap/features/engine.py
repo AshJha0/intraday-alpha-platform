@@ -37,6 +37,19 @@ Pinned state-update semantics (family modules document the formulas):
   rolling window and history of that instrument is CLEARED and the warmup
   anchor moves to the recovery timestamp (``warmup_after_recovery``).  A
   window therefore never spans an interval the platform did not observe.
+- **Same-timestamp coalescing** (v1.14, D-P1-1; API_FEATURES §2.3): the
+  events of one instrument that share an ``exchange_ts`` are ONE market
+  state change.  ``apply(ev, group_end=False)`` applies the event to the
+  book and folds its flow (trades, event counts, venue updates) but does
+  not refresh, sample or emit; the event with ``group_end=True`` closes the
+  group: one refresh over every venue the group touched, one set of
+  samples, one emission check.  The effective spread of a trade in the
+  group is measured against the merged mid BEFORE the group (the refresh
+  has not run), not against a book the trade's own EXECUTE already moved.
+  :func:`group_ends` marks the last event of each group of a stream;
+  :meth:`FeatureEngine.run` coalesces by default.  ``apply(ev)`` alone
+  (``group_end=True`` on every event) is the per-event legacy semantics
+  the streaming MVP and the alpha golden frames still use.
 - Validity: a feature is invalid during warmup, when the book is not ok
   (for book-derived features), or when its inputs are undefined — including
   every ``x / (y + EPS)`` ratio whose denominator ``y`` is <= 0 (an
@@ -46,7 +59,7 @@ Pinned state-update semantics (family modules document the formulas):
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from math import log
 
@@ -75,6 +88,53 @@ _HIST_KEEP_NS = 660 * _NS
 #: market: window sums must stay exactly representable as int64 in every
 #: port, and 2^40 units leaves >= 2^23 samples of headroom per window.
 FEATURE_MAX_QTY = 1 << 40
+
+
+def group_ends(events: Iterable[MarketEvent]) -> list[bool]:
+    """``group_end`` flag of every event of a stream (pinned, D-P1-1).
+
+    An event closes its group when the NEXT event of the same instrument
+    has a different ``exchange_ts`` (or there is none): consecutive events
+    of one instrument's sub-stream sharing a timestamp form one group,
+    whatever other instruments' events are interleaved between them.
+    """
+    evs = events if isinstance(events, list) else list(events)
+    out = [True] * len(evs)
+    nxt: dict[int, int] = {}
+    for i in range(len(evs) - 1, -1, -1):
+        ev = evs[i]
+        iid = ev.instrument_id
+        nts = nxt.get(iid)
+        out[i] = nts is None or nts != ev.exchange_ts
+        nxt[iid] = ev.exchange_ts
+    return out
+
+
+def iter_group_ends(events: Iterable[MarketEvent]) -> Iterator[tuple[MarketEvent, bool]]:
+    """Streaming :func:`group_ends`: yields ``(event, group_end)`` in order
+    while holding only the events of the current ``exchange_ts``.
+
+    Exact for a stream in canonical order (``exchange_ts`` non-decreasing,
+    as every normalized file is): an instrument's group then cannot resume
+    once the timestamp has moved on, so within one timestamp block an event
+    closes its group iff it is that instrument's last event of the block."""
+    block: list[MarketEvent] = []
+    for ev in events:
+        if block and ev.exchange_ts != block[0].exchange_ts:
+            yield from _flush_block(block)
+            block = []
+        block.append(ev)
+    if block:
+        yield from _flush_block(block)
+
+
+def _flush_block(block: list[MarketEvent]) -> Iterator[tuple[MarketEvent, bool]]:
+    last: dict[int, int] = {}
+    for i, ev in enumerate(block):
+        last[ev.instrument_id] = i
+    for i, ev in enumerate(block):
+        yield ev, last[ev.instrument_id] == i
+
 
 _BOOK_TOUCH = frozenset(
     {
@@ -128,8 +188,21 @@ class _InstState:
         self.recovered_ts: int | None = None
         #: number of stale->fresh recoveries (rolling state resets)
         self.recoveries = 0
-        #: sorted ids of this instrument's venues whose book is stale
+        #: sorted ids of this instrument's venues whose book is stale, as of
+        #: the last group close (refresh decisions compare against it)
         self.stale_venues: tuple = ()
+        #: the same set after the latest event (inside an open group)
+        self.stale_running: tuple = ()
+        #: an event of the open group changed the stale set / left a venue
+        #: stale: a venue that goes stale and recovers within one timestamp
+        #: (a sequence gap repaired by a same-timestamp SNAPSHOT) is still a
+        #: stale->fresh recovery — a message was lost (D-P1-1)
+        self.stale_touched = False
+        self.stale_seen = False
+        #: open same-timestamp group (D-P1-1): a sampling refresh is due /
+        #: venues whose depth cache the closing refresh must re-read
+        self.pending_refresh = False
+        self.pending_venues: set[int] = set()
         #: monotone counter of merged-view refreshes (label sampling hook)
         self.refresh_seq = 0
         #: events the book dropped/held (never folded into rolling state)
@@ -173,6 +246,8 @@ class _InstState:
         self.ofi = {w: RollingSum(WINDOW_NS[w], 4) for w in ("1s", "5s", "30s")}
         self.depthavg = {w: RollingSum(WINDOW_NS[w], 12) for w in ("1s", "10s", "1m")}
         self.trades = {w: RollingSum(WINDOW_NS[w], 6) for w in ("1s", "10s", "1m")}
+        #: side-less cross prints (opening / closing / halt crosses, D-P2-6)
+        self.xprints = {w: RollingSum(WINDOW_NS[w], 1) for w in ("1s", "10s", "1m")}
         self.evstats = {w: RollingSum(WINDOW_NS[w], 7) for w in ("1s", "10s", "1m")}
         self.queue = {w: RollingSum(WINDOW_NS[w], 4) for w in ("1s", "10s")}
         self.xc = {w: RollingSum(WINDOW_NS[w], 5) for w in ("1m", "5m")}
@@ -180,6 +255,14 @@ class _InstState:
         self.venue_updates = RollingKeyCount(WINDOW_NS["10s"])
 
     # ------------------------------------------------------ family accessors
+
+    def traded_volume(self, w: str) -> int:
+        """Traded quantity over window w: continuous TRADE prints plus the
+        side-less cross prints folded in by :meth:`FeatureEngine.on_cross_print`
+        (D-P2-6; zero on a stream without them, e.g. every synthetic one).
+        Volume, participation, the volume clock and the volume profile read
+        this; signed flow (signed volume, trade imbalance) never sees a cross."""
+        return self.trades[w].sums[1] + self.xprints[w].sums[0]
 
     def warm(self, w_ns: int) -> bool:
         """True when the window w has fully elapsed since the warmup anchor.
@@ -254,6 +337,7 @@ class _InstState:
         self.ofi = {w: RollingSum(WINDOW_NS[w], 4) for w in ("1s", "5s", "30s")}
         self.depthavg = {w: RollingSum(WINDOW_NS[w], 12) for w in ("1s", "10s", "1m")}
         self.trades = {w: RollingSum(WINDOW_NS[w], 6) for w in ("1s", "10s", "1m")}
+        self.xprints = {w: RollingSum(WINDOW_NS[w], 1) for w in ("1s", "10s", "1m")}
         self.evstats = {w: RollingSum(WINDOW_NS[w], 7) for w in ("1s", "10s", "1m")}
         self.queue = {w: RollingSum(WINDOW_NS[w], 4) for w in ("1s", "10s")}
         self.xc = {w: RollingSum(WINDOW_NS[w], 5) for w in ("1m", "5m")}
@@ -268,6 +352,7 @@ class _InstState:
             self.ofi,
             self.depthavg,
             self.trades,
+            self.xprints,
             self.evstats,
             self.queue,
             self.xc,
@@ -319,6 +404,9 @@ class FeatureEngine:
         #: refreshes whose merged depth exceeded FEATURE_MAX_QTY
         self.oversized_depth_skipped = 0
         self.vectors_emitted = 0
+        #: side-less cross prints folded into volume (D-P2-6) / dropped
+        self.cross_prints_folded = 0
+        self.cross_prints_dropped = 0
 
     # ---------------------------------------------------------------- states
 
@@ -340,8 +428,13 @@ class FeatureEngine:
 
     # ----------------------------------------------------------------- apply
 
-    def apply(self, ev: MarketEvent) -> FeatureVector | None:
+    def apply(self, ev: MarketEvent, group_end: bool = True) -> FeatureVector | None:
         """Apply one event; returns the emitted FeatureVector, if any.
+
+        ``group_end=False`` (D-P1-1, module docs) leaves the instrument's
+        same-timestamp group open: the event reaches the book and the flow
+        windows, but the refresh, the samples and the emission wait for the
+        event that closes the group (:func:`group_ends`).
 
         Events the book DROPS or HOLDS (API_CORE §4 / API_FEATURES §2) are
         counted and then ignored: they contribute to no rolling sample.  A
@@ -374,17 +467,19 @@ class FeatureEngine:
         # The merged view is a function of WHICH venues are stale, so the
         # trigger is a change of the stale SET (a second venue going stale
         # must remove it from the view too), not of "any venue is stale".
+        # The venue whose event changed the set is re-read by the refresh.
         stale_now = tuple(vid for vid in sorted(st.cons.books) if st.cons.books[vid].stale)
-        stale_changed = stale_now != st.stale_venues
-        just_recovered = bool(st.stale_venues) and not stale_now
-        st.stale_venues = stale_now
+        if stale_now != st.stale_running:
+            st.pending_venues.add(ev.venue_id)
+            st.stale_running = stale_now
+            st.stale_touched = True
+        if stale_now:
+            st.stale_seen = True
 
         if status != ApplyStatus.APPLIED:
             st.events_dropped += 1
             self.events_dropped += 1
-            if stale_changed:
-                self._refresh_book(st, ev.venue_id, t, just_recovered, samples=False)
-            return self._maybe_emit(st, t)
+            return self._close_group(st, t, group_end)
         st.venue_last_ts[ev.venue_id] = t
         st.venue_updates.add(t, ev.venue_id)
 
@@ -410,10 +505,53 @@ class FeatureEngine:
 
         et = ev.event_type
         if et in _BOOK_TOUCH or (et == EventType.SNAPSHOT and ev.trade_id == 0):
-            self._refresh_book(st, ev.venue_id, t, just_recovered)
-        elif stale_changed:
-            self._refresh_book(st, ev.venue_id, t, just_recovered, samples=False)
+            st.pending_refresh = True
+            st.pending_venues.add(ev.venue_id)
+        return self._close_group(st, t, group_end)
 
+    def on_cross_print(self, instrument_id: int, ts: int, qty: int) -> bool:
+        """Fold a side-less cross print (opening / closing / halt cross,
+        ITCH ``Q``) into the instrument's VOLUME windows (D-P2-6).
+
+        A cross print is not an event of the stream (it has no aggressor and
+        rests nowhere, so the book and the native engines never see it); the
+        feature pipeline calls this at its exchange_ts, before the first
+        event after it.  It counts in ``traded_volume_*``, ``participation_*``,
+        the volume profile and the volume clock, never in signed flow, trade
+        counts or the effective spread.  A print before the instrument's last
+        timestamp, or with a quantity outside (0, FEATURE_MAX_QTY], is dropped
+        and counted.  Returns True when folded."""
+        st = self._state(instrument_id)
+        if qty <= 0 or qty > FEATURE_MAX_QTY or (st.first_ts is not None and ts < st.last_ts):
+            self.cross_prints_dropped += 1
+            return False
+        for win in st.xprints.values():
+            win.add(ts, (qty,))
+        self.cross_prints_folded += 1
+        return True
+
+    def _group_event(self, st: _InstState) -> None:
+        """Hook: an event that leaves its group open (subclasses observe it)."""
+
+    def _close_group(self, st: _InstState, t: int, group_end: bool) -> FeatureVector | None:
+        """Close the instrument's same-timestamp group (D-P1-1): one refresh
+        over the venues the group touched, then the emission check.  With
+        ``group_end=False`` the group stays open and nothing is emitted."""
+        if not group_end:
+            self._group_event(st)
+            return None
+        stale_now = st.stale_running
+        stale_changed = st.stale_touched
+        just_recovered = (bool(st.stale_venues) or st.stale_seen) and not stale_now
+        st.stale_venues = stale_now
+        st.stale_touched = st.stale_seen = False
+        venues = sorted(st.pending_venues)
+        if st.pending_refresh:
+            self._refresh_book(st, venues, t, just_recovered)
+        elif stale_changed:
+            self._refresh_book(st, venues, t, just_recovered, samples=False)
+        st.pending_refresh = False
+        st.pending_venues.clear()
         return self._maybe_emit(st, t)
 
     def _maybe_emit(self, st: _InstState, t: int) -> FeatureVector | None:
@@ -424,10 +562,14 @@ class FeatureEngine:
             return vec
         return None
 
-    def run(self, events: Iterable[MarketEvent]) -> dict:
-        """Apply an event stream; returns summary stats."""
-        for ev in events:
-            self.apply(ev)
+    def run(self, events: Iterable[MarketEvent], coalesce: bool = True) -> dict:
+        """Apply an event stream; returns summary stats.  ``coalesce``
+        (default) closes same-timestamp groups at their last event (D-P1-1);
+        ``False`` is the per-event legacy semantics."""
+        evs = list(events)
+        ends = group_ends(evs) if coalesce else [True] * len(evs)
+        for ev, end in zip(evs, ends, strict=True):
+            self.apply(ev, end)
         return {
             "events_processed": self.events_processed,
             "events_dropped": self.events_dropped,
@@ -446,6 +588,9 @@ class FeatureEngine:
             win.add(t, vals)
 
     def _on_trade(self, st: _InstState, ev: MarketEvent) -> None:
+        # st.mid / st.book_ok are the merged view as of the last group close:
+        # inside a coalesced group that is the PRE-group mid (D-P1-1), so a
+        # trade is not measured against the book its own EXECUTE moved.
         qty = ev.qty
         buy = qty if ev.side == 0 else 0
         sell = qty - buy
@@ -462,7 +607,7 @@ class FeatureEngine:
     def _refresh_book(
         self,
         st: _InstState,
-        venue_id: int,
+        venue_ids: Iterable[int],
         t: int,
         just_recovered: bool = False,
         samples: bool = True,
@@ -477,9 +622,10 @@ class FeatureEngine:
         """
         cons = st.cons
         st.refresh_seq += 1
-        vb = cons.books.get(venue_id)
-        if vb is not None:
-            st.venue_cache[venue_id] = (vb.depth(0, 10), vb.depth(1, 10))
+        for venue_id in venue_ids:  # ascending: the venues the group touched
+            vb = cons.books.get(venue_id)
+            if vb is not None:
+                st.venue_cache[venue_id] = (vb.depth(0, 10), vb.depth(1, 10))
         # stale->fresh recovery: clear all rolling state before this refresh
         # contributes anything (pinned, API_FEATURES §2.1).
         if just_recovered:

@@ -120,7 +120,7 @@ def _metric_value(st, metric: str):
     function when it folds the post-emission observation into the profile.
     """
     if metric == "volume":
-        return st.trades["1m"].sums[1] if st.warm(WINDOW_NS["1m"]) else None
+        return st.traded_volume("1m") if st.warm(WINDOW_NS["1m"]) else None
     if metric == "spread":
         return st.spread_bps if st.book_ok else None
     if metric == "vol":

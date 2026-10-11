@@ -35,15 +35,15 @@ flowchart TD
     FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
-    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,156 looks / 216 configs, two datasets, two method bundles)<br/>REPORT.md, ML_REPORT.md, model manifests"]
-    RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 24 CANDIDATE / 0 beyond"]
+    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,358 looks / 293 configs, two datasets, three method revisions)<br/>REPORT.md, ML_REPORT.md, model manifests"]
+    RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 23 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```
 
 ## 2. Cross-language golden-test topology
 
 How one validated Python reference pins four implementations. The parity table is
-printed by `tests/harness/run_all.sh` (python 2344 · cpp 302 · rust 358 · java 571
+printed by `tests/harness/run_all.sh` (python 2385 · cpp 302 · rust 362 · java 575
 tests; 193/72/71/124 in the golden groups — the Java gate runs all seventeen
 `*GoldenTest` classes, the Rust gate ten golden targets). Two goldens are
 owned by a port language and consumed by Python as well: the fills golden
@@ -635,7 +635,7 @@ flowchart TD
     FEAT --> CHILD["8. per child: AlgoScheduler → SorAdapter.route (3 venues)<br/>→ controls (slice interval, latency budget, participation)<br/>→ RiskEngineAdapter.evaluate (RiskDecision) → submit<br/>a REJECT is never submitted"]
     CHILD --> TRACE["9. TraceBuilder per decision → JsonlTraceSink + StoreTraceSink + TraceDigest"]
     TRACE --> OUT["data/mvp/RUN_ID/: traces.jsonl · iap.sqlite · risk_audit.jsonl<br/>report.json / report.md · paper_evidence.json · config.json"]
-    OUT --> VERIFY["python -m iap.mvp verify — run twice, identical bytes<br/>python -m iap.mvp replay --run … — same digest from the captured stream<br/>golden: tests/golden/expected_mvp.json (15,805 events, 800 decisions,<br/>235 parents, 169 fills, P&L −81.53 USD, digest 20d4ff76…)"]
+    OUT --> VERIFY["python -m iap.mvp verify — run twice, identical bytes<br/>python -m iap.mvp replay --run … — same digest from the captured stream<br/>golden: tests/golden/expected_mvp.json (15,805 events, 800 decisions,<br/>231 parents, 163 fills, P&L −82.84 USD, digest 6fdb3a2c…)"]
     SIM -. "next event" .-> SIM
 ```
 
@@ -1397,7 +1397,7 @@ flowchart LR
     EV["IAP1 or canonical JSONL events"] --> API["iap.features.native<br/>compute_native / compute_native_file<br/>engine = python or rust"]
     API --> RES{"resolve_engine"}
     RES -->|"python, or rust without the wheel<br/>(warning, falls back)"| PYE["Python reference engine<br/>all 205 features"]
-    RES -->|"rust"| EXT["iap_features_rs (pyo3 0.22.6, abi3 wheel,<br/>maturin 1.7.8; GIL released)"]
+    RES -->|"rust"| EXT["iap_features_rs (pyo3 0.29.3, abi3 wheel,<br/>maturin 1.7.8; GIL released)"]
     EXT --> RS["rust/features crate<br/>45 native slots: pinned 40 + 5 alpha inputs"]
     PYE --> NF["NativeFrame<br/>values n x 45 (NaN where invalid),<br/>validity n x 45, ids, event index, timestamps"]
     RS --> NF
@@ -1556,7 +1556,7 @@ flowchart LR
 | Governing institutional specification (verbatim) | [SPECIFICATION.md](SPECIFICATION.md) |
 | Teaching walkthrough of every subsystem | [../LEARN.md](../LEARN.md) |
 | How the quant, algo and AI sides work, top-down | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) |
-| 68 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
+| 74 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
 | Data model, views, SQLite/PostgreSQL portability, query cookbook | [DATA_MODEL.md](DATA_MODEL.md) |
 | The 7-state promotion lifecycle: gates, evidence, registry, bootstrap result | [LIFECYCLE.md](LIFECYCLE.md) |
 | The decision trace: record, ids, canonical JSON, digest, sinks, replay | [DECISION_TRACE.md](DECISION_TRACE.md) |

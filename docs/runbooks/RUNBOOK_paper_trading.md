@@ -429,6 +429,16 @@ the stream replay those events. If N &lt; M the audit was truncated or
 belongs to another session: do not resume at all, escalate per
 `RUNBOOK_incident_kill_switch.md`.
 
+### 5.1 The risk audit chain across restarts (v1.14)
+
+Each checkpoint records the risk audit chain head (`riskAuditSeq`,
+`riskAuditHeadSha256` in `session_state.json`), and `--resume` restores the
+engine with `RiskEngine.restoreChained`, so `risk_audit.jsonl` stays one
+chain across restarts. A checkpoint written before v1.14 has no head and
+the resumed engine starts a new chain. To check a state directory, verify
+the audit file and compare the head with `session_state.json`
+(RUNBOOK_incident_kill_switch.md §6).
+
 ## 6. Stopping
 
 ```bash

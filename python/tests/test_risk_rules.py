@@ -13,11 +13,13 @@ from __future__ import annotations
 import copy
 import json
 import math
+import re
 
 import pytest
 from iap.core.rng import SplitMix64
 from iap.reference.refdata import ReferenceData
 from iap.risk import (
+    GENESIS_SHA256,
     Decision,
     Fill,
     InstrumentRef,
@@ -35,9 +37,12 @@ from iap.risk import (
     instrument_refs_from_config,
     instrument_refs_from_golden,
     instrument_refs_from_reference_data,
+    line_sha256,
     load_instrument_refs,
     order_validation_error,
     to_canonical_json,
+    unchained_line,
+    verify_audit_chain,
 )
 from iap.risk.serialize import rust_display_f64
 
@@ -487,7 +492,13 @@ def test_u64_order_ids_print_unsigned_and_sort_unsigned(config_doc):
     d = eng3.check_order(order(max_u64, 0, 10, 2450, timestamp=T0 + 2 * SEC))
     assert d.reason == f"order_id 18446744073709551615 already used at ts {T0 + SEC}"
     assert eng3.snapshot()["open"] == {
-        "18446744073709551615": {"instrument_id": 1, "side": 0, "price_ticks": 2450, "qty": 10}
+        "18446744073709551615": {
+            "instrument_id": 1,
+            "side": 0,
+            "price_ticks": 2450,
+            "qty": 10,
+            "strategy_id": "S1",
+        }
     }
 
 
@@ -981,6 +992,8 @@ def test_every_decision_is_audited_and_deterministic(config_doc):
             "severity",
             "decision",
             "reason",
+            "seq",
+            "prev_sha256",
         }
 
 
@@ -997,16 +1010,18 @@ def test_risk_event_json_line_round_trips_with_schema_keys():
     line = ev.to_json_line()
     assert list(json.loads(line)) == [
         "decision",
+        "prev_sha256",
         "reason",
         "rule_id",
         "scope",
         "scope_id",
+        "seq",
         "severity",
         "timestamp",
     ]
     assert line == (
-        '{"decision":2,"reason":"price 30 vs mid 24.51","rule_id":"PRICE_BAND",'
-        '"scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":42}'
+        '{"decision":2,"prev_sha256":"","reason":"price 30 vs mid 24.51","rule_id":"PRICE_BAND",'
+        '"scope":"INSTRUMENT","scope_id":"1","seq":0,"severity":2,"timestamp":42}'
     )
     assert RiskEvent.from_json_line(line) == ev
     assert to_canonical_json(ev.to_dict()) == line
@@ -1040,8 +1055,8 @@ def test_risk_event_json_escapes_like_serde_json():
         7, Scope.GLOBAL, "", Rules.KILL_SWITCH_ENGAGED, 3, 3, 'a\bb\fc\nd\re\tf\u0001g"h\\i\u007fé'
     )
     assert ev.to_json_line() == (
-        '{"decision":3,"reason":"a\\bb\\fc\\nd\\re\\tf\\u0001g\\"h\\\\i\u007fé",'
-        '"rule_id":"KILL_SWITCH_ENGAGED","scope":"GLOBAL","scope_id":"",'
+        '{"decision":3,"prev_sha256":"","reason":"a\\bb\\fc\\nd\\re\\tf\\u0001g\\"h\\\\i\u007fé",'
+        '"rule_id":"KILL_SWITCH_ENGAGED","scope":"GLOBAL","scope_id":"","seq":0,'
         '"severity":3,"timestamp":7}'
     )
     assert RiskEvent.from_json_line(ev.to_json_line()) == ev
@@ -1368,7 +1383,7 @@ def test_risk_clear_kill_after_loss_latch_resumes_with_override(config_doc):
     )
     assert n_latches == 2
     # override below the loss is legal but ineffective
-    eng.override_loss_limit(Scope.STRATEGY, "S1", 51_000.0, T0 + 4 * NS, "cro")
+    eng.override_loss_limit(Scope.STRATEGY, "S1", 51_000.0, T0 + 4 * NS, "cro, cfo")
     eng.clear_kill(Scope.STRATEGY, "S1", T0 + 4 * NS, "ops clear #2")
     assert eng.check_order(order(4, 0, 100, 2450)).rule_id == Rules.STRATEGY_LOSS
     # a flat strategy's realized loss cannot re-latch on a mark (no lot to
@@ -1379,7 +1394,7 @@ def test_risk_clear_kill_after_loss_latch_resumes_with_override(config_doc):
     eng.on_market(1, 2450, 2452, T0 + 4 * NS + 2)
     assert eng.check_order(order(7, 0, 100, 2450)).rule_id == Rules.STRATEGY_LOSS
     # override above the loss + clear -> ALLOW, and marks no longer latch
-    eng.override_loss_limit(Scope.STRATEGY, "S1", 75_000.0, T0 + 5 * NS, "cro")
+    eng.override_loss_limit(Scope.STRATEGY, "S1", 75_000.0, T0 + 5 * NS, "cro, cfo")
     eng.clear_kill(Scope.STRATEGY, "S1", T0 + 5 * NS, "ops clear INC-1")
     eng.on_market(1, 2450, 2452, T0 + 5 * NS)
     assert eng.check_order(order(5, 0, 100, 2450)).allowed()
@@ -1387,10 +1402,10 @@ def test_risk_clear_kill_after_loss_latch_resumes_with_override(config_doc):
     assert ids.count(Rules.LOSS_LIMIT_OVERRIDE) == 2
     assert ids.count(Rules.KILL_SWITCH_CLEARED) == 4
     ov = next(e for e in eng.audit() if e.rule_id == Rules.LOSS_LIMIT_OVERRIDE)
-    assert ov.reason == "daily loss limit 50000.00 -> 51000.00 approved by cro"
+    assert ov.reason == "daily loss limit 50000.00 -> 51000.00 approved by cro, cfo"
     assert ov.severity == int(Severity.WARN) and ov.decision == int(Decision.ALLOW)
     ov2 = [e for e in eng.audit() if e.rule_id == Rules.LOSS_LIMIT_OVERRIDE][1]
-    assert ov2.reason == "daily loss limit 51000.00 -> 75000.00 approved by cro"
+    assert ov2.reason == "daily loss limit 51000.00 -> 75000.00 approved by cro, cfo"
     assert eng.snapshot()["loss_override_strategy"] == {"S1": 75000.0}
     # invalid overrides are refused without side effects
     before = eng.snapshot_json()
@@ -1411,17 +1426,17 @@ def test_risk_clear_kill_after_loss_latch_resumes_with_override(config_doc):
 
 def test_global_override_replaces_the_effective_limit(config_doc):
     eng = engine(config_doc)
-    eng.override_loss_limit(Scope.GLOBAL, "", 400_000, T0, "cro")  # an int is a number
+    eng.override_loss_limit(Scope.GLOBAL, "", 400_000, T0, "cro, cfo")  # an int is a number
     ov = eng.audit()[-1]
-    assert ov.reason == "daily loss limit 250000.00 -> 400000.00 approved by cro"
+    assert ov.reason == "daily loss limit 250000.00 -> 400000.00 approved by cro, cfo"
     assert ov.scope == Scope.GLOBAL and ov.scope_id == ""
     assert eng.snapshot()["loss_override_global"] == 400000.0
     eng.on_fill(fill("S1", 1, 0, 95_000, 2452))
     eng.on_fill(fill("S1", 1, 1, 95_000, 2180))  # -258,400: below the default, above the override
     assert kills(eng) == [Rules.STRATEGY_LOSS]
     assert not eng.kill_switch_engaged()
-    eng.override_loss_limit(Scope.GLOBAL, "", 200_000.0, T0 + NS, "cro")
-    assert eng.audit()[-1].reason == "daily loss limit 400000.00 -> 200000.00 approved by cro"
+    eng.override_loss_limit(Scope.GLOBAL, "", 200_000.0, T0 + NS, "cro, cfo")
+    assert eng.audit()[-1].reason == "daily loss limit 400000.00 -> 200000.00 approved by cro, cfo"
     d = eng.check_order(order(1, 0, 100, 2450, strategy_id="S2"))
     assert d.rule_id == Rules.DAILY_LOSS
     assert d.reason == "global daily pnl -258400.00 at daily loss limit 200000.00"
@@ -1438,7 +1453,7 @@ def test_scenario_session_roll_rebases_daily_pnl_and_keeps_latches(config_doc):
     eng.on_fill(fill("S1", 1, 0, 95_000, 2452))  # unrealized -950 at 24.51
     eng.on_fill(fill("S2", 2, 0, 1_000, 3120))
     eng.on_fill(fill("S2", 2, 1, 1_000, 3110))  # realized -100
-    eng.override_loss_limit(Scope.GLOBAL, "", 400_000.0, T0, "cro")
+    eng.override_loss_limit(Scope.GLOBAL, "", 400_000.0, T0, "cro, cfo")
     eng.engage_kill(Scope.STRATEGY, "S2", T0, "manual")
     assert abs(eng.global_daily_pnl() + 1_050.0) < 1e-6
     eng.roll_session(T0 + NS, "roll")
@@ -1505,18 +1520,18 @@ def test_risk_snapshot_restore_roundtrip(config_doc):
     unbroken = engine(config_doc)
     first = script(unbroken, 0, 30)
     snap = unbroken.snapshot()
-    assert snap["x-version"] == 1
+    assert snap["x-version"] == 2
     limits = RiskLimits.from_json(config_doc)
     restored = RiskEngine.restore(limits, equity_refs(ticks()), snap, T0 + 5 * NS)
     assert restored.audit_len() == 1
     assert restored.audit()[0].rule_id == Rules.STATE_RESTORED
-    assert restored.audit()[0].reason.startswith("restored snapshot v1: ")
+    assert restored.audit()[0].reason.startswith("restored snapshot v2: ")
     a = script(unbroken, 30, 20)
     b = script(restored, 30, 20)
     assert a == b
     assert len(first) == 30
-    full_lines = unbroken.audit_jsonl().splitlines()
-    tail = restored.audit_jsonl().splitlines()[1:]
+    full_lines = [unchained_line(x) for x in unbroken.audit_jsonl().splitlines()]
+    tail = [unchained_line(x) for x in restored.audit_jsonl().splitlines()[1:]]
     assert full_lines[len(full_lines) - len(tail) :] == tail
     assert restored.snapshot() == unbroken.snapshot()
     assert restored.snapshot_json() == unbroken.snapshot_json()
@@ -1566,7 +1581,7 @@ def test_restore_is_strict_field_by_field(config_doc):
     eng.on_fill(fill("S1", 1, 0, 10, 2450, order_id=1))
     eng.engage_kill(Scope.INSTRUMENT, "2", T0, "x")
     eng.on_venue_disconnect(2, T0)
-    eng.override_loss_limit(Scope.STRATEGY, "S1", 60_000.0, T0, "cro")
+    eng.override_loss_limit(Scope.STRATEGY, "S1", 60_000.0, T0, "cro, cfo")
     snap = eng.snapshot()
     limits = RiskLimits.from_json(config_doc)
     refs = equity_refs(ticks())
@@ -1616,7 +1631,7 @@ def test_restore_is_strict_field_by_field(config_doc):
     assert restored.metrics.gauge_value("risk_daily_pnl") == eng.metrics.gauge_value(
         "risk_daily_pnl"
     )
-    assert restored.audit()[0].reason == "restored snapshot v1: 1 positions, 1 open orders"
+    assert restored.audit()[0].reason == "restored snapshot v2: 1 positions, 1 open orders"
     # a restored snapshot with a latched global switch stays latched
     eng.engage_kill(Scope.GLOBAL, "", T0, "x")
     latched = RiskEngine.restore(limits, refs, eng.snapshot(), T0)
@@ -1764,6 +1779,9 @@ def _exposure_state(eng: RiskEngine) -> dict:
     snap = eng.snapshot()
     del snap["seen_orders"]
     del snap["buckets"]
+    # the 15c3-5 message buckets: check 28 refills, check 29 spends on ALLOW
+    del snap["venue_buckets"]
+    del snap["cancel_buckets"]
     return snap
 
 
@@ -1935,8 +1953,9 @@ def test_property_applied_decisions_are_replayable(config_doc, seed):
         restored = RiskEngine.restore(limits, equity_refs(ticks()), json.loads(snap_json), 0)
         for step in script[cut + 1 :]:
             _apply(restored, step)
-        tail = restored.audit_jsonl().splitlines()[1:]
-        assert tail == full[len(full) - len(tail) :], f"cut {cut}"
+        tail = [unchained_line(x) for x in restored.audit_jsonl().splitlines()[1:]]
+        want = [unchained_line(x) for x in full[len(full) - len(tail) :]]
+        assert tail == want, f"cut {cut}"
         assert restored.snapshot_json() == a.snapshot_json(), f"cut {cut}"
         # the snapshot document itself round-trips through canonical JSON
         assert json.loads(snap_json) == restored_snapshot_parse(snap_json)
@@ -1972,6 +1991,10 @@ def test_snapshot_is_json_shaped_and_independent_of_the_engine(config_doc):
         "realized",
         "loss_override_global",
         "loss_override_strategy",
+        "venue_buckets",
+        "cancel_buckets",
+        "market_volume",
+        "executed",
     }
     assert not math.isnan(eng.metrics.gauge_value("risk_daily_pnl"))
 
@@ -2047,7 +2070,13 @@ def test_restore_tolerates_unknown_instruments_fail_closed(config_doc):
     eng = engine(config_doc)
     eng.engage_kill(Scope.VENUE, "3", T0, "x")
     snap = eng.snapshot()
-    snap["open"]["5"] = {"instrument_id": 99, "side": 0, "price_ticks": 0, "qty": 10}
+    snap["open"]["5"] = {
+        "instrument_id": 99,
+        "side": 0,
+        "price_ticks": 0,
+        "qty": 10,
+        "strategy_id": "S9",
+    }
     limits = RiskLimits.from_json(config_doc)
     restored = RiskEngine.restore(limits, equity_refs(ticks()), snap, T0)
     assert restored.snapshot()["kill_venues"] == {"3": True}
@@ -2431,3 +2460,106 @@ def test_extreme_timestamps_fail_closed_without_overflow(config_doc):
     assert eng.check_order(at(8, 1, T0)).allowed()
     assert eng.check_order(at(8, 1, i64_min)).reason == why
     assert eng.check_order(at(9, 1, i64_min)).reason == why
+
+
+# ------------------------------------------ v1.14: G-P0-1 / G-P0-2 / G-P2-*
+
+
+def test_audit_chain_links_every_record_and_detects_tampering(config_doc):
+    """G-P0-1: seq 1..n, each prev_sha256 the hash of the line before; an
+    edited, dropped or reordered line breaks the chain."""
+    eng = engine(config(config_doc))
+    eng.check_order(order(1, 0, 100, 2450))
+    eng.check_order(order(2, 0, 60_000, 2450))
+    eng.on_venue_disconnect(2, T0 + NS)
+    text = eng.audit_jsonl()
+    lines = text.splitlines()
+    assert verify_audit_chain(text) == (3, line_sha256(lines[-1]))
+    assert eng.audit_chain_head() == (3, line_sha256(lines[-1]))
+    assert eng.audit()[0].prev_sha256 == GENESIS_SHA256
+    edited = text.replace("max_order_qty 50000", "max_order_qty 90000")
+    with pytest.raises(ValueError, match="line 3: prev_sha256 mismatch"):
+        verify_audit_chain(edited)
+    with pytest.raises(ValueError, match="line 2: seq 3, want 2"):
+        verify_audit_chain(lines[0] + "\n" + lines[2] + "\n")
+    with pytest.raises(ValueError, match="line 1: seq 2, want 1"):
+        verify_audit_chain("\n".join([lines[1], lines[0]]) + "\n")
+    # a restore continues the chain from the head it is given
+    restored = RiskEngine.restore(
+        RiskLimits.from_json(config(config_doc)),
+        equity_refs(ticks()),
+        eng.snapshot(),
+        T0 + 2 * NS,
+        chain=eng.audit_chain_head(),
+    )
+    verify_audit_chain(text + restored.audit_jsonl())
+    with pytest.raises(ValueError, match="64 lowercase hex"):
+        RiskEngine.restore(
+            RiskLimits.from_json(config(config_doc)),
+            equity_refs(ticks()),
+            eng.snapshot(),
+            T0,
+            chain=(3, "ABC"),
+        )
+
+
+def test_x_version_4_keys_are_optional_and_strict(config_doc):
+    doc = config(config_doc)
+    for section in ("pre_trade", "overrides"):
+        del doc[section]
+    del doc["market_data"]["max_mid_jump_ratio"]
+    off = RiskLimits.from_json(doc)
+    assert off.max_open_orders is None and off.min_approvers is None
+    assert off.restricted_instruments == frozenset() and off.max_mid_jump_ratio is None
+    on = RiskLimits.from_json(config(config_doc))
+    assert on.max_open_orders == 1000 and on.min_approvers == 2
+    assert on.max_mid_jump_ratio == 10.0 and on.max_participation_bps is None
+    for section, key, value, why in (
+        ("market_data", "max_mid_jump_ratio", 1.0, "max_mid_jump_ratio must be > 1, got 1"),
+        ("pre_trade", "max_open_orders", 0, "pre_trade.max_open_orders must be > 0, got 0"),
+        ("pre_trade", "restricted_instruments", 5, "restricted_instruments must be an array"),
+        ("pre_trade", "restricted_instruments", [1 << 32], "must be u32 instrument ids"),
+        ("pre_trade", "max_participation_bps", 100.0, "non-integer pre_trade.participation"),
+        ("overrides", "min_approvers", "two", "missing/non-integer overrides.min_approvers"),
+    ):
+        bad = config(config_doc)
+        bad[section][key] = value
+        with pytest.raises(ValueError, match=why):
+            RiskLimits.from_json(bad)
+    # null is "off", like an absent key
+    nulled = config(config_doc)
+    nulled["pre_trade"]["max_open_orders"] = None
+    assert RiskLimits.from_json(nulled).max_open_orders is None
+
+
+def test_loss_override_is_bounded_and_two_party(config_doc):
+    """G-P2-3: a refused override changes nothing and is audited."""
+    eng = engine(config(config_doc))
+    for approver, limit, why in (
+        ("cro", 300_000.0, "needs 2 distinct approvers, got 1: cro"),
+        ("cro, cro", 300_000.0, "needs 2 distinct approvers, got 1"),
+        ("cro,cfo", 500_000.01, "exceeds cap 500000.00 (2.00x the configured 250000.00)"),
+    ):
+        with pytest.raises(ValueError, match=re.escape(why)):
+            eng.override_loss_limit(Scope.GLOBAL, "", limit, T0, approver)
+        last = eng.audit()[-1]
+        assert last.rule_id == Rules.LOSS_LIMIT_OVERRIDE_REJECTED
+        assert last.severity == int(Severity.BREACH) and why in last.reason
+    assert eng._effective_global_loss(eng._limits) == 250_000.0
+    eng.override_loss_limit(Scope.GLOBAL, "", 500_000.0, T0, "cro,cfo")
+    assert eng._effective_global_loss(eng._limits) == 500_000.0
+
+
+def test_cancel_requests_spend_strategy_and_venue_budgets(config_doc):
+    doc = config(config_doc)
+    doc["pre_trade"].update(
+        {"max_cancels_per_sec": 1.0, "cancel_burst": 1.0, "venue_msg_burst": 2.0}
+    )
+    eng = engine(doc)
+    eng.on_cancel_request("S1", 1, T0)
+    expect(eng, order(1, 0, 10, 2450, timestamp=T0), Rules.CANCEL_RATE)
+    expect(eng, order(2, 0, 10, 2450, timestamp=T0, strategy_id="S2"), Rules.ALLOW)
+    expect(eng, order(3, 0, 10, 2449, timestamp=T0, strategy_id="S3"), Rules.VENUE_MESSAGE_RATE)
+    # one second refills the cancel bucket to its burst
+    expect(eng, order(4, 0, 10, 2448, timestamp=T0 + NS), Rules.ALLOW)
+    assert eng.metrics.counter_value("risk_cancel_requests_total") == 1

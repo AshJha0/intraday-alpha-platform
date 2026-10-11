@@ -24,6 +24,22 @@ the numbers below are the v1.5.0 numbers. Each old rule keeps a legacy name
 report), and where a v1.4.0 figure is still the clearer illustration it is
 quoted as such, with its date.
 
+Three reading paths, depending on why you are here:
+
+- *You do quant research.* §1, §5, §6, §23, §24, §32, §33, §40, §42, then
+  §44. Run COOKBOOK recipes 1, 3, 4, 29 and 35 alongside. You will come
+  out knowing why a t of 21 can be overstated, what a look costs, and why
+  nothing here is promoted.
+- *You build trading systems.* §3, §9, §10, §12, §16, §21, §22, §25, §30,
+  §36, then §44. Run recipes 2, 9, 10, 14, 22, 69 and 70. The theme is
+  fail-closed design and proving four implementations agree.
+- *You are reviewing the platform.* §20, §27, §44, then
+  [docs/ROADMAP.md](docs/ROADMAP.md) §3.8-3.10 and CHANGELOG.md. These say
+  what is wrong or unfinished, in the platform's own words.
+
+The [glossary](#glossary) at the end defines the terms this document uses
+without stopping to explain them.
+
 For a shorter, top-down explanation of how the quant, algo and AI sides fit
 together — one page per subsystem, each ending with where to look and a
 command that runs — start with [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md)
@@ -76,6 +92,7 @@ Contents:
 43. [Feedback loops in passive execution](#43-feedback-loops-in-passive-execution)
 44. [What an independent review found, and how we triaged it (v1.13/v1.14)](#44-what-an-independent-review-found-and-how-we-triaged-it-v113v114)
 45. [Further reading](#45-further-reading)
+- [Glossary](#glossary)
 
 ---
 
@@ -645,12 +662,14 @@ count)` (`tstat_threshold="ledger"`, the default since v1.5.0; §6.6 and
 §24.4). For the committed report that is **4.365**. Up to v1.4.0 it was a
 fixed 3.0 (`"fixed"`, the legacy rule).
 
-Result on the bundled data: **0 PROMOTE / 11 ITERATE / 13 REJECT**. The
+Result on the bundled data (v1.14.0): **0 PROMOTE / 12 ITERATE / 12
+REJECT** (0 / 11 / 13 under v1.5.0 to v1.13.0). The
 cost gate fails for all 24, in two different ways: **18 alphas make no
 trade at all** on the last fold — their forecast never exceeds the
 round-trip spread and fee, so their net P&L is exactly 0, and 0 does not
-pass `net P&L > 0` — and **6 trade and lose** (EQ11 −502, FX05 −64, FX08
-−328, FX09 −255, FX10 −22, FX11 −733 USD). None ends above zero. The
+pass `net P&L > 0` — and **6 trade and lose** (EQ11 −662, FX05 −160, FX08
+−425, FX09 −471, FX10 −93, FX11 −1,853 USD; under v1.5.0 −502, −64, −328,
+−255, −22, −733: the causal row block trades rows the old mask skipped). None ends above zero. The
 ITERATE set is EQ01, EQ02, EQ03, EQ05, EQ06, EQ12, FX01, FX04, FX08, FX10
 and FX11.
 
@@ -746,8 +765,10 @@ looks of the v1.3.0 dataset are kept and the new ones are added. v1.5.0
 did the same thing along a different axis: the method bundle is part of
 the canonical config, so the same 24 pipelines run under the new default
 rules are new looks at the same sample, added beside the v1.4.0 ones
-(ledger `x-version` 3). The current ledger holds **216 distinct
-configurations / 5156 looks**:
+(ledger `x-version` 3). At v1.5.0 the ledger held 216 distinct
+configurations and a look count of 5,156, broken down below. At v1.14.0 it holds
+**293 distinct configurations / 5,358 looks**: v1.14.0 regenerated every statistic under its revised methods, and each one is a new look (`stats_revision`), adding 202 to the count over 77 configurations (the
+breakdown below is the v1.5.0 one, and every entry in it is still there):
 
 - on the v1.3.0 dataset (`203c8f54…`), 70 entries carrying 1,068 of the
   looks: a one-time design scan (216: 24 alphas × 9 horizons), 24
@@ -770,8 +791,8 @@ evaluations at four folds (itemised in
 and every one of them is a look.
 
 That translates into a selection yardstick: Bonferroni per-test threshold
-|t| ≥ **4.424**, and an expected **max |t| ≈ 4.135 under the global null**
-(4.206 and 3.888 at the v1.4.0 count of 1920, 4.071 and 3.735 before the
+|t| ≥ **4.432**, and an expected **max |t| ≈ 4.144 under the global null**
+at v1.14.0 (4.424 and 4.135 at v1.5.0's count of 5,156, 4.206 and 3.888 at the v1.4.0 count of 1920, 4.071 and 3.735 before the
 dataset regeneration: looking again raised the bar each time). Up to
 v1.4.0 this yardstick was printed beside a fixed gate of t ≥ 3.0 and read
 by nothing. Since v1.5.0 the Bonferroni figure *is* the PROMOTE
@@ -783,7 +804,8 @@ on each entry as `gate_looks`. The committed report was judged at **3,936
 looks** (the 1,920 already recorded plus its own 2,016), which gives the
 threshold of **4.365** and a yardstick of 4.07; the runner and adaptive
 runs that followed brought the ledger to 4,396, and the combination
-experiments of §29 to 5,156. The threshold is not
+experiments of §29 to 5,156, and the v1.14.0 regeneration to 5,358. The
+threshold is not
 retroactive — later looks tighten later runs and do not re-judge a
 recorded one.
 
@@ -794,7 +816,8 @@ EQ03 (5.16) clear the threshold; EQ06 (4.36) and FX04 (4.24) are above the
 yardstick and below the threshold, so they fail the significance gate
 that, at a fixed 3.0, they used to pass; EQ08 (−4.57) and FX09 (−5.75)
 are beyond it with the wrong sign. The lists are the same at 3,936 and at
-5,156 looks. Most quant shops track this informally at best;
+5,156 (the v1.5.0 report; the v1.14 report's t values differ, see
+docs/RESEARCH_VALIDITY.md §4b). Most quant shops track this informally at best;
 here it is a serialized, deterministic artifact — and the runner's entries
 were deliberately *not* de-duplicated against the pipeline entries for the
 same alpha and horizon: the denominator may only grow.
@@ -1329,8 +1352,8 @@ match**.
   the portfolio golden is checked against an SLSQP optimum. Golden files are
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
-  suites and prints the table (the v1.13.0 counts from CI, 2026-10-11: python 2344,
-  cpp 302, rust 358, java 571 tests passed; golden groups 193/72/71/124; all
+  suites and prints the table (the v1.14.0 counts from CI, 2026-10-11: python 2385,
+  cpp 302, rust 362, java 575 tests passed; golden groups 193/72/71/124; all
   PASS, plus `integration` (35) and `replay` (6) rows for the repo-level
   pytest suites, a `deployment` row — 26 structural checks passed in CI,
   where promtool and kubeconform are installed — and a `numbers` row that re-derives every headline
@@ -1943,7 +1966,7 @@ reproduces them with string concatenation and one hash (pinned:
 digest is sha256 over every canonical line + newline in emission order;
 same seed ⇒ same digest; one changed field or one swapped line changes it.
 Known answers are pinned for one trace, the same trace twice, and the empty
-stream; the MVP golden pins a whole session's digest (`20d4ff76…`, 800
+stream; the MVP golden pins a whole session's digest (`6fdb3a2c…`, 800
 traces).
 
 ### 18.3 Four languages, one line
@@ -2030,7 +2053,7 @@ index that lied about what its sources contain would be worse than none.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=20d4ff76af0b631c...
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=231 children=347 fills=163 pnl=-82.837333 USD digest=6fdb3a2ce2d31481...
 ```
 
 Seven seconds later `data/mvp/58a10f2194a3c81c/` holds the captured stream,
@@ -2056,28 +2079,31 @@ regenerated.
 v1.5.0 regenerated it once more and changed nothing a trader would see.
 The loop does not use the research backtester, so the new default methods
 do not touch it: the events, decisions, parents, fills and P&L are
-identical to v1.4.0. What moved is the digest (`f51890da…` → `20d4ff76…`)
+identical to v1.4.0. What moved is the digest (`f51890da…` → `2affe409…`)
 and the `config_version` it covers (`f293e7e7…` → `439bbad5…`), because
 `config_version` hashes `configs/execution/execution.json`, which now
 names its impact model, and `alpha_params.json`, whose header names the
 regeneration commit. A digest that changes when a hashed configuration
 document changes, with every count and every dollar the same, is the
-digest doing its job.
+digest doing its job. In v1.14.0 the digest moved again (`6fdb3a2c…`) and
+this time a few counts moved too, because the refitted `alpha_params.json`
+changes the expected returns the loop trades on: 231 parents and 163 fills
+(was 235 and 169), −82.84 USD (was −81.53).
 
 ### 20.2 The numbers, stated as they are
 
-Seed 12345: 15,805 events, 800 decisions, 235 parent orders, 507 children
-generated of which 348 submitted (159 blocked by the 500 ms slice-interval
-control, exactly as the Java loop would), 169 fills, 15.1 % fill rate.
-Risk: 348 ALLOW, 0 REJECT, 0 KILL, 8 sequence gaps each recovered by the
-following SNAPSHOT burst, 28 mark regressions dropped. Routing: XV3 70.9 %,
-XV1 19.8 %, XV2 9.3 % of filled quantity (aggressive routing picks the
-cheapest taker fee on price ties; passive routing prefers XV1's rebate).
-TCA: implementation shortfall +0.063 bps quantity-weighted; TWAP fills
-0.4 % (passive limits at a 1 s horizon mostly expire), POV 6.3 %, IS
-72.9 %. **P&L −81.53 USD** on 8,229 shares: +0.022 bps of alpha
-contribution against −0.41 bps of execution cost, net −0.39 bps of filled
-notional. The report field is
+Seed 12345 (v1.14.0): 15,805 events, 800 decisions, 231 parent orders, 496
+children generated of which 347 submitted (149 blocked by the 500 ms
+slice-interval control, exactly as the Java loop would), 163 fills, 15.4 %
+fill rate. Risk: 347 ALLOW, 0 REJECT, 0 KILL, 8 sequence gaps each
+recovered by the following SNAPSHOT burst, 28 mark regressions dropped.
+Routing: XV3 69.2 %, XV1 19.6 %, XV2 11.2 % of filled quantity (aggressive
+routing picks the cheapest taker fee on price ties; passive routing
+prefers XV1's rebate). TCA: implementation shortfall +0.065 bps
+quantity-weighted; TWAP fills 0.4 % (passive limits at a 1 s horizon
+mostly expire), POV 6.7 %, IS 77.8 %. **P&L −82.84 USD** on 8,295 shares:
++0.0245 bps of alpha contribution against −0.4367 bps of execution cost,
+net −0.41 bps of filled notional. The report field is
 `alpha.cost_negative: true`. This is the research finding of §6 — a small
 signal, no money after costs — reproduced by a full loop on a different
 synthetic stream, and it is the headline number of the MVP, not a footnote.
@@ -2096,16 +2122,16 @@ The golden session reports realized ICs far from the research ICs:
 
 | alpha | realized IC at 1 s | cost-adjusted | shift-by-one | n | fitted horizon: realized IC | research IC | gap |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| EQ01 | +0.217 | −0.024 | +0.149 | 790 | 1 s: +0.217 | 0.011 | 0.206 |
-| EQ03 | +0.110 | −0.029 | +0.116 | 707 | 5 s: +0.147 | 0.019 | 0.128 |
-| EQ06 | −0.079 | +0.079 | −0.047 | 354 | 10 s: −0.130 | 0.028 | 0.158 |
-| ensemble | +0.104 | −0.003 | +0.111 | 790 | — | — | — |
+| EQ01 | +0.217 | −0.024 | +0.149 | 790 | 1 s: +0.217 | 0.024 | 0.193 |
+| EQ03 | +0.109 | −0.029 | +0.116 | 707 | 5 s: +0.147 | 0.030 | 0.117 |
+| EQ06 | −0.079 | +0.079 | −0.047 | 354 | 10 s: −0.130 | 0.056 | 0.185 |
+| ensemble | +0.103 | −0.002 | +0.111 | 790 | — | — | — |
 
-(The research IC is the gate IC of the v1.5.0 report — 0.0105, 0.0189 and
-0.0277 — which is why the last two columns differ from the v1.4.0 table in
-the third decimal; the realized columns are unchanged.) EQ01's realized IC
-is twenty times its research IC; EQ06's has the wrong
-sign. The pitfalls of §27 say what to do with numbers like that. The audit
+(v1.14.0 numbers. The research IC is the gate IC of the v1.14 report —
+0.0237, 0.0300 and 0.0556; under v1.5.0 it was 0.0105, 0.0189 and 0.0277,
+with gaps 0.206 / 0.128 / 0.158. The realized columns barely moved.)
+EQ01's realized IC is about nine times its research IC; EQ06's has the
+wrong sign. The pitfalls of §27 say what to do with numbers like that. The audit
 was first done on 2026-09-20, on the v1.3.0 stream, when the loop reported
 0.285 / 0.338 / −0.102 against research ICs of 0.027 / 0.030 / 0.043
 (docs/MVP.md §7.1 records it); the steps are the same on the v1.4.0
@@ -2161,10 +2187,10 @@ golden, and one of them now reads differently.
 5. **Check that it still does not pay.** The cost-adjusted IC — buy the ask
    now, sell the bid at t + h — is −0.024 for EQ01 and −0.029 for EQ03 at
    1 s, and −0.003 for the ensemble the loop trades on. The predicted move
-   is smaller than the spread; that is the −81.53 USD.
+   is smaller than the spread; that is the −82.84 USD.
 6. **Let the lifecycle see it.** `paper_evidence.json` carries the realized
    IC at the fitted horizon, so the `paper_ic_tracking` gate (max gap 0.01)
-   fails all three alphas on this data (gaps 0.206 / 0.128 / 0.158; on the
+   fails all three alphas on this data (gaps 0.193 / 0.117 / 0.185 at v1.14.0; on the
    v1.3.0 stream it failed EQ01 and EQ03) — correctly: paper behaviour
    that differs this much from research is a finding, not a promotion.
 
@@ -3098,8 +3124,8 @@ Dependabot bump is being asked to do.
 3. **Random splits on overlapping labels.** Walk-forward only, purge at the
    label horizon, 60 s embargo (§6.2).
 4. **Uncounted multiple testing.** A ledger de-duplicated by (alpha, kind,
-   config, dataset) — 216 distinct configurations, 5156 looks — with a printed
-   expected-max-|t| yardstick of 4.135; FX08's t = 3.84 is called what it is.
+   config, dataset) — 293 distinct configurations, 5,358 looks at v1.14.0 — with a printed
+   expected-max-|t| yardstick of 4.144; FX08's t = 3.84 is called what it is.
    Regenerating the dataset did not reset the count, and neither did
    changing the default methods: the looks already taken are kept and the
    new ones added (§6.6). Since v1.5.0 the count is not only printed: the
@@ -3247,7 +3273,7 @@ lags: persistence, which is neither proof of a leak nor proof against
 one); then look at the
 data — a synthetic generator whose venues lean towards a shared efficient
 price makes microprice and OFI look clairvoyant at 1 s; and finally check
-the cost-adjusted IC (−0.024) and the P&L (−81.53 USD): still no money. A
+the cost-adjusted IC (−0.024) and the P&L (−82.84 USD): still no money. A
 number that survives all of that is a property of the data, stated as such,
 and the lifecycle's `paper_ic_tracking` gate still fails the alpha for
 diverging from research — correctly.
@@ -4383,7 +4409,7 @@ pre-registrations, with every docs number re-read. Splitting it this way
 keeps each release's claims checkable: v1.13 can be verified by "nothing
 moved", v1.14 by "everything moved for a stated reason".
 
-- **v1.13 (this release, hygiene and hardening):** LF artefacts, the O(1)
+- **v1.13 (hygiene and hardening, shipped):** LF artefacts, the O(1)
   order lookup, the 3.11/3.12 CI matrix and slow-test split, advisory
   mypy, hashed requirements and gitleaks; regulatory fee fields (default
   0), one markout reference convention, the auction entry cutoff, quoting
@@ -4393,12 +4419,50 @@ moved", v1.14 by "everything moved for a stated reason".
   event calendar; the required `governance` CI job, a merge procedure for
   research branches, signed approval for human lifecycle edges, a locked
   blackboard append and a stricter LLM numbers rule.
-- **v1.14 (in progress, correctness):** the causal row block, trailing
-  labels by default, day-clustered inference with an automatic bandwidth,
-  the data-mapping fixes, queue credit on MODIFY, feed latency, the risk
-  audit hash chain and a chained ledger.
-- **Later:** the 15c3-5 control set (it only means something once there is
-  a live gateway), archiving the frozen Java copy.
+- **v1.14 (correctness, shipped 2026-10-11):** the causal row block,
+  trailing labels by default, day-separated inference with an automatic
+  bandwidth, the time-shift leakage detector, one look per gate decision,
+  the data-mapping fixes, queue credit on MODIFY, opt-in feed latency and
+  routed exits, the risk audit hash chain, a chained ledger, maintainer
+  trust roots, blocking supply-chain audits, and the 15c3-5 control set.
+- **Later:** archiving the frozen Java copy, and switching the opt-in
+  execution options on in the v2 maker and quoting pre-registrations.
+
+The 15c3-5 controls were planned for "later" and shipped in v1.14 anyway.
+The argument for waiting was that a pre-trade check guarding a simulator
+protects nothing. The argument that won was cost: seven new checks pinned
+by goldens in three languages are cheap to add while the risk engine is
+being regenerated for the hash chain, and expensive to retrofit under a
+live gateway, where every change to a risk rule is a production change.
+
+**Three ideas from v1.14 worth keeping.**
+
+*A state change is not an event.* An ITCH execute arrives as two
+canonical events (EXECUTE, then TRADE) and a replace as two more (CANCEL,
+then ADD), each pair stamped with one nanosecond. Up to v1.13 the feature
+engine sampled the book after each event, so it saw a book with the old
+order gone and the new one not yet added: a state the market was never
+in. On the synthetic equity vector that phantom state was 409 of 2,000
+rows. The fix groups events by `(instrument, exchange_ts)` and samples
+once per group. The streaming MVP keeps the per-event rule, because a live
+consumer cannot know an event closes its group until the next one arrives;
+that is a stated difference, not an oversight.
+
+*A hash chain makes an edit visible, not impossible.* Each risk audit line
+carries the hash of the previous line, and the ledger carries a head over
+every entry's identity. Change one byte and every later link breaks. But
+someone who can rewrite the whole file can rebuild the chain, so the value
+of a chain is only as good as the place its head is copied to: the paper
+session's state file, git history on `main`, a pre-registration. The trust
+roots follow the same logic one level up: CI reads them from `main`, so a
+branch cannot add a key and vouch for it in the same change.
+
+*Causal means "known at decision time", including what you skip.* The old
+backtest skipped rows whose future label was invalid. That sounds like
+hygiene and is look-ahead: at 09:31:00 you do not know whether the quote
+at 09:31:01 will be valid. The v1.14 row block uses only decision-time
+state. The old figure is still reported beside the new one
+(`net_pnl_1x_cost_label_block`) so the size of the bias is on the page.
 
 **What happened to the studies.** The maker study was left to finish as
 registered; it will be reported with the fee, queue-credit, decomposition
@@ -4408,8 +4472,8 @@ continuing would have spent about twelve hours on a run that could not test
 its hypothesis. A v2 protocol in ticks will be pre-registered. AUC01 was
 already done; its holdout verdict (0 trades, not confirmed) stands, and
 the in-sample +19.4 bp now carries the cutoff and fitted-sign caveats. The
-next confirmatory round on new data (R7) must run on v1.14, or it would
-inherit every bias above.
+next confirmatory round on new data (R7) runs on v1.14, after the
+sessions are re-ingested under manifest x-version 2.
 
 **The lesson.** A review is most useful when it is allowed to say that a
 number you published is wrong, and when the fixes are sorted by what they
@@ -4429,6 +4493,8 @@ result first and then deciding would have been.
 
 Inside this repository, in suggested order:
 
+0. `docs/HOW_IT_WORKS.md` — the whole platform top-down in one sitting,
+   before any of the below.
 1. `docs/SPECIFICATION.md` — the governing spec; §32 is one paragraph and
    worth memorizing.
 2. `PLATFORM_CONVENTIONS.md` + `schemas/FORMAT.md` — how contracts get pinned.
@@ -4445,8 +4511,6 @@ Inside this repository, in suggested order:
    (C++/Rust/Java case study) especially.
 8. `cpp/include/iap/execution/execution.hpp` — the header comment is the
    best short document on deterministic fill modeling in the repo.
-0. `docs/HOW_IT_WORKS.md` — the whole platform top-down in one sitting,
-   before any of the below.
 9. `docs/MVP.md` — the loop end to end, the wiring review, the IC audit and
    the success-criteria table; then `docs/LIFECYCLE.md`,
    `docs/DECISION_TRACE.md` and `docs/DATA_MODEL.md` for the three
@@ -4459,6 +4523,8 @@ Inside this repository, in suggested order:
     `CHANGELOG.md` for what v1.3.0 fixed and what it leaves open, for
     the v1.4.0 dataset regeneration (§2.3), and for the v1.5.0 table of
     what each new default moved.
+11. `docs/ROADMAP.md` §3.8-3.10 and the v1.14.0 section of `CHANGELOG.md`
+    — the 2026-10-11 review, what v1.14 fixed and every number it moved.
 
 Classic external literature these designs draw on (find current editions):
 
@@ -4484,3 +4550,41 @@ Classic external literature these designs draw on (find current editions):
 Everything else is in the code — which, in this repository, is the point:
 every claim above is a test, a golden file, or a committed report you can
 rerun.
+
+## Glossary
+
+Terms as this repository uses them. Where a term has a wider meaning
+elsewhere, the entry gives the local one.
+
+| term | meaning here |
+|---|---|
+| adverse selection (AS) | for a passive fill, how far the mid moves against you after the fill, signed so that positive is a loss: `s * (m_future - m_fill) / p`, in bp. Measured per message or, since v1.14, per touch order (COOKBOOK 73) |
+| alpha | a scored signal with a fixed id (EQ01, FX11, ...), a horizon and an expected sign; not a strategy until it survives costs |
+| anchor | a git commit that contains a blackboard entry, proving the entry existed at that commit's time |
+| blackboard | `research/agents/blackboard.jsonl`, the append-only, hash-chained log of pre-registrations and findings |
+| Bonferroni threshold | the \|t\| a result must reach given the number of looks taken so far; it rises as the ledger grows |
+| bundle (method bundle) | a named set of research rules: `v2` (default), `v3`, `v4`, `legacy_v1`, and since v1.14 the frozen `*_v113` copies |
+| CANDIDATE | the second lifecycle state: the alpha passed the research checks it can pass on bundled data. Not promoted |
+| coalescing | treating all events of one instrument with the same `exchange_ts` as one state change (v1.14) |
+| decision trace | one `DecisionTrace` record per trading decision, from signal to TCA, written as canonical JSONL with a stream digest |
+| embargo | rows removed after a test fold so that labels overlapping the fold cannot leak into training |
+| fail-closed | on missing, NaN or out-of-range input, the risk engine rejects rather than allows |
+| FROZEN copy | a duplicated implementation kept for parity and changed only with a `POLYGLOT-OVERRIDE` line ([docs/POLYGLOT.md](docs/POLYGLOT.md)) |
+| gate | a pass/fail check in the promotion report (significance, stability, cost, leakage, ...). An alpha is promoted only if every gate passes |
+| golden | a committed expected-output file that every language must reproduce, byte for byte or within a stated tolerance |
+| HAC | heteroskedasticity- and autocorrelation-consistent standard errors (Newey-West). Since v1.14 the bandwidth is chosen automatically and no lag product spans two session days |
+| holdout | data set aside and only scored against pre-registered hypotheses. Once looked at, it is spent |
+| IC | information coefficient: the rank correlation between a signal and the next-horizon return |
+| ledger (look ledger) | `research/experiments.json`: every statistic the research has computed, counted as looks. A hash chain since v1.14 |
+| look | one statistic computed and seen. Since v1.14 one look per gate decision |
+| markout | the mid some time after a fill, relative to the fill, as a measure of execution quality |
+| OFI | order-flow imbalance: signed changes in best bid and ask size (Cont, Kukanov and Stoikov) |
+| PBO | probability of backtest overfitting, from combinatorially symmetric cross-validation |
+| pre-registration | a signed blackboard entry naming alpha, horizon, sign and pass rule before the data is scored |
+| PROMOTE | the verdict that an alpha passed every gate. No alpha has received it |
+| queue position (`ahead_qty`) | the displayed size ahead of a resting simulated order at its price level; cancels and, since v1.14, size-reducing MODIFYs ahead of it reduce it |
+| row block | which feature rows the backtest is not allowed to trade on. Since v1.14 `causal`: decided from decision-time state only |
+| stats revision | the tag (`v1.14`) on a ledger identity, so that a rerun under new rules is a new look |
+| time-shift leakage test | v1.14 check: pair each label with the score from a quarter-horizon earlier. A causal signal keeps most of its IC; one that collapses is suspected of look-ahead and flagged for review. Too few pairs reports `null`, never a pass. In the #88 regeneration FX11 failed it (IC 0.108 to 0.027); the review has not found a leak |
+| touch order | a resting simulated order at the best price, the unit of a v1.14 per-order markout |
+| trust root | a maintainer key in `research/agents/trust_roots.json`, read from `main`, that must sign the agent key registry |

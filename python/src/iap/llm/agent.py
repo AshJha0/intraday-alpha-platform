@@ -205,7 +205,8 @@ class Session:
         return self.workspace / SESSIONS_RELPATH / self.session_id
 
     def _signed(self, op: str, args: dict[str, Any]) -> dict[str, str]:
-        return sign(self.private_key, self.agent, op, args)
+        # bound to the board head + board id (ed25519-v2, G-P1-4)
+        return sign(self.private_key, self.agent, op, args, **self.broker.request_context())
 
     # -- tools ---------------------------------------------------------
     def list_alphas(self) -> dict[str, Any]:

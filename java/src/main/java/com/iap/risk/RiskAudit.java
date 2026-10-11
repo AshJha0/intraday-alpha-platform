@@ -8,7 +8,8 @@ import com.iap.config.Json;
 import com.iap.monitoring.MetricsRegistry;
 
 /**
- * Audit-log emission and full-state snapshot/restore (schema x-version 1),
+ * Audit-log emission (hash-chained, G-P0-1) and full-state snapshot/restore
+ * (schema x-version 2),
  * split out of {@code RiskEngine} verbatim — the Java analogue of the Rust
  * port's {@code impl RiskEngine} continued in a separate file
  * ({@code rust/risk/src/audit.rs}). {@code RiskEngine}'s public
@@ -29,7 +30,23 @@ final class RiskAudit {
 
     static void emit(RiskEngine e, RiskEvent ev) {
         e.metrics.counter("risk_events_total").inc();
-        e.audit.add(ev);
+        e.auditSeq++;
+        RiskEvent chained = ev.chained(e.auditSeq, e.auditHead);
+        e.auditHead = RiskEvent.lineSha256(chained.toJsonLine());
+        e.audit.add(chained);
+    }
+
+    private static void rateMap(StringBuilder sb, Map<String, RiskEngine.Rate> m) {
+        boolean first = true;
+        for (Map.Entry<String, RiskEngine.Rate> re : m.entrySet()) {
+            sb.append(first ? "" : ",");
+            first = false;
+            jsonStr(sb, re.getKey());
+            sb.append(":{\"last_ts\":").append(re.getValue().lastTs)
+                    .append(",\"tokens\":");
+            jsonDouble(sb, re.getValue().tokens);
+            sb.append('}');
+        }
     }
 
     private static void jsonStr(StringBuilder sb, String s) {
@@ -63,6 +80,15 @@ final class RiskAudit {
                     .append(",\"tokens\":");
             jsonDouble(sb, be.getValue().tokens);
             sb.append('}');
+        }
+        sb.append("},\"cancel_buckets\":{");
+        rateMap(sb, e.cancelBuckets);
+        sb.append("},\"executed\":{");
+        first = true;
+        for (Map.Entry<Long, Long> xe : e.executed.entrySet()) {
+            sb.append(first ? "" : ",").append('"').append(xe.getKey())
+                    .append("\":").append(xe.getValue());
+            first = false;
         }
         sb.append("},\"kill_global\":").append(e.killGlobal);
         sb.append(",\"kill_instruments\":{");
@@ -129,6 +155,13 @@ final class RiskAudit {
                     .append(",\"ts\":").append(m.ts).append('}');
             first = false;
         }
+        sb.append("},\"market_volume\":{");
+        first = true;
+        for (Map.Entry<Long, Long> ve : e.marketVolume.entrySet()) {
+            sb.append(first ? "" : ",").append('"').append(ve.getKey())
+                    .append("\":").append(ve.getValue());
+            first = false;
+        }
         sb.append("},\"open\":{");
         first = true;
         for (Map.Entry<Long, RiskEngine.OpenOrder> oe : e.open.entrySet()) {
@@ -138,7 +171,10 @@ final class RiskAudit {
                     .append("\":{\"instrument_id\":").append(o.instrumentId)
                     .append(",\"price_ticks\":").append(o.priceTicks)
                     .append(",\"qty\":").append(o.qty)
-                    .append(",\"side\":").append(o.side).append('}');
+                    .append(",\"side\":").append(o.side)
+                    .append(",\"strategy_id\":");
+            jsonStr(sb, o.strategyId);
+            sb.append('}');
             first = false;
         }
         sb.append("},\"positions\":{");
@@ -171,7 +207,17 @@ final class RiskAudit {
                     .append(se.getValue()).append(']');
             first = false;
         }
-        sb.append("],\"venues_down\":{");
+        sb.append("],\"venue_buckets\":{");
+        first = true;
+        for (Map.Entry<Integer, RiskEngine.Rate> vb : e.venueBuckets.entrySet()) {
+            sb.append(first ? "" : ",").append('"').append(vb.getKey())
+                    .append("\":{\"last_ts\":").append(vb.getValue().lastTs)
+                    .append(",\"tokens\":");
+            jsonDouble(sb, vb.getValue().tokens);
+            sb.append('}');
+            first = false;
+        }
+        sb.append("},\"venues_down\":{");
         first = true;
         for (Map.Entry<Integer, Boolean> ve : e.venuesDown.entrySet()) {
             sb.append(first ? "" : ",").append('"').append(ve.getKey())
@@ -239,7 +285,11 @@ final class RiskAudit {
      */
     static RiskEngine restore(RiskLimits limits,
             Map<Long, InstrumentRef> instruments, Map<String, Object> snap,
-            long ts, MetricsRegistry metrics) {
+            long ts, MetricsRegistry metrics, long chainSeq, String chainHead) {
+        if (chainHead != null && !chainHead.matches("[0-9a-f]{64}")) {
+            throw new IllegalArgumentException(
+                    "audit chain head must be 64 lowercase hex digits");
+        }
         if (snapLong(snap.get("x-version"), "x-version") != RiskEngine.SNAPSHOT_VERSION) {
             throw bad("x-version");
         }
@@ -304,6 +354,7 @@ final class RiskAudit {
             r.side = (int) side;
             r.priceTicks = snapLong(o.get("price_ticks"), "open.price_ticks");
             r.qty = snapLong(o.get("qty"), "open.qty");
+            r.strategyId = snapStr(o.get("strategy_id"), "open.strategy_id");
             long id;
             try {
                 id = Long.parseUnsignedLong(e.getKey());
@@ -341,6 +392,36 @@ final class RiskAudit {
                 "loss_override_strategy").entrySet()) {
             eng.lossOverrideStrategy.put(e.getKey(),
                     snapDouble(e.getValue(), "loss_override_strategy"));
+        }
+        for (Map.Entry<String, Object> e
+                : snapObj(snap.get("venue_buckets"), "venue_buckets").entrySet()) {
+            Map<String, Object> b = snapObj(e.getValue(), "venue_buckets");
+            RiskEngine.Rate rt = new RiskEngine.Rate();
+            rt.tokens = snapDouble(b.get("tokens"), "venue_buckets.tokens");
+            rt.lastTs = snapLong(b.get("last_ts"), "venue_buckets.last_ts");
+            eng.venueBuckets.put(parseU16(e.getKey(), "venue_buckets"), rt);
+        }
+        for (Map.Entry<String, Object> e
+                : snapObj(snap.get("cancel_buckets"), "cancel_buckets").entrySet()) {
+            Map<String, Object> b = snapObj(e.getValue(), "cancel_buckets");
+            RiskEngine.Rate rt = new RiskEngine.Rate();
+            rt.tokens = snapDouble(b.get("tokens"), "cancel_buckets.tokens");
+            rt.lastTs = snapLong(b.get("last_ts"), "cancel_buckets.last_ts");
+            eng.cancelBuckets.put(e.getKey(), rt);
+        }
+        for (Map.Entry<String, Object> e
+                : snapObj(snap.get("market_volume"), "market_volume").entrySet()) {
+            eng.marketVolume.put(parseU32(e.getKey(), "market_volume"),
+                    snapLong(e.getValue(), "market_volume"));
+        }
+        for (Map.Entry<String, Object> e
+                : snapObj(snap.get("executed"), "executed").entrySet()) {
+            eng.executed.put(parseU32(e.getKey(), "executed"),
+                    snapLong(e.getValue(), "executed"));
+        }
+        if (chainHead != null) {
+            eng.auditSeq = chainSeq;
+            eng.auditHead = chainHead;
         }
         eng.refreshPnlGauges();
         int nPos = 0;

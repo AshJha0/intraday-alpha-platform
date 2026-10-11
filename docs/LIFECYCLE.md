@@ -3,7 +3,7 @@
 The seven-state promotion machine every flagship alpha moves through, the
 gate at every edge, the evidence each gate reads, the two artefacts the
 service writes, and the honest result of running it over the bundled
-research: **24 alphas at CANDIDATE, 0 beyond, because nothing survives 1×
+research: **23 alphas at CANDIDATE, 0 beyond, because nothing survives 1×
 modelled costs.** Since v1.5.0 the machine runs under the corrected rules by
 default — the significance gate reads the multiple-testing threshold the
 evidence carries, and retirement follows a CUSUM of the rolling-IC shortfall
@@ -442,9 +442,9 @@ and the registry (now x-version 2) and the log were rebuilt with
 `bootstrap --force` from the `v2` reports. The bootstrap event time did not
 move.
 
-Result on the current dataset (`116b7787…`) under the v1.5.0 default
-methods — **24 CANDIDATE, 0 VALIDATING, 0 PROMOTE**
-(report verdicts: 0 PROMOTE / 11 ITERATE / 13 REJECT); every alpha fails
+Result on the current dataset (`116b7787…`) under the v1.14.0
+methods — **23 CANDIDATE, 0 VALIDATING, 0 PROMOTE**
+(report verdicts at v1.14.0: 0 PROMOTE / 12 ITERATE / 12 REJECT; 0 / 11 / 13 under v1.5.0); every alpha fails
 `net_pnl_after_costs` and `capacity`:
 
 | alpha | report verdict | state | failed gates (CANDIDATE → VALIDATING) |
@@ -676,6 +676,18 @@ changed.
   RETIRED alpha keeps trading at full size and `AlphaLifecycleRetired` pages
   a human. Making RETIRED an allocation gate is backlog issue `L04`
   (docs/EPICS.md). The state machine here decides *state*, not *size*.
+
+### 8.1 v1.14 and the lifecycle
+
+The state machine, its 17 edges and 20 gates did not change in v1.14. The
+evidence the research gates read did: validation reports are computed
+under the v1.14 statistics (docs/RESEARCH_VALIDITY.md §4b), and an alpha
+that fails the new time-shift leakage test is held in RESEARCH until a
+person reviews it. The test flags; it does not prove a leak, so the hold
+is a request for review, not a rejection. Lifecycle entries selected from
+a superseded bundle are ranked below current ones rather than discarded,
+so the bootstrap still finds evidence for every alpha. Human edges still
+need a signed approval (GOVERNANCE.md).
 
 ## 9. Where the pieces are pinned
 

@@ -608,12 +608,21 @@ void ExecutionSimulator::on_event(const MarketEvent& ev) {
             }
         } else if (et == EventType::MODIFY) {
             for (const auto& [id, before] : level_before) {
-                const ChildOrder& o = orders_.at(id);
-                if (real_id &&
-                    book->level_qty(o.side == 0 ? Side::BID : Side::ASK,
-                                    o.limit_ticks) > before) {
+                ChildOrder& o = orders_.at(id);
+                const std::int64_t after = book->level_qty(
+                    o.side == 0 ? Side::BID : Side::ASK, o.limit_ticks);
+                const auto bit = behind_.find(id);
+                const bool is_behind = bit != behind_.end() &&
+                                       bit->second.count(ev.order_id) != 0;
+                if (real_id && after > before) {
                     // A size increase moves the order to the level's tail.
                     behind_[id].insert(ev.order_id);
+                } else if (after < before && real_id && pre_open &&
+                           !is_behind) {
+                    // X-P1-1: a size decrease keeps the order's priority; if
+                    // it is ahead of us the removed shares credit our queue
+                    // position exactly like a CANCEL.
+                    o.ahead_qty -= std::min(o.ahead_qty, before - after);
                 }
             }
         } else if (et == EventType::ADD) {

@@ -1,5 +1,5 @@
 {
-  "description": "Feature-engine golden checkpoints on the ANOMALY vectors (arrival order: duplicates, invalid sides, payload drops, sequence gaps + SNAPSHOT recovery, venue sequence reset, HALT + re-opening auction, multi-venue staleness, exchange_ts regressions).  Pins API_FEATURES section 2: only APPLIED events feed rolling state, ts regressions are dropped+counted, a stale->fresh recovery resets rolling state and re-anchors warmup, EPS-guarded ratios stay invalid on a zero denominator.  Feature set = the native-45 sub-vector every port implements; value is null when valid is false.  Tolerance: abs 1e-9 / rel 1e-9.",
+  "description": "Feature-engine golden checkpoints on the ANOMALY vectors (arrival order: duplicates, invalid sides, payload drops, sequence gaps + SNAPSHOT recovery, venue sequence reset, HALT + re-opening auction, multi-venue staleness, exchange_ts regressions).  Pins API_FEATURES section 2: only APPLIED events feed rolling state, ts regressions are dropped+counted, a stale->fresh recovery resets rolling state and re-anchors warmup, EPS-guarded ratios stay invalid on a zero denominator.  Coalesced engine (v1.14, D-P1-1): one refresh / row per (instrument, exchange_ts), checkpoints on group ends.  Feature set = the native-45 sub-vector every port implements; value is null when valid is false.  Tolerance: abs 1e-9 / rel 1e-9.",
   "registry_hash": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
   "tolerance": {
     "abs": 1e-09,
@@ -201,11 +201,11 @@
             "valid": true
           },
           "rvol_w10s_v1": {
-            "value": 9.128671239867252e-05,
+            "value": 0.00012909890606627037,
             "valid": true
           },
           "rvol_w1m_v1": {
-            "value": 3.7267644278824384e-05,
+            "value": 5.270440770230971e-05,
             "valid": true
           },
           "rvol_w5m_v1": {
@@ -233,15 +233,15 @@
             "valid": true
           },
           "ofi_norm_l5_w1s_v1": {
-            "value": 0.09108159392789371,
+            "value": 0.08988764044943819,
             "valid": true
           },
           "ofi_norm_l5_w5s_v1": {
-            "value": 0.011385199240986714,
+            "value": 0.011235955056179773,
             "valid": true
           },
           "ret_vol_adj_10s_v1": {
-            "value": -10.954450799109386,
+            "value": -7.74596654544484,
             "valid": true
           },
           "vol_regime_ratio_v1": {
@@ -595,7 +595,7 @@
             "valid": true
           },
           "rvol_w5m_v1": {
-            "value": 0.00014900316197854268,
+            "value": 0.00014713001358244667,
             "valid": true
           },
           "ret_simple_1s_v1": {
@@ -615,15 +615,15 @@
             "valid": true
           },
           "ofi_norm_l1_w1s_v1": {
-            "value": -0.10526315789473673,
+            "value": -0.0999999999999999,
             "valid": true
           },
           "ofi_norm_l5_w1s_v1": {
-            "value": -0.12765957446808507,
+            "value": -0.12499999999999996,
             "valid": true
           },
           "ofi_norm_l5_w5s_v1": {
-            "value": -0.12765957446808507,
+            "value": -0.12499999999999996,
             "valid": true
           },
           "ret_vol_adj_10s_v1": {
@@ -631,7 +631,7 @@
             "valid": true
           },
           "vol_regime_ratio_v1": {
-            "value": 0.1770554486436804,
+            "value": 0.17930958509971343,
             "valid": true
           }
         }
@@ -780,15 +780,15 @@
             "valid": true
           },
           "rvol_w10s_v1": {
-            "value": 7.631088724666563e-12,
+            "value": 3.9852061127397324e-12,
             "valid": true
           },
           "rvol_w1m_v1": {
-            "value": 7.902703858340439e-05,
+            "value": 7.902703858340443e-05,
             "valid": true
           },
           "rvol_w5m_v1": {
-            "value": 7.452882782816342e-05,
+            "value": 7.992523207786978e-05,
             "valid": true
           },
           "ret_simple_1s_v1": {
@@ -824,7 +824,7 @@
             "valid": true
           },
           "vol_regime_ratio_v1": {
-            "value": 1.0603552990965714,
+            "value": 0.9887620659974772,
             "valid": true
           }
         }
@@ -973,15 +973,15 @@
             "valid": true
           },
           "rvol_w10s_v1": {
-            "value": 7.970412225479465e-12,
+            "value": 4.601719643932854e-12,
             "valid": true
           },
           "rvol_w1m_v1": {
-            "value": 2.6398005382653e-05,
+            "value": 2.6398005382653267e-05,
             "valid": true
           },
           "rvol_w5m_v1": {
-            "value": 7.928736751718987e-05,
+            "value": 7.928736751718993e-05,
             "valid": true
           },
           "ret_simple_1s_v1": {
@@ -1017,7 +1017,7 @@
             "valid": true
           },
           "vol_regime_ratio_v1": {
-            "value": 0.3329408690985852,
+            "value": 0.3329408690985884,
             "valid": true
           }
         }
@@ -1166,15 +1166,15 @@
             "valid": true
           },
           "rvol_w10s_v1": {
-            "value": 6.478085980211784e-05,
+            "value": 6.478085980211751e-05,
             "valid": true
           },
           "rvol_w1m_v1": {
-            "value": 2.6446675268993605e-05,
+            "value": 2.6446675268993873e-05,
             "valid": true
           },
           "rvol_w5m_v1": {
-            "value": 7.935196927599755e-05,
+            "value": 7.93519692759976e-05,
             "valid": true
           },
           "ret_simple_1s_v1": {
@@ -1206,11 +1206,11 @@
             "valid": true
           },
           "ret_vol_adj_10s_v1": {
-            "value": 7.745966399524846,
+            "value": 7.745966399524767,
             "valid": true
           },
           "vol_regime_ratio_v1": {
-            "value": 0.3332831582758219,
+            "value": 0.33328315827582505,
             "valid": true
           }
         }
@@ -1953,7 +1953,7 @@
             "valid": true
           },
           "rvol_w5m_v1": {
-            "value": 7.514371523491364e-07,
+            "value": 7.514371523491366e-07,
             "valid": true
           },
           "ret_simple_1s_v1": {
@@ -1977,11 +1977,11 @@
             "valid": true
           },
           "ofi_norm_l5_w1s_v1": {
-            "value": -0.0923076923076909,
+            "value": -0.09374999999999854,
             "valid": true
           },
           "ofi_norm_l5_w5s_v1": {
-            "value": -0.0923076923076909,
+            "value": -0.09374999999999854,
             "valid": true
           },
           "ret_vol_adj_10s_v1": {
@@ -1989,14 +1989,14 @@
             "valid": true
           },
           "vol_regime_ratio_v1": {
-            "value": 1.5811294501849316,
+            "value": 1.5811294501849311,
             "valid": true
           }
         }
       },
-      "240": {
+      "241": {
         "timestamp": 1787541127992316107,
-        "events_processed": 240,
+        "events_processed": 241,
         "events_dropped": 1,
         "ts_regressions_dropped": 0,
         "oversized_qty_dropped": 0,
@@ -2006,67 +2006,67 @@
         "book_ok": true,
         "features": {
           "ofi_l1_w1s_v1": {
-            "value": -2.0,
+            "value": 9.0,
             "valid": true
           },
           "ofi_l1_w5s_v1": {
-            "value": -2.0,
+            "value": 9.0,
             "valid": true
           },
           "ofi_l1_w30s_v1": {
-            "value": -2.0,
+            "value": 9.0,
             "valid": true
           },
           "ofi_l3_w1s_v1": {
-            "value": 13.0,
+            "value": 16.0,
             "valid": true
           },
           "ofi_l3_w5s_v1": {
-            "value": 13.0,
+            "value": 16.0,
             "valid": true
           },
           "ofi_l3_w30s_v1": {
-            "value": 13.0,
+            "value": 16.0,
             "valid": true
           },
           "ofi_l5_w1s_v1": {
-            "value": 13.0,
+            "value": 16.0,
             "valid": true
           },
           "ofi_l5_w5s_v1": {
-            "value": 13.0,
+            "value": 16.0,
             "valid": true
           },
           "ofi_l5_w30s_v1": {
-            "value": 13.0,
+            "value": 16.0,
             "valid": true
           },
           "ofi_l10_w1s_v1": {
-            "value": 13.0,
+            "value": 16.0,
             "valid": true
           },
           "ofi_l10_w5s_v1": {
-            "value": 13.0,
+            "value": 16.0,
             "valid": true
           },
           "ofi_l10_w30s_v1": {
-            "value": 13.0,
+            "value": 16.0,
             "valid": true
           },
           "imbalance_l1_v1": {
-            "value": -0.2631578947368421,
+            "value": 0.037037037037037035,
             "valid": true
           },
           "imbalance_l3_v1": {
-            "value": 0.3142857142857143,
+            "value": 0.373134328358209,
             "valid": true
           },
           "imbalance_l5_v1": {
-            "value": 0.3142857142857143,
+            "value": 0.373134328358209,
             "valid": true
           },
           "imbalance_l10_v1": {
-            "value": 0.3142857142857143,
+            "value": 0.373134328358209,
             "valid": true
           },
           "mid_price_v1": {
@@ -2074,11 +2074,11 @@
             "valid": true
           },
           "microprice_v1": {
-            "value": 1.0866436842105263,
+            "value": 1.0866451851851853,
             "valid": true
           },
           "micro_mid_dev_bps_v1": {
-            "value": -0.012108733522184178,
+            "value": 0.001704192125177941,
             "valid": true
           },
           "spread_ticks_v1": {
@@ -2094,7 +2094,7 @@
             "valid": true
           },
           "depth_ask_l1_v1": {
-            "value": 24.0,
+            "value": 13.0,
             "valid": true
           },
           "depth_bid_l5_v1": {
@@ -2102,7 +2102,7 @@
             "valid": true
           },
           "depth_ask_l5_v1": {
-            "value": 24.0,
+            "value": 21.0,
             "valid": true
           },
           "depth_bid_l10_v1": {
@@ -2110,7 +2110,7 @@
             "valid": true
           },
           "depth_ask_l10_v1": {
-            "value": 24.0,
+            "value": 21.0,
             "valid": true
           },
           "signed_volume_w1s_v1": {
@@ -2138,15 +2138,15 @@
             "valid": false
           },
           "rvol_w10s_v1": {
-            "value": 1.4550680930486684e-06,
+            "value": 1.4550680930486689e-06,
             "valid": true
           },
           "rvol_w1m_v1": {
-            "value": 1.0288932498496833e-06,
+            "value": 1.3282966962481052e-06,
             "valid": true
           },
           "rvol_w5m_v1": {
-            "value": 1.2460706303151035e-06,
+            "value": 1.6802027007702054e-06,
             "valid": true
           },
           "ret_simple_1s_v1": {
@@ -2166,23 +2166,23 @@
             "valid": true
           },
           "ofi_norm_l1_w1s_v1": {
-            "value": -0.05263157894736703,
+            "value": 0.333333333333321,
             "valid": true
           },
           "ofi_norm_l5_w1s_v1": {
-            "value": 0.18571428571428308,
+            "value": 0.23880597014925017,
             "valid": true
           },
           "ofi_norm_l5_w5s_v1": {
-            "value": 0.18571428571428308,
+            "value": 0.23880597014925017,
             "valid": true
           },
           "ret_vol_adj_10s_v1": {
-            "value": 4.472111031181138,
+            "value": 3.4640798803374224,
             "valid": true
           },
           "vol_regime_ratio_v1": {
-            "value": 0.8257095537834365,
+            "value": 0.7905569399943673,
             "valid": true
           }
         }
@@ -2335,11 +2335,11 @@
             "valid": true
           },
           "rvol_w1m_v1": {
-            "value": 5.940454617932853e-07,
+            "value": 5.940454617932855e-07,
             "valid": true
           },
           "rvol_w5m_v1": {
-            "value": 8.811025966751293e-07,
+            "value": 1.0289036654692601e-06,
             "valid": true
           },
           "ret_simple_1s_v1": {
@@ -2363,11 +2363,11 @@
             "valid": true
           },
           "ofi_norm_l5_w1s_v1": {
-            "value": -0.130081300813006,
+            "value": -0.12698412698412495,
             "valid": true
           },
           "ofi_norm_l5_w5s_v1": {
-            "value": -0.130081300813006,
+            "value": -0.12698412698412495,
             "valid": true
           },
           "ret_vol_adj_10s_v1": {
@@ -2375,7 +2375,7 @@
             "valid": true
           },
           "vol_regime_ratio_v1": {
-            "value": 0.6742061478751574,
+            "value": 0.5773571466141179,
             "valid": true
           }
         }
@@ -2524,7 +2524,7 @@
             "valid": false
           },
           "rvol_w10s_v1": {
-            "value": 1.4550145328967318e-06,
+            "value": 1.4550145328967384e-06,
             "valid": true
           },
           "rvol_w1m_v1": {
@@ -2532,7 +2532,7 @@
             "valid": true
           },
           "rvol_w5m_v1": {
-            "value": 1.2459992236041158e-06,
+            "value": 1.5489812554578253e-06,
             "valid": true
           },
           "ret_simple_1s_v1": {
@@ -2552,15 +2552,15 @@
             "valid": true
           },
           "ofi_norm_l1_w1s_v1": {
-            "value": -0.5866666666666355,
+            "value": -0.4888888888888672,
             "valid": true
           },
           "ofi_norm_l5_w1s_v1": {
-            "value": 0.12244897959183423,
+            "value": 0.1176470588235271,
             "valid": true
           },
           "ofi_norm_l5_w5s_v1": {
-            "value": 0.12244897959183423,
+            "value": 0.1176470588235271,
             "valid": true
           },
           "ret_vol_adj_10s_v1": {
@@ -2568,7 +2568,7 @@
             "valid": true
           },
           "vol_regime_ratio_v1": {
-            "value": 1.0659975092571679,
+            "value": 0.85748763758645,
             "valid": true
           }
         }
@@ -2745,15 +2745,15 @@
             "valid": true
           },
           "ofi_norm_l1_w1s_v1": {
-            "value": -0.16869300911853158,
+            "value": -0.165644171779132,
             "valid": true
           },
           "ofi_norm_l5_w1s_v1": {
-            "value": 0.19182027649769176,
+            "value": 0.1898066783831243,
             "valid": true
           },
           "ofi_norm_l5_w5s_v1": {
-            "value": 0.19182027649769176,
+            "value": 0.1898066783831243,
             "valid": true
           },
           "ret_vol_adj_10s_v1": {

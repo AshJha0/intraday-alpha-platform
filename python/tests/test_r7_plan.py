@@ -127,7 +127,7 @@ def test_record_sampling_cli_writes_dataset_json(tmp_path, capsys):
     ds.mkdir()
     sessions = {d: {} for d in ("2025-12-08", "2025-12-09", "2025-12-10", "2026-06-12")}
     (ds / "dataset.json").write_text(
-        json.dumps({"x-version": 1, "kind": "real", "dataset_version": "v", "sessions": sessions})
+        json.dumps({"x-version": 2, "kind": "real", "dataset_version": "v", "sessions": sessions})
     )
     rc = md_main(["record-sampling", "--dataset-dir", str(ds), "--n", "3", "--seed", "7"])
     assert rc == 0

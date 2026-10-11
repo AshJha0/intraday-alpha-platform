@@ -3,6 +3,8 @@ name = "contracts"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
 description = "IAP cross-language contracts: canonical JSON (Python json.dumps parity), SHA-256, trace ids, DecisionTrace records, JSONL trace sink + digest, explain()"
 
 [dependencies]

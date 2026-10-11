@@ -1,5 +1,5 @@
 {
-  "description": "Feature-engine golden checkpoints: representative feature values (every family) after applying the first N events of each golden vector with emission cadence = every event. value is null when valid is false. Tolerance: abs 1e-9 / rel 1e-9. Validated against independent brute-force pandas recomputation before writing.",
+  "description": "Feature-engine golden checkpoints: representative feature values (every family) after applying the first N events of each golden vector with emission cadence = every event, same-timestamp events coalesced (v1.14, D-P1-1: one refresh / row per (instrument, exchange_ts); every checkpoint is the last event of its timestamp group). value is null when valid is false. Tolerance: abs 1e-9 / rel 1e-9. Validated against independent brute-force pandas recomputation before writing.",
   "registry_hash": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
   "registered_count": 205,
   "tolerance": {
@@ -10,7 +10,7 @@
     "vector": "events_eq_mbo.jsonl",
     "instrument_id": 1,
     "checkpoints": {
-      "500": {
+      "501": {
         "timestamp": 1787579830566121437,
         "features": {
           "ret_simple_5s_v1": {
@@ -90,12 +90,12 @@
             "valid": true
           },
           "signed_volume_w1m_v1": {
-            "value": 200.0,
+            "value": 100.0,
             "valid": true
           },
           "trade_imbalance_w10s_v1": {
-            "value": null,
-            "valid": false
+            "value": -1.0,
+            "valid": true
           },
           "cancel_intensity_w10s_v1": {
             "value": 0.3,
@@ -110,11 +110,11 @@
             "valid": true
           },
           "effective_spread_bps_w1m_v1": {
-            "value": 28.592828801997957,
+            "value": 28.588936767858975,
             "valid": true
           },
           "participation_w1m_v1": {
-            "value": 0.04406364749082007,
+            "value": 0.05447941888619854,
             "valid": true
           },
           "resiliency_halflife_v1": {
@@ -142,7 +142,7 @@
             "valid": true
           },
           "norm_spread_m5_v1": {
-            "value": 1.2417584458619193,
+            "value": 1.2277728920535658,
             "valid": true
           },
           "ref_ret_1s_v1": {
@@ -182,7 +182,7 @@
             "valid": true
           },
           "vol_regime_ratio_v1": {
-            "value": 1.6899878752804744,
+            "value": 1.689987875280475,
             "valid": true
           },
           "half_spread_cost_bps_v1": {
@@ -303,7 +303,7 @@
             "valid": true
           },
           "effective_spread_bps_w1m_v1": {
-            "value": 12.404382881950141,
+            "value": 12.404382881950127,
             "valid": true
           },
           "participation_w1m_v1": {
@@ -335,7 +335,7 @@
             "valid": true
           },
           "norm_spread_m5_v1": {
-            "value": 0.17603557421199337,
+            "value": 0.1765096302742194,
             "valid": true
           },
           "ref_ret_1s_v1": {
@@ -375,7 +375,7 @@
             "valid": true
           },
           "vol_regime_ratio_v1": {
-            "value": 0.3782250441036435,
+            "value": 0.3771500558049122,
             "valid": true
           },
           "half_spread_cost_bps_v1": {
@@ -396,7 +396,7 @@
           }
         }
       },
-      "1500": {
+      "1501": {
         "timestamp": 1787583385211361810,
         "features": {
           "ret_simple_5s_v1": {
@@ -476,12 +476,12 @@
             "valid": true
           },
           "signed_volume_w1m_v1": {
-            "value": 100.0,
+            "value": 400.0,
             "valid": true
           },
           "trade_imbalance_w10s_v1": {
-            "value": null,
-            "valid": false
+            "value": 1.0,
+            "valid": true
           },
           "cancel_intensity_w10s_v1": {
             "value": 0.0,
@@ -496,11 +496,11 @@
             "valid": true
           },
           "effective_spread_bps_w1m_v1": {
-            "value": 20.61006560034144,
+            "value": 22.673622909764717,
             "valid": true
           },
           "participation_w1m_v1": {
-            "value": 0.09633027522935778,
+            "value": 0.17727272727272722,
             "valid": true
           },
           "resiliency_halflife_v1": {
@@ -516,7 +516,7 @@
             "valid": true
           },
           "vol_ratio_w10s_w1m_v1": {
-            "value": 0.0,
+            "value": 5.576745232344049e-09,
             "valid": true
           },
           "minute_of_day_v1": {
@@ -528,7 +528,7 @@
             "valid": true
           },
           "norm_spread_m5_v1": {
-            "value": 0.6286751942936577,
+            "value": 0.6782262936914697,
             "valid": true
           },
           "ref_ret_1s_v1": {
@@ -568,7 +568,7 @@
             "valid": true
           },
           "vol_regime_ratio_v1": {
-            "value": 1.7735228045349538,
+            "value": 1.7735228045349547,
             "valid": true
           },
           "half_spread_cost_bps_v1": {
@@ -580,11 +580,11 @@
             "valid": true
           },
           "alpha_decay_proxy_v1": {
-            "value": 0.0,
+            "value": 5.576745232344049e-09,
             "valid": true
           },
           "urgency_score_v1": {
-            "value": 0.0,
+            "value": 2.7883726161720245e-10,
             "valid": true
           }
         }
@@ -689,11 +689,11 @@
             "valid": true
           },
           "effective_spread_bps_w1m_v1": {
-            "value": 16.481252575195434,
+            "value": 16.48125257519522,
             "valid": true
           },
           "participation_w1m_v1": {
-            "value": 0.011285266457680248,
+            "value": 0.011235955056179773,
             "valid": true
           },
           "resiliency_halflife_v1": {
@@ -701,15 +701,15 @@
             "valid": false
           },
           "rvol_w1m_v1": {
-            "value": 5.947282366798204e-05,
+            "value": 2.659376770609931e-05,
             "valid": true
           },
           "range_bps_w1m_v1": {
-            "value": 2.0601565718994643,
+            "value": 0.0,
             "valid": true
           },
           "vol_ratio_w10s_w1m_v1": {
-            "value": 0.0,
+            "value": 3.460750294393171e-07,
             "valid": true
           },
           "minute_of_day_v1": {
@@ -721,7 +721,7 @@
             "valid": true
           },
           "norm_spread_m5_v1": {
-            "value": 1.2778216258842021,
+            "value": 1.2064004666606405,
             "valid": true
           },
           "ref_ret_1s_v1": {
@@ -753,15 +753,15 @@
             "valid": true
           },
           "trend_score_w1m_v1": {
-            "value": -0.44715831548263185,
+            "value": -0.9999999951454636,
             "valid": true
           },
           "meanrev_score_w1m_v1": {
-            "value": -0.999999999998,
-            "valid": true
+            "value": null,
+            "valid": false
           },
           "vol_regime_ratio_v1": {
-            "value": 0.3798951179153017,
+            "value": 0.17186931332989533,
             "valid": true
           },
           "half_spread_cost_bps_v1": {
@@ -773,11 +773,11 @@
             "valid": true
           },
           "alpha_decay_proxy_v1": {
-            "value": 0.0,
+            "value": 3.460750294393171e-07,
             "valid": true
           },
           "urgency_score_v1": {
-            "value": 0.0,
+            "value": 2.1065436574567128e-08,
             "valid": true
           }
         }
@@ -808,7 +808,7 @@
             "valid": true
           },
           "ret_vol_adj_30s_v1": {
-            "value": 8.94423669507889,
+            "value": 6.928181493823875,
             "valid": true
           },
           "mid_price_v1": {
@@ -900,15 +900,15 @@
             "valid": true
           },
           "rvol_w1m_v1": {
-            "value": 2.057883557465411e-06,
+            "value": 2.656714415080641e-06,
             "valid": true
           },
           "range_bps_w1m_v1": {
-            "value": 0.2300754647524388,
+            "value": 0.18406037180195103,
             "valid": true
           },
           "vol_ratio_w10s_w1m_v1": {
-            "value": 2.2360622606087732,
+            "value": 2.190883356351123,
             "valid": true
           },
           "minute_of_day_v1": {
@@ -952,15 +952,15 @@
             "valid": true
           },
           "trend_score_w1m_v1": {
-            "value": 1.7320526914546677,
+            "value": 1.3416431907686734,
             "valid": true
           },
           "meanrev_score_w1m_v1": {
-            "value": -1.2126781251810765,
+            "value": -0.9999999999995,
             "valid": true
           },
           "vol_regime_ratio_v1": {
-            "value": 1.9999948351120114,
+            "value": 1.9999946290185722,
             "valid": true
           },
           "half_spread_cost_bps_v1": {
@@ -972,11 +972,11 @@
             "valid": true
           },
           "alpha_decay_proxy_v1": {
-            "value": 2.2360622606087732,
+            "value": 2.190883356351123,
             "valid": true
           },
           "urgency_score_v1": {
-            "value": 1.171270707937929,
+            "value": 1.1476055676124932,
             "valid": true
           }
         }

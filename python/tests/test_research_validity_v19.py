@@ -187,7 +187,7 @@ def test_stratified_day_sample_is_seeded_stratified_and_recorded():
 
 def test_day_sampling_is_written_into_dataset_json(tmp_path):
     manifest = {
-        "x-version": 1,
+        "x-version": 2,
         "kind": "real",
         "source": {"format": "itch50", "venue": "XNAS", "venue_id": 101},
         "sessions": {d: {} for d in DAYS},
@@ -436,6 +436,13 @@ def test_v2_defaults_are_unchanged_and_v3_is_opt_in(frames, v2_report):
         "significance",
         "stress_version",
         "tstat_threshold",
+        # v1.14.0 statistics revision
+        "row_block",
+        "hac_bandwidth",
+        "hac_day_separated",
+        "hypothesis_rule",
+        "standardisation",
+        "leakage_time_shift",
     }
     assert methods(METHODS_V2).validate_kwargs().keys() == {
         "ic_rows",
@@ -444,12 +451,17 @@ def test_v2_defaults_are_unchanged_and_v3_is_opt_in(frames, v2_report):
         "significance",
         "capacity",
         "fold_diagnostics",
+        "validity_diagnostics",  # v1.14.0 (R-P1-3): v2 always carries it
     }
     v3 = methods(METHODS_V3)
     assert v3.validate_kwargs()["gate_ic_source"] == "instrument_mean"
     assert v3.validate_kwargs()["split_mode"] == "day_aligned"
-    assert v3.looks(4) == methods(METHODS_V2).looks(4) + VALIDITY_LOOKS == 88
-    assert looks_per_validation(4) == 83
+    # v1.14.0 (R-P2-4): one gate decision + the backtest, whatever is reported
+    assert v3.looks(4) == methods(METHODS_V2).looks(4) == 2
+    assert looks_per_validation(4) == 1
+    # the v1.13.0 revision counts every statistic
+    assert methods("v3_v113").looks(4) == methods("v2_v113").looks(4) + VALIDITY_LOOKS == 88
+    assert looks_per_validation(4, looks_rule="statistics") == 83
     r = _validate(frames, **v3.validate_kwargs())
     assert r["gate_ic_source"] == "instrument_mean" and "validity" in r
     assert r["validity"]["n_days"] == 4
