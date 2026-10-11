@@ -74,6 +74,7 @@ Contents:
 63. [A maker run on extended features, an event clock and a fill hazard (v1.12)](#63-a-maker-run-on-extended-features-an-event-clock-and-a-fill-hazard-v112)
 64. [The markout feedback loop on a toxic regime (v1.12)](#64-the-markout-feedback-loop-on-a-toxic-regime-v112)
 65. [Read the latency SLO burn rates by hand (v1.12)](#65-read-the-latency-slo-burn-rates-by-hand-v112)
+66. [Plan the R7 data load: candidate days, a resumable ingest, a seeded draw (v1.13)](#66-plan-the-r7-data-load-candidate-days-a-resumable-ingest-a-seeded-draw-v113)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -3975,3 +3976,67 @@ minutes, and so on for 8 cases. They run in CI
 machine has no `promtool`, so this recipe reproduces only the thresholds.
 In Prometheus the same reading is
 `job:order_path_latency_slo_errors:ratio_rate1h / 0.01`.
+
+## 66. Plan the R7 data load: candidate days, a resumable ingest, a seeded draw (v1.13)
+
+**Goal:** see what an R7 load would cost and what the batch would do,
+without downloading or ingesting anything (docs/R7_DATA_PLAN.md). From
+`python/`:
+
+```bash
+PYTHONUTF8=1 PYTHONPATH=src python -m iap.marketdata plan-ingest     --manifest ../research/r7/r7_candidates.json --vendor-dir ../data/vendor     --out-root ../data/real/r7 --dry-run | head -9
+```
+
+Output:
+
+```text
+{
+  "estimate": {
+    "days": 10,
+    "gz_gb": 88.75,
+    "dataset_gb": 150.9,
+    "features_gb": 6.0,
+    "ingest_hours": 5.4,
+    "features_hours": 3.3
+  },
+```
+
+The rest of the output lists each day with `"present": false` and the
+`.cmd` it would write. The tier-2 draw of the plan is R1's sampler over the
+2025-01-02..2026-09-30 trading days, minus the spent and tier-1 days:
+
+```python
+import datetime as dt
+from iap.marketdata.r7plan import SPENT_DAYS
+from iap.validation.sessions import stratified_day_sample
+
+HOLIDAYS = {"2025-01-01", "2025-01-09", "2025-01-20", "2025-02-17", "2025-04-18",
+            "2025-05-26", "2025-06-19", "2025-07-04", "2025-09-01", "2025-11-27",
+            "2025-12-25", "2026-01-01", "2026-01-19", "2026-02-16", "2026-04-03",
+            "2026-05-25", "2026-06-19", "2026-07-03", "2026-09-07"}
+TIER1 = {"2025-11-28", "2025-12-08", "2025-12-09", "2025-12-10", "2025-12-11",
+         "2025-12-12", "2026-06-12"}
+d, days = dt.date(2025, 1, 2), []
+while d <= dt.date(2026, 9, 30):
+    s = d.isoformat()
+    if d.weekday() < 5 and s not in HOLIDAYS | SPENT_DAYS | TIER1:
+        days.append(s)
+    d += dt.timedelta(days=1)
+r = stratified_day_sample(days, 40, seed=20261011, strata="month")
+print(len(days), r["selected"][:4], r["event_days"])
+```
+
+Output:
+
+```text
+428 ['2025-01-15', '2025-01-22', '2025-02-03', '2025-02-21'] {'2026-07-29': ['fomc']}
+```
+
+How to read it. The estimate uses the measured v1.8 rates (59 min and
+1.7x the gzip size per 2026-class day), so 88.75 GB of gzip needs about
+150 GB of datasets: more than this machine has free, hence the waves or the
+external disk in the plan. Nothing downloads: `tools/r7_download.py` exits
+2 without `--i-have-approval`. After an approved download,
+`verify-download` checks the size and records the sha256, and
+`record-sampling` writes the seeded draw into a merged dataset's
+`dataset.json` (the `dataset_version` is unchanged).

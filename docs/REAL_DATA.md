@@ -395,6 +395,15 @@ ns, dollars) exported from the normalized book for a true mid and spread.
 With two sessions the walk-forward has one test day; it needs the 9+ days on
 disk to say anything.
 
+### 3.4 More sessions and symbols: the R7 data plan (v1.13, DRAFT)
+
+The free unseen ITCH days on Nasdaq's sample directory (10 sessions,
+88.75 GB, 2019-10-18 to 2026-06-12), a seeded tier-2 draw, the A2 symbol
+list, disk/time estimates and the files awaiting the owner's approval are in
+[R7_DATA_PLAN.md](R7_DATA_PLAN.md). `python -m iap.marketdata plan-ingest`
+writes a resumable batch ingest from that manifest; nothing downloads
+without `tools/r7_download.py --i-have-approval` (COOKBOOK recipe 66).
+
 ## 4. Mapping to canonical events
 
 The canonical contract is the twelve-field `MarketEvent`
