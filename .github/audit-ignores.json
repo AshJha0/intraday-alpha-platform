@@ -1,3 +1,10 @@
 {
-  "ignores": []
+  "ignores": [
+    {
+      "tool": "trivy",
+      "id": "CVE-2021-29937",
+      "expires": "2027-04-11",
+      "reason": "False positive (name collision): trivy matches the workspace PATH crate rust/telemetry (no `source` in rust/Cargo.lock, never fetched from crates.io) against the unrelated crates.io crate `telemetry` < 0.1.3. Renew only while the workspace crate keeps that name; renaming it removes the need."
+    }
+  ]
 }
