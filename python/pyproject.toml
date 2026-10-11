@@ -21,7 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 ml = ["xgboost", "lightgbm"]
 # v1.11 LLM research agent (iap.llm); tests and CI use a scripted client, not the SDK
-llm = ["anthropic>=1.0,<2"]
+llm = ["anthropic>=1.12.0,<2"]
 dev = ["pytest>=9.1,<10", "pytest-cov>=7.1,<8", "pytest-xdist>=3.8,<4", "pyyaml>=6.0,<7"]
 
 [project.scripts]
