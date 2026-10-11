@@ -164,17 +164,24 @@ id:            R7-CONFIRM-1 (DRAFT)
 data:          r7_holdout = 2025-11-28, 2025-12-08..12, 2026-06-12 (7 sessions,
                never used before); AAPL, MSFT, QQQ; dataset_version recorded at ingest
 look:          ONE look per hypothesis; no parameter changes after registration
+execution:     configs/prereg/v2.json (platform cost model incl. SEC 31 + FINRA TAF)
+machine form:  research/r7/r7_confirm_prereg_DRAFT.json (DRAFT, unsigned)
 bundles:       validation v3 (R1 sampling, FOMC/holiday split) and v4 (CPCV, PBO,
                deflated Sharpe with N from the ledger)
 hypotheses (each with its in-sample estimate frozen at registration):
   H1 maker:    M2/M6 maker policy, edge net of rebate and measured markout > 0
-  H2 quoting:  the quoting study's net PnL per share > 0
+               in-sample estimate: PENDING maker_real summary
+  (H2 quoting: DROPPED 2026-10-11 by owner decision - the quoting study was
+               aborted and has no in-sample estimate; it may get its own
+               pre-registration later)
   H3 auction:  AUC01 NOII imbalance -> closing-cross return, IC > 0
   H4 EQ:       EQ01 1s, EQ02 5s, EQ04 5s, EQ05 1s, EQ07 10s, EQ10 1s pooled
                uncrossed IC > 0 (same horizons as the v1.8 holdout)
 gate:          HAC t >= ledger threshold in force; deflated Sharpe > 0.95; reported
                with and without 2025-12-10 (FOMC) and 2025-11-28 (holiday-thin)
 decision:      a failure is final for that hypothesis on these sessions
+sensitivity:   feed latency 10 us (primary 100 us, configs/prereg/v2.json), reported
+               alongside results only; never decides pass/fail; no ledger look
 ```
 
 ## 7. A2 pre-registration template (DRAFT: not registered, not on the blackboard)
