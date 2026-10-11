@@ -15,6 +15,17 @@ that tag.
   2019-01-01, including the FINRA TAF pause 2026-10-01..2026-12-31). Off in code defaults,
   on in `configs/prereg/v2.json`. New cross-engine golden
   `tests/golden/expected_regulatory_fees.json`; no existing golden changes.
+- **R-P1-3: FX11 leak-vs-fast investigation.** Finding in
+  `docs/research/FX11_FINDING.md`: no look-ahead found; the v1.14
+  time-shift failure is consistent with a fast causal signal (verdict
+  "fast, not leak", with the stated limit that the gate's two numbers alone
+  cannot tell a 45 s leak from a fast signal). The leakage tester gains a
+  time-shift triage (detector 2c): on a time-shift failure it reports
+  `time_shift_profile` and `time_shift_class` (`fast_causal` /
+  `leak_suspect` / `causality_unproven`). `passed` is unchanged by default;
+  `LeakageTester(accept_fast_causal=True)` is the opt-in. Reports of alphas
+  that pass the time shift are byte-identical. FX11 stays RESEARCH pending
+  human review. Tests: `python/tests/test_fx11_time_shift.py`.
 
 ### Java engine archived (G-P1-3, owner-approved)
 
