@@ -177,8 +177,54 @@ them on).**  Report-only: no gate reads them, so no verdict moves.
   ledger's distinct configurations), plus ``dsr_at_looks`` at
   ``ledger_looks``.  :data:`DSR_LOOKS` more look.
 
+**Statistics revision v1.14.0 (the ``v2`` / ``v3`` / ``v4`` defaults;
+the ``*_v113`` bundles of** :mod:`iap.validation.methods` **keep the
+v1.13.0 rules for the experiments and pre-registrations run under them).**
+
+- **``hac_bandwidth``** (R-P1-3) - ``"auto"`` (default): the HAC lag count
+  of every t is :func:`iap.validation.metrics.auto_hac_lags` on the gate
+  rows' bucket count (never below the horizon rule); ``"horizon"``
+  (v1.13.0): :func:`iap.validation.metrics.nw_lags` alone (L = 2 for every
+  horizon up to five minutes).  ``nw_lags`` reports the count used and
+  ``nw_lags_rule`` the rule.
+- **``hac_day_separated``** (R-P1-3) - ``True`` (default): the pooled-slope
+  HAC t (``nw_tstat_pooled*``, and therefore the gate t) counts no lag
+  product across a session-day boundary (``day_ns`` = one day);
+  ``False`` (v1.13.0): consecutive buckets are neighbours across the
+  overnight gap.  With it, a ``validity`` block of fewer than four session
+  days carries ``few_sessions``: the sign-and-replication reading (every
+  day's IC has the gate IC's sign) that a short holdout is read by instead
+  of its t.
+- **``hypothesis_rule``** (R-P2-1) - ``"sign_consistency"`` (default):
+  ``hypothesis_confirmed`` is true when the fitted beta agrees with the
+  rationale in at least ``GATES["min_fold_sign_consistency"]`` (70 %) of
+  the folds; ``"last_fold"`` (v1.13.0): the last fold's beta alone (EQ01
+  has a negative-beta fold the old rule never saw).  The last fold's
+  reading stays as ``hypothesis_confirmed_last_fold``.
+- **``standardisation``** (R-P2-2) - ``"instrument"`` (default): before
+  any pooled statistic the standardized signal and the label are divided by
+  that instrument's own standard deviation over its out-of-sample pairs
+  (scale only, no demeaning; per fold), so the pooled IC, its t and the
+  gate no longer weight an instrument by its volatility (on the real data
+  QQQ is about half of the rows and most of the variance).  ``"pooled"``
+  (v1.13.0): the raw standardized signal is pooled.
+- **``leakage_time_shift``** (R-P2-3) - ``True`` (default): the leakage
+  block carries the time-shift detector of :mod:`iap.validation.leakage`
+  (detector 2b), which is applicable where the row-shift test is vacuous.
+- **Looks = decisions** (R-P2-4; ``looks_rule`` of
+  :func:`looks_per_validation`) - ``"decisions"`` (default): one validation
+  debits ONE look, the gate decision it makes; the ~83 correlated report
+  statistics beside the gate are diagnostics no gate reads and no longer
+  inflate the Bonferroni denominator.  ``"statistics"`` (v1.5.0-v1.13.0)
+  counts every one of them.
+- **Causal row block** (R-P0-1) - the research backtester's default row
+  block is ``"causal"`` (:mod:`iap.backtest.engine`); when it is in force
+  the report adds ``net_pnl_1x_cost_label_block``, the last fold's 1x net
+  P&L under the v1.13.0 label-valid block, as a diagnostic.
+
 **Looks.**  :func:`looks_per_validation` itemises what one call evaluates;
-the ledger debits exactly that.
+the ledger debits the gate decisions (``looks_rule="decisions"``) or all
+of it (``"statistics"``).
 """
 
 from __future__ import annotations
@@ -186,12 +232,18 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from iap.backtest.engine import Backtester, BacktestResult
+from iap.backtest.engine import (
+    BLOCK_ROWS_AUTO,
+    BLOCK_ROWS_CAUSAL,
+    Backtester,
+    BacktestResult,
+)
 from iap.labels.frames import DEFAULT_IC_ROWS, IC_ROWS, LEGACY_IC_ROWS, scored_labels
 from iap.validation.cpcv import (
     DEFAULT_CPCV_GROUPS,
@@ -207,8 +259,10 @@ from iap.validation.diagnostics import (
 )
 from iap.validation.leakage import LeakageTester, RecomputeSource
 from iap.validation.metrics import (
+    EPS,
     HORIZON_ORDER,
     HORIZONS_NS,
+    auto_hac_lags,
     bucket_ics_with_counts,
     bucket_size_summary,
     capacity_breakeven,
@@ -219,6 +273,7 @@ from iap.validation.metrics import (
     hit_rate,
     ic,
     instrument_ics,
+    n_ts_buckets,
     newey_west_tstat,
     nw_lags,
     pooled_slope_hac_tstat,
@@ -294,6 +349,27 @@ DSR_LOOKS = 1
 #: day-clustered t, day-block bootstrap t.
 VALIDITY_LOOKS = 4
 
+#: HAC bandwidth rules (module docs, R-P1-3): default, then v1.13.0.
+HAC_BANDWIDTHS = ("auto", "horizon")
+DEFAULT_HAC_BANDWIDTH = "auto"
+V113_HAC_BANDWIDTH = "horizon"
+#: What ``hypothesis_confirmed`` reads (R-P2-1): default, then v1.13.0.
+HYPOTHESIS_RULES = ("sign_consistency", "last_fold")
+DEFAULT_HYPOTHESIS_RULE = "sign_consistency"
+V113_HYPOTHESIS_RULE = "last_fold"
+#: How the pooled statistics are scaled (R-P2-2): default, then v1.13.0.
+STANDARDISATIONS = ("instrument", "pooled")
+DEFAULT_STANDARDISATION = "instrument"
+V113_STANDARDISATION = "pooled"
+#: What a validation debits to the ledger (R-P2-4): default, then v1.13.0.
+LOOKS_RULES = ("decisions", "statistics")
+DEFAULT_LOOKS_RULE = "decisions"
+V113_LOOKS_RULE = "statistics"
+#: Gate decisions one validation makes (the verdict).
+DECISION_LOOKS = 1
+#: Session days below which a holdout is read by sign and replication.
+FEW_SESSIONS = 4
+
 _KEY_1X = f"x{1.0:g}"
 
 
@@ -303,6 +379,7 @@ def looks_per_validation(
     validity_diagnostics: bool = False,
     cpcv: bool = False,
     deflated_sharpe: bool = False,
+    looks_rule: str = DEFAULT_LOOKS_RULE,
 ) -> int:
     """Looks at the data ONE ``validate_alpha`` call makes — the ledger is
     the denominator of every multiple-testing correction, so it counts what
@@ -338,17 +415,32 @@ def looks_per_validation(
     ``validity_diagnostics=True`` (v1.9, opt-in) adds
     :data:`VALIDITY_LOOKS`; ``cpcv=True`` (v1.12) :data:`CPCV_LOOKS`;
     ``deflated_sharpe=True`` (v1.12) :data:`DSR_LOOKS`.
+
+    That itemisation is ``looks_rule="statistics"`` (v1.5.0-v1.13.0).  The
+    default since v1.14.0 is ``"decisions"`` (R-P2-4): a validation makes
+    ONE gate decision (:data:`DECISION_LOOKS`) whatever it reports beside
+    it - the other statistics are highly correlated diagnostics that no
+    gate reads, and counting each as an independent test made the
+    Bonferroni denominator a function of how much a report prints.
     """
     if n_folds < 1:
         raise ValueError("n_folds must be >= 1")
+    if looks_rule not in LOOKS_RULES:
+        raise ValueError(f"unknown looks_rule {looks_rule!r}; known: {LOOKS_RULES}")
+    if looks_rule == "decisions":
+        return DECISION_LOOKS
     if cpcv or deflated_sharpe:
         return (
-            looks_per_validation(n_folds, fold_diagnostics, validity_diagnostics)
+            looks_per_validation(
+                n_folds, fold_diagnostics, validity_diagnostics, looks_rule=looks_rule
+            )
             + (CPCV_LOOKS if cpcv else 0)
             + (DSR_LOOKS if deflated_sharpe else 0)
         )
     if validity_diagnostics:
-        return looks_per_validation(n_folds, fold_diagnostics) + VALIDITY_LOOKS
+        return looks_per_validation(n_folds, fold_diagnostics, looks_rule=looks_rule) + (
+            VALIDITY_LOOKS
+        )
     if not fold_diagnostics:
         per_fold = len(HORIZON_ORDER) + len(COST_MULTIPLIERS) + 2
         return 1 + per_fold + len(LATENCY_SHIFTS) + len(LATENCY_TIMES_NS) + 2 + 1
@@ -577,6 +669,11 @@ def validate_alpha(
     deflated_sharpe_trials_basis: str = "distinct_configurations",
     frozen_params: Mapping[str, Any] | None = None,
     prereg_t_threshold: float | None = None,
+    hac_bandwidth: str = DEFAULT_HAC_BANDWIDTH,
+    hac_day_separated: bool = True,
+    hypothesis_rule: str = DEFAULT_HYPOTHESIS_RULE,
+    standardisation: str = DEFAULT_STANDARDISATION,
+    leakage_time_shift: bool = True,
 ) -> dict:
     """Full validation of one alpha.  ``model_factory()`` returns a fresh
     unfitted model (a fresh instance per fold — no state bleeds across).
@@ -611,6 +708,14 @@ def validate_alpha(
         raise ValueError(f"unknown gate_ic_source {gate_ic_source!r}; known: {GATE_IC_SOURCES}")
     if book_scope not in BOOK_SCOPES:
         raise ValueError(f"unknown book_scope {book_scope!r}; known: {BOOK_SCOPES}")
+    if hac_bandwidth not in HAC_BANDWIDTHS:
+        raise ValueError(f"unknown hac_bandwidth {hac_bandwidth!r}; known: {HAC_BANDWIDTHS}")
+    if hypothesis_rule not in HYPOTHESIS_RULES:
+        raise ValueError(f"unknown hypothesis_rule {hypothesis_rule!r}; known: {HYPOTHESIS_RULES}")
+    if standardisation not in STANDARDISATIONS:
+        raise ValueError(f"unknown standardisation {standardisation!r}; known: {STANDARDISATIONS}")
+    per_instrument = standardisation == "instrument"
+    hac_day_ns = NS_DAY if hac_day_separated else None
     if deflated_sharpe and not fold_diagnostics:
         raise ValueError("deflated_sharpe needs fold_diagnostics (the 1x backtest P&L)")
     if deflated_sharpe and deflated_sharpe_trials is None:
@@ -659,6 +764,9 @@ def validate_alpha(
         # expected_return weights each fold by |beta_k| (pinned, round-3).
         beta = float(model.params().get("beta", 0.0) or 0.0)
         z = er / beta if beta != 0.0 else er
+        y_valid, y_reopen, available = _pooled_row_policies(scores, test, horizon)
+        if per_instrument:
+            z, y, y_valid, y_reopen = _standardise_by_instrument(iids, z, y, y_valid, y_reopen)
         n_pairs = int(np.sum(np.isfinite(er) & np.isfinite(y)))
         degenerate = n_pairs < MIN_TEST_PAIRS
         # Fold statistics are computed on z, NEVER on expected_return.
@@ -681,6 +789,15 @@ def validate_alpha(
                 "rank_ic": _fnum(rank_ic(z, y)),
                 "hit_rate": _fnum(hit_rate(z, y)),
                 "beta_fit": model.params().get("beta_fit"),
+                **(
+                    {
+                        "hypothesis_confirmed": bool(
+                            model.params().get("hypothesis_confirmed", False)
+                        )
+                    }
+                    if hypothesis_rule == "sign_consistency"
+                    else {}
+                ),
             }
         )
         pooled_ts.append(ts)
@@ -689,7 +806,6 @@ def validate_alpha(
         pooled_y.append(y)
         pooled_c.append(crossed)
         pooled_i.append(iids)
-        y_valid, y_reopen, available = _pooled_row_policies(scores, test, horizon)
         pooled_valid.append(y_valid)
         pooled_reopen.append(y_reopen)
         reopen_available = reopen_available and available
@@ -711,7 +827,13 @@ def validate_alpha(
     oos_ic_er = ic(er_pooled, y)
     oos_rank_ic = rank_ic(x, y)
     oos_hit = hit_rate(x, y)
-    lags = nw_lags(horizon_ns)
+    if hac_bandwidth == "auto":
+        # The bandwidth follows the sample the gate t is computed on (the
+        # uncrossed rows when there are any; module docs, R-P1-3).
+        gate_ts = ts[~crossed] if np.any(~crossed) else ts
+        lags = auto_hac_lags(n_ts_buckets(gate_ts), horizon_ns)
+    else:
+        lags = nw_lags(horizon_ns)
     # Bucket ICs are weighted by their pair count: fixed time buckets range
     # from ~81 to ~2 592 pairs here, and equal weighting let one thin bucket
     # swing EQ03's headline t between 4.89 and 11.46 (metrics module docs).
@@ -719,7 +841,7 @@ def validate_alpha(
     nw_t = newey_west_tstat(bics, lags=lags, weights=bcounts)
     # The HAC t of the POOLED slope keeps between-bucket signal, which the
     # within-bucket Pearson above removes; it is the gate's t by default.
-    nw_t_pooled = pooled_slope_hac_tstat(ts, x, y, lags=lags)
+    nw_t_pooled = pooled_slope_hac_tstat(ts, x, y, lags=lags, day_ns=hac_day_ns)
     # Scale-free ICs (the pooled IC lets the most volatile instrument
     # dominate; metrics.instrument_ics).  Headline report fields.
     instrument_ids = np.concatenate(pooled_i)
@@ -743,7 +865,9 @@ def validate_alpha(
     oos_ic_crossed = ic(np.where(crossed, x, np.nan), np.where(crossed, y, np.nan))
     bics_unc, bcounts_unc = bucket_ics_with_counts(ts[unc], x[unc], y[unc])
     nw_t_uncrossed = newey_west_tstat(bics_unc, lags=lags, weights=bcounts_unc)
-    nw_t_pooled_uncrossed = pooled_slope_hac_tstat(ts[unc], x[unc], y[unc], lags=lags)
+    nw_t_pooled_uncrossed = pooled_slope_hac_tstat(
+        ts[unc], x[unc], y[unc], lags=lags, day_ns=hac_day_ns
+    )
     by_instrument_unc = instrument_ics(instrument_ids[unc], x[unc], y[unc])
 
     def _ic_pair(labels: np.ndarray) -> tuple[float | None, float | None]:
@@ -765,7 +889,11 @@ def validate_alpha(
     sign_consistency = float(positive / n_folds_run) if n_folds_run else float("nan")
 
     # leakage + decay + turnover on the last (largest-train) fold
-    leak = LeakageTester(ic_rows=ic_rows).run(last_model, last_test, recompute=recompute).to_dict()
+    leak = (
+        LeakageTester(ic_rows=ic_rows, time_shift=leakage_time_shift)
+        .run(last_model, last_test, recompute=recompute)
+        .to_dict()
+    )
     scores_last = last_scores
     beta_last = float(last_model.params().get("beta", 0.0) or 0.0)
     decay: dict[str, float | None] = {}
@@ -828,7 +956,13 @@ def validate_alpha(
         capacity, bt, last_result_1x, last_test, universe, capacity_meta, max_participation
     )
 
-    hypothesis_confirmed = bool(last_model.params().get("hypothesis_confirmed", False))
+    hypothesis_last_fold = bool(last_model.params().get("hypothesis_confirmed", False))
+    beta_consistency = beta_sign_consistency(fold_rows)
+    hypothesis_confirmed = hypothesis_last_fold
+    if hypothesis_rule == "sign_consistency":
+        hyp_share = _fold_hypothesis_share(fold_rows)
+        if hyp_share is not None:
+            hypothesis_confirmed = bool(hyp_share >= gates["min_fold_sign_consistency"])
     # The PROMOTE gate reads the UNCROSSED IC: a crossed consolidated book is
     # a stale-quote artefact, not a tradable state (pinned, round-3).
     gate_ic_pooled = oos_ic_uncrossed if np.isfinite(oos_ic_uncrossed) else oos_ic
@@ -892,6 +1026,7 @@ def validate_alpha(
             gate_ic_source=gate_ic_source,
             seed=seed,
             n_boot=n_boot,
+            few_sessions_rule=hac_day_separated,
         )
     if dataset_version is not None:
         extras["dataset_versions"] = (
@@ -942,6 +1077,19 @@ def validate_alpha(
         extras["tstat_threshold_policy"] = tstat_threshold
         extras["ledger_t_threshold"] = float(ledger_t_threshold)
         extras["ledger_looks"] = None if ledger_looks is None else int(ledger_looks)
+    if bt.config.block_rows_column == BLOCK_ROWS_CAUSAL:
+        # The v1.13.0 label-valid row block, kept as a diagnostic beside the
+        # causal 1x net P&L (R-P0-1): the difference is what the look-ahead
+        # in the old mask was worth on the last fold.
+        label_bt = Backtester(
+            bt.cost_model,
+            bt.meta,
+            replace(bt.config, block_rows_column=BLOCK_ROWS_AUTO),
+            reporting_ccy=bt.reporting_ccy,
+        )
+        extras["net_pnl_1x_cost_label_block"] = _fnum(
+            label_bt.run(last_test, scores_last, asset_class).total_pnl
+        )
     if fold_diagnostics:
         series = bar_series(results_1x)
         extras["fold_diagnostics"] = diag_rows
@@ -963,6 +1111,12 @@ def validate_alpha(
             "cap_fills_at_l1": bool(bt.config.cap_fills_at_l1),
             "block_rows": bt.config.block_rows_label(),
             "impact_model": bt.cost_model.impact_model,
+            "row_block": _row_block_name(bt.config.block_rows_column),
+            "hac_bandwidth": hac_bandwidth,
+            "hac_day_separated": bool(hac_day_separated),
+            "hypothesis_rule": hypothesis_rule,
+            "standardisation": standardisation,
+            "leakage_time_shift": bool(leakage_time_shift),
             **method_extras,
         },
         "alpha_id": probe.alpha_id,
@@ -1005,16 +1159,19 @@ def validate_alpha(
         "nw_tstat_pooled": _fnum(nw_t_pooled),
         "nw_tstat_pooled_uncrossed": _fnum(nw_t_pooled_uncrossed),
         "nw_lags": int(lags),
+        "nw_lags_rule": hac_bandwidth,
         "n_ic_buckets": int(bics.size),
         "n_ic_buckets_uncrossed": int(bics_unc.size),
         "ic_bucket_pairs": bucket_size_summary(bcounts),
         "ic_bucket_pairs_uncrossed": bucket_size_summary(bcounts_unc),
         "fold_sign_consistency": _fnum(sign_consistency),
         "hypothesis_confirmed": hypothesis_confirmed,
-        # v1.13 (R-P2-1), additive: the share of folds whose fitted beta is
-        # positive.  ``hypothesis_confirmed`` above still reads the last
-        # fold only (v1.14 makes it read this).
-        "beta_sign_consistency": beta_sign_consistency(fold_rows),
+        "hypothesis_rule": hypothesis_rule,
+        "hypothesis_confirmed_last_fold": hypothesis_last_fold,
+        # v1.13 (R-P2-1): the share of folds whose fitted beta is positive;
+        # since v1.14.0 ``hypothesis_confirmed`` reads the share of folds
+        # whose model confirmed the hypothesis (``hypothesis_rule``).
+        "beta_sign_consistency": beta_consistency,
         "leakage": leak,
         "decay_ic_by_horizon": decay_out,
         "turnover_flips_per_hour": _fnum(turnover),
@@ -1034,6 +1191,53 @@ def validate_alpha(
         "promote_gates": promote_gates,
         "verdict": verdict,
     }
+
+
+def _row_block_name(column: str | None) -> str:
+    """The report name of a backtest row block (``methods.row_block``)."""
+    if column is None:
+        return "none"
+    if column == BLOCK_ROWS_CAUSAL:
+        return "causal"
+    if column == BLOCK_ROWS_AUTO:
+        return "label_valid"
+    return f"column:{column}"
+
+
+def _standardise_by_instrument(ids: np.ndarray, x: np.ndarray, y: np.ndarray, *more: np.ndarray):
+    """``(x, y, *more)`` with each instrument's rows divided by that
+    instrument's standard deviation of ``x`` and of ``y`` over its finite
+    ``(x, y)`` pairs (scale only; ``more`` are label series scaled like
+    ``y``).  An instrument with fewer than two pairs or a degenerate side
+    is left unscaled (R-P2-2)."""
+    ids = np.asarray(ids)
+    xs = np.asarray(x, dtype=float).copy()
+    ys = np.asarray(y, dtype=float).copy()
+    ms = [np.asarray(m, dtype=float).copy() for m in more]
+    ok = np.isfinite(xs) & np.isfinite(ys)
+    for iid in np.unique(ids):
+        rows = ids == iid
+        pairs = rows & ok
+        if int(pairs.sum()) < 2:
+            continue
+        sx = float(np.std(xs[pairs]))
+        sy = float(np.std(ys[pairs]))
+        if sx > EPS:
+            xs[rows] = xs[rows] / sx
+        if sy > EPS:
+            ys[rows] = ys[rows] / sy
+            for m in ms:
+                m[rows] = m[rows] / sy
+    return (xs, ys, *ms)
+
+
+def _fold_hypothesis_share(fold_rows) -> float | None:
+    """Share of folds whose own model confirmed the hypothesis (``None``
+    when no fold row carries the flag)."""
+    flags = [bool(r["hypothesis_confirmed"]) for r in fold_rows if "hypothesis_confirmed" in r]
+    if not flags:
+        return None
+    return float(sum(flags) / len(flags))
 
 
 def beta_sign_consistency(fold_rows) -> float | None:
@@ -1097,6 +1301,7 @@ def _validity_block(
     gate_ic_source: str,
     seed: int,
     n_boot: int,
+    few_sessions_rule: bool = False,
 ) -> dict:
     """The ``validity`` report block (module docs, R1/R2/R6) on the gate's
     rows: per-day ICs, the event-day split, the day-separated HAC t, the
@@ -1123,7 +1328,27 @@ def _validity_block(
         )
     keep = ~event_day_mask(ts)
     boot = day_block_bootstrap_tstat(ts, x, y, seed=seed, n_boot=min(int(n_boot), 2000))
+    extra: dict[str, object] = {}
+    if few_sessions_rule and len(day_rows) < FEW_SESSIONS:
+        # Fewer than four sessions: no t-statistic of a handful of day
+        # clusters is credible, so the reading is the sign of the gate IC
+        # replicated on every session day (R-P1-3).
+        gate_value = gate_stat(pairs)
+        gate_sign = int(np.sign(gate_value)) if np.isfinite(gate_value) else 0
+        same = sum(
+            1
+            for r in day_rows
+            if r["ic"] is not None and gate_sign != 0 and int(np.sign(r["ic"])) == gate_sign
+        )
+        extra["few_sessions"] = {
+            "rule": "sign_and_replication",
+            "n_days": len(day_rows),
+            "gate_sign": gate_sign,
+            "days_same_sign": int(same),
+            "replicated": bool(len(day_rows) >= 2 and same == len(day_rows)),
+        }
     return {
+        **extra,
         "n_days": len(day_rows),
         "days": day_rows,
         "ex_event": {

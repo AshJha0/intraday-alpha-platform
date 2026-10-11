@@ -60,7 +60,13 @@ from iap.backtest.engine import ensemble_scores  # noqa: E402
 from iap.experiment.tracker import data_version  # noqa: E402
 from iap.validation import ExperimentLedger, validate_alpha  # noqa: E402
 from iap.validation.leakage import RecomputeSources  # noqa: E402
-from iap.validation.methods import METHODS, METHODS_V2, ResearchMethods, methods  # noqa: E402
+from iap.validation.methods import (  # noqa: E402
+    METHODS,
+    METHODS_V2,
+    V113_REVISION,
+    ResearchMethods,
+    methods,
+)
 from iap.validation.metrics import HORIZONS_NS  # noqa: E402
 from iap.validation.validate import GATES  # noqa: E402
 
@@ -96,9 +102,11 @@ RUN_IDS: list[str] = list(ALPHA_IDS)
 #: so the report does not describe real data as the synthetic set.
 REAL_DATASET: tuple[list[str], list[str]] | None = None
 
-#: Looks-at-the-data counted per alpha in one pipeline run. This is the
-#: denominator of every multiple-testing correction in the research, so it
-#: counts what the chain ACTUALLY evaluates:
+#: Looks-at-the-data counted per alpha in one pipeline run. Since v1.14.0
+#: (R-P2-4) that is the ONE gate decision of the validation plus the day-2
+#: backtest: 2, the same number ``iap.research.LOOKS_PER_EXPERIMENT``
+#: carries. Up to v1.13.0 (``v2_v113``) it counted every statistic the
+#: chain evaluates:
 #: ``iap.validation.validate.looks_per_validation`` itemises one validation
 #: (83 at four folds under the default methods) and the day-2 backtest of
 #: the serialized parameters is one more — 84, the same number
@@ -116,6 +124,11 @@ def ledger_config(horizon: str, bundle: ResearchMethods) -> dict:
     config = {"n_folds": N_FOLDS, "embargo_s": EMBARGO_S, "horizon": horizon}
     if bundle.name != "legacy_v1":
         config["methods"] = bundle.name
+    if bundle.revision != V113_REVISION:
+        # v1.14.0: the bundle name is unchanged but the statistics are not,
+        # so the revision is part of what was looked at (a new look, never a
+        # silent rerun of the v1.13.0 entry).
+        config["stats_revision"] = bundle.revision
     return config
 
 
@@ -422,7 +435,22 @@ def _write_report(
         if bundle.significance == "pooled_slope"
         else "the Newey-West t of the mean of within-bucket ICs"
     )
-    a(f"- **Gate t:** {t_text}; lag count `L` follows the horizon.")
+    if bundle.hac_bandwidth == "auto":
+        lag_text = (
+            "lag count `L` automatic (Newey-West 1994 rule on the bucket count, "
+            "never below the horizon rule)"
+        )
+    else:
+        lag_text = "lag count `L` follows the horizon"
+    day_text = "; no lag product across a session-day boundary" if bundle.hac_day_separated else ""
+    a(f"- **Gate t:** {t_text}; {lag_text}{day_text}.")
+    if bundle.standardisation == "instrument":
+        a(
+            "- **Scaling:** signal and label divided by each instrument's own standard "
+            "deviation before pooling, so no instrument dominates by volatility."
+        )
+    if bundle.hypothesis_rule == "sign_consistency":
+        a("- **Hypothesis:** the fitted beta has the stated sign in >= 70% of the folds.")
     if bundle.tstat_threshold == "ledger":
         a(
             f"- **PROMOTE t threshold:** {gates['min_nw_tstat']:.3f} = the Bonferroni |t| at the "
@@ -436,7 +464,14 @@ def _write_report(
             "- **Backtest:** cost-aware positions (enter only when |expected return| exceeds "
             "the round-trip spread + fee, hold for the label horizon or until an opposite "
             "signal that clears the same bar, renew at half of it), fills capped at the "
-            "displayed L1 size, only the rows the IC scores are traded, square-root impact. "
+            "displayed L1 size, "
+            + (
+                "rows blocked only on decision-time state (a missing mid or an unusable "
+                "book at the decision; never on whether the label later turns out valid), "
+                if bundle.causal_row_block
+                else "only the rows the IC scores are traded, "
+            )
+            + "square-root impact. "
             "An alpha whose forecast never clears its costs makes NO trade: its net P&L is "
             "0, which does not pass `net P&L > 0`."
         )

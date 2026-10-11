@@ -218,8 +218,11 @@ def test_v4_bundle_is_v3_plus_report_only_blocks():
     v3, v4 = methods(METHODS_V3), methods(METHODS_V4)
     kw = v4.validate_kwargs()
     assert kw == {**v3.validate_kwargs(), "cpcv": True, "deflated_sharpe": True}
-    assert v4.looks(4) == v3.looks(4) + CPCV_LOOKS + DSR_LOOKS
-    assert looks_per_validation(4) == 83  # the default is untouched
+    # v1.14.0 (R-P2-4): the report-only blocks make no gate decision
+    assert v4.looks(4) == v3.looks(4) == 2
+    v3_old, v4_old = methods("v3_v113"), methods("v4_v113")
+    assert v4_old.looks(4) == v3_old.looks(4) + CPCV_LOOKS + DSR_LOOKS
+    assert looks_per_validation(4, looks_rule="statistics") == 83
 
 
 def test_validate_with_cpcv_and_dsr_keeps_the_v3_verdict():

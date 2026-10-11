@@ -37,6 +37,22 @@ Two independent detectors, both mandatory in the promotion pipeline:
      the full ``collapse_ratio`` when rows are dense relative to the
      horizon.  ``median_row_gap`` is measured from the frames themselves.
 
+2b. **Time-shift test** (v1.14.0, R-P2-3; ``time_shift=True``, the
+   default).  The shift-by-one test above is vacuous whenever a row already
+   spans the horizon — its required survival ratio is then 0 and it can
+   never fire (every synthetic alpha reported ``required_shift_ratio
+   0.0``).  The time-shift test lags the score by a fixed TIME instead of
+   a row: each label at ``t`` is paired with the score prevailing at
+   ``t - horizon / 4`` (the latest row at or before it), and only pairs
+   whose lagged score is younger than ``horizon / 2`` are kept, so the lag
+   really is a fraction of the horizon.  A causal signal keeps at least
+   ``collapse_ratio * (1 - median_lag / horizon)`` of its IC; a signal
+   that collapses below that while its unlagged IC is suspicious fails.
+   With fewer than :data:`TIME_SHIFT_MIN_PAIRS` usable pairs the test is
+   NOT APPLICABLE and says so (``time_shift_ok`` is ``None``,
+   ``time_shift_pairs`` the count) instead of passing silently; ``passed``
+   needs it not to be ``False``.
+
 3. **Engine-level leak probe** (``truncation_probe``): re-score the model on
    frames truncated at each of several anchors and assert the score at the
    anchor is bit-identical to the score computed with the full frame.  A
@@ -111,9 +127,36 @@ class LeakageResult:
     recompute_ok: bool | None = None
     recompute_n_anchors: int = 0
     recompute_mismatches: list[dict] = field(default_factory=list)
+    #: detector 2b (v1.14.0): True / False, None = not applicable; absent
+    #: from the report when the tester runs without it (pre-v1.14 bundles)
+    time_shift_ok: bool | None = None
+    ic_time_shifted: float | None = None
+    time_shift_pairs: int = 0
+    time_shift_lag_ns: int = 0
+    required_time_shift_ratio: float = 0.0
+    time_shift: bool = False
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        d = asdict(self)
+        if not self.time_shift:
+            for k in (
+                "time_shift_ok",
+                "ic_time_shifted",
+                "time_shift_pairs",
+                "time_shift_lag_ns",
+                "required_time_shift_ratio",
+            ):
+                d.pop(k)
+        d.pop("time_shift")
+        return d
+
+
+#: Pairs the time-shift test needs to be applicable (module docs, 2b).
+TIME_SHIFT_MIN_PAIRS = 256
+#: Score lag of the time-shift test as a fraction of the horizon.
+TIME_SHIFT_LAG_FRACTION = 0.25
+#: Oldest lagged score kept, as a fraction of the horizon.
+TIME_SHIFT_MAX_AGE_FRACTION = 0.5
 
 
 @dataclass
@@ -341,9 +384,12 @@ class LeakageTester:
         suspicious_ic: float = LEAK_IC_MULTIPLE * MIN_OOS_IC_GATE,
         collapse_ratio: float = 0.5,
         ic_rows: str = DEFAULT_IC_ROWS,
+        time_shift: bool = True,
     ) -> None:
         self.suspicious_ic = suspicious_ic
         self.collapse_ratio = collapse_ratio
+        #: run detector 2b (v1.14.0); False = the v1.13.0 detector set
+        self.time_shift = bool(time_shift)
         #: rows the shift test scores (:mod:`iap.labels.frames`)
         self.ic_rows = ic_rows
 
@@ -382,6 +428,50 @@ class LeakageTester:
         ic0 = ic(np.concatenate(xs), np.concatenate(ys))
         ic1 = ic(np.concatenate(xs_lag), np.concatenate(ys_lag))
         return {"ic_unshifted": ic0, "ic_shifted": ic1}
+
+    def time_shift_test(self, model, frames: Mapping[int, pd.DataFrame]) -> dict[str, float]:
+        """Detector 2b: ``{"ic_unshifted", "ic_time_shifted", "n_pairs",
+        "lag_ns", "median_age_ns"}`` with the score lagged by
+        ``TIME_SHIFT_LAG_FRACTION x horizon`` in time (module docs)."""
+        scores = model.score(frames)
+        h_ns = int(HORIZONS_NS[model.horizon])
+        lag = max(1, int(h_ns * TIME_SHIFT_LAG_FRACTION))
+        max_age = int(h_ns * TIME_SHIFT_MAX_AGE_FRACTION)
+        xs, ys, xl, yl, ages = [], [], [], [], []
+        for iid, sc in scores.items():
+            df = frames[iid]
+            ts = df["exchange_ts"].to_numpy(dtype=np.int64)
+            er = sc["expected_return"].to_numpy(dtype=float).copy()
+            er[sc["confidence"].to_numpy(dtype=float) <= 0.0] = np.nan
+            lab, _ = scored_labels(df, model.horizon, self.ic_rows)
+            xs.append(er)
+            ys.append(lab)
+            j = np.searchsorted(ts, ts - lag, side="right") - 1
+            has = j >= 0
+            jj = np.where(has, j, 0)
+            age = np.where(has, ts - ts[jj], np.iinfo(np.int64).max)
+            keep = has & (age <= max_age)
+            xl.append(np.where(keep, er[jj], np.nan))
+            yl.append(np.where(keep, lab, np.nan))
+            ages.append(age[keep])
+        if not xs:
+            return {
+                "ic_unshifted": float("nan"),
+                "ic_time_shifted": float("nan"),
+                "n_pairs": 0,
+                "lag_ns": lag,
+                "median_age_ns": 0,
+            }
+        x_l, y_l = np.concatenate(xl), np.concatenate(yl)
+        pairs = np.isfinite(x_l) & np.isfinite(y_l)
+        all_ages = np.concatenate(ages) if ages else np.empty(0, np.int64)
+        return {
+            "ic_unshifted": ic(np.concatenate(xs), np.concatenate(ys)),
+            "ic_time_shifted": ic(x_l, y_l),
+            "n_pairs": int(pairs.sum()),
+            "lag_ns": lag,
+            "median_age_ns": int(np.median(all_ages)) if all_ages.size else 0,
+        }
 
     @staticmethod
     def median_row_gap_ns(frames: Mapping[int, pd.DataFrame]) -> int:
@@ -520,6 +610,24 @@ class LeakageTester:
         if np.isfinite(ic0) and abs(ic0) > self.suspicious_ic and required > 0:
             survived = np.isfinite(ic1) and abs(ic1) >= required * abs(ic0)
             shift_ok = bool(survived)
+        ts_extra: dict = {}
+        time_shift_ok: bool | None = None
+        if self.time_shift:
+            tst = self.time_shift_test(model, frames)
+            ic_t = tst["ic_time_shifted"]
+            req_t = self.collapse_ratio * (1.0 - min(1.0, tst["median_age_ns"] / float(horizon_ns)))
+            if tst["n_pairs"] >= TIME_SHIFT_MIN_PAIRS and np.isfinite(ic0):
+                time_shift_ok = True
+                if abs(ic0) > self.suspicious_ic and req_t > 0:
+                    time_shift_ok = bool(np.isfinite(ic_t) and abs(ic_t) >= req_t * abs(ic0))
+            ts_extra = {
+                "time_shift": True,
+                "time_shift_ok": time_shift_ok,
+                "ic_time_shifted": float(ic_t) if np.isfinite(ic_t) else None,
+                "time_shift_pairs": int(tst["n_pairs"]),
+                "time_shift_lag_ns": int(tst["lag_ns"]),
+                "required_time_shift_ratio": float(req_t),
+            }
         trunc_ok = self.truncation_probe(model, frames) if probe_truncation else True
         recompute_ok: bool | None = None
         n_anchors = 0
@@ -536,7 +644,13 @@ class LeakageTester:
             ic_unshifted=float(ic0) if np.isfinite(ic0) else float("nan"),
             ic_shifted=float(ic1) if np.isfinite(ic1) else float("nan"),
             shift_ok=shift_ok,
-            passed=guard and shift_ok and trunc_ok and recompute_ok is not False,
+            passed=(
+                guard
+                and shift_ok
+                and trunc_ok
+                and recompute_ok is not False
+                and time_shift_ok is not False
+            ),
             truncation_ok=trunc_ok,
             suspicious_ic=float(self.suspicious_ic),
             required_shift_ratio=float(required),
@@ -544,4 +658,5 @@ class LeakageTester:
             recompute_ok=recompute_ok,
             recompute_n_anchors=n_anchors,
             recompute_mismatches=mismatches,
+            **ts_extra,
         )

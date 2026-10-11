@@ -6,6 +6,27 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## Unreleased — v1.14.0 (correctness release, in progress)
+
+### Research statistics (R-P0-1, R-P1-3, R-P2-1..4)
+
+The `v2` / `v3` / `v4` bundles move to the v1.14.0 statistics revision;
+the v1.13.0 rules are frozen as `v2_v113` / `v3_v113` / `v4_v113`
+(schemas/MIGRATIONS.md). Bundle names, and therefore experiment ids, are
+unchanged; the ledger identity gains `stats_revision`, so every
+regenerated statistic is a new look.
+
+- Causal backtest row block (decision-time state only) is the default; the
+  label-valid block is reported beside it (`net_pnl_1x_cost_label_block`).
+  Every net P&L, bootstrap interval and capacity figure moves.
+- Automatic HAC bandwidth and no lag product across a session day in the
+  gate t; `v2` carries the `validity` block; holdouts of fewer than four
+  sessions are read by sign and replication (`few_sessions`).
+- `hypothesis_confirmed` = >= 70 % of folds confirm (was: the last fold).
+- Per-instrument scaling before pooling (QQQ no longer dominates).
+- Time-shift leakage detector (applicable where the row shift is vacuous).
+- One ledger look per gate decision (2 per experiment, was 84).
+
 ## v1.13.0 — 2026-10-11
 
 The hygiene-and-hardening release that follows the consolidated quality

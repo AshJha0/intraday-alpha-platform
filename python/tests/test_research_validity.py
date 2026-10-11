@@ -149,7 +149,7 @@ BASE_LEGACY = BacktestConfig.legacy(
 
 def test_base_configs_are_the_default_and_the_legacy_rules():
     assert BASE.position_policy == "cost_aware" and BASE.horizon_ns == NS_S
-    assert BASE.cap_fills_at_l1 is True and BASE.block_rows_column == "auto"
+    assert BASE.cap_fills_at_l1 is True and BASE.block_rows_column == "causal"
     assert BASE_LEGACY.position_policy == "sign"
     assert BASE_LEGACY.cap_fills_at_l1 is False and BASE_LEGACY.block_rows_column is None
 
@@ -430,8 +430,14 @@ def test_report_carries_the_pooled_tstat_beside_the_gate_input(default_report, l
         "recompute_probe": False,
         "position_policy": "cost_aware",
         "cap_fills_at_l1": True,
-        "block_rows": "scored_rows:1s",
+        "block_rows": "causal",
         "impact_model": "sqrt",
+        "row_block": "causal",
+        "hac_bandwidth": "auto",
+        "hac_day_separated": True,
+        "hypothesis_rule": "sign_consistency",
+        "standardisation": "instrument",
+        "leakage_time_shift": True,
     }
     assert r["gate_tstat"] == r["nw_tstat_pooled_uncrossed"]
     assert r["gates"] == {**GATES, "min_nw_tstat": LEDGER_T}
@@ -457,10 +463,22 @@ def test_report_carries_the_pooled_tstat_beside_the_gate_input(default_report, l
         "cap_fills_at_l1": False,
         "block_rows": None,
         "impact_model": "linear",
+        "row_block": "none",
+        "hac_bandwidth": "horizon",
+        "hac_day_separated": False,
+        "hypothesis_rule": "last_fold",
+        "standardisation": "pooled",
+        "leakage_time_shift": False,
     }
     assert old["gate_tstat"] == old["nw_tstat_uncrossed"]
-    for key in ("nw_tstat", "nw_tstat_pooled", "nw_tstat_uncrossed", "gate_ic", "oos_ic"):
-        assert old[key] == r[key]
+    # one instrument: the per-instrument scaling of v1.14.0 (per fold) leaves
+    # every fold's correlation unchanged; the pooled IC moves only because
+    # the folds are pooled on a common scale, never in sign
+    for f_old, f_new in zip(old["folds"], r["folds"], strict=True):
+        assert f_old["ic"] == pytest.approx(f_new["ic"], abs=1e-12)
+    for key in ("gate_ic", "oos_ic"):
+        assert np.sign(old[key]) == np.sign(r[key])
+        assert old[key] == pytest.approx(r[key], abs=0.01)
 
 
 # ---------------------------------------------------------------------------

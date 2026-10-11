@@ -1571,3 +1571,53 @@ and nothing else. `python/src/iap/marketdata`, `iap/features`,
   (`python3 tools/regenerate_dataset_artifacts.py --only power,power_extended`,
   on the CI runner for the committed files). A version-2 report cannot be
   converted.
+
+## 2026-10-11 — v1.14.0 research statistics revision (R-P0-1, R-P1-3, R-P2-1..4); no wire schema changed, every research artefact regenerated
+
+The `v2` / `v3` / `v4` method bundles (`iap.validation.methods`) move to the
+v1.14.0 statistics revision; the v1.13.0 rules stay reachable, frozen, as
+`v2_v113` / `v3_v113` / `v4_v113`.
+
+- **Backtest row block (R-P0-1).** `BacktestConfig.block_rows_column`
+  default `"auto"` -> `"causal"`: rows are blocked only on decision-time
+  state (no positive mid, or an ANCHOR reason bit of `label_reason_<h>`),
+  never on whether the forward label later turns out valid. `"auto"` is
+  kept by name and reported as `net_pnl_1x_cost_label_block`.
+  `tests/golden/expected_backtest.json` names its row block explicitly, so
+  it and the Java/C++ ports are unchanged.
+- **Inference (R-P1-3).** `validate_alpha(hac_bandwidth="auto",
+  hac_day_separated=True)`: automatic HAC lags
+  (`metrics.auto_hac_lags`, never below the horizon rule) and no lag
+  product across a session day in the gate t; `v2` always carries the
+  `validity` block; a block of fewer than four session days carries
+  `few_sessions` (sign-and-replication reading).
+- **`hypothesis_confirmed` (R-P2-1)** reads the share of folds whose model
+  confirms the hypothesis (>= 0.70); `hypothesis_confirmed_last_fold` keeps
+  the old reading; fold rows gain `hypothesis_confirmed`.
+- **Scaling (R-P2-2).** `standardisation="instrument"`: signal and label are
+  divided by each instrument's own standard deviation (per fold) before any
+  pooled statistic.
+- **Leakage (R-P2-3).** The leakage block gains the time-shift detector:
+  `time_shift_ok` (`null` = not applicable), `ic_time_shifted`,
+  `time_shift_pairs`, `time_shift_lag_ns`, `required_time_shift_ratio`.
+- **Looks (R-P2-4).** `looks_per_validation(..., looks_rule="decisions")`:
+  one look per gate decision (a runner experiment / pipeline alpha debits
+  2, was 84).
+- **Report keys.** `methods` gains `row_block`, `hac_bandwidth`,
+  `hac_day_separated`, `hypothesis_rule`, `standardisation`,
+  `leakage_time_shift`; the report gains `nw_lags_rule`, `hypothesis_rule`,
+  `hypothesis_confirmed_last_fold`. A report without them was computed at
+  the v1.13.0 revision (`iap.store.importers` reads it so).
+- **Ledger identity.** Pipelines at the v1.14.0 revision add
+  `stats_revision: "v1.14"` to their ledger configuration
+  (`methods.ledger_config`), so the same alpha / spec / combination on the
+  same data is a NEW look, never a silent rerun; entries without it are
+  scoped to the `*_v113` bundle (`methods.ledger_bundle`). Experiment ids
+  are NOT changed: an `ExperimentSpec` names the bundle, not the revision,
+  so the five runner experiments keep their ids and are re-run in place
+  (their v1.13.0 directories were removed deliberately, as the runner's
+  drift guard requires). A v1.13.0 result is reproduced by building the
+  spec with `methods="v2_v113"` (a new id).
+- Migration path: `python3 tools/regenerate_dataset_artifacts.py` on the
+  CI runner (the `regenerate` job); its "already ledgered" check now also
+  compares `stats_revision`.

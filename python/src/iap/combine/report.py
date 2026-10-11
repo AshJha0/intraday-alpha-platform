@@ -82,7 +82,7 @@ from iap.experiment import tracker
 from iap.labels.frames import scored_labels
 from iap.validation.leakage import RecomputeSources
 from iap.validation.ledger import ExperimentLedger
-from iap.validation.methods import DEFAULT_METHODS, ResearchMethods, methods
+from iap.validation.methods import DEFAULT_METHODS, ResearchMethods, ledger_config, methods
 from iap.validation.metrics import HORIZONS_NS, ic, nw_lags, pooled_slope_hac_tstat
 from iap.validation.splits import WalkForwardSplitter
 from iap.validation.validate import GATES, looks_per_validation, validate_alpha
@@ -585,6 +585,10 @@ def run_combination(
                     "method": name,
                     "horizon": probe.horizon,
                     "config": config,
+                    # the ledger identity also names the statistics revision
+                    # (v1.14.0); the experiment id below does not, so it is
+                    # preserved across the revision
+                    "ledger_config": ledger_config(config, bundle),
                     "looks": combination_looks(len(ids)),
                     "experiment_id": content_hash(
                         {
@@ -605,12 +609,12 @@ def run_combination(
     # Declared before the first experiment is evaluated: one gate look count
     # for the whole report (iap.validation.ledger, "Gate look count").
     ledger = ExperimentLedger(ledger_path, dataset_version=dataset_version)
-    identities = [(p["combination_id"], LEDGER_KIND, p["config"], p["looks"]) for p in plan]
+    identities = [(p["combination_id"], LEDGER_KIND, p["ledger_config"], p["looks"]) for p in plan]
     batch_total = ledger.batch_total(identities)
     seen: set[int] = set()
     for p in plan:
         p["gate_looks"] = ledger.gate_looks_for(
-            p["combination_id"], LEDGER_KIND, p["config"], batch_total
+            p["combination_id"], LEDGER_KIND, p["ledger_config"], batch_total
         )
         seen.add(p["gate_looks"])
     if len(seen) > 1:
@@ -679,7 +683,7 @@ def run_combination(
             ledger.record(
                 comb_id,
                 LEDGER_KIND,
-                config=p["config"],
+                config=p["ledger_config"],
                 result={
                     "experiment_id": p["experiment_id"],
                     "oos_ic": report["oos_ic"],

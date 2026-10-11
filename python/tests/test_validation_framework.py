@@ -701,9 +701,12 @@ class _BackwardsAlpha(LinearAlpha):
         return df["sig_feature"]
 
 
-#: Looks one default four-fold validation plus its out-of-sample backtest
-#: debits (``methods("v2").looks(4)``): 19 + 16 * 4 + 1.
+#: Looks one four-fold validation plus its out-of-sample backtest debits
+#: at the v1.13.0 revision (``methods("v2_v113").looks(4)``): 19 + 16 * 4 + 1.
 _BACKWARDS_LOOKS = 84
+#: ``bundle.looks(4)`` per bundle: one gate decision + the backtest since
+#: v1.14.0 (R-P2-4), every report statistic before.
+_LOOKS_BY_BUNDLE = {"v2": 2, "v2_v113": _BACKWARDS_LOOKS, "legacy_v1": 28}
 
 
 def _validate_backwards(bundle_name="v2"):
@@ -714,7 +717,7 @@ def _validate_backwards(bundle_name="v2"):
     from iap.validation.validate import validate_alpha
 
     bundle = methods(bundle_name)
-    assert bundle.looks(4) == (_BACKWARDS_LOOKS if bundle_name == "v2" else 28)
+    assert bundle.looks(4) == _LOOKS_BY_BUNDLE[bundle_name]
     kwargs = bundle.validate_kwargs()
     if bundle.tstat_threshold == "ledger":
         # the caller's part of the ledger policy: the Bonferroni |t| at the
@@ -754,7 +757,7 @@ def _validate_backwards(bundle_name="v2"):
     )
 
 
-@pytest.fixture(scope="module", params=["v2", "legacy_v1"])
+@pytest.fixture(scope="module", params=["v2", "v2_v113", "legacy_v1"])
 def backwards_report(request):
     """The backwards fixture's report under the default bundle AND under the
     legacy one: the round-4 honesty rules hold whichever methods are named."""
@@ -767,7 +770,19 @@ def test_validate_alpha_defaults_are_the_v2_methods_and_legacy_is_named():
     from iap.backtest import BacktestConfig, Backtester, CostModel
     from iap.validation.validate import GATES, validate_alpha
 
-    default = _validate_backwards("v2")
+    current = _validate_backwards("v2")
+    assert current["methods"]["row_block"] == "causal"
+    assert current["methods"]["block_rows"] == "causal"
+    assert current["methods"]["hac_bandwidth"] == "auto"
+    assert current["methods"]["hac_day_separated"] is True
+    assert current["methods"]["hypothesis_rule"] == "sign_consistency"
+    assert current["methods"]["standardisation"] == "instrument"
+    assert current["methods"]["leakage_time_shift"] is True
+    assert current["methods"]["validity_diagnostics"] is True
+    assert "validity" in current and "net_pnl_1x_cost_label_block" in current
+
+    # the v1.13.0 revision of v2, frozen under its own name
+    default = _validate_backwards("v2_v113")
     assert default["methods"] == {
         "ic_rows": "blackout_reopen",
         "significance": "pooled_slope",
@@ -780,6 +795,12 @@ def test_validate_alpha_defaults_are_the_v2_methods_and_legacy_is_named():
         "cap_fills_at_l1": True,
         "block_rows": "scored_rows:1s",
         "impact_model": "sqrt",
+        "row_block": "label_valid",
+        "hac_bandwidth": "horizon",
+        "hac_day_separated": False,
+        "hypothesis_rule": "last_fold",
+        "standardisation": "pooled",
+        "leakage_time_shift": False,
     }
     # ledger policy: max(3.0, Bonferroni |t| at 84 looks); two-sided
     # 0.05 / 84 -> one tail 2.976e-4 -> |z| ~ 3.4335, which is above 3.0
@@ -807,6 +828,12 @@ def test_validate_alpha_defaults_are_the_v2_methods_and_legacy_is_named():
         "cap_fills_at_l1": False,
         "block_rows": None,
         "impact_model": "linear",
+        "row_block": "none",
+        "hac_bandwidth": "horizon",
+        "hac_day_separated": False,
+        "hypothesis_rule": "last_fold",
+        "standardisation": "pooled",
+        "leakage_time_shift": False,
     }
     assert legacy["gates"] == GATES and legacy["gates"]["min_nw_tstat"] == 3.0
     assert legacy["gate_tstat"] == legacy["nw_tstat_uncrossed"]

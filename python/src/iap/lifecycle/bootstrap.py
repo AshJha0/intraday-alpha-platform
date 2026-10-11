@@ -122,7 +122,7 @@ from iap.lifecycle.evidence import (
 )
 from iap.lifecycle.machine import STATE_COUNT, AlphaLifecycle
 from iap.lifecycle.registry import AlphaRegistry, LifecycleTransitionLog
-from iap.validation.methods import DEFAULT_METHODS, METHODS_LEGACY
+from iap.validation.methods import DEFAULT_METHODS
 
 __all__ = [
     "BootstrapRow",
@@ -181,8 +181,11 @@ def load_report(root: Path, alpha_id: str) -> dict[str, Any]:
 
 def _entry_methods(entry: Mapping[str, Any]) -> str:
     """The method bundle a ``promotion_pipeline`` entry was recorded under
-    (an entry written before v1.5.0 names none: the legacy bundle)."""
-    return str((entry.get("config") or {}).get("methods", METHODS_LEGACY))
+    (an entry written before v1.5.0 names none: the legacy bundle; one
+    written under ``v2`` before v1.14.0 is the frozen ``v2_v113``)."""
+    from iap.validation.methods import ledger_bundle
+
+    return ledger_bundle(entry.get("config"))
 
 
 def select_pipeline_entries(

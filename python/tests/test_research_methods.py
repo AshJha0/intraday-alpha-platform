@@ -294,7 +294,8 @@ def test_fill_cap_is_the_default_and_limits_each_fill_to_the_displayed_size():
 
 
 def test_default_backtest_config_hand_calc_cost_aware_capped_and_row_blocked():
-    """The v1.5.0 default configuration, nothing named, on six 1 s rows.
+    """The v1.5.0 configuration (the v1.13.0 ``"auto"`` row block named;
+    the default is ``"causal"`` since v1.14.0) on six 1 s rows.
 
     mid 25, half-spread 0.01 (2 ticks of 0.01), fee 0.003/share: the entry
     threshold is the round-trip cost (2 * 0.01 + 2 * 0.003) / 25 = 1.04e-3
@@ -310,12 +311,12 @@ def test_default_backtest_config_hand_calc_cost_aware_capped_and_row_blocked():
     5    0       blocked (invalid label): no decision                      -100
     """
     assert BacktestConfig().position_policy == "cost_aware"
-    assert BacktestConfig().block_rows_column == "auto"
+    assert BacktestConfig().block_rows_column == "causal"
     er = [2e-3, 6e-4, 1e-4, -2e-3, 0.0, 0.0]
     valid = [True, True, True, True, True, False]
     frame = _l1_frame(6, bid_size=[500] * 6, ask_size=[300] * 6, valid=valid)
     frame["label_mid_1s"] = 0.0
-    cfg = BacktestConfig(max_pos_qty=1000, latency_rows=0)
+    cfg = BacktestConfig(max_pos_qty=1000, latency_rows=0, block_rows_column="auto")
     bt = Backtester(_cost_model(), META, cfg)
     with pytest.raises(ValueError, match="needs horizon_ns"):
         bt.run_instrument(1, frame, _scores(er))
@@ -386,11 +387,11 @@ def test_fill_cap_keeps_the_accounting_identity_and_exempts_the_session_flatten(
 
 
 def test_blocked_rows_make_no_decision_and_legacy_trades_every_row():
-    """The default blocks the rows the IC does not score (``"auto"``); the
-    legacy config blocks nothing.  Positions are hand-computed under the
+    """``"auto"`` (the v1.5.0-v1.13.0 default) blocks the rows the IC does
+    not score; the legacy config blocks nothing.  Positions are hand-computed under the
     legacy SIGN policy, named, with the block off, on a named column and on
     the default ``"auto"`` mask."""
-    assert BacktestConfig().block_rows_column == "auto"
+    assert BacktestConfig().block_rows_column == "causal"
     assert BacktestConfig.legacy().block_rows_column is None
     er = [1e-3, 1e-3, -1e-3, -1e-3, 1e-3, 1e-3]
     valid = [True, True, False, False, True, True]
@@ -413,7 +414,7 @@ def test_blocked_rows_make_no_decision_and_legacy_trades_every_row():
     # the default mask, "auto" = the rows the IC scores at the horizon: here
     # exactly the valid-label rows, so it blocks the same two decisions
     auto_cfg = BacktestConfig.legacy(max_pos_qty=100, latency_rows=0, block_rows_column="auto")
-    assert auto_cfg.block_rows_column == BacktestConfig().block_rows_column
+    assert auto_cfg.block_rows_column == "auto"
     labelled = frame.assign(label_mid_1s=0.0)
     auto = Backtester(_cost_model(), META, auto_cfg).for_horizon("1s")
     assert auto.config.block_rows_label() == "scored_rows:1s"
