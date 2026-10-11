@@ -1397,7 +1397,7 @@ flowchart LR
     EV["IAP1 or canonical JSONL events"] --> API["iap.features.native<br/>compute_native / compute_native_file<br/>engine = python or rust"]
     API --> RES{"resolve_engine"}
     RES -->|"python, or rust without the wheel<br/>(warning, falls back)"| PYE["Python reference engine<br/>all 205 features"]
-    RES -->|"rust"| EXT["iap_features_rs (pyo3 0.22.6, abi3 wheel,<br/>maturin 1.7.8; GIL released)"]
+    RES -->|"rust"| EXT["iap_features_rs (pyo3 0.29.3, abi3 wheel,<br/>maturin 1.7.8; GIL released)"]
     EXT --> RS["rust/features crate<br/>45 native slots: pinned 40 + 5 alpha inputs"]
     PYE --> NF["NativeFrame<br/>values n x 45 (NaN where invalid),<br/>validity n x 45, ids, event index, timestamps"]
     RS --> NF

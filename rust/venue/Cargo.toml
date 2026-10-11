@@ -3,6 +3,8 @@ name = "venue"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
 description = "IAP venue adapter layer: order/execution contracts, length-prefixed wire codec, simulated venue endpoint"
 
 [dependencies]

@@ -13,7 +13,16 @@
     prereg  --agent ID --alpha EQ01 --horizon 1s --hypothesis "..." --expected-sign 1
             [--keyfile PATH] [--ledger FILE] [--dataset-version V] [--supersede]
     anchor                                                     # G3: write anchors.json
-    verify-board [--legacy-hmac-keyfile PATH]  # G3/G4: chain, git, anchors, signatures
+    verify-board [--legacy-hmac-keyfile PATH] [--trust-ref REF]
+                                               # G3/G4: chain, git, anchors, signatures
+    maintainer-keygen --maintainer ID --keyfile PATH  # G-P1-4: trust-root key pair
+    sign-registry --maintainer ID --keyfile PATH      # G-P1-4: sign agent_pubkeys.json
+
+Since v1.14 (G-P1-4) a non-empty agent key registry is used only when a
+maintainer listed in ``research/agents/trust_roots.json`` has signed it
+(:mod:`iap.agents.trust`); ``prereg`` refuses an unsigned write by an agent
+that has a registered key, and signed requests are bound to the board head
+and board id (``ed25519-v2``).
 
 ``issue`` is run by the person approving; ``apply`` verifies the signature,
 burns the nonce on the blackboard and performs the HUMAN lifecycle edge
@@ -148,8 +157,49 @@ def cmd_agent_keygen(a: argparse.Namespace) -> int:
     return 0
 
 
-def _pubkeys(root: Path) -> dict[str, str]:
-    return _keys(root / PUBKEYS_RELPATH)
+def _pubkeys(root: Path, ref: str | None = None) -> dict[str, str]:
+    """The registry, only if it is empty or maintainer-signed (G-P1-4)."""
+    from iap.agents import trust
+
+    try:
+        return trust.trusted_pubkeys(root, ref)
+    except trust.TrustError as exc:
+        raise SystemExit(f"agent key registry not trusted: {exc}") from exc
+
+
+def cmd_maintainer_keygen(a: argparse.Namespace) -> int:
+    """A trust-root key pair: private key OUTSIDE the repo, public key into
+    research/agents/trust_roots.json (trusted by CI once it is on main)."""
+    from iap.agents import signing, trust
+
+    path = _outside(a.keyfile, a.root)
+    keys = _keys(path)
+    roots_path = a.root / trust.TRUST_ROOTS_RELPATH
+    roots = _keys(roots_path) or {"maintainers": {}}
+    if a.maintainer in keys or a.maintainer in roots["maintainers"]:
+        raise SystemExit(f"maintainer {a.maintainer!r} already has a key")
+    priv, pub = signing.generate_keypair()
+    keys[a.maintainer] = priv
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(keys, sort_keys=True), encoding="ascii")
+    roots["maintainers"][a.maintainer] = pub
+    roots_path.write_text(json.dumps(roots, indent=2, sort_keys=True) + "\n", encoding="ascii")
+    print(f"private key for {a.maintainer!r} written to {path}; public key added to {roots_path}")
+    return 0
+
+
+def cmd_sign_registry(a: argparse.Namespace) -> int:
+    """Sign the current agent key registry as a maintainer (G-P1-4)."""
+    from iap.agents import trust
+
+    keys = _keys(_outside(a.keyfile, a.root))
+    if a.maintainer not in keys:
+        raise SystemExit(f"no key for maintainer {a.maintainer!r}")
+    doc = trust.sign_registry(keys[a.maintainer], a.maintainer, trust.load_pubkeys(a.root))
+    out = a.root / trust.REGISTRY_SIG_RELPATH
+    out.write_text(json.dumps(doc, indent=2, sort_keys=True) + "\n", encoding="ascii")
+    print(f"registry signed by {a.maintainer!r} -> {out}")
+    return 0
 
 
 def cmd_prereg(a: argparse.Namespace) -> int:
@@ -164,16 +214,24 @@ def cmd_prereg(a: argparse.Namespace) -> int:
         "hypothesis": a.hypothesis,
         "expected_sign": a.expected_sign,
     }
+    registry = _pubkeys(a.root)
+    if a.keyfile is None and a.agent in registry:
+        # G-P1-4: a keyed agent never writes unsigned
+        print(
+            f"refused: agent {a.agent!r} has a registered public key; sign the request (--keyfile)",
+            file=sys.stderr,
+        )
+        return 1
     if a.keyfile is not None:
         raw = _keys(_outside(a.keyfile, a.root))
         if a.agent not in raw:
             raise SystemExit(f"no key for agent {a.agent!r}")
-        registry = _pubkeys(a.root)
         if a.agent not in registry:
             raise SystemExit(f"agent {a.agent!r} has no public key in {PUBKEYS_RELPATH}")
         pubkeys = {a.agent: registry[a.agent]}
-        auth = sign(raw[a.agent], a.agent, "preregister", args)
     broker = WriteBroker(a.root, {a.agent}, pubkeys=pubkeys)
+    if pubkeys is not None:
+        auth = sign(raw[a.agent], a.agent, "preregister", args, **broker.request_context())
     try:
         pid = broker.preregister(
             a.agent,
@@ -206,17 +264,24 @@ def cmd_anchor(a: argparse.Namespace) -> int:
 
 def cmd_verify_board(a: argparse.Namespace) -> int:
     """Chain + git-history (re-chaining) + anchors + signatures (G3, G4)."""
-    from iap.agents import anchor, prereg_gate
+    from iap.agents import anchor, prereg_gate, trust
     from iap.agents.blackboard import Blackboard
+    from iap.agents.broker import board_id
 
     board = prereg_gate.board_path(a.root)
-    report = anchor.verify(a.root, board, a.root / anchor.ANCHORS_RELPATH)
+    report = anchor.verify(a.root, board, a.root / anchor.ANCHORS_RELPATH, ref=a.trust_ref)
+    try:
+        pubkeys = trust.trusted_pubkeys(a.root, a.trust_ref)
+    except trust.TrustError as exc:
+        report["problems"].append(f"agent key registry not trusted: {exc}")
+        report["ok"] = False
+        pubkeys = trust.load_pubkeys(a.root)
     legacy = None
     if a.legacy_hmac_keyfile is not None:
         raw = _keys(_outside(a.legacy_hmac_keyfile, a.root))
         legacy = {k: bytes.fromhex(v) for k, v in raw.items()}
     if report["entries"]:
-        sig = Blackboard(board).verify_signatures(_pubkeys(a.root), legacy)
+        sig = Blackboard(board).verify_signatures(pubkeys, legacy, board_id(a.root, board))
         report["problems"] += sig
         report["ok"] = report["ok"] and not sig
     print(json.dumps(report, indent=2, sort_keys=True))
@@ -264,6 +329,17 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("anchor")
     vb = sub.add_parser("verify-board")
     vb.add_argument("--legacy-hmac-keyfile", type=Path, default=None)
+    vb.add_argument(
+        "--trust-ref",
+        default=None,
+        help="git ref to read trust roots from and verify anchors against (CI: origin/main)",
+    )
+    mk = sub.add_parser("maintainer-keygen")
+    mk.add_argument("--maintainer", required=True)
+    mk.add_argument("--keyfile", type=Path, required=True)
+    sr = sub.add_parser("sign-registry")
+    sr.add_argument("--maintainer", required=True)
+    sr.add_argument("--keyfile", type=Path, required=True)
     a = ap.parse_args(argv)
     return {
         "keygen": cmd_keygen,
@@ -274,6 +350,8 @@ def main(argv: list[str] | None = None) -> int:
         "prereg": cmd_prereg,
         "anchor": cmd_anchor,
         "verify-board": cmd_verify_board,
+        "maintainer-keygen": cmd_maintainer_keygen,
+        "sign-registry": cmd_sign_registry,
     }[a.cmd](a)
 
 

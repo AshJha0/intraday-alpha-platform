@@ -23,23 +23,30 @@ it is a stopgap.
 
 ## 2. Vulnerability scanning
 
-What runs today. The two dependency audits are **non-blocking** (a finding
-is reported in the CI log and does not fail the run, because none has been
-triaged yet); the lint and sanitizer steps are **blocking**:
+What runs today. Since v1.14 (G-P1-7) the dependency audits are
+**blocking** (the `supply-chain` job in `ci.yml`), as are the lint and
+sanitizer steps. The only way past a finding is a bumped dependency or an
+entry in `.github/audit-ignores.json` with a reason and an `expires` date;
+`tools/audit_ignores.py` fails the job once an entry has expired:
 
-- Python: `pip-audit` against `python/requirements-ci.txt` (the `advisory` job
-  in `ci.yml`, non-blocking), plus `ruff check` (blocking; rules E, W, F, I,
-  UP and B — `ruff.toml`) and `ruff format --check` (blocking).
-- Rust: `cargo audit` against `Cargo.lock` (RustSec advisory DB, `advisory`
-  job, non-blocking) and `cargo clippy -D warnings` (a blocking step of the
-  `rust` job).
+- Python: `pip-audit --strict` against `python/requirements-ci.txt` and
+  `python/requirements-image.txt` (`supply-chain`), plus `ruff check`
+  (blocking; rules E, W, F, I, UP and B — `ruff.toml`) and
+  `ruff format --check` (`advisory` job).
+- Rust: `cargo audit --deny warnings` against `rust/Cargo.lock` and a
+  generated lockfile for `rust/features_py`, `cargo deny check bans licenses
+  sources` (`rust/deny.toml`: crates.io only, permissive licences, no
+  wildcards), all in `supply-chain`; `cargo clippy -D warnings` in `rust`.
+- Containers and config: `trivy fs` (lockfile vulnerabilities) and
+  `trivy config` (Dockerfiles, compose, k8s) at HIGH/CRITICAL in
+  `supply-chain`; `trivy image` on all four images (HIGH/CRITICAL with a
+  fix) in `images`. The trivy release tarball is pinned by SHA-256.
 - C++: an ASan+UBSan build of the full ctest suite (`cpp-sanitizers` job,
   blocking).
-- Source code: CodeQL for python, java-kotlin, c-cpp and the workflows
-  (`codeql.yml`).
+- Source code: CodeQL for python, java-kotlin, c-cpp, rust (v1.14) and the
+  workflows (`codeql.yml`).
 
-What is required but **not implemented**: `trivy image` (or equivalent) on
-every candidate image before it is digest-pinned, and refreshing/re-digesting
+What is required but **not implemented**: refreshing/re-digesting
 base images monthly (Dependabot opens the PRs; the cadence is not enforced).
 Dependabot alerts are a repository setting that is not yet configured
 (`REPO_SETTINGS.md` section 3). Policy: a release is blocked on any

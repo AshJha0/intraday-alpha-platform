@@ -386,7 +386,7 @@ def test_ledger_is_dataset_scoped(tmp_path):
     new.save()
 
     blob = json.loads(path.read_text())
-    assert blob["x-version"] == 3  # v1.5.0: entries may carry gate_looks
+    assert blob["x-version"] == 4  # v1.5.0: gate_looks; v1.14: chain_head (G-P1-5)
     first, second = blob["entries"]
     # recorded without a gate look count: the v1.5.0 field is absent, not null
     assert "gate_looks" not in first and "gate_looks" not in second
@@ -413,9 +413,10 @@ def test_committed_ledger_names_a_dataset_on_every_entry():
     """research/experiments.json after the v1.4.0 migration
     (research/migrate_ledger_dataset_scope.py): no entry without a dataset,
     the retired v1.3.0 dataset's 1068 looks still counted, the total equal to
-    the sum over datasets.  The document is x-version 3 since v1.5.0."""
+    the sum over datasets.  The document is x-version 3 since v1.5.0, 4 (chained,
+    G-P1-5) since v1.14."""
     blob = json.loads((REPO_ROOT / "research" / "experiments.json").read_text())
-    assert blob["x-version"] == 3
+    assert blob["x-version"] == 4
     assert all(ExperimentLedger.entry_dataset_version(e) for e in blob["entries"])
     by_dataset = {d["dataset_version"]: d for d in blob["datasets"]}
     legacy = by_dataset["203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b"]

@@ -1,6 +1,8 @@
 {
   "bonferroni_p_threshold": 9.69743987587277e-06,
   "bonferroni_t_threshold": 4.423812040443981,
+  "chain_head": "7e9248ec210dc97b416e716f7c29fa8e7f7b6695a8931f99c0489cb20d1da6e4",
+  "chain_length": 216,
   "datasets": [
     {
       "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
@@ -5062,5 +5064,5 @@
   "expected_max_null_t": 4.134710718794987,
   "pinned_alpha": 0.05,
   "total_experiments": 5156,
-  "x-version": 3
+  "x-version": 4
 }

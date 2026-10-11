@@ -1161,7 +1161,7 @@ default location is `research/models/registry`. API_ADAPTIVE.md §9.
 
 ### 17.3 The Rust feature engine as a Python wheel (E2)
 
-`rust/features_py` is a pyo3 0.22.6 extension module built by maturin
+`rust/features_py` is a pyo3 0.29.3 extension module built by maturin
 1.7.8 into a single **abi3** wheel (`iap_features_rs`): one binary per OS
 and architecture serves every CPython from 3.10 up, because it uses only
 the stable ABI. It is a standalone package outside the `rust/` workspace,

@@ -1,0 +1,52 @@
+# cargo-deny policy for the rust/ workspace (G-P1-7, v1.14). Blocking in the
+# `supply-chain` CI job: `cargo deny check bans licenses sources` from rust/
+# (and against rust/features_py/Cargo.toml with a generated lockfile).
+#
+# Advisories are checked by `cargo audit` in the same job, whose only ignores
+# are the reasoned, expiring entries of .github/audit-ignores.json; keep
+# [advisories].ignore below empty so there is one place to look.
+
+[graph]
+all-features = true
+
+[advisories]
+# RustSec: vulnerabilities, unsound and yanked crates fail; unmaintained
+# crates fail only when a workspace crate depends on them directly.
+version = 2
+yanked = "deny"
+unmaintained = "workspace"
+ignore = []
+
+[licenses]
+version = 2
+confidence-threshold = 0.9
+# one allow list for the workspace and features_py; not every entry is used by both
+unused-allowed-license = "allow"
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+]
+
+[licenses.private]
+# workspace crates are `publish = false` (MIT, LICENSE at the repo root)
+ignore = true
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# path dependencies between workspace crates have no version requirement
+allow-wildcard-paths = true
+
+[sources]
+# crates.io only: no git or alternative-registry dependencies
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
