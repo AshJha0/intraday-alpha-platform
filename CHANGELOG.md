@@ -6,6 +6,21 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## v1.13.0 — unreleased
+
+- **Feature-build memory (E5).** `python -m iap.features` streams events
+  from the IAP1 file (`iap.core.codec.iter_iap1`, validated before the
+  first event), keeps the label mid series in a `CompactMidSeries` (typed
+  arrays; `iap.labels`) and row timestamps / validity / the parallel
+  profile log in typed arrays, and spools the float64 row values to
+  `--out-dir/.spool_<pid>` until an instrument's row group is written.
+  Output is byte-identical for every option combination (default,
+  `--workers`, `--label-freshness trailing`, `--feature-set extended`,
+  `--sampling events|volume`, `--engine rust`). Serial peak RSS on a 3-day
+  synthetic set: 672 MB -> 234 MB, wall time 192.5 s -> 184.9 s
+  (`tools/bench_feature_memory.py`, docs/REAL_DATA.md §10). Real-day
+  re-measurement pending; `--worker-mem-gb` default unchanged.
+
 ## v1.12.0 — 2026-10-10
 
 Honest Sharpe, better passive fills, new features, measured latency and

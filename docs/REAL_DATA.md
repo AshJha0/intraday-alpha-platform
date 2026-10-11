@@ -784,6 +784,48 @@ normalisation; per-symbol parallelism of pass 2 and a Rust decoder (backlog
 XD07) are the larger steps. The Python feature engine still uses the
 reference book and is the slow stage on a liquid name.
 
+**Feature build memory (v1.13.0, plan item E5).** A 2026 day used about
+10 GB of 16 GB in `python -m iap.features`, and with `--workers` every
+worker holds a day. The same pattern as the v1.8.0 ingest fix now applies
+to the feature build: events are streamed from the IAP1 file 65,536
+records at a time (`iter_iap1`; magic, size and CRC-32 are checked before
+the first event), the per-refresh label mid series is held in typed arrays
+(`CompactMidSeries`, 25 bytes a sample instead of four boxed list entries),
+row timestamps / validity / the parallel build's profile log are typed
+arrays, and the float64 row values -- rows x features x 8 bytes, the
+largest part of a day -- are spooled to a file under `--out-dir/.spool_<pid>`
+and read back one instrument at a time when its row group is written. The
+Rust overlay and the parallel norm_* patch are recorded per column and
+applied at that point, in the old order. Labels keep the same two-pointer
+sweep. Parquet bytes and the summary (except `runtime_seconds`) are
+identical to v1.12.0 for the default build, `--workers 2/3`,
+`--label-freshness trailing`, `--feature-set extended`, `--sampling
+events:N` / `volume:N` and `--engine rust` (checked against the v1.12.0
+tree; `test_feature_memory.py` and `test_feature_parallel.py` keep the
+pieces pinned). Measured with `tools/bench_feature_memory.py` (serial
+build, 3 synthetic days, `--slots 6000`, 100 ms cadence, 200 MB of
+normalized input, Windows laptop, Python 3.12):
+
+| Build | Peak RSS | Wall time |
+|---|---:|---:|
+| v1.12.0 | 672 MB | 192.5 s |
+| v1.13.0 (E5) | 234 MB | 184.9 s |
+
+2.9x less peak memory, no slower. What remains resident is one day's engine
+state, the per-instrument timestamps, validity and mid series, and one
+instrument's row group while it is written. The spool needs free disk of
+about rows x features x 8 bytes for the day in flight. Not yet re-measured
+on a real day (two real-data jobs were using the machine); the validation
+command, expected to go from ~10 GB to roughly a third of that:
+
+    PYTHONPATH=python/src python -m iap.features --data-dir <real normalized dir> \
+        --out-dir <scratch out> --files <one 2026 day>.normalized.iap1 --workers 1
+
+reading peak working set from Task Manager / `/usr/bin/time -v`, then
+comparing the parquet bytes with the v1.12.0 store of that day.
+`--worker-mem-gb` keeps its default of 5 until that measurement; on a
+16 GB machine 3 workers should then fit where 2 did.
+
 **On synthesised input** (`test_parser_throughput_smoke_and_bounded_memory`
 prints the figures of its own run; it asserts only a generous lower bound):
 
@@ -798,8 +840,8 @@ orders of the universe; mapped events go to a fixed-width spool file, not a
 list (3.2 MB peak traced while streaming an 8.4 MB file, independent of
 file size). Pass 2 and the normaliser then hold one session's universe
 events in memory (about 2.7 GB for the 5.4 million events above), as the
-normaliser does for synthetic data, and so does the feature pipeline —
-that, not the reader, bounds the size of a universe.
+normaliser does for synthetic data; the feature pipeline streams them
+since v1.13.0 (above).
 
 ## 11. Known limitations
 

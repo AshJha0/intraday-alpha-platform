@@ -354,6 +354,96 @@ def read_iap1(path: str | Path) -> list[MarketEvent]:
         return decode_iap1(f.read())
 
 
+#: Records decoded per chunk by :func:`iter_iap1` (~4.7 MB of raw bytes).
+_ITER_CHUNK_RECORDS = 65536
+
+
+def iter_iap1(path: str | Path, chunk_records: int = _ITER_CHUNK_RECORDS) -> Iterator[MarketEvent]:
+    """Stream the events of an IAP1 file in file order (v1.13, E5).
+
+    Same validation as :func:`read_iap1` -- magic, version, size, trailer and
+    CRC-32 are all checked BEFORE the first event is yielded (one chunked
+    pass over the file) -- but only ``chunk_records`` 72-byte records are
+    decoded at a time, so a full day never exists as a list of
+    ``MarketEvent`` objects.  Yields exactly the events ``read_iap1`` returns.
+    """
+    if chunk_records < 1:
+        raise ValueError("chunk_records must be >= 1")
+    with open(path, "rb") as f:
+        head = f.read(IAP1_HEADER_SIZE)
+        if len(head) < IAP1_HEADER_SIZE:
+            raise ValueError(f"IAP1 file truncated: {len(head)} bytes < 16-byte header")
+        magic, version, count = _HEADER.unpack_from(head, 0)
+        if magic != IAP1_MAGIC:
+            raise ValueError(f"bad IAP1 magic: 0x{magic:08X} (expected 0x{IAP1_MAGIC:08X})")
+        if version not in (IAP1_VERSION, IAP1_VERSION_LEGACY):
+            raise ValueError(f"unsupported IAP1 version: {version}")
+        with_trailer = version == IAP1_VERSION
+        body_size = IAP1_HEADER_SIZE + IAP1_RECORD_SIZE * count
+        expected = body_size + (IAP1_TRAILER_SIZE if with_trailer else 0)
+        size = f.seek(0, 2)
+        if size != expected:
+            raise ValueError(
+                f"IAP1 size mismatch: {size} bytes, header count={count} "
+                f"(version {version}) implies {expected}"
+            )
+        step = IAP1_RECORD_SIZE * chunk_records
+        if with_trailer:
+            f.seek(body_size)
+            crc, reserved, count_echo = _TRAILER.unpack(f.read(IAP1_TRAILER_SIZE))
+            if reserved != 0:
+                raise ValueError(f"IAP1 trailer reserved field must be 0: {reserved}")
+            if count_echo != count:
+                raise ValueError(f"IAP1 trailer count echo {count_echo} != header count {count}")
+            f.seek(0)
+            actual = 0
+            left = body_size
+            while left > 0:
+                block = f.read(min(step, left))
+                actual = zlib.crc32(block, actual)
+                left -= len(block)
+            actual &= 0xFFFFFFFF
+            if actual != crc:
+                raise ValueError(
+                    f"IAP1 CRC-32 mismatch: trailer 0x{crc:08X}, computed 0x{actual:08X}"
+                )
+        f.seek(IAP1_HEADER_SIZE)
+        left = count
+        it = _RECORD.iter_unpack
+        while left > 0:
+            n = min(chunk_records, left)
+            block = f.read(IAP1_RECORD_SIZE * n)
+            left -= n
+            for (
+                event_id,
+                instrument_id,
+                venue_id,
+                event_type,
+                side,
+                exchange_ts,
+                receive_ts,
+                sequence,
+                price_ticks,
+                qty,
+                order_id,
+                trade_id,
+            ) in it(block):
+                yield MarketEvent(
+                    event_id,
+                    instrument_id,
+                    venue_id,
+                    exchange_ts,
+                    receive_ts,
+                    sequence,
+                    event_type,
+                    side,
+                    price_ticks,
+                    qty,
+                    order_id,
+                    trade_id,
+                )
+
+
 # -------------------------------------------------------------------- SHA-256
 
 
