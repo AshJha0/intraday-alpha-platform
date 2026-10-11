@@ -1,10 +1,10 @@
 # cargo-deny policy for the rust/ workspace (G-P1-7, v1.14). Blocking in the
-# `supply-chain` CI job: `cargo deny --locked check` from rust/ (and against
-# rust/features_py/Cargo.toml with a generated lockfile).
+# `supply-chain` CI job: `cargo deny check bans licenses sources` from rust/
+# (and against rust/features_py/Cargo.toml with a generated lockfile).
 #
-# Any `ignore` entry below MUST carry a reason and a review-by date and be
-# listed in the PR that adds it; an expired entry is removed or renewed with
-# a new reason, never left to rot.
+# Advisories are checked by `cargo audit` in the same job, whose only ignores
+# are the reasoned, expiring entries of .github/audit-ignores.json; keep
+# [advisories].ignore below empty so there is one place to look.
 
 [graph]
 all-features = true
@@ -20,6 +20,8 @@ ignore = []
 [licenses]
 version = 2
 confidence-threshold = 0.9
+# one allow list for the workspace and features_py; not every entry is used by both
+unused-allowed-license = "allow"
 allow = [
     "MIT",
     "Apache-2.0",

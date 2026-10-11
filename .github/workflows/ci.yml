@@ -594,8 +594,8 @@ jobs:
         working-directory: rust
         run: |
           cargo deny --locked check bans licenses sources
-          cargo deny --manifest-path features_py/Cargo.toml --config deny.toml \
-            check bans licenses sources
+          cargo deny --manifest-path features_py/Cargo.toml \
+            check --config deny.toml bans licenses sources
       # trivy: release tarball pinned by SHA-256 (same pattern as gitleaks),
       # not the trivy-action (its tags were hijacked in March 2026).
       - name: install trivy
