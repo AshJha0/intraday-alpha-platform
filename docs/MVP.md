@@ -525,7 +525,7 @@ its own `<out>/<SYMBOL>/` directory.
 Smoke run (2026-10-11, `ds3_20190130`, AAPL, `--limit-events 200000`, legacy
 manifest). The first 200,000 AAPL events run from 03:08 to 09:41 ET, so about
 11 minutes of regular session. Results: 4,836 decisions, 4,424 parents, 956
-children submitted, 946 fills, gross P&L +219.78 USD, fees 64.63 USD,
-execution cost 634.35 USD, equity -414.57 USD, trace digest `88bb4218…`,
+children submitted, 946 fills, gross P&L USD +219.78, fees USD 64.63,
+execution cost USD 634.35, equity USD -414.57 (a loss), trace digest `88bb4218…`,
 359 s wall time. This run checks the plumbing only. It is not a research
 result; the full-day runs come after the maker study.
