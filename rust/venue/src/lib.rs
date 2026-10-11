@@ -5,6 +5,7 @@
 
 pub mod codec;
 pub mod messages;
+pub mod regfees;
 pub mod sim;
 
 pub use codec::{
@@ -14,4 +15,5 @@ pub use codec::{
 pub use messages::{
     order_validation_error, validate_order, ExecStatus, ExecutionReport, OrderRequest, OrderType,
 };
+pub use regfees::{FeePeriod, RegulatoryFeeSchedule};
 pub use sim::{RejectReason, SimVenueConfig, SimulatedVenue};

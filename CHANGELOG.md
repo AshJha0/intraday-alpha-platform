@@ -6,7 +6,15 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
-## Unreleased — v1.15
+## Unreleased (v1.15)
+
+- **X-P1-1: dated SEC Section 31 + FINRA TAF fees** in the Python, C++ and
+  Rust execution engines (sell side only), from
+  `configs/reference/regulatory_fee_schedule.json` (dated periods with
+  sec.gov / finra.org sources, verified 2026-10-11; continuous from
+  2019-01-01, including the FINRA TAF pause 2026-10-01..2026-12-31). Off in code defaults,
+  on in `configs/prereg/v2.json`. New cross-engine golden
+  `tests/golden/expected_regulatory_fees.json`; no existing golden changes.
 
 ### Java engine archived (G-P1-3, owner-approved)
 
@@ -25,10 +33,10 @@ that tag.
   any remaining four-language count; the Java FROZEN paths and the Java
   declaration extractor left the polyglot policy (the override machinery stays
   for the Rust and C++ frozen copies).
-- Docs and site counts: parity is 2385 / 302 / 362 tests, 193 / 72 / 71
-  golden: 3,049 green (was 3,624 with Java's 575).
-- Ruleset: `java` must be dropped from the `protect-main` required checks
-  (owner action; docs/governance/REPO_SETTINGS.md updated).
+- Docs and site counts: parity is 2411 / 302 / 365 tests, 193 / 72 / 71
+  golden: 3,078 green (was 3,653 with Java's 575).
+- Ruleset: `java` dropped from the `protect-main` required checks
+  (2026-10-11; docs/governance/REPO_SETTINGS.md updated).
 
 ## v1.14.0 — 2026-10-11
 

@@ -732,6 +732,21 @@ Every item is opt-in or default-off unless marked; the execution goldens
   million = 0.207 bp and TAF $0.000119/share capped at $5.95; 2026: $20.60
   per million from 2026-04-04 and TAF $0.000195 capped at $9.79) are in
   `configs/templates/regulatory_fees.json`; no shipped config sets them.
+- **Dated regulatory fee schedule (v1.15, X-P1-1).**
+  `configs/reference/regulatory_fee_schedule.json` holds dated SEC Section
+  31 and FINRA TAF periods (`from_ns <= ts < until_ns`, each citing its
+  sec.gov / finra.org notice). `ExecConfig.regulatory_fees` (Python
+  `iap.execution.regulatory.RegulatoryFeeSchedule`, C++
+  `iap/execution/regulatory_fees.hpp`, Rust `venue::regfees` via
+  `SimulatedVenue::with_regulatory_fees`) charges, on equity SELL fills only,
+  `usd_per_million * notional / 1e6 + min(per_share * qty, max_per_trade)`
+  at the fill's `exchange_ts`; a fill outside every period raises (fail
+  closed). Default off (`None` / empty) so v1 numbers and every existing
+  golden are unchanged; `load_exec_config(..., regulatory_fees=True)` loads
+  it and `configs/prereg/v2.json` asks for it. Cross-engine golden:
+  `tests/golden/expected_regulatory_fees.json`
+  (`python/tools/make_golden_regulatory_fees.py`). The research `CostModel`
+  takes a period via `with_dated_regulatory_fees(schedule, ts)`.
 - **Markout reference (X-P1-4, default changed, research paths only).** The
   maker and quoting backtesters measure a MAKER fill's adverse selection
   from the mid before the FIRST event of its `exchange_ts`, the rule of

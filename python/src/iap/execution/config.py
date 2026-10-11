@@ -24,6 +24,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from iap.execution.regulatory import RegulatoryFeeSchedule, load_default_schedule
 from iap.execution.types import InstrumentSpec, LatencyConfig, VenueSpec
 
 PathLike = str | Path
@@ -51,6 +52,10 @@ class ExecConfig:
     impact_coeff_bps_per_pct_adv: float = 2.0
     instruments: Mapping[int, InstrumentSpec] = field(default_factory=dict)
     venues: Mapping[int, VenueSpec] = field(default_factory=dict)
+    #: v1.15 X-P1-1: dated SEC Section 31 + FINRA TAF schedule charged on
+    #: SELL fills of equity venues by fill time (``iap.execution.regulatory``).
+    #: ``None`` (the default) keeps rule 5 byte-identical to v1.
+    regulatory_fees: RegulatoryFeeSchedule | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.seed, int) or self.seed < 0:
@@ -212,12 +217,20 @@ def load_sor_options(path: PathLike) -> SorOptions:
     return SorOptions(pr, int(_number(sor, "max_venue_latency_ns", f"{path} sor")))
 
 
-def load_exec_config(config_dir: PathLike, latency: LatencyConfig = LatencyConfig()) -> ExecConfig:  # noqa: B008 (frozen dataclass default, one shared immutable instance is intended)
+def load_exec_config(
+    config_dir: PathLike,
+    latency: LatencyConfig = LatencyConfig(),  # noqa: B008 (frozen dataclass default, one shared immutable instance is intended)
+    *,
+    regulatory_fees: bool = False,
+) -> ExecConfig:
     """Build the ``ExecConfig`` the platform runs with from a config directory.
 
     Mirrors the Java ``PaperTrading`` wiring: ``LatencyConfig`` defaults (or
     the one given), ``defaults.seed`` and ``cost_model.impact_coeff_bps_per_pct_adv``
     from ``execution/execution.json``, every instrument and every venue.
+    ``regulatory_fees=True`` (v1.15 X-P1-1; what ``configs/prereg/v2.json``
+    asks for) also loads the dated Section 31 + TAF schedule
+    ``reference/regulatory_fee_schedule.json``; the default stays off.
     """
     base = Path(config_dir)
     exec_path = base / EXECUTION_FILE
@@ -236,4 +249,5 @@ def load_exec_config(config_dir: PathLike, latency: LatencyConfig = LatencyConfi
         ),
         instruments=load_instruments(base / INSTRUMENTS_FILE),
         venues=load_venues(base / VENUES_FILE),
+        regulatory_fees=load_default_schedule(base) if regulatory_fees else None,
     )

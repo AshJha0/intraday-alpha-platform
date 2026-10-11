@@ -69,6 +69,9 @@ this module is self-contained:
    only: plus ``sell_notional_fee_bps * 1e-4 * notional`` on SELL fills (SEC
    Section 31) and ``min(per_share_fee_all * qty, per_share_fee_cap)`` (FINRA
    TAF; sells only unless ``per_share_fee_sell_only`` is false).
+   v1.15 opt-in (X-P1-1, ``ExecConfig.regulatory_fees``, default ``None``):
+   plus the DATED Section 31 + TAF fee of the fill's ``exchange_ts`` on
+   equity SELL fills (``iap.execution.regulatory``; same in C++ and Rust).
 6. **Linear impact** (taker fills only; the ``impact_model = "linear"`` rule
    of ``iap.backtest.costs``, whose research default is the square root
    since v1.5.0 — this simulator rule did not change):
@@ -381,7 +384,9 @@ class ExecutionSimulator:
         self._resting = [i for i in self._resting if i != o.order_id]
         self._cancels = [e for e in self._cancels if e[1] != o.order_id]
 
-    def _fill_fee(self, o: ChildOrder, price_ticks: int, qty: int, liq: Liquidity) -> float:
+    def _fill_fee(
+        self, o: ChildOrder, price_ticks: int, qty: int, liq: Liquidity, ts: int = 0
+    ) -> float:
         """Rule 5."""
         v = self._venue(o.venue_id)
         if v.is_fx:
@@ -399,6 +404,12 @@ class ExecutionSimulator:
             ins = self._instrument(o.instrument_id)
             notional = float(qty) * ins.qty_unit * float(price_ticks) * ins.tick_size
             base += v.regulatory_fee(o.side, float(qty), notional)
+        sched = self._config.regulatory_fees
+        if sched is not None and o.side == 1:
+            # v1.15 X-P1-1: dated Section 31 + TAF by fill time (sells only).
+            ins = self._instrument(o.instrument_id)
+            notional = float(qty) * ins.qty_unit * float(price_ticks) * ins.tick_size
+            base += sched.fee(o.side, float(qty), notional, ts)
         return base
 
     def _emit_fill(
@@ -425,7 +436,7 @@ class ExecutionSimulator:
                 qty=qty,
                 ts=ts,
                 liquidity=liq,
-                fee=self._fill_fee(o, price_ticks, qty, liq),
+                fee=self._fill_fee(o, price_ticks, qty, liq, ts),
                 impact_cost=impact_cost,
             )
         )
