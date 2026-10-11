@@ -93,7 +93,7 @@ fn check_checkpoint(golden: &serde_json::Value, key: &str, index: &str, vec: &Fe
                 && feats
                     .get("rvol_w1m_v1")
                     .and_then(|e| e["value"].as_f64())
-                    .is_none_or(|v| v.abs() <= 1e-9)
+                    .map_or(true, |v| v.abs() <= 1e-9)
             {
                 let rv5 = features::feature_index("rvol_w5m_v1").map_or(0.0, |i| vec.values[i]);
                 let rv5 = if rv5.is_nan() { 0.0 } else { rv5.abs() };
