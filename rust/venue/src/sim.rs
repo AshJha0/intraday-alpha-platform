@@ -146,7 +146,7 @@ impl SimulatedVenue {
         schedule: RegulatoryFeeSchedule,
         tick_size: f64,
     ) -> Result<SimulatedVenue, IapError> {
-        if !(tick_size > 0.0) {
+        if tick_size.is_nan() || tick_size <= 0.0 {
             return Err(IapError::InvalidArgument("tick_size must be > 0".to_string()));
         }
         self.regfees = Some((schedule, tick_size));

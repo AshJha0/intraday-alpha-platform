@@ -703,6 +703,13 @@ data:
         }
       ]
     }
+  prereg__v2.json: |
+    {
+      "x-version": 1,
+      "description": "v2 pre-registration config: realism opt-ins that are OFF in code defaults (v1 numbers unchanged) and ON for v2 preregistered runs. v1.15 X-P1-1 adds the dated SEC Section 31 + FINRA TAF schedule (configs/reference/regulatory_fee_schedule.json); R-P0-2 extends this file with the other realism opt-ins. Read with iap.execution.regulatory.prereg_wants_regulatory_fees and passed as load_exec_config(..., regulatory_fees=True).",
+      "methods": "v2",
+      "regulatory_fees": true
+    }
   reference__auction_entry_cutoffs.json: |
     {
       "x-version": 1,
@@ -783,6 +790,105 @@ data:
           "as_of": "2026-10-11"
         }
       }
+    }
+  reference__regulatory_fee_schedule.json: |
+    {
+      "x-version": 1,
+      "description": "v1.15 X-P1-1: dated US equity regulatory fee schedule (SEC Section 31 transaction fee and FINRA Trading Activity Fee), both charged on SELL fills of EQUITY/ETF venues only. A period applies to fills with from_ns <= exchange_ts < until_ns (UTC midnight of the ISO dates; until absent = open-ended). A fill outside every period of a table is an error (fail closed): the table only covers windows whose rate was verified against the cited notice. Applied per fill, unrounded: sec = usd_per_million * notional / 1e6; taf = min(per_share * qty, max_per_trade) (a fill stands in for a trade). Off in code defaults (v1 numbers unchanged); turned on by configs/prereg/v2.json. Verified 2026-10-11.",
+      "sec_section31": [
+        {
+          "from": "2019-04-16",
+          "from_ns": 1555372800000000000,
+          "until": "2020-01-01",
+          "until_ns": 1577836800000000000,
+          "usd_per_million": 20.70,
+          "source": "https://www.sec.gov/news/press-release/2019-30 (Fee Rate Advisory #2 FY2019: $20.70 per million for charge dates on/after 2019-04-16). Window closed at 2020-01-01 to cover the 2019 ITCH sample days only."
+        },
+        {
+          "from": "2024-01-01",
+          "from_ns": 1704067200000000000,
+          "until": "2024-05-22",
+          "until_ns": 1716336000000000000,
+          "usd_per_million": 8.00,
+          "source": "https://www.sec.gov/rules-regulations/fee-rate-advisories/2024-2 ($8.00 per million for charge dates through 2024-05-21)"
+        },
+        {
+          "from": "2024-05-22",
+          "from_ns": 1716336000000000000,
+          "until": "2025-05-14",
+          "until_ns": 1747180800000000000,
+          "usd_per_million": 27.80,
+          "source": "https://www.sec.gov/rules-regulations/fee-rate-advisories/2024-2 ($27.80 per million on/after 2024-05-22); https://www.sec.gov/rules-regulations/fee-rate-advisories/2025-2 ($27.80 through 2025-05-13)"
+        },
+        {
+          "from": "2025-05-14",
+          "from_ns": 1747180800000000000,
+          "until": "2026-04-04",
+          "until_ns": 1775260800000000000,
+          "usd_per_million": 0.00,
+          "source": "https://www.sec.gov/rules-regulations/fee-rate-advisories/2025-2 ($0.00 per million on/after 2025-05-14); https://www.sec.gov/rules-regulations/fee-rate-advisories/2026-2 ($0.00 through 2026-04-03)"
+        },
+        {
+          "from": "2026-04-04",
+          "from_ns": 1775260800000000000,
+          "usd_per_million": 20.60,
+          "source": "https://www.sec.gov/rules-regulations/fee-rate-advisories/2026-2 ($20.60 per million on/after 2026-04-04, until 60 days after the FY2027 appropriation is enacted)"
+        }
+      ],
+      "finra_taf": [
+        {
+          "from": "2019-01-01",
+          "from_ns": 1546300800000000000,
+          "until": "2020-01-01",
+          "until_ns": 1577836800000000000,
+          "per_share": 0.000119,
+          "max_per_trade": 5.95,
+          "source": "FINRA By-Laws Schedule A Section 1 (TAF covered equity sales $0.000119 per share, max $5.95 per trade, in force in 2019); history at https://www.finra.org/rules-guidance/rule-filings/sr-finra-2024-019/fee-adjustment-schedule"
+        },
+        {
+          "from": "2024-01-01",
+          "from_ns": 1704067200000000000,
+          "until": "2026-01-01",
+          "until_ns": 1767225600000000000,
+          "per_share": 0.000166,
+          "max_per_trade": 8.30,
+          "source": "https://www.finra.org/rules-guidance/rule-filings/sr-finra-2024-019/fee-adjustment-schedule (2024 and 2025: $0.000166 per share, max $8.30)"
+        },
+        {
+          "from": "2026-01-01",
+          "from_ns": 1767225600000000000,
+          "until": "2027-01-01",
+          "until_ns": 1798761600000000000,
+          "per_share": 0.000195,
+          "max_per_trade": 9.79,
+          "source": "https://www.finra.org/rules-guidance/rule-filings/sr-finra-2024-019/fee-adjustment-schedule (2026: $0.000195 per share, max $9.79)"
+        },
+        {
+          "from": "2027-01-01",
+          "from_ns": 1798761600000000000,
+          "until": "2028-01-01",
+          "until_ns": 1830297600000000000,
+          "per_share": 0.000232,
+          "max_per_trade": 11.61,
+          "source": "https://www.finra.org/rules-guidance/rule-filings/sr-finra-2024-019/fee-adjustment-schedule (2027, scheduled: $0.000232 per share, max $11.61)"
+        },
+        {
+          "from": "2028-01-01",
+          "from_ns": 1830297600000000000,
+          "until": "2029-01-01",
+          "until_ns": 1861920000000000000,
+          "per_share": 0.000240,
+          "max_per_trade": 12.05,
+          "source": "https://www.finra.org/rules-guidance/rule-filings/sr-finra-2024-019/fee-adjustment-schedule (2028, scheduled: $0.000240 per share, max $12.05)"
+        },
+        {
+          "from": "2029-01-01",
+          "from_ns": 1861920000000000000,
+          "per_share": 0.000249,
+          "max_per_trade": 12.50,
+          "source": "https://www.finra.org/rules-guidance/rule-filings/sr-finra-2024-019/fee-adjustment-schedule (2029, scheduled: $0.000249 per share, max $12.50; last year of the schedule)"
+        }
+      ]
     }
   risk__risk.json: |
     {
