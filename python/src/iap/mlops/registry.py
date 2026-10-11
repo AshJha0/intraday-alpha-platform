@@ -28,6 +28,18 @@ exists returns the existing record when the content matches and raises
 :class:`RegistryError` otherwise; nothing is ever overwritten.
 :meth:`ModelRegistry.load` / :meth:`verify` recompute the artefact hash,
 the id and the record hash and raise :class:`TamperError` on any mismatch.
+
+**Content hash (v1.14, review E-P2-5).**  ``artefact_sha256`` hashes pickle
+bytes, which move with the joblib/pickle/scikit-learn version even when the
+fitted estimator is the same.  :func:`content_sha256` hashes the estimator's
+*state* instead -- class path, constructor params and fitted attributes,
+recursively, numpy arrays by dtype, shape and little-endian bytes, with the
+``_sklearn_version`` stamp dropped -- so it is stable across library
+versions.  It is written to a sidecar ``content.json`` next to the record;
+``record.json``, ``model_id`` and ``record_hash`` are unchanged (every
+existing digest stays valid).  :meth:`ModelRegistry.find_by_content` finds
+the equivalent model after a re-fit under another library version, and
+:meth:`ModelRegistry.verify_content` re-derives it from the loaded artefact.
 """
 
 from __future__ import annotations
@@ -42,6 +54,10 @@ from typing import Any
 SCHEMA = 1
 RECORD = "record.json"
 ARTEFACT = "model.joblib"
+CONTENT = "content.json"
+CONTENT_SCHEME = 1
+#: pickled attributes that stamp the library version, not the model state
+VOLATILE_STATE = frozenset({"_sklearn_version"})
 DEFAULT_CODE_MODULES = ("iap.models.zoo", "iap.models.metalabel", "iap.backtest.maker")
 
 
@@ -75,6 +91,62 @@ def _load_bytes(data: bytes) -> Any:
     import joblib
 
     return joblib.load(io.BytesIO(data))
+
+
+def _state_of(obj: Any, depth: int = 0) -> Any:
+    """A canonical-JSON-able, version-free description of ``obj``'s state."""
+    import numpy as np
+
+    if depth > 64:
+        raise RegistryError("model state nests too deeply to hash")
+    if obj is None or isinstance(obj, (bool, int, str)):
+        return obj
+    if isinstance(obj, float):
+        return {"float": obj.hex()}
+    if isinstance(obj, (bytes, bytearray)):
+        return {"bytes": sha256(bytes(obj))}
+    if isinstance(obj, np.generic):
+        return _state_of(np.asarray(obj), depth + 1)
+    if isinstance(obj, np.ndarray):
+        if obj.dtype.hasobject:
+            return {
+                "ndarray": "object",
+                "shape": list(obj.shape),
+                "items": [_state_of(x, depth + 1) for x in obj.ravel(order="C").tolist()],
+            }
+        if obj.dtype.fields is not None:
+            data = np.ascontiguousarray(obj).tobytes()
+            dtype = repr(obj.dtype.descr)
+        else:
+            arr = np.ascontiguousarray(obj, dtype=obj.dtype.newbyteorder("<"))
+            data, dtype = arr.tobytes(), arr.dtype.str
+        return {"ndarray": dtype, "shape": list(obj.shape), "sha256": sha256(data)}
+    if isinstance(obj, (list, tuple)):
+        return {type(obj).__name__: [_state_of(x, depth + 1) for x in obj]}
+    if isinstance(obj, (set, frozenset)):
+        items = sorted((_state_of(x, depth + 1) for x in obj), key=canonical)
+        return {"set": items}
+    if isinstance(obj, dict):
+        pairs = [
+            [_state_of(k, depth + 1), _state_of(v, depth + 1)]
+            for k, v in obj.items()
+            if k not in VOLATILE_STATE
+        ]
+        return {"dict": sorted(pairs, key=lambda kv: canonical(kv[0]))}
+    if isinstance(obj, type) or callable(obj) and not hasattr(obj, "__dict__"):
+        return {"ref": f"{getattr(obj, '__module__', '?')}.{getattr(obj, '__qualname__', '?')}"}
+    cls = type(obj)
+    state = obj.__getstate__() if hasattr(obj, "__getstate__") else vars(obj)
+    if state is None:
+        state = {}
+    if isinstance(state, tuple) and len(state) == 2 and state[0] is None:
+        state = state[1]  # (None, slots) from object.__getstate__ with __slots__
+    return {"class": f"{cls.__module__}.{cls.__qualname__}", "state": _state_of(state, depth + 1)}
+
+
+def content_sha256(model: Any) -> str:
+    """Version-stable SHA-256 of a fitted model's state (module docs)."""
+    return sha256(canonical({"scheme": CONTENT_SCHEME, "state": _state_of(model)}))
 
 
 def default_code_hash(alpha_id: str | None = None) -> str:
@@ -219,7 +291,40 @@ class ModelRegistry:
         d.mkdir(parents=True, exist_ok=True)
         (d / ARTEFACT).write_bytes(blob)
         (d / RECORD).write_text(json.dumps(rec.to_dict(), sort_keys=True, indent=2) + "\n")
+        self._write_content(rec.model_id, model)
         return rec
+
+    def _write_content(self, model_id: str, model: Any) -> str | None:
+        """Write the sidecar ``content.json``; ``None`` when the state cannot be hashed."""
+        try:
+            digest = content_sha256(model)
+        except (RegistryError, TypeError, ValueError):
+            return None
+        doc = {"content_sha256": digest, "scheme": CONTENT_SCHEME}
+        (self.root / model_id / CONTENT).write_text(canonical(doc) + "\n")
+        return digest
+
+    def content_hash(self, model_id: str) -> str | None:
+        """The recorded version-stable content hash (``None`` for older records)."""
+        path = self.root / model_id / CONTENT
+        if not path.exists():
+            return None
+        return json.loads(path.read_text())["content_sha256"]
+
+    def find_by_content(self, digest: str, name: str | None = None) -> list[ModelRecord]:
+        """Every registered model whose content hash is ``digest``."""
+        return [r for r in self.list(name) if self.content_hash(r.model_id) == digest]
+
+    def verify_content(self, model_id: str) -> str:
+        """Re-derive the content hash from the verified artefact; backfill if absent."""
+        model, _ = self.load(model_id)
+        digest = content_sha256(model)
+        recorded = self.content_hash(model_id)
+        if recorded is None:
+            self._write_content(model_id, model)
+        elif recorded != digest:
+            raise TamperError(f"model {model_id}: content hash mismatch")
+        return digest
 
     # ------------------------------------------------------------------- read
     def ids(self) -> list[str]:
