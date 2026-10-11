@@ -313,7 +313,7 @@ positive in-sample result justifies an out-of-sample test, nothing more.
 | A3 futures lead-lag | on hold: ES / NQ data from Databento would cost about $10-25 |
 | AI4 deep order-book baselines | nothing in the evidence yet asks for a higher-capacity model (HOW_IT_WORKS.md §6.4) |
 | real batch re-run under `v3` | not done in v1.11; still the next statistics task |
-| E4-E5 split god classes, feature memory | not started |
+| E4-E5 split god classes, feature memory | done in v1.13 (§3.8) |
 
 **Next.** Read the running studies and report them whatever they say
 (REAL_DATA.md); re-run the real batch under `v3`; ingest more symbols for
@@ -367,9 +367,74 @@ on `research/step2` that are not on `main` yet.
 | A3 futures lead-lag | on hold: ES / NQ data would cost about $10-25 |
 | A4 | not started |
 | AI4 deep order-book baselines | not started; nothing in the evidence asks for it yet |
-| E4-E5 split god classes, feature memory | not started |
+| E4-E5 split god classes, feature memory | done in v1.13 (§3.8) |
 | P1-P3 | not started |
 | real batch re-run under `v3` / `v4` | not done |
+
+## 3.8 v1.13.0 (2026-10-11): the quality review, hardening done, correctness in progress
+
+On 2026-10-11 five independent read-only reviews (research validity,
+execution realism, data, risk/governance/AI/security, engineering) reviewed
+v1.12.0. No headline conclusion flips (0 PROMOTE, no trade at 1x, AUC01 no
+edge), but some published statistics are overstated or not causal, and the
+evidence trail had holes (LEARN.md §44). The findings were split by what a
+fix does to published numbers.
+
+**Done in v1.13 (hygiene and hardening; no published number, golden or
+ledger change):**
+
+- Engineering: LF artefacts on every OS; O(1) `OrderBook.order()`; CI
+  `python` (3.11), `python-312`, `python-slow` (slow files + coverage);
+  advisory mypy (87-error baseline); hashed requirements with
+  `--require-hashes`; gitleaks; LLM transcripts git-ignored; pinned model
+  ids; Rust 1.99.0.
+- Execution: SEC Section 31 and FINRA TAF fields (default 0, sourced
+  templates); one markout reference convention; auction MOC/LOC entry
+  cutoff; quoting parameters in ticks; hazard-based passive-exit
+  probability; DST-aware volume curve; explicit Almgren-Chriss ADV units.
+- Research: frozen-parameter scoring and a pre-registered threshold (and
+  corrected 2026 holdout wording, REAL_DATA.md §3.2); fixed auction
+  orientation; power-aware study summariser; longer two-sided embargo;
+  sourced event calendar; `beta_sign_consistency`; DSR trials from
+  registered hypotheses (RESEARCH_VALIDITY.md §4a).
+- Governance: required `governance` CI job; research-branch merge procedure
+  and `tools/merge_ledger.py`; signed approval for human lifecycle edges;
+  locked, monotone blackboard append; stricter LLM numbers rule; MCP read
+  caps; GOVERNANCE.md §0 now states the live ruleset (strict, twelve
+  required checks, 0 reviewers, no bypass).
+- Plan items: E4 god-class split; E5 feature-build memory 2.9x lower (672 to
+  234 MB on the benchmark, byte-identical output); R7 data preparation (10
+  free unseen Nasdaq sessions identified, wave 1 of 3 days downloaded,
+  ingest pending; A2 symbol plan; confirmatory pre-registration in DRAFT).
+
+**Studies:** maker study running (exploratory, in-sample, 7 sessions,
+pre-registered; due about 2026-10-12 evening). M5 quoting study **aborted
+before any result was read**: the registered A-S parameters were
+numerically inert (`data/real/quoting_real/ABORTED.md`); a v2 protocol in
+ticks will be pre-registered. AUC01 done: no demonstrated edge in-sample
+(underpowered, MOC-cutoff caveat); 2026 holdout NOT CONFIRMED, 0 trades.
+
+**In progress: v1.14, the correctness release** (one regeneration of
+goldens, stores and reports under new pre-registrations; every docs number
+re-read): causal row block for the backtest (R-P0-1), trailing labels by
+default, day-clustered inference with automatic bandwidth, coalesced
+same-timestamp events, quote-rule signing of hidden prints, midpoint
+rounding, queue credit on MODIFY size-downs, feed latency, risk audit hash
+chain (G-P0-1), chained ledger and stronger key trust, shared replays and a
+study base class. The R7 confirmatory round runs on v1.14.
+
+**Later:** the SEC 15c3-5 pre-trade control set (G-P0-2; meaningful once the
+live gateway work P1-P3 exists), archiving the frozen Java copy, SOR/FX
+realism items (synthetic-only today).
+
+| Item | State |
+|---|---|
+| R7 data ingest | wave 1 downloaded (3 days), ingest pending; runs on v1.14 |
+| A2 QQQ against its constituents | symbol plan done; needs the ingest |
+| A3 futures lead-lag | on hold (data cost) |
+| AI4 deep order-book baselines | not started |
+| E4-E5 | done in v1.13 |
+| P1-P3 | not started |
 
 ## 4. MVP success criteria
 

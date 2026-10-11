@@ -75,6 +75,8 @@ Contents:
 64. [The markout feedback loop on a toxic regime (v1.12)](#64-the-markout-feedback-loop-on-a-toxic-regime-v112)
 65. [Read the latency SLO burn rates by hand (v1.12)](#65-read-the-latency-slo-burn-rates-by-hand-v112)
 66. [Plan the R7 data load: candidate days, a resumable ingest, a seeded draw (v1.13)](#66-plan-the-r7-data-load-candidate-days-a-resumable-ingest-a-seeded-draw-v113)
+67. [Price a round trip with regulatory fees (v1.13)](#67-price-a-round-trip-with-regulatory-fees-v113)
+68. [Run the governance checks locally (v1.13)](#68-run-the-governance-checks-locally-v113)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -4077,3 +4079,82 @@ external disk in the plan. Nothing downloads: `tools/r7_download.py` exits
 `verify-download` checks the size and records the sha256, and
 `record-sampling` writes the seeded draw into a merged dataset's
 `dataset.json` (the `dataset_version` is unchanged).
+
+## 67. Price a round trip with regulatory fees (v1.13)
+
+**Goal:** see what SEC Section 31 and the FINRA Trading Activity Fee add to
+an equity round trip. Both are opt-in fields of `CostModel` (and of
+`VenueSpec` in the simulator); the default is 0, so nothing published
+moves. Save as `python/recipe67.py` and run
+`cd python && PYTHONPATH=src python recipe67.py`:
+
+```python
+import json
+import numpy as np
+from iap.backtest.costs import CostModel
+
+base = CostModel.load("../configs/execution/execution.json")
+tpl = json.load(open("../configs/templates/regulatory_fees.json"))
+p = {x["label"]: x for x in tpl["periods"]}["current (2026)"]
+fees = base.with_regulatory_fees(p["sell_notional_fee_bps"], p["per_share_fee_all"],
+                                 p["per_share_fee_cap"], p["per_share_fee_sell_only"])
+qty, mid, hs = np.array([500.0, -500.0]), np.array([250.0, 250.0]), np.array([0.005, 0.005])
+for name, cm in (("no reg fees", base), ("2026 reg fees", fees)):
+    c = cm.cost_components(qty, mid, hs, "EQUITY", adv=5e7, lot_size=1)
+    rt = cm.round_trip_cost_return(mid[:1], hs[:1], "EQUITY")[0] * 1e4
+    print(f"{name:14s} fee buy {c['fee'][0]:.4f} sell {c['fee'][1]:.4f} USD; "
+          f"size-free round trip {rt:.4f} bp")
+```
+
+Output:
+
+```text
+no reg fees    fee buy 1.5000 sell 1.5000 USD; size-free round trip 0.6400 bp
+2026 reg fees  fee buy 1.5000 sell 4.1725 USD; size-free round trip 0.8538 bp
+```
+
+How to read it. Only the sale pays: Section 31 is 0.206 bp of the 125,000
+USD sold (2.575 USD) and TAF is 500 x 0.000195 = 0.0975 USD (capped at
+9.79 USD per trade), on top of the 0.003 USD/share taker fee. On the
+size-free hurdle (spread plus fees, no impact) that is about +0.21 bp per
+round trip at a 250 USD price: small, but 15-60% of the per-trip
+magnitudes the maker and auction studies measure, which is why the review
+asked for it. The 2019 row of the template (0.207 bp, 0.000119 USD/share,
+cap 5.95) is the one to use when replaying the 2019-20 sessions.
+
+## 68. Run the governance checks locally (v1.13)
+
+**Goal:** run what the required `governance` CI job runs, before pushing a
+branch that touches `research/`. From the repo root, with the base branch
+fetched (`git fetch origin main`):
+
+```bash
+PYTHONPATH=python/src python -m iap.agents.cli verify-board
+python tests/harness/check_agent_keys.py
+python tests/harness/check_ledger_monotone.py --base origin/main
+```
+
+Output (on the v1.13.0 release branch, 2026-10-11):
+
+```text
+{
+  "anchored": 6,
+  "entries": 6,
+  "ok": true,
+  "problems": [],
+  "unanchored": 0
+}
+board entries 6 (signed 0); registry keys 0
+ledgers and blackboard are monotone vs origin/main
+```
+
+How to read it. `verify-board` checks the blackboard's hash chain, its git
+anchors and any signatures. `check_agent_keys.py` passes with an empty key
+registry only because no entry on this branch is signed; the first signed
+entry needs its agent's public key in `research/agents/agent_pubkeys.json`.
+`check_ledger_monotone.py` fails if the branch has fewer experiments or
+models than the base, or if the base blackboard is not a byte-identical
+prefix of this one: research branches are merged, never rebased, and
+ledgers are combined with `tools/merge_ledger.py` (GOVERNANCE.md §2c). In CI
+a pull request is compared with its base branch and a push with the
+previous commit.

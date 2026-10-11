@@ -1042,9 +1042,10 @@ cross-language-pinned ones; a calibration only replaces config values
 ### 15.4 Dependencies
 
 One new runtime dependency: `cryptography` (`>=46,<51` in
-`python/pyproject.toml`; pinned `cryptography==50.0.1` with `cffi==2.1.1`
-and `pycparser==3.0` in `python/requirements-ci.txt`, which CI and the
-Docker image use as constraints). It is used only by `iap.agents.signing`
+`python/pyproject.toml`; pinned `cryptography==50.0.2` with its transitive
+dependencies in the hashed `python/requirements-ci.txt` and
+`python/requirements-image.txt`, installed with `--require-hashes` by CI and
+the Docker image since v1.13). It is used only by `iap.agents.signing`
 for Ed25519; the trading-path packages do not import it, and the agents
 package stays off the trading path (an import-policy test keeps trading-path
 packages from importing `iap.agents`). Everything else uses the existing
@@ -1067,11 +1068,11 @@ every signature. Details and gaps: docs/governance/GOVERNANCE.md §2a.
 
 ### 15.6 Real-data status of these subsystems
 
-| subsystem | real-data status (2026-10-10, v1.12.0) |
+| subsystem | real-data status (2026-10-11, v1.13.0) |
 |---|---|
-| calibration, maker backtest | a pre-registered, exploratory in-sample study on the seven 2019-20 sessions (EQ01 / EQ02 / EQ05 / EQ10, taker and passive exits) is running; no result yet |
-| quoting | M5 on real files is running (branch `research/step2`, pre-registered, exploratory in-sample; the driver checkpoints per cell); no result yet |
-| auction (`AUC01`) | in-sample result, exploratory: NO DEMONSTRATED EDGE on both cells (`C-300s` session-clustered mean +19.4 bp, 95% CI −254 to +293 bp, 3 trades on 2 sessions; `O-300s` +6.1 bp); underpowered. The declared 2026 holdout is running. REAL_DATA.md §3.3 |
+| calibration, maker backtest | a pre-registered, exploratory in-sample study on the seven 2019-20 sessions (EQ01 / EQ02 / EQ05 / EQ10, taker and passive exits) is running (finishes about 2026-10-12 evening); no result yet |
+| quoting | M5 on real files was **aborted** on 2026-10-11 before any result was read: the quality review found the registered Avellaneda-Stoikov parameters numerically inert (every quote a fixed 1-2 ticks behind the touch), so skew vs no-skew could not be tested (`data/real/quoting_real/ABORTED.md`). A v2 protocol in ticks (`QuotingConfig.skew_mode="ticks"`, v1.13) is to be pre-registered |
+| auction (`AUC01`) | in-sample result, exploratory: NO DEMONSTRATED EDGE on both cells (`C-300s` session-clustered mean +19.4 bp, 95% CI −254 to +293 bp, 3 trades on 2 sessions; `O-300s` +6.1 bp); underpowered; the `C-300s` figure carries the MOC entry-cutoff caveat (v1.13). 2026 holdout: NOT CONFIRMED (0 trades). REAL_DATA.md §3.3 |
 | Almgren-Chriss, urgency, volume curve | no real-data study; the volume curve CLI reads real IAP1 files |
 | `v3` / `v4` bundles | not yet applied to the published real-data batch (ROADMAP.md §3.7) |
 | v1.12 extended features, router, fill hazard | no real-data run; the router has one venue on Nasdaq-only data |
@@ -1207,3 +1208,43 @@ from its checkpoint; there is no active-active and no leader election.
 Eight pre-v1.12 alerts still have no promtool test, on an allowlist that
 `check_deployment.py` only lets shrink. Diagrams: DIAGRAMS.md §30-§35.
 
+## 19. v1.13: hardening from the 2026-10-11 quality review
+
+v1.13 changes no golden and no published number; behaviour changed in the
+places below.
+
+- **CI layout.** `python` is Python 3.11 and runs the fast tests
+  (`-m "not slow"`, about a minute of feedback on a pull request);
+  `python-312` runs the same on 3.12; `python-slow` runs the ten slowest
+  test files with coverage. `governance` verifies the blackboard
+  (`verify-board`), checks every signed agent has a registered key, and
+  checks the ledger and blackboard only grow against the base branch.
+  `advisory` adds gitleaks and a non-blocking mypy step (87 errors at the
+  baseline). The required checks are listed in GOVERNANCE.md §0.
+- **Dependencies.** Python installs come from hashed lock files
+  (`requirements-ci.txt`, `requirements-image.txt`) with
+  `--require-hashes`; the Rust toolchain is 1.99.0 everywhere.
+- **Artefacts.** `atomic_write_text` writes LF on every OS, so ledgers and
+  study files hash the same on Windows and Linux.
+- **Order book.** `OrderBook.order(order_id)` is an O(1) lookup; the
+  simulator uses it instead of scanning resting orders (80x to 3,758x faster
+  lookup; fills unchanged).
+- **Execution costs.** SEC Section 31 and FINRA TAF fields in `VenueSpec` /
+  `CostModel` (default 0; sourced rates in
+  `configs/templates/regulatory_fees.json`).
+- **Markout reference.** Maker and quoting markouts use the mid before the
+  first event at the fill's `exchange_ts`, the same convention as the
+  calibration.
+- **Auction cutoff.** `iap.auction` refuses a closing-cross exit decided at
+  or after the MOC/LOC entry cutoff and prices it as a taker exit
+  (`--no-entry-cutoff` restores the old rule).
+- **Module structure.** E4 split `PaperTrading.java` and `iap/mvp/engine.py`
+  (§9.1); E5 streams the feature build (peak RSS 672 MB to 234 MB on the
+  benchmark, byte-identical output; REAL_DATA.md §10).
+- **Governance in code.** Blackboard appends take a file lock and require a
+  non-decreasing `ts`; `python -m iap.lifecycle retire|reset` needs a signed,
+  single-use approval; MCP reads are capped at 8 MiB.
+
+v1.14 is the correctness release (ROADMAP.md §3.8): causal row blocking,
+data-mapping fixes, the risk audit hash chain, and one regeneration of
+goldens, stores and reports.

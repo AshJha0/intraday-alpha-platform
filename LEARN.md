@@ -74,7 +74,8 @@ Contents:
 41. [What tick-to-trade does and does not measure](#41-what-tick-to-trade-does-and-does-not-measure)
 42. [An underpowered result is not a negative result (AUC01)](#42-an-underpowered-result-is-not-a-negative-result-auc01)
 43. [Feedback loops in passive execution](#43-feedback-loops-in-passive-execution)
-44. [Further reading](#44-further-reading)
+44. [What an independent review found, and how we triaged it (v1.13/v1.14)](#44-what-an-independent-review-found-and-how-we-triaged-it-v113v114)
+45. [Further reading](#45-further-reading)
 
 ---
 
@@ -4325,7 +4326,106 @@ the real sessions.
 2. The feedback cut the markout loss by 97%. Is the strategy now good?
    *(No: it still loses; it just quotes much less.)*
 
-## 44. Further reading
+## 44. What an independent review found, and how we triaged it (v1.13/v1.14)
+
+**The setting.** On 2026-10-11, after v1.12.0, five independent read-only
+reviews looked at the platform against the standard of a top market-making
+or quant firm: research validity, execution and simulator realism, data and
+features, risk/governance/AI/security, and engineering. Every P0 and P1
+finding was checked by reading the code path. Their common verdict was
+that the spine is right (integer contracts, one RNG, byte-exact
+cross-language goldens, a fail-closed risk engine with a differential
+fuzzer, the look ledger and pre-registration, a harness that re-derives
+every published number) and that several published statements were
+weaker than they read.
+
+**What it found, plainly.**
+
+- *Some statistics are not causal or are overstated.* The research
+  backtest blocks rows using whether the *future* label is valid, a
+  look-ahead that reaches every "net P&L at 1x" and bootstrap CI (R-P0-1).
+  The gate t-statistics use a two-bucket HAC window without day
+  clustering, so t values such as 21.1 and 25.7 are overstated (R-P1-3).
+  The 2026 holdout write-up said "parameters frozen", but every fold
+  refitted `mu`/`sigma`/`beta` on 2026 rows, and its threshold rose with
+  run order (R-P1-2). **No headline conclusion flips**: still 0 alphas
+  promoted, no trade at 1x, no edge in AUC01. The wording and several
+  report fields had to change.
+- *Evidence integrity had holes.* The risk audit log has no hash chain
+  (G-P0-1); the look ledger is plain JSON and the ledger and blackboard
+  had already forked between branches (G-P1-1, G-P1-5); `verify-board` ran
+  nowhere in CI and the agent key registry was empty (G-P1-2); a CLI could
+  record a human lifecycle decision with no proof (G-P1-3).
+- *The pre-trade control set is incomplete* against SEC Rule 15c3-5 (no
+  max open orders, participation cap, message throttle, cancel-rate limit
+  or per-strategy position limit; G-P0-2).
+- *Two running studies had rules that could not do what they claimed.* The
+  quoting study's Avellaneda-Stoikov terms were numerically inert at the
+  registered parameters: every quote sat a fixed 1-2 ticks behind the
+  touch and the alpha skew moved it by a fraction of a cent, so "skew vs no
+  skew" was untestable (X-P1-3). The maker/quoting verdict rule needed t
+  about 4.8 on six sessions or fewer and dropped zero-trip sessions from
+  the estimand (R-P1-5). AUC01's closing-cross exit assumed an MOC order
+  accepted at Nasdaq's 15:55 cutoff (X-P1-5).
+- *Data mapping and simulator biases*, none sign-changing: same-nanosecond
+  replace and execute pairs emitted as separate book states, hidden prints
+  signed by the tick rule, midpoint prints rounded up, MODIFY size-downs
+  never crediting queue position, no SEC/FINRA fees, zero feed latency.
+- *Engineering*: CRLF artefacts on Windows (different hashes from Linux,
+  the one engineering P0), an O(N) resting-order scan, CI on 3.11 while
+  studies ran on 3.12, no type checking.
+
+**How it was triaged.** The rule was: what can be fixed *without changing
+any published number or regenerating any artefact* goes into v1.13 now;
+what changes numbers goes into one v1.14 "correctness release" that
+regenerates goldens, stores and reports once, under new
+pre-registrations, with every docs number re-read. Splitting it this way
+keeps each release's claims checkable: v1.13 can be verified by "nothing
+moved", v1.14 by "everything moved for a stated reason".
+
+- **v1.13 (this release, hygiene and hardening):** LF artefacts, the O(1)
+  order lookup, the 3.11/3.12 CI matrix and slow-test split, advisory
+  mypy, hashed requirements and gitleaks; regulatory fee fields (default
+  0), one markout reference convention, the auction entry cutoff, quoting
+  parameters in ticks; frozen-parameter scoring and a pre-registered
+  threshold (code, plus corrected holdout wording), the fixed auction
+  orientation, a power-aware study summariser, a longer embargo, a sourced
+  event calendar; the required `governance` CI job, a merge procedure for
+  research branches, signed approval for human lifecycle edges, a locked
+  blackboard append and a stricter LLM numbers rule.
+- **v1.14 (in progress, correctness):** the causal row block, trailing
+  labels by default, day-clustered inference with an automatic bandwidth,
+  the data-mapping fixes, queue credit on MODIFY, feed latency, the risk
+  audit hash chain and a chained ledger.
+- **Later:** the 15c3-5 control set (it only means something once there is
+  a live gateway), archiving the frozen Java copy.
+
+**What happened to the studies.** The maker study was left to finish as
+registered; it will be reported with the fee, queue-credit, decomposition
+and power caveats. The quoting study was **aborted before any result was
+read**, with the reason logged (`data/real/quoting_real/ABORTED.md`):
+continuing would have spent about twelve hours on a run that could not test
+its hypothesis. A v2 protocol in ticks will be pre-registered. AUC01 was
+already done; its holdout verdict (0 trades, not confirmed) stands, and
+the in-sample +19.4 bp now carries the cutoff and fitted-sign caveats. The
+next confirmatory round on new data (R7) must run on v1.14, or it would
+inherit every bias above.
+
+**The lesson.** A review is most useful when it is allowed to say that a
+number you published is wrong, and when the fixes are sorted by what they
+do to published claims rather than by how easy they are. Aborting a study
+because its design cannot answer its question is not a loss; reading its
+result first and then deciding would have been.
+
+**Check yourself.**
+
+1. Why put the causal row-block fix in v1.14 and not v1.13? *(It changes
+   every net P&L and CI; v1.13 promises no published number moves.)*
+2. Why does it matter that the quoting abort happened before any result was
+   read? *(An abort after seeing the result is a selection decision; before,
+   it is a design correction.)*
+
+## 45. Further reading
 
 Inside this repository, in suggested order:
 

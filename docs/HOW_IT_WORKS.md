@@ -995,6 +995,35 @@ single candidate: this is capability for multi-venue data, not a result.
 **Where to look:** `iap.execution.sor_v2`, `venues_model`; API_TRADING.md
 §2.9; DIAGRAMS.md §33. **How to run it:** COOKBOOK recipe 59.
 
+### 3.11 What v1.13 changed in execution (quality review 2026-10-11)
+
+Goldens, including the C++-pinned fills golden, are unchanged. Three
+behaviours changed or gained an option:
+
+- **Regulatory fees.** `VenueSpec` (simulator rule 5) and `CostModel` carry
+  SEC Section 31 (`sell_notional_fee_bps`, on sale notional) and FINRA TAF
+  (`per_share_fee_all`, capped per trade by `per_share_fee_cap`, sells only
+  by default). Default 0; sourced 2019 and 2026 rates are in
+  `configs/templates/regulatory_fees.json`. At 2026 rates they add about
+  0.2 bp to a round trip (COOKBOOK recipe 67).
+- **Markout reference.** Maker and quoting markouts are now measured from
+  the mid before the *first event* at the fill's `exchange_ts`, the same
+  convention the calibration uses. Before, the studies used the mid just
+  before the fill event itself, which can already include same-timestamp
+  book changes. Fills and net P&L are unchanged; the split between spread
+  captured and adverse selection moved (COOKBOOK recipes 39 and 40).
+- **Auction entry cutoff.** `iap.auction` refuses a closing-cross exit
+  decided at or after the MOC/LOC entry cutoff (dated, cited table in
+  `configs/reference/auction_entry_cutoffs.json`) and prices that exit as a
+  taker trade instead; `--no-entry-cutoff` restores the old rule. Recipe
+  42's numbers moved; the recorded AUC01 in-sample result is unchanged but
+  carries the caveat (REAL_DATA.md §3.3).
+
+Also new: quoting parameters in ticks (`skew_mode="ticks"`) with a
+ticks-behind-touch readout, a hazard-based passive-exit fill probability, a
+DST-aware volume curve (`--tz`), and explicit ADV units for Almgren-Chriss
+parameters. API_TRADING.md §2.11.
+
 ## 4. Risk: the engine that says no
 
 ### 4.1 The rule order
@@ -1374,6 +1403,17 @@ planted EQ02 / 1 s effect. Because the live model behaved well, the live
 run did not stress the controls; the mocked adversarial runs are the
 evidence that the controls work.
 
+**v1.13 governance changes.** The blackboard is now verified on every
+push and pull request by the required `governance` CI job (`verify-board`,
+the agent-key check, and a check that ledgers and the board only grow
+against the base branch; COOKBOOK recipe 68). Appends take a file lock and
+need a non-decreasing timestamp. `python -m iap.lifecycle retire|reset`
+needs a signed, single-use approval. The numbers rule for LLM findings is
+stricter (exact decimals at the shown precision, evidence only from result
+subtrees, labelled statistics must match that statistic), and the agent may
+request only pinned model ids. Python dependencies install from hashed lock
+files with `--require-hashes`. GOVERNANCE.md §0 and §2c.
+
 ### 6.3 What is still planned
 
 Deep order-book baselines (AI4) are deferred: on this data a
@@ -1572,7 +1612,7 @@ COOKBOOK recipes 60 and 65.
 | every pinned rule | [../PLATFORM_CONVENTIONS.md](../PLATFORM_CONVENTIONS.md) |
 | what is done and what is backlog | [ROADMAP.md](ROADMAP.md), [EPICS.md](EPICS.md) |
 | to run the pipeline on real historical files you obtained (ITCH 5.0, LOBSTER) | [REAL_DATA.md](REAL_DATA.md) |
-| what changed in each release, v1.1.0 to v1.12.0 | [../CHANGELOG.md](../CHANGELOG.md) |
+| what changed in each release, v1.1.0 to v1.13.0 | [../CHANGELOG.md](../CHANGELOG.md) |
 | the real-data studies: 7 sessions, power, the 2026 holdout, auctions | [REAL_DATA.md](REAL_DATA.md) §3 |
 | the governance controls, one table | [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2a |
 | the LLM agent's controls and evals | [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2b |

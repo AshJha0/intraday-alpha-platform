@@ -6,85 +6,92 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
-## v1.13.0 — unreleased
+## v1.13.0 — 2026-10-11
 
-- **E4: split the god classes (behaviour-preserving).** Java
-  `PaperTrading.java` (1,843 → 1,428 lines) keeps its public API and
-  delegates to new package-private `PaperTradingSession`,
-  `PaperTradingMetrics`, `PaperTradingSizer`, `PaperTradingReports` and
-  `PaperTradingCli`. Python `iap/mvp/engine.py` (1,313 → 811 lines) keeps the
-  loop and re-exports its old public names; the rest moved to
-  `iap.mvp.engine_io`, `accounting`, `metrics`, `orders`, `risk_wiring`,
-  `sizing` and `engine_metrics` (ARCHITECTURE.md §9.1). No golden, digest,
-  report, CLI, Docker or k8s change; no test-count change.
+The hygiene-and-hardening release that follows the consolidated quality
+review of 2026-10-11 (five independent read-only reviews of v1.12.0;
+LEARN.md §44, ROADMAP.md §3.8). Everything here was chosen because it can
+ship **without changing a published number, a golden or a ledger entry**;
+the review items that do change numbers (causal row block, day-clustered
+inference, data-mapping fixes, queue credit on MODIFY, the risk audit hash
+chain) are the v1.14 "correctness release", in progress. Two research
+defaults changed and are marked (markout reference, auction entry cutoff);
+both moved only COOKBOOK recipe numbers, not recorded results. Studies: the
+maker study is still running; the M5 quoting study was aborted before any
+result was read (its registered A-S parameters were numerically inert;
+`data/real/quoting_real/ABORTED.md`); AUC01's 2026 holdout was not
+confirmed (0 trades). New COOKBOOK recipes 67-68, LEARN chapter 44;
+REAL_DATA.md §2.1 states the data source and terms.
 
-- **R7 data preparation** (plan item R7, data half; opt-in, DRAFT plan):
-  docs/R7_DATA_PLAN.md — source survey of 2026-10-11 (Nasdaq sample
-  directory: 10 unseen full-day ITCH 5.0 files, 88.75 GB; LOBSTER;
-  Databento), selection (tier 1 free, tier 2 seeded R1 draw of 40 days, A2
-  symbol list), capacity and the download list awaiting approval.
-  `research/r7/r7_candidates.json`; `python -m iap.marketdata
-  plan-ingest | verify-download | record-sampling`
-  (`iap.marketdata.r7plan`, no network); `tools/r7_download.py`, which
-  refuses without `--i-have-approval` and fetches only allowlisted hosts.
-  The R1 calendar (`iap.validation.sessions`) gains the 2021 and 2025 FOMC
-  and holiday-thin days. COOKBOOK recipe 66. Nothing was downloaded or
-  ingested.
+### Engineering & CI
 
-- **Feature-build memory (E5).** `python -m iap.features` streams events
-  from the IAP1 file (`iap.core.codec.iter_iap1`, validated before the
-  first event), keeps the label mid series in a `CompactMidSeries` (typed
-  arrays; `iap.labels`) and row timestamps / validity / the parallel
-  profile log in typed arrays, and spools the float64 row values to
-  `--out-dir/.spool_<pid>` until an instrument's row group is written.
-  Output is byte-identical for every option combination (default,
-  `--workers`, `--label-freshness trailing`, `--feature-set extended`,
-  `--sampling events|volume`, `--engine rust`). Serial peak RSS on a 3-day
-  synthetic set: 672 MB -> 234 MB, wall time 192.5 s -> 184.9 s
-  (`tools/bench_feature_memory.py`, docs/REAL_DATA.md §10). Real-day
-  re-measurement pending; `--worker-mem-gb` default unchanged.
+Quality review E-/G- items. No published number, golden, fixture or report
+changes.
 
-Governance items of the 2026-10-11 quality review (G-P1-1, G-P1-2, G-P1-3,
-G-P1-6 docs, G-P2-1, G-P2-2). Python and CI only: no ledger, blackboard,
-golden or published number changes.
+- **E-P0-1** `iap.experiment.locking.atomic_write_text` now defaults to
+  `newline="\n"`: ledgers and study files are LF on every OS (on Windows they
+  were CRLF, so their bytes and hashes differed from Linux). Test asserts no
+  `\r`.
+- **E-P1-1** `OrderBook.order(order_id) -> (side, price, qty) | None` (O(1));
+  the execution simulator uses it for EXECUTE events while a maker order
+  rests, instead of scanning `resting_orders()`. Behaviour-identical (execution
+  and golden tests unchanged); lookup 80x / 700x / 3,758x faster at 100 /
+  1,000 / 5,000 resting orders.
+- **E-P1-6** CI `python` job is a 3.11 + 3.12 matrix (the 3.11 entry keeps the
+  required check name `python`; the 3.12 entry reports as `python-312`).
+- **E-P2-7** `slow` pytest marker on the ten slowest test files; the PR
+  `python` job runs `-m "not slow"`, a parallel `python-slow` job runs
+  `-m slow` with coverage; pull-request feedback from `python` takes about a
+  minute.
+- **E-P1-5** (advisory) mypy config (`python/pyproject.toml`) and a
+  non-blocking CI step on core/orderbook/execution/backtest/features with the
+  error count in the job summary (87 at the baseline);
+  path to blocking in CONTRIBUTING.md §2.2.
+- **G-P1-7** (part) hashed `python/requirements-ci.txt` (from
+  `requirements-ci.in`) and new `python/requirements-image.txt`, installed with
+  `--require-hashes` in CI and `Dockerfile.python`; gitleaks (release tarball
+  pinned by SHA-256) scans the history in the `advisory` job.
+- **G-P2-11** `**/llm_sessions/*/transcript.jsonl` and `tool_log.jsonl` are
+  git-ignored (reports/ and session.json stay trackable).
+- **G-P2-12** `iap.llm.budget.PINNED_MODELS` lists the exact model ids the
+  agent may request; `session.json` records `served_models` (`resp.model`);
+  a live eval fails when the served id differs from the requested one.
+- **E-P2-4** no change needed on main: the `load_events` fallback that caught
+  `ValueError` lives only on the research branches.
 
-- **`governance` CI job** (G-P1-2, G-P1-1): `python -m iap.agents.cli
-  verify-board` with full history; `tests/harness/check_agent_keys.py`
-  (every agent with signed board entries has a key in
-  `research/agents/agent_pubkeys.json`; an empty registry is accepted only
-  while no entry carries `auth`); `tests/harness/check_ledger_monotone.py`
-  (head `research/experiments.json` total and keys, `research/models/ledger.json`
-  count and blackboard length >= the base, and the base board a
-  byte-identical prefix of the head board). Intended as a required check;
-  adding it to the `protect-main` ruleset is a repository-owner action.
-- **Research-branch merge procedure** (G-P1-1): GOVERNANCE.md §2c (merge,
-  never rebase; ledger merged by entry identity; board re-anchored only via
-  `cli anchor`) and `tools/merge_ledger.py` (merges two ledgers by entry
-  key, reports totals and result conflicts, renders through
-  `ExperimentLedger`).
-- **Lifecycle CLI needs an approval** (G-P1-3): `python -m iap.lifecycle
-  retire|reset` now requires `--approval FILE --keyfile PATH`; the approval
-  must name the same alpha, action and reason and is applied through
-  `agents.cli apply` (signature, expiry, single-use nonce on the
-  blackboard). Without one: exit 2. Library callers pass
-  `cmd_manual(..., require_approval=False)` explicitly.
-- **Locked blackboard append** (G-P2-1): `Blackboard.append` verifies and
-  appends under `iap.experiment.locking.FileLock`; `ts` must be
-  non-decreasing. Concurrency test with four writer processes.
-- **Stricter numbers rule for LLM findings** (G-P2-2): exact-decimal
-  matching (integers exact, decimals by rounding at the shown precision),
-  evidence restricted to `metrics`/`result(s)`/`stats` subtrees and
-  `t_threshold`, number words refused, labelled statistics (`IC`, `t`,
-  `Sharpe`, `hit rate`) must match a field of that statistic. Mocked
-  adversarial evals still pass; seven new bypass cases are rejected.
-- **MCP server** (extra): JSON reads capped at 8 MiB; the lifecycle log tail
-  is streamed instead of read whole.
-- **Docs** (G-P1-6): GOVERNANCE.md §0 describes the live `protect-main`
-  ruleset and the recommended owner actions.
+### Execution realism
 
-Research-validity hardening from the 2026-10-11 quality review (R items).
-Opt-in or additive: no published number, committed report, golden or
-ledger change (RESEARCH_VALIDITY.md §4a).
+Quality review X-* items; Python only. Defaults, goldens (including the
+C++-pinned fills golden) and published numbers are unchanged except where
+marked. API_TRADING.md §2.11, HOW_IT_WORKS.md §3.11.
+
+- X-P1-2: SEC Section 31 (`sell_notional_fee_bps`) and FINRA TAF
+  (`per_share_fee_all`, `per_share_fee_cap`, `per_share_fee_sell_only`) in
+  `VenueSpec` (simulator rule 5) and `CostModel`; default 0. Sourced values
+  for 2019 and 2026 in `configs/templates/regulatory_fees.json`.
+- X-P1-4 (research default changed): maker / quoting markout reference is
+  the mid before the first event of the fill's `exchange_ts`. COOKBOOK 39 and
+  40 spread / AS columns moved; fills and net unchanged.
+- X-P1-5 (default changed): `iap.auction` refuses a cross exit at or after
+  the MOC / MOO entry cutoff (dated, cited table in
+  `configs/reference/auction_entry_cutoffs.json`) and prices it as a taker
+  exit; `--no-entry-cutoff` restores the old rule. COOKBOOK 42 updated;
+  REAL_DATA §3.3 carries the caveat on the in-sample `C-300s` +19.4 bp (the
+  recorded numbers are unchanged).
+- X-P1-3: `QuotingConfig.skew_mode="ticks"`, `h_min_ticks`,
+  `inv_skew_ticks`; quoting summary adds `ticks_behind_touch_*` and
+  `frac_decisions_skew_changed_quote`.
+- X-P2-8: passive-exit fill probability from the fill-hazard model at
+  `exit_timeout_ns`, else a TTL-censored calibration cell
+  (`estimate_calibration(fill_within_ns=...)`), else as before.
+- X-P2-13: `estimate_volume_curves(tz="America/New_York")` / `--tz`.
+- X-P2-15: `ac_params_from_calibration(adv_per_day=..., horizon_s=...)`;
+  ambiguous unit combinations are refused.
+
+### Research validity
+
+Quality review R-* items. Opt-in or additive: no published number,
+committed report, golden or ledger change (RESEARCH_VALIDITY.md §4a).
 
 - **R-P1-2** `frozen_params` no-refit scoring (`frozen_ic` / `frozen_t`
   beside the refit statistics) and `tstat_threshold="prereg"` (threshold
@@ -109,65 +116,109 @@ ledger change (RESEARCH_VALIDITY.md §4a).
   with per-year `source` / `as_of`; 2020, 2021 and 2025 added;
   `event_calendar_for_year` fails closed; Python API unchanged.
 
-Engineering / CI hygiene from the 2026-10-11 quality review. No published
-number, golden, fixture or report changes.
+### Governance
 
-- **E-P0-1** `iap.experiment.locking.atomic_write_text` now defaults to
-  `newline="\n"`: ledgers and study files are LF on every OS (on Windows they
-  were CRLF, so their bytes and hashes differed from Linux). Test asserts no
-  `\r`.
-- **E-P1-1** `OrderBook.order(order_id) -> (side, price, qty) | None` (O(1));
-  the execution simulator uses it for EXECUTE events while a maker order
-  rests, instead of scanning `resting_orders()`. Behaviour-identical (execution
-  and golden tests unchanged); lookup 80x / 700x / 3,700x faster at 100 /
-  1,000 / 5,000 resting orders.
-- **E-P1-6** CI `python` job is a 3.11 + 3.12 matrix (the 3.11 entry keeps the
-  required check name `python`).
-- **E-P2-7** `slow` pytest marker on the ten slowest test files; the PR
-  `python` job runs `-m "not slow"`, a parallel `python-slow` job runs
-  `-m slow` with coverage.
-- **E-P1-5** (advisory) mypy config (`python/pyproject.toml`) and a
-  non-blocking CI step on core/orderbook/execution/backtest/features with the
-  error count in the job summary; path to blocking in CONTRIBUTING.md §2.2.
-- **G-P1-7** (part) hashed `python/requirements-ci.txt` (from
-  `requirements-ci.in`) and new `python/requirements-image.txt`, installed with
-  `--require-hashes` in CI and `Dockerfile.python`; gitleaks (release tarball
-  pinned by SHA-256) scans the history in the `advisory` job.
-- **G-P2-11** `**/llm_sessions/*/transcript.jsonl` and `tool_log.jsonl` are
-  git-ignored (reports/ and session.json stay trackable).
-- **G-P2-12** `iap.llm.budget.PINNED_MODELS` lists the exact model ids the
-  agent may request; `session.json` records `served_models` (`resp.model`);
-  a live eval fails when the served id differs from the requested one.
-- **E-P2-4** no change needed on main: the `load_events` fallback that caught
-  `ValueError` lives only on the research branches.
+Quality review G-P1-1, G-P1-2, G-P1-3, G-P1-6 (docs), G-P2-1, G-P2-2.
+Python and CI only: no ledger, blackboard, golden or published number
+changes.
 
-### Execution realism (quality review 2026-10-11, X-* items; Python only)
+- **`governance` CI job** (G-P1-2, G-P1-1): `python -m iap.agents.cli
+  verify-board` with full history; `tests/harness/check_agent_keys.py`
+  (every agent with signed board entries has a key in
+  `research/agents/agent_pubkeys.json`; an empty registry is accepted only
+  while no entry carries `auth`); `tests/harness/check_ledger_monotone.py`
+  (head `research/experiments.json` total and keys, `research/models/ledger.json`
+  count and blackboard length >= the base, and the base board a
+  byte-identical prefix of the head board). A required check in the
+  `protect-main` ruleset (GOVERNANCE.md §0).
+- **Research-branch merge procedure** (G-P1-1): GOVERNANCE.md §2c (merge,
+  never rebase; ledger merged by entry identity; board re-anchored only via
+  `cli anchor`) and `tools/merge_ledger.py` (merges two ledgers by entry
+  key, reports totals and result conflicts, renders through
+  `ExperimentLedger`).
+- **Lifecycle CLI needs an approval** (G-P1-3): `python -m iap.lifecycle
+  retire|reset` now requires `--approval FILE --keyfile PATH`; the approval
+  must name the same alpha, action and reason and is applied through
+  `agents.cli apply` (signature, expiry, single-use nonce on the
+  blackboard). Without one: exit 2. Library callers pass
+  `cmd_manual(..., require_approval=False)` explicitly.
+- **Locked blackboard append** (G-P2-1): `Blackboard.append` verifies and
+  appends under `iap.experiment.locking.FileLock`; `ts` must be
+  non-decreasing. Concurrency test with four writer processes.
+- **Stricter numbers rule for LLM findings** (G-P2-2): exact-decimal
+  matching (integers exact, decimals by rounding at the shown precision),
+  evidence restricted to `metrics`/`result(s)`/`stats` subtrees and
+  `t_threshold`, number words refused, labelled statistics (`IC`, `t`,
+  `Sharpe`, `hit rate`) must match a field of that statistic. Mocked
+  adversarial evals still pass; seven new bypass cases are rejected.
+- **MCP server** (extra): JSON reads capped at 8 MiB; the lifecycle log tail
+  is streamed instead of read whole.
+- **Docs** (G-P1-6): GOVERNANCE.md §0 states the live `protect-main`
+  ruleset as read from the API on 2026-10-11 09:06: strict status checks;
+  required `python`, `integration`, `cpp`, `rust`, `java`, `golden`,
+  `deployment`, `CodeQL`, `governance`, `advisory`, `rust-pyo3`,
+  `python-slow`; 0 required reviewers (sole maintainer); force-push and
+  deletion blocked; no bypass actors.
 
-Defaults, goldens (including the C++-pinned fills golden) and published
-numbers are unchanged except where marked. API_TRADING.md §2.11.
+### Data & tooling (E4, E5, R7 prep)
 
-- X-P1-2: SEC Section 31 (`sell_notional_fee_bps`) and FINRA TAF
-  (`per_share_fee_all`, `per_share_fee_cap`, `per_share_fee_sell_only`) in
-  `VenueSpec` (simulator rule 5) and `CostModel`; default 0. Sourced values
-  for 2019 and 2026 in `configs/templates/regulatory_fees.json`.
-- X-P1-4 (research default changed): maker / quoting markout reference is
-  the mid before the first event of the fill's `exchange_ts`. COOKBOOK 39 and
-  40 spread / AS columns moved; fills and net unchanged.
-- X-P1-5 (default changed): `iap.auction` refuses a cross exit at or after
-  the MOC / MOO entry cutoff (dated, cited table in
-  `configs/reference/auction_entry_cutoffs.json`) and prices it as a taker
-  exit; `--no-entry-cutoff` restores the old rule. COOKBOOK 42 updated;
-  REAL_DATA §3.3 carries the caveat on the in-sample `C-300s` +19.4 bp (the
-  recorded numbers are unchanged).
-- X-P1-3: `QuotingConfig.skew_mode="ticks"`, `h_min_ticks`,
-  `inv_skew_ticks`; quoting summary adds `ticks_behind_touch_*` and
-  `frac_decisions_skew_changed_quote`.
-- X-P2-8: passive-exit fill probability from the fill-hazard model at
-  `exit_timeout_ns`, else a TTL-censored calibration cell
-  (`estimate_calibration(fill_within_ns=...)`), else as before.
-- X-P2-13: `estimate_volume_curves(tz="America/New_York")` / `--tz`.
-- X-P2-15: `ac_params_from_calibration(adv_per_day=..., horizon_s=...)`;
-  ambiguous unit combinations are refused.
+- **E4: split the god classes (behaviour-preserving).** Java
+  `PaperTrading.java` (1,843 → 1,428 lines) keeps its public API and
+  delegates to new package-private `PaperTradingSession`,
+  `PaperTradingMetrics`, `PaperTradingSizer`, `PaperTradingReports` and
+  `PaperTradingCli`. Python `iap/mvp/engine.py` (1,313 → 811 lines) keeps the
+  loop and re-exports its old public names; the rest moved to
+  `iap.mvp.engine_io`, `accounting`, `metrics`, `orders`, `risk_wiring`,
+  `sizing` and `engine_metrics` (ARCHITECTURE.md §9.1). No golden, digest,
+  report, CLI, Docker or k8s change; no test-count change.
+
+- **Feature-build memory (E5).** `python -m iap.features` streams events
+  from the IAP1 file (`iap.core.codec.iter_iap1`, validated before the
+  first event), keeps the label mid series in a `CompactMidSeries` (typed
+  arrays; `iap.labels`) and row timestamps / validity / the parallel
+  profile log in typed arrays, and spools the float64 row values to
+  `--out-dir/.spool_<pid>` until an instrument's row group is written.
+  Output is byte-identical for every option combination (default,
+  `--workers`, `--label-freshness trailing`, `--feature-set extended`,
+  `--sampling events|volume`, `--engine rust`). Serial peak RSS on a 3-day
+  synthetic set: 672 MB -> 234 MB, wall time 192.5 s -> 184.9 s
+  (`tools/bench_feature_memory.py`, docs/REAL_DATA.md §10). Real-day
+  re-measurement pending; `--worker-mem-gb` default unchanged.
+
+- **R7 data preparation** (plan item R7, data half; opt-in, DRAFT plan):
+  docs/R7_DATA_PLAN.md — source survey of 2026-10-11 (Nasdaq sample
+  directory: 10 unseen full-day ITCH 5.0 files, 88.75 GB; LOBSTER;
+  Databento), selection (tier 1 free, tier 2 seeded R1 draw of 40 days, A2
+  symbol list), capacity and the download list awaiting approval.
+  `research/r7/r7_candidates.json`; `python -m iap.marketdata
+  plan-ingest | verify-download | record-sampling`
+  (`iap.marketdata.r7plan`, no network); `tools/r7_download.py`, which
+  refuses without `--i-have-approval` and fetches only allowlisted hosts.
+  The R1 calendar (`iap.validation.sessions`) gains the 2021 and 2025 FOMC
+  and holiday-thin days. COOKBOOK recipe 66. Nothing was downloaded or
+  ingested.
+- **R7 status (2026-10-11).** Of the 10 free unseen Nasdaq sessions,
+  wave 1 (3 days) has been downloaded with approval; ingest is pending.
+  The A2 symbol plan is written; the confirmatory pre-registration is a
+  DRAFT and will run on v1.14.
+- **Data source and terms** (docs/REAL_DATA.md §2.1): Nasdaq
+  TotalView-ITCH sample files from `emi.nasdaq.com`; raw and normalized
+  data and feature stores are never redistributed; only aggregate derived
+  statistics are published. The stale pre-fix dataset
+  `data/real/ds_20191230` is removed from the REAL_DATA examples in favour
+  of the `ds3_*` datasets.
+
+### Dependencies
+
+- Rust toolchain 1.98.1 -> 1.99.0 everywhere (`rust-toolchain.toml`, CI,
+  risk-fuzz, docs), matching the Dependabot `rust:1.99.0-slim-bookworm`
+  Docker base bump.
+- `cryptography` 50.0.1 -> 50.0.2 (Dependabot); the hashed
+  `requirements-ci.txt` / `requirements-image.txt` regenerated with
+  pip-compile 7.6.1.
+- GitHub Actions (Dependabot): `actions/download-artifact` 8.0.1 -> 8.0.2,
+  `taiki-e/install-action` 2.87.22 -> 2.87.26, `dtolnay/rust-toolchain`
+  bumped.
 
 ## v1.12.0 — 2026-10-10
 

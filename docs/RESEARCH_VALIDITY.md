@@ -399,6 +399,26 @@ ledger entry changes (the regeneration is v1.14).
   minimum-detectable-effect statement at the given n (with the effect a
   registered t rule needs).
 
+**What v1.13 does not fix (v1.14, the correctness release).** The review
+(LEARN.md §44) found three defaults that overstate published statistics,
+and they change numbers, so they wait for one regeneration under new
+pre-registrations: the research backtest blocks rows by the validity of
+the *future* label (R-P0-1; a look-ahead in every net-P&L-at-1x figure and
+bootstrap CI); the gate t uses a two-bucket HAC window without day
+clustering by default (R-P1-3; the in-sample t of 21-26 are overstated);
+and label freshness defaults to whole-day rather than `trailing` (R-P1-1).
+No headline verdict is expected to flip (0 PROMOTE, no trade at 1x), but
+until v1.14 ships read the published t-statistics as upper bounds.
+
+**Studies under these rules (2026-10-11).** The maker study runs as
+registered and will be reported with `summarise_study` and the fee,
+markout-convention and power caveats. The M5 quoting study was aborted
+before any result was read, because its registered parameters could not
+move a quote (`data/real/quoting_real/ABORTED.md`); its v2 protocol will be
+registered in ticks. AUC01's holdout verdict (0 trades, not confirmed)
+stands. The R7 confirmatory round will use `frozen_params` and a
+`prereg` threshold and runs on v1.14.
+
 ## 5. Tooling
 
 - `python -m iap.research run --methods {v2,v3,v4,legacy_v1}`: the method

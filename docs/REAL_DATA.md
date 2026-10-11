@@ -59,9 +59,11 @@ manifest.
 
 ## 2. Obtaining data
 
-Nothing is bundled and nothing is downloaded by any code in this repository
+Nothing is bundled, and the library downloads nothing
 (`python/tests/test_import_policy.py` forbids network clients in
-`iap.marketdata`). You obtain the files, under the provider's terms:
+`iap.marketdata`); the one downloader, `tools/r7_download.py` (v1.13),
+refuses to run without `--i-have-approval` and fetches only allowlisted
+hosts. You obtain the files, under the provider's terms:
 
 - **Nasdaq TotalView-ITCH 5.0** — historical daily files are a Nasdaq data
   product; the vendor also publishes sample files of the same format. One
@@ -81,6 +83,28 @@ data/real/       ingest writes dataset directories here
 
 Both are in `.gitignore`. A dataset directory can live anywhere else; these
 are only the places that are safe by default.
+
+### 2.1 Data source and terms (v1.13)
+
+- **Source.** Every real session used here is a Nasdaq TotalView-ITCH 5.0
+  sample file from the public directory at `emi.nasdaq.com`. The directory
+  showed no licence or terms text as of 2026-10-11.
+- **Never redistributed.** Raw files, normalized datasets and feature stores
+  stay under the git-ignored `data/vendor/` and `data/real/`; none of them is
+  committed or published.
+- **What is published.** Only aggregate derived statistics (ICs,
+  t-statistics, P&L summaries, counts, per-symbol summary statistics) that
+  cannot be used to reconstruct the underlying data, which is how the
+  Nasdaq Data Policies (v2.6) define "Derived Data".
+- **Limits.** Commercial use of the data would need a Nasdaq Global Data
+  Agreement. Historical TotalView-ITCH is listed as "Not Eligible" for
+  delayed redistribution, so this repository does not redistribute it in
+  any form.
+- **Stale dataset.** `data/real/ds_20191230` was ingested before the
+  tick-size fix (§4.1; tick 0.0001) and is being replaced by a correct
+  re-ingest. Do not use it; the examples below use the `ds3_*` datasets.
+
+This is a description of what the repository does, not legal advice.
 
 ## 3. From a downloaded file to an alpha report
 
@@ -148,7 +172,7 @@ and treated an ingested ETF as a constituent.
 ```bash
 # single-day datasets ingested separately (in parallel processes if you like)
 # -> one multi-day dataset, without parsing the source files again
-PYTHONPATH=src python3 -m iap.marketdata merge     ../data/real/ds_20190130 ../data/real/ds_20190327 ../data/real/ds_20191230     --out ../data/real/multi
+PYTHONPATH=src python3 -m iap.marketdata merge     ../data/real/ds3_20190130 ../data/real/ds3_20190327 ../data/real/ds3_20190730     --out ../data/real/multi
 
 # all 24 alphas, the day-1-fit / day-2 backtest and the ensembles
 # (--out-dir is required: research/alpha_reports stays the synthetic record)

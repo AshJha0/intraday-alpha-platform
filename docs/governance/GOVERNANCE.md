@@ -8,42 +8,39 @@ Binding for every change to this repository.
 Controls in this document are of two kinds. Be clear which is which before
 relying on one.
 
-**Live branch ruleset (read from the GitHub API, 2026-10-11).** One active
-ruleset, `protect-main` (id 24455225), targets the default branch with no
-bypass actors:
+**Live branch ruleset (read from the GitHub API, 2026-10-11 09:06).** One
+active ruleset, `protect-main`, targets the default branch with **no bypass
+actors**:
 
-- `pull_request`: a pull request is required; **0 approving reviews**, no
-  code-owner review, no last-push approval, stale reviews not dismissed;
-  merge, squash and rebase all allowed;
-- `required_status_checks`: `python`, `integration`, `cpp`, `rust`, `java`,
-  `golden`, `deployment`, **non-strict** (a branch need not be up to date
-  with `main` before merging);
+- `pull_request`: a pull request is required; **0 approving reviews** (the
+  repository has one maintainer, and GitHub does not let an author approve
+  their own pull request);
+- `required_status_checks`, **strict** (a branch must be up to date with
+  `main` before merging): `python`, `integration`, `cpp`, `rust`, `java`,
+  `golden`, `deployment`, `CodeQL`, `governance`, `advisory`, `rust-pyo3`,
+  `python-slow`;
 - `non_fast_forward` (no force-push) and `deletion` (no branch deletion).
 
-Not required today: `governance` (added in v1.13), `rust-pyo3`,
-`cpp-sanitizers`, `advisory`, CodeQL, `images`.
+Not required today: `python-312` (the Python 3.12 entry), `cpp-sanitizers`,
+`images`.
 
 **Recommended owner actions** (repository settings; code cannot do them):
 
-1. add `governance` to the required checks once it has run green on `main`;
-2. turn on "require branches to be up to date" (strict), so the monotone
-   ledger check and the golden suite run against the current `main`;
-3. add `rust-pyo3`, `cpp-sanitizers`, `advisory` and CodeQL `analyze` as
-   required checks;
-4. require 1 approving review (and code-owner review) as soon as a second
+1. require 1 approving review (and code-owner review) as soon as a second
    maintainer exists;
-5. restrict merge methods to merge commits for research branches, or at
+2. consider adding `python-312` and `cpp-sanitizers` as required checks;
+3. restrict merge methods to merge commits for research branches, or at
    least never rebase them (section 2c).
 
 | Control | Status (2026-10-11) | Enforced by |
 |---|---|---|
-| CI green on every push and pull request (all four languages, golden gate, deployment validation) | **Enforced as a merge gate for the seven required checks** | `protect-main` ruleset; other jobs run but do not block |
+| CI green on every push and pull request (all four languages, golden gate, deployment validation) | **Enforced as a merge gate for the twelve required checks** | `protect-main` ruleset; other jobs run but do not block |
 | Pull requests only, no direct push to `main` | **Enforced** | `protect-main` (`pull_request` rule, no bypass actors) |
-| Required status checks before merge | **Enforced, non-strict**: python, integration, cpp, rust, java, golden, deployment | `protect-main`; `governance` is not yet required (recommended action 1) |
+| Required status checks before merge | **Enforced, strict**: python, integration, cpp, rust, java, golden, deployment, CodeQL, governance, advisory, rust-pyo3, python-slow | `protect-main` |
 | "1 to 2 reviewers" by change class (section 1) | **Not enforced: the ruleset requires 0 approvals**; not satisfiable by one maintainer | Needs a second maintainer; GitHub does not let an author approve their own pull request |
 | Reviewer ownership by path | Enforced as a file, applied only once the ruleset requires code-owner review | `CODEOWNERS` (every path owned by `@AshJha0`) |
 | Force-push and branch-deletion protection | **Enforced** | `protect-main` (`non_fast_forward`, `deletion`) |
-| Blackboard chain, anchors and signatures verify; every signed writer has a registered key; ledger and board only grow vs the base (v1.13) | **Enforced as a check** (`governance` job), not yet a merge gate | `iap.agents.cli verify-board`, `tests/harness/check_agent_keys.py`, `tests/harness/check_ledger_monotone.py` |
+| Blackboard chain, anchors and signatures verify; every signed writer has a registered key; ledger and board only grow vs the base (v1.13) | **Enforced as a merge gate** (`governance` job is a required check) | `iap.agents.cli verify-board`, `tests/harness/check_agent_keys.py`, `tests/harness/check_ledger_monotone.py` |
 | HUMAN lifecycle edges (`retire`, `reset`) need a signed, single-use approval (v1.13) | Enforced in code | `python -m iap.lifecycle retire|reset --approval --keyfile`, `iap.agents.approvals` |
 | Signed release tags | **A practice, not enforced** | Nothing verifies tag signatures ([REPO_SETTINGS.md](REPO_SETTINGS.md) section 2) |
 | Dependabot alerts and security updates | **Required setting, not yet configured** (version-update PRs are configured by `.github/dependabot.yml`) | [REPO_SETTINGS.md](REPO_SETTINGS.md) section 3 |
