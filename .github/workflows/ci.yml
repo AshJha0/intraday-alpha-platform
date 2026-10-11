@@ -897,10 +897,12 @@ jobs:
           echo "2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a  /tmp/trivy.tar.gz" | sha256sum -c -
           tar -xzf /tmp/trivy.tar.gz -C /tmp trivy
           python3 tools/audit_ignores.py --tool trivy > /tmp/.trivyignore
-          for df in python java cpp rust; do
+          rc=0
+          for df in python java cpp rust; do   # scan all four, then fail
             /tmp/trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed \
-              --exit-code 1 --ignorefile /tmp/.trivyignore "iap/$df:ci-${GITHUB_SHA::12}"
+              --exit-code 1 --ignorefile /tmp/.trivyignore "iap/$df:ci-${GITHUB_SHA::12}" || rc=1
           done
+          exit "$rc"
       - name: the C++ replay container runs bench_all to completion
         run: docker run --rm "iap/cpp:ci-${GITHUB_SHA::12}"
       - name: the Rust replay container exits 0
