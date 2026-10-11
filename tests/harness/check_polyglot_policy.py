@@ -48,38 +48,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 POLICY = ROOT / "tests" / "harness" / "polyglot_policy.json"
 
-_JAVA_KEYWORDS = frozenset(
-    {
-        "return",
-        "new",
-        "throw",
-        "else",
-        "case",
-        "if",
-        "for",
-        "while",
-        "switch",
-        "catch",
-        "do",
-        "try",
-        "yield",
-        "assert",
-    }
-)
 _RUST_FN = re.compile(
     r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:const\s+)?(?:unsafe\s+)?(?:extern\s+\"[^\"]*\"\s+)?fn\s+([A-Za-z_]\w*)"
 )
 _RUST_TYPE = re.compile(
     r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:struct|enum|trait|type|mod)\s+([A-Za-z_]\w*)"
 )
-_JAVA_TYPE = re.compile(r"\b(?:class|interface|enum|record)\s+([A-Za-z_]\w*)")
-_JAVA_METHOD = re.compile(
-    r"^\s*(?:@\w+(?:\([^)]*\))?\s+)*"
-    r"(?:(?:public|protected|private|static|final|abstract|synchronized|native|default|strictfp)\s+)*"
-    r"(?:<[^>]+>\s+)?"
-    r"([A-Za-z_][\w<>\[\],.? ]*?)\s+([A-Za-z_]\w*)\s*\([^;]*$"
-)
-_JAVA_CTOR = re.compile(r"^\s*(?:public|protected|private)\s+([A-Z]\w*)\s*\([^;]*$")
 _CPP_TYPE = re.compile(
     r"^\s*(?:class|struct|enum\s+class|enum)\s+([A-Za-z_]\w*)\s*(?:final\s*)?[:{]"
 )
@@ -101,23 +75,6 @@ def declarations(path: str, text: str) -> set[str]:
                 m = rx.match(line)
                 if m:
                     names.add(m.group(1))
-        elif path.endswith(".java"):
-            m = _JAVA_TYPE.search(line)
-            if m and not stripped.startswith(("return", "throw")):
-                names.add(m.group(1))
-            if stripped.endswith(";"):
-                continue
-            m = _JAVA_METHOD.match(line)
-            if (
-                m
-                and m.group(1).split()[-1] not in _JAVA_KEYWORDS
-                and m.group(2) not in _JAVA_KEYWORDS
-            ):
-                if "=" not in line.split("(")[0]:
-                    names.add(m.group(2))
-            m = _JAVA_CTOR.match(line)
-            if m:
-                names.add(m.group(1))
         elif path.endswith((".cpp", ".hpp", ".h", ".cc")):
             m = _CPP_TYPE.match(line)
             if m:
@@ -241,27 +198,16 @@ def self_test(policy: dict) -> list[str]:
     fails = []
     rs_old = "pub fn apply(&mut self) {}\nfn helper() {}\npub struct Book;\n"
     rs_new = rs_old + "pub fn new_feature(x: i64) -> i64 { x }\n"
-    java_old = (
-        "public final class OrderBook {\n  public OrderBook(int v) {\n  }\n"
-        "  public long bestBid() {\n    return foo(1);\n  }\n"
-        "  private static <T> List<T> sorted(List<T> xs) {\n    if (x) {\n    }\n  }\n}\n"
-    )
-    java_new = java_old.replace(
-        "}\n}\n", "}\n  public double spread(int lvl) {\n    return 0;\n  }\n}\n"
-    )
     cpp_old = "namespace iap {\nstd::string Value::dump() const {\n  if (x) {\n  }\n}\n}\n"
     cpp_new = cpp_old + "int canonical_extra(int a) {\n  return a;\n}\n"
     expect = {
         ("a.rs", rs_old): {"apply", "helper", "Book"},
-        ("A.java", java_old): {"OrderBook", "bestBid", "sorted"},
         ("a.cpp", cpp_old): {"Value::dump"},
     }
     for (path, text), want in expect.items():
         got = declarations(path, text)
         if got != want:
             fails.append(f"self-test: declarations({path}) = {sorted(got)}, want {sorted(want)}")
-    if declarations("A.java", java_new) - declarations("A.java", java_old) != {"spread"}:
-        fails.append("self-test: java new method not detected")
     if declarations("a.cpp", cpp_new) - declarations("a.cpp", cpp_old) != {"canonical_extra"}:
         fails.append("self-test: cpp new function not detected")
     frozen = policy["frozen"][0]["path"] + "x.rs"

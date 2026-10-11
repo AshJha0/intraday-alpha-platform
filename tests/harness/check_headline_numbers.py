@@ -84,7 +84,7 @@ EXTRA_COUNT_SOURCES = {
     "docs/diagrams/golden_topology.mmd": ROOT / "docs" / "diagrams" / "golden_topology.mmd",
 }
 
-LANGS = ("python", "cpp", "rust", "java")
+LANGS = ("python", "cpp", "rust")  # Java archived in v1.15 (archive/java/)
 
 PLATFORM_FAILURES: list[str] = []
 RESEARCH_STALE: list[str] = []
@@ -266,21 +266,6 @@ def check_platform(docs: dict[str, str]) -> None:
             "data/normalized/qc_report.json absent (generated) — skipped",
             PLATFORM_FAILURES,
         )
-
-    # --- java golden classes ---------------------------------------------
-    on_disk = sorted(
-        p.stem
-        for p in (ROOT / "java" / "src" / "test" / "java" / "com" / "iap").glob("*GoldenTest.java")
-    )
-    run_all = (ROOT / "tests" / "harness" / "run_all.sh").read_text()
-    m = re.search(r'JAVA_GOLDEN_CLASSES="([^"]*)"', run_all)
-    listed = sorted(c.split(".")[-1] for c in m.group(1).split()) if m else []
-    report(
-        "java_golden_classes",
-        listed == on_disk,
-        f"{len(on_disk)} classes on disk, {len(listed)} in the golden gate",
-        PLATFORM_FAILURES,
-    )
 
     # --- mermaid sources vs the blocks embedded in the docs ---------------
     # docs/diagrams/*.mmd is what `mmdc` renders; DIAGRAMS.md / ARCHITECTURE.md
@@ -566,8 +551,8 @@ def check_mermaid_sync() -> None:
 #
 # The pinned record is the parity table in README.md, which the README itself
 # labels "captured from `tests/harness/run_all.sh`". Everything else must agree
-# with it, and the two counts that CAN be re-derived without running a suite
-# (java @Test, rust #[test]) are checked against the tree so the table itself
+# with it, and the count that CAN be re-derived without running a suite
+# (rust #[test]) is checked against the tree so the table itself
 # cannot silently drift either. python and cpp are not statically derivable —
 # pytest parametrization and gtest macros both expand — and this says so rather
 # than pretending otherwise.
@@ -582,7 +567,7 @@ def parity_table_counts() -> tuple[dict[str, int], dict[str, int]] | None:
     tests: dict[str, int] = {}
     golden: dict[str, int] = {}
     for line in readme.read_text().splitlines():
-        m = re.match(r"\s*(python|cpp|rust|java)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|", line)
+        m = re.match(r"\s*(python|cpp|rust)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|", line)
         if m:
             tests[m.group(1)] = int(m.group(2))
             golden[m.group(1)] = int(m.group(3))
@@ -619,14 +604,14 @@ def check_test_counts(docs: dict[str, str]) -> None:
     report(
         "parity_table_parsed",
         True,
-        "README table: tests %s, golden %s (python/cpp/rust/java)"  # noqa: UP031 (byte-pinned output format, kept as-is)
+        "README table: tests %s, golden %s (python/cpp/rust)"  # noqa: UP031 (byte-pinned output format, kept as-is)
         % ("/".join(map(str, t_tuple)), "/".join(map(str, g_tuple))),
         PLATFORM_FAILURES,
     )
 
     sources = count_sources(docs)
     check_repo_level_rows(sources)
-    check_parity_quadruples(sources, t_tuple, g_tuple)
+    check_parity_triples(sources, t_tuple, g_tuple)
     check_golden_topology_diagram(sources, golden)
     check_per_language_count_prose(sources, tests)
     check_parity_table_vs_tree(tests, golden)
@@ -666,20 +651,19 @@ def check_repo_level_rows(sources: dict[str, str]) -> None:
     )
 
 
-def check_parity_quadruples(
+def check_parity_triples(
     sources: dict[str, str], t_tuple: tuple[int, ...], g_tuple: tuple[int, ...]
 ) -> None:
-    """`626/243/254/448` and `65/45/47/85` wherever they are quoted.
+    """`626/243/254` and `65/45/47` (python/cpp/rust) wherever they are quoted.
 
-    Only quadruples whose surrounding text is talking about tests are
+    Only triples whose surrounding text is talking about tests are
     considered, so version strings and ratios elsewhere are left alone.
     """
     problems = []
     seen = 0
     for name, text in sources.items():
         for m in re.finditer(
-            r"(?<![\d,./])(\d{2,4})/(\d{2,4})/(\d{2,4})"
-            r"/(\d{2,4})(?![\d,./])",
+            r"(?<![\d,./])(\d{3,4})/(\d{2,4})/(\d{2,4})(?![\d,./])",  # first count >= 100: not a 50/25/25 split
             text,
         ):
             window = text[max(0, m.start() - 120) : m.end() + 120].lower()
@@ -694,16 +678,22 @@ def check_parity_quadruples(
                 f"{'/'.join(map(str, t_tuple))} tests and "
                 f"{'/'.join(map(str, g_tuple))} golden"
             )
+        # A four-number count is a pre-v1.15 python/cpp/rust/java quote that
+        # the Java archive left stale (the triple pattern cannot see it).
+        for m in re.finditer(r"(?<![\d,./])\d{3,4}(?:/\d{2,4}){3}(?![\d,./])", text):
+            window = text[max(0, m.start() - 120) : m.end() + 120].lower()
+            if any(w in window for w in ("test", "golden", "parity")):
+                problems.append(f"{name}: {m.group(0)} — a four-language count (Java is archived)")
     report(
-        "parity_quadruples_in_docs",
+        "parity_triples_in_docs",
         not problems,
-        "; ".join(problems) or f"{seen} python/cpp/rust/java count quadruples, all matching",
+        "; ".join(problems) or f"{seen} python/cpp/rust count triples, all matching",
         PLATFORM_FAILURES,
     )
 
 
 def check_golden_topology_diagram(sources: dict[str, str], golden: dict[str, int]) -> None:
-    """The golden-topology diagram's four leaf nodes carry golden counts.
+    """The golden-topology diagram's three leaf nodes carry golden counts.
 
     They live in three synchronized copies (the .mmd source plus the blocks
     embedded in DIAGRAMS.md and ARCHITECTURE.md); mermaid_sources_in_sync
@@ -713,8 +703,6 @@ def check_golden_topology_diagram(sources: dict[str, str], golden: dict[str, int
         "python": r"python: pytest -k golden<br/>(\d+) tests",
         "cpp": r"cpp: ctest -R Golden<br/>(\d+) tests",
         "rust": r"rust: \d+ golden test targets<br/>(\d+) tests",
-        "java": r"java: [^\"]*GoldenTest \(JUnitCore\)<br/>(\d+) "
-        r"golden-group tests",
     }
     run_all = (ROOT / "tests" / "harness" / "run_all.sh").read_text()
     m_targets = re.search(r'RUST_GOLDEN_TARGETS="([^"]*)"', run_all)
@@ -755,11 +743,11 @@ def check_golden_topology_diagram(sources: dict[str, str], golden: dict[str, int
 
 
 def check_per_language_count_prose(sources: dict[str, str], tests: dict[str, int]) -> None:
-    """Prose of the form "cpp 243, rust 254, java 448 tests passed"."""
+    """Prose of the form "cpp 243, rust 254 tests passed"."""
     problems = []
     seen = 0
     for name, text in sources.items():
-        for m in re.finditer(r"(python|cpp|rust|java)[ ·]+(\d{2,4})\b", text):
+        for m in re.finditer(r"(python|cpp|rust)[ ·]+(\d{2,4})\b", text):
             window = text[max(0, m.start() - 200) : m.end() + 200].lower()
             if (
                 "tests passed" not in window
@@ -783,11 +771,8 @@ def check_per_language_count_prose(sources: dict[str, str], tests: dict[str, int
 
 
 def check_parity_table_vs_tree(tests: dict[str, int], golden: dict[str, int]) -> None:
-    """Re-derive the two counts that do not need a suite run.
+    """Re-derive the count that does not need a suite run.
 
-    java: `@Test` annotations under java/src/test (JUnit4, and the harness
-    asserts zero `@Ignore`); the golden column is the same count restricted to
-    the `*GoldenTest` classes.
     rust: `#[test]` under rust/; the golden column is the same restricted to
     the golden integration-test targets run_all.sh names.
     python and cpp are deliberately NOT derived: pytest parametrization and the
@@ -796,23 +781,6 @@ def check_parity_table_vs_tree(tests: dict[str, int], golden: dict[str, int]) ->
     """
     problems = []
     detail = []
-
-    java_test_dir = ROOT / "java" / "src" / "test"
-    if java_test_dir.is_dir():
-        java_files = sorted(java_test_dir.rglob("*.java"))
-        total = sum(len(re.findall(r"@Test\b", p.read_text())) for p in java_files)
-        gold = sum(
-            len(re.findall(r"@Test\b", p.read_text()))
-            for p in java_files
-            if p.stem.endswith("GoldenTest")
-        )
-        detail.append(f"java @Test {total} (golden {gold})")
-        if total != tests["java"]:
-            problems.append(f"java: {total} @Test in the tree, table says {tests['java']}")
-        if gold != golden["java"]:
-            problems.append(
-                f"java golden: {gold} @Test in the *GoldenTest classes, table says {golden['java']}"
-            )
 
     rust_dir = ROOT / "rust"
     if rust_dir.is_dir():

@@ -82,7 +82,7 @@ python3 -c "import json;print(json.load(open('../data/features/features_summary.
 
 Cross-language replay reproduction works the same way: replay engines take
 explicit seeds and checkpoint cadences from configs, and
-`tests/harness/run_golden.sh` proves all four languages produce identical
+`tests/harness/run_golden.sh` proves the three languages (python, cpp, rust; Java archived in v1.15) produce identical
 book states, fills, risk decisions, canonical-JSON lines, trace digests and
 lifecycle state sequences from the same event files and documents (exact
 integer / byte equality; float tolerance 1e-9 abs/rel — conventions §5).

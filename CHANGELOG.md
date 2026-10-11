@@ -16,6 +16,28 @@ that tag.
   on in `configs/prereg/v2.json`. New cross-engine golden
   `tests/golden/expected_regulatory_fees.json`; no existing golden changes.
 
+### Java engine archived (G-P1-3, owner-approved)
+
+- The Java engine (frozen since v1.14) moved from `java/` to `archive/java/`
+  unchanged, with a README: frozen at v1.14.0 (575 tests, 124 golden at that
+  tag) and how to restore it.
+- CI: the `java` job is removed (and from `images.needs`); the `golden` job no
+  longer installs a JDK or JUnit; CodeQL drops `java-kotlin`; the nightly risk
+  differential fuzz (`risk-fuzz.yml`, `python/tools/risk_fuzz_nightly.py`)
+  runs Rust against the Python oracle only. The `deployment` job keeps its JDK:
+  the `java` platform image still builds from the frozen copy
+  (`Dockerfile.java` copies `archive/java`), so compose and k8s are unchanged.
+- Harnesses: `run_all.sh` / `run_golden.sh` have three language rows (python,
+  cpp, rust); `check_deployment.py` drops the dead Java golden-gate check;
+  `check_headline_numbers.py` checks python/cpp/rust count triples and flags
+  any remaining four-language count; the Java FROZEN paths and the Java
+  declaration extractor left the polyglot policy (the override machinery stays
+  for the Rust and C++ frozen copies).
+- Docs and site counts: parity is 2411 / 302 / 365 tests, 193 / 72 / 71
+  golden: 3,078 green (was 3,653 with Java's 575).
+- Ruleset: `java` dropped from the `protect-main` required checks
+  (2026-10-11; docs/governance/REPO_SETTINGS.md updated).
+
 ## v1.14.0 — 2026-10-11
 
 Correctness release of the 2026-10-11 quality review: data mapping and

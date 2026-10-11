@@ -34,7 +34,7 @@ Not required today: `python-312` (the Python 3.12 entry), `cpp-sanitizers`,
 
 | Control | Status (2026-10-11) | Enforced by |
 |---|---|---|
-| CI green on every push and pull request (all four languages, golden gate, deployment validation) | **Enforced as a merge gate for the twelve required checks** | `protect-main` ruleset; other jobs run but do not block |
+| CI green on every push and pull request (python, cpp and rust, golden gate, deployment validation; Java archived in v1.15) | **Enforced as a merge gate for the twelve required checks** | `protect-main` ruleset; other jobs run but do not block |
 | Pull requests only, no direct push to `main` | **Enforced** | `protect-main` (`pull_request` rule, no bypass actors) |
 | Required status checks before merge | **Enforced, strict**: python, integration, cpp, rust, java, golden, deployment, CodeQL, governance, advisory, rust-pyo3, python-slow | `protect-main` |
 | "1 to 2 reviewers" by change class (section 1) | **Not enforced: the ruleset requires 0 approvals**; not satisfiable by one maintainer | Needs a second maintainer; GitHub does not let an author approve their own pull request |
@@ -70,7 +70,7 @@ blast radius:
 | **Deployment / observability** | `deployment/`, `docs/runbooks/`, `tests/harness/`, `.github/` | 1 platform reviewer (`CODEOWNERS`); the deployment validation used in CI must pass — `python3 tests/harness/check_deployment.py`, i.e. `promtool check rules` + `check config` + `promtool test rules`, `docker compose config -q`, every Dockerfile `COPY` source resolving in a clean build context, k8s manifests parsing and dry-running, the generated ConfigMaps matching `configs/`, every rule and dashboard expression naming a metric a producer exports, and the Java golden gate covering every `*GoldenTest` class. |
 | Everything else | docs, research scripts, benchmarks | 1 reviewer. |
 
-Mandatory for every PR class: `tests/harness/run_all.sh` green (all four
+Mandatory for every PR class: `tests/harness/run_all.sh` green (all three
 languages, < 120 s each, plus the deployment column), zero compiler warnings
 (conventions §8), no new dependencies without a SECURITY.md §1 entry.
 

@@ -1,10 +1,11 @@
 # =============================================================================
-# CodeQL code scanning: python, java-kotlin, c-cpp, rust (v1.14, G-P1-7) and
+# CodeQL code scanning: python, c-cpp, rust (v1.14, G-P1-7) and
 # the workflows themselves (actions). Runs on push to main, on pull requests, and weekly (new queries
 # land without a code change). Results go to the repository's code-scanning
 # alerts; the workflow has no secrets and reads the repository only.
-# Java and C++ are compiled with the repository's own build scripts
-# (java/build.sh, cpp/build.sh) so the extractor sees the real build.
+# C++ is compiled with the repository's own build script (cpp/build.sh) so
+# the extractor sees the real build. java-kotlin was dropped in v1.15 when the
+# Java engine was archived (archive/java/, frozen at v1.14.0).
 # =============================================================================
 name: codeql
 
@@ -38,8 +39,6 @@ jobs:
         include:
           - language: python
             build-mode: none
-          - language: java-kotlin
-            build-mode: manual
           - language: c-cpp
             build-mode: manual
           - language: actions
@@ -48,12 +47,6 @@ jobs:
             build-mode: none
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: JDK 21
-        if: matrix.language == 'java-kotlin'
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
-        with:
-          distribution: temurin
-          java-version: "21"
       - name: C++ toolchain
         if: matrix.language == 'c-cpp'
         run: |
@@ -64,9 +57,6 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
-      - name: build (java)
-        if: matrix.language == 'java-kotlin'
-        run: bash java/build.sh
       - name: build (c++)
         if: matrix.language == 'c-cpp'
         run: bash cpp/build.sh

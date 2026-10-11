@@ -1,5 +1,10 @@
 # POLYGLOT — which copy of each component is canonical, and which is frozen
 
+> **v1.15 (G-P1-3): the Java engine is archived** in `archive/java/`, frozen at
+> v1.14.0 ([archive/java/README.md](../archive/java/README.md)). Its rows below
+> are historical: the Java paths left `tests/harness/polyglot_policy.json`,
+> and parity is now tested across three engines (python, cpp, rust).
+
 IAP_Next_Releases_Plan item **E3** (v1.11.0). The platform implements several
 components in more than one language: the order book in four, features and
 the alpha scoring in four, risk in three, the lifecycle in three (four counting
