@@ -1,0 +1,20 @@
+{
+  "schema": "iap.r7_candidates/v1",
+  "status": "DRAFT - not approved for download",
+  "checked": "2026-10-11",
+  "source": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/",
+  "note": "Sizes from the public directory listing and HEAD requests (no file body fetched). The listing's .md5sum/.done entries return HTTP 404, so no publisher checksum is available: verify-download records the sha256 after download.",
+  "symbols": "AAPL,MSFT,QQQ",
+  "days": [
+    {"date": "2019-10-18", "file": "S101819-v50.txt.gz", "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S101819-v50.txt.gz", "bytes": 3951201663, "sha256": null, "role": "insample"},
+    {"date": "2021-07-13", "file": "S071321-v50.txt.gz", "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S071321-v50.txt.gz", "bytes": 5996745270, "sha256": null, "role": "insample"},
+    {"date": "2021-08-13", "file": "S081321-v50.txt.gz", "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S081321-v50.txt.gz", "bytes": 4889328604, "sha256": null, "role": "insample"},
+    {"date": "2025-11-28", "file": "S112825-v50.txt.gz", "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S112825-v50.txt.gz", "bytes": 4735308661, "sha256": null, "role": "holdout"},
+    {"date": "2025-12-08", "file": "S120825-v50.txt.gz", "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S120825-v50.txt.gz", "bytes": 8775891119, "sha256": null, "role": "holdout"},
+    {"date": "2025-12-09", "file": "S120925-v50.txt.gz", "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S120925-v50.txt.gz", "bytes": 7929915419, "sha256": null, "role": "holdout"},
+    {"date": "2025-12-10", "file": "S121025-v50.txt.gz", "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S121025-v50.txt.gz", "bytes": 11557662295, "sha256": null, "role": "holdout"},
+    {"date": "2025-12-11", "file": "S121125-v50.txt.gz", "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S121125-v50.txt.gz", "bytes": 10471034001, "sha256": null, "role": "holdout"},
+    {"date": "2025-12-12", "file": "S121225-v50.txt.gz", "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S121225-v50.txt.gz", "bytes": 12551644054, "sha256": null, "role": "holdout"},
+    {"date": "2026-06-12", "file": "S061226-v50.txt.gz", "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S061226-v50.txt.gz", "bytes": 17894268560, "sha256": null, "role": "holdout"}
+  ]
+}

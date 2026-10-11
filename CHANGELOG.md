@@ -18,6 +18,19 @@ that tag.
   `sizing` and `engine_metrics` (ARCHITECTURE.md §9.1). No golden, digest,
   report, CLI, Docker or k8s change; no test-count change.
 
+- **R7 data preparation** (plan item R7, data half; opt-in, DRAFT plan):
+  docs/R7_DATA_PLAN.md — source survey of 2026-10-11 (Nasdaq sample
+  directory: 10 unseen full-day ITCH 5.0 files, 88.75 GB; LOBSTER;
+  Databento), selection (tier 1 free, tier 2 seeded R1 draw of 40 days, A2
+  symbol list), capacity and the download list awaiting approval.
+  `research/r7/r7_candidates.json`; `python -m iap.marketdata
+  plan-ingest | verify-download | record-sampling`
+  (`iap.marketdata.r7plan`, no network); `tools/r7_download.py`, which
+  refuses without `--i-have-approval` and fetches only allowlisted hosts.
+  The R1 calendar (`iap.validation.sessions`) gains the 2021 and 2025 FOMC
+  and holiday-thin days. COOKBOOK recipe 66. Nothing was downloaded or
+  ingested.
+
 ## v1.12.0 — 2026-10-10
 
 Honest Sharpe, better passive fills, new features, measured latency and
