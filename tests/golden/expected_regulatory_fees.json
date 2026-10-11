@@ -4,23 +4,55 @@
   "tolerance": 1e-12,
   "schedule": {
     "x-version": 1,
-    "description": "v1.15 X-P1-1: dated US equity regulatory fee schedule (SEC Section 31 transaction fee and FINRA Trading Activity Fee), both charged on SELL fills of EQUITY/ETF venues only. A period applies to fills with from_ns <= exchange_ts < until_ns (UTC midnight of the ISO dates; until absent = open-ended). A fill outside every period of a table is an error (fail closed): the table only covers windows whose rate was verified against the cited notice. Applied per fill, unrounded: sec = usd_per_million * notional / 1e6; taf = min(per_share * qty, max_per_trade) (a fill stands in for a trade). Off in code defaults (v1 numbers unchanged); turned on by configs/prereg/v2.json. Verified 2026-10-11.",
+    "description": "v1.15 X-P1-1: dated US equity regulatory fee schedule (SEC Section 31 transaction fee and FINRA Trading Activity Fee), both charged on SELL fills of EQUITY/ETF venues only. A period applies to fills with from_ns <= exchange_ts < until_ns (UTC midnight of the ISO dates; until absent = open-ended). A fill outside every period of a table is an error (fail closed): both tables are continuous from 2019-01-01 (every rate change verified against the cited notice). Applied per fill, unrounded: sec = usd_per_million * notional / 1e6; taf = min(per_share * qty, max_per_trade) (a fill stands in for a trade). Off in code defaults (v1 numbers unchanged); turned on by configs/prereg/v2.json. Verified 2026-10-11.",
     "sec_section31": [
+      {
+        "from": "2019-01-01",
+        "from_ns": 1546300800000000000,
+        "until": "2019-04-16",
+        "until_ns": 1555372800000000000,
+        "usd_per_million": 13.0,
+        "source": "https://www.sec.gov/news/press-release/2018-67 (Fee Rate Advisory #3 FY2018: $13.00 per million on/after 2018-05-22); https://www.sec.gov/news/press-release/2019-30 ($13.00 through 2019-04-15). Table starts 2019-01-01."
+      },
       {
         "from": "2019-04-16",
         "from_ns": 1555372800000000000,
-        "until": "2020-01-01",
-        "until_ns": 1577836800000000000,
+        "until": "2020-02-18",
+        "until_ns": 1581984000000000000,
         "usd_per_million": 20.7,
-        "source": "https://www.sec.gov/news/press-release/2019-30 (Fee Rate Advisory #2 FY2019: $20.70 per million for charge dates on/after 2019-04-16). Window closed at 2020-01-01 to cover the 2019 ITCH sample days only."
+        "source": "https://www.sec.gov/news/press-release/2019-30 (FY2019: $20.70 per million on/after 2019-04-16); https://www.sec.gov/news/press-release/2020-7 ($20.70 through 2020-02-17)"
       },
       {
-        "from": "2024-01-01",
-        "from_ns": 1704067200000000000,
+        "from": "2020-02-18",
+        "from_ns": 1581984000000000000,
+        "until": "2021-02-25",
+        "until_ns": 1614211200000000000,
+        "usd_per_million": 22.1,
+        "source": "https://www.sec.gov/news/press-release/2020-7 (FY2020: $22.10 per million on/after 2020-02-18); https://www.sec.gov/news/press-release/2020-49 (unchanged); https://www.sec.gov/news/press-release/2021-8 ($22.10 through 2021-02-24)"
+      },
+      {
+        "from": "2021-02-25",
+        "from_ns": 1614211200000000000,
+        "until": "2022-05-14",
+        "until_ns": 1652486400000000000,
+        "usd_per_million": 5.1,
+        "source": "https://www.sec.gov/news/press-release/2021-8 (FY2021: $5.10 per million on/after 2021-02-25); https://www.sec.gov/news/press-release/2021-36 (unchanged); https://www.sec.gov/news/press-release/2022-60 ($5.10 through 2022-05-13)"
+      },
+      {
+        "from": "2022-05-14",
+        "from_ns": 1652486400000000000,
+        "until": "2023-02-27",
+        "until_ns": 1677456000000000000,
+        "usd_per_million": 22.9,
+        "source": "https://www.sec.gov/news/press-release/2022-60 (FY2022: $22.90 per million on/after 2022-05-14); https://www.sec.gov/newsroom/press-releases/2023-15 ($22.90 through 2023-02-26)"
+      },
+      {
+        "from": "2023-02-27",
+        "from_ns": 1677456000000000000,
         "until": "2024-05-22",
         "until_ns": 1716336000000000000,
         "usd_per_million": 8.0,
-        "source": "https://www.sec.gov/rules-regulations/fee-rate-advisories/2024-2 ($8.00 per million for charge dates through 2024-05-21)"
+        "source": "https://www.sec.gov/newsroom/press-releases/2023-15 (FY2023: $8.00 per million on/after 2023-02-27); https://www.sec.gov/newsroom/press-releases/2023-41 (unchanged); https://www.sec.gov/rules-regulations/fee-rate-advisories/2024-2 ($8.00 through 2024-05-21)"
       },
       {
         "from": "2024-05-22",
@@ -49,11 +81,29 @@
       {
         "from": "2019-01-01",
         "from_ns": 1546300800000000000,
-        "until": "2020-01-01",
-        "until_ns": 1577836800000000000,
+        "until": "2022-01-01",
+        "until_ns": 1640995200000000000,
         "per_share": 0.000119,
         "max_per_trade": 5.95,
-        "source": "FINRA By-Laws Schedule A Section 1 (TAF covered equity sales $0.000119 per share, max $5.95 per trade, in force in 2019); history at https://www.finra.org/rules-guidance/rule-filings/sr-finra-2024-019/fee-adjustment-schedule"
+        "source": "https://www.finra.org/sites/default/files/2020-10/NOF%20IMM%20EFF%20FINRA-2020-032.pdf (SR-FINRA-2020-032, 85 FR No. 203, 2020-10-20: $0.000119 per share, max $5.95 per trade since 2012, unchanged for 2020 and 2021)"
+      },
+      {
+        "from": "2022-01-01",
+        "from_ns": 1640995200000000000,
+        "until": "2023-01-01",
+        "until_ns": 1672531200000000000,
+        "per_share": 0.00013,
+        "max_per_trade": 6.49,
+        "source": "https://www.finra.org/sites/default/files/2020-10/NOF%20IMM%20EFF%20FINRA-2020-032.pdf (SR-FINRA-2020-032 schedule, 2022: $0.000130 per share, max $6.49)"
+      },
+      {
+        "from": "2023-01-01",
+        "from_ns": 1672531200000000000,
+        "until": "2024-01-01",
+        "until_ns": 1704067200000000000,
+        "per_share": 0.000145,
+        "max_per_trade": 7.27,
+        "source": "https://www.finra.org/sites/default/files/2020-10/NOF%20IMM%20EFF%20FINRA-2020-032.pdf (SR-FINRA-2020-032 schedule, 2023: $0.000145 per share, max $7.27)"
       },
       {
         "from": "2024-01-01",
@@ -62,16 +112,25 @@
         "until_ns": 1767225600000000000,
         "per_share": 0.000166,
         "max_per_trade": 8.3,
-        "source": "https://www.finra.org/rules-guidance/rule-filings/sr-finra-2024-019/fee-adjustment-schedule (2024 and 2025: $0.000166 per share, max $8.30)"
+        "source": "https://www.finra.org/rules-guidance/rule-filings/sr-finra-2024-019/fee-adjustment-schedule (2024 and 2025: $0.000166 per share, max $8.30; 2024 also in https://www.finra.org/sites/default/files/2020-10/NOF%20IMM%20EFF%20FINRA-2020-032.pdf)"
       },
       {
         "from": "2026-01-01",
         "from_ns": 1767225600000000000,
-        "until": "2027-01-01",
-        "until_ns": 1798761600000000000,
+        "until": "2026-10-01",
+        "until_ns": 1790812800000000000,
         "per_share": 0.000195,
         "max_per_trade": 9.79,
-        "source": "https://www.finra.org/rules-guidance/rule-filings/sr-finra-2024-019/fee-adjustment-schedule (2026: $0.000195 per share, max $9.79)"
+        "source": "https://www.finra.org/rules-guidance/rule-filings/sr-finra-2024-019/fee-adjustment-schedule (2026: $0.000195 per share, max $9.79); paused from 2026-10-01 by https://www.finra.org/sites/default/files/2026-09/SR-FINRA-2026-021.pdf"
+      },
+      {
+        "from": "2026-10-01",
+        "from_ns": 1790812800000000000,
+        "until": "2027-01-01",
+        "until_ns": 1798761600000000000,
+        "per_share": 0.0,
+        "max_per_trade": 0.0,
+        "source": "https://www.finra.org/sites/default/files/2026-09/SR-FINRA-2026-021.pdf (SR-FINRA-2026-021, filed for immediate effectiveness: TAF paused, $0.00, for transactions 2026-10-01 through 2026-12-31; resumes 2027-01-01)"
       },
       {
         "from": "2027-01-01",
@@ -269,11 +328,161 @@
       "price_ticks": 18725,
       "tick_size": 0.01,
       "qty_unit": 1.0,
-      "error": true
+      "fee": 0.255325
+    },
+    {
+      "label": "2019-01-02 sell 100",
+      "ts": 1546439400000000000,
+      "side": 1,
+      "qty": 100,
+      "price_ticks": 18725,
+      "tick_size": 0.01,
+      "qty_unit": 1.0,
+      "fee": 0.255325
+    },
+    {
+      "label": "2020-01-30 sell 2000",
+      "ts": 1580394600000000000,
+      "side": 1,
+      "qty": 2000,
+      "price_ticks": 32150,
+      "tick_size": 0.01,
+      "qty_unit": 1.0,
+      "fee": 13.5481
+    },
+    {
+      "label": "2020-02-18 sell 2000",
+      "ts": 1582036200000000000,
+      "side": 1,
+      "qty": 2000,
+      "price_ticks": 32150,
+      "tick_size": 0.01,
+      "qty_unit": 1.0,
+      "fee": 14.4483
+    },
+    {
+      "label": "2021-02-24 sell 2000",
+      "ts": 1614177000000000000,
+      "side": 1,
+      "qty": 2000,
+      "price_ticks": 32150,
+      "tick_size": 0.01,
+      "qty_unit": 1.0,
+      "fee": 14.4483
     },
     {
       "label": "2021-06-01 sell 100",
       "ts": 1622557800000000000,
+      "side": 1,
+      "qty": 100,
+      "price_ticks": 18725,
+      "tick_size": 0.01,
+      "qty_unit": 1.0,
+      "fee": 0.1073975
+    },
+    {
+      "label": "2021-07-13 sell 400",
+      "ts": 1626186600000000000,
+      "side": 1,
+      "qty": 400,
+      "price_ticks": 36012,
+      "tick_size": 0.01,
+      "qty_unit": 1.0,
+      "fee": 0.7822447999999999
+    },
+    {
+      "label": "2021-08-13 sell 70000",
+      "ts": 1628865000000000000,
+      "side": 1,
+      "qty": 70000,
+      "price_ticks": 44520,
+      "tick_size": 0.01,
+      "qty_unit": 1.0,
+      "fee": 164.88639999999998
+    },
+    {
+      "label": "2021-08-13 buy 400",
+      "ts": 1628865000000000000,
+      "side": 0,
+      "qty": 400,
+      "price_ticks": 44520,
+      "tick_size": 0.01,
+      "qty_unit": 1.0,
+      "fee": 0.0
+    },
+    {
+      "label": "2022-05-13 sell 1000",
+      "ts": 1652452200000000000,
+      "side": 1,
+      "qty": 1000,
+      "price_ticks": 40000,
+      "tick_size": 0.01,
+      "qty_unit": 1.0,
+      "fee": 2.1699999999999995
+    },
+    {
+      "label": "2022-05-16 sell 1000",
+      "ts": 1652711400000000000,
+      "side": 1,
+      "qty": 1000,
+      "price_ticks": 40000,
+      "tick_size": 0.01,
+      "qty_unit": 1.0,
+      "fee": 9.290000000000001
+    },
+    {
+      "label": "2023-02-27 sell 1000",
+      "ts": 1677508200000000000,
+      "side": 1,
+      "qty": 1000,
+      "price_ticks": 40000,
+      "tick_size": 0.01,
+      "qty_unit": 1.0,
+      "fee": 3.345
+    },
+    {
+      "label": "2023-06-01 sell 60000",
+      "ts": 1685629800000000000,
+      "side": 1,
+      "qty": 60000,
+      "price_ticks": 40000,
+      "tick_size": 0.01,
+      "qty_unit": 1.0,
+      "fee": 199.27
+    },
+    {
+      "label": "2026-09-30 sell 300",
+      "ts": 1790778600000000000,
+      "side": 1,
+      "qty": 300,
+      "price_ticks": 50000,
+      "tick_size": 0.01,
+      "qty_unit": 1.0,
+      "fee": 3.1485
+    },
+    {
+      "label": "2026-10-01 sell 300",
+      "ts": 1790865000000000000,
+      "side": 1,
+      "qty": 300,
+      "price_ticks": 50000,
+      "tick_size": 0.01,
+      "qty_unit": 1.0,
+      "fee": 3.09
+    },
+    {
+      "label": "2026-12-31 sell 300",
+      "ts": 1798727400000000000,
+      "side": 1,
+      "qty": 300,
+      "price_ticks": 50000,
+      "tick_size": 0.01,
+      "qty_unit": 1.0,
+      "fee": 3.09
+    },
+    {
+      "label": "2018-12-31 sell 100",
+      "ts": 1546266600000000000,
       "side": 1,
       "qty": 100,
       "price_ticks": 18725,

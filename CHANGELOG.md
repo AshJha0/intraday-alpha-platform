@@ -11,7 +11,8 @@ that tag.
 - **X-P1-1: dated SEC Section 31 + FINRA TAF fees** in the Python, C++ and
   Rust execution engines (sell side only), from
   `configs/reference/regulatory_fee_schedule.json` (dated periods with
-  sec.gov / finra.org sources, verified 2026-10-11). Off in code defaults,
+  sec.gov / finra.org sources, verified 2026-10-11; continuous from
+  2019-01-01, including the FINRA TAF pause 2026-10-01..2026-12-31). Off in code defaults,
   on in `configs/prereg/v2.json`. New cross-engine golden
   `tests/golden/expected_regulatory_fees.json`; no existing golden changes.
 
