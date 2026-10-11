@@ -361,6 +361,10 @@ class MvpEngine(RiskWiringMixin, SizingMixin, EngineMetricsMixin):
         # disagreed; TRADE is the tape and is what both now use.
         if ev.event_type == EventType.TRADE:
             self.account.session_volume += ev.qty
+        # v1.15 X-P1-3: the same tape feeds the risk engine's session market
+        # volume (the 15c3-5 participation cap, check 27); it ignores every
+        # non-TRADE type itself.
+        self.risk_engine.on_market_event(self.iid, int(ev.event_type), ev.qty, t)
         # 3. risk wiring: stale transitions + reference price + account mark
         self._on_market(ev)
         # 4. TCA timeline

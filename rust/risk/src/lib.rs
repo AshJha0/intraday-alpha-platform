@@ -22,7 +22,7 @@ mod killswitch;
 pub mod limits;
 mod limits_eval;
 
-pub use engine::{Fill, InstrumentRef, RiskDecision, RiskEngine, SNAPSHOT_VERSION};
+pub use engine::{Fill, InstrumentRef, RiskDecision, RiskEngine, SNAPSHOT_VERSION, TAPE_EVENT_TYPE};
 pub use event::{
     fmt_fixed, line_sha256, rules, unchained_line, verify_audit_chain, Decision, RiskEvent, Scope,
     Severity, GENESIS_SHA256,
