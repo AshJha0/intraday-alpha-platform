@@ -12,7 +12,9 @@ v1.14 (G-P1-4): a non-empty registry must also carry a maintainer
 signature (``research/agents/agent_pubkeys.sig.json``) by a trust root of
 ``research/agents/trust_roots.json``.  With ``--trust-ref REF`` (CI:
 ``origin/main``) the trust roots are read from that ref, not the working
-tree, so a change cannot vouch for itself.
+tree, so a change cannot vouch for itself.  v1.15 (G-P1-2): CI also passes
+``--require-signed``: no trust root, or an unsigned registry (even an empty
+one), fails.
 
 Exit codes: 0 ok, 1 a problem (listed on stderr).
 
@@ -69,6 +71,11 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
     ap.add_argument("--trust-ref", default=None, help="git ref to read the trust roots from")
+    ap.add_argument(
+        "--require-signed",
+        action="store_true",
+        help="G-P1-2: fail unless trust roots exist and the registry (even empty) is signed",
+    )
     a = ap.parse_args(argv)
     from iap.agents import trust
 
@@ -77,7 +84,12 @@ def main(argv: list[str] | None = None) -> int:
     if isinstance(pubkeys, dict):
         sig = a.root / trust.REGISTRY_SIG_RELPATH
         sig_doc = json.loads(sig.read_text(encoding="ascii")) if sig.is_file() else None
-        problems += trust.verify_registry(pubkeys, sig_doc, trust.read_roots(a.root, a.trust_ref))
+        problems += trust.verify_registry(
+            pubkeys,
+            sig_doc,
+            trust.read_roots(a.root, a.trust_ref),
+            require_signature=a.require_signed,
+        )
     signed = sum(1 for e in entries if isinstance(e.get("auth"), dict))
     n_keys = len(pubkeys) if isinstance(pubkeys, dict) else 0
     print(f"board entries {len(entries)} (signed {signed}); registry keys {n_keys}")

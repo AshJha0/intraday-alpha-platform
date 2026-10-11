@@ -40,6 +40,14 @@ versions.  It is written to a sidecar ``content.json`` next to the record;
 existing digest stays valid).  :meth:`ModelRegistry.find_by_content` finds
 the equivalent model after a re-fit under another library version, and
 :meth:`ModelRegistry.verify_content` re-derives it from the loaded artefact.
+
+**Promotion is gated on the content hash (v1.15, G-P0-1).**
+:meth:`ModelRegistry.promote` refuses a model whose ``content.json`` is
+missing (no backfill at promotion: :class:`RegistryError`) or does not match
+the hash re-derived from the verified artefact (:class:`TamperError`), and
+records the promoted hash in ``promotion.json``.
+:meth:`ModelRegistry.check_promotions` re-checks every promoted model;
+CI runs it (``python -m iap.mlops check-promotions``) and fails on any problem.
 """
 
 from __future__ import annotations
@@ -55,6 +63,7 @@ SCHEMA = 1
 RECORD = "record.json"
 ARTEFACT = "model.joblib"
 CONTENT = "content.json"
+PROMOTION = "promotion.json"
 CONTENT_SCHEME = 1
 #: pickled attributes that stamp the library version, not the model state
 VOLATILE_STATE = frozenset({"_sklearn_version"})
@@ -325,6 +334,51 @@ class ModelRegistry:
         elif recorded != digest:
             raise TamperError(f"model {model_id}: content hash mismatch")
         return digest
+
+    # -------------------------------------------------------------- promotion
+    def _content_problem(self, model_id: str) -> tuple[str | None, Exception | None]:
+        recorded = self.content_hash(model_id)
+        if recorded is None:
+            return None, RegistryError(
+                f"model {model_id}: no content hash (content.json); promotion requires one "
+                "(run verify_content to backfill, then review)"
+            )
+        model, _ = self.load(model_id)
+        try:
+            derived = content_sha256(model)
+        except (TypeError, ValueError) as exc:
+            return None, RegistryError(f"model {model_id}: content hash not derivable: {exc}")
+        if derived != recorded:
+            return None, TamperError(f"model {model_id}: content hash mismatch at promotion")
+        return derived, None
+
+    def promote(self, model_id: str) -> dict:
+        """Promote a model; BLOCKING on its content hash (module docs, G-P0-1)."""
+        digest, err = self._content_problem(model_id)
+        if err is not None:
+            raise err
+        rec = self.get(model_id)
+        doc = {"content_sha256": digest, "model_id": model_id, "record_hash": rec.record_hash}
+        (self.root / model_id / PROMOTION).write_text(canonical(doc) + "\n")
+        return doc
+
+    def promoted(self) -> list[str]:
+        return [i for i in self.ids() if (self.root / i / PROMOTION).exists()]
+
+    def check_promotions(self) -> list[str]:
+        """Problems with every promoted model's content hash; ``[]`` = ok."""
+        problems: list[str] = []
+        for model_id in self.promoted():
+            try:
+                digest, err = self._content_problem(model_id)
+                if err is not None:
+                    raise err
+                doc = json.loads((self.root / model_id / PROMOTION).read_text())
+                if doc.get("content_sha256") != digest or doc.get("model_id") != model_id:
+                    raise TamperError(f"model {model_id}: promotion.json does not match")
+            except RegistryError as exc:
+                problems.append(str(exc))
+        return problems
 
     # ------------------------------------------------------------------- read
     def ids(self) -> list[str]:

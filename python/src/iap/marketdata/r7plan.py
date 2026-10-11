@@ -27,6 +27,9 @@ from pathlib import Path, PureWindowsPath
 #: Hosts a manifest URL may name (and the only hosts tools/r7_download.py fetches).
 ALLOWED_HOSTS: frozenset[str] = frozenset({"emi.nasdaq.com"})
 ROLES = ("insample", "holdout")
+#: Ingest formats a candidate day may name (``format``, default ``itch50``):
+#: the Nasdaq public files are ITCH 5.0, the Databento tier 2 is DBN MBO.
+DAY_FORMATS = ("itch50", "dbn-mbo")
 #: Sessions already used by a study (in-sample 2019-20 and the v1.8 holdout).
 #: They are SPENT: none may be a holdout again.
 SPENT_DAYS: frozenset[str] = frozenset(
@@ -84,6 +87,8 @@ def load_candidates(path: str | Path) -> dict:
             raise ValueError(f"{iso}: 'file' must be a bare file name")
         if not isinstance(d.get("bytes"), int) or d["bytes"] <= 0:
             raise ValueError(f"{iso}: 'bytes' must be a positive integer")
+        if d.get("format", "itch50") not in DAY_FORMATS:
+            raise ValueError(f"{iso}: format must be one of {DAY_FORMATS}")
         if d.get("url"):
             _check_url(d["url"])
     doc["days"] = sorted(days, key=lambda d: d["date"])
@@ -174,7 +179,7 @@ def render_batch(
             f'python -m iap.marketdata verify-download --manifest "%M%" --vendor-dir "%V%" '
             f"--date {d['date']} >> %L% 2>&1",
             "if errorlevel 1 goto fail",
-            f'python -m iap.marketdata ingest --format itch50 --input "%V%\\{d["file"]}" '
+            f'python -m iap.marketdata ingest --format {d.get("format", "itch50")} --input "%V%\\{d["file"]}" '
             f'--date {d["date"]} --symbols {syms} --out "{ds}" > "%OUT%\\ingest_{t}.log" 2>&1',
             "if errorlevel 1 goto fail",
             f'echo ok > "%OUT%\\_DONE_{t}"',

@@ -118,7 +118,7 @@ abs and rel 1e-9; adaptive PSI/KS at 1e-10 with exact refit booleans and
 lifecycle state sequences; canonical-JSON lines, trace digests, the risk
 audit / snapshot and the lifecycle registry are byte-identical; the 7-state
 lifecycle golden is compared exactly, field by field. The v1.13.0 table
-(2026-10-11, counts from CI) reads python 2385 / cpp 302 / rust 362
+(2026-10-11, counts from CI) reads python 2411 / cpp 302 / rust 362
 (golden 193/72/71; Java archived in v1.15), `integration` 35, `replay` 6.
 
 ## 4. Golden regeneration protocol
@@ -186,7 +186,16 @@ change with one regeneration, never a partial one
    the float artefacts depend on the platform and the library versions, and
    some suites compare them exactly, so they are produced where they are
    verified. The script refuses to run the report pipelines twice on one
-   dataset: start from the ledger as committed.
+   dataset: start from the ledger as committed. On a merged release branch
+   `python tools/release.py prepare-regenerate --branch <branch>` (v1.15)
+   resets `research/experiments.json` to `origin/main`, drops the five
+   runner experiment dirs, pushes and dispatches with
+   `regenerate_allow_rerun=true`; `python tools/release.py apply-bundle
+   --run-id <id>` applies the bundle (`tar --force-local`, CRLF-only
+   `expected_features*` skipped) and `python tools/release.py publish
+   --version X.Y.Z` tags and releases after main CI is green. Every
+   subcommand is a dry run unless given `--execute`; `flow` prints the
+   sequence.
 3. The ledger keeps the looks of the old dataset and adds the new ones
    (`iap.validation.ledger`, "Dataset scope"); archive
    `research/lifecycle_transitions.jsonl` under `research/archive/` before

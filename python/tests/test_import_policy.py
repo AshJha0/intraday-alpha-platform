@@ -74,6 +74,7 @@ NETWORK_MODULES = frozenset(
         "starlette",
         "uvicorn",
         "django",
+        "databento",  # v1.15: the Databento network client (tools/ only; the codec is databento_dbn)
     }
 )
 
