@@ -444,7 +444,9 @@ def test_eligibility_never_changes_an_experiment_id():
     run again under the v1.5.0 default method bundle — new ids once more,
     because ``configuration.methods`` is part of the spec — each with an
     ``x-version`` 2 sidecar carrying the threshold it was judged at.  Only
-    the third generation is gate-eligible: a spec that names no method
+    the third generation was gate-eligible until v1.14 rewrote it through the
+    regenerate chain, which runs it ``--no-prereg`` (exploratory: same ids,
+    same thresholds, not gate evidence); a spec that names no method
     bundle was computed under what is now ``legacy_v1``."""
     legacy_dataset = "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b"
     legacy_ids = [
@@ -477,7 +479,10 @@ def test_eligibility_never_changes_an_experiment_id():
         got = reg.gate_eligibility(rec.experiment_id)
         if rec.experiment_id in current_ids:
             assert rec.spec.configuration == DEFAULT_CONFIGURATION
-            assert got.eligible and got.reasons == ()
+            # v1.14: rewritten by tools/regenerate_dataset_artifacts.py, which
+            # runs them --no-prereg (exploratory): the only reason recorded
+            assert not got.eligible and len(got.reasons) == 1
+            assert "not pre-registered (--no-prereg)" in got.reasons[0]
             assert got.periods_verified  # the sidecar the runner wrote
             assert got.methods == "v2"
             # the threshold the result was judged at is the ledger's

@@ -30,8 +30,7 @@ release owner re-ingests: REAL_DATA §4 and the commands in the PR).
   (`POLYGLOT-OVERRIDE: bug fix only`, overloads of the existing `apply` /
   `run`, no new method name, type or constructor).
 - Kept per-event (documented): the streaming MVP (no lookahead on a live
-  stream), the alpha golden frames (`build_golden_frame`; `expected_alpha`,
-  `expected_backtest`, `expected_mvp` unchanged) and every port test that
+  stream), the alpha golden frames (`build_golden_frame`) and every port test that
   drives `apply(ev)` alone. `python -m iap.features --same-ts per_event
   --label-freshness whole_day --cross-prints omit` rebuilds a v1.13 store;
   `test_legacy_methods.py` uses it to keep reproducing the v1.4.0 alpha
@@ -122,8 +121,21 @@ refuses a rerun with different evidence otherwise). The legacy-method
 experiment directories were computed on the pre-v1.14 (per-event,
 whole-day) store and are kept as they were. Port golden checks now apply the
 documented `vol_regime_ratio_v1` residue rule at the `expected_features.json`
-checkpoints too (PLATFORM_CONVENTIONS §17). Moved research numbers: pending
-the regeneration run.
+checkpoints too (PLATFORM_CONVENTIONS §17). Moved research numbers (regenerate
+run 38129763007, committed as produced on Linux):
+
+- `configs/strategies/alpha_params.json` is refit on the coalesced store
+  (e.g. EQ01 sigma 1.4335 → 1.4450, n_train 80,238 → 80,263), so every
+  golden that embeds the params moves although its frames are per-event:
+  `expected_alpha.json` (all six alphas' cases; FX05 additionally because
+  its cases come from the bundled day-2 store: first case −1.060e-6 →
+  −9.79e-7, IC window 0.00178 → 0.00142), `expected_backtest.json`
+  (default rules: 96 → 138 trades, total P&L −7.10 → −39.15),
+  `expected_mvp.json` (235 → 231 parents, 169 → 163 fills, P&L −81.53 →
+  −82.84 USD, digest `e5a1b688…`), `expected_adaptive.json`, the alpha,
+  adaptive, baseline and combination reports.
+- The five v2 runner experiments keep their ids and thresholds but are now
+  exploratory (`--no-prereg` in the regenerate chain, not gate evidence).
 
 ## v1.13.0 — 2026-10-11
 

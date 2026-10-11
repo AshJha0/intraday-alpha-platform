@@ -1943,7 +1943,7 @@ reproduces them with string concatenation and one hash (pinned:
 digest is sha256 over every canonical line + newline in emission order;
 same seed ⇒ same digest; one changed field or one swapped line changes it.
 Known answers are pinned for one trace, the same trace twice, and the empty
-stream; the MVP golden pins a whole session's digest (`20d4ff76…`, 800
+stream; the MVP golden pins a whole session's digest (`e5a1b688…`, 800
 traces).
 
 ### 18.3 Four languages, one line
@@ -2030,7 +2030,7 @@ index that lied about what its sources contain would be worse than none.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=20d4ff76af0b631c...
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=e5a1b6881f9cd639...
 ```
 
 Seven seconds later `data/mvp/58a10f2194a3c81c/` holds the captured stream,
@@ -2056,7 +2056,7 @@ regenerated.
 v1.5.0 regenerated it once more and changed nothing a trader would see.
 The loop does not use the research backtester, so the new default methods
 do not touch it: the events, decisions, parents, fills and P&L are
-identical to v1.4.0. What moved is the digest (`f51890da…` → `20d4ff76…`)
+identical to v1.4.0. What moved is the digest (`f51890da…` → `e5a1b688…`)
 and the `config_version` it covers (`f293e7e7…` → `439bbad5…`), because
 `config_version` hashes `configs/execution/execution.json`, which now
 names its impact model, and `alpha_params.json`, whose header names the
@@ -2066,7 +2066,7 @@ digest doing its job.
 
 ### 20.2 The numbers, stated as they are
 
-Seed 12345: 15,805 events, 800 decisions, 235 parent orders, 507 children
+Seed 12345: 15,805 events, 800 decisions, 231 parent orders, 507 children
 generated of which 348 submitted (159 blocked by the 500 ms slice-interval
 control, exactly as the Java loop would), 169 fills, 15.1 % fill rate.
 Risk: 348 ALLOW, 0 REJECT, 0 KILL, 8 sequence gaps each recovered by the
@@ -2075,7 +2075,7 @@ XV1 19.8 %, XV2 9.3 % of filled quantity (aggressive routing picks the
 cheapest taker fee on price ties; passive routing prefers XV1's rebate).
 TCA: implementation shortfall +0.063 bps quantity-weighted; TWAP fills
 0.4 % (passive limits at a 1 s horizon mostly expire), POV 6.3 %, IS
-72.9 %. **P&L −81.53 USD** on 8,229 shares: +0.022 bps of alpha
+72.9 %. **P&L −82.84 USD** on 8,229 shares: +0.022 bps of alpha
 contribution against −0.41 bps of execution cost, net −0.39 bps of filled
 notional. The report field is
 `alpha.cost_negative: true`. This is the research finding of §6 — a small
@@ -2161,7 +2161,7 @@ golden, and one of them now reads differently.
 5. **Check that it still does not pay.** The cost-adjusted IC — buy the ask
    now, sell the bid at t + h — is −0.024 for EQ01 and −0.029 for EQ03 at
    1 s, and −0.003 for the ensemble the loop trades on. The predicted move
-   is smaller than the spread; that is the −81.53 USD.
+   is smaller than the spread; that is the −82.84 USD.
 6. **Let the lifecycle see it.** `paper_evidence.json` carries the realized
    IC at the fitted horizon, so the `paper_ic_tracking` gate (max gap 0.01)
    fails all three alphas on this data (gaps 0.206 / 0.128 / 0.158; on the
@@ -3247,7 +3247,7 @@ lags: persistence, which is neither proof of a leak nor proof against
 one); then look at the
 data — a synthetic generator whose venues lean towards a shared efficient
 price makes microprice and OFI look clairvoyant at 1 s; and finally check
-the cost-adjusted IC (−0.024) and the P&L (−81.53 USD): still no money. A
+the cost-adjusted IC (−0.024) and the P&L (−82.84 USD): still no money. A
 number that survives all of that is a property of the data, stated as such,
 and the lifecycle's `paper_ic_tracking` gate still fails the alpha for
 diverging from research — correctly.

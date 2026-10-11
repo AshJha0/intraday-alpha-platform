@@ -252,9 +252,9 @@ possible.
 
 ## 7. Honest results of the golden run (seed 12345, `report.md`)
 
-Run id `58a10f2194a3c81c`, 15,805 events, 800 decisions, 235 parent orders,
+Run id `58a10f2194a3c81c`, 15,805 events, 800 decisions, 231 parent orders,
 507 children generated / 348 submitted, 169 fills, fill rate 15.1 %.
-Trace digest `20d4ff76af0b631c53c488a1cc504c1bbf8d8488dd5c210a947f96d63e734a45`
+Trace digest `e5a1b6881f9cd639dbaee0323307918dd711c8ed0c4509e7e5e2b8bcbab6933d`
 (`config_version` `439bbad5…`).
 Wall time: about 2.2× the v1.3.0 session on the same machine (27 s → 59 s on
 the laptop this was measured on; 0.8 s of that is feed generation and
@@ -270,7 +270,7 @@ all of which changed (the cost model now names its `impact_model`; the
 header of `alpha_params.json` names the regeneration commit; the registry is
 x-version 2), so it went from
 `f293e7e7…` to `439bbad5…`, and the trace digest, which covers
-`config_version`, from `f51890da…` to `20d4ff76…`. The research IC the
+`config_version`, from `f51890da…` to `e5a1b688…`. The research IC the
 realized IC is compared with (§7.1, last two columns) is now the gate IC of
 the v2 report. The run id is the
 one of v1.3.0 because `mvp.json` and the seed did not change; the stream did:
@@ -381,7 +381,7 @@ observations no longer holds (item 3).
 5. **It still does not pay.** The cost-adjusted IC (buy at the ask now,
    sell at the bid at t+h) is −0.024 (EQ01) / −0.029 (EQ03) at 1 s — not
    small and positive as on the v1.3.0 session, negative: the predicted
-   move is smaller than the spread, which is the −81.53 USD above and the
+   move is smaller than the spread, which is the −82.84 USD above and the
    research verdicts.
 6. **The gap the lifecycle sees.** `ic_gap` is measured at the alpha's
    FITTED horizon (like for like with the registry's `oos_ic`): 0.206 /

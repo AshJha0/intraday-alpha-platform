@@ -1159,7 +1159,7 @@ synthetic equity `SYN.EQ.AAPL` and writes every artefact under
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.mvp run                       # configs/mvp/mvp.json, seed 12345
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=20d4ff76af0b631c... out=.../data/mvp/58a10f2194a3c81c
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=e5a1b6881f9cd639... out=.../data/mvp/58a10f2194a3c81c
 PYTHONPATH=src python3 -m iap.mvp run --seed 7 --out /tmp/mvp7          # another seed, explicit directory
 PYTHONPATH=src python3 -m iap.mvp verify                                  # run twice from scratch, compare digest/report/stream
 cat ../data/mvp/58a10f2194a3c81c/report.md                                # the honest numbers (cost-negative)

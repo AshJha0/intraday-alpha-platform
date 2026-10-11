@@ -159,7 +159,7 @@ still spans the whole window (a weaker, disclosed protocol).
   §13.2), `report.json` and the stream sha256, refusing first if a
   reference document changed (`config_version`). The golden run is
   `tests/golden/expected_mvp.json`: seed 12345, run `58a10f2194a3c81c`,
-  digest `20d4ff76af0b631c53c488a1cc504c1bbf8d8488dd5c210a947f96d63e734a45`
+  digest `e5a1b6881f9cd639dbaee0323307918dd711c8ed0c4509e7e5e2b8bcbab6933d`
   (v1.5.0; the run id is unchanged from v1.3.0 because `mvp.json` and the
   seed are. In v1.4.0 the stream, the fitted parameters and therefore the
   digest moved with the generator fix. In v1.5.0 the stream, every count
