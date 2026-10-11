@@ -523,8 +523,10 @@ def test_standardisation_of_test_rows_uses_training_statistics_only():
 
 
 def test_a_combination_costs_the_validation_chain_plus_one_look_per_member():
-    assert combine_report.combination_looks(12) == looks_per_validation(4) + 12 == 95
-    assert combine_report.combination_looks(3) == 86
+    assert (
+        combine_report.combination_looks(12) == looks_per_validation(4) + 12 == 13
+    )  # one gate decision + K (v1.14.0)
+    assert combine_report.combination_looks(3) == 4
     with pytest.raises(ValueError):
         combine_report.combination_looks(0)
     a = combine_report.experiment_identity("EQUITY", ["EQ03", "EQ01"], "ridge", "5s")
@@ -612,7 +614,7 @@ def test_committed_report_evaluates_eight_experiments_and_promotes_none(committe
     assert committed["default_method"] == DEFAULT_METHOD and committed["methods_bundle"] == "v2"
     assert sorted(committed["combinations"]) == ["EQUITY", "FX"]
     looks = committed["looks"]
-    assert looks["experiments"] == 8 and looks["declared_by_this_report"] == 8 * 95
+    assert looks["experiments"] == 8 and looks["declared_by_this_report"] == 8 * 13
     assert looks["gate_looks"] == looks["ledger_before"] + looks["declared_by_this_report"]
     assert looks["tstat_threshold"] == pytest.approx(
         ExperimentLedger.bonferroni_t_threshold_at(looks["gate_looks"])
@@ -648,8 +650,14 @@ def test_committed_report_evaluates_eight_experiments_and_promotes_none(committe
 def test_committed_ledger_holds_the_eight_combination_entries(committed):
     ledger = json.loads((ROOT / "research" / "experiments.json").read_text(encoding="utf-8"))
     entries = [e for e in ledger["entries"] if e["kind"] == combine_report.LEDGER_KIND]
+    # the v1.13.0 entries stay (history, scoped as v2_v113); the report in
+    # force is the v1.14.0 revision
+    from iap.validation.methods import ledger_bundle
+
+    assert sum(ledger_bundle(e["config"]) == "v2_v113" for e in entries) == 8
+    entries = [e for e in entries if ledger_bundle(e["config"]) == "v2"]
     assert len(entries) == 8 and {e["alpha_id"] for e in entries} == {"COMB_EQ", "COMB_FX"}
-    assert {e["count"] for e in entries} == {95}
+    assert {e["count"] for e in entries} == {13}
     assert {e["gate_looks"] for e in entries} == {committed["looks"]["gate_looks"]}
     assert {e["config"]["method"] for e in entries} == set(METHODS)
     assert all(len(e["config"]["members"]) == 12 for e in entries)
@@ -695,16 +703,16 @@ def test_report_pipeline_on_the_bundled_data(tmp_path):
     first = combine_report.run_combination(ROOT, **kwargs)
     doc = first["document"]
     assert first["correlation"] is None  # not the full member lists: no gate document
-    assert doc["looks"]["declared_by_this_report"] == 86 == doc["looks"]["gate_looks"]
+    assert doc["looks"]["declared_by_this_report"] == 4 == doc["looks"]["gate_looks"]
     block = doc["combinations"]["EQUITY"]
     assert block["members"] == ["EQ01", "EQ03", "EQ06"] and block["horizon"] == "5s"
     result = block["methods"][DEFAULT_METHOD]
     assert result["verdict"] != "PROMOTE" and result["leakage"]["passed"]
     assert block["weights_ignore_test_rows"] == {DEFAULT_METHOD: True}
     ledger = ExperimentLedger(ledger_path)
-    assert ledger.total_experiments == 86 and len(ledger.entries) == 1
+    assert ledger.total_experiments == 4 and len(ledger.entries) == 1
     second = combine_report.run_combination(ROOT, **kwargs)
-    assert ExperimentLedger(ledger_path).total_experiments == 86
+    assert ExperimentLedger(ledger_path).total_experiments == 4
     assert json.dumps(second["document"], sort_keys=True) == json.dumps(doc, sort_keys=True)
     paths = combine_report.write_reports(first, tmp_path / "out", 0.7)
     assert paths["md"].read_text(encoding="utf-8").startswith("# Signal combination report")

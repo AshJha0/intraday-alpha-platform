@@ -12,7 +12,8 @@ Correctness release of the 2026-10-11 quality review: data mapping and
 same-timestamp coalescing (#83), behaviour-preserving engineering (#84),
 execution-simulator realism (#86), governance trust roots, chained ledger and
 blocking supply-chain audits (#87) and the SEC 15c3-5 pre-trade risk set
-(#89). @@RESEARCHSTATS@@
+(#89), and the research statistics revision: causal backtest row block,
+automatic HAC with day separation, time-shift leakage gate (#88).
 
 Parity counts from CI (v1.14.0): @@COUNTS@@
 
@@ -250,6 +251,26 @@ published number, golden, digest, model id or record hash changes.
   dropped), stable across joblib/pickle/scikit-learn versions; written to a
   `content.json` sidecar so `record.json`, `model_id` and `record_hash` are
   unchanged; `find_by_content`, `verify_content` (backfills older records).
+
+### Research statistics (#88; R-P0-1, R-P1-3, R-P2-1..4)
+
+The `v2` / `v3` / `v4` bundles move to the v1.14.0 statistics revision;
+the v1.13.0 rules are frozen as `v2_v113` / `v3_v113` / `v4_v113`
+(schemas/MIGRATIONS.md). Bundle names, and therefore experiment ids, are
+unchanged; the ledger identity gains `stats_revision`, so every
+regenerated statistic is a new look.
+
+- Causal backtest row block (decision-time state only) is the default; the
+  label-valid block is reported beside it (`net_pnl_1x_cost_label_block`).
+  Every net P&L, bootstrap interval and capacity figure moves.
+- Automatic HAC bandwidth and no lag product across a session day in the
+  gate t; `v2` carries the `validity` block; holdouts of fewer than four
+  sessions are read by sign and replication (`few_sessions`).
+- `hypothesis_confirmed` = >= 70 % of folds confirm (was: the last fold).
+- Per-instrument scaling before pooling (QQQ no longer dominates).
+- Time-shift leakage detector (applicable where the row shift is vacuous).
+- One ledger look per gate decision (2 per experiment, was 84).
+- Parity counts from CI: python 2343 (2041 in `python` + 302 in `python-slow`), +16 (mostly `tests/test_research_stats_v114.py`). FX11 fails the new time-shift leakage detector and stays in RESEARCH (23 CANDIDATE).
 
 ## v1.13.0 — 2026-10-11
 

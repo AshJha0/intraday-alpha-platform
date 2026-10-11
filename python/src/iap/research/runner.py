@@ -33,9 +33,10 @@ maps the outcome onto the contract:
    annualised 1-minute-bar Sharpe.
 4. **Ledger.**  The run is one entry in the multiple-testing ledger under
    kind ``"experiment_runner"`` with the full spec as its configuration,
-   debiting ``ResearchMethods.looks(n_folds)`` looks — what the chain
-   evaluates under the spec's bundle (84 under ``v2`` at four folds,
-   :data:`LOOKS_PER_EXPERIMENT`; 28 under ``legacy_v1``).  The ledger
+   debiting ``ResearchMethods.looks(n_folds)`` looks — the gate decision
+   plus the holdout backtest under the spec's bundle (2 under ``v2`` since
+   v1.14.0, :data:`LOOKS_PER_EXPERIMENT`; 84 under ``v2_v113`` at four
+   folds, which counts every report statistic; 28 under ``legacy_v1``).  The ledger
    de-duplicates by (alpha, kind, config), so re-running a spec does not
    inflate the denominator.  ``n_experiments_in_ledger`` is the total
    after recording.
@@ -138,9 +139,13 @@ from iap.validation.ledger import ExperimentLedger
 from iap.validation.methods import (
     METHODS_LEGACY,
     METHODS_V2,
+    METHODS_V2_V113,
     METHODS_V3,
+    METHODS_V3_V113,
     METHODS_V4,
+    METHODS_V4_V113,
     ResearchMethods,
+    ledger_config,
     methods,
 )
 from iap.validation.metrics import HORIZONS_NS
@@ -163,7 +168,9 @@ __all__ = [
 ]
 
 #: Looks at the data one experiment makes under the default method bundle
-#: at the pinned four folds.  The ledger is the denominator of every
+#: at the pinned four folds: since v1.14.0 (R-P2-4) the ONE gate decision
+#: of the validation plus the holdout backtest, i.e. 2.  What follows is the
+#: v1.13.0 count (``v2_v113``), kept for the record.  The ledger is the denominator of every
 #: multiple-testing correction in the research, so it counts what the chain
 #: ACTUALLY evaluates, not a round number.  The itemisation is
 #: :func:`iap.validation.validate.looks_per_validation` (83 at four folds:
@@ -217,6 +224,9 @@ _REPORT_METRICS = {
 _REPORT_METRICS[METHODS_V3] = _REPORT_METRICS[METHODS_V2]
 #: ``v4`` (v1.12, opt-in) adds report-only blocks to ``v3``.
 _REPORT_METRICS[METHODS_V4] = _REPORT_METRICS[METHODS_V2]
+#: The frozen v1.13.0 revisions (iap.validation.methods) map like their bundle.
+for _name in (METHODS_V2_V113, METHODS_V3_V113, METHODS_V4_V113):
+    _REPORT_METRICS[_name] = _REPORT_METRICS[METHODS_V2]
 
 #: Result fields a rerun may legitimately change (provenance, not evidence).
 _PROVENANCE_FIELDS = ("git_commit", "n_experiments_in_ledger")
@@ -522,7 +532,10 @@ class ExperimentRunner:
         ingested ITCH dataset is validated as one Nasdaq book.  Earlier
         bundles keep the consolidated default and their published reports."""
         kwargs = dict(bundle.validate_kwargs())
-        if bundle.name in (METHODS_V3, METHODS_V4) and "book_scope" not in kwargs:
+        if (
+            bundle.name in (METHODS_V3, METHODS_V4, METHODS_V3_V113, METHODS_V4_V113)
+            and "book_scope" not in kwargs
+        ):
             root = self.feature_store_dir.parent if self.feature_store_dir else None
             kwargs["book_scope"] = book_scope_for_dataset(root)
         return kwargs
@@ -533,7 +546,7 @@ class ExperimentRunner:
         "Which N")."""
         if not bundle.deflated_sharpe:
             return {}
-        new = self.ledger.would_add(spec.alpha_id, LEDGER_KIND, spec.to_dict(), 1) > 0
+        new = self.ledger.would_add(spec.alpha_id, LEDGER_KIND, self._ledger_config(spec), 1) > 0
         return {"deflated_sharpe_trials": effective_trials(self.ledger, include_new=new)}
 
     @staticmethod
@@ -644,13 +657,21 @@ class ExperimentRunner:
         """Looks this spec's run debits (module docs, step 4)."""
         return self._methods(spec).looks(int(spec.configuration["n_folds"]))
 
+    def _ledger_config(self, spec: ExperimentSpec) -> dict[str, Any]:
+        """The ledger identity of a run: the spec, plus the bundle's
+        statistics revision since v1.14.0 (``iap.validation.methods``) - the
+        experiment id is unchanged, but the same spec answered under other
+        statistics is another look."""
+        return ledger_config(spec.to_dict(), self._methods(spec))
+
     def _gate_looks(self, spec: ExperimentSpec) -> int:
         """The look count this spec's t threshold is derived from: recorded
         on its ledger entry when it has run before, else the ledger total
         once this run's looks are in it."""
-        identity = (spec.alpha_id, LEDGER_KIND, spec.to_dict(), self._looks(spec))
+        config = self._ledger_config(spec)
+        identity = (spec.alpha_id, LEDGER_KIND, config, self._looks(spec))
         return self.ledger.gate_looks_for(
-            spec.alpha_id, LEDGER_KIND, spec.to_dict(), self.ledger.batch_total([identity])
+            spec.alpha_id, LEDGER_KIND, config, self.ledger.batch_total([identity])
         )
 
     def _ledger_total_after(
@@ -659,7 +680,7 @@ class ExperimentRunner:
         return self.ledger.record(
             spec.alpha_id,
             LEDGER_KIND,
-            config=spec.to_dict(),
+            config=self._ledger_config(spec),
             result={
                 "experiment_id": spec.experiment_id,
                 "oos_ic": report["oos_ic"],
@@ -853,7 +874,15 @@ class ExperimentRunner:
                 f"{asset_class} beside the feature store"
             )
         if (
-            bundle.name in (METHODS_V2, METHODS_V3, METHODS_V4)
+            bundle.name
+            in (
+                METHODS_V2,
+                METHODS_V3,
+                METHODS_V4,
+                METHODS_V2_V113,
+                METHODS_V3_V113,
+                METHODS_V4_V113,
+            )
             and not report["label_reopen_available"]
         ):
             run_reasons.append(

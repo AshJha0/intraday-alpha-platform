@@ -302,7 +302,7 @@ def test_config_defaults_are_the_v150_rules_and_legacy_names_the_old_ones():
     cfg = BacktestConfig()
     assert cfg.position_policy == "cost_aware"
     assert cfg.cap_fills_at_l1 is True
-    assert cfg.block_rows_column == "auto"
+    assert cfg.block_rows_column == "causal"  # v1.14.0 (R-P0-1); "auto" before
     assert cfg.horizon_ns is None and cfg.hysteresis == 0.5
     old = BacktestConfig.legacy(max_pos_qty=7)
     assert old.position_policy == "sign"
@@ -332,8 +332,8 @@ def _default_rules_inputs():
 
 
 def test_default_rules_hand_calc():
-    """Cost-aware positions + L1 fill cap + scored-rows block + sqrt impact,
-    every number derived by hand.
+    """Cost-aware positions + L1 fill cap + scored-rows block (the v1.13.0
+    ``"auto"`` block, named) + sqrt impact, every number derived by hand.
 
     Desired sign per decision row (horizon 1 s, hysteresis 0.5):
       row 0: 0.5e-3 < hurdle 1.04e-3              -> flat
@@ -348,7 +348,9 @@ def test_default_rules_hand_calc():
     toward the still-standing target; row 4 sells 100 (bid 500).
     """
     frame, scores, mids = _default_rules_inputs()
-    bt = Backtester(_cost_model(), META, BacktestConfig(max_pos_qty=100)).for_horizon("1s")
+    bt = Backtester(
+        _cost_model(), META, BacktestConfig(max_pos_qty=100, block_rows_column="auto")
+    ).for_horizon("1s")
     res = bt.run_instrument(1, frame, scores)
     assert res.positions.tolist() == [0.0, 0.0, 60.0, 100.0, 0.0, 0.0, 0.0, 0.0]
     assert res.trade_count == 3
@@ -398,8 +400,13 @@ def test_default_fill_cap_and_row_block_need_their_columns():
     bt = Backtester(_cost_model(), META, BacktestConfig(max_pos_qty=100)).for_horizon("1s")
     with pytest.raises(ValueError, match="cap_fills_at_l1 needs frame column"):
         bt.run_instrument(1, frame.drop(columns=["depth_ask_l1_v1"]), scores)
+    auto = Backtester(
+        _cost_model(), META, BacktestConfig(max_pos_qty=100, block_rows_column="auto")
+    ).for_horizon("1s")
     with pytest.raises(ValueError, match="block_rows_column='auto' needs frame column"):
-        bt.run_instrument(1, frame.drop(columns=["label_valid_1s"]), scores)
+        auto.run_instrument(1, frame.drop(columns=["label_valid_1s"]), scores)
+    # the causal default reads no label column at all
+    bt.run_instrument(1, frame.drop(columns=["label_valid_1s", "label_mid_1s"]), scores)
 
 
 def test_ensemble_scores_cancels_opposite_members():

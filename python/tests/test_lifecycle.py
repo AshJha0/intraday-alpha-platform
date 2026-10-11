@@ -1255,12 +1255,16 @@ def bootstrap():
 
 def test_bootstrap_no_alpha_beyond_candidate(bootstrap):
     assert len(bootstrap.rows) == 24
-    assert bootstrap.count_by_state() == {"CANDIDATE": 24}
+    # v1.14.0: FX11 is flagged by the time-shift leakage detector (R-P2-3,
+    # manual review) and stays in RESEARCH; the other 23 are CANDIDATE
+    assert bootstrap.count_by_state() == {"CANDIDATE": 23, "RESEARCH": 1}
+    assert bootstrap.registry.get("FX11").state is S.RESEARCH
     assert bootstrap.event_ts == 1787691480577291027
     for row in bootstrap.rows:
         assert row.missing_metrics == ()
-        assert "net_pnl_after_costs" in row.failed_gates, "no alpha survives 1x costs"
-    assert len(bootstrap.machine.transitions) == 24
+        if row.alpha_id != "FX11":
+            assert "net_pnl_after_costs" in row.failed_gates, "no alpha survives 1x costs"
+    assert len(bootstrap.machine.transitions) == 23
     assert all(t.to_state is S.CANDIDATE for t in bootstrap.machine.transitions)
 
 
@@ -1288,6 +1292,11 @@ def test_bootstrap_failed_gates_agree_with_report_verdicts(bootstrap):
     for row in bootstrap.rows:
         rep = load_report(ROOT, row.alpha_id)
         ev = bootstrap.registry.get(row.alpha_id).last_evaluation
+        if not rep["leakage"]["passed"]:
+            # leakage blocks the RESEARCH -> CANDIDATE edge (FX11, v1.14.0)
+            assert ev is not None and ev.state is S.RESEARCH
+            assert "leakage_clean" in ev.failed_gates
+            continue
         assert ev is not None and ev.state is S.CANDIDATE
         expected_failed = []
         gate_ic, gate_t = rep["gate_ic"], rep["gate_tstat"]
@@ -1359,21 +1368,18 @@ def test_bootstrap_failed_gates_agree_with_report_verdicts(bootstrap):
     # Updated with the v1.5.0 gates: every alpha also fails
     # net_pnl_bootstrap_ci (no trade, or a negative lower bound); the
     # correlation gate passes vacuously for all 24 (nobody is at VALIDATING).
-    assert by_id["EQ01"] == (
-        "statistical_significance",
-        "net_pnl_after_costs",
-        "net_pnl_bootstrap_ci",
-        "capacity",
-        "stability",
-    )
+    # Updated 2026-10-11 (v1.14.0 statistics revision; same dataset): the
+    # per-instrument scaling and the fold-share hypothesis rule lift EQ01 and
+    # EQ05 (EQ01 now clears significance and stability), the automatic HAC
+    # bandwidth with day separation is stricter, and FX11 fails the
+    # time-shift leakage detector and stays in RESEARCH.
+    assert by_id["EQ01"] == ("net_pnl_after_costs", "net_pnl_bootstrap_ci", "capacity")
     assert by_id["EQ03"] == ("net_pnl_after_costs", "net_pnl_bootstrap_ci", "capacity")
     assert by_id["EQ05"] == (
-        "oos_ic",
         "statistical_significance",
         "net_pnl_after_costs",
         "net_pnl_bootstrap_ci",
         "capacity",
-        "stability",
     )
     assert by_id["FX01"] == (
         "statistical_significance",
@@ -1392,6 +1398,7 @@ def test_bootstrap_failed_gates_agree_with_report_verdicts(bootstrap):
         "capacity",
         "stability",
     )
+    assert by_id["FX11"] == ("leakage_clean",)
     assert set(by_id["FX03"]) >= {"statistical_significance", "hypothesis_sign", "fold_consistency"}
 
 
@@ -1430,6 +1437,8 @@ def test_pipeline_entry_selection_prefers_the_default_method_bundle():
 
     def entry(alpha_id, key, methods=None):
         config = {} if methods is None else {"methods": methods}
+        if methods == "v2":
+            config["stats_revision"] = "v1.14"  # the current revision of v2
         return {
             "alpha_id": alpha_id,
             "kind": "promotion_pipeline",
@@ -1595,17 +1604,17 @@ def test_bootstrap_refuses_to_truncate_the_transition_log_without_force(tmp_path
     run_bootstrap(root, write=True)
     first_log = log_path.read_bytes()
     first_registry = registry_path.read_bytes()
-    assert len(first_log.splitlines()) == 24
+    assert len(first_log.splitlines()) == 23  # FX11 stays in RESEARCH (v1.14.0)
 
     # A HUMAN action appends to the audit.
     _, registry, machine = __import__("iap.lifecycle.__main__", fromlist=["_load"])._load(root)
     machine.retire("EQ03", 1_800_000_000_000_000_000, "review 2026-09-20", actor=Actor.HUMAN)
     registry.save(registry_path)
     audited = log_path.read_bytes()
-    assert len(audited.splitlines()) == 25 and audited.startswith(first_log)
+    assert len(audited.splitlines()) == 24 and audited.startswith(first_log)
 
     # A routine bootstrap must not destroy it.
-    with pytest.raises(TransitionLogExists, match="25 transition"):
+    with pytest.raises(TransitionLogExists, match="24 transition"):
         run_bootstrap(root, write=True)
     assert log_path.read_bytes() == audited
     assert registry_path.read_bytes() != first_registry  # the retire is still there
@@ -1978,6 +1987,9 @@ def test_bootstrap_builds_both_blocks_from_the_artefacts(bootstrap, config):
         assert (block.n_resamples, block.seed) == (1000, 20260829)
         assert block.n_trades == sum(f["trade_count_1x"] for f in rep["fold_diagnostics"])
         gates = bootstrap.registry.get(row.alpha_id).last_evaluation.gates
+        if "cross_alpha_correlation" not in gates:  # FX11: never left RESEARCH
+            assert row.alpha_id == "FX11"
+            continue
         corr = gates["cross_alpha_correlation"]
         assert (corr.passed, corr.value, corr.threshold) == (True, 0.0, 0.7), row.alpha_id
         boot = gates[BOOTSTRAP_GATE]
@@ -1988,11 +2000,14 @@ def test_bootstrap_builds_both_blocks_from_the_artefacts(bootstrap, config):
         else:
             assert boot.value == block.ci_low < 0.0
             negative.append(row.alpha_id)
-    assert (len(no_trade), len(negative)) == (16, 8)  # v1.14 store: EQ07 now trades
-    assert negative == ["EQ06", "EQ07", "EQ11", "FX05", "FX08", "FX09", "FX10", "FX11"]
+    # (FX11 never left RESEARCH in v1.14.0: the leakage gate stops it first)
+    assert (len(no_trade), len(negative)) == (17, 6)
+    assert negative == ["EQ06", "EQ11", "FX05", "FX08", "FX09", "FX10"]
     # no verdict or state moved because of the two gates: every alpha
     # already failed net_pnl_after_costs
     for row in bootstrap.rows:
+        if row.alpha_id == "FX11":
+            continue
         assert row.state is S.CANDIDATE and "net_pnl_after_costs" in row.failed_gates
 
 

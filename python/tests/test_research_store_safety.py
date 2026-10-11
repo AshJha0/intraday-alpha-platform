@@ -36,7 +36,12 @@ from iap.research import (
     gate_eligibility,
 )
 from iap.research.__main__ import main as cli_main
-from iap.research.runner import ELIGIBILITY_FILE, STAGING_PREFIX, render_document
+from iap.research.runner import (
+    ELIGIBILITY_FILE,
+    EXPLORATORY_REASON,
+    STAGING_PREFIX,
+    render_document,
+)
 from iap.store.__main__ import main as store_main
 from iap.store.db import Store
 from iap.validation.ledger import ExperimentLedger
@@ -479,10 +484,9 @@ def test_eligibility_never_changes_an_experiment_id():
         got = reg.gate_eligibility(rec.experiment_id)
         if rec.experiment_id in current_ids:
             assert rec.spec.configuration == DEFAULT_CONFIGURATION
-            # v1.14: rewritten by tools/regenerate_dataset_artifacts.py, which
-            # runs them --no-prereg (exploratory): the only reason recorded
-            assert not got.eligible and len(got.reasons) == 1
-            assert "not pre-registered (--no-prereg)" in got.reasons[0]
+            # v1.14.0: re-run in place under the same ids by the regenerate
+            # job, which runs them --no-prereg (G4): exploratory, and says so
+            assert not got.eligible and got.reasons == (EXPLORATORY_REASON,)
             assert got.periods_verified  # the sidecar the runner wrote
             assert got.methods == "v2"
             # the threshold the result was judged at is the ledger's
@@ -538,8 +542,11 @@ def test_runner_records_eligibility_beside_the_result(frames, tmp_path):
     assert doc["gate_eligible"] is False and doc["periods_verified"] is True
     assert doc["x-version"] == 2 and doc["experiment_id"] == cheap.experiment_id
     # the first run on an empty ledger is judged at its own looks
-    assert doc["methods"] == "v2" and doc["threshold_looks"] == LOOKS_PER_EXPERIMENT == 84
-    assert doc["significance_threshold"] == ExperimentLedger.bonferroni_t_threshold_at(84)
+    # (v1.14.0, R-P2-4: one gate decision + the holdout backtest = 2 looks)
+    assert doc["methods"] == "v2" and doc["threshold_looks"] == LOOKS_PER_EXPERIMENT == 2
+    # Bonferroni |t| at 2 looks is ~2.24; the gate never goes below 3.0
+    assert ExperimentLedger.bonferroni_t_threshold_at(2) < 3.0
+    assert doc["significance_threshold"] == 3.0
     assert sorted(doc) == [
         "experiment_id",
         "gate_eligible",
@@ -557,7 +564,7 @@ def test_runner_records_eligibility_beside_the_result(frames, tmp_path):
     # frames in memory: no normalized events, so the recompute probe did not run
     assert any("recompute leakage probe did not run" in r for r in got.reasons)
     assert got.significance_threshold == doc["significance_threshold"]
-    assert (got.methods, got.threshold_looks) == ("v2", 84)
+    assert (got.methods, got.threshold_looks) == ("v2", 2)
     assert ExperimentLedger(tmp_path / "experiments.json").distinct_experiments == 1
 
 
@@ -858,22 +865,28 @@ def test_runner_ledger_policy_uses_the_post_debit_threshold(frames, tmp_path, mo
     legacy = _spec(frames, configuration={"methods": "legacy_v1"})
     _runner(frames, tmp_path, dry_run=True).run(legacy)
     assert seen == {"policy": "fixed", "threshold": None, "looks": None}
-    assert LEGACY_LOOKS_PER_EXPERIMENT == 28 and LOOKS_PER_EXPERIMENT == 84
+    assert LEGACY_LOOKS_PER_EXPERIMENT == 28 and LOOKS_PER_EXPERIMENT == 2
     # the default bundle on a ledger holding the legacy run's 28 looks:
-    # 28 + 84 = 112 once its own are debited
+    # 28 + 2 = 30 once its own are debited (v1.14.0: one gate decision + the
+    # holdout backtest)
     spec = _spec(frames)
     _runner(frames, tmp_path, dry_run=True).run(spec)
-    assert seen["policy"] == "ledger" and seen["looks"] == 112
-    assert seen["threshold"] == ExperimentLedger.bonferroni_t_threshold_at(112)
+    assert seen["policy"] == "ledger" and seen["looks"] == 30
+    assert seen["threshold"] == ExperimentLedger.bonferroni_t_threshold_at(30)
     runner = _runner(frames, tmp_path, dry_run=True)
-    runner.run(_spec(frames, "1s"))  # a NEW spec: 84 more looks
-    assert seen["policy"] == "ledger" and seen["looks"] == 196
-    assert seen["threshold"] == ExperimentLedger.bonferroni_t_threshold_at(196)
+    runner.run(_spec(frames, "1s"))  # a NEW spec: 2 more looks
+    assert seen["policy"] == "ledger" and seen["looks"] == 32
+    assert seen["threshold"] == ExperimentLedger.bonferroni_t_threshold_at(32)
     runner = _runner(frames, tmp_path, dry_run=True)
     runner.run(spec)  # a rerun: no new looks, judged where its first run was
-    assert seen["looks"] == 112
-    assert seen["threshold"] == ExperimentLedger.bonferroni_t_threshold_at(112)
-    assert ExperimentLedger(tmp_path / "experiments.json").total_experiments == 196
+    assert seen["looks"] == 30
+    assert seen["threshold"] == ExperimentLedger.bonferroni_t_threshold_at(30)
+    # the same spec at the v1.13.0 revision is another look, under a new id
+    old = _spec(frames, configuration={"methods": "v2_v113"})
+    assert old.experiment_id != spec.experiment_id
+    _runner(frames, tmp_path, dry_run=True).run(old)
+    assert seen["looks"] == 32 + 84
+    assert ExperimentLedger(tmp_path / "experiments.json").total_experiments == 32 + 84
 
 
 @pytest.fixture()

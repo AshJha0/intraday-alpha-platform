@@ -3,7 +3,7 @@
 The seven-state promotion machine every flagship alpha moves through, the
 gate at every edge, the evidence each gate reads, the two artefacts the
 service writes, and the honest result of running it over the bundled
-research: **24 alphas at CANDIDATE, 0 beyond, because nothing survives 1×
+research: **23 alphas at CANDIDATE, 0 beyond, because nothing survives 1×
 modelled costs.** Since v1.5.0 the machine runs under the corrected rules by
 default — the significance gate reads the multiple-testing threshold the
 evidence carries, and retirement follows a CUSUM of the rolling-IC shortfall
@@ -443,7 +443,7 @@ and the registry (now x-version 2) and the log were rebuilt with
 move.
 
 Result on the current dataset (`116b7787…`) under the v1.5.0 default
-methods — **24 CANDIDATE, 0 VALIDATING, 0 PROMOTE**
+methods — **23 CANDIDATE, 0 VALIDATING, 0 PROMOTE**
 (report verdicts: 0 PROMOTE / 11 ITERATE / 13 REJECT); every alpha fails
 `net_pnl_after_costs` and `capacity`:
 

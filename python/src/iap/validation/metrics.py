@@ -358,6 +358,28 @@ def nw_lags(horizon_ns: int, bucket_ns: int = 300 * NS_S) -> int:
     return int(-(-int(horizon_ns) // int(bucket_ns))) + 1
 
 
+def auto_hac_lags(n_buckets: int, horizon_ns: int, bucket_ns: int = 300 * NS_S) -> int:
+    """Automatic HAC bandwidth (v1.14.0, R-P1-3): the larger of the
+    horizon rule (:func:`nw_lags`) and the Newey-West (1994) plug-in-free
+    rule ``floor(4 * (n / 100) ** (2 / 9))`` on the number of non-empty
+    buckets, capped at ``n - 1``.  The horizon rule alone gives L = 2 for
+    every horizon up to five minutes however long the sample is, which
+    leaves the slowly decaying autocorrelation of a long intraday sample
+    out of the long-run variance; the plug-in rule grows with ``n``."""
+    base = nw_lags(horizon_ns, bucket_ns)
+    n = int(n_buckets)
+    if n <= 1:
+        return base
+    rule = int(np.floor(4.0 * (n / 100.0) ** (2.0 / 9.0)))
+    return int(max(base, min(rule, n - 1)))
+
+
+def n_ts_buckets(ts: np.ndarray, bucket_ns: int = 300 * NS_S) -> int:
+    """Number of distinct non-empty ``bucket_ns`` buckets of ``ts``."""
+    t = np.asarray(ts, dtype=np.int64)
+    return int(np.unique(t // int(bucket_ns)).size) if t.size else 0
+
+
 def newey_west_tstat(
     series: np.ndarray,
     lags: int = 2,

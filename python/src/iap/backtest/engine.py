@@ -86,20 +86,27 @@ Pinned semantics (mirrored by the accounting-identity tests):
   inventory overnight).  With the flag off — the legacy behaviour — a trade
   fills in full at ``mid +- half spread`` whatever its size: a 1 000-share
   order "fills" at the touch of a book showing 100.
-- **Blocked rows** (``block_rows_column``; default ``"auto"`` since v1.5.0):
-  rows where the row mask is False produce NO decision (the position
-  carries).  ``"auto"`` is the mask of the rows the IC scores at the
-  configured horizon (:func:`iap.labels.frames.scored_rows`: a valid label,
-  or one invalid for BLACKOUT alone that is scored at its reopen return),
-  so the backtest trades exactly the rows the IC is measured on.  The IC
-  leaves out every row it has no price for — a stale forward mid, a
-  non-tradable anchor, the end of the session — and a backtest that keeps
-  trading through them describes a different row population.  The mask is
-  built from labels, which are only known after the fact: it removes a
-  selection difference between two research statistics and is not a
-  tradable rule (the live path has no such column and does not use it).
-  A column name blocks on that boolean column; ``None`` — the legacy
-  behaviour — trades every row.
+- **Blocked rows** (``block_rows_column``; default ``"causal"`` since
+  v1.14.0, R-P0-1): rows where the row mask is False produce NO decision
+  (the position carries).  ``"causal"`` blocks only on state that is
+  observable at the decision time: the row's own mid is missing or not
+  positive, or — when the frame carries ``label_reason_<h>`` — the label
+  engine found the ANCHOR itself unusable (``NO_ANCHOR`` /
+  ``ANCHOR_NOT_TRADABLE``: no prevailing two-sided book at ``t``).  Those
+  bits describe the book at ``t``, never a sample after it.  Whether the
+  FORWARD window is later invalid (a halt inside the horizon, the end of
+  the stream, a stale forward mid) is not known at ``t`` and does not
+  block, so a live router could have made exactly the same decisions.
+  ``"auto"`` (the v1.5.0-v1.13.0 default, kept as a named diagnostic) is
+  the mask of the rows the IC scores at the configured horizon
+  (:func:`iap.labels.frames.scored_rows`: a valid label, or one invalid
+  for BLACKOUT alone that is scored at its reopen return).  That mask is
+  built from labels, which are only known after the fact: it is a
+  look-ahead (a row is skipped because the market WILL halt), and every
+  net P&L and bootstrap interval computed under it inherits it.  The
+  validation report quotes the 1x net P&L under the label mask beside the
+  causal one (``net_pnl_1x_cost_label_block``).  A column name blocks on
+  that boolean column; ``None`` — the legacy behaviour — trades every row.
 - **Accounting identity** (tested exactly): with cash updated only by
   executions and equity marked at the last valid mid,
 
@@ -140,7 +147,7 @@ import pandas as pd
 
 from iap.backtest.costs import CostModel
 from iap.labels.frames import scored_rows
-from iap.labels.labels import HORIZONS_NS
+from iap.labels.labels import HORIZONS_NS, LabelReason
 from iap.reference.refdata import session_values
 
 NS_S = 1_000_000_000
@@ -158,15 +165,22 @@ LEGACY_POSITION_POLICY = "sign"
 #: ``block_rows_column`` value meaning "the rows the IC scores at the
 #: configured horizon" (:func:`iap.labels.frames.scored_rows`).
 BLOCK_ROWS_AUTO = "auto"
+#: ``block_rows_column`` value meaning "the rows whose decision-time state
+#: is usable" (module docs, R-P0-1): the default since v1.14.0.
+BLOCK_ROWS_CAUSAL = "causal"
+#: Label-reason bits that describe the ANCHOR (the book at ``t``) and are
+#: therefore observable at the decision time.
+_ANCHOR_REASON_BITS = LabelReason.NO_ANCHOR | LabelReason.ANCHOR_NOT_TRADABLE
 
 _HORIZON_NAME_BY_NS = {ns: name for name, ns in HORIZONS_NS.items()}
 
 
 @dataclass(frozen=True)
 class BacktestConfig:
-    """Research backtest configuration.  The defaults are the v1.5.0 rules
-    (cost-aware positions, fills capped at displayed size, invalid-label rows
-    blocked); :meth:`legacy` names the v1.4.0 rules."""
+    """Research backtest configuration.  The defaults are the v1.14.0 rules
+    (cost-aware positions, fills capped at displayed size, rows blocked on
+    decision-time state only); :meth:`legacy` names the v1.4.0 rules and
+    ``block_rows_column="auto"`` the v1.5.0-v1.13.0 label-valid row block."""
 
     max_pos_qty: int = 1000  # matches execution defaults max_child_qty
     conf_min: float = 0.5
@@ -190,10 +204,11 @@ class BacktestConfig:
     hysteresis: float = 0.5
     #: cap each fill at the displayed L1 size on the side it takes
     cap_fills_at_l1: bool = True
-    #: rows where the mask is False make no decision: "auto" = the rows
-    #: the IC scores at the horizon; a name = that boolean frame column;
-    #: ``None`` = trade every row (legacy)
-    block_rows_column: str | None = BLOCK_ROWS_AUTO
+    #: rows where the mask is False make no decision: "causal" = rows whose
+    #: decision-time state is usable (default); "auto" = the rows the IC
+    #: scores at the horizon (label look-ahead, v1.5.0-v1.13.0); a name =
+    #: that boolean frame column; ``None`` = trade every row (legacy)
+    block_rows_column: str | None = BLOCK_ROWS_CAUSAL
 
     def __post_init__(self) -> None:
         if self.position_policy not in POSITION_POLICIES:
@@ -251,8 +266,8 @@ class BacktestConfig:
         return name
 
     def block_rows_label(self) -> str | None:
-        """What blocks rows, for a report: ``None``, a column name, or
-        ``"scored_rows:<horizon>"`` for the ``"auto"`` mask."""
+        """What blocks rows, for a report: ``None``, a column name,
+        ``"causal"`` or ``"scored_rows:<horizon>"`` for the ``"auto"`` mask."""
         if self.block_rows_column != BLOCK_ROWS_AUTO:
             return self.block_rows_column
         return f"scored_rows:{self.horizon_name()}"
@@ -262,6 +277,8 @@ class BacktestConfig:
         column = self.block_rows_column
         if column is None:
             return None
+        if column == BLOCK_ROWS_CAUSAL:
+            return causal_rows(frame, self.horizon_ns)
         if column == BLOCK_ROWS_AUTO:
             name = self.horizon_name()
             for needed in (f"label_mid_{name}", f"label_valid_{name}"):
@@ -273,6 +290,24 @@ class BacktestConfig:
         if column not in frame.columns:
             raise ValueError(f"{where}: frame lacks block_rows_column {column!r}")
         return frame[column].to_numpy(dtype=bool)
+
+
+def causal_rows(frame: pd.DataFrame, horizon_ns: int | None = None) -> np.ndarray:
+    """Rows whose decision-time state is usable (module docs, R-P0-1): a
+    finite positive ``mid_price_v1`` and, when ``horizon_ns`` names a pinned
+    horizon whose ``label_reason_<h>`` column the frame carries, no ANCHOR
+    reason bit.  Nothing about ``(t, t + h]`` enters the mask."""
+    n = len(frame)
+    if "mid_price_v1" in frame.columns:
+        mid = frame["mid_price_v1"].to_numpy(dtype=float)
+        ok = np.isfinite(mid) & (mid > 0.0)
+    else:
+        ok = np.ones(n, dtype=bool)
+    name = _HORIZON_NAME_BY_NS.get(int(horizon_ns)) if horizon_ns is not None else None
+    if name is not None and f"label_reason_{name}" in frame.columns:
+        reason = frame[f"label_reason_{name}"].to_numpy(dtype=np.int64)
+        ok &= (reason & _ANCHOR_REASON_BITS) == 0
+    return ok
 
 
 @dataclass
