@@ -43,7 +43,7 @@ import sys
 import threading
 import time
 from collections.abc import Callable, Iterable, Iterator
-from heapq import heappop, heappush
+from heapq import heappush
 from pathlib import Path
 
 from iap.core.codec import sha256_file
@@ -54,6 +54,7 @@ from iap.marketdata.itch50 import (
     PRICE_SCALE,
     Itch50Mapper,
     Itch50Reader,
+    LevelBook,
     ProtoEvent,
 )
 from iap.marketdata.lobster import LobsterConverter, sibling_orderbook, symbol_from_filename
@@ -63,7 +64,16 @@ from iap.reference.secmaster import SecurityMaster, SecurityRecord
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 
-MANIFEST_VERSION = 1
+#: Manifest x-version.  2 (v1.14) = the ingest rules of v1.14: hidden prints
+#: signed by the quote rule (D-P1-2), off-grid prints rounded half to even
+#: with a residue histogram (D-P1-3), the half-penny tick (D-P2-10), ITCH
+#: operational halts (D-P2-12) and ``config_version`` (D-P2-9).  A dataset of
+#: x-version 1 was ingested under the earlier rules and is refused
+#: (:func:`load_manifest`, D-P1-4): re-ingest it.
+MANIFEST_VERSION = 2
+#: Version of the mapping / rounding rules a dataset was ingested under
+#: (recorded in the manifest; bumped with every rule change).
+INGEST_RULES_VERSION = 2
 MANIFEST_NAME = "dataset.json"
 FORMATS = ("itch50", "lobster")
 
@@ -73,12 +83,27 @@ SOURCE_VENUE = {"itch50": ("XNAS", 101), "lobster": ("XNAS", 101)}
 
 #: Domain separation of real dataset versions: no synthetic dataset
 #: (``iap.experiment.tracker.data_version``) hashes this prefix.
-DATASET_VERSION_DOMAIN = b"iap.real-dataset.v1\n"
+DATASET_VERSION_DOMAIN = b"iap.real-dataset.v2\n"
 
 #: Tick sizes a US equity can have, in 1/10000 dollars (Reg NMS Rule 612).
 TICK_CENT_E4 = 100
+TICK_HALF_PENNY_E4 = 50
 TICK_SUBPENNY_E4 = 1
-TICK_CHOICES = {"auto": None, "0.01": TICK_CENT_E4, "0.0001": TICK_SUBPENNY_E4}
+TICK_CHOICES = {
+    "auto": None,
+    "0.01": TICK_CENT_E4,
+    "0.005": TICK_HALF_PENNY_E4,
+    "0.0001": TICK_SUBPENNY_E4,
+}
+
+#: Half-penny guard (D-P2-10): when at least ``HALF_PENNY_GUARD_MIN_ORDERS``
+#: and more than this fraction of an instrument's displayed orders at or
+#: above $1.00 sit on the half-penny grid
+#: ($x.xx50), the instrument quotes in half pennies (Rule 612 as amended for
+#: tick-constrained stocks): ``auto`` picks 0.005, and a forced 0.01 is
+#: refused instead of rejecting those orders as off-tick.
+HALF_PENNY_GUARD_FRACTION = 0.01
+HALF_PENNY_GUARD_MIN_ORDERS = 100
 
 _SPOOL = struct.Struct("<HqBBqqQQ")
 _SPOOL_BATCH = 4096
@@ -105,9 +130,43 @@ def load_manifest(dataset_dir: str | Path) -> dict:
         raise IngestError(f"{dataset_dir} is not an ingested dataset: no {MANIFEST_NAME}")
     with open(path, encoding="utf-8") as f:
         doc = json.load(f)
-    if doc.get("x-version") != MANIFEST_VERSION or doc.get("kind") != "real":
+    if doc.get("kind") != "real":
+        raise IngestError(f"{path}: not a real-data manifest")
+    version = doc.get("x-version")
+    if isinstance(version, int) and version < MANIFEST_VERSION:
+        raise IngestError(
+            f"{path}: dataset ingested under pre-v1.14 rules (manifest x-version {version}; "
+            "hidden prints signed by the tick rule, midpoint prints rounded half up, no "
+            "half-penny or operational-halt handling, possibly a 0.0001 tick for a stock "
+            f"above $1). It is refused: re-ingest the session(s) with this version "
+            f"(manifest x-version {MANIFEST_VERSION}, docs/REAL_DATA.md §2)"
+        )
+    if version != MANIFEST_VERSION:
         raise IngestError(f"{path}: not a real-data manifest of x-version {MANIFEST_VERSION}")
     return doc
+
+
+def config_version(dataset_dir: str | Path) -> str:
+    """sha256 over ``relative/path \\n sha256 \\n`` of every file under the
+    dataset's ``configs/`` and ``reference/`` trees, in sorted order (D-P2-9).
+
+    ``dataset_version`` pins the normalized events only; the instruments,
+    venues, cost model, security master and corporate actions a run reads
+    sit beside them and are pinned by this hash, recorded in the manifest
+    and stamped on ledger entries (``iap.validation.ledger``)."""
+    root = Path(dataset_dir)
+    h = hashlib.sha256()
+    h.update(b"iap.real-config.v1\n")
+    files = [
+        f for sub in ("configs", "reference") if (root / sub).is_dir()
+        for f in (root / sub).rglob("*") if f.is_file()
+    ]
+    for f in sorted(files, key=lambda p: p.relative_to(root).as_posix()):
+        h.update(f.relative_to(root).as_posix().encode())
+        h.update(b"\n")
+        h.update(sha256_file(f).encode())
+        h.update(b"\n")
+    return h.hexdigest()
 
 
 def real_dataset_version(normalized_dir: str | Path) -> str:
@@ -310,6 +369,7 @@ class _InstrumentStats:
         "adds_subdollar",
         "prints_dollar",
         "prints_subdollar",
+        "adds_half_penny",
         "first_add",
         "first_trade",
         "volume",
@@ -319,6 +379,7 @@ class _InstrumentStats:
         self.events = 0
         self.adds_dollar = 0  # displayed orders priced at or above $1.00
         self.adds_subdollar = 0  # displayed orders priced below $1.00
+        self.adds_half_penny = 0  # displayed orders >= $1.00 on the $x.xx50 grid
         self.prints_dollar = 0  # trade prints at or above $1.00
         self.prints_subdollar = 0  # trade prints below $1.00
         self.first_add = 0  # first displayed price at or above $1.00, else the first one
@@ -393,6 +454,8 @@ def _spool_pass(protos: Iterable[ProtoEvent], spool: Path, n_inst: int) -> list[
                     if st.adds_dollar == 0:
                         st.first_add = ev[4]
                     st.adds_dollar += 1
+                    if ev[4] % TICK_CENT_E4 == TICK_HALF_PENNY_E4:
+                        st.adds_half_penny += 1
                 else:
                     if st.adds_dollar == 0 and st.adds_subdollar == 0:
                         st.first_add = ev[4]
@@ -423,36 +486,19 @@ def _iter_spool(spool: Path) -> Iterator[ProtoEvent]:
             yield from _SPOOL.iter_unpack(chunk)
 
 
-class _CheckState:
-    """Order state of one instrument for the consistency check."""
+class _CheckState(LevelBook):
+    """Order state of one instrument for the consistency check (the level
+    totals and lazy best-price heaps are the mapper's :class:`LevelBook`)."""
 
-    __slots__ = ("orders", "totals", "heaps", "status", "applied", "drops")
+    __slots__ = ("orders", "status", "applied", "drops")
 
     def __init__(self) -> None:
+        super().__init__()
         #: order_id -> [side, price_ticks, qty]
         self.orders: dict[int, list[int]] = {}
-        #: per side: price_ticks -> resting quantity
-        self.totals: tuple[dict[int, int], dict[int, int]] = ({}, {})
-        #: per side: lazy heap of prices, best first (bids negated)
-        self.heaps: tuple[list[int], list[int]] = ([], [])
         self.status = _TRADING
         self.applied = 0
         self.drops: dict[str, int] = {}
-
-    def best(self, side: int) -> int | None:
-        """Best resting price of a side (lazy deletion of emptied levels)."""
-        heap, totals = self.heaps[side], self.totals[side]
-        sign = -1 if side == 0 else 1
-        while heap:
-            price = sign * heap[0]
-            if price in totals:
-                return price
-            heappop(heap)
-        return None
-
-    def crossed(self) -> bool:
-        bid, ask = self.best(0), self.best(1)
-        return bid is not None and ask is not None and bid > ask
 
 
 class _BookCheck:
@@ -572,8 +618,17 @@ def sequence_rows(
       later MODIFY / CANCEL / EXECUTE of that order is dropped and counted
       (``events_on_rejected_orders``);
     * a TRADE print off the grid (a non-displayed midpoint execution, or
-      the print of a rejected order's execution) is rounded half up and
-      counted (``trade_prices_rounded_to_tick``) — a print rests nowhere.
+      the print of a rejected order's execution) is rounded to the nearest
+      tick, **half to even** (v1.14, D-P1-3; before: half up, a +0.5 tick
+      bias on every midpoint print of a one-tick market), and counted
+      (``trade_prices_rounded_to_tick``) — a print rests nowhere.  The
+      residues (``price mod tick`` in 1/10000 dollars) of the rounded prints
+      are counted in ``trade_price_residue_histogram``.
+
+    Half to even rather than toward the resting side: the resting side of a
+    hidden print is itself inferred (the quote / tick rule), so rounding
+    toward it would feed a signing guess into the price; half to even is
+    unbiased over a session of midpoint prints whatever the signs are.
 
     ``sequence`` counts from 1 per instrument over the EMITTED events,
     ``event_id`` from 1 over the stream, ``receive_ts == exchange_ts``.
@@ -587,12 +642,17 @@ def sequence_rows(
     followers = 0
     n = 0
     rounded = 0
+    residues: dict[int, int] = {}
     for inst, ts, etype, side, price, qty, oid, tid in protos:
         tick = ticks_e4[inst]
         if etype == _TRADE:
-            if price % tick:
+            q, r = divmod(price, tick)
+            if r:
                 rounded += 1
-            price = max(1, (2 * price + tick) // (2 * tick))
+                residues[r] = residues.get(r, 0) + 1
+                if 2 * r > tick or (2 * r == tick and q & 1):
+                    q += 1
+            price = max(1, q)
         elif tick != 1 and etype != _STATUS:
             if etype == _ADD:
                 if price % tick:
@@ -612,6 +672,9 @@ def sequence_rows(
     if counters is not None:
         counters["events"] = n
         counters["trade_prices_rounded_to_tick"] = rounded
+        counters["trade_price_residue_histogram"] = {
+            str(r): residues[r] for r in sorted(residues)
+        }
         counters["off_tick_orders_rejected"] = sum(off_tick)
         counters["events_on_rejected_orders"] = followers
         counters["off_tick_orders_rejected_by_instrument"] = off_tick
@@ -819,7 +882,22 @@ def _decide_ticks(
             sub_dollar = st.prints_subdollar > st.prints_dollar
         else:
             sub_dollar = st.adds_subdollar > st.adds_dollar
-        observed = TICK_SUBPENNY_E4 if sub_dollar else TICK_CENT_E4
+        half_penny = (
+            st.adds_half_penny >= HALF_PENNY_GUARD_MIN_ORDERS
+            and st.adds_half_penny > HALF_PENNY_GUARD_FRACTION * st.adds_dollar
+        )
+        if sub_dollar:
+            observed = TICK_SUBPENNY_E4
+        elif half_penny:
+            observed = TICK_HALF_PENNY_E4
+        else:
+            observed = TICK_CENT_E4
+        if forced_e4 == TICK_CENT_E4 and half_penny and not sub_dollar:
+            raise IngestError(
+                f"{symbol}: {st.adds_half_penny} of {st.adds_dollar} displayed orders at or "
+                "above $1.00 are on the half-penny grid; --tick-size 0.01 would reject them "
+                "as off-tick (use --tick-size auto or 0.005)"
+            )
         tick = forced_e4 if forced_e4 is not None else previous.get(symbol, observed)
         if symbol in previous and previous[symbol] != tick:
             raise IngestError(
@@ -908,6 +986,7 @@ def ingest(
             raise IngestError(f"{out} exists, is not empty and is not an ingested dataset")
         manifest = {
             "x-version": MANIFEST_VERSION,
+            "ingest_rules_version": INGEST_RULES_VERSION,
             "kind": "real",
             "source": {"format": source_format, "venue": venue, "venue_id": venue_id},
             "universe": [],
@@ -987,6 +1066,7 @@ def ingest(
         per_symbol[s] = {
             "events": st.events,
             "displayed_orders_below_one_dollar": st.adds_subdollar,
+            "displayed_orders_on_half_penny": st.adds_half_penny,
             "off_tick_orders_rejected": off_tick[i],
             "volume": st.volume + fact["extra_volume"],
             "ref_price_e4": ref,
@@ -1001,6 +1081,7 @@ def ingest(
             ),
             "asset_class": fact["asset_class"],
             "lot_size": fact["lot_size"],
+            "cross_volume": fact["extra_volume"],
             "crosses": fact["crosses"],
         }
     raw_file = raw_dir / f"{stem}.jsonl"
@@ -1038,6 +1119,7 @@ def ingest(
             "sha256": sha256_file(target),
             "actions": len(table),
         }
+    manifest["config_version"] = config_version(out)
 
     normalized_dir = out / "normalized"
     if defer_normalize:
@@ -1094,6 +1176,7 @@ def merge_datasets(inputs: Iterable[str | Path], out: str | Path, configs_dir: P
     first = manifests[0]
     merged: dict = {
         "x-version": first["x-version"],
+        "ingest_rules_version": first.get("ingest_rules_version", INGEST_RULES_VERSION),
         "kind": "real",
         "source": first["source"],
         "universe": first["universe"],
@@ -1134,6 +1217,7 @@ def merge_datasets(inputs: Iterable[str | Path], out: str | Path, configs_dir: P
             master.upsert(rec)
     master.save(staging / "reference" / "security_master.json")
     _write_configs(staging, merged, configs_dir)
+    merged["config_version"] = config_version(staging)
     normalized_dir = staging / "normalized"
     _write_json(
         normalized_dir / "qc_report.json",
@@ -1304,6 +1388,7 @@ def main(argv: list[str] | None = None) -> int:
     summary = {
         "dataset_dir": str(Path(args.out)),
         "dataset_version": manifest.get("dataset_version"),
+        "config_version": manifest.get("config_version"),
         "date": date,
         "sessions": sorted(manifest["sessions"]),
         "symbols": session["symbols"],

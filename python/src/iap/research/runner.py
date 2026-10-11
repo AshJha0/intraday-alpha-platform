@@ -470,6 +470,7 @@ class ExperimentRunner:
         normalized_dir: Path | None = None,
         gate: Callable[[ExperimentSpec], None] | None = None,
         exploratory: bool = False,
+        config_version: str | None = None,
     ) -> None:
         #: ``--no-prereg`` run (G4): the result is recorded and ledgered but its
         #: eligibility carries a reason, so registry / lifecycle gates refuse it
@@ -499,7 +500,9 @@ class ExperimentRunner:
         exec_cfg = json.loads((self.configs_dir / "execution" / "execution.json").read_text())
         self.max_participation = float(exec_cfg["defaults"]["max_participation"])
         self.cost_model = CostModel.load(self.configs_dir / "execution" / "execution.json")
-        self.ledger = ExperimentLedger(self.ledger_path)
+        #: ``config_version`` of an ingested dataset (D-P2-9), stamped on new
+        #: ledger entries; ``None`` on the synthetic checkout
+        self.ledger = ExperimentLedger(self.ledger_path, config_version=config_version)
         self._recompute = RecomputeSources(self.normalized_dir, self.configs_dir)
 
     # -- inputs ---------------------------------------------------------
