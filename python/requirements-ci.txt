@@ -296,6 +296,14 @@ cryptography==50.0.2 \
     --hash=sha256:fa8f5efb344d6908a1ce62f4a24e2e5780f825d6f53f5f50ec5ffacac72936cb \
     --hash=sha256:fdd28f912fccfec1846a94e2e1e8f9b0012f557f0c46fe4f3eb0d7a87afcf90b
     # via -r requirements-ci.in
+databento-dbn==0.71.0 \
+    --hash=sha256:273f90e70be05ea5d387e624e053ea20422db15de0a8240d83ac7579248c22ee \
+    --hash=sha256:34309b44281259cbe8aa4a0e6d315f8c3b3add12ce04f5d96a3f2311c880e653 \
+    --hash=sha256:5463c3803bd26f5a75cfc95375ff8d09580233116c14ab7a41d98f2bfc85f10e \
+    --hash=sha256:5c6d3a019dffd7acf599825b640c43acd08ce8644a4d9edfe275c0de9c1f9e68 \
+    --hash=sha256:86d4b3afe1e0a64c7d9d02396c61d5c5a1f2345faa4a75ae861fe8048d7d1189 \
+    --hash=sha256:bf5d16f6a12556a45775b6eb582f700915945c81b57f5ba49436feaac420f742
+    # via -r requirements-ci.in
 execnet==2.1.2 \
     --hash=sha256:63d83bfdd9a23e35b9c6a3261412324f964c2ec8dcd8d3c6916ee9373e0befcd \
     --hash=sha256:67fba928dd5a544b783f6056f449e5e3931a5c378b128bc18501f7ea79e296ec
