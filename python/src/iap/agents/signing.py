@@ -6,6 +6,12 @@ canonical JSON.  The scheme is named in the stored ``auth`` record:
 - ``"ed25519"`` (default, v1.10): the agent signs with its private key, held
   outside the repository; the broker and every verifier hold only the public
   key (``research/agents/agent_pubkeys.json``), so a verifier cannot forge.
+- ``"ed25519-v2"`` (v1.14, G-P1-4): as ``"ed25519"`` but the signed message
+  also binds ``prev`` (the board's head hash the agent saw) and ``board``
+  (the board's path relative to the repository root), so a signed request
+  cannot be replayed onto another board or at another position of the same
+  board.  The broker accepts only this scheme for new requests; ``"ed25519"``
+  records stay verify-only.
 - ``"hmac-sha256"``: the symmetric scheme of the first v1.10 draft.  Records
   without a ``scheme`` field are this scheme.  It can still be VERIFIED with
   the shared key (:func:`verify`), but nothing signs new requests with it.
@@ -30,12 +36,25 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 from iap.agents.blackboard import canonical, digest
 
 ED25519 = "ed25519"
+ED25519_V2 = "ed25519-v2"
 HMAC_SHA256 = "hmac-sha256"
 _RAW = serialization.Encoding.Raw
 
 
-def message(agent: str, op: Any, args_digest: Any, nonce: Any) -> bytes:
+def message(
+    agent: str,
+    op: Any,
+    args_digest: Any,
+    nonce: Any,
+    prev: Any = None,
+    board: Any = None,
+) -> bytes:
+    """The signed bytes.  ``prev``/``board`` are bound only by ``ed25519-v2``
+    (both ``None`` = the v1.10 ``ed25519`` message, unchanged)."""
     doc = {"agent": agent, "op": op, "args_digest": args_digest, "nonce": nonce}
+    if prev is not None or board is not None:
+        doc["prev"] = prev
+        doc["board"] = board
     return canonical(doc).encode("ascii")
 
 
@@ -54,12 +73,28 @@ def public_of(private_hex: str) -> str:
     return priv.public_key().public_bytes(_RAW, serialization.PublicFormat.Raw).hex()
 
 
-def sign(private_hex: str, agent: str, op: str, args: Any) -> dict[str, str]:
-    """The ``auth`` an agent passes with a request (fresh nonce each call)."""
+def sign(
+    private_hex: str,
+    agent: str,
+    op: str,
+    args: Any,
+    *,
+    prev: str | None = None,
+    board: str | None = None,
+) -> dict[str, str]:
+    """The ``auth`` an agent passes with a request (fresh nonce each call).
+
+    With ``prev`` and ``board`` (the broker's ``request_context()``) the
+    request is ``ed25519-v2``, bound to that board position; without them it
+    is a v1.10 ``ed25519`` request, which the broker no longer accepts."""
+    if (prev is None) != (board is None):
+        raise ValueError("prev and board are bound together")
     nonce = secrets.token_hex(16)
     priv = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(private_hex))
-    sig = priv.sign(message(agent, op, digest(args), nonce))
-    return {"scheme": ED25519, "nonce": nonce, "sig": sig.hex()}
+    sig = priv.sign(message(agent, op, digest(args), nonce, prev, board))
+    if prev is None:
+        return {"scheme": ED25519, "nonce": nonce, "sig": sig.hex()}
+    return {"scheme": ED25519_V2, "nonce": nonce, "sig": sig.hex(), "prev": prev, "board": board}
 
 
 def verify_ed25519(public_hex: str, msg: bytes, sig_hex: str) -> bool:
@@ -84,7 +119,18 @@ def verify(
         return "key_id is not the writing agent"
     msg = message(agent, auth.get("op"), auth.get("args_digest"), auth.get("nonce"))
     scheme = auth.get("scheme", HMAC_SHA256)
-    if scheme == ED25519:
+    if scheme == ED25519_V2:
+        if auth.get("prev") is None or auth.get("board") is None:
+            return "ed25519-v2 record without prev/board"
+        msg = message(
+            agent,
+            auth.get("op"),
+            auth.get("args_digest"),
+            auth.get("nonce"),
+            auth.get("prev"),
+            auth.get("board"),
+        )
+    if scheme in (ED25519, ED25519_V2):
         pub = pubkeys.get(agent)
         if pub is None:
             return f"no public key for {agent}"

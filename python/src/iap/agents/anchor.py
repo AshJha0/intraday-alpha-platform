@@ -13,6 +13,12 @@ commit whose copy of the board contains it (what was done by hand for the
    matches: each anchored hash is present at its seq and its commit still
    contains it.
 
+4. optionally (``ref``, G-P1-4), against a ref the change under review
+   cannot rewrite - CI passes ``origin/main``: the board at ``ref`` is a
+   prefix of the current one and every anchor commit is an ancestor of
+   ``ref``.  Without it, the check trusts whatever local history it is
+   given (a rewritten local branch can carry its own consistent anchors).
+
 A re-chained board fails 2 (the committed lines differ) and 3.  Entries not
 yet committed are reported as ``unanchored``, not as failures.  Uses the
 ``git`` executable on PATH (standard library ``subprocess`` only).
@@ -52,6 +58,15 @@ def _versions(repo: Path, rel: str) -> list[tuple[str, list[str]]]:
     return out
 
 
+def _is_ancestor(repo: Path, commit: str, ref: str) -> bool:
+    out = subprocess.run(
+        ["git", "-C", str(repo), "merge-base", "--is-ancestor", commit, ref],
+        capture_output=True,
+        check=False,
+    )
+    return out.returncode == 0
+
+
 def _rel(repo: Path, board: Path) -> str:
     return Path(board).resolve().relative_to(Path(repo).resolve()).as_posix()
 
@@ -72,7 +87,9 @@ def anchors(repo: Path, board: Path) -> dict[str, Any]:
     return {"board": rel, "entries": rows}
 
 
-def verify(repo: Path, board: Path, anchor_file: Path | None = None) -> dict[str, Any]:
+def verify(
+    repo: Path, board: Path, anchor_file: Path | None = None, ref: str | None = None
+) -> dict[str, Any]:
     """``{"ok", "entries", "anchored", "unanchored", "problems"}``."""
     repo, board = Path(repo), Path(board)
     problems: list[str] = []
@@ -105,6 +122,19 @@ def verify(repo: Path, board: Path, anchor_file: Path | None = None) -> dict[str
                 continue
             if row["hash"] not in text:
                 problems.append(f"anchor seq {row['seq']}: commit does not contain the entry")
+            elif ref is not None and not _is_ancestor(repo, row["commit"], ref):
+                problems.append(
+                    f"anchor seq {row['seq']}: commit {row['commit'][:12]} is not on {ref}"
+                )
+    if ref is not None:
+        try:
+            text = _git(repo, "show", f"{ref}:{rel}")
+        except BlackboardError:
+            text = None
+        if text is not None:
+            lines = [ln for ln in text.splitlines() if ln.strip()]
+            if current[: len(lines)] != lines:
+                problems.append(f"the board on {ref} is not a prefix of the current board")
     return {
         "ok": not problems,
         "entries": n,

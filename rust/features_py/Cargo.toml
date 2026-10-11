@@ -11,6 +11,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
 publish = false
+license = "MIT"
 description = "Python (pyo3) bindings for the IAP native feature engine"
 
 [lib]

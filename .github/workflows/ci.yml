@@ -32,10 +32,15 @@
 #                                Rust-vs-Python native-feature parity tests
 #                                and the events/s benchmark (job summary)
 #   cpp-sanitizers               ASan+UBSan ctest (blocking; green on first run)
-#   advisory                     ruff (blocking), gitleaks (blocking),
-#                                mypy, pip-audit, cargo audit
-#                                (non-blocking); clippy is a blocking step of
-#                                the rust job
+#   advisory                     ruff (blocking), gitleaks (blocking);
+#                                clippy is a blocking step of the rust job
+#   supply-chain                 v1.14 (G-P1-7), all BLOCKING: pip-audit of
+#                                both pinned requirement files, cargo audit
+#                                and cargo deny (bans/licenses/sources) of the
+#                                rust workspace and rust/features_py, trivy
+#                                (lockfile vulns + Dockerfile/k8s misconfig).
+#                                Ignores only via .github/audit-ignores.json
+#                                (reason + expiry, tools/audit_ignores.py)
 #   images                       builds the four images; needs every other job;
 #                                runs on push to main and on PRs that change
 #                                image inputs
@@ -516,9 +521,8 @@ jobs:
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: ctest --test-dir build-asan --output-on-failure
 
-  # Non-blocking supply-chain and lint signals. Each step is continue-on-error
-  # so a finding is reported in the log (and the step summary) without failing
-  # the workflow; none of them is a required check.
+  # Lint and secrets signals (both blocking since v1.13). The dependency
+  # audits moved to the blocking `supply-chain` job in v1.14 (G-P1-7).
   advisory:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -543,22 +547,72 @@ jobs:
           python -m pip install ruff==0.16.10
           ruff check python tests tools research deployment --output-format=concise
           ruff format --check python tests tools research deployment
-      - name: pip-audit (python/requirements-ci.txt)
-        continue-on-error: true
+
+  # v1.14 (G-P1-7): BLOCKING dependency and configuration audits. A finding
+  # fails the job; the only way past one is a bumped dependency or a reviewed,
+  # time-boxed entry in .github/audit-ignores.json (tools/audit_ignores.py
+  # fails the job once an entry's `expires` date has passed).
+  supply-chain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: audit ignores are well-formed and unexpired
+        run: python tools/audit_ignores.py --check
+      - name: pip-audit (requirements-ci.txt, requirements-image.txt)
         run: |
           python -m pip install pip-audit==2.10.1
-          pip-audit -r python/requirements-ci.txt --no-deps --disable-pip
+          IGNORES=$(python tools/audit_ignores.py --tool pip-audit)
+          for req in python/requirements-ci.txt python/requirements-image.txt; do
+            echo "::group::pip-audit $req"
+            # shellcheck disable=SC2086  # IGNORES is a word list by design
+            pip-audit -r "$req" --no-deps --disable-pip --strict $IGNORES
+            echo "::endgroup::"
+          done
       - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1 (toolchain pinned by input)
         with:
           toolchain: "1.99.0"      # == rust/rust-toolchain.toml (check_deployment.py enforces)
-      - name: install cargo-audit
+      - name: install cargo-audit + cargo-deny
         uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
         with:
-          tool: cargo-audit
-      - name: cargo audit (rust/Cargo.lock)
-        continue-on-error: true
+          tool: cargo-audit@0.22.2,cargo-deny@0.19.9
+      - name: lockfile for rust/features_py (standalone package, not committed)
+        working-directory: rust/features_py
+        run: cargo generate-lockfile
+      - name: cargo audit (rust/Cargo.lock, rust/features_py)
         working-directory: rust
-        run: cargo audit
+        run: |
+          IGNORES=$(python ../tools/audit_ignores.py --tool cargo-audit)
+          # shellcheck disable=SC2086
+          cargo audit --deny warnings $IGNORES
+          # shellcheck disable=SC2086
+          cargo audit --deny warnings --file features_py/Cargo.lock $IGNORES
+      - name: cargo deny (bans, licenses, sources)
+        working-directory: rust
+        run: |
+          cargo deny --locked check bans licenses sources
+          cargo deny --manifest-path features_py/Cargo.toml --config deny.toml \
+            check bans licenses sources
+      # trivy: release tarball pinned by SHA-256 (same pattern as gitleaks),
+      # not the trivy-action (its tags were hijacked in March 2026).
+      - name: install trivy
+        run: |
+          curl -fsSL -o /tmp/trivy.tar.gz \
+            https://github.com/aquasecurity/trivy/releases/download/v0.74.0/trivy_0.74.0_Linux-64bit.tar.gz
+          echo "2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a  /tmp/trivy.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/trivy.tar.gz -C /tmp trivy
+          python tools/audit_ignores.py --tool trivy > /tmp/.trivyignore
+      - name: trivy fs (lockfile vulnerabilities, HIGH/CRITICAL)
+        run: |
+          /tmp/trivy fs --scanners vuln --severity HIGH,CRITICAL --exit-code 1 \
+            --ignorefile /tmp/.trivyignore --skip-dirs data --skip-dirs research .
+      - name: trivy config (Dockerfiles, compose, k8s; HIGH/CRITICAL)
+        run: |
+          /tmp/trivy config --severity HIGH,CRITICAL --exit-code 1 \
+            --ignorefile /tmp/.trivyignore deployment
 
   golden:
     runs-on: ubuntu-24.04
@@ -690,12 +744,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r python/requirements-ci.txt
+      # v1.14 (G-P1-4): anchors, trust roots and the board are checked
+      # against origin/main, which this change cannot rewrite.
       - name: verify-board (chain, git prefixes, anchors, signatures)
         env:
           PYTHONPATH: python/src
-        run: python -m iap.agents.cli verify-board
-      - name: agent public-key registry covers every signed writer
-        run: python tests/harness/check_agent_keys.py
+        run: python -m iap.agents.cli verify-board --trust-ref origin/main
+      - name: agent public-key registry covers every signed writer, maintainer-signed
+        run: python tests/harness/check_agent_keys.py --trust-ref origin/main
       - name: ledgers and blackboard are monotone vs the base
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -831,6 +887,19 @@ jobs:
           for df in python java cpp rust; do
             docker build -f "deployment/docker/Dockerfile.$df" \
               -t "iap/$df:ci-${GITHUB_SHA::12}" .
+          done
+      # v1.14 (G-P1-7): every image is scanned, blocking on HIGH/CRITICAL
+      # vulnerabilities that have a fix (ignores: .github/audit-ignores.json).
+      - name: trivy image scan (HIGH/CRITICAL, fixable)
+        run: |
+          curl -fsSL -o /tmp/trivy.tar.gz \
+            https://github.com/aquasecurity/trivy/releases/download/v0.74.0/trivy_0.74.0_Linux-64bit.tar.gz
+          echo "2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a  /tmp/trivy.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/trivy.tar.gz -C /tmp trivy
+          python3 tools/audit_ignores.py --tool trivy > /tmp/.trivyignore
+          for df in python java cpp rust; do
+            /tmp/trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed \
+              --exit-code 1 --ignorefile /tmp/.trivyignore "iap/$df:ci-${GITHUB_SHA::12}"
           done
       - name: the C++ replay container runs bench_all to completion
         run: docker run --rm "iap/cpp:ci-${GITHUB_SHA::12}"

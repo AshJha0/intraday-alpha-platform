@@ -250,16 +250,22 @@ def test_authenticated_broker_refuses_unsigned_forged_and_replayed(tmp_path, cod
         b.post_task("alice", "t", {})
     other, _ = signing.generate_keypair()
     with pytest.raises(BrokerError, match="bad request signature"):  # someone else's key
-        b.post_task("alice", "t", {}, auth=sign(other, "alice", "post_task", TASK))
+        b.post_task(
+            "alice", "t", {}, auth=sign(other, "alice", "post_task", TASK, **b.request_context())
+        )
     with pytest.raises(BrokerError, match="bad request signature"):  # signature for other args
-        b.post_task("alice", "u", {}, auth=sign(PRIV, "alice", "post_task", TASK))
-    auth = sign(PRIV, "alice", "post_task", TASK)
+        b.post_task(
+            "alice", "u", {}, auth=sign(PRIV, "alice", "post_task", TASK, **b.request_context())
+        )
+    auth = sign(PRIV, "alice", "post_task", TASK, **b.request_context())
     tid = b.post_task("alice", "t", {}, auth=auth)
     with pytest.raises(BrokerError, match="replayed"):
         b.post_task("alice", "t", {}, auth=auth)
     with pytest.raises(BrokerError, match="bad request signature"):  # moved to another op
         b.claim("alice", tid, auth=auth)
-    b.claim("alice", tid, auth=sign(PRIV, "alice", "claim", {"task_id": tid}))
+    b.claim(
+        "alice", tid, auth=sign(PRIV, "alice", "claim", {"task_id": tid}, **b.request_context())
+    )
     assert Blackboard(b.board.path).verify_signatures({"alice": PUB}) == []
     _, wrong_pub = signing.generate_keypair()
     assert Blackboard(b.board.path).verify_signatures({"alice": wrong_pub})
@@ -285,7 +291,9 @@ def test_new_hmac_requests_refused_but_old_hmac_entries_verify(tmp_path, code):
     b = _broker(tmp_path, code, pubkeys={"alice": PUB})
     with pytest.raises(BrokerError, match="scheme"):
         b.post_task("alice", "t", {}, auth={"scheme": "hmac-sha256", "nonce": "b", "sig": "c"})
-    b.post_task("alice", "t", {}, auth=sign(PRIV, "alice", "post_task", TASK))
+    b.post_task(
+        "alice", "t", {}, auth=sign(PRIV, "alice", "post_task", TASK, **b.request_context())
+    )
     assert board.verify() == 2
     assert board.verify_signatures({"alice": PUB}, {"alice": hkey}) == []
     assert any("no shared key" in p for p in board.verify_signatures({"alice": PUB}))
@@ -298,7 +306,9 @@ def test_v19_reader_still_verifies_a_signed_board(tmp_path, code):
     from iap.agents.blackboard import GENESIS
 
     b = _broker(tmp_path, code, pubkeys={"alice": PUB})
-    b.post_task("alice", "t", {}, auth=sign(PRIV, "alice", "post_task", TASK))
+    b.post_task(
+        "alice", "t", {}, auth=sign(PRIV, "alice", "post_task", TASK, **b.request_context())
+    )
     b.preregister(
         "alice",
         "EQ01",
@@ -310,6 +320,7 @@ def test_v19_reader_still_verifies_a_signed_board(tmp_path, code):
             "alice",
             "preregister",
             {"alpha_id": "EQ01", "horizon": "1s", "hypothesis": "h", "expected_sign": 1},
+            **b.request_context(),
         ),
     )
     prev = GENESIS

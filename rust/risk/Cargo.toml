@@ -3,6 +3,8 @@ name = "risk"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
 description = "IAP fail-closed hard risk engine: pre-trade checks, kill switches, deterministic replayable RiskEvent audit log"
 
 [dependencies]

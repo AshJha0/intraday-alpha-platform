@@ -3,6 +3,8 @@ name = "orderbook"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
 description = "IAP pinned MBO/L2/L1 order book with sequencing, snapshots, checkpoints"
 
 [dependencies]

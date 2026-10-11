@@ -6,6 +6,34 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## Unreleased (v1.14, in progress) — governance
+
+Quality review G-P1-4, G-P1-5 and the rest of G-P1-7. No published number,
+golden or ledger total changed; `research/experiments.json` gains
+`chain_head` / `chain_length` (x-version 4).
+
+- **Trust roots (G-P1-4).** A non-empty agent key registry is used only
+  when a maintainer in `research/agents/trust_roots.json` has signed it
+  (`agent_pubkeys.sig.json`; `cli maintainer-keygen` / `sign-registry`,
+  `iap.agents.trust`); CI reads the trust roots from `origin/main`. New
+  agent requests are `ed25519-v2`, binding the board head and board id
+  (`WriteBroker.request_context`); a stale head or another board is
+  refused. `prereg` refuses an unsigned write by a keyed agent;
+  `verify-board --trust-ref origin/main` checks anchors and the board
+  against `origin/main`.
+- **Chained ledger (G-P1-5).** `ExperimentLedger` chains every entry's
+  immutable identity and refuses to load a ledger whose `chain_head` does
+  not match (so Bonferroni never reads an edited ledger); each prereg
+  records `ledger_head`; `check_ledger_monotone.py` requires the head ledger
+  to descend from the base and every prereg head to be on the chain.
+- **Blocking supply-chain audits (G-P1-7).** New `supply-chain` CI job:
+  pip-audit (both requirement files), cargo audit (workspace and
+  `features_py`), cargo deny (`rust/deny.toml`), trivy fs + config; trivy
+  image scan in `images`; CodeQL for Rust. Ignores only through
+  `.github/audit-ignores.json` with a reason and an expiry
+  (`tools/audit_ignores.py`). Rust crates declare `license = "MIT"`,
+  `publish = false`.
+
 ## v1.13.0 — 2026-10-11
 
 The hygiene-and-hardening release that follows the consolidated quality

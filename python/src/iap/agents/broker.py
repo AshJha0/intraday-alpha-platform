@@ -48,10 +48,29 @@ class BrokerError(ValueError):
     pass
 
 
-def sign(private_hex: str, agent: str, op: str, args: Mapping[str, Any]) -> dict[str, str]:
+def sign(
+    private_hex: str,
+    agent: str,
+    op: str,
+    args: Mapping[str, Any],
+    *,
+    prev: str | None = None,
+    board: str | None = None,
+) -> dict[str, str]:
     """The ``auth`` an agent passes with a request: Ed25519 over (agent, op,
-    args digest, fresh nonce), signed with the agent's PRIVATE key."""
-    return signing.sign(private_hex, agent, op, dict(args))
+    args digest, fresh nonce[, board head, board id]), signed with the
+    agent's PRIVATE key.  The broker accepts only bound requests: pass
+    ``**broker.request_context()`` (G-P1-4)."""
+    return signing.sign(private_hex, agent, op, dict(args), prev=prev, board=board)
+
+
+def board_id(root: Path, board: Path) -> str:
+    """A board's id: its path relative to ``root`` (posix), else its absolute path."""
+    b, r = Path(board).resolve(), Path(root).resolve()
+    try:
+        return b.relative_to(r).as_posix()
+    except ValueError:
+        return b.as_posix()
 
 
 def _default_fingerprint(alpha_id: str) -> dict[str, Any] | None:
@@ -92,6 +111,8 @@ class WriteBroker:
         self.lease_ns = lease_ns
         self.fingerprinter = fingerprinter
         self.board = Blackboard(board or self.root / "research" / "agents" / "blackboard.jsonl")
+        #: the board id a bound request signs (G-P1-4): its path relative to the root
+        self.board_id = board_id(self.root, self.board.path)
 
     # -- state ----------------------------------------------------------
     def state(self, now: int | None = None) -> dict[str, Any]:
@@ -130,34 +151,55 @@ class WriteBroker:
             return None
         if not auth or "nonce" not in auth or "sig" not in auth:
             raise BrokerError(f"{agent}: unsigned request (this broker requires signed requests)")
-        if auth.get("scheme") != signing.ED25519:
+        if auth.get("scheme") != signing.ED25519_V2:
             raise BrokerError(
                 f"{agent}: signature scheme {auth.get('scheme')!r} refused; new requests "
-                "must be ed25519 (hmac-sha256 is legacy, verify-only)"
+                "must be ed25519-v2 (bound to the board head; ed25519 and hmac-sha256 are "
+                "legacy, verify-only)"
             )
         nonce = str(auth["nonce"])
         args_digest = digest(dict(args))
-        msg = signing.message(agent, op, args_digest, nonce)
+        prev, board = str(auth.get("prev")), str(auth.get("board"))
+        msg = signing.message(agent, op, args_digest, nonce, prev, board)
         if not signing.verify_ed25519(self.pubkeys[agent], msg, str(auth["sig"])):
             raise BrokerError(f"{agent}: bad request signature for {op}")
+        if board != self.board_id:
+            raise BrokerError(f"{agent}: request signed for board {board!r}, not {self.board_id!r}")
+        try:
+            head = self.board.head()
+        except BlackboardError as exc:
+            raise BrokerError(str(exc)) from exc
+        if prev != head:
+            raise BrokerError(
+                f"{agent}: request signed against a stale board head (replayed or raced); re-sign"
+            )
         for e in self.board.entries():
             a = e.get("auth") or e["body"].get("request_auth") or {}
             if a.get("key_id") == agent and a.get("nonce") == nonce:
                 raise BrokerError(f"{agent}: replayed request (nonce already used)")
         return {
-            "scheme": signing.ED25519,
+            "scheme": signing.ED25519_V2,
             "key_id": agent,
             "op": op,
             "args_digest": args_digest,
             "nonce": nonce,
+            "prev": prev,
+            "board": board,
             "sig": str(auth["sig"]),
         }
+
+    def request_context(self) -> dict[str, str]:
+        """What a bound (``ed25519-v2``) request signs besides its arguments:
+        ``{"prev": board head hash, "board": board id}`` (G-P1-4).  Pass it
+        to :func:`sign` as keyword arguments."""
+        return {"prev": self.board.head(), "board": self.board_id}
 
     def _write(
         self, kind: str, agent: str, body: dict[str, Any], auth: dict[str, Any] | None = None
     ) -> dict[str, Any]:
+        expect = auth.get("prev") if auth is not None else None
         try:
-            return self.board.append(kind, agent, self.clock(), body, auth)
+            return self.board.append(kind, agent, self.clock(), body, auth, expect_prev=expect)
         except BlackboardError as exc:
             raise BrokerError(str(exc)) from exc
 
@@ -266,9 +308,13 @@ class WriteBroker:
             body["code"] = code
         if prior is not None:
             body["supersedes_seq"] = prior["seq"]
-        body["ledger_total"] = self._debit_look(
+        total, head, ledger_id = self._debit_look(
             pid, alpha_id, horizon, code, ledger, dataset_version
         )
+        body["ledger_total"] = total
+        # G-P1-5: the ledger chain head after this look, and which ledger
+        body["ledger_head"] = head
+        body["ledger"] = ledger_id
         self._write("prereg", agent, body, rec)
         return pid
 
@@ -280,7 +326,7 @@ class WriteBroker:
         code: dict[str, Any] | None,
         ledger: Path | None,
         dataset_version: str | None,
-    ) -> int:
+    ) -> tuple[int, str, str]:
         from iap.validation.ledger import ExperimentLedger
 
         path = Path(ledger) if ledger is not None else self.root / "research" / "experiments.json"
@@ -293,7 +339,7 @@ class WriteBroker:
         }
         total = led.record(alpha_id, "prereg", config)
         led.save()
-        return int(total)
+        return int(total), led.chain_head, board_id(self.root, path)
 
     def is_preregistered(self, alpha_id: str, horizon: str) -> bool:
         return digest({"alpha": alpha_id, "horizon": horizon})[:16] in self.state()["preregs"]
