@@ -141,5 +141,5 @@ def test_r7_confirm_prereg_is_draft_without_quoting():
     assert d["status"].startswith("DRAFT")
     assert d["signed"] is False and d["signature"] is None and d["on_blackboard"] is False
     assert "H2" not in d["hypotheses"]
-    assert d["hypotheses"]["H1"]["insample_estimate"] == "PENDING maker_real summary"
+    assert set(d["hypotheses"]) == {"H4"} and "H1" in d["dropped"]
     assert (REPO / d["execution_config"]).is_file()
