@@ -6,6 +6,11 @@
   "on_blackboard": false,
   "plan_item": "M-P0-1 (IAP_v1.15_Plan.md)",
   "drafted": "2026-10-11",
+  "owner_decisions": {
+    "date": "2026-10-11",
+    "decided": ["sampling clock", "window", "horizon", "cost model", "min_confidence"],
+    "note": "values approved by the owner; the file stays DRAFT and unsigned until sign-off and blackboard registration"
+  },
   "hypothesis": "On the R7 holdout sessions, the DeepLOB classifier (iap.models.deeplob_torch.DeepLOBClassifier, arch 'deeplob') earns a positive mean net-of-cost P&L per non-overlapping taker trade, with a one-sided 95% lower bound above zero, and a higher mean than both baselines on the same features and split.",
   "candidate": "deeplob",
   "baselines": ["linear", "gbm"],
@@ -15,18 +20,27 @@
   "holdout_days": ["2025-11-28", "2025-12-08", "2025-12-09", "2025-12-10", "2025-12-11", "2025-12-12", "2026-06-12"],
   "dataset": {
     "builder": "iap.models.deeplob.build_lob_dataset",
+    "sampling_clock": "event: one step per order-book event",
     "levels": 10,
     "window": 100,
+    "window_unit": "events",
     "horizon_rows": 50,
+    "horizon_unit": "events",
     "label_threshold": 2e-5,
     "normaliser": "fitted on insample rows only",
-    "TO_CONFIRM": "sampling clock (event vs 1 s) and per-symbol vs pooled training"
+    "TO_CONFIRM": "per-symbol vs pooled training"
   },
   "acceptance": {
     "code": "iap.models.deeplob_baselines.accept",
-    "metric": "iap.models.deeplob_baselines.net_of_cost (taker, half spread each side + fee_bp, non-overlapping trades)",
-    "fee_bp": 0.0,
-    "min_confidence": 0.0,
+    "metric": "iap.models.deeplob_baselines.net_of_cost (taker, non-overlapping trades), costs from the platform cost model including SEC Section 31 and FINRA TAF regulatory fees",
+    "cost_model": {
+      "execution_config": "configs/prereg/v2.json",
+      "regulatory_fees": true,
+      "fee_schedule": "configs/reference/regulatory_fee_schedule.json",
+      "flat_fee_bp": null,
+      "note": "not a flat fee_bp: load_exec_config(..., regulatory_fees=True) as configs/prereg/v2.json prescribes"
+    },
+    "min_confidence": 0.6,
     "min_trades": 30,
     "rules": ["mean_net_positive", "lower95_positive", "enough_trades", "beats_baselines"],
     "unit": "per symbol; the hypothesis holds only if it is accepted on every symbol (no pooling across symbols after the fact)"
@@ -34,8 +48,7 @@
   "looks": "one confirmatory look on the holdout; any re-run counts as a new look in the ledger",
   "promotion": "none without a holdout pass; a pass makes AI4 eligible for review, not promoted",
   "open_for_owner": [
-    "fee_bp and min_confidence values",
-    "sampling clock and window/horizon in rows",
+    "per-symbol vs pooled training",
     "sign-off and blackboard registration (WriteBroker.preregister) before any holdout data is read"
   ]
 }
