@@ -62,6 +62,17 @@ python3 -m json.tool research/models/ledger.json | head
 python3 -m json.tool research/models/<run_id>/manifest.json
 ```
 
+### 2.1 Row blocking and methods since v1.14
+
+The research backtester blocks rows causally by default
+(`block_rows_column="causal"`): it refuses to trade a row only for reasons
+visible at the decision time. Up to v1.13 the default skipped rows whose
+future label was invalid, which is look-ahead. A validation report shows
+both: the causal net P&L and `net_pnl_1x_cost_label_block`. If a report
+you produced before v1.14 disagrees with a new one, compare those two
+fields first, then rerun with `--methods v2_v113` to separate the row
+block from the other statistics changes (COOKBOOK recipe 72).
+
 ## 3. Production-grade simulators (per language)
 
 ```bash

@@ -611,7 +611,9 @@ unit of independence. The opt-in `v3` bundle answers each:
   judged causally (`--label-freshness trailing`).
 
 `v3` is not the default, so no published number moved. The validity block
-costs four more looks per validation (88 instead of 84 at four folds).
+costs four more looks per validation (88 instead of 84 at four folds, under
+the v1.13 look rule; since v1.14 a validation is charged one look per gate
+decision, and the v1.13 count is kept as `v2_v113` / `v3_v113`).
 
 **Where to look:** `python/src/iap/validation/methods.py`, `sessions.py`,
 `metrics.py`; docs/RESEARCH_VALIDITY.md §1a; LEARN.md §32.

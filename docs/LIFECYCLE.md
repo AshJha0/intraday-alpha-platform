@@ -677,6 +677,18 @@ changed.
   a human. Making RETIRED an allocation gate is backlog issue `L04`
   (docs/EPICS.md). The state machine here decides *state*, not *size*.
 
+### 8.1 v1.14 and the lifecycle
+
+The state machine, its 17 edges and 20 gates did not change in v1.14. The
+evidence the research gates read did: validation reports are computed
+under the v1.14 statistics (docs/RESEARCH_VALIDITY.md §4b), and an alpha
+that fails the new time-shift leakage test is held in RESEARCH until a
+person reviews it. The test flags; it does not prove a leak, so the hold
+is a request for review, not a rejection. Lifecycle entries selected from
+a superseded bundle are ranked below current ones rather than discarded,
+so the bootstrap still finds evidence for every alpha. Human edges still
+need a signed approval (GOVERNANCE.md).
+
 ## 9. Where the pieces are pinned
 
 | topic | document |

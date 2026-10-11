@@ -252,6 +252,27 @@ python3 tools/regenerate_dataset_artifacts.py --only goldens,tca
   both. An `x-version` 1 generator config that does not name the
   calibration is refused rather than silently given the new default.
 
+## 3.4 What v1.14 added to reproducibility
+
+- **Real datasets carry their rules.** Manifest x-version 2 records
+  `ingest_rules_version` 2 and a `config_version` (sha256 over the
+  dataset's `configs/**` and `reference/**`). A dataset ingested under the
+  old rules is refused, not silently reused, and every `--dataset-dir`
+  ledger entry records the `config_version`.
+- **The look ledger is a hash chain** (x-version 4, `chain_head`,
+  `chain_length`). A pre-registration records the ledger head it was
+  written against, so you can tell which looks had been taken when a
+  hypothesis was registered.
+- **The risk audit log is a hash chain.** A paper session records the head
+  in `session_state.json`; a resumed session continues the chain.
+- **Models have a content hash.** `content_sha256` ignores library
+  versions, so two records of the same fitted model can be matched
+  (API_ADAPTIVE.md §9).
+- **Old rules stay runnable.** `--methods v2_v113` and the
+  `--same-ts per_event --label-freshness whole_day --cross-prints omit`
+  feature flags reproduce v1.13 outputs; `test_legacy_methods.py` keeps
+  the v1.4.0 alpha reports byte-identical through them.
+
 ## 4. Release manifests
 
 A production release additionally records: the four language build

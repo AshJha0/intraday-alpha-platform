@@ -121,6 +121,11 @@ it, not venue round-trip. A JVM restart resets the cumulative histograms;
 
 ## 4. Trading-state HA, backups and restore
 
+Since v1.14 a backup of a state directory includes a hash-chained
+`risk_audit.jsonl` whose head is recorded in `session_state.json`. Back up
+both together; restoring one without the other leaves a chain that does
+not match its checkpoint (RUNBOOK_paper_trading.md §5).
+
 What this deployment provides is **restart-and-resume, plus backups**. It is
 not active-active and it has no hot standby:
 

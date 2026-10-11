@@ -234,6 +234,19 @@ is ported (EQ01/EQ03/EQ06/FX01/FX09), reproduce the 5 cases and the IC, and
 carries over: `hypothesis_confirmed=false` params ship with the sign the
 fit produced — ports must not "fix" signs, thresholds or coefficients.
 
+### 7.1 What v1.14 changed in validation (not in alpha scores)
+
+Alpha scores and `expected_alpha.json` did not change beyond the last ulp
+(inside the 1e-9 tolerance the ports use). What changed is how the Python
+research pipeline judges them (docs/RESEARCH_VALIDITY.md §4b): features
+are scaled per instrument before pooling, the backtest row block is
+causal, the gate t uses an automatic HAC bandwidth with no lag product
+across days, a time-shift leakage test runs beside the row-shift test,
+and `hypothesis_confirmed` needs a majority of folds. None of this is a
+port contract: a port reproduces scores, and the ports' backtest golden
+(`expected_backtest.json`) names its row block explicitly, so it did not
+move either.
+
 ## 8. Signal combination — `iap.combine` (Python research; not a port contract)
 
 `CombinedAlpha(member_ids, method="equal_weight", *, asset_class=None,
