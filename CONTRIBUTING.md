@@ -72,7 +72,7 @@ instrumentation: 306-359 s with `-n auto` for the 1988 tests of v1.5.0; see
 The ten slowest test files (by CI `--durations`) carry
 `pytestmark = pytest.mark.slow` (marker registered in `python/pyproject.toml`).
 CI splits the suite: the `python` job (a 3.11 + 3.12 matrix; the 3.11 entry
-keeps the check name `python`) runs `-m "not slow"` without coverage, and the
+keeps the check name `python`, the 3.12 entry is `python-312`) runs `-m "not slow"` without coverage, and the
 `python-slow` job runs `-m slow` with `--cov` in parallel. Locally,
 `pytest -m "not slow"` is the quick loop; run the whole suite (no `-m`)
 before asking for review. Mark a file `slow` only when its tests take tens of

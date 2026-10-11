@@ -96,8 +96,8 @@ permissions:
 jobs:
   python:
     # The 3.11 entry keeps the context name `python` (a required check of the
-    # protect-main ruleset); the 3.12 entry reports as `python (3.12)`.
-    name: ${{ matrix.python-version == '3.11' && 'python' || format('python ({0})', matrix.python-version) }}
+    # protect-main ruleset); the 3.12 entry reports as `python-312` (not required).
+    name: ${{ matrix.python-version == '3.11' && 'python' || 'python-312' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
