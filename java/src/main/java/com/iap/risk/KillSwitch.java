@@ -88,7 +88,13 @@ final class KillSwitch {
      * Raise (or lower) the effective daily loss limit of the GLOBAL or a
      * STRATEGY scope with written approval. Audited; never clears a latched
      * kill switch. Throws on a non-positive/non-finite limit or an
-     * unsupported scope (nothing changes).
+     * unsupported scope (nothing changes). Bounded and multi-party (G-P2-3):
+     * with {@code overrides.min_approvers} the comma-separated approver list
+     * must name that many distinct (space-trimmed, non-empty) approvers, and
+     * with {@code overrides.max_loss_override_multiple} the new limit may not
+     * exceed that multiple of the configured limit; a refused override
+     * changes nothing, is audited {@code LOSS_LIMIT_OVERRIDE_REJECTED} and
+     * throws.
      */
     static void overrideLossLimit(RiskEngine e, Scope scope, String scopeId,
             double newLimit, long ts, String approver) {
@@ -98,6 +104,48 @@ final class KillSwitch {
         }
         if (e.limits == null) {
             throw new IllegalStateException("engine is fail-closed (no limits)");
+        }
+        double base = switch (scope) {
+            case GLOBAL -> e.limits.maxDailyLoss();
+            case STRATEGY -> e.limits.strategyMaxDailyLoss();
+            default -> throw new IllegalArgumentException(
+                    "loss limits exist at GLOBAL and STRATEGY scope only");
+        };
+        String why = null;
+        if (e.limits.minApprovers() != null) {
+            java.util.TreeSet<String> names = new java.util.TreeSet<>();
+            for (String part : approver.split(",", -1)) {
+                int a = 0;
+                int b = part.length();
+                while (a < b && part.charAt(a) == ' ') {
+                    a++;
+                }
+                while (b > a && part.charAt(b - 1) == ' ') {
+                    b--;
+                }
+                if (b > a) {
+                    names.add(part.substring(a, b));
+                }
+            }
+            if (names.size() < e.limits.minApprovers()) {
+                why = "loss limit override needs " + e.limits.minApprovers()
+                        + " distinct approvers, got " + names.size() + ": " + approver;
+            }
+        }
+        if (why == null && e.limits.maxLossOverrideMultiple() != null) {
+            double mult = e.limits.maxLossOverrideMultiple();
+            double cap = base * mult;
+            if (newLimit > cap) {
+                why = "loss limit override " + RiskEngine.fmtFixed(newLimit, 2)
+                        + " exceeds cap " + RiskEngine.fmtFixed(cap, 2) + " ("
+                        + RiskEngine.fmtFixed(mult, 2) + "x the configured "
+                        + RiskEngine.fmtFixed(base, 2) + ")";
+            }
+        }
+        if (why != null) {
+            e.emit(new RiskEvent(ts, scope, scopeId, Rules.LOSS_LIMIT_OVERRIDE_REJECTED,
+                    Severity.BREACH.code(), Decision.REJECT.code(), why));
+            throw new IllegalArgumentException(why);
         }
         double old;
         switch (scope) {
@@ -137,6 +185,8 @@ final class KillSwitch {
         }
         e.lossOverrideGlobal = null;
         e.lossOverrideStrategy.clear();
+        e.marketVolume.clear();
+        e.executed.clear();
         e.refreshPnlGauges();
         e.emit(new RiskEvent(ts, Scope.GLOBAL, "", Rules.SESSION_ROLLED,
                 Severity.INFO.code(), Decision.ALLOW.code(), reason));

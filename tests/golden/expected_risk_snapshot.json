@@ -17,6 +17,10 @@
       "tokens": 3.0
     }
   },
+  "cancel_buckets": {},
+  "executed": {
+    "1": 95000
+  },
   "kill_global": false,
   "kill_instruments": {
     "2": false
@@ -66,6 +70,7 @@
       "ts": 1787578207000000000
     }
   },
+  "market_volume": {},
   "open": {},
   "positions": {
     "1": 95000,
@@ -188,8 +193,14 @@
       1787578210500000000
     ]
   ],
+  "venue_buckets": {
+    "1": {
+      "last_ts": 1787578210500000000,
+      "tokens": 99.0
+    }
+  },
   "venues_down": {
     "2": false
   },
-  "x-version": 1
+  "x-version": 2
 }

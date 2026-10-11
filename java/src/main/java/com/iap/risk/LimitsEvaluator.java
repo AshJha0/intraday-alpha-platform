@@ -28,8 +28,11 @@ final class LimitsEvaluator {
                     Rules.NOT_BOOTSTRAPPED -> Scope.GLOBAL;
             case Rules.KILL_STRATEGY, Rules.MALFORMED_ORDER,
                     Rules.DUPLICATE_ORDER_ID, Rules.RATE_THROTTLE,
-                    Rules.STRATEGY_LOSS, Rules.ALLOW -> Scope.STRATEGY;
-            case Rules.KILL_VENUE, Rules.VENUE_DISCONNECTED -> Scope.VENUE;
+                    Rules.STRATEGY_LOSS, Rules.ALLOW, Rules.MAX_OPEN_ORDERS,
+                    Rules.MAX_OPEN_NOTIONAL, Rules.STRATEGY_POSITION,
+                    Rules.CANCEL_RATE, Rules.STATE_CAPACITY -> Scope.STRATEGY;
+            case Rules.KILL_VENUE, Rules.VENUE_DISCONNECTED,
+                    Rules.VENUE_MESSAGE_RATE -> Scope.VENUE;
             default -> Scope.INSTRUMENT;
         };
     }
@@ -194,6 +197,23 @@ final class LimitsEvaluator {
             }
             long cutoff = checkedCutoff;
             e.seenOrders.values().removeIf(ts -> ts < cutoff);
+        }
+        // bounded per-key state (G-P2-7): a full map rejects the order that
+        // would grow it — forgetting a key would be fail-open
+        Long cap = e.limits.maxTrackedKeys();
+        if (cap != null) {
+            String full = null;
+            if (!e.seenOrders.containsKey(order.orderId()) && e.seenOrders.size() >= cap) {
+                full = "seen order ids";
+            } else if (e.open.size() >= cap) {
+                full = "open orders";
+            } else if (!e.buckets.containsKey(order.strategyId()) && e.buckets.size() >= cap) {
+                full = "strategies";
+            }
+            if (full != null) {
+                return reject(Rules.STATE_CAPACITY, Severity.WARN, "risk state capacity "
+                        + cap + " reached for " + full + " (fail-closed)");
+            }
         }
         e.seenOrders.put(order.orderId(), order.timestamp());
         // 8. venue connectivity
@@ -489,6 +509,166 @@ final class LimitsEvaluator {
             return reject(Rules.STRATEGY_LOSS, Severity.BREACH,
                     "strategy daily pnl " + RiskEngine.fmtFixed(stratPnl, 2)
                             + " at loss limit " + RiskEngine.fmtFixed(stratLimit, 2));
+        }
+        return evaluate15c35(e, order, orderNotional);
+    }
+
+    /**
+     * Checks 23-29, the SEC 15c3-5 pre-trade set ({@code pre_trade} in
+     * risk.json; an absent key turns its check off). They run after every
+     * legacy check, so an order a legacy rule rejects keeps that rule id, and
+     * only an order about to be ALLOWed spends a venue message token (check
+     * 29 is last).
+     */
+    private static RiskDecision evaluate15c35(RiskEngine e, OrderRequest order,
+            double orderNotional) {
+        RiskLimits limits = e.limits;
+        String sid = order.strategyId();
+        // 23. restricted list
+        if (limits.restrictedInstruments().contains(order.instrumentId())) {
+            return reject(Rules.RESTRICTED_INSTRUMENT, Severity.WARN, "instrument "
+                    + order.instrumentId() + " is on the restricted list");
+        }
+        // 24. open orders per strategy (this order included)
+        if (limits.maxOpenOrders() != null) {
+            long n = 1;
+            for (RiskEngine.OpenOrder r : e.open.values()) {
+                if (r.strategyId.equals(sid)) {
+                    n++;
+                }
+            }
+            if (n > limits.maxOpenOrders()) {
+                return reject(Rules.MAX_OPEN_ORDERS, Severity.WARN, "strategy " + sid
+                        + " would have " + n + " open orders, max_open_orders "
+                        + limits.maxOpenOrders());
+            }
+        }
+        // 25. open notional per strategy (every open order valued as in
+        // check 19, which has already rejected an unvaluable one)
+        if (limits.maxOpenNotional() != null) {
+            double total = 0.0;
+            for (RiskEngine.OpenOrder r : e.open.values()) {
+                if (!r.strategyId.equals(sid)) {
+                    continue;
+                }
+                InstrumentRef oins = e.instruments.get(r.instrumentId);
+                if (oins == null) {
+                    continue;
+                }
+                Double price = r.priceTicks > 0
+                        ? Double.valueOf((double) r.priceTicks * oins.tickSize())
+                        : e.markPrice(r.instrumentId);
+                double[] rate = e.fxRate(oins.quoteCcy());
+                if (price == null || rate == null) {
+                    continue;
+                }
+                total += (double) r.qty * oins.qtyUnit() * price * rate[0];
+            }
+            total += orderNotional;
+            double max = limits.maxOpenNotional();
+            if (!(total <= max)) {
+                return reject(Rules.MAX_OPEN_NOTIONAL, Severity.WARN, "strategy " + sid
+                        + " open notional " + RiskEngine.fmtFixed(total, 2)
+                        + " exceeds max_open_notional " + RiskEngine.fmtFixed(max, 2));
+            }
+        }
+        // 26. per-strategy position (worst case, like check 17)
+        if (limits.maxStrategyPositionQty() != null) {
+            java.util.TreeMap<Long, RiskEngine.Lot> held = e.lots.get(sid);
+            RiskEngine.Lot lot = held == null ? null : held.get(order.instrumentId());
+            long spos = lot == null ? 0 : lot.pos;
+            Long openSame = 0L;
+            for (RiskEngine.OpenOrder r : e.open.values()) {
+                if (r.strategyId.equals(sid) && r.instrumentId == order.instrumentId()
+                        && r.side == order.side()) {
+                    openSame = RiskEngine.posAdd(openSame, r.qty);
+                    if (openSame == null) {
+                        break;
+                    }
+                }
+            }
+            Long projected = null;
+            if (openSame != null) {
+                projected = order.side() == 0 ? RiskEngine.posAdd(spos, openSame)
+                        : RiskEngine.posSub(spos, openSame);
+            }
+            if (projected != null) {
+                projected = order.side() == 0 ? RiskEngine.posAdd(projected, order.qty())
+                        : RiskEngine.posSub(projected, order.qty());
+            }
+            if (projected == null) {
+                return reject(Rules.MALFORMED_ORDER, Severity.WARN,
+                        "projected position overflows i64 (fail-closed)");
+            }
+            if (Math.abs(projected) > limits.maxStrategyPositionQty()) {
+                return reject(Rules.STRATEGY_POSITION, Severity.WARN, "strategy " + sid
+                        + " projected position " + projected
+                        + " exceeds max_strategy_position_qty "
+                        + limits.maxStrategyPositionQty());
+            }
+        }
+        // 27. participation: the firm's session quantity in the instrument
+        // (executed + every open order + this order) against the cap
+        if (limits.maxParticipationBps() != null && limits.participationFloorQty() != null) {
+            double openQty = 0.0;
+            for (RiskEngine.OpenOrder r : e.open.values()) {
+                if (r.instrumentId == order.instrumentId()) {
+                    openQty += (double) r.qty;
+                }
+            }
+            double projectedQty = (double) e.executed.getOrDefault(order.instrumentId(), 0L)
+                    + openQty + (double) order.qty();
+            long volume = e.marketVolume.getOrDefault(order.instrumentId(), 0L);
+            double bps = limits.maxParticipationBps();
+            long floor = limits.participationFloorQty();
+            double cap = Math.max((double) floor, (double) volume * bps / 1e4);
+            if (!(projectedQty <= cap)) {
+                return reject(Rules.PARTICIPATION, Severity.WARN, "projected session qty "
+                        + RiskEngine.fmtFixed(projectedQty, 0) + " exceeds participation cap "
+                        + RiskEngine.fmtFixed(cap, 0) + " (" + RiskEngine.fmtFixed(bps, 1)
+                        + "bps of market volume " + volume + ", floor " + floor + ")");
+            }
+        }
+        // 28. cancel rate: a strategy whose cancel bucket is spent may not
+        // place new orders until it refills
+        if (limits.maxCancelsPerSec() != null && limits.cancelBurst() != null) {
+            RiskEngine.Rate cb = e.cancelBuckets.get(sid);
+            if (cb != null) {
+                if (!cb.refill(order.timestamp(), limits.maxCancelsPerSec(),
+                        limits.cancelBurst())) {
+                    return tsOverflow();
+                }
+                if (!(cb.tokens >= 1.0)) {
+                    return reject(Rules.CANCEL_RATE, Severity.WARN, "strategy " + sid
+                            + " exceeded " + RiskEngine.fmtFixed(limits.maxCancelsPerSec(), 2)
+                            + " cancels/s (burst " + RiskEngine.fmtFixed(limits.cancelBurst(), 2)
+                            + ")");
+                }
+            }
+        }
+        // 29. per-venue message rate (venue 0 = SOR: the child orders are
+        // throttled where they are sent); the token is spent here, last
+        if (order.venueId() != 0 && limits.maxVenueMsgsPerSec() != null
+                && limits.venueMsgBurst() != null) {
+            RiskEngine.Rate vb = e.venueBuckets.get(order.venueId());
+            if (vb == null) {
+                vb = new RiskEngine.Rate();
+                vb.tokens = limits.venueMsgBurst();
+                vb.lastTs = order.timestamp();
+                e.venueBuckets.put(order.venueId(), vb);
+            }
+            if (!vb.refill(order.timestamp(), limits.maxVenueMsgsPerSec(),
+                    limits.venueMsgBurst())) {
+                return tsOverflow();
+            }
+            if (!(vb.tokens >= 1.0)) {
+                return reject(Rules.VENUE_MESSAGE_RATE, Severity.WARN, "venue "
+                        + order.venueId() + " exceeded "
+                        + RiskEngine.fmtFixed(limits.maxVenueMsgsPerSec(), 2)
+                        + " messages/s (burst " + RiskEngine.fmtFixed(limits.venueMsgBurst(), 2)
+                        + ")");
+            }
+            vb.tokens -= 1.0;
         }
         return new RiskDecision(Decision.ALLOW, Rules.ALLOW, Severity.INFO, "");
     }

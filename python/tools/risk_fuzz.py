@@ -77,6 +77,8 @@ from iap.risk import (  # noqa: E402
     RiskLimits,
     Scope,
     instrument_refs_from_golden,
+    unchained_line,
+    verify_audit_chain,
 )
 
 SCRIPT_VERSION = 1
@@ -212,7 +214,10 @@ class Runner:
         self._done.append(self.eng.audit_jsonl())
         self._done_lines += self.eng.audit_len()
         snap = json.loads(self.eng.snapshot_json(pretty=False))
-        self.eng = self.engine_cls.restore(RiskLimits.from_json(self.doc), self.refs, snap, ts)
+        chain = self.eng.audit_chain_head()
+        self.eng = self.engine_cls.restore(
+            RiskLimits.from_json(self.doc), self.refs, snap, ts, chain=chain
+        )
 
     # --------------------------------------------------------------- steps
 
@@ -345,6 +350,10 @@ def verify_script(
     audit, _, snapshot = run_script(script, base, engine_cls=engine_cls)
     if audit != want_audit:
         raise Divergence(f"{name}: audit differs: {_first_diff(audit, want_audit)}")
+    try:
+        verify_audit_chain(audit)
+    except ValueError as e:
+        raise Divergence(f"{name}: {e}") from None
     if snapshot != want_snapshot:
         raise Divergence(f"{name}: final snapshot differs")
     full = audit_lines(audit)
@@ -353,8 +362,15 @@ def verify_script(
         lines = audit_lines(got)
         if lines[mark].find('"rule_id":"STATE_RESTORED"') < 0:
             raise Divergence(f"{name}: cut {cut}: no STATE_RESTORED record")
-        if lines[:mark] != full[:mark] or lines[mark + 1 :] != full[mark:]:
+        # the restored engine continues the chain, so its records sit one
+        # chain position later: compare their content, then the chain itself
+        tail = [unchained_line(x) for x in lines[mark + 1 :]]
+        if lines[:mark] != full[:mark] or tail != [unchained_line(x) for x in full[mark:]]:
             raise Divergence(f"{name}: cut {cut}: the restored engine's audit tail differs")
+        try:
+            verify_audit_chain(got)
+        except ValueError as e:
+            raise Divergence(f"{name}: cut {cut}: {e}") from None
         if snap != want_snapshot:
             raise Divergence(f"{name}: cut {cut}: the restored engine's final state differs")
 
@@ -1221,7 +1237,7 @@ class Generator:
         elif which == 4:
             bid = ask = I64_MAX
         elif which == 5:
-            bid, ask = I64_MAX, 1
+            bid, ask = 1, I64_MAX  # overflows bid + ask (I64_MAX, 1 would be crossed)
         elif which == 6:
             ts = (md.ts if md is not None else self.now) - self.rng.pick((1, t, 3600 * SEC))
         elif which == 7:
@@ -1239,6 +1255,12 @@ class Generator:
         self.emit(
             {"type": "market", "instrument_id": iid, "bid_ticks": bid, "ask_ticks": ask, "ts": ts}
         )
+        if which in (4, 5):
+            # probe the overflowing mark at once: the sanity gate (v1.14)
+            # must not let a bid + ask that leaves i64 look like a jump
+            self.send(
+                self.order_step(iid, 0, 1, max(1, mid - 1), 2, self.strategy(), self.now, venue=1)
+            )
 
     # --------------------------------------------------------------- fills
 
@@ -1392,7 +1414,8 @@ class Generator:
             "scope_id": scope_id,
             "new_limit": new_limit,
             "ts": self.ts(),
-            "approver": self.text(),
+            # overrides.min_approvers is 2: mostly a two-party approval
+            "approver": (self.text() + ", second approver" if self.rng.pct(75) else self.text()),
         }
 
     def do_override(self) -> None:
@@ -1941,7 +1964,7 @@ BRANCHES: tuple[tuple[str, ...], ...] = (
     ("LOSS_LIMIT_OVERRIDE", "daily loss limit"),
     ("SESSION_ROLLED", ""),
     ("BOOTSTRAP_COMPLETE", "drop-copy fills"),
-    ("STATE_RESTORED", "restored snapshot v1"),
+    ("STATE_RESTORED", "restored snapshot v2"),
 )
 #: Branches no input can reach, with the reason (reported, never required).
 UNREACHABLE: dict[tuple[str, ...], str] = {

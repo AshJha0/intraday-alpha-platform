@@ -23,5 +23,8 @@ pub mod limits;
 mod limits_eval;
 
 pub use engine::{Fill, InstrumentRef, RiskDecision, RiskEngine, SNAPSHOT_VERSION};
-pub use event::{fmt_fixed, rules, Decision, RiskEvent, Scope, Severity};
+pub use event::{
+    fmt_fixed, line_sha256, rules, unchained_line, verify_audit_chain, Decision, RiskEvent, Scope,
+    Severity, GENESIS_SHA256,
+};
 pub use limits::{FxConversion, RiskLimits};

@@ -17,7 +17,17 @@ and is emitted as the decision's ``rule_id`` (deterministic, replayable):
 13. ``FAT_FINGER_NOTIONAL``  14. ``PRICE_BAND``  15. ``RATE_THROTTLE``
 16. ``SELF_MATCH``  17. ``POSITION_LIMIT``  18. ``INSTRUMENT_NOTIONAL``
 19. ``GROSS_NOTIONAL``  20. ``NET_NOTIONAL``  21. ``DAILY_LOSS``
-22. ``STRATEGY_LOSS`` — else ``ALLOW``.
+22. ``STRATEGY_LOSS``, then the SEC 15c3-5 set (each off unless its
+``pre_trade`` key is configured): 23. ``RESTRICTED_INSTRUMENT``
+24. ``MAX_OPEN_ORDERS``  25. ``MAX_OPEN_NOTIONAL``  26. ``STRATEGY_POSITION``
+27. ``PARTICIPATION``  28. ``CANCEL_RATE``  29. ``VENUE_MESSAGE_RATE``
+— else ``ALLOW``. Check 7 also rejects ``STATE_CAPACITY`` when a bounded
+state map is full (``pre_trade.max_tracked_keys``).
+
+Audit chain (G-P0-1): every record carries ``seq`` and ``prev_sha256``
+(:mod:`iap.risk.events`); the head is part of the snapshot, so a restored
+engine continues the chain (its ``STATE_RESTORED`` record links to the
+snapshot's head).
 
 Pinned semantics (the Rust module docs, verbatim in substance):
 
@@ -99,10 +109,19 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
-from iap.risk.events import Decision, RiskEvent, Rules, Scope, Severity, fmt_fixed
+from iap.risk.events import (
+    GENESIS_SHA256,
+    Decision,
+    RiskEvent,
+    Rules,
+    Scope,
+    Severity,
+    fmt_fixed,
+    line_sha256,
+)
 from iap.risk.limits import RiskLimits
 from iap.risk.orders import Fill, OrderRequest, OrderType, order_validation_error
 from iap.risk.refdata import InstrumentRef, equity_refs
@@ -111,8 +130,9 @@ from iap.risk.serialize import to_canonical_json
 __all__ = ["RiskDecision", "RiskEngine", "RiskMetrics", "SNAPSHOT_VERSION"]
 
 _NS_PER_SEC = 1e9
-#: Snapshot schema version.
-SNAPSHOT_VERSION = 1
+#: Snapshot schema version (2: audit chain head, open-order strategy, the
+#: 15c3-5 buckets and the session volume counters).
+SNAPSHOT_VERSION = 2
 
 _I64_MAX = (1 << 63) - 1
 _I64_MIN = -(1 << 63)
@@ -249,15 +269,40 @@ class _MarketState:
 
 
 class _OpenOrder:
-    __slots__ = ("instrument_id", "side", "price_ticks", "qty")
+    __slots__ = ("instrument_id", "side", "price_ticks", "qty", "strategy_id")
 
-    def __init__(self, instrument_id: int, side: int, price_ticks: int, qty: int) -> None:
+    def __init__(
+        self, instrument_id: int, side: int, price_ticks: int, qty: int, strategy_id: str
+    ) -> None:
         self.instrument_id = instrument_id
         self.side = side
         #: Limit / pegged price in ticks; 0 = unpriced (MARKET, unpriced
         #: IOC/FOK, MID).
         self.price_ticks = price_ticks
         self.qty = qty
+        #: Owning strategy (checks 24-26).
+        self.strategy_id = strategy_id
+
+
+class _Rate:
+    """A 15c3-5 message bucket (checks 28/29): event-time token bucket whose
+    tokens a cancel may drive below zero (a cancel is never refused)."""
+
+    __slots__ = ("tokens", "last_ts")
+
+    def __init__(self, tokens: float, last_ts: int) -> None:
+        self.tokens = tokens
+        self.last_ts = last_ts
+
+    def refill(self, ts: int, rate: float, burst: float) -> bool:
+        """Refill to ``ts`` (event time never refills backwards); ``False``
+        (nothing changed) when ``ts - last_ts`` leaves i64."""
+        gap = _ts_sub(ts, self.last_ts)
+        if gap is None:
+            return False
+        self.tokens = min(self.tokens + float(max(gap, 0)) * rate / _NS_PER_SEC, burst)
+        self.last_ts = max(self.last_ts, ts)
+        return True
 
 
 class _Bucket:
@@ -296,9 +341,16 @@ _STRATEGY_SCOPE_RULES = frozenset(
         Rules.RATE_THROTTLE,
         Rules.STRATEGY_LOSS,
         Rules.ALLOW,
+        Rules.MAX_OPEN_ORDERS,
+        Rules.MAX_OPEN_NOTIONAL,
+        Rules.STRATEGY_POSITION,
+        Rules.CANCEL_RATE,
+        Rules.STATE_CAPACITY,
     }
 )
-_VENUE_SCOPE_RULES = frozenset({Rules.KILL_VENUE, Rules.VENUE_DISCONNECTED})
+_VENUE_SCOPE_RULES = frozenset(
+    {Rules.KILL_VENUE, Rules.VENUE_DISCONNECTED, Rules.VENUE_MESSAGE_RATE}
+)
 
 
 class RiskEngine:
@@ -341,6 +393,17 @@ class RiskEngine:
         self._realized: dict[tuple[str, str], float] = {}
         self._loss_override_global: float | None = None
         self._loss_override_strategy: dict[str, float] = {}
+        #: Per-venue message buckets (check 29) and per-strategy cancel
+        #: buckets (check 28).
+        self._venue_buckets: dict[int, _Rate] = {}
+        self._cancel_buckets: dict[str, _Rate] = {}
+        #: Session market volume (``on_market_trade``) and the firm's
+        #: session executed quantity (fills) per instrument (check 27).
+        self._market_volume: dict[int, int] = {}
+        self._executed: dict[int, int] = {}
+        #: Audit chain: seq of the last record and SHA-256 of its line.
+        self._audit_seq: int = 0
+        self._audit_head: str = GENESIS_SHA256
         self._audit: list[RiskEvent] = []
         #: Engine metrics (decision counters, PnL gauges).
         self.metrics: RiskMetrics = RiskMetrics()
@@ -429,12 +492,38 @@ class RiskEngine:
         _require("ask_ticks", ask_ticks, _I64_MIN, _I64_MAX)
         _require("ts", ts, _I64_MIN, _I64_MAX)
         st = self._market.get(instrument_id)
+        limits = self._limits
+        if st is None and limits is not None and limits.max_tracked_keys is not None:
+            if len(self._market) >= limits.max_tracked_keys:
+                self.metrics.inc("risk_state_capacity_dropped_total")
+                return
+        if st is not None and ts < st.ts:
+            self.metrics.inc("risk_market_regressions_dropped_total")
+            return
+        # Reference-price sanity gate (G-P2-6): a crossed two-sided book is
+        # never a usable reference price, and (when configured) neither is a
+        # jump of more than max_mid_jump_ratio against the stored two-sided
+        # mark. A dropped update leaves the previous mark (which then ages
+        # into STALE_PRICE): fail-closed, never a guessed price.
+        if bid_ticks > 0 and ask_ticks > 0 and bid_ticks > ask_ticks:
+            self.metrics.inc("risk_market_crossed_dropped_total")
+            return
+        ratio = limits.max_mid_jump_ratio if limits is not None else None
+        if ratio is not None and st is not None and bid_ticks > 0 and ask_ticks > 0:
+            new_sum = _sum_ticks(bid_ticks, ask_ticks)
+            old_sum = (
+                _sum_ticks(st.bid_ticks, st.ask_ticks)
+                if st.bid_ticks > 0 and st.ask_ticks > 0
+                else None
+            )
+            if new_sum is not None and old_sum is not None:
+                n, o = float(new_sum), float(old_sum)
+                if n > ratio * o or n * ratio < o:
+                    self.metrics.inc("risk_market_jump_dropped_total")
+                    return
         if st is None:
             st = _MarketState(bid_ticks, ask_ticks, ts, 0, False)
             self._market[instrument_id] = st
-        if ts < st.ts:
-            self.metrics.inc("risk_market_regressions_dropped_total")
-            return
         st.bid_ticks = bid_ticks
         st.ask_ticks = ask_ticks
         st.ts = ts
@@ -457,6 +546,11 @@ class RiskEngine:
         threshold = self._limits.max_sequence_gap_before_halt if self._limits else 0
         st = self._market.get(instrument_id)
         if st is None:
+            cap = self._limits.max_tracked_keys if self._limits else None
+            if cap is not None and len(self._market) >= cap:
+                # no state => no mid => STALE_PRICE: still fail-closed
+                self.metrics.inc("risk_state_capacity_dropped_total")
+                return
             st = _MarketState(0, 0, ts, 0, False)
             self._market[instrument_id] = st
         st.gaps = _u64(st.gaps + 1)
@@ -471,6 +565,63 @@ class RiskEngine:
         if st is not None:
             st.gated = False
             st.gaps = 0
+
+    def on_market_trade(self, instrument_id: int, qty: int, ts: int) -> None:
+        """A market trade print (any participant): adds ``qty`` to the
+        instrument's session market volume, the denominator of the
+        participation cap (check 27). A print for an instrument without
+        reference data or with ``qty <= 0`` is dropped and counted
+        (``risk_market_trades_dropped_total``); the volume saturates at
+        ``i64::MAX``. Reset by :meth:`roll_session`."""
+        _require("instrument_id", instrument_id, 0, _U32_MAX)
+        _require("qty", qty, _I64_MIN, _I64_MAX)
+        _require("ts", ts, _I64_MIN, _I64_MAX)
+        if qty <= 0 or instrument_id not in self._instruments:
+            self.metrics.inc("risk_market_trades_dropped_total")
+            return
+        self._market_volume[instrument_id] = min(
+            self._market_volume.get(instrument_id, 0) + qty, _I64_MAX
+        )
+
+    def on_cancel_request(self, strategy_id: str, venue_id: int, ts: int) -> None:
+        """A cancel (or cancel/replace) the strategy sends to ``venue_id``.
+        Never refused (a cancel reduces risk); it spends one token of the
+        strategy's cancel bucket (check 28) and, for a real venue, one of the
+        venue's message bucket (check 29) — tokens may go below zero, and
+        new orders reject until the bucket refills to 1. A timestamp
+        difference that leaves i64 does not refill (fail-closed). No-op on a
+        fail-closed engine or when neither control is configured."""
+        if not isinstance(strategy_id, str):
+            raise ValueError(f"strategy_id must be a str, got {strategy_id!r}")
+        _require("venue_id", venue_id, 0, _U16_MAX)
+        _require("ts", ts, _I64_MIN, _I64_MAX)
+        limits = self._limits
+        if limits is None:
+            return
+        self.metrics.inc("risk_cancel_requests_total")
+        if limits.max_cancels_per_sec is not None and limits.cancel_burst is not None:
+            b = self._cancel_buckets.get(strategy_id)
+            if b is None:
+                cap = limits.max_tracked_keys
+                if cap is not None and len(self._cancel_buckets) >= cap:
+                    self.metrics.inc("risk_state_capacity_dropped_total")
+                else:
+                    b = _Rate(limits.cancel_burst, ts)
+                    self._cancel_buckets[strategy_id] = b
+            if b is not None:
+                b.refill(ts, limits.max_cancels_per_sec, limits.cancel_burst)
+                b.tokens -= 1.0
+        if (
+            venue_id != 0
+            and limits.max_venue_msgs_per_sec is not None
+            and limits.venue_msg_burst is not None
+        ):
+            vb = self._venue_buckets.get(venue_id)
+            if vb is None:
+                vb = _Rate(limits.venue_msg_burst, ts)
+                self._venue_buckets[venue_id] = vb
+            vb.refill(ts, limits.max_venue_msgs_per_sec, limits.venue_msg_burst)
+            vb.tokens -= 1.0
 
     def on_venue_disconnect(self, venue_id: int, ts: int) -> None:
         """Venue disconnect: orders to the venue reject until reconnect."""
@@ -603,19 +754,55 @@ class RiskEngine:
         ):
             raise ValueError(f"loss limit override must be finite and > 0, got {new_limit!r}")
         new_limit = float(new_limit)
+        if not isinstance(approver, str):
+            raise ValueError(f"approver must be a str, got {approver!r}")
         limits = self._limits
         if limits is None:
             raise ValueError("engine is fail-closed (no limits)")
+        if scope == Scope.GLOBAL:
+            base = limits.max_daily_loss
+        elif scope == Scope.STRATEGY:
+            base = limits.strategy_max_daily_loss
+        else:
+            raise ValueError("loss limits exist at GLOBAL and STRATEGY scope only")
+        # Bounded, multi-party override (G-P2-3): refused AND audited.
+        why = None
+        if limits.min_approvers is not None:
+            names = {p.strip(" ") for p in approver.split(",")} - {""}
+            if len(names) < limits.min_approvers:
+                why = (
+                    f"loss limit override needs {limits.min_approvers} distinct approvers, "
+                    f"got {len(names)}: {approver}"
+                )
+        if why is None and limits.max_loss_override_multiple is not None:
+            cap = base * limits.max_loss_override_multiple
+            if not (new_limit <= cap):
+                why = (
+                    f"loss limit override {fmt_fixed(new_limit, 2)} exceeds cap "
+                    f"{fmt_fixed(cap, 2)} ({fmt_fixed(limits.max_loss_override_multiple, 2)}x "
+                    f"the configured {fmt_fixed(base, 2)})"
+                )
+        if why is not None:
+            self._emit(
+                RiskEvent(
+                    timestamp=ts,
+                    scope=scope,
+                    scope_id=scope_id,
+                    rule_id=Rules.LOSS_LIMIT_OVERRIDE_REJECTED,
+                    severity=Severity.BREACH,
+                    decision=Decision.REJECT,
+                    reason=why,
+                )
+            )
+            raise ValueError(why)
         if scope == Scope.GLOBAL:
             old = self._loss_override_global
             if old is None:
                 old = limits.max_daily_loss
             self._loss_override_global = new_limit
-        elif scope == Scope.STRATEGY:
+        else:
             old = self._loss_override_strategy.get(scope_id, limits.strategy_max_daily_loss)
             self._loss_override_strategy[scope_id] = new_limit
-        else:
-            raise ValueError("loss limits exist at GLOBAL and STRATEGY scope only")
         self._emit(
             RiskEvent(
                 timestamp=ts,
@@ -644,6 +831,8 @@ class RiskEngine:
                 lot.avg_price = mark
         self._loss_override_global = None
         self._loss_override_strategy.clear()
+        self._market_volume.clear()
+        self._executed.clear()
         self._refresh_pnl_gauges()
         self._emit(
             RiskEvent(
@@ -788,6 +977,9 @@ class RiskEngine:
         )
         rkey = (fill.strategy_id, ccy)
         self._realized[rkey] = self._realized.get(rkey, 0.0) + realized
+        self._executed[fill.instrument_id] = min(
+            self._executed.get(fill.instrument_id, 0) + fill.qty, _I64_MAX
+        )
         # open order reduction
         if fill.order_id != 0:
             r = self._open.get(fill.order_id)
@@ -1009,8 +1201,16 @@ class RiskEngine:
         """Full audit log as JSONL (one RiskEvent per line, trailing newline)."""
         return "".join(ev.to_json_line() + "\n" for ev in self._audit)
 
+    def audit_chain_head(self) -> tuple[int, str]:
+        """``(seq, sha256)`` of the last audit record (``(0, GENESIS)``
+        before the first): the value to anchor externally (G-P0-1)."""
+        return self._audit_seq, self._audit_head
+
     def _emit(self, ev: RiskEvent) -> None:
         self.metrics.inc("risk_events_total")
+        self._audit_seq = _u64(self._audit_seq + 1)
+        ev = replace(ev, seq=self._audit_seq, prev_sha256=self._audit_head)
+        self._audit_head = line_sha256(ev.to_json_line())
         self._audit.append(ev)
 
     # ------------------------------------------------------ pre-trade path
@@ -1041,7 +1241,11 @@ class RiskEngine:
         # track every allowed order as open (self-match / projections)
         if outcome.allowed():
             self._open[order.order_id] = _OpenOrder(
-                order.instrument_id, order.side, self._tracked_price(order), order.qty
+                order.instrument_id,
+                order.side,
+                self._tracked_price(order),
+                order.qty,
+                order.strategy_id,
             )
         return outcome
 
@@ -1192,6 +1396,23 @@ class RiskEngine:
             if cutoff is None:
                 return reject(Rules.MALFORMED_ORDER, warn, _TS_OVERFLOW)
             self._seen_orders = {oid: ts for oid, ts in self._seen_orders.items() if ts >= cutoff}
+        # bounded per-key state (G-P2-7): a full map rejects the order that
+        # would grow it — forgetting a key would be fail-open
+        cap = limits.max_tracked_keys
+        if cap is not None:
+            full = None
+            if order.order_id not in self._seen_orders and len(self._seen_orders) >= cap:
+                full = "seen order ids"
+            elif len(self._open) >= cap:
+                full = "open orders"
+            elif order.strategy_id not in self._buckets and len(self._buckets) >= cap:
+                full = "strategies"
+            if full is not None:
+                return reject(
+                    Rules.STATE_CAPACITY,
+                    warn,
+                    f"risk state capacity {cap} reached for {full} (fail-closed)",
+                )
         self._seen_orders[order.order_id] = order.timestamp
         # 8. venue connectivity
         if order.venue_id != 0 and self._venues_down.get(order.venue_id, False):
@@ -1477,6 +1698,152 @@ class RiskEngine:
                 f"strategy daily pnl {fmt_fixed(strat_pnl, 2)} at loss limit "
                 f"{fmt_fixed(strat_limit, 2)}",
             )
+        return self._evaluate_15c3_5(order, limits, order_notional)
+
+    def _evaluate_15c3_5(
+        self, order: OrderRequest, limits: RiskLimits, order_notional: float
+    ) -> RiskDecision:
+        """Checks 23-29, the SEC 15c3-5 pre-trade set (``pre_trade`` in
+        risk.json; an absent key turns its check off). They run after every
+        legacy check, so an order a legacy rule rejects keeps that rule id,
+        and only an order about to be ALLOWed spends a venue message token
+        (check 29 is last)."""
+        reject = self._reject
+        warn = Severity.WARN
+        sid = order.strategy_id
+        # 23. restricted list
+        if order.instrument_id in limits.restricted_instruments:
+            return reject(
+                Rules.RESTRICTED_INSTRUMENT,
+                warn,
+                f"instrument {order.instrument_id} is on the restricted list",
+            )
+        # 24. open orders per strategy (this order included)
+        if limits.max_open_orders is not None:
+            n = sum(1 for r in self._open.values() if r.strategy_id == sid) + 1
+            if n > limits.max_open_orders:
+                return reject(
+                    Rules.MAX_OPEN_ORDERS,
+                    warn,
+                    f"strategy {sid} would have {n} open orders, "
+                    f"max_open_orders {limits.max_open_orders}",
+                )
+        # 25. open notional per strategy (every open order valued as in
+        # check 19, which has already rejected an unvaluable one)
+        if limits.max_open_notional is not None:
+            total = 0.0
+            for oid in sorted(self._open):
+                r = self._open[oid]
+                if r.strategy_id != sid:
+                    continue
+                oins = self._instruments.get(r.instrument_id)
+                if oins is None:
+                    continue
+                if r.price_ticks > 0:
+                    price: float | None = float(r.price_ticks) * oins.tick_size
+                else:
+                    price = self._mark_price(r.instrument_id)
+                rate = self._fx_rate(oins.quote_ccy)
+                if price is None or rate is None:
+                    continue
+                total += float(r.qty) * oins.qty_unit * price * rate[0]
+            total += order_notional
+            if not (total <= limits.max_open_notional):
+                return reject(
+                    Rules.MAX_OPEN_NOTIONAL,
+                    warn,
+                    f"strategy {sid} open notional {fmt_fixed(total, 2)} exceeds "
+                    f"max_open_notional {fmt_fixed(limits.max_open_notional, 2)}",
+                )
+        # 26. per-strategy position (worst case, like check 17)
+        if limits.max_strategy_position_qty is not None:
+            lot = self._lots.get((sid, order.instrument_id))
+            spos = lot.pos if lot is not None else 0
+            open_same: int | None = 0
+            for oid in sorted(self._open):
+                r = self._open[oid]
+                if r.strategy_id == sid and r.instrument_id == order.instrument_id:
+                    if r.side == order.side:
+                        open_same = _pos_add(open_same, r.qty)
+                        if open_same is None:
+                            break
+            step = _pos_add if order.side == 0 else _pos_sub
+            projected = step(spos, open_same) if open_same is not None else None
+            if projected is not None:
+                projected = step(projected, order.qty)
+            if projected is None:
+                return reject(
+                    Rules.MALFORMED_ORDER, warn, "projected position overflows i64 (fail-closed)"
+                )
+            if abs(projected) > limits.max_strategy_position_qty:
+                return reject(
+                    Rules.STRATEGY_POSITION,
+                    warn,
+                    f"strategy {sid} projected position {projected} exceeds "
+                    f"max_strategy_position_qty {limits.max_strategy_position_qty}",
+                )
+        # 27. participation: the firm's session quantity in the instrument
+        # (executed + every open order + this order) against the cap
+        if limits.max_participation_bps is not None and limits.participation_floor_qty is not None:
+            open_qty = 0.0
+            for oid in sorted(self._open):
+                r = self._open[oid]
+                if r.instrument_id == order.instrument_id:
+                    open_qty += float(r.qty)
+            projected_qty = (
+                float(self._executed.get(order.instrument_id, 0)) + open_qty + float(order.qty)
+            )
+            volume = self._market_volume.get(order.instrument_id, 0)
+            cap = max(
+                float(limits.participation_floor_qty),
+                float(volume) * limits.max_participation_bps / 1e4,
+            )
+            if not (projected_qty <= cap):
+                return reject(
+                    Rules.PARTICIPATION,
+                    warn,
+                    f"projected session qty {fmt_fixed(projected_qty, 0)} exceeds participation "
+                    f"cap {fmt_fixed(cap, 0)} ({fmt_fixed(limits.max_participation_bps, 1)}bps "
+                    f"of market volume {volume}, floor {limits.participation_floor_qty})",
+                )
+        # 28. cancel rate: a strategy whose cancel bucket is spent may not
+        # place new orders until it refills
+        if limits.max_cancels_per_sec is not None and limits.cancel_burst is not None:
+            cb = self._cancel_buckets.get(sid)
+            if cb is not None:
+                if not cb.refill(order.timestamp, limits.max_cancels_per_sec, limits.cancel_burst):
+                    return reject(Rules.MALFORMED_ORDER, warn, _TS_OVERFLOW)
+                if not (cb.tokens >= 1.0):
+                    return reject(
+                        Rules.CANCEL_RATE,
+                        warn,
+                        f"strategy {sid} exceeded {fmt_fixed(limits.max_cancels_per_sec, 2)} "
+                        f"cancels/s (burst {fmt_fixed(limits.cancel_burst, 2)})",
+                    )
+        # 29. per-venue message rate (venue 0 = SOR: the child orders are
+        # throttled where they are sent); the token is spent here, last
+        if (
+            order.venue_id != 0
+            and limits.max_venue_msgs_per_sec is not None
+            and limits.venue_msg_burst is not None
+        ):
+            vb = self._venue_buckets.get(order.venue_id)
+            if vb is None:
+                vb = _Rate(limits.venue_msg_burst, order.timestamp)
+                self._venue_buckets[order.venue_id] = vb
+            if not vb.refill(
+                order.timestamp, limits.max_venue_msgs_per_sec, limits.venue_msg_burst
+            ):
+                return reject(Rules.MALFORMED_ORDER, warn, _TS_OVERFLOW)
+            if not (vb.tokens >= 1.0):
+                return reject(
+                    Rules.VENUE_MESSAGE_RATE,
+                    warn,
+                    f"venue {order.venue_id} exceeded "
+                    f"{fmt_fixed(limits.max_venue_msgs_per_sec, 2)} messages/s "
+                    f"(burst {fmt_fixed(limits.venue_msg_burst, 2)})",
+                )
+            vb.tokens -= 1.0
         return RiskDecision(Decision.ALLOW, Rules.ALLOW, Severity.INFO, "")
 
     # ---------------------------------------------------- snapshot/restore
@@ -1519,6 +1886,7 @@ class RiskEngine:
                     "side": o.side,
                     "price_ticks": o.price_ticks,
                     "qty": o.qty,
+                    "strategy_id": o.strategy_id,
                 }
                 for k, o in sorted(self._open.items())
             },
@@ -1540,6 +1908,16 @@ class RiskEngine:
             "loss_override_strategy": {
                 k: self._loss_override_strategy[k] for k in sorted(self._loss_override_strategy)
             },
+            "venue_buckets": {
+                str(k): {"tokens": b.tokens, "last_ts": b.last_ts}
+                for k, b in sorted(self._venue_buckets.items())
+            },
+            "cancel_buckets": {
+                k: {"tokens": b.tokens, "last_ts": b.last_ts}
+                for k, b in sorted(self._cancel_buckets.items())
+            },
+            "market_volume": {str(k): v for k, v in sorted(self._market_volume.items())},
+            "executed": {str(k): v for k, v in sorted(self._executed.items())},
         }
 
     def snapshot_json(self, pretty: bool = True) -> str:
@@ -1555,11 +1933,18 @@ class RiskEngine:
         instruments: Mapping[int, InstrumentRef],
         snap: Any,
         ts: int,
+        chain: tuple[int, str] | None = None,
     ) -> RiskEngine:
         """Rebuild an engine from ``limits``, ``instruments`` and a
         :meth:`snapshot` document (strict: unknown version or a malformed
-        field is a ``ValueError``, nothing is restored). Emits a
-        ``STATE_RESTORED`` audit record stamped ``ts``."""
+        field is a ``ValueError``, nothing is restored). Emits a ``STATE_RESTORED`` audit record stamped ``ts``.
+
+        ``chain`` is the ``(seq, sha256)`` audit-chain head to continue
+        (:meth:`audit_chain_head` of the engine that wrote the snapshot, as
+        the session store records it next to the snapshot); without it the
+        restored engine starts a new chain at the genesis hash. The head is
+        deliberately not part of the snapshot: the snapshot is the trading
+        state, identical for an unbroken and a restored engine."""
         _require("ts", ts, _I64_MIN, _I64_MAX)
         get = _SnapReader(snap)
         if get.u64_opt("x-version") != SNAPSHOT_VERSION:
@@ -1611,7 +1996,11 @@ class RiskEngine:
             if iid > _U32_MAX:
                 raise _bad("open.instrument_id")
             eng._open[oid] = _OpenOrder(
-                iid, side, r.i64("price_ticks", "open.price_ticks"), r.i64("qty", "open.qty")
+                iid,
+                side,
+                r.i64("price_ticks", "open.price_ticks"),
+                r.i64("qty", "open.qty"),
+                r.str("strategy_id", "open.strategy_id"),
             )
         for k, v in get.obj("positions").items():
             iid = _key(k, _U32_MAX, "positions")
@@ -1635,6 +2024,32 @@ class RiskEngine:
         )
         for k, v in get.obj("loss_override_strategy").items():
             eng._loss_override_strategy[k] = _as_f64(v, "loss_override_strategy")
+        for k, b in get.obj("venue_buckets").items():
+            vid = _key(k, _U16_MAX, "venue_buckets")
+            r = _SnapReader(b)
+            eng._venue_buckets[vid] = _Rate(
+                r.f64("tokens", "venue_buckets.tokens"), r.i64("last_ts", "venue_buckets.last_ts")
+            )
+        for k, b in get.obj("cancel_buckets").items():
+            r = _SnapReader(b)
+            eng._cancel_buckets[k] = _Rate(
+                r.f64("tokens", "cancel_buckets.tokens"),
+                r.i64("last_ts", "cancel_buckets.last_ts"),
+            )
+        for k, v in get.obj("market_volume").items():
+            eng._market_volume[_key(k, _U32_MAX, "market_volume")] = _as_i64(v, "market_volume")
+        for k, v in get.obj("executed").items():
+            eng._executed[_key(k, _U32_MAX, "executed")] = _as_i64(v, "executed")
+        if chain is not None:
+            seq, head = chain
+            _require("chain seq", seq, 0, _U64_MAX)
+            if (
+                not isinstance(head, str)
+                or len(head) != 64
+                or any(c not in "0123456789abcdef" for c in head)
+            ):
+                raise ValueError("audit chain head must be 64 lowercase hex digits")
+            eng._audit_seq, eng._audit_head = seq, head
         eng._refresh_pnl_gauges()
         n_pos = sum(1 for p in eng._positions.values() if p != 0)
         eng._emit(

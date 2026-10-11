@@ -10,7 +10,7 @@ byte-identical snapshot + restore continuation).
 Modules:
 
 - :mod:`iap.risk.limits` — ``RiskLimits`` (strict ``configs/risk/risk.json``
-  x-version 3 parser, fail-closed on any error);
+  x-version 4 parser, fail-closed on any error);
 - :mod:`iap.risk.refdata` — ``InstrumentRef`` and the builders from
   ``configs/instruments/instruments.json`` / ``ReferenceData`` / the golden table;
 - :mod:`iap.risk.orders` — ``OrderRequest`` / ``OrderType`` / ``Fill`` contracts;
@@ -23,7 +23,18 @@ Modules:
 """
 
 from iap.risk.engine import SNAPSHOT_VERSION, RiskDecision, RiskEngine, RiskMetrics
-from iap.risk.events import Decision, RiskEvent, Rules, Scope, Severity, fmt_fixed
+from iap.risk.events import (
+    GENESIS_SHA256,
+    Decision,
+    RiskEvent,
+    Rules,
+    Scope,
+    Severity,
+    fmt_fixed,
+    line_sha256,
+    unchained_line,
+    verify_audit_chain,
+)
 from iap.risk.limits import RISK_CONFIG_VERSION, FxConversion, RiskLimits
 from iap.risk.orders import Fill, OrderRequest, OrderType, order_validation_error
 from iap.risk.refdata import (
@@ -60,6 +71,10 @@ __all__ = [
     "Severity",
     "Decision",
     "fmt_fixed",
+    "GENESIS_SHA256",
+    "line_sha256",
+    "unchained_line",
+    "verify_audit_chain",
     "format_f64",
     "json_escape",
     "to_canonical_json",

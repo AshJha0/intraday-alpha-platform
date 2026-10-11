@@ -1,9 +1,13 @@
-//! Hard-risk limits (`configs/risk/risk.json`, x-version 3 — the complete
+//! Hard-risk limits (`configs/risk/risk.json`, x-version 4 — the complete
 //! pinned limit set plus the currency block). Parsing is STRICT: any
 //! missing or invalid limit is an error, and the engine built from a
 //! failed parse is fail-closed (rejects every order with `CONFIG_MISSING`).
+//!
+//! x-version 4 adds OPTIONAL keys (absent or null = that control is off; a
+//! present key is parsed strictly): `market_data.max_mid_jump_ratio`, the
+//! SEC 15c3-5 `pre_trade` set and the `overrides` bounds.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use marketdata::IapError;
 
@@ -59,6 +63,40 @@ pub struct RiskLimits {
     /// Quote-currency -> conversion source (`currency.conversion`).
     /// A quote currency equal to `reporting_ccy` needs no entry.
     pub fx_conversion: BTreeMap<String, FxConversion>,
+    /// `market_data.max_mid_jump_ratio` (> 1): a two-sided update whose
+    /// `bid + ask` is more than this factor above / below the stored
+    /// two-sided one is dropped (G-P2-6). Crossed books are always dropped.
+    pub max_mid_jump_ratio: Option<f64>,
+    /// `pre_trade.restricted_instruments` (check 23).
+    pub restricted_instruments: BTreeSet<u32>,
+    /// `pre_trade.max_open_orders` per strategy (check 24).
+    pub max_open_orders: Option<i64>,
+    /// `pre_trade.max_open_notional` per strategy (check 25).
+    pub max_open_notional: Option<f64>,
+    /// `pre_trade.max_strategy_position_qty` per (strategy, instrument)
+    /// (check 26).
+    pub max_strategy_position_qty: Option<i64>,
+    /// `pre_trade.max_participation_bps` of session market volume (check 27).
+    pub max_participation_bps: Option<f64>,
+    /// `pre_trade.participation_floor_qty` (required with the bps).
+    pub participation_floor_qty: Option<i64>,
+    /// `pre_trade.max_cancels_per_sec` per strategy (check 28).
+    pub max_cancels_per_sec: Option<f64>,
+    /// `pre_trade.cancel_burst` (required with the rate).
+    pub cancel_burst: Option<f64>,
+    /// `pre_trade.max_venue_msgs_per_sec` per venue (check 29).
+    pub max_venue_msgs_per_sec: Option<f64>,
+    /// `pre_trade.venue_msg_burst` (required with the rate).
+    pub venue_msg_burst: Option<f64>,
+    /// `pre_trade.max_tracked_keys`: bound of every per-key state map
+    /// (G-P2-7).
+    pub max_tracked_keys: Option<i64>,
+    /// `overrides.max_loss_override_multiple` x the configured loss limit
+    /// caps an override (G-P2-3).
+    pub max_loss_override_multiple: Option<f64>,
+    /// `overrides.min_approvers`: distinct comma-separated approvers an
+    /// override needs (G-P2-3).
+    pub min_approvers: Option<i64>,
 }
 
 fn need_f64(doc: &serde_json::Value, section: &str, key: &str) -> Result<f64, IapError> {
@@ -129,6 +167,50 @@ fn parse_conversion(
     Ok(out)
 }
 
+/// An optional f64 key: `None` when absent or null, else `need_pos_f64`.
+fn opt_pos_f64(doc: &serde_json::Value, section: &str, key: &str) -> Result<Option<f64>, IapError> {
+    if doc[section][key].is_null() {
+        return Ok(None);
+    }
+    need_pos_f64(doc, section, key).map(Some)
+}
+
+/// An optional i64 key: `None` when absent or null, else `need_pos_i64`.
+fn opt_pos_i64(doc: &serde_json::Value, section: &str, key: &str) -> Result<Option<i64>, IapError> {
+    if doc[section][key].is_null() {
+        return Ok(None);
+    }
+    need_pos_i64(doc, section, key).map(Some)
+}
+
+/// `pre_trade.restricted_instruments`: absent / null = empty; else an array
+/// of u32 instrument ids.
+fn parse_restricted(doc: &serde_json::Value) -> Result<BTreeSet<u32>, IapError> {
+    let v = &doc["pre_trade"]["restricted_instruments"];
+    if v.is_null() {
+        return Ok(BTreeSet::new());
+    }
+    let arr = v.as_array().ok_or_else(|| {
+        IapError::InvalidArgument(
+            "risk.json: pre_trade.restricted_instruments must be an array".to_string(),
+        )
+    })?;
+    let mut out = BTreeSet::new();
+    for item in arr {
+        let iid = item
+            .as_u64()
+            .and_then(|x| u32::try_from(x).ok())
+            .ok_or_else(|| {
+                IapError::InvalidArgument(
+                    "risk.json: pre_trade.restricted_instruments entries must be u32 instrument ids"
+                        .to_string(),
+                )
+            })?;
+        out.insert(iid);
+    }
+    Ok(out)
+}
+
 fn need_bool(doc: &serde_json::Value, section: &str, key: &str) -> Result<bool, IapError> {
     doc[section][key].as_bool().ok_or_else(|| {
         IapError::InvalidArgument(format!("risk.json: missing/non-bool {section}.{key}"))
@@ -150,7 +232,7 @@ impl RiskLimits {
                 "risk.json: duplicate_order_window_ns must be >= 0".to_string(),
             ));
         }
-        Ok(RiskLimits {
+        let base = RiskLimits {
             kill_switch_engaged: need_bool(doc, "global", "kill_switch_engaged")?,
             max_gross_notional: need_pos_f64(doc, "global", "max_gross_notional")?,
             max_net_notional: need_pos_f64(doc, "global", "max_net_notional")?,
@@ -183,6 +265,72 @@ impl RiskLimits {
                 })?
                 .to_string(),
             fx_conversion: parse_conversion(doc)?,
+            max_mid_jump_ratio: None,
+            restricted_instruments: BTreeSet::new(),
+            max_open_orders: None,
+            max_open_notional: None,
+            max_strategy_position_qty: None,
+            max_participation_bps: None,
+            participation_floor_qty: None,
+            max_cancels_per_sec: None,
+            cancel_burst: None,
+            max_venue_msgs_per_sec: None,
+            venue_msg_burst: None,
+            max_tracked_keys: None,
+            max_loss_override_multiple: None,
+            min_approvers: None,
+        };
+        // x-version 4 keys, parsed in this order (the first error names its key)
+        let jump = opt_pos_f64(doc, "market_data", "max_mid_jump_ratio")?;
+        if let Some(j) = jump {
+            if j <= 1.0 {
+                return Err(IapError::InvalidArgument(format!(
+                    "risk.json: market_data.max_mid_jump_ratio must be > 1, got {j}"
+                )));
+            }
+        }
+        let restricted = parse_restricted(doc)?;
+        let max_open_orders = opt_pos_i64(doc, "pre_trade", "max_open_orders")?;
+        let max_open_notional = opt_pos_f64(doc, "pre_trade", "max_open_notional")?;
+        let max_strategy_position_qty = opt_pos_i64(doc, "pre_trade", "max_strategy_position_qty")?;
+        let max_participation_bps = opt_pos_f64(doc, "pre_trade", "max_participation_bps")?;
+        let participation_floor_qty = if max_participation_bps.is_some() {
+            Some(need_pos_i64(doc, "pre_trade", "participation_floor_qty")?)
+        } else {
+            None
+        };
+        let max_cancels_per_sec = opt_pos_f64(doc, "pre_trade", "max_cancels_per_sec")?;
+        let cancel_burst = if max_cancels_per_sec.is_some() {
+            Some(need_pos_f64(doc, "pre_trade", "cancel_burst")?)
+        } else {
+            None
+        };
+        let max_venue_msgs_per_sec = opt_pos_f64(doc, "pre_trade", "max_venue_msgs_per_sec")?;
+        let venue_msg_burst = if max_venue_msgs_per_sec.is_some() {
+            Some(need_pos_f64(doc, "pre_trade", "venue_msg_burst")?)
+        } else {
+            None
+        };
+        let max_tracked_keys = opt_pos_i64(doc, "pre_trade", "max_tracked_keys")?;
+        let max_loss_override_multiple =
+            opt_pos_f64(doc, "overrides", "max_loss_override_multiple")?;
+        let min_approvers = opt_pos_i64(doc, "overrides", "min_approvers")?;
+        Ok(RiskLimits {
+            max_mid_jump_ratio: jump,
+            restricted_instruments: restricted,
+            max_open_orders,
+            max_open_notional,
+            max_strategy_position_qty,
+            max_participation_bps,
+            participation_floor_qty,
+            max_cancels_per_sec,
+            cancel_burst,
+            max_venue_msgs_per_sec,
+            venue_msg_burst,
+            max_tracked_keys,
+            max_loss_override_multiple,
+            min_approvers,
+            ..base
         })
     }
 

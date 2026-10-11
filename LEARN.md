@@ -1943,7 +1943,7 @@ reproduces them with string concatenation and one hash (pinned:
 digest is sha256 over every canonical line + newline in emission order;
 same seed ⇒ same digest; one changed field or one swapped line changes it.
 Known answers are pinned for one trace, the same trace twice, and the empty
-stream; the MVP golden pins a whole session's digest (`20d4ff76…`, 800
+stream; the MVP golden pins a whole session's digest (`5918f870…`, 800
 traces).
 
 ### 18.3 Four languages, one line
@@ -2030,7 +2030,7 @@ index that lied about what its sources contain would be worse than none.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=20d4ff76af0b631c...
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=5918f8705c061e0d...
 ```
 
 Seven seconds later `data/mvp/58a10f2194a3c81c/` holds the captured stream,
@@ -2056,7 +2056,7 @@ regenerated.
 v1.5.0 regenerated it once more and changed nothing a trader would see.
 The loop does not use the research backtester, so the new default methods
 do not touch it: the events, decisions, parents, fills and P&L are
-identical to v1.4.0. What moved is the digest (`f51890da…` → `20d4ff76…`)
+identical to v1.4.0. What moved is the digest (`f51890da…` → `5918f870…`)
 and the `config_version` it covers (`f293e7e7…` → `439bbad5…`), because
 `config_version` hashes `configs/execution/execution.json`, which now
 names its impact model, and `alpha_params.json`, whose header names the

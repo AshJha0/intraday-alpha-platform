@@ -1,70 +1,64 @@
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000000000000000}
-{"decision":1,"reason":"venue 65535 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"65535","severity":1,"timestamp":1700000000000398000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000000002398000}
-{"decision":2,"reason":"LIMIT order needs price_ticks > 0: 0","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000005002398001}
-{"decision":3,"reason":"venue 1 disconnected","rule_id":"VENUE_DISCONNECT","scope":"VENUE","scope_id":"1","severity":2,"timestamp":1700000005002398001}
-{"decision":2,"reason":"venue 1 is disconnected","rule_id":"VENUE_DISCONNECTED","scope":"VENUE","scope_id":"1","severity":2,"timestamp":1700000005049439001}
-{"decision":2,"reason":"venue 1 is disconnected","rule_id":"VENUE_DISCONNECTED","scope":"VENUE","scope_id":"1","severity":2,"timestamp":1700000005067439001}
-{"decision":2,"reason":"venue 1 is disconnected","rule_id":"VENUE_DISCONNECTED","scope":"VENUE","scope_id":"1","severity":2,"timestamp":1700000005067439001}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000005067439001}
-{"decision":2,"reason":"venue 1 is disconnected","rule_id":"VENUE_DISCONNECTED","scope":"VENUE","scope_id":"1","severity":2,"timestamp":1700000005067439001}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000005067439001}
-{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"VENUE","scope_id":"65535","severity":1,"timestamp":1700000005067439001}
-{"decision":1,"reason":"","rule_id":"SESSION_ROLLED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000005068301001}
-{"decision":1,"reason":"venue 1 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"1","severity":1,"timestamp":1700000005068488001}
-{"decision":2,"reason":"kill scope id \"-1\" is not a valid VENUE id: nothing cleared (fail-closed): desk request #42","rule_id":"MALFORMED_KILL","scope":"VENUE","scope_id":"-1","severity":3,"timestamp":1700000005068488001}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000005068488001}
-{"decision":1,"reason":"daily loss limit 250000.00 -> 0.01 approved by ","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"GLOBAL","scope_id":"","severity":2,"timestamp":1700000005068885001}
-{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000005099885001}
-{"decision":2,"reason":"qty 99999 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000005099885001}
-{"decision":3,"reason":"global daily pnl -58.76 breaches daily loss limit 0.01","rule_id":"DAILY_LOSS","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000005100533001}
-{"decision":1,"reason":"daily loss limit 0.01 -> 1117.52 approved by desk request #42","rule_id":"LOSS_LIMIT_OVERRIDE","scope":"GLOBAL","scope_id":"","severity":2,"timestamp":1700000005107533001}
-{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000005107533001}
-{"decision":2,"reason":"qty 976081 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000005107533001}
-{"decision":2,"reason":"would cross own open order 9223372036854775809 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000005139533001}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000005148533001}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000007148533001}
-{"decision":3,"reason":"","rule_id":"KILL_SWITCH_ENGAGED","scope":"INSTRUMENT","scope_id":"1","severity":3,"timestamp":1700000007186533001}
-{"decision":2,"reason":"instrument 1 kill switch engaged","rule_id":"KILL_INSTRUMENT","scope":"INSTRUMENT","scope_id":"1","severity":3,"timestamp":1700000007194533001}
-{"decision":3,"reason":"desk request #42","rule_id":"KILL_SWITCH_ENGAGED","scope":"STRATEGY","scope_id":"S1","severity":3,"timestamp":1700000007237533001}
-{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"1","severity":1,"timestamp":1700000007268533001}
-{"decision":2,"reason":"order_id 8 already used at ts 1700000005067439001","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000007268533001}
-{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000007289533001}
-{"decision":1,"reason":"back\\slash","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000007323533001}
-{"decision":3,"reason":"desk request #42","rule_id":"KILL_SWITCH_ENGAGED","scope":"INSTRUMENT","scope_id":"+1","severity":3,"timestamp":1700000007323533001}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000007340533001}
-{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"1","severity":1,"timestamp":1700000007388533001}
-{"decision":3,"reason":"desk request #42","rule_id":"KILL_SWITCH_ENGAGED","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000007388533001}
-{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000007456533001}
-{"decision":1,"reason":"line1\nline2","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000007456533001}
-{"decision":3,"reason":"venue 65535 disconnected","rule_id":"VENUE_DISCONNECT","scope":"VENUE","scope_id":"65535","severity":2,"timestamp":1700000007509334001}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000012509334002}
-{"decision":2,"reason":"order_id 13 already used at ts 1700000005139533001","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000012509334002}
-{"decision":2,"reason":"no reference data for instrument 6","rule_id":"UNKNOWN_INSTRUMENT","scope":"INSTRUMENT","scope_id":"6","severity":2,"timestamp":1700000012509334002}
-{"decision":1,"reason":"venue 65535 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"65535","severity":1,"timestamp":1700000012509839002}
-{"decision":1,"reason":"venue 3 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"3","severity":1,"timestamp":1700000012509839002}
-{"decision":3,"reason":"kill scope id \"1.0\" is not a valid INSTRUMENT id: escalated to GLOBAL (fail-closed): ops halt","rule_id":"MALFORMED_KILL","scope":"INSTRUMENT","scope_id":"1.0","severity":3,"timestamp":1700000014561839002}
-{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000014597839002}
-{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000014597907002}
-{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000019597994003}
-{"decision":2,"reason":"instrument 2 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000019610994003}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000024597994002}
-{"decision":2,"reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000019613994003}
-{"decision":2,"reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000024614385003}
-{"decision":2,"reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000024614385003}
-{"decision":2,"reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000024614385003}
-{"decision":2,"reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000024614385003}
-{"decision":2,"reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000024614385003}
-{"decision":2,"reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000024614385003}
-{"decision":2,"reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000024614385003}
-{"decision":2,"reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000024683385003}
-{"decision":1,"reason":"venue 1 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"1","severity":1,"timestamp":1700000024692385003}
-{"decision":2,"reason":"order_id 3 already used at ts 1700000000002398000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000024727385003}
-{"decision":2,"reason":"would cross own open order 15 at 504","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000024727755003}
-{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"VENUE","scope_id":"3","severity":1,"timestamp":1700000024747755003}
-{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000024755755003}
-{"decision":3,"reason":"ops halt","rule_id":"KILL_SWITCH_ENGAGED","scope":"STRATEGY","scope_id":"S3","severity":3,"timestamp":1700000025755755003}
-{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000025755755003}
-{"decision":2,"reason":"would cross own open order 8 at 498","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000025780755003}
-{"decision":2,"reason":"would cross own open order 15 at 504","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000025780997003}
-{"decision":2,"reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000025817997003}
+{"decision":1,"prev_sha256":"0000000000000000000000000000000000000000000000000000000000000000","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","seq":1,"severity":1,"timestamp":1700000000000000000}
+{"decision":1,"prev_sha256":"3aaa7eb8c8e9a793058e748cf0cbacabc7a4764c56506b0c23482f57a49e82a1","reason":"venue 65535 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"65535","seq":2,"severity":1,"timestamp":1700000000000398000}
+{"decision":1,"prev_sha256":"89fde9a6bfe4a153583963e2db2c53cda920793a20947302fbe5ffe2c227573f","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","seq":3,"severity":1,"timestamp":1700000000002398000}
+{"decision":2,"prev_sha256":"09599ef76f588f3fbf2f1ea896bf079f969639283f9cb8605ed61f9f6bf905dd","reason":"LIMIT order needs price_ticks > 0: 0","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S3","seq":4,"severity":2,"timestamp":1700000005002398001}
+{"decision":3,"prev_sha256":"035b3f460ba7fd272d84a7e0606112cb8f22e1f82f5c285b8f74da41ebfaa901","reason":"venue 1 disconnected","rule_id":"VENUE_DISCONNECT","scope":"VENUE","scope_id":"1","seq":5,"severity":2,"timestamp":1700000005002398001}
+{"decision":2,"prev_sha256":"5656388fb261ed51f0d9f9f94c3592c8b8512b94b11f3651c0fdd05b745625fd","reason":"venue 1 is disconnected","rule_id":"VENUE_DISCONNECTED","scope":"VENUE","scope_id":"1","seq":6,"severity":2,"timestamp":1700000005049439001}
+{"decision":2,"prev_sha256":"269588b5663c450515aa13975f43da574f51cd81ba38941b8a4b8ba816b436a8","reason":"venue 1 is disconnected","rule_id":"VENUE_DISCONNECTED","scope":"VENUE","scope_id":"1","seq":7,"severity":2,"timestamp":1700000005067439001}
+{"decision":2,"prev_sha256":"88a01055954e961733463405f69d7fe2dda53a9c03484504257cc8e1b947a750","reason":"venue 1 is disconnected","rule_id":"VENUE_DISCONNECTED","scope":"VENUE","scope_id":"1","seq":8,"severity":2,"timestamp":1700000005067439001}
+{"decision":1,"prev_sha256":"2ee59e266a8240720e372fdb5f270e4812a44318e7fadfbaa3c02e85ebc9b6e4","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","seq":9,"severity":1,"timestamp":1700000005067439001}
+{"decision":2,"prev_sha256":"e21c29aed2427929affd219898a5b31b6b226da32b5fedc21bda3bd092849db9","reason":"venue 1 is disconnected","rule_id":"VENUE_DISCONNECTED","scope":"VENUE","scope_id":"1","seq":10,"severity":2,"timestamp":1700000005067439001}
+{"decision":1,"prev_sha256":"325c770da34aec6a42b40b7022a3c40555a56e1b8e6c1fbbc3295abff4b80d86","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","seq":11,"severity":1,"timestamp":1700000005067439001}
+{"decision":1,"prev_sha256":"eca5e53a4721b7da9cbafced3b67410ba1815056a4ae2d263b4da430923a91a5","reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"VENUE","scope_id":"65535","seq":12,"severity":1,"timestamp":1700000005067439001}
+{"decision":1,"prev_sha256":"35cce7d7441cef3829a85c259229299b497bb9added2532c21d77692ecb9c426","reason":"","rule_id":"SESSION_ROLLED","scope":"GLOBAL","scope_id":"","seq":13,"severity":1,"timestamp":1700000005068301001}
+{"decision":1,"prev_sha256":"3fbd37d7b228e20f8700a46f988f3caa882092289b57708e598bd68d2b182886","reason":"venue 1 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"1","seq":14,"severity":1,"timestamp":1700000005068488001}
+{"decision":2,"prev_sha256":"4cae44e632d055a0dc40711ccc8eb48c14a8c36c90b9be4589e80b2521543e62","reason":"kill scope id \"-1\" is not a valid VENUE id: nothing cleared (fail-closed): desk request #42","rule_id":"MALFORMED_KILL","scope":"VENUE","scope_id":"-1","seq":15,"severity":3,"timestamp":1700000005068488001}
+{"decision":1,"prev_sha256":"a48c442967ce85eeb55bfed673d7ab28583bb78656adadf04ba5769188ad9411","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","seq":16,"severity":1,"timestamp":1700000005068488001}
+{"decision":2,"prev_sha256":"bcb48b2dee31c08d348e219b87f24a057f33086ff84cf7983c813fc87e35c8df","reason":"loss limit override needs 2 distinct approvers, got 1: ops halt","rule_id":"LOSS_LIMIT_OVERRIDE_REJECTED","scope":"GLOBAL","scope_id":"","seq":17,"severity":3,"timestamp":1700000005068885001}
+{"decision":1,"prev_sha256":"85f3b5ec7fc62130e03218ba760476e9f49dfa3f35d3b6b163a6d0e070fddc8e","reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S1","seq":18,"severity":1,"timestamp":1700000005068885001}
+{"decision":2,"prev_sha256":"28b4ae26444bfeac4697101bbb0a12f8f16f9e69a7c8cab84a7236c544941fdf","reason":"qty 99999 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"1","seq":19,"severity":2,"timestamp":1700000005068885001}
+{"decision":2,"prev_sha256":"e9d5f6f6beb18a42864a2abd3d4bb3faba43e042894f8913a75648912ea62b8e","reason":"qty 9223372036854775807 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"1","seq":20,"severity":2,"timestamp":1700000005076533001}
+{"decision":1,"prev_sha256":"118e3c225d1f9c9f092a1a3312fb56c5aa9592cf2b17e73bf91dfbcd0fac6686","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","seq":21,"severity":1,"timestamp":1700000005076929001}
+{"decision":1,"prev_sha256":"af2251fde737bd5cc49a0753c80dc13b46c298427c109fe5ef54a9dd8f80ff4d","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","seq":22,"severity":1,"timestamp":1700000005130929001}
+{"decision":1,"prev_sha256":"2241c44a2d8ec5ca9f13364f498a346563d7bfe2afc24afe8f32bc22b7100654","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","seq":23,"severity":1,"timestamp":1700000007130929001}
+{"decision":3,"prev_sha256":"3660e7761d34afd7ae953c589e032efcc8f2ead510ce543c6f6ebf9e3d449d03","reason":"","rule_id":"KILL_SWITCH_ENGAGED","scope":"INSTRUMENT","scope_id":"1","seq":24,"severity":3,"timestamp":1700000007168929001}
+{"decision":2,"prev_sha256":"4778b9c0c6e289667f522b0a8ef26211b902658c57c62a5258ebbe199b95d9e9","reason":"instrument 1 kill switch engaged","rule_id":"KILL_INSTRUMENT","scope":"INSTRUMENT","scope_id":"1","seq":25,"severity":3,"timestamp":1700000007176929001}
+{"decision":3,"prev_sha256":"aa0c39441a8207d3ded71762c8ca804efb2b8acd22e36564bf55923aa5f7ac59","reason":"desk request #42","rule_id":"KILL_SWITCH_ENGAGED","scope":"STRATEGY","scope_id":"S1","seq":26,"severity":3,"timestamp":1700000007219929001}
+{"decision":1,"prev_sha256":"9d75de1070a7c7e86ed990259778a62a73fa810a89749669b764bae486035c5a","reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"1","seq":27,"severity":1,"timestamp":1700000007250929001}
+{"decision":2,"prev_sha256":"95dcb7823238c19b7f18a6f4332fe4a25fd04463fc01fdcb39551eb3c9f541cf","reason":"order_id 8 already used at ts 1700000005067439001","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S2","seq":28,"severity":2,"timestamp":1700000007250929001}
+{"decision":1,"prev_sha256":"1c8230decb9d987402ec258158a860e9c12fabf4cb256ab0e3944a52a4198c48","reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","seq":29,"severity":1,"timestamp":1700000007271929001}
+{"decision":1,"prev_sha256":"35d6a42bc9eb3c2de2bad9d4a6ee1fff8a86cc70a533ee5ad0676efc24be60d1","reason":"back\\slash","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S1","seq":30,"severity":1,"timestamp":1700000007305929001}
+{"decision":3,"prev_sha256":"dbf85638339a63efc93e18d30d9e4502d19b4247cdbadfa7b88f9e66ab193243","reason":"desk request #42","rule_id":"KILL_SWITCH_ENGAGED","scope":"INSTRUMENT","scope_id":"+1","seq":31,"severity":3,"timestamp":1700000007305929001}
+{"decision":1,"prev_sha256":"5bf35ac412164acb2582908c311b738662daa96900a6fe04d473f02f88d38f9c","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","seq":32,"severity":1,"timestamp":1700000007322929001}
+{"decision":1,"prev_sha256":"29a044a91095ea91863676bb1305890cea36a3b448b909f1d82df0e14ebbe0d1","reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"1","seq":33,"severity":1,"timestamp":1700000007370929001}
+{"decision":3,"prev_sha256":"51eddc68921303c873c606f26a65caa23bed01db5c9ea0f9462a4ac9b0d4553b","reason":"desk request #42","rule_id":"KILL_SWITCH_ENGAGED","scope":"GLOBAL","scope_id":"","seq":34,"severity":3,"timestamp":1700000007370929001}
+{"decision":2,"prev_sha256":"4318dba3869f86ab28e0a88d2815b2eb2e15c7a0909e6be86e83544a66bf731d","reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","seq":35,"severity":3,"timestamp":1700000007438929001}
+{"decision":1,"prev_sha256":"ea61222c2451dc1e19e2e6be8e118adcaf48507e712bc5c6c7aa234d17c26f6c","reason":"line1\nline2","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","seq":36,"severity":1,"timestamp":1700000007438929001}
+{"decision":3,"prev_sha256":"b56037572315a77eb05f86f0772c3179fb7073cc6dff3d924cb95ea26b96ffa4","reason":"venue 65535 disconnected","rule_id":"VENUE_DISCONNECT","scope":"VENUE","scope_id":"65535","seq":37,"severity":2,"timestamp":1700000007491730001}
+{"decision":1,"prev_sha256":"5906acdb2ab353e10f43a7ae257aa7685937b77065b8a614702d918afc2fa003","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","seq":38,"severity":1,"timestamp":1700000012491730002}
+{"decision":2,"prev_sha256":"2644a4e55ab4a8f1a75ed7c2db05900c270e952874999f7b79fd548c3b391e97","reason":"order_id 13 already used at ts 1700000005076929001","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S2","seq":39,"severity":2,"timestamp":1700000012491730002}
+{"decision":2,"prev_sha256":"66e843c08648568b545062d8ded307bdc19069cc9878a70ae55e447a0f2202a7","reason":"no reference data for instrument 6","rule_id":"UNKNOWN_INSTRUMENT","scope":"INSTRUMENT","scope_id":"6","seq":40,"severity":2,"timestamp":1700000012491730002}
+{"decision":1,"prev_sha256":"7f78185e332e91e7af8fedc18e7fb99467df88bf72da48e6b6449f42539f61f8","reason":"venue 65535 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"65535","seq":41,"severity":1,"timestamp":1700000012492235002}
+{"decision":1,"prev_sha256":"bd9a113ec30e3f2c28315cfc164db41187eadea59ef035e310a2fcf67c68bca6","reason":"venue 3 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"3","seq":42,"severity":1,"timestamp":1700000012492235002}
+{"decision":3,"prev_sha256":"62f3fbdc2d1eb4a5a9ee86c9ef8a4f011c1f41ae8b27535a3633a5ba60ffdbc8","reason":"kill scope id \"1.0\" is not a valid INSTRUMENT id: escalated to GLOBAL (fail-closed): ops halt","rule_id":"MALFORMED_KILL","scope":"INSTRUMENT","scope_id":"1.0","seq":43,"severity":3,"timestamp":1700000014544235002}
+{"decision":2,"prev_sha256":"9f4b8caa699034773d86cb1a019e16a795c4dd41dacd7fcd3a7890bd824dd320","reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","seq":44,"severity":3,"timestamp":1700000014580235002}
+{"decision":2,"prev_sha256":"e097dbe0f2828280bcb0c582454970ff381ae216e8ffa3058a432a9cea1c424b","reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","seq":45,"severity":3,"timestamp":1700000014580303002}
+{"decision":1,"prev_sha256":"1eeeef53d1a04acc463009cb4ae6240f4e23beb436debb2ce06a76ba7f47b624","reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","seq":46,"severity":1,"timestamp":1700000019580390003}
+{"decision":2,"prev_sha256":"1e9a6211f9521460145344a8b4a9aa4c472dec92e33ba270f6c877a5b3d930d4","reason":"instrument 2 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"2","seq":47,"severity":2,"timestamp":1700000019593390003}
+{"decision":1,"prev_sha256":"8cbab3e0fe273289ff50ab117180a0dbcaa5ab60e5e4cb62e35b9ad16b686885","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","seq":48,"severity":1,"timestamp":1700000024580390002}
+{"decision":2,"prev_sha256":"3c4dde48fe743b45c0306c765bbf706022b0a0114f16e0a77d342441aeabda3d","reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","seq":49,"severity":2,"timestamp":1700000019596390003}
+{"decision":2,"prev_sha256":"419da9a1b4f34eb71898a23e3c4d8d155ff219edc0aebbd1939bef4c4496b66d","reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","seq":50,"severity":2,"timestamp":1700000024596781003}
+{"decision":2,"prev_sha256":"24df3765ca647be87c36278856659fc32f0ad110c7f97eb171aa1f34d2ebc5c1","reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","seq":51,"severity":2,"timestamp":1700000024596781003}
+{"decision":2,"prev_sha256":"501c2d9322d66192e3decbb78426c3c3ea08e65a9053e8cf7de4562cd9ddfd6d","reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","seq":52,"severity":2,"timestamp":1700000024596781003}
+{"decision":2,"prev_sha256":"63a13b76fce495b3d82305c609995828be036db67538072e87ac0ea9be9cac20","reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","seq":53,"severity":2,"timestamp":1700000024596781003}
+{"decision":2,"prev_sha256":"b866dff1af7a0f5cd1235f25bfd819a9cb8f19e8986b82e4d5df8b75e3e09f5d","reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","seq":54,"severity":2,"timestamp":1700000024596781003}
+{"decision":2,"prev_sha256":"169e17abca40dc8aa913621e2b9c6ffd37a0d63d7e88546f148ee3efa96e9b4c","reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","seq":55,"severity":2,"timestamp":1700000024596781003}
+{"decision":2,"prev_sha256":"ad9ae6dd781aacc9597996e7093517cc42523b19294c9c7580f61692d0875b80","reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","seq":56,"severity":2,"timestamp":1700000024596781003}
+{"decision":2,"prev_sha256":"47f243fe22b626c0201a03a9161dcf0cb6311bfc145a1985d3be6aa79240e6fe","reason":"instrument 1 feed has an unrecovered gap","rule_id":"SEQUENCE_GAP","scope":"INSTRUMENT","scope_id":"1","seq":57,"severity":2,"timestamp":1700000024665781003}
+{"decision":1,"prev_sha256":"ea12f860a61462b121ed94ea75a1ecd263e3ae13e64f022b8366d09ce4373a17","reason":"venue 1 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"1","seq":58,"severity":1,"timestamp":1700000024674781003}
+{"decision":2,"prev_sha256":"e502fa36a47c20a099cc9fff55f4fc71b1d5c98608a3505f79c0c910ddecd5fa","reason":"order_id 3 already used at ts 1700000000002398000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S1","seq":59,"severity":2,"timestamp":1700000024709781003}
+{"decision":2,"prev_sha256":"9df0a9695903164b479501ca6beb2b6ae57e5af798b454c011980f9f7bb7693f","reason":"would cross own open order 15 at 504","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","seq":60,"severity":2,"timestamp":1700000024710151003}
+{"decision":1,"prev_sha256":"7c7e8634e8c551554a5c754e7b2bb1ceb934cb89c553abe70779d6cbd8c0bc74","reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"VENUE","scope_id":"3","seq":61,"severity":1,"timestamp":1700000024730151003}
+{"decision":1,"prev_sha256":"d59c372007b4c1c45d627d62c41c8cc5be3768cee0b47ef562f8229bf3e6e4b6","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","seq":62,"severity":1,"timestamp":1700000024766151003}
+{"decision":3,"prev_sha256":"47f086eff9ca30d39871eccacb72b17edc6bacc36f8293a9b53da5f2ce05b61f","reason":"venue 1 disconnected","rule_id":"VENUE_DISCONNECT","scope":"VENUE","scope_id":"1","seq":63,"severity":2,"timestamp":1700000024819151003}
+{"decision":2,"prev_sha256":"cf3228a2fae674ac66c429273f522968f17a215072ced83994102c23839a81dc","reason":"venue 1 is disconnected","rule_id":"VENUE_DISCONNECTED","scope":"VENUE","scope_id":"1","seq":64,"severity":2,"timestamp":1700000024826151003}

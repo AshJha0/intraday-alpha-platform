@@ -12,7 +12,18 @@
 //! 13. `FAT_FINGER_NOTIONAL`  14. `PRICE_BAND`  15. `RATE_THROTTLE`
 //! 16. `SELF_MATCH`  17. `POSITION_LIMIT`  18. `INSTRUMENT_NOTIONAL`
 //! 19. `GROSS_NOTIONAL`  20. `NET_NOTIONAL`  21. `DAILY_LOSS`
-//! 22. `STRATEGY_LOSS` — else `ALLOW`.
+//! 22. `STRATEGY_LOSS`  23. `RESTRICTED_INSTRUMENT`  24. `MAX_OPEN_ORDERS`
+//! 25. `MAX_OPEN_NOTIONAL`  26. `STRATEGY_POSITION`  27. `PARTICIPATION`
+//! 28. `CANCEL_RATE`  29. `VENUE_MESSAGE_RATE` — else `ALLOW`.
+//!
+//! Checks 23-29 are the SEC 15c3-5 set, each off unless its `pre_trade` key
+//! is configured. Check 7 also rejects `STATE_CAPACITY` when a bounded
+//! state map is full (`pre_trade.max_tracked_keys`).
+//!
+//! Audit chain (G-P0-1): every record carries `seq` and `prev_sha256`
+//! ([`crate::event`]); [`RiskEngine::audit_chain_head`] is the value to
+//! persist next to a snapshot, and [`RiskEngine::restore_chained`]
+//! continues the chain from it.
 //!
 //! Pinned semantics:
 //!
@@ -111,12 +122,13 @@ use serde_json::Value;
 use telemetry::Registry;
 use venue::{OrderRequest, OrderType};
 
-use crate::event::{fmt_fixed, rules, Decision, RiskEvent, Scope, Severity};
+use crate::event::{fmt_fixed, rules, Decision, RiskEvent, Scope, Severity, GENESIS_SHA256};
 use crate::limits::RiskLimits;
 
 pub(crate) const NS_PER_SEC: f64 = 1e9;
-/// Snapshot schema version.
-pub const SNAPSHOT_VERSION: u64 = 1;
+/// Snapshot schema version (2: open-order strategy, the 15c3-5 buckets and
+/// the session volume counters).
+pub const SNAPSHOT_VERSION: u64 = 2;
 
 /// Per-instrument reference data the engine needs.
 #[derive(Debug, Clone, PartialEq)]
@@ -234,6 +246,29 @@ pub(crate) struct OpenOrder {
     /// without a price, MID).
     pub(crate) price_ticks: i64,
     pub(crate) qty: i64,
+    /// Owning strategy (checks 24-26).
+    pub(crate) strategy_id: String,
+}
+
+/// A 15c3-5 message bucket (checks 28/29): an event-time token bucket whose
+/// tokens a cancel may drive below zero (a cancel is never refused).
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct Rate {
+    pub(crate) tokens: f64,
+    pub(crate) last_ts: i64,
+}
+
+impl Rate {
+    /// Refill to `ts` (event time never refills backwards); `false`
+    /// (nothing changed) when `ts - last_ts` leaves i64.
+    pub(crate) fn refill(&mut self, ts: i64, rate: f64, burst: f64) -> bool {
+        let Some(gap) = ts.checked_sub(self.last_ts) else {
+            return false;
+        };
+        self.tokens = (self.tokens + gap.max(0) as f64 * rate / NS_PER_SEC).min(burst);
+        self.last_ts = self.last_ts.max(ts);
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -283,6 +318,17 @@ pub struct RiskEngine {
     pub(crate) realized: BTreeMap<(String, String), f64>,
     pub(crate) loss_override_global: Option<f64>,
     pub(crate) loss_override_strategy: BTreeMap<String, f64>,
+    /// Per-venue message buckets (check 29).
+    pub(crate) venue_buckets: BTreeMap<u16, Rate>,
+    /// Per-strategy cancel buckets (check 28).
+    pub(crate) cancel_buckets: BTreeMap<String, Rate>,
+    /// Session market volume per instrument (`on_market_trade`, check 27).
+    pub(crate) market_volume: BTreeMap<u32, i64>,
+    /// The firm's session executed quantity per instrument (check 27).
+    pub(crate) executed: BTreeMap<u32, i64>,
+    /// Audit chain: seq of the last record and SHA-256 of its line.
+    pub(crate) audit_seq: u64,
+    pub(crate) audit_head: String,
     pub(crate) audit: Vec<RiskEvent>,
     /// Engine metrics (decision counters, PnL gauges).
     pub metrics: Registry,
@@ -327,6 +373,12 @@ impl RiskEngine {
             realized: BTreeMap::new(),
             loss_override_global: None,
             loss_override_strategy: BTreeMap::new(),
+            venue_buckets: BTreeMap::new(),
+            cancel_buckets: BTreeMap::new(),
+            market_volume: BTreeMap::new(),
+            executed: BTreeMap::new(),
+            audit_seq: 0,
+            audit_head: GENESIS_SHA256.to_string(),
             audit: Vec::new(),
             metrics: Registry::new(),
         };
@@ -368,6 +420,20 @@ impl RiskEngine {
                 stale_feed_timeout_ns: 1,
                 reporting_ccy: "USD".to_string(),
                 fx_conversion: BTreeMap::new(),
+                max_mid_jump_ratio: None,
+                restricted_instruments: std::collections::BTreeSet::new(),
+                max_open_orders: None,
+                max_open_notional: None,
+                max_strategy_position_qty: None,
+                max_participation_bps: None,
+                participation_floor_qty: None,
+                max_cancels_per_sec: None,
+                cancel_burst: None,
+                max_venue_msgs_per_sec: None,
+                venue_msg_burst: None,
+                max_tracked_keys: None,
+                max_loss_override_multiple: None,
+                min_approvers: None,
             },
             BTreeMap::new(),
         );
@@ -415,6 +481,8 @@ impl RiskEngine {
         }
         self.bootstrapped = true;
         self.emit(RiskEvent {
+            seq: 0,
+            prev_sha256: String::new(),
             timestamp: ts,
             scope: Scope::Global,
             scope_id: String::new(),
@@ -436,6 +504,48 @@ impl RiskEngine {
     /// counted. Re-evaluates the loss limits of every strategy holding the
     /// instrument (a mark move can latch a kill with no fill).
     pub fn on_market(&mut self, instrument_id: u32, bid_ticks: i64, ask_ticks: i64, ts: i64) {
+        let cap = self.limits.as_ref().and_then(|l| l.max_tracked_keys);
+        let ratio = self.limits.as_ref().and_then(|l| l.max_mid_jump_ratio);
+        let existing = self.market.get(&instrument_id).copied();
+        if existing.is_none() {
+            if let Some(cap) = cap {
+                if self.market.len() as i64 >= cap {
+                    self.metrics.counter("risk_state_capacity_dropped_total").inc();
+                    return;
+                }
+            }
+        }
+        if let Some(st) = existing {
+            if ts < st.ts {
+                self.metrics
+                    .counter("risk_market_regressions_dropped_total")
+                    .inc();
+                return;
+            }
+        }
+        // Reference-price sanity gate (G-P2-6): a crossed two-sided book is
+        // never a usable reference price, and (when configured) neither is a
+        // jump of more than max_mid_jump_ratio against the stored two-sided
+        // mark. A dropped update leaves the previous mark (which then ages
+        // into STALE_PRICE): fail-closed, never a guessed price.
+        if bid_ticks > 0 && ask_ticks > 0 && bid_ticks > ask_ticks {
+            self.metrics.counter("risk_market_crossed_dropped_total").inc();
+            return;
+        }
+        if let (Some(ratio), Some(st)) = (ratio, existing) {
+            if bid_ticks > 0 && ask_ticks > 0 && st.bid_ticks > 0 && st.ask_ticks > 0 {
+                if let (Some(new_sum), Some(old_sum)) = (
+                    bid_ticks.checked_add(ask_ticks),
+                    st.bid_ticks.checked_add(st.ask_ticks),
+                ) {
+                    let (n, o) = (new_sum as f64, old_sum as f64);
+                    if n > ratio * o || n * ratio < o {
+                        self.metrics.counter("risk_market_jump_dropped_total").inc();
+                        return;
+                    }
+                }
+            }
+        }
         let st = self.market.entry(instrument_id).or_insert(MarketState {
             bid_ticks,
             ask_ticks,
@@ -443,12 +553,6 @@ impl RiskEngine {
             gaps: 0,
             gated: false,
         });
-        if ts < st.ts {
-            self.metrics
-                .counter("risk_market_regressions_dropped_total")
-                .inc();
-            return;
-        }
         st.bid_ticks = bid_ticks;
         st.ask_ticks = ask_ticks;
         st.ts = ts;
@@ -472,6 +576,15 @@ impl RiskEngine {
             .limits
             .as_ref()
             .map_or(0, |l| l.max_sequence_gap_before_halt);
+        if !self.market.contains_key(&instrument_id) {
+            if let Some(cap) = self.limits.as_ref().and_then(|l| l.max_tracked_keys) {
+                if self.market.len() as i64 >= cap {
+                    // no state => no mid => STALE_PRICE: still fail-closed
+                    self.metrics.counter("risk_state_capacity_dropped_total").inc();
+                    return;
+                }
+            }
+        }
         let st = self.market.entry(instrument_id).or_insert(MarketState {
             bid_ticks: 0,
             ask_ticks: 0,
@@ -490,6 +603,69 @@ impl RiskEngine {
         if let Some(st) = self.market.get_mut(&instrument_id) {
             st.gated = false;
             st.gaps = 0;
+        }
+    }
+
+    /// A market trade print (any participant): adds `qty` to the
+    /// instrument's session market volume, the denominator of the
+    /// participation cap (check 27). A print for an instrument without
+    /// reference data or with `qty <= 0` is dropped and counted
+    /// (`risk_market_trades_dropped_total`); the volume saturates at
+    /// `i64::MAX`. Reset by [`RiskEngine::roll_session`].
+    pub fn on_market_trade(&mut self, instrument_id: u32, qty: i64, _ts: i64) {
+        if qty <= 0 || !self.instruments.contains_key(&instrument_id) {
+            self.metrics.counter("risk_market_trades_dropped_total").inc();
+            return;
+        }
+        let v = self.market_volume.entry(instrument_id).or_insert(0);
+        *v = v.saturating_add(qty);
+    }
+
+    /// A cancel (or cancel/replace) the strategy sends to `venue_id`. Never
+    /// refused (a cancel reduces risk); it spends one token of the
+    /// strategy's cancel bucket (check 28) and, for a real venue, one of the
+    /// venue's message bucket (check 29) — tokens may go below zero, and new
+    /// orders reject until the bucket refills to 1. A timestamp difference
+    /// that leaves i64 does not refill (fail-closed). No-op on a fail-closed
+    /// engine or when neither control is configured.
+    pub fn on_cancel_request(&mut self, strategy_id: &str, venue_id: u16, ts: i64) {
+        let Some(limits) = self.limits.clone() else {
+            return;
+        };
+        self.metrics.counter("risk_cancel_requests_total").inc();
+        if let (Some(rate), Some(burst)) = (limits.max_cancels_per_sec, limits.cancel_burst) {
+            if !self.cancel_buckets.contains_key(strategy_id) {
+                match limits.max_tracked_keys {
+                    Some(cap) if self.cancel_buckets.len() as i64 >= cap => {
+                        self.metrics.counter("risk_state_capacity_dropped_total").inc();
+                    }
+                    _ => {
+                        self.cancel_buckets.insert(
+                            strategy_id.to_string(),
+                            Rate {
+                                tokens: burst,
+                                last_ts: ts,
+                            },
+                        );
+                    }
+                }
+            }
+            if let Some(b) = self.cancel_buckets.get_mut(strategy_id) {
+                let _ = b.refill(ts, rate, burst);
+                b.tokens -= 1.0;
+            }
+        }
+        if venue_id != 0 {
+            if let (Some(rate), Some(burst)) =
+                (limits.max_venue_msgs_per_sec, limits.venue_msg_burst)
+            {
+                let b = self.venue_buckets.entry(venue_id).or_insert(Rate {
+                    tokens: burst,
+                    last_ts: ts,
+                });
+                let _ = b.refill(ts, rate, burst);
+                b.tokens -= 1.0;
+            }
         }
     }
 
@@ -527,6 +703,8 @@ impl RiskEngine {
         if let Some(why) = invalid {
             self.metrics.counter("risk_malformed_fills_total").inc();
             self.emit(RiskEvent {
+                seq: 0,
+                prev_sha256: String::new(),
                 timestamp: fill.ts,
                 scope: Scope::Strategy,
                 scope_id: fill.strategy_id.clone(),
@@ -608,6 +786,8 @@ impl RiskEngine {
             .realized
             .entry((fill.strategy_id.clone(), ccy))
             .or_insert(0.0) += realized;
+        let done = self.executed.entry(fill.instrument_id).or_insert(0);
+        *done = done.saturating_add(fill.qty);
         // open order reduction
         if fill.order_id != 0 {
             let remove = match self.open.get_mut(&fill.order_id) {
@@ -770,6 +950,8 @@ impl RiskEngine {
             if pnl <= -limit {
                 self.kill_strategies.insert(sid.clone(), true);
                 self.emit(RiskEvent {
+                    seq: 0,
+                    prev_sha256: String::new(),
                     timestamp: ts,
                     scope: Scope::Strategy,
                     scope_id: sid.clone(),
@@ -790,6 +972,8 @@ impl RiskEngine {
                 if pnl <= -limit {
                     let _ = self.set_kill(Scope::Global, "", true);
                     self.emit(RiskEvent {
+                        seq: 0,
+                        prev_sha256: String::new(),
                         timestamp: ts,
                         scope: Scope::Global,
                         scope_id: String::new(),
@@ -833,6 +1017,13 @@ impl RiskEngine {
         &self.audit
     }
 
+    /// `(seq, sha256)` of the last audit record (`(0, GENESIS)` before the
+    /// first): the value to persist next to a snapshot and to anchor
+    /// externally (G-P0-1).
+    pub fn audit_chain_head(&self) -> (u64, String) {
+        (self.audit_seq, self.audit_head.clone())
+    }
+
     // `audit_jsonl`, `emit`, `snapshot` and `restore` live in `audit.rs`
     // (`impl RiskEngine` continued there).
 
@@ -850,6 +1041,8 @@ impl RiskEngine {
             self.metrics.counter("risk_rejected_total").inc();
         }
         self.emit(RiskEvent {
+            seq: 0,
+            prev_sha256: String::new(),
             timestamp: order.timestamp,
             scope,
             scope_id,
@@ -868,6 +1061,7 @@ impl RiskEngine {
                     side: order.side,
                     price_ticks,
                     qty: order.qty,
+                    strategy_id: order.strategy_id.clone(),
                 },
             );
         }

@@ -1,17 +1,27 @@
 package com.iap.risk;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import com.iap.config.Json;
 
 /**
- * Hard-risk limits ({@code configs/risk/risk.json}, x-version 3 — the complete
+ * Hard-risk limits ({@code configs/risk/risk.json}, x-version 4 — the complete
  * pinned limit set plus the currency block; Rust reference
  * {@code rust/risk/src/limits.rs}).
  * Parsing is STRICT: any missing or invalid limit is an
  * {@link IllegalArgumentException}, and the engine built from a failed
  * parse is fail-closed (rejects every order with {@code CONFIG_MISSING}).
+ *
+ * <p>x-version 4 adds OPTIONAL keys (absent or null = that control is off,
+ * {@code null} here; a present key is parsed strictly):
+ * {@code market_data.max_mid_jump_ratio}, the SEC 15c3-5 {@code pre_trade}
+ * set (checks 23-29 and {@code max_tracked_keys}) and the {@code overrides}
+ * bounds.
  */
 public record RiskLimits(
         boolean killSwitchEngaged,
@@ -31,7 +41,38 @@ public record RiskLimits(
         long maxSequenceGapBeforeHalt,
         long staleFeedTimeoutNs,
         String reportingCcy,
-        TreeMap<String, FxConversion> fxConversion) {
+        TreeMap<String, FxConversion> fxConversion,
+        Double maxMidJumpRatio,
+        Set<Long> restrictedInstruments,
+        Long maxOpenOrders,
+        Double maxOpenNotional,
+        Long maxStrategyPositionQty,
+        Double maxParticipationBps,
+        Long participationFloorQty,
+        Double maxCancelsPerSec,
+        Double cancelBurst,
+        Double maxVenueMsgsPerSec,
+        Double venueMsgBurst,
+        Long maxTrackedKeys,
+        Double maxLossOverrideMultiple,
+        Long minApprovers) {
+
+    /** The x-version 3 limit set: every x-version 4 control off. */
+    public RiskLimits(boolean killSwitchEngaged, double maxGrossNotional,
+            double maxNetNotional, double maxDailyLoss, double maxOrderRatePerSec,
+            double orderRateBurst, long maxOrderQty, double maxOrderNotional,
+            double priceBandBps, boolean staleBookReject, long duplicateOrderWindowNs,
+            long maxPositionQty, double maxInstrumentNotional,
+            double strategyMaxDailyLoss, long maxSequenceGapBeforeHalt,
+            long staleFeedTimeoutNs, String reportingCcy,
+            TreeMap<String, FxConversion> fxConversion) {
+        this(killSwitchEngaged, maxGrossNotional, maxNetNotional, maxDailyLoss,
+                maxOrderRatePerSec, orderRateBurst, maxOrderQty, maxOrderNotional,
+                priceBandBps, staleBookReject, duplicateOrderWindowNs, maxPositionQty,
+                maxInstrumentNotional, strategyMaxDailyLoss, maxSequenceGapBeforeHalt,
+                staleFeedTimeoutNs, reportingCcy, fxConversion, null, Set.of(), null,
+                null, null, null, null, null, null, null, null, null, null, null);
+    }
 
     /**
      * How one quote currency converts into the reporting currency: the
@@ -131,6 +172,39 @@ public record RiskLimits(
         return l;
     }
 
+    /** An optional number key: null when absent or JSON null. */
+    private static Double optPosF64(Map<String, Object> doc, String section, String key) {
+        return section(doc, section).get(key) == null ? null
+                : needPosF64(doc, section, key);
+    }
+
+    /** An optional integer key: null when absent or JSON null. */
+    private static Long optPosI64(Map<String, Object> doc, String section, String key) {
+        return section(doc, section).get(key) == null ? null
+                : needPosI64(doc, section, key);
+    }
+
+    /** {@code pre_trade.restricted_instruments}: absent / null = empty. */
+    private static Set<Long> parseRestricted(Map<String, Object> doc) {
+        Object v = section(doc, "pre_trade").get("restricted_instruments");
+        if (v == null) {
+            return Set.of();
+        }
+        if (!(v instanceof List)) {
+            throw new IllegalArgumentException(
+                    "risk.json: pre_trade.restricted_instruments must be an array");
+        }
+        TreeSet<Long> out = new TreeSet<>();
+        for (Object item : Json.array(v)) {
+            if (!(item instanceof Long) || (Long) item < 0 || (Long) item > 0xFFFFFFFFL) {
+                throw new IllegalArgumentException("risk.json: pre_trade.restricted_instruments"
+                        + " entries must be u32 instrument ids");
+            }
+            out.add((Long) item);
+        }
+        return Collections.unmodifiableSet(out);
+    }
+
     private static boolean needBool(Map<String, Object> doc, String section, String key) {
         Object v = section(doc, section).get(key);
         if (!(v instanceof Boolean)) {
@@ -155,7 +229,7 @@ public record RiskLimits(
         // Arguments are evaluated left to right, i.e. in the reference's
         // field order: the FIRST offending key decides the error, and that
         // text is the CONFIG_MISSING reason every order is then audited with.
-        return new RiskLimits(
+        RiskLimits base = new RiskLimits(
                 needBool(doc, "global", "kill_switch_engaged"),
                 needPosF64(doc, "global", "max_gross_notional"),
                 needPosF64(doc, "global", "max_net_notional"),
@@ -174,6 +248,39 @@ public record RiskLimits(
                 needPosI64(doc, "market_data", "stale_feed_timeout_ns"),
                 reportingCcy(doc),
                 parseConversion(doc));
+        // x-version 4 keys, parsed in the reference's order
+        Double jump = optPosF64(doc, "market_data", "max_mid_jump_ratio");
+        if (jump != null && jump <= 1.0) {
+            throw new IllegalArgumentException(
+                    "risk.json: market_data.max_mid_jump_ratio must be > 1, got "
+                            + OrderRequest.rustDisplay(jump));
+        }
+        Set<Long> restricted = parseRestricted(doc);
+        Long maxOpenOrders = optPosI64(doc, "pre_trade", "max_open_orders");
+        Double maxOpenNotional = optPosF64(doc, "pre_trade", "max_open_notional");
+        Long maxStrategyPos = optPosI64(doc, "pre_trade", "max_strategy_position_qty");
+        Double partBps = optPosF64(doc, "pre_trade", "max_participation_bps");
+        Long partFloor = partBps == null ? null
+                : needPosI64(doc, "pre_trade", "participation_floor_qty");
+        Double cancelRate = optPosF64(doc, "pre_trade", "max_cancels_per_sec");
+        Double cancelBurst = cancelRate == null ? null
+                : needPosF64(doc, "pre_trade", "cancel_burst");
+        Double venueRate = optPosF64(doc, "pre_trade", "max_venue_msgs_per_sec");
+        Double venueBurst = venueRate == null ? null
+                : needPosF64(doc, "pre_trade", "venue_msg_burst");
+        Long maxKeys = optPosI64(doc, "pre_trade", "max_tracked_keys");
+        Double overrideMult = optPosF64(doc, "overrides", "max_loss_override_multiple");
+        Long minApprovers = optPosI64(doc, "overrides", "min_approvers");
+        return new RiskLimits(base.killSwitchEngaged(), base.maxGrossNotional(),
+                base.maxNetNotional(), base.maxDailyLoss(), base.maxOrderRatePerSec(),
+                base.orderRateBurst(), base.maxOrderQty(), base.maxOrderNotional(),
+                base.priceBandBps(), base.staleBookReject(), base.duplicateOrderWindowNs(),
+                base.maxPositionQty(), base.maxInstrumentNotional(),
+                base.strategyMaxDailyLoss(), base.maxSequenceGapBeforeHalt(),
+                base.staleFeedTimeoutNs(), base.reportingCcy(), base.fxConversion(),
+                jump, restricted, maxOpenOrders, maxOpenNotional, maxStrategyPos,
+                partBps, partFloor, cancelRate, cancelBurst, venueRate, venueBurst,
+                maxKeys, overrideMult, minApprovers);
     }
 
     private static long sequenceGaps(Map<String, Object> doc) {
