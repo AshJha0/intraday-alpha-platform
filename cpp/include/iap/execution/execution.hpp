@@ -103,8 +103,10 @@
 //        the display first shows an uncrossed opposite best; without this
 //        the same displayed liquidity would be double-counted (taken
 //        aggressively AND again via the crossing rule);
-//      - MODIFY events do not change ahead_qty (a modified order's queue
-//        position is unknowable from the public stream — pinned: ignored).
+//      - a MODIFY that grows an order re-queues it behind us; a MODIFY
+//        that shrinks an order keeps its priority, so when that order is
+//        known to be ahead (as for CANCEL) ahead_qty is reduced by the
+//        displayed size removed from our level, floored at 0 (X-P1-1, v1.14).
 //    Passive fills are stamped with the triggering event's exchange_ts.
 // 5. Fees (configs/venues/venues.json): equity venues charge
 //    taker_fee_per_share * qty on aggressive fills and rebate

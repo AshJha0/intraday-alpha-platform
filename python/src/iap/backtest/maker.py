@@ -98,6 +98,20 @@ Pinned rules (``MakerBacktester.run_instrument``):
    horizon is known, updates the EWMA; while toxic, a decision stands down
    (``feedback_stood_down``), posts ``widen_ticks`` behind the touch, or
    posts a reduced size. The extra counters appear only when the option is on.
+8. **v1.14 options** (off by default; the default run is byte-identical to
+   v1.13). ``feed_latency_ns`` (X-P1-6) adds the market-data feed leg to
+   every decision: the order a decision at ``t`` sends carries
+   ``decision_ts = t + feed_latency_ns`` (and its ``ttl_ns`` /
+   ``exit_timeout_ns`` run from there), so it reaches the venue after the
+   feed, internal and venue legs. ``exit_route="sim"`` (X-P1-6) sends every
+   taker exit (``exit="taker"``, the passive-exit timeout cross) as a MARKET
+   child through the simulator (latency, top-10 depth walk, taker fee and
+   impact per fill, rule 8 gate); a remainder the walk did not fill is
+   re-sent at the next event, ``exit_px`` is the qty-weighted price of every
+   exit fill, ``exit_mid`` the mid before the completing fill, and
+   ``exit_market_orders`` counts the children. The end-of-stream forced
+   close still crosses the last state. ``hidden_print_fills`` (X-P2-7)
+   passes ``hidden_prints=True`` to the simulator.
 """
 
 from __future__ import annotations
@@ -123,6 +137,7 @@ from iap.execution.types import CancelReason, ChildOrder, Liquidity, OrderType
 EXIT_MODES = ("taker", "mid", "passive")
 REPRICE_POLICIES = ("follow", "hazard")
 GIVE_UP_MODES = ("cancel", "cross")
+EXIT_ROUTES = ("book", "sim")
 
 
 @dataclass(frozen=True)
@@ -167,8 +182,22 @@ class MakerConfig:
     #: tail condition: hazard P(fill within ttl) at decision time
     min_fill_prob: float | None = None
     feedback: FeedbackConfig | None = None
+    # ---- v1.14 options (rule 8; defaults = off, the v1.13 run) ----
+    #: X-P1-6: market-data feed latency added to every decision's
+    #: ``decision_ts`` (entries, reposts, exit posts, MARKET exits)
+    feed_latency_ns: int = 0
+    #: X-P1-6: ``"book"`` (default) crosses taker exits at the pre-event
+    #: touch outside the simulator; ``"sim"`` sends them as MARKET children
+    #: through the simulator's latency path and depth walk
+    exit_route: str = "book"
+    #: X-P2-7: hidden (non-displayed) prints fill resting orders
+    hidden_print_fills: bool = False
 
     def __post_init__(self) -> None:
+        if self.feed_latency_ns < 0:
+            raise ValueError("feed_latency_ns must be >= 0")
+        if self.exit_route not in EXIT_ROUTES:
+            raise ValueError(f"exit_route must be one of {EXIT_ROUTES}")
         if self.post_only not in ("", "reject", "slide"):
             raise ValueError("post_only must be '', 'reject' or 'slide'")
         if self.entry_reprices < 0:
@@ -413,7 +442,15 @@ class MakerBacktester:
         if fb is not None:
             cx.update(feedback_stood_down=0, feedback_widened=0, feedback_reduced=0)
 
-        sim = ExecutionSimulator(self.exec_config, self.calibration)
+        sim = ExecutionSimulator(
+            self.exec_config, self.calibration, hidden_prints=cfg.hidden_print_fills
+        )
+        feed = cfg.feed_latency_ns
+        routed = cfg.exit_route == "sim" and cfg.exit != "mid"
+        if routed:
+            cx["exit_market_orders"] = 0
+        if cfg.hidden_print_fills:
+            cx["hidden_print_trades"] = 0
         c = dict.fromkeys(
             (
                 "decisions",
@@ -440,7 +477,14 @@ class MakerBacktester:
             "exit_started": False,
         }
         # passive-exit ledger of the current trip
-        xl: dict[str, Any] = {"qty": 0, "px_sum": 0.0, "fees": 0.0, "reprices": 0}
+        xl: dict[str, Any] = {
+            "qty": 0,
+            "px_sum": 0.0,
+            "fees": 0.0,
+            "reprices": 0,
+            "xqty": 0,  # v1.14: qty filled by routed MARKET exits
+            "impact": 0.0,
+        }
         p_exit = cfg.passive_exit_fill_prob
         # v1.13 X-P2-8: with no explicit probability, the passive exit uses
         # the hazard model's P(fill within exit_timeout_ns | state) when a
@@ -519,8 +563,8 @@ class MakerBacktester:
                     type=OrderType.LIMIT,
                     qty=qty,
                     limit_ticks=limit,
-                    decision_ts=t,
-                    expire_ts=t + cfg.ttl_ns,
+                    decision_ts=t + feed,
+                    expire_ts=t + feed + cfg.ttl_ns,
                     post_only=cfg.post_only,
                 )
             )
@@ -540,7 +584,7 @@ class MakerBacktester:
                     side=ctx["side"],
                     type=OrderType.MARKET,
                     qty=ctx["qty"],
-                    decision_ts=t,
+                    decision_ts=t + feed,
                 )
             )
             st["side"] = ctx["side"]
@@ -658,14 +702,31 @@ class MakerBacktester:
                     type=OrderType.LIMIT,
                     qty=abs(st["pos"]),
                     limit_ticks=apx if st["side"] == 0 else bpx,
-                    decision_ts=t,
-                    expire_ts=t + cfg.exit_timeout_ns,
+                    decision_ts=t + feed,
+                    expire_ts=t + feed + cfg.exit_timeout_ns,
                     post_only=cfg.post_only,
                 )
             )
             st["exit_order"] = oid
             c["exit_posts"] += 1
             return True
+
+        def market_exit(t: int) -> None:
+            """Rule 8 (X-P1-6): the taker exit as a MARKET child."""
+            if book_state() is None:
+                return  # no two-sided open book: retry on the next event
+            st["exit_order"] = sim.submit(
+                ChildOrder(
+                    instrument_id=instrument_id,
+                    venue_id=venue_id,
+                    side=1 - st["side"],
+                    type=OrderType.MARKET,
+                    qty=abs(st["pos"]),
+                    decision_ts=t + feed,
+                )
+            )
+            st["exit_crossing"] = True
+            cx["exit_market_orders"] += 1
 
         def close(t: int, forced: bool, mid_hint: float | None = None) -> None:
             q_rem = abs(st["pos"])
@@ -709,7 +770,8 @@ class MakerBacktester:
                 )
                 exit_impact = imp_bps * 1e-4 * rem_notional
             exit_fee = xl["fees"] + taker_fee
-            timeout = cfg.exit == "passive" and q_rem > 0
+            exit_impact += xl["impact"]
+            timeout = cfg.exit == "passive" and (q_rem > 0 or xl["xqty"] > 0)
             epx = entry["px"]
             gross = s * (exit_px - epx) * q * unit
             net = gross - entry["fees"] - exit_fee - exit_impact
@@ -726,7 +788,7 @@ class MakerBacktester:
                     "exit_mid": exit_mid,
                     "liquidity": entry["liq"],
                     "exit_mode": cfg.exit,
-                    "exit_passive_qty": xl["qty"],
+                    "exit_passive_qty": xl["qty"] - xl["xqty"],
                     "exit_timeout": timeout,
                     "exit_reprices": xl["reprices"],
                     "gross": gross,
@@ -751,20 +813,28 @@ class MakerBacktester:
             st["exit_due"] = None
             st["exit_order"] = None
             st["exit_started"] = False
-            xl.update(qty=0, px_sum=0.0, fees=0.0, reprices=0)
+            st["exit_crossing"] = False
+            xl.update(qty=0, px_sum=0.0, fees=0.0, reprices=0, xqty=0, impact=0.0)
 
         def exit_step(t: int) -> None:
             """Exit work at an event at/after the hold horizon (rule 5)."""
             if cfg.exit != "passive":
-                close(t, forced=False)
+                if not routed:
+                    close(t, forced=False)
+                elif st["exit_order"] is None:
+                    market_exit(t)
                 return
             if st["exit_order"] is not None:
                 return  # the post is resting
-            if not st["exit_started"]:
+            if st.get("exit_crossing"):
+                market_exit(t)  # re-send the unfilled remainder
+            elif not st["exit_started"]:
                 st["exit_started"] = post_exit(t)
             elif xl["reprices"] < cfg.exit_reprices:
                 if post_exit(t):
                     xl["reprices"] += 1
+            elif routed:
+                market_exit(t)  # timeout: the remainder as a MARKET child
             else:
                 close(t, forced=False)  # timeout: cross the remainder
 
@@ -810,7 +880,12 @@ class MakerBacktester:
                 if st["exit_order"] is not None and f.order_id == st["exit_order"]:
                     xl["qty"] += f.qty
                     xl["px_sum"] += f.price_ticks * tick * f.qty
-                    xl["fees"] += f.fee + f.impact_cost
+                    if st.get("exit_crossing"):
+                        xl["xqty"] += f.qty
+                        xl["fees"] += f.fee
+                        xl["impact"] += f.impact_cost
+                    else:
+                        xl["fees"] += f.fee + f.impact_cost
                     st["pos"] += f.qty if f.side == 0 else -f.qty
                     if st["pos"] == 0:
                         close(f.ts, forced=False, mid_hint=pre_mid)
@@ -898,6 +973,8 @@ class MakerBacktester:
             )
         if fb is not None:
             cx.update(fb.counters)
+        if cfg.hidden_print_fills:
+            cx["hidden_print_trades"] = sim.hidden_print_trades
         c.update(cx)
         return MakerResult(
             instrument_id=instrument_id,

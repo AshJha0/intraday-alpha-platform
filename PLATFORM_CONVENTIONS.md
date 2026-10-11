@@ -488,7 +488,7 @@ displayed top-10 depth, one fill per level, simulated fills never mutate the rep
 (3b) displayed liquidity consumed by an earlier child or by the crossing check is debited in an
 overlay and never re-used on the same display — a level refresh caps the overlay at
 `min(consumed, new displayed)`; (4) deterministic queue position (only book-APPLIED events are tracked;
-a cancel advances us only when the cancelled order is known to be ahead; trade-through, marketable-ADD expansion, crossing with the double-count exemption); (5) fees;
+a cancel, or a MODIFY size decrease (X-P1-1, v1.14), advances us only when that order is known to be ahead; trade-through, marketable-ADD expansion, crossing with the double-count exemption); (5) fees;
 (6) linear impact identical to the research cost model, `impact_bps = coeff × (qty × qty_unit /
 adv × 100)`; (7) cancels travel the same latency path, take effect at `max(cancel arrival, order
 arrival)`, `expire_ts` (time-in-force) expires pending or resting orders before activation,
