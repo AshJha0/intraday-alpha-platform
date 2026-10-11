@@ -48,6 +48,13 @@ the hash re-derived from the verified artefact (:class:`TamperError`), and
 records the promoted hash in ``promotion.json``.
 :meth:`ModelRegistry.check_promotions` re-checks every promoted model;
 CI runs it (``python -m iap.mlops check-promotions``) and fails on any problem.
+
+**Promotion requires a model card (v1.15).**  :meth:`ModelRegistry.promote`
+also refuses a model without a valid ``model_card.json``
+(:mod:`iap.mlops.model_card`: data/sessions, prereg id and hash, metrics net
+of costs, calibration, limitations, intended use, owner sign-off, bound to
+the record hash) with :class:`RegistryError`; :meth:`check_promotions`
+re-validates it.  :meth:`ModelRegistry.write_card` generates and writes one.
 """
 
 from __future__ import annotations
@@ -352,13 +359,49 @@ class ModelRegistry:
             return None, TamperError(f"model {model_id}: content hash mismatch at promotion")
         return derived, None
 
+    def write_card(self, model_id: str, **kw) -> dict:
+        """Generate and write the model card (:func:`model_card.generate_card` kwargs)."""
+        from iap.mlops import model_card as mc
+
+        rec = self.verify(model_id)
+        try:
+            card = mc.generate_card(rec, **kw)
+        except ValueError as exc:
+            raise RegistryError(f"model {model_id}: {exc}") from exc
+        mc.write_card(self.root, card)
+        return card
+
+    def _card_problem(self, model_id: str) -> RegistryError | None:
+        from iap.mlops import model_card as mc
+
+        card = mc.read_card(self.root, model_id)
+        if card is None:
+            return RegistryError(
+                f"model {model_id}: no model card ({mc.CARD}); promotion requires one"
+            )
+        problems = mc.validate_card(card, self.get(model_id))
+        if problems:
+            return RegistryError(f"model {model_id}: invalid model card: {'; '.join(problems)}")
+        return None
+
     def promote(self, model_id: str) -> dict:
-        """Promote a model; BLOCKING on its content hash (module docs, G-P0-1)."""
+        """Promote a model; BLOCKING on its content hash (module docs, G-P0-1)
+        and on a valid model card (v1.15)."""
         digest, err = self._content_problem(model_id)
         if err is not None:
             raise err
+        card_err = self._card_problem(model_id)
+        if card_err is not None:
+            raise card_err
+        from iap.mlops.model_card import read_card
+
         rec = self.get(model_id)
-        doc = {"content_sha256": digest, "model_id": model_id, "record_hash": rec.record_hash}
+        doc = {
+            "card_hash": read_card(self.root, model_id)["card_hash"],
+            "content_sha256": digest,
+            "model_id": model_id,
+            "record_hash": rec.record_hash,
+        }
         (self.root / model_id / PROMOTION).write_text(canonical(doc) + "\n")
         return doc
 
@@ -367,14 +410,24 @@ class ModelRegistry:
 
     def check_promotions(self) -> list[str]:
         """Problems with every promoted model's content hash; ``[]`` = ok."""
+        from iap.mlops import model_card as mc
+
         problems: list[str] = []
         for model_id in self.promoted():
             try:
                 digest, err = self._content_problem(model_id)
                 if err is not None:
                     raise err
+                card_err = self._card_problem(model_id)
+                if card_err is not None:
+                    raise card_err
                 doc = json.loads((self.root / model_id / PROMOTION).read_text())
-                if doc.get("content_sha256") != digest or doc.get("model_id") != model_id:
+                card = mc.read_card(self.root, model_id)
+                if (
+                    doc.get("content_sha256") != digest
+                    or doc.get("model_id") != model_id
+                    or doc.get("card_hash") != card["card_hash"]
+                ):
                     raise TamperError(f"model {model_id}: promotion.json does not match")
             except RegistryError as exc:
                 problems.append(str(exc))

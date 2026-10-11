@@ -8,6 +8,26 @@ that tag.
 
 ## Unreleased (v1.15)
 
+- **M-P1-2: conformal sizing (opt-in, Python research only)** —
+  `iap.models.conformal`: split-conformal and adaptive conformal (ACI,
+  rolling window) intervals on alpha forecasts, a confidence-scaled sizing
+  rule (`conformal_size`, monotone in confidence, never above the base target
+  or `max_position`), and `calibration_report` (empirical vs nominal coverage
+  by session). Flag `ConformalSizingConfig.enabled` is OFF by default and is
+  not in `configs/prereg/v2.json`. Not wired into the parity-checked MVP
+  engine sizing, so no golden changes.
+- **Feature drift monitor** (`iap.research.drift`, CLI
+  `python -m iap.research.drift --ref <dirs> --target <dirs> --out <dir>`):
+  PSI, KS, mean shift (reference-std units) and std ratio per feature, per
+  symbol and pooled, streamed from the feature store in record batches
+  (chunk-invariant); JSON + markdown report with configurable thresholds.
+  Descriptive only; the R7 plan runs it after ingest and before the
+  confirmatory run.
+- **Model cards required at promotion** (`iap.mlops.model_card`,
+  `ModelRegistry.write_card`, `python -m iap.mlops card`): `promote()` raises
+  `RegistryError` on a missing or invalid card, alongside the content-hash
+  check; `promotion.json` records the card hash.
+
 - **X-P1-1: dated SEC Section 31 + FINRA TAF fees** in the Python, C++ and
   Rust execution engines (sell side only), from
   `configs/reference/regulatory_fee_schedule.json` (dated periods with
@@ -15,6 +35,17 @@ that tag.
   2019-01-01, including the FINRA TAF pause 2026-10-01..2026-12-31). Off in code defaults,
   on in `configs/prereg/v2.json`. New cross-engine golden
   `tests/golden/expected_regulatory_fees.json`; no existing golden changes.
+- **R-P1-3: FX11 leak-vs-fast investigation.** Finding in
+  `docs/research/FX11_FINDING.md`: no look-ahead found; the v1.14
+  time-shift failure is consistent with a fast causal signal (verdict
+  "fast, not leak", with the stated limit that the gate's two numbers alone
+  cannot tell a 45 s leak from a fast signal). The leakage tester gains a
+  time-shift triage (detector 2c): on a time-shift failure it reports
+  `time_shift_profile` and `time_shift_class` (`fast_causal` /
+  `leak_suspect` / `causality_unproven`). `passed` is unchanged by default;
+  `LeakageTester(accept_fast_causal=True)` is the opt-in. Reports of alphas
+  that pass the time shift are byte-identical. FX11 stays RESEARCH pending
+  human review. Tests: `python/tests/test_fx11_time_shift.py`.
 - **R-P0-2: v2 prereg turns the v1.14 execution-realism opt-ins on.**
   `configs/prereg/v2.json` gains `execution_realism` (`feed_latency_ns`
   100,000 ns, an assumed feed leg; `exit_route`/`flatten_route` `"sim"`;
