@@ -6,18 +6,16 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "7abd57dc99f0709c",
+      "experiment_id": "c0a4f652eabb690c",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ01",
         "consecutive_failures": 0,
         "event_ts": 1787691480577291027,
         "failed_gates": [
-          "statistical_significance",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability"
+          "capacity"
         ],
         "gate_order": [
           "leakage_clean",
@@ -46,7 +44,7 @@
           "fold_consistency": {
             "passed": true,
             "threshold": 0.7,
-            "value": 0.75
+            "value": 1.0
           },
           "fold_count": {
             "passed": true,
@@ -76,17 +74,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.012007752459738345
+            "value": 0.023715054750760297
           },
           "stability": {
-            "passed": false,
+            "passed": true,
             "threshold": 1.0,
-            "value": 1.7376108068737932
+            "value": 0.546662458862033
           },
           "statistical_significance": {
-            "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 1.7859485312555616
+            "passed": true,
+            "threshold": 4.425812536056746,
+            "value": 6.542881133030165
           }
         },
         "outcome": "HOLD",
@@ -107,7 +105,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 2004.0
+            "value": 5158.0
           }
         },
         "policy": "lifecycle_v1",
@@ -126,7 +124,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "09bf2a467ea3ff31",
+      "experiment_id": "dcc2aa1b522120b1",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ02",
@@ -194,17 +192,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.024400028269723
+            "value": 0.03615667524798832
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.20318483182487845
+            "value": 0.18464649613556355
           },
           "statistical_significance": {
             "passed": true,
-            "threshold": 4.365155224196862,
-            "value": 6.897010719326576
+            "threshold": 4.425812536056746,
+            "value": 10.923742206666379
           }
         },
         "outcome": "HOLD",
@@ -225,7 +223,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 2088.0
+            "value": 5160.0
           }
         },
         "policy": "lifecycle_v1",
@@ -244,7 +242,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "70421bc02273a6ab",
+      "experiment_id": "bf5f814d02cc0093",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ03",
@@ -312,17 +310,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.018823068572055134
+            "value": 0.030006669428547718
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.07131285254750745
+            "value": 0.418445844485205
           },
           "statistical_significance": {
             "passed": true,
-            "threshold": 4.365155224196862,
-            "value": 4.976080345728298
+            "threshold": 4.425812536056746,
+            "value": 7.972723623581445
           }
         },
         "outcome": "HOLD",
@@ -343,7 +341,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 2172.0
+            "value": 5162.0
           }
         },
         "policy": "lifecycle_v1",
@@ -362,7 +360,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "77031372cfbecd6c",
+      "experiment_id": "9c5a09402428b9ba",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ04",
@@ -434,17 +432,17 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.0057846305925517
+            "value": -0.01009290085663633
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.5938901636057099
+            "value": 0.637786159471055
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": -0.9288355251554222
+            "threshold": 4.425812536056746,
+            "value": -1.8892735272966132
           }
         },
         "outcome": "HOLD",
@@ -465,7 +463,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 2256.0
+            "value": 5164.0
           }
         },
         "policy": "lifecycle_v1",
@@ -484,19 +482,17 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "041488ab325e97eb",
+      "experiment_id": "b493e395e9076119",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ05",
         "consecutive_failures": 0,
         "event_ts": 1787691480577291027,
         "failed_gates": [
-          "oos_ic",
           "statistical_significance",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability"
+          "capacity"
         ],
         "gate_order": [
           "leakage_clean",
@@ -553,19 +549,19 @@
             "value": null
           },
           "oos_ic": {
-            "passed": false,
+            "passed": true,
             "threshold": 0.01,
-            "value": 0.004777301369064646
+            "value": 0.010238611171428906
           },
           "stability": {
-            "passed": false,
+            "passed": true,
             "threshold": 1.0,
-            "value": 2.7811581010022706
+            "value": 0.7259323219207682
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 1.4158032501576487
+            "threshold": 4.425812536056746,
+            "value": 3.155280677868564
           }
         },
         "outcome": "HOLD",
@@ -586,7 +582,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 2340.0
+            "value": 5166.0
           }
         },
         "policy": "lifecycle_v1",
@@ -605,7 +601,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "9623ece84ddea1d4",
+      "experiment_id": "50975e914f98a4b3",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ06",
@@ -614,8 +610,7 @@
         "failed_gates": [
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability"
+          "capacity"
         ],
         "gate_order": [
           "leakage_clean",
@@ -669,22 +664,22 @@
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -2015.898837553672
+            "value": -2445.9499391617865
           },
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.03340807966921983
+            "value": 0.055581904699236545
           },
           "stability": {
-            "passed": false,
+            "passed": true,
             "threshold": 1.0,
-            "value": 1.0648572090893833
+            "value": 0.26319092825645124
           },
           "statistical_significance": {
             "passed": true,
-            "threshold": 4.365155224196862,
-            "value": 5.113390596141896
+            "threshold": 4.425812536056746,
+            "value": 10.916836098299544
           }
         },
         "outcome": "HOLD",
@@ -705,7 +700,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 2424.0
+            "value": 5168.0
           }
         },
         "policy": "lifecycle_v1",
@@ -724,7 +719,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "ba11dca454634149",
+      "experiment_id": "bbd7a13d231006be",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ07",
@@ -737,8 +732,7 @@
           "hypothesis_sign",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability"
+          "capacity"
         ],
         "gate_order": [
           "leakage_clean",
@@ -792,22 +786,22 @@
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -1444.0360297853476
+            "value": -1627.952502617889
           },
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.013919671316397514
+            "value": -0.027920793561234523
           },
           "stability": {
-            "passed": false,
+            "passed": true,
             "threshold": 1.0,
-            "value": 1.8403390181190338
+            "value": 0.35159484816609204
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": -2.932261361541467
+            "threshold": 4.425812536056746,
+            "value": -6.525488828221327
           }
         },
         "outcome": "HOLD",
@@ -828,7 +822,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 2508.0
+            "value": 5170.0
           }
         },
         "policy": "lifecycle_v1",
@@ -847,7 +841,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "d4df983b3656ec9f",
+      "experiment_id": "77280cc82190b5a2",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ08",
@@ -919,17 +913,17 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.04889009070501651
+            "value": -0.05119648045272018
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.15756199519667205
+            "value": 0.15977563713045576
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": -4.605027353876459
+            "threshold": 4.425812536056746,
+            "value": -6.386084895514418
           }
         },
         "outcome": "HOLD",
@@ -950,7 +944,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 2592.0
+            "value": 5172.0
           }
         },
         "policy": "lifecycle_v1",
@@ -969,7 +963,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "4bb44174bb9b85f3",
+      "experiment_id": "51aaa116ea1cf1c6",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ09",
@@ -1012,7 +1006,7 @@
           "fold_consistency": {
             "passed": false,
             "threshold": 0.7,
-            "value": 0.5
+            "value": 0.25
           },
           "fold_count": {
             "passed": true,
@@ -1042,17 +1036,17 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.028151802422259148
+            "value": -0.020390348662252485
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 1.0530708084042686
+            "value": 1.6902306935194207
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": -1.5654014311718099
+            "threshold": 4.425812536056746,
+            "value": -1.7394570465811037
           }
         },
         "outcome": "HOLD",
@@ -1073,7 +1067,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 2676.0
+            "value": 5174.0
           }
         },
         "policy": "lifecycle_v1",
@@ -1092,7 +1086,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "1357421c77d540a0",
+      "experiment_id": "f7bfb211fba340ff",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ10",
@@ -1101,6 +1095,7 @@
         "failed_gates": [
           "oos_ic",
           "statistical_significance",
+          "hypothesis_sign",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
           "capacity"
@@ -1140,7 +1135,7 @@
             "value": 4.0
           },
           "hypothesis_sign": {
-            "passed": true,
+            "passed": false,
             "threshold": null,
             "value": null
           },
@@ -1162,17 +1157,17 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": 0.004129109023510776
+            "value": 0.002520382594774899
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.8449941266554166
+            "value": 0.033446653419111363
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 0.9443346996961071
+            "threshold": 4.425812536056746,
+            "value": 0.7222222067530494
           }
         },
         "outcome": "HOLD",
@@ -1193,7 +1188,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 2760.0
+            "value": 5176.0
           }
         },
         "policy": "lifecycle_v1",
@@ -1212,7 +1207,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "a55f50d256e0c7e2",
+      "experiment_id": "99f69618dea3283f",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ11",
@@ -1221,6 +1216,7 @@
         "failed_gates": [
           "oos_ic",
           "statistical_significance",
+          "fold_consistency",
           "hypothesis_sign",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
@@ -1252,9 +1248,9 @@
             "value": 0.0
           },
           "fold_consistency": {
-            "passed": true,
+            "passed": false,
             "threshold": 0.7,
-            "value": 0.75
+            "value": 0.5
           },
           "fold_count": {
             "passed": true,
@@ -1274,27 +1270,27 @@
           "net_pnl_after_costs": {
             "passed": false,
             "threshold": 0.0,
-            "value": -4.776837959303157
+            "value": -6.615889906772573
           },
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -5129.238625756484
+            "value": -5153.274243209713
           },
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": 0.0023133547338761717
+            "value": 0.005928771738486058
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 3.2976786450807944
+            "value": 1.088197190186195
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 0.11950559321856358
+            "threshold": 4.425812536056746,
+            "value": 0.41780410784756544
           }
         },
         "outcome": "HOLD",
@@ -1315,7 +1311,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 2844.0
+            "value": 5178.0
           }
         },
         "policy": "lifecycle_v1",
@@ -1334,7 +1330,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "47b4dbc5c409759e",
+      "experiment_id": "4959ab81cbdd820e",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ12",
@@ -1402,17 +1398,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.02549393167545448
+            "value": 0.03765375914692193
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.16978148042735947
+            "value": 0.21111143339036742
           },
           "statistical_significance": {
             "passed": true,
-            "threshold": 4.365155224196862,
-            "value": 6.871178671404768
+            "threshold": 4.425812536056746,
+            "value": 10.906439736845929
           }
         },
         "outcome": "HOLD",
@@ -1433,7 +1429,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 2928.0
+            "value": 5180.0
           }
         },
         "policy": "lifecycle_v1",
@@ -1452,7 +1448,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "036424437698cae2",
+      "experiment_id": "736228a4b39e98c8",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX01",
@@ -1492,7 +1488,7 @@
           "fold_consistency": {
             "passed": false,
             "threshold": 0.7,
-            "value": 0.0
+            "value": 0.5
           },
           "fold_count": {
             "passed": true,
@@ -1522,17 +1518,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.014914327735926722
+            "value": 0.022178665280762035
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.47141296696148355
+            "value": 0.6056587781970905
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 2.286182678512936
+            "threshold": 4.425812536056746,
+            "value": 4.336192437667513
           }
         },
         "outcome": "HOLD",
@@ -1553,7 +1549,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3012.0
+            "value": 5182.0
           }
         },
         "policy": "lifecycle_v1",
@@ -1572,14 +1568,13 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "aff067ac0137c9d3",
+      "experiment_id": "72fe2e975df935d2",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX02",
         "consecutive_failures": 0,
         "event_ts": 1787691480577291027,
         "failed_gates": [
-          "oos_ic",
           "statistical_significance",
           "hypothesis_sign",
           "net_pnl_after_costs",
@@ -1641,19 +1636,19 @@
             "value": null
           },
           "oos_ic": {
-            "passed": false,
+            "passed": true,
             "threshold": 0.01,
-            "value": 0.00676386992583992
+            "value": 0.018087426932042724
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.9331768846380449
+            "value": 0.12018019998746336
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 0.41852393143532746
+            "threshold": 4.425812536056746,
+            "value": 1.1159692798354393
           }
         },
         "outcome": "HOLD",
@@ -1674,7 +1669,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3096.0
+            "value": 5184.0
           }
         },
         "policy": "lifecycle_v1",
@@ -1693,7 +1688,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "5d39a1c5ff05746c",
+      "experiment_id": "6c0870e6e4b28dfa",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX03",
@@ -1734,7 +1729,7 @@
           "fold_consistency": {
             "passed": false,
             "threshold": 0.7,
-            "value": 0.25
+            "value": 0.5
           },
           "fold_count": {
             "passed": true,
@@ -1764,17 +1759,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.016525390841018894
+            "value": 0.023717590474316912
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.8674784689555922
+            "value": 0.33484373504276027
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 1.6802372550978786
+            "threshold": 4.425812536056746,
+            "value": 2.571062133331175
           }
         },
         "outcome": "HOLD",
@@ -1795,7 +1790,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3180.0
+            "value": 5186.0
           }
         },
         "policy": "lifecycle_v1",
@@ -1814,7 +1809,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "ecad7e621530e185",
+      "experiment_id": "deb9836ca52c3896",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX04",
@@ -1882,17 +1877,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.04766952604098305
+            "value": 0.054802313837150646
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.07034174037433268
+            "value": 0.17233522096060333
           },
           "statistical_significance": {
             "passed": true,
-            "threshold": 4.365155224196862,
-            "value": 7.403120545218753
+            "threshold": 4.425812536056746,
+            "value": 8.691938071982205
           }
         },
         "outcome": "HOLD",
@@ -1913,7 +1908,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3264.0
+            "value": 5188.0
           }
         },
         "policy": "lifecycle_v1",
@@ -1932,7 +1927,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "574d290cf6c48f4e",
+      "experiment_id": "2eaedf95635ab7ed",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX05",
@@ -1995,27 +1990,27 @@
           "net_pnl_after_costs": {
             "passed": false,
             "threshold": 0.0,
-            "value": -1.2432449982651155
+            "value": -1.6041863743743354
           },
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -297.14275903380286
+            "value": -365.2728948136933
           },
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.0069248490042393305
+            "value": -0.012513882965842896
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 6.752807407759607
+            "value": 3.0730370352002963
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": -0.3643811952669611
+            "threshold": 4.425812536056746,
+            "value": -0.6837468172378826
           }
         },
         "outcome": "HOLD",
@@ -2036,7 +2031,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3348.0
+            "value": 5190.0
           }
         },
         "policy": "lifecycle_v1",
@@ -2055,17 +2050,19 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "43e3217e791adcc2",
+      "experiment_id": "dc1a993520ab57c8",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX06",
         "consecutive_failures": 0,
         "event_ts": 1787691480577291027,
         "failed_gates": [
+          "oos_ic",
           "statistical_significance",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
-          "capacity"
+          "capacity",
+          "stability"
         ],
         "gate_order": [
           "leakage_clean",
@@ -2122,19 +2119,19 @@
             "value": null
           },
           "oos_ic": {
-            "passed": true,
+            "passed": false,
             "threshold": 0.01,
-            "value": 0.019797554677928174
+            "value": 0.008065958601219544
           },
           "stability": {
-            "passed": true,
+            "passed": false,
             "threshold": 1.0,
-            "value": 0.4422226351739123
+            "value": 2.698045656503848
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 1.246611041810635
+            "threshold": 4.425812536056746,
+            "value": 0.6610107802022356
           }
         },
         "outcome": "HOLD",
@@ -2155,7 +2152,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3432.0
+            "value": 5192.0
           }
         },
         "policy": "lifecycle_v1",
@@ -2174,7 +2171,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "1ca4bb975973dbfb",
+      "experiment_id": "4a9507ddd4d4a31b",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX07",
@@ -2246,17 +2243,17 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.009124387537170906
+            "value": -0.011695064635264202
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.8014010586724124
+            "value": 0.8607151580785795
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": -0.9712530382614806
+            "threshold": 4.425812536056746,
+            "value": -1.0474083139245656
           }
         },
         "outcome": "HOLD",
@@ -2277,7 +2274,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3516.0
+            "value": 5194.0
           }
         },
         "policy": "lifecycle_v1",
@@ -2296,14 +2293,13 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "43dcbca3d4ab28d1",
+      "experiment_id": "9e70e42ddf2c7a6f",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX08",
         "consecutive_failures": 0,
         "event_ts": 1787691480577291027,
         "failed_gates": [
-          "statistical_significance",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
           "capacity",
@@ -2326,7 +2322,7 @@
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
-            "value": 214.8893743556689
+            "value": 0.0
           },
           "cross_alpha_correlation": {
             "passed": true,
@@ -2356,27 +2352,27 @@
           "net_pnl_after_costs": {
             "passed": false,
             "threshold": 0.0,
-            "value": -3.0248961455293246
+            "value": -4.253667662218952
           },
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -1529.6013774106843
+            "value": -2004.42177216967
           },
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.03450055074924758
+            "value": 0.04711541356263969
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 2.632636010012979
+            "value": 1.732220994165755
           },
           "statistical_significance": {
-            "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 3.1988402010531103
+            "passed": true,
+            "threshold": 4.425812536056746,
+            "value": 4.4398538469575985
           }
         },
         "outcome": "HOLD",
@@ -2397,7 +2393,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3600.0
+            "value": 5196.0
           }
         },
         "policy": "lifecycle_v1",
@@ -2416,7 +2412,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "1d0ceea1e6b34c3b",
+      "experiment_id": "2aebf3f798e07a26",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX09",
@@ -2479,27 +2475,27 @@
           "net_pnl_after_costs": {
             "passed": false,
             "threshold": 0.0,
-            "value": -3.228424335603002
+            "value": -4.713663434728235
           },
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -1889.0876725193723
+            "value": -2442.6962259724405
           },
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.047046607745776396
+            "value": -0.06043687252015987
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 2.798146007149445
+            "value": 1.9848235603156625
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": -5.510775763696524
+            "threshold": 4.425812536056746,
+            "value": -7.0772694988817655
           }
         },
         "outcome": "HOLD",
@@ -2520,7 +2516,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3684.0
+            "value": 5198.0
           }
         },
         "policy": "lifecycle_v1",
@@ -2539,7 +2535,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "7c5839806c61949b",
+      "experiment_id": "96ddf0f6a93b6f31",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX10",
@@ -2599,27 +2595,27 @@
           "net_pnl_after_costs": {
             "passed": false,
             "threshold": 0.0,
-            "value": -0.7656242656113349
+            "value": -0.9322447191404287
           },
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -593.4140191888911
+            "value": -763.275425214779
           },
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.015240540159491353
+            "value": 0.02189832315185954
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 3.458731385643791
+            "value": 1.919707153590122
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 1.4719542171685143
+            "threshold": 4.425812536056746,
+            "value": 2.3796478530105065
           }
         },
         "outcome": "HOLD",
@@ -2640,7 +2636,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3768.0
+            "value": 5200.0
           }
         },
         "policy": "lifecycle_v1",
@@ -2659,10 +2655,52 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "4f3f6bfaae7ce201",
+      "experiment_id": "c0d40c61b69132e9",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX11",
+        "consecutive_failures": 0,
+        "event_ts": 1787691480577291027,
+        "failed_gates": [
+          "leakage_clean"
+        ],
+        "gate_order": [
+          "ledger_entry_exists",
+          "leakage_clean"
+        ],
+        "gates": {
+          "leakage_clean": {
+            "passed": false,
+            "threshold": null,
+            "value": null
+          },
+          "ledger_entry_exists": {
+            "passed": true,
+            "threshold": 1.0,
+            "value": 5202.0
+          }
+        },
+        "outcome": "HOLD",
+        "state": "RESEARCH",
+        "transition": null
+      },
+      "last_transition": null,
+      "model_version": "fc05e6efd63775ff2e6a890b985ddbaaff4b485d06936cf982fe55418705de8b",
+      "recovery_count": 0,
+      "since_ts": 1787691480577291027,
+      "state": "RESEARCH",
+      "state_index": 0
+    },
+    "FX12": {
+      "alpha_id": "FX12",
+      "breach_count": 0,
+      "consecutive_failures": 0,
+      "cusum": 0.0,
+      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+      "experiment_id": "6f0e35487bd505ac",
+      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+      "last_evaluation": {
+        "alpha_id": "FX12",
         "consecutive_failures": 0,
         "event_ts": 1787691480577291027,
         "failed_gates": [
@@ -2689,7 +2727,7 @@
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
-            "value": 469.686266066352
+            "value": 0.0
           },
           "cross_alpha_correlation": {
             "passed": true,
@@ -2719,126 +2757,6 @@
           "net_pnl_after_costs": {
             "passed": false,
             "threshold": 0.0,
-            "value": -13.018557366039339
-          },
-          "net_pnl_bootstrap_ci": {
-            "passed": false,
-            "threshold": 0.0,
-            "value": -3616.4029235920016
-          },
-          "oos_ic": {
-            "passed": true,
-            "threshold": 0.01,
-            "value": 0.03763298254119816
-          },
-          "stability": {
-            "passed": false,
-            "threshold": 1.0,
-            "value": 1.4315750396300873
-          },
-          "statistical_significance": {
-            "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 2.799210213600651
-          }
-        },
-        "outcome": "HOLD",
-        "state": "CANDIDATE",
-        "transition": null
-      },
-      "last_transition": {
-        "actor": "SYSTEM",
-        "alpha_id": "FX11",
-        "event_ts": 1787691480577291027,
-        "from_state": "RESEARCH",
-        "gates": {
-          "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "ledger_entry_exists": {
-            "passed": true,
-            "threshold": 1.0,
-            "value": 3852.0
-          }
-        },
-        "policy": "lifecycle_v1",
-        "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
-        "to_state": "CANDIDATE"
-      },
-      "model_version": "fc05e6efd63775ff2e6a890b985ddbaaff4b485d06936cf982fe55418705de8b",
-      "recovery_count": 0,
-      "since_ts": 1787691480577291027,
-      "state": "CANDIDATE",
-      "state_index": 1
-    },
-    "FX12": {
-      "alpha_id": "FX12",
-      "breach_count": 0,
-      "consecutive_failures": 0,
-      "cusum": 0.0,
-      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "d96e67be1c20bd8d",
-      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
-      "last_evaluation": {
-        "alpha_id": "FX12",
-        "consecutive_failures": 0,
-        "event_ts": 1787691480577291027,
-        "failed_gates": [
-          "statistical_significance",
-          "fold_consistency",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity"
-        ],
-        "gate_order": [
-          "leakage_clean",
-          "oos_ic",
-          "statistical_significance",
-          "fold_consistency",
-          "fold_count",
-          "hypothesis_sign",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability",
-          "cross_alpha_correlation"
-        ],
-        "gates": {
-          "capacity": {
-            "passed": false,
-            "threshold": 1000000.0,
-            "value": 0.0
-          },
-          "cross_alpha_correlation": {
-            "passed": true,
-            "threshold": 0.7,
-            "value": 0.0
-          },
-          "fold_consistency": {
-            "passed": false,
-            "threshold": 0.7,
-            "value": 0.5
-          },
-          "fold_count": {
-            "passed": true,
-            "threshold": 3.0,
-            "value": 4.0
-          },
-          "hypothesis_sign": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "net_pnl_after_costs": {
-            "passed": false,
-            "threshold": 0.0,
             "value": 0.0
           },
           "net_pnl_bootstrap_ci": {
@@ -2849,17 +2767,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.016954296988787466
+            "value": 0.020484713552572344
           },
           "stability": {
-            "passed": true,
+            "passed": false,
             "threshold": 1.0,
-            "value": 0.9523588104781426
+            "value": 1.0771594605607213
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 1.940267808303197
+            "threshold": 4.425812536056746,
+            "value": 2.5090022164048715
           }
         },
         "outcome": "HOLD",
@@ -2880,7 +2798,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3936.0
+            "value": 5204.0
           }
         },
         "policy": "lifecycle_v1",
