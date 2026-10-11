@@ -1,0 +1,190 @@
+{
+  "schema": "iap.r7_power_inputs/v1",
+  "description": "Summary statistics extracted (2026-10-11) from already-computed, git-ignored in-sample and v1.8 holdout result files under data/real/ so the R7 power analysis is reproducible from the repository. No market data was read; source_sha256 pins each source file. EQ: multi7 = the seven 2019-20 sessions.",
+  "H4": {
+    "alphas": {
+      "EQ01": {
+        "horizon": "1s",
+        "registered_sign": 1,
+        "insample": {
+          "sessions": 7,
+          "test_folds": 4,
+          "gate_ic": 0.10508342324541939,
+          "gate_t": 21.06658123401654,
+          "n_ic_buckets": 452,
+          "fold_ic": [
+            0.16900179591538672,
+            0.0959293306538167,
+            0.11291811136039182,
+            0.07293147930912235
+          ],
+          "source": "data/real/multi7/research/alpha_reports/EQ01.json",
+          "source_sha256": "9f2cf9085da0d30b17814bc076bdbc77025e36c742d117bd36960550427d0a78"
+        },
+        "holdout_v18": {
+          "sessions": 2,
+          "ic": 0.03676549012676577,
+          "t": 7.742567071334353,
+          "source": "data/real/holdout2026/research/experiments/c754059e9d2c001a/result.json",
+          "source_sha256": "bad9e989c74ee9870f2dad1fb666c33cc4a3ccd36c5e5d5efef7e10217ac4c9e"
+        }
+      },
+      "EQ02": {
+        "horizon": "5s",
+        "registered_sign": 1,
+        "insample": {
+          "sessions": 7,
+          "test_folds": 4,
+          "gate_ic": 0.041895729999236096,
+          "gate_t": 25.74409678595994,
+          "n_ic_buckets": 452,
+          "fold_ic": [
+            0.06191343848600644,
+            0.03908626298788942,
+            0.04281592681993702,
+            0.03025938089747166
+          ],
+          "source": "data/real/multi7/research/alpha_reports/EQ02.json",
+          "source_sha256": "e6e7826c43a7865518f0adb54397c628ba3b6c0f6bd33b4144e3ae269c5d0796"
+        },
+        "holdout_v18": {
+          "sessions": 2,
+          "ic": 0.01611433251181277,
+          "t": 8.021692481381342,
+          "source": "data/real/holdout2026/research/experiments/2cd3163655127b14/result.json",
+          "source_sha256": "7006f1bd7069ab06f969f394297258c27c829c400455339dcc8b09ecffa68c9e"
+        }
+      },
+      "EQ04": {
+        "horizon": "5s",
+        "registered_sign": 1,
+        "insample": {
+          "sessions": 7,
+          "test_folds": 4,
+          "gate_ic": 0.013707737739784537,
+          "gate_t": 3.6105428627372076,
+          "n_ic_buckets": 452,
+          "fold_ic": [
+            0.008055969259068155,
+            0.006632223161843438,
+            0.018963334436291418,
+            0.020664814965620542
+          ],
+          "source": "data/real/multi7/research/alpha_reports/EQ04.json",
+          "source_sha256": "15e54e49e67e43630bd7511cd332768fef1a842c10e662c5a7e5dd6151333adb"
+        },
+        "holdout_v18": {
+          "sessions": 2,
+          "ic": 0.027551714690413592,
+          "t": 3.148529887492375,
+          "source": "data/real/holdout2026/research/experiments/abe123f3bb963d21/result.json",
+          "source_sha256": "d6b304ed4a0930a0919a88dc073385d8a93e3af0eb30602560cab01519fe6913"
+        }
+      },
+      "EQ05": {
+        "horizon": "1s",
+        "registered_sign": 1,
+        "insample": {
+          "sessions": 7,
+          "test_folds": 4,
+          "gate_ic": 0.06274247436968561,
+          "gate_t": 24.201000263972293,
+          "n_ic_buckets": 452,
+          "fold_ic": [
+            0.05589183177559745,
+            0.061755139642636236,
+            0.0856461318280465,
+            0.05481397641646657
+          ],
+          "source": "data/real/multi7/research/alpha_reports/EQ05.json",
+          "source_sha256": "73f756b4cb77f5fec11d610b949f7cfe4e1f8afeeec580b369f1ea2ea68021c4"
+        },
+        "holdout_v18": {
+          "sessions": 2,
+          "ic": 0.03307077358409086,
+          "t": 9.51456454190443,
+          "source": "data/real/holdout2026/research/experiments/00d4dec83a2bca12/result.json",
+          "source_sha256": "92c344f65d1dad5e210de62eee2c4f05390acca1e4ab907b13d775970f0b4bd8"
+        }
+      },
+      "EQ07": {
+        "horizon": "10s",
+        "registered_sign": 1,
+        "insample": {
+          "sessions": 7,
+          "test_folds": 4,
+          "gate_ic": -0.012012231602207891,
+          "gate_t": -3.037145376580892,
+          "n_ic_buckets": 452,
+          "fold_ic": [
+            -0.0028712938499556376,
+            -0.0023007833805105678,
+            -0.013046160968483772,
+            -0.03004217027734025
+          ],
+          "source": "data/real/multi7/research/alpha_reports/EQ07.json",
+          "source_sha256": "a63bdaafc94a994436e0559bdb2ca6611637cb3a7f242012fdaa6216774c0ee7"
+        },
+        "holdout_v18": {
+          "sessions": 2,
+          "ic": -0.020597823162706294,
+          "t": -3.944976243994198,
+          "source": "data/real/holdout2026/research/experiments/176b427e02f79419/result.json",
+          "source_sha256": "45cc9353b8bcd7ca88c97ed1cf23811e7324acd83917e0846d853aacbc2b1d30"
+        }
+      },
+      "EQ10": {
+        "horizon": "1s",
+        "registered_sign": 1,
+        "insample": {
+          "sessions": 7,
+          "test_folds": 4,
+          "gate_ic": 0.07563883669137826,
+          "gate_t": 13.242128568943206,
+          "n_ic_buckets": 448,
+          "fold_ic": [
+            0.07323932349107885,
+            0.06042185721196071,
+            0.10105254094214453,
+            0.07420601105641893
+          ],
+          "source": "data/real/multi7/research/alpha_reports/EQ10.json",
+          "source_sha256": "62325321910501b223e03ebf2b05c86eeeb03029678129ed98ea7d46bb3ec7e9"
+        },
+        "holdout_v18": {
+          "sessions": 2,
+          "ic": 0.09663229450755607,
+          "t": 8.084419064435457,
+          "source": "data/real/holdout2026/research/experiments/6fd114c92b0ab059/result.json",
+          "source_sha256": "21adcdbbdfaba7cb293425cf1b872cc3fceb96e4dfb82686f7f547f50ccfd843"
+        }
+      }
+    }
+  },
+  "H3": {
+    "cell": "C-300s",
+    "statistic_insample": "session-clustered mean net bps (no in-sample IC exists)",
+    "decisions_per_session": 3,
+    "insample_sessions": 7,
+    "insample_test_sessions": 6,
+    "active_sessions": 2,
+    "mean_net_bps": 19.36227392364338,
+    "se_bps": 21.535244441203567,
+    "per_session": {
+      "2019-08-30": {
+        "mean_net_bps": 40.897518364846945,
+        "n": 2
+      },
+      "2019-10-30": {
+        "mean_net_bps": -2.172970517560187,
+        "n": 1
+      }
+    },
+    "source": "data/real/auction/AUC01_insample_summary.json",
+    "source_sha256": "b74904c599afb024af349a071c1e19fa633470be2b2796fa1386df6aba03a782"
+  },
+  "H1": {
+    "status": "PLACEHOLDER: maker_real summary not written yet",
+    "expected_summary": "data/real/maker_real/summary.json"
+  }
+}

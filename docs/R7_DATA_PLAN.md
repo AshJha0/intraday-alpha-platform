@@ -179,14 +179,32 @@ hypotheses (each with its in-sample estimate frozen at registration):
   (H2 quoting: DROPPED 2026-10-11 by owner decision - the quoting study was
                aborted and has no in-sample estimate; it may get its own
                pre-registration later)
-  H3 auction:  AUC01 NOII imbalance -> closing-cross return, IC > 0
-  H4 EQ:       EQ01 1s, EQ02 5s, EQ04 5s, EQ05 1s, EQ07 10s, EQ10 1s pooled
-               uncrossed IC > 0 (same horizons as the v1.8 holdout)
-gate:          HAC t >= ledger threshold in force; deflated Sharpe > 0.95; reported
+  (H3 auction: DROPPED 2026-10-11 by owner decision - underpowered even on
+               47 sessions (docs/research/R7_POWER.md); needs a redesign)
+  H4 EQ:       EQ10 1s, EQ05 1s pooled uncrossed IC > 0 (same horizons as the
+               v1.8 holdout); tier 1 only (owner decision 2026-10-11)
+  deferred:    EQ01 1s, EQ02 5s, EQ04 5s to tier 1 + tier 2 (47 sessions) under a
+               later pre-registration (power on 7 sessions 0.26 / 0.49 / 0.04)
+  (EQ07 10s:   DROPPED - drafted sign contradicts in-sample and the v1.8
+               holdout; flipping it after seeing results would fit seen data)
+gate:          HAC t >= ledger threshold in force; deflated Sharpe > 0.95 (H4: on
+               the per-session IC series; net-of-cost P&L descriptive only; H1
+               series open until the maker summary); reported
                with and without 2025-12-10 (FOMC) and 2025-11-28 (holiday-thin)
 decision:      a failure is final for that hypothesis on these sessions
 sensitivity:   feed latency 10 us (primary 100 us, configs/prereg/v2.json), reported
                alongside results only; never decides pass/fail; no ledger look
+cost sens.:    platform cost model at 0.5x, 1.0x (primary, the only one that decides)
+               and 1.5x: explicit + implicit components scaled
+               (CostModel.with_cost_sensitivity), regulatory fees at schedule;
+               reporting only, never decides pass/fail, no ledger look
+fingerprints:  each holdout .gz file's bytes + sha256 (computed streaming, never
+               decompressed), and sha256 of r7_candidates.json, configs/prereg/v2.json
+               and configs/reference/regulatory_fee_schedule.json; checked before ingest
+power:         docs/research/R7_POWER.md (tools/r7_power.py): power and minimum
+               detectable effect per hypothesis on tier 1 (7) and tier 1+2 (47)
+               sessions; H1 placeholder until the maker_real summary exists. A
+               planning aid for the owner; it changes no hypothesis
 ```
 
 ## 7. A2 pre-registration template (DRAFT: not registered, not on the blackboard)
