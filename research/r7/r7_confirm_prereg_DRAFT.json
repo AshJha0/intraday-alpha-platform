@@ -153,13 +153,14 @@
     "H1 in-sample estimate from the maker_real summary, then rerun tools/r7_power.py and decide the H1 deflated-Sharpe series",
     "sign-off and blackboard registration before any holdout data is read"
   ],
-  "deferred_to_tier2": {
-    "decision": "owner decision 2026-10-11 on docs/research/R7_POWER.md",
-    "sessions": "tier 1 + tier 2 = 47, under a later pre-registration",
+  "untested_insufficient_free_data": {
+    "decision": "owner decisions 2026-10-11 on docs/research/R7_POWER.md and R7_MULTI_SYMBOL_PLAN.md",
+    "sessions": "not tested: the 47-session route (paid tier 2) was declined and more symbols on the 7 free sessions does not reach 0.8 power (docs/research/R7_MULTI_SYMBOL_PLAN.md); revisit only if new free sessions appear (tools/r7_watch_nasdaq.py)",
     "alphas": {
       "EQ01@1s": "joint power 0.26 on 7 sessions at the in-sample IC (0.00 at the v1.8 IC); MDE IC 0.175 vs 0.042 on 47",
       "EQ02@5s": "joint power 0.49 on 7 sessions at the in-sample IC (0.00 at the v1.8 IC); MDE IC 0.057 vs 0.014 on 47",
       "EQ04@5s": "joint power 0.04 on 7 sessions at the in-sample IC (0.70 at the v1.8 IC); MDE IC 0.031 vs 0.008 on 47"
-    }
+    },
+    "status": "UNTESTED (insufficient free data) - not a failure"
   }
 }

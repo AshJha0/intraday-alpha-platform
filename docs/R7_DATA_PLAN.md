@@ -183,8 +183,9 @@ hypotheses (each with its in-sample estimate frozen at registration):
                47 sessions (docs/research/R7_POWER.md); needs a redesign)
   H4 EQ:       EQ10 1s, EQ05 1s pooled uncrossed IC > 0 (same horizons as the
                v1.8 holdout); tier 1 only (owner decision 2026-10-11)
-  deferred:    EQ01 1s, EQ02 5s, EQ04 5s to tier 1 + tier 2 (47 sessions) under a
-               later pre-registration (power on 7 sessions 0.26 / 0.49 / 0.04)
+  untested:    EQ01 1s, EQ02 5s, EQ04 5s - insufficient free data (power on 7
+               sessions 0.26 / 0.49 / 0.04; paid tier 2 declined; more symbols does
+               not reach 0.8, R7_MULTI_SYMBOL_PLAN.md). Not a failure.
   (EQ07 10s:   DROPPED - drafted sign contradicts in-sample and the v1.8
                holdout; flipping it after seeing results would fit seen data)
 gate:          HAC t >= ledger threshold in force; deflated Sharpe > 0.95 (H4: on
