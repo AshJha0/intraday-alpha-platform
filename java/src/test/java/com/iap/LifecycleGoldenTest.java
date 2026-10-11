@@ -330,7 +330,11 @@ public class LifecycleGoldenTest {
         }
         assertEquals(24, machine.evaluations().size());
         for (GateEvaluation ev : machine.evaluations()) {
-            assertEquals(GateEvaluation.Outcome.NO_EVIDENCE, ev.outcome());
+            // a RESEARCH alpha (FX11) is held at its entry gates, not starved
+            assertEquals(ev.alphaId(),
+                    "FX11".equals(ev.alphaId()) ? GateEvaluation.Outcome.HOLD
+                            : GateEvaluation.Outcome.NO_EVIDENCE,
+                    ev.outcome());
         }
     }
 

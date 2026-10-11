@@ -125,6 +125,13 @@ def test_legacy_v1_reproduces_the_v140_alpha_report(pipeline, alpha_id):
         "significance": "within_bucket",
         "stress_version": 1,
         "tstat_threshold": "fixed",
+        # the v1.14.0 report keys, at their v1.13.0 (= legacy) values
+        "row_block": "none",
+        "hac_bandwidth": "horizon",
+        "hac_day_separated": False,
+        "hypothesis_rule": "last_fold",
+        "standardisation": "pooled",
+        "leakage_time_shift": False,
     }
 
 
@@ -145,7 +152,10 @@ def test_the_default_bundle_is_not_the_legacy_one(pipeline):
     # ... on other rows (BLACKOUT rows scored at their reopen return) ...
     assert legacy["gate_ic"] == pytest.approx(pinned["gate_ic"], rel=1e-9)
     assert default["gate_ic"] != pytest.approx(pinned["gate_ic"], rel=1e-4)
-    assert default["gate_ic_valid_only"] == pytest.approx(pinned["gate_ic"], rel=1e-9)
+    # (v1.14.0 scales per instrument, so the valid-only IC is compared under
+    # the v1.13.0 revision of the bundle, by name)
+    v113 = _report(pipeline, "EQ03", "v2_v113", ledger_t=4.0, gate_looks=1000)
+    assert v113["gate_ic_valid_only"] == pytest.approx(pinned["gate_ic"], rel=1e-9)
     # ... and the backtest trades by another rule: the legacy sign policy
     # trades EQ03 thousands of times at a loss; under the cost-aware default
     # its forecast never clears the round-trip cost and it makes no trade
