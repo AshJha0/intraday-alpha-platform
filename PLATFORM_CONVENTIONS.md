@@ -1479,3 +1479,28 @@ agreed on the defect (§14.1 said the same of the simulator on 2026-09-20).
   only for a copy with no consumer in deployment/, CI, the MVP, a documented
   command or the golden harness. Parity tests are never weakened to retire
   anything. §5 (golden tests) and §11 (normative owners) are unchanged.
+
+## 17. Data mapping and feature semantics corrected in v1.14 (quality review 2026-10-11, D-items)
+
+v1.14 is a correctness release: each rule below replaces earlier behaviour
+**deliberately**, moves synthetic goldens and every real `dataset_version`,
+and is pinned by a test that fails under the old rule. `CHANGELOG.md`
+(v1.14.0) lists every number that moved and by how much.
+
+| item | corrected rule | normative text |
+|---|---|---|
+| D-P1-1 | the events of one instrument sharing an `exchange_ts` are ONE state change: applied and flow-folded one by one, then one refresh / sample / emission at the group's last event (`group_ends`); a trade's effective spread uses the pre-group mid; a venue stale inside the group is a recovery. Python / Rust / C++ (canonical) and Java (port) identical; per-event `apply(ev)` stays for streaming callers (MVP, alpha golden frames) | API_FEATURES §2.3 |
+| D-P1-2 | a post-2014 ITCH hidden print (`P`) is signed by the quote rule against the mapper's own best bid / ask (Lee–Ready), the tick rule only at the mid or without a two-sided quote | REAL_DATA §4.2 |
+| D-P1-3 | an off-grid TRADE price rounds half to even (not half up); residues histogrammed in the manifest | REAL_DATA §4.1 |
+| D-P1-4 | a dataset manifest of x-version 1 (pre-v1.14 rules) is refused by every reader with the reason | REAL_DATA §4, §7 |
+| D-P2-6 | side-less cross prints count in volume / participation / volume profile / volume clock, never in signed flow, trade counts or the effective spread (`--cross-prints fold`, default) | REAL_DATA §4.2 |
+| D-P2-8 | `ref_price` / `adv` per session (as-of: earlier sessions only) in `instruments.json` and the security master; the backtester's impact and the capacity proxy read them | REAL_DATA §7 |
+| D-P2-9 | `config_version` = sha256 over `configs/**` + `reference/**` of a dataset, in the manifest and on every new ledger entry of a `--dataset-dir` run (provenance, not identity) | REAL_DATA §7 |
+| D-P2-10 | an instrument quoted on the half-penny grid gets tick 0.005 (`auto`); a forced 0.01 is refused | REAL_DATA §4.1 |
+| D-P2-12 | ITCH `h` operational halts of the mapped market map to `STATUS HALT` | REAL_DATA §4.2 |
+| D-P2-13 | the feature store's label freshness defaults to `trailing` (causal); `whole_day` is the legacy store; `features_summary.json` records `store_version` 2, `label_freshness`, `same_ts` | API_FEATURES §6 |
+
+The v1.13 feature store is rebuilt exactly by
+`python -m iap.features --same-ts per_event --label-freshness whole_day
+--cross-prints omit` (`python/tests/test_legacy_methods.py` does so to keep
+reproducing the v1.4.0 alpha reports byte for byte).

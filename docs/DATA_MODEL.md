@@ -268,6 +268,20 @@ The files are the truth; the store is an index of them. Concretely:
 | `research/baselines/*.json` | `import_baselines` | `drift_baselines` | |
 | a session's trace JSONL / live `TraceSink` | `Store.insert_trace` / `iap.trace.StoreTraceSink` | `decision_traces` + the stage tables | the JSONL file (and its `TraceDigest`) is the durable record; the store rows are its index |
 
+**v1.14 fields the store does not index (D-P2-8, D-P2-9, D-P2-13).** An
+ingested dataset's `instruments.json` rows carry `ref_price_by_session` /
+`adv_by_session` (point-in-time values per session, also on its
+security-master records); `import_reference` keeps loading the scalar
+`ref_price` / `adv` into `instruments`, and per-session consumers (the
+backtester, the capacity proxy) read the file, never the store. Ledger
+entries of `--dataset-dir` runs carry `config_version` (sha256 over the
+dataset's `configs/` + `reference/` trees): it stays in the entry JSON and
+is not a `ledger_entries` column (it is provenance, not part of the key).
+`features_summary.json` records `store_version` (2 = coalesced
+same-timestamp events + trailing label freshness) beside the
+`feature_versions.registry_hash` the store indexes; a store row's numbers
+are only comparable across feature stores of the same `store_version`.
+
 `import_all` runs them in that order (alpha rows must exist before the
 state writers run). Each importer returns an `ImportReport(inserted={table:
 n}, warnings=(…))`.

@@ -6,6 +6,116 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## v1.14.0 — unreleased
+
+Correctness release, data half (IAP_Quality_Review_2026-10-11 D-items:
+D-P1-1..4, D-P2-6, D-P2-8..10, D-P2-12, D-P2-13). Unlike v1.12, defaults
+change **deliberately**: synthetic feature goldens, the seeded feature store
+and every artefact computed from it, and every real `dataset_version` move.
+PLATFORM_CONVENTIONS §17 is the normative summary; every moved number is
+listed below. **No real-data store was rebuilt by this change** (the
+release owner re-ingests: REAL_DATA §4 and the commands in the PR).
+
+### Same-timestamp coalescing (D-P1-1) — all feature engines
+
+- The events of one instrument sharing an `exchange_ts` (ITCH `E` → EXECUTE
+  + TRADE, `U` → CANCEL + ADD, a two-sided FX quote) are one state change:
+  every event is applied to the book and its flow folded, then ONE refresh /
+  sample / emission at the group's last event (`group_ends`). A trade's
+  effective spread is measured against the pre-group mid; a venue stale at
+  any point of the group is a stale→fresh recovery. API_FEATURES §2.3.
+- Ported identically to the canonical Rust (`apply_grouped`, `group_ends`,
+  pyo3 `replay_*(coalesce=True)`) and C++ (`apply(ev, out, group_end)`,
+  `group_ends`, `run(..., coalesce)`) engines and to the frozen Java engine
+  (`POLYGLOT-OVERRIDE: bug fix only`, overloads of the existing `apply` /
+  `run`, no new method name, type or constructor).
+- Kept per-event (documented): the streaming MVP (no lookahead on a live
+  stream), the alpha golden frames (`build_golden_frame`; `expected_alpha`,
+  `expected_backtest`, `expected_mvp` unchanged) and every port test that
+  drives `apply(ev)` alone. `python -m iap.features --same-ts per_event
+  --label-freshness whole_day --cross-prints omit` rebuilds a v1.13 store;
+  `test_legacy_methods.py` uses it to keep reproducing the v1.4.0 alpha
+  reports byte for byte.
+- **Moved numbers (synthetic goldens, cadence 0).** Rows: EQ golden vector
+  2,000 → 1,591 (−409), FX 800 → 426 (−374), EQ anomalies 1,379 → 1,034
+  (−345), FX anomalies 544 → 303 (−241). Of the rows that remain, 1,567 of
+  1,591 (EQ) / 396 of 426 (FX) / 959 of 1,034 / 289 of 303 differ in at
+  least one of the 205 features, 1,061 / 377 / 616 / 281 in a native-45
+  slot (time-of-day norms, volatility, depth averages and the OFI sums
+  move most: they no longer sample phantom states). `expected_features.json`:
+  EQ checkpoints 500 / 1500 → 501 / 1501 (the events closing their groups),
+  24 of 188 EQ and 9 of 94 FX checkpoint values changed.
+  `expected_features_anomalies.json`: FX checkpoint 240 → 241; 12 of 360 EQ
+  and 42 of 270 FX values changed; drop counters, regression counts and
+  recoveries (EQ 6, FX 2) unchanged. `expected_features_snapshot_burst.json`:
+  192 → 123 EQ and 25 → 19 FX checkpoints (only group-closing events emit),
+  184 of 5,535 and 47 of 855 remaining values changed.
+  `test_feature_pipeline`: 2,000 → 1,591 rows.
+
+### ITCH mapping and ingest rules (manifest x-version 2)
+
+- **Hidden prints signed by the quote rule (D-P1-2).** A post-2014 `P` print
+  is signed against the mapper's own best bid / ask (Lee–Ready: above the
+  mid buy, below sell); the tick rule only at the mid or without a
+  two-sided uncrossed quote. New counter `hidden_trades_signed_by_quote_rule`;
+  `hidden_trades_signed_by_tick_rule` now counts the fallbacks only. The
+  level book (`itch50.LevelBook`) is the lazy-heap best price the ingest
+  consistency check already used (`_CheckState` now inherits it).
+- **Midpoint prints round half to even (D-P1-3)**, not half up; residues in
+  `raw.trade_price_residue_histogram`. Pinned seeded dataset of
+  `test_output_bytes_of_a_seeded_dataset_are_pinned`: 119 midpoint prints of
+  2019-12-30 (histogram `{"50": 119}`), dataset_version `70ddb405…` →
+  `8ae6f26f…` (also the v2 domain prefix below), raw sha `104ceb7f…` →
+  `6060224…`.
+- **Pre-rule datasets refused (D-P1-4).** `MANIFEST_VERSION` 2,
+  `ingest_rules_version` 2; `load_manifest` refuses x-version 1 (the
+  `ds_20191230` dataset with its 0.0001 tick, and every dataset ingested
+  before v1.14) with the reason, so ingest-into, merge, feature builds and
+  `--dataset-dir` runs all stop. `dataset_version` domain
+  `iap.real-dataset.v1` → `v2`: every real dataset version changes.
+- **Half-penny tick (D-P2-10).** `--tick-size auto` picks 0.005 when at
+  least 100 and more than 1 % of the displayed orders at or above $1.00 are
+  on the $x.xx50 grid; a forced 0.01 is refused; per symbol
+  `displayed_orders_on_half_penny`.
+- **Operational halts (D-P2-12).** ITCH `h` (21 bytes) is decoded; a halt of
+  market `Q` maps to `STATUS HALT` until resumed (independent of `H`);
+  counters `operational_halt_messages`, `operational_halts_other_markets`,
+  `unknown_operational_halt_actions`.
+- **`config_version` (D-P2-9)**: sha256 over the dataset's `configs/**` +
+  `reference/**`, in the manifest, the ingest summary and on every new
+  ledger entry of a `--dataset-dir` run (`ExperimentLedger(config_version=)`;
+  provenance only, the experiment key is unchanged).
+
+### Feature store and consumers
+
+- **Cross prints in volume, not in signed flow (D-P2-6).**
+  `FeatureEngine.on_cross_print` + `python -m iap.features --cross-prints
+  fold` (default; `omit` = v1.13) fold the side-less opening / closing /
+  halt crosses of `dataset.json` into `traded_volume_*`, `participation_*`,
+  the volume profile, the impact proxy and the `volume:N` clock; signed
+  volume, trade imbalance, trade counts and effective spread never see them.
+  The native-45 slots do not change (no native slot reads volume). No
+  effect on synthetic data (no crosses).
+- **Per-session reference values (D-P2-8).** `instruments.json` rows of an
+  ingested dataset add `ref_price_by_session` / `adv_by_session` (as-of: the
+  mean volume of EARLIER sessions; the first session's own volume for the
+  first); security-master records carry `ref_price` / `adv`
+  (`SecurityRecord`, written only when set). The backtester's impact cost
+  reads each trade's own session ADV; the capacity proxy the mean of
+  `adv × ref_price` over the sessions. Synthetic configs have no per-session
+  values: their numbers are unchanged.
+- **Trailing label freshness by default (D-P2-13 / R-P1-1).**
+  `--label-freshness trailing` is the store default (`whole_day` = legacy);
+  `features_summary.json` records `store_version` 2, `label_freshness` and
+  `same_ts` (and `cross_prints` on an ingested dataset).
+
+### Moved research artefacts (seeded synthetic dataset)
+
+Regenerated by the CI `regenerate` job (`regenerate_allow_rerun=true`: the
+synthetic `data_version` is unchanged, so the report pipelines' ledger
+entries are reruns of the same identities); see the PR for the run. The
+moved numbers are listed in the next paragraph.
+
 ## v1.12.0 — 2026-10-10
 
 Honest Sharpe, better passive fills, new features, measured latency and
