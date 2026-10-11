@@ -1024,6 +1024,26 @@ ticks-behind-touch readout, a hazard-based passive-exit fill probability, a
 DST-aware volume curve (`--tz`), and explicit ADV units for Almgren-Chriss
 parameters. API_TRADING.md §2.11.
 
+### 3.12 What v1.14 changed in execution and risk
+
+One execution rule changed by default: a MODIFY that shrinks an order
+ahead of a resting child now credits the child's queue position, as a
+cancel always did. Before, a child behind an order that was cut from 500
+to 100 shares still waited behind 500. No golden moved, because the golden
+vector never shrinks a level where a child rests; the pinned unit test in
+C++, Java and Python carries the rule.
+
+Everything else is opt-in, because each one moves every maker number and
+belongs in a new pre-registration, not a release: feed latency, exits
+routed through the simulator, fills from hidden prints, adverse selection
+counted once per touch order, and priority-keeping size amends
+(API_TRADING.md §2.12, COOKBOOK recipe 73).
+
+On the risk side (§4), the audit log became a hash chain and the engine
+gained the SEC 15c3-5 pre-trade set as checks 23-29, run after the 22
+legacy checks so that no existing decision moved (COOKBOOK recipes 69 and
+70).
+
 ## 4. Risk: the engine that says no
 
 ### 4.1 The rule order

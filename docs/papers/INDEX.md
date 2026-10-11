@@ -34,6 +34,17 @@ are statements about this dataset and pipeline, not about real markets).
 > variance; hot path ≈ 0.76 µs/event). The 760 / 65 / 3.99 / 3.64 figures in
 > the papers' own errata are the 2026-09-06 snapshot each paper quotes.
 >
+> **Note — 2026-10-11 (v1.14.0).** v1.14 changed the default research
+> statistics (causal backtest row block, automatic HAC with no lag product
+> across days, a time-shift leakage test, one look per gate decision) and
+> the feature engine's handling of same-timestamp events, and regenerated
+> the synthetic store and reports. The papers' bodies and earlier errata
+> are not rewritten: they are dated statements about the pipeline as it
+> was. Where a paper's figure and a current report disagree, the report is
+> current; RESEARCH_VALIDITY.md §4b and CHANGELOG.md list what moved and
+> why. The conclusions the papers draw (no promoted alpha, costs dominate
+> at short horizons, the lead-lag null) are unchanged.
+>
 > **Errata — 2026-10-03 (v1.4.0).** The synthetic dataset was regenerated.
 > Up to v1.3.0 the generator stopped the equity continuous flow 37.6-43.2 %
 > of the way through each session; it now runs to the close, with about the
