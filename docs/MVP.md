@@ -10,7 +10,7 @@ replaying it from the captured stream reproduces the trace digest.
 
 Package: `python/src/iap/mvp/` (`config.py`, `feed.py`, `alpha.py`,
 `portfolio.py`, `adapters.py`, `engine.py`, `report.py`, `session.py`,
-`__main__.py`). Configuration: `configs/mvp/{mvp,venues,instruments,generator}.json`
+`__main__.py`; `real.py` runs the loop on an ingested real dataset, section 9). Configuration: `configs/mvp/{mvp,venues,instruments,generator}.json`
 (+ `mvp_tiny.json` / `generator_tiny.json` for the fast tests). Golden:
 `tests/golden/expected_mvp.json` (generator `python/tools/make_golden_mvp.py`).
 
@@ -479,3 +479,62 @@ a research verdict); the shift-by-one probe cannot discriminate a leak
 from a persistent signal on this session (§7.1 item 3) — the
 pinned-definition and truncation tests are the leak evidence; `explain` renders expected returns
 at 0.1 bp resolution (pinned format).
+
+## 9. The MVP on a real ITCH session (`python -m iap.mvp.real`, v1.15)
+
+```
+python -m iap.mvp.real --dataset data/real/<dataset> --date 2019-01-30 \
+  --symbols AAPL,MSFT --config configs/prereg/v2.json --out <dir> \
+  [--limit-events N] [--mvp-config configs/mvp/mvp.json] [--allow-legacy-dataset]
+```
+
+`iap.mvp.real` feeds the normalized stream of a dataset directory written by
+`iap.marketdata.ingest` (docs/REAL_DATA.md) through the same `MvpEngine` and
+`run_session` as the synthetic run. The loop is unchanged; only the feed and
+the reference data differ, so the synthetic golden (digest `6fdb3a2c`) does not
+move. The MVP trades one instrument, so each symbol gets its own engine and
+its own `<out>/<SYMBOL>/` directory.
+
+- **Reference data.** The dataset's instruments row (one symbol), its venues
+  (`XNAS`, venue 101, latency 0 because ITCH carries exchange timestamps only)
+  and its calendar are written to `<out>/<SYMBOL>/reference_root/configs/real/`.
+  The risk, execution, alpha-parameter, alpha-registry and generator documents
+  are copied next to them at their repository-relative paths. The session block
+  (timezone, open, close) comes from the dataset's `sessions` entry for the
+  instrument's asset class (09:30 to 16:00 America/New_York for ITCH).
+- **Streaming.** Events are read with `iter_iap1` (chunked) or `iter_jsonl` and
+  are never held as a list. Pass 1 counts the symbol's events (stopping at
+  `--limit-events`). Pass 2 hashes them: `data_version` is the sha256 of their
+  IAP1 encoding, the platform's dataset definition. Pass 3 drives the engine.
+  Event ids are renumbered 1..N after the symbol filter, the same as `generate_feed`.
+  The engine's own state (decisions, timeline, label series) still grows with
+  the session.
+- **Identity checks.** The normalized file's sha256 must match `dataset.json`.
+  A pre-v1.14 manifest (x-version 1) is refused unless `--allow-legacy-dataset`
+  is passed. That flag is for smoke runs only, and the run manifest records `legacy: true`.
+- **Run manifest.** `<out>/<SYMBOL>/run_manifest.json` records the dataset
+  (`dataset_version`, normalized file sha256, dataset `config_version`), the
+  pre-registration config (path, content hash, methods), the MVP `run_id` and
+  `config_version`, the event count and bounds, decisions / parents / children /
+  fills / P&L, and the trace digest. It contains no wall clock and no absolute
+  path, so two runs of the same inputs write identical bytes (tested).
+- **Pre-registration.** `--config` is pinned by hash and its opt-ins that
+  the MVP loop exercises are applied through `MvpEngine(realism=...)` (an
+  opt-in keyword; the synthetic run, the golden and the C++/Rust parity path
+  never set it, so the golden digest `6fdb3a2c` is unchanged):
+  `regulatory_fees` (SEC Section 31 + FINRA TAF on sell fills, dated by fill
+  time, `ExecConfig.regulatory_fees`), `hidden_print_fills`
+  (`ExecutionSimulator(hidden_prints=True)`) and `feed_latency_ns` (added to
+  the decision latency leg). `modify_queue_credit` is always on. These are
+  listed under `applied`. `exit_route`, `flatten_route`, `amend_size_down` and
+  `markout_unit` belong to the maker / quoting / calibration paths and have no
+  counterpart in the MVP loop. They are listed under `not_applied` with the
+  reason. Without `--config` the run is the pinned v1 loop.
+
+Smoke run (2026-10-11, `ds3_20190130`, AAPL, `--limit-events 200000`, legacy
+manifest, before the prereg opt-ins were wired, so v1 costs). The first 200,000 AAPL events run from 03:08 to 09:41 ET, so about
+11 minutes of regular session. Results: 4,836 decisions, 4,424 parents, 956
+children submitted, 946 fills, gross P&L USD +219.78, fees USD 64.63,
+execution cost USD 634.35, equity USD -414.57 (a loss), trace digest `88bb4218…`,
+359 s wall time. This run checks the plumbing only. It is not a research
+result; the full-day runs come after the maker study.

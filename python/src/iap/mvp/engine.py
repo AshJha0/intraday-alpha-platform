@@ -63,6 +63,7 @@ from __future__ import annotations
 import math
 from dataclasses import replace
 from functools import partial
+from typing import Any
 
 from iap.contracts.ids import NO_ROUTE
 from iap.contracts.protocols import TraceSink
@@ -81,6 +82,8 @@ from iap.contracts.types import (
 from iap.core.events import EventType, MarketEvent
 from iap.execution.config import ExecConfig, SorOptions, load_sor_options
 from iap.execution.passive import ExecPolicy, PassiveStats, max_behind_qty, post_price
+from iap.execution.realism import RealismOptIns
+from iap.execution.regulatory import load_default_schedule
 from iap.execution.simulator import ExecutionSimulator
 from iap.execution.sor import SmartOrderRouter
 from iap.execution.types import (
@@ -106,7 +109,7 @@ from iap.mvp.adapters import (
     TcaMarket,
 )
 from iap.mvp.alpha import AlphaEnsemble, LinearZAlpha, load_alphas
-from iap.mvp.config import MvpConfig
+from iap.mvp.config import REPO_ROOT, MvpConfig
 from iap.mvp.engine_io import feature_context, horizon_name, load_controls
 from iap.mvp.engine_metrics import EngineMetricsMixin
 from iap.mvp.feed import FeedResult, build_reference_data
@@ -164,7 +167,13 @@ class MvpEngine(RiskWiringMixin, SizingMixin, EngineMetricsMixin):
         sink: TraceSink,
         *,
         ref: ReferenceData | None = None,
+        realism: RealismOptIns | None = None,
     ) -> None:
+        # ``realism`` (v1.15 X-P1-2, opt-in; Python only, never set on the
+        # golden / parity path): the pre-registration execution opt-ins the
+        # MVP loop exercises (regulatory fees, hidden-print fills, the feed
+        # latency leg). ``None`` is the pinned v1 loop, byte for byte.
+        self.realism = realism
         self.cfg = cfg
         self.feed = feed
         self.sink = sink
@@ -205,8 +214,9 @@ class MvpEngine(RiskWiringMixin, SizingMixin, EngineMetricsMixin):
             )
         self.venues = dict(sorted(venues.items()))
         self.venue_names = {vid: spec.name for vid, spec in self.venues.items()}
+        feed_latency_ns = 0 if realism is None else realism.feed_latency_ns
         latency = LatencyConfig(
-            cfg.execution.latency_decision_ns,
+            cfg.execution.latency_decision_ns + feed_latency_ns,
             cfg.execution.latency_risk_ns,
             cfg.execution.latency_wire_ns,
         )
@@ -224,7 +234,15 @@ class MvpEngine(RiskWiringMixin, SizingMixin, EngineMetricsMixin):
             },
             venues=self.venues,
         )
-        self.sim = SimulatorAdapter(ExecutionSimulator(self.exec_config))
+        sim_kwargs: dict[str, Any] = {}
+        if realism is not None:
+            if realism.regulatory_fees:
+                self.exec_config = replace(
+                    self.exec_config,
+                    regulatory_fees=load_default_schedule(REPO_ROOT / "configs"),
+                )
+            sim_kwargs = realism.simulator_kwargs()
+        self.sim = SimulatorAdapter(ExecutionSimulator(self.exec_config, **sim_kwargs))
         self.book: ConsolidatedBook = self.sim.simulator.instrument_book(self.iid)
         sor_file = load_sor_options(cfg.reference_path("execution"))
         sor_options = SorOptions(cfg.sor.prefer_rebate, cfg.sor.max_venue_latency_ns)
