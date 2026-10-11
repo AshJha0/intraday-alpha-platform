@@ -704,7 +704,7 @@ language | tests passed | golden passed  | time   | status
 ---------+--------------+----------------+--------+-------
 python   | 2385         | 193            |    -s | PASS
 cpp      | 302          | 72             |    -s | PASS
-rust     | 362          | 71             |    -s | PASS
+rust     | 365          | 71             |    -s | PASS
 java     | 575          | 124            |    -s | PASS
 integration | 35           | -              |    -s | PASS
 replay   | 6            | -              |    -s | PASS

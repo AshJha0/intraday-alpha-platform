@@ -192,7 +192,7 @@ golden harness. Every duplicated copy fails that test:
 - the two RETIRE candidates (Rust `alpha`, Rust `lifecycle`) have no runtime
   consumer, but each is the only Rust proof of a golden contract
   (`golden_alpha.rs`, `golden_lifecycle.rs` — the registry byte-parity check)
-  and is counted in the README parity table (`rust 362`). Deleting them would
+  and is counted in the README parity table (`rust 365`). Deleting them would
   remove golden evidence and change the published counts, which the brief
   rules out;
 - the reserved C++ risk paths in `CODEOWNERS` (`cpp/include/iap/risk/`,
