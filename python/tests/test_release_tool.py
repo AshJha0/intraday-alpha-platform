@@ -239,7 +239,7 @@ def test_publish_reruns_release_once_when_verify_ci_raced(tmp_path):
     r, fake = _runner(tmp_path, answers, execute=True)
     pages = []
     rel.publish(
-        r, "1.15.0", fetch=lambda url: pages.append(url) or "<h2>v1.15</h2>", sleep=lambda s: None
+        r, "1.15.0", fetch=lambda url: pages.append(url) or "<h2>v1.15.0</h2>", sleep=lambda s: None
     )
     assert ["gh", "run", "rerun", "7", "--failed"] in fake.calls
     assert pages == [rel.SITE_URL]
@@ -263,3 +263,31 @@ def test_cli_flow_and_default_dry_run(capsys):
     r = rel.Runner(exec_fn=FakeExec(_publish_answers()))
     assert rel.main(["publish", "--version", "1.15.0"], runner=r) == 0
     assert r.execute is False
+
+
+def test_site_check_needs_full_version():
+    # the site's roadmap names the next minor before it ships: "v1.15" is vacuous
+    assert not rel.site_mentions("1.15.0", fetch=lambda u: "roadmap: v1.15 next; v1.14.0")
+    assert not rel.site_mentions("1.15.0", fetch=lambda u: "v1.15.01 v1.15.0.1")
+    assert rel.site_mentions("1.15.0", fetch=lambda u: "<h2>v1.15.0</h2>")
+    assert rel.site_mentions("1.15.0", fetch=lambda u: "released v1.15.0.")
+
+
+def test_publish_dry_run_reports_all_blockers_and_prints_plan(tmp_path):
+    answers = _publish_answers(ci_conclusion="failure")
+    answers[("git", "show")] = "# Changelog\n\n## Unreleased (v1.15)\n\n- x\n"
+    r, fake = _runner(tmp_path, answers)
+    with pytest.raises(rel.ReleaseError, match="CHANGELOG.md has no.*main CI is green"):
+        rel.publish(r, "1.15.0")
+    assert sum(x.startswith("BLOCKER") for x in r.log) == 2
+    assert any(x.startswith("would run: gh release create v1.15.0") for x in r.log)
+    assert not any(c[:2] == ["git", "tag"] and "-a" in c for c in fake.calls)
+
+
+def test_publish_execute_stops_at_first_blocker(tmp_path):
+    answers = _publish_answers()
+    answers[("git", "tag", "--list")] = "v1.15.0\n"
+    r, fake = _runner(tmp_path, answers, execute=True)
+    with pytest.raises(rel.ReleaseError, match="already exists"):
+        rel.publish(r, "1.15.0", fetch=lambda u: "", sleep=lambda s: None)
+    assert not any(c[:2] == ["gh", "release"] for c in fake.calls)

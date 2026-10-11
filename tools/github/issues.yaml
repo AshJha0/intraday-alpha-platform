@@ -101,6 +101,14 @@ milestones:
     description: "Production engineering — real feeds, HA, kernel bypass, regulatory controls. Documented as out of scope for this repository; tracked so the boundary is explicit."
   - title: "Backlog"
     description: "Unscheduled work with a written scope and proof-of-done, including the read-only agentic/MCP research layer."
+  - title: "v1.12"
+    description: "Released 2026-10-10: R7 statistics half (CPCV, PBO, deflated Sharpe), tick-to-trade benchmark, opt-in extended features, cost-aware multi-venue router, production alerting and state HA. All opt-in."
+  - title: "v1.13"
+    description: "Released 2026-10-11: review-driven hardening (atomic writes, CI matrix, research-validity fixes, governance CI job, god-class split, feature-build memory, R7 data preparation)."
+  - title: "v1.14"
+    description: "Released 2026-10-11: real-data mapping and feature store, SEC 15c3-5 pre-trade risk set and tamper-evident audit, execution-realism opt-ins, trust roots and chained ledger, shared research engines."
+  - title: "v1.15"
+    description: "In progress (IAP_v1.15_Plan.md): R7 confirmatory round, v2 realism config, models (DeepLOB, conformal sizing), regulatory fees, governance enforcement, narrower agent job, Java archive, release automation."
 
 # ----------------------------------------------------------------------------
 epics:
@@ -701,6 +709,87 @@ epics:
       - "A killed-and-restored session has the same kill-switch latch, positions and audit continuity as an uninterrupted one"
     out_of_scope:
       - "Formal verification of the engines"
+
+  - key: E32
+    title: "Epic: v1.12 - R7 statistics, latency benchmark, extended features, multi-venue router, alerting"
+    labels: [type:epic, area:research, phase:phase2, priority:p1]
+    milestone: "v1.12"
+    objective: >
+      Release v1.12.0 (2026-10-10), from IAP_Next_Releases_Plan items R7
+      (statistics half), X4, X5, X6, M6 and P4. Every new path is opt-in: no
+      default, golden, published number, ledger or cross-language contract
+      changes.
+    scope:
+      - "combinatorial purged CV, PBO and the deflated Sharpe ratio (v4 method bundle, report-only)"
+      - "tick-to-trade latency benchmark"
+      - "opt-in extended feature set and event-time sampling"
+      - "cost-aware multi-venue router (Python only)"
+      - "production alerting, SLOs and state HA"
+    acceptance:
+      - "Each item ships behind an opt-in with tests; defaults and goldens are unchanged"
+    out_of_scope:
+      - "Turning any of the new methods into a promotion gate"
+
+  - key: E33
+    title: "Epic: v1.13 - review-driven hardening"
+    labels: [type:epic, area:repo, phase:phase2, priority:p1]
+    milestone: "v1.13"
+    objective: >
+      Release v1.13.0 (2026-10-11): close the engineering, research-validity
+      and governance findings of the external review, split the god classes
+      without behaviour change, bound feature-build memory and prepare the R7
+      unseen-data round.
+    scope:
+      - "engineering and CI: atomic writes by default, O(1) order lookup, 3.11 + 3.12 matrix, slow marker, hashed CI requirements"
+      - "research validity: frozen-parameter scoring, embargo covering the longest feature window, DSR trials = registered hypotheses"
+      - "governance CI job, approval-gated lifecycle CLI, locked blackboard append"
+      - "E4 god-class split, E5 streaming feature build, R7 data preparation"
+    acceptance:
+      - "Every review finding is fixed or recorded with a reason; goldens move only where the CHANGELOG says so"
+    out_of_scope:
+      - "New research results"
+
+  - key: E34
+    title: "Epic: v1.14 - real-data mapping, 15c3-5 risk, execution realism, trust roots"
+    labels: [type:epic, area:risk, phase:phase2, priority:p0]
+    milestone: "v1.14"
+    objective: >
+      Release v1.14.0 (2026-10-11): correct the real-data mapping and feature
+      store, add the SEC 15c3-5 pre-trade set and a tamper-evident risk audit,
+      make execution realism available as opt-ins, add trust roots, a chained
+      ledger and blocking supply-chain audits, and share the research engines.
+    scope:
+      - "data mapping and feature store (#83): quote-rule hidden prints, half-even midpoints, pre-rule datasets refused, operational halts"
+      - "risk engine (#89): G-P0-1 audit chain, G-P0-2 15c3-5 pre-trade set, bounded overrides and state"
+      - "execution simulator (#86): MODIFY queue credit, feed latency, hidden prints, amend-down"
+      - "governance (#87): trust roots, chained ledger, supply-chain CI job"
+      - "engineering (#84) and research statistics (#88)"
+    acceptance:
+      - "Released with main CI green; moved numbers are listed in the CHANGELOG"
+    out_of_scope:
+      - "Turning the realism opt-ins on (v1.15 R-P0-2)"
+
+  - key: E35
+    title: "Epic: v1.15 - research evidence, models, fees, governance enforcement, release automation"
+    labels: [type:epic, area:research, phase:phase2, priority:p0]
+    milestone: "v1.15"
+    objective: >
+      Release v1.15 per IAP_v1.15_Plan.md: run the R7 confirmatory round on
+      unseen sessions with realism on, land the model work (DeepLOB, conformal
+      sizing), add dated regulatory fees, make the governance controls
+      blocking, narrow the agent job, archive the Java engine and automate the
+      release flow. Item keys are the plan's IDs.
+    scope:
+      - "R: R7 confirmatory round, v2 realism config, FX11 investigation, A2 basis, maker write-up"
+      - "M: DeepLOB (AI4), conformal sizing"
+      - "X: SEC Section 31 + FINRA TAF, MVP on real ITCH, market prints to risk"
+      - "G: registry hash at promotion, trust roots, Java archive"
+      - "A: narrower agent job, ledger debit per proposal, eval harness, summary claim check"
+      - "E: release.py, EPICS.md regeneration, housekeeping"
+    acceptance:
+      - "Every plan item is done or carried to v1.16 with a reason; the release is cut with tools/release.py"
+    out_of_scope:
+      - "v1.16 direction (decided by the R7 outcome)"
 
 # ----------------------------------------------------------------------------
 issues:
@@ -3624,3 +3713,480 @@ issues:
       - "tests/golden/risk_fuzz/COVERAGE.txt; python/tools/risk_fuzz.py (BRANCHES, coverage_report)"
       - "python/tests/test_risk_fuzz_golden.py; tests/golden/expected_risk_edge_decisions.json"
       - "rust/risk/tests/golden_risk_fuzz.rs; java/src/test/java/com/iap/RiskFuzzGoldenTest.java"
+
+  # ---------------------------------------------------- v1.12..v1.15 ----
+  - key: V12-R7S
+    epic: E32
+    title: "v1.12 R7 statistics half: CPCV, PBO, deflated Sharpe, v4 bundle"
+    labels: [type:research, area:research, lang:python, priority:p1]
+    milestone: "v1.12"
+    status: done
+    estimate_days: 4
+    context: >
+      Combinatorial purged CV with PBO and the deflated Sharpe ratio (N from the ledger), packaged as the report-only v4 method bundle.
+    acceptance:
+      - "CPCV, PBO and DSR are tested and reported, never gating by default"
+    evidence:
+      - "python/src/iap/validation/cpcv.py; python/src/iap/validation/deflated.py"
+
+  - key: V12-X6
+    epic: E32
+    title: "v1.12 X6: tick-to-trade latency benchmark"
+    labels: [type:feature, area:performance, lang:cpp, lang:python, priority:p2]
+    milestone: "v1.12"
+    status: done
+    estimate_days: 2
+    context: >
+      A stage-by-stage tick-to-trade benchmark with recorded results.
+    acceptance:
+      - "Benchmark source and results are in the repository"
+    evidence:
+      - "cpp/bench/bench_tick_to_trade.cpp; benchmarks/results_tick_to_trade.md; tools/tick_to_trade_py.py"
+
+  - key: V12-M6
+    epic: E32
+    title: "v1.12 M6: opt-in extended feature set and event-time sampling"
+    labels: [type:feature, area:features, lang:python, priority:p2]
+    milestone: "v1.12"
+    status: done
+    estimate_days: 3
+    context: >
+      Extended features and event-time sampling, opt-in, outside the parity-checked native set.
+    acceptance:
+      - "Default feature output is unchanged"
+    evidence:
+      - "python/src/iap/features/extended.py"
+
+  - key: V12-X5
+    epic: E32
+    title: "v1.12 X5: cost-aware multi-venue router (Python, opt-in)"
+    labels: [type:feature, area:execution, lang:python, priority:p2]
+    milestone: "v1.12"
+    status: done
+    estimate_days: 3
+    context: >
+      A cost-aware smart order router with a deterministic monthly fee ledger.
+    acceptance:
+      - "The router is opt-in and tested; the default router is unchanged"
+    evidence:
+      - "python/src/iap/execution/sor_v2.py"
+
+  - key: V12-P4
+    epic: E32
+    title: "v1.12 P4: production alerting, SLOs and state HA"
+    labels: [type:feature, area:observability, area:deployment, priority:p2]
+    milestone: "v1.12"
+    status: done
+    estimate_days: 3
+    context: >
+      Alertmanager routing, SLO alerts and state backup for the deployment manifests.
+    acceptance:
+      - "Manifests validate in the deployment CI job"
+    evidence:
+      - "deployment/k8s/alertmanager.yaml; deployment/k8s/cronjob-state-backup.yaml"
+
+  - key: V13-ENG
+    epic: E33
+    title: "v1.13 engineering and CI hardening (E-P0-1, E-P1-1, E-P1-6, E-P2-7, G-P1-7 part)"
+    labels: [type:feature, area:repo, lang:python, priority:p1]
+    milestone: "v1.13"
+    status: done
+    estimate_days: 3
+    context: >
+      Atomic writes by default, O(1) order lookup, a 3.11 + 3.12 CI matrix, a slow marker and hashed CI requirements.
+    acceptance:
+      - "CI runs the matrix and the hashed install"
+    evidence:
+      - "python/src/iap/experiment/locking.py; python/requirements-ci.txt; .github/workflows/ci.yml"
+
+  - key: V13-RV
+    epic: E33
+    title: "v1.13 research validity fixes (R-P1-2, R-P1-4..6, R-P2-1, R-P2-7, R-P2-9)"
+    labels: [type:research, area:research, lang:python, priority:p1]
+    milestone: "v1.13"
+    status: done
+    estimate_days: 4
+    context: >
+      Frozen-parameter scoring, registered-orientation auction walk-forward, zero-trip sessions in study stats, a post-block embargo covering the longest feature window, DSR trials = registered hypotheses, event calendar as config.
+    acceptance:
+      - "Each fix has a test; moved numbers are listed in the CHANGELOG"
+    evidence:
+      - "python/src/iap/research/study_stats.py; configs/reference/event_calendar.json"
+
+  - key: V13-GOV
+    epic: E33
+    title: "v1.13 governance CI job, approval-gated lifecycle CLI, locked blackboard"
+    labels: [type:feature, area:agentic, area:lifecycle, lang:python, priority:p1]
+    milestone: "v1.13"
+    status: done
+    estimate_days: 3
+    context: >
+      A governance CI job, a lifecycle CLI that needs an approval, a locked blackboard append and a stricter numbers rule for LLM findings.
+    acceptance:
+      - "The governance job is a required check"
+    evidence:
+      - "python/src/iap/agents/cli.py; python/src/iap/llm/budget.py"
+
+  - key: V13-DATA
+    epic: E33
+    title: "v1.13 E4 god-class split, E5 streaming feature build, R7 data preparation"
+    labels: [type:feature, area:features, area:marketdata, lang:python, priority:p1]
+    milestone: "v1.13"
+    status: done
+    estimate_days: 4
+    context: >
+      Behaviour-preserving split of the large classes, a streaming feature build with bounded memory, and the opt-in R7 data plan.
+    acceptance:
+      - "Goldens unchanged by the split; the R7 plan is tested"
+    evidence:
+      - "python/src/iap/marketdata/r7plan.py; docs/R7_DATA_PLAN.md; python/tests/test_r7_plan.py"
+
+  - key: V14-DATA
+    epic: E34
+    title: "v1.14 data mapping and feature store corrections (#83)"
+    labels: [type:feature, area:marketdata, area:features, lang:python, priority:p0]
+    milestone: "v1.14"
+    status: done
+    estimate_days: 5
+    context: >
+      Quote-rule signing of hidden prints, half-even midpoint rounding, refusal of pre-rule datasets, half-penny tick, operational halts, config_version, cross prints and per-session reference values.
+    acceptance:
+      - "Moved feature goldens are listed in the CHANGELOG"
+    evidence:
+      - "python/src/iap/marketdata/ingest.py; python/tests/test_real_data_ingest.py"
+
+  - key: V14-RISK
+    epic: E34
+    title: "v1.14 risk: tamper-evident audit and SEC 15c3-5 pre-trade set (G-P0-1, G-P0-2)"
+    labels: [type:feature, area:risk, lang:rust, lang:python, priority:p0]
+    milestone: "v1.14"
+    status: done
+    estimate_days: 5
+    context: >
+      Every RiskEvent carries a sequence and chain hash; the 15c3-5 pre-trade checks with bounded overrides and per-key state, Rust normative.
+    acceptance:
+      - "Cross-engine risk goldens cover the new checks"
+    evidence:
+      - "configs/risk/risk.json; rust/risk"
+
+  - key: V14-EXEC
+    epic: E34
+    title: "v1.14 execution-realism opt-ins (X-P1-1, X-P1-6, X-P2-7, X-P2-9, X-P2-12)"
+    labels: [type:feature, area:execution, lang:cpp, lang:python, priority:p1]
+    milestone: "v1.14"
+    status: done
+    estimate_days: 4
+    context: >
+      MODIFY queue credit, feed latency and simulator-routed exits, hidden prints, per-touch markout calibration, amend-down; all opt-in.
+    acceptance:
+      - "Replay-fills goldens byte-identical with the options off"
+    evidence:
+      - "python/src/iap/execution/realism.py"
+
+  - key: V14-GOV
+    epic: E34
+    title: "v1.14 governance: trust roots, chained ledger, blocking supply-chain audits"
+    labels: [type:feature, area:agentic, area:repo, lang:python, priority:p0]
+    milestone: "v1.14"
+    status: done
+    estimate_days: 4
+    context: >
+      A trust-root agent key registry, a hash-chained experiment ledger and a blocking supply-chain CI job.
+    acceptance:
+      - "supply-chain is a required check; a broken ledger chain fails verification"
+    evidence:
+      - "python/src/iap/agents/trust.py; python/src/iap/validation/ledger.py; tools/audit_ignores.py"
+
+  - key: V14-ENG
+    epic: E34
+    title: "v1.14 shared research engines and registry content hash (E-P1-2..4, E-P2-5)"
+    labels: [type:feature, area:research, lang:python, priority:p1]
+    milestone: "v1.14"
+    status: done
+    estimate_days: 3
+    context: >
+      EventColumns, SharedReplay and StudyBase shared by the studies; content hash of fitted models in the registry.
+    acceptance:
+      - "Studies produce identical results on the shared engines"
+    evidence:
+      - "python/src/iap/research/events.py; python/src/iap/research/replay.py; python/src/iap/research/study.py"
+
+  - key: R-P0-1
+    epic: E35
+    title: "v1.15 R-P0-1: R7 confirmatory round on unseen sessions"
+    labels: [type:research, area:research, lang:python, priority:p0]
+    milestone: "v1.15"
+    status: in-progress
+    estimate_days: 8
+    context: >
+      Ingest waves 1-3, features and sampling records, then the pre-registered confirmatory run. Data download under way; prereg awaits owner sign-off.
+    acceptance:
+      - "Confirmatory result reported against the signed pre-registration"
+    evidence:
+      - "research/r7/r7_confirm_prereg_DRAFT.json; tools/r7_download.py"
+
+  - key: R-P0-2
+    epic: E35
+    title: "v1.15 R-P0-2: v2 prereg turns the v1.14 realism opt-ins on"
+    labels: [type:research, area:research, area:execution, lang:python, priority:p0]
+    milestone: "v1.15"
+    status: done
+    estimate_days: 2
+    context: >
+      configs/prereg/v2.json gains execution_realism; code defaults stay off, v1 numbers and goldens unchanged.
+    acceptance:
+      - "v1 goldens do not move; v2 loads the realism block"
+    evidence:
+      - "configs/prereg/v2.json; python/tests/test_v115_prereg_realism.py"
+
+  - key: R-P1-3
+    epic: E35
+    title: "v1.15 R-P1-3: FX11 leak-vs-fast investigation and time-shift triage"
+    labels: [type:research, area:research, lang:python, priority:p1]
+    milestone: "v1.15"
+    status: done
+    estimate_days: 3
+    context: >
+      No look-ahead found; verdict fast, not leak, with stated limits. Leakage tester gains a time-shift triage; FX11 stays RESEARCH pending human review.
+    acceptance:
+      - "Finding written; triage tested; passing alphas' reports byte-identical"
+    evidence:
+      - "docs/research/FX11_FINDING.md; python/tests/test_fx11_time_shift.py"
+
+  - key: R-P1-4
+    epic: E35
+    title: "v1.15 R-P1-4: A2 QQQ vs top-15 basket basis on R7"
+    labels: [type:research, area:research, lang:python, priority:p1]
+    milestone: "v1.15"
+    status: backlog
+    estimate_days: 5
+    context: >
+      Point-in-time weights; ingest A2 symbols on a few days in symbol batches first.
+    acceptance:
+      - "Smoke run on a few days, then the pre-registered run"
+    evidence:
+      - "planned: research/r7/ (A2 prereg)"
+
+  - key: R-P2-5
+    epic: E35
+    title: "v1.15 R-P2-5: maker study write-up"
+    labels: [type:docs, area:research, priority:p2]
+    milestone: "v1.15"
+    status: backlog
+    estimate_days: 1
+    context: >
+      Write up the detached maker study when it finishes.
+    acceptance:
+      - "Report in research/maker-real, merged"
+    evidence:
+      - "planned: research/maker-real/"
+
+  - key: M-P0-1
+    epic: E35
+    title: "v1.15 M-P0-1: AI4 DeepLOB vs baselines, net of costs"
+    labels: [type:research, area:ml, lang:python, priority:p0]
+    milestone: "v1.15"
+    status: in-progress
+    estimate_days: 6
+    context: >
+      Code landed (#85) with linear/GBM baselines; smoke run on a real session and the pre-registered comparison remain.
+    acceptance:
+      - "Pre-registered net-of-cost comparison against the baselines"
+    evidence:
+      - "python/src/iap/models/deeplob.py; python/src/iap/models/deeplob_baselines.py; research/r7/ai4_deeplob_prereg_DRAFT.json"
+
+  - key: M-P1-2
+    epic: E35
+    title: "v1.15 M-P1-2: conformal sizing (opt-in)"
+    labels: [type:feature, area:ml, lang:python, priority:p1]
+    milestone: "v1.15"
+    status: done
+    estimate_days: 3
+    context: >
+      Split and adaptive conformal intervals, confidence-scaled sizing, calibration report; off by default, not in v2 prereg.
+    acceptance:
+      - "Sizing is monotone in confidence and never above the base target"
+    evidence:
+      - "python/src/iap/models/conformal.py"
+
+  - key: X-P1-1
+    epic: E35
+    title: "v1.15 X-P1-1: dated SEC Section 31 + FINRA TAF fees"
+    labels: [type:feature, area:execution, area:tca, lang:python, lang:cpp, lang:rust, priority:p1]
+    milestone: "v1.15"
+    status: done
+    estimate_days: 3
+    context: >
+      Sell-side fees from a dated, sourced schedule in all three engines; off in code defaults, on in v2 prereg.
+    acceptance:
+      - "New cross-engine golden; no existing golden changes"
+    evidence:
+      - "configs/reference/regulatory_fee_schedule.json; tests/golden/expected_regulatory_fees.json"
+
+  - key: X-P1-2
+    epic: E35
+    title: "v1.15 X-P1-2: MVP on a real ITCH session end to end"
+    labels: [type:feature, area:mvp, lang:python, priority:p1]
+    milestone: "v1.15"
+    status: backlog
+    estimate_days: 2
+    context: >
+      Run the MVP loop on a real ITCH session instead of synthetic data.
+    acceptance:
+      - "Digest recorded; site shows it"
+    evidence:
+      - "planned: docs/ (real-session MVP digest)"
+
+  - key: X-P1-3
+    epic: E35
+    title: "v1.15 X-P1-3: market-trade prints feed the risk participation cap"
+    labels: [type:feature, area:risk, lang:rust, lang:python, priority:p1]
+    milestone: "v1.15"
+    status: done
+    estimate_days: 2
+    context: >
+      Only TRADE prints count as session market volume for the 15c3-5 participation cap; new cross-engine golden.
+    acceptance:
+      - "Participation check tested against prints"
+    evidence:
+      - "tests/golden/expected_risk_participation_prints.json"
+
+  - key: G-P0-1
+    epic: E35
+    title: "v1.15 G-P0-1: registry content hash and model card enforced at promotion"
+    labels: [type:feature, area:lifecycle, area:ml, lang:python, priority:p0]
+    milestone: "v1.15"
+    status: done
+    estimate_days: 2
+    context: >
+      promote() refuses a mismatched content hash or a missing/invalid model card; promotion.json records the card hash.
+    acceptance:
+      - "Promotion with a mismatched hash or no card fails"
+    evidence:
+      - "python/src/iap/mlops/registry.py; python/src/iap/mlops/model_card.py"
+
+  - key: G-P1-2
+    epic: E35
+    title: "v1.15 G-P1-2: trust roots enabled, registry signed, verification blocking"
+    labels: [type:feature, area:agentic, area:repo, lang:python, priority:p1]
+    milestone: "v1.15"
+    status: done
+    estimate_days: 2
+    context: >
+      Maintainer key, signed registry, blocking verification.
+    acceptance:
+      - "Unsigned registry fails CI"
+    evidence:
+      - "python/src/iap/agents/signing.py; python/src/iap/agents/trust.py"
+
+  - key: G-P1-3
+    epic: E35
+    title: "v1.15 G-P1-3: archive the Java engine"
+    labels: [type:feature, area:repo, area:parity, lang:java, priority:p1]
+    milestone: "v1.15"
+    status: done
+    estimate_days: 2
+    context: >
+      Java moved to archive/java (frozen at v1.14.0); java job and CodeQL java-kotlin removed; java dropped from protect-main.
+    acceptance:
+      - "Ruleset updated by owner; parity counts updated"
+    evidence:
+      - "archive/java"
+
+  - key: A-P0-1
+    epic: E35
+    title: "v1.15 A-P0-1: narrower agent job (propose, prereg, human sign-off)"
+    labels: [type:feature, area:agentic, lang:python, priority:p0]
+    milestone: "v1.15"
+    status: done
+    estimate_days: 3
+    context: >
+      Agents propose and pre-register; a human signs off; agents never run confirmatory tests.
+    acceptance:
+      - "Workflow enforced in code"
+    evidence:
+      - "python/src/iap/agents/cli.py"
+
+  - key: A-P1-2
+    epic: E35
+    title: "v1.15 A-P1-2: agent proposals debit the chained ledger"
+    labels: [type:feature, area:agentic, area:research, lang:python, priority:p1]
+    milestone: "v1.15"
+    status: done
+    estimate_days: 2
+    context: >
+      Each agent look costs multiple-testing budget; hit rate per look reported.
+    acceptance:
+      - "Ledger entries per proposal"
+    evidence:
+      - "python/src/iap/validation/ledger.py"
+
+  - key: A-P1-3
+    epic: E35
+    title: "v1.15 A-P1-3: agent eval harness"
+    labels: [type:feature, area:agentic, lang:python, priority:p1]
+    milestone: "v1.15"
+    status: done
+    estimate_days: 2
+    context: >
+      Fixed, scored, regression-tracked agent tasks.
+    acceptance:
+      - "Harness and baseline scores in CI (advisory)"
+    evidence:
+      - "python/src/iap/agents/eval_harness.py"
+
+  - key: A-P1-4
+    epic: E35
+    title: "v1.15 A-P1-4: summary claim check against the tool log"
+    labels: [type:feature, area:agentic, lang:python, priority:p1]
+    milestone: "v1.15"
+    status: backlog
+    estimate_days: 2
+    context: >
+      A live eval found a closing summary claiming a finding was filed after a rejection; summaries must be verified against the tool log.
+    acceptance:
+      - "Unsupported summary claims are flagged"
+    evidence:
+      - "planned: python/src/iap/agents/ (summary claim check)"
+
+  - key: E-P1-1
+    epic: E35
+    title: "v1.15 E-P1-1: release automation (tools/release.py)"
+    labels: [type:feature, area:repo, lang:python, priority:p1]
+    milestone: "v1.15"
+    status: done
+    estimate_days: 2
+    context: >
+      The v1.14 release flow as code, dry-run by default; rehearsed for v1.15.0 in docs/release/V1150_REHEARSAL.md.
+    acceptance:
+      - "Dry-run plans match the documented flow; mocked tests"
+    evidence:
+      - "tools/release.py; python/tests/test_release_tool.py; docs/release/V1150_REHEARSAL.md"
+
+  - key: E-P2-2
+    epic: E35
+    title: "v1.15 E-P2-2: EPICS.md regeneration"
+    labels: [type:docs, area:repo, priority:p2]
+    milestone: "v1.15"
+    status: done
+    estimate_days: 1
+    context: >
+      issues.yaml gains v1.12-v1.15 epics; docs/EPICS.md regenerated and checked.
+    acceptance:
+      - "create_issues.py --check-md docs/EPICS.md passes"
+    evidence:
+      - "tools/github/issues.yaml; docs/EPICS.md"
+
+  - key: E-P2-3
+    epic: E35
+    title: "v1.15 E-P2-3: housekeeping (stale worktree, step-2 abort entries, v2 quoting prereg in ticks)"
+    labels: [type:feature, area:repo, priority:p2]
+    milestone: "v1.15"
+    status: backlog
+    estimate_days: 1
+    context: >
+      Remove the stale v1.14/research-stats worktree; record step-2 abort entries; v2 quoting prereg in ticks.
+    acceptance:
+      - "Done and recorded"
+    evidence:
+      - "planned: research/ (step-2 abort entries)"

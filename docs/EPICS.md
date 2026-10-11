@@ -15,11 +15,11 @@ planned paths of the current release, **backlog** says what would prove it done.
 
 | | count | estimate (days) |
 |---|---:|---:|
-| epics | 31 | |
-| issues | 163 | 547 |
-| issues `done` | 109 | 280.5 |
-| issues `in-progress` | 0 | 0 |
-| issues `backlog` | 54 | 266.5 |
+| epics | 35 | |
+| issues | 197 | 651 |
+| issues `done` | 136 | 359.5 |
+| issues `in-progress` | 2 | 14 |
+| issues `backlog` | 59 | 277.5 |
 
 ### By milestone
 
@@ -35,6 +35,10 @@ planned paths of the current release, **backlog** says what would prove it done.
 | Phase 2 | 3 | 12 | 11 | 0 | 1 |
 | Phase 3 | 2 | 15 | 6 | 0 | 9 |
 | Backlog | 7 | 45 | 1 | 0 | 44 |
+| v1.12 | 1 | 5 | 5 | 0 | 0 |
+| v1.13 | 1 | 4 | 4 | 0 | 0 |
+| v1.14 | 1 | 5 | 5 | 0 | 0 |
+| v1.15 | 1 | 20 | 13 | 2 | 5 |
 
 Issues are listed under their epic; an issue's own milestone can differ from
 the epic's (a backlog item under a finished epic sits in **Backlog**).
@@ -72,6 +76,10 @@ the epic's (a backlog item under a finished epic sits in **Backlog**).
 - [E29 — Research throughput — feature store, distributed runs, marginal-contribution allocation](#e29--research-throughput--feature-store-distributed-runs-marginal-contribution-allocation) · Backlog · backlog · 3 issues
 - [E30 — Agent layer — write broker, blackboard, pre-registration, hidden-seed reserve, human approvals, evals](#e30--agent-layer--write-broker-blackboard-pre-registration-hidden-seed-reserve-human-approvals-evals) · Backlog · backlog · 7 issues
 - [E31 — Differential fuzzing, property tests, crash injection and risk golden coverage](#e31--differential-fuzzing-property-tests-crash-injection-and-risk-golden-coverage) · Backlog · partial · 5 issues
+- [E32 — v1.12 - R7 statistics, latency benchmark, extended features, multi-venue router, alerting](#e32--v112---r7-statistics-latency-benchmark-extended-features-multi-venue-router-alerting) · v1.12 · done · 5 issues
+- [E33 — v1.13 - review-driven hardening](#e33--v113---review-driven-hardening) · v1.13 · done · 4 issues
+- [E34 — v1.14 - real-data mapping, 15c3-5 risk, execution realism, trust roots](#e34--v114---real-data-mapping-15c3-5-risk-execution-realism-trust-roots) · v1.14 · done · 5 issues
+- [E35 — v1.15 - research evidence, models, fees, governance enforcement, release automation](#e35--v115---research-evidence-models-fees-governance-enforcement-release-automation) · v1.15 · in-progress · 20 issues
 
 ## Phase 0
 
@@ -848,6 +856,124 @@ Find the defects the hand-written goldens cannot: fuzz the three risk engines ag
 | FZ03 | Snapshot/restore fuzzing across the three risk engines | done | 4 | Phase 2 | `rust/risk/tests/golden_risk_fuzz.rs; java/src/test/java/com/iap/RiskFuzzGoldenTest.java; python/tests/test_risk_fuzz_golden.py`<br>`python/tests/test_risk_fuzz_properties.py; tests/golden/risk_fuzz/` |
 | FZ04 | Crash injection on the Java paper-trading path | backlog | 5 | Backlog | `java/src/main/java/com/iap/platform/PaperTrading.java; docs/runbooks/RUNBOOK_paper_trading.md` |
 | FZ05 | Risk golden coverage for KILL_VENUE, bootstrap, restore and fail-closed branches | done | 4 | Phase 2 | `tests/golden/risk_fuzz/COVERAGE.txt; python/tools/risk_fuzz.py (BRANCHES, coverage_report)`<br>`python/tests/test_risk_fuzz_golden.py; tests/golden/expected_risk_edge_decisions.json`<br>`rust/risk/tests/golden_risk_fuzz.rs; java/src/test/java/com/iap/RiskFuzzGoldenTest.java` |
+
+## v1.12
+
+Released 2026-10-10: R7 statistics half (CPCV, PBO, deflated Sharpe), tick-to-trade benchmark, opt-in extended features, cost-aware multi-venue router, production alerting and state HA. All opt-in.
+
+### E32 — v1.12 - R7 statistics, latency benchmark, extended features, multi-venue router, alerting
+
+**Status:** done · **Milestone:** v1.12 · **Issues:** 5 (done 5, in-progress 0, backlog 0) · **Estimate:** 15 days · **Labels:** `type:epic`, `area:research`, `phase:phase2`, `priority:p1`, `status:done`
+
+Release v1.12.0 (2026-10-10), from IAP_Next_Releases_Plan items R7 (statistics half), X4, X5, X6, M6 and P4. Every new path is opt-in: no default, golden, published number, ledger or cross-language contract changes.
+
+**Scope:** combinatorial purged CV, PBO and the deflated Sharpe ratio (v4 method bundle, report-only); tick-to-trade latency benchmark; opt-in extended feature set and event-time sampling; cost-aware multi-venue router (Python only); production alerting, SLOs and state HA.
+
+**Acceptance criteria:**
+
+- [x] Each item ships behind an opt-in with tests; defaults and goldens are unchanged
+
+**Out of scope:** Turning any of the new methods into a promotion gate.
+
+| key | title | status | est. (d) | milestone | evidence |
+|---|---|---|---:|---|---|
+| V12-R7S | v1.12 R7 statistics half: CPCV, PBO, deflated Sharpe, v4 bundle | done | 4 | v1.12 | `python/src/iap/validation/cpcv.py; python/src/iap/validation/deflated.py` |
+| V12-X6 | v1.12 X6: tick-to-trade latency benchmark | done | 2 | v1.12 | `cpp/bench/bench_tick_to_trade.cpp; benchmarks/results_tick_to_trade.md; tools/tick_to_trade_py.py` |
+| V12-M6 | v1.12 M6: opt-in extended feature set and event-time sampling | done | 3 | v1.12 | `python/src/iap/features/extended.py` |
+| V12-X5 | v1.12 X5: cost-aware multi-venue router (Python, opt-in) | done | 3 | v1.12 | `python/src/iap/execution/sor_v2.py` |
+| V12-P4 | v1.12 P4: production alerting, SLOs and state HA | done | 3 | v1.12 | `deployment/k8s/alertmanager.yaml; deployment/k8s/cronjob-state-backup.yaml` |
+
+## v1.13
+
+Released 2026-10-11: review-driven hardening (atomic writes, CI matrix, research-validity fixes, governance CI job, god-class split, feature-build memory, R7 data preparation).
+
+### E33 — v1.13 - review-driven hardening
+
+**Status:** done · **Milestone:** v1.13 · **Issues:** 4 (done 4, in-progress 0, backlog 0) · **Estimate:** 14 days · **Labels:** `type:epic`, `area:repo`, `phase:phase2`, `priority:p1`, `status:done`
+
+Release v1.13.0 (2026-10-11): close the engineering, research-validity and governance findings of the external review, split the god classes without behaviour change, bound feature-build memory and prepare the R7 unseen-data round.
+
+**Scope:** engineering and CI: atomic writes by default, O(1) order lookup, 3.11 + 3.12 matrix, slow marker, hashed CI requirements; research validity: frozen-parameter scoring, embargo covering the longest feature window, DSR trials = registered hypotheses; governance CI job, approval-gated lifecycle CLI, locked blackboard append; E4 god-class split, E5 streaming feature build, R7 data preparation.
+
+**Acceptance criteria:**
+
+- [x] Every review finding is fixed or recorded with a reason; goldens move only where the CHANGELOG says so
+
+**Out of scope:** New research results.
+
+| key | title | status | est. (d) | milestone | evidence |
+|---|---|---|---:|---|---|
+| V13-ENG | v1.13 engineering and CI hardening (E-P0-1, E-P1-1, E-P1-6, E-P2-7, G-P1-7 part) | done | 3 | v1.13 | `python/src/iap/experiment/locking.py; python/requirements-ci.txt; .github/workflows/ci.yml` |
+| V13-RV | v1.13 research validity fixes (R-P1-2, R-P1-4..6, R-P2-1, R-P2-7, R-P2-9) | done | 4 | v1.13 | `python/src/iap/research/study_stats.py; configs/reference/event_calendar.json` |
+| V13-GOV | v1.13 governance CI job, approval-gated lifecycle CLI, locked blackboard | done | 3 | v1.13 | `python/src/iap/agents/cli.py; python/src/iap/llm/budget.py` |
+| V13-DATA | v1.13 E4 god-class split, E5 streaming feature build, R7 data preparation | done | 4 | v1.13 | `python/src/iap/marketdata/r7plan.py; docs/R7_DATA_PLAN.md; python/tests/test_r7_plan.py` |
+
+## v1.14
+
+Released 2026-10-11: real-data mapping and feature store, SEC 15c3-5 pre-trade risk set and tamper-evident audit, execution-realism opt-ins, trust roots and chained ledger, shared research engines.
+
+### E34 — v1.14 - real-data mapping, 15c3-5 risk, execution realism, trust roots
+
+**Status:** done · **Milestone:** v1.14 · **Issues:** 5 (done 5, in-progress 0, backlog 0) · **Estimate:** 21 days · **Labels:** `type:epic`, `area:risk`, `phase:phase2`, `priority:p0`, `status:done`
+
+Release v1.14.0 (2026-10-11): correct the real-data mapping and feature store, add the SEC 15c3-5 pre-trade set and a tamper-evident risk audit, make execution realism available as opt-ins, add trust roots, a chained ledger and blocking supply-chain audits, and share the research engines.
+
+**Scope:** data mapping and feature store (#83): quote-rule hidden prints, half-even midpoints, pre-rule datasets refused, operational halts; risk engine (#89): G-P0-1 audit chain, G-P0-2 15c3-5 pre-trade set, bounded overrides and state; execution simulator (#86): MODIFY queue credit, feed latency, hidden prints, amend-down; governance (#87): trust roots, chained ledger, supply-chain CI job; engineering (#84) and research statistics (#88).
+
+**Acceptance criteria:**
+
+- [x] Released with main CI green; moved numbers are listed in the CHANGELOG
+
+**Out of scope:** Turning the realism opt-ins on (v1.15 R-P0-2).
+
+| key | title | status | est. (d) | milestone | evidence |
+|---|---|---|---:|---|---|
+| V14-DATA | v1.14 data mapping and feature store corrections (#83) | done | 5 | v1.14 | `python/src/iap/marketdata/ingest.py; python/tests/test_real_data_ingest.py` |
+| V14-RISK | v1.14 risk: tamper-evident audit and SEC 15c3-5 pre-trade set (G-P0-1, G-P0-2) | done | 5 | v1.14 | `configs/risk/risk.json; rust/risk` |
+| V14-EXEC | v1.14 execution-realism opt-ins (X-P1-1, X-P1-6, X-P2-7, X-P2-9, X-P2-12) | done | 4 | v1.14 | `python/src/iap/execution/realism.py` |
+| V14-GOV | v1.14 governance: trust roots, chained ledger, blocking supply-chain audits | done | 4 | v1.14 | `python/src/iap/agents/trust.py; python/src/iap/validation/ledger.py; tools/audit_ignores.py` |
+| V14-ENG | v1.14 shared research engines and registry content hash (E-P1-2..4, E-P2-5) | done | 3 | v1.14 | `python/src/iap/research/events.py; python/src/iap/research/replay.py; python/src/iap/research/study.py` |
+
+## v1.15
+
+In progress (IAP_v1.15_Plan.md): R7 confirmatory round, v2 realism config, models (DeepLOB, conformal sizing), regulatory fees, governance enforcement, narrower agent job, Java archive, release automation.
+
+### E35 — v1.15 - research evidence, models, fees, governance enforcement, release automation
+
+**Status:** in-progress · **Milestone:** v1.15 · **Issues:** 20 (done 13, in-progress 2, backlog 5) · **Estimate:** 54 days · **Labels:** `type:epic`, `area:research`, `phase:phase2`, `priority:p0`, `status:in-progress`
+
+Release v1.15 per IAP_v1.15_Plan.md: run the R7 confirmatory round on unseen sessions with realism on, land the model work (DeepLOB, conformal sizing), add dated regulatory fees, make the governance controls blocking, narrow the agent job, archive the Java engine and automate the release flow. Item keys are the plan's IDs.
+
+**Scope:** R: R7 confirmatory round, v2 realism config, FX11 investigation, A2 basis, maker write-up; M: DeepLOB (AI4), conformal sizing; X: SEC Section 31 + FINRA TAF, MVP on real ITCH, market prints to risk; G: registry hash at promotion, trust roots, Java archive; A: narrower agent job, ledger debit per proposal, eval harness, summary claim check; E: release.py, EPICS.md regeneration, housekeeping.
+
+**Acceptance criteria:**
+
+- [ ] Every plan item is done or carried to v1.16 with a reason; the release is cut with tools/release.py
+
+**Out of scope:** v1.16 direction (decided by the R7 outcome).
+
+| key | title | status | est. (d) | milestone | evidence |
+|---|---|---|---:|---|---|
+| R-P0-1 | v1.15 R-P0-1: R7 confirmatory round on unseen sessions | in-progress | 8 | v1.15 | `research/r7/r7_confirm_prereg_DRAFT.json; tools/r7_download.py` |
+| R-P0-2 | v1.15 R-P0-2: v2 prereg turns the v1.14 realism opt-ins on | done | 2 | v1.15 | `configs/prereg/v2.json; python/tests/test_v115_prereg_realism.py` |
+| R-P1-3 | v1.15 R-P1-3: FX11 leak-vs-fast investigation and time-shift triage | done | 3 | v1.15 | `docs/research/FX11_FINDING.md; python/tests/test_fx11_time_shift.py` |
+| R-P1-4 | v1.15 R-P1-4: A2 QQQ vs top-15 basket basis on R7 | backlog | 5 | v1.15 | `planned: research/r7/ (A2 prereg)` |
+| R-P2-5 | v1.15 R-P2-5: maker study write-up | backlog | 1 | v1.15 | `planned: research/maker-real/` |
+| M-P0-1 | v1.15 M-P0-1: AI4 DeepLOB vs baselines, net of costs | in-progress | 6 | v1.15 | `python/src/iap/models/deeplob.py; python/src/iap/models/deeplob_baselines.py; research/r7/ai4_deeplob_prereg_DRAFT.json` |
+| M-P1-2 | v1.15 M-P1-2: conformal sizing (opt-in) | done | 3 | v1.15 | `python/src/iap/models/conformal.py` |
+| X-P1-1 | v1.15 X-P1-1: dated SEC Section 31 + FINRA TAF fees | done | 3 | v1.15 | `configs/reference/regulatory_fee_schedule.json; tests/golden/expected_regulatory_fees.json` |
+| X-P1-2 | v1.15 X-P1-2: MVP on a real ITCH session end to end | backlog | 2 | v1.15 | `planned: docs/ (real-session MVP digest)` |
+| X-P1-3 | v1.15 X-P1-3: market-trade prints feed the risk participation cap | done | 2 | v1.15 | `tests/golden/expected_risk_participation_prints.json` |
+| G-P0-1 | v1.15 G-P0-1: registry content hash and model card enforced at promotion | done | 2 | v1.15 | `python/src/iap/mlops/registry.py; python/src/iap/mlops/model_card.py` |
+| G-P1-2 | v1.15 G-P1-2: trust roots enabled, registry signed, verification blocking | done | 2 | v1.15 | `python/src/iap/agents/signing.py; python/src/iap/agents/trust.py` |
+| G-P1-3 | v1.15 G-P1-3: archive the Java engine | done | 2 | v1.15 | `archive/java` |
+| A-P0-1 | v1.15 A-P0-1: narrower agent job (propose, prereg, human sign-off) | done | 3 | v1.15 | `python/src/iap/agents/cli.py` |
+| A-P1-2 | v1.15 A-P1-2: agent proposals debit the chained ledger | done | 2 | v1.15 | `python/src/iap/validation/ledger.py` |
+| A-P1-3 | v1.15 A-P1-3: agent eval harness | done | 2 | v1.15 | `python/src/iap/agents/eval_harness.py` |
+| A-P1-4 | v1.15 A-P1-4: summary claim check against the tool log | backlog | 2 | v1.15 | `planned: python/src/iap/agents/ (summary claim check)` |
+| E-P1-1 | v1.15 E-P1-1: release automation (tools/release.py) | done | 2 | v1.15 | `tools/release.py; python/tests/test_release_tool.py; docs/release/V1150_REHEARSAL.md` |
+| E-P2-2 | v1.15 E-P2-2: EPICS.md regeneration | done | 1 | v1.15 | `tools/github/issues.yaml; docs/EPICS.md` |
+| E-P2-3 | v1.15 E-P2-3: housekeeping (stale worktree, step-2 abort entries, v2 quoting prereg in ticks) | backlog | 1 | v1.15 | `planned: research/ (step-2 abort entries)` |
 
 ## Labels
 
