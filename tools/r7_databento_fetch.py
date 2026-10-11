@@ -14,7 +14,7 @@ reader keeps), saved as ``<vendor-dir>/xnas-itch-<yyyymmdd>.mbo.dbn.zst``
 via a ``.part`` file; ``--manifest-out`` writes a candidate manifest
 (format ``dbn-mbo``, bytes, sha256) for ``plan-ingest`` / ``verify-download``.
 Needs the optional extra: ``pip install 'iap[databento]'``.
-docs/R7_DATA_PLAN.md §7.
+docs/R7_DATA_PLAN.md §8.
 
     set DATABENTO_API_KEY=...            (never on the command line)
     python tools/r7_databento_fetch.py                       # estimate only
