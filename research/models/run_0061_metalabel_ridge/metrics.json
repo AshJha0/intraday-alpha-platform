@@ -1,0 +1,128 @@
+{
+  "auc_test": 0.6086526075173254,
+  "base_rate_test": 0.07486493439670697,
+  "best_tau_from_calibration": 0.3,
+  "brier_test": 0.06843982727055706,
+  "calibration_curve": [
+    {
+      "bin": 0,
+      "count": 3762,
+      "empirical": 0.06831472620946305,
+      "p_mean": 0.06836326659309247
+    },
+    {
+      "bin": 1,
+      "count": 125,
+      "empirical": 0.272,
+      "p_mean": 0.12623329432633207
+    }
+  ],
+  "calibration_method": "sigmoid",
+  "calibration_positives": 274,
+  "economics_gate_best_tau": {
+    "hit_rate": 0.0,
+    "mean_net_bps_per_trade": 0.0,
+    "n_signals": 3887,
+    "n_trades": 0,
+    "total_net_bps": 0.0
+  },
+  "economics_gate_off": {
+    "hit_rate": 0.07486493439670697,
+    "mean_net_bps_per_trade": -0.08780511163896762,
+    "n_signals": 3887,
+    "n_trades": 3887,
+    "total_net_bps": -341.29846894066714
+  },
+  "economics_gate_tau": {
+    "hit_rate": 0.0,
+    "mean_net_bps_per_trade": 0.0,
+    "n_signals": 3887,
+    "n_trades": 0,
+    "total_net_bps": 0.0
+  },
+  "gate_degenerate": true,
+  "impute_nan": false,
+  "n_meta_samples": 15627,
+  "n_missing_meta_values": 115,
+  "n_taken_at_best_tau": 0,
+  "n_taken_at_tau": 0,
+  "primary_model": "ridge",
+  "segments": {
+    "calibration": 3893,
+    "test": 3887,
+    "train": 7814
+  },
+  "tau": 0.5,
+  "tau_sweep_calibration": [
+    {
+      "n_trades": 3503,
+      "tau": 0.056488,
+      "total_net_bps": -62.94649658918766
+    },
+    {
+      "n_trades": 2920,
+      "tau": 0.063019,
+      "total_net_bps": -54.77823393621818
+    },
+    {
+      "n_trades": 1948,
+      "tau": 0.069233,
+      "total_net_bps": -35.66470588320668
+    },
+    {
+      "n_trades": 972,
+      "tau": 0.074972,
+      "total_net_bps": -16.208037798517637
+    },
+    {
+      "n_trades": 390,
+      "tau": 0.081524,
+      "total_net_bps": -11.86986288837777
+    },
+    {
+      "n_trades": 0,
+      "tau": 0.3,
+      "total_net_bps": 0.0
+    },
+    {
+      "n_trades": 0,
+      "tau": 0.35,
+      "total_net_bps": 0.0
+    },
+    {
+      "n_trades": 0,
+      "tau": 0.4,
+      "total_net_bps": 0.0
+    },
+    {
+      "n_trades": 0,
+      "tau": 0.45,
+      "total_net_bps": 0.0
+    },
+    {
+      "n_trades": 0,
+      "tau": 0.5,
+      "total_net_bps": 0.0
+    },
+    {
+      "n_trades": 0,
+      "tau": 0.55,
+      "total_net_bps": 0.0
+    },
+    {
+      "n_trades": 0,
+      "tau": 0.6,
+      "total_net_bps": 0.0
+    },
+    {
+      "n_trades": 0,
+      "tau": 0.65,
+      "total_net_bps": 0.0
+    },
+    {
+      "n_trades": 0,
+      "tau": 0.7,
+      "total_net_bps": 0.0
+    }
+  ]
+}
