@@ -743,8 +743,22 @@ class ExperimentRunner:
 
     # -- protocol -------------------------------------------------------
 
-    def run(self, spec: ExperimentSpec) -> ExperimentResult:
-        """Run ``spec`` (see the module docs for the six steps)."""
+    def run(
+        self,
+        spec: ExperimentSpec,
+        *,
+        frozen_params: Mapping[str, Any] | None = None,
+        prereg_t_threshold: float | None = None,
+    ) -> ExperimentResult:
+        """Run ``spec`` (see the module docs for the six steps).
+
+        v1.13 (R-P1-2), both opt-in: ``frozen_params`` (fitted params from
+        the design period) adds a no-refit scoring of the window, reported as
+        ``frozen_ic`` / ``frozen_t`` in ``last_report`` beside the refit
+        walk-forward statistics; ``prereg_t_threshold`` judges the gate t at
+        that pre-registered number (``threshold_policy="prereg"``) instead of
+        the ledger's running look count, so the verdict does not depend on
+        run order.  The ledger still records the run's looks."""
         if self._gate is not None:
             self._gate(spec)
         self._check_spec(spec)
@@ -789,7 +803,12 @@ class ExperimentRunner:
         bundle = self._methods(spec)
         gate_looks: int | None = None
         ledger_t: float | None = None
-        if bundle.tstat_threshold == "ledger":
+        extra_kwargs: dict[str, Any] = {}
+        if frozen_params is not None:
+            extra_kwargs["frozen_params"] = dict(frozen_params)
+        if prereg_t_threshold is not None:
+            extra_kwargs["prereg_t_threshold"] = float(prereg_t_threshold)
+        elif bundle.tstat_threshold == "ledger":
             # The run is judged against the denominator it contributes to,
             # and a rerun against the one its first run was judged at
             # (iap.validation.ledger, "Gate look count").
@@ -813,6 +832,7 @@ class ExperimentRunner:
                 dataset_version=spec.dataset_version,
                 **self._dsr_kwargs(spec, bundle),
                 **self._validate_kwargs(bundle),
+                **extra_kwargs,
             )
         except ValueError as exc:  # splitter: too few rows / degenerate boundaries
             raise ResearchError(f"walk-forward validation impossible: {exc}") from exc

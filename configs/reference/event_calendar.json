@@ -1,0 +1,51 @@
+{
+  "schema": "iap.event_calendar.v1",
+  "description": "Session-day event tags for iap.validation.sessions (v1.13, R-P2-9). fomc = scheduled FOMC statement (second, decision) day. holiday_thin = NYSE 1:00 pm early closes plus the platform's convention of the trading days between Christmas and New Year. A year missing here is not covered: iap.validation.sessions.event_calendar_for_year refuses it (fail closed).",
+  "years": {
+    "2019": {
+      "fomc": ["2019-01-30", "2019-03-20", "2019-05-01", "2019-06-19", "2019-07-31", "2019-09-18", "2019-10-30", "2019-12-11"],
+      "holiday_thin": ["2019-07-03", "2019-11-29", "2019-12-24", "2019-12-26", "2019-12-27", "2019-12-30", "2019-12-31"],
+      "source": {
+        "fomc": "https://www.federalreserve.gov/monetarypolicy/fomchistorical2019.htm (scheduled meetings; the 2019-10-04 conference call is unscheduled and not tagged)",
+        "holiday_thin": "early closes 2019-07-03, 2019-11-29, 2019-12-24 per the NYSE holiday calendar of that year (no longer on nyse.com/markets/hours-calendars, which lists 2026-2028; not re-verified); 2019-12-26..31 by convention"
+      },
+      "as_of": "2026-10-11"
+    },
+    "2020": {
+      "fomc": ["2020-01-29", "2020-04-29", "2020-06-10", "2020-07-29", "2020-09-16", "2020-11-05", "2020-12-16"],
+      "holiday_thin": ["2020-11-27", "2020-12-24", "2020-12-28", "2020-12-29", "2020-12-30", "2020-12-31"],
+      "source": {
+        "fomc": "https://www.federalreserve.gov/monetarypolicy/fomchistorical2020.htm (scheduled meetings; 2020-03-17/18 cancelled; unscheduled meetings and notation votes not tagged)",
+        "holiday_thin": "early closes 2020-11-27, 2020-12-24 per the NYSE holiday calendar of that year (not on the current nyse.com page; not re-verified); 2020-12-28..31 by convention"
+      },
+      "as_of": "2026-10-11"
+    },
+    "2021": {
+      "fomc": ["2021-01-27", "2021-03-17", "2021-04-28", "2021-06-16", "2021-07-28", "2021-09-22", "2021-11-03", "2021-12-15"],
+      "holiday_thin": ["2021-11-26", "2021-12-27", "2021-12-28", "2021-12-29", "2021-12-30", "2021-12-31"],
+      "source": {
+        "fomc": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+        "holiday_thin": "early close 2021-11-26 per the NYSE holiday calendar of that year (2021-12-24 was a full holiday; not on the current nyse.com page; not re-verified); 2021-12-27..31 by convention"
+      },
+      "as_of": "2026-10-11"
+    },
+    "2025": {
+      "fomc": ["2025-01-29", "2025-03-19", "2025-05-07", "2025-06-18", "2025-07-30", "2025-09-17", "2025-10-29", "2025-12-10"],
+      "holiday_thin": ["2025-07-03", "2025-11-28", "2025-12-24", "2025-12-26", "2025-12-29", "2025-12-30", "2025-12-31"],
+      "source": {
+        "fomc": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+        "holiday_thin": "early closes 2025-07-03, 2025-11-28, 2025-12-24 per the NYSE 2025 holiday calendar (no longer on nyse.com/markets/hours-calendars; not re-verified); 2025-12-26..31 by convention"
+      },
+      "as_of": "2026-10-11"
+    },
+    "2026": {
+      "fomc": ["2026-01-28", "2026-03-18", "2026-04-29", "2026-06-17", "2026-07-29", "2026-09-16", "2026-10-28", "2026-12-09"],
+      "holiday_thin": ["2026-07-02", "2026-11-27", "2026-12-24", "2026-12-28", "2026-12-29", "2026-12-30", "2026-12-31"],
+      "source": {
+        "fomc": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm (verified 2026-10-11)",
+        "holiday_thin": "early closes 2026-11-27, 2026-12-24 verified on https://www.nyse.com/markets/hours-calendars 2026-10-11; 2026-07-02 (eve of the 2026-07-03 observed holiday) is NOT an NYSE early close and is kept as a platform convention; 2026-12-28..31 by convention"
+      },
+      "as_of": "2026-10-11"
+    }
+  }
+}

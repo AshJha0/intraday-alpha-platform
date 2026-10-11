@@ -56,7 +56,7 @@ from itertools import combinations
 import numpy as np
 import pandas as pd
 
-from iap.validation.splits import MIN_TEST_PAIRS, NS_DAY
+from iap.validation.splits import MIN_TEST_PAIRS, NS_DAY, post_block_embargo_ns
 
 #: The opt-in defaults: 6 groups, 2 test groups -> 15 splits, 5 paths.
 DEFAULT_CPCV_GROUPS = 6
@@ -94,13 +94,21 @@ class CPCVSplit:
                 out.append([s, e])
         return [(a, b) for a, b in out]
 
-    def train_mask(self, ts: np.ndarray, horizon_ns: int, embargo_ns: int) -> np.ndarray:
+    def train_mask(
+        self,
+        ts: np.ndarray,
+        horizon_ns: int,
+        embargo_ns: int,
+        post_embargo_ns: int | None = None,
+    ) -> np.ndarray:
         """Train rows: outside every test interval, purged before it and
-        embargoed after it (module docs)."""
+        embargoed after it (module docs).  ``post_embargo_ns`` (v1.13,
+        R-P1-6) is the gap after each interval, default ``embargo_ns``."""
         ts = np.asarray(ts, dtype=np.int64)
+        after = embargo_ns if post_embargo_ns is None else int(post_embargo_ns)
         keep = np.ones(ts.shape, dtype=bool)
         for s, e in self.intervals():
-            keep &= (ts + horizon_ns + embargo_ns < s) | (ts >= e + embargo_ns)
+            keep &= (ts + horizon_ns + embargo_ns < s) | (ts >= e + after)
         return keep
 
     def test_mask(self, ts: np.ndarray) -> np.ndarray:
@@ -125,6 +133,7 @@ class CombinatorialPurgedSplitter:
         n_groups: int = DEFAULT_CPCV_GROUPS,
         k_test: int = DEFAULT_CPCV_TEST_GROUPS,
         embargo_ns: int = 60_000_000_000,
+        feature_window_ns: int | str | None = None,
     ) -> None:
         if n_groups < 2:
             raise ValueError("n_groups must be >= 2")
@@ -135,6 +144,8 @@ class CombinatorialPurgedSplitter:
         self.n_groups = int(n_groups)
         self.k_test = int(k_test)
         self.embargo_ns = int(embargo_ns)
+        #: post-block embargo (v1.13, R-P1-6; opt-in via feature_window_ns)
+        self.post_embargo_ns = post_block_embargo_ns(self.embargo_ns, feature_window_ns)
         #: ``"day_aligned"`` or ``"row_mass"`` once :meth:`groups` has run
         self.grouping: str | None = None
 
@@ -211,9 +222,9 @@ class CombinatorialPurgedSplitter:
             test: dict[int, pd.DataFrame] = {}
             for iid, df in frames.items():
                 ts = df["exchange_ts"].to_numpy()
-                train[iid] = df[split.train_mask(ts, horizon_ns, self.embargo_ns)].reset_index(
-                    drop=True
-                )
+                train[iid] = df[
+                    split.train_mask(ts, horizon_ns, self.embargo_ns, self.post_embargo_ns)
+                ].reset_index(drop=True)
                 test[iid] = df[split.test_mask(ts)].reset_index(drop=True)
             yield split, train, test
 
