@@ -414,7 +414,7 @@ numerically inert (`data/real/quoting_real/ABORTED.md`); a v2 protocol in
 ticks will be pre-registered. AUC01 done: no demonstrated edge in-sample
 (underpowered, MOC-cutoff caveat); 2026 holdout NOT CONFIRMED, 0 trades.
 
-**In progress: v1.14, the correctness release** (one regeneration of
+**v1.14, the correctness release** (done; §3.9) (one regeneration of
 goldens, stores and reports under new pre-registrations; every docs number
 re-read): causal row block for the backtest (R-P0-1), trailing labels by
 default, day-clustered inference with automatic bandwidth, coalesced
@@ -423,8 +423,8 @@ rounding, queue credit on MODIFY size-downs, feed latency, risk audit hash
 chain (G-P0-1), chained ledger and stronger key trust, shared replays and a
 study base class. The R7 confirmatory round runs on v1.14.
 
-**Later:** the SEC 15c3-5 pre-trade control set (G-P0-2; meaningful once the
-live gateway work P1-P3 exists), archiving the frozen Java copy, SOR/FX
+**Later (as planned at v1.13):** the SEC 15c3-5 pre-trade control set (G-P0-2;
+it shipped in v1.14 after all, §3.9), archiving the frozen Java copy, SOR/FX
 realism items (synthetic-only today).
 
 | Item | State |
@@ -435,6 +435,75 @@ realism items (synthetic-only today).
 | AI4 deep order-book baselines | not started |
 | E4-E5 | done in v1.13 |
 | P1-P3 | not started |
+
+## 3.9 v1.14.0 (2026-10-11): the correctness release
+
+v1.14 is the release §3.8 planned: every review finding that moves a
+published number, fixed once, with goldens, stores and reports regenerated
+together. It shipped as six pull requests (#83, #84, #86, #87, #88, #89);
+CHANGELOG.md lists every number that moved and why. The headline did not
+change: still 0 alphas promoted, no strategy that trades at 1x costs.
+
+**Done:**
+
+- Data (#83): same-timestamp events coalesced into one state change in all
+  four feature engines; hidden prints signed by the quote rule; midpoint
+  prints rounded half to even; manifest x-version 2, so every dataset
+  ingested before v1.14 is refused until it is re-ingested; half-penny
+  tick detection; ITCH operational halts; a `config_version` on every
+  dataset run; cross prints counted in volume but not in signed flow.
+- Research statistics (#88): a causal backtest row block (R-P0-1);
+  automatic HAC bandwidth with no lag product across session days; a
+  `few_sessions` reading for under four sessions; the time-shift leakage
+  detector; one ledger look per gate decision; per-instrument scaling;
+  `hypothesis_confirmed` by fold majority. The v1.13 rules stay reachable
+  as `v2_v113` / `v3_v113` / `v4_v113` (COOKBOOK recipe 72).
+- Execution (#86): queue credit on a MODIFY that shrinks an order ahead
+  (on by default, no golden moved); feed latency, simulator-routed exits,
+  hidden-print fills, per-touch-order adverse selection and priority-keeping
+  size amends, all opt-in (recipe 73).
+- Risk (#89): the audit log is a SHA-256 hash chain (G-P0-1, recipe 69);
+  the SEC 15c3-5 pre-trade set as checks 23-29 (G-P0-2, recipe 70), moved
+  forward from "later" because the checks are cheap to pin now and costly
+  to retrofit under a live gateway; two-party, capped loss overrides; a
+  sanity gate on crossed books and mark jumps; bounded per-key state.
+- Governance (#87): maintainer trust roots for the agent key registry,
+  read from `origin/main` (recipe 74); `ed25519-v2` signatures bound to the
+  board head; the look ledger as a hash chain (x-version 4); a blocking
+  `supply-chain` job (pip-audit, cargo audit, cargo deny, Trivy) and Rust
+  in CodeQL.
+- Engineering (#84): `SharedReplay` (one prepared stream per instrument,
+  replayed for every maker config), a numpy-backed event cursor,
+  `StudyBase` for study drivers, and a version-stable model content hash.
+  Behaviour-preserving: no golden, digest or model id moved.
+
+**Not done, and why:**
+
+- The execution-realism options are off by default. Switching them on
+  changes every maker number, so they are switched on in the v2
+  pre-registrations, not retroactively in a release.
+- The participation check (27) is off in the repo config: it needs the
+  market's trade prints, which only the live gateway (P1-P3) provides.
+- The study drivers on the `research/*` branches have not moved to
+  `StudyBase`; they adopt it after their running studies finish.
+- The R7 confirmatory round has not run. It needs the re-ingest under
+  manifest x-version 2, which is the first thing to do on v1.14.
+
+## 3.10 Next: v1.15 and after
+
+| Item | State |
+|---|---|
+| R7 confirmatory round (10 unseen Nasdaq sessions) | data partly downloaded; re-ingest under x-version 2, then run on v1.14 |
+| AI4 deep order-book baselines | code in review (PR #85), targeted at v1.15; no result yet |
+| A2 QQQ against its constituents (basis study) | code in review (PR #85), targeted at v1.15; needs the R7 ingest |
+| Maker v2 and quoting v2 pre-registrations | to write, with the v1.14 execution options switched on and the protocol in ticks |
+| A3 futures lead-lag | on hold (data cost) |
+| P1-P3 live gateway | not started |
+| Archive the frozen Java copy | later |
+
+Neither v1.15 study has produced a number. When they do, they go through
+the same gate and ledger as everything else; a deep model gets no
+exemption for being deep.
 
 ## 4. MVP success criteria
 

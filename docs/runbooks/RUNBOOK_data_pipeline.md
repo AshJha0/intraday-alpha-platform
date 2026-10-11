@@ -162,6 +162,19 @@ CPU throttling (`kubectl top pods`), GC pauses (dashboard panel), and recent
 deploys. A sustained 100k backlog means the latency SLO is already gone;
 prefer restarting the slow consumer over letting it drain for hours.
 
+### Real dataset refused: manifest x-version 1 (v1.14)
+
+Every reader of an ingested real dataset (ingest-into, merge, feature
+build, `--dataset-dir` research runs) refuses a manifest written before
+v1.14, with a message naming the old ingest rules. This is deliberate: the
+v1.14 rules sign hidden prints differently, round midpoint prints half to
+even and recognise the half-penny tick, so an old store would mix two
+definitions of the same column. The fix is to re-ingest from the raw ITCH
+file with the current code (REAL_DATA.md §3 and §4). The new
+`dataset_version` differs from the old one by construction (domain
+`iap.real-dataset.v2`); the old one stays valid in the ledger as a
+statement about the old rules.
+
 ### Pipeline job failed
 
 ```bash

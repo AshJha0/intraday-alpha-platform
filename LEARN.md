@@ -24,6 +24,22 @@ the numbers below are the v1.5.0 numbers. Each old rule keeps a legacy name
 report), and where a v1.4.0 figure is still the clearer illustration it is
 quoted as such, with its date.
 
+Three reading paths, depending on why you are here:
+
+- *You do quant research.* §1, §5, §6, §23, §24, §32, §33, §40, §42, then
+  §44. Run COOKBOOK recipes 1, 3, 4, 29 and 35 alongside. You will come
+  out knowing why a t of 21 can be overstated, what a look costs, and why
+  nothing here is promoted.
+- *You build trading systems.* §3, §9, §10, §12, §16, §21, §22, §25, §30,
+  §36, then §44. Run recipes 2, 9, 10, 14, 22, 69 and 70. The theme is
+  fail-closed design and proving four implementations agree.
+- *You are reviewing the platform.* §20, §27, §44, then
+  [docs/ROADMAP.md](docs/ROADMAP.md) §3.8-3.10 and CHANGELOG.md. These say
+  what is wrong or unfinished, in the platform's own words.
+
+The [glossary](#glossary) at the end defines the terms this document uses
+without stopping to explain them.
+
 For a shorter, top-down explanation of how the quant, algo and AI sides fit
 together — one page per subsystem, each ending with where to look and a
 command that runs — start with [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md)
@@ -76,6 +92,7 @@ Contents:
 43. [Feedback loops in passive execution](#43-feedback-loops-in-passive-execution)
 44. [What an independent review found, and how we triaged it (v1.13/v1.14)](#44-what-an-independent-review-found-and-how-we-triaged-it-v113v114)
 45. [Further reading](#45-further-reading)
+- [Glossary](#glossary)
 
 ---
 
@@ -4383,7 +4400,7 @@ pre-registrations, with every docs number re-read. Splitting it this way
 keeps each release's claims checkable: v1.13 can be verified by "nothing
 moved", v1.14 by "everything moved for a stated reason".
 
-- **v1.13 (this release, hygiene and hardening):** LF artefacts, the O(1)
+- **v1.13 (hygiene and hardening, shipped):** LF artefacts, the O(1)
   order lookup, the 3.11/3.12 CI matrix and slow-test split, advisory
   mypy, hashed requirements and gitleaks; regulatory fee fields (default
   0), one markout reference convention, the auction entry cutoff, quoting
@@ -4393,12 +4410,50 @@ moved", v1.14 by "everything moved for a stated reason".
   event calendar; the required `governance` CI job, a merge procedure for
   research branches, signed approval for human lifecycle edges, a locked
   blackboard append and a stricter LLM numbers rule.
-- **v1.14 (in progress, correctness):** the causal row block, trailing
-  labels by default, day-clustered inference with an automatic bandwidth,
-  the data-mapping fixes, queue credit on MODIFY, feed latency, the risk
-  audit hash chain and a chained ledger.
-- **Later:** the 15c3-5 control set (it only means something once there is
-  a live gateway), archiving the frozen Java copy.
+- **v1.14 (correctness, shipped 2026-10-11):** the causal row block,
+  trailing labels by default, day-separated inference with an automatic
+  bandwidth, the time-shift leakage detector, one look per gate decision,
+  the data-mapping fixes, queue credit on MODIFY, opt-in feed latency and
+  routed exits, the risk audit hash chain, a chained ledger, maintainer
+  trust roots, blocking supply-chain audits, and the 15c3-5 control set.
+- **Later:** archiving the frozen Java copy, and switching the opt-in
+  execution options on in the v2 maker and quoting pre-registrations.
+
+The 15c3-5 controls were planned for "later" and shipped in v1.14 anyway.
+The argument for waiting was that a pre-trade check guarding a simulator
+protects nothing. The argument that won was cost: seven new checks pinned
+by goldens in three languages are cheap to add while the risk engine is
+being regenerated for the hash chain, and expensive to retrofit under a
+live gateway, where every change to a risk rule is a production change.
+
+**Three ideas from v1.14 worth keeping.**
+
+*A state change is not an event.* An ITCH execute arrives as two
+canonical events (EXECUTE, then TRADE) and a replace as two more (CANCEL,
+then ADD), each pair stamped with one nanosecond. Up to v1.13 the feature
+engine sampled the book after each event, so it saw a book with the old
+order gone and the new one not yet added: a state the market was never
+in. On the synthetic equity vector that phantom state was 409 of 2,000
+rows. The fix groups events by `(instrument, exchange_ts)` and samples
+once per group. The streaming MVP keeps the per-event rule, because a live
+consumer cannot know an event closes its group until the next one arrives;
+that is a stated difference, not an oversight.
+
+*A hash chain makes an edit visible, not impossible.* Each risk audit line
+carries the hash of the previous line, and the ledger carries a head over
+every entry's identity. Change one byte and every later link breaks. But
+someone who can rewrite the whole file can rebuild the chain, so the value
+of a chain is only as good as the place its head is copied to: the paper
+session's state file, git history on `main`, a pre-registration. The trust
+roots follow the same logic one level up: CI reads them from `main`, so a
+branch cannot add a key and vouch for it in the same change.
+
+*Causal means "known at decision time", including what you skip.* The old
+backtest skipped rows whose future label was invalid. That sounds like
+hygiene and is look-ahead: at 09:31:00 you do not know whether the quote
+at 09:31:01 will be valid. The v1.14 row block uses only decision-time
+state. The old figure is still reported beside the new one
+(`net_pnl_1x_cost_label_block`) so the size of the bias is on the page.
 
 **What happened to the studies.** The maker study was left to finish as
 registered; it will be reported with the fee, queue-credit, decomposition
@@ -4408,8 +4463,8 @@ continuing would have spent about twelve hours on a run that could not test
 its hypothesis. A v2 protocol in ticks will be pre-registered. AUC01 was
 already done; its holdout verdict (0 trades, not confirmed) stands, and
 the in-sample +19.4 bp now carries the cutoff and fitted-sign caveats. The
-next confirmatory round on new data (R7) must run on v1.14, or it would
-inherit every bias above.
+next confirmatory round on new data (R7) runs on v1.14, after the
+sessions are re-ingested under manifest x-version 2.
 
 **The lesson.** A review is most useful when it is allowed to say that a
 number you published is wrong, and when the fixes are sorted by what they
@@ -4429,6 +4484,8 @@ result first and then deciding would have been.
 
 Inside this repository, in suggested order:
 
+0. `docs/HOW_IT_WORKS.md` — the whole platform top-down in one sitting,
+   before any of the below.
 1. `docs/SPECIFICATION.md` — the governing spec; §32 is one paragraph and
    worth memorizing.
 2. `PLATFORM_CONVENTIONS.md` + `schemas/FORMAT.md` — how contracts get pinned.
@@ -4445,8 +4502,6 @@ Inside this repository, in suggested order:
    (C++/Rust/Java case study) especially.
 8. `cpp/include/iap/execution/execution.hpp` — the header comment is the
    best short document on deterministic fill modeling in the repo.
-0. `docs/HOW_IT_WORKS.md` — the whole platform top-down in one sitting,
-   before any of the below.
 9. `docs/MVP.md` — the loop end to end, the wiring review, the IC audit and
    the success-criteria table; then `docs/LIFECYCLE.md`,
    `docs/DECISION_TRACE.md` and `docs/DATA_MODEL.md` for the three
@@ -4459,6 +4514,8 @@ Inside this repository, in suggested order:
     `CHANGELOG.md` for what v1.3.0 fixed and what it leaves open, for
     the v1.4.0 dataset regeneration (§2.3), and for the v1.5.0 table of
     what each new default moved.
+11. `docs/ROADMAP.md` §3.8-3.10 and the v1.14.0 section of `CHANGELOG.md`
+    — the 2026-10-11 review, what v1.14 fixed and every number it moved.
 
 Classic external literature these designs draw on (find current editions):
 
@@ -4484,3 +4541,41 @@ Classic external literature these designs draw on (find current editions):
 Everything else is in the code — which, in this repository, is the point:
 every claim above is a test, a golden file, or a committed report you can
 rerun.
+
+## Glossary
+
+Terms as this repository uses them. Where a term has a wider meaning
+elsewhere, the entry gives the local one.
+
+| term | meaning here |
+|---|---|
+| adverse selection (AS) | for a passive fill, how far the mid moves against you after the fill, signed so that positive is a loss: `s * (m_future - m_fill) / p`, in bp. Measured per message or, since v1.14, per touch order (COOKBOOK 73) |
+| alpha | a scored signal with a fixed id (EQ01, FX11, ...), a horizon and an expected sign; not a strategy until it survives costs |
+| anchor | a git commit that contains a blackboard entry, proving the entry existed at that commit's time |
+| blackboard | `research/agents/blackboard.jsonl`, the append-only, hash-chained log of pre-registrations and findings |
+| Bonferroni threshold | the \|t\| a result must reach given the number of looks taken so far; it rises as the ledger grows |
+| bundle (method bundle) | a named set of research rules: `v2` (default), `v3`, `v4`, `legacy_v1`, and since v1.14 the frozen `*_v113` copies |
+| CANDIDATE | the second lifecycle state: the alpha passed the research checks it can pass on bundled data. Not promoted |
+| coalescing | treating all events of one instrument with the same `exchange_ts` as one state change (v1.14) |
+| decision trace | one `DecisionTrace` record per trading decision, from signal to TCA, written as canonical JSONL with a stream digest |
+| embargo | rows removed after a test fold so that labels overlapping the fold cannot leak into training |
+| fail-closed | on missing, NaN or out-of-range input, the risk engine rejects rather than allows |
+| FROZEN copy | a duplicated implementation kept for parity and changed only with a `POLYGLOT-OVERRIDE` line ([docs/POLYGLOT.md](docs/POLYGLOT.md)) |
+| gate | a pass/fail check in the promotion report (significance, stability, cost, leakage, ...). An alpha is promoted only if every gate passes |
+| golden | a committed expected-output file that every language must reproduce, byte for byte or within a stated tolerance |
+| HAC | heteroskedasticity- and autocorrelation-consistent standard errors (Newey-West). Since v1.14 the bandwidth is chosen automatically and no lag product spans two session days |
+| holdout | data set aside and only scored against pre-registered hypotheses. Once looked at, it is spent |
+| IC | information coefficient: the rank correlation between a signal and the next-horizon return |
+| ledger (look ledger) | `research/experiments.json`: every statistic the research has computed, counted as looks. A hash chain since v1.14 |
+| look | one statistic computed and seen. Since v1.14 one look per gate decision |
+| markout | the mid some time after a fill, relative to the fill, as a measure of execution quality |
+| OFI | order-flow imbalance: signed changes in best bid and ask size (Cont, Kukanov and Stoikov) |
+| PBO | probability of backtest overfitting, from combinatorially symmetric cross-validation |
+| pre-registration | a signed blackboard entry naming alpha, horizon, sign and pass rule before the data is scored |
+| PROMOTE | the verdict that an alpha passed every gate. No alpha has received it |
+| queue position (`ahead_qty`) | the displayed size ahead of a resting simulated order at its price level; cancels and, since v1.14, size-reducing MODIFYs ahead of it reduce it |
+| row block | which feature rows the backtest is not allowed to trade on. Since v1.14 `causal`: decided from decision-time state only |
+| stats revision | the tag (`v1.14`) on a ledger identity, so that a rerun under new rules is a new look |
+| time-shift leakage test | v1.14 check: pair each label with the score from a quarter-horizon earlier. A causal signal keeps most of its IC; one that collapses is suspected of look-ahead and flagged for review. Too few pairs reports `null`, never a pass. In the #88 regeneration FX11 failed it (IC 0.108 to 0.027); the review has not found a leak |
+| touch order | a resting simulated order at the best price, the unit of a v1.14 per-order markout |
+| trust root | a maintainer key in `research/agents/trust_roots.json`, read from `main`, that must sign the agent key registry |

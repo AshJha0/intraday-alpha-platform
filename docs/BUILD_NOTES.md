@@ -162,3 +162,22 @@ normalized.jsonl` by default), which is omitted with a printed note when
 `data/` has not been generated. Regenerate only on an **idle** box —
 `cat /proc/loadavg` first; the other agent's build will otherwise show up
 as a hot-path regression.
+
+## Supply-chain checks (v1.14)
+
+The `supply-chain` CI job blocks a merge. To run its main steps locally:
+
+```bash
+pip install pip-audit && pip-audit --strict -r requirements-ci.txt
+cargo install cargo-audit cargo-deny
+(cd rust && cargo audit --deny warnings && cargo deny check bans licenses sources)
+```
+
+`rust/deny.toml` allows crates.io only, permissive licences and no
+wildcard versions. Trivy runs in CI from a SHA-256-verified release
+tarball; install it the same way if you want the filesystem and config
+scans locally. The pyo3 extension (`rust/features_py`) moved from pyo3
+0.22.6 to 0.29.3 and numpy 0.29.0 in v1.14 to clear two RUSTSEC
+advisories; rebuild the wheel (COOKBOOK recipe 52) if you have an older
+one installed. Ignores go in `.github/audit-ignores.json` with a reason
+and an expiry date (CONTRIBUTING.md §6).

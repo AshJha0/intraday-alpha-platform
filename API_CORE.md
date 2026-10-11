@@ -271,3 +271,28 @@ non-deterministic telemetry paths and must be counted where it is used. The
 replay demo (`cargo run -p replay --bin demo`) is the reference wiring:
 decoder thread → ring → `ReplayEngine` on the consumer thread, with an
 end-of-stream marker so the consumer terminates deterministically.
+
+## 9. Same-timestamp groups (v1.14)
+
+The canonical event stream did not change in v1.14; how consumers read it
+did. ITCH reports one exchange action as several canonical events with
+the same `exchange_ts`: an execute is EXECUTE + TRADE, a replace is
+CANCEL + ADD, and an FX venue can quote both sides in one update. The book
+must apply every event (each is a real change), but a consumer that
+samples state, such as the feature engine, should treat the group as one
+state change and sample once, after its last event.
+
+- **Group key:** `(instrument_id, exchange_ts)`, in stream order. A group
+  ends at the last event of the instrument's substream with that
+  timestamp, so events of other instruments in between do not split it.
+- **Where it is implemented:** `group_ends` in Python, Rust and C++, and
+  in the frozen Java engine as an overload of `apply` / `run`
+  (API_FEATURES.md §2.3).
+- **Where it is not used, on purpose:** the order book and replay engine
+  (they apply events one at a time, as before) and the streaming MVP,
+  which cannot know an event closes its group until the next event
+  arrives. Waiting would add a lookahead of one event to a live path.
+
+Why it matters: on the synthetic equity golden vector 409 of 2,000 feature
+rows were samples of a book in the middle of a group, a state the market
+never showed (COOKBOOK recipe 71).

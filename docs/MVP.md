@@ -153,6 +153,19 @@ so the MVP does the same: SOR → controls → risk → submit. A `NO_ROUTE`
 child therefore never reaches the risk engine (it is counted, not
 decided), exactly as in `BacktestEngine.decide`.
 
+### 4.1 Why the MVP stays per-event (v1.14)
+
+Since v1.14 the research feature engine treats events of one instrument
+with the same `exchange_ts` as one state change (API_CORE.md §9). The MVP
+does not. It is a streaming loop: when an EXECUTE arrives it cannot know
+whether a TRADE with the same timestamp follows without waiting for the
+next event, and waiting is a lookahead a live system does not have. So
+the MVP's features are computed per event, as they were in v1.13, and the
+gap between its realized IC and the research IC includes this difference.
+The risk engine the MVP drives is the v1.14 one (hash-chained audit, the
+15c3-5 checks configured loosely enough not to bind); its counts and P&L
+did not change, only the hashed config and so the trace digest.
+
 ## 5. Determinism contract — what is hashed
 
 | hash | over |

@@ -955,7 +955,9 @@ since v1.13.0 (above).
   as `TRADING`; the session bounds in `instruments.json` stay 09:30–16:00.
 - **Timestamps are exchange time.** `receive_ts == exchange_ts`; there is
   no capture latency, so latency features are zero and the backtester's
-  `latency_ns` is the only delay.
+  `latency_ns` is the only delay. Since v1.14 the maker and quoting
+  backtests can add an assumed feed leg (`feed_latency_ns`, off by
+  default); it is an assumption, not a measurement.
 - **Broken trades** are counted, not reversed.
 - **One tick size and one universe per dataset** (§4.1); listings,
   delistings and symbol changes inside a dataset are backlog XD08.
@@ -969,8 +971,10 @@ since v1.13.0 (above).
   does not corrupt rolling state; a split inside a multi-day dataset still
   shifts price LEVELS across sessions (`merge` refuses inputs carrying
   corporate-action tables rather than merge them wrongly).
-- **One real ITCH day has been ingested; LOBSTER has not been run on a
-  vendor file** (see Status).
+- **Seven in-sample ITCH sessions and two holdout sessions have been
+  ingested, all on AAPL / MSFT / QQQ, all before v1.14.** Their manifests
+  are x-version 1, so v1.14 refuses them until they are re-ingested (§4).
+  LOBSTER has not been run on a vendor file.
 - **Not supported:** CBOE PITCH, NYSE feeds, FX ECN feeds (backlog XD02,
   XD07); ITCH versions other than 5.0; the Rust, C++ and Java ports do not
   have these readers — they consume the canonical files the ingest writes.

@@ -199,6 +199,23 @@ reproduce the digest from the captured stream; `explain` and
 step; the fix shows up as a digest diff; the captured stream + expected
 digest become a golden.
 
+## 8a. What v1.14 changed for traces
+
+The trace format did not change. Two things around it did:
+
+- A risk rejection can now carry the rule ids of the SEC 15c3-5 checks
+  (`rule_index` 23-29). The `RiskDecision` contract already allowed those
+  indices, so old readers parse new traces.
+- The risk audit log a trace points to is a hash chain. When an incident
+  replay reproduces the trace digest, check the audit chain too
+  (RUNBOOK_incident_kill_switch.md §6): a matching trace digest with a
+  broken audit chain means the log was touched after the run.
+
+The MVP trace digest moved twice during v1.14 because config files that
+are hashed into it changed (`alpha_params.json`, the risk config), not
+because any decision changed. A digest is a statement about inputs as
+well as outputs.
+
 ## 9. Pinned in
 
 | topic | document |

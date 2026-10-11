@@ -29,7 +29,7 @@ implementation (`iap.risk`, `iap.execution`) proven by the same golden files
 the Java ports are proven by, so the loop the MVP runs is the reference
 loop end to end.
 
-## Current status (v1.13.0, 2026-10-11)
+## Current status (v1.14.0, 2026-10-11)
 
 **Where the research stands.**
 
@@ -243,13 +243,67 @@ number, golden or ledger entry changed):
 - data terms: what is and is not published from the Nasdaq sample files
   ([docs/REAL_DATA.md](docs/REAL_DATA.md) §2.1).
 
-**Next: v1.14, the correctness release (in progress).** One regeneration
-of goldens, feature stores and reports under new pre-registrations: a
-causal row block for the backtest, trailing labels by default,
-day-clustered inference, the data-mapping fixes, queue credit on MODIFY,
-feed latency, a hash-chained risk audit log and ledger. The R7
-confirmatory round runs on v1.14. **Later:** the 15c3-5 control set, the
-Java archive ([docs/ROADMAP.md](docs/ROADMAP.md) §3.8).
+**New in v1.14.0, the correctness release** (2026-10-11). This is the
+release that was allowed to move numbers: every review finding that
+changes a published figure was fixed once, and goldens, the synthetic
+feature store and the reports were regenerated together. CHANGELOG.md
+lists each moved number with its reason. The conclusions did not move:
+0 PROMOTE, no trade at 1x costs.
+
+- data: events of one instrument sharing a timestamp are one state change
+  (an ITCH execute or replace no longer leaves a half-applied book that a
+  feature can sample), in all four engines; hidden prints signed by the
+  quote rule; midpoint prints rounded half to even; manifest x-version 2,
+  so a dataset ingested before v1.14 is refused until re-ingested
+  (COOKBOOK 71);
+- research statistics: a causal backtest row block (the old one peeked at
+  whether the future label was valid); automatic HAC bandwidth with no lag
+  product across session days; a time-shift leakage detector; one ledger
+  look per gate decision; per-instrument scaling; `hypothesis_confirmed`
+  by fold majority. The v1.13 rules stay reachable as `v2_v113` and
+  friends (COOKBOOK 72);
+- execution: a MODIFY that shrinks an order ahead of yours now credits
+  your queue position, as a cancel does (on by default; no golden moved).
+  Feed latency, simulator-routed exits, hidden-print fills,
+  per-touch-order adverse selection and priority-keeping amends are opt-in
+  and will be switched on in the v2 pre-registrations (COOKBOOK 73);
+- risk: the audit log is a SHA-256 hash chain (COOKBOOK 69); SEC 15c3-5
+  pre-trade checks 23-29 (restricted list, open orders, open notional,
+  strategy position, participation, cancel rate, venue message rate);
+  two-party, capped loss overrides; crossed books and 10x mark jumps
+  dropped; bounded per-key state (COOKBOOK 70);
+- governance: maintainer trust roots for agent keys, read from `main` so a
+  branch cannot vouch for itself (COOKBOOK 74); the look ledger is a hash
+  chain; a blocking `supply-chain` job (pip-audit, cargo audit, cargo
+  deny, Trivy) and Rust in CodeQL;
+- engineering: shared replay across maker configs, a numpy event cursor,
+  `StudyBase` for study drivers, a version-stable model content hash.
+
+The real-data figures above are still the v1.13 statistics on the v1.13
+stores: no real dataset has been re-ingested under x-version 2 yet
+([docs/REAL_DATA.md](docs/REAL_DATA.md) §4). Expect the day-separated HAC
+to report lower t values than 21 and 25 when it is.
+
+**Next: v1.15.** The R7 confirmatory round on unseen sessions (re-ingest
+first), deep order-book baselines (AI4) and the QQQ basis study (A2),
+whose code is in review; maker and quoting v2 pre-registrations with the
+execution options switched on ([docs/ROADMAP.md](docs/ROADMAP.md) §3.9-3.10).
+
+## What this is, and what it is not
+
+It is a research platform that tries hard not to fool its owner: one
+seeded generator, integer contracts, byte-identical goldens across Python,
+C++, Rust and Java, a look ledger that prices every statistic computed, and
+pre-registration that is checked by code. It runs the full loop from
+market data to TCA on one instrument and paper-trades a universe.
+
+It is not a profitable strategy. Nothing has been promoted, and the
+documents say so at the top rather than in a footnote. It is not connected
+to a live venue: there is no order gateway, so the 15c3-5 checks guard a
+simulator. The real data is seven (plus two holdout) Nasdaq sessions on
+three symbols, which is enough to find statistically strong signals and
+not enough to say much about their size. The Java tree is largely a frozen
+copy kept for parity, not a production service.
 
 ## Architecture in one line
 
@@ -739,7 +793,7 @@ golden tests — the engineering discipline this repo is built around
 |---|---|
 | [LEARN.md](LEARN.md) | textbook walkthrough: microstructure, generator, book, features, honest alpha research, ML/meta-labeling, portfolio, risk, execution, TCA, parity, latency economics, adaptability, contracts & Protocols, the Python risk/execution reference, the 7-state lifecycle, the decision trace, the data model, the MVP walkthrough with its honest numbers, the v1.3.0 review as six case-study chapters (fail-closed risk bugs, simulator realism, statistical power, gate gaming, crash consistency, supply-chain hygiene), pitfalls, interview Q&A, combining signals, adverse selection, five v1.9-v1.10 case studies (why taker-only research cannot pay at 1 s, the FOMC sampling flaw and day-clustered inference, the 2026 holdout as pre-registration, what the synthetic maker/quoting results show, governance keys and code hashes), and four from v1.11 (parity proves agreement, not correctness: the snapshot-burst bug; why an LLM must never compute a number; freezing copies instead of deleting them; model registries as evidence), and four from v1.12 (why a Sharpe must be deflated; what tick-to-trade does and does not measure; an underpowered result is not a negative result, AUC01; feedback loops in passive execution), and one from v1.13 (what an independent review found, and how it was triaged) |
 | [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) | how the quant, algo and AI sides work — a guided explanation for a newcomer: the pipeline on one page, the research statistics and gates, the execution algorithms and simulator rules, the fail-closed risk engine, the ML layer with its negative results, the LLM/agent boundary (what exists, what is backlog, what would be theatre on this data), determinism and replay; since v1.10 also the real-data path and the `v3` validity bundle, the maker path (calibrate, post or quote, decompose), auctions, optimal execution and the governance chain; since v1.11 the LLM research agent and its controls, the Rust feature engine from Python, the model registry and the polyglot policy; every section ends with where to look and a command that runs |
-| [COOKBOOK.md](COOKBOOK.md) | 68 task-oriented recipes with runnable commands (39-61: maker backtest, quoting, optimal execution, auctions, parallel features, the `v3` validity block, calibrating and backtesting a real session, signed pre-registration, the Almgren-Chriss frontier, the Rust feature engine from Python and building its wheel with maturin, the model registry, shadow mode and week-by-week monitoring, the LLM research agent, its evals and a guarded session with the scripted client, the `POLYGLOT-OVERRIDE` workflow, combinatorial purged CV, PBO and the deflated Sharpe ratio, tick-to-trade percentiles, extended features and event clocks, the multi-venue router, alert routing and SLOs, the fill hazard with post-only and markout feedback; 62-65: deflating a study's Sharpe, a maker run combining extended features and the hazard, the feedback loop on a toxic regime, reading the SLO burn rates; 66: planning the R7 data load; 67-68: regulatory fees on a round trip, the governance checks run locally) |
+| [COOKBOOK.md](COOKBOOK.md) | 74 task-oriented recipes with runnable commands (39-61: maker backtest, quoting, optimal execution, auctions, parallel features, the `v3` validity block, calibrating and backtesting a real session, signed pre-registration, the Almgren-Chriss frontier, the Rust feature engine from Python and building its wheel with maturin, the model registry, shadow mode and week-by-week monitoring, the LLM research agent, its evals and a guarded session with the scripted client, the `POLYGLOT-OVERRIDE` workflow, combinatorial purged CV, PBO and the deflated Sharpe ratio, tick-to-trade percentiles, extended features and event clocks, the multi-venue router, alert routing and SLOs, the fill hazard with post-only and markout feedback; 62-65: deflating a study's Sharpe, a maker run combining extended features and the hazard, the feedback loop on a toxic regime, reading the SLO burn rates; 66: planning the R7 data load; 67-68: regulatory fees on a round trip, the governance checks run locally; 69-74 (v1.14): verifying the risk audit hash chain, the 15c3-5 pre-trade controls, a v1.13 feature store next to a v1.14 one, the `*_v113` method bundles, per-touch-order adverse selection, maintainer trust roots) |
 | [docs/REAL_DATA.md](docs/REAL_DATA.md) | real historical data: what `python -m iap.marketdata ingest` reads (Nasdaq TotalView-ITCH 5.0, LOBSTER), how to obtain files yourself (nothing is bundled), the commands from a downloaded file to an alpha report, the mapping table to canonical events, the point-in-time security master and corporate-actions table, known limitations, and what a first real-data study can and cannot conclude |
 | [docs/RESEARCH_VALIDITY.md](docs/RESEARCH_VALIDITY.md) + [research/power/POWER_REPORT.md](research/power/POWER_REPORT.md) | the corrected research methods (the defaults since v1.5.0, each with its named legacy rule), the research store under parallel writers, gate eligibility; the planted-signal power study of the validation chain |
 | [CHANGELOG.md](CHANGELOG.md) | release notes, newest first (v1.11.0: the Rust feature engine via pyo3, the polyglot policy, the model registry, the LLM research agent and its evals; v1.10.0: skewed quoting, auctions, optimal execution, governance G1-G4; v1.9.0: research validity options, parallel features, maker economics; v1.8.0: the 2026 holdout and the ingest memory fix; v1.6.0-v1.7.2: real data, the agent layer, signal combination, real-data power; v1.5.0: the corrected research methods become the defaults, every old rule keeps a legacy name, every dataset-derived artefact regenerated; v1.4.0: the generator's equity flow calibration fixed so flow reaches the close, and every dataset-derived artefact regenerated; v1.3.0: fail-closed risk, simulator fill rules, paper-platform safety, governance and deployment hardening, research validity) |

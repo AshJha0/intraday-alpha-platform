@@ -399,7 +399,7 @@ ledger entry changes (the regeneration is v1.14).
   minimum-detectable-effect statement at the given n (with the effect a
   registered t rule needs).
 
-**What v1.13 does not fix (v1.14, the correctness release).** The review
+**What v1.13 did not fix (shipped in v1.14; see §4b).** The review
 (LEARN.md §44) found three defaults that overstate published statistics,
 and they change numbers, so they wait for one regeneration under new
 pre-registrations: the research backtest blocks rows by the validity of
@@ -407,8 +407,9 @@ the *future* label (R-P0-1; a look-ahead in every net-P&L-at-1x figure and
 bootstrap CI); the gate t uses a two-bucket HAC window without day
 clustering by default (R-P1-3; the in-sample t of 21-26 are overstated);
 and label freshness defaults to whole-day rather than `trailing` (R-P1-1).
-No headline verdict is expected to flip (0 PROMOTE, no trade at 1x), but
-until v1.14 ships read the published t-statistics as upper bounds.
+No headline verdict flipped (0 PROMOTE, no trade at 1x). Real-data
+t-statistics published before the stores are re-ingested under v1.14 are
+still v1.13 numbers: read them as upper bounds.
 
 **Studies under these rules (2026-10-11).** The maker study runs as
 registered and will be reported with `summarise_study` and the fee,
@@ -419,9 +420,41 @@ registered in ticks. AUC01's holdout verdict (0 trades, not confirmed)
 stands. The R7 confirmatory round will use `frozen_params` and a
 `prereg` threshold and runs on v1.14.
 
+## 4b. The v1.14 statistics revision
+
+v1.14 changed the defaults of the `v2`, `v3` and `v4` bundles. The names
+stayed, so experiment ids did not move; the v1.13 rules are frozen as
+`v2_v113`, `v3_v113` and `v4_v113` (COOKBOOK 72).
+
+| item | v1.14 default | v1.13 (`*_v113`) | why |
+|---|---|---|---|
+| R-P0-1 backtest row block | `causal`: decision-time state only (no positive mid, or an ANCHOR reason bit) | `auto`: the rows the IC scores, which depend on whether the future label is valid | the old rule is look-ahead; it is still reported as `net_pnl_1x_cost_label_block` so its size is visible |
+| R-P1-3 HAC | automatic bandwidth (`auto_hac_lags`, never below the horizon rule), no lag product across a session day; `few_sessions` reading below 4 sessions | horizon rule (L = 2), adjacent rows across days | a two-row window cannot see intraday persistence, and the last row of one day is not correlated with the first of the next by the mechanism HAC models |
+| R-P2-1 `hypothesis_confirmed` | at least 70 % of folds confirm | last fold only (kept as `hypothesis_confirmed_last_fold`) | one fold is one draw |
+| R-P2-2 scaling | per instrument, per fold, before pooling | pooled | pooled scaling lets the most volatile instrument set everyone's units |
+| R-P2-3 leakage | row shift plus a time-shift detector (`time_shift_ok`; `null` = not applicable) | row shift only | the row-shift test was vacuous whenever a row spans the horizon: every synthetic alpha reported `required_shift_ratio 0.0` |
+| R-P2-4 looks | one per gate decision (2 per experiment or pipeline alpha) | every report statistic | the ledger should price decisions, not columns of a report |
+
+Ledger identities now carry `stats_revision: "v1.14"`
+(`methods.ledger_config`), so a statistic regenerated under the new rules
+is a new look and never silently replaces an old one.
+
+What it found. In the synthetic regeneration (#88) FX11 failed the
+time-shift detector: IC 0.108 drops to 0.027 under a 75 s lag, below the
+required ratio. It was moved back to RESEARCH and flagged for manual
+review; the review has not shown a leak. The verdict counts moved (still 0
+PROMOTE; CHANGELOG.md has the table), and the look ledger grew because
+every regenerated statistic is a new look.
+
+Limitations that remain. Day separation removes cross-day lag products;
+it is not a full cluster-robust estimator, and with 7 sessions no
+estimator gives a reliable day-level t. The `few_sessions` reading says so
+instead of printing a t. The time-shift detector flags; it cannot prove a
+leak, and a slow-moving causal signal can fail it.
+
 ## 5. Tooling
 
-- `python -m iap.research run --methods {v2,v3,v4,legacy_v1}`: the method
+- `python -m iap.research run --methods {v2,v3,v4,legacy_v1,v2_v113,v3_v113,v4_v113}`: the method
   bundle (default `v2`; `v3` adds the v1.9 validity block of §1a, `v4` adds
   the report-only CPCV / PBO / deflated-Sharpe blocks of §1b); `--normalized-dir` names the events of the recompute
   probe (default `<features-dir>/../normalized`).

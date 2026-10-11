@@ -229,8 +229,9 @@ Research truth is the product (spec §32). Two rules are mechanical:
    under the v1.5.0 default methods, 760 of them by the signal-combination
    report). An experiment runs under the default
    method bundle (`v2`) unless it names `--methods legacy_v1`; the bundle
-   is part of the experiment id, a `v2` validation costs 84 looks (28
-   under `legacy_v1`), and its PROMOTE t threshold is the ledger's
+   is part of the experiment id, a `v2` validation cost 84 looks under the
+   v1.13 rules (28 under `legacy_v1`; since v1.14 one look per gate decision,
+   2 per experiment, and the v1.13 count survives as `v2_v113`), and its PROMOTE t threshold is the ledger's
    multiple-testing threshold at the look count declared before the run,
    never below 3.0. A number quoted under a legacy rule says so. Runner entries are never de-duplicated against
    the report pipeline's entries even when the computation coincides, and a
@@ -263,6 +264,19 @@ Promotion requests use the **Alpha promotion request** issue form, one
 transition per request, with evidence per gate
 (`docs/governance/GOVERNANCE.md` §2). An alpha whose fitted sign contradicts
 its `Economic rationale:` docstring can at best be ITERATE.
+
+Since v1.14 the ledger is a hash chain (x-version 4: `chain_head`,
+`chain_length`). Do not edit `research/experiments.json` by hand: a
+loader raises `LedgerIntegrityError` on a head or total that does not
+match, and `check_ledger_monotone.py` requires the branch's chain to
+extend the base branch's. Combine ledgers from two branches with
+`tools/merge_ledger.py`, which appends.
+
+Supply-chain findings. The `supply-chain` job (pip-audit, cargo audit,
+cargo deny, Trivy) blocks the merge. If a finding is a false positive or
+has no fix yet, add it to `.github/audit-ignores.json` with a `reason` and
+an `expires` date; `tools/audit_ignores.py` fails the job once the date
+has passed, so an ignore is a decision with a deadline, not a mute button.
 
 ## 7. Epics and issues
 

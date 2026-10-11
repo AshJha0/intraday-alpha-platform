@@ -133,6 +133,14 @@ completion first (`RUNBOOK_paper_trading.md` §5) if the incident needs the
 report's digests, or work from `decision_traces.jsonl` and
 `risk_audit.jsonl` directly — both are complete up to the checkpoint.
 
+### 3.1 Check the audit chain before trusting the replay (v1.14)
+
+A replay proves the captured stream reproduces the trace digest. It says
+nothing about whether `risk_audit.jsonl` is the file the engine wrote.
+Since v1.14 it is a hash chain; verify it before reading decisions out of
+it (RUNBOOK_incident_kill_switch.md §6). A broken chain is its own
+incident.
+
 ## 4. Debug — step the engine
 
 The engine is a plain Python object; drive it over the captured stream with

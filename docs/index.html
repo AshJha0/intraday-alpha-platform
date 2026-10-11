@@ -29,30 +29,40 @@ pre{background:#10222a;color:#d7e3ea;padding:1rem 1.2rem;border-radius:4px;overf
 .honest{background:#fff8ec;border-left:4px solid var(--green);padding:.8rem 1.2rem;
   border-radius:4px;font-size:.92rem;line-height:1.55;margin:1.2rem 0}
 footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
+.honest.new{border-left-color:var(--teal);background:#eef6f8}
+.honest ul{margin:.5rem 0;padding-left:1.2rem}
+.honest li{margin:.3rem 0}
+.tbl{overflow-x:auto;margin:1.2rem 0}
+table{border-collapse:collapse;width:100%;background:#fff;font-size:.9rem;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+th,td{text-align:left;vertical-align:top;padding:.5rem .7rem;border-bottom:1px solid #e3e8ec;line-height:1.4}
+th{background:#eef2f5;color:var(--teal)}
+details.history{margin:1.2rem 0}
+details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding:.4rem 0}
+.numbers{overflow-x:auto}
+@media (max-width:600px){
+  header{padding:2rem 1rem}
+  header h1{font-size:1.6rem}
+  .wrap{padding:0 1rem}
+  .grid{grid-template-columns:1fr}
+  nav a{padding:.45rem .8rem;margin:.2rem .3rem .2rem 0;font-size:.9rem}
+  th,td{padding:.4rem .5rem;font-size:.85rem}
+}
 </style>
 </head>
 <body>
 <header>
   <div class="wrap">
     <h1>intraday-alpha-platform</h1>
-    <p>An institutional-style, event-driven research-to-production trading platform for
-       equities and FX — deliberately polyglot: Python for research and reference
-       implementations, C++ for the latency-critical path, Rust for safety-critical
-       infrastructure, Java for the strategy/platform layer. Market data → order books →
-       205-feature factory → 24 alphas → validation → ML → portfolio → fail-closed risk →
-       execution/SOR → deterministic replay → TCA → decision trace → 7-state promotion
-       lifecycle, held together by cross-language golden tests, and run end to end by one
-       command (<code>python -m iap.mvp run</code>) whose golden result is honestly cost-negative.
-       Since v1.9–v1.10 it also has the maker side (a simulator calibrated from the event
-       stream, a posting backtest and a skewed two-sided quoter), auction-imbalance research,
-       optimal-execution schedules, and pre-registration that is costed, code-bound,
-       git-anchored and Ed25519-signed. Since v1.11 an optional LLM research agent works only
-       through that governance, fitted models live in a content-hashed registry with drift
-       monitoring and shadow mode, the Rust feature engine is callable from Python, and most
-       duplicated language copies are frozen by policy. Since v1.12 a study's Sharpe can be
-       deflated by the ledger's trial count, the C++ hot path has per-event tick-to-trade
-       percentiles, and alerts route by severity against latency SLOs. Seven real Nasdaq ITCH sessions and a
-       two-day 2026 holdout have been studied; nothing is claimed to be profitable.</p>
+    <p>An event-driven trading research platform for equities and FX, written in four
+       languages on purpose: Python for research and the reference implementation, C++ for
+       the latency-critical path, Rust for the hard risk engine and infrastructure, Java for
+       the strategy and platform layer. Market data → order books → 205-feature factory →
+       24 alphas → validation → ML → portfolio → fail-closed risk → execution/SOR →
+       deterministic replay → TCA → decision trace → 7-state promotion lifecycle. Cross-language
+       golden tests hold it together, and one command (<code>python -m iap.mvp run</code>) runs
+       the whole loop on one instrument. Its golden result loses money, and the page says so.</p>
+    <p>Seven real Nasdaq ITCH sessions and a two-day 2026 holdout have been studied. The signals
+       are statistically real; none pays its trading costs. Nothing is claimed to be profitable.</p>
     <nav>
       <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/HOW_IT_WORKS.md">How it works</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">Learn (guide)</a>
@@ -77,6 +87,72 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
 </header>
 
 <div class="wrap">
+  <h2>What this is, and what it is not</h2>
+  <div class="grid">
+    <div class="card"><h3>It is</h3>
+      <p>A research platform built to make self-deception hard: one seeded
+         generator, integer prices and timestamps, byte-identical goldens across four languages,
+         a ledger that counts every statistic ever computed and raises the significance bar with
+         it, and pre-registration checked by code and anchored in git. The loop from market data
+         to TCA runs end to end, and a Java paper-trading vertical covers the universe.</p></div>
+    <div class="card"><h3>It is not</h3>
+      <p>A profitable strategy: no alpha has been promoted. Not connected to a venue: there is no
+         live order gateway, so the risk checks guard a simulator. Not a large-sample study: the
+         real data is nine Nasdaq sessions on AAPL, MSFT and QQQ, enough to show a signal exists and
+         too little to size it. Not four production services: much of the Java tree is a frozen copy
+         kept for parity.</p></div>
+    <div class="card"><h3>Why four languages</h3>
+      <p>Each one owns what it is good at, and the duplication is the test. Python defines the
+         semantics; C++, Rust and Java must reproduce them from the same golden files. Parity has
+         caught real bugs (a Rust feature engine reading a half-built book) and missed others
+         (three risk engines agreeing on a wrong answer). Both stories are in
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">LEARN.md</a> §21 and §36.</p></div>
+  </div>
+
+  <h2>Results so far</h2>
+  <div class="tbl"><table>
+    <tr><th>Question</th><th>Answer</th><th>Where</th></tr>
+    <tr><td>Does any alpha pass every gate on the bundled data?</td><td>No. 0 PROMOTE of 24; 18 never forecast a move larger than their cost, and the 6 that trade lose.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/alpha_reports/REPORT.md">REPORT</a></td></tr>
+    <tr><td>Are the signals real on real data?</td><td>Statistically, yes: EQ01 microprice IC 0.105, t 21 (v1.13 statistics, before the v1.14 day-separated HAC, which will lower the t).</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/REAL_DATA.md">REAL_DATA §3.1</a></td></tr>
+    <tr><td>Do they pay?</td><td>No. A 1 s edge of ~0.07 bp against a ~0.7 bp taker round trip.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">LEARN §31</a></td></tr>
+    <tr><td>Do they hold out of time?</td><td>4 of 4 confirmatory signals confirmed on two 2026 sessions, pre-registered first. Their size is not established, and those two days are spent.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/REAL_DATA.md">REAL_DATA §3.2</a></td></tr>
+    <tr><td>Does the closing-cross strategy work?</td><td>No demonstrated edge: +19.4 bp, 95% CI −254 to +293 bp, from 3 trades. Underpowered, not negative. Holdout not confirmed, 0 trades.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">LEARN §42</a></td></tr>
+    <tr><td>Can a maker do better than a taker?</td><td>Unknown. Synthetic only so far (−6.7 bp per trip). The real-session maker study has no result yet; the quoting study was aborted before any result was read.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/ROADMAP.md">ROADMAP §3.8</a></td></tr>
+    <tr><td>What does the full loop do?</td><td>Loses 81.53 USD on its golden session.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/MVP.md">MVP</a></td></tr>
+  </table></div>
+
+  <div class="honest new">
+    <strong>v1.14.0 (2026-10-11): the correctness release.</strong>
+    An independent review of v1.12 listed every place where a published number was weaker than it
+    read. v1.13 fixed what could be fixed without moving a number; v1.14 fixes the rest, once, and
+    regenerates goldens, the synthetic feature store and the reports together. The conclusions did
+    not change: 0 promoted, no trade at 1x costs.
+    <ul>
+      <li><strong>Data.</strong> Events of one instrument with the same timestamp are one state change,
+          so no feature samples the half-applied book between an execute and its print (409 of 2,000
+          synthetic equity rows were such phantom states). Hidden prints are signed by the quote rule,
+          midpoint prints round half to even, and datasets ingested under the old rules are refused
+          until re-ingested.</li>
+      <li><strong>Statistics.</strong> A causal backtest row block (the old one peeked at whether a
+          future label was valid), automatic HAC bandwidth with no lag product across days, a
+          time-shift leakage detector, one ledger look per gate decision. The v1.13 rules stay
+          reachable as <code>v2_v113</code>.</li>
+      <li><strong>Execution.</strong> A shrinking order ahead of yours now moves you up the queue.
+          Feed latency, simulator-routed exits, hidden-print fills and per-order adverse selection are
+          opt-in, for the v2 pre-registrations.</li>
+      <li><strong>Risk.</strong> The audit log is a SHA-256 hash chain; SEC 15c3-5 pre-trade checks
+          23-29 (restricted list, open orders and notional, strategy position, participation, cancel and
+          venue message rates); loss overrides need two approvers and are capped.</li>
+      <li><strong>Governance.</strong> Agent keys must be signed by a maintainer trust root read from
+          <code>main</code>; the look ledger is a hash chain; supply-chain audits block the build.</li>
+    </ul>
+    Not yet done: the real sessions have not been re-ingested under the new rules, so the real-data
+    figures on this page are still v1.13 statistics. Recipes 69-74 of the
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/COOKBOOK.md">cookbook</a> walk
+    through each change. Next, in v1.15: the confirmatory round on unseen sessions, deep order-book
+    baselines and a QQQ basis study, whose code is in review.
+  </div>
+
   <h2>Measured, not claimed</h2>
   <div class="numbers">
     Cross-language parity&nbsp;&nbsp;&nbsp; python 2334&nbsp; · cpp 302&nbsp; · rust 362&nbsp; · java 575 tests — 3,565 green, one command; golden groups 193/72/71/124<br>
@@ -102,9 +178,11 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     Polyglot policy&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 18 canonical / 20 frozen copies (24 paths) · 2 retire candidates kept as parity evidence · nothing deleted · a change to a frozen copy needs <code>POLYGLOT-OVERRIDE:</code><br>
     Tick-to-trade (C++)&nbsp;&nbsp;&nbsp;&nbsp; decoded IAP1 frame → book → features → alpha → order decision, per event, CI runner (AMD EPYC): golden eq_mbo p50 1,279 ns · p99 2,559 ns · p99.9 11,263 ns · max 33,112 ns; generated day p50 1,407 · p99 1,727 · p99.9 12,287 ns · in-process only: no network, no kernel bypass, no C++ risk engine<br>
     Deflated Sharpe&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; CPCV paths, PBO, PSR / DSR / minimum track record with N from the ledger's distinct configurations (DSR at raw looks beside it) · paper's worked example reproduced (DSR 0.9004) · opt-in <code>v4</code> bundle, report-only<br>
-    Auction study (AUC01)&nbsp;&nbsp; exploratory, in-sample, 7 real sessions: closing cross C-300s 3 trades, 2 of 6 test sessions, session-clustered mean +19.4 bp, 95% CI −254 to +293 bp → no demonstrated edge (underpowered: 21 decisions; below the registered 4 active sessions) · opening O-300s 4 trades, +6.1 bp, 95% CI −9.7 to +21.9 → no demonstrated edge · 2026 holdout running; maker and quoting studies running
+    Auction study (AUC01)&nbsp;&nbsp; exploratory, in-sample, 7 real sessions: closing cross C-300s 3 trades, 2 of 6 test sessions, session-clustered mean +19.4 bp, 95% CI −254 to +293 bp → no demonstrated edge (underpowered: 21 decisions; below the registered 4 active sessions) · opening O-300s 4 trades, +6.1 bp, 95% CI −9.7 to +21.9 → no demonstrated edge · 2026 holdout not confirmed (0 trades) · maker study running; quoting study aborted before any result was read
   </div>
 
+  <details class="history">
+  <summary>Release history, v1.3 to v1.13: what each review found and what moved</summary>
   <div class="honest">
     <strong>Research truth over backtest cosmetics.</strong> The adversarial review of this
     platform found — and fixed — a generator artifact that left the consolidated equity book
@@ -260,8 +338,7 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     touch), so it could not test skew against no skew; a tick-based protocol will be
     pre-registered. The maker study is still <strong>running</strong>. AUC01's 2026 holdout:
     not confirmed, 0 trades. v1.14, the correctness release that regenerates goldens and reports
-    once (causal row block, day-clustered inference, data-mapping fixes, a hash-chained risk audit
-    log), is in progress.
+    once, has its own box above.
     <br><br><strong>Data terms.</strong> The real sessions are Nasdaq TotalView-ITCH sample files
     from <code>emi.nasdaq.com</code> (no terms were shown on the directory as of 2026-10-11). Raw
     and normalized data and feature stores are never committed or redistributed; only aggregate
@@ -269,6 +346,8 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     Nasdaq data agreement
     (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/REAL_DATA.md#21-data-source-and-terms-v113">REAL_DATA §2.1</a>).
   </div>
+
+  </details>
 
   <h2>Start here</h2>
   <div class="grid">
@@ -379,7 +458,9 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
          venue-disconnect handling and four-scope kill switches — Rust reference with Java
          and Python ports, byte-identical audit logs, replayable. Since v1.3.0 also closed
          against future-stamped marks, NaN, integer overflow and router-bound orders under a
-         venue kill, with an edge golden all three engines replay.</p></div>
+         venue kill, with an edge golden all three engines replay. Since v1.14 the audit log is a
+         SHA-256 hash chain that survives restores, and SEC 15c3-5 pre-trade checks 23-29 run
+         after the legacy set, so no existing rule id or golden decision moved.</p></div>
     <div class="card"><h3>Execution &amp; SOR</h3>
       <p>Market/limit/IOC/FOK, VWAP/TWAP/POV/IS parent algos, deterministic queue-position
          modeling for passive orders (pinned depletion rules), fees/rebates/impact,
@@ -440,7 +521,9 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
          prefix of the current one, the git anchors, and every Ed25519 signature. Since v1.13 a
          required <code>governance</code> CI job runs it on every change, with checks that every
          signer has a registered key and that ledgers and the board only grow; human lifecycle
-         edges need a signed approval
+         edges need a signed approval. Since v1.14 the agent key registry must be signed by a
+         maintainer trust root read from <code>main</code>, the look ledger is itself a hash chain,
+         and pip-audit, cargo audit, cargo deny and Trivy block the build
          (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/governance/GOVERNANCE.md">GOVERNANCE</a>).</p></div>
     <div class="card"><h3>Event-driven backtester</h3>
       <p>Replays every market event in event-time through book → features → alphas →

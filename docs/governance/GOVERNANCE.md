@@ -373,5 +373,21 @@ Auditable events and where they are recorded:
   config hash is reported by the running platform on `/status`, not in the
   manifest); rollbacks reference the prior manifest rather than rebuilding.
 
+- **Risk audit (runtime, v1.14, G-P0-1)**: every line of
+  `<state-dir>/risk_audit.jsonl` carries `seq` and `prev_sha256`, the
+  SHA-256 of the line before it, so the log is a hash chain from a genesis
+  of 64 zeros. `session_state.json` records the head at each checkpoint and
+  a resumed session continues the chain. Verify with
+  `iap.risk.events.verify_audit_chain` (COOKBOOK recipe 69,
+  RUNBOOK_incident_kill_switch.md §6). A loss-limit override needs
+  `overrides.min_approvers` distinct approvers and is capped at
+  `overrides.max_loss_override_multiple` times the configured limit; a
+  refused override is itself an audit line (`LOSS_LIMIT_OVERRIDE_REJECTED`).
+
 Audit logs are never edited in place. Corrections are new entries referencing
-the entry they correct.
+the entry they correct. The hash chains make that rule checkable for the
+risk audit, the blackboard and the look ledger. They make an edit visible,
+not impossible: a chain is only as trustworthy as the place its head is
+copied to, which is why heads are recorded in checkpoints, pre-registrations
+and git history on `main`, and why shipping the logs off-host (section 0,
+not implemented) is still on the list.
