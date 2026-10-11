@@ -84,12 +84,6 @@
     "validation v4 (CPCV, PBO, deflated Sharpe with N from the ledger)"
   ],
   "hypotheses": {
-    "H1": {
-      "name": "maker",
-      "statement": "M2/M6 maker policy, edge net of rebate and measured markout > 0",
-      "insample_estimate": "PENDING maker_real summary",
-      "dsr_series": "OPEN: decided after the maker_real summary and the power rerun"
-    },
     "H4": {
       "name": "EQ",
       "statement": "EQ10 1s and EQ05 1s pooled uncrossed IC > 0 (same horizons as the v1.8 holdout); tier 1 = the 7 holdout sessions",
@@ -97,7 +91,32 @@
         "EQ10@1s",
         "EQ05@1s"
       ],
-      "insample_estimate": "frozen at registration",
+      "insample_estimate": {
+        "EQ10@1s": {
+          "gate_ic": 0.07563883669137826,
+          "gate_t": 13.242128568943206,
+          "fold_ic": [
+            0.07323932349107885,
+            0.06042185721196071,
+            0.10105254094214453,
+            0.07420601105641893
+          ],
+          "source": "data/real/multi7/research/alpha_reports/EQ10.json",
+          "source_sha256": "62325321910501b223e03ebf2b05c86eeeb03029678129ed98ea7d46bb3ec7e9"
+        },
+        "EQ05@1s": {
+          "gate_ic": 0.06274247436968561,
+          "gate_t": 24.201000263972293,
+          "fold_ic": [
+            0.05589183177559745,
+            0.061755139642636236,
+            0.0856461318280465,
+            0.05481397641646657
+          ],
+          "source": "data/real/multi7/research/alpha_reports/EQ05.json",
+          "source_sha256": "73f756b4cb77f5fec11d610b949f7cfe4e1f8afeeec580b369f1ea2ea68021c4"
+        }
+      },
       "dsr_series": "per-session IC series (defined every session); net-of-cost P&L reported alongside, descriptive only"
     }
   },
@@ -116,6 +135,10 @@
       "name": "auction",
       "decision": "owner decision 2026-10-11 on docs/research/R7_POWER.md: dropped from R7; underpowered even on 47 sessions (joint power about 0.01; MDE about 51 bp, IC 0.41 on 141 decisions)",
       "future": "needs a redesign (pooled / longer sample) and its own pre-registration"
+    },
+    "H1": {
+      "was": "M2/M6 maker policy, edge net of rebate and measured markout > 0",
+      "reason": "maker_real in-sample summary (6 sessions, data/real/maker_real/summary.json, status EXPLORATORY IN-SAMPLE): every traded cell has negative mean net edge (passive/gated bps: EQ01@1s -1.019, EQ02@5s -0.918, EQ05@1s -1.009, EQ10@1s -1.669; ungated cells all negative with |t| 20-65); verdict NO DEMONSTRATED MAKER EDGE in all gated cells. No positive in-sample effect to confirm. Owner decision 2026-10-11."
     }
   },
   "gate": "HAC t >= ledger threshold in force; deflated Sharpe > 0.95 (H4: on the per-session IC series; net-of-cost P&L descriptive only); reported with and without 2025-12-10 (FOMC) and 2025-11-28 (holiday-thin)",
@@ -126,7 +149,7 @@
     ],
     "primary_feed_latency_ns": 100000,
     "role": "reported alongside results only; never decides pass/fail; not a hypothesis, no ledger look (owner decision 2026-10-11)",
-    "applies_to": "hypotheses whose execution depends on feed latency (H1 maker); others unaffected"
+    "applies_to": "none after H1 was dropped (H4 is an IC test, latency-independent); kept for the record"
   },
   "cost_sensitivity": {
     "scales": [
@@ -150,8 +173,7 @@
     "decisions": "owner decision 2026-10-11 on docs/research/R7_POWER.md: H4 tier 1 = EQ10, EQ05; EQ01/EQ02/EQ04 deferred to tier 2; EQ07 and H3 dropped"
   },
   "open_for_owner": [
-    "H1 in-sample estimate from the maker_real summary, then rerun tools/r7_power.py and decide the H1 deflated-Sharpe series",
-    "sign-off and blackboard registration before any holdout data is read"
+    "owner approval of this final text, then sign-off and blackboard registration before any holdout data is read"
   ],
   "untested_insufficient_free_data": {
     "decision": "owner decisions 2026-10-11 on docs/research/R7_POWER.md and R7_MULTI_SYMBOL_PLAN.md",

@@ -174,27 +174,29 @@ machine form:  research/r7/r7_confirm_prereg_DRAFT.json (DRAFT, unsigned)
 bundles:       validation v3 (R1 sampling, FOMC/holiday split) and v4 (CPCV, PBO,
                deflated Sharpe with N from the ledger)
 hypotheses (each with its in-sample estimate frozen at registration):
-  H1 maker:    M2/M6 maker policy, edge net of rebate and measured markout > 0
-               in-sample estimate: PENDING maker_real summary
+  (H1 maker:   DROPPED 2026-10-11 by owner decision - the maker_real in-sample
+               summary shows negative net edge in every traded cell (passive/
+               gated -0.9 to -1.7 bp); no positive effect to confirm)
   (H2 quoting: DROPPED 2026-10-11 by owner decision - the quoting study was
                aborted and has no in-sample estimate; it may get its own
                pre-registration later)
   (H3 auction: DROPPED 2026-10-11 by owner decision - underpowered even on
                47 sessions (docs/research/R7_POWER.md); needs a redesign)
   H4 EQ:       EQ10 1s, EQ05 1s pooled uncrossed IC > 0 (same horizons as the
-               v1.8 holdout); tier 1 only (owner decision 2026-10-11)
+               v1.8 holdout); tier 1 only (owner decision 2026-10-11);
+               in-sample IC frozen: EQ10 0.0756, EQ05 0.0627 (multi7)
   untested:    EQ01 1s, EQ02 5s, EQ04 5s - insufficient free data (power on 7
                sessions 0.26 / 0.49 / 0.04; paid tier 2 declined; more symbols does
                not reach 0.8, R7_MULTI_SYMBOL_PLAN.md). Not a failure.
   (EQ07 10s:   DROPPED - drafted sign contradicts in-sample and the v1.8
                holdout; flipping it after seeing results would fit seen data)
 gate:          HAC t >= ledger threshold in force; deflated Sharpe > 0.95 (H4: on
-               the per-session IC series; net-of-cost P&L descriptive only; H1
-               series open until the maker summary); reported
+               the per-session IC series; net-of-cost P&L descriptive only); reported
                with and without 2025-12-10 (FOMC) and 2025-11-28 (holiday-thin)
 decision:      a failure is final for that hypothesis on these sessions
 sensitivity:   feed latency 10 us (primary 100 us, configs/prereg/v2.json), reported
                alongside results only; never decides pass/fail; no ledger look
+               (applied to no hypothesis since H1 was dropped; kept for the record)
 cost sens.:    platform cost model at 0.5x, 1.0x (primary, the only one that decides)
                and 1.5x: explicit + implicit components scaled
                (CostModel.with_cost_sensitivity), regulatory fees at schedule;
