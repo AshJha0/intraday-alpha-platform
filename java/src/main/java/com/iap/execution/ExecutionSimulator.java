@@ -86,8 +86,8 @@ import com.iap.orderbook.OrderBook;
  *       EXEMPTION: a remainder that rests while
  *       the display already crosses its price (the aggressive leg just
  *       consumed that display) is crossing-exempt until the display first
- *       shows an uncrossed opposite best; MODIFY events never change
- *       ahead_qty. Passive fills are stamped with the triggering event's
+ *       shows an uncrossed opposite best; a MODIFY that shrinks an
+ *       order known to be ahead reduces ahead_qty like a CANCEL (X-P1-1). Passive fills are stamped with the triggering event's
  *       exchange_ts.</li>
  *   <li><b>Fees</b>: equity venues charge taker_fee_per_share * qty on
  *       aggressive fills and rebate maker_rebate_per_share * qty on passive
@@ -741,12 +741,20 @@ public final class ExecutionSimulator {
             } else if (et == EventType.MODIFY) {
                 for (int i = 0; i < levelIds.size(); i++) {
                     ChildOrder o = orders.get(levelIds.get(i));
-                    if (realId && levelQty(book,
-                            o.side == 0 ? Side.BID : Side.ASK, o.limitTicks)
-                            > levelBefore.get(i)) {
+                    long before = levelBefore.get(i);
+                    long after = levelQty(book,
+                            o.side == 0 ? Side.BID : Side.ASK, o.limitTicks);
+                    HashSet<Long> set = behind.get(levelIds.get(i));
+                    boolean isBehind = set != null && set.contains(evOrder);
+                    if (realId && after > before) {
                         // A size increase moves the order to the level's tail.
                         behind.computeIfAbsent(levelIds.get(i),
                                 k -> new HashSet<>()).add(evOrder);
+                    } else if (after < before && realId && preOpen && !isBehind) {
+                        // X-P1-1: a size decrease keeps the order's priority;
+                        // if it is ahead of us the removed shares credit our
+                        // queue position exactly like a CANCEL.
+                        o.aheadQty -= Math.min(o.aheadQty, before - after);
                     }
                 }
             } else if (et == EventType.ADD) {

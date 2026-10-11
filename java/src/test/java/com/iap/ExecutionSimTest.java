@@ -178,12 +178,13 @@ public class ExecutionSimTest {
         // A cancel at another level does nothing.
         sim.onEvent(f.cancel(T0 + 2_100_000, 0, 99, 400, 12));
         assertEquals(60, sim.orders().get(id).aheadQty);
-        // MODIFY events never change queue position (pinned).
+        // X-P1-1 (v1.14): a MODIFY that decreases an order ahead of us keeps
+        // its priority and credits our position by the removed size.
         sim.onEvent(f.modify(T0 + 2_200_000, 0, 100, 10, 13));
-        assertEquals(60, sim.orders().get(id).aheadQty);
+        assertEquals(10, sim.orders().get(id).aheadQty);
         // An EXECUTE quoting 70 on order 13 trades only its remaining 10.
         sim.onEvent(f.exec(T0 + 3_000_000, 0, 100, 70, 13));
-        assertEquals(50, sim.orders().get(id).aheadQty);
+        assertEquals(0, sim.orders().get(id).aheadQty);
         assertTrue(sim.fills().isEmpty());
     }
 
@@ -404,7 +405,7 @@ public class ExecutionSimTest {
         sim.onEvent(f.cancel(T0 + 2_200_000, 0, 100, 80, 14));
         assertEquals(300, sim.orders().get(id).aheadQty);
         // A size increase re-queues order 11 at the tail (behind us); its
-        // later cancel does not advance us (MODIFY never changes ahead).
+        // later cancel does not advance us (a size increase never changes ahead).
         sim.onEvent(f.modify(T0 + 2_300_000, 0, 100, 500, 11));
         sim.onEvent(f.cancel(T0 + 2_400_000, 0, 100, 500, 11));
         assertEquals(300, sim.orders().get(id).aheadQty);

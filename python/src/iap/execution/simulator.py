@@ -58,8 +58,9 @@ this module is self-contained:
    overlay, which the check debits (one pool per side, ``ahead_qty``
    consumed first; an unchanged display is never consumed twice) — EXEMPT while the display still
    shows the liquidity our own aggressive leg consumed, until the display
-   first shows an uncrossed opposite best; MODIFY never changes
-   ``ahead_qty``. Passive fills are stamped with the triggering event's
+   first shows an uncrossed opposite best; a MODIFY that shrinks an order
+   known to be ahead reduces ``ahead_qty`` like a CANCEL (X-P1-1). Passive
+   fills are stamped with the triggering event's
    ``exchange_ts``.
 5. **Fees.** Equity: ``taker_fee_per_share * qty`` (taker), ``-
    maker_rebate_per_share * qty`` (maker). FX: ``commission_per_million *
@@ -717,9 +718,21 @@ class ExecutionSimulator:
             elif et == EventType.MODIFY:
                 for oid, before in level_before:
                     o = self._orders[oid]
-                    if real_id and book.level_qty(o.side, o.limit_ticks) > before:
+                    after = book.level_qty(o.side, o.limit_ticks)
+                    behind = self._behind.get(oid)
+                    if real_id and after > before:
                         # A size increase moves the order to the level's tail.
                         self._behind.setdefault(oid, set()).add(ev.order_id)
+                    elif (
+                        after < before
+                        and real_id
+                        and pre_open
+                        and (behind is None or ev.order_id not in behind)
+                    ):
+                        # X-P1-1: a size decrease keeps the order's priority;
+                        # if it is ahead of us the removed shares credit our
+                        # queue position exactly like a CANCEL.
+                        o.ahead_qty -= min(o.ahead_qty, before - after)
             elif et == EventType.ADD:
                 if real_id:
                     for oid in self._resting:
