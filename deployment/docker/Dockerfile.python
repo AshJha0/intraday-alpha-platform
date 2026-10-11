@@ -1,5 +1,5 @@
 # =============================================================================
-# Dockerfile.python — IAP research / data-pipeline image
+# Dockerfile.python — IAP research / data-pipeline image (TEMP: trigger the images job to exercise trivy image; reverted before review)
 #
 # Runs the end-to-end synthetic market-data pipeline (docs/BUILD_NOTES.md):
 #   generator -> data/raw/*.jsonl -> normalize -> data/normalized/{*.jsonl,
