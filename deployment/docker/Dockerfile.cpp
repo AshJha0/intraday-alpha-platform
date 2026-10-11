@@ -59,6 +59,11 @@ RUN cd cpp && ctest --test-dir build --output-on-failure
 # -------------------------------------------------------------- runtime stage
 FROM debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587
 
+# v1.14 (G-P1-7): take the Debian security fixes the pinned base image does not
+# carry yet (the `images` job's trivy scan blocks on fixable HIGH/CRITICAL).
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --gid 10001 iap && \
     useradd --uid 10001 --gid iap --create-home --shell /usr/sbin/nologin iap
 

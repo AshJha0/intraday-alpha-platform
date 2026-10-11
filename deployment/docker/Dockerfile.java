@@ -51,6 +51,11 @@ RUN cd java && bash build.sh
 # -------------------------------------------------------------- runtime stage
 FROM eclipse-temurin:25-jre@sha256:fcd7fd7b387f94bb2ac461478a7436ad8e349924c374ea8313919624dceae636
 
+# v1.14 (G-P1-7): the base ships /usr/bin/pebble (a Go service manager this
+# image never runs), built with a Go stdlib that trivy flags (HIGH, fixed
+# upstream). Unused, so removed rather than waived.
+RUN rm -f /usr/bin/pebble
+
 RUN groupadd --gid 10001 iap && \
     useradd --uid 10001 --gid iap --create-home --shell /usr/sbin/nologin iap
 
