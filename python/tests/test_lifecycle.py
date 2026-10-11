@@ -1396,8 +1396,7 @@ def test_bootstrap_failed_gates_agree_with_report_verdicts(bootstrap):
         "net_pnl_after_costs",
         "net_pnl_bootstrap_ci",
         "capacity",
-        "stability",
-    )
+    )  # v1.14.0 coalesced store: EQ07 trades, so stability no longer fails
     assert by_id["FX11"] == ("leakage_clean",)
     assert set(by_id["FX03"]) >= {"statistical_significance", "hypothesis_sign", "fold_consistency"}
 
@@ -1976,7 +1975,7 @@ def test_bootstrap_builds_both_blocks_from_the_artefacts(bootstrap, config):
     """On the committed artefacts: every alpha's evidence carries the
     report's interval and trade count, nobody is at or beyond VALIDATING so
     the correlation gate passes vacuously for all 24, and the bootstrap gate
-    fails for all 24 — 17 for making no trade, 7 on a negative lower bound."""
+    fails for the 23 that reach it — 16 for making no trade, 7 on a negative lower bound."""
     correlations = load_signal_correlations(ROOT)
     assert correlations is not None and sorted(correlations) == sorted(ALPHA_IDS)
     no_trade, negative = [], []
@@ -2001,8 +2000,9 @@ def test_bootstrap_builds_both_blocks_from_the_artefacts(bootstrap, config):
             assert boot.value == block.ci_low < 0.0
             negative.append(row.alpha_id)
     # (FX11 never left RESEARCH in v1.14.0: the leakage gate stops it first)
-    assert (len(no_trade), len(negative)) == (17, 6)
-    assert negative == ["EQ06", "EQ11", "FX05", "FX08", "FX09", "FX10"]
+    # (v1.14.0 coalesced store: EQ07 now trades, so it moves to negative)
+    assert (len(no_trade), len(negative)) == (16, 7)
+    assert negative == ["EQ06", "EQ07", "EQ11", "FX05", "FX08", "FX09", "FX10"]
     # no verdict or state moved because of the two gates: every alpha
     # already failed net_pnl_after_costs
     for row in bootstrap.rows:

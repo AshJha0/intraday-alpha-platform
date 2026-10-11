@@ -15,7 +15,7 @@ blocking supply-chain audits (#87) and the SEC 15c3-5 pre-trade risk set
 (#89), and the research statistics revision: causal backtest row block,
 automatic HAC with day separation, time-shift leakage gate (#88).
 
-Parity counts from CI (v1.14.0): @@COUNTS@@
+Parity counts from CI (v1.14.0): python 2385 (2080 in `python` + 305 in `python-slow`) / cpp 302 / rust 362 / java 575, golden 193/72/71/124: 3,624 green.
 
 ### Numbers that changed
 
