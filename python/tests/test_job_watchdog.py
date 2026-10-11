@@ -173,7 +173,7 @@ def test_watchdog_own_process_is_ignored(tmp_path):
 
 
 def test_example_registry_loads():
-    reg = wd.load_registry(REPO_ROOT / "configs/jobs/jobs.example.json")
+    reg = wd.load_registry(REPO_ROOT / "tools/jobs/jobs.example.json")
     assert {j.name for j in reg.jobs} == {"maker_real", "r7_insample_chain"}
     assert all(not j.restart_safe for j in reg.jobs)
 

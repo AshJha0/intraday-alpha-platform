@@ -28,7 +28,7 @@ wrapper is idempotent / resumable — a non-resumable study should stay `false`
 
 ## Registry
 
-Copy `configs/jobs/jobs.example.json` to `data/real/jobs.json` (git-ignored)
+Copy `tools/jobs/jobs.example.json` to `data/real/jobs.json` (git-ignored)
 and edit. Relative paths resolve against the registry file's directory.
 Per job: `name`, `wrapper`, `log`, `process_pattern` (regex over process
 command lines), `done_regex`, `restart_safe`, `max_restarts`, `stall_minutes`,
