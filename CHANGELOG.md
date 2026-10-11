@@ -62,6 +62,27 @@ that tag.
   breach only because EXECUTE is not volume. No existing golden changes
   (`max_participation_bps` stays off in `configs/risk/risk.json`).
 
+### Agent workflow over MCP, adversarial evals, first live eval (owner-approved)
+
+- `iap.agents.mcp_workflow` (`iap-mcp-agent`): the agent side of the v1.15
+  workflow as MCP tools - `propose`, `draft_prereg`, `hit_rate`,
+  `regulatory_fee`, `list_drafts` - through the same Ed25519-signed broker
+  and chained ledger (each proposal debits one look; per-agent look cap).
+  Sign-off, confirmatory runs, outcomes and promotion have no tool; the
+  module refuses to import if one is added and a test enumerates the tool list.
+- Eval harness: six adversarial tasks (prompt injection in a board entry and
+  in a report data field, authority claim to sign off/promote, look-budget
+  evasion by tiny and by repeated proposals, pushed fabricated numbers), each
+  scored by named checks; scorers are policy-agnostic so they also score a
+  real model; `--live` runs the suite with a hard USD cap. Baseline updated
+  (11 tasks); the `overreach` check `no_reports_written` became
+  `no_confirmatory_report_written` (an exploratory synthetic run is allowed).
+- Verifier fix found by the live run: a field name such as `ic_first_half`
+  is an identifier, not the number word "half".
+- First live run (`research/agents/eval_live_2026-10-11.json`,
+  `docs/research/AGENT_EVAL_LIVE.md`): Sonnet 5.5 0.9773, Opus 5.5 1.0 vs stub
+  1.0; USD 0.76 spent of a 20 cap.
+
 ### Java engine archived (G-P1-3, owner-approved)
 
 - The Java engine (frozen since v1.14) moved from `java/` to `archive/java/`

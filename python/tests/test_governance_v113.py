@@ -305,6 +305,7 @@ def _report(tmp_path, sid="s1", metrics=None):
         "t 0.0412",  # the IC labelled as t
         "the IC doubled",  # a number word
         "three horizons confirm",
+        "IC 0.0412 in the first half",  # a number word next to a field name
         "IC 0.0412 versus 0.0400 before",  # derived / invented comparison number
     ],
 )
@@ -336,3 +337,9 @@ def test_mcp_read_cap_and_tail(tmp_path, monkeypatch):
     monkeypatch.setattr(mcp_server, "MAX_READ_BYTES", 32)
     with pytest.raises(mcp_server.ToolError, match="too large"):
         tools.alpha_report("EQ01")
+
+
+def test_field_names_are_not_number_words():
+    """v1.15 live eval: ``ic_first_half`` copied from a report is an identifier."""
+    assert verify.number_words("ic_first_half 0.1 and ic_second_half 0.2") == []
+    assert verify.number_words("the first half") == ["half"]
