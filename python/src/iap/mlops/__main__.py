@@ -1,6 +1,9 @@
-"""CLI: ``python -m iap.mlops {list,show,verify,lineage,promote,check-promotions,monitor}``.
+"""CLI: ``python -m iap.mlops {list,show,verify,lineage,card,promote,check-promotions,monitor}``.
 
-``promote`` refuses a model with a missing or mismatched content hash and
+``card <model_id> --spec card.json`` writes the model card from a JSON spec
+holding the :func:`iap.mlops.model_card.generate_card` keyword arguments.
+``promote`` refuses a model with a missing or mismatched content hash or a
+missing / invalid model card, and
 ``check-promotions`` exits 1 if any promoted model fails that check (G-P0-1).
 
 ``monitor`` reads two ``.npz`` files (reference and current); every array is
@@ -40,6 +43,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("check-promotions")
     for c in ("show", "verify", "lineage", "promote"):
         sub.add_parser(c).add_argument("model_id")
+    c = sub.add_parser("card")
+    c.add_argument("model_id")
+    c.add_argument("--spec", required=True, help="JSON with generate_card kwargs")
     m = sub.add_parser("monitor")
     m.add_argument("--reference", required=True)
     m.add_argument("--current", required=True)
@@ -60,6 +66,10 @@ def main(argv: list[str] | None = None) -> int:
         if a.cmd in ("show", "verify"):
             rec = reg.verify(a.model_id) if a.cmd == "verify" else reg.get(a.model_id)
             print(json.dumps(rec.to_dict(), indent=2, sort_keys=True))
+            return 0
+        if a.cmd == "card":
+            spec = json.loads(Path(a.spec).read_text(encoding="utf-8"))
+            print(json.dumps(reg.write_card(a.model_id, **spec), indent=2, sort_keys=True))
             return 0
         if a.cmd == "promote":
             print(json.dumps(reg.promote(a.model_id), indent=2, sort_keys=True))

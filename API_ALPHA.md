@@ -314,3 +314,26 @@ signal_correlation.json, reports/<id>.<method>.json}`. Each (asset class,
 method) pair is one experiment costing `83 + K` looks (§13.8).
 `signal_correlation.json` (`x-version` 1) is the input of the lifecycle's
 `cross_alpha_correlation` gate (docs/LIFECYCLE.md §3).
+
+## 9. Conformal sizing — `iap.models.conformal` (Python research; not a port contract)
+
+Opt-in (v1.15 M-P1-2). `ConformalSizingConfig(enabled=False, alpha=0.1,
+method="adaptive", gamma=0.005, window=500, ref_width=None)`; the flag is OFF
+in code defaults and is not set in any prereg config — enable it explicitly in
+a research run.
+
+- `SplitConformal(alpha).fit(y_cal, pred_cal).interval(pred)` — `pred ± q`,
+  `q` the `ceil((n+1)(1-alpha))`-th absolute calibration residual. Valid only
+  under exchangeability.
+- `AdaptiveConformal(alpha, gamma, window)` — ACI (Gibbs & Candes 2021):
+  `interval(pred)` then `update(y, pred)`; `alpha_t` moves by
+  `gamma·(alpha − miss)`, so coverage recovers under intraday non-stationarity.
+- `confidence_from_width(width, ref_width)` → `min(1, ref_width/width)`.
+- `conformal_size(target_qty, confidence, max_position, lot=1)` — scales the
+  base target by confidence, caps at `max_position`, rounds toward zero; it is
+  applied before the existing risk checks, which still run unchanged.
+- `calibration_report(y, lo, hi, sessions, alpha)` — overall and per-session
+  `n`, coverage, nominal, gap, mean width.
+
+Kept out of `iap.mvp.sizing` because that path is parity-checked against the
+C++/Rust engines; a multiplier there would move every engine's goldens.
