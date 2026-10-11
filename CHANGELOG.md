@@ -6,6 +6,33 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## Unreleased (v1.14 engineering)
+
+Behaviour-preserving engineering items of the 2026-10-11 quality review. No
+published number, golden, digest, model id or record hash changes.
+
+- **E-P1-3** `iap.research.events`: `EventColumns` keeps a session's events as
+  twelve `int64` numpy columns and is a `Sequence[MarketEvent]` whose
+  iteration is a chunked cursor (same Python-int `MarketEvent`s, one chunk
+  alive at a time); `read_event_columns` reads row group by row group with
+  `pyarrow.compute` and never imports `pyarrow.dataset`.
+- **E-P1-2** `iap.research.replay`: `SharedReplay` prepares one instrument's
+  stream once (filter, venue) and replays it for every maker configuration
+  of a unit (`run_grid`); results equal independent `run_instrument` calls.
+  `iap.backtest.maker` is not edited; one event loop per configuration
+  remains until the Rust/pyo3 simulator.
+- **E-P1-4** `iap.research.study`: `StudyBase` (pre-registration + SHA,
+  blackboard check, ordered checkpointed unit loop, atomic canonical unit
+  files) and the shared helpers (`cluster_stats`, `peak_rss_gb`, `log`,
+  `unit_name`, `file_sha256`) for the study drivers.
+- **E-P2-5** `iap.mlops.registry`: `content_sha256` hashes the fitted
+  model's state (class, params, fitted arrays; the `_sklearn_version` stamp
+  dropped), stable across joblib/pickle/scikit-learn versions; written to a
+  `content.json` sidecar so `record.json`, `model_id` and `record_hash` are
+  unchanged; `find_by_content`, `verify_content` (backfills older records).
+
+Python tests: 2336 (9 new in `test_research_v114.py`).
+
 ## v1.13.0 — 2026-10-11
 
 The hygiene-and-hardening release that follows the consolidated quality
