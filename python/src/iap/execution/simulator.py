@@ -666,10 +666,7 @@ class ExecutionSimulator:
         # The book's own record of the order an EXECUTE names (side, price, qty).
         exec_order: tuple[int, int, int] | None = None
         if self._resting and pre_open and et == EventType.EXECUTE:
-            for boid, bside, bprice, bqty in pre.resting_orders():
-                if boid == ev.order_id:
-                    exec_order = (bside, bprice, bqty)
-                    break
+            exec_order = pre.order(ev.order_id)
         level_before: list[tuple[int, int]] = []
         if self._resting and et in (EventType.CANCEL, EventType.MODIFY):
             level_before = self._level_before(ev, pre)

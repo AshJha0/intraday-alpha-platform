@@ -9,11 +9,14 @@
 # This workflow is it (PLATFORM_CONVENTIONS.md §9, §12.7).
 #
 # Jobs:
-#   python | cpp | rust | java   one per language, the canonical commands from
+#   python | cpp | rust | java   one per language (python: a 3.11 + 3.12
+#                                matrix running -m "not slow"), the canonical commands from
 #                                docs/BUILD_NOTES.md, run in parallel; python
 #                                (and golden) first restore or regenerate the
 #                                seeded dataset so the data-dependent tests
 #                                run instead of skipping
+#   python-slow                  the files marked `slow` (pytest -m slow),
+#                                in parallel with python, with --cov
 #   integration                  tests/integration + tests/replay (tests/README.md
 #                                levels 3-4: cross-component runs and same-seed
 #                                byte determinism) — the `integration` and
@@ -29,7 +32,8 @@
 #                                Rust-vs-Python native-feature parity tests
 #                                and the events/s benchmark (job summary)
 #   cpp-sanitizers               ASan+UBSan ctest (blocking; green on first run)
-#   advisory                     ruff (blocking), pip-audit, cargo audit
+#   advisory                     ruff (blocking), gitleaks (blocking),
+#                                mypy, pip-audit, cargo audit
 #                                (non-blocking); clippy is a blocking step of
 #                                the rust job
 #   images                       builds the four images; needs every other job;
@@ -91,17 +95,25 @@ permissions:
 
 jobs:
   python:
+    # The 3.11 entry keeps the context name `python` (a required check of the
+    # protect-main ruleset); the 3.12 entry reports as `python-312` (not required).
+    name: ${{ matrix.python-version == '3.11' && 'python' || 'python-312' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 = the pinned CI interpreter; 3.12 = what the studies run on (E-P1-6)
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
       - name: Install the research stack
         run: |
           python -m pip install --upgrade pip
-          pip install -r python/requirements-ci.txt
+          pip install --require-hashes -r python/requirements-ci.txt
       # The seeded dataset (data/normalized + data/features, git-ignored) is
       # what test_research_runner::test_eq03_report_reproduces_through_the_runner,
       # test_alpha_golden::test_golden_fx05_via_class_on_bundled_data and the
@@ -145,6 +157,7 @@ jobs:
       # on the platform it was generated on, fails before the Rust and Java
       # replays trust it.
       - name: risk fuzz corpus is current (regenerate + diff)
+        if: matrix.python-version == '3.11'
         run: python3 python/tools/make_risk_fuzz_corpus.py --check
       # xdist: every test writes under tmp_path / tmp_path_factory (a
       # per-worker basetemp) and only READS the repo's data/, configs/ and
@@ -154,12 +167,90 @@ jobs:
       # shared read-only. Same tests, same outcomes as the serial run
       # (compared test by test on the PR that introduced this, #23). pytest-cov
       # combines the workers' data into one coverage-python.xml.
-      - name: pytest
+      # E-P2-7: the files marked `slow` run in the parallel python-slow job
+      # (which also carries coverage), so this PR job stays short.
+      - name: pytest (not slow)
         working-directory: python
         env:
           PYTHONPATH: src
         run: >
           python -m pytest -q -n auto --dist loadfile --durations=25
+          -m "not slow"
+      # E-P1-5 (advisory): mypy on core/orderbook/execution/backtest/features
+      # (config: python/pyproject.toml [tool.mypy]); the error count goes to
+      # the job summary.  Non-blocking until the count is 0 (CONTRIBUTING.md).
+      - name: mypy (advisory)
+        if: matrix.python-version == '3.12'
+        continue-on-error: true
+        working-directory: python
+        run: |
+          python -m pip install mypy==2.3.1
+          set +e
+          python -m mypy > /tmp/mypy.txt 2>&1
+          rc=$?
+          tail -n 1 /tmp/mypy.txt
+          n=$(grep -c ": error:" /tmp/mypy.txt)
+          {
+            echo "### mypy (advisory)"
+            echo ""
+            echo "errors: **$n** -- $(tail -n 1 /tmp/mypy.txt)"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
+  python-slow:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install the research stack
+        run: |
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r python/requirements-ci.txt
+      # The seeded dataset (data/normalized + data/features, git-ignored) is
+      # what test_research_runner::test_eq03_report_reproduces_through_the_runner,
+      # test_alpha_golden::test_golden_fx05_via_class_on_bundled_data and the
+      # test_alpha_interface frames run on; without it they skip and the
+      # "runner reproduces the flagship report" claim is not CI-proven.  The
+      # cache key is the generator inputs + the generator / normaliser /
+      # feature-engine sources, so a change to any of them regenerates
+      # (~10 s market data + ~60 s features; identical seed => identical bytes).
+      - name: Restore the seeded dataset
+        id: dataset-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            data/raw
+            data/normalized
+            data/features
+          key: dataset-${{ runner.os }}-${{ hashFiles('configs/marketdata/generator.json', 'configs/instruments/instruments.json', 'configs/venues/venues.json', 'data/reference/feature_registry.json', 'python/src/iap/marketdata/**', 'python/src/iap/features/**', 'python/src/iap/core/**', 'python/src/iap/orderbook/**') }}
+      - name: Generate the seeded dataset (cache miss)
+        if: steps.dataset-cache.outputs.cache-hit != 'true'
+        working-directory: python
+        env:
+          PYTHONPATH: src
+        run: |
+          python3 -m iap.marketdata
+          python3 -m iap.features
+      # xdist: every test writes under tmp_path / tmp_path_factory (a
+      # per-worker basetemp) and only READS the repo's data/, configs/ and
+      # research/; `--dist loadfile` keeps a file's tests on one worker so the
+      # module-scoped fixtures that build the golden runs and frames are built
+      # once, not once per worker. The seeded dataset is the cache step above,
+      # shared read-only. Same tests, same outcomes as the serial run
+      # (compared test by test on the PR that introduced this, #23). pytest-cov
+      # combines the workers' data into one coverage-python.xml.
+      # E-P2-7: the files marked `slow` (python/tests, pytestmark), with
+      # coverage; runs in parallel with the python job.  The coverage
+      # report therefore covers the slow files' tests.
+      - name: pytest (slow)
+        working-directory: python
+        env:
+          PYTHONPATH: src
+        run: >
+          python -m pytest -q -n auto --dist loadfile --durations=25 -m slow
           --cov=iap --cov-report=term-missing
           --cov-report=xml:../coverage-python.xml
       - name: upload python coverage report
@@ -181,7 +272,7 @@ jobs:
       - name: Install the research stack
         run: |
           python -m pip install --upgrade pip
-          pip install -r python/requirements-ci.txt
+          pip install --require-hashes -r python/requirements-ci.txt
       # Run from the repo root: tests/conftest.py puts python/src on sys.path.
       - name: integration (cross-component end-to-end runs)
         run: python3 -m pytest -q tests/integration
@@ -335,7 +426,8 @@ jobs:
       - name: Install the research stack + maturin
         run: |
           python -m pip install --upgrade pip
-          pip install -r python/requirements-ci.txt maturin==1.7.8
+          pip install --require-hashes -r python/requirements-ci.txt
+          pip install maturin==1.7.8
       - name: cargo clippy (features_py, blocking)
         working-directory: rust/features_py
         run: cargo clippy --all-targets -- -D warnings
@@ -432,6 +524,17 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # gitleaks scans the whole history
+      # G-P1-7: secrets scan.  The release tarball is pinned by SHA-256 (same
+      # pattern as promtool in the deployment job), not fetched by tag alone.
+      - name: gitleaks (blocking)
+        run: |
+          curl -fsSL -o /tmp/gitleaks.tar.gz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  /tmp/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          /tmp/gitleaks git --redact --no-banner -v .
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
@@ -482,7 +585,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             g++ cmake make libgtest-dev libeigen3-dev junit4
           python -m pip install --upgrade pip
-          pip install -r python/requirements-ci.txt
+          pip install --require-hashes -r python/requirements-ci.txt
       # Same seeded dataset as the python job (same cache key): the Python
       # golden group includes test_golden_fx05_via_class_on_bundled_data.
       - name: Restore the seeded dataset
@@ -524,7 +627,7 @@ jobs:
           # check_headline_numbers.py imports iap.contracts / iap.lifecycle from
           # python/src to re-derive the contract counts: it needs the same
           # research stack as the python job (jsonschema/referencing/numpy).
-          pip install -r python/requirements-ci.txt
+          pip install --require-hashes -r python/requirements-ci.txt
           curl -fsSL -o /tmp/prometheus.tar.gz \
             https://github.com/prometheus/prometheus/releases/download/v2.53.0/prometheus-2.53.0.linux-amd64.tar.gz
           echo "d9900a11e3c89261e6416e3c9989858bad7b206af8b6838dfe9a5392d8ddc60d  /tmp/prometheus.tar.gz" | sha256sum -c -
@@ -629,7 +732,7 @@ jobs:
       - name: Install the research stack (+ the ml extra, pinned)
         run: |
           python -m pip install --upgrade pip
-          pip install -r python/requirements-ci.txt
+          pip install --require-hashes -r python/requirements-ci.txt
           pip install xgboost==3.2.0 lightgbm==4.7.0
       - name: regenerate (dataset -> features -> research -> goldens)
         env:
@@ -701,13 +804,14 @@ jobs:
               - '**/Dockerfile*'
               - '.dockerignore'
               - 'python/requirements-ci.txt'
+              - 'python/requirements-image.txt'
               - 'rust/rust-toolchain.toml'
               - 'rust/Cargo.lock'
 
   images:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    needs: [python, integration, cpp, rust, java, golden, deployment, changes]
+    needs: [python, python-slow, integration, cpp, rust, java, golden, deployment, changes]
     # Image builds are the merge-to-main promotion gate (GOVERNANCE gate 10).
     # They run on every push to main, and on a pull request only when it
     # changes image inputs (deployment/docker/**, any Dockerfile, the pinned

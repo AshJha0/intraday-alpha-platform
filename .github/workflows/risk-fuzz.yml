@@ -72,7 +72,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends junit4
           python -m pip install --upgrade pip
-          pip install -r python/requirements-ci.txt
+          pip install --require-hashes -r python/requirements-ci.txt
       - name: Build the Rust engine driver (the golden_risk_fuzz test binary)
         working-directory: rust
         run: cargo test --locked -p risk --test golden_risk_fuzz --no-run

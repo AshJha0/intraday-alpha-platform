@@ -109,6 +109,38 @@ ledger change (RESEARCH_VALIDITY.md §4a).
   with per-year `source` / `as_of`; 2020, 2021 and 2025 added;
   `event_calendar_for_year` fails closed; Python API unchanged.
 
+Engineering / CI hygiene from the 2026-10-11 quality review. No published
+number, golden, fixture or report changes.
+
+- **E-P0-1** `iap.experiment.locking.atomic_write_text` now defaults to
+  `newline="\n"`: ledgers and study files are LF on every OS (on Windows they
+  were CRLF, so their bytes and hashes differed from Linux). Test asserts no
+  `\r`.
+- **E-P1-1** `OrderBook.order(order_id) -> (side, price, qty) | None` (O(1));
+  the execution simulator uses it for EXECUTE events while a maker order
+  rests, instead of scanning `resting_orders()`. Behaviour-identical (execution
+  and golden tests unchanged); lookup 80x / 700x / 3,700x faster at 100 /
+  1,000 / 5,000 resting orders.
+- **E-P1-6** CI `python` job is a 3.11 + 3.12 matrix (the 3.11 entry keeps the
+  required check name `python`).
+- **E-P2-7** `slow` pytest marker on the ten slowest test files; the PR
+  `python` job runs `-m "not slow"`, a parallel `python-slow` job runs
+  `-m slow` with coverage.
+- **E-P1-5** (advisory) mypy config (`python/pyproject.toml`) and a
+  non-blocking CI step on core/orderbook/execution/backtest/features with the
+  error count in the job summary; path to blocking in CONTRIBUTING.md §2.2.
+- **G-P1-7** (part) hashed `python/requirements-ci.txt` (from
+  `requirements-ci.in`) and new `python/requirements-image.txt`, installed with
+  `--require-hashes` in CI and `Dockerfile.python`; gitleaks (release tarball
+  pinned by SHA-256) scans the history in the `advisory` job.
+- **G-P2-11** `**/llm_sessions/*/transcript.jsonl` and `tool_log.jsonl` are
+  git-ignored (reports/ and session.json stay trackable).
+- **G-P2-12** `iap.llm.budget.PINNED_MODELS` lists the exact model ids the
+  agent may request; `session.json` records `served_models` (`resp.model`);
+  a live eval fails when the served id differs from the requested one.
+- **E-P2-4** no change needed on main: the `load_events` fallback that caught
+  `ValueError` lives only on the research branches.
+
 ## v1.12.0 — 2026-10-10
 
 Honest Sharpe, better passive fills, new features, measured latency and

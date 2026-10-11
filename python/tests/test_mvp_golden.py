@@ -18,6 +18,10 @@ from iap.mvp.feed import generate_feed
 from iap.mvp.golden import GOLDEN_CONFIG_PATH, GOLDEN_VERSION, golden_document, render
 from iap.mvp.session import RunResult, compare_runs, run_session
 
+# E-P2-7: one of the slowest test files (CI --durations); run by the
+# python-slow CI job, deselected from the PR python job (-m 'not slow').
+pytestmark = pytest.mark.slow
+
 GOLDEN = REPO_ROOT / "tests" / "golden" / "expected_mvp.json"
 TOL = 1e-9
 

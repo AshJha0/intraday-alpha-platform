@@ -12,14 +12,27 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-#: model -> (input, output, cache read) USD per MTok
-PRICES: dict[str, tuple[float, float, float]] = {
-    "claude-opus-5-5": (4.00, 20.00, 0.20),
-    "claude-sonnet-5-5": (2.00, 10.00, 0.20),
-    "claude-haiku-5-5": (0.10, 0.50, 0.01),
+#: Pinned model ids (G-P2-12).  Every id the agent may request is listed here
+#: explicitly -- never a floating ``-latest`` alias -- and the id the API
+#: reports back (``resp.model``) is recorded in ``session.json``
+#: (``served_models``); a live eval fails when it differs from the requested
+#: id.  When Anthropic publishes a dated snapshot id for a family, pin it here
+#: (key and PRICES entry) in its own PR -- that is a reviewed change, not a
+#: silent upgrade.
+PINNED_MODELS: dict[str, str] = {
+    "opus": "claude-opus-5-5",
+    "sonnet": "claude-sonnet-5-5",
+    "haiku": "claude-haiku-5-5",
 }
-DEFAULT_MODEL = "claude-opus-5-5"
-EVAL_MODEL = "claude-haiku-5-5"
+
+#: pinned model id -> (input, output, cache read) USD per MTok
+PRICES: dict[str, tuple[float, float, float]] = {
+    PINNED_MODELS["opus"]: (4.00, 20.00, 0.20),
+    PINNED_MODELS["sonnet"]: (2.00, 10.00, 0.20),
+    PINNED_MODELS["haiku"]: (0.10, 0.50, 0.01),
+}
+DEFAULT_MODEL = PINNED_MODELS["opus"]
+EVAL_MODEL = PINNED_MODELS["haiku"]
 CACHE_WRITE_MULT = 1.25
 
 

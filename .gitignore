@@ -69,6 +69,10 @@ python/src/iap/_schemas/
 .env
 *.env
 .iap_keys/
+# --- LLM session transcripts and tool logs (G-P2-11): raw model I/O stays
+#     local; the signed reports/ and the session.json summary stay trackable
+**/llm_sessions/*/transcript.jsonl
+**/llm_sessions/*/tool_log.jsonl
 # --- alert receiver URLs (v1.12 P4): real ones live OUTSIDE the repo; only the
 #     secret-free local compose default local-sink.url is tracked
 deployment/alertmanager/*.url
