@@ -27,12 +27,19 @@ lessons of the v1.14.0 release (2026-10-11):
     the working tree is line endings (CRLF-only churn).
 
 ``publish --version X.Y.Z``  after the release PR is merged:
-    1. require a green ``ci`` run on main for the merge commit;
+    1. require a green ``ci`` run and a green ``codeql`` run (every
+       ``analyze`` job) on main for the merge commit;
     2. annotated tag ``vX.Y.Z`` on it, message = the CHANGELOG section;
     3. ``gh release create vX.Y.Z --verify-tag`` with the CHANGELOG section;
     4. watch ``release.yml`` for the tag; when it failed in its verify-ci
        guard (raced the main CI run), ``gh run rerun --failed`` once;
-    5. site check: the GitHub Pages site mentions ``vX.Y``.
+    5. site check: the GitHub Pages site mentions the full ``vX.Y.Z`` (a
+       ``vX.Y`` match is vacuous: the site's roadmap names the next minor
+       before it ships).
+
+In dry-run mode a failed ``publish`` precondition (tag exists, no CHANGELOG
+section, main CI not green) is reported as a BLOCKER and the rest of the
+plan is still printed; the command then exits non-zero.
 
 ``flow``  print the whole sequence above (no queries).
 """
@@ -257,14 +264,18 @@ def changelog_section(text: str, version: str) -> str:
     return body.strip() + "\n"
 
 
-def main_ci_green(r: Runner, sha: str) -> bool:
+def main_ci_green(r: Runner, sha: str, workflow: str = "ci.yml") -> bool:
+    """A completed, successful push run of ``workflow`` on main for ``sha``.
+
+    For ``codeql.yml`` a successful run means every ``analyze`` matrix job
+    passed (the run concludes ``success`` only when all its jobs do)."""
     out = r.query(
         [
             "gh",
             "run",
             "list",
             "--workflow",
-            "ci.yml",
+            workflow,
             "--branch",
             "main",
             "--commit",
@@ -302,14 +313,15 @@ def verify_ci_raced(r: Runner, run_id: int) -> bool:
 
 
 def site_mentions(version: str, fetch: Callable[[str], str] | None = None) -> bool:
-    short = "v" + ".".join(version.split(".")[:2])
+    """The page names the full ``vX.Y.Z`` (not ``vX.Y.Z0`` or ``vX.Y.Z.1``)."""
+    pat = re.compile(rf"v{re.escape(version)}(?!\.?\d)")
     if fetch is None:
 
         def fetch(url: str) -> str:
             with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310 (fixed https URL)
                 return resp.read().decode("utf-8", "replace")
 
-    return short in fetch(SITE_URL)
+    return pat.search(fetch(SITE_URL)) is not None
 
 
 def publish(
@@ -325,11 +337,28 @@ def publish(
     tag = f"v{version}"
     r.query(["git", "fetch", "origin", "main", "--tags"])
     sha = r.query(["git", "rev-parse", "origin/main"]).strip()
+    blockers: list[str] = []
+
+    def block(msg: str) -> None:
+        if r.execute:
+            raise ReleaseError(msg)
+        blockers.append(msg)
+        r.note(f"BLOCKER: {msg}")
+
     if r.query(["git", "tag", "--list", tag]).strip():
-        raise ReleaseError(f"tag {tag} already exists")
+        block(f"tag {tag} already exists")
+    try:
+        section = changelog_section(r.query(["git", "show", f"{sha}:CHANGELOG.md"]), version)
+    except ReleaseError as e:
+        block(str(e))
+        section = f"(CHANGELOG section for {tag} missing)\n"
     if not main_ci_green(r, sha):
-        raise ReleaseError(f"no green ci run on main for {sha}: tag only after main CI is green")
-    section = changelog_section(r.query(["git", "show", f"{sha}:CHANGELOG.md"]), version)
+        block(f"no green ci run on main for {sha}: tag only after main CI is green")
+    if not main_ci_green(r, sha, "codeql.yml"):
+        block(
+            f"no green codeql run on main for {sha}: tag only after every CodeQL "
+            "analyze job is green"
+        )
     notes = Path(tempfile.mkdtemp(prefix="iap-rel-")) / f"{tag}.md"
     notes.write_text(section, encoding="utf-8", newline="\n")
     r.note(f"release notes from CHANGELOG ({len(section.splitlines())} lines): {notes}")
@@ -340,6 +369,8 @@ def publish(
     )
     if not r.execute:
         r.note(f"then: watch release.yml for {tag}; rerun once if verify-ci raced; site check")
+        if blockers:
+            raise ReleaseError("dry run found blockers: " + "; ".join(blockers))
         return
     rerun = False
     for _ in range(max_polls):
@@ -367,7 +398,7 @@ def publish(
 # -------------------------------------------------------------------------- CLI
 
 FLOW = """\
-v1.14 release flow (tools/release.py, dry-run by default; --execute to act):
+release flow (tools/release.py, dry-run by default; --execute to act):
  1. merge the working branches into release/vX.Y.Z (one PR the owner merges)
  2. python tools/release.py prepare-regenerate --branch release/vX.Y.Z
       reset research/experiments.json to origin/main, drop the 5 runner dirs,
@@ -377,8 +408,9 @@ v1.14 release flow (tools/release.py, dry-run by default; --execute to act):
       skipping CRLF-only expected_features*; review the diff, commit, push
  4. owner merges the release PR (merge commit)
  5. python tools/release.py publish --version X.Y.Z
-      main CI green -> annotated tag from CHANGELOG -> gh release --verify-tag
-      -> release.yml (rerun if verify-ci raced) -> site check
+      main ci + codeql green -> annotated tag from CHANGELOG -> gh release --verify-tag
+      -> release.yml (rerun if verify-ci raced) -> site shows vX.Y.Z
+      (needs a '## vX.Y.Z' CHANGELOG heading: rename 'Unreleased' first)
 """
 
 
