@@ -714,7 +714,7 @@ replay   | 6            | -              |    -s | PASS
 deployment | -            | -              |    -s | PASS
 numbers  | -            | -              |    -s | PASS
 =======================================================================
-deployment checks: 26 passed, 0 failed, 0 skipped
+deployment checks: 29 passed, 0 failed, 0 skipped
 headline numbers: all headline numbers match their artefacts
 (a '-' count means the suite did not run in this mode, or has no golden
  group (integration/replay); '?' means it ran but its count could not be
