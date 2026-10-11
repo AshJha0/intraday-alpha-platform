@@ -133,4 +133,8 @@ def test_draft_fingerprints_cost_sensitivity_and_power():
     assert "never decides" in cs["role"] and "no ledger look" in cs["role"]
     assert (REPO / d["power"]["report"]).is_file()
     # hypotheses unchanged by the hardening
-    assert set(d["hypotheses"]) == {"H1", "H3", "H4"}
+    assert set(d["hypotheses"]) == {"H1", "H4"}
+    assert d["hypotheses"]["H4"]["alphas"] == ["EQ10@1s", "EQ05@1s"]
+    assert set(d["deferred_to_tier2"]["alphas"]) == {"EQ01@1s", "EQ02@5s", "EQ04@5s"}
+    assert {"H2", "H3", "EQ07"} <= set(d["dropped"])
+    assert not any("deflated-Sharpe gate reads for H3" in x for x in d["open_for_owner"])

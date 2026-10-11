@@ -16,7 +16,19 @@ This is a planning aid for the owner before sign-off. It does not change the dra
 1. **Between-session variance dominant.** Per-session effects are independent draws around the true effect; their sd is taken from the in-sample walk-forward fold ICs (4 folds over 6 test sessions, scaled by sqrt(1.5) to one session) for EQ, and from the session-clustered SE for the auction cell. Four folds give a very rough sd: treat every number as order of magnitude.
 2. **HAC.** The gate's t uses 5-minute buckets without day clusters, so its SE is the within-session one and shrinks as 1/sqrt(sessions) (calibrated from the in-sample IC / t). The estimate's real spread also includes the between-session term, which the HAC SE ignores; the model includes both.
 3. **Effect sizes.** Primary: the in-sample (2019-20, 7 sessions) gate IC. The v1.8 2026 holdout found the microstructure ICs at a third to a half of in-sample, so a second column uses the v1.8 holdout IC as a decayed effect.
-4. **Deflated Sharpe on a statistic.** The draft's DSR gate is defined on the strategy's daily P&L. The EQ taker strategies made no trade at 1x cost in-sample or in the v1.8 holdout, so their P&L DSR is undefined; the table models DSR on the per-session IC series instead. **Owner decision needed:** which series the DSR gate reads for H3/H4.
+4. **Deflated Sharpe on a statistic.** The EQ taker strategies made no trade at 1x cost in-sample or in the v1.8 holdout, so a P&L DSR is undefined; the table models DSR on the per-session IC series, which the owner adopted for H4.
+
+## Owner decisions (2026-10-11)
+
+Recorded in `research/r7/r7_confirm_prereg_DRAFT.json` (still DRAFT, unsigned):
+
+- **H4 tier 1 (7 sessions) = EQ10 @1s and EQ05 @1s only.** They are the two with joint power >= 0.8 at their in-sample IC.
+- **EQ01, EQ02, EQ04 deferred to tier 1 + tier 2 (47 sessions)** under a later pre-registration: joint power on 7 sessions 0.26 / 0.49 / 0.04 at the in-sample IC, about 1.00 on 47.
+- **EQ07 dropped:** the drafted sign (+) contradicts the in-sample IC and the v1.8 holdout; flipping it after seeing results would fit seen data. It may return as a new idea with its own pre-registration.
+- **H3 (auction) dropped from R7:** underpowered even on 47 sessions; needs a redesign (pooled / longer sample).
+- **DSR series for H4:** the per-session IC series (defined every session); net-of-cost P&L is reported alongside, descriptive only. H1 keeps its PENDING placeholder; its DSR series is decided after the maker summary and a rerun.
+
+The tables below are the analysis the decisions were taken on; they still list every drafted hypothesis.
 
 ## H4 (EQ alphas, pooled uncrossed IC > 0)
 
