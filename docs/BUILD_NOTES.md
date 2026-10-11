@@ -86,7 +86,7 @@ golden group is `ctest --test-dir build -R Golden` (suites `*Golden`, including
 ## Rust
 
 ```bash
-cd rust && cargo test        # workspace (eleven crates, 358 tests, ~55 s after a full rebuild)
+cd rust && cargo test        # workspace (eleven crates, 362 tests, ~55 s after a full rebuild)
 ```
 
 Crates: `marketdata`, `orderbook`, `replay`, `eventbus`, `telemetry`, `features`,
@@ -113,7 +113,7 @@ canonical-JSON byte parity the contracts / lifecycle goldens pin.
 ## Java — why there is NO Maven build
 
 ```bash
-cd java && bash build.sh && bash test.sh    # 571 tests; the seventeen *GoldenTest classes are 124 of them
+cd java && bash build.sh && bash test.sh    # 575 tests; the seventeen *GoldenTest classes are 124 of them
 ```
 
 **Maven/Gradle are deliberately not used: Maven Central is unreachable from

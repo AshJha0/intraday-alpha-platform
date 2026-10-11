@@ -290,7 +290,7 @@ and are matched by Java, Rust and C++ (the trace and canonical-JSON ports)
 and by Java and Rust (the lifecycle ports). The harness
 (`tests/harness/run_all.sh`, with `run_golden.sh` as the golden-only alias)
 runs every suite with the canonical commands and prints the parity table; a
-v1.13.0 CI run (2026-10-11) passes 2327/302/358/571 tests (193/72/71/124
+v1.13.0 CI run (2026-10-11) passes 2327/302/362/575 tests (193/72/71/124
 golden) across python/cpp/rust/java, plus the repo-level `integration` (35)
 and `replay` (6) rows — the same counts the README parity table records.
 
@@ -636,7 +636,7 @@ book → `FeatureEngine` → three fitted `linear_z_v1` alphas ensembled →
 and compares bytes; `replay` re-runs it from the captured stream and must
 reproduce the trace digest; `tests/golden/expected_mvp.json` pins the golden
 run (seed 12345: 15,805 events, 800 decisions, 235 parents, 169 fills,
-−81.53 USD, digest `20d4ff76…`) as the cross-language pin for any port of
+−81.53 USD, digest `5918f870…`) as the cross-language pin for any port of
 the loop (docs/MVP.md §9 lists what a port must reproduce). The result is
 cost-negative and the realized-IC audit (docs/MVP.md §7.1) is part of the
 document: the MVP's mid-to-mid IC is 0.13–0.21 away from the research IC

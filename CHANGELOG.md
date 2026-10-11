@@ -6,6 +6,36 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## Unreleased — v1.14 (correctness release, in progress)
+
+### Risk engine (Rust normative; Java and Python ports)
+
+Quality-review items G-P0-1, G-P0-2, G-P2-3, G-P2-6, G-P2-7, in all three
+engines, pinned by the regenerated risk goldens and the differential-fuzz
+corpus (PLATFORM_CONVENTIONS.md §11.1; schemas/MIGRATIONS.md lists every
+golden that moved). No existing golden decision, rule id or reason changed.
+
+- **G-P0-1 tamper-evident audit.** Every `RiskEvent` carries `seq` and
+  `prev_sha256` (SHA-256 of the previous JSONL line): the audit log is a hash
+  chain (`risk_event.schema.json` x-version 2). `audit_chain_head()` is the
+  value to anchor; a chained restore continues the chain, and the Java paper
+  session records the head in `session_state.json` so `risk_audit.jsonl` is
+  one chain across restarts. `verify_audit_chain` in Python and Rust.
+- **G-P0-2 SEC 15c3-5 pre-trade set** (`risk.json` x-version 4, `pre_trade`,
+  every key optional): restricted list, max open orders and open notional
+  per strategy, per-strategy position, participation of session market
+  volume (`on_market_trade`), per-strategy cancel rate and per-venue message
+  rate (`on_cancel_request`) — checks 23-29, after every legacy check.
+- **G-P2-3** loss-limit overrides are bounded (`overrides.max_loss_override_multiple`
+  x the configured limit) and need `overrides.min_approvers` distinct
+  approvers; a refused override is audited `LOSS_LIMIT_OVERRIDE_REJECTED`.
+- **G-P2-6** reference-price sanity gate: crossed books are dropped, and a
+  mark that jumps more than `market_data.max_mid_jump_ratio` (10x in the repo
+  config) against the stored one is dropped.
+- **G-P2-7** bounded per-key state: `pre_trade.max_tracked_keys` caps the
+  seen-order, open-order, strategy, market and cancel-bucket maps
+  (`STATE_CAPACITY`, fail-closed).
+
 ## v1.13.0 — 2026-10-11
 
 The hygiene-and-hardening release that follows the consolidated quality

@@ -1571,3 +1571,43 @@ and nothing else. `python/src/iap/marketdata`, `iap/features`,
   (`python3 tools/regenerate_dataset_artifacts.py --only power,power_extended`,
   on the CI runner for the committed files). A version-2 report cannot be
   converted.
+
+## 2026-10-11 — v1.14 risk: audit hash chain, SEC 15c3-5 controls (risk_event v1 -> v2, risk.json v3 -> v4, risk snapshot v1 -> v2, edge golden v1 -> v2)
+
+Quality-review items G-P0-1, G-P0-2, G-P2-3, G-P2-6, G-P2-7 (PLATFORM_CONVENTIONS.md §11.1).
+
+- **`schemas/risk/risk_event.schema.json` x-version 2**: two new required fields, `seq`
+  (u64, 1-based position in the engine's audit chain) and `prev_sha256` (hex SHA-256 of the
+  previous record's JSONL line, 64 zeros for the first). Sorted-key JSONL lines now read
+  `decision, prev_sha256, reason, rule_id, scope, scope_id, seq, severity, timestamp`. The Python
+  and Rust parsers accept a version-1 line (both fields default to 0 / "").
+  `iap.contracts.versions.RISK_EVENT_VERSION` 1 -> 2.
+- **`configs/risk/risk.json` x-version 4**: optional `market_data.max_mid_jump_ratio`, `pre_trade`
+  and `overrides` sections (absent or null = off). A version-3 document still parses, with every
+  new control off.
+- **Risk snapshot x-version 2** (`RiskEngine.snapshot()`): adds `open.*.strategy_id`,
+  `venue_buckets`, `cancel_buckets`, `market_volume`, `executed`. Restore is strict: a version-1
+  snapshot is refused (`risk snapshot: bad x-version`). The audit chain head is NOT in the
+  snapshot; the Java session store records it in `session_state.json` (`risk_audit_seq`,
+  `risk_audit_head_sha256`, optional on read).
+- **Goldens regenerated** (Python reference-equivalent port; the Rust generator
+  `make_risk_golden.rs` reproduces them):
+  - `expected_risk_audit.jsonl`: every line gains `seq` / `prev_sha256`; decisions, rule ids,
+    severities and reasons unchanged except the two override approvers, now two-party
+    (`cro@desk, head-of-risk@desk incident-0824[b]`) because the repo config requires 2.
+  - `expected_risk_decisions.json`: those two `approver` strings; every `expect` unchanged.
+  - `expected_risk_snapshot.json`: x-version 2 (`strategy_id` per open order, `venue_buckets`,
+    empty `cancel_buckets` / `market_volume` / `executed`).
+  - `expected_risk_edge_decisions.json` x-version 1 -> 2 (`python/tools/make_golden_risk_edge.py`):
+    `config_set`, step types `trade`, `cancel_request`, `bad_override`; restores continue the
+    audit chain; four new scenarios (15c3-5 controls, bounded two-party override, sanity gate,
+    bounded state). The eight existing scenarios' decisions are unchanged.
+    `expected_risk_edge_audit.jsonl` regenerated.
+  - `tests/golden/risk_fuzz/` regenerated (`make_risk_fuzz_corpus.py --force`): chained audit,
+    snapshot v2, override steps mostly two-party, `market_weird` no longer emits a crossed
+    `(i64::MAX, 1)` book (it would now be dropped) but `(1, i64::MAX)` followed by a probing order.
+  - `expected_mvp.json`: `config_version` and the trace digest only (the risk config is part of
+    the configuration hash); every count, P&L and float unchanged. Digest `20d4ff76…` ->
+    `5918f870…` in the docs that quote it.
+- Migration path: none for data. A paper session checkpointed before v1.14 cannot resume (its
+  risk snapshot is version 1); start a new session.
