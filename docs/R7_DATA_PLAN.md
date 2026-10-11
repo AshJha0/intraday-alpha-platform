@@ -175,3 +175,29 @@ gate:          HAC t >= ledger threshold in force; deflated Sharpe > 0.95; repor
                with and without 2025-12-10 (FOMC) and 2025-11-28 (holiday-thin)
 decision:      a failure is final for that hypothesis on these sessions
 ```
+
+## 7. A2 pre-registration template (DRAFT: not registered, not on the blackboard)
+
+Code: `iap.research.basis` (v1.15; synthetic tests only, `python/tests/test_research_basis.py`).
+No data has been ingested for the 15 constituents; nothing below has been run.
+
+```
+id:            A2-QQQ-BASIS-1 (DRAFT)
+data:          QQQ + the §2 top 15 (point-in-time weights per session, GOOG
+               checked); 1s mid bars on one aligned clock, causal forward-fill;
+               sessions named at registration, dataset_version recorded at ingest
+construction:  buy-and-hold basket from first-bar prices, weights renormalised
+               over the symbols present; basis_bps = 1e4 * log(QQQ / basket),
+               zero at the open; residual = QQQ ret - a - b * basket ret, (a, b)
+               fitted on the first half of each session only
+look:          ONE look per hypothesis; lags, bar size and weights frozen at
+               registration
+hypotheses (each with its in-sample estimate frozen at registration):
+  H1 lead-lag: basket leads QQQ: lead-lag ratio (lags 1..10 bars) > 1 and the
+               peak |xcorr| lag > 0, pooled across sessions
+  H2 basis:    basis is mean-reverting: AR(1) half-life < 60 bars
+  H3 tradable: a basis-reversion signal's net PnL after QQQ costs > 0
+gate:          HAC t >= ledger threshold in force; deflated Sharpe > 0.95 (H3);
+               reported with and without FOMC / holiday-thin sessions
+decision:      a failure is final for that hypothesis on these sessions
+```
