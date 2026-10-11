@@ -527,7 +527,7 @@ intraday-alpha-platform/
 ## Quick start
 
 Prerequisites are already the environment baseline: Python 3.11 (+ pyarrow),
-g++ 13 / CMake / GoogleTest, Rust (the toolchain is pinned to 1.98.1 in
+g++ 13 / CMake / GoogleTest, Rust (the toolchain is pinned to 1.99.0 in
 `rust/rust-toolchain.toml`), Java 21 (JUnit4 jar at
 `/usr/share/java/junit4.jar` — there is deliberately **no Maven**; see
 [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)).

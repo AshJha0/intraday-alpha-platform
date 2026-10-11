@@ -306,7 +306,7 @@ hot paths allocation-conscious (primitive arrays, no boxing). All: no dead code,
 
 Python 3.11 (numpy/pandas/scipy/sklearn/matplotlib/pytest; polars/duckdb/pyarrow pip-installable
 with --break-system-packages; xgboost/lightgbm may be installable — try, fall back to sklearn's
-GradientBoosting + document). g++13/CMake/GoogleTest/Eigen. Rust 1.98.1 (pinned, `rust/rust-toolchain.toml`) + crates.io (deps as
+GradientBoosting + document). g++13/CMake/GoogleTest/Eigen. Rust 1.99.0 (pinned, `rust/rust-toolchain.toml`) + crates.io (deps as
 shipped: **serde, serde_json only** — `rand` was permitted in wave 1 but is unused and
 SECURITY.md §1 allows serde/serde_json alone; crossbeam optional). Java 21 + JUnit4 jar.
 2 CPUs — benchmark methodology must state this; use -j2.

@@ -63,7 +63,7 @@ jobs:
           java-version: "21"
       - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1 (toolchain pinned by input)
         with:
-          toolchain: "1.98.1"      # == rust/rust-toolchain.toml
+          toolchain: "1.99.0"      # == rust/rust-toolchain.toml
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: rust

@@ -102,7 +102,7 @@ byte-identical `research/alpha_registry.json`). Golden targets run by
 `research/alpha_registry.json` relative to the crate (the Docker image copies
 them).
 
-Rust 1.98.1 (pinned in `rust/rust-toolchain.toml`; CI and `Dockerfile.rust` name the same version and `check_deployment.py` fails if they drift; the workspace MSRV stays 1.75; the figures in the papers were measured with rustc 1.95.0), crates.io reachable; keep deps to serde/serde_json only (`rand` was
+Rust 1.99.0 (pinned in `rust/rust-toolchain.toml`; CI and `Dockerfile.rust` name the same version and `check_deployment.py` fails if they drift; the workspace MSRV stays 1.75; the figures in the papers were measured with rustc 1.95.0), crates.io reachable; keep deps to serde/serde_json only (`rand` was
 permitted historically but is NOT used — the pinned RNG is SplitMix64,
 conventions §3 — and SECURITY.md §1 allows serde/serde_json alone) (+ crossbeam
 where justified); zero warnings. `serde_json` is built with its

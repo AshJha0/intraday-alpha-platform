@@ -3077,7 +3077,7 @@ packages, not `iap.replay`, and not the other three languages).
 python3 tests/harness/check_deployment.py --verbose | grep -E "image_pinning|workflow_supply_chain|rust_toolchain_pinned"
 #   [ok  ] image_pinning
 #   [ok  ] workflow_supply_chain: 3 workflows
-#   [ok  ] rust_toolchain_pinned: 1.98.1
+#   [ok  ] rust_toolchain_pinned: 1.99.0
 cd python && PYTHONPATH=src python3 -m pytest -q tests/test_import_policy.py
 # 27 passed
 ```
