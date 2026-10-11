@@ -21,8 +21,63 @@
     "2025-12-12",
     "2026-06-12"
   ],
+  "holdout_files": {
+    "location": "data/real/itch/r7/ (git-ignored vendor files)",
+    "computed": "2026-10-11, streaming sha256 of the compressed .gz bytes as downloaded; files were not decompressed and no message content was read",
+    "check": "before ingest, each file must match bytes and sha256 exactly; any mismatch stops the run",
+    "files": [
+      {
+        "date": "2025-11-28",
+        "file": "S112825-v50.txt.gz",
+        "bytes": 4735308661,
+        "sha256": "e965ea6f9779c1b5d7b74de4549836ffe29a5f6ff64bb7894186a6f6404baaa4"
+      },
+      {
+        "date": "2025-12-08",
+        "file": "S120825-v50.txt.gz",
+        "bytes": 8775891119,
+        "sha256": "3e3d43c0c827b3d589eee64631b5e5401a39f9c922f29b18bad4a055eb922aa0"
+      },
+      {
+        "date": "2025-12-09",
+        "file": "S120925-v50.txt.gz",
+        "bytes": 7929915419,
+        "sha256": "b6bf2f5dbd87445e37a58951c6119908ef0ea559ca373be80a0346ab73e14d66"
+      },
+      {
+        "date": "2025-12-10",
+        "file": "S121025-v50.txt.gz",
+        "bytes": 11557662295,
+        "sha256": "5a64714a79df1b5ea987b66e12d70005beeefe1cf6cea8c151d1adc842275741"
+      },
+      {
+        "date": "2025-12-11",
+        "file": "S121125-v50.txt.gz",
+        "bytes": 10471034001,
+        "sha256": "de9058d8c600a6510ce087a000cdd3f513197688b7c8ebcc0c7baad9a6796c17"
+      },
+      {
+        "date": "2025-12-12",
+        "file": "S121225-v50.txt.gz",
+        "bytes": 12551644054,
+        "sha256": "46f42fb12f0e659814416713c4e22985dba1b062b0c13097ea9b5b003d612798"
+      },
+      {
+        "date": "2026-06-12",
+        "file": "S061226-v50.txt.gz",
+        "bytes": 17894268560,
+        "sha256": "1f9d35e12120ef37ea22df9f59dc5207fe51b075b6ccf1c9cdfd09fa566dc1d5"
+      }
+    ]
+  },
   "dataset_version": "recorded at ingest",
   "execution_config": "configs/prereg/v2.json",
+  "fingerprints": {
+    "algorithm": "sha256 of the file bytes at drafting (LF line endings, .gitattributes eol=lf)",
+    "research/r7/r7_candidates.json": "e8d5df8183644260c60f5c7db4365fc3641cc89515fad2100faba3939fb431dc",
+    "configs/prereg/v2.json": "db79bef71fe82399dd228e10c5ee79c0c91d59cb357b43ed944fe9392d647d60",
+    "configs/reference/regulatory_fee_schedule.json": "0b8e834ae2221261ee86756d9e1369f744fd0cc73b19ab89ce82c058e621800f"
+  },
   "look": "ONE look per hypothesis; no parameter changes after registration",
   "bundles": [
     "validation v3 (R1 sampling, FOMC/holiday split)",
@@ -62,8 +117,29 @@
     "role": "reported alongside results only; never decides pass/fail; not a hypothesis, no ledger look (owner decision 2026-10-11)",
     "applies_to": "hypotheses whose execution depends on feed latency (H1 maker); others unaffected"
   },
+  "cost_sensitivity": {
+    "scales": [
+      0.5,
+      1.0,
+      1.5
+    ],
+    "primary_scale": 1.0,
+    "decides": "only the 1.0x (primary) run decides pass/fail",
+    "role": "reported alongside results only; never decides pass/fail; not a hypothesis, no ledger look",
+    "scaled": "explicit (exchange fee per share / FX commission) and implicit (spread, impact) components of the platform cost model under configs/prereg/v2.json",
+    "not_scaled": "regulatory fees (SEC Section 31, FINRA TAF) stay at configs/reference/regulatory_fee_schedule.json",
+    "hook": "iap.backtest.costs.CostModel.with_cost_sensitivity(scale) (field sensitivity_scale, default 1.0 = byte-identical; COST_SENSITIVITY_SCALES)"
+  },
+  "power": {
+    "report": "docs/research/R7_POWER.md",
+    "data": "research/r7/r7_power.json",
+    "tool": "tools/r7_power.py (iap.research.r7_power); rerun when the maker_real summary exists",
+    "role": "planning aid for the owner before sign-off; does not change the hypotheses; no look, nothing charged to the ledger",
+    "h1": "PLACEHOLDER until the maker_real summary is written"
+  },
   "open_for_owner": [
     "H1 in-sample estimate from the maker_real summary",
-    "sign-off and blackboard registration before any holdout data is read"
+    "sign-off and blackboard registration before any holdout data is read",
+    "read docs/research/R7_POWER.md: per hypothesis test now or wait for tier 2, and which series the deflated-Sharpe gate reads for H3/H4 (their taker strategies made no trade in-sample)"
   ]
 }

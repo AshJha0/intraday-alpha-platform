@@ -187,6 +187,17 @@ gate:          HAC t >= ledger threshold in force; deflated Sharpe > 0.95; repor
 decision:      a failure is final for that hypothesis on these sessions
 sensitivity:   feed latency 10 us (primary 100 us, configs/prereg/v2.json), reported
                alongside results only; never decides pass/fail; no ledger look
+cost sens.:    platform cost model at 0.5x, 1.0x (primary, the only one that decides)
+               and 1.5x: explicit + implicit components scaled
+               (CostModel.with_cost_sensitivity), regulatory fees at schedule;
+               reporting only, never decides pass/fail, no ledger look
+fingerprints:  each holdout .gz file's bytes + sha256 (computed streaming, never
+               decompressed), and sha256 of r7_candidates.json, configs/prereg/v2.json
+               and configs/reference/regulatory_fee_schedule.json; checked before ingest
+power:         docs/research/R7_POWER.md (tools/r7_power.py): power and minimum
+               detectable effect per hypothesis on tier 1 (7) and tier 1+2 (47)
+               sessions; H1 placeholder until the maker_real summary exists. A
+               planning aid for the owner; it changes no hypothesis
 ```
 
 ## 7. A2 pre-registration template (DRAFT: not registered, not on the blackboard)
