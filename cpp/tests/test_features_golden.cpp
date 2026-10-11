@@ -74,7 +74,19 @@ void check_checkpoint(const std::string& market, const std::string& cp_key,
         }
         const double want = entry["value"].num();
         const double got = vec.values[static_cast<std::size_t>(slot)];
-        EXPECT_LE(std::fabs(got - want), 1e-9 + 1e-9 * std::fabs(want))
+        double tol = 1e-9 + 1e-9 * std::fabs(want);
+        // rvol_w1m float residue / (rvol_w5m + EPS): the residue rule of the
+        // burst check below and the pyo3 parity test (a zero 1m vol leaves
+        // ~1e-12 in one engine and an exact 0 in another)
+        const auto& feats = cp["features"];
+        if (name == "vol_regime_ratio_v1" && feats.has("rvol_w1m_v1") &&
+            (!feats["rvol_w1m_v1"]["valid"].boolean ||
+             std::fabs(feats["rvol_w1m_v1"]["value"].num()) <= 1e-9)) {
+            const double rv5 = std::fabs(vec.values[static_cast<std::size_t>(
+                iap::feature_index("rvol_w5m_v1"))]);
+            tol += 1e-9 / ((std::isnan(rv5) ? 0.0 : rv5) + 1e-12);
+        }
+        EXPECT_LE(std::fabs(got - want), tol)
             << market << " cp " << cp_key << " " << name << ": got " << got
             << " want " << want;
     }

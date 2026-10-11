@@ -87,7 +87,18 @@ fn check_checkpoint(golden: &serde_json::Value, key: &str, index: &str, vec: &Fe
         if want_valid {
             let want = entry["value"].as_f64().expect("value");
             let got = vec.values[slot];
-            let tol = ABS_TOL + REL_TOL * want.abs();
+            let mut tol = ABS_TOL + REL_TOL * want.abs();
+            // rvol_w1m float residue / (rvol_w5m + EPS): see the burst check
+            if name == "vol_regime_ratio_v1"
+                && feats
+                    .get("rvol_w1m_v1")
+                    .and_then(|e| e["value"].as_f64())
+                    .is_none_or(|v| v.abs() <= 1e-9)
+            {
+                let rv5 = features::feature_index("rvol_w5m_v1").map_or(0.0, |i| vec.values[i]);
+                let rv5 = if rv5.is_nan() { 0.0 } else { rv5.abs() };
+                tol += 1e-9 / (rv5 + 1e-12);
+            }
             assert!(
                 (got - want).abs() <= tol,
                 "{key}@{index} {name}: got {got}, want {want} (tol {tol})"

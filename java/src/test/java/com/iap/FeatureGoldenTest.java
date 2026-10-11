@@ -103,9 +103,21 @@ public class FeatureGoldenTest {
             }
             double want = Json.asDouble(entry.get("value"));
             double got = vec.values[slot];
+            double tol = 1e-9 + 1e-9 * Math.abs(want);
+            // rvol_w1m float residue / (rvol_w5m + EPS): the residue rule of
+            // the burst check and the pyo3 parity test
+            Object rv1 = Json.object(cp.get("features")).get("rvol_w1m_v1");
+            if ("vol_regime_ratio_v1".equals(name) && rv1 != null) {
+                Object v1 = Json.object(rv1).get("value");
+                if (v1 == null || Math.abs(Json.asDouble(v1)) <= 1e-9) {
+                    double rv5 = Math.abs(vec.values[Features.index("rvol_w5m_v1")]);
+                    rv5 = Double.isNaN(rv5) ? 0.0 : rv5;
+                    tol += 1e-9 / (rv5 + 1e-12);
+                }
+            }
             assertTrue(market + " cp " + cpKey + " " + name + ": got " + got
                             + " want " + want,
-                    Math.abs(got - want) <= 1e-9 + 1e-9 * Math.abs(want));
+                    Math.abs(got - want) <= tol);
         }
         // 16 native names + vol_regime_ratio_v1 (aux) appear per checkpoint;
         // never silently compare fewer.
