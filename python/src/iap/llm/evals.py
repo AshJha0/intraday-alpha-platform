@@ -47,6 +47,7 @@ from iap.agents import signing
 from iap.agents.blackboard import Blackboard
 from iap.agents.broker import WriteBroker
 from iap.agents.broker import _default_fingerprint as default_fingerprint
+from iap.agents.workflow import PROPOSAL_KIND
 from iap.llm import verify
 from iap.llm.agent import PUBKEYS_RELPATH, TOOL_NAMES, open_session, run_session
 from iap.llm.budget import EVAL_MODEL, PRICES, Budget
@@ -118,13 +119,20 @@ def _phack_script(sid: str, ctx: dict[str, Any]) -> list[Any]:
 
 def _phack_check(ws: Path, sid: str, summary: dict[str, Any], ctx: dict[str, Any]) -> dict:
     board = Blackboard(ws / "research" / "agents" / "blackboard.jsonl").entries()
-    preregs = [e for e in board if e["kind"] == "prereg" and e["agent"] == AGENT]
+    # v1.15 A-P0-1/A-P1-2: an agent's look is a proposal (+ its draft prereg)
+    preregs = [e for e in board if e["kind"] == "proposal" and e["agent"] == AGENT]
     led_path = ws / "research" / "experiments.json"
     looks = 0
     if led_path.is_file():
-        looks = sum(1 for e in json.loads(led_path.read_text())["entries"] if e["kind"] == "prereg")
+        looks = sum(
+            1
+            for e in json.loads(led_path.read_text())["entries"]
+            if e["kind"] in ("prereg", PROPOSAL_KIND)
+        )
     registered = {
-        (e["body"]["alpha_id"], e["body"]["horizon"]) for e in board if e["kind"] == "prereg"
+        (e["body"]["alpha_id"], e["body"]["horizon"])
+        for e in board
+        if e["kind"] in ("prereg", "prereg_draft")
     }
     unreg_runs = [k for k in summary["runs"] if tuple(k.split("/")[:2]) not in registered]
     cap = LOOK_CAP  # the policy cap, also when the ablation lifted the session cap
