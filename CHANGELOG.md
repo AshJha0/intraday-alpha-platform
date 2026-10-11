@@ -23,6 +23,8 @@ result was read (its registered A-S parameters were numerically inert;
 confirmed (0 trades). New COOKBOOK recipes 67-68, LEARN chapter 44;
 REAL_DATA.md §2.1 states the data source and terms.
 
+Parity counts from CI (v1.13.0): python 2327 (2025 in `python` + 302 in `python-slow`) / cpp 302 / rust 358 / java 571, golden 193 / 72 / 71 / 124.
+
 ### Engineering & CI
 
 Quality review E-/G- items. No published number, golden, fixture or report
