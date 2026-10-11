@@ -166,7 +166,11 @@ rolling-IC rule set that `iap.lifecycle` composes (ACTIVE ⇄ WATCH → RETIRED)
 
 Generator / normaliser / labels / validation / models / research / store /
 MVP / agents (Python only); `rust/eventbus`, `rust/telemetry`, `rust/venue`
-(Rust only); the Java platform vertical `com.iap.{platform,monitoring,api,config}`.
+(Rust only); the Java platform vertical `com.iap.{platform,monitoring,api,config}`
+(since v1.13 E4 `PaperTrading` is a thin coordinator over package-private
+`PaperTradingSession` / `PaperTradingMetrics` / `PaperTradingSizer` /
+`PaperTradingReports` / `PaperTradingCli`; same behaviour and public API, and
+the FROZEN component copies it consumes are untouched).
 These have one copy and no drift risk of this kind; the policy does not
 touch them.
 

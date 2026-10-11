@@ -646,6 +646,28 @@ EQ06 −0.079 against 0.027), so all three fail the lifecycle's
 gap and the evidence that it is not a leak (the pinned label definition and
 the truncation probe).
 
+**Module structure (v1.13 E4, behaviour-preserving).** The two former god
+classes are split by concern with their public surfaces unchanged.
+`iap.mvp.engine` keeps the event loop (`MvpEngine.__init__`, `on_event`,
+`finish`, the decision, child issue / PASSIVE working / submission and
+finalisation) and re-exports every old public name; the rest lives in
+`iap.mvp.engine_io` (horizon names, declared controls, feature context),
+`iap.mvp.accounting` (`Account`, `Counters`), `iap.mvp.metrics` (`pearson`,
+`IcResult`, `OrderOutcome`), `iap.mvp.orders` (block controls, PASSIVE
+states, live-parent records) and three mixins of `MvpEngine`:
+`iap.mvp.risk_wiring.RiskWiringMixin` (reports → account + risk, stale
+transitions and the mark, TCA timeline), `iap.mvp.sizing.SizingMixin` (bar
+roll, in-flight quantity) and `iap.mvp.engine_metrics.EngineMetricsMixin`
+(P&L identity, labels, realized IC). Java `com.iap.platform.PaperTrading`
+stays the coordinator (`Options`, `Result`, `SessionState`, `validate`,
+`run`, `RiskWiring`, the probes, resume helpers, `statusJson`, `main`) and
+delegates to package-private `PaperTradingSession` (exit marker, checkpoint
+commit, checkpoint P&L), `PaperTradingMetrics` (risk-limit gauges,
+`ExecMetrics`, book-health counters), `PaperTradingSizer` (the pinned sizing
+problem and its hash), `PaperTradingReports` (`/status` and the session
+report JSON) and `PaperTradingCli` (the command line). The golden MVP run,
+its digest and the paper-trading outputs are unchanged.
+
 ## 10. Known deviations from the spec blueprint (documented, not hidden)
 
 - **Rust workspace membership** differs from the spec's sketch: the

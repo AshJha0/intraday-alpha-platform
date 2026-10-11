@@ -6,6 +6,18 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## v1.13.0 — unreleased
+
+- **E4: split the god classes (behaviour-preserving).** Java
+  `PaperTrading.java` (1,843 → 1,428 lines) keeps its public API and
+  delegates to new package-private `PaperTradingSession`,
+  `PaperTradingMetrics`, `PaperTradingSizer`, `PaperTradingReports` and
+  `PaperTradingCli`. Python `iap/mvp/engine.py` (1,313 → 811 lines) keeps the
+  loop and re-exports its old public names; the rest moved to
+  `iap.mvp.engine_io`, `accounting`, `metrics`, `orders`, `risk_wiring`,
+  `sizing` and `engine_metrics` (ARCHITECTURE.md §9.1). No golden, digest,
+  report, CLI, Docker or k8s change; no test-count change.
+
 ## v1.12.0 — 2026-10-10
 
 Honest Sharpe, better passive fills, new features, measured latency and
