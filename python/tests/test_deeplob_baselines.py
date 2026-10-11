@@ -125,3 +125,21 @@ def test_prereg_is_draft_and_unsigned():
     cand = json.loads((REPO / "research" / "r7" / "r7_candidates.json").read_text(encoding="utf-8"))
     holdout = [x["date"] for x in cand["days"] if x["role"] == "holdout"]
     assert d["holdout_days"] == holdout
+    # owner decisions 2026-10-11
+    assert d["dataset"]["sampling_clock"].startswith("event")
+    assert d["dataset"]["window"] == 100 and d["dataset"]["horizon_rows"] == 50
+    assert d["acceptance"]["min_confidence"] == 0.6
+    assert "fee_bp" not in d["acceptance"]
+    cm = d["acceptance"]["cost_model"]
+    assert cm["execution_config"] == "configs/prereg/v2.json" and cm["regulatory_fees"] is True
+    assert (REPO / cm["execution_config"]).is_file()
+
+
+def test_r7_confirm_prereg_is_draft_without_quoting():
+    p = REPO / "research" / "r7" / "r7_confirm_prereg_DRAFT.json"
+    d = json.loads(p.read_text(encoding="utf-8"))
+    assert d["status"].startswith("DRAFT")
+    assert d["signed"] is False and d["signature"] is None and d["on_blackboard"] is False
+    assert "H2" not in d["hypotheses"]
+    assert d["hypotheses"]["H1"]["insample_estimate"] == "PENDING maker_real summary"
+    assert (REPO / d["execution_config"]).is_file()
