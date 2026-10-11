@@ -728,10 +728,10 @@ data:
         },
         "2021": {
           "fomc": ["2021-01-27", "2021-03-17", "2021-04-28", "2021-06-16", "2021-07-28", "2021-09-22", "2021-11-03", "2021-12-15"],
-          "holiday_thin": ["2021-11-26", "2021-12-27", "2021-12-28", "2021-12-29", "2021-12-30", "2021-12-31"],
+          "holiday_thin": ["2021-07-02", "2021-11-26", "2021-12-23", "2021-12-27", "2021-12-28", "2021-12-29", "2021-12-30", "2021-12-31"],
           "source": {
             "fomc": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
-            "holiday_thin": "early close 2021-11-26 per the NYSE holiday calendar of that year (2021-12-24 was a full holiday; not on the current nyse.com page; not re-verified); 2021-12-27..31 by convention"
+            "holiday_thin": "early close 2021-11-26 per the NYSE holiday calendar of that year (2021-12-24 was a full holiday; not on the current nyse.com page; not re-verified); 2021-12-27..31 by convention; 2021-07-02 and 2021-12-23 by convention (trading day before a full market holiday: 2021-07-05 observed Independence Day, 2021-12-24 Christmas), not exchange early closes"
           },
           "as_of": "2026-10-11"
         },
