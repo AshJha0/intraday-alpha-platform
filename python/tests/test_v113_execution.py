@@ -9,8 +9,10 @@ from __future__ import annotations
 import copy
 import json
 import math
+import re
 from dataclasses import replace
 from pathlib import Path
+from urllib.parse import urlparse
 
 import numpy as np
 import pytest
@@ -110,7 +112,13 @@ def test_regulatory_fee_template_documents_sources():
     assert by["2019"]["sell_notional_fee_bps"] == pytest.approx(
         by["2019"]["sec_section31_usd_per_million"] / 100.0
     )
-    assert "sec.gov" in by["2019"]["sec_source"] and "finra.org" in by["curr"]["finra_source"]
+    hosts = {
+        urlparse(u).hostname
+        for p in doc["periods"]
+        for k in ("sec_source", "finra_source")
+        for u in re.findall(r"https://[^\s)]+", p[k])
+    }
+    assert {"www.sec.gov", "www.finra.org"} <= hosts
 
 
 def test_cost_model_regulatory_fees_exact_and_default_identical():
