@@ -180,6 +180,8 @@ hypotheses (each with its in-sample estimate frozen at registration):
 gate:          HAC t >= ledger threshold in force; deflated Sharpe > 0.95; reported
                with and without 2025-12-10 (FOMC) and 2025-11-28 (holiday-thin)
 decision:      a failure is final for that hypothesis on these sessions
+sensitivity:   feed latency 10 us (primary 100 us, configs/prereg/v2.json), reported
+               alongside results only; never decides pass/fail; no ledger look
 ```
 
 ## 7. A2 pre-registration template (DRAFT: not registered, not on the blackboard)

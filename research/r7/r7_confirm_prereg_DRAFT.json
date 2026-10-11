@@ -7,12 +7,27 @@
   "on_blackboard": false,
   "drafted": "2026-10-11",
   "source": "docs/R7_DATA_PLAN.md section 6",
-  "symbols": ["AAPL", "MSFT", "QQQ"],
-  "holdout_days": ["2025-11-28", "2025-12-08", "2025-12-09", "2025-12-10", "2025-12-11", "2025-12-12", "2026-06-12"],
+  "symbols": [
+    "AAPL",
+    "MSFT",
+    "QQQ"
+  ],
+  "holdout_days": [
+    "2025-11-28",
+    "2025-12-08",
+    "2025-12-09",
+    "2025-12-10",
+    "2025-12-11",
+    "2025-12-12",
+    "2026-06-12"
+  ],
   "dataset_version": "recorded at ingest",
   "execution_config": "configs/prereg/v2.json",
   "look": "ONE look per hypothesis; no parameter changes after registration",
-  "bundles": ["validation v3 (R1 sampling, FOMC/holiday split)", "validation v4 (CPCV, PBO, deflated Sharpe with N from the ledger)"],
+  "bundles": [
+    "validation v3 (R1 sampling, FOMC/holiday split)",
+    "validation v4 (CPCV, PBO, deflated Sharpe with N from the ledger)"
+  ],
   "hypotheses": {
     "H1": {
       "name": "maker",
@@ -39,6 +54,14 @@
   },
   "gate": "HAC t >= ledger threshold in force; deflated Sharpe > 0.95; reported with and without 2025-12-10 (FOMC) and 2025-11-28 (holiday-thin)",
   "decision": "a failure is final for that hypothesis on these sessions",
+  "sensitivity": {
+    "feed_latency_ns": [
+      10000
+    ],
+    "primary_feed_latency_ns": 100000,
+    "role": "reported alongside results only; never decides pass/fail; not a hypothesis, no ledger look (owner decision 2026-10-11)",
+    "applies_to": "hypotheses whose execution depends on feed latency (H1 maker); others unaffected"
+  },
   "open_for_owner": [
     "H1 in-sample estimate from the maker_real summary",
     "sign-off and blackboard registration before any holdout data is read"
