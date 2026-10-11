@@ -6,98 +6,30 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
-## Unreleased (v1.14 engineering)
+## v1.14.0 — 2026-10-11
 
-Behaviour-preserving engineering items of the 2026-10-11 quality review. No
-published number, golden, digest, model id or record hash changes.
+Correctness release of the 2026-10-11 quality review: data mapping and
+same-timestamp coalescing (#83), behaviour-preserving engineering (#84),
+execution-simulator realism (#86), governance trust roots, chained ledger and
+blocking supply-chain audits (#87) and the SEC 15c3-5 pre-trade risk set
+(#89). @@RESEARCHSTATS@@
 
-- **E-P1-3** `iap.research.events`: `EventColumns` keeps a session's events as
-  twelve `int64` numpy columns and is a `Sequence[MarketEvent]` whose
-  iteration is a chunked cursor (same Python-int `MarketEvent`s, one chunk
-  alive at a time); `read_event_columns` reads row group by row group with
-  `pyarrow.compute` and never imports `pyarrow.dataset`.
-- **E-P1-2** `iap.research.replay`: `SharedReplay` prepares one instrument's
-  stream once (filter, venue) and replays it for every maker configuration
-  of a unit (`run_grid`); results equal independent `run_instrument` calls.
-  `iap.backtest.maker` is not edited; one event loop per configuration
-  remains until the Rust/pyo3 simulator.
-- **E-P1-4** `iap.research.study`: `StudyBase` (pre-registration + SHA,
-  blackboard check, ordered checkpointed unit loop, atomic canonical unit
-  files) and the shared helpers (`cluster_stats`, `peak_rss_gb`, `log`,
-  `unit_name`, `file_sha256`) for the study drivers.
-- **E-P2-5** `iap.mlops.registry`: `content_sha256` hashes the fitted
-  model's state (class, params, fitted arrays; the `_sklearn_version` stamp
-  dropped), stable across joblib/pickle/scikit-learn versions; written to a
-  `content.json` sidecar so `record.json`, `model_id` and `record_hash` are
-  unchanged; `find_by_content`, `verify_content` (backfills older records).
+Parity counts from CI (v1.14.0): @@COUNTS@@
 
-Python tests: 2336 (9 new in `test_research_v114.py`).
+### Numbers that changed
 
-## Unreleased (v1.14, in progress) — governance
+@@NUMBERS@@
 
-Quality review G-P1-4, G-P1-5 and the rest of G-P1-7. No published number,
-golden or ledger total changed; `research/experiments.json` gains
-`chain_head` / `chain_length` (x-version 4).
+### Execution realism is opt-in
 
-Parity counts from CI: python 2334 (2032 in `python` + 302 in `python-slow`) / cpp 302 / rust 358 / java 571, golden 193 / 72 / 71 / 124.
+The execution-realism options of #86 (feed latency `feed_latency_ns`,
+simulator-routed exits `exit_route='sim'` / `flatten_route='sim'`, hidden
+prints `hidden_prints`, per-touch-order adverse selection
+`markout_unit='touch_order'`, and `amend_down` / `amend_size_down`) default
+off in code: the default runs and every golden are byte-identical. They will
+be switched on in the v2 pre-registrations, not retroactively.
 
-- **Trust roots (G-P1-4).** A non-empty agent key registry is used only
-  when a maintainer in `research/agents/trust_roots.json` has signed it
-  (`agent_pubkeys.sig.json`; `cli maintainer-keygen` / `sign-registry`,
-  `iap.agents.trust`); CI reads the trust roots from `origin/main`. New
-  agent requests are `ed25519-v2`, binding the board head and board id
-  (`WriteBroker.request_context`); a stale head or another board is
-  refused. `prereg` refuses an unsigned write by a keyed agent;
-  `verify-board --trust-ref origin/main` checks anchors and the board
-  against `origin/main`.
-- **Chained ledger (G-P1-5).** `ExperimentLedger` chains every entry's
-  immutable identity and refuses to load a ledger whose `chain_head` does
-  not match (so Bonferroni never reads an edited ledger); each prereg
-  records `ledger_head`; `check_ledger_monotone.py` requires the head ledger
-  to descend from the base and every prereg head to be on the chain.
-- **Blocking supply-chain audits (G-P1-7).** New `supply-chain` CI job:
-  pip-audit (both requirement files), cargo audit (workspace and
-  `features_py`), cargo deny (`rust/deny.toml`), trivy fs + config; trivy
-  image scan in `images`; CodeQL for Rust. Ignores only through
-  `.github/audit-ignores.json` with a reason and an expiry
-  (`tools/audit_ignores.py`). Rust crates declare `license = "MIT"`,
-  `publish = false`. The new cargo audit of `rust/features_py` found
-  RUSTSEC-2025-0020 and RUSTSEC-2026-0177 in pyo3 0.22.6: bumped to pyo3
-  0.29.3 / numpy 0.29.0 (`PyDict::new`, `into_pyarray`, `Python::detach`).
-
-## Unreleased — v1.14 (correctness release, in progress)
-
-### Risk engine (Rust normative; Java and Python ports)
-
-Quality-review items G-P0-1, G-P0-2, G-P2-3, G-P2-6, G-P2-7, in all three
-engines, pinned by the regenerated risk goldens and the differential-fuzz
-corpus (PLATFORM_CONVENTIONS.md §11.1; schemas/MIGRATIONS.md lists every
-golden that moved). No existing golden decision, rule id or reason changed.
-
-Parity counts from CI (v1.14 risk branch): python 2331 (2029 in `python` + 302 in `python-slow`) / cpp 302 / rust 362 / java 575, golden 193 / 72 / 71 / 124.
-
-- **G-P0-1 tamper-evident audit.** Every `RiskEvent` carries `seq` and
-  `prev_sha256` (SHA-256 of the previous JSONL line): the audit log is a hash
-  chain (`risk_event.schema.json` x-version 2). `audit_chain_head()` is the
-  value to anchor; a chained restore continues the chain, and the Java paper
-  session records the head in `session_state.json` so `risk_audit.jsonl` is
-  one chain across restarts. `verify_audit_chain` in Python and Rust.
-- **G-P0-2 SEC 15c3-5 pre-trade set** (`risk.json` x-version 4, `pre_trade`,
-  every key optional): restricted list, max open orders and open notional
-  per strategy, per-strategy position, participation of session market
-  volume (`on_market_trade`), per-strategy cancel rate and per-venue message
-  rate (`on_cancel_request`) — checks 23-29, after every legacy check.
-- **G-P2-3** loss-limit overrides are bounded (`overrides.max_loss_override_multiple`
-  x the configured limit) and need `overrides.min_approvers` distinct
-  approvers; a refused override is audited `LOSS_LIMIT_OVERRIDE_REJECTED`.
-- **G-P2-6** reference-price sanity gate: crossed books are dropped, and a
-  mark that jumps more than `market_data.max_mid_jump_ratio` (10x in the repo
-  config) against the stored one is dropped.
-- **G-P2-7** bounded per-key state: `pre_trade.max_tracked_keys` caps the
-  seen-order, open-order, strategy, market and cancel-bucket maps
-  (`STATE_CAPACITY`, fail-closed).
-
-## v1.14.0 — unreleased
+### Data mapping and feature store (#83)
 
 Correctness release, data half (IAP_Quality_Review_2026-10-11 D-items:
 D-P1-1..4, D-P2-6, D-P2-8..10, D-P2-12, D-P2-13). Unlike v1.12, defaults
@@ -107,7 +39,7 @@ PLATFORM_CONVENTIONS §17 is the normative summary; every moved number is
 listed below. **No real-data store was rebuilt by this change** (the
 release owner re-ingests: REAL_DATA §4 and the commands in the PR).
 
-### Same-timestamp coalescing (D-P1-1) — all feature engines
+#### Same-timestamp coalescing (D-P1-1) — all feature engines
 
 - The events of one instrument sharing an `exchange_ts` (ITCH `E` → EXECUTE
   + TRADE, `U` → CANCEL + ADD, a two-sided FX quote) are one state change:
@@ -142,7 +74,7 @@ release owner re-ingests: REAL_DATA §4 and the commands in the PR).
   184 of 5,535 and 47 of 855 remaining values changed.
   `test_feature_pipeline`: 2,000 → 1,591 rows.
 
-### ITCH mapping and ingest rules (manifest x-version 2)
+#### ITCH mapping and ingest rules (manifest x-version 2)
 
 - **Hidden prints signed by the quote rule (D-P1-2).** A post-2014 `P` print
   is signed against the mapper's own best bid / ask (Lee–Ready: above the
@@ -176,7 +108,7 @@ release owner re-ingests: REAL_DATA §4 and the commands in the PR).
   ledger entry of a `--dataset-dir` run (`ExperimentLedger(config_version=)`;
   provenance only, the experiment key is unchanged).
 
-### Feature store and consumers
+#### Feature store and consumers
 
 - **Cross prints in volume, not in signed flow (D-P2-6).**
   `FeatureEngine.on_cross_print` + `python -m iap.features --cross-prints
@@ -199,7 +131,7 @@ release owner re-ingests: REAL_DATA §4 and the commands in the PR).
   `features_summary.json` records `store_version` 2, `label_freshness` and
   `same_ts` (and `cross_prints` on an ingested dataset).
 
-### Moved research artefacts (seeded synthetic dataset)
+#### Moved research artefacts (seeded synthetic dataset)
 
 Regenerated by the CI `regenerate` job (`regenerate_allow_rerun=true`: the
 synthetic `data_version` is unchanged, so the report pipelines' ledger
@@ -227,6 +159,97 @@ run 38129763007, committed as produced on Linux):
   adaptive, baseline and combination reports.
 - The five v2 runner experiments keep their ids and thresholds but are now
   exploratory (`--no-prereg` in the regenerate chain, not gate evidence).
+
+### Risk engine (#89; Rust normative, Java and Python ports)
+
+Quality-review items G-P0-1, G-P0-2, G-P2-3, G-P2-6, G-P2-7, in all three
+engines, pinned by the regenerated risk goldens and the differential-fuzz
+corpus (PLATFORM_CONVENTIONS.md §11.1; schemas/MIGRATIONS.md lists every
+golden that moved). No existing golden decision, rule id or reason changed.
+
+- **G-P0-1 tamper-evident audit.** Every `RiskEvent` carries `seq` and
+  `prev_sha256` (SHA-256 of the previous JSONL line): the audit log is a hash
+  chain (`risk_event.schema.json` x-version 2). `audit_chain_head()` is the
+  value to anchor; a chained restore continues the chain, and the Java paper
+  session records the head in `session_state.json` so `risk_audit.jsonl` is
+  one chain across restarts. `verify_audit_chain` in Python and Rust.
+- **G-P0-2 SEC 15c3-5 pre-trade set** (`risk.json` x-version 4, `pre_trade`,
+  every key optional): restricted list, max open orders and open notional
+  per strategy, per-strategy position, participation of session market
+  volume (`on_market_trade`), per-strategy cancel rate and per-venue message
+  rate (`on_cancel_request`) — checks 23-29, after every legacy check.
+- **G-P2-3** loss-limit overrides are bounded (`overrides.max_loss_override_multiple`
+  x the configured limit) and need `overrides.min_approvers` distinct
+  approvers; a refused override is audited `LOSS_LIMIT_OVERRIDE_REJECTED`.
+- **G-P2-6** reference-price sanity gate: crossed books are dropped, and a
+  mark that jumps more than `market_data.max_mid_jump_ratio` (10x in the repo
+  config) against the stored one is dropped.
+- **G-P2-7** bounded per-key state: `pre_trade.max_tracked_keys` caps the
+  seen-order, open-order, strategy, market and cancel-bucket maps
+  (`STATE_CAPACITY`, fail-closed).
+
+### Execution simulator (#86)
+
+- **X-P1-1** a MODIFY that shrinks an order ahead of a resting child credits its queue position like a CANCEL (C++ reference, Java and Python ports; replay-fills goldens byte-identical).
+- **X-P1-6** `feed_latency_ns`; taker exits / flatten rounds routed through the simulator (`exit_route='sim'`, `flatten_route='sim'`).
+- **X-P2-7** `ExecutionSimulator(hidden_prints=True)`: non-displayed executions against the resting side.
+- **X-P2-9** `estimate_calibration(markout_unit='touch_order')` (CLI `--markout-unit`).
+- **X-P2-12** `ExecutionSimulator.amend_down` and `QuotingConfig.amend_size_down` (priority-keeping size decrease).
+
+### Governance (#87)
+
+Quality review G-P1-4, G-P1-5 and the rest of G-P1-7. No published number,
+golden or ledger total changed; `research/experiments.json` gains
+`chain_head` / `chain_length` (x-version 4).
+
+- **Trust roots (G-P1-4).** A non-empty agent key registry is used only
+  when a maintainer in `research/agents/trust_roots.json` has signed it
+  (`agent_pubkeys.sig.json`; `cli maintainer-keygen` / `sign-registry`,
+  `iap.agents.trust`); CI reads the trust roots from `origin/main`. New
+  agent requests are `ed25519-v2`, binding the board head and board id
+  (`WriteBroker.request_context`); a stale head or another board is
+  refused. `prereg` refuses an unsigned write by a keyed agent;
+  `verify-board --trust-ref origin/main` checks anchors and the board
+  against `origin/main`.
+- **Chained ledger (G-P1-5).** `ExperimentLedger` chains every entry's
+  immutable identity and refuses to load a ledger whose `chain_head` does
+  not match (so Bonferroni never reads an edited ledger); each prereg
+  records `ledger_head`; `check_ledger_monotone.py` requires the head ledger
+  to descend from the base and every prereg head to be on the chain.
+- **Blocking supply-chain audits (G-P1-7).** New `supply-chain` CI job:
+  pip-audit (both requirement files), cargo audit (workspace and
+  `features_py`), cargo deny (`rust/deny.toml`), trivy fs + config; trivy
+  image scan in `images`; CodeQL for Rust. Ignores only through
+  `.github/audit-ignores.json` with a reason and an expiry
+  (`tools/audit_ignores.py`). Rust crates declare `license = "MIT"`,
+  `publish = false`. The new cargo audit of `rust/features_py` found
+  RUSTSEC-2025-0020 and RUSTSEC-2026-0177 in pyo3 0.22.6: bumped to pyo3
+  0.29.3 / numpy 0.29.0 (`PyDict::new`, `into_pyarray`, `Python::detach`).
+
+### Engineering (#84)
+
+Behaviour-preserving engineering items of the 2026-10-11 quality review. No
+published number, golden, digest, model id or record hash changes.
+
+- **E-P1-3** `iap.research.events`: `EventColumns` keeps a session's events as
+  twelve `int64` numpy columns and is a `Sequence[MarketEvent]` whose
+  iteration is a chunked cursor (same Python-int `MarketEvent`s, one chunk
+  alive at a time); `read_event_columns` reads row group by row group with
+  `pyarrow.compute` and never imports `pyarrow.dataset`.
+- **E-P1-2** `iap.research.replay`: `SharedReplay` prepares one instrument's
+  stream once (filter, venue) and replays it for every maker configuration
+  of a unit (`run_grid`); results equal independent `run_instrument` calls.
+  `iap.backtest.maker` is not edited; one event loop per configuration
+  remains until the Rust/pyo3 simulator.
+- **E-P1-4** `iap.research.study`: `StudyBase` (pre-registration + SHA,
+  blackboard check, ordered checkpointed unit loop, atomic canonical unit
+  files) and the shared helpers (`cluster_stats`, `peak_rss_gb`, `log`,
+  `unit_name`, `file_sha256`) for the study drivers.
+- **E-P2-5** `iap.mlops.registry`: `content_sha256` hashes the fitted
+  model's state (class, params, fitted arrays; the `_sklearn_version` stamp
+  dropped), stable across joblib/pickle/scikit-learn versions; written to a
+  `content.json` sidecar so `record.json`, `model_id` and `record_hash` are
+  unchanged; `find_by_content`, `verify_content` (backfills older records).
 
 ## v1.13.0 — 2026-10-11
 
