@@ -12,6 +12,8 @@ Quality review G-P1-4, G-P1-5 and the rest of G-P1-7. No published number,
 golden or ledger total changed; `research/experiments.json` gains
 `chain_head` / `chain_length` (x-version 4).
 
+Parity counts from CI: python 2334 (2032 in `python` + 302 in `python-slow`) / cpp 302 / rust 358 / java 571, golden 193 / 72 / 71 / 124.
+
 - **Trust roots (G-P1-4).** A non-empty agent key registry is used only
   when a maintainer in `research/agents/trust_roots.json` has signed it
   (`agent_pubkeys.sig.json`; `cli maintainer-keygen` / `sign-registry`,
