@@ -395,12 +395,14 @@ class ExtendedFeatureEngine(FeatureEngine):
         self._cur: MarketEvent | None = None
         self._dropped_before = 0
 
-    def apply(self, ev: MarketEvent) -> FeatureVector | None:
+    def apply(self, ev: MarketEvent, group_end: bool = True) -> FeatureVector | None:
         self._cur = ev
         self._dropped_before = self.events_dropped
-        return super().apply(ev)
+        return super().apply(ev, group_end)
 
-    def _maybe_emit(self, st, t: int) -> FeatureVector | None:
+    def _observe(self, st) -> None:
+        """Fold the current event into the extended state and the
+        event / volume clock (every event of a coalesced group, D-P1-1)."""
         ev = self._cur
         iid = st.ctx.instrument_id
         applied = self.events_dropped == self._dropped_before
@@ -414,13 +416,27 @@ class ExtendedFeatureEngine(FeatureEngine):
         usable = applied and ev is not None and ev.qty <= FEATURE_MAX_QTY
         if usable and not recovered:
             xs.on_event(ev)
-        if self.sampling == "clock":
-            return super()._maybe_emit(st, t)
-        if usable:
+        if usable and self.sampling != "clock":
             if self.sampling == "events":
                 self._acc[iid] = self._acc.get(iid, 0) + 1
             elif ev.event_type == EventType.TRADE:
                 self._acc[iid] = self._acc.get(iid, 0) + ev.qty
+
+    def _group_event(self, st) -> None:
+        self._observe(st)
+
+    def on_cross_print(self, instrument_id: int, ts: int, qty: int) -> bool:
+        """A folded cross print also advances the volume clock (D-P2-6)."""
+        folded = super().on_cross_print(instrument_id, ts, qty)
+        if folded and self.sampling == "volume":
+            self._acc[instrument_id] = self._acc.get(instrument_id, 0) + qty
+        return folded
+
+    def _maybe_emit(self, st, t: int) -> FeatureVector | None:
+        self._observe(st)
+        iid = st.ctx.instrument_id
+        if self.sampling == "clock":
+            return super()._maybe_emit(st, t)
         if st.last_emit is None or self._acc.get(iid, 0) >= self.sample_n:
             self._acc[iid] = 0
             vec = self._emit(st, t)

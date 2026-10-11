@@ -78,11 +78,11 @@ State-machine transitions of `passive_u0.5`: posts 10,329, reprices 1,722, rest_
 
 | run | P&L total | gross | spread cost | fees net | impact | execution cost | traded qty | maker qty | parents | fills |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `native` | -81.53 | 1.43 | 61.79 | 21.12 | 0.0604 | 82.96 | 8,229 | 100 | 235 | 169 |
-| `aggressive` | -195.45 | 1.57 | 146.95 | 49.94 | 0.1356 | 197.02 | 19,144 | 0 | 223 | 314 |
-| `passive` | -182.71 | -2.78 | 134.91 | 44.88 | 0.1314 | 179.92 | 18,845 | 943 | 223 | 269 |
+| `native` | -82.84 | 2.59 | 64.03 | 21.33 | 0.0621 | 85.42 | 8,295 | 100 | 231 | 163 |
+| `aggressive` | -206.18 | -2.73 | 153.36 | 49.96 | 0.1356 | 203.45 | 19,155 | 0 | 214 | 304 |
+| `passive` | -192.89 | -5.91 | 141.29 | 45.56 | 0.1311 | 186.99 | 18,899 | 808 | 223 | 271 |
 
-USD. The three runs are closed loops: different fills give different positions and therefore different later parents, so the rows are three sessions, not one session re-priced. `execution cost = spread cost + fees net + impact`; per traded share it is 0.0101 (native), 0.0103 (aggressive) and 0.0095 (passive).
+USD. The three runs are closed loops: different fills give different positions and therefore different later parents, so the rows are three sessions, not one session re-priced. `execution cost = spread cost + fees net + impact`; per traded share it is 0.0103 (native), 0.0106 (aggressive) and 0.0099 (passive).
 
 ## 6. Verdict and what is a simulator assumption
 
@@ -90,9 +90,9 @@ USD. The three runs are closed loops: different fills give different positions a
 
 Where it comes from: the spread line moves from 0.85 bps paid to 0.33 bps, fees net from 0.16 to 0.08 bps (maker rebates on 29.1% of the filled quantity), while opportunity + completion for the unfilled quantity is 0.08 bps (fill rate 90.3% against 90.5%).
 
-MVP session: P&L -81.53 USD (native, the pinned run), -195.45 (aggressive), -182.71 (passive); execution cost 82.96 / 197.02 / 179.92 USD. The session still loses money under every policy: the alpha does not cover even the cheapest execution.
+MVP session: P&L -82.84 USD (native, the pinned run), -206.18 (aggressive), -192.89 (passive); execution cost 85.42 / 203.45 / 186.99 USD. The session still loses money under every policy: the alpha does not cover even the cheapest execution.
 
-`native` loses least because it trades least (8,229 shares against 19,144 and 18,845): its TWAP children join the touch and mostly expire unfilled, and the position it never took costs nothing in a session whose alpha is worth a fraction of a basis point. Per traded share the three policies cost about the same; passive is the cheapest of the two that actually complete their orders.
+`native` loses least because it trades least (8,295 shares against 19,155 and 18,899): its TWAP children join the touch and mostly expire unfilled, and the position it never took costs nothing in a session whose alpha is worth a fraction of a basis point. Per traded share the three policies cost about the same; passive is the cheapest of the two that actually complete their orders.
 
 What part of the passive result is the simulator rather than the market:
 

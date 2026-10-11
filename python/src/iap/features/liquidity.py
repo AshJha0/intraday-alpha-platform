@@ -136,7 +136,7 @@ def compute(st, values: list[float], valid: list[bool]) -> None:
     for w in WINDOWS:
         wok = st.warm(WINDOW_NS[w])
         if wok:
-            vols[w] = st.trades[w].sums[1]
+            vols[w] = st.traded_volume(w)
         put(values, valid, vols.get(w), wok)
     for w in WINDOWS:
         v = None

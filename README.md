@@ -863,7 +863,7 @@ IC (EQ01 0.149 shifted against 0.217, EQ03 0.116 against 0.110), because
 with flow spread over the whole session the signals persist from one
 decision to the next. That is persistence, not look-ahead, and the probe
 cannot tell the two apart at a cadence equal to the horizon. The
-cost-adjusted IC (−0.024 / −0.029) and the −81.53 USD session say the same
+cost-adjusted IC (−0.024 / −0.029) and the −82.84 USD session say the same
 thing the research reports say: a real feed would not be this kind, and
 even this one does not pay the spread.
 

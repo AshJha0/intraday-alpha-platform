@@ -409,6 +409,25 @@ def test_ledger_is_dataset_scoped(tmp_path):
     assert ExperimentLedger.entry_dataset_version({"config": {}}) is None
 
 
+def test_ledger_stamps_config_version_without_changing_the_key(tmp_path):
+    """v1.14 (D-P2-9): an ingested dataset's ``config_version`` is stamped on
+    new entries as provenance; the experiment identity (key) is unchanged."""
+    path = tmp_path / "experiments.json"
+    cfg = {"horizon": "5s"}
+    led = ExperimentLedger(path, dataset_version="a" * 64, config_version="c" * 64)
+    led.record("EQ01", "promotion_pipeline", config=cfg, result={}, count=2)
+    led.save()
+    (entry,) = json.loads(path.read_text())["entries"]
+    assert entry["config_version"] == "c" * 64
+    assert entry["key"] == ExperimentLedger.experiment_key(
+        "EQ01", "promotion_pipeline", cfg, "a" * 64
+    )
+    plain = ExperimentLedger(tmp_path / "plain.json", dataset_version="a" * 64)
+    plain.record("EQ01", "promotion_pipeline", config=cfg, result={}, count=2)
+    plain.save()
+    assert "config_version" not in json.loads((tmp_path / "plain.json").read_text())["entries"][0]
+
+
 def test_committed_ledger_names_a_dataset_on_every_entry():
     """research/experiments.json after the v1.4.0 migration
     (research/migrate_ledger_dataset_scope.py): no entry without a dataset,

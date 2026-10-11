@@ -123,6 +123,7 @@ from iap.contracts.types import ExperimentResult, ExperimentSpec, Verdict
 from iap.contracts.validate import validate_typed
 from iap.experiment import tracker
 from iap.experiment.locking import atomic_write_text
+from iap.reference.refdata import session_meta
 from iap.research.errors import ResearchError
 from iap.research.specs import (
     GateEligibility,
@@ -328,6 +329,8 @@ def load_instrument_meta(configs_dir: Path) -> dict[int, dict]:
             "ref_price": float(row.get("ref_price", 1.0)),
             "base_currency": row.get("base_currency"),
             "quote_currency": row.get("quote_currency", row.get("currency", "USD")),
+            # v1.14 (D-P2-8): per-session ref_price / adv of an ingested dataset
+            **session_meta(row, (cfg.get("calendar") or {}).get("timezone")),
         }
     return meta
 
@@ -470,6 +473,7 @@ class ExperimentRunner:
         normalized_dir: Path | None = None,
         gate: Callable[[ExperimentSpec], None] | None = None,
         exploratory: bool = False,
+        config_version: str | None = None,
     ) -> None:
         #: ``--no-prereg`` run (G4): the result is recorded and ledgered but its
         #: eligibility carries a reason, so registry / lifecycle gates refuse it
@@ -499,7 +503,9 @@ class ExperimentRunner:
         exec_cfg = json.loads((self.configs_dir / "execution" / "execution.json").read_text())
         self.max_participation = float(exec_cfg["defaults"]["max_participation"])
         self.cost_model = CostModel.load(self.configs_dir / "execution" / "execution.json")
-        self.ledger = ExperimentLedger(self.ledger_path)
+        #: ``config_version`` of an ingested dataset (D-P2-9), stamped on new
+        #: ledger entries; ``None`` on the synthetic checkout
+        self.ledger = ExperimentLedger(self.ledger_path, config_version=config_version)
         self._recompute = RecomputeSources(self.normalized_dir, self.configs_dir)
 
     # -- inputs ---------------------------------------------------------

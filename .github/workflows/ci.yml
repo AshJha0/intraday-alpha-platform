@@ -78,6 +78,10 @@ on:
         description: "With regenerate: comma-separated steps of tools/regenerate_dataset_artifacts.py to run (empty = the whole chain; the dataset and features are always built first)"
         type: string
         default: ""
+      regenerate_allow_rerun:
+        description: "With regenerate: pass --allow-rerun (the report pipelines re-run on a synthetic data_version the ledger has seen, e.g. after a feature-engine semantics change; their entries are recorded as reruns)"
+        type: boolean
+        default: false
       risk_fuzz:
         description: "Also run the large risk differential-fuzz job (fresh scripts, three engines)"
         type: boolean
@@ -793,12 +797,15 @@ jobs:
       - name: regenerate (dataset -> features -> research -> goldens)
         env:
           REGENERATE_ONLY: ${{ inputs.regenerate_only }}
+          REGENERATE_ALLOW_RERUN: ${{ inputs.regenerate_allow_rerun }}
         run: |
+          RERUN=""
+          if [ "$REGENERATE_ALLOW_RERUN" = "true" ]; then RERUN="--allow-rerun"; fi
           if [ -z "$REGENERATE_ONLY" ]; then
-            python3 tools/regenerate_dataset_artifacts.py --timings-out regeneration_timings.json
+            python3 tools/regenerate_dataset_artifacts.py $RERUN --timings-out regeneration_timings.json
           else
             # A subset still needs the (git-ignored) dataset and features.
-            python3 tools/regenerate_dataset_artifacts.py \
+            python3 tools/regenerate_dataset_artifacts.py $RERUN \
               --only "dataset,features,$REGENERATE_ONLY" \
               --timings-out regeneration_timings.json
           fi

@@ -187,7 +187,7 @@ def test_stratified_day_sample_is_seeded_stratified_and_recorded():
 
 def test_day_sampling_is_written_into_dataset_json(tmp_path):
     manifest = {
-        "x-version": 1,
+        "x-version": 2,
         "kind": "real",
         "source": {"format": "itch50", "venue": "XNAS", "venue_id": 101},
         "sessions": {d: {} for d in DAYS},

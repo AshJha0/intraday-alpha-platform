@@ -2,7 +2,9 @@
 
 Checkpoints INSIDE and right after every SNAPSHOT recovery burst of the two
 anomaly vectors (interior records have ``trade_id > 0``), from the Python
-reference engine at cadence 0: the native-45 sub-vector. The anomaly golden
+reference engine at cadence 0: the native-45 sub-vector.  Since v1.14 the
+engine coalesces same-timestamp events (D-P1-1), so only the events that
+close a timestamp group emit and carry a checkpoint. The anomaly golden
 (expected_features_anomalies.json) never lands inside a burst, which hid a
 Rust divergence until v1.11 (CHANGELOG v1.11.0, Fixed). Consumed by
 rust/features/tests/golden_features.rs and the pyo3 parity tests.
@@ -19,7 +21,7 @@ from pathlib import Path
 from iap.core.codec import read_jsonl
 from iap.core.events import EventType
 from iap.features.context import build_contexts
-from iap.features.engine import FeatureEngine
+from iap.features.engine import FeatureEngine, group_ends
 from iap.features.native import NATIVE_NAMES
 from iap.features.registry import feature_index
 
@@ -39,8 +41,9 @@ def _side(vector: str, instrument_id: int) -> dict:
     idx = feature_index()
     eng = FeatureEngine(build_contexts(REPO / "configs"), cadence_ns=0)
     cps = {}
+    ends = group_ends(events)  # v1.14 (D-P1-1): coalesced, rows at group ends only
     for i, ev in enumerate(events, start=1):
-        vec = eng.apply(ev)
+        vec = eng.apply(ev, ends[i - 1])
         if i in want and vec is not None and ev.instrument_id == instrument_id:
             feats = {}
             for n in NATIVE_NAMES:
@@ -54,8 +57,9 @@ def main() -> int:
     doc = {
         "description": "Native-45 features at every event inside and up to "
         f"{AFTER} events after each SNAPSHOT recovery burst of the anomaly "
-        "vectors (Python reference, cadence 0). Keys are 1-based event "
-        "indices. Tolerance: abs 1e-9 / rel 1e-9.",
+        "vectors (Python reference, cadence 0, same-timestamp events "
+        "coalesced: v1.14 D-P1-1). Keys are 1-based event indices of the "
+        "emitting (group-closing) events. Tolerance: abs 1e-9 / rel 1e-9.",
         "tolerance": {"abs": 1e-9, "rel": 1e-9},
         "eq": _side("events_eq_anomalies.jsonl", 1),
         "fx": _side("events_fx_anomalies.jsonl", 101),

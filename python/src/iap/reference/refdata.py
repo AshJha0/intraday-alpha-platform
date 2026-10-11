@@ -397,3 +397,53 @@ class ReferenceData:
         """
         self.instrument(key)  # validate the key
         return []
+
+
+# ------------------------------------------------- per-session values (D-P2-8)
+
+#: Time zone a timestamp is mapped to its session date in when an instrument
+#: row carries per-session values but its meta names no calendar zone.
+DEFAULT_SESSION_TIMEZONE = "America/New_York"
+
+
+def session_meta(row: dict, calendar_timezone: str | None = None) -> dict:
+    """The per-session extras of an instruments.json row (v1.14, D-P2-8):
+    ``{"adv_by_session", "ref_price_by_session", "session_timezone"}`` when
+    the row has them (an ingested dataset), else ``{}`` (synthetic configs:
+    every consumer then keeps its dataset-level scalar)."""
+    out: dict = {}
+    for key in ("adv_by_session", "ref_price_by_session"):
+        if row.get(key):
+            out[key] = {str(d): float(v) for d, v in row[key].items()}
+    if out:
+        out["session_timezone"] = calendar_timezone or DEFAULT_SESSION_TIMEZONE
+    return out
+
+
+def session_values(meta: dict, key: str, ts):
+    """``meta[key]`` per timestamp: the value of the session each ``ts``
+    (epoch ns) falls in when ``meta`` carries ``<key>_by_session``, else the
+    scalar.  A session missing from the map falls back to the scalar."""
+    import numpy as np
+    import pandas as pd
+
+    scalar = float(meta[key])
+    by = meta.get(f"{key}_by_session")
+    if not by:
+        return scalar
+    tz = meta.get("session_timezone", DEFAULT_SESSION_TIMEZONE)
+    dates = pd.to_datetime(np.asarray(ts, dtype=np.int64), utc=True).tz_convert(tz)
+    return np.array([float(by.get(d, scalar)) for d in dates.strftime("%Y-%m-%d")])
+
+
+def session_notional_adv(meta: dict) -> float:
+    """Average daily traded NOTIONAL (``adv x ref_price``): the mean over the
+    sessions of their own as-of ADV times their own reference price when the
+    meta is per-session (D-P2-8), else the scalar product."""
+    adv_by = meta.get("adv_by_session")
+    ref_by = meta.get("ref_price_by_session")
+    if adv_by and ref_by:
+        days = sorted(set(adv_by) & set(ref_by))
+        if days:
+            return sum(float(adv_by[d]) * float(ref_by[d]) for d in days) / len(days)
+    return float(meta["adv"]) * float(meta["ref_price"])

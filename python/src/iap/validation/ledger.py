@@ -190,13 +190,21 @@ class ExperimentLedger:
     """Persistent experiment counter + entries (research/experiments.json)."""
 
     def __init__(
-        self, path, lock_timeout_s: float = 30.0, dataset_version: str | None = None
+        self,
+        path,
+        lock_timeout_s: float = 30.0,
+        dataset_version: str | None = None,
+        config_version: str | None = None,
     ) -> None:
         self.path = Path(path)
         self.lock_timeout_s = float(lock_timeout_s)
         #: Dataset scope of every ``record`` of this instance (module docs);
         #: ``None`` = unscoped (identity is alpha, kind and config alone).
         self.dataset_version = dataset_version
+        #: v1.14 (D-P2-9): the ingested dataset's ``config_version`` (sha256
+        #: over its configs/ + reference/ trees), stamped on every NEW entry.
+        #: A provenance stamp, not part of the identity: the key is unchanged.
+        self.config_version = config_version
         self.entries: list[dict] = []
         self.total_experiments = 0
         self._index: dict[str, int] = {}
@@ -326,6 +334,8 @@ class ExperimentLedger:
         }
         if self.dataset_version is not None:
             entry["dataset_version"] = self.dataset_version
+        if self.config_version is not None:
+            entry["config_version"] = self.config_version
         if gate_looks is not None:
             entry["gate_looks"] = int(gate_looks)
         self.entries.append(entry)

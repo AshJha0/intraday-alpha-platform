@@ -252,7 +252,7 @@ possible.
 
 ## 7. Honest results of the golden run (seed 12345, `report.md`)
 
-Run id `58a10f2194a3c81c`, 15,805 events, 800 decisions, 235 parent orders,
+Run id `58a10f2194a3c81c`, 15,805 events, 800 decisions, 231 parent orders,
 507 children generated / 348 submitted, 169 fills, fill rate 15.1 %.
 Trace digest `5918f8705c061e0d255d926b9e1f0a1aedbdb632e03f2eef81d12c4456e19384`
 (`config_version` `439bbad5…`).
@@ -381,7 +381,7 @@ observations no longer holds (item 3).
 5. **It still does not pay.** The cost-adjusted IC (buy at the ask now,
    sell at the bid at t+h) is −0.024 (EQ01) / −0.029 (EQ03) at 1 s — not
    small and positive as on the v1.3.0 session, negative: the predicted
-   move is smaller than the spread, which is the −81.53 USD above and the
+   move is smaller than the spread, which is the −82.84 USD above and the
    research verdicts.
 6. **The gap the lifecycle sees.** `ic_gap` is measured at the alpha's
    FITTED horizon (like for like with the registry's `oos_ic`): 0.206 /

@@ -450,7 +450,7 @@ E18, each with its evidence:
 | a decision trace per decision, JSONL + SQLite, `explain` in four languages | done | `traces.jsonl`, `iap.sqlite`, `python -m iap.mvp explain`; the multi-signal `explain` rule tested in Python, Java, Rust, C++ |
 | realized IC pinned to the research label definition, leakage probed | done | `MvpEngine.realized_ic` over `iap.labels.compute_labels`; shift-by-one and truncation probes; the audit in docs/MVP.md §7.1. On the v1.4.0 session the shift-by-one IC does not collapse (EQ01 0.149 against 0.217): the signals persist across decisions, so the probe cannot separate persistence from look-ahead there, and the leak evidence is the pinned label definition and the truncation probe |
 | paper evidence for the lifecycle, registry untouched | done | `paper_evidence.json` (`PaperEvidence` x-version 3: `paper: null` when an IC is undefined ⇒ `NO_EVIDENCE`); the `paper_ic_tracking` gate fails EQ01, EQ03 and EQ06 on this data (realized-vs-research IC gaps 0.206 / 0.128 / 0.158 against a maximum of 0.01) — a finding, not a promotion |
-| honest result stated | done | −81.53 USD on 8,229 shares: +0.022 bps of alpha against −0.41 bps of execution cost; `alpha.cost_negative: true` in `report.json` |
+| honest result stated | done | −82.84 USD on 8,229 shares: +0.022 bps of alpha against −0.41 bps of execution cost; `alpha.cost_negative: true` in `report.json` |
 | golden pinned for ports | done | `tests/golden/expected_mvp.json` (x-version 1); docs/MVP.md §9 lists what a port must reproduce |
 | multi-instrument portfolio in the MVP command | out of scope by design | the Java paper vertical covers the universe; the MVP is one instrument, one session |
 

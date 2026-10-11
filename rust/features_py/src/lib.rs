@@ -7,11 +7,15 @@
 //!
 //! Parity with the Python reference is asserted by
 //! `python/tests/test_features_rust_backend.py` on the golden vectors.
+//!
+//! `coalesce` (default true, v1.14 D-P1-1) replays with one refresh / row
+//! per (instrument, exchange_ts) group, emitted at the group's last event;
+//! `coalesce=False` is the per-event legacy semantics.
 #![allow(clippy::useless_conversion)] // pyo3 macro expansion
 
 use std::collections::BTreeMap;
 
-use features::{FeatureEngine, FEATURE_COUNT, FEATURE_NAMES, NATIVE_COUNT};
+use features::{group_ends, FeatureEngine, FEATURE_COUNT, FEATURE_NAMES, NATIVE_COUNT};
 use marketdata::codec::decode_jsonl;
 use marketdata::{decode_iap1, read_iap1, read_jsonl, IapError, MarketEvent};
 use numpy::ndarray::Array2;
@@ -43,11 +47,17 @@ fn replay(
     events: &[MarketEvent],
     ticks: BTreeMap<u32, f64>,
     cadence_ns: i64,
+    coalesce: bool,
 ) -> Result<Replay, IapError> {
     let mut eng = FeatureEngine::new(ticks, cadence_ns)?;
     let mut out = Replay::default();
+    let ends = if coalesce {
+        group_ends(events)
+    } else {
+        vec![true; events.len()]
+    };
     for (i, ev) in events.iter().enumerate() {
-        if let Some(v) = eng.apply(ev)? {
+        if let Some(v) = eng.apply_grouped(ev, ends[i])? {
             out.event_index.push(i as u64);
             out.instrument_id.push(v.instrument_id);
             out.timestamp.push(v.timestamp);
@@ -109,28 +119,32 @@ fn native_count() -> usize {
 
 /// Replay encoded events (`format` = "iap1" | "jsonl").
 #[pyfunction]
-#[pyo3(signature = (data, ticks, cadence_ns=0, format="iap1"))]
+#[pyo3(signature = (data, ticks, cadence_ns=0, format="iap1", coalesce=true))]
 fn replay_bytes<'py>(
     py: Python<'py>,
     data: &[u8],
     ticks: BTreeMap<u32, f64>,
     cadence_ns: i64,
     format: &str,
+    coalesce: bool,
 ) -> PyResult<Bound<'py, PyDict>> {
     let r = py
-        .detach(|| decode(data, format).and_then(|ev| replay(&ev, ticks, cadence_ns)))
+        .detach(|| {
+            decode(data, format).and_then(|ev| replay(&ev, ticks, cadence_ns, coalesce))
+        })
         .map_err(err)?;
     to_dict(py, r)
 }
 
 /// Replay a normalized file (`.iap1`, else canonical JSONL).
 #[pyfunction]
-#[pyo3(signature = (path, ticks, cadence_ns=0))]
+#[pyo3(signature = (path, ticks, cadence_ns=0, coalesce=true))]
 fn replay_file<'py>(
     py: Python<'py>,
     path: String,
     ticks: BTreeMap<u32, f64>,
     cadence_ns: i64,
+    coalesce: bool,
 ) -> PyResult<Bound<'py, PyDict>> {
     let r = py
         .detach(|| {
@@ -139,7 +153,7 @@ fn replay_file<'py>(
             } else {
                 read_jsonl(&path)?
             };
-            replay(&events, ticks, cadence_ns)
+            replay(&events, ticks, cadence_ns, coalesce)
         })
         .map_err(err)?;
     to_dict(py, r)

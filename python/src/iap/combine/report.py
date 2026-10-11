@@ -80,6 +80,7 @@ from iap.combine.weights import (
 from iap.contracts.versions import content_hash
 from iap.experiment import tracker
 from iap.labels.frames import scored_labels
+from iap.reference.refdata import session_meta
 from iap.validation.leakage import RecomputeSources
 from iap.validation.ledger import ExperimentLedger
 from iap.validation.methods import DEFAULT_METHODS, ResearchMethods, methods
@@ -174,6 +175,8 @@ def _load_meta(configs_dir: Path) -> dict[int, dict]:
             "ref_price": float(row.get("ref_price", 1.0)),
             "base_currency": row.get("base_currency"),
             "quote_currency": row.get("quote_currency", row.get("currency", "USD")),
+            # v1.14 (D-P2-8): per-session ref_price / adv of an ingested dataset
+            **session_meta(row, (cfg.get("calendar") or {}).get("timezone")),
         }
     return meta
 
@@ -526,6 +529,7 @@ def run_combination(
     dataset_version: str | None = None,
     feature_version: str | None = None,
     gate: Callable[[str, str], None] | None = None,
+    config_version: str | None = None,
 ) -> dict[str, Any]:
     """Evaluate the combinations (module docs) and return the report
     document together with the full validation reports
@@ -604,7 +608,9 @@ def run_combination(
 
     # Declared before the first experiment is evaluated: one gate look count
     # for the whole report (iap.validation.ledger, "Gate look count").
-    ledger = ExperimentLedger(ledger_path, dataset_version=dataset_version)
+    ledger = ExperimentLedger(
+        ledger_path, dataset_version=dataset_version, config_version=config_version
+    )
     identities = [(p["combination_id"], LEDGER_KIND, p["config"], p["looks"]) for p in plan]
     batch_total = ledger.batch_total(identities)
     seen: set[int] = set()

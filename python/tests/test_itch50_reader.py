@@ -57,10 +57,10 @@ def _one_of_each() -> Itch50Encoder:
 
 def test_layout_sizes_match_the_specification():
     assert MESSAGE_LENGTHS == {
-        "S": 12, "R": 39, "H": 25, "Y": 20, "L": 26, "A": 36, "F": 40, "E": 31,
+        "S": 12, "R": 39, "H": 25, "h": 21, "Y": 20, "L": 26, "A": 36, "F": 40, "E": 31,
         "C": 36, "X": 23, "D": 19, "U": 35, "P": 44, "Q": 40, "B": 19, "I": 50,
     }  # fmt: skip
-    assert set(itch50.SUPPORTED_TYPES) == set("SRHYLAFECXDUPQBI")
+    assert set(itch50.SUPPORTED_TYPES) == set("SRHhYLAFECXDUPQBI")
 
 
 def test_round_trip_of_every_supported_type(tmp_path):

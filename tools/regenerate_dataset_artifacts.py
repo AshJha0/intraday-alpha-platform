@@ -153,7 +153,7 @@ def _steps() -> list[tuple[str, list[tuple[Path, list[str]]]]]:
                 for alpha, horizon in RUNNER_EXPERIMENTS
             ],
         ),
-        ("combination", [(py_dir, [PY, "-m", "iap.research", "combine"])]),
+        ("combination", [(py_dir, [PY, "-m", "iap.research", "combine", "--no-prereg"])]),
         ("lifecycle", [(py_dir, [PY, "-m", "iap.lifecycle", "bootstrap", "--force"])]),
         ("ml", [(REPO, [PY, "research/ml_reports/run_ml.py"])]),
         ("adaptive", [(REPO, [PY, "research/adaptive_reports/run_adaptive.py"])]),

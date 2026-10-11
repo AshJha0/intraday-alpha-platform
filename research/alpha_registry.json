@@ -76,17 +76,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.010519815457579376
+            "value": 0.012007752459738345
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 1.9451791390250808
+            "value": 1.7376108068737932
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": 1.594398343233103
+            "value": 1.7859485312555616
           }
         },
         "outcome": "HOLD",
@@ -114,7 +114,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "914738f686548929fa22e5c5ec7db7d05c311d032424007d8ef4a733a22108a6",
+      "model_version": "f7767a16089a9827b34b8a1c145925b91b3e695dd463e927a34c92e9b60888a8",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -194,17 +194,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.02507627731154791
+            "value": 0.024400028269723
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.32196369877082914
+            "value": 0.20318483182487845
           },
           "statistical_significance": {
             "passed": true,
             "threshold": 4.365155224196862,
-            "value": 7.165268822035137
+            "value": 6.897010719326576
           }
         },
         "outcome": "HOLD",
@@ -232,7 +232,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "e128221509be110d4680eb659ef56229dc3fc8a84913324339c1f30a721ad128",
+      "model_version": "81c882d32596d06e297692b988250f2df73b0d52a0de4edd082148906cc14836",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -312,17 +312,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.018850474014781526
+            "value": 0.018823068572055134
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.11975554375499804
+            "value": 0.07131285254750745
           },
           "statistical_significance": {
             "passed": true,
             "threshold": 4.365155224196862,
-            "value": 5.162083476166736
+            "value": 4.976080345728298
           }
         },
         "outcome": "HOLD",
@@ -350,7 +350,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "afba16e3b521ac30021c73444482d0dc5c74d59bc85bbbeef35f00bf786bf86b",
+      "model_version": "5acf17bf5fefd1b6e5305da687e89a7c6d290ff3434c8ea01cba9cf476e8e83b",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -375,8 +375,7 @@
           "hypothesis_sign",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability"
+          "capacity"
         ],
         "gate_order": [
           "leakage_clean",
@@ -405,7 +404,7 @@
           "fold_consistency": {
             "passed": false,
             "threshold": 0.7,
-            "value": 0.5
+            "value": 0.25
           },
           "fold_count": {
             "passed": true,
@@ -435,17 +434,17 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.0034041610495965137
+            "value": -0.0057846305925517
           },
           "stability": {
-            "passed": false,
+            "passed": true,
             "threshold": 1.0,
-            "value": 1.3871540432218938
+            "value": 0.5938901636057099
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": -0.5547422493172751
+            "value": -0.9288355251554222
           }
         },
         "outcome": "HOLD",
@@ -473,7 +472,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "df6e4e12ac80eb5e31c2603cf32d7e98a88e2c22401cfca55d4c3ddf72caeb72",
+      "model_version": "4678520cc13d499d3029cc89fb19b3b31ae78bb2ce0360bed619c5ccc85bf0b0",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -556,17 +555,17 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": 0.0055498762961367675
+            "value": 0.004777301369064646
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 2.0983040338640464
+            "value": 2.7811581010022706
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": 1.6420946785070754
+            "value": 1.4158032501576487
           }
         },
         "outcome": "HOLD",
@@ -594,7 +593,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "d702e2b7cc554bbbdc4bfb25a65eda1a3a4db6c2635cf70e231de0d46695c52d",
+      "model_version": "774ad3c34a11997e735ef2042ee45796386b721335e5a4a78fe82f8c7afa236b",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -613,7 +612,6 @@
         "consecutive_failures": 0,
         "event_ts": 1787691480577291027,
         "failed_gates": [
-          "statistical_significance",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
           "capacity",
@@ -671,22 +669,22 @@
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -1301.5037706689036
+            "value": -2015.898837553672
           },
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.027713055971364267
+            "value": 0.03340807966921983
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 1.189387886707619
+            "value": 1.0648572090893833
           },
           "statistical_significance": {
-            "passed": false,
+            "passed": true,
             "threshold": 4.365155224196862,
-            "value": 4.360652284233195
+            "value": 5.113390596141896
           }
         },
         "outcome": "HOLD",
@@ -714,7 +712,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "fe519a986e7690eb93c530897fcfe6adaa66f5066076bae88e0adf6078c9d2b1",
+      "model_version": "d22a48821401a8e438c446738322979a5190076c537d7f29e605d6f87ceaf0f9",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -769,7 +767,7 @@
           "fold_consistency": {
             "passed": false,
             "threshold": 0.7,
-            "value": 0.5
+            "value": 0.0
           },
           "fold_count": {
             "passed": true,
@@ -794,22 +792,22 @@
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": null
+            "value": -1444.0360297853476
           },
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": 0.0006333514048878078
+            "value": -0.013919671316397514
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 31.589233498142427
+            "value": 1.8403390181190338
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": 0.14017470990792835
+            "value": -2.932261361541467
           }
         },
         "outcome": "HOLD",
@@ -837,7 +835,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "e0ba2d4c6090f18cd34376493e5d69d0cbbfa41a83cc3764f4aa29dfe69c5a5e",
+      "model_version": "008fb416b7850846450f33205145d0ff046083782ae949130154faa2b30ed3bf",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -921,17 +919,17 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.048141214140341664
+            "value": -0.04889009070501651
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.1395738044277243
+            "value": 0.15756199519667205
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": -4.5658096083202535
+            "value": -4.605027353876459
           }
         },
         "outcome": "HOLD",
@@ -959,7 +957,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "70b16f753b3b562c872c018207843383250335d9694f86ce201e374e43c5a5b4",
+      "model_version": "77ef71978f04abce70ac58c4531d145df4b1090bac5d05131f541692a87781c9",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -1044,17 +1042,17 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.02290206772997278
+            "value": -0.028151802422259148
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 1.2705671484356036
+            "value": 1.0530708084042686
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": -1.316822200812153
+            "value": -1.5654014311718099
           }
         },
         "outcome": "HOLD",
@@ -1082,7 +1080,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "5268c92e5820b4e2d7d6aad9f0492ac49798654cadc206decc673937b76a876b",
+      "model_version": "7fc07b9b80dcc1fa78398350474e643e412d6c5e40294cbc23df35947296d945",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -1164,17 +1162,17 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": 0.003981272054347236
+            "value": 0.004129109023510776
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.8393035817947329
+            "value": 0.8449941266554166
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": 0.9080872110157954
+            "value": 0.9443346996961071
           }
         },
         "outcome": "HOLD",
@@ -1202,7 +1200,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "a1f947b7e38864ef3029da503cc82ec46ba44648b45d9017e8d897c8320d2c33",
+      "model_version": "8c34e52a4b1eecb0d106ecb03f23567afffeeb63ff40d540da3f9a37fc134d29",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -1223,6 +1221,7 @@
         "failed_gates": [
           "oos_ic",
           "statistical_significance",
+          "hypothesis_sign",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
           "capacity",
@@ -1245,7 +1244,7 @@
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
-            "value": 38248.2782977495
+            "value": 21139.98689668705
           },
           "cross_alpha_correlation": {
             "passed": true,
@@ -1263,7 +1262,7 @@
             "value": 4.0
           },
           "hypothesis_sign": {
-            "passed": true,
+            "passed": false,
             "threshold": null,
             "value": null
           },
@@ -1275,27 +1274,27 @@
           "net_pnl_after_costs": {
             "passed": false,
             "threshold": 0.0,
-            "value": -5.017158492121816
+            "value": -4.776837959303157
           },
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -5142.375055486925
+            "value": -5129.238625756484
           },
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": 0.0038013470421630817
+            "value": 0.0023133547338761717
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 2.169827079146986
+            "value": 3.2976786450807944
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": 0.19787514158224379
+            "value": 0.11950559321856358
           }
         },
         "outcome": "HOLD",
@@ -1323,7 +1322,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "803bb0a75f220ad6196ab59712d614231d98d428a366eb0a94b3c326c8206506",
+      "model_version": "597966d1b437074109cc977152da66faae2adf0a4cc92d2392dca3274c98b4e5",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -1403,17 +1402,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.026063538586629183
+            "value": 0.02549393167545448
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.2863015828435954
+            "value": 0.16978148042735947
           },
           "statistical_significance": {
             "passed": true,
             "threshold": 4.365155224196862,
-            "value": 7.195453980881905
+            "value": 6.871178671404768
           }
         },
         "outcome": "HOLD",
@@ -1441,7 +1440,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "410cd407283f484ad25571f5e3faeb4f96659d659a77711ce208fc7a3517ca5c",
+      "model_version": "63b2bbcdb37a969d1c3c9a1dd4cafbecb5b4586433ec206086619540a980bf98",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -1523,17 +1522,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.018288646675376993
+            "value": 0.014914327735926722
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.82512454766451
+            "value": 0.47141296696148355
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": 2.2572730900249756
+            "value": 2.286182678512936
           }
         },
         "outcome": "HOLD",
@@ -1561,7 +1560,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "076d4afdded2d8f706cdb5375c9d806ef77599e14a38a3fbae035b83ca94eb9b",
+      "model_version": "ba2b7cf9389b8b7f76021917357f09230fc0bfcc31b15c6bcab13d47c9ca03c8",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -1644,17 +1643,17 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": 0.005839451711789503
+            "value": 0.00676386992583992
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.23014234243180173
+            "value": 0.9331768846380449
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": 0.3429080223694012
+            "value": 0.41852393143532746
           }
         },
         "outcome": "HOLD",
@@ -1682,7 +1681,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "b1a0744b2b43e9c7d3d5a3a84c498c16b90246764de90c1082e96c821fd2e960",
+      "model_version": "86f1af385ebe060c5c775be0fb514df17409d25ee1fb2fd5400cde37fb82ef4b",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -1706,8 +1705,7 @@
           "hypothesis_sign",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability"
+          "capacity"
         ],
         "gate_order": [
           "leakage_clean",
@@ -1766,17 +1764,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.011233662272281128
+            "value": 0.016525390841018894
           },
           "stability": {
-            "passed": false,
+            "passed": true,
             "threshold": 1.0,
-            "value": 1.346066463260465
+            "value": 0.8674784689555922
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": 1.1327063966195106
+            "value": 1.6802372550978786
           }
         },
         "outcome": "HOLD",
@@ -1804,7 +1802,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "377fc9ead7884ae10d794652b72151f93e5cc0f6e2f9c3aebe0c6ceacfb6e2d9",
+      "model_version": "cbeeb20bf1453ba92979075e5871741b0c46d6a20476a77ae8bf2df13466a179",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -1823,7 +1821,6 @@
         "consecutive_failures": 0,
         "event_ts": 1787691480577291027,
         "failed_gates": [
-          "statistical_significance",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
           "capacity"
@@ -1885,17 +1882,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.02984218195192158
+            "value": 0.04766952604098305
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.1998600020596221
+            "value": 0.07034174037433268
           },
           "statistical_significance": {
-            "passed": false,
+            "passed": true,
             "threshold": 4.365155224196862,
-            "value": 4.241756475254401
+            "value": 7.403120545218753
           }
         },
         "outcome": "HOLD",
@@ -1923,7 +1920,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "c95256f52f02f3730c3123d8e5fa8db9433730e4ad1ad6aa8fdd311c70d598e2",
+      "model_version": "c4249107bad26f43cbab8eaaabfa8cbf7a9b2fa5982f8ce58e7c176cda146b7c",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -1998,27 +1995,27 @@
           "net_pnl_after_costs": {
             "passed": false,
             "threshold": 0.0,
-            "value": -0.6360575348499578
+            "value": -1.2432449982651155
           },
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -131.29841638981225
+            "value": -297.14275903380286
           },
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.0072328313169683685
+            "value": -0.0069248490042393305
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 5.527088353341046
+            "value": 6.752807407759607
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": -0.41600376773412034
+            "value": -0.3643811952669611
           }
         },
         "outcome": "HOLD",
@@ -2046,7 +2043,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "8adba7be81ccb12561a6110b939bdf54257010f1ff40ade384afb044f40d9286",
+      "model_version": "6d2e9d05f238b43533cb3b50565427cc522c872b3e289d2258a0ed41b9b5da60",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -2127,17 +2124,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.02104109699872492
+            "value": 0.019797554677928174
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.3771246890625525
+            "value": 0.4422226351739123
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": 1.470841664848521
+            "value": 1.246611041810635
           }
         },
         "outcome": "HOLD",
@@ -2165,7 +2162,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "2f30adc33de2796f84f22f334e71253c5e7937ce6e9c7a2de553fd9e9d9d278e",
+      "model_version": "6890998962879d073b0626e9c6a89fdf409a275768f3c878b51c17fadce7ed3c",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -2249,17 +2246,17 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.011868888129801702
+            "value": -0.009124387537170906
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.7921926353015332
+            "value": 0.8014010586724124
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": -1.3709254006431513
+            "value": -0.9712530382614806
           }
         },
         "outcome": "HOLD",
@@ -2287,7 +2284,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "50a568bbcf1afbe54dd40eb5f96c247bb93ffddbfe1f890c2acad57e86f9013b",
+      "model_version": "dc8c47cc55f67e82d208b799efbb8c3f850927f7a575999f06123d3a2af26779",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -2329,7 +2326,7 @@
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
-            "value": 1560.7813690045955
+            "value": 214.8893743556689
           },
           "cross_alpha_correlation": {
             "passed": true,
@@ -2359,27 +2356,27 @@
           "net_pnl_after_costs": {
             "passed": false,
             "threshold": 0.0,
-            "value": -3.280089828956179
+            "value": -3.0248961455293246
           },
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -1630.4609116505342
+            "value": -1529.6013774106843
           },
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.04073126903648808
+            "value": 0.03450055074924758
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 2.1139979363446812
+            "value": 2.632636010012979
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": 3.8443634723257953
+            "value": 3.1988402010531103
           }
         },
         "outcome": "HOLD",
@@ -2407,7 +2404,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "ac24978f90f37722942713d598ab67fbcf2c311145168aa06b3a48dc216ab549",
+      "model_version": "caddcbd0d057cd0fd3db4b7da0009e715d504d44cbcd0fd23d5b36dce6b74493",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -2482,27 +2479,27 @@
           "net_pnl_after_costs": {
             "passed": false,
             "threshold": 0.0,
-            "value": -2.554079897748809
+            "value": -3.228424335603002
           },
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -1660.723717647129
+            "value": -1889.0876725193723
           },
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.047147784756255924
+            "value": -0.047046607745776396
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 2.433608527882102
+            "value": 2.798146007149445
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": -5.745953956973862
+            "value": -5.510775763696524
           }
         },
         "outcome": "HOLD",
@@ -2530,7 +2527,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "4ef651215fc23f9c072c3c6dda51634d63214603859b04a4de803c697f8de032",
+      "model_version": "20f4a6dd823aa6671c78cecb3191fe67e94631080ff636dc9c3ecaa7528b995c",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -2572,7 +2569,7 @@
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
-            "value": 61134.929356750545
+            "value": 0.0
           },
           "cross_alpha_correlation": {
             "passed": true,
@@ -2602,27 +2599,27 @@
           "net_pnl_after_costs": {
             "passed": false,
             "threshold": 0.0,
-            "value": -0.2239150090956759
+            "value": -0.7656242656113349
           },
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -575.8385395065645
+            "value": -593.4140191888911
           },
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.01959946842988097
+            "value": 0.015240540159491353
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 1.7502816155754806
+            "value": 3.458731385643791
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": 1.545827450932388
+            "value": 1.4719542171685143
           }
         },
         "outcome": "HOLD",
@@ -2650,7 +2647,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "6162b2c905dd9114b4b08e852247e687f8db0f34cae13e873234fad4d8b70c37",
+      "model_version": "78d04aaca0a85b2ffd5c9d57a8d141f0bff27d53348a146a0d605d07d511ba57",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -2692,7 +2689,7 @@
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
-            "value": 0.0
+            "value": 469.686266066352
           },
           "cross_alpha_correlation": {
             "passed": true,
@@ -2722,27 +2719,27 @@
           "net_pnl_after_costs": {
             "passed": false,
             "threshold": 0.0,
-            "value": -7.331641148278877
+            "value": -13.018557366039339
           },
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -2510.367165608912
+            "value": -3616.4029235920016
           },
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.032791771149745956
+            "value": 0.03763298254119816
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 1.3414929661397041
+            "value": 1.4315750396300873
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": 2.2205022528299714
+            "value": 2.799210213600651
           }
         },
         "outcome": "HOLD",
@@ -2770,7 +2767,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "292a0e7107734a783d6c27092d38dbe13639f1927812c513efa2170bbcd619c5",
+      "model_version": "fc05e6efd63775ff2e6a890b985ddbaaff4b485d06936cf982fe55418705de8b",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -2789,13 +2786,11 @@
         "consecutive_failures": 0,
         "event_ts": 1787691480577291027,
         "failed_gates": [
-          "oos_ic",
           "statistical_significance",
           "fold_consistency",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability"
+          "capacity"
         ],
         "gate_order": [
           "leakage_clean",
@@ -2852,19 +2847,19 @@
             "value": null
           },
           "oos_ic": {
-            "passed": false,
+            "passed": true,
             "threshold": 0.01,
-            "value": 0.008590673405563187
+            "value": 0.016954296988787466
           },
           "stability": {
-            "passed": false,
+            "passed": true,
             "threshold": 1.0,
-            "value": 1.8382040407211342
+            "value": 0.9523588104781426
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.365155224196862,
-            "value": 1.053121658613505
+            "value": 1.940267808303197
           }
         },
         "outcome": "HOLD",
@@ -2892,7 +2887,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "ec6be25de635146f4a097f4585d937d8c1f23b20b9bde4303a3545b84d426ec6",
+      "model_version": "a89deb96218974d468cf6c85af532f1f1d2acd345b25e27e8364202fa3ddc945",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",

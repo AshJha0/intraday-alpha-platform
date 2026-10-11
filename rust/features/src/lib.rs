@@ -6,5 +6,5 @@ pub mod engine;
 pub mod names;
 pub mod rolling;
 
-pub use engine::{FeatureEngine, FeatureVector, EPS};
+pub use engine::{group_ends, FeatureEngine, FeatureVector, EPS};
 pub use names::{feature_index, FEATURE_COUNT, FEATURE_NAMES, NATIVE_COUNT};
