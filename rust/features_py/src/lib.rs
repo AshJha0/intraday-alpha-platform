@@ -3,11 +3,11 @@
 //! Replays a stream of normalized events (IAP1 or canonical JSONL, as bytes
 //! or a file path) through [`features::FeatureEngine`] and returns the
 //! emitted rows as numpy arrays. The row buffers are built in Rust and
-//! handed to numpy without a copy (`into_pyarray_bound` moves the Vec).
+//! handed to numpy without a copy (`into_pyarray` moves the Vec).
 //!
 //! Parity with the Python reference is asserted by
 //! `python/tests/test_features_rust_backend.py` on the golden vectors.
-#![allow(clippy::useless_conversion)] // pyo3 0.22 macro expansion
+#![allow(clippy::useless_conversion)] // pyo3 macro expansion
 
 use std::collections::BTreeMap;
 
@@ -64,16 +64,16 @@ fn replay(
 
 fn to_dict(py: Python<'_>, r: Replay) -> PyResult<Bound<'_, PyDict>> {
     let n = r.timestamp.len();
-    let d = PyDict::new_bound(py);
+    let d = PyDict::new(py);
     let values = Array2::from_shape_vec((n, FEATURE_COUNT), r.values)
         .map_err(|e| PyValueError::new_err(e.to_string()))?;
     let validity = Array2::from_shape_vec((n, FEATURE_COUNT), r.validity)
         .map_err(|e| PyValueError::new_err(e.to_string()))?;
-    d.set_item("instrument_id", r.instrument_id.into_pyarray_bound(py))?;
-    d.set_item("event_index", r.event_index.into_pyarray_bound(py))?;
-    d.set_item("timestamp", r.timestamp.into_pyarray_bound(py))?;
-    d.set_item("values", values.into_pyarray_bound(py))?;
-    d.set_item("validity", validity.into_pyarray_bound(py))?;
+    d.set_item("instrument_id", r.instrument_id.into_pyarray(py))?;
+    d.set_item("event_index", r.event_index.into_pyarray(py))?;
+    d.set_item("timestamp", r.timestamp.into_pyarray(py))?;
+    d.set_item("values", values.into_pyarray(py))?;
+    d.set_item("validity", validity.into_pyarray(py))?;
     d.set_item("events_processed", r.events_processed)?;
     d.set_item("vectors_emitted", r.vectors_emitted)?;
     d.set_item("events_dropped", r.events_dropped)?;
@@ -118,7 +118,7 @@ fn replay_bytes<'py>(
     format: &str,
 ) -> PyResult<Bound<'py, PyDict>> {
     let r = py
-        .allow_threads(|| decode(data, format).and_then(|ev| replay(&ev, ticks, cadence_ns)))
+        .detach(|| decode(data, format).and_then(|ev| replay(&ev, ticks, cadence_ns)))
         .map_err(err)?;
     to_dict(py, r)
 }
@@ -133,7 +133,7 @@ fn replay_file<'py>(
     cadence_ns: i64,
 ) -> PyResult<Bound<'py, PyDict>> {
     let r = py
-        .allow_threads(|| {
+        .detach(|| {
             let events = if path.ends_with(".iap1") {
                 read_iap1(&path)?
             } else {

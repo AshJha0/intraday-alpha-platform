@@ -475,7 +475,7 @@ emission on the benchmark hardware (2 CPUs — methodology per
 ### 7.1 The Rust engine from Python (pyo3, v1.11.0)
 
 `rust/features_py` wraps the `features` crate in a pyo3 extension module,
-`iap_features_rs` (pyo3 0.22.6, numpy 0.22.1, maturin 1.7.8, one abi3 wheel
+`iap_features_rs` (pyo3 0.29.3, numpy 0.29.0, maturin 1.7.8, one abi3 wheel
 for CPython >= 3.10). It is a standalone package outside the `rust/`
 workspace, so the workspace builds, tests and lints without libpython. It
 is optional: nothing in the Python package requires it.

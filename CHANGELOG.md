@@ -32,7 +32,9 @@ golden or ledger total changed; `research/experiments.json` gains
   image scan in `images`; CodeQL for Rust. Ignores only through
   `.github/audit-ignores.json` with a reason and an expiry
   (`tools/audit_ignores.py`). Rust crates declare `license = "MIT"`,
-  `publish = false`.
+  `publish = false`. The new cargo audit of `rust/features_py` found
+  RUSTSEC-2025-0020 and RUSTSEC-2026-0177 in pyo3 0.22.6: bumped to pyo3
+  0.29.3 / numpy 0.29.0 (`PyDict::new`, `into_pyarray`, `Python::detach`).
 
 ## v1.13.0 — 2026-10-11
 
