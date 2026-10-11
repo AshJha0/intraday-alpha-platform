@@ -503,8 +503,14 @@ public final class PaperTrading {
             // Only the snapshot session_state.json commits to (by sha256) is
             // accepted: the cursor and the risk state are one checkpoint.
             resumedRisk = store.readCommittedRiskSnapshot(st);
-            risk = RiskEngine.restore(limits, cfg.riskInstruments(),
-                    resumedRisk, restoreTs, reg);
+            // continue the audit hash chain the checkpoint recorded; a
+            // checkpoint without the field starts a new chain (G-P0-1)
+            risk = st.riskAuditHeadSha256.isEmpty()
+                    ? RiskEngine.restore(limits, cfg.riskInstruments(),
+                            resumedRisk, restoreTs, reg)
+                    : RiskEngine.restoreChained(limits, cfg.riskInstruments(),
+                            resumedRisk, restoreTs, reg, st.riskAuditSeq,
+                            st.riskAuditHeadSha256);
             reg.counter("risk_session_restarts_total").add(st.restarts);
             // The simulator is not snapshotted, so the children the snapshot
             // tracks as open no longer exist and will never report: release

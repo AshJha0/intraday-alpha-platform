@@ -1,12 +1,13 @@
 """RiskEvent — the auditable decision record, and the pinned rule ids.
 
 Mirrors ``rust/risk/src/event.rs`` (normative) field-for-field:
-``schemas/risk/risk_event.schema.json`` (x-version 1) fixes the exact
+``schemas/risk/risk_event.schema.json`` (x-version 2) fixes the exact
 field set and the enum codes (severity INFO=1 WARN=2 BREACH=3; decision
 ALLOW=1 REJECT=2 KILL=3; scope GLOBAL / STRATEGY / INSTRUMENT / VENUE).
 
 Every RiskEvent serialises as one JSONL line with sorted keys
-(``decision, reason, rule_id, scope, scope_id, severity, timestamp``) via
+(``decision, prev_sha256, reason, rule_id, scope, scope_id, seq, severity,
+timestamp``) via
 :mod:`iap.risk.serialize`, so identical input sequences produce audit logs
 that are byte-identical to the Rust reference and the Java port
 (``tests/golden/expected_risk_audit.jsonl``).
@@ -17,10 +18,18 @@ zero to an integer and printed as ``[-]int.frac`` — the identical IEEE-754
 product in every language, so decimal ties print identically everywhere
 (``2.675`` -> ``2.68`` because ``2.675 * 100`` is ``267.5`` in binary;
 ``24.505`` -> ``24.51``).
+
+Tamper evidence (x-version 2, review item G-P0-1): every record an engine
+emits carries ``seq`` (1, 2, 3, ... per engine, continued across a
+snapshot/restore) and ``prev_sha256``, the lowercase hex SHA-256 of the
+previous record's JSONL line (UTF-8 bytes, no newline), or
+:data:`GENESIS_SHA256` for the first record. Editing, dropping, inserting
+or reordering a line breaks the chain (:func:`verify_audit_chain`).
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from dataclasses import dataclass
@@ -29,7 +38,21 @@ from typing import Any
 
 from iap.risk.serialize import json_escape
 
-__all__ = ["Scope", "Severity", "Decision", "RiskEvent", "Rules", "fmt_fixed"]
+__all__ = [
+    "Scope",
+    "Severity",
+    "Decision",
+    "RiskEvent",
+    "Rules",
+    "fmt_fixed",
+    "GENESIS_SHA256",
+    "line_sha256",
+    "verify_audit_chain",
+    "unchained_line",
+]
+
+#: ``prev_sha256`` of the first record of a chain.
+GENESIS_SHA256 = "0" * 64
 
 _I64_MAX = (1 << 63) - 1
 _I64_MIN = -(1 << 63)
@@ -134,8 +157,30 @@ class Rules:
     BOOTSTRAP_COMPLETE = "BOOTSTRAP_COMPLETE"
     #: Engine state restored from a snapshot.
     STATE_RESTORED = "STATE_RESTORED"
+    #: A loss-limit override was refused (too few distinct approvers, or
+    #: above ``overrides.max_loss_override_multiple`` x the configured limit).
+    LOSS_LIMIT_OVERRIDE_REJECTED = "LOSS_LIMIT_OVERRIDE_REJECTED"
+    # ---- SEC 15c3-5 pre-trade set (checks 23-29, ``pre_trade`` in risk.json)
+    #: Instrument on ``pre_trade.restricted_instruments``.
+    RESTRICTED_INSTRUMENT = "RESTRICTED_INSTRUMENT"
+    #: The strategy would exceed ``pre_trade.max_open_orders``.
+    MAX_OPEN_ORDERS = "MAX_OPEN_ORDERS"
+    #: The strategy's open notional would exceed ``pre_trade.max_open_notional``.
+    MAX_OPEN_NOTIONAL = "MAX_OPEN_NOTIONAL"
+    #: The strategy's projected position would exceed
+    #: ``pre_trade.max_strategy_position_qty``.
+    STRATEGY_POSITION = "STRATEGY_POSITION"
+    #: The firm's projected session quantity would exceed the participation cap.
+    PARTICIPATION = "PARTICIPATION"
+    #: The strategy's cancel budget is spent.
+    CANCEL_RATE = "CANCEL_RATE"
+    #: The venue's message budget is spent.
+    VENUE_MESSAGE_RATE = "VENUE_MESSAGE_RATE"
+    #: A bounded per-key state map is full (``pre_trade.max_tracked_keys``).
+    STATE_CAPACITY = "STATE_CAPACITY"
 
-    #: The 23 pre-trade rule ids in pinned check order (index = check number).
+    #: The pre-trade rule ids in pinned check order (index = check number;
+    #: 23-29 are the 15c3-5 set, 30 the state-capacity reject of check 7).
     CHECK_ORDER = (
         CONFIG_MISSING,
         KILL_GLOBAL,
@@ -160,6 +205,14 @@ class Rules:
         NET_NOTIONAL,
         DAILY_LOSS,
         STRATEGY_LOSS,
+        RESTRICTED_INSTRUMENT,
+        MAX_OPEN_ORDERS,
+        MAX_OPEN_NOTIONAL,
+        STRATEGY_POSITION,
+        PARTICIPATION,
+        CANCEL_RATE,
+        VENUE_MESSAGE_RATE,
+        STATE_CAPACITY,
     )
 
 
@@ -182,6 +235,10 @@ class RiskEvent:
     decision: int
     #: Human-readable reason.
     reason: str
+    #: Position in the engine's audit chain (1-based; 0 = not yet emitted).
+    seq: int = 0
+    #: Hex SHA-256 of the previous record's JSONL line ("" = not yet emitted).
+    prev_sha256: str = ""
 
     def __post_init__(self) -> None:
         if not isinstance(self.scope, Scope):
@@ -198,7 +255,9 @@ class RiskEvent:
         return (
             '{"decision":'
             + str(int(self.decision))
-            + ',"reason":"'
+            + ',"prev_sha256":"'
+            + json_escape(self.prev_sha256)
+            + '","reason":"'
             + json_escape(self.reason)
             + '","rule_id":"'
             + json_escape(self.rule_id)
@@ -206,7 +265,9 @@ class RiskEvent:
             + self.scope.value
             + '","scope_id":"'
             + json_escape(self.scope_id)
-            + '","severity":'
+            + '","seq":'
+            + str(self.seq)
+            + ',"severity":'
             + str(int(self.severity))
             + ',"timestamp":'
             + str(self.timestamp)
@@ -227,7 +288,8 @@ class RiskEvent:
     def from_dict(cls, doc: Any) -> RiskEvent:
         """Strict deserialisation of a parsed schema-shaped object (every
         schema field required and typed; unknown fields are ignored, as
-        serde's derived deserializer does in the Rust reference)."""
+        serde's derived deserializer does in the Rust reference; the chain
+        fields ``seq`` / ``prev_sha256`` default to 0 / "" when absent)."""
         expected = {"timestamp", "scope", "scope_id", "rule_id", "severity", "decision", "reason"}
         if not isinstance(doc, dict) or not expected <= set(doc):
             raise ValueError("bad RiskEvent line: missing schema field")
@@ -240,6 +302,12 @@ class RiskEvent:
         for key in ("scope", "scope_id", "rule_id", "reason"):
             if not isinstance(doc[key], str):
                 raise ValueError(f"bad RiskEvent line: {key} must be a string")
+        seq = doc.get("seq", 0)
+        prev = doc.get("prev_sha256", "")
+        if not _is_int(seq) or not (0 <= seq <= (1 << 64) - 1):
+            raise ValueError("bad RiskEvent line: seq must be a u64")
+        if not isinstance(prev, str):
+            raise ValueError("bad RiskEvent line: prev_sha256 must be a string")
         try:
             scope = Scope.parse(doc["scope"])
         except ValueError:
@@ -257,6 +325,8 @@ class RiskEvent:
             severity=doc["severity"],
             decision=doc["decision"],
             reason=doc["reason"],
+            seq=seq,
+            prev_sha256=prev,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -269,7 +339,45 @@ class RiskEvent:
             "severity": int(self.severity),
             "decision": int(self.decision),
             "reason": self.reason,
+            "seq": self.seq,
+            "prev_sha256": self.prev_sha256,
         }
+
+
+def line_sha256(line: str) -> str:
+    """Lowercase hex SHA-256 of one audit line (UTF-8, without newline)."""
+    return hashlib.sha256(line.encode("utf-8")).hexdigest()
+
+
+def verify_audit_chain(
+    text: str, first_seq: int = 1, prev_sha256: str = GENESIS_SHA256
+) -> tuple[int, str]:
+    """Verify an audit JSONL chain: consecutive ``seq`` from ``first_seq``
+    and each ``prev_sha256`` the hash of the line before (``prev_sha256``
+    for the first). Returns ``(last seq, head sha256)``; ``ValueError``
+    names the first broken line. Lines are split on LF only."""
+    seq, head = first_seq - 1, prev_sha256
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    for n, line in enumerate(lines):
+        ev = RiskEvent.from_json_line(line)
+        if ev.seq != seq + 1:
+            raise ValueError(f"audit chain broken at line {n + 1}: seq {ev.seq}, want {seq + 1}")
+        if ev.prev_sha256 != head:
+            raise ValueError(f"audit chain broken at line {n + 1}: prev_sha256 mismatch")
+        seq, head = ev.seq, line_sha256(line)
+    return seq, head
+
+
+def unchained_line(line: str) -> str:
+    """``line`` without its chain fields: the record's content, comparable
+    between an unbroken run and a restored one (whose chain positions are
+    shifted by the ``STATE_RESTORED`` record)."""
+    ev = RiskEvent.from_json_line(line)
+    return line.replace(f',"prev_sha256":"{ev.prev_sha256}"', "", 1).replace(
+        f',"seq":{ev.seq},', ",", 1
+    )
 
 
 def _is_int(v: Any) -> bool:

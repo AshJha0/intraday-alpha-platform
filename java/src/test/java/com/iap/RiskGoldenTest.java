@@ -119,6 +119,10 @@ public class RiskGoldenTest {
                     (String) step.getOrDefault("approver", ""));
             case "roll_session" -> eng.rollSession(Json.asLong(step.get("ts")),
                     (String) step.getOrDefault("reason", ""));
+            case "trade" -> eng.onMarketTrade(Json.asLong(step.get("instrument_id")),
+                    Json.asLong(step.get("qty")), Json.asLong(step.get("ts")));
+            case "cancel_request" -> eng.onCancelRequest((String) step.get("strategy_id"),
+                    (int) Json.asLong(step.get("venue_id")), Json.asLong(step.get("ts")));
             case "order" -> {
                 OrderRequest order = parseOrder(Json.object(step.get("order")));
                 RiskDecision d = eng.checkOrder(order);
@@ -255,15 +259,22 @@ public class RiskGoldenTest {
         // 2. restoring the golden snapshot and replaying the rest reproduces
         //    the unbroken run's audit tail exactly
         RiskLimits limits = RiskLimits.fromJson(config(golden));
-        RiskEngine restored = RiskEngine.restore(limits, instruments(golden), want, 0);
+        long headSeq = eng.auditChainSeq();
+        String head = eng.auditChainHead();
+        RiskEngine restored = RiskEngine.restoreChained(limits, instruments(golden), want,
+                0, new com.iap.monitoring.MetricsRegistry(), headSeq, head);
         assertEquals(1, restored.audit().size());
         assertEquals("STATE_RESTORED", restored.audit().get(0).ruleId());
+        // the restored engine continues the unbroken engine's audit chain
+        assertEquals(headSeq + 1, restored.audit().get(0).seq());
+        assertEquals(head, restored.audit().get(0).prevSha256());
         for (int i = k + 1; i < steps.size(); i++) {
             apply(restored, i, Json.object(steps.get(i)), true);
             apply(eng, i, Json.object(steps.get(i)), true);
         }
-        List<String> full = eng.auditJsonl().lines().toList();
-        List<String> tail = restored.auditJsonl().lines().skip(1).toList();
+        List<String> full = eng.auditJsonl().lines().map(RiskEvent::unchainedLine).toList();
+        List<String> tail = restored.auditJsonl().lines().skip(1)
+                .map(RiskEvent::unchainedLine).toList();
         assertEquals(full.subList(full.size() - tail.size(), full.size()), tail);
         assertEquals(Json.parse(eng.snapshot()), Json.parse(restored.snapshot()));
     }
@@ -298,6 +309,13 @@ public class RiskGoldenTest {
                 List<Object> rm = Json.array(sc.get("config_remove"));
                 Json.object(doc.get((String) rm.get(0))).remove((String) rm.get(1));
             }
+            if (sc.get("config_set") != null) {
+                for (Object s : Json.array(sc.get("config_set"))) {
+                    List<Object> set = Json.array(s);
+                    Json.object(doc.get((String) set.get(0))).put((String) set.get(1),
+                            set.get(2));
+                }
+            }
             RiskEngine eng = RiskEngine.fromConfig(doc, instruments(golden));
             if (Boolean.TRUE.equals(sc.get("require_bootstrap"))) {
                 eng.requireBootstrap();
@@ -325,6 +343,19 @@ public class RiskGoldenTest {
                         assertTrue("step " + i
                                 + ": a malformed kill command must fail", failed);
                     }
+                    case "bad_override" -> {
+                        boolean failed = false;
+                        try {
+                            eng.overrideLossLimit(Scope.parse((String) step.get("scope")),
+                                    (String) step.get("scope_id"),
+                                    Json.asDouble(step.get("new_limit")),
+                                    Json.asLong(step.get("ts")),
+                                    (String) step.getOrDefault("approver", ""));
+                        } catch (IllegalArgumentException expected) {
+                            failed = true;
+                        }
+                        assertTrue("step " + i + ": a refused override must fail", failed);
+                    }
                     case "bootstrap" -> {
                         List<RiskFill> fills = new java.util.ArrayList<>();
                         for (Object f : Json.array(step.get("fills"))) {
@@ -334,10 +365,12 @@ public class RiskGoldenTest {
                     }
                     case "restore" -> {
                         out.append(eng.auditJsonl());
-                        eng = RiskEngine.restore(RiskLimits.fromJson(doc),
+                        eng = RiskEngine.restoreChained(RiskLimits.fromJson(doc),
                                 instruments(golden),
                                 Json.object(Json.parse(eng.snapshot())),
-                                Json.asLong(step.get("ts")));
+                                Json.asLong(step.get("ts")),
+                                new com.iap.monitoring.MetricsRegistry(),
+                                eng.auditChainSeq(), eng.auditChainHead());
                     }
                     default -> apply(eng, i, step, check);
                 }
@@ -350,8 +383,8 @@ public class RiskGoldenTest {
     @Test
     public void edgeDecisionsMatchExactly() {
         Map<String, Object> golden = Golden.json("expected_risk_edge_decisions.json");
-        assertEquals(1L, Json.asLong(golden.get("x-version")));
-        assertTrue(Json.array(golden.get("scenarios")).size() >= 8);
+        assertEquals(2L, Json.asLong(golden.get("x-version")));
+        assertTrue(Json.array(golden.get("scenarios")).size() >= 12);
         replayEdge(golden, true);
     }
 

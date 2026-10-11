@@ -88,7 +88,9 @@ public final class PaperTraces implements BacktestEngine.ExecutionListener {
         Rules.FAT_FINGER_NOTIONAL, Rules.PRICE_BAND, Rules.RATE_THROTTLE,
         Rules.SELF_MATCH, Rules.POSITION_LIMIT, Rules.INSTRUMENT_NOTIONAL,
         Rules.GROSS_NOTIONAL, Rules.NET_NOTIONAL, Rules.DAILY_LOSS,
-        Rules.STRATEGY_LOSS};
+        Rules.STRATEGY_LOSS, Rules.RESTRICTED_INSTRUMENT, Rules.MAX_OPEN_ORDERS,
+        Rules.MAX_OPEN_NOTIONAL, Rules.STRATEGY_POSITION, Rules.PARTICIPATION,
+        Rules.CANCEL_RATE, Rules.VENUE_MESSAGE_RATE, Rules.STATE_CAPACITY};
 
     /** The registry hash of the Java engine's pinned feature slot table. */
     public static String engineFeatureVersion() {

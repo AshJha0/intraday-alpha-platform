@@ -6,6 +6,7 @@ rust-version.workspace = true
 description = "IAP fail-closed hard risk engine: pre-trade checks, kill switches, deterministic replayable RiskEvent audit log"
 
 [dependencies]
+contracts = { path = "../contracts" }
 marketdata = { path = "../marketdata" }
 venue = { path = "../venue" }
 telemetry = { path = "../telemetry" }

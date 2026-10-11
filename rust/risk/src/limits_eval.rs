@@ -15,7 +15,7 @@
 
 use venue::{order_validation_error, OrderRequest};
 
-use crate::engine::{pos_add, pos_sub, Bucket, RiskDecision, RiskEngine, NS_PER_SEC};
+use crate::engine::{pos_add, pos_sub, Bucket, Rate, RiskDecision, RiskEngine, NS_PER_SEC};
 use crate::event::{fmt_fixed, rules, Decision, Scope, Severity};
 use crate::limits::RiskLimits;
 
@@ -44,8 +44,13 @@ impl RiskEngine {
             | rules::DUPLICATE_ORDER_ID
             | rules::RATE_THROTTLE
             | rules::STRATEGY_LOSS
-            | rules::ALLOW => (Scope::Strategy, order.strategy_id.clone()),
-            rules::KILL_VENUE | rules::VENUE_DISCONNECTED => {
+            | rules::ALLOW
+            | rules::MAX_OPEN_ORDERS
+            | rules::MAX_OPEN_NOTIONAL
+            | rules::STRATEGY_POSITION
+            | rules::CANCEL_RATE
+            | rules::STATE_CAPACITY => (Scope::Strategy, order.strategy_id.clone()),
+            rules::KILL_VENUE | rules::VENUE_DISCONNECTED | rules::VENUE_MESSAGE_RATE => {
                 (Scope::Venue, order.venue_id.to_string())
             }
             _ => (Scope::Instrument, order.instrument_id.to_string()),
@@ -217,6 +222,30 @@ impl RiskEngine {
                 return Self::ts_overflow();
             };
             self.seen_orders.retain(|_, &mut ts| ts >= cutoff);
+        }
+        // bounded per-key state (G-P2-7): a full map rejects the order that
+        // would grow it — forgetting a key would be fail-open
+        if let Some(cap) = limits.max_tracked_keys {
+            let full = if !self.seen_orders.contains_key(&order.order_id)
+                && self.seen_orders.len() as i64 >= cap
+            {
+                Some("seen order ids")
+            } else if self.open.len() as i64 >= cap {
+                Some("open orders")
+            } else if !self.buckets.contains_key(&order.strategy_id)
+                && self.buckets.len() as i64 >= cap
+            {
+                Some("strategies")
+            } else {
+                None
+            };
+            if let Some(full) = full {
+                return Self::reject(
+                    rules::STATE_CAPACITY,
+                    Warn,
+                    format!("risk state capacity {cap} reached for {full} (fail-closed)"),
+                );
+            }
         }
         self.seen_orders.insert(order.order_id, order.timestamp);
         // 8. venue connectivity
@@ -605,6 +634,195 @@ impl RiskEngine {
                     fmt_fixed(strat_limit, 2)
                 ),
             );
+        }
+        self.evaluate_15c3_5(order, &limits, order_notional)
+    }
+
+    /// Checks 23-29, the SEC 15c3-5 pre-trade set (`pre_trade` in risk.json;
+    /// an absent key turns its check off). They run after every legacy
+    /// check, so an order a legacy rule rejects keeps that rule id, and only
+    /// an order about to be ALLOWed spends a venue message token (check 29
+    /// is last).
+    fn evaluate_15c3_5(
+        &mut self,
+        order: &OrderRequest,
+        limits: &RiskLimits,
+        order_notional: f64,
+    ) -> RiskDecision {
+        use Severity::Warn;
+        let sid = &order.strategy_id;
+        // 23. restricted list
+        if limits.restricted_instruments.contains(&order.instrument_id) {
+            return Self::reject(
+                rules::RESTRICTED_INSTRUMENT,
+                Warn,
+                format!("instrument {} is on the restricted list", order.instrument_id),
+            );
+        }
+        // 24. open orders per strategy (this order included)
+        if let Some(max) = limits.max_open_orders {
+            let n = self.open.values().filter(|r| r.strategy_id == *sid).count() as i64 + 1;
+            if n > max {
+                return Self::reject(
+                    rules::MAX_OPEN_ORDERS,
+                    Warn,
+                    format!("strategy {sid} would have {n} open orders, max_open_orders {max}"),
+                );
+            }
+        }
+        // 25. open notional per strategy (every open order valued as in
+        // check 19, which has already rejected an unvaluable one)
+        if let Some(max) = limits.max_open_notional {
+            let mut total = 0.0f64;
+            for r in self.open.values() {
+                if r.strategy_id != *sid {
+                    continue;
+                }
+                let Some(oins) = self.instruments.get(&r.instrument_id) else {
+                    continue;
+                };
+                let price = if r.price_ticks > 0 {
+                    Some(r.price_ticks as f64 * oins.tick_size)
+                } else {
+                    self.mark_price(r.instrument_id)
+                };
+                let rate = self.fx_rate(&oins.quote_ccy);
+                let (Some(price), Some((rate, _))) = (price, rate) else {
+                    continue;
+                };
+                total += r.qty as f64 * oins.qty_unit * price * rate;
+            }
+            total += order_notional;
+            if !(total <= max) {
+                return Self::reject(
+                    rules::MAX_OPEN_NOTIONAL,
+                    Warn,
+                    format!(
+                        "strategy {sid} open notional {} exceeds max_open_notional {}",
+                        fmt_fixed(total, 2),
+                        fmt_fixed(max, 2)
+                    ),
+                );
+            }
+        }
+        // 26. per-strategy position (worst case, like check 17)
+        if let Some(max) = limits.max_strategy_position_qty {
+            let spos = self
+                .lots
+                .get(&(sid.clone(), order.instrument_id))
+                .map_or(0, |l| l.pos);
+            let mut open_same = Some(0i64);
+            for r in self.open.values() {
+                if r.strategy_id == *sid
+                    && r.instrument_id == order.instrument_id
+                    && r.side == order.side
+                {
+                    open_same = open_same.and_then(|acc| pos_add(acc, r.qty));
+                    if open_same.is_none() {
+                        break;
+                    }
+                }
+            }
+            let step = if order.side == 0 { pos_add } else { pos_sub };
+            let projected = open_same
+                .and_then(|o| step(spos, o))
+                .and_then(|p| step(p, order.qty));
+            let Some(projected) = projected else {
+                return Self::reject(
+                    rules::MALFORMED_ORDER,
+                    Warn,
+                    "projected position overflows i64 (fail-closed)".into(),
+                );
+            };
+            if projected.abs() > max {
+                return Self::reject(
+                    rules::STRATEGY_POSITION,
+                    Warn,
+                    format!(
+                        "strategy {sid} projected position {projected} exceeds max_strategy_position_qty {max}"
+                    ),
+                );
+            }
+        }
+        // 27. participation: the firm's session quantity in the instrument
+        // (executed + every open order + this order) against the cap
+        if let (Some(bps), Some(floor)) =
+            (limits.max_participation_bps, limits.participation_floor_qty)
+        {
+            let mut open_qty = 0.0f64;
+            for r in self.open.values() {
+                if r.instrument_id == order.instrument_id {
+                    open_qty += r.qty as f64;
+                }
+            }
+            let executed = self.executed.get(&order.instrument_id).copied().unwrap_or(0);
+            let projected_qty = executed as f64 + open_qty + order.qty as f64;
+            let volume = self
+                .market_volume
+                .get(&order.instrument_id)
+                .copied()
+                .unwrap_or(0);
+            let cap = (floor as f64).max(volume as f64 * bps / 1e4);
+            if !(projected_qty <= cap) {
+                return Self::reject(
+                    rules::PARTICIPATION,
+                    Warn,
+                    format!(
+                        "projected session qty {} exceeds participation cap {} ({}bps of market volume {volume}, floor {floor})",
+                        fmt_fixed(projected_qty, 0),
+                        fmt_fixed(cap, 0),
+                        fmt_fixed(bps, 1)
+                    ),
+                );
+            }
+        }
+        // 28. cancel rate: a strategy whose cancel bucket is spent may not
+        // place new orders until it refills
+        if let (Some(rate), Some(burst)) = (limits.max_cancels_per_sec, limits.cancel_burst) {
+            if let Some(cb) = self.cancel_buckets.get_mut(sid) {
+                if !cb.refill(order.timestamp, rate, burst) {
+                    return Self::ts_overflow();
+                }
+                if !(cb.tokens >= 1.0) {
+                    return Self::reject(
+                        rules::CANCEL_RATE,
+                        Warn,
+                        format!(
+                            "strategy {sid} exceeded {} cancels/s (burst {})",
+                            fmt_fixed(rate, 2),
+                            fmt_fixed(burst, 2)
+                        ),
+                    );
+                }
+            }
+        }
+        // 29. per-venue message rate (venue 0 = SOR: the child orders are
+        // throttled where they are sent); the token is spent here, last
+        if order.venue_id != 0 {
+            if let (Some(rate), Some(burst)) =
+                (limits.max_venue_msgs_per_sec, limits.venue_msg_burst)
+            {
+                let vb = self.venue_buckets.entry(order.venue_id).or_insert(Rate {
+                    tokens: burst,
+                    last_ts: order.timestamp,
+                });
+                if !vb.refill(order.timestamp, rate, burst) {
+                    return Self::ts_overflow();
+                }
+                if !(vb.tokens >= 1.0) {
+                    return Self::reject(
+                        rules::VENUE_MESSAGE_RATE,
+                        Warn,
+                        format!(
+                            "venue {} exceeded {} messages/s (burst {})",
+                            order.venue_id,
+                            fmt_fixed(rate, 2),
+                            fmt_fixed(burst, 2)
+                        ),
+                    );
+                }
+                vb.tokens -= 1.0;
+            }
         }
         RiskDecision {
             decision: Decision::Allow,

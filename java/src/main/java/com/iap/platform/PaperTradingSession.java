@@ -61,6 +61,9 @@ final class PaperTradingSession {
         traces.flush();
         st.traceLines = traces.count();
         st.equityPeak = equityPeak;
+        // the audit chain head the resumed engine continues from (G-P0-1)
+        st.riskAuditSeq = risk.auditChainSeq();
+        st.riskAuditHeadSha256 = risk.auditChainHead();
         store.commitCheckpoint(st, risk.snapshot());
         return audit.size();
     }

@@ -46,12 +46,15 @@ DESCRIPTION = (
     "python/tools/make_golden_risk_edge.py from the Python reference-equivalent port; "
     "replayed by Rust, Java and Python. `scenarios` are independent: each builds a "
     "fresh engine from `config` (minus the [section, key] named by `config_remove`, "
-    "when present) and the `instruments` table, calls require_bootstrap when "
+    "when present; then every [section, key, value] of `config_set` assigned, when "
+    "present) and the `instruments` table, calls require_bootstrap when "
     "`require_bootstrap` is true, then runs `steps`. Step types are those of "
     "expected_risk_decisions.json plus: bad_kill / bad_unkill (a kill command whose "
     "scope_id does not parse: the call must fail), bootstrap (bootstrap_positions "
     "with `fills`), restore (snapshot the engine and continue on the engine restored "
-    "from that snapshot; the audit of the engine before the restore is kept). "
+    "from that snapshot, continuing its audit chain; the audit of the engine before the "
+    "restore is kept), and since x-version 2: trade (on_market_trade), cancel_request "
+    "(on_cancel_request) and bad_override (an override_loss_limit call that must fail). "
     "expected_risk_edge_audit.jsonl is the audit JSONL of every scenario in order "
     "(across a restore: the old engine's log, then the restored engine's) and must "
     "be reproduced byte for byte. `must_pin` lists [rule_id, reason fragment] pairs "
@@ -111,6 +114,126 @@ def kill(kind: str, scope: str, scope_id: str, ts: int, reason: str) -> dict[str
 
 def marks(ts: int = T0) -> list[dict[str, Any]]:
     return [market(1, 2450, 2452, ts), market(2, 3119, 3121, ts)]
+
+
+def trade(iid: int, qty: int, ts: int) -> dict[str, Any]:
+    return {"type": "trade", "instrument_id": iid, "qty": qty, "ts": ts}
+
+
+def cancel_request(strategy: str, venue: int, ts: int) -> dict[str, Any]:
+    return {"type": "cancel_request", "strategy_id": strategy, "venue_id": venue, "ts": ts}
+
+
+def override(kind: str, scope: str, scope_id: str, limit: float, ts: int, approver: str):
+    return {
+        "type": kind,
+        "scope": scope,
+        "scope_id": scope_id,
+        "new_limit": limit,
+        "ts": ts,
+        "approver": approver,
+    }
+
+
+#: The x-version 4 controls set tight enough for a short script to reach
+#: every one of them (``config_set`` entries: [section, key, value]).
+PRE_TRADE_SET = [
+    ["pre_trade", "restricted_instruments", [2]],
+    ["pre_trade", "max_open_orders", 2],
+    ["pre_trade", "max_open_notional", 50000.0],
+    ["pre_trade", "max_strategy_position_qty", 300],
+    ["pre_trade", "max_participation_bps", 1000.0],
+    ["pre_trade", "participation_floor_qty", 400],
+    ["pre_trade", "max_cancels_per_sec", 1.0],
+    ["pre_trade", "cancel_burst", 2.0],
+    ["pre_trade", "max_venue_msgs_per_sec", 1.0],
+    ["pre_trade", "venue_msg_burst", 3.0],
+]
+
+
+def pre_trade_scenarios() -> list[dict[str, Any]]:
+    """v1.14 (review items G-P0-2, G-P2-3, G-P2-6, G-P2-7)."""
+    t = T0 + 100 * MS
+    return [
+        {
+            "name": "sec_15c3_5_pre_trade_controls",
+            "config_set": PRE_TRADE_SET,
+            "steps": marks()
+            + [
+                order(1, 2, 0, 10, 3120, t),  # RESTRICTED_INSTRUMENT
+                order(2, 1, 0, 100, 2450, t + SEC),  # ALLOW (S1 open 1)
+                order(3, 1, 0, 100, 2449, t + 2 * SEC),  # ALLOW (S1 open 2)
+                order(4, 1, 0, 100, 2448, t + 3 * SEC),  # MAX_OPEN_ORDERS
+                order(5, 1, 0, 2100, 2450, t + 3 * SEC, strategy="S2"),  # MAX_OPEN_NOTIONAL
+                order(6, 1, 0, 400, 2450, t + 3 * SEC, strategy="S3"),  # STRATEGY_POSITION
+                order(7, 1, 0, 300, 2450, t + 3 * SEC, strategy="S4"),  # PARTICIPATION (500 > 400)
+                market(1, 2450, 2452, t + 4 * SEC),
+                trade(1, 10_000, t + 4 * SEC),  # cap: 10% of 10,000 = 1,000
+                trade(9, 10_000, t + 4 * SEC),  # unknown instrument: dropped
+                order(8, 1, 0, 300, 2450, t + 4 * SEC, strategy="S4"),  # ALLOW (500/1000)
+                order(9, 1, 0, 300, 2450, t + 5 * SEC, strategy="S5"),  # ALLOW (800/1000)
+                order(10, 1, 0, 300, 2450, t + 6 * SEC, strategy="S6"),  # PARTICIPATION
+                fill("S1", 1, 0, 100, 2450, t + 6 * SEC, order_id=2),  # executed 100
+                {"type": "cancel", "order_id": 3},  # open 600, session 700
+                order(11, 1, 0, 200, 2450, t + 6 * SEC, strategy="S6"),  # ALLOW (900/1000)
+                cancel_request("S7", 2, t + 7 * SEC),
+                cancel_request("S7", 2, t + 7 * SEC),
+                cancel_request("S7", 2, t + 7 * SEC),
+                cancel_request("S7", 2, t + 7 * SEC),
+                market(1, 2450, 2452, t + 7 * SEC),
+                order(12, 1, 1, 10, 2452, t + 7 * SEC, venue=2, strategy="S7"),  # CANCEL_RATE
+                order(
+                    13, 1, 1, 10, 2452, t + 7 * SEC, venue=2, strategy="S8"
+                ),  # VENUE_MESSAGE_RATE
+                order(14, 1, 1, 10, 2452, t + 7 * SEC, venue=0, strategy="S8"),  # SOR: ALLOW
+                {"type": "restore", "ts": t + 8 * SEC},
+                order(15, 1, 1, 10, 2452, t + 8 * SEC, venue=2, strategy="S7"),  # still spent
+                order(16, 1, 1, 10, 2452, t + 10 * SEC, venue=2, strategy="S7"),  # refilled
+            ],
+        },
+        {
+            "name": "bounded_two_party_loss_override",
+            "steps": marks()
+            + [
+                override("bad_override", "GLOBAL", "", 300_000.0, T0 + 1, "cro"),
+                override("bad_override", "GLOBAL", "", 600_000.0, T0 + 2, "cro, cfo"),
+                override("bad_override", "STRATEGY", "S1", 60_000.0, T0 + 3, "cro, cro ,"),
+                override("override_loss", "STRATEGY", "S1", 100_000.0, T0 + 4, "cro,cfo"),
+                override("override_loss", "GLOBAL", "", 500_000.0, T0 + 5, " cro , cfo "),
+                order(1, 1, 0, 100, 2450, t),
+            ],
+        },
+        {
+            "name": "reference_price_sanity_gate",
+            "steps": marks()
+            + [
+                market(1, 2460, 2450, T0 + 1),  # crossed: dropped
+                order(1, 1, 0, 100, 2450, t),  # still priced off 24.51
+                market(1, 245_000, 245_002, T0 + 2),  # 100x jump: dropped
+                order(2, 1, 0, 100, 245_000, t + 10 * MS),  # PRICE_BAND vs 24.51
+                market(1, 2450, 2450, T0 + 3),  # locked: accepted
+                market(2, 300, 302, T0 + 3),  # 10.3x drop: dropped
+                order(3, 2, 0, 100, 3120, t + 20 * MS),  # still priced off 31.20
+                market(1, 2440, 2442, T0 + 6 * SEC),  # in range: accepted
+                order(4, 1, 0, 100, 2441, T0 + 6 * SEC),
+                order(5, 2, 0, 100, 3120, T0 + 6 * SEC),  # instrument 2 mark aged out
+            ],
+        },
+        {
+            "name": "bounded_state_capacity",
+            "config_set": [["pre_trade", "max_tracked_keys", 2]],
+            "steps": marks()
+            + [
+                market(3, 1000, 1002, T0),  # third instrument: dropped (capacity)
+                {"type": "gap", "instrument_id": 4, "ts": T0},  # dropped too
+                order(1, 1, 0, 10, 2450, t),
+                order(2, 1, 0, 10, 2449, t + 10 * MS, strategy="S2"),
+                order(3, 1, 0, 10, 2448, t + 20 * MS, strategy="S3"),  # seen ids full
+                {"type": "cancel", "order_id": 1},
+                order(1, 1, 0, 10, 2450, t + 30 * MS),  # DUPLICATE_ORDER_ID first
+            ],
+        },
+    ]
 
 
 def scenarios() -> list[dict[str, Any]]:
@@ -261,15 +384,28 @@ MUST_PIN = [
     ["NOT_BOOTSTRAPPED", "positions not bootstrapped (fail-closed)"],
     ["BOOTSTRAP_COMPLETE", "bootstrapped from 3 drop-copy fills (1 rejected)"],
     ["MALFORMED_FILL", "fill for order 9 rejected"],
-    ["STATE_RESTORED", "restored snapshot v1"],
+    ["STATE_RESTORED", "restored snapshot v2"],
     ["DUPLICATE_ORDER_ID", "already used"],
     ["SELF_MATCH", "would cross own open order 2"],
+    ["RESTRICTED_INSTRUMENT", "instrument 2 is on the restricted list"],
+    ["MAX_OPEN_ORDERS", "would have 3 open orders, max_open_orders 2"],
+    ["MAX_OPEN_NOTIONAL", "exceeds max_open_notional 50000.00"],
+    ["STRATEGY_POSITION", "exceeds max_strategy_position_qty 300"],
+    ["PARTICIPATION", "of market volume 0, floor 400"],
+    ["PARTICIPATION", "of market volume 10000, floor 400"],
+    ["CANCEL_RATE", "cancels/s (burst 2.00)"],
+    ["VENUE_MESSAGE_RATE", "venue 2 exceeded 1.00 messages/s (burst 3.00)"],
+    ["LOSS_LIMIT_OVERRIDE_REJECTED", "needs 2 distinct approvers, got 1: cro"],
+    ["LOSS_LIMIT_OVERRIDE_REJECTED", "exceeds cap 500000.00 (2.00x the configured 250000.00)"],
+    ["LOSS_LIMIT_OVERRIDE", "approved by cro,cfo"],
+    ["PRICE_BAND", "bps from mid, band 200.0bps"],
+    ["STATE_CAPACITY", "risk state capacity 2 reached for seen order ids (fail-closed)"],
 ]
 
 
 def main() -> None:
     golden: dict[str, Any] = {
-        "x-version": 1,
+        "x-version": 2,
         "description": DESCRIPTION,
         "config": "configs/risk/risk.json",
         "instruments": {
@@ -277,7 +413,7 @@ def main() -> None:
             "2": {"tick_size": 0.01, "qty_unit": 1.0, "quote_ccy": "USD"},
         },
         "must_pin": MUST_PIN,
-        "scenarios": scenarios(),
+        "scenarios": scenarios() + pre_trade_scenarios(),
     }
     with open(ROOT / golden["config"], encoding="utf-8") as f:
         config = json.load(f)

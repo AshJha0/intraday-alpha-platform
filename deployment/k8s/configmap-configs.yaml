@@ -786,8 +786,8 @@ data:
     }
   risk__risk.json: |
     {
-      "x-version": 3,
-      "description": "Complete pinned hard-risk limit set (spec section 16), consumed by the Rust risk engine (rust/risk, normative) and its Java port. FAIL-CLOSED: a missing or invalid limit puts the engine in reject-everything mode; every decision is emitted as a RiskEvent (schemas/risk/risk_event.schema.json) to a JSONL audit log; decisions are deterministic and replayable. Money semantics (PLATFORM_CONVENTIONS.md section 11): every notional and loss figure is in currency.reporting_ccy; notional = qty x qty_unit x price_ticks x tick_size x fx_rate (qty_unit = lot_size for FX, 1 for EQUITY/ETF); quote currencies convert through currency.conversion (last consolidated mid of the named pair, inverted when the pair is REPORTING/CCY) and an order whose conversion is missing or stale is rejected with FX_RATE_MISSING. Loss limits act on daily P&L = realized (average cost) + unrealized (mark-to-market at the last consolidated mid) and latch the strategy/global kill switch on fills AND on mark updates. duplicate_order_window_ns 0 means the entire session; order rate is a per-strategy event-time token bucket (rate max_order_rate_per_sec, capacity order_rate_burst).",
+      "x-version": 4,
+      "description": "Complete pinned hard-risk limit set (spec section 16), consumed by the Rust risk engine (rust/risk, normative) and its Java port. FAIL-CLOSED: a missing or invalid limit puts the engine in reject-everything mode; every decision is emitted as a RiskEvent (schemas/risk/risk_event.schema.json) to a JSONL audit log; decisions are deterministic and replayable. Money semantics (PLATFORM_CONVENTIONS.md section 11): every notional and loss figure is in currency.reporting_ccy; notional = qty x qty_unit x price_ticks x tick_size x fx_rate (qty_unit = lot_size for FX, 1 for EQUITY/ETF); quote currencies convert through currency.conversion (last consolidated mid of the named pair, inverted when the pair is REPORTING/CCY) and an order whose conversion is missing or stale is rejected with FX_RATE_MISSING. Loss limits act on daily P&L = realized (average cost) + unrealized (mark-to-market at the last consolidated mid) and latch the strategy/global kill switch on fills AND on mark updates. duplicate_order_window_ns 0 means the entire session; order rate is a per-strategy event-time token bucket (rate max_order_rate_per_sec, capacity order_rate_burst). x-version 4 (v1.14): market_data.max_mid_jump_ratio drops a two-sided mark update more than that factor away from the stored one (crossed books are always dropped); pre_trade is the SEC 15c3-5 set, checks 23-29 after every legacy check (restricted list, open orders and open notional per strategy, per-strategy position, participation of session market volume, per-strategy cancel rate, per-venue message rate) plus max_tracked_keys, the bound of every per-key state map; overrides bounds a loss-limit override (max_loss_override_multiple x the configured limit, min_approvers distinct comma-separated approvers). Every x-version 4 key is optional: absent or null turns that control off. max_participation_bps is off here because it needs the market trade-print feed (RiskEngine.on_market_trade) that the live gateway supplies.",
       "global": {
         "kill_switch_engaged": false,
         "max_gross_notional": 5000000.0,
@@ -812,7 +812,8 @@ data:
       },
       "market_data": {
         "max_sequence_gap_before_halt": 1,
-        "stale_feed_timeout_ns": 5000000000
+        "stale_feed_timeout_ns": 5000000000,
+        "max_mid_jump_ratio": 10.0
       },
       "currency": {
         "reporting_ccy": "USD",
@@ -825,6 +826,21 @@ data:
           "CHF": {"instrument_id": 106, "invert": true},
           "NZD": {"instrument_id": 107, "invert": false}
         }
+      },
+      "pre_trade": {
+        "restricted_instruments": [],
+        "max_open_orders": 1000,
+        "max_open_notional": 5000000.0,
+        "max_strategy_position_qty": 100000,
+        "max_cancels_per_sec": 1000.0,
+        "cancel_burst": 100.0,
+        "max_venue_msgs_per_sec": 1000.0,
+        "venue_msg_burst": 100.0,
+        "max_tracked_keys": 1000000
+      },
+      "overrides": {
+        "max_loss_override_multiple": 2.0,
+        "min_approvers": 2
       }
     }
   strategies__alpha_params.json: |

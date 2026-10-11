@@ -779,7 +779,7 @@ fn risk_clear_kill_after_loss_latch_resumes_with_override() {
     let n_latches = eng.audit().iter().filter(|e| e.rule_id == rules::STRATEGY_LOSS && e.decision == Decision::Kill as u8).count();
     assert_eq!(n_latches, 2);
     // override below the loss is legal but ineffective
-    eng.override_loss_limit(Scope::Strategy, "S1", 51_000.0, T0 + 4 * NS, "cro").unwrap();
+    eng.override_loss_limit(Scope::Strategy, "S1", 51_000.0, T0 + 4 * NS, "cro, cfo").unwrap();
     eng.clear_kill(Scope::Strategy, "S1", T0 + 4 * NS, "ops clear #2").expect("kill scope id parses");
     assert_eq!(eng.check_order(&order(4, 0, 100, 2450)).rule_id, rules::STRATEGY_LOSS);
     // a flat strategy's realized loss cannot re-latch on a mark (no lot to
@@ -790,7 +790,7 @@ fn risk_clear_kill_after_loss_latch_resumes_with_override() {
     eng.on_market(1, 2450, 2452, T0 + 4 * NS + 2);
     assert_eq!(eng.check_order(&order(7, 0, 100, 2450)).rule_id, rules::STRATEGY_LOSS);
     // override above the loss + clear -> ALLOW, and marks no longer latch
-    eng.override_loss_limit(Scope::Strategy, "S1", 75_000.0, T0 + 5 * NS, "cro").unwrap();
+    eng.override_loss_limit(Scope::Strategy, "S1", 75_000.0, T0 + 5 * NS, "cro, cfo").unwrap();
     eng.clear_kill(Scope::Strategy, "S1", T0 + 5 * NS, "ops clear INC-1").expect("kill scope id parses");
     eng.on_market(1, 2450, 2452, T0 + 5 * NS);
     assert!(eng.check_order(&order(5, 0, 100, 2450)).allowed());
@@ -798,7 +798,7 @@ fn risk_clear_kill_after_loss_latch_resumes_with_override() {
     assert_eq!(ids.iter().filter(|r| **r == rules::LOSS_LIMIT_OVERRIDE).count(), 2);
     assert_eq!(ids.iter().filter(|r| **r == rules::KILL_SWITCH_CLEARED).count(), 4);
     let ov = eng.audit().iter().find(|e| e.rule_id == rules::LOSS_LIMIT_OVERRIDE).unwrap();
-    assert_eq!(ov.reason, "daily loss limit 50000.00 -> 51000.00 approved by cro");
+    assert_eq!(ov.reason, "daily loss limit 50000.00 -> 51000.00 approved by cro, cfo");
     // invalid overrides are refused without side effects
     assert!(eng.override_loss_limit(Scope::Strategy, "S1", -1.0, T0, "x").is_err());
     assert!(eng.override_loss_limit(Scope::Instrument, "1", 10.0, T0, "x").is_err());
@@ -813,7 +813,7 @@ fn scenario_session_roll_rebases_daily_pnl_and_keeps_latches() {
     eng.on_fill(&fill("S1", 1, 0, 95_000, 2452)); // unrealized -950 at 24.51
     eng.on_fill(&fill("S2", 2, 0, 1_000, 3120));
     eng.on_fill(&fill("S2", 2, 1, 1_000, 3110)); // realized -100
-    eng.override_loss_limit(Scope::Global, "", 400_000.0, T0, "cro").unwrap();
+    eng.override_loss_limit(Scope::Global, "", 400_000.0, T0, "cro, cfo").unwrap();
     eng.engage_kill(Scope::Strategy, "S2", T0, "manual").expect("kill scope id parses");
     assert!((eng.global_daily_pnl().unwrap() + 1_050.0).abs() < 1e-6);
     eng.roll_session(T0 + NS, "roll");
@@ -860,7 +860,7 @@ fn risk_snapshot_restore_roundtrip() {
     let mut unbroken = engine();
     let first = script(&mut unbroken, 0, 30);
     let snap = unbroken.snapshot();
-    assert_eq!(snap["x-version"].as_u64(), Some(1));
+    assert_eq!(snap["x-version"].as_u64(), Some(2));
     let limits = RiskLimits::from_json(&config()).unwrap();
     let mut restored = RiskEngine::restore(limits, unbroken_refs(), &snap, T0 + 5 * NS).unwrap();
     assert_eq!(restored.audit().len(), 1);
@@ -870,9 +870,9 @@ fn risk_snapshot_restore_roundtrip() {
     assert_eq!(a, b);
     assert_eq!(first.len(), 30);
     let full = unbroken.audit_jsonl();
-    let full_lines: Vec<&str> = full.lines().collect();
+    let full_lines: Vec<String> = full.lines().map(risk::unchained_line).collect();
     let restored_audit = restored.audit_jsonl();
-    let tail: Vec<&str> = restored_audit.lines().skip(1).collect();
+    let tail: Vec<String> = restored_audit.lines().skip(1).map(risk::unchained_line).collect();
     assert_eq!(&full_lines[full_lines.len() - tail.len()..], &tail[..]);
     assert_eq!(restored.snapshot(), unbroken.snapshot());
     // a malformed snapshot is refused as a whole
@@ -1409,4 +1409,145 @@ fn extreme_timestamps_fail_closed_without_overflow() {
     assert!(eng.check_order(&at(8, 1, T0)).allowed());
     assert_eq!(eng.check_order(&at(8, 1, i64::MIN)).reason, WHY);
     assert_eq!(eng.check_order(&at(9, 1, i64::MIN)).reason, WHY);
+}
+
+// ------------------------------------------ v1.14: G-P0-1 / G-P0-2 / G-P2-*
+
+/// G-P0-1: seq 1..n, each prev_sha256 the hash of the line before; an
+/// edited, dropped or reordered line breaks the chain, and a chained
+/// restore continues it.
+#[test]
+fn audit_chain_links_every_record_and_detects_tampering() {
+    let mut eng = engine();
+    eng.check_order(&order(1, 0, 100, 2450));
+    eng.check_order(&order(2, 0, 60_000, 2450));
+    eng.on_venue_disconnect(2, T0 + NS);
+    let text = eng.audit_jsonl();
+    let lines: Vec<&str> = text.lines().collect();
+    let head = risk::line_sha256(lines[2]);
+    assert_eq!(
+        risk::verify_audit_chain(&text, 1, risk::GENESIS_SHA256),
+        Ok((3, head.clone()))
+    );
+    assert_eq!(eng.audit_chain_head(), (3, head));
+    assert_eq!(eng.audit()[0].prev_sha256, risk::GENESIS_SHA256);
+    let edited = text.replace("max_order_qty 50000", "max_order_qty 90000");
+    assert!(risk::verify_audit_chain(&edited, 1, risk::GENESIS_SHA256)
+        .unwrap_err()
+        .contains("line 3: prev_sha256 mismatch"));
+    let dropped = format!("{}\n{}\n", lines[0], lines[2]);
+    assert!(risk::verify_audit_chain(&dropped, 1, risk::GENESIS_SHA256)
+        .unwrap_err()
+        .contains("line 2: seq 3, want 2"));
+    let limits = RiskLimits::from_json(&config()).unwrap();
+    let restored = RiskEngine::restore_chained(
+        limits,
+        risk_refs(),
+        &eng.snapshot(),
+        T0 + 2 * NS,
+        Some(eng.audit_chain_head()),
+    )
+    .unwrap();
+    let joined = format!("{text}{}", restored.audit_jsonl());
+    assert!(risk::verify_audit_chain(&joined, 1, risk::GENESIS_SHA256).is_ok());
+    let limits = RiskLimits::from_json(&config()).unwrap();
+    assert!(RiskEngine::restore_chained(
+        limits,
+        risk_refs(),
+        &eng.snapshot(),
+        T0,
+        Some((3, "ABC".to_string()))
+    )
+    .is_err());
+}
+
+fn risk_refs() -> BTreeMap<u32, InstrumentRef> {
+    ticks()
+        .into_iter()
+        .map(|(iid, t)| (iid, InstrumentRef::equity(t)))
+        .collect()
+}
+
+/// x-version 4: every new key is optional (absent or null = off) and a
+/// present key is parsed strictly.
+#[test]
+fn x_version_4_keys_are_optional_and_strict() {
+    let mut doc = config();
+    doc.as_object_mut().unwrap().remove("pre_trade");
+    doc.as_object_mut().unwrap().remove("overrides");
+    doc["market_data"].as_object_mut().unwrap().remove("max_mid_jump_ratio");
+    let off = RiskLimits::from_json(&doc).unwrap();
+    assert!(off.max_open_orders.is_none());
+    assert!(off.min_approvers.is_none());
+    assert!(off.restricted_instruments.is_empty());
+    let on = RiskLimits::from_json(&config()).unwrap();
+    assert_eq!(on.max_open_orders, Some(1000));
+    assert_eq!(on.min_approvers, Some(2));
+    assert_eq!(on.max_mid_jump_ratio, Some(10.0));
+    assert!(on.max_participation_bps.is_none());
+    let cases = [
+        ("market_data", "max_mid_jump_ratio", serde_json::json!(1.0), "max_mid_jump_ratio must be > 1, got 1"),
+        ("pre_trade", "max_open_orders", serde_json::json!(0), "pre_trade.max_open_orders must be > 0, got 0"),
+        ("pre_trade", "restricted_instruments", serde_json::json!(5), "restricted_instruments must be an array"),
+        ("pre_trade", "restricted_instruments", serde_json::json!([4_294_967_296u64]), "must be u32 instrument ids"),
+        ("pre_trade", "max_participation_bps", serde_json::json!(100.0), "non-integer pre_trade.participation_floor_qty"),
+        ("overrides", "min_approvers", serde_json::json!("two"), "missing/non-integer overrides.min_approvers"),
+    ];
+    for (section, key, value, why) in cases {
+        let mut bad = config();
+        bad[section][key] = value;
+        let err = RiskLimits::from_json(&bad).unwrap_err().to_string();
+        assert!(err.contains(why), "{section}.{key}: {err}");
+    }
+    let mut nulled = config();
+    nulled["pre_trade"]["max_open_orders"] = serde_json::Value::Null;
+    assert!(RiskLimits::from_json(&nulled).unwrap().max_open_orders.is_none());
+}
+
+/// G-P2-3: a refused override changes nothing and is audited.
+#[test]
+fn loss_override_is_bounded_and_two_party() {
+    let mut eng = engine();
+    for (approver, limit, why) in [
+        ("cro", 300_000.0, "needs 2 distinct approvers, got 1: cro"),
+        ("cro, cro", 300_000.0, "needs 2 distinct approvers, got 1"),
+        ("cro,cfo", 500_000.01, "exceeds cap 500000.00 (2.00x the configured 250000.00)"),
+    ] {
+        let err = eng
+            .override_loss_limit(Scope::Global, "", limit, T0, approver)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains(why), "{err}");
+        let last = eng.audit().last().unwrap();
+        assert_eq!(last.rule_id, rules::LOSS_LIMIT_OVERRIDE_REJECTED);
+        assert_eq!(last.severity, Severity::Breach as u8);
+        assert!(last.reason.contains(why));
+    }
+    eng.override_loss_limit(Scope::Global, "", 500_000.0, T0, "cro,cfo")
+        .unwrap();
+    assert_eq!(eng.audit().last().unwrap().rule_id, rules::LOSS_LIMIT_OVERRIDE);
+}
+
+/// Checks 28/29: cancels spend the strategy's cancel budget and the venue's
+/// message budget; event time refills both.
+#[test]
+fn cancel_requests_spend_strategy_and_venue_budgets() {
+    let mut doc = config();
+    doc["pre_trade"]["max_cancels_per_sec"] = serde_json::json!(1.0);
+    doc["pre_trade"]["cancel_burst"] = serde_json::json!(1.0);
+    doc["pre_trade"]["venue_msg_burst"] = serde_json::json!(2.0);
+    let mut eng = RiskEngine::from_config_ticks(&doc, ticks());
+    eng.on_market(1, 2450, 2452, T0);
+    eng.on_cancel_request("S1", 1, T0);
+    let at = |id: u64, price: i64, sid: &str, ts: i64| {
+        let mut o = order(id, 0, 10, price);
+        o.strategy_id = sid.to_string();
+        o.timestamp = ts;
+        o
+    };
+    assert_eq!(eng.check_order(&at(1, 2450, "S1", T0)).rule_id, rules::CANCEL_RATE);
+    assert!(eng.check_order(&at(2, 2450, "S2", T0)).allowed());
+    assert_eq!(eng.check_order(&at(3, 2449, "S3", T0)).rule_id, rules::VENUE_MESSAGE_RATE);
+    assert!(eng.check_order(&at(4, 2448, "S1", T0 + NS)).allowed());
+    assert_eq!(eng.metrics.counter_value("risk_cancel_requests_total"), 1);
 }

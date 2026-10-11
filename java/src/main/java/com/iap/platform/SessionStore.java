@@ -96,6 +96,16 @@ public final class SessionStore {
          * checkpoint written before the field existed (verification skipped).
          */
         public String riskSnapshotSha256 = "";
+        /**
+         * The risk audit chain head at this checkpoint (G-P0-1): {@code seq}
+         * and SHA-256 of the last {@code risk_audit.jsonl} record, so a
+         * resumed engine continues the hash chain (the snapshot itself
+         * carries no chain). Empty / 0 for a checkpoint written before the
+         * field existed: the resumed engine then starts a new chain.
+         */
+        public String riskAuditHeadSha256 = "";
+        /** Seq of the last risk audit record at this checkpoint. */
+        public long riskAuditSeq;
 
         /** Sorted-key JSON document (round-trips exactly). */
         public String toJson() {
@@ -110,6 +120,9 @@ public final class SessionStore {
                     .append(",\"instrument_id\":").append(instrumentId)
                     .append(",\"orders_submitted\":").append(ordersSubmitted)
                     .append(",\"restarts\":").append(restarts)
+                    .append(",\"risk_audit_head_sha256\":\"")
+                    .append(esc(riskAuditHeadSha256))
+                    .append("\",\"risk_audit_seq\":").append(riskAuditSeq)
                     .append(",\"risk_order_seq\":").append(riskOrderSeq)
                     .append(",\"risk_snapshot_sha256\":\"")
                     .append(esc(riskSnapshotSha256))
@@ -153,6 +166,10 @@ public final class SessionStore {
             s.traceLines = asLong(doc, "trace_lines", where);
             if (doc.containsKey("risk_snapshot_sha256")) {
                 s.riskSnapshotSha256 = asStr(doc, "risk_snapshot_sha256", where);
+            }
+            if (doc.containsKey("risk_audit_head_sha256")) {
+                s.riskAuditHeadSha256 = asStr(doc, "risk_audit_head_sha256", where);
+                s.riskAuditSeq = asLong(doc, "risk_audit_seq", where);
             }
             if (s.eventCursor < 0 || s.riskOrderSeq < 0 || s.restarts < 0
                     || s.auditLines < 0 || s.traceLines < 0) {

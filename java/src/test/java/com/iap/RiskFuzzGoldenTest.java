@@ -197,8 +197,9 @@ public class RiskFuzzGoldenTest {
         void restore(long ts) {
             done.append(eng.auditJsonl());
             doneLines += eng.audit().size();
-            eng = RiskEngine.restore(RiskLimits.fromJson(doc), refs,
-                    Json.object(Json.parse(eng.snapshot())), ts);
+            eng = RiskEngine.restoreChained(RiskLimits.fromJson(doc), refs,
+                    Json.object(Json.parse(eng.snapshot())), ts, eng.auditChainSeq(),
+                    eng.auditChainHead());
         }
 
         private boolean callFails(String kind, Map<String, Object> step) {
@@ -349,6 +350,23 @@ public class RiskFuzzGoldenTest {
         return "unexpected fields " + g.keySet();
     }
 
+    /**
+     * {@code null} when the audit lines form one hash chain (seq 1..n, each
+     * {@code prev_sha256} the SHA-256 of the line before), else the first
+     * broken line.
+     */
+    private static String chainError(List<String> lines) {
+        String prev = RiskEvent.GENESIS_SHA256;
+        for (int i = 0; i < lines.size(); i++) {
+            Map<String, Object> doc = Json.object(Json.parse(lines.get(i)));
+            if (Json.asLong(doc.get("seq")) != i + 1L || !prev.equals(doc.get("prev_sha256"))) {
+                return "audit chain broken at line " + (i + 1);
+            }
+            prev = RiskEvent.lineSha256(lines.get(i));
+        }
+        return null;
+    }
+
     /** The full check of one script. */
     private static void verify(Case c) {
         Run main = run(c.script(), -1, true);
@@ -360,6 +378,10 @@ public class RiskFuzzGoldenTest {
         if (diff != null) {
             throw new Divergence("final snapshot differs at " + diff);
         }
+        String broken = chainError(full);
+        if (broken != null) {
+            throw new Divergence(broken);
+        }
         for (Object cutValue : Json.array(c.script().get("cuts"))) {
             int cut = (int) Json.asLong(cutValue);
             Run r = run(c.script(), cut, true);
@@ -368,11 +390,19 @@ public class RiskFuzzGoldenTest {
             if (!got.get(mark).contains("\"rule_id\":\"STATE_RESTORED\"")) {
                 throw new Divergence("cut " + cut + ": no STATE_RESTORED record");
             }
-            if (!got.subList(0, mark).equals(full.subList(0, mark))
-                    || !got.subList(mark + 1, got.size())
-                            .equals(full.subList(mark, full.size()))) {
+            // the restored engine continues the chain, so its records sit
+            // one chain position later: compare their content, then the chain
+            List<String> tail = got.subList(mark + 1, got.size()).stream()
+                    .map(RiskEvent::unchainedLine).toList();
+            List<String> want = full.subList(mark, full.size()).stream()
+                    .map(RiskEvent::unchainedLine).toList();
+            if (!got.subList(0, mark).equals(full.subList(0, mark)) || !tail.equals(want)) {
                 throw new Divergence("cut " + cut
                         + ": the restored engine's audit tail differs");
+            }
+            broken = chainError(got);
+            if (broken != null) {
+                throw new Divergence("cut " + cut + ": " + broken);
             }
             diff = snapshotDiff(r.snapshot(), c.snapshot());
             if (diff != null) {
