@@ -37,10 +37,14 @@ Per symbol:
   / fills / P&L and the trace digest.  No wall clock, no absolute path:
   two runs of the same inputs write identical manifests.
 
-The pre-registration config (``--config``) is hashed into the manifest.
-The MVP engine does not (yet) consume its opt-ins (regulatory fees,
-execution realism); the manifest lists them under ``not_applied`` rather
-than claiming them.
+The pre-registration config (``--config``) is hashed into the manifest and
+its opt-ins the MVP loop exercises are APPLIED (``MvpEngine(realism=...)``):
+regulatory fees (SEC Section 31 + FINRA TAF on sell fills, by fill date),
+hidden-print fills and the feed latency leg; the modify queue credit is
+always on.  The maker / quoting / calibration options (exit and flatten
+routes, amend size-down, markout unit) have no counterpart in the MVP loop
+and are listed under ``not_applied`` with the reason.  Without
+``--config`` the run is the pinned v1 loop.
 """
 
 from __future__ import annotations
@@ -68,6 +72,8 @@ from iap.core.codec import (
     sha256_file,
 )
 from iap.core.events import MarketEvent
+from iap.execution.realism import RealismOptIns
+from iap.execution.regulatory import SCHEDULE_RELPATH
 from iap.marketdata.ingest import MANIFEST_NAME, MANIFEST_VERSION, config_version
 from iap.mvp.config import DEFAULT_CONFIG_PATH, REPO_ROOT, MvpConfig
 from iap.mvp.feed import FeedResult
@@ -284,22 +290,64 @@ def _stream_identity(factory: Callable[[], Iterator[MarketEvent]], n: int) -> tu
     return iap1.hexdigest(), jsonl.hexdigest()
 
 
-def _prereg_block(path: Path) -> dict[str, Any]:
+_NOT_APPLIED_REASONS = {
+    "exit_route": "the MVP has no maker exit leg (MakerConfig only); every MVP child "
+    "already goes through the execution simulator",
+    "flatten_route": "the MVP has no quoting flatten leg (QuotingConfig only)",
+    "amend_size_down": "the MVP never amends a resting child (QuotingConfig only)",
+    "markout_unit": "the MVP runs no execution calibration (estimate_calibration only)",
+}
+
+
+def _prereg_block(path: Path | None) -> tuple[dict[str, Any] | None, RealismOptIns | None]:
+    """The manifest block of a pre-registration and the opt-ins the MVP
+    loop applies (``None`` without a prereg: the pinned v1 loop)."""
+    if path is None:
+        return None, None
     doc = _load_json(path)
+    opts = RealismOptIns.from_prereg(doc)
     try:
         rel = path.resolve().relative_to(REPO_ROOT).as_posix()
     except ValueError:
         rel = path.name
-    opt_ins = sorted(k for k in doc if k not in ("x-version", "description", "methods"))
+    defaults = RealismOptIns()
+    applied: dict[str, Any] = {}
+    not_applied: dict[str, str] = {}
+    if opts.regulatory_fees:
+        sched = REPO_ROOT / "configs" / SCHEDULE_RELPATH
+        applied["regulatory_fees"] = {
+            "value": True,
+            "where": "ExecConfig.regulatory_fees: SEC Section 31 + FINRA TAF on SELL "
+            "fills, dated by fill time",
+            "schedule": f"configs/{SCHEDULE_RELPATH}",
+            "schedule_sha256": sha256_file(sched),
+        }
+    if opts.feed_latency_ns:
+        applied["feed_latency_ns"] = {
+            "value": opts.feed_latency_ns,
+            "where": "added to the decision latency leg (a child reaches the venue "
+            "feed_latency_ns later)",
+        }
+    if opts.hidden_print_fills:
+        applied["hidden_print_fills"] = {
+            "value": True,
+            "where": "ExecutionSimulator(hidden_prints=True)",
+        }
+    applied["modify_queue_credit"] = {
+        "value": True,
+        "where": "always on in the simulator since v1.14 (no switch)",
+    }
+    for name, reason in _NOT_APPLIED_REASONS.items():
+        value = getattr(opts, name)
+        if value != getattr(defaults, name):
+            not_applied[name] = f"{value!r}: {reason}"
     return {
         "path": rel,
         "content_hash": content_hash(doc),
         "methods": doc.get("methods"),
-        "applied": [],
-        "not_applied": opt_ins,
-        "note": "the MVP engine does not consume the pre-registration opt-ins yet; "
-        "the config is pinned by hash, not applied",
-    }
+        "applied": applied,
+        "not_applied": not_applied,
+    }, opts
 
 
 def run_symbol(
@@ -308,7 +356,7 @@ def run_symbol(
     symbol: str,
     out_dir: str | Path,
     *,
-    prereg: str | Path,
+    prereg: str | Path | None = None,
     mvp_config: str | Path | None = None,
     limit_events: int | None = None,
     allow_legacy: bool = False,
@@ -322,6 +370,7 @@ def run_symbol(
     if date not in (ds_manifest.get("sessions") or {}):
         raise ValueError(f"{dataset}: no session {date} in {MANIFEST_NAME}")
     source, source_sha = _normalized_source(dataset, ds_manifest)
+    prereg_block, realism = _prereg_block(None if prereg is None else Path(prereg))
     base = MvpConfig.load(mvp_config or DEFAULT_CONFIG_PATH)
     cfg, iid = _symbol_config(base, dataset, date, symbol, out / "reference_root")
 
@@ -346,7 +395,7 @@ def run_symbol(
         generator_stats={},
         qc_totals=dict(sorted((ds_manifest.get("normalized") or {}).get("qc_totals", {}).items())),
     )
-    result = run_session(cfg, feed, out)  # pass 3
+    result = run_session(cfg, feed, out, realism=realism)  # pass 3
     rep = result.report
     counters = rep["counts"]["counters"]
     manifest = {
@@ -364,7 +413,7 @@ def run_symbol(
         "date": date,
         "symbol": symbol,
         "instrument_id": iid,
-        "prereg": _prereg_block(Path(prereg)),
+        "prereg": prereg_block,
         "mvp": {
             "run_id": cfg.run_id,
             "session_id": cfg.session_id,
@@ -422,7 +471,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--date", required=True, help="session date YYYY-MM-DD")
     p.add_argument("--symbols", required=True, help="comma-separated symbols")
     p.add_argument(
-        "--config", required=True, help="pre-registration config (configs/prereg/v2.json)"
+        "--config",
+        default=None,
+        help="pre-registration config (configs/prereg/v2.json); omitted = the pinned v1 loop",
     )
     p.add_argument("--mvp-config", default=None, help="base MVP config (configs/mvp/mvp.json)")
     p.add_argument("--out", required=True, help="output directory")

@@ -14,8 +14,10 @@ that tag.
   never materialised) through the unchanged `MvpEngine` / `run_session`, one
   engine per symbol, with a deterministic `run_manifest.json` (dataset version
   + verified normalized sha256, prereg hash, config version, event count,
-  parents / children / fills / P&L, trace digest). The prereg opt-ins are
-  pinned by hash and listed as `not_applied`, because the MVP engine does not consume them yet.
+  parents / children / fills / P&L, trace digest). The v2 prereg opt-ins the MVP
+  loop exercises are applied via the opt-in `MvpEngine(realism=...)` (regulatory
+  fees on sell fills by fill date, hidden-print fills, feed latency); maker /
+  quoting / calibration-only options are listed as `not_applied` with a reason.
   Pre-v1.14 manifests need `--allow-legacy-dataset`. Tests:
   `python/tests/test_mvp_real.py` (a tiny synthetic dataset in the ingest format,
   determinism, `--limit-events`, CLI errors). The synthetic golden is unchanged

@@ -25,6 +25,7 @@ from typing import Any
 
 from iap.alpha import ALPHA_CLASSES
 from iap.contracts.versions import canonical_json
+from iap.execution.realism import RealismOptIns
 from iap.features.registry import registry_dicts
 from iap.lifecycle.evidence import PaperEvidence
 from iap.lifecycle.registry import AlphaRegistry
@@ -208,8 +209,17 @@ def _write(path: Path, text: str) -> None:
         fh.write(text)
 
 
-def run_session(cfg: MvpConfig, feed: FeedResult, out_dir: str | Path) -> RunResult:
-    """Run one session (see module docstring) and write every artefact."""
+def run_session(
+    cfg: MvpConfig,
+    feed: FeedResult,
+    out_dir: str | Path,
+    *,
+    realism: RealismOptIns | None = None,
+) -> RunResult:
+    """Run one session (see module docstring) and write every artefact.
+
+    ``realism`` (v1.15, opt-in) is passed to :class:`MvpEngine`; ``None``
+    (every synthetic / golden run) is the pinned loop."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     registry = AlphaRegistry.load(cfg.reference_path("alpha_registry"))
@@ -225,7 +235,7 @@ def run_session(cfg: MvpConfig, feed: FeedResult, out_dir: str | Path) -> RunRes
         jsonl_sink = JsonlTraceSink(out_dir / TRACES_FILE)
         store_sink = StoreTraceSink(store)
         with MultiSink(jsonl_sink, store_sink) as sink:
-            engine = MvpEngine(cfg, feed, sink)
+            engine = MvpEngine(cfg, feed, sink, realism=realism)
             _import_reference(store, cfg, engine, registry)
             for ev in feed.events:
                 engine.on_event(ev)

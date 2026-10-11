@@ -114,7 +114,19 @@ def test_real_runner_is_deterministic_and_writes_a_manifest(dataset: Path, tmp_p
         m["stream"]["data_version"]
         == json.loads((dataset / "dataset.json").read_text())["dataset_version"]
     )
-    assert m["prereg"]["methods"] == "v2" and m["prereg"]["applied"] == []
+    assert m["prereg"]["methods"] == "v2"
+    assert set(m["prereg"]["applied"]) == {
+        "regulatory_fees",
+        "feed_latency_ns",
+        "hidden_print_fills",
+        "modify_queue_credit",
+    }
+    assert set(m["prereg"]["not_applied"]) == {
+        "exit_route",
+        "flatten_route",
+        "amend_size_down",
+        "markout_unit",
+    }
     assert m["results"]["decisions"] > 0
     assert m["trace_digest"] == a.result.trace_digest
 
@@ -151,3 +163,42 @@ def test_cli_and_errors(dataset: Path, tmp_path: Path) -> None:
     _write(legacy / "dataset.json", doc)
     with pytest.raises(ValueError, match="allow-legacy-dataset"):
         _run(legacy, tmp_path / "x")
+
+
+def _prereg(tmp_path: Path, name: str, doc: dict) -> Path:
+    path = tmp_path / f"{name}.json"
+    _write(path, {"x-version": 1, "methods": "test", **doc})
+    return path
+
+
+def test_default_prereg_is_the_pinned_loop(dataset: Path, tmp_path: Path) -> None:
+    """No prereg and an all-defaults prereg run the identical (v1) loop."""
+    plain = run_symbol(dataset, DATE, "TINY", tmp_path / "p", mvp_config=TINY_CONFIG)
+    assert plain.manifest["prereg"] is None
+    off = _run_with(dataset, tmp_path / "o", _prereg(tmp_path, "off", {}))
+    assert off.result.trace_digest == plain.result.trace_digest
+    assert off.manifest["prereg"]["applied"].keys() == {"modify_queue_credit"}
+    assert off.manifest["prereg"]["not_applied"] == {}
+
+
+def _run_with(dataset: Path, out: Path, prereg: Path):
+    return run_symbol(dataset, DATE, "TINY", out, prereg=prereg, mvp_config=TINY_CONFIG)
+
+
+def test_regulatory_fees_are_charged_on_sell_fills_only(dataset: Path, tmp_path: Path) -> None:
+    plain = run_symbol(dataset, DATE, "TINY", tmp_path / "p", mvp_config=TINY_CONFIG)
+    fees = _run_with(dataset, tmp_path / "f", _prereg(tmp_path, "fees", {"regulatory_fees": True}))
+    p, f = plain.result.report["pnl"], fees.result.report["pnl"]
+    # same fills (fees do not move the market), strictly more fees
+    assert fees.manifest["results"]["fills"] == plain.manifest["results"]["fills"] > 0
+    assert f["fees"] > p["fees"]
+    assert f["equity"] < p["equity"]
+    assert abs(f["identity_abs_diff"]) < 1e-6
+
+
+def test_v2_realism_changes_the_run(dataset: Path, tmp_path: Path) -> None:
+    plain = run_symbol(dataset, DATE, "TINY", tmp_path / "p", mvp_config=TINY_CONFIG)
+    v2 = _run(dataset, tmp_path / "v2")
+    assert v2.result.trace_digest != plain.result.trace_digest
+    assert v2.result.engine.realism is not None
+    assert v2.result.engine.realism.feed_latency_ns == 100_000

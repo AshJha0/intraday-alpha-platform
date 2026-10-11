@@ -518,12 +518,21 @@ its own `<out>/<SYMBOL>/` directory.
   `config_version`, the event count and bounds, decisions / parents / children /
   fills / P&L, and the trace digest. It contains no wall clock and no absolute
   path, so two runs of the same inputs write identical bytes (tested).
-- **Pre-registration.** `--config` is pinned by hash. The MVP engine does not
-  yet consume its opt-ins (regulatory fees, execution realism). The manifest
-  lists them under `not_applied` instead of claiming them.
+- **Pre-registration.** `--config` is pinned by hash and its opt-ins that
+  the MVP loop exercises are applied through `MvpEngine(realism=...)` (an
+  opt-in keyword; the synthetic run, the golden and the C++/Rust parity path
+  never set it, so the golden digest `6fdb3a2c` is unchanged):
+  `regulatory_fees` (SEC Section 31 + FINRA TAF on sell fills, dated by fill
+  time, `ExecConfig.regulatory_fees`), `hidden_print_fills`
+  (`ExecutionSimulator(hidden_prints=True)`) and `feed_latency_ns` (added to
+  the decision latency leg). `modify_queue_credit` is always on. These are
+  listed under `applied`. `exit_route`, `flatten_route`, `amend_size_down` and
+  `markout_unit` belong to the maker / quoting / calibration paths and have no
+  counterpart in the MVP loop. They are listed under `not_applied` with the
+  reason. Without `--config` the run is the pinned v1 loop.
 
 Smoke run (2026-10-11, `ds3_20190130`, AAPL, `--limit-events 200000`, legacy
-manifest). The first 200,000 AAPL events run from 03:08 to 09:41 ET, so about
+manifest, before the prereg opt-ins were wired, so v1 costs). The first 200,000 AAPL events run from 03:08 to 09:41 ET, so about
 11 minutes of regular session. Results: 4,836 decisions, 4,424 parents, 956
 children submitted, 946 fills, gross P&L USD +219.78, fees USD 64.63,
 execution cost USD 634.35, equity USD -414.57 (a loss), trace digest `88bb4218…`,
