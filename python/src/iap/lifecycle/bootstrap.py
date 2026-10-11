@@ -222,11 +222,20 @@ def select_pipeline_entries(
             rank = 2
         else:
             continue  # another dataset's look: history, not this evidence
-        by_rank = ranked.setdefault(entry["alpha_id"], {})
-        if rank in by_rank:
-            raise ValueError(f"{source}: duplicate {_LEDGER_KIND} entry for {entry['alpha_id']}")
-        by_rank[rank] = entry
-    return {alpha_id: by_rank[min(by_rank)] for alpha_id, by_rank in ranked.items()}
+        ranked.setdefault(entry["alpha_id"], {}).setdefault(rank, []).append(entry)
+    out: dict[str, dict[str, Any]] = {}
+    for alpha_id, by_rank in ranked.items():
+        # Only the rank in force must be unambiguous: since v1.14.0 one
+        # dataset can hold the same alpha under several superseded bundles
+        # (``legacy_v1``, ``v2_v113``) beside the current one.
+        # A fallback rank (no entry under ``methods`` yet) takes the latest
+        # recorded entry; two entries under ``methods`` are an error.
+        rank = min(by_rank)
+        best = by_rank[rank]
+        if rank == 0 and len(best) > 1:
+            raise ValueError(f"{source}: duplicate {_LEDGER_KIND} entry for {alpha_id}")
+        out[alpha_id] = best[-1]
+    return out
 
 
 def load_ledger_entries(
