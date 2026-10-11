@@ -185,7 +185,7 @@ void ExecutionSimulator::cancel_all() {
 
 double ExecutionSimulator::fill_fee(const ChildOrder& o,
                                     std::int64_t price_ticks, std::int64_t qty,
-                                    Liquidity liq) const {
+                                    Liquidity liq, std::int64_t ts) const {
     const VenueSpec& v = venue(o.venue_id);
     if (v.is_fx) {
         const InstrumentSpec& ins = instrument(o.instrument_id);
@@ -194,10 +194,19 @@ double ExecutionSimulator::fill_fee(const ChildOrder& o,
                                 ins.tick_size;
         return v.commission_per_million * notional / 1e6;
     }
-    if (liq == Liquidity::TAKER) {
-        return v.taker_fee_per_share * static_cast<double>(qty);
+    double base = liq == Liquidity::TAKER
+                      ? v.taker_fee_per_share * static_cast<double>(qty)
+                      : -v.maker_rebate_per_share * static_cast<double>(qty);
+    if (config_.regulatory_fees && o.side == 1) {
+        // v1.15 X-P1-1: dated Section 31 + TAF by fill time (sells only).
+        const InstrumentSpec& ins = instrument(o.instrument_id);
+        const double notional = static_cast<double>(qty) * ins.qty_unit *
+                                static_cast<double>(price_ticks) *
+                                ins.tick_size;
+        base += config_.regulatory_fees->fee(o.side, static_cast<double>(qty),
+                                             notional, ts);
     }
-    return -v.maker_rebate_per_share * static_cast<double>(qty);
+    return base;
 }
 
 void ExecutionSimulator::emit_fill(ChildOrder& o, std::int64_t price_ticks,
@@ -214,7 +223,7 @@ void ExecutionSimulator::emit_fill(ChildOrder& o, std::int64_t price_ticks,
     f.qty = qty;
     f.ts = ts;
     f.liquidity = liq;
-    f.fee = fill_fee(o, price_ticks, qty, liq);
+    f.fee = fill_fee(o, price_ticks, qty, liq, ts);
     if (liq == Liquidity::TAKER) {
         // Pinned rule 6: linear impact from the child's total size in base
         // units (qty * qty_unit) — the linear rule of the research cost

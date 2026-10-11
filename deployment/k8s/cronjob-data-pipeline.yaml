@@ -112,10 +112,14 @@ spec:
                     path: mvp/mvp_tiny.json
                   - key: mvp__venues.json
                     path: mvp/venues.json
+                  - key: prereg__v2.json
+                    path: prereg/v2.json
                   - key: reference__auction_entry_cutoffs.json
                     path: reference/auction_entry_cutoffs.json
                   - key: reference__event_calendar.json
                     path: reference/event_calendar.json
+                  - key: reference__regulatory_fee_schedule.json
+                    path: reference/regulatory_fee_schedule.json
                   - key: risk__risk.json
                     path: risk/risk.json
                   - key: strategies__alpha_params.json

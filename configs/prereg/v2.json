@@ -1,0 +1,6 @@
+{
+  "x-version": 1,
+  "description": "v2 pre-registration config: realism opt-ins that are OFF in code defaults (v1 numbers unchanged) and ON for v2 preregistered runs. v1.15 X-P1-1 adds the dated SEC Section 31 + FINRA TAF schedule (configs/reference/regulatory_fee_schedule.json); R-P0-2 extends this file with the other realism opt-ins. Read with iap.execution.regulatory.prereg_wants_regulatory_fees and passed as load_exec_config(..., regulatory_fees=True).",
+  "methods": "v2",
+  "regulatory_fees": true
+}
