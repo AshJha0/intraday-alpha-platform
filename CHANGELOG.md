@@ -8,6 +8,18 @@ that tag.
 
 ## Unreleased (v1.15)
 
+- **Feature drift monitor** (`iap.research.drift`, CLI
+  `python -m iap.research.drift --ref <dirs> --target <dirs> --out <dir>`):
+  PSI, KS, mean shift (reference-std units) and std ratio per feature, per
+  symbol and pooled, streamed from the feature store in record batches
+  (chunk-invariant); JSON + markdown report with configurable thresholds.
+  Descriptive only; the R7 plan runs it after ingest and before the
+  confirmatory run.
+- **Model cards required at promotion** (`iap.mlops.model_card`,
+  `ModelRegistry.write_card`, `python -m iap.mlops card`): `promote()` raises
+  `RegistryError` on a missing or invalid card, alongside the content-hash
+  check; `promotion.json` records the card hash.
+
 - **X-P1-1: dated SEC Section 31 + FINRA TAF fees** in the Python, C++ and
   Rust execution engines (sell side only), from
   `configs/reference/regulatory_fee_schedule.json` (dated periods with
