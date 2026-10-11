@@ -36,7 +36,12 @@ from iap.research import (
     gate_eligibility,
 )
 from iap.research.__main__ import main as cli_main
-from iap.research.runner import ELIGIBILITY_FILE, STAGING_PREFIX, render_document
+from iap.research.runner import (
+    ELIGIBILITY_FILE,
+    EXPLORATORY_REASON,
+    STAGING_PREFIX,
+    render_document,
+)
 from iap.store.__main__ import main as store_main
 from iap.store.db import Store
 from iap.validation.ledger import ExperimentLedger
@@ -477,7 +482,9 @@ def test_eligibility_never_changes_an_experiment_id():
         got = reg.gate_eligibility(rec.experiment_id)
         if rec.experiment_id in current_ids:
             assert rec.spec.configuration == DEFAULT_CONFIGURATION
-            assert got.eligible and got.reasons == ()
+            # v1.14.0: re-run in place under the same ids by the regenerate
+            # job, which runs them --no-prereg (G4): exploratory, and says so
+            assert not got.eligible and got.reasons == (EXPLORATORY_REASON,)
             assert got.periods_verified  # the sidecar the runner wrote
             assert got.methods == "v2"
             # the threshold the result was judged at is the ledger's

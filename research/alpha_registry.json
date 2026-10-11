@@ -6,18 +6,16 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "7abd57dc99f0709c",
+      "experiment_id": "c0a4f652eabb690c",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ01",
         "consecutive_failures": 0,
         "event_ts": 1787691480577291027,
         "failed_gates": [
-          "statistical_significance",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability"
+          "capacity"
         ],
         "gate_order": [
           "leakage_clean",
@@ -46,7 +44,7 @@
           "fold_consistency": {
             "passed": true,
             "threshold": 0.7,
-            "value": 0.75
+            "value": 1.0
           },
           "fold_count": {
             "passed": true,
@@ -76,17 +74,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.010519815457579376
+            "value": 0.023400911817318754
           },
           "stability": {
-            "passed": false,
+            "passed": true,
             "threshold": 1.0,
-            "value": 1.9451791390250808
+            "value": 0.487189458598006
           },
           "statistical_significance": {
-            "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 1.594398343233103
+            "passed": true,
+            "threshold": 4.425812536056746,
+            "value": 6.865773863493911
           }
         },
         "outcome": "HOLD",
@@ -107,7 +105,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 2004.0
+            "value": 5158.0
           }
         },
         "policy": "lifecycle_v1",
@@ -126,7 +124,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "09bf2a467ea3ff31",
+      "experiment_id": "dcc2aa1b522120b1",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ02",
@@ -194,17 +192,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.02507627731154791
+            "value": 0.03517277233977837
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.32196369877082914
+            "value": 0.04324380785158304
           },
           "statistical_significance": {
             "passed": true,
-            "threshold": 4.365155224196862,
-            "value": 7.165268822035137
+            "threshold": 4.425812536056746,
+            "value": 11.300596289467016
           }
         },
         "outcome": "HOLD",
@@ -225,7 +223,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 2088.0
+            "value": 5160.0
           }
         },
         "policy": "lifecycle_v1",
@@ -244,7 +242,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "70421bc02273a6ab",
+      "experiment_id": "bf5f814d02cc0093",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ03",
@@ -312,17 +310,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.018850474014781526
+            "value": 0.028106782114102592
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.11975554375499804
+            "value": 0.24705930884294197
           },
           "statistical_significance": {
             "passed": true,
-            "threshold": 4.365155224196862,
-            "value": 5.162083476166736
+            "threshold": 4.425812536056746,
+            "value": 7.899266529889529
           }
         },
         "outcome": "HOLD",
@@ -343,7 +341,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 2172.0
+            "value": 5162.0
           }
         },
         "policy": "lifecycle_v1",
@@ -362,7 +360,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "77031372cfbecd6c",
+      "experiment_id": "9c5a09402428b9ba",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ04",
@@ -375,8 +373,7 @@
           "hypothesis_sign",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability"
+          "capacity"
         ],
         "gate_order": [
           "leakage_clean",
@@ -405,7 +402,7 @@
           "fold_consistency": {
             "passed": false,
             "threshold": 0.7,
-            "value": 0.5
+            "value": 0.25
           },
           "fold_count": {
             "passed": true,
@@ -435,17 +432,17 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.0034041610495965137
+            "value": -0.006594037127939073
           },
           "stability": {
-            "passed": false,
+            "passed": true,
             "threshold": 1.0,
-            "value": 1.3871540432218938
+            "value": 0.8831329769382336
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": -0.5547422493172751
+            "threshold": 4.425812536056746,
+            "value": -1.1819156181435757
           }
         },
         "outcome": "HOLD",
@@ -466,7 +463,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 2256.0
+            "value": 5164.0
           }
         },
         "policy": "lifecycle_v1",
@@ -485,19 +482,17 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "041488ab325e97eb",
+      "experiment_id": "b493e395e9076119",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ05",
         "consecutive_failures": 0,
         "event_ts": 1787691480577291027,
         "failed_gates": [
-          "oos_ic",
           "statistical_significance",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability"
+          "capacity"
         ],
         "gate_order": [
           "leakage_clean",
@@ -554,19 +549,19 @@
             "value": null
           },
           "oos_ic": {
-            "passed": false,
+            "passed": true,
             "threshold": 0.01,
-            "value": 0.0055498762961367675
+            "value": 0.010086325388654581
           },
           "stability": {
-            "passed": false,
+            "passed": true,
             "threshold": 1.0,
-            "value": 2.0983040338640464
+            "value": 0.6615717873588303
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 1.6420946785070754
+            "threshold": 4.425812536056746,
+            "value": 3.178670803767634
           }
         },
         "outcome": "HOLD",
@@ -587,7 +582,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 2340.0
+            "value": 5166.0
           }
         },
         "policy": "lifecycle_v1",
@@ -606,18 +601,16 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "9623ece84ddea1d4",
+      "experiment_id": "50975e914f98a4b3",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ06",
         "consecutive_failures": 0,
         "event_ts": 1787691480577291027,
         "failed_gates": [
-          "statistical_significance",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability"
+          "capacity"
         ],
         "gate_order": [
           "leakage_clean",
@@ -671,22 +664,22 @@
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -1301.5037706689036
+            "value": -1493.8863166836672
           },
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.027713055971364267
+            "value": 0.047801486655971184
           },
           "stability": {
-            "passed": false,
+            "passed": true,
             "threshold": 1.0,
-            "value": 1.189387886707619
+            "value": 0.28222747813279747
           },
           "statistical_significance": {
-            "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 4.360652284233195
+            "passed": true,
+            "threshold": 4.425812536056746,
+            "value": 9.429841091964061
           }
         },
         "outcome": "HOLD",
@@ -707,7 +700,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 2424.0
+            "value": 5168.0
           }
         },
         "policy": "lifecycle_v1",
@@ -726,7 +719,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "ba11dca454634149",
+      "experiment_id": "bbd7a13d231006be",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "EQ07",
@@ -734,973 +727,6 @@
         "event_ts": 1787691480577291027,
         "failed_gates": [
           "oos_ic",
-          "statistical_significance",
-          "fold_consistency",
-          "hypothesis_sign",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability"
-        ],
-        "gate_order": [
-          "leakage_clean",
-          "oos_ic",
-          "statistical_significance",
-          "fold_consistency",
-          "fold_count",
-          "hypothesis_sign",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability",
-          "cross_alpha_correlation"
-        ],
-        "gates": {
-          "capacity": {
-            "passed": false,
-            "threshold": 1000000.0,
-            "value": 0.0
-          },
-          "cross_alpha_correlation": {
-            "passed": true,
-            "threshold": 0.7,
-            "value": 0.0
-          },
-          "fold_consistency": {
-            "passed": false,
-            "threshold": 0.7,
-            "value": 0.5
-          },
-          "fold_count": {
-            "passed": true,
-            "threshold": 3.0,
-            "value": 4.0
-          },
-          "hypothesis_sign": {
-            "passed": false,
-            "threshold": null,
-            "value": null
-          },
-          "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "net_pnl_after_costs": {
-            "passed": false,
-            "threshold": 0.0,
-            "value": 0.0
-          },
-          "net_pnl_bootstrap_ci": {
-            "passed": false,
-            "threshold": 0.0,
-            "value": null
-          },
-          "oos_ic": {
-            "passed": false,
-            "threshold": 0.01,
-            "value": 0.0006333514048878078
-          },
-          "stability": {
-            "passed": false,
-            "threshold": 1.0,
-            "value": 31.589233498142427
-          },
-          "statistical_significance": {
-            "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 0.14017470990792835
-          }
-        },
-        "outcome": "HOLD",
-        "state": "CANDIDATE",
-        "transition": null
-      },
-      "last_transition": {
-        "actor": "SYSTEM",
-        "alpha_id": "EQ07",
-        "event_ts": 1787691480577291027,
-        "from_state": "RESEARCH",
-        "gates": {
-          "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "ledger_entry_exists": {
-            "passed": true,
-            "threshold": 1.0,
-            "value": 2508.0
-          }
-        },
-        "policy": "lifecycle_v1",
-        "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
-        "to_state": "CANDIDATE"
-      },
-      "model_version": "e0ba2d4c6090f18cd34376493e5d69d0cbbfa41a83cc3764f4aa29dfe69c5a5e",
-      "recovery_count": 0,
-      "since_ts": 1787691480577291027,
-      "state": "CANDIDATE",
-      "state_index": 1
-    },
-    "EQ08": {
-      "alpha_id": "EQ08",
-      "breach_count": 0,
-      "consecutive_failures": 0,
-      "cusum": 0.0,
-      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "d4df983b3656ec9f",
-      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
-      "last_evaluation": {
-        "alpha_id": "EQ08",
-        "consecutive_failures": 0,
-        "event_ts": 1787691480577291027,
-        "failed_gates": [
-          "oos_ic",
-          "statistical_significance",
-          "fold_consistency",
-          "hypothesis_sign",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity"
-        ],
-        "gate_order": [
-          "leakage_clean",
-          "oos_ic",
-          "statistical_significance",
-          "fold_consistency",
-          "fold_count",
-          "hypothesis_sign",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability",
-          "cross_alpha_correlation"
-        ],
-        "gates": {
-          "capacity": {
-            "passed": false,
-            "threshold": 1000000.0,
-            "value": 0.0
-          },
-          "cross_alpha_correlation": {
-            "passed": true,
-            "threshold": 0.7,
-            "value": 0.0
-          },
-          "fold_consistency": {
-            "passed": false,
-            "threshold": 0.7,
-            "value": 0.0
-          },
-          "fold_count": {
-            "passed": true,
-            "threshold": 3.0,
-            "value": 4.0
-          },
-          "hypothesis_sign": {
-            "passed": false,
-            "threshold": null,
-            "value": null
-          },
-          "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "net_pnl_after_costs": {
-            "passed": false,
-            "threshold": 0.0,
-            "value": 0.0
-          },
-          "net_pnl_bootstrap_ci": {
-            "passed": false,
-            "threshold": 0.0,
-            "value": null
-          },
-          "oos_ic": {
-            "passed": false,
-            "threshold": 0.01,
-            "value": -0.048141214140341664
-          },
-          "stability": {
-            "passed": true,
-            "threshold": 1.0,
-            "value": 0.1395738044277243
-          },
-          "statistical_significance": {
-            "passed": false,
-            "threshold": 4.365155224196862,
-            "value": -4.5658096083202535
-          }
-        },
-        "outcome": "HOLD",
-        "state": "CANDIDATE",
-        "transition": null
-      },
-      "last_transition": {
-        "actor": "SYSTEM",
-        "alpha_id": "EQ08",
-        "event_ts": 1787691480577291027,
-        "from_state": "RESEARCH",
-        "gates": {
-          "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "ledger_entry_exists": {
-            "passed": true,
-            "threshold": 1.0,
-            "value": 2592.0
-          }
-        },
-        "policy": "lifecycle_v1",
-        "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
-        "to_state": "CANDIDATE"
-      },
-      "model_version": "70b16f753b3b562c872c018207843383250335d9694f86ce201e374e43c5a5b4",
-      "recovery_count": 0,
-      "since_ts": 1787691480577291027,
-      "state": "CANDIDATE",
-      "state_index": 1
-    },
-    "EQ09": {
-      "alpha_id": "EQ09",
-      "breach_count": 0,
-      "consecutive_failures": 0,
-      "cusum": 0.0,
-      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "4bb44174bb9b85f3",
-      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
-      "last_evaluation": {
-        "alpha_id": "EQ09",
-        "consecutive_failures": 0,
-        "event_ts": 1787691480577291027,
-        "failed_gates": [
-          "oos_ic",
-          "statistical_significance",
-          "fold_consistency",
-          "hypothesis_sign",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability"
-        ],
-        "gate_order": [
-          "leakage_clean",
-          "oos_ic",
-          "statistical_significance",
-          "fold_consistency",
-          "fold_count",
-          "hypothesis_sign",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability",
-          "cross_alpha_correlation"
-        ],
-        "gates": {
-          "capacity": {
-            "passed": false,
-            "threshold": 1000000.0,
-            "value": 0.0
-          },
-          "cross_alpha_correlation": {
-            "passed": true,
-            "threshold": 0.7,
-            "value": 0.0
-          },
-          "fold_consistency": {
-            "passed": false,
-            "threshold": 0.7,
-            "value": 0.5
-          },
-          "fold_count": {
-            "passed": true,
-            "threshold": 3.0,
-            "value": 4.0
-          },
-          "hypothesis_sign": {
-            "passed": false,
-            "threshold": null,
-            "value": null
-          },
-          "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "net_pnl_after_costs": {
-            "passed": false,
-            "threshold": 0.0,
-            "value": 0.0
-          },
-          "net_pnl_bootstrap_ci": {
-            "passed": false,
-            "threshold": 0.0,
-            "value": null
-          },
-          "oos_ic": {
-            "passed": false,
-            "threshold": 0.01,
-            "value": -0.02290206772997278
-          },
-          "stability": {
-            "passed": false,
-            "threshold": 1.0,
-            "value": 1.2705671484356036
-          },
-          "statistical_significance": {
-            "passed": false,
-            "threshold": 4.365155224196862,
-            "value": -1.316822200812153
-          }
-        },
-        "outcome": "HOLD",
-        "state": "CANDIDATE",
-        "transition": null
-      },
-      "last_transition": {
-        "actor": "SYSTEM",
-        "alpha_id": "EQ09",
-        "event_ts": 1787691480577291027,
-        "from_state": "RESEARCH",
-        "gates": {
-          "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "ledger_entry_exists": {
-            "passed": true,
-            "threshold": 1.0,
-            "value": 2676.0
-          }
-        },
-        "policy": "lifecycle_v1",
-        "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
-        "to_state": "CANDIDATE"
-      },
-      "model_version": "5268c92e5820b4e2d7d6aad9f0492ac49798654cadc206decc673937b76a876b",
-      "recovery_count": 0,
-      "since_ts": 1787691480577291027,
-      "state": "CANDIDATE",
-      "state_index": 1
-    },
-    "EQ10": {
-      "alpha_id": "EQ10",
-      "breach_count": 0,
-      "consecutive_failures": 0,
-      "cusum": 0.0,
-      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "1357421c77d540a0",
-      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
-      "last_evaluation": {
-        "alpha_id": "EQ10",
-        "consecutive_failures": 0,
-        "event_ts": 1787691480577291027,
-        "failed_gates": [
-          "oos_ic",
-          "statistical_significance",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity"
-        ],
-        "gate_order": [
-          "leakage_clean",
-          "oos_ic",
-          "statistical_significance",
-          "fold_consistency",
-          "fold_count",
-          "hypothesis_sign",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability",
-          "cross_alpha_correlation"
-        ],
-        "gates": {
-          "capacity": {
-            "passed": false,
-            "threshold": 1000000.0,
-            "value": 0.0
-          },
-          "cross_alpha_correlation": {
-            "passed": true,
-            "threshold": 0.7,
-            "value": 0.0
-          },
-          "fold_consistency": {
-            "passed": true,
-            "threshold": 0.7,
-            "value": 0.75
-          },
-          "fold_count": {
-            "passed": true,
-            "threshold": 3.0,
-            "value": 4.0
-          },
-          "hypothesis_sign": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "net_pnl_after_costs": {
-            "passed": false,
-            "threshold": 0.0,
-            "value": 0.0
-          },
-          "net_pnl_bootstrap_ci": {
-            "passed": false,
-            "threshold": 0.0,
-            "value": null
-          },
-          "oos_ic": {
-            "passed": false,
-            "threshold": 0.01,
-            "value": 0.003981272054347236
-          },
-          "stability": {
-            "passed": true,
-            "threshold": 1.0,
-            "value": 0.8393035817947329
-          },
-          "statistical_significance": {
-            "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 0.9080872110157954
-          }
-        },
-        "outcome": "HOLD",
-        "state": "CANDIDATE",
-        "transition": null
-      },
-      "last_transition": {
-        "actor": "SYSTEM",
-        "alpha_id": "EQ10",
-        "event_ts": 1787691480577291027,
-        "from_state": "RESEARCH",
-        "gates": {
-          "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "ledger_entry_exists": {
-            "passed": true,
-            "threshold": 1.0,
-            "value": 2760.0
-          }
-        },
-        "policy": "lifecycle_v1",
-        "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
-        "to_state": "CANDIDATE"
-      },
-      "model_version": "a1f947b7e38864ef3029da503cc82ec46ba44648b45d9017e8d897c8320d2c33",
-      "recovery_count": 0,
-      "since_ts": 1787691480577291027,
-      "state": "CANDIDATE",
-      "state_index": 1
-    },
-    "EQ11": {
-      "alpha_id": "EQ11",
-      "breach_count": 0,
-      "consecutive_failures": 0,
-      "cusum": 0.0,
-      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "a55f50d256e0c7e2",
-      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
-      "last_evaluation": {
-        "alpha_id": "EQ11",
-        "consecutive_failures": 0,
-        "event_ts": 1787691480577291027,
-        "failed_gates": [
-          "oos_ic",
-          "statistical_significance",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability"
-        ],
-        "gate_order": [
-          "leakage_clean",
-          "oos_ic",
-          "statistical_significance",
-          "fold_consistency",
-          "fold_count",
-          "hypothesis_sign",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability",
-          "cross_alpha_correlation"
-        ],
-        "gates": {
-          "capacity": {
-            "passed": false,
-            "threshold": 1000000.0,
-            "value": 38248.2782977495
-          },
-          "cross_alpha_correlation": {
-            "passed": true,
-            "threshold": 0.7,
-            "value": 0.0
-          },
-          "fold_consistency": {
-            "passed": true,
-            "threshold": 0.7,
-            "value": 0.75
-          },
-          "fold_count": {
-            "passed": true,
-            "threshold": 3.0,
-            "value": 4.0
-          },
-          "hypothesis_sign": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "net_pnl_after_costs": {
-            "passed": false,
-            "threshold": 0.0,
-            "value": -5.017158492121816
-          },
-          "net_pnl_bootstrap_ci": {
-            "passed": false,
-            "threshold": 0.0,
-            "value": -5142.375055486925
-          },
-          "oos_ic": {
-            "passed": false,
-            "threshold": 0.01,
-            "value": 0.0038013470421630817
-          },
-          "stability": {
-            "passed": false,
-            "threshold": 1.0,
-            "value": 2.169827079146986
-          },
-          "statistical_significance": {
-            "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 0.19787514158224379
-          }
-        },
-        "outcome": "HOLD",
-        "state": "CANDIDATE",
-        "transition": null
-      },
-      "last_transition": {
-        "actor": "SYSTEM",
-        "alpha_id": "EQ11",
-        "event_ts": 1787691480577291027,
-        "from_state": "RESEARCH",
-        "gates": {
-          "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "ledger_entry_exists": {
-            "passed": true,
-            "threshold": 1.0,
-            "value": 2844.0
-          }
-        },
-        "policy": "lifecycle_v1",
-        "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
-        "to_state": "CANDIDATE"
-      },
-      "model_version": "803bb0a75f220ad6196ab59712d614231d98d428a366eb0a94b3c326c8206506",
-      "recovery_count": 0,
-      "since_ts": 1787691480577291027,
-      "state": "CANDIDATE",
-      "state_index": 1
-    },
-    "EQ12": {
-      "alpha_id": "EQ12",
-      "breach_count": 0,
-      "consecutive_failures": 0,
-      "cusum": 0.0,
-      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "47b4dbc5c409759e",
-      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
-      "last_evaluation": {
-        "alpha_id": "EQ12",
-        "consecutive_failures": 0,
-        "event_ts": 1787691480577291027,
-        "failed_gates": [
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity"
-        ],
-        "gate_order": [
-          "leakage_clean",
-          "oos_ic",
-          "statistical_significance",
-          "fold_consistency",
-          "fold_count",
-          "hypothesis_sign",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability",
-          "cross_alpha_correlation"
-        ],
-        "gates": {
-          "capacity": {
-            "passed": false,
-            "threshold": 1000000.0,
-            "value": 0.0
-          },
-          "cross_alpha_correlation": {
-            "passed": true,
-            "threshold": 0.7,
-            "value": 0.0
-          },
-          "fold_consistency": {
-            "passed": true,
-            "threshold": 0.7,
-            "value": 1.0
-          },
-          "fold_count": {
-            "passed": true,
-            "threshold": 3.0,
-            "value": 4.0
-          },
-          "hypothesis_sign": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "net_pnl_after_costs": {
-            "passed": false,
-            "threshold": 0.0,
-            "value": 0.0
-          },
-          "net_pnl_bootstrap_ci": {
-            "passed": false,
-            "threshold": 0.0,
-            "value": null
-          },
-          "oos_ic": {
-            "passed": true,
-            "threshold": 0.01,
-            "value": 0.026063538586629183
-          },
-          "stability": {
-            "passed": true,
-            "threshold": 1.0,
-            "value": 0.2863015828435954
-          },
-          "statistical_significance": {
-            "passed": true,
-            "threshold": 4.365155224196862,
-            "value": 7.195453980881905
-          }
-        },
-        "outcome": "HOLD",
-        "state": "CANDIDATE",
-        "transition": null
-      },
-      "last_transition": {
-        "actor": "SYSTEM",
-        "alpha_id": "EQ12",
-        "event_ts": 1787691480577291027,
-        "from_state": "RESEARCH",
-        "gates": {
-          "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "ledger_entry_exists": {
-            "passed": true,
-            "threshold": 1.0,
-            "value": 2928.0
-          }
-        },
-        "policy": "lifecycle_v1",
-        "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
-        "to_state": "CANDIDATE"
-      },
-      "model_version": "410cd407283f484ad25571f5e3faeb4f96659d659a77711ce208fc7a3517ca5c",
-      "recovery_count": 0,
-      "since_ts": 1787691480577291027,
-      "state": "CANDIDATE",
-      "state_index": 1
-    },
-    "FX01": {
-      "alpha_id": "FX01",
-      "breach_count": 0,
-      "consecutive_failures": 0,
-      "cusum": 0.0,
-      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "036424437698cae2",
-      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
-      "last_evaluation": {
-        "alpha_id": "FX01",
-        "consecutive_failures": 0,
-        "event_ts": 1787691480577291027,
-        "failed_gates": [
-          "statistical_significance",
-          "fold_consistency",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity"
-        ],
-        "gate_order": [
-          "leakage_clean",
-          "oos_ic",
-          "statistical_significance",
-          "fold_consistency",
-          "fold_count",
-          "hypothesis_sign",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability",
-          "cross_alpha_correlation"
-        ],
-        "gates": {
-          "capacity": {
-            "passed": false,
-            "threshold": 1000000.0,
-            "value": 0.0
-          },
-          "cross_alpha_correlation": {
-            "passed": true,
-            "threshold": 0.7,
-            "value": 0.0
-          },
-          "fold_consistency": {
-            "passed": false,
-            "threshold": 0.7,
-            "value": 0.0
-          },
-          "fold_count": {
-            "passed": true,
-            "threshold": 3.0,
-            "value": 4.0
-          },
-          "hypothesis_sign": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "net_pnl_after_costs": {
-            "passed": false,
-            "threshold": 0.0,
-            "value": 0.0
-          },
-          "net_pnl_bootstrap_ci": {
-            "passed": false,
-            "threshold": 0.0,
-            "value": null
-          },
-          "oos_ic": {
-            "passed": true,
-            "threshold": 0.01,
-            "value": 0.018288646675376993
-          },
-          "stability": {
-            "passed": true,
-            "threshold": 1.0,
-            "value": 0.82512454766451
-          },
-          "statistical_significance": {
-            "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 2.2572730900249756
-          }
-        },
-        "outcome": "HOLD",
-        "state": "CANDIDATE",
-        "transition": null
-      },
-      "last_transition": {
-        "actor": "SYSTEM",
-        "alpha_id": "FX01",
-        "event_ts": 1787691480577291027,
-        "from_state": "RESEARCH",
-        "gates": {
-          "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "ledger_entry_exists": {
-            "passed": true,
-            "threshold": 1.0,
-            "value": 3012.0
-          }
-        },
-        "policy": "lifecycle_v1",
-        "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
-        "to_state": "CANDIDATE"
-      },
-      "model_version": "076d4afdded2d8f706cdb5375c9d806ef77599e14a38a3fbae035b83ca94eb9b",
-      "recovery_count": 0,
-      "since_ts": 1787691480577291027,
-      "state": "CANDIDATE",
-      "state_index": 1
-    },
-    "FX02": {
-      "alpha_id": "FX02",
-      "breach_count": 0,
-      "consecutive_failures": 0,
-      "cusum": 0.0,
-      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "aff067ac0137c9d3",
-      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
-      "last_evaluation": {
-        "alpha_id": "FX02",
-        "consecutive_failures": 0,
-        "event_ts": 1787691480577291027,
-        "failed_gates": [
-          "oos_ic",
-          "statistical_significance",
-          "hypothesis_sign",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity"
-        ],
-        "gate_order": [
-          "leakage_clean",
-          "oos_ic",
-          "statistical_significance",
-          "fold_consistency",
-          "fold_count",
-          "hypothesis_sign",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability",
-          "cross_alpha_correlation"
-        ],
-        "gates": {
-          "capacity": {
-            "passed": false,
-            "threshold": 1000000.0,
-            "value": 0.0
-          },
-          "cross_alpha_correlation": {
-            "passed": true,
-            "threshold": 0.7,
-            "value": 0.0
-          },
-          "fold_consistency": {
-            "passed": true,
-            "threshold": 0.7,
-            "value": 0.75
-          },
-          "fold_count": {
-            "passed": true,
-            "threshold": 3.0,
-            "value": 4.0
-          },
-          "hypothesis_sign": {
-            "passed": false,
-            "threshold": null,
-            "value": null
-          },
-          "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "net_pnl_after_costs": {
-            "passed": false,
-            "threshold": 0.0,
-            "value": 0.0
-          },
-          "net_pnl_bootstrap_ci": {
-            "passed": false,
-            "threshold": 0.0,
-            "value": null
-          },
-          "oos_ic": {
-            "passed": false,
-            "threshold": 0.01,
-            "value": 0.005839451711789503
-          },
-          "stability": {
-            "passed": true,
-            "threshold": 1.0,
-            "value": 0.23014234243180173
-          },
-          "statistical_significance": {
-            "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 0.3429080223694012
-          }
-        },
-        "outcome": "HOLD",
-        "state": "CANDIDATE",
-        "transition": null
-      },
-      "last_transition": {
-        "actor": "SYSTEM",
-        "alpha_id": "FX02",
-        "event_ts": 1787691480577291027,
-        "from_state": "RESEARCH",
-        "gates": {
-          "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "ledger_entry_exists": {
-            "passed": true,
-            "threshold": 1.0,
-            "value": 3096.0
-          }
-        },
-        "policy": "lifecycle_v1",
-        "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
-        "to_state": "CANDIDATE"
-      },
-      "model_version": "b1a0744b2b43e9c7d3d5a3a84c498c16b90246764de90c1082e96c821fd2e960",
-      "recovery_count": 0,
-      "since_ts": 1787691480577291027,
-      "state": "CANDIDATE",
-      "state_index": 1
-    },
-    "FX03": {
-      "alpha_id": "FX03",
-      "breach_count": 0,
-      "consecutive_failures": 0,
-      "cusum": 0.0,
-      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "5d39a1c5ff05746c",
-      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
-      "last_evaluation": {
-        "alpha_id": "FX03",
-        "consecutive_failures": 0,
-        "event_ts": 1787691480577291027,
-        "failed_gates": [
           "statistical_significance",
           "fold_consistency",
           "hypothesis_sign",
@@ -1764,19 +790,986 @@
             "value": null
           },
           "oos_ic": {
-            "passed": true,
+            "passed": false,
             "threshold": 0.01,
-            "value": 0.011233662272281128
+            "value": -0.008741430506035555
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 1.346066463260465
+            "value": 1.3947419512180956
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 1.1327063966195106
+            "threshold": 4.425812536056746,
+            "value": -2.0457362546124207
+          }
+        },
+        "outcome": "HOLD",
+        "state": "CANDIDATE",
+        "transition": null
+      },
+      "last_transition": {
+        "actor": "SYSTEM",
+        "alpha_id": "EQ07",
+        "event_ts": 1787691480577291027,
+        "from_state": "RESEARCH",
+        "gates": {
+          "leakage_clean": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "ledger_entry_exists": {
+            "passed": true,
+            "threshold": 1.0,
+            "value": 5170.0
+          }
+        },
+        "policy": "lifecycle_v1",
+        "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
+        "to_state": "CANDIDATE"
+      },
+      "model_version": "e0ba2d4c6090f18cd34376493e5d69d0cbbfa41a83cc3764f4aa29dfe69c5a5e",
+      "recovery_count": 0,
+      "since_ts": 1787691480577291027,
+      "state": "CANDIDATE",
+      "state_index": 1
+    },
+    "EQ08": {
+      "alpha_id": "EQ08",
+      "breach_count": 0,
+      "consecutive_failures": 0,
+      "cusum": 0.0,
+      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+      "experiment_id": "77280cc82190b5a2",
+      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+      "last_evaluation": {
+        "alpha_id": "EQ08",
+        "consecutive_failures": 0,
+        "event_ts": 1787691480577291027,
+        "failed_gates": [
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "gate_order": [
+          "leakage_clean",
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "fold_count",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity",
+          "stability",
+          "cross_alpha_correlation"
+        ],
+        "gates": {
+          "capacity": {
+            "passed": false,
+            "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
+            "value": 0.0
+          },
+          "fold_consistency": {
+            "passed": false,
+            "threshold": 0.7,
+            "value": 0.0
+          },
+          "fold_count": {
+            "passed": true,
+            "threshold": 3.0,
+            "value": 4.0
+          },
+          "hypothesis_sign": {
+            "passed": false,
+            "threshold": null,
+            "value": null
+          },
+          "leakage_clean": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "net_pnl_after_costs": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
+          },
+          "oos_ic": {
+            "passed": false,
+            "threshold": 0.01,
+            "value": -0.04951219561916599
+          },
+          "stability": {
+            "passed": true,
+            "threshold": 1.0,
+            "value": 0.1612351896990924
+          },
+          "statistical_significance": {
+            "passed": false,
+            "threshold": 4.425812536056746,
+            "value": -6.211815954012166
+          }
+        },
+        "outcome": "HOLD",
+        "state": "CANDIDATE",
+        "transition": null
+      },
+      "last_transition": {
+        "actor": "SYSTEM",
+        "alpha_id": "EQ08",
+        "event_ts": 1787691480577291027,
+        "from_state": "RESEARCH",
+        "gates": {
+          "leakage_clean": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "ledger_entry_exists": {
+            "passed": true,
+            "threshold": 1.0,
+            "value": 5172.0
+          }
+        },
+        "policy": "lifecycle_v1",
+        "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
+        "to_state": "CANDIDATE"
+      },
+      "model_version": "70b16f753b3b562c872c018207843383250335d9694f86ce201e374e43c5a5b4",
+      "recovery_count": 0,
+      "since_ts": 1787691480577291027,
+      "state": "CANDIDATE",
+      "state_index": 1
+    },
+    "EQ09": {
+      "alpha_id": "EQ09",
+      "breach_count": 0,
+      "consecutive_failures": 0,
+      "cusum": 0.0,
+      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+      "experiment_id": "51aaa116ea1cf1c6",
+      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+      "last_evaluation": {
+        "alpha_id": "EQ09",
+        "consecutive_failures": 0,
+        "event_ts": 1787691480577291027,
+        "failed_gates": [
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity",
+          "stability"
+        ],
+        "gate_order": [
+          "leakage_clean",
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "fold_count",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity",
+          "stability",
+          "cross_alpha_correlation"
+        ],
+        "gates": {
+          "capacity": {
+            "passed": false,
+            "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
+            "value": 0.0
+          },
+          "fold_consistency": {
+            "passed": false,
+            "threshold": 0.7,
+            "value": 0.25
+          },
+          "fold_count": {
+            "passed": true,
+            "threshold": 3.0,
+            "value": 4.0
+          },
+          "hypothesis_sign": {
+            "passed": false,
+            "threshold": null,
+            "value": null
+          },
+          "leakage_clean": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "net_pnl_after_costs": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
+          },
+          "oos_ic": {
+            "passed": false,
+            "threshold": 0.01,
+            "value": -0.015395717938371935
+          },
+          "stability": {
+            "passed": false,
+            "threshold": 1.0,
+            "value": 2.168378672795883
+          },
+          "statistical_significance": {
+            "passed": false,
+            "threshold": 4.425812536056746,
+            "value": -1.3855309837556726
+          }
+        },
+        "outcome": "HOLD",
+        "state": "CANDIDATE",
+        "transition": null
+      },
+      "last_transition": {
+        "actor": "SYSTEM",
+        "alpha_id": "EQ09",
+        "event_ts": 1787691480577291027,
+        "from_state": "RESEARCH",
+        "gates": {
+          "leakage_clean": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "ledger_entry_exists": {
+            "passed": true,
+            "threshold": 1.0,
+            "value": 5174.0
+          }
+        },
+        "policy": "lifecycle_v1",
+        "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
+        "to_state": "CANDIDATE"
+      },
+      "model_version": "5268c92e5820b4e2d7d6aad9f0492ac49798654cadc206decc673937b76a876b",
+      "recovery_count": 0,
+      "since_ts": 1787691480577291027,
+      "state": "CANDIDATE",
+      "state_index": 1
+    },
+    "EQ10": {
+      "alpha_id": "EQ10",
+      "breach_count": 0,
+      "consecutive_failures": 0,
+      "cusum": 0.0,
+      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+      "experiment_id": "f7bfb211fba340ff",
+      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+      "last_evaluation": {
+        "alpha_id": "EQ10",
+        "consecutive_failures": 0,
+        "event_ts": 1787691480577291027,
+        "failed_gates": [
+          "oos_ic",
+          "statistical_significance",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "gate_order": [
+          "leakage_clean",
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "fold_count",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity",
+          "stability",
+          "cross_alpha_correlation"
+        ],
+        "gates": {
+          "capacity": {
+            "passed": false,
+            "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
+            "value": 0.0
+          },
+          "fold_consistency": {
+            "passed": true,
+            "threshold": 0.7,
+            "value": 0.75
+          },
+          "fold_count": {
+            "passed": true,
+            "threshold": 3.0,
+            "value": 4.0
+          },
+          "hypothesis_sign": {
+            "passed": false,
+            "threshold": null,
+            "value": null
+          },
+          "leakage_clean": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "net_pnl_after_costs": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
+          },
+          "oos_ic": {
+            "passed": false,
+            "threshold": 0.01,
+            "value": 0.0022204034596068943
+          },
+          "stability": {
+            "passed": true,
+            "threshold": 1.0,
+            "value": 0.17275586054676564
+          },
+          "statistical_significance": {
+            "passed": false,
+            "threshold": 4.425812536056746,
+            "value": 0.6210203708001263
+          }
+        },
+        "outcome": "HOLD",
+        "state": "CANDIDATE",
+        "transition": null
+      },
+      "last_transition": {
+        "actor": "SYSTEM",
+        "alpha_id": "EQ10",
+        "event_ts": 1787691480577291027,
+        "from_state": "RESEARCH",
+        "gates": {
+          "leakage_clean": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "ledger_entry_exists": {
+            "passed": true,
+            "threshold": 1.0,
+            "value": 5176.0
+          }
+        },
+        "policy": "lifecycle_v1",
+        "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
+        "to_state": "CANDIDATE"
+      },
+      "model_version": "a1f947b7e38864ef3029da503cc82ec46ba44648b45d9017e8d897c8320d2c33",
+      "recovery_count": 0,
+      "since_ts": 1787691480577291027,
+      "state": "CANDIDATE",
+      "state_index": 1
+    },
+    "EQ11": {
+      "alpha_id": "EQ11",
+      "breach_count": 0,
+      "consecutive_failures": 0,
+      "cusum": 0.0,
+      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+      "experiment_id": "99f69618dea3283f",
+      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+      "last_evaluation": {
+        "alpha_id": "EQ11",
+        "consecutive_failures": 0,
+        "event_ts": 1787691480577291027,
+        "failed_gates": [
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity",
+          "stability"
+        ],
+        "gate_order": [
+          "leakage_clean",
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "fold_count",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity",
+          "stability",
+          "cross_alpha_correlation"
+        ],
+        "gates": {
+          "capacity": {
+            "passed": false,
+            "threshold": 1000000.0,
+            "value": 53746.32517276912
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
+            "value": 0.0
+          },
+          "fold_consistency": {
+            "passed": false,
+            "threshold": 0.7,
+            "value": 0.5
+          },
+          "fold_count": {
+            "passed": true,
+            "threshold": 3.0,
+            "value": 4.0
+          },
+          "hypothesis_sign": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "leakage_clean": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "net_pnl_after_costs": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": -4.258998882819578
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": -5025.704057671561
+          },
+          "oos_ic": {
+            "passed": false,
+            "threshold": 0.01,
+            "value": 0.0061314752714023545
+          },
+          "stability": {
+            "passed": false,
+            "threshold": 1.0,
+            "value": 1.0671708644263296
+          },
+          "statistical_significance": {
+            "passed": false,
+            "threshold": 4.425812536056746,
+            "value": 0.426915373794933
+          }
+        },
+        "outcome": "HOLD",
+        "state": "CANDIDATE",
+        "transition": null
+      },
+      "last_transition": {
+        "actor": "SYSTEM",
+        "alpha_id": "EQ11",
+        "event_ts": 1787691480577291027,
+        "from_state": "RESEARCH",
+        "gates": {
+          "leakage_clean": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "ledger_entry_exists": {
+            "passed": true,
+            "threshold": 1.0,
+            "value": 5178.0
+          }
+        },
+        "policy": "lifecycle_v1",
+        "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
+        "to_state": "CANDIDATE"
+      },
+      "model_version": "803bb0a75f220ad6196ab59712d614231d98d428a366eb0a94b3c326c8206506",
+      "recovery_count": 0,
+      "since_ts": 1787691480577291027,
+      "state": "CANDIDATE",
+      "state_index": 1
+    },
+    "EQ12": {
+      "alpha_id": "EQ12",
+      "breach_count": 0,
+      "consecutive_failures": 0,
+      "cusum": 0.0,
+      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+      "experiment_id": "4959ab81cbdd820e",
+      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+      "last_evaluation": {
+        "alpha_id": "EQ12",
+        "consecutive_failures": 0,
+        "event_ts": 1787691480577291027,
+        "failed_gates": [
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "gate_order": [
+          "leakage_clean",
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "fold_count",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity",
+          "stability",
+          "cross_alpha_correlation"
+        ],
+        "gates": {
+          "capacity": {
+            "passed": false,
+            "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
+            "value": 0.0
+          },
+          "fold_consistency": {
+            "passed": true,
+            "threshold": 0.7,
+            "value": 1.0
+          },
+          "fold_count": {
+            "passed": true,
+            "threshold": 3.0,
+            "value": 4.0
+          },
+          "hypothesis_sign": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "leakage_clean": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "net_pnl_after_costs": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
+          },
+          "oos_ic": {
+            "passed": true,
+            "threshold": 0.01,
+            "value": 0.03664476612507588
+          },
+          "stability": {
+            "passed": true,
+            "threshold": 1.0,
+            "value": 0.0686752691492731
+          },
+          "statistical_significance": {
+            "passed": true,
+            "threshold": 4.425812536056746,
+            "value": 11.43176716451052
+          }
+        },
+        "outcome": "HOLD",
+        "state": "CANDIDATE",
+        "transition": null
+      },
+      "last_transition": {
+        "actor": "SYSTEM",
+        "alpha_id": "EQ12",
+        "event_ts": 1787691480577291027,
+        "from_state": "RESEARCH",
+        "gates": {
+          "leakage_clean": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "ledger_entry_exists": {
+            "passed": true,
+            "threshold": 1.0,
+            "value": 5180.0
+          }
+        },
+        "policy": "lifecycle_v1",
+        "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
+        "to_state": "CANDIDATE"
+      },
+      "model_version": "410cd407283f484ad25571f5e3faeb4f96659d659a77711ce208fc7a3517ca5c",
+      "recovery_count": 0,
+      "since_ts": 1787691480577291027,
+      "state": "CANDIDATE",
+      "state_index": 1
+    },
+    "FX01": {
+      "alpha_id": "FX01",
+      "breach_count": 0,
+      "consecutive_failures": 0,
+      "cusum": 0.0,
+      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+      "experiment_id": "736228a4b39e98c8",
+      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+      "last_evaluation": {
+        "alpha_id": "FX01",
+        "consecutive_failures": 0,
+        "event_ts": 1787691480577291027,
+        "failed_gates": [
+          "statistical_significance",
+          "fold_consistency",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "gate_order": [
+          "leakage_clean",
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "fold_count",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity",
+          "stability",
+          "cross_alpha_correlation"
+        ],
+        "gates": {
+          "capacity": {
+            "passed": false,
+            "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
+            "value": 0.0
+          },
+          "fold_consistency": {
+            "passed": false,
+            "threshold": 0.7,
+            "value": 0.25
+          },
+          "fold_count": {
+            "passed": true,
+            "threshold": 3.0,
+            "value": 4.0
+          },
+          "hypothesis_sign": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "leakage_clean": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "net_pnl_after_costs": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
+          },
+          "oos_ic": {
+            "passed": true,
+            "threshold": 0.01,
+            "value": 0.021375120099660555
+          },
+          "stability": {
+            "passed": true,
+            "threshold": 1.0,
+            "value": 0.8311487887858446
+          },
+          "statistical_significance": {
+            "passed": false,
+            "threshold": 4.425812536056746,
+            "value": 3.742659315820479
+          }
+        },
+        "outcome": "HOLD",
+        "state": "CANDIDATE",
+        "transition": null
+      },
+      "last_transition": {
+        "actor": "SYSTEM",
+        "alpha_id": "FX01",
+        "event_ts": 1787691480577291027,
+        "from_state": "RESEARCH",
+        "gates": {
+          "leakage_clean": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "ledger_entry_exists": {
+            "passed": true,
+            "threshold": 1.0,
+            "value": 5182.0
+          }
+        },
+        "policy": "lifecycle_v1",
+        "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
+        "to_state": "CANDIDATE"
+      },
+      "model_version": "076d4afdded2d8f706cdb5375c9d806ef77599e14a38a3fbae035b83ca94eb9b",
+      "recovery_count": 0,
+      "since_ts": 1787691480577291027,
+      "state": "CANDIDATE",
+      "state_index": 1
+    },
+    "FX02": {
+      "alpha_id": "FX02",
+      "breach_count": 0,
+      "consecutive_failures": 0,
+      "cusum": 0.0,
+      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+      "experiment_id": "72fe2e975df935d2",
+      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+      "last_evaluation": {
+        "alpha_id": "FX02",
+        "consecutive_failures": 0,
+        "event_ts": 1787691480577291027,
+        "failed_gates": [
+          "statistical_significance",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "gate_order": [
+          "leakage_clean",
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "fold_count",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity",
+          "stability",
+          "cross_alpha_correlation"
+        ],
+        "gates": {
+          "capacity": {
+            "passed": false,
+            "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
+            "value": 0.0
+          },
+          "fold_consistency": {
+            "passed": true,
+            "threshold": 0.7,
+            "value": 0.75
+          },
+          "fold_count": {
+            "passed": true,
+            "threshold": 3.0,
+            "value": 4.0
+          },
+          "hypothesis_sign": {
+            "passed": false,
+            "threshold": null,
+            "value": null
+          },
+          "leakage_clean": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "net_pnl_after_costs": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
+          },
+          "oos_ic": {
+            "passed": true,
+            "threshold": 0.01,
+            "value": 0.01368035798114619
+          },
+          "stability": {
+            "passed": true,
+            "threshold": 1.0,
+            "value": 0.005766284553955443
+          },
+          "statistical_significance": {
+            "passed": false,
+            "threshold": 4.425812536056746,
+            "value": 0.7995521718294814
+          }
+        },
+        "outcome": "HOLD",
+        "state": "CANDIDATE",
+        "transition": null
+      },
+      "last_transition": {
+        "actor": "SYSTEM",
+        "alpha_id": "FX02",
+        "event_ts": 1787691480577291027,
+        "from_state": "RESEARCH",
+        "gates": {
+          "leakage_clean": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "ledger_entry_exists": {
+            "passed": true,
+            "threshold": 1.0,
+            "value": 5184.0
+          }
+        },
+        "policy": "lifecycle_v1",
+        "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
+        "to_state": "CANDIDATE"
+      },
+      "model_version": "b1a0744b2b43e9c7d3d5a3a84c498c16b90246764de90c1082e96c821fd2e960",
+      "recovery_count": 0,
+      "since_ts": 1787691480577291027,
+      "state": "CANDIDATE",
+      "state_index": 1
+    },
+    "FX03": {
+      "alpha_id": "FX03",
+      "breach_count": 0,
+      "consecutive_failures": 0,
+      "cusum": 0.0,
+      "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+      "experiment_id": "6c0870e6e4b28dfa",
+      "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+      "last_evaluation": {
+        "alpha_id": "FX03",
+        "consecutive_failures": 0,
+        "event_ts": 1787691480577291027,
+        "failed_gates": [
+          "statistical_significance",
+          "fold_consistency",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "gate_order": [
+          "leakage_clean",
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "fold_count",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity",
+          "stability",
+          "cross_alpha_correlation"
+        ],
+        "gates": {
+          "capacity": {
+            "passed": false,
+            "threshold": 1000000.0,
+            "value": 0.0
+          },
+          "cross_alpha_correlation": {
+            "passed": true,
+            "threshold": 0.7,
+            "value": 0.0
+          },
+          "fold_consistency": {
+            "passed": false,
+            "threshold": 0.7,
+            "value": 0.5
+          },
+          "fold_count": {
+            "passed": true,
+            "threshold": 3.0,
+            "value": 4.0
+          },
+          "hypothesis_sign": {
+            "passed": false,
+            "threshold": null,
+            "value": null
+          },
+          "leakage_clean": {
+            "passed": true,
+            "threshold": null,
+            "value": null
+          },
+          "net_pnl_after_costs": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": 0.0
+          },
+          "net_pnl_bootstrap_ci": {
+            "passed": false,
+            "threshold": 0.0,
+            "value": null
+          },
+          "oos_ic": {
+            "passed": true,
+            "threshold": 0.01,
+            "value": 0.015830044940041737
+          },
+          "stability": {
+            "passed": true,
+            "threshold": 1.0,
+            "value": 0.6759440399359996
+          },
+          "statistical_significance": {
+            "passed": false,
+            "threshold": 4.425812536056746,
+            "value": 1.6280068635655172
           }
         },
         "outcome": "HOLD",
@@ -1797,7 +1790,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3180.0
+            "value": 5186.0
           }
         },
         "policy": "lifecycle_v1",
@@ -1816,14 +1809,13 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "ecad7e621530e185",
+      "experiment_id": "deb9836ca52c3896",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX04",
         "consecutive_failures": 0,
         "event_ts": 1787691480577291027,
         "failed_gates": [
-          "statistical_significance",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
           "capacity"
@@ -1885,17 +1877,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.02984218195192158
+            "value": 0.034972769374972575
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.1998600020596221
+            "value": 0.27916222245034256
           },
           "statistical_significance": {
-            "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 4.241756475254401
+            "passed": true,
+            "threshold": 4.425812536056746,
+            "value": 5.339940462574242
           }
         },
         "outcome": "HOLD",
@@ -1916,7 +1908,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3264.0
+            "value": 5188.0
           }
         },
         "policy": "lifecycle_v1",
@@ -1935,7 +1927,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "574d290cf6c48f4e",
+      "experiment_id": "2eaedf95635ab7ed",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX05",
@@ -1978,7 +1970,7 @@
           "fold_consistency": {
             "passed": false,
             "threshold": 0.7,
-            "value": 0.0
+            "value": 0.25
           },
           "fold_count": {
             "passed": true,
@@ -1998,27 +1990,27 @@
           "net_pnl_after_costs": {
             "passed": false,
             "threshold": 0.0,
-            "value": -0.6360575348499578
+            "value": -0.9528022919940746
           },
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -131.29841638981225
+            "value": -187.7026836604206
           },
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.0072328313169683685
+            "value": -0.01320278042615143
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 5.527088353341046
+            "value": 2.3865758323615567
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": -0.41600376773412034
+            "threshold": 4.425812536056746,
+            "value": -0.7468633259559371
           }
         },
         "outcome": "HOLD",
@@ -2039,14 +2031,14 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3348.0
+            "value": 5190.0
           }
         },
         "policy": "lifecycle_v1",
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "8adba7be81ccb12561a6110b939bdf54257010f1ff40ade384afb044f40d9286",
+      "model_version": "79f31d4a5710286246406a531e38721ad6735b587767d88d75e7aec391beffc4",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -2058,7 +2050,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "43e3217e791adcc2",
+      "experiment_id": "dc1a993520ab57c8",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX06",
@@ -2068,7 +2060,8 @@
           "statistical_significance",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
-          "capacity"
+          "capacity",
+          "stability"
         ],
         "gate_order": [
           "leakage_clean",
@@ -2127,17 +2120,17 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.02104109699872492
+            "value": 0.012924327252678731
           },
           "stability": {
-            "passed": true,
+            "passed": false,
             "threshold": 1.0,
-            "value": 0.3771246890625525
+            "value": 1.3205688486262859
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 1.470841664848521
+            "threshold": 4.425812536056746,
+            "value": 1.1604054370273842
           }
         },
         "outcome": "HOLD",
@@ -2158,14 +2151,14 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3432.0
+            "value": 5192.0
           }
         },
         "policy": "lifecycle_v1",
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "2f30adc33de2796f84f22f334e71253c5e7937ce6e9c7a2de553fd9e9d9d278e",
+      "model_version": "5326bf1d858f39d842c5901068d9c68a66426ebce6c9fc1df0f757bce68cf26a",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -2177,7 +2170,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "1ca4bb975973dbfb",
+      "experiment_id": "4a9507ddd4d4a31b",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX07",
@@ -2249,17 +2242,17 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.011868888129801702
+            "value": -0.016086750203829776
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.7921926353015332
+            "value": 0.8524315689190387
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": -1.3709254006431513
+            "threshold": 4.425812536056746,
+            "value": -1.557820257225326
           }
         },
         "outcome": "HOLD",
@@ -2280,7 +2273,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3516.0
+            "value": 5194.0
           }
         },
         "policy": "lifecycle_v1",
@@ -2299,14 +2292,13 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "43dcbca3d4ab28d1",
+      "experiment_id": "9e70e42ddf2c7a6f",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX08",
         "consecutive_failures": 0,
         "event_ts": 1787691480577291027,
         "failed_gates": [
-          "statistical_significance",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
           "capacity",
@@ -2329,7 +2321,7 @@
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
-            "value": 1560.7813690045955
+            "value": 548.0140932124111
           },
           "cross_alpha_correlation": {
             "passed": true,
@@ -2359,27 +2351,27 @@
           "net_pnl_after_costs": {
             "passed": false,
             "threshold": 0.0,
-            "value": -3.280089828956179
+            "value": -4.39641287100497
           },
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -1630.4609116505342
+            "value": -1987.9137182505997
           },
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.04073126903648808
+            "value": 0.050942901492996136
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 2.1139979363446812
+            "value": 1.5181781900708358
           },
           "statistical_significance": {
-            "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 3.8443634723257953
+            "passed": true,
+            "threshold": 4.425812536056746,
+            "value": 4.7392917600900235
           }
         },
         "outcome": "HOLD",
@@ -2400,7 +2392,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3600.0
+            "value": 5196.0
           }
         },
         "policy": "lifecycle_v1",
@@ -2419,7 +2411,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "1d0ceea1e6b34c3b",
+      "experiment_id": "2aebf3f798e07a26",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX09",
@@ -2482,27 +2474,27 @@
           "net_pnl_after_costs": {
             "passed": false,
             "threshold": 0.0,
-            "value": -2.554079897748809
+            "value": -3.5008309239521225
           },
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -1660.723717647129
+            "value": -2042.061077760683
           },
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.047147784756255924
+            "value": -0.06030862463031193
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 2.433608527882102
+            "value": 1.706964051918332
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": -5.745953956973862
+            "threshold": 4.425812536056746,
+            "value": -6.799369151035406
           }
         },
         "outcome": "HOLD",
@@ -2523,7 +2515,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3684.0
+            "value": 5198.0
           }
         },
         "policy": "lifecycle_v1",
@@ -2542,7 +2534,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "7c5839806c61949b",
+      "experiment_id": "96ddf0f6a93b6f31",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX10",
@@ -2572,7 +2564,7 @@
           "capacity": {
             "passed": false,
             "threshold": 1000000.0,
-            "value": 61134.929356750545
+            "value": 47232.27571618117
           },
           "cross_alpha_correlation": {
             "passed": true,
@@ -2602,27 +2594,27 @@
           "net_pnl_after_costs": {
             "passed": false,
             "threshold": 0.0,
-            "value": -0.2239150090956759
+            "value": -0.33727149683584606
           },
           "net_pnl_bootstrap_ci": {
             "passed": false,
             "threshold": 0.0,
-            "value": -575.8385395065645
+            "value": -684.4907061347985
           },
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.01959946842988097
+            "value": 0.0267693804628702
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 1.7502816155754806
+            "value": 1.099670867988066
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 1.545827450932388
+            "threshold": 4.425812536056746,
+            "value": 2.3713834339566655
           }
         },
         "outcome": "HOLD",
@@ -2643,7 +2635,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3768.0
+            "value": 5200.0
           }
         },
         "policy": "lifecycle_v1",
@@ -2662,119 +2654,41 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "4f3f6bfaae7ce201",
+      "experiment_id": "c0d40c61b69132e9",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX11",
         "consecutive_failures": 0,
         "event_ts": 1787691480577291027,
         "failed_gates": [
-          "statistical_significance",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability"
+          "leakage_clean"
         ],
         "gate_order": [
-          "leakage_clean",
-          "oos_ic",
-          "statistical_significance",
-          "fold_consistency",
-          "fold_count",
-          "hypothesis_sign",
-          "net_pnl_after_costs",
-          "net_pnl_bootstrap_ci",
-          "capacity",
-          "stability",
-          "cross_alpha_correlation"
+          "ledger_entry_exists",
+          "leakage_clean"
         ],
         "gates": {
-          "capacity": {
-            "passed": false,
-            "threshold": 1000000.0,
-            "value": 0.0
-          },
-          "cross_alpha_correlation": {
-            "passed": true,
-            "threshold": 0.7,
-            "value": 0.0
-          },
-          "fold_consistency": {
-            "passed": true,
-            "threshold": 0.7,
-            "value": 1.0
-          },
-          "fold_count": {
-            "passed": true,
-            "threshold": 3.0,
-            "value": 4.0
-          },
-          "hypothesis_sign": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
           "leakage_clean": {
-            "passed": true,
-            "threshold": null,
-            "value": null
-          },
-          "net_pnl_after_costs": {
             "passed": false,
-            "threshold": 0.0,
-            "value": -7.331641148278877
-          },
-          "net_pnl_bootstrap_ci": {
-            "passed": false,
-            "threshold": 0.0,
-            "value": -2510.367165608912
-          },
-          "oos_ic": {
-            "passed": true,
-            "threshold": 0.01,
-            "value": 0.032791771149745956
-          },
-          "stability": {
-            "passed": false,
-            "threshold": 1.0,
-            "value": 1.3414929661397041
-          },
-          "statistical_significance": {
-            "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 2.2205022528299714
-          }
-        },
-        "outcome": "HOLD",
-        "state": "CANDIDATE",
-        "transition": null
-      },
-      "last_transition": {
-        "actor": "SYSTEM",
-        "alpha_id": "FX11",
-        "event_ts": 1787691480577291027,
-        "from_state": "RESEARCH",
-        "gates": {
-          "leakage_clean": {
-            "passed": true,
             "threshold": null,
             "value": null
           },
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3852.0
+            "value": 5202.0
           }
         },
-        "policy": "lifecycle_v1",
-        "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
-        "to_state": "CANDIDATE"
+        "outcome": "HOLD",
+        "state": "RESEARCH",
+        "transition": null
       },
-      "model_version": "292a0e7107734a783d6c27092d38dbe13639f1927812c513efa2170bbcd619c5",
+      "last_transition": null,
+      "model_version": "a7f299027d3e3a1eff860cc735afdfca90b89f6ebfe1ef93f339da78c0963395",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
-      "state": "CANDIDATE",
-      "state_index": 1
+      "state": "RESEARCH",
+      "state_index": 0
     },
     "FX12": {
       "alpha_id": "FX12",
@@ -2782,7 +2696,7 @@
       "consecutive_failures": 0,
       "cusum": 0.0,
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "experiment_id": "d96e67be1c20bd8d",
+      "experiment_id": "6f0e35487bd505ac",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
       "last_evaluation": {
         "alpha_id": "FX12",
@@ -2791,7 +2705,6 @@
         "failed_gates": [
           "oos_ic",
           "statistical_significance",
-          "fold_consistency",
           "net_pnl_after_costs",
           "net_pnl_bootstrap_ci",
           "capacity",
@@ -2822,9 +2735,9 @@
             "value": 0.0
           },
           "fold_consistency": {
-            "passed": false,
+            "passed": true,
             "threshold": 0.7,
-            "value": 0.5
+            "value": 0.75
           },
           "fold_count": {
             "passed": true,
@@ -2854,17 +2767,17 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": 0.008590673405563187
+            "value": 0.009709399193098989
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 1.8382040407211342
+            "value": 2.4994858575394203
           },
           "statistical_significance": {
             "passed": false,
-            "threshold": 4.365155224196862,
-            "value": 1.053121658613505
+            "threshold": 4.425812536056746,
+            "value": 1.2144332218366949
           }
         },
         "outcome": "HOLD",
@@ -2885,7 +2798,7 @@
           "ledger_entry_exists": {
             "passed": true,
             "threshold": 1.0,
-            "value": 3936.0
+            "value": 5204.0
           }
         },
         "policy": "lifecycle_v1",

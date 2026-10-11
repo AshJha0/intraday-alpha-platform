@@ -632,7 +632,8 @@ def test_ledger_increments_by_exactly_the_looks_and_deduplicates(frames, tmp_pat
         LOOKS_PER_EXPERIMENT,
         1,
     )
-    assert entry["config"] == a.to_dict()
+    # the spec plus its statistics revision (v1.14.0): same id, new look
+    assert entry["config"] == {**a.to_dict(), "stats_revision": "v1.14"}
     assert entry["result"]["experiment_id"] == a.experiment_id
     # a different spec is one more batch of looks
     rb = runner.run(b)
@@ -804,9 +805,11 @@ def test_cli_list_and_show_legacy_v1(frames, tmp_path, legacy_spec, capsys):
     assert "error:" in capsys.readouterr().err
 
 
-def test_cli_list_and_show(frames, tmp_path, spec, capsys):
-    """Default bundle: the same experiment is an ITERATE that never trades
-    (cost-aware policy), judged at the ledger threshold of its own looks."""
+def test_cli_list_and_show(frames, tmp_path, capsys):
+    """The v1.13.0 revision of the default bundle (``v2_v113``, by name):
+    the same experiment is an ITERATE that never trades (cost-aware policy),
+    judged at the ledger threshold of its own 84 looks."""
+    spec = _spec(frames, configuration={"methods": "v2_v113"})
     result = _runner(frames, tmp_path).run(spec)
     assert result.verdict is Verdict.ITERATE
     out_dir = str(tmp_path / "experiments")
@@ -818,12 +821,9 @@ def test_cli_list_and_show(frames, tmp_path, spec, capsys):
     assert cli_main(["--out-dir", out_dir, "show", spec.experiment_id]) == 0
     shown = capsys.readouterr().out
     assert "VERDICT: ITERATE" in shown and spec.dataset_version in shown
-    assert "methods=v2" in shown
-    threshold = ExperimentLedger.bonferroni_t_threshold_at(LOOKS_PER_EXPERIMENT)
-    assert (
-        f"PROMOTE t threshold: {threshold:.4f} "
-        f"(ledger Bonferroni |t| at {LOOKS_PER_EXPERIMENT} looks)"
-    ) in shown
+    assert "methods=v2_v113" in shown
+    threshold = ExperimentLedger.bonferroni_t_threshold_at(84)
+    assert (f"PROMOTE t threshold: {threshold:.4f} (ledger Bonferroni |t| at 84 looks)") in shown
     assert cli_main(["--out-dir", out_dir, "show", "0000000000000000"]) == 1
     assert "error:" in capsys.readouterr().err
 
@@ -1111,10 +1111,14 @@ def test_looks_per_experiment_counts_every_look_the_chain_takes():
     assert (per_fold, fixed) == (16, 19)
     expected = fixed + 4 * per_fold + 1  # + the holdout backtest
     assert expected == 84
-    assert LOOKS_PER_EXPERIMENT == expected == looks_per_validation(4) + 1
-    assert methods(METHODS_V2).looks(4) == expected
+    # the v1.13.0 revision counts every statistic ...
+    assert expected == looks_per_validation(4, looks_rule="statistics") + 1
+    assert methods("v2_v113").looks(4) == expected
     # another fold count debits its own total: 19 + 16 * 3 + 1
-    assert methods(METHODS_V2).looks(3) == 68
+    assert methods("v2_v113").looks(3) == 68
+    # ... since v1.14.0 (R-P2-4) one look per gate decision + the holdout
+    assert LOOKS_PER_EXPERIMENT == methods(METHODS_V2).looks(4) == looks_per_validation(4) + 1 == 2
+    assert methods(METHODS_V2).looks(3) == 2
 
 
 def test_ledger_records_the_full_look_count(frames, tmp_path):
@@ -1122,9 +1126,12 @@ def test_ledger_records_the_full_look_count(frames, tmp_path):
     runner = _runner(frames, tmp_path, dry_run=True)
     spec = _spec(frames)
     result = runner.run(spec)
-    assert result.n_experiments_in_ledger == LOOKS_PER_EXPERIMENT == 84
+    assert result.n_experiments_in_ledger == LOOKS_PER_EXPERIMENT == 2
     entry = ExperimentLedger(tmp_path / "experiments.json").entries[0]
-    assert (entry["count"], entry["gate_looks"]) == (84, 84)
+    assert (entry["count"], entry["gate_looks"]) == (2, 2)
+    # the v1.13.0 revision, by name, debits what it evaluates
+    old = runner.run(_spec(frames, configuration={"methods": "v2_v113"}))
+    assert old.n_experiments_in_ledger == 2 + 84
 
 
 def test_ledger_records_the_full_look_count_legacy_v1(frames, tmp_path):
@@ -1155,24 +1162,27 @@ def test_ledger_threshold_is_the_bonferroni_t_at_the_recorded_gate_looks(frames,
     want_84 = NormalDist().inv_cdf(1.0 - 0.05 / 84 / 2.0)
     want_168 = NormalDist().inv_cdf(1.0 - 0.05 / 168 / 2.0)
     assert (round(want_84, 3), round(want_168, 3)) == (3.434, 3.617)
-    a, b = _spec(frames, "5s"), _spec(frames, "1s")
+    # the v1.13.0 revision (84 looks a run), by name; the arithmetic is the
+    # same at any count
+    old = {"methods": "v2_v113"}
+    a, b = _spec(frames, "5s", configuration=old), _spec(frames, "1s", configuration=old)
     runner = _runner(frames, tmp_path, dry_run=True)
     runner.run(a)
     first = runner.last_eligibility
-    assert first.threshold_looks == LOOKS_PER_EXPERIMENT
+    assert first.threshold_looks == 84
     assert first.significance_threshold == ExperimentLedger.bonferroni_t_threshold_at(84)
     assert first.significance_threshold == pytest.approx(want_84, abs=1e-6)
     assert runner.last_report["gates"]["min_nw_tstat"] == first.significance_threshold
     assert runner.last_report["tstat_threshold_policy"] == "ledger"
     runner.run(b)
     second = runner.last_eligibility
-    assert second.threshold_looks == 2 * LOOKS_PER_EXPERIMENT
+    assert second.threshold_looks == 168
     assert second.significance_threshold == ExperimentLedger.bonferroni_t_threshold_at(168)
     assert second.significance_threshold == pytest.approx(want_168, abs=1e-6)
     # a rerun (fresh runner, ledger now at 168) is judged where it first was
     again = _runner(frames, tmp_path, dry_run=True)
     again.run(a)
-    assert again.last_eligibility.threshold_looks == LOOKS_PER_EXPERIMENT
+    assert again.last_eligibility.threshold_looks == 84
     assert again.last_eligibility.significance_threshold == first.significance_threshold
     entries = {e["config"]["experiment_id"]: e for e in again.ledger.entries}
     assert entries[a.experiment_id]["gate_looks"] == 84

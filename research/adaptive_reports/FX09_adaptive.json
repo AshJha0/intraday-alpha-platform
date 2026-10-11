@@ -19,17 +19,17 @@
   "n_blocks": 169,
   "policies": {
     "drift_triggered": {
-      "deployed_ic": 0.13566167294318687,
+      "deployed_ic": 0.1356616729431871,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": -84.55896229951284,
+      "gross_pnl": -117.1920800230055,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 658,
       "lifecycle_transitions": [],
       "n_evals": 169,
       "n_ic_evals": 159,
       "n_informative_evals": 155,
-      "net_pnl": -1776.1978204537359,
+      "net_pnl": -2283.551469168683,
       "policy": {
         "ic_z_threshold": -2.0,
         "min_refit_gap_ns": 3600000000000,
@@ -49,21 +49,21 @@
       ],
       "rolling_ic_mean": 0.11477863507187853,
       "rolling_ic_std": 0.03312235851874747,
-      "total_costs": 1691.638858154181,
-      "trade_count": 4786
+      "total_costs": 2166.359389145324,
+      "trade_count": 6006
     },
     "scheduled_daily": {
-      "deployed_ic": 0.13626833313843323,
+      "deployed_ic": 0.13626833313843334,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": -80.63928992579606,
+      "gross_pnl": -118.57203794350261,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 658,
       "lifecycle_transitions": [],
       "n_evals": 169,
       "n_ic_evals": 159,
       "n_informative_evals": 155,
-      "net_pnl": -1657.4401945595134,
+      "net_pnl": -2128.913592186943,
       "policy": {
         "period_ns": 86400000000000,
         "policy": "scheduled"
@@ -89,21 +89,21 @@
       ],
       "rolling_ic_mean": 0.11482587507640266,
       "rolling_ic_std": 0.03311592389281907,
-      "total_costs": 1576.8009046336724,
-      "trade_count": 4556
+      "total_costs": 2010.3415542431987,
+      "trade_count": 5699
     },
     "scheduled_weekly": {
-      "deployed_ic": 0.13566167294318687,
+      "deployed_ic": 0.1356616729431871,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": -84.55896229951284,
+      "gross_pnl": -117.1920800230055,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 658,
       "lifecycle_transitions": [],
       "n_evals": 169,
       "n_ic_evals": 159,
       "n_informative_evals": 155,
-      "net_pnl": -1776.1978204537359,
+      "net_pnl": -2283.551469168683,
       "policy": {
         "period_ns": 604800000000000,
         "policy": "scheduled"
@@ -121,21 +121,21 @@
       ],
       "rolling_ic_mean": 0.11477863507187853,
       "rolling_ic_std": 0.03312235851874747,
-      "total_costs": 1691.638858154181,
-      "trade_count": 4786
+      "total_costs": 2166.359389145324,
+      "trade_count": 6006
     },
     "static": {
-      "deployed_ic": 0.13566167294318687,
+      "deployed_ic": 0.1356616729431871,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": -84.55896229951284,
+      "gross_pnl": -117.1920800230055,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 658,
       "lifecycle_transitions": [],
       "n_evals": 169,
       "n_ic_evals": 159,
       "n_informative_evals": 155,
-      "net_pnl": -1776.1978204537359,
+      "net_pnl": -2283.551469168683,
       "policy": {
         "policy": "static"
       },
@@ -152,8 +152,8 @@
       ],
       "rolling_ic_mean": 0.11477863507187853,
       "rolling_ic_std": 0.03312235851874747,
-      "total_costs": 1691.638858154181,
-      "trade_count": 4786
+      "total_costs": 2166.359389145324,
+      "trade_count": 6006
     }
   },
   "universe": [

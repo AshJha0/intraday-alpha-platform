@@ -1078,7 +1078,7 @@ was judged at, not a re-judgement: `legacy_v1` rows read the fixed 3.0,
 `v2` rows `max(3.0, Bonferroni |t| at gate_looks)`, where `gate_looks`
 counts every look the ledger held at the time, across datasets;
 `scope_bonferroni_t` is what the scope alone would demand. The ledger total
-(5,156 looks over 216 entries) is the sum of the three scopes: 1,068 on the
+(5,358 looks over 216 entries) is the sum of the three scopes: 1,068 on the
 v1.3.0 dataset, 852 on the current dataset under the old rules, and 3,236
 under the default rules (24 × 84 for the promotion report, 5 × 84 for the
 runner experiments, 40 adaptive deployments, 8 × 95 for the signal-combination
@@ -1159,7 +1159,7 @@ synthetic equity `SYN.EQ.AAPL` and writes every artefact under
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.mvp run                       # configs/mvp/mvp.json, seed 12345
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=20d4ff76af0b631c... out=.../data/mvp/58a10f2194a3c81c
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=8c5468f6f51de035... out=.../data/mvp/58a10f2194a3c81c
 PYTHONPATH=src python3 -m iap.mvp run --seed 7 --out /tmp/mvp7          # another seed, explicit directory
 PYTHONPATH=src python3 -m iap.mvp verify                                  # run twice from scratch, compare digest/report/stream
 cat ../data/mvp/58a10f2194a3c81c/report.md                                # the honest numbers (cost-negative)
@@ -1600,9 +1600,9 @@ PYTHONPATH=src python3 -m iap.research --out-dir ../data/store/scratch/experimen
 # VERDICT: ITERATE
 # PROMOTE t threshold: 4.3830 (ledger ...)
 # gate eligible: yes
-# looks: 5156 bonferroni |t|: 4.424
+# looks: 5156 bonferroni |t|: 4.432
 # this run's count, 4272: 4.383
-# ledger min_nw_tstat: 4.424
+# ledger min_nw_tstat: 4.432
 # fixed  min_nw_tstat: 3.0
 # experiment         47e6cdacc73e85fe
 # ... t-stat (the gate's)             +4.8405 ... holdout net return (bps)        -2174.7262 ...
@@ -2808,7 +2808,7 @@ nonce). What the new entry holds:
                   "deps": {"numpy": "...", "pandas": "...", "scipy": "..."}}}
 ```
 
-`ledger_total` is 5157: the committed 5,156 looks plus this one. Now edit
+`ledger_total` is 5157: the committed 5,358 looks plus this one. Now edit
 the hypothesis text of that last entry and verify again:
 
 ```bash

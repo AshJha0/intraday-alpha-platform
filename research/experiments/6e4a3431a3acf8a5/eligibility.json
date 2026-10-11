@@ -1,0 +1,12 @@
+{
+  "experiment_id": "6e4a3431a3acf8a5",
+  "gate_eligible": false,
+  "methods": "v2",
+  "periods_verified": true,
+  "reasons": [
+    "not pre-registered (--no-prereg): exploratory, not gate evidence"
+  ],
+  "significance_threshold": 4.425978373033232,
+  "threshold_looks": 5208,
+  "x-version": 2
+}

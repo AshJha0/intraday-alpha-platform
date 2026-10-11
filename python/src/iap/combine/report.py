@@ -83,9 +83,22 @@ from iap.labels.frames import scored_labels
 from iap.validation.leakage import RecomputeSources
 from iap.validation.ledger import ExperimentLedger
 from iap.validation.methods import DEFAULT_METHODS, ResearchMethods, ledger_config, methods
-from iap.validation.metrics import HORIZONS_NS, ic, nw_lags, pooled_slope_hac_tstat
+from iap.validation.metrics import (
+    HORIZONS_NS,
+    auto_hac_lags,
+    ic,
+    n_ts_buckets,
+    nw_lags,
+    pooled_slope_hac_tstat,
+)
+from iap.validation.sessions import NS_DAY
 from iap.validation.splits import WalkForwardSplitter
-from iap.validation.validate import GATES, looks_per_validation, validate_alpha
+from iap.validation.validate import (
+    GATES,
+    _standardise_by_instrument,
+    looks_per_validation,
+    validate_alpha,
+)
 
 __all__ = [
     "ASSET_CLASSES",
@@ -191,15 +204,26 @@ def _backtester(bundle: ResearchMethods, meta: dict[int, dict], configs_dir: Pat
     )
 
 
-def _gate_stats(ts, x, y, crossed, horizon: str) -> dict[str, float | None]:
+def _gate_stats(
+    ts, x, y, crossed, horizon: str, groups=None, bundle: ResearchMethods | None = None
+) -> dict[str, float | None]:
     """IC and pooled-slope HAC t on the rows the gate reads (uncrossed when
-    that IC is finite) — the statistics ``validate_alpha`` gates on."""
+    that IC is finite) — the statistics ``validate_alpha`` gates on, under
+    ``bundle``'s statistics revision (v1.14.0: per-(fold, instrument)
+    scaling over ``groups``, automatic bandwidth, no lag across a day)."""
+    if bundle is not None and bundle.standardisation == "instrument" and groups is not None:
+        x, y = _standardise_by_instrument(groups, x, y)
     unc = ~crossed
     ic_all = ic(x, y)
     ic_unc = ic(x[unc], y[unc])
-    lags = nw_lags(HORIZONS_NS[horizon])
-    t_all = pooled_slope_hac_tstat(ts, x, y, lags=lags)
-    t_unc = pooled_slope_hac_tstat(ts[unc], x[unc], y[unc], lags=lags)
+    h_ns = HORIZONS_NS[horizon]
+    if bundle is not None and bundle.hac_bandwidth == "auto":
+        lags = auto_hac_lags(n_ts_buckets(ts[unc] if np.any(unc) else ts), h_ns)
+    else:
+        lags = nw_lags(h_ns)
+    day_ns = NS_DAY if bundle is not None and bundle.hac_day_separated else None
+    t_all = pooled_slope_hac_tstat(ts, x, y, lags=lags, day_ns=day_ns)
+    t_unc = pooled_slope_hac_tstat(ts[unc], x[unc], y[unc], lags=lags, day_ns=day_ns)
     return {
         "ic": _fnum(ic_all),
         "gate_ic": _fnum(ic_unc if np.isfinite(ic_unc) else ic_all),
@@ -268,7 +292,7 @@ def member_pass(
     universe = probe.universe(list(frames))
     uframes = {i: frames[i] for i in universe}
     splitter = WalkForwardSplitter(n_folds=n_folds, embargo_ns=embargo_ns)
-    z_all, y_all, ts_all, c_all = [], [], [], []
+    z_all, y_all, ts_all, c_all, g_all = [], [], [], [], []
     combined: dict[str, list[np.ndarray]] = {m: [] for m in method_names}
     weights: dict[str, list[dict[str, Any]]] = {m: [] for m in method_names}
     bars: dict[str, dict[int, float]] = {aid: {} for aid in ids}
@@ -300,6 +324,9 @@ def member_pass(
             else:
                 crossed.append(np.zeros(len(df), dtype=bool))
             stamps.append(df["exchange_ts"].to_numpy(dtype=np.int64))
+            # (fold, instrument) group of every row: the scaling unit of the
+            # v1.14.0 statistics (validate_alpha scales per fold)
+            g_all.append(np.full(len(df), int(fold.index) * 1_000_000 + int(i), dtype=np.int64))
         y_all.append(np.concatenate(labels))
         c_all.append(np.concatenate(crossed))
         ts_all.append(np.concatenate(stamps))
@@ -340,6 +367,7 @@ def member_pass(
         "y": np.concatenate(y_all),
         "ts": np.concatenate(ts_all),
         "crossed": np.concatenate(c_all),
+        "groups": np.concatenate(g_all),
         "combined": {m: np.concatenate(v) for m, v in combined.items()},
         "weights_by_fold": weights,
         "bars": bars,
@@ -653,7 +681,15 @@ def run_combination(
             member_table[aid] = {
                 "own_horizon": build(aid).horizon,
                 **_own_report(repo, aid),
-                **_gate_stats(mp["ts"], mp["z"][:, k], mp["y"], mp["crossed"], comb_horizon),
+                **_gate_stats(
+                    mp["ts"],
+                    mp["z"][:, k],
+                    mp["y"],
+                    mp["crossed"],
+                    comb_horizon,
+                    mp["groups"],
+                    bundle,
+                ),
                 "net_pnl_1x_all_folds": float(mp["net_pnl"][aid]),
                 "trade_count_all_folds": int(mp["trades"][aid]),
             }
@@ -705,7 +741,7 @@ def run_combination(
                 "looks": p["looks"],
                 **_summary(report),
                 "member_pass_check": _gate_stats(
-                    mp["ts"], z_comb, mp["y"], mp["crossed"], comb_horizon
+                    mp["ts"], z_comb, mp["y"], mp["crossed"], comb_horizon, mp["groups"], bundle
                 ),
                 "weights_by_fold": mp["weights_by_fold"][name],
                 "weight_stability": _weight_stability(mp["weights_by_fold"][name], ids),

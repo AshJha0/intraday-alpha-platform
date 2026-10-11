@@ -8,8 +8,8 @@
     "bucket_ns": 300000000000,
     "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
     "horizon": "10s",
-    "ic_mean": 0.007832494206295289,
-    "ic_std": 0.0671463708058665,
+    "ic_mean": 0.007832494206295306,
+    "ic_std": 0.06714637080586654,
     "kind": "ic",
     "n_buckets_baseline": 10,
     "name": "run_eq06_ic",
@@ -19,17 +19,17 @@
   "n_blocks": 112,
   "policies": {
     "drift_triggered": {
-      "deployed_ic": 0.027771061126998505,
+      "deployed_ic": 0.027771061126998522,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": -10.000000000019327,
+      "gross_pnl": -2.999999999985903,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 6860,
       "lifecycle_transitions": [],
       "n_evals": 112,
       "n_ic_evals": 46,
       "n_informative_evals": 42,
-      "net_pnl": -69.93150106619578,
+      "net_pnl": -183.66140858900326,
       "policy": {
         "ic_z_threshold": -2.0,
         "min_refit_gap_ns": 3600000000000,
@@ -48,22 +48,22 @@
         }
       ],
       "rolling_ic_mean": 0.0272945648999806,
-      "rolling_ic_std": 0.016719011716804035,
-      "total_costs": 59.93150106623876,
-      "trade_count": 7
+      "rolling_ic_std": 0.01671901171680403,
+      "total_costs": 180.6614085889828,
+      "trade_count": 9
     },
     "scheduled_daily": {
-      "deployed_ic": 0.026932838845342078,
+      "deployed_ic": 0.026932838845342123,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": -1.5000000000270575,
+      "gross_pnl": 5.5000000000063665,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 6860,
       "lifecycle_transitions": [],
       "n_evals": 112,
       "n_ic_evals": 46,
       "n_informative_evals": 42,
-      "net_pnl": -178.70339640363818,
+      "net_pnl": -311.0511292786832,
       "policy": {
         "period_ns": 86400000000000,
         "policy": "scheduled"
@@ -88,22 +88,22 @@
         }
       ],
       "rolling_ic_mean": 0.027296716542371247,
-      "rolling_ic_std": 0.01671780140325657,
-      "total_costs": 177.2033964037456,
-      "trade_count": 17
+      "rolling_ic_std": 0.016717801403256575,
+      "total_costs": 316.5511292786971,
+      "trade_count": 21
     },
     "scheduled_weekly": {
-      "deployed_ic": 0.027771061126998505,
+      "deployed_ic": 0.027771061126998522,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": -10.000000000019327,
+      "gross_pnl": -2.999999999985903,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 6860,
       "lifecycle_transitions": [],
       "n_evals": 112,
       "n_ic_evals": 46,
       "n_informative_evals": 42,
-      "net_pnl": -69.93150106619578,
+      "net_pnl": -183.66140858900326,
       "policy": {
         "period_ns": 604800000000000,
         "policy": "scheduled"
@@ -120,22 +120,22 @@
         }
       ],
       "rolling_ic_mean": 0.0272945648999806,
-      "rolling_ic_std": 0.016719011716804035,
-      "total_costs": 59.93150106623876,
-      "trade_count": 7
+      "rolling_ic_std": 0.01671901171680403,
+      "total_costs": 180.6614085889828,
+      "trade_count": 9
     },
     "static": {
-      "deployed_ic": 0.027771061126998505,
+      "deployed_ic": 0.027771061126998522,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
-      "gross_pnl": -10.000000000019327,
+      "gross_pnl": -2.999999999985903,
       "ic_baseline_kind": "oos",
       "ic_baseline_rows": 6860,
       "lifecycle_transitions": [],
       "n_evals": 112,
       "n_ic_evals": 46,
       "n_informative_evals": 42,
-      "net_pnl": -69.93150106619578,
+      "net_pnl": -183.66140858900326,
       "policy": {
         "policy": "static"
       },
@@ -151,9 +151,9 @@
         }
       ],
       "rolling_ic_mean": 0.0272945648999806,
-      "rolling_ic_std": 0.016719011716804035,
-      "total_costs": 59.93150106623876,
-      "trade_count": 7
+      "rolling_ic_std": 0.01671901171680403,
+      "total_costs": 180.6614085889828,
+      "trade_count": 9
     }
   },
   "universe": [

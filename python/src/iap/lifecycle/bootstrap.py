@@ -228,11 +228,12 @@ def select_pipeline_entries(
         # Only the rank in force must be unambiguous: since v1.14.0 one
         # dataset can hold the same alpha under several superseded bundles
         # (``legacy_v1``, ``v2_v113``) beside the current one.
-        # A fallback rank (no entry under ``methods`` yet) takes the latest
-        # recorded entry; two entries under ``methods`` are an error.
-        rank = min(by_rank)
-        best = by_rank[rank]
-        if rank == 0 and len(best) > 1:
+        # Two entries of the winning rank under the SAME bundle are an
+        # error; entries of different superseded bundles in a fallback rank
+        # resolve to the latest recorded one.
+        best = by_rank[min(by_rank)]
+        bundles = [_entry_methods(e) for e in best]
+        if len(set(bundles)) != len(bundles):
             raise ValueError(f"{source}: duplicate {_LEDGER_KIND} entry for {alpha_id}")
         out[alpha_id] = best[-1]
     return out

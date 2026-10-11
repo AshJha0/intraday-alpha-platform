@@ -418,13 +418,13 @@ FROM ledger_scopes ORDER BY dataset_version, methods;
 -- {"bonferroni_t":4.018,"dataset":"116b7787","looks":852,"methods":"legacy_v1","n_entries":69}
 -- {"bonferroni_t":4.322,"dataset":"116b7787","looks":3236,"methods":"v2","n_entries":77}
 -- {"bonferroni_t":4.071,"dataset":"203c8f54","looks":1068,"methods":"legacy_v1","n_entries":70}
--- (v1.5.0 snapshot: the 5,156 looks, by scope. bonferroni_t is the |t| each scope alone would demand.)
+-- (v1.5.0 snapshot: the 5,358 looks, by scope. bonferroni_t is the |t| each scope alone would demand.)
 
 SELECT kind, n_entries, n_alphas, total_count, n_promote, n_iterate, n_reject,
        max_gate_looks, ROUND(max_promote_t_threshold, 3) AS max_t_threshold
 FROM v_experiment_ledger_summary_current ORDER BY kind;
 -- {"kind":"adaptive_deployment","max_gate_looks":null,"max_t_threshold":null,"n_alphas":10,"n_entries":40,"n_iterate":0,"n_promote":0,"n_reject":0,"total_count":40}
--- {"kind":"combination","max_gate_looks":5156,"max_t_threshold":4.424,"n_alphas":2,"n_entries":8,"n_iterate":8,"n_promote":0,"n_reject":0,"total_count":760}
+-- {"kind":"combination","max_gate_looks":5156,"max_t_threshold":4.432,"n_alphas":2,"n_entries":8,"n_iterate":8,"n_promote":0,"n_reject":0,"total_count":760}
 -- {"kind":"experiment_runner","max_gate_looks":4356,"max_t_threshold":4.387,"n_alphas":3,"n_entries":5,"n_iterate":3,"n_promote":0,"n_reject":2,"total_count":420}
 -- {"kind":"promotion_pipeline","max_gate_looks":3936,"max_t_threshold":4.365,"n_alphas":24,"n_entries":24,"n_iterate":11,"n_promote":0,"n_reject":13,"total_count":2016}
 -- (v1.5.0 snapshot, the current scope: 24 alphas x 84 looks judged at |t| >= 4.365, 11 ITERATE / 13 REJECT —

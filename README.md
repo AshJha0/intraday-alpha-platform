@@ -276,11 +276,11 @@ the full design, data flow, and diagrams.
 | Registered features | **205** (10 families; 40-feature native core set ported to C++/Rust/Java) | `data/reference/feature_registry.json` |
 | Flagship alphas | **24** (EQ01–EQ12, FX01–FX12), each with an enforced `Economic rationale:` docstring | `python/src/iap/alpha/`, `research/alpha_reports/` |
 | Promotion verdicts | **0 PROMOTE / 11 ITERATE / 13 REJECT** (gated on the pooled *uncrossed* IC and its HAC t against the ledger threshold, 4.365; the v1.5.0 default methods) | `research/alpha_reports/REPORT.md` |
-| Lifecycle registry | **24 alphas at CANDIDATE, 0 beyond** — every one fails `net_pnl_after_costs` at 1× costs, its bootstrap bound `net_pnl_bootstrap_ci` and `capacity`; the cross-alpha correlation gate passes vacuously (7 states, 17 pinned edges, 20 gates) | `research/alpha_registry.json`, `research/lifecycle_transitions.jsonl`, `tests/golden/expected_lifecycle.json` |
-| Experiments ledger | 5,156 recorded looks over **216 distinct configurations** (de-duplicated by alpha × kind × config × dataset: 70 configurations of the v1.3.0 dataset are kept as history, 146 are on the current one — 69 under the rules up to v1.4.0, 77 under the v1.5.0 defaults, eight of those signal combinations); expected max \|t\| under the global null ≈ 4.135, Bonferroni per-test \|t\| ≥ 4.424 | `research/experiments.json` |
+| Lifecycle registry | **23 alphas at CANDIDATE, 0 beyond** — every one fails `net_pnl_after_costs` at 1× costs, its bootstrap bound `net_pnl_bootstrap_ci` and `capacity`; the cross-alpha correlation gate passes vacuously (7 states, 17 pinned edges, 20 gates) | `research/alpha_registry.json`, `research/lifecycle_transitions.jsonl`, `tests/golden/expected_lifecycle.json` |
+| Experiments ledger | 5,358 recorded looks over **293 distinct configurations** (de-duplicated by alpha × kind × config × dataset: 70 configurations of the v1.3.0 dataset are kept as history, 223 are on the current one — 69 under the rules up to v1.4.0, 77 under the v1.5.0 defaults (now scoped `v2_v113`), 77 under the v1.14.0 statistics revision; eight of each of the last two are signal combinations); expected max \|t\| under the global null ≈ 4.144, Bonferroni per-test \|t\| ≥ 4.432 | `research/experiments.json` |
 | Contracts | **17** JSON Schemas (all `x-version` 1) mirrored by **22** typed Python contracts and **18** runtime-checkable Protocols; one pinned instance each | `schemas/`, `python/src/iap/contracts/`, `tests/golden/expected_contracts_examples.json` |
 | Python reference ports proven by the ports' own goldens | risk: `expected_risk_decisions.json` exact, audit JSONL + snapshot **byte-identical**; execution: `expected_replay_fills.json` **bit-identical** | `python/tests/test_risk_golden.py`, `python/tests/test_execution_golden.py` |
-| MVP golden run (`python -m iap.mvp run`, seed 12345) | **15,805** events · **800** decisions · **235** parent orders · **169** fills · P&L **−81.53 USD** (cost-negative: +0.022 bps alpha vs −0.41 bps execution cost) · trace digest `20d4ff76…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
+| MVP golden run (`python -m iap.mvp run`, seed 12345) | **15,805** events · **800** decisions · **235** parent orders · **169** fills · P&L **−81.53 USD** (cost-negative: +0.022 bps alpha vs −0.41 bps execution cost) · trace digest `8c5468f6…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
 | Adaptive deployment study | 4 refit policies × 10 alphas; 88 drift-triggered refits; FX01 retired under every policy; 19 of 40 deployments make no trade, none ends above zero | `research/adaptive_reports/ADAPTIVE_REPORT.md` |
 | Bundled dataset | 2 synthetic sessions, 19 instruments, 308,975 normalized events (`data_version` `116b7787…`; equity flow runs to the close since v1.4.0) | `data/normalized/qc_report.json` |
 | Feature emission | 213,021 vectors at 100 ms cadence | `data/features/features_summary.json` |
@@ -449,7 +449,7 @@ conclusion. What moved:
 - **Ledger.** The 1920 already recorded are kept; the regenerated pipelines
   added 2,476 (84 per alpha per run under the default methods, 28 under the
   legacy ones), for 4,396; the eight signal-combination experiments added
-  760, for 5,156.
+  760, for 5,156 (the v1.14.0 statistics revision then added 2 per alpha, 13 per combination and 2 per runner experiment: 5,358 today).
 - **Ports.** Java and Rust implement the CUSUM and the consecutive
   retirement rule and the ledger and the fixed significance threshold, by
   name; the Java `ResearchBacktester` and `CostModel` default to the v1.5.0
@@ -726,7 +726,7 @@ and `strategies/lifecycle.json` — dashboard metric provenance, Java
 golden-gate completeness), and `numbers` is
 `tests/harness/check_headline_numbers.py`, which re-derives every headline
 figure in this README — test and golden counts, the ledger denominator, the
-24 alphas / 24 CANDIDATE, the MVP counts and P&L, the schema, contract and
+24 alphas / 23 CANDIDATE, the MVP counts and P&L, the schema, contract and
 Protocol counts, the benchmark figures — from the artefact that produces it.
 
 Four independent implementations of one pinned semantics, held identical by
@@ -744,7 +744,7 @@ golden tests — the engineering discipline this repo is built around
 | [docs/RESEARCH_VALIDITY.md](docs/RESEARCH_VALIDITY.md) + [research/power/POWER_REPORT.md](research/power/POWER_REPORT.md) | the corrected research methods (the defaults since v1.5.0, each with its named legacy rule), the research store under parallel writers, gate eligibility; the planted-signal power study of the validation chain |
 | [CHANGELOG.md](CHANGELOG.md) | release notes, newest first (v1.11.0: the Rust feature engine via pyo3, the polyglot policy, the model registry, the LLM research agent and its evals; v1.10.0: skewed quoting, auctions, optimal execution, governance G1-G4; v1.9.0: research validity options, parallel features, maker economics; v1.8.0: the 2026 holdout and the ingest memory fix; v1.6.0-v1.7.2: real data, the agent layer, signal combination, real-data power; v1.5.0: the corrected research methods become the defaults, every old rule keeps a legacy name, every dataset-derived artefact regenerated; v1.4.0: the generator's equity flow calibration fixed so flow reaches the close, and every dataset-derived artefact regenerated; v1.3.0: fail-closed risk, simulator fill rules, paper-platform safety, governance and deployment hardening, research validity) |
 | [docs/MVP.md](docs/MVP.md) | the executable MVP (`python -m iap.mvp run / replay / verify / explain`): one deterministic, fully traced trading loop on a synthetic equity — the loop module by module, the §11.4 wiring rules with code references, the determinism contract, the incident replay flow, the honest golden-run results (cost-negative) with the realized-IC audit, and the success-criteria table |
-| [docs/LIFECYCLE.md](docs/LIFECYCLE.md) | the 7-state promotion lifecycle: states, the 17-edge transition table, the 20 gates with config keys and defaults, evidence documents, registry and transition-log formats, the bootstrap result (24 CANDIDATE / 0 beyond), the golden, the Java/Rust ports, the RETIRED-is-observational caveat |
+| [docs/LIFECYCLE.md](docs/LIFECYCLE.md) | the 7-state promotion lifecycle: states, the 17-edge transition table, the 20 gates with config keys and defaults, evidence documents, registry and transition-log formats, the bootstrap result (23 CANDIDATE / 0 beyond), the golden, the Java/Rust ports, the RETIRED-is-observational caveat |
 | [docs/DECISION_TRACE.md](docs/DECISION_TRACE.md) | the decision trace: the record, ids, canonical JSON rules, the stream digest with its known answers, sinks, the pinned `explain()` block, store views, emission points in Python / Java / C++ / Rust, incident replay |
 | [API_CONTRACTS.md](API_CONTRACTS.md) | the contract layer: 22 typed contracts field by field, ids and canonical JSON, validation, the 18 Protocols and what satisfies them, versioning, the 17-schema index |
 | [API_TRADING.md](API_TRADING.md) | the Python reference ports of the hard risk engine (`iap.risk`) and the execution stack (`iap.execution`): public APIs, golden parity statements, what is pinned about each port |

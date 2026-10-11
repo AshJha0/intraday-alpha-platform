@@ -16,7 +16,7 @@ PROMOTE here would be a reason to look for leakage before anything else.
 - **Outer validation:** `validate_alpha`, 4 expanding walk-forward folds purged at the combination horizon, 60 s embargo, method bundle `v2` — the chain of the alpha reports.
 - **Weights:** fitted inside each fold's training window on the members' out-of-sample predictions from 3 inner walk-forward folds (same splitter); standardisation, weights, ridge penalty and scale never see a test row.
 - **Methods:** `equal_weight`, `ic_weighted`, `ridge`, `shrinkage_mv`; default `equal_weight` (the baseline). `ridge` and `shrinkage_mv` account for member correlation explicitly; `equal_weight` and `ic_weighted` do not, and nothing is orthogonalised.
-- **Looks:** each experiment debits `looks_per_validation(4) + K` (83 + members); this report declared 760 looks over 8 experiments on a ledger of 4,396 and was judged at 5,156 looks: PROMOTE needs gate t >= 4.424.
+- **Looks:** each experiment debits `looks_per_validation(4) + K` (83 + members); this report declared 104 looks over 8 experiments on a ledger of 5,214 and was judged at 5,318 looks: PROMOTE needs gate t >= 4.430.
 
 ## COMB_EQ — EQUITY, horizon 5s
 
@@ -29,32 +29,32 @@ member's committed report at its own horizon.
 
 | signal | gate IC | gate t | folds+ | hyp | leak | trades (all folds) | net P&L 1x last fold | net P&L 1x pooled | CI low | CI high | verdict | fails |
 |--------|---------|--------|--------|-----|------|--------------------|----------------------|-------------------|--------|---------|---------|-------|
-| **equal_weight** | +0.0105 | +1.98 | 1.00 | yes | pass | 0 | +0 | +0 | +0 | +0 | **ITERATE** | significance, cost |
-| **ic_weighted** | +0.0262 | +6.29 | 1.00 | yes | pass | 3 | +0 | -44 | -131 | +0 | **ITERATE** | cost |
-| **ridge** | +0.0429 | +7.06 | 1.00 | yes | pass | 6 | +0 | -73 | -189 | +0 | **ITERATE** | cost |
-| **shrinkage_mv** | +0.0413 | +6.38 | 1.00 | yes | pass | 6 | +0 | -73 | -189 | +0 | **ITERATE** | cost |
+| **equal_weight** | +0.0302 | +7.67 | 1.00 | yes | pass | 0 | +0 | +0 | +0 | +0 | **ITERATE** | cost |
+| **ic_weighted** | +0.0409 | +10.83 | 1.00 | yes | pass | 3 | +0 | -44 | -131 | +0 | **ITERATE** | cost |
+| **ridge** | +0.0512 | +11.52 | 1.00 | yes | pass | 6 | +0 | -73 | -189 | +0 | **ITERATE** | cost |
+| **shrinkage_mv** | +0.0517 | +12.15 | 1.00 | yes | pass | 6 | +0 | -73 | -189 | +0 | **ITERATE** | cost |
 
 | member | own horizon | own gate IC | own gate t | own verdict | gate IC here | gate t here | trades (all folds) | net P&L 1x (all folds) |
 |--------|-------------|-------------|------------|-------------|--------------|-------------|--------------------|------------------------|
-| EQ01 | 1s | +0.0105 | +1.59 | ITERATE | +0.0168 | +1.82 | 0 | +0 |
-| EQ02 | 5s | +0.0251 | +7.17 | ITERATE | +0.0251 | +7.17 | 0 | +0 |
-| EQ03 | 5s | +0.0189 | +5.16 | ITERATE | +0.0189 | +5.16 | 0 | +0 |
-| EQ04 | 5s | -0.0034 | -0.55 | REJECT | -0.0034 | -0.55 | 0 | +0 |
-| EQ05 | 1s | +0.0055 | +1.64 | ITERATE | +0.0149 | +4.05 | 0 | +0 |
-| EQ06 | 10s | +0.0277 | +4.36 | ITERATE | +0.0192 | +4.37 | 34 | -679 |
-| EQ07 | 10s | +0.0006 | +0.14 | REJECT | +0.0077 | +1.82 | 0 | +0 |
-| EQ08 | 10s | -0.0481 | -4.57 | REJECT | -0.0400 | -5.27 | 0 | +0 |
-| EQ09 | 10s | -0.0229 | -1.32 | REJECT | -0.0066 | -0.43 | 0 | +0 |
-| EQ10 | 1s | +0.0040 | +0.91 | REJECT | -0.0013 | -0.34 | 0 | +0 |
-| EQ11 | 15m | +0.0038 | +0.20 | REJECT | -0.0317 | -3.96 | 185 | -3151 |
-| EQ12 | 5s | +0.0261 | +7.20 | ITERATE | +0.0261 | +7.20 | 0 | +0 |
+| EQ01 | 1s | +0.0234 | +6.87 | ITERATE | +0.0168 | +1.82 | 0 | +0 |
+| EQ02 | 5s | +0.0352 | +11.30 | ITERATE | +0.0251 | +7.17 | 0 | +0 |
+| EQ03 | 5s | +0.0281 | +7.90 | ITERATE | +0.0189 | +5.16 | 0 | +0 |
+| EQ04 | 5s | -0.0066 | -1.18 | REJECT | -0.0034 | -0.55 | 0 | +0 |
+| EQ05 | 1s | +0.0101 | +3.18 | ITERATE | +0.0149 | +4.05 | 0 | +0 |
+| EQ06 | 10s | +0.0478 | +9.43 | ITERATE | +0.0192 | +4.37 | 44 | -810 |
+| EQ07 | 10s | -0.0087 | -2.05 | REJECT | +0.0077 | +1.82 | 0 | +0 |
+| EQ08 | 10s | -0.0495 | -6.21 | REJECT | -0.0400 | -5.27 | 0 | +0 |
+| EQ09 | 10s | -0.0154 | -1.39 | REJECT | -0.0066 | -0.43 | 0 | +0 |
+| EQ10 | 1s | +0.0022 | +0.62 | REJECT | -0.0013 | -0.34 | 0 | +0 |
+| EQ11 | 15m | +0.0061 | +0.43 | REJECT | -0.0317 | -3.96 | 190 | -3021 |
+| EQ12 | 5s | +0.0366 | +11.43 | ITERATE | +0.0261 | +7.20 | 0 | +0 |
 
 ### Breadth: arithmetic vs measurement
 
 - Members with a defined IC: 12; mean member gate IC +0.0038, mean member gate t +1.75.
 - Mean pairwise signal correlation +0.069 (mean |rho| 0.158); effective independent bets 6.55 of 12 (eigenvalue participation ratio), 6.80 by `K / (1 + (K - 1) rho)`.
-- Expected equal-weight IC = mean IC x sqrt(breadth): +0.0132 if the members were independent, +0.0099 at the measured correlation. **Measured: +0.0105.**
-- Expected gate t = mean member t x sqrt(effective breadth): +4.57. **Measured: +1.98.**
+- Expected equal-weight IC = mean IC x sqrt(breadth): +0.0132 if the members were independent, +0.0099 at the measured correlation. **Measured: +0.0302.**
+- Expected gate t = mean member t x sqrt(effective breadth): +4.57. **Measured: +7.67.**
 
 ### Signal correlation of the members (out-of-sample z, common rows)
 
@@ -81,8 +81,8 @@ Pairs above the lifecycle's `max_cross_alpha_correlation` (0.7): EQ02/EQ03 (+0.9
 
 | | EQ06 | EQ11 |
 |---|---|---|
-| EQ06 | +1.00 | -0.04 |
-| EQ11 | -0.04 | +1.00 |
+| EQ06 | +1.00 | -0.07 |
+| EQ11 | -0.07 | +1.00 |
 
 ### Weights per fold and their stability
 
@@ -125,10 +125,10 @@ Pairs above the lifecycle's `max_cross_alpha_correlation` (0.7): EQ02/EQ03 (+0.9
 ### Leakage checks
 
 - Fitted parameters of the last fold are identical when every label from the test start onwards is replaced by garbage: `equal_weight` yes, `ic_weighted` yes, `ridge` yes, `shrinkage_mv` yes.
-- `equal_weight`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0105 against the validation's +0.0105.
-- `ic_weighted`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0262 against the validation's +0.0262.
-- `ridge`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0429 against the validation's +0.0429.
-- `shrinkage_mv`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0413 against the validation's +0.0413.
+- `equal_weight`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0105 against the validation's +0.0302.
+- `ic_weighted`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0262 against the validation's +0.0409.
+- `ridge`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0429 against the validation's +0.0512.
+- `shrinkage_mv`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0413 against the validation's +0.0517.
 
 ## COMB_FX — FX, horizon 1m
 
@@ -141,32 +141,32 @@ member's committed report at its own horizon.
 
 | signal | gate IC | gate t | folds+ | hyp | leak | trades (all folds) | net P&L 1x last fold | net P&L 1x pooled | CI low | CI high | verdict | fails |
 |--------|---------|--------|--------|-----|------|--------------------|----------------------|-------------------|--------|---------|---------|-------|
-| **equal_weight** | +0.0315 | +3.22 | 1.00 | yes | pass | 15 | +0 | -13 | -42 | +0 | **ITERATE** | significance, cost |
-| **ic_weighted** | +0.0428 | +3.74 | 1.00 | yes | pass | 2713 | -153 | -929 | -1192 | -696 | **ITERATE** | significance, cost |
-| **ridge** | +0.0482 | +4.73 | 1.00 | yes | pass | 4444 | -273 | -1627 | -1886 | -1376 | **ITERATE** | cost |
-| **shrinkage_mv** | +0.0478 | +4.76 | 1.00 | yes | pass | 4419 | -271 | -1631 | -1884 | -1393 | **ITERATE** | cost |
+| **equal_weight** | +0.0357 | +3.96 | 1.00 | yes | pass | 14 | +0 | -14 | -42 | +0 | **ITERATE** | significance, cost |
+| **ic_weighted** | +0.0534 | +4.77 | 1.00 | yes | pass | 3423 | -218 | -1129 | -1445 | -815 | **ITERATE** | cost |
+| **ridge** | +0.0618 | +5.96 | 1.00 | yes | pass | 5538 | -375 | -2024 | -2312 | -1736 | **ITERATE** | cost |
+| **shrinkage_mv** | +0.0613 | +5.98 | 1.00 | no | pass | 5519 | -370 | -2028 | -2318 | -1753 | **ITERATE** | hypothesis, cost |
 
 | member | own horizon | own gate IC | own gate t | own verdict | gate IC here | gate t here | trades (all folds) | net P&L 1x (all folds) |
 |--------|-------------|-------------|------------|-------------|--------------|-------------|--------------------|------------------------|
-| FX01 | 500ms | +0.0183 | +2.26 | ITERATE | +0.0480 | +5.07 | 0 | +0 |
-| FX02 | 1m | +0.0058 | +0.34 | REJECT | +0.0058 | +0.34 | 0 | +0 |
-| FX03 | 1m | +0.0112 | +1.13 | REJECT | +0.0112 | +1.13 | 0 | +0 |
-| FX04 | 30s | +0.0298 | +4.24 | ITERATE | +0.0280 | +3.11 | 0 | +0 |
-| FX05 | 5m | -0.0072 | -0.42 | REJECT | -0.0180 | -0.89 | 137 | -64 |
-| FX06 | 30s | +0.0210 | +1.47 | REJECT | +0.0111 | +0.58 | 0 | +0 |
-| FX07 | 1m | -0.0119 | -1.37 | REJECT | -0.0118 | -1.36 | 0 | +0 |
-| FX08 | 1m | +0.0407 | +3.84 | ITERATE | +0.0407 | +3.84 | 3789 | -1406 |
-| FX09 | 1m | -0.0471 | -5.75 | REJECT | -0.0471 | -5.75 | 3932 | -1441 |
-| FX10 | 1m | +0.0196 | +1.55 | ITERATE | +0.0196 | +1.55 | 840 | -340 |
-| FX11 | 5m | +0.0328 | +2.22 | ITERATE | +0.0351 | +2.93 | 5381 | -2047 |
-| FX12 | 1m | +0.0086 | +1.05 | REJECT | +0.0086 | +1.05 | 0 | +0 |
+| FX01 | 500ms | +0.0214 | +3.74 | ITERATE | +0.0480 | +5.07 | 0 | +0 |
+| FX02 | 1m | +0.0137 | +0.80 | REJECT | +0.0058 | +0.34 | 0 | +0 |
+| FX03 | 1m | +0.0158 | +1.63 | ITERATE | +0.0112 | +1.13 | 0 | +0 |
+| FX04 | 30s | +0.0350 | +5.34 | ITERATE | +0.0280 | +3.11 | 0 | +0 |
+| FX05 | 5m | -0.0132 | -0.75 | REJECT | -0.0180 | -0.89 | 189 | -95 |
+| FX06 | 30s | +0.0129 | +1.16 | REJECT | +0.0111 | +0.58 | 0 | +0 |
+| FX07 | 1m | -0.0161 | -1.56 | REJECT | -0.0118 | -1.36 | 0 | +0 |
+| FX08 | 1m | +0.0509 | +4.74 | ITERATE | +0.0407 | +3.84 | 4746 | -1712 |
+| FX09 | 1m | -0.0603 | -6.80 | REJECT | -0.0471 | -5.75 | 4926 | -1820 |
+| FX10 | 1m | +0.0268 | +2.37 | ITERATE | +0.0196 | +1.55 | 1032 | -408 |
+| FX11 | 5m | +0.0406 | +2.60 | REJECT | +0.0351 | +2.93 | 7217 | -2882 |
+| FX12 | 1m | +0.0097 | +1.21 | REJECT | +0.0086 | +1.05 | 0 | +0 |
 
 ### Breadth: arithmetic vs measurement
 
 - Members with a defined IC: 12; mean member gate IC +0.0109, mean member gate t +0.97.
 - Mean pairwise signal correlation +0.017 (mean |rho| 0.078); effective independent bets 9.87 of 12 (eigenvalue participation ratio), 10.11 by `K / (1 + (K - 1) rho)`.
-- Expected equal-weight IC = mean IC x sqrt(breadth): +0.0379 if the members were independent, +0.0348 at the measured correlation. **Measured: +0.0315.**
-- Expected gate t = mean member t x sqrt(effective breadth): +3.08. **Measured: +3.22.**
+- Expected equal-weight IC = mean IC x sqrt(breadth): +0.0379 if the members were independent, +0.0348 at the measured correlation. **Measured: +0.0357.**
+- Expected gate t = mean member t x sqrt(effective breadth): +3.08. **Measured: +3.96.**
 
 ### Signal correlation of the members (out-of-sample z, common rows)
 
@@ -193,11 +193,11 @@ Pairs above the lifecycle's `max_cross_alpha_correlation` (0.7): none. Of such a
 
 | | FX05 | FX08 | FX09 | FX10 | FX11 |
 |---|---|---|---|---|---|
-| FX05 | +1.00 | -0.02 | -0.02 | +0.01 | +0.05 |
-| FX08 | -0.02 | +1.00 | +0.41 | +0.16 | +0.16 |
-| FX09 | -0.02 | +0.41 | +1.00 | +0.08 | +0.13 |
-| FX10 | +0.01 | +0.16 | +0.08 | +1.00 | +0.03 |
-| FX11 | +0.05 | +0.16 | +0.13 | +0.03 | +1.00 |
+| FX05 | +1.00 | -0.04 | -0.03 | -0.00 | +0.05 |
+| FX08 | -0.04 | +1.00 | +0.36 | +0.13 | +0.27 |
+| FX09 | -0.03 | +0.36 | +1.00 | +0.12 | +0.13 |
+| FX10 | -0.00 | +0.13 | +0.12 | +1.00 | +0.07 |
+| FX11 | +0.05 | +0.27 | +0.13 | +0.07 | +1.00 |
 
 ### Weights per fold and their stability
 
@@ -240,10 +240,10 @@ Pairs above the lifecycle's `max_cross_alpha_correlation` (0.7): none. Of such a
 ### Leakage checks
 
 - Fitted parameters of the last fold are identical when every label from the test start onwards is replaced by garbage: `equal_weight` yes, `ic_weighted` yes, `ridge` yes, `shrinkage_mv` yes.
-- `equal_weight`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0315 against the validation's +0.0315.
-- `ic_weighted`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0428 against the validation's +0.0428.
-- `ridge`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0482 against the validation's +0.0482.
-- `shrinkage_mv`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0478 against the validation's +0.0478.
+- `equal_weight`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0315 against the validation's +0.0357.
+- `ic_weighted`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0428 against the validation's +0.0534.
+- `ridge`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0482 against the validation's +0.0618.
+- `shrinkage_mv`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0478 against the validation's +0.0613.
 
 ## Result
 

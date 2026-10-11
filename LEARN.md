@@ -747,7 +747,7 @@ did the same thing along a different axis: the method bundle is part of
 the canonical config, so the same 24 pipelines run under the new default
 rules are new looks at the same sample, added beside the v1.4.0 ones
 (ledger `x-version` 3). The current ledger holds **216 distinct
-configurations / 5156 looks**:
+configurations / 5358 looks**:
 
 - on the v1.3.0 dataset (`203c8f54…`), 70 entries carrying 1,068 of the
   looks: a one-time design scan (216: 24 alphas × 9 horizons), 24
@@ -770,7 +770,7 @@ evaluations at four folds (itemised in
 and every one of them is a look.
 
 That translates into a selection yardstick: Bonferroni per-test threshold
-|t| ≥ **4.424**, and an expected **max |t| ≈ 4.135 under the global null**
+|t| ≥ **4.432**, and an expected **max |t| ≈ 4.144 under the global null**
 (4.206 and 3.888 at the v1.4.0 count of 1920, 4.071 and 3.735 before the
 dataset regeneration: looking again raised the bar each time). Up to
 v1.4.0 this yardstick was printed beside a fixed gate of t ≥ 3.0 and read
@@ -794,7 +794,7 @@ EQ03 (5.16) clear the threshold; EQ06 (4.36) and FX04 (4.24) are above the
 yardstick and below the threshold, so they fail the significance gate
 that, at a fixed 3.0, they used to pass; EQ08 (−4.57) and FX09 (−5.75)
 are beyond it with the wrong sign. The lists are the same at 3,936 and at
-5,156 looks. Most quant shops track this informally at best;
+5,358 looks. Most quant shops track this informally at best;
 here it is a serialized, deterministic artifact — and the runner's entries
 were deliberately *not* de-duplicated against the pipeline entries for the
 same alpha and horizon: the denominator may only grow.
@@ -1943,7 +1943,7 @@ reproduces them with string concatenation and one hash (pinned:
 digest is sha256 over every canonical line + newline in emission order;
 same seed ⇒ same digest; one changed field or one swapped line changes it.
 Known answers are pinned for one trace, the same trace twice, and the empty
-stream; the MVP golden pins a whole session's digest (`20d4ff76…`, 800
+stream; the MVP golden pins a whole session's digest (`8c5468f6…`, 800
 traces).
 
 ### 18.3 Four languages, one line
@@ -2030,7 +2030,7 @@ index that lied about what its sources contain would be worse than none.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=20d4ff76af0b631c...
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=8c5468f6f51de035...
 ```
 
 Seven seconds later `data/mvp/58a10f2194a3c81c/` holds the captured stream,
@@ -2056,7 +2056,7 @@ regenerated.
 v1.5.0 regenerated it once more and changed nothing a trader would see.
 The loop does not use the research backtester, so the new default methods
 do not touch it: the events, decisions, parents, fills and P&L are
-identical to v1.4.0. What moved is the digest (`f51890da…` → `20d4ff76…`)
+identical to v1.4.0. What moved is the digest (`f51890da…` → `8c5468f6…`)
 and the `config_version` it covers (`f293e7e7…` → `439bbad5…`), because
 `config_version` hashes `configs/execution/execution.json`, which now
 names its impact model, and `alpha_params.json`, whose header names the
@@ -3098,8 +3098,8 @@ Dependabot bump is being asked to do.
 3. **Random splits on overlapping labels.** Walk-forward only, purge at the
    label horizon, 60 s embargo (§6.2).
 4. **Uncounted multiple testing.** A ledger de-duplicated by (alpha, kind,
-   config, dataset) — 216 distinct configurations, 5156 looks — with a printed
-   expected-max-|t| yardstick of 4.135; FX08's t = 3.84 is called what it is.
+   config, dataset) — 293 distinct configurations, 5358 looks — with a printed
+   expected-max-|t| yardstick of 4.144; FX08's t = 3.84 is called what it is.
    Regenerating the dataset did not reset the count, and neither did
    changing the default methods: the looks already taken are kept and the
    new ones added (§6.6). Since v1.5.0 the count is not only printed: the

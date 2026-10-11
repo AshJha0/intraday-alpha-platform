@@ -1075,7 +1075,7 @@ Artefacts:
 byte-deterministic, re-rendered byte-identically by
 the Rust and Java ports) and `research/lifecycle_transitions.jsonl` (canonical `LifecycleTransition`
 lines, schema-validated on write); `research/lifecycle_log.jsonl` is the adaptive study's policy
-comparison and never sets a state. The bundled result: 24 CANDIDATE / 0 beyond
+comparison and never sets a state. The bundled result: 23 CANDIDATE / 0 beyond
 (`net_pnl_after_costs` and `net_pnl_bootstrap_ci` fail for all 24 — 17 alphas make no trade, 7
 have a negative lower bound; `cross_alpha_correlation` passes vacuously for all 24, nobody being
 at VALIDATING). In the live Java loop the state is **observational**
