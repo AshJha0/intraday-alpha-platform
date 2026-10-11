@@ -108,15 +108,20 @@ progress, and the CHANGELOG section is `## Unreleased (v1.15)`.
   `codeql.yml` and are enforced at merge time by the ruleset, not by the tag
   gate.
 
-### Needs a decision
+### Owner decisions (2026-10-11)
 
-1. **Ship the Java image in v1.15.0?** `release.yml` will still build, attest
-   and publish `ghcr.io/ashjha0/intraday-alpha-platform-java:v1.15.0` from
-   the frozen archive, and the manifest job still installs a JDK. Keep (k8s
-   `java-platform.yaml` uses it) or drop the `java` matrix entry and the k8s
-   manifest.
-2. **Should the tag gate also require `codeql.yml`?** Today a main commit
-   with a failed post-merge CodeQL run can still be tagged.
-3. **CHANGELOG:** rename `## Unreleased (v1.15)` to `## v1.15.0 — <date>`
-   in the release PR; the Unreleased section does not yet list #92, #94,
-   #85, #93 or #96 (plan progress lists them as merged).
+1. **Java image:** kept for v1.15; `release.yml` keeps building it from
+   `archive/java`. No change.
+2. **CodeQL at the tag gate: adopted.** `publish` now also requires a
+   completed, successful `codeql.yml` push run on main for the release commit
+   (the run succeeds only when every `analyze` job does). A dry run lists it as
+   a BLOCKER; `--execute` stops on it before tagging. Mocked tests:
+   `test_publish_requires_green_codeql` (failed, in progress, no run).
+   Re-run after the change (main @ 99f0dec, both workflows still running):
+   ```
+   [dry-run] BLOCKER: CHANGELOG.md has no '## v1.15.0' section
+   [dry-run] BLOCKER: no green ci run on main for 99f0dec...: tag only after main CI is green
+   [dry-run] BLOCKER: no green codeql run on main for 99f0dec...: tag only after every CodeQL analyze job is green
+   ```
+3. **CHANGELOG:** the rename to `## v1.15.0 — <date>` and the missing
+   #92/#94/#85/#93/#96 entries are done at release time, not here.

@@ -27,7 +27,8 @@ lessons of the v1.14.0 release (2026-10-11):
     the working tree is line endings (CRLF-only churn).
 
 ``publish --version X.Y.Z``  after the release PR is merged:
-    1. require a green ``ci`` run on main for the merge commit;
+    1. require a green ``ci`` run and a green ``codeql`` run (every
+       ``analyze`` job) on main for the merge commit;
     2. annotated tag ``vX.Y.Z`` on it, message = the CHANGELOG section;
     3. ``gh release create vX.Y.Z --verify-tag`` with the CHANGELOG section;
     4. watch ``release.yml`` for the tag; when it failed in its verify-ci
@@ -263,14 +264,18 @@ def changelog_section(text: str, version: str) -> str:
     return body.strip() + "\n"
 
 
-def main_ci_green(r: Runner, sha: str) -> bool:
+def main_ci_green(r: Runner, sha: str, workflow: str = "ci.yml") -> bool:
+    """A completed, successful push run of ``workflow`` on main for ``sha``.
+
+    For ``codeql.yml`` a successful run means every ``analyze`` matrix job
+    passed (the run concludes ``success`` only when all its jobs do)."""
     out = r.query(
         [
             "gh",
             "run",
             "list",
             "--workflow",
-            "ci.yml",
+            workflow,
             "--branch",
             "main",
             "--commit",
@@ -349,6 +354,11 @@ def publish(
         section = f"(CHANGELOG section for {tag} missing)\n"
     if not main_ci_green(r, sha):
         block(f"no green ci run on main for {sha}: tag only after main CI is green")
+    if not main_ci_green(r, sha, "codeql.yml"):
+        block(
+            f"no green codeql run on main for {sha}: tag only after every CodeQL "
+            "analyze job is green"
+        )
     notes = Path(tempfile.mkdtemp(prefix="iap-rel-")) / f"{tag}.md"
     notes.write_text(section, encoding="utf-8", newline="\n")
     r.note(f"release notes from CHANGELOG ({len(section.splitlines())} lines): {notes}")
@@ -398,7 +408,7 @@ release flow (tools/release.py, dry-run by default; --execute to act):
       skipping CRLF-only expected_features*; review the diff, commit, push
  4. owner merges the release PR (merge commit)
  5. python tools/release.py publish --version X.Y.Z
-      main CI green -> annotated tag from CHANGELOG -> gh release --verify-tag
+      main ci + codeql green -> annotated tag from CHANGELOG -> gh release --verify-tag
       -> release.yml (rerun if verify-ci raced) -> site shows vX.Y.Z
       (needs a '## vX.Y.Z' CHANGELOG heading: rename 'Unreleased' first)
 """
