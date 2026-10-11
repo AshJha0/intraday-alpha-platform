@@ -484,7 +484,10 @@ iap/
                    research/agents/anchors.json), reserve.py / reserve_runner.py
                    (hidden-seed evaluation), approvals.py (signed HUMAN
                    approvals), evals.py, untrusted.py, citations.py,
-                   mcp_server.py (read-only MCP over stdio, `iap-mcp`), cli.py
+                   mcp_server.py (read-only MCP over stdio, `iap-mcp`),
+                   mcp_workflow.py (v1.15 agent workflow over MCP: propose,
+                   draft_prereg, hit_rate, regulatory_fee, list_drafts; no
+                   human-only op; `iap-mcp-agent`), cli.py
                    (`iap-agents`: keygen, issue, apply, reserve, agent-keygen,
                    prereg, anchor, verify-board).
   auction/         (v1.10, A1, opt-in) Nasdaq NOII / cross stream: stream.py
@@ -532,4 +535,4 @@ cryptography (Ed25519 for `iap.agents.signing` only); extras `ml`
 (xgboost, lightgbm) and `dev` (pytest, pytest-cov, pytest-xdist, pyyaml).
 Console entry points: `iap-marketdata`, `iap-features`, `iap-tca`,
 `iap-research`, `iap-lifecycle`, `iap-store`, `iap-mvp`, `iap-mcp`,
-`iap-agents`.
+`iap-mcp-agent`, `iap-agents`.

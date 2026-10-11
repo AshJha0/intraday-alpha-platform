@@ -61,7 +61,9 @@ NUMBER_WORDS = frozenset(
     "dozens half halves quarter quarters third thirds twice thrice double doubled "
     "triple tripled quadruple quadrupled tenfold hundredfold".split()
 )
-_WORD = re.compile(r"[A-Za-z]+")
+#: a word standing alone: letters glued to ``_`` or digits are an identifier
+#: (``ic_first_half``, a field name copied from a report), not a number word
+_WORD = re.compile(r"(?<![A-Za-z0-9_])[A-Za-z]+(?![A-Za-z0-9_])")
 
 #: label in the text -> predicate on a field name (the statistic it names)
 _LABEL = re.compile(
