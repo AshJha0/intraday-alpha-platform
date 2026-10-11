@@ -14,5 +14,5 @@
 {"type":"fill","strategy_id":"S2","instrument_id":1,"order_id":0,"side":0,"qty":9,"price_ticks":2463,"ts":1700000000110598000},
 {"type":"venue_down","venue_id":0,"ts":1700000000110703000},
 {"type":"market","instrument_id":2,"bid_ticks":9223372036854775807,"ask_ticks":9223372036854775807,"ts":1700000000111448000},
-{"type":"market","instrument_id":2,"bid_ticks":498,"ask_ticks":500,"ts":1700000000137448000}
+{"type":"order","order":{"order_id":5,"instrument_id":2,"side":0,"qty":1,"price_ticks":498,"order_type":2,"venue_id":1,"strategy_id":"S2","urgency":0.5,"timestamp":1700000000111448000},"expect":{"decision":2,"rule_id":"CONFIG_MISSING","severity":3,"scope":"GLOBAL","scope_id":"","reason":"fail-closed: invalid argument: risk.json: missing market_data.max_sequence_gap_before_halt"}}
 ]}

@@ -1,8 +1,5 @@
-{"decision":2,"reason":"price deviates 8.2bps from mid, band 0.0bps","rule_id":"PRICE_BAND","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000000000000000}
-{"decision":2,"reason":"no reference price for instrument 2","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000000030000000}
-{"decision":2,"reason":"price deviates 40.0bps from mid, band 0.0bps","rule_id":"PRICE_BAND","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000000137000000}
-{"decision":2,"reason":"price deviates 40.0bps from mid, band 0.0bps","rule_id":"PRICE_BAND","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000000138065000}
-{"decision":2,"reason":"price deviates 12.2bps from mid, band 0.0bps","rule_id":"PRICE_BAND","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000000151065000}
-{"decision":2,"reason":"price deviates 12.2bps from mid, band 0.0bps","rule_id":"PRICE_BAND","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000000151065000}
-{"decision":2,"reason":"price deviates 12.2bps from mid, band 0.0bps","rule_id":"PRICE_BAND","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000000151065000}
-{"decision":2,"reason":"price deviates 12.2bps from mid, band 0.0bps","rule_id":"PRICE_BAND","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000000151065000}
+{"decision":2,"prev_sha256":"0000000000000000000000000000000000000000000000000000000000000000","reason":"price deviates 8.2bps from mid, band 0.0bps","rule_id":"PRICE_BAND","scope":"INSTRUMENT","scope_id":"1","seq":1,"severity":2,"timestamp":1700000000000000000}
+{"decision":2,"prev_sha256":"7eb3fdbec1e335482c3fa131edd73bf576a26b6dafd1a986092daba2eeed549c","reason":"no reference price for instrument 2","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","seq":2,"severity":2,"timestamp":1700000000030000000}
+{"decision":2,"prev_sha256":"d057ef948caaa2edfec458903c1f0f37e91cb306075e721646706b0b2a743e75","reason":"price deviates 20.0bps from mid, band 0.0bps","rule_id":"PRICE_BAND","scope":"INSTRUMENT","scope_id":"2","seq":3,"severity":2,"timestamp":1700000000137000000}
+{"decision":1,"prev_sha256":"03df4616deb3d47a97882b1dcd62ccf91a410515712b23f4f22acf6efcde5c26","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","seq":4,"severity":1,"timestamp":1700000000180646000}
+{"decision":2,"prev_sha256":"2945c9af9d99ced0e9c9cef1f3ddb1d17f49b7c1931d6020bbb9e398b5caeb2a","reason":"price deviates 8.2bps from mid, band 0.0bps","rule_id":"PRICE_BAND","scope":"INSTRUMENT","scope_id":"1","seq":5,"severity":2,"timestamp":1700000000238646000}

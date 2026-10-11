@@ -1,15 +1,15 @@
-{"decision":3,"reason":"ops halt","rule_id":"KILL_SWITCH_ENGAGED","scope":"INSTRUMENT","scope_id":"99","severity":3,"timestamp":1700000000000109000}
-{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"99","severity":1,"timestamp":1700000000059109000}
-{"decision":2,"reason":"position in instrument 2 has no mark price (fail-closed)","rule_id":"GROSS_NOTIONAL","scope":"GLOBAL","scope_id":"","severity":2,"timestamp":1700000000107109000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000000162109000}
-{"decision":2,"reason":"urgency must be in [0, 1]: 123456789.125","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000000162348000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000000167348000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000000183348000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000000183348000}
-{"decision":2,"reason":"order_id 5 already used at ts 1700000000167348000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000005183348001}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000006183348001}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000006183348001}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000006183348001}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000006183348001}
-{"decision":2,"reason":"strategy S3 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000006183348001}
-{"decision":2,"reason":"strategy S3 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000006183348001}
+{"decision":3,"prev_sha256":"0000000000000000000000000000000000000000000000000000000000000000","reason":"ops halt","rule_id":"KILL_SWITCH_ENGAGED","scope":"INSTRUMENT","scope_id":"99","seq":1,"severity":3,"timestamp":1700000000000109000}
+{"decision":1,"prev_sha256":"e32ed836ba59df0df8d4e7c6ff483e4f6481ee1c1e7a69d2294d5b05d592fdf2","reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"99","seq":2,"severity":1,"timestamp":1700000000059109000}
+{"decision":2,"prev_sha256":"beaf82623818475df984089d4e39a832ba29d648d5cec6509c110746e287239f","reason":"position in instrument 2 has no mark price (fail-closed)","rule_id":"GROSS_NOTIONAL","scope":"GLOBAL","scope_id":"","seq":3,"severity":2,"timestamp":1700000000107109000}
+{"decision":1,"prev_sha256":"5bc3c74ecf5a3aa44b7b6160e44b9b5a737d7c9943d698f08d5046c5ff721489","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","seq":4,"severity":1,"timestamp":1700000000162109000}
+{"decision":2,"prev_sha256":"3a62b7a72482b8ca4b21d202bc0fe3531c1c0cc3a2bb4616c212b06cd5b1244c","reason":"urgency must be in [0, 1]: 123456789.125","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S2","seq":5,"severity":2,"timestamp":1700000000162348000}
+{"decision":1,"prev_sha256":"5856cbe63d0fa3175df00ad0afa9898042fad6d26f4c6e70981804b756822645","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","seq":6,"severity":1,"timestamp":1700000000167348000}
+{"decision":1,"prev_sha256":"7b086d3439afb1fc34d13daf9f6c301e29528c1c680dda0c95b251bb5d821e4d","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","seq":7,"severity":1,"timestamp":1700000000183348000}
+{"decision":1,"prev_sha256":"189fd4caa9041893b88a0fd8793cd70969d1a5ea9b13adb79aee9706bccdabe3","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","seq":8,"severity":1,"timestamp":1700000000183348000}
+{"decision":2,"prev_sha256":"bd52e565c33f1c159fc58ded3c1e314ee3465707b5902dab58a366100e43f844","reason":"order_id 5 already used at ts 1700000000167348000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S1","seq":9,"severity":2,"timestamp":1700000005183348001}
+{"decision":1,"prev_sha256":"3a5d39bd052b27705a50cc76946d6a38cfb78c9359b075e3f2d25496ce315731","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","seq":10,"severity":1,"timestamp":1700000006183348001}
+{"decision":1,"prev_sha256":"2b4320077d3da47b29f58d498e71dc6708aaea1c332181788c20b82da546a3ad","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","seq":11,"severity":1,"timestamp":1700000006183348001}
+{"decision":1,"prev_sha256":"81abf1ab56b008260a9bacab71b8b05a95f0f111429a3c608003d051a20ca64c","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","seq":12,"severity":1,"timestamp":1700000006183348001}
+{"decision":1,"prev_sha256":"bfcb1d20c441faf57068d9c11ba842bfd78dd4f01f82ff1c2b07c8e70cf91d78","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","seq":13,"severity":1,"timestamp":1700000006183348001}
+{"decision":2,"prev_sha256":"6148708fc6fe0cd6d4d022e91b27203a5d02c7f8dcbde12b9491b40ce9ec1fe0","reason":"strategy S3 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S3","seq":14,"severity":2,"timestamp":1700000006183348001}
+{"decision":2,"prev_sha256":"a0f9378b6eed419da2b2b186f6d70ef35fd56db9293d28e750162036004dcac8","reason":"strategy S3 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S3","seq":15,"severity":2,"timestamp":1700000006183348001}
