@@ -8,8 +8,10 @@ Off in code defaults; on only through configs/prereg/v2.json.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import replace
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pytest
 from iap.execution import ExecutionSimulator, OrderType
@@ -57,7 +59,9 @@ def test_schedule_dates_match_ns_and_cite_sources():
                     assert int(d.timestamp()) * 10**9 == row[ns]
                 else:
                     assert ns not in row
-            assert "sec.gov" in row["source"] or "finra" in row["source"].lower()
+            hosts = {urlparse(u).hostname for u in re.findall(r"https://\S+", row["source"])}
+            want = "www.sec.gov" if table == "sec_section31" else "www.finra.org"
+            assert want in hosts, row["source"]
 
 
 def test_known_rates():
