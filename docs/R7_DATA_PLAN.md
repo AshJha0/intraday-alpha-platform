@@ -126,6 +126,11 @@ under `data/real/` say DONE):
 2. Days 1-2: remaining holdout days in waves (overnight ingest ~3.5 h).
 3. Day 3: insample days (~1 h), merges, sampling records, features.
 4. Then the confirmatory round of §6, once, on the holdout.
+5. Feature drift report (v1.15): after ingest and features and BEFORE the
+   confirmatory run, `python -m iap.research.drift --ref <insample feature
+   dirs> --target <holdout feature dirs> --out <dir>` (PSI, KS, mean/std
+   shift per symbol and pooled). It is descriptive only -- it never changes
+   the pre-registration or a gate -- and is reported alongside the results.
 
 ## 4. Tooling (opt-in, v1.13)
 

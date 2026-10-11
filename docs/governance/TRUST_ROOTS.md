@@ -21,6 +21,12 @@
   does not match the hash re-derived from the verified artefact, and writes
   `promotion.json`. CI runs `python -m iap.mlops check-promotions`, which
   fails if any promoted model no longer matches.
+- Promotion also requires a valid model card (`model_card.json`,
+  `iap.mlops.model_card`; write it with `python -m iap.mlops card <id> --spec
+  <json>`): data/sessions, prereg id and hash, metrics net of costs,
+  calibration (or null), known limitations, intended use and the owner
+  sign-off reference, bound to the record hash. A missing or invalid card is
+  a `RegistryError`; `check-promotions` re-validates it.
 
 ## Where the private key lives
 

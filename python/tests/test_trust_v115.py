@@ -21,7 +21,15 @@ REPO = Path(__file__).resolve().parents[2]
 def _registered(tmp_path):
     X, y = _data(seed=0)
     rec = MakerFilter("meta_gbm", tau=0.5).fit(X, y).register(tmp_path, exploratory=True, **META)
-    return ModelRegistry(tmp_path), rec.model_id
+    reg = ModelRegistry(tmp_path)
+    reg.write_card(
+        rec.model_id,
+        metrics_net_of_costs={"sharpe_net": 0.1},
+        known_limitations=["synthetic data"],
+        intended_use="test",
+        owner_signoff="test",
+    )
+    return reg, rec.model_id
 
 
 # ------------------------------------------------------------------ G-P0-1
