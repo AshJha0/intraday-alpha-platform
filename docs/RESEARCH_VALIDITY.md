@@ -353,6 +353,52 @@ looks); the five run on the v1.4.0 dataset under the rules of that release
 carry the version-1 sidecar; the five on the v1.3.0 dataset predate it and can
 be checked against the configuration bounds only (`periods_verified: false`).
 
+## 4a. v1.13 research-validity options (quality review 2026-10-11)
+
+All opt-in or additive: no default verdict, published number, golden or
+ledger entry changes (the regeneration is v1.14).
+
+- **Frozen-parameter scoring (R-P1-2a).** `validate_alpha(...,
+  frozen_params=<AlphaModel.params() blob>)` and `ExperimentRunner.run(spec,
+  frozen_params=...)` score every row of the window with those parameters
+  and no refit; the report gains `frozen_ic`, `frozen_t` (pooled-slope HAC
+  t on the gate rows) and a `frozen` block (`refit: false`, `n_pairs`,
+  `params_sha256`) beside the refit walk-forward statistics. The 2026
+  holdout refit `mu`/`sigma`/`beta` per fold (REAL_DATA.md §3.2); the next
+  one can report both.
+- **Pre-registered threshold (R-P1-2b).** `tstat_threshold="prereg"`
+  (`validate_alpha(..., prereg_t_threshold=t)`, `ExperimentRunner.run(spec,
+  prereg_t_threshold=t)`): the gate t threshold is `max(3.0, t)` with `t`
+  written in the pre-registration, not the ledger's running look count, so
+  a verdict does not depend on run order. The ledger still debits the looks.
+- **Post-block embargo (R-P1-6).** On two-sided splits (leave-one-day-out
+  folds and CPCV) the gap after a test block is
+  `max(embargo_ns, feature_window_ns)`: `feature_window_ns="registry"` reads
+  the longest `window`/`horizon` in the feature registry (5 m); an int is
+  used as given; `None` (default) keeps `embargo_ns`.
+  `iap.validation.splits.post_block_embargo_ns`.
+- **Beta sign consistency (R-P2-1).** `beta_sign_consistency` in every
+  `validate_alpha` report: the share of folds with fitted `beta_fit > 0`.
+  `hypothesis_confirmed` still reads the last fold (v1.14 changes it).
+- **DSR trials (R-P2-7).** `iap.validation.deflated.registered_hypotheses_trials(
+  Blackboard(path).entries(), data_family)` counts distinct pre-registered
+  hypotheses for one data family; pass it as `deflated_sharpe_trials` with
+  `deflated_sharpe_trials_basis="registered_hypotheses"`. `dsr_at_looks` is
+  kept.
+- **Event calendar (R-P2-9).** `FOMC_DAYS` / `HOLIDAY_THIN_DAYS` are read from
+  `configs/reference/event_calendar.json`, which records `source` and
+  `as_of` per year (2019, 2020, 2021, 2025, 2026; FOMC dates checked
+  against federalreserve.gov, 2026 early closes against nyse.com on
+  2026-10-11). `event_calendar_for_year` raises for an uncovered year.
+- **Auction orientation (R-P1-4).** `iap.auction.walk_forward` uses the
+  registered orientation; `fit_orientation=True` restores the +/-1 search;
+  `looks_consumed` is reported either way.
+- **Study summariser (R-P1-5).** `iap.research.study_stats.summarise_study`:
+  per-session net USD over every session (zero-trip sessions are 0 USD),
+  per-trip bps descriptive only, CI and t `None` below 3 sessions, and a
+  minimum-detectable-effect statement at the given n (with the effect a
+  registered t rule needs).
+
 ## 5. Tooling
 
 - `python -m iap.research run --methods {v2,v3,v4,legacy_v1}`: the method

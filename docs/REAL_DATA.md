@@ -241,12 +241,27 @@ hypotheses were written on `research/agents/blackboard.jsonl` and pushed
 feature existed; each names alpha, horizon, expected sign and the pass rule.
 Data: the two full XNAS ITCH days merged (`dataset_version d7f7ffd1…`), same
 universe (AAPL, MSFT, QQQ) and the same feature registry (`585dd7b9…`) as the
-2019–20 sessions; parameters, cost model and methods frozen at v1.7.2.
+2019–20 sessions.
+
+**What was frozen, and what was not (wording corrected in v1.13, review
+R-P1-2; the numbers below are unchanged).** Frozen at the v1.7.2 tree: the
+alpha definitions (features, functional form, sign rationale), the
+horizons, the universe, the cost model and the `v2` method bundle. The
+fitted model parameters were **not** frozen: the runner's walk-forward
+refits each alpha's `mu`, `sigma` and `beta` per fold on the 2026 rows
+themselves (earlier 2026 folds train, later 2026 folds test), so every IC
+and t in the table is an out-of-time test of the *specification*, not of
+the 2019–20 fitted coefficients. v1.13 adds a no-refit scoring mode
+(`frozen_params`, reported as `frozen_ic` / `frozen_t`) for future holdouts.
 
 **Pass rule (registered):** leakage passes, the gate IC has the registered
 sign and the gate t reaches the run's Bonferroni threshold on the holdout
-dataset's own, fresh ledger (84 looks per run, so the threshold rises from
-3.43 to 3.89 in run order). A positive IC below the threshold is "weaker, not
+dataset's own, fresh ledger. That threshold depended on run order: each run
+added 84 looks, so it rose from 3.43 (first run, EQ01) to 3.89 (last run,
+EQ04), and the same statistic could pass or fail depending on when its
+hypothesis ran. Future holdouts use a threshold fixed as a number in the
+pre-registration (`threshold_policy="prereg"`, v1.13), not the running
+ledger count. A positive IC below the threshold is "weaker, not
 confirmed". Statistical only: no P&L claim was registered.
 
 | Hypothesis | Role | 2019–20 gate IC (t) | 2026 gate IC | 2026 t | Threshold | Outcome |

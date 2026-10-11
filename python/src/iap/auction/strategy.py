@@ -18,7 +18,8 @@ Taker legs are priced with :meth:`iap.backtest.costs.CostModel.cost_components`
 the label frame's ``half_spread_t`` when known, else
 ``default_half_spread_bps`` of the mid.
 
-:func:`walk_forward` fits (orientation, threshold) on each fold's purged
+:func:`walk_forward` fits the threshold (and, only with
+``fit_orientation=True``, the orientation; v1.13) on each fold's purged
 train days and applies them to the test day, using
 :class:`iap.validation.splits.WalkForwardSplitter` in ``day_aligned`` mode
 (horizon = ``decision_s``) and a stationary-bootstrap interval
@@ -100,6 +101,9 @@ class AuctionBacktestResult:
     config: dict
     folds: list = field(default_factory=list)
     bootstrap: dict | None = None
+    #: Configurations the walk-forward evaluated on train days, summed over
+    #: folds (v1.13, R-P1-4): the looks the fit consumed.
+    looks_consumed: int | None = None
 
     def summary(self) -> dict:
         t = self.trades
@@ -125,6 +129,7 @@ class AuctionBacktestResult:
             "summary": self.summary(),
             "folds": self.folds,
             "bootstrap": self.bootstrap,
+            **({} if self.looks_consumed is None else {"looks_consumed": self.looks_consumed}),
         }
 
 
@@ -178,15 +183,28 @@ def backtest(
     return AuctionBacktestResult(_apply(frame, valid, cfg), asdict(cfg))
 
 
+def fit_orientations(cfg: AuctionStrategyConfig, fit_orientation: bool) -> tuple[int, ...]:
+    """Orientations the walk-forward may choose from (v1.13, R-P1-4): the
+    registered sign ``cfg.orientation`` only, unless ``fit_orientation``
+    opts in to the +/-1 search (which doubles the looks)."""
+    return (1, -1) if fit_orientation else (int(cfg.orientation),)
+
+
+def fit_looks(n_orientations: int, thresholds: tuple[float, ...]) -> int:
+    """Configurations one fold's fit evaluates."""
+    return int(n_orientations) * len(thresholds)
+
+
 def _fit(
     frame: pd.DataFrame,
     valid: np.ndarray,
     cfg: AuctionStrategyConfig,
     thresholds: tuple[float, ...],
     min_train_trades: int,
+    orientations: tuple[int, ...] = (1, -1),
 ) -> AuctionStrategyConfig | None:
     best, best_score = None, 0.0
-    for orientation in (1, -1):
+    for orientation in orientations:
         for thr in thresholds:
             c = replace(cfg, orientation=orientation, threshold=thr)
             t = _apply(frame, valid, c)
@@ -208,8 +226,14 @@ def walk_forward(
     thresholds: tuple[float, ...] = DEFAULT_THRESHOLDS,
     min_train_trades: int = 5,
     seed: int = 20261010,
+    fit_orientation: bool = False,
 ) -> AuctionBacktestResult:
     """Purged, day-aligned walk-forward; out-of-sample trades only.
+
+    The orientation is the registered ``cfg.orientation`` (v1.13, R-P1-4);
+    ``fit_orientation=True`` restores the +/-1 search.  Either way the
+    result reports ``looks_consumed`` (configurations evaluated on train
+    days, summed over folds).
 
     A fold whose train days admit no (orientation, threshold) with positive
     train net P&L stays flat (no trades) - that is a result, not an error.
@@ -220,12 +244,15 @@ def walk_forward(
     ts = frame["ts"].to_numpy(np.int64)
     splitter = WalkForwardSplitter(n_folds=n_folds, embargo_ns=embargo_ns, mode="day_aligned")
     horizon_ns = int(cfg.decision_s * NS_S)
+    orientations = fit_orientations(cfg, fit_orientation)
+    looks = 0
     oos: list[pd.DataFrame] = []
     folds: list[dict] = []
     for fold in splitter.folds_by_day(ts):
         tr = fold.train_mask(ts, horizon_ns, embargo_ns)
         te = fold.test_mask(ts)
-        fitted = _fit(frame[tr], valid[tr], cfg, thresholds, min_train_trades)
+        fitted = _fit(frame[tr], valid[tr], cfg, thresholds, min_train_trades, orientations)
+        looks += fit_looks(len(orientations), thresholds)
         row = {
             "fold": fold.index,
             "train_decisions": int(tr.sum()),
@@ -244,4 +271,4 @@ def walk_forward(
     trades = pd.concat(oos, ignore_index=True) if oos else _apply(frame[:0], valid[:0], cfg)
     daily = trades.groupby("date")["net_usd"].sum().to_list() if len(trades) else []
     boot = stationary_bootstrap_ci(daily, seed=seed)
-    return AuctionBacktestResult(trades, asdict(cfg), folds, boot)
+    return AuctionBacktestResult(trades, asdict(cfg), folds, boot, looks_consumed=looks)

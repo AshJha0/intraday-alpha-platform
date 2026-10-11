@@ -3746,8 +3746,13 @@ fooling yourself?
 2. *Make the timing verifiable.* The entries were committed and pushed
    (commit `6723fd0`) before any 2026 feature was computed. The commit is
    the timestamp; v1.10's `anchors.json` now records it for each entry.
-3. *Freeze everything else.* Parameters, cost model, methods and feature
-   registry were frozen at v1.7.2. The data was two full XNAS ITCH days,
+3. *Freeze everything else.* The alpha definitions, horizons, cost model,
+   `v2` methods and feature registry were frozen at v1.7.2. The fitted
+   parameters were not: `mu`, `sigma` and `beta` were refit per fold on the
+   2026 rows, so this tested the specification, not the 2019–20
+   coefficients (v1.13 adds a no-refit `frozen_params` mode for the next
+   holdout). The threshold rose with run order, 3.43 to 3.89; future
+   holdouts fix it in the pre-registration. The data was two full XNAS ITCH days,
    2026-05-15 and 2026-05-18, on the same three symbols.
 4. *Include controls that should fail.* EQ07 (a "reversal" whose sign was
    already wrong in sample) and EQ04 (known to be underpowered) were

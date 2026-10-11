@@ -82,6 +82,33 @@ golden or published number changes.
 - **Docs** (G-P1-6): GOVERNANCE.md §0 describes the live `protect-main`
   ruleset and the recommended owner actions.
 
+Research-validity hardening from the 2026-10-11 quality review (R items).
+Opt-in or additive: no published number, committed report, golden or
+ledger change (RESEARCH_VALIDITY.md §4a).
+
+- **R-P1-2** `frozen_params` no-refit scoring (`frozen_ic` / `frozen_t`
+  beside the refit statistics) and `tstat_threshold="prereg"` (threshold
+  fixed in the pre-registration) in `validate_alpha` and
+  `ExperimentRunner.run`. REAL_DATA.md §3.2 and LEARN.md reworded: the 2026
+  holdout froze the alpha definitions, horizons, cost model and `v2`
+  methods, but refit `mu`/`sigma`/`beta` per fold on 2026 rows; its
+  threshold rose with run order (3.43 to 3.89). Recorded t/IC values
+  unchanged.
+- **R-P1-4** `iap.auction.walk_forward` keeps the registered orientation by
+  default; `fit_orientation=True` restores the +/-1 search; `looks_consumed`
+  reported.
+- **R-P1-5** `iap.research.study_stats.summarise_study`: zero-trip sessions
+  count as 0 USD, CIs `None` below 3 sessions, MDE/power statement.
+- **R-P1-6** post-block embargo `max(embargo_ns, longest feature window)` on
+  two-sided splits (`feature_window_ns`, opt-in) in `WalkForwardSplitter`
+  and `CombinatorialPurgedSplitter`.
+- **R-P2-1** additive `beta_sign_consistency` in the validation report.
+- **R-P2-7** DSR trials = registered hypotheses for a data family
+  (`registered_hypotheses_trials`, `deflated_sharpe_trials_basis`).
+- **R-P2-9** event calendar moved to `configs/reference/event_calendar.json`
+  with per-year `source` / `as_of`; 2020, 2021 and 2025 added;
+  `event_calendar_for_year` fails closed; Python API unchanged.
+
 ## v1.12.0 — 2026-10-10
 
 Honest Sharpe, better passive fills, new features, measured latency and

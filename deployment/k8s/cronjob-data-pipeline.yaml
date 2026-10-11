@@ -112,6 +112,8 @@ spec:
                     path: mvp/mvp_tiny.json
                   - key: mvp__venues.json
                     path: mvp/venues.json
+                  - key: reference__event_calendar.json
+                    path: reference/event_calendar.json
                   - key: risk__risk.json
                     path: risk/risk.json
                   - key: strategies__alpha_params.json

@@ -2446,6 +2446,13 @@ folds: [(1, 1, 0.05, 2), (2, 1, 0.05, 2), (3, 1, 0.05, 2)]
 out of sample: 6 trades over 3 days, net +6.94 bp
 ```
 
+Since v1.13 (review R-P1-4) the walk-forward fits only the threshold: the
+orientation is the registered `cfg.orientation` (+1, follow the imbalance).
+`walk_forward(..., fit_orientation=True)` restores the +/-1 search, which
+doubles the configurations evaluated; either way `wf.looks_consumed` (and
+`looks_consumed` in `to_dict()`) reports how many were evaluated on train
+days, summed over folds (15 here: 3 folds x 5 thresholds).
+
 Every fold learns to follow the imbalance (orientation `+1`), as planted.
 For real files, use the CLI: `python -m iap.auction extract`, then
 `backtest`. Pre-register `AUC01/<cross type>-<seconds>s` and push it before
