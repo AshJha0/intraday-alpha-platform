@@ -1575,3 +1575,18 @@ checkpoint comparisons of the Rust, C++ and Java ports: when the golden
 an extra `1e-9 / (rvol_w5m + 1e-12)` — a zero 1-minute volatility leaves
 ~1e-12 of float residue in one engine and an exact 0 in another, and the
 division amplifies it (coalesced FX checkpoint 800: 7.8e-8 vs 0).
+
+## 18. The other v1.14 changes, and where each is pinned
+
+§17 covers the data items. The rest of v1.14 is pinned in the sections it
+changed; this table is the index.
+
+| change | normative text | default |
+|---|---|---|
+| risk audit hash chain (`seq`, `prev_sha256`; chained restore) | §11.1; `risk_event.schema.json` x-version 2 | on |
+| SEC 15c3-5 checks 23-29, bounded two-party override, sanity gate, bounded state | §11.1; `risk.json` x-version 4 | each check off unless its key is set; the repo config sets all but participation |
+| MODIFY size-down credits `ahead_qty` | §11.2 rule 4; `execution.hpp` | on |
+| feed latency, routed exits, hidden prints, per-order markouts, size amends | API_TRADING.md §2.12 | off |
+| causal row block, automatic day-separated HAC, time-shift leakage, looks per gate decision, per-instrument scaling, fold-majority hypothesis | docs/RESEARCH_VALIDITY.md §4b | on in `v2` / `v3` / `v4`; the v1.13 rules as `*_v113` |
+| chained look ledger (x-version 4), trust roots, `ed25519-v2` | docs/governance/GOVERNANCE.md | on |
+| model content hash (`content.json`) | API_ADAPTIVE.md §9.1 | written for new records, backfilled by `verify_content` |

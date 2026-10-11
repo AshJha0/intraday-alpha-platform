@@ -11,7 +11,12 @@ JSON goldens (`tests/golden/`), the research JSON documents
 audits (`research/lifecycle_log.jsonl`, `research/lifecycle_transitions.jsonl`,
 the paper-trading `risk_audit.jsonl`, the decision-trace JSONL a session's
 `JsonlTraceSink` writes). They are deterministic, checksummed, reviewed and
-archived; nothing in this document changes that.
+archived; nothing in this document changes that. Since v1.14 two of them
+are hash chains as well: `risk_audit.jsonl` (`seq`, `prev_sha256` on every
+line) and `research/experiments.json` (`chain_head`, `chain_length`). The
+store indexes their content, not their chain fields; verify a chain against
+the source file (COOKBOOK recipes 69 and 74), never against the store,
+because the store is rebuilt and proves nothing about the file it read.
 
 The store is a **derived, rebuildable index** over those artefacts: one
 relational schema (`schemas/sql/iap_v2.sql`, x-version 2) that every contract
