@@ -662,12 +662,14 @@ count)` (`tstat_threshold="ledger"`, the default since v1.5.0; §6.6 and
 §24.4). For the committed report that is **4.365**. Up to v1.4.0 it was a
 fixed 3.0 (`"fixed"`, the legacy rule).
 
-Result on the bundled data: **0 PROMOTE / 11 ITERATE / 13 REJECT**. The
+Result on the bundled data (v1.14.0): **0 PROMOTE / 12 ITERATE / 12
+REJECT** (0 / 11 / 13 under v1.5.0 to v1.13.0). The
 cost gate fails for all 24, in two different ways: **18 alphas make no
 trade at all** on the last fold — their forecast never exceeds the
 round-trip spread and fee, so their net P&L is exactly 0, and 0 does not
-pass `net P&L > 0` — and **6 trade and lose** (EQ11 −502, FX05 −64, FX08
-−328, FX09 −255, FX10 −22, FX11 −733 USD). None ends above zero. The
+pass `net P&L > 0` — and **6 trade and lose** (EQ11 −662, FX05 −160, FX08
+−425, FX09 −471, FX10 −93, FX11 −1,853 USD; under v1.5.0 −502, −64, −328,
+−255, −22, −733: the causal row block trades rows the old mask skipped). None ends above zero. The
 ITERATE set is EQ01, EQ02, EQ03, EQ05, EQ06, EQ12, FX01, FX04, FX08, FX10
 and FX11.
 
@@ -763,8 +765,10 @@ looks of the v1.3.0 dataset are kept and the new ones are added. v1.5.0
 did the same thing along a different axis: the method bundle is part of
 the canonical config, so the same 24 pipelines run under the new default
 rules are new looks at the same sample, added beside the v1.4.0 ones
-(ledger `x-version` 3). The current ledger holds **216 distinct
-configurations / 5156 looks**:
+(ledger `x-version` 3). At v1.5.0 the ledger held 216 distinct
+configurations and a look count of 5,156, broken down below. At v1.14.0 it holds
+**293 distinct configurations / 5,358 looks**: v1.14.0 regenerated every statistic under its revised methods, and each one is a new look (`stats_revision`), adding 202 to the count over 77 configurations (the
+breakdown below is the v1.5.0 one, and every entry in it is still there):
 
 - on the v1.3.0 dataset (`203c8f54…`), 70 entries carrying 1,068 of the
   looks: a one-time design scan (216: 24 alphas × 9 horizons), 24
@@ -787,8 +791,8 @@ evaluations at four folds (itemised in
 and every one of them is a look.
 
 That translates into a selection yardstick: Bonferroni per-test threshold
-|t| ≥ **4.424**, and an expected **max |t| ≈ 4.135 under the global null**
-(4.206 and 3.888 at the v1.4.0 count of 1920, 4.071 and 3.735 before the
+|t| ≥ **4.432**, and an expected **max |t| ≈ 4.144 under the global null**
+at v1.14.0 (4.424 and 4.135 at v1.5.0's count of 5,156, 4.206 and 3.888 at the v1.4.0 count of 1920, 4.071 and 3.735 before the
 dataset regeneration: looking again raised the bar each time). Up to
 v1.4.0 this yardstick was printed beside a fixed gate of t ≥ 3.0 and read
 by nothing. Since v1.5.0 the Bonferroni figure *is* the PROMOTE
@@ -800,7 +804,8 @@ on each entry as `gate_looks`. The committed report was judged at **3,936
 looks** (the 1,920 already recorded plus its own 2,016), which gives the
 threshold of **4.365** and a yardstick of 4.07; the runner and adaptive
 runs that followed brought the ledger to 4,396, and the combination
-experiments of §29 to 5,156. The threshold is not
+experiments of §29 to 5,156, and the v1.14.0 regeneration to 5,358. The
+threshold is not
 retroactive — later looks tighten later runs and do not re-judge a
 recorded one.
 
@@ -811,7 +816,8 @@ EQ03 (5.16) clear the threshold; EQ06 (4.36) and FX04 (4.24) are above the
 yardstick and below the threshold, so they fail the significance gate
 that, at a fixed 3.0, they used to pass; EQ08 (−4.57) and FX09 (−5.75)
 are beyond it with the wrong sign. The lists are the same at 3,936 and at
-5,156 looks. Most quant shops track this informally at best;
+5,156 (the v1.5.0 report; the v1.14 report's t values differ, see
+docs/RESEARCH_VALIDITY.md §4b). Most quant shops track this informally at best;
 here it is a serialized, deterministic artifact — and the runner's entries
 were deliberately *not* de-duplicated against the pipeline entries for the
 same alpha and horizon: the denominator may only grow.
@@ -1960,7 +1966,7 @@ reproduces them with string concatenation and one hash (pinned:
 digest is sha256 over every canonical line + newline in emission order;
 same seed ⇒ same digest; one changed field or one swapped line changes it.
 Known answers are pinned for one trace, the same trace twice, and the empty
-stream; the MVP golden pins a whole session's digest (`2affe409…`, 800
+stream; the MVP golden pins a whole session's digest (`6fdb3a2c…`, 800
 traces).
 
 ### 18.3 Four languages, one line
@@ -2047,7 +2053,7 @@ index that lied about what its sources contain would be worse than none.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=2affe40903b499bd...
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=231 children=347 fills=163 pnl=-82.837333 USD digest=6fdb3a2ce2d31481...
 ```
 
 Seven seconds later `data/mvp/58a10f2194a3c81c/` holds the captured stream,
@@ -2079,22 +2085,25 @@ and the `config_version` it covers (`f293e7e7…` → `439bbad5…`), because
 names its impact model, and `alpha_params.json`, whose header names the
 regeneration commit. A digest that changes when a hashed configuration
 document changes, with every count and every dollar the same, is the
-digest doing its job.
+digest doing its job. In v1.14.0 the digest moved again (`6fdb3a2c…`) and
+this time a few counts moved too, because the refitted `alpha_params.json`
+changes the expected returns the loop trades on: 231 parents and 163 fills
+(was 235 and 169), −82.84 USD (was −81.53).
 
 ### 20.2 The numbers, stated as they are
 
-Seed 12345: 15,805 events, 800 decisions, 231 parent orders, 507 children
-generated of which 348 submitted (159 blocked by the 500 ms slice-interval
-control, exactly as the Java loop would), 163 fills, 15.1 % fill rate.
-Risk: 348 ALLOW, 0 REJECT, 0 KILL, 8 sequence gaps each recovered by the
-following SNAPSHOT burst, 28 mark regressions dropped. Routing: XV3 70.9 %,
-XV1 19.8 %, XV2 9.3 % of filled quantity (aggressive routing picks the
-cheapest taker fee on price ties; passive routing prefers XV1's rebate).
-TCA: implementation shortfall +0.063 bps quantity-weighted; TWAP fills
-0.4 % (passive limits at a 1 s horizon mostly expire), POV 6.3 %, IS
-72.9 %. **P&L −82.84 USD** on 8,229 shares: +0.022 bps of alpha
-contribution against −0.41 bps of execution cost, net −0.39 bps of filled
-notional. The report field is
+Seed 12345 (v1.14.0): 15,805 events, 800 decisions, 231 parent orders, 496
+children generated of which 347 submitted (149 blocked by the 500 ms
+slice-interval control, exactly as the Java loop would), 163 fills, 15.4 %
+fill rate. Risk: 347 ALLOW, 0 REJECT, 0 KILL, 8 sequence gaps each
+recovered by the following SNAPSHOT burst, 28 mark regressions dropped.
+Routing: XV3 69.2 %, XV1 19.6 %, XV2 11.2 % of filled quantity (aggressive
+routing picks the cheapest taker fee on price ties; passive routing
+prefers XV1's rebate). TCA: implementation shortfall +0.065 bps
+quantity-weighted; TWAP fills 0.4 % (passive limits at a 1 s horizon
+mostly expire), POV 6.7 %, IS 77.8 %. **P&L −82.84 USD** on 8,295 shares:
++0.0245 bps of alpha contribution against −0.4367 bps of execution cost,
+net −0.41 bps of filled notional. The report field is
 `alpha.cost_negative: true`. This is the research finding of §6 — a small
 signal, no money after costs — reproduced by a full loop on a different
 synthetic stream, and it is the headline number of the MVP, not a footnote.
@@ -2113,16 +2122,16 @@ The golden session reports realized ICs far from the research ICs:
 
 | alpha | realized IC at 1 s | cost-adjusted | shift-by-one | n | fitted horizon: realized IC | research IC | gap |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| EQ01 | +0.217 | −0.024 | +0.149 | 790 | 1 s: +0.217 | 0.011 | 0.206 |
-| EQ03 | +0.110 | −0.029 | +0.116 | 707 | 5 s: +0.147 | 0.019 | 0.128 |
-| EQ06 | −0.079 | +0.079 | −0.047 | 354 | 10 s: −0.130 | 0.028 | 0.158 |
-| ensemble | +0.104 | −0.003 | +0.111 | 790 | — | — | — |
+| EQ01 | +0.217 | −0.024 | +0.149 | 790 | 1 s: +0.217 | 0.024 | 0.193 |
+| EQ03 | +0.109 | −0.029 | +0.116 | 707 | 5 s: +0.147 | 0.030 | 0.117 |
+| EQ06 | −0.079 | +0.079 | −0.047 | 354 | 10 s: −0.130 | 0.056 | 0.185 |
+| ensemble | +0.103 | −0.002 | +0.111 | 790 | — | — | — |
 
-(The research IC is the gate IC of the v1.5.0 report — 0.0105, 0.0189 and
-0.0277 — which is why the last two columns differ from the v1.4.0 table in
-the third decimal; the realized columns are unchanged.) EQ01's realized IC
-is twenty times its research IC; EQ06's has the wrong
-sign. The pitfalls of §27 say what to do with numbers like that. The audit
+(v1.14.0 numbers. The research IC is the gate IC of the v1.14 report —
+0.0237, 0.0300 and 0.0556; under v1.5.0 it was 0.0105, 0.0189 and 0.0277,
+with gaps 0.206 / 0.128 / 0.158. The realized columns barely moved.)
+EQ01's realized IC is about nine times its research IC; EQ06's has the
+wrong sign. The pitfalls of §27 say what to do with numbers like that. The audit
 was first done on 2026-09-20, on the v1.3.0 stream, when the loop reported
 0.285 / 0.338 / −0.102 against research ICs of 0.027 / 0.030 / 0.043
 (docs/MVP.md §7.1 records it); the steps are the same on the v1.4.0
@@ -2181,7 +2190,7 @@ golden, and one of them now reads differently.
    is smaller than the spread; that is the −82.84 USD.
 6. **Let the lifecycle see it.** `paper_evidence.json` carries the realized
    IC at the fitted horizon, so the `paper_ic_tracking` gate (max gap 0.01)
-   fails all three alphas on this data (gaps 0.206 / 0.128 / 0.158; on the
+   fails all three alphas on this data (gaps 0.193 / 0.117 / 0.185 at v1.14.0; on the
    v1.3.0 stream it failed EQ01 and EQ03) — correctly: paper behaviour
    that differs this much from research is a finding, not a promotion.
 
@@ -3115,8 +3124,8 @@ Dependabot bump is being asked to do.
 3. **Random splits on overlapping labels.** Walk-forward only, purge at the
    label horizon, 60 s embargo (§6.2).
 4. **Uncounted multiple testing.** A ledger de-duplicated by (alpha, kind,
-   config, dataset) — 216 distinct configurations, 5156 looks — with a printed
-   expected-max-|t| yardstick of 4.135; FX08's t = 3.84 is called what it is.
+   config, dataset) — 293 distinct configurations, 5,358 looks at v1.14.0 — with a printed
+   expected-max-|t| yardstick of 4.144; FX08's t = 3.84 is called what it is.
    Regenerating the dataset did not reset the count, and neither did
    changing the default methods: the looks already taken are kept and the
    new ones added (§6.6). Since v1.5.0 the count is not only printed: the

@@ -132,8 +132,8 @@ flowchart TD
     FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
-    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,156 looks / 216 configs, two datasets, two method bundles)<br/>REPORT.md, ML_REPORT.md, model manifests"]
-    RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 24 CANDIDATE / 0 beyond"]
+    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,358 looks / 293 configs, two datasets, three method revisions)<br/>REPORT.md, ML_REPORT.md, model manifests"]
+    RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 23 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```
 
@@ -636,7 +636,7 @@ book → `FeatureEngine` → three fitted `linear_z_v1` alphas ensembled →
 and compares bytes; `replay` re-runs it from the captured stream and must
 reproduce the trace digest; `tests/golden/expected_mvp.json` pins the golden
 run (seed 12345: 15,805 events, 800 decisions, 231 parents, 163 fills,
-−82.84 USD, digest `2affe409…`) as the cross-language pin for any port of
+−82.84 USD, digest `6fdb3a2c…`) as the cross-language pin for any port of
 the loop (docs/MVP.md §9 lists what a port must reproduce). The result is
 cost-negative and the realized-IC audit (docs/MVP.md §7.1) is part of the
 document: the MVP's mid-to-mid IC is 0.13–0.21 away from the research IC
@@ -786,9 +786,9 @@ will find the cheapest path to a pass faster than a person: cheaper costs, a
 chosen holdout, uncounted looks. v1.3.0 closed those three in the tooling
 (LEARN.md §24) and measured what the validation chain can detect at all
 (the planted-signal power study, LEARN.md §23). It did not build the agents
-(v1.7.0 built the controls; v1.11.0 built the agent on top of them), and on two synthetic sessions whose ledger now holds 5,156 looks (1068 on
+(v1.7.0 built the controls; v1.11.0 built the agent on top of them), and on two synthetic sessions whose ledger now holds 5,358 looks (1068 on
 the v1.3.0 dataset, 852 on the regenerated v1.4.0 one, 3,236 on that same
-dataset under the v1.5.0 default methods), more searching is not what the platform lacks (HOW_IT_WORKS.md §6.4
+dataset under the v1.5.0 default methods, 202 under the v1.14 revision), more searching is not what the platform lacks (HOW_IT_WORKS.md §6.4
 lists what would be theatre on this data, and why). DIAGRAMS.md §19 draws
 the layer as planned at v1.3.0, and §26 the agent loop as built in v1.11.
 

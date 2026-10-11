@@ -159,14 +159,16 @@ still spans the whole window (a weaker, disclosed protocol).
   §13.2), `report.json` and the stream sha256, refusing first if a
   reference document changed (`config_version`). The golden run is
   `tests/golden/expected_mvp.json`: seed 12345, run `58a10f2194a3c81c`,
-  digest `2affe40903b499bd77c30f2140b90e9d3df9f174d406f85fb7dfe799c8bba56e`
-  (v1.5.0; the run id is unchanged from v1.3.0 because `mvp.json` and the
+  digest `6fdb3a2ce2d31481246a799112923b67ba8fdf043c4c4138ba75457e34d1cba5`
+  (v1.14.0; `2affe409…` at v1.5.0, `20d4ff76…` at v1.13.0; the run id is unchanged from v1.3.0 because `mvp.json` and the
   seed are. In v1.4.0 the stream, the fitted parameters and therefore the
   digest moved with the generator fix. In v1.5.0 the stream, every count
   and the P&L are identical to v1.4.0, and the digest moved only because
   `config_version`, which every trace carries, hashes `execution.json`,
   `alpha_params.json` and the registry: `f293e7e7…` became `439bbad5…`.
-  A run captured by v1.4.0 therefore replays only from the v1.4.0 tag).
+  A run captured by v1.4.0 therefore replays only from the v1.4.0 tag. In
+  v1.14.0 the refitted `alpha_params.json` moved a few counts and the P&L,
+  and `config_version` became `62d78a3b…`).
 - **A Java paper session** is reproduced by re-running `java/paper.sh` on
   the same vector and configuration: `decision_traces.jsonl` and the
   report's `trace.digest` are a pure function of the event stream

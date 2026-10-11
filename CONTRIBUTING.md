@@ -223,11 +223,11 @@ Research truth is the product (spec §32). Two rules are mechanical:
    the SHA-256 of the canonical spec and writes
    `research/experiments/<id>/{spec,result}.json`) *before* its result is
    read, and every report prints the denominator and the expected max |t|
-   under the global null (5,156 looks / 216 configurations, max |t| ≈ 4.135 as
-   of 2026-10-04: the 1068 made on the v1.3.0 dataset, the 852 made on
-   the current one under the rules up to v1.4.0 and the 3,236 made on it
+   under the global null (5,358 looks / 293 configurations, max |t| ≈ 4.144
+   at v1.14.0: the 1068 made on the v1.3.0 dataset, the 852 made on
+   the current one under the rules up to v1.4.0, the 3,236 made on it
    under the v1.5.0 default methods, 760 of them by the signal-combination
-   report). An experiment runs under the default
+   report, and the 202 of the v1.14 statistics revision). An experiment runs under the default
    method bundle (`v2`) unless it names `--methods legacy_v1`; the bundle
    is part of the experiment id, a `v2` validation cost 84 looks under the
    v1.13 rules (28 under `legacy_v1`; since v1.14 one look per gate decision,

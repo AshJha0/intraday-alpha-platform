@@ -75,9 +75,10 @@ are statements about this dataset and pipeline, not about real markets).
 > REJECT (FX03 moved from ITERATE to REJECT; FX10 and FX11 from REJECT to
 > ITERATE). At 1x costs on the last fold 18 alphas make no trade, 6 trade
 > and lose, none ends above zero; under the legacy methods all 24 traded
-> and lost. The ledger holds **5156 looks over 216 distinct configurations**
-> (Bonferroni per-test |t| ≥ 4.424, expected max |t| under the global null
-> ≈ 4.135). Papers 1-4 carry a dated `Erratum / Update — 2026-10-04` section
+> and lost. The ledger total at that date was 5,156 (Bonferroni per-test
+> |t| 4.424, a null expectation for the largest |t| of 4.135); at v1.14.0 it
+> holds **5,358 looks over 293 distinct configurations** (Bonferroni |t| ≥
+> 4.432, expected max |t| ≈ 4.144). Papers 1-4 carry a dated `Erratum / Update — 2026-10-04` section
 > that restates their figures under the default methods and says of each
 > conclusion whether it is weaker, stronger or unchanged; papers 5 and 6
 > carry a short note. The summaries below are true of the current
@@ -157,7 +158,7 @@ differently once crossed rows are excluded: gate IC 0.0298 at a gate t of
 legacy methods (within-bucket t 4.82 against a fixed 3.0) that cleared
 every *statistical* promotion gate and FX04 was held at ITERATE by the cost
 gate alone. Under the default methods it does not: 4.24 is above the
-selection yardstick (expected max |t| 4.135 over 216 distinct configurations)
+selection yardstick (an expected max |t| of 4.144 over 293 distinct configurations at v1.14.0; it was 4.135 at v1.5.0)
 and below the PROMOTE t threshold of 4.365, so FX04 now fails the
 significance gate, narrowly, as well as the cost gate. It makes no trade
 under the cost-aware backtest (the legacy policy lost 32,566 USD at 1x).

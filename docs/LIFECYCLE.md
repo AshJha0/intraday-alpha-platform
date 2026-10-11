@@ -442,9 +442,9 @@ and the registry (now x-version 2) and the log were rebuilt with
 `bootstrap --force` from the `v2` reports. The bootstrap event time did not
 move.
 
-Result on the current dataset (`116b7787…`) under the v1.5.0 default
+Result on the current dataset (`116b7787…`) under the v1.14.0
 methods — **23 CANDIDATE, 0 VALIDATING, 0 PROMOTE**
-(report verdicts: 0 PROMOTE / 11 ITERATE / 13 REJECT); every alpha fails
+(report verdicts at v1.14.0: 0 PROMOTE / 12 ITERATE / 12 REJECT; 0 / 11 / 13 under v1.5.0); every alpha fails
 `net_pnl_after_costs` and `capacity`:
 
 | alpha | report verdict | state | failed gates (CANDIDATE → VALIDATING) |

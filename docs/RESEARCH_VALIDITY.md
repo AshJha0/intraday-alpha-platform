@@ -329,8 +329,10 @@ for the lead-lag.
   the `v2` bundle on the same dataset (2,476 by the report pipelines, 760 by
   the signal-combination experiments): 5,156 looks over 216 entries (1,068 on
   the v1.3.0 dataset, 4,088 on the v1.4.0 one), Bonferroni |t| 4.424,
-  expected largest |t| under the null 4.135. The thresholds derived from it
-  only tighten.
+  expected largest |t| under the null 4.135. v1.14.0 added 202 looks over
+  77 configurations under the revised statistics: 5,358 looks over 293
+  entries, Bonferroni |t| 4.432, expected largest |t| 4.144. The thresholds
+  derived from it only tighten.
 
 ## 4. Gate eligibility
 

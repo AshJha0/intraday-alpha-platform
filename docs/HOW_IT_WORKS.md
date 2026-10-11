@@ -23,7 +23,7 @@ Three things to know before reading:
 2. **The results are negative, and that is the headline.** 24 alphas were
    researched; none is promoted. Eighteen of them never forecast a move
    larger than the cost of trading it, and make no trade; the six that
-   trade lose. The end-to-end loop loses 81.53 USD on its
+   trade lose. The end-to-end loop loses 82.84 USD on its
    golden session. The ML gate passes on this dataset — the linear baseline
    has a small positive IC, so the trees and the network are fitted — and
    no model earns its costs. The platform is built so that those sentences
@@ -100,8 +100,8 @@ floats.
 
 The loop above is not a diagram of intent. One command runs it on one
 synthetic instrument and writes a trace for every decision. On its golden
-session (15,805 events, 800 decisions) it fills 169 times and loses 81.53
-USD: about +0.02 bps of alpha against −0.41 bps of execution cost.
+session (15,805 events, 800 decisions) it fills 163 times and loses 82.84
+USD: about +0.02 bps of alpha against −0.44 bps of execution cost.
 
 **Where to look**
 
@@ -277,10 +277,11 @@ buckets gain (FX08 2.18 → 3.84). The threshold the t is compared with is
 Try enough things and something will look significant. So every look at
 the data is recorded in a ledger (`research/experiments.json`), identified
 by alpha, kind, configuration and — since v1.4.0 — dataset, so that
-re-running a script does not inflate the count. Today it holds 5,156 looks
-over 216 entries: 1,068 were taken on the v1.3.0 dataset, 852 on the
-v1.4.0 dataset under the old rules, 2,476 were added when v1.5.0
-re-ran everything under the new ones, and 760 by the signal-combination
+re-running a script does not inflate the count. Today (v1.14.0) it holds
+5,358 looks over 293 entries: 1,068 were taken on the v1.3.0 dataset, 852
+on the v1.4.0 dataset under the old rules, 2,476 were added when v1.5.0
+re-ran everything under the new ones, 202 when v1.14.0 re-ran it under the
+revised statistics, and 760 by the signal-combination
 experiments of the same release (§2.13). A statistic computed on a different
 dataset, or under a different method bundle, is a different look, and the
 denominator only grows: regenerating the data or changing the rules does
@@ -1469,7 +1470,7 @@ reason for each:
   trading path in any case.
 - **Agent debate.** Several agents arguing about 24 alphas on the same two
   sessions add no data. Evidence comes from sessions, and the ledger
-  already holds 5,156 looks at them (1,068 on the v1.3.0 dataset, the rest
+  already holds 5,358 looks at them (1,068 on the v1.3.0 dataset, the rest
   on the regenerated one). Debate multiplies looks; it does not add a
   holdout. Pre-registration and a hidden reserve seed (built since v1.7)
   are what would score who was right, and they score one registered

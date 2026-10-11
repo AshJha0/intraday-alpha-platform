@@ -406,8 +406,8 @@ PYTHONPATH=python/src python3 research/alpha_reports/run_all.py \
 (Neither line was re-run for this page — the first rewrites the committed
 reports — and the figures below are read from the committed
 `REPORT.md`.) Outputs of the first: `research/alpha_reports/REPORT.md`
-(the honest master table — 0 PROMOTE / 11 ITERATE / 13 REJECT on the
-bundled data; at 1× costs 18 alphas make no trade, 6 trade and lose, none
+(the honest master table — 0 PROMOTE / 12 ITERATE / 12 REJECT on the
+bundled data at v1.14.0; at 1× costs 18 alphas make no trade, 6 trade and lose, none
 ends above zero), one JSON of full
 evidence per alpha, the appending multiple-testing ledger
 `research/experiments.json`, and refreshed day-1-fitted
@@ -1091,7 +1091,9 @@ was judged at, not a re-judgement: `legacy_v1` rows read the fixed 3.0,
 `v2` rows `max(3.0, Bonferroni |t| at gate_looks)`, where `gate_looks`
 counts every look the ledger held at the time, across datasets;
 `scope_bonferroni_t` is what the scope alone would demand. The ledger total
-(5,156 looks over 216 entries) is the sum of the three scopes: 1,068 on the
+(a total of 5,156 over 216 entries in the output above, captured at v1.5.0; 5,358
+over 293 at v1.14.0, which adds a fourth scope for the v1.14 statistics
+revision) is the sum of the three scopes: 1,068 on the
 v1.3.0 dataset, 852 on the current dataset under the old rules, and 3,236
 under the default rules (24 × 84 for the promotion report, 5 × 84 for the
 runner experiments, 40 adaptive deployments, 8 × 95 for the signal-combination
@@ -1172,7 +1174,7 @@ synthetic equity `SYN.EQ.AAPL` and writes every artefact under
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.mvp run                       # configs/mvp/mvp.json, seed 12345
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=2affe40903b499bd... out=.../data/mvp/58a10f2194a3c81c
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=231 children=347 fills=163 pnl=-82.837333 USD digest=6fdb3a2ce2d31481... out=.../data/mvp/58a10f2194a3c81c
 PYTHONPATH=src python3 -m iap.mvp run --seed 7 --out /tmp/mvp7          # another seed, explicit directory
 PYTHONPATH=src python3 -m iap.mvp verify                                  # run twice from scratch, compare digest/report/stream
 cat ../data/mvp/58a10f2194a3c81c/report.md                                # the honest numbers (cost-negative)
@@ -1192,14 +1194,18 @@ itself is not touched). The golden `tests/golden/expected_mvp.json` pins
 the run above. The run id is the same as in v1.3.0 because `mvp.json` and
 the seed are unchanged; the session is not — the v1.4.0 generator spreads
 the flow over the whole 15-minute session, the three alphas were refitted,
-and the loop makes 800 decisions (355 before) and loses 81.53 USD (22.65
-before): +0.022 bps of alpha against −0.41 bps of cost on filled notional.
-v1.5.0 changed none of that. The loop does not use the research
+and the loop makes 800 decisions (355 before) and, at v1.14.0, loses
+82.84 USD on 8,295 shares: +0.0245 bps of alpha against −0.4367 bps of cost
+on filled notional. v1.5.0 changed none of the v1.4.0 numbers. The loop does not use the research
 backtester, so its events, decisions, parents, children, fills and P&L are
 identical to v1.4.0; what moved is `config_version` (`439bbad5…`, was
 `f293e7e7…`), which hashes `execution.json` and `alpha_params.json`, and
-with it the trace digest printed above (`f51890da…` in v1.4.0), because
-every trace carries `config_version`. The summary line was re-run for this
+with it the trace digest (`f51890da…` in v1.4.0, `2affe409…` in v1.5.0,
+`20d4ff76…` in v1.13.0), because every trace carries `config_version`. In v1.14.0 the
+counts and P&L moved slightly (231 parents, 347 children submitted, 163
+fills, −82.84 USD; it was 235 / 348 / 169 / −81.53) and the digest became
+`6fdb3a2c…` with `config_version` `62d78a3b…`: `alpha_params.json` and the
+risk configuration are hashed, and both changed in the v1.14 regeneration. The summary line was re-run for this
 page with `--out` pointing at a scratch directory; `replay` (recipe 23)
 and `explain` (recipe 24) were re-run against that directory.
 Outside the checkout (the Python image bakes `configs/` and
@@ -2821,7 +2827,7 @@ nonce). What the new entry holds:
                   "deps": {"numpy": "...", "pandas": "...", "scipy": "..."}}}
 ```
 
-`ledger_total` is 5157: the committed 5,156 looks plus this one. Now edit
+`ledger_total` is 5157: the 5,156 committed when this output was captured (v1.5.0; 5,358 at v1.14.0) plus this one. Now edit
 the hypothesis text of that last entry and verify again:
 
 ```bash

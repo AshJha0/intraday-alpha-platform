@@ -150,8 +150,8 @@ lives in `research/alpha_registry.json`. Since v1.5.0 the
 multiple-testing threshold the evidence carries (never below 3.0;
 `tstat_threshold = "fixed"` is the legacy rule), and the live sub-machine
 retires by the CUSUM rule (`breach_rule = "consecutive"` is the legacy
-rule). Bundled result: 24 CANDIDATE, 0
-beyond — every alpha fails `net_pnl_after_costs`, `net_pnl_bootstrap_ci` and
+rule). Bundled result (v1.14.0): 23 CANDIDATE, 0
+beyond, FX11 held in RESEARCH by the time-shift leakage gate — every candidate fails `net_pnl_after_costs`, `net_pnl_bootstrap_ci` and
 `capacity`. Gate 8 (cross-alpha correlation) is the lifecycle gate
 `cross_alpha_correlation` on CANDIDATE → VALIDATING since v1.5.0 (AF03): the
 largest absolute signal correlation with an alpha at or beyond VALIDATING

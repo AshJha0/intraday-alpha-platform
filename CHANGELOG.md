@@ -19,7 +19,26 @@ Parity counts from CI (v1.14.0): @@COUNTS@@
 
 ### Numbers that changed
 
-@@NUMBERS@@
+All read from the committed artefacts of this release.
+
+- **Verdicts:** still 0 PROMOTE; 0 / 11 / 13 → 0 / 12 / 12 (PROMOTE /
+  ITERATE / REJECT, `research/alpha_reports/REPORT.md`). EQ01's gate t
+  1.59 → 6.54 (automatic, day-separated HAC); it now fails only the cost
+  gate. The PROMOTE t threshold is 4.426 at the run's look count.
+- **Lifecycle:** 24 → 23 CANDIDATE, 0 beyond. FX11 fails the time-shift
+  leakage test and is held in RESEARCH for review.
+- **Ledger:** 5,156 → 5,358 looks, 216 → 293 distinct configurations;
+  Bonferroni |t| 4.424 → 4.432, expected max |t| under the null 4.135 →
+  4.144. Every regenerated statistic is a new look (`stats_revision`).
+- **Backtest golden** (`expected_backtest.json`, default rules): 96 → 138
+  trades, P&L −7.10 → −39.15 (the synthetic feature store moved with
+  same-timestamp coalescing); the legacy run 385 → 386 trades.
+- **MVP golden** (`expected_mvp.json`): 235 → 231 parents, 348 → 347
+  children submitted, 169 → 163 fills, P&L −81.53 → −82.84 USD; 800
+  decisions and 15,805 events unchanged; trace digest `6fdb3a2c…`,
+  `config_version` `62d78a3b…`.
+- **Feature goldens:** see "Data mapping and feature store" below for the
+  row and checkpoint counts.
 
 ### Execution realism is opt-in
 

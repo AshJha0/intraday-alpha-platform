@@ -163,8 +163,10 @@ next event, and waiting is a lookahead a live system does not have. So
 the MVP's features are computed per event, as they were in v1.13, and the
 gap between its realized IC and the research IC includes this difference.
 The risk engine the MVP drives is the v1.14 one (hash-chained audit, the
-15c3-5 checks configured loosely enough not to bind); its counts and P&L
-did not change, only the hashed config and so the trace digest.
+15c3-5 checks configured loosely enough not to bind: every order is still
+ALLOW). The session itself moved a little because `alpha_params.json` was
+refitted on the regenerated store: 231 parents and 163 fills, −82.84 USD
+(§7).
 
 ## 5. Determinism contract — what is hashed
 
@@ -266,15 +268,19 @@ possible.
 ## 7. Honest results of the golden run (seed 12345, `report.md`)
 
 Run id `58a10f2194a3c81c`, 15,805 events, 800 decisions, 231 parent orders,
-507 children generated / 348 submitted, 163 fills, fill rate 15.1 %.
-Trace digest `2affe40903b499bd77c30f2140b90e9d3df9f174d406f85fb7dfe799c8bba56e`
-(`config_version` `439bbad5…`).
+496 children generated / 347 submitted, 163 fills, fill rate 15.4 %
+(v1.14.0). Trace digest
+`6fdb3a2ce2d31481246a799112923b67ba8fdf043c4c4138ba75457e34d1cba5`
+(`config_version` `62d78a3b…`).
 Wall time: about 2.2× the v1.3.0 session on the same machine (27 s → 59 s on
 the laptop this was measured on; 0.8 s of that is feed generation and
 normalisation) — there are 800 decisions to make instead of 355.
 
-These are the numbers of the v1.4.0 golden (2026-10-03), and v1.5.0
-(2026-10-04) did not move one of them: the loop does not use the research
+v1.14.0 refitted `alpha_params.json`, which moved the session slightly:
+231 parents, 347 children submitted, 163 fills and −82.84 USD, where
+v1.4.0 to v1.13.0 had 235, 348, 169 and −81.53. The paragraph below is the
+history up to v1.13. Those were the numbers of the v1.4.0 golden
+(2026-10-03), and v1.5.0 (2026-10-04) did not move one of them: the loop does not use the research
 backtester, so the new default research methods change no event, decision,
 fill or cent. What v1.5.0 changed is the identity of the run:
 `config_version` hashes `configs/execution/execution.json`,
@@ -295,17 +301,17 @@ the close. The numbers of the v1.3.0 golden are in CHANGELOG.md (v1.4.0,
 
 | P&L (USD) | value |
 |---|---:|
-| total (`risk daily − fees_net − impact`) | **−81.53** |
-| risk daily (realized −56.02 + unrealized −4.33) | −60.36 |
-| gross (mark-to-market) | +1.43 |
-| spread cost | 61.79 |
-| fees net (21.32 taker fees − 0.20 maker rebates) | 21.12 |
+| total (`risk daily − fees_net − impact`) | **−82.84** |
+| risk daily (realized −56.49 + unrealized −4.96) | −61.45 |
+| gross (mark-to-market) | +2.59 |
+| spread cost | 64.03 |
+| fees net (21.53 taker fees − 0.20 maker rebates) | 21.33 |
 | impact | 0.06 |
-| identity \|risk daily − (gross − spread)\| | 6.8e-11 |
+| identity \|risk daily − (gross − spread)\| | 5.8e-12 |
 
-**The session is cost-negative.** The alpha contribution is +0.022 bps of
-filled notional against −0.41 bps of execution cost (net −0.39 bps, about
-82 USD on 8,229 shares × 190 USD): the fitted expected returns are
+**The session is cost-negative.** The alpha contribution is +0.0245 bps of
+filled notional against −0.4367 bps of execution cost (net −0.41 bps, about
+83 USD on 8,295 shares × 190 USD): the fitted expected returns are
 hundredths of a basis point per decision while crossing a 1-tick spread on
 a 190 USD stock costs ~0.5 bp. The loss is 3.6 times the v1.3.0 one on 2.6
 times the shares: the loop now trades for the whole session and pays the
@@ -318,10 +324,10 @@ This is the same picture the research reports give (every alpha fails
 
 | alpha | IC@1s mid | IC@1s cost | IC@1s shift-1 | n | fitted h | IC@h mid | IC@h cost | IC@h shift-1 | n@h | research IC@h | gap |
 |---|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| EQ01 | +0.217 | −0.024 | +0.149 | 790 | 1s | +0.217 | −0.024 | +0.149 | 790 | +0.011 | 0.206 |
-| EQ03 | +0.110 | −0.029 | +0.116 | 707 | 5s | +0.147 | +0.067 | +0.070 | 677 | +0.019 | 0.128 |
-| EQ06 | −0.079 | +0.079 | −0.047 | 354 | 10s | −0.130 | +0.033 | −0.098 | 301 | +0.028 | 0.158 |
-| ensemble | +0.104 | −0.003 | +0.111 | 790 | — | — | — | — | — | — | — |
+| EQ01 | +0.217 | −0.024 | +0.149 | 790 | 1s | +0.217 | −0.024 | +0.149 | 790 | +0.024 | 0.193 |
+| EQ03 | +0.109 | −0.029 | +0.116 | 707 | 5s | +0.147 | +0.069 | +0.070 | 677 | +0.030 | 0.117 |
+| EQ06 | −0.079 | +0.079 | −0.047 | 354 | 10s | −0.130 | +0.033 | −0.098 | 301 | +0.056 | 0.185 |
+| ensemble | +0.103 | −0.002 | +0.111 | 790 | — | — | — | — | — | — | — |
 
 The realized ICs are several times the research ICs. That gap was audited
 on 2026-09-20, on the v1.3.0 session; the audit's conclusions are restated
@@ -397,9 +403,10 @@ observations no longer holds (item 3).
    move is smaller than the spread, which is the −82.84 USD above and the
    research verdicts.
 6. **The gap the lifecycle sees.** `ic_gap` is measured at the alpha's
-   FITTED horizon (like for like with the registry's `oos_ic`): 0.206 /
-   0.128 / 0.158 (0.207 / 0.128 / 0.157 against the v1.4.0 registry; the
-   realized ICs are the same, the registry IC is now the v2 gate IC). `paper_evidence.json` carries that IC, so the
+   FITTED horizon (like for like with the registry's `oos_ic`): 0.193 /
+   0.117 / 0.185 at v1.14.0 (0.206 / 0.128 / 0.158 under v1.5.0 to v1.13.0,
+   0.207 / 0.128 / 0.157 against the v1.4.0 registry; the realized ICs
+   barely move, the registry IC is the current gate IC). `paper_evidence.json` carries that IC, so the
    `paper_ic_tracking` gate (max gap 0.01) fails all three alphas on this
    data (EQ01 and EQ03 on the v1.3.0 session; EQ06's gap was 0.021 there)
    — correctly: paper behaviour that differs this much from research is a
