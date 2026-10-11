@@ -2272,9 +2272,9 @@ maker adverse selection    1s: +0.80 bp (se 0.21, n 233)
 maker adverse selection   10s: +1.36 bp (se 0.40, n 214)
 labels: bid filled 0.17, not run over 0.07
 taker    posted   0 filled   0 gated out 698
-passive  posted  83 filled  22 gated out  22 | spread +5.90 AS +7.13 exit +5.72 net -6.71 bp/trip, -35.70 USD | exit filled passively 0.32, timeout cross 0.68
-taker*   posted 101 filled  27 gated out  38 | spread +3.36 AS +4.20 exit +10.16 net -11.41 bp/trip, -74.70 USD
-passive* posted  83 filled  22 gated out  22 | spread +5.90 AS +7.13 exit +5.72 net -6.71 bp/trip, -35.70 USD | exit filled passively 0.32, timeout cross 0.68
+passive  posted  83 filled  22 gated out  22 | spread +6.74 AS +7.98 exit +5.72 net -6.71 bp/trip, -35.70 USD | exit filled passively 0.32, timeout cross 0.68
+taker*   posted 101 filled  27 gated out  38 | spread +3.66 AS +4.50 exit +10.16 net -11.41 bp/trip, -74.70 USD
+passive* posted  83 filled  22 gated out  22 | spread +6.74 AS +7.98 exit +5.72 net -6.71 bp/trip, -35.70 USD | exit filled passively 0.32, timeout cross 0.68
 ```
 
 How to read it.
@@ -2288,13 +2288,18 @@ The passive exit changes the gate. It expects to earn the second
 half-spread and rebate with the calibrated touch fill probability (0.35
 here), and on these wide synthetic spreads it then admits nearly every row.
 The outcome does not support that: only 32% of exits fill passively, 68%
-time out and cross, and adverse selection on the trips (+7.1 bp) is far
+time out and cross, and adverse selection on the trips (+8.0 bp) is far
 above the calibrated +1.4 bp, because the trips that last are the ones the
 market ran over. Net is -6.7 bp per trip. That is better than the -11.4 bp
 of the ungated taker exit, but still a loss.
 
 The decomposition `gross = spread earned - adverse selection - exit slippage`
-holds for every row. With a passive exit, a fully passive exit shows
+holds for every row. (v1.13: the spread / AS columns moved — passive +5.90 /
++7.13 to +6.74 / +7.98, taker* +3.36 / +4.20 to +3.66 / +4.50 — because the
+markout reference of a maker fill is now the mid before the FIRST event of
+its `exchange_ts`, the rule `tca/markout.py` and the calibration already
+used (X-P1-4). Fills, exits and net are unchanged: only the split between
+the two columns moved.) With a passive exit, a fully passive exit shows
 negative slippage (the second half-spread earned) and a timeout pays it back.
 These are illustrations on a sparse synthetic stream (2,000 events in two
 hours), not results. To calibrate a real session, run
@@ -2350,10 +2355,19 @@ EOF
 
 ```
 skewed   fills  97 (bid 0.17 ask 0.19) max|q| 300 mean|q| 151 AS floor +0.80 bp (calibration:1s)
-         spread +205.50 markout -49.00 inventory -82.50 flatten -6.00 rebates +19.40 fees -0.90 = net +86.50 USD
+         spread +223.00 markout -66.50 inventory -82.50 flatten -6.00 rebates +19.40 fees -0.90 = net +86.50 USD
 no-skew  fills 104 (bid 0.19 ask 0.19) max|q| 300 mean|q| 142 AS floor +0.80 bp (calibration:1s)
-         spread +218.50 markout -45.50 inventory -69.00 flatten -4.00 rebates +20.80 fees -0.60 = net +120.20 USD
+         spread +236.50 markout -63.50 inventory -69.00 flatten -4.00 rebates +20.80 fees -0.60 = net +120.20 USD
 ```
+
+v1.13: spread and markout moved (skewed +205.50 / -49.00 to +223.00 /
+-66.50; no-skew +218.50 / -45.50 to +236.50 / -63.50) for the X-P1-4
+markout-reference change described under recipe 39; their sum, the fills
+and the net are unchanged. The summary also carries
+`ticks_behind_touch_{mean,median,max}` and
+`frac_decisions_skew_changed_quote`: a skew that never changes a quoted
+price is inert, and `QuotingConfig(skew_mode="ticks", h_min_ticks=...)`
+(rule 8) prices the alpha and inventory skews in whole ticks from the touch.
 
 How to read it. The five P&L terms add up to the gross exactly
 (`spread + markout + inventory + flatten`; the identity is tested), and the
@@ -2419,6 +2433,7 @@ an edge:
 cd python
 PYTHONUTF8=1 PYTHONPATH=src:tests python3 - <<'EOF'
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 from iap.auction import (AuctionStream, AuctionStrategyConfig, auction_features,
                          auction_targets, backtest, extract_auction_stream, walk_forward)
@@ -2430,9 +2445,13 @@ stream = AuctionStream.concat(
     for i, d in enumerate(_days(6)))
 labels = auction_targets(auction_features(stream.noii, "C"), stream.crosses)
 cfg = AuctionStrategyConfig(decision_s=300, threshold=0.1, exit="cross")
-s = backtest(labels, cfg).summary()
-print(f"in sample: {s['n_trades']} trades, net {s['mean_net_bps']:+.2f} bp (cost {s['mean_cost_bps']:.2f})")
-wf = walk_forward(labels, cfg, n_folds=3)
+s = backtest(labels, cfg)
+print(f"cutoff enforced: {s.summary()['n_trades']} trades, exits {sorted(set(s.trades['exit_used']))},"
+      f" net {s.summary()['mean_net_bps']:+.2f} bp (cost {s.summary()['mean_cost_bps']:.2f})")
+legacy = replace(cfg, enforce_entry_cutoff=False)  # the pre-v1.13 rule
+s = backtest(labels, legacy).summary()
+print(f"pre-v1.13 rule:  {s['n_trades']} trades, net {s['mean_net_bps']:+.2f} bp (cost {s['mean_cost_bps']:.2f})")
+wf = walk_forward(labels, legacy, n_folds=3)
 print("folds:", [(f["fold"], f["orientation"], f["threshold"], f["test_trades"]) for f in wf.folds])
 o = wf.summary()
 print(f"out of sample: {o['n_trades']} trades over {o['n_days']} days, net {o['mean_net_bps']:+.2f} bp")
@@ -2440,10 +2459,22 @@ EOF
 ```
 
 ```
-in sample: 12 trades, net +6.98 bp (cost 1.60)
+cutoff enforced: 12 trades, exits ['taker'], net -2.61 bp (cost 3.13)
+pre-v1.13 rule:  12 trades, net +6.98 bp (cost 1.60)
 folds: [(1, 1, 0.05, 2), (2, 1, 0.05, 2), (3, 1, 0.05, 2)]
 out of sample: 6 trades over 3 days, net +6.94 bp
 ```
+
+v1.13 (X-P1-5): a cross exit needs a market-on-close order, and Nasdaq
+accepts those only until 15:55 ET (300 s before the close, since October
+2018; dated table in `configs/reference/auction_entry_cutoffs.json`). A
+decision at `time_to_cross_s <= 300` therefore cannot exit in the cross: by
+default it is priced as `exit="taker"` (column `exit_used`), which is what
+the first line shows. The second line and the walk-forward use
+`enforce_entry_cutoff=False`, the pre-v1.13 rule, and reproduce the numbers
+this recipe printed before v1.13 (in-sample +6.98 bp, out of sample +6.94
+bp). On real data the closing NOII only starts at 15:55, so every closing
+decision is past the cutoff.
 
 Every fold learns to follow the imbalance (orientation `+1`), as planted.
 For real files, use the CLI: `python -m iap.auction extract`, then

@@ -319,6 +319,19 @@ points is not evidence of an edge and not evidence against one: the study
 is underpowered (LEARN.md §42). The opening cell's narrower interval rests
 on two sessions. No look beyond the registered cells was taken.
 
+**Caveat: MOC entry cutoff (v1.13, quality review X-P1-5).** The `C-300s`
+cell exits in the closing cross from a decision 300 s before the close, at
+15:55 ET. That is exactly Nasdaq's market-on-close entry cutoff (15:55 ET
+since October 2018; `configs/reference/auction_entry_cutoffs.json` cites
+the sources), so the exit order would not have been accepted, and the
+in-sample +19.4 bp prices an exit that was not available. The recorded
+numbers above are left as they were run; they were computed under the
+pre-v1.13 rule. From v1.13 `iap.auction` refuses a cross exit at
+`time_to_cross_s <= cutoff` and prices that row as a taker exit
+(`exit_used = taker`); `--no-entry-cutoff` reproduces the recorded run. The
+`O-300s` cell (09:25 ET, before the 09:28 MOO cutoff) is not affected. The
+holdout verdict does not change: it made no trade.
+
 **2026 holdout: running.** Declared in the pre-registration before any 2026
 auction data was extracted, with the `C-300s` fit frozen from the in-sample
 run. Extraction of 2026-05-15 finished (1,592 two-sided mids); 2026-05-18 was
@@ -393,7 +406,9 @@ publishes it within the inside quotes, but it is a proxy; the report says
 `mid_source`). Pass `--mids mids.csv` (`symbol,ts,mid[,half_spread]`, epoch
 ns, dollars) exported from the normalized book for a true mid and spread.
 With two sessions the walk-forward has one test day; it needs the 9+ days on
-disk to say anything.
+disk to say anything. Since v1.13 `--exit cross` at `--decision-s 300` on the closing
+cross falls back to taker pricing (the MOC cutoff caveat above); add
+`--no-entry-cutoff` to reproduce a pre-v1.13 report.
 
 ## 4. Mapping to canonical events
 

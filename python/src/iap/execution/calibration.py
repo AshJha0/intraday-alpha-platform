@@ -270,6 +270,7 @@ class _Order:
     executed: int = 0
     first_exec_ts: int | None = None
     done: bool = False
+    end_ts: int | None = None  #: when it left the book (v1.13 TTL cells)
 
 
 @dataclass
@@ -277,6 +278,25 @@ class _Episode:
     price: int
     start_ts: int
     start_qty: int
+
+
+def _p_fill_within(orders: Sequence[_Order], ttl_ns: int, last_ts: int) -> dict:
+    """v1.13 (X-P2-8) TTL-censored P(any fill within ``ttl_ns``) of touch joins.
+
+    Filled within the TTL -> 1; observed for at least the TTL without a fill
+    (left the book later, or still open ``ttl_ns`` before the stream end) ->
+    0; left the book unfilled before the TTL -> censored (excluded).
+    """
+    hit = n = 0
+    for o in orders:
+        if o.first_exec_ts is not None and o.first_exec_ts - o.add_ts <= ttl_ns:
+            hit += 1
+            n += 1
+            continue
+        end = o.end_ts if o.done and o.end_ts is not None else last_ts
+        if end - o.add_ts >= ttl_ns:
+            n += 1
+    return {"n": n, "p": hit / n if n >= MIN_SAMPLES else None}
 
 
 def _fill_cell(orders: Sequence[_Order]) -> dict:
@@ -308,8 +328,14 @@ def estimate_calibration(
     queue_edges: Sequence[int] = DEFAULT_QUEUE_EDGES,
     latency_tail: Mapping[int, dict] | None = None,
     source: Mapping | None = None,
+    fill_within_ns: Sequence[int] = (),
 ) -> dict:
     """Estimate a calibration document from one ordered event stream.
+
+    ``fill_within_ns`` (v1.13 X-P2-8, opt-in; empty = the document is
+    unchanged): for each TTL, ``fill_rates.all.p_fill_within[str(ttl)] =
+    {"n", "p"}``, the TTL-censored touch fill probability
+    (:func:`_p_fill_within`) the maker backtester's passive exit reads.
 
     ``tick_sizes``: instrument_id -> tick size (instruments not listed are
     skipped). ``latency_tail``: venue_id -> a :func:`parametric_latency`
@@ -379,6 +405,7 @@ def estimate_calibration(
                     o.first_exec_ts = t
                 if o.remaining <= 0:
                     o.done = True
+                    o.end_ts = t
                 maker_fills.append((iid, t, o.side, o.price * tick_sizes[iid]))
                 aggr = 1 - o.side
                 sweeps[(iid, t, aggr)] = sweeps.get((iid, t, aggr), 0) + q
@@ -388,12 +415,14 @@ def estimate_calibration(
             o = orders.get(okey)
             if o is not None:
                 o.done = True
+                o.end_ts = t
                 o.remaining = 0
         elif et == EventType.MODIFY:
             o = orders.get(okey)
             if o is not None and not o.done:
                 if ev.qty <= 0:
                     o.done = True
+                    o.end_ts = t
                     o.remaining = 0
                 else:
                     o.remaining = ev.qty
@@ -424,6 +453,11 @@ def estimate_calibration(
         "all": _fill_cell([o for _, o in touch_orders]),
         "by_queue_ahead": {b: _fill_cell(by_bucket[b]) for b in labels if b in by_bucket},
     }
+    if fill_within_ns:
+        fill_rates["all"]["p_fill_within"] = {
+            str(int(x)): _p_fill_within([o for _, o in touch_orders], int(x), last_ts)
+            for x in fill_within_ns
+        }
 
     # queue depletion hazards
     qd: dict[str, dict] = {"bid": {}, "ask": {}}
