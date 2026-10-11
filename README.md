@@ -29,7 +29,7 @@ implementation (`iap.risk`, `iap.execution`) proven by the same golden files
 the Java ports are proven by, so the loop the MVP runs is the reference
 loop end to end.
 
-## Current status (v1.13.0, 2026-10-11)
+## Current status (v1.14.0, 2026-10-11)
 
 **Where the research stands.**
 
@@ -243,13 +243,67 @@ number, golden or ledger entry changed):
 - data terms: what is and is not published from the Nasdaq sample files
   ([docs/REAL_DATA.md](docs/REAL_DATA.md) §2.1).
 
-**Next: v1.14, the correctness release (in progress).** One regeneration
-of goldens, feature stores and reports under new pre-registrations: a
-causal row block for the backtest, trailing labels by default,
-day-clustered inference, the data-mapping fixes, queue credit on MODIFY,
-feed latency, a hash-chained risk audit log and ledger. The R7
-confirmatory round runs on v1.14. **Later:** the 15c3-5 control set, the
-Java archive ([docs/ROADMAP.md](docs/ROADMAP.md) §3.8).
+**New in v1.14.0, the correctness release** (2026-10-11). This is the
+release that was allowed to move numbers: every review finding that
+changes a published figure was fixed once, and goldens, the synthetic
+feature store and the reports were regenerated together. CHANGELOG.md
+lists each moved number with its reason. The conclusions did not move:
+0 PROMOTE, no trade at 1x costs.
+
+- data: events of one instrument sharing a timestamp are one state change
+  (an ITCH execute or replace no longer leaves a half-applied book that a
+  feature can sample), in all four engines; hidden prints signed by the
+  quote rule; midpoint prints rounded half to even; manifest x-version 2,
+  so a dataset ingested before v1.14 is refused until re-ingested
+  (COOKBOOK 71);
+- research statistics: a causal backtest row block (the old one peeked at
+  whether the future label was valid); automatic HAC bandwidth with no lag
+  product across session days; a time-shift leakage detector; one ledger
+  look per gate decision; per-instrument scaling; `hypothesis_confirmed`
+  by fold majority. The v1.13 rules stay reachable as `v2_v113` and
+  friends (COOKBOOK 72);
+- execution: a MODIFY that shrinks an order ahead of yours now credits
+  your queue position, as a cancel does (on by default; no golden moved).
+  Feed latency, simulator-routed exits, hidden-print fills,
+  per-touch-order adverse selection and priority-keeping amends are opt-in
+  and will be switched on in the v2 pre-registrations (COOKBOOK 73);
+- risk: the audit log is a SHA-256 hash chain (COOKBOOK 69); SEC 15c3-5
+  pre-trade checks 23-29 (restricted list, open orders, open notional,
+  strategy position, participation, cancel rate, venue message rate);
+  two-party, capped loss overrides; crossed books and 10x mark jumps
+  dropped; bounded per-key state (COOKBOOK 70);
+- governance: maintainer trust roots for agent keys, read from `main` so a
+  branch cannot vouch for itself (COOKBOOK 74); the look ledger is a hash
+  chain; a blocking `supply-chain` job (pip-audit, cargo audit, cargo
+  deny, Trivy) and Rust in CodeQL;
+- engineering: shared replay across maker configs, a numpy event cursor,
+  `StudyBase` for study drivers, a version-stable model content hash.
+
+The real-data figures above are still the v1.13 statistics on the v1.13
+stores: no real dataset has been re-ingested under x-version 2 yet
+([docs/REAL_DATA.md](docs/REAL_DATA.md) §4). Expect the day-separated HAC
+to report lower t values than 21 and 25 when it is.
+
+**Next: v1.15.** The R7 confirmatory round on unseen sessions (re-ingest
+first), deep order-book baselines (AI4) and the QQQ basis study (A2),
+whose code is in review; maker and quoting v2 pre-registrations with the
+execution options switched on ([docs/ROADMAP.md](docs/ROADMAP.md) §3.9-3.10).
+
+## What this is, and what it is not
+
+It is a research platform that tries hard not to fool its owner: one
+seeded generator, integer contracts, byte-identical goldens across Python,
+C++, Rust and Java, a look ledger that prices every statistic computed, and
+pre-registration that is checked by code. It runs the full loop from
+market data to TCA on one instrument and paper-trades a universe.
+
+It is not a profitable strategy. Nothing has been promoted, and the
+documents say so at the top rather than in a footnote. It is not connected
+to a live venue: there is no order gateway, so the 15c3-5 checks guard a
+simulator. The real data is seven (plus two holdout) Nasdaq sessions on
+three symbols, which is enough to find statistically strong signals and
+not enough to say much about their size. The Java tree is largely a frozen
+copy kept for parity, not a production service.
 
 ## Architecture in one line
 
