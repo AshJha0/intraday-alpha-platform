@@ -196,7 +196,7 @@ def test_changelog_section():
         rel.changelog_section(CHANGELOG, "9.9.9")
 
 
-def _publish_answers(ci_conclusion="success", release_runs=None, jobs=None):
+def _publish_answers(ci_conclusion="success", release_runs=None, jobs=None, codeql="success"):
     release_runs = release_runs or [
         [{"databaseId": 7, "status": "completed", "conclusion": "success"}]
     ]
@@ -207,6 +207,9 @@ def _publish_answers(ci_conclusion="success", release_runs=None, jobs=None):
         ("git", "show"): CHANGELOG,
         ("gh", "run", "list", "--workflow", "ci.yml"): json.dumps(
             [{"databaseId": 1, "status": "completed", "conclusion": ci_conclusion, "event": "push"}]
+        ),
+        ("gh", "run", "list", "--workflow", "codeql.yml"): json.dumps(
+            [{"databaseId": 2, "status": "completed", "conclusion": codeql, "event": "push"}]
         ),
         ("gh", "run", "list", "--workflow", "release.yml"): lambda argv: json.dumps(next(seq)),
         ("gh", "run", "view"): json.dumps({"jobs": jobs or []}),
@@ -239,7 +242,7 @@ def test_publish_reruns_release_once_when_verify_ci_raced(tmp_path):
     r, fake = _runner(tmp_path, answers, execute=True)
     pages = []
     rel.publish(
-        r, "1.15.0", fetch=lambda url: pages.append(url) or "<h2>v1.15</h2>", sleep=lambda s: None
+        r, "1.15.0", fetch=lambda url: pages.append(url) or "<h2>v1.15.0</h2>", sleep=lambda s: None
     )
     assert ["gh", "run", "rerun", "7", "--failed"] in fake.calls
     assert pages == [rel.SITE_URL]
@@ -263,3 +266,54 @@ def test_cli_flow_and_default_dry_run(capsys):
     r = rel.Runner(exec_fn=FakeExec(_publish_answers()))
     assert rel.main(["publish", "--version", "1.15.0"], runner=r) == 0
     assert r.execute is False
+
+
+def test_site_check_needs_full_version():
+    # the site's roadmap names the next minor before it ships: "v1.15" is vacuous
+    assert not rel.site_mentions("1.15.0", fetch=lambda u: "roadmap: v1.15 next; v1.14.0")
+    assert not rel.site_mentions("1.15.0", fetch=lambda u: "v1.15.01 v1.15.0.1")
+    assert rel.site_mentions("1.15.0", fetch=lambda u: "<h2>v1.15.0</h2>")
+    assert rel.site_mentions("1.15.0", fetch=lambda u: "released v1.15.0.")
+
+
+def test_publish_dry_run_reports_all_blockers_and_prints_plan(tmp_path):
+    answers = _publish_answers(ci_conclusion="failure")
+    answers[("git", "show")] = "# Changelog\n\n## Unreleased (v1.15)\n\n- x\n"
+    r, fake = _runner(tmp_path, answers)
+    with pytest.raises(rel.ReleaseError, match="CHANGELOG.md has no.*main CI is green"):
+        rel.publish(r, "1.15.0")
+    assert sum(x.startswith("BLOCKER") for x in r.log) == 2
+    assert any(x.startswith("would run: gh release create v1.15.0") for x in r.log)
+    assert not any(c[:2] == ["git", "tag"] and "-a" in c for c in fake.calls)
+
+
+def test_publish_execute_stops_at_first_blocker(tmp_path):
+    answers = _publish_answers()
+    answers[("git", "tag", "--list")] = "v1.15.0\n"
+    r, fake = _runner(tmp_path, answers, execute=True)
+    with pytest.raises(rel.ReleaseError, match="already exists"):
+        rel.publish(r, "1.15.0", fetch=lambda u: "", sleep=lambda s: None)
+    assert not any(c[:2] == ["gh", "release"] for c in fake.calls)
+
+
+@pytest.mark.parametrize("codeql", ["failure", "in_progress", None])
+def test_publish_requires_green_codeql(tmp_path, codeql):
+    answers = _publish_answers(codeql=codeql or "success")
+    if codeql == "in_progress":
+        answers[("gh", "run", "list", "--workflow", "codeql.yml")] = json.dumps(
+            [{"databaseId": 2, "status": "in_progress", "conclusion": "", "event": "push"}]
+        )
+    if codeql is None:
+        answers[("gh", "run", "list", "--workflow", "codeql.yml")] = "[]"
+    # dry run: listed as a blocker, plan still printed
+    r, _ = _runner(tmp_path, answers)
+    with pytest.raises(rel.ReleaseError, match="codeql"):
+        rel.publish(r, "1.15.0")
+    assert any(x.startswith("BLOCKER: no green codeql") for x in r.log)
+    assert any(x.startswith("would run: gh release create") for x in r.log)
+    # execute: stops before tagging
+    r, fake = _runner(tmp_path, answers, execute=True)
+    with pytest.raises(rel.ReleaseError, match="codeql"):
+        rel.publish(r, "1.15.0", fetch=lambda u: "", sleep=lambda s: None)
+    assert not any(c[:3] == ["git", "tag", "-a"] or c[:2] == ["gh", "release"] for c in fake.calls)
+    assert ["gh", "run", "list", "--workflow", "codeql.yml"] == fake.calls[-1][:5]
