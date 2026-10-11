@@ -61,6 +61,8 @@ spec:
                   key: admin-password
             - name: GF_USERS_ALLOW_SIGN_UP
               value: "false"
+            - name: GF_LOG_MODE      # stdout only: the root filesystem is read-only
+              value: console
           volumeMounts:
             - name: provisioning-datasources
               mountPath: /etc/grafana/provisioning/datasources
@@ -73,6 +75,8 @@ spec:
               readOnly: true
             - name: storage
               mountPath: /var/lib/grafana
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: 100m
@@ -94,6 +98,9 @@ spec:
             periodSeconds: 10
           securityContext:
             allowPrivilegeEscalation: false
+            # v1.14 (trivy KSV-0014): grafana writes only to /var/lib/grafana
+            # (PVC: db, plugins, sessions) and /tmp (emptyDir); logs go to stdout
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
       volumes:
@@ -115,6 +122,9 @@ spec:
         - name: storage
           persistentVolumeClaim:
             claimName: iap-grafana   # users, preferences and ad-hoc dashboards survive restarts
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
 ---
 apiVersion: v1
 kind: Service
