@@ -8,14 +8,43 @@ Binding for every change to this repository.
 Controls in this document are of two kinds. Be clear which is which before
 relying on one.
 
-| Control | Status (2026-10-03) | Enforced by |
+**Live branch ruleset (read from the GitHub API, 2026-10-11).** One active
+ruleset, `protect-main` (id 24455225), targets the default branch with no
+bypass actors:
+
+- `pull_request`: a pull request is required; **0 approving reviews**, no
+  code-owner review, no last-push approval, stale reviews not dismissed;
+  merge, squash and rebase all allowed;
+- `required_status_checks`: `python`, `integration`, `cpp`, `rust`, `java`,
+  `golden`, `deployment`, **non-strict** (a branch need not be up to date
+  with `main` before merging);
+- `non_fast_forward` (no force-push) and `deletion` (no branch deletion).
+
+Not required today: `governance` (added in v1.13), `rust-pyo3`,
+`cpp-sanitizers`, `advisory`, CodeQL, `images`.
+
+**Recommended owner actions** (repository settings; code cannot do them):
+
+1. add `governance` to the required checks once it has run green on `main`;
+2. turn on "require branches to be up to date" (strict), so the monotone
+   ledger check and the golden suite run against the current `main`;
+3. add `rust-pyo3`, `cpp-sanitizers`, `advisory` and CodeQL `analyze` as
+   required checks;
+4. require 1 approving review (and code-owner review) as soon as a second
+   maintainer exists;
+5. restrict merge methods to merge commits for research branches, or at
+   least never rebase them (section 2c).
+
+| Control | Status (2026-10-11) | Enforced by |
 |---|---|---|
-| CI green on every push and pull request (all four languages, golden gate, deployment validation) | **Enforced as a check, not as a merge gate** | `.github/workflows/ci.yml` runs it; nothing stops a merge when it is red, because no branch protection exists |
-| Pull requests only, no direct push to `main` | **Required setting, not yet configured** | Needs a branch ruleset ([REPO_SETTINGS.md](REPO_SETTINGS.md) section 1). Today `main` is unprotected |
-| Required status checks before merge | **Required setting, not yet configured** | Same ruleset |
-| "1 to 2 reviewers" by change class (section 1) | **Required setting, not yet configured, and not satisfiable by one maintainer** | Needs the ruleset and a second maintainer; GitHub does not let an author approve their own pull request |
+| CI green on every push and pull request (all four languages, golden gate, deployment validation) | **Enforced as a merge gate for the seven required checks** | `protect-main` ruleset; other jobs run but do not block |
+| Pull requests only, no direct push to `main` | **Enforced** | `protect-main` (`pull_request` rule, no bypass actors) |
+| Required status checks before merge | **Enforced, non-strict**: python, integration, cpp, rust, java, golden, deployment | `protect-main`; `governance` is not yet required (recommended action 1) |
+| "1 to 2 reviewers" by change class (section 1) | **Not enforced: the ruleset requires 0 approvals**; not satisfiable by one maintainer | Needs a second maintainer; GitHub does not let an author approve their own pull request |
 | Reviewer ownership by path | Enforced as a file, applied only once the ruleset requires code-owner review | `CODEOWNERS` (every path owned by `@AshJha0`) |
-| Force-push and branch-deletion protection | **Required setting, not yet configured** | Ruleset |
+| Force-push and branch-deletion protection | **Enforced** | `protect-main` (`non_fast_forward`, `deletion`) |
+| Blackboard chain, anchors and signatures verify; every signed writer has a registered key; ledger and board only grow vs the base (v1.13) | **Enforced as a check** (`governance` job), not yet a merge gate | `iap.agents.cli verify-board`, `tests/harness/check_agent_keys.py`, `tests/harness/check_ledger_monotone.py` |
+| HUMAN lifecycle edges (`retire`, `reset`) need a signed, single-use approval (v1.13) | Enforced in code | `python -m iap.lifecycle retire|reset --approval --keyfile`, `iap.agents.approvals` |
 | Signed release tags | **A practice, not enforced** | Nothing verifies tag signatures ([REPO_SETTINGS.md](REPO_SETTINGS.md) section 2) |
 | Dependabot alerts and security updates | **Required setting, not yet configured** (version-update PRs are configured by `.github/dependabot.yml`) | [REPO_SETTINGS.md](REPO_SETTINGS.md) section 3 |
 | Audit logs shipped off-host daily (section 3) | **Not implemented** | Nothing ships them; they exist only on the state volume |
@@ -180,6 +209,54 @@ implicitly, dynamic `importlib` imports with computed names, data and
 config files read at run time (fitted params, `configs/`), the interpreter,
 and other third-party libraries.
 
+**Registering an agent public key (G-P1-2).** Every agent that writes
+signed entries must have its Ed25519 public key in
+`research/agents/agent_pubkeys.json`, or the `governance` CI job fails:
+
+1. `python -m iap.agents.cli agent-keygen --agent <ID> --keyfile <PATH OUTSIDE THE REPO>`
+   writes the private key to the key file (refused inside the repository)
+   and adds the public key (32-byte lowercase hex) to the registry;
+2. commit `agent_pubkeys.json` in its own pull request, BEFORE the first
+   signed write by that agent reaches `main`; the reviewer checks that the
+   id is new and the key came from the agent's operator;
+3. never edit or remove an existing key: entries it signed would stop
+   verifying. A compromised key is retired by a reviewed change that adds a
+   new agent id.
+
+An empty registry is accepted only while no board entry carries `auth`.
+
+### 2c. Research branches: merging the ledger and the blackboard (v1.13, G-P1-1)
+
+`research/experiments.json` (the multiple-testing ledger),
+`research/models/ledger.json` and `research/agents/blackboard.jsonl` are
+append-only state. A research branch that records looks or board entries
+holds a FORKED copy; it is merged by the release owner as follows, never by
+an automated merge:
+
+1. **Merge, never rebase or squash-rewrite the research files.** A rebase
+   re-applies the branch's board lines on top of `main`'s, which changes
+   their `seq`/`prev`/`hash` (a re-chain) and orphans the anchors.
+2. **Ledger: merge by entry identity.** Run
+   `python tools/merge_ledger.py --ours <main's experiments.json> --theirs <branch's> --out research/experiments.json`.
+   Every `main` entry is kept unchanged; branch entries whose key is new are
+   appended and their looks added; an identity present on both sides is one
+   experiment (kept as on `main`, result conflicts listed for the reviewer).
+   The merged total is >= both inputs. Commit the report the tool prints in
+   the PR description.
+3. **Blackboard: `main`'s lines stay a byte-identical prefix.** Branch
+   entries that are not on `main` are re-written AFTER `main`'s head through
+   the broker (new `seq`/`prev`, the same bodies, the original signatures
+   re-issued by the agent if signed), never by hand-editing the file. Then
+   `python -m iap.agents.cli anchor` and commit `anchors.json`; re-chaining
+   is legitimate only through this reviewed step.
+4. CI's `governance` job checks the result: `verify-board` (chain, git
+   prefixes, anchors, signatures), `check_agent_keys.py`, and
+   `check_ledger_monotone.py` (head totals and board length >= base, base
+   ledger keys present, base board a byte-identical prefix).
+
+Published numbers that depend on the ledger total (Bonferroni thresholds)
+move only in the release that merges the ledger, and that release says so.
+
 ### 2b. The LLM research agent (v1.11, AI1-AI2)
 
 The model is a client of the 2a controls, not an exception to them.
@@ -191,7 +268,7 @@ The model is a client of the 2a controls, not an exception to them.
 | A pre-registration is a 2a pre-registration (one look, code fingerprint) and a session may make at most `--max-preregs` of them | `Budget.check_prereg`, `WriteBroker.preregister` | p-hacking by trying variants |
 | A run needs a verified pre-registration and an allowed dataset; one run per (alpha, horizon, dataset) | `prereg_gate.require`, `Session.run_gated_study` | unregistered runs, re-running until lucky, unapproved data |
 | Metrics and verdict computed by code and written as a report | `iap.llm.runners.verdict` | a model "deciding" a result |
-| Every number in a finding must appear, up to the rounding shown, in a numeric field of a cited artefact; free-text fields are not evidence; at least one cited report must be from the session | `iap.llm.verify.verify_finding` | invented, derived or injected numbers; hallucinated citations |
+| Every number in a finding must appear in the evidence of a cited artefact (`metrics`/`result(s)`/`stats` subtrees and `t_threshold`, not metadata) under exact-decimal matching (integers exactly; decimals by rounding at the precision shown); a labelled statistic (`IC`, `t`, `Sharpe`, `hit rate`) must match a field of that statistic; number words are refused (v1.13); free-text fields are not evidence; at least one cited report must be from the session | `iap.llm.verify.verify_finding` | invented, derived or injected numbers; hallucinated citations |
 | Tool output free text wrapped and flagged as untrusted; the system prompt says it is data | `iap.agents.untrusted` | prompt injection (advisory; the structural controls above are the real ones) |
 | Caps on estimated USD (projected one call ahead), tokens, tool calls; session stops at the first | `iap.llm.budget.Budget` | runaway spend |
 | Transcript, tool log and summary persisted; the API key is scrubbed from anything written | `run_session`, `envfile.redact` | unaudited sessions, key leaks |

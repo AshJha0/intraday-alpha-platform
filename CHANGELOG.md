@@ -6,6 +6,46 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## v1.13.0 — unreleased
+
+Governance items of the 2026-10-11 quality review (G-P1-1, G-P1-2, G-P1-3,
+G-P1-6 docs, G-P2-1, G-P2-2). Python and CI only: no ledger, blackboard,
+golden or published number changes.
+
+- **`governance` CI job** (G-P1-2, G-P1-1): `python -m iap.agents.cli
+  verify-board` with full history; `tests/harness/check_agent_keys.py`
+  (every agent with signed board entries has a key in
+  `research/agents/agent_pubkeys.json`; an empty registry is accepted only
+  while no entry carries `auth`); `tests/harness/check_ledger_monotone.py`
+  (head `research/experiments.json` total and keys, `research/models/ledger.json`
+  count and blackboard length >= the base, and the base board a
+  byte-identical prefix of the head board). Intended as a required check;
+  adding it to the `protect-main` ruleset is a repository-owner action.
+- **Research-branch merge procedure** (G-P1-1): GOVERNANCE.md §2c (merge,
+  never rebase; ledger merged by entry identity; board re-anchored only via
+  `cli anchor`) and `tools/merge_ledger.py` (merges two ledgers by entry
+  key, reports totals and result conflicts, renders through
+  `ExperimentLedger`).
+- **Lifecycle CLI needs an approval** (G-P1-3): `python -m iap.lifecycle
+  retire|reset` now requires `--approval FILE --keyfile PATH`; the approval
+  must name the same alpha, action and reason and is applied through
+  `agents.cli apply` (signature, expiry, single-use nonce on the
+  blackboard). Without one: exit 2. Library callers pass
+  `cmd_manual(..., require_approval=False)` explicitly.
+- **Locked blackboard append** (G-P2-1): `Blackboard.append` verifies and
+  appends under `iap.experiment.locking.FileLock`; `ts` must be
+  non-decreasing. Concurrency test with four writer processes.
+- **Stricter numbers rule for LLM findings** (G-P2-2): exact-decimal
+  matching (integers exact, decimals by rounding at the shown precision),
+  evidence restricted to `metrics`/`result(s)`/`stats` subtrees and
+  `t_threshold`, number words refused, labelled statistics (`IC`, `t`,
+  `Sharpe`, `hit rate`) must match a field of that statistic. Mocked
+  adversarial evals still pass; seven new bypass cases are rejected.
+- **MCP server** (extra): JSON reads capped at 8 MiB; the lifecycle log tail
+  is streamed instead of read whole.
+- **Docs** (G-P1-6): GOVERNANCE.md §0 describes the live `protect-main`
+  ruleset and the recommended owner actions.
+
 ## v1.12.0 — 2026-10-10
 
 Honest Sharpe, better passive fills, new features, measured latency and
