@@ -28,7 +28,8 @@
     "horizon_unit": "events",
     "label_threshold": 2e-5,
     "normaliser": "fitted on insample rows only",
-    "TO_CONFIRM": "per-symbol vs pooled training"
+    "training": "pooled across AAPL, MSFT, QQQ (one model; owner decision 2026-10-11)",
+    "evaluation": "acceptance reported per symbol and pooled"
   },
   "acceptance": {
     "code": "iap.models.deeplob_baselines.accept",
@@ -48,7 +49,6 @@
   "looks": "one confirmatory look on the holdout; any re-run counts as a new look in the ledger",
   "promotion": "none without a holdout pass; a pass makes AI4 eligible for review, not promoted",
   "open_for_owner": [
-    "per-symbol vs pooled training",
     "sign-off and blackboard registration (WriteBroker.preregister) before any holdout data is read"
   ]
 }
