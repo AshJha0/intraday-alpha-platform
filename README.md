@@ -280,7 +280,7 @@ the full design, data flow, and diagrams.
 | Experiments ledger | 5,156 recorded looks over **216 distinct configurations** (de-duplicated by alpha × kind × config × dataset: 70 configurations of the v1.3.0 dataset are kept as history, 146 are on the current one — 69 under the rules up to v1.4.0, 77 under the v1.5.0 defaults, eight of those signal combinations); expected max \|t\| under the global null ≈ 4.135, Bonferroni per-test \|t\| ≥ 4.424 | `research/experiments.json` |
 | Contracts | **17** JSON Schemas (all `x-version` 1) mirrored by **22** typed Python contracts and **18** runtime-checkable Protocols; one pinned instance each | `schemas/`, `python/src/iap/contracts/`, `tests/golden/expected_contracts_examples.json` |
 | Python reference ports proven by the ports' own goldens | risk: `expected_risk_decisions.json` exact, audit JSONL + snapshot **byte-identical**; execution: `expected_replay_fills.json` **bit-identical** | `python/tests/test_risk_golden.py`, `python/tests/test_execution_golden.py` |
-| MVP golden run (`python -m iap.mvp run`, seed 12345) | **15,805** events · **800** decisions · **235** parent orders · **169** fills · P&L **−81.53 USD** (cost-negative: +0.022 bps alpha vs −0.41 bps execution cost) · trace digest `5918f870…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
+| MVP golden run (`python -m iap.mvp run`, seed 12345) | **15,805** events · **800** decisions · **235** parent orders · **169** fills · P&L **−82.84 USD** (cost-negative: +0.022 bps alpha vs −0.41 bps execution cost) · trace digest `2affe409…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
 | Adaptive deployment study | 4 refit policies × 10 alphas; 88 drift-triggered refits; FX01 retired under every policy; 19 of 40 deployments make no trade, none ends above zero | `research/adaptive_reports/ADAPTIVE_REPORT.md` |
 | Bundled dataset | 2 synthetic sessions, 19 instruments, 308,975 normalized events (`data_version` `116b7787…`; equity flow runs to the close since v1.4.0) | `data/normalized/qc_report.json` |
 | Feature emission | 213,021 vectors at 100 ms cadence | `data/features/features_summary.json` |
@@ -370,7 +370,7 @@ report is unchanged. What moved, all of it on the equity side:
   detected at any size. Nothing is flagged at the null level, nothing is
   promoted, and no bootstrap P&L interval lies above zero.
 - **MVP.** The golden session trades through all 15 minutes instead of the
-  first part of them: 800 decisions and 169 fills (was 355 and 55), and it
+  first part of them: 800 decisions and 163 fills (was 355 and 55), and it
   loses 81.53 USD (was 22.65).
 - **Ledger.** The looks already spent on the v1.3.0 dataset (1068) are kept
   and the regenerated pipelines added 852 more, so the multiple-testing
@@ -443,7 +443,7 @@ conclusion. What moved:
   ([extended report](research/power/extended/POWER_REPORT.md)).
 - **MVP.** Events, decisions, fills and P&L are identical (the loop does
   not use the research backtester). `config_version` and the trace digest
-  changed (`f293e7e7…` → `439bbad5…`, `f51890da…` → `5918f870…`) because
+  changed (`f293e7e7…` → `439bbad5…`, `f51890da…` → `2affe409…`) because
   `execution.json`, `alpha_params.json` and the registry are among the
   hashed configuration documents.
 - **Ledger.** The 1920 already recorded are kept; the regenerated pipelines

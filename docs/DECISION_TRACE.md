@@ -117,7 +117,7 @@ lowercase SHA-256 over everything hashed so far. Known answers
 | the golden `DecisionTrace` example, one line (5627 bytes, line sha256 `8ecadebd…`) | `bf60a300d151c9cea462e339b0dac407c595fdc5e3c59efd588d5aada8455162` |
 | the same trace twice | `e6f6ea54e5d5ff314dc11d235efc4caa4065e3604756101dbdce215502e053ca` |
 | empty stream | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
-| the MVP golden session (800 traces, seed 12345; v1.4.0 dataset, v1.5.0 configuration documents) | `5918f8705c061e0d255d926b9e1f0a1aedbdb632e03f2eef81d12c4456e19384` (`expected_mvp.json`; `f51890da…` at v1.4.0 — every trace carries `config_version`) |
+| the MVP golden session (800 traces, seed 12345; v1.4.0 dataset, v1.5.0 configuration documents) | `2affe40903b499bd77c30f2140b90e9d3df9f174d406f85fb7dfe799c8bba56e` (`expected_mvp.json`; `f51890da…` at v1.4.0 — every trace carries `config_version`) |
 
 `TraceDigest.of_jsonl(path)` re-canonicalises a file line by line and must
 equal the digest the emitting sink reported; same seed ⇒ same digest; any

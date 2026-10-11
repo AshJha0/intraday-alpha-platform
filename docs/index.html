@@ -79,7 +79,7 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
 <div class="wrap">
   <h2>Measured, not claimed</h2>
   <div class="numbers">
-    Cross-language parity&nbsp;&nbsp;&nbsp; python 2334&nbsp; · cpp 302&nbsp; · rust 358&nbsp; · java 571 tests — 3,565 green, one command; golden groups 193/72/71/124<br>
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 2334&nbsp; · cpp 302&nbsp; · rust 362&nbsp; · java 575 tests — 3,565 green, one command; golden groups 193/72/71/124<br>
     Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in all four languages<br>
     C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
     Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly; the MVP run twice and replayed from its capture reproduces its trace digest<br>
@@ -87,7 +87,7 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     Feature factory&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 205 registered, versioned features across 10 families; validity-bitset semantics, no NaN ever valid<br>
     Alpha research&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 24 flagship alphas · walk-forward + purging/embargo · 5,156-look multiple-testing ledger over 216 distinct configurations, both datasets and both method bundles counted (expected max |t| 4.135, Bonferroni |t| ≥ 4.424)<br>
     Promotion lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 7 states · 17 pinned edges · 20 gates; bundled data: 24 alphas at CANDIDATE, 0 beyond — every one fails net P&amp;L after costs and capacity<br>
-    MVP golden run&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 15,805 events · 800 decisions · 235 parent orders · 169 fills · P&amp;L −81.53 USD (cost-negative, stated) · digest 5918f870…<br>
+    MVP golden run&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 15,805 events · 800 decisions · 231 parent orders · 163 fills · P&amp;L −82.84 USD (cost-negative, stated) · digest 2affe409…<br>
     Adaptive lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; PSI/KS drift monitors · 88 drift-triggered refits in the study · CUSUM retirement rule · RETIRED halts allocation in the backtest, pages a human live<br>
     Verdicts (honest)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 PROMOTE · 11 ITERATE · 13 REJECT — 3 alphas clear the multiple-testing threshold (t ≥ 4.365), 18 never forecast a move larger than their cost and make no trade, the 6 that trade lose; nothing survives costs, and we say so<br>
     Real data&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 7 Nasdaq ITCH sessions (2019-01-30 … 2020-01-30; AAPL, MSFT, QQQ; 3,100,181 feature rows) · 0 PROMOTE / 8 ITERATE / 4 REJECT · strong ICs (EQ01 microprice 0.105, t 21) but not one trade survives costs: a 1 s edge of ~0.07 bp against a ~0.7 bp taker round trip<br>

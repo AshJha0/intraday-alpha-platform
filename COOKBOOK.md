@@ -776,7 +776,7 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
 the first line. The v1.13.0 counts (CI): python 2336 / cpp 302 /
-rust 358 / java 571 tests passed (golden groups 193/72/71/124), plus
+rust 362 / java 575 tests passed (golden groups 193/72/71/124), plus
 `integration` (35) and `replay` (6) rows for the repo-level pytest suites, a
 `deployment` row (26 structural checks passed in CI, where `promtool` and
 `kubeconform` are installed; a machine without them reports those checks as
@@ -1159,7 +1159,7 @@ synthetic equity `SYN.EQ.AAPL` and writes every artefact under
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.mvp run                       # configs/mvp/mvp.json, seed 12345
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=5918f8705c061e0d... out=.../data/mvp/58a10f2194a3c81c
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=2affe40903b499bd... out=.../data/mvp/58a10f2194a3c81c
 PYTHONPATH=src python3 -m iap.mvp run --seed 7 --out /tmp/mvp7          # another seed, explicit directory
 PYTHONPATH=src python3 -m iap.mvp verify                                  # run twice from scratch, compare digest/report/stream
 cat ../data/mvp/58a10f2194a3c81c/report.md                                # the honest numbers (cost-negative)

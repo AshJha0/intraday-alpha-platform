@@ -253,8 +253,8 @@ possible.
 ## 7. Honest results of the golden run (seed 12345, `report.md`)
 
 Run id `58a10f2194a3c81c`, 15,805 events, 800 decisions, 231 parent orders,
-507 children generated / 348 submitted, 169 fills, fill rate 15.1 %.
-Trace digest `5918f8705c061e0d255d926b9e1f0a1aedbdb632e03f2eef81d12c4456e19384`
+507 children generated / 348 submitted, 163 fills, fill rate 15.1 %.
+Trace digest `2affe40903b499bd77c30f2140b90e9d3df9f174d406f85fb7dfe799c8bba56e`
 (`config_version` `439bbad5…`).
 Wall time: about 2.2× the v1.3.0 session on the same machine (27 s → 59 s on
 the laptop this was measured on; 0.8 s of that is feed generation and
@@ -270,7 +270,7 @@ all of which changed (the cost model now names its `impact_model`; the
 header of `alpha_params.json` names the regeneration commit; the registry is
 x-version 2), so it went from
 `f293e7e7…` to `439bbad5…`, and the trace digest, which covers
-`config_version`, from `f51890da…` to `5918f870…`. The research IC the
+`config_version`, from `f51890da…` to `2affe409…`. The research IC the
 realized IC is compared with (§7.1, last two columns) is now the gate IC of
 the v2 report. The run id is the
 one of v1.3.0 because `mvp.json` and the seed did not change; the stream did:

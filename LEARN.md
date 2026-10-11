@@ -1330,7 +1330,7 @@ match**.
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all four
   suites and prints the table (the v1.13.0 counts from CI, 2026-10-11: python 2336,
-  cpp 302, rust 358, java 571 tests passed; golden groups 193/72/71/124; all
+  cpp 302, rust 362, java 575 tests passed; golden groups 193/72/71/124; all
   PASS, plus `integration` (35) and `replay` (6) rows for the repo-level
   pytest suites, a `deployment` row — 26 structural checks passed in CI,
   where promtool and kubeconform are installed — and a `numbers` row that re-derives every headline
@@ -1943,7 +1943,7 @@ reproduces them with string concatenation and one hash (pinned:
 digest is sha256 over every canonical line + newline in emission order;
 same seed ⇒ same digest; one changed field or one swapped line changes it.
 Known answers are pinned for one trace, the same trace twice, and the empty
-stream; the MVP golden pins a whole session's digest (`5918f870…`, 800
+stream; the MVP golden pins a whole session's digest (`2affe409…`, 800
 traces).
 
 ### 18.3 Four languages, one line
@@ -2030,7 +2030,7 @@ index that lied about what its sources contain would be worse than none.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=5918f8705c061e0d...
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=235 children=348 fills=169 pnl=-81.531396 USD digest=2affe40903b499bd...
 ```
 
 Seven seconds later `data/mvp/58a10f2194a3c81c/` holds the captured stream,
@@ -2056,7 +2056,7 @@ regenerated.
 v1.5.0 regenerated it once more and changed nothing a trader would see.
 The loop does not use the research backtester, so the new default methods
 do not touch it: the events, decisions, parents, fills and P&L are
-identical to v1.4.0. What moved is the digest (`f51890da…` → `5918f870…`)
+identical to v1.4.0. What moved is the digest (`f51890da…` → `2affe409…`)
 and the `config_version` it covers (`f293e7e7…` → `439bbad5…`), because
 `config_version` hashes `configs/execution/execution.json`, which now
 names its impact model, and `alpha_params.json`, whose header names the
@@ -2068,7 +2068,7 @@ digest doing its job.
 
 Seed 12345: 15,805 events, 800 decisions, 231 parent orders, 507 children
 generated of which 348 submitted (159 blocked by the 500 ms slice-interval
-control, exactly as the Java loop would), 169 fills, 15.1 % fill rate.
+control, exactly as the Java loop would), 163 fills, 15.1 % fill rate.
 Risk: 348 ALLOW, 0 REJECT, 0 KILL, 8 sequence gaps each recovered by the
 following SNAPSHOT burst, 28 mark regressions dropped. Routing: XV3 70.9 %,
 XV1 19.8 %, XV2 9.3 % of filled quantity (aggressive routing picks the
