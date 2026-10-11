@@ -152,6 +152,17 @@ class CostModel:
             per_share_fee_sell_only=bool(per_share_fee_sell_only),
         )
 
+    def with_dated_regulatory_fees(self, schedule, ts: int) -> CostModel:
+        """v1.15 X-P1-1: the regulatory fees in force at ``ts`` (ns, UTC) from
+        a dated :class:`iap.execution.regulatory.RegulatoryFeeSchedule`
+        (Section 31 USD per million -> bps = rate / 100; TAF per share and
+        per-trade cap; sells only). Raises if no period covers ``ts``."""
+        sec = schedule.sec_rate(ts)
+        taf = schedule.taf_rate(ts)
+        return self.with_regulatory_fees(
+            sec.usd_per_million / 100.0, taf.per_share, taf.max_per_trade, True
+        )
+
     def with_multiplier(self, multiplier: float) -> CostModel:
         return replace(self, multiplier=multiplier)
 

@@ -37,6 +37,11 @@
 //!   `receive_ts = exchange_ts + latency_ns`; execution ids are monotone
 //!   per venue. Taker fills pay `taker_fee_per_share * qty`; maker
 //!   (resting) fills earn `-maker_rebate_per_share * qty`.
+//! - v1.15 opt-in (X-P1-1, [`SimulatedVenue::with_regulatory_fees`], off by
+//!   default): SELL fills also pay the DATED SEC Section 31 + FINRA TAF fee
+//!   ([`crate::regfees`]) of the report's `exchange_ts`, on notional
+//!   `qty * price_ticks * tick_size` (same rule as the Python and C++
+//!   execution simulators).
 
 use std::collections::BTreeMap;
 
@@ -45,6 +50,7 @@ use orderbook::OrderBook;
 use telemetry::Registry;
 
 use crate::messages::{validate_order, ExecStatus, ExecutionReport, OrderRequest, OrderType};
+use crate::regfees::RegulatoryFeeSchedule;
 
 /// Why the simulated venue rejected the last order (pinned gating rules).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -108,6 +114,8 @@ pub struct SimulatedVenue {
     resting: BTreeMap<u64, RestingOrder>,
     next_exec_id: u64,
     last_reject: Option<RejectReason>,
+    /// v1.15 X-P1-1: dated regulatory fees and the tick size pricing them.
+    regfees: Option<(RegulatoryFeeSchedule, f64)>,
     /// Venue metrics (orders/fills/latency histogram).
     pub metrics: Registry,
 }
@@ -126,8 +134,40 @@ impl SimulatedVenue {
             resting: BTreeMap::new(),
             next_exec_id: 0,
             last_reject: None,
+            regfees: None,
             metrics: Registry::new(),
         })
+    }
+
+    /// v1.15 X-P1-1: charge the dated SEC Section 31 + FINRA TAF fee on
+    /// SELL fills, pricing notional at `tick_size` per tick.
+    pub fn with_regulatory_fees(
+        mut self,
+        schedule: RegulatoryFeeSchedule,
+        tick_size: f64,
+    ) -> Result<SimulatedVenue, IapError> {
+        if !(tick_size > 0.0) {
+            return Err(IapError::InvalidArgument("tick_size must be > 0".to_string()));
+        }
+        self.regfees = Some((schedule, tick_size));
+        Ok(self)
+    }
+
+    /// Regulatory fee of one fill reported at `ts` (0.0 when off or a buy).
+    fn regulatory_fee(
+        &self,
+        side: u8,
+        qty: i64,
+        price_ticks: i64,
+        ts: i64,
+    ) -> Result<f64, IapError> {
+        match &self.regfees {
+            Some((sched, tick)) if side == 1 => {
+                let notional = qty as f64 * price_ticks as f64 * tick;
+                sched.fee(side, qty as f64, notional, ts + self.cfg.latency_ns)
+            }
+            _ => Ok(0.0),
+        }
     }
 
     /// Reason of the most recent rejection (`None` after an accepted order).
@@ -219,7 +259,8 @@ impl SimulatedVenue {
             if fill <= 0 {
                 continue;
             }
-            let fees = -self.cfg.maker_rebate_per_share * fill as f64;
+            let fees = -self.cfg.maker_rebate_per_share * fill as f64
+                + self.regulatory_fee(r.side, fill, r.price_ticks, ev.exchange_ts)?;
             let status = if fill == r.remaining {
                 ExecStatus::Filled
             } else {
@@ -364,7 +405,8 @@ impl SimulatedVenue {
             } else {
                 ExecStatus::Partial
             };
-            let fees = self.cfg.taker_fee_per_share * qty as f64;
+            let fees = self.cfg.taker_fee_per_share * qty as f64
+                + self.regulatory_fee(order.side, qty, price, ts)?;
             out.push(self.report(order.order_id, status, qty, price, ts, fees));
             self.metrics.counter("venue_fills_total").inc();
         }

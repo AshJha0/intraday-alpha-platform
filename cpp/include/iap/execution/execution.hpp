@@ -114,6 +114,9 @@
 //    FX venues charge commission_per_million * notional / 1e6 on every fill,
 //    notional = qty * qty_unit * price_ticks * tick_size (qty_unit =
 //    lot_size for FX, 1 for EQUITY/ETF; conventions section 1).
+//    v1.15 opt-in (X-P1-1, ExecConfig::regulatory_fees, default empty):
+//    equity SELL fills also pay the DATED SEC Section 31 + FINRA TAF fee of
+//    the fill's exchange_ts (regulatory_fees.hpp; same in Python and Rust).
 // 6. Linear impact (aggressive fills only, configs/execution/execution.json
 //    cost_model; the impact_model = "linear" rule of the research cost model
 //    iap.backtest.costs, whose default is the square root since v1.5.0):
@@ -157,11 +160,13 @@
 
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <tuple>
 #include <vector>
 
+#include "iap/execution/regulatory_fees.hpp"
 #include "iap/marketdata/events.hpp"
 #include "iap/marketdata/rng.hpp"
 #include "iap/orderbook/book.hpp"
@@ -224,6 +229,8 @@ struct ExecConfig {
     double impact_coeff_bps_per_pct_adv = 2.0;
     std::map<std::uint32_t, InstrumentSpec> instruments;
     std::map<std::uint16_t, VenueSpec> venues;
+    // v1.15 X-P1-1: dated Section 31 + TAF schedule; empty = off (v1).
+    std::optional<RegulatoryFeeSchedule> regulatory_fees;
 };
 
 struct Fill {
@@ -334,7 +341,7 @@ private:
     void emit_fill(ChildOrder& o, std::int64_t price_ticks, std::int64_t qty,
                    std::int64_t ts, Liquidity liq);
     double fill_fee(const ChildOrder& o, std::int64_t price_ticks,
-                    std::int64_t qty, Liquidity liq) const;
+                    std::int64_t qty, Liquidity liq, std::int64_t ts) const;
 
     ExecConfig config_;
     SplitMix64 rng_;
