@@ -1,6 +1,6 @@
 """Real historical data -> a dataset directory the existing pipeline consumes.
 
-``python -m iap.marketdata ingest --format {itch50,lobster} --input FILE...
+``python -m iap.marketdata ingest --format {itch50,dbn-mbo,lobster} --input FILE...
 --date YYYY-MM-DD --symbols A,B --out DATASET`` (docs/REAL_DATA.md) reads
 vendor files the owner obtained, from local disk only, and writes::
 
@@ -49,6 +49,7 @@ from pathlib import Path
 
 from iap.core.codec import sha256_file
 from iap.core.events import EventType, MarketEvent, SessionStatus
+from iap.marketdata.dbn_mbo import DbnMboReader
 from iap.marketdata.feederrors import BookDivergenceError, IngestError
 from iap.marketdata.itch50 import (
     ITCH_TIMEZONE,
@@ -76,11 +77,11 @@ MANIFEST_VERSION = 2
 #: (recorded in the manifest; bumped with every rule change).
 INGEST_RULES_VERSION = 2
 MANIFEST_NAME = "dataset.json"
-FORMATS = ("itch50", "lobster")
+FORMATS = ("itch50", "lobster", "dbn-mbo")
 
 #: Venue of each supported source (both are Nasdaq order-by-order data).
 #: Ids from 101 up are real venues; every synthetic venue id is below 100.
-SOURCE_VENUE = {"itch50": ("XNAS", 101), "lobster": ("XNAS", 101)}
+SOURCE_VENUE = {"itch50": ("XNAS", 101), "lobster": ("XNAS", 101), "dbn-mbo": ("XNAS", 101)}
 
 #: Domain separation of real dataset versions: no synthetic dataset
 #: (``iap.experiment.tracker.data_version``) hashes this prefix.
@@ -271,6 +272,41 @@ class _ItchSource:
 
     def verification(self) -> dict | None:
         return None
+
+
+class _DbnMboSource(_ItchSource):
+    """One Databento DBN MBO file (XNAS.ITCH) -> ITCH messages -> the ITCH mapper."""
+
+    format = "dbn-mbo"
+
+    def __init__(
+        self,
+        inputs: list[Path],
+        date: str,
+        symbols: tuple[str, ...],
+        limit_messages: int | None,
+        extended_hours: bool,
+    ) -> None:
+        if len(inputs) != 1:
+            raise IngestError("--format dbn-mbo takes exactly one --input file per session date")
+        self.inputs = inputs
+        self.symbols = symbols
+        self.mapper = Itch50Mapper(date, symbols, extended_hours=extended_hours)
+        self.reader = DbnMboReader(  # type: ignore[assignment]
+            inputs[0], date, symbols, limit_messages=limit_messages, mapper=self.mapper
+        )
+
+    def finish(self) -> None:
+        missing = [s for s in self.symbols if s not in self.mapper.directory]
+        if missing:
+            raise IngestError(
+                f"{self.inputs[0].name}: no symbology mapping for {missing} on the session date"
+            )
+
+    def messages(self) -> dict:
+        doc = super().messages()
+        doc["dbn"] = {"dataset": self.reader.dataset, **self.reader.counters}
+        return doc
 
 
 class _LobsterSource:
@@ -1057,10 +1093,11 @@ def ingest(
         }
     previous_ticks = {e["symbol"]: e["tick_size_e4"] for e in manifest["universe"]}
 
-    if source_format == "itch50":
+    if source_format in ("itch50", "dbn-mbo"):
         if book_paths is not None:
             raise IngestError("--orderbook applies to --format lobster only")
-        source: _ItchSource | _LobsterSource = _ItchSource(
+        kind = _ItchSource if source_format == "itch50" else _DbnMboSource
+        source: _ItchSource | _LobsterSource = kind(
             paths, date, universe, limit_messages, extended_hours
         )
     else:
@@ -1355,13 +1392,14 @@ def _parser() -> argparse.ArgumentParser:
         "--input",
         required=True,
         nargs="+",
-        help="itch50: the day's file (.gz or plain); lobster: one message file per symbol",
+        help="itch50: the day's file (.gz or plain); dbn-mbo: the day's Databento XNAS.ITCH MBO "
+        "file (.dbn or .dbn.zst); lobster: one message file per symbol",
     )
     p.add_argument("--date", required=True, help="session date, YYYY-MM-DD")
     p.add_argument(
         "--symbols",
         default=None,
-        help="comma-separated universe (itch50: required; lobster: in --input order, "
+        help="comma-separated universe (itch50, dbn-mbo: required; lobster: in --input order, "
         "default: taken from the file names)",
     )
     p.add_argument("--out", required=True, help="dataset directory (created; git-ignored place)")
@@ -1380,7 +1418,7 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--extended-hours",
         action="store_true",
-        help="itch50: treat pre-/post-market as TRADING (default: regular session only)",
+        help="itch50, dbn-mbo: treat pre-/post-market as TRADING (default: regular session only)",
     )
     p.add_argument(
         "--tick-size",

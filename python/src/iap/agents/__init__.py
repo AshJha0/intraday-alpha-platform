@@ -10,4 +10,7 @@ trading-path package from importing this one).  Standard library plus
 - ``broker``     - the only writer; validates, attributes and replays.
 - ``mcp_server`` - read-only Model Context Protocol server over stdio.
 - ``evals``      - each control must fail when removed.
+- ``workflow``   - the agent job (v1.15): propose (one ledger look) -> draft prereg ->
+  HUMAN sign-off; confirmatory runs, outcomes and promotion are human-only.
+- ``eval_harness`` - fixed agent task set, stub model, scored against a baseline.
 """
