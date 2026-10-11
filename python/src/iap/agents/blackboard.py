@@ -32,7 +32,19 @@ from pathlib import Path
 from typing import Any
 
 GENESIS = "0" * 64
-KINDS = ("task", "claim", "release", "finding", "prereg", "reserve", "approval")
+KINDS = (
+    "task",
+    "claim",
+    "release",
+    "finding",
+    "prereg",
+    "reserve",
+    "approval",
+    # v1.15 A-P0-1: the narrowed agent workflow (iap.agents.workflow)
+    "proposal",
+    "prereg_draft",
+    "outcome",
+)
 
 
 def canonical(obj: Any) -> str:

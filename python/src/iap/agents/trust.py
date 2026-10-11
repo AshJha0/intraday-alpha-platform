@@ -15,14 +15,23 @@ trusted only when it carries a maintainer signature:
 The trust roots a check uses should come from a ref the change under review
 cannot edit: CI reads them from ``origin/main`` (``--trust-ref``), so a pull
 request that adds both a maintainer key and a registry signed by it is not
-trusted until the maintainer key itself has been reviewed onto main.  An
-empty registry needs no signature (there is nothing to trust).
+trusted until the maintainer key itself has been reviewed onto main.
+
+v1.15 (G-P1-2): trust roots are ENABLED.  Once any maintainer is listed,
+the registry must carry a maintainer signature even when it is empty (an
+unsigned registry fails CI), and CI runs with ``require_signature`` so a
+registry with no trust roots at all fails too.  Bootstrap: when the trust
+ref holds no maintainer yet (only the one pull request that introduces the
+first trust root), :func:`read_roots` falls back to the working tree's roots
+and says so on stderr; once a maintainer is on main the fallback never fires
+again.  Key rotation and restore: ``docs/governance/TRUST_ROOTS.md``.
 """
 
 from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -54,13 +63,25 @@ def sign_registry(private_hex: str, maintainer: str, pubkeys: dict[str, str]) ->
     }
 
 
-def verify_registry(pubkeys: dict[str, str], sig_doc: Any, roots: Any) -> list[str]:
-    """Problems with the registry's maintainer signature; ``[]`` = trusted."""
-    if not pubkeys:
+def _maintainers(roots: Any) -> dict[str, str]:
+    if isinstance(roots, dict) and isinstance(roots.get("maintainers"), dict):
+        return dict(roots["maintainers"])
+    return {}
+
+
+def verify_registry(
+    pubkeys: dict[str, str], sig_doc: Any, roots: Any, *, require_signature: bool = False
+) -> list[str]:
+    """Problems with the registry's maintainer signature; ``[]`` = trusted.
+
+    An empty registry is exempt only while no trust root exists and
+    ``require_signature`` is off (G-P1-2: enabled trust roots sign even
+    the empty registry)."""
+    maintainers = _maintainers(roots)
+    if not pubkeys and not maintainers and not require_signature:
         return []
     if not isinstance(roots, dict) or not isinstance(roots.get("maintainers"), dict):
-        return [f"{TRUST_ROOTS_RELPATH} has no maintainers: a non-empty registry cannot be trusted"]
-    maintainers = roots["maintainers"]
+        return [f"{TRUST_ROOTS_RELPATH} has no maintainers: the registry cannot be trusted"]
     if not maintainers:
         return [f"{TRUST_ROOTS_RELPATH} lists no maintainer: the registry cannot be trusted"]
     if not isinstance(sig_doc, dict):
@@ -82,16 +103,24 @@ def _read_json(path: Path) -> Any:
 
 def read_roots(root: Path, ref: str | None = None) -> Any:
     """The trust roots from the working tree, or from git ``ref`` when given."""
+    local = _read_json(Path(root) / TRUST_ROOTS_RELPATH)
     if ref is None:
-        return _read_json(Path(root) / TRUST_ROOTS_RELPATH)
+        return local
     out = subprocess.run(
         ["git", "-C", str(root), "show", f"{ref}:{TRUST_ROOTS_RELPATH.as_posix()}"],
         capture_output=True,
         check=False,
     )
-    if out.returncode != 0:
-        return None
-    return json.loads(out.stdout.decode("ascii"))
+    at_ref = json.loads(out.stdout.decode("ascii")) if out.returncode == 0 else None
+    if _maintainers(at_ref) or not _maintainers(local):
+        return at_ref
+    # bootstrap (module docs): the ref has no trust root yet, this tree adds the first
+    print(
+        f"warning: {ref} lists no trust root; bootstrapping from the working tree's "
+        f"{TRUST_ROOTS_RELPATH.as_posix()} (fires only until a maintainer key is on {ref})",
+        file=sys.stderr,
+    )
+    return local
 
 
 def load_pubkeys(root: Path) -> dict[str, str]:

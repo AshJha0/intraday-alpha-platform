@@ -40,9 +40,12 @@ def require(
     horizon: str,
     board: Path | None = None,
     fingerprinter: Callable[[str], dict[str, Any] | None] | None = None,
+    agents: frozenset[str] | set[str] | None = None,
 ) -> dict:
     """The (latest) pre-registration entry for (alpha, horizon), or
-    :class:`PreregistrationError`."""
+    :class:`PreregistrationError`.  ``agents`` (default: the ids in
+    ``research/agents/agent_pubkeys.json`` under ``repo_root``) are the agent
+    ids whose own pre-registrations are refused (A-P0-1)."""
     path = Path(board) if board else board_path(repo_root)
     bb = Blackboard(path)
     try:
@@ -58,6 +61,17 @@ def require(
         raise PreregistrationError(
             f"{alpha_id}/{horizon} is not pre-registered on {path}; register the hypothesis "
             "first (WriteBroker.preregister), or pass --no-prereg for an exploratory run"
+        )
+    # v1.15 A-P0-1: an agent may draft a pre-registration but never make one;
+    # a prereg written by a registered agent id is refused until a human signs
+    # off its draft (iap.agents.workflow, written by the ``signoff`` writer).
+    from iap.agents.workflow import registered_agents
+
+    if found["agent"] in (agents if agents is not None else registered_agents(repo_root)):
+        raise PreregistrationError(
+            f"{alpha_id}/{horizon}: pre-registered by agent {found['agent']!r} (entry "
+            f"{found['seq']}); an agent pre-registration needs human sign-off "
+            "(iap.agents.workflow.Workflow.sign_off) before a confirmatory run"
         )
     registered = found["body"].get("code")
     if registered is not None:

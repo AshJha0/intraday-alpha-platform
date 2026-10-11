@@ -42,6 +42,9 @@ from iap.agents.blackboard import Blackboard, BlackboardError, digest
 AGENT_ID = re.compile(r"^[a-z][a-z0-9_-]{1,31}$")
 LEASE_NS = 15 * 60 * 10**9
 PREREG_FORMAT = 2
+#: v1.15 (A-P0-1): the human sign-off writer alone writes signed-off preregs and
+#: the outcome writer alone records confirmatory outcomes; others as before
+TRUSTED_KINDS: dict[str, tuple[str, ...]] = {"signoff": ("prereg",), "outcomes": ("outcome",)}
 
 
 class BrokerError(ValueError):
@@ -205,8 +208,10 @@ class WriteBroker:
 
     # -- writes ---------------------------------------------------------
     def write_trusted(self, writer: str, kind: str, body: dict[str, Any]) -> dict[str, Any]:
-        """Entry for the evaluator and approval service only (reserve / approval kinds)."""
-        if writer not in self.trusted or kind not in ("reserve", "approval"):
+        """Entry for the evaluator, approval, sign-off and outcome services only."""
+        if writer not in self.trusted or kind not in TRUSTED_KINDS.get(
+            writer, ("reserve", "approval")
+        ):
             raise BrokerError(f"{writer!r} may not write {kind!r}")
         return self._write(kind, writer, body)
 
