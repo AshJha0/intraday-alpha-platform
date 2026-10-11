@@ -94,6 +94,10 @@ MIN_SAMPLES = 20
 _NS_PER_DAY = 86_400_000_000_000
 
 
+#: v1.14 X-P2-9: the unit one maker markout observation stands for
+MARKOUT_UNITS = ("message", "touch_order")
+
+
 def queue_bucket(qty: int, edges: Sequence[int] = DEFAULT_QUEUE_EDGES) -> str:
     """Bucket label of a queue size: ``"0"``, ``"1-100"``, ..., ``">2000"``."""
     lo = 0
@@ -271,6 +275,7 @@ class _Order:
     first_exec_ts: int | None = None
     done: bool = False
     end_ts: int | None = None  #: when it left the book (v1.13 TTL cells)
+    touch: bool = False  #: joined (or set) the touch (v1.14 X-P2-9)
 
 
 @dataclass
@@ -329,6 +334,7 @@ def estimate_calibration(
     latency_tail: Mapping[int, dict] | None = None,
     source: Mapping | None = None,
     fill_within_ns: Sequence[int] = (),
+    markout_unit: str = "message",
 ) -> dict:
     """Estimate a calibration document from one ordered event stream.
 
@@ -337,11 +343,22 @@ def estimate_calibration(
     {"n", "p"}``, the TTL-censored touch fill probability
     (:func:`_p_fill_within`) the maker backtester's passive exit reads.
 
+    ``markout_unit`` (v1.14 X-P2-9, opt-in): ``"message"`` (default, the
+    document is unchanged) pools the passive side of every EXECUTE message
+    equally, so one resting order hit by ten partial executions counts ten
+    times; ``"touch_order"`` takes ONE maker markout per displayed order that
+    joined (or set) the touch, at its first execution (the population the
+    maker backtester's resting entry belongs to) and records
+    ``markouts.unit = "touch_order"``.
+
     ``tick_sizes``: instrument_id -> tick size (instruments not listed are
     skipped). ``latency_tail``: venue_id -> a :func:`parametric_latency`
     table used where the stream has no receive-stamp latency. ``source`` is
     recorded verbatim (dataset id, sessions, ...).
     """
+    if markout_unit not in MARKOUT_UNITS:
+        raise ValueError(f"markout_unit must be one of {MARKOUT_UNITS}")
+    per_touch_order = markout_unit == "touch_order"
     hz = dict(CALIBRATION_HORIZONS_NS if horizons_ns is None else horizons_ns)
     edges = tuple(queue_edges)
     books: dict[int, ConsolidatedBook] = {}
@@ -388,6 +405,7 @@ def estimate_calibration(
             ahead = pre.level_qty(ev.side, ev.price_ticks) if pre is not None else 0
             joined = _Order(ev.side, ev.price_ticks, ev.qty, ev.qty, ev.exchange_ts, ahead)
             if at_or_better:
+                joined.touch = True
                 touch_orders.append((iid, joined))
         status = cons.apply(ev)
         if status != ApplyStatus.APPLIED:
@@ -401,12 +419,14 @@ def estimate_calibration(
                 q = min(ev.qty, o.remaining)
                 o.executed += q
                 o.remaining -= q
-                if o.first_exec_ts is None:
+                first = o.first_exec_ts is None
+                if first:
                     o.first_exec_ts = t
                 if o.remaining <= 0:
                     o.done = True
                     o.end_ts = t
-                maker_fills.append((iid, t, o.side, o.price * tick_sizes[iid]))
+                if not per_touch_order or (first and o.touch):
+                    maker_fills.append((iid, t, o.side, o.price * tick_sizes[iid]))
                 aggr = 1 - o.side
                 sweeps[(iid, t, aggr)] = sweeps.get((iid, t, aggr), 0) + q
                 exec_qty[iid] = exec_qty.get(iid, 0) + q
@@ -520,6 +540,8 @@ def estimate_calibration(
             for iid, cells in sorted(per_ins.items())
         },
     }
+    if per_touch_order:
+        markouts["unit"] = "touch_order"
 
     n_days = max(len(days), 1)
     imp_x: list[float] = []
@@ -587,12 +609,23 @@ def main(argv: Iterable[str] | None = None) -> int:
     ap.add_argument("--events", nargs="+", required=True, help="IAP1 or JSONL event files")
     ap.add_argument("--tick", nargs="+", required=True, help="instrument_id=tick_size")
     ap.add_argument("--out", required=True)
+    ap.add_argument(
+        "--markout-unit",
+        choices=MARKOUT_UNITS,
+        default="message",
+        help="maker AS observation unit (v1.14 X-P2-9)",
+    )
     args = ap.parse_args(list(argv) if argv is not None else None)
     ticks = {int(k): float(v) for k, v in (t.split("=", 1) for t in args.tick)}
     events: list[MarketEvent] = []
     for p in args.events:
         events.extend(_read_events(p))
-    doc = estimate_calibration(events, ticks, source={"files": [Path(p).name for p in args.events]})
+    doc = estimate_calibration(
+        events,
+        ticks,
+        source={"files": [Path(p).name for p in args.events]},
+        markout_unit=args.markout_unit,
+    )
     write_calibration(doc, args.out)
     print(f"wrote {args.out}: {doc['n_events']} events, {len(doc['instruments'])} instruments")
     return 0

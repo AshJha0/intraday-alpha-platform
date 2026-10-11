@@ -368,3 +368,18 @@ trigger, detection latency (alert → engage), what the latched audit log
 shows, config/limit changes made, and at least one prevention item. The
 session's audit JSONL replays byte-identically — attach its hash so the
 postmortem is reproducible (REPRODUCIBILITY.md).
+
+Before attaching it, check the audit log is intact. Since v1.14 every line
+carries `seq` and `prev_sha256`, and the Java paper session records the
+chain head in `session_state.json`:
+
+```bash
+PYTHONPATH=python/src python -c "import sys; from iap.risk.events import verify_audit_chain; print(verify_audit_chain(open(sys.argv[1], encoding='utf-8').read()))" <state-dir>/risk_audit.jsonl
+# (last_seq, head_sha256)   -- compare the head with session_state.json
+```
+
+A `ValueError` names the first line whose recorded hash does not match the
+line before it. Treat that as a separate incident: the log was edited,
+truncated or rewritten (a CRLF conversion is enough). A matching head
+shows the log is the one the engine wrote; it does not show the engine
+was right.

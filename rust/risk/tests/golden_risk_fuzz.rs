@@ -199,7 +199,8 @@ impl Runner {
         let text = self.eng.snapshot().to_string();
         let snap: Value = serde_json::from_str(&text).map_err(|e| format!("snapshot text: {e}"))?;
         let limits = RiskLimits::from_json(&self.doc).map_err(|e| format!("limits: {e}"))?;
-        self.eng = RiskEngine::restore(limits, self.refs.clone(), &snap, ts)
+        let chain = Some(self.eng.audit_chain_head());
+        self.eng = RiskEngine::restore_chained(limits, self.refs.clone(), &snap, ts, chain)
             .map_err(|e| format!("restore: {e}"))?;
         Ok(())
     }
@@ -337,6 +338,7 @@ fn verify(case: &Case) -> Result<(), String> {
     if snapshot != case.snapshot {
         return Err("final snapshot differs".to_string());
     }
+    risk::verify_audit_chain(&audit, 1, risk::GENESIS_SHA256)?;
     for cut in case.script["cuts"].as_array().unwrap() {
         let cut = cut.as_u64().unwrap() as usize;
         let (got, mark, snap) = run(&case.script, Some(cut), true)?;
@@ -344,9 +346,16 @@ fn verify(case: &Case) -> Result<(), String> {
         if !got[mark].contains("\"rule_id\":\"STATE_RESTORED\"") {
             return Err(format!("cut {cut}: no STATE_RESTORED record"));
         }
-        if got[..mark] != full[..mark] || got[mark + 1..] != full[mark..] {
+        // the restored engine continues the chain, so its records sit one
+        // chain position later: compare their content, then the chain itself
+        let tail: Vec<String> = got[mark + 1..].iter().copied().map(risk::unchained_line).collect();
+        let want: Vec<String> = full[mark..].iter().copied().map(risk::unchained_line).collect();
+        if got[..mark] != full[..mark] || tail != want {
             return Err(format!("cut {cut}: the restored engine's audit tail differs"));
         }
+        let joined = got.join("\n") + "\n";
+        risk::verify_audit_chain(&joined, 1, risk::GENESIS_SHA256)
+            .map_err(|e| format!("cut {cut}: {e}"))?;
         if snap != case.snapshot {
             return Err(format!("cut {cut}: the restored engine's final state differs"));
         }

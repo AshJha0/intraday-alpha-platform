@@ -190,8 +190,8 @@ def _fake_rust(monkeypatch, shift: float):
 
     real = native.compute_native_file
 
-    def fake(path, contexts, cadence_ns=0, engine="python"):
-        frame = real(path, contexts, cadence_ns, engine="python")
+    def fake(path, contexts, cadence_ns=0, engine="python", coalesce=True):
+        frame = real(path, contexts, cadence_ns, engine="python", coalesce=coalesce)
         frame.values = frame.values + shift
         return frame
 

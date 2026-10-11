@@ -10,9 +10,17 @@ working tree:
    every base entry ``key`` is still present (merged by entry identity, never
    replaced);
 2. ``research/models/ledger.json``: ``experiment_count`` at head >= base;
+   and (v1.14, G-P1-5) the head ledger DESCENDS from the base ledger: the
+   base's entry chain (``iap.validation.ledger.chain_heads``) is a prefix
+   of the head's, and the head's recorded ``chain_head`` (required at head)
+   matches its entries;
 3. ``research/agents/blackboard.jsonl``: head length >= base, and the base
    board's bytes are a byte-identical prefix of the head board's
    (append-only: no entry edited, removed, reordered or re-chained).
+
+4. every pre-registration on the head board that records a ``ledger_head``
+   for ``research/experiments.json`` names a head that is on that ledger's
+   chain (the look it debited is still there, in place).
 
 A file absent at the base is not checked (nothing to lose).  CRLF is
 normalised to LF on both sides so a Windows checkout compares like CI.
@@ -33,6 +41,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "python" / "src"))
+
+from iap.validation.ledger import LEDGER_GENESIS, chain_head, chain_heads  # noqa: E402
+
 LEDGER = "research/experiments.json"
 MODELS_LEDGER = "research/models/ledger.json"
 BOARD = "research/agents/blackboard.jsonl"
@@ -51,6 +63,48 @@ def compare_ledger(base: dict, head: dict) -> list[str]:
     lost = [e.get("key") for e in base.get("entries", []) if e.get("key") not in head_keys]
     if lost:
         problems.append(f"{LEDGER}: {len(lost)} base entries missing at head, e.g. {lost[:3]}")
+    return problems + compare_ledger_chain(base, head)
+
+
+def compare_ledger_chain(base: dict, head: dict) -> list[str]:
+    """G-P1-5: head records a correct chain head and descends from base."""
+    problems = []
+    entries = head.get("entries", [])
+    stored = head.get("chain_head")
+    if stored is None:
+        problems.append(f"{LEDGER}: no chain_head at head (save it with ExperimentLedger)")
+    elif stored != chain_head(entries) or head.get("chain_length") != len(entries):
+        problems.append(f"{LEDGER}: chain_head does not match the entries")
+    base_entries = base.get("entries", [])
+    if base_entries:
+        want = chain_head(base_entries)
+        heads = chain_heads(entries)
+        if len(heads) < len(base_entries) or heads[len(base_entries) - 1] != want:
+            problems.append(
+                f"{LEDGER}: the head ledger does not descend from the base (the base's "
+                f"{len(base_entries)} entries are not an unchanged prefix; merge with "
+                "tools/merge_ledger.py, which appends)"
+            )
+    return problems
+
+
+def check_prereg_heads(board: bytes, ledger: dict) -> list[str]:
+    """Every prereg's recorded ``ledger_head`` on ``research/experiments.json``
+    is one of that ledger's prefix heads."""
+    heads = set(chain_heads(ledger.get("entries", []))) | {LEDGER_GENESIS}
+    problems = []
+    for line in _lf(board).splitlines():
+        if not line.strip():
+            continue
+        e = json.loads(line)
+        b = e.get("body") or {}
+        if e.get("kind") != "prereg" or "ledger_head" not in b or b.get("ledger") != LEDGER:
+            continue
+        if b["ledger_head"] not in heads:
+            problems.append(
+                f"{BOARD}: prereg entry {e.get('seq')} debited a look at ledger head "
+                f"{b['ledger_head'][:12]}, which is not on {LEDGER}'s chain"
+            )
     return problems
 
 
@@ -102,6 +156,9 @@ def check(root: Path, base_ref: str) -> list[str]:
             problems.append(f"{BOARD}: present at {base_ref} but deleted at head")
         else:
             problems += compare_board(base, path.read_bytes())
+    board, ledger = root / BOARD, root / LEDGER
+    if board.is_file() and ledger.is_file():
+        problems += check_prereg_heads(board.read_bytes(), json.loads(ledger.read_bytes()))
     return problems
 
 

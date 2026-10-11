@@ -55,7 +55,17 @@ import risk_fuzz as rf  # noqa: E402
 #: Master seed of the property sequences (the committed corpus uses 31).
 PROPERTY_SEED = 20261004
 N_SCRIPTS = 3 * len(rf.PROFILES)
-AUDIT_KEYS = ["decision", "reason", "rule_id", "scope", "scope_id", "severity", "timestamp"]
+AUDIT_KEYS = [
+    "decision",
+    "prev_sha256",
+    "reason",
+    "rule_id",
+    "scope",
+    "scope_id",
+    "seq",
+    "severity",
+    "timestamp",
+]
 
 
 @pytest.fixture(scope="module")

@@ -29,13 +29,13 @@ implementation (`iap.risk`, `iap.execution`) proven by the same golden files
 the Java ports are proven by, so the loop the MVP runs is the reference
 loop end to end.
 
-## Current status (v1.13.0, 2026-10-11)
+## Current status (v1.14.0, 2026-10-11)
 
 **Where the research stands.**
 
 - **Synthetic data (bundled):** 24 alphas, 0 PROMOTE. Eighteen never
   forecast a move larger than their round-trip cost; the six that trade
-  lose. The executable loop loses 81.53 USD on its golden session. Details
+  lose. The executable loop loses 82.84 USD on its golden session. Details
   below.
 - **Real data (owner-supplied, not bundled):** seven Nasdaq TotalView-ITCH
   sessions, 2019-01-30 to 2020-01-30, AAPL / MSFT / QQQ. The signals are
@@ -243,13 +243,67 @@ number, golden or ledger entry changed):
 - data terms: what is and is not published from the Nasdaq sample files
   ([docs/REAL_DATA.md](docs/REAL_DATA.md) §2.1).
 
-**Next: v1.14, the correctness release (in progress).** One regeneration
-of goldens, feature stores and reports under new pre-registrations: a
-causal row block for the backtest, trailing labels by default,
-day-clustered inference, the data-mapping fixes, queue credit on MODIFY,
-feed latency, a hash-chained risk audit log and ledger. The R7
-confirmatory round runs on v1.14. **Later:** the 15c3-5 control set, the
-Java archive ([docs/ROADMAP.md](docs/ROADMAP.md) §3.8).
+**New in v1.14.0, the correctness release** (2026-10-11). This is the
+release that was allowed to move numbers: every review finding that
+changes a published figure was fixed once, and goldens, the synthetic
+feature store and the reports were regenerated together. CHANGELOG.md
+lists each moved number with its reason. The conclusions did not move:
+0 PROMOTE, no trade at 1x costs.
+
+- data: events of one instrument sharing a timestamp are one state change
+  (an ITCH execute or replace no longer leaves a half-applied book that a
+  feature can sample), in all four engines; hidden prints signed by the
+  quote rule; midpoint prints rounded half to even; manifest x-version 2,
+  so a dataset ingested before v1.14 is refused until re-ingested
+  (COOKBOOK 71);
+- research statistics: a causal backtest row block (the old one peeked at
+  whether the future label was valid); automatic HAC bandwidth with no lag
+  product across session days; a time-shift leakage detector; one ledger
+  look per gate decision; per-instrument scaling; `hypothesis_confirmed`
+  by fold majority. The v1.13 rules stay reachable as `v2_v113` and
+  friends (COOKBOOK 72);
+- execution: a MODIFY that shrinks an order ahead of yours now credits
+  your queue position, as a cancel does (on by default; no golden moved).
+  Feed latency, simulator-routed exits, hidden-print fills,
+  per-touch-order adverse selection and priority-keeping amends are opt-in
+  and will be switched on in the v2 pre-registrations (COOKBOOK 73);
+- risk: the audit log is a SHA-256 hash chain (COOKBOOK 69); SEC 15c3-5
+  pre-trade checks 23-29 (restricted list, open orders, open notional,
+  strategy position, participation, cancel rate, venue message rate);
+  two-party, capped loss overrides; crossed books and 10x mark jumps
+  dropped; bounded per-key state (COOKBOOK 70);
+- governance: maintainer trust roots for agent keys, read from `main` so a
+  branch cannot vouch for itself (COOKBOOK 74); the look ledger is a hash
+  chain; a blocking `supply-chain` job (pip-audit, cargo audit, cargo
+  deny, Trivy) and Rust in CodeQL;
+- engineering: shared replay across maker configs, a numpy event cursor,
+  `StudyBase` for study drivers, a version-stable model content hash.
+
+The real-data figures above are still the v1.13 statistics on the v1.13
+stores: no real dataset has been re-ingested under x-version 2 yet
+([docs/REAL_DATA.md](docs/REAL_DATA.md) §4). Expect the day-separated HAC
+to report lower t values than 21 and 25 when it is.
+
+**Next: v1.15.** The R7 confirmatory round on unseen sessions (re-ingest
+first), deep order-book baselines (AI4) and the QQQ basis study (A2),
+whose code is in review; maker and quoting v2 pre-registrations with the
+execution options switched on ([docs/ROADMAP.md](docs/ROADMAP.md) §3.9-3.10).
+
+## What this is, and what it is not
+
+It is a research platform that tries hard not to fool its owner: one
+seeded generator, integer contracts, byte-identical goldens across Python,
+C++, Rust and Java, a look ledger that prices every statistic computed, and
+pre-registration that is checked by code. It runs the full loop from
+market data to TCA on one instrument and paper-trades a universe.
+
+It is not a profitable strategy. Nothing has been promoted, and the
+documents say so at the top rather than in a footnote. It is not connected
+to a live venue: there is no order gateway, so the 15c3-5 checks guard a
+simulator. The real data is seven (plus two holdout) Nasdaq sessions on
+three symbols, which is enough to find statistically strong signals and
+not enough to say much about their size. The Java tree is largely a frozen
+copy kept for parity, not a production service.
 
 ## Architecture in one line
 
@@ -275,12 +329,12 @@ the full design, data flow, and diagrams.
 |---|---|---|
 | Registered features | **205** (10 families; 40-feature native core set ported to C++/Rust/Java) | `data/reference/feature_registry.json` |
 | Flagship alphas | **24** (EQ01–EQ12, FX01–FX12), each with an enforced `Economic rationale:` docstring | `python/src/iap/alpha/`, `research/alpha_reports/` |
-| Promotion verdicts | **0 PROMOTE / 11 ITERATE / 13 REJECT** (gated on the pooled *uncrossed* IC and its HAC t against the ledger threshold, 4.365; the v1.5.0 default methods) | `research/alpha_reports/REPORT.md` |
-| Lifecycle registry | **24 alphas at CANDIDATE, 0 beyond** — every one fails `net_pnl_after_costs` at 1× costs, its bootstrap bound `net_pnl_bootstrap_ci` and `capacity`; the cross-alpha correlation gate passes vacuously (7 states, 17 pinned edges, 20 gates) | `research/alpha_registry.json`, `research/lifecycle_transitions.jsonl`, `tests/golden/expected_lifecycle.json` |
-| Experiments ledger | 5,156 recorded looks over **216 distinct configurations** (de-duplicated by alpha × kind × config × dataset: 70 configurations of the v1.3.0 dataset are kept as history, 146 are on the current one — 69 under the rules up to v1.4.0, 77 under the v1.5.0 defaults, eight of those signal combinations); expected max \|t\| under the global null ≈ 4.135, Bonferroni per-test \|t\| ≥ 4.424 | `research/experiments.json` |
-| Contracts | **17** JSON Schemas (all `x-version` 1) mirrored by **22** typed Python contracts and **18** runtime-checkable Protocols; one pinned instance each | `schemas/`, `python/src/iap/contracts/`, `tests/golden/expected_contracts_examples.json` |
+| Promotion verdicts | **0 PROMOTE / 12 ITERATE / 12 REJECT** (gated on the pooled *uncrossed* IC and its HAC t against the ledger threshold, 4.426 at the run's look count; the v1.14.0 methods: causal row block, automatic day-separated HAC, time-shift leakage; FX11 fails leakage) | `research/alpha_reports/REPORT.md` |
+| Lifecycle registry | **23 alphas at CANDIDATE, 0 beyond** (FX11 held in RESEARCH by the v1.14 time-shift leakage gate) — every candidate fails `net_pnl_after_costs` at 1× costs, its bootstrap bound `net_pnl_bootstrap_ci` and `capacity`; the cross-alpha correlation gate passes vacuously (7 states, 17 pinned edges, 20 gates) | `research/alpha_registry.json`, `research/lifecycle_transitions.jsonl`, `tests/golden/expected_lifecycle.json` |
+| Experiments ledger | 5,358 recorded looks over **293 distinct configurations** (de-duplicated by alpha × kind × config × dataset × statistics revision: 70 configurations holding 1,068 of the looks on the v1.3.0 dataset are kept as history, 223 holding 4,290 of them are on the current one, 77 of them added by the v1.14 regeneration); expected max \|t\| under the global null ≈ 4.144, Bonferroni per-test \|t\| ≥ 4.432; a hash chain since v1.14 | `research/experiments.json` |
+| Contracts | **17** JSON Schemas (all `x-version` 1 except `risk_event`, 2 since v1.14) mirrored by **22** typed Python contracts and **18** runtime-checkable Protocols; one pinned instance each | `schemas/`, `python/src/iap/contracts/`, `tests/golden/expected_contracts_examples.json` |
 | Python reference ports proven by the ports' own goldens | risk: `expected_risk_decisions.json` exact, audit JSONL + snapshot **byte-identical**; execution: `expected_replay_fills.json` **bit-identical** | `python/tests/test_risk_golden.py`, `python/tests/test_execution_golden.py` |
-| MVP golden run (`python -m iap.mvp run`, seed 12345) | **15,805** events · **800** decisions · **235** parent orders · **169** fills · P&L **−81.53 USD** (cost-negative: +0.022 bps alpha vs −0.41 bps execution cost) · trace digest `20d4ff76…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
+| MVP golden run (`python -m iap.mvp run`, seed 12345) | **15,805** events · **800** decisions · **231** parent orders · **163** fills · P&L **−82.84 USD** (cost-negative: +0.0245 bps alpha vs −0.4367 bps execution cost) · trace digest `6fdb3a2c…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
 | Adaptive deployment study | 4 refit policies × 10 alphas; 88 drift-triggered refits; FX01 retired under every policy; 19 of 40 deployments make no trade, none ends above zero | `research/adaptive_reports/ADAPTIVE_REPORT.md` |
 | Bundled dataset | 2 synthetic sessions, 19 instruments, 308,975 normalized events (`data_version` `116b7787…`; equity flow runs to the close since v1.4.0) | `data/normalized/qc_report.json` |
 | Feature emission | 213,021 vectors at 100 ms cadence | `data/features/features_summary.json` |
@@ -443,13 +497,13 @@ conclusion. What moved:
   ([extended report](research/power/extended/POWER_REPORT.md)).
 - **MVP.** Events, decisions, fills and P&L are identical (the loop does
   not use the research backtester). `config_version` and the trace digest
-  changed (`f293e7e7…` → `439bbad5…`, `f51890da…` → `20d4ff76…`) because
+  changed (`f293e7e7…` → `439bbad5…`, `f51890da…` → `2affe409…`) because
   `execution.json`, `alpha_params.json` and the registry are among the
   hashed configuration documents.
 - **Ledger.** The 1920 already recorded are kept; the regenerated pipelines
   added 2,476 (84 per alpha per run under the default methods, 28 under the
   legacy ones), for 4,396; the eight signal-combination experiments added
-  760, for 5,156.
+  760, for 5,156 (v1.5.0; v1.14.0 brought it to 5,358).
 - **Ports.** Java and Rust implement the CUSUM and the consecutive
   retirement rule and the ledger and the fixed significance threshold, by
   name; the Java `ResearchBacktester` and `CostModel` default to the v1.5.0
@@ -476,13 +530,13 @@ reported finding (see
 [research paper 1](docs/papers/01_ofi_predictability_equities.md), and the
 dated errata appended to all four papers). The two newest artefacts say the
 same thing from two more directions: the promotion lifecycle
-([docs/LIFECYCLE.md](docs/LIFECYCLE.md)) bootstraps all 24 alphas to
-CANDIDATE and advances none, because the `net_pnl_after_costs` gate fails
+([docs/LIFECYCLE.md](docs/LIFECYCLE.md)) bootstraps 23 of the 24 alphas to
+CANDIDATE (FX11 is held in RESEARCH by the time-shift leakage gate) and advances none, because the `net_pnl_after_costs` gate fails
 for every one; and the executable MVP ([docs/MVP.md](docs/MVP.md)) runs the
-full loop on one synthetic equity and loses 81.53 USD on 8,229 shares — an
-alpha contribution of +0.022 bps against −0.41 bps of modelled execution
-cost. Its realized mid-to-mid IC (0.22 for EQ01 at 1 s) is about twenty
-times the research IC (0.011); the audit of that gap (2026-09-20, on the
+full loop on one synthetic equity and loses 82.84 USD on 8,295 shares — an
+alpha contribution of +0.0245 bps against −0.4367 bps of modelled execution
+cost. Its realized mid-to-mid IC (0.22 for EQ01 at 1 s) is about nine
+times the research IC (0.024); the audit of that gap (2026-09-20, on the
 v1.3.0 session) attributed it to the synthetic generator's mean-reverting
 venue noise, not a leak — and the cost-adjusted IC (−0.024) is negative
 (docs/MVP.md §7.1).
@@ -648,10 +702,10 @@ python3 tools/github/create_issues.py --dry-run   # the epics/issues plan (docs/
 ===================== cross-language parity table =====================
 language | tests passed | golden passed  | time   | status
 ---------+--------------+----------------+--------+-------
-python   | 2327         | 193            |    -s | PASS
+python   | 2385         | 193            |    -s | PASS
 cpp      | 302          | 72             |    -s | PASS
-rust     | 358          | 71             |    -s | PASS
-java     | 571          | 124            |    -s | PASS
+rust     | 362          | 71             |    -s | PASS
+java     | 575          | 124            |    -s | PASS
 integration | 35           | -              |    -s | PASS
 replay   | 6            | -              |    -s | PASS
 deployment | -            | -              |    -s | PASS
@@ -726,7 +780,7 @@ and `strategies/lifecycle.json` — dashboard metric provenance, Java
 golden-gate completeness), and `numbers` is
 `tests/harness/check_headline_numbers.py`, which re-derives every headline
 figure in this README — test and golden counts, the ledger denominator, the
-24 alphas / 24 CANDIDATE, the MVP counts and P&L, the schema, contract and
+24 alphas / 23 CANDIDATE, the MVP counts and P&L, the schema, contract and
 Protocol counts, the benchmark figures — from the artefact that produces it.
 
 Four independent implementations of one pinned semantics, held identical by
@@ -739,12 +793,12 @@ golden tests — the engineering discipline this repo is built around
 |---|---|
 | [LEARN.md](LEARN.md) | textbook walkthrough: microstructure, generator, book, features, honest alpha research, ML/meta-labeling, portfolio, risk, execution, TCA, parity, latency economics, adaptability, contracts & Protocols, the Python risk/execution reference, the 7-state lifecycle, the decision trace, the data model, the MVP walkthrough with its honest numbers, the v1.3.0 review as six case-study chapters (fail-closed risk bugs, simulator realism, statistical power, gate gaming, crash consistency, supply-chain hygiene), pitfalls, interview Q&A, combining signals, adverse selection, five v1.9-v1.10 case studies (why taker-only research cannot pay at 1 s, the FOMC sampling flaw and day-clustered inference, the 2026 holdout as pre-registration, what the synthetic maker/quoting results show, governance keys and code hashes), and four from v1.11 (parity proves agreement, not correctness: the snapshot-burst bug; why an LLM must never compute a number; freezing copies instead of deleting them; model registries as evidence), and four from v1.12 (why a Sharpe must be deflated; what tick-to-trade does and does not measure; an underpowered result is not a negative result, AUC01; feedback loops in passive execution), and one from v1.13 (what an independent review found, and how it was triaged) |
 | [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) | how the quant, algo and AI sides work — a guided explanation for a newcomer: the pipeline on one page, the research statistics and gates, the execution algorithms and simulator rules, the fail-closed risk engine, the ML layer with its negative results, the LLM/agent boundary (what exists, what is backlog, what would be theatre on this data), determinism and replay; since v1.10 also the real-data path and the `v3` validity bundle, the maker path (calibrate, post or quote, decompose), auctions, optimal execution and the governance chain; since v1.11 the LLM research agent and its controls, the Rust feature engine from Python, the model registry and the polyglot policy; every section ends with where to look and a command that runs |
-| [COOKBOOK.md](COOKBOOK.md) | 68 task-oriented recipes with runnable commands (39-61: maker backtest, quoting, optimal execution, auctions, parallel features, the `v3` validity block, calibrating and backtesting a real session, signed pre-registration, the Almgren-Chriss frontier, the Rust feature engine from Python and building its wheel with maturin, the model registry, shadow mode and week-by-week monitoring, the LLM research agent, its evals and a guarded session with the scripted client, the `POLYGLOT-OVERRIDE` workflow, combinatorial purged CV, PBO and the deflated Sharpe ratio, tick-to-trade percentiles, extended features and event clocks, the multi-venue router, alert routing and SLOs, the fill hazard with post-only and markout feedback; 62-65: deflating a study's Sharpe, a maker run combining extended features and the hazard, the feedback loop on a toxic regime, reading the SLO burn rates; 66: planning the R7 data load; 67-68: regulatory fees on a round trip, the governance checks run locally) |
+| [COOKBOOK.md](COOKBOOK.md) | 74 task-oriented recipes with runnable commands (39-61: maker backtest, quoting, optimal execution, auctions, parallel features, the `v3` validity block, calibrating and backtesting a real session, signed pre-registration, the Almgren-Chriss frontier, the Rust feature engine from Python and building its wheel with maturin, the model registry, shadow mode and week-by-week monitoring, the LLM research agent, its evals and a guarded session with the scripted client, the `POLYGLOT-OVERRIDE` workflow, combinatorial purged CV, PBO and the deflated Sharpe ratio, tick-to-trade percentiles, extended features and event clocks, the multi-venue router, alert routing and SLOs, the fill hazard with post-only and markout feedback; 62-65: deflating a study's Sharpe, a maker run combining extended features and the hazard, the feedback loop on a toxic regime, reading the SLO burn rates; 66: planning the R7 data load; 67-68: regulatory fees on a round trip, the governance checks run locally; 69-74 (v1.14): verifying the risk audit hash chain, the 15c3-5 pre-trade controls, a v1.13 feature store next to a v1.14 one, the `*_v113` method bundles, per-touch-order adverse selection, maintainer trust roots) |
 | [docs/REAL_DATA.md](docs/REAL_DATA.md) | real historical data: what `python -m iap.marketdata ingest` reads (Nasdaq TotalView-ITCH 5.0, LOBSTER), how to obtain files yourself (nothing is bundled), the commands from a downloaded file to an alpha report, the mapping table to canonical events, the point-in-time security master and corporate-actions table, known limitations, and what a first real-data study can and cannot conclude |
 | [docs/RESEARCH_VALIDITY.md](docs/RESEARCH_VALIDITY.md) + [research/power/POWER_REPORT.md](research/power/POWER_REPORT.md) | the corrected research methods (the defaults since v1.5.0, each with its named legacy rule), the research store under parallel writers, gate eligibility; the planted-signal power study of the validation chain |
 | [CHANGELOG.md](CHANGELOG.md) | release notes, newest first (v1.11.0: the Rust feature engine via pyo3, the polyglot policy, the model registry, the LLM research agent and its evals; v1.10.0: skewed quoting, auctions, optimal execution, governance G1-G4; v1.9.0: research validity options, parallel features, maker economics; v1.8.0: the 2026 holdout and the ingest memory fix; v1.6.0-v1.7.2: real data, the agent layer, signal combination, real-data power; v1.5.0: the corrected research methods become the defaults, every old rule keeps a legacy name, every dataset-derived artefact regenerated; v1.4.0: the generator's equity flow calibration fixed so flow reaches the close, and every dataset-derived artefact regenerated; v1.3.0: fail-closed risk, simulator fill rules, paper-platform safety, governance and deployment hardening, research validity) |
 | [docs/MVP.md](docs/MVP.md) | the executable MVP (`python -m iap.mvp run / replay / verify / explain`): one deterministic, fully traced trading loop on a synthetic equity — the loop module by module, the §11.4 wiring rules with code references, the determinism contract, the incident replay flow, the honest golden-run results (cost-negative) with the realized-IC audit, and the success-criteria table |
-| [docs/LIFECYCLE.md](docs/LIFECYCLE.md) | the 7-state promotion lifecycle: states, the 17-edge transition table, the 20 gates with config keys and defaults, evidence documents, registry and transition-log formats, the bootstrap result (24 CANDIDATE / 0 beyond), the golden, the Java/Rust ports, the RETIRED-is-observational caveat |
+| [docs/LIFECYCLE.md](docs/LIFECYCLE.md) | the 7-state promotion lifecycle: states, the 17-edge transition table, the 20 gates with config keys and defaults, evidence documents, registry and transition-log formats, the bootstrap result (23 CANDIDATE / 0 beyond), the golden, the Java/Rust ports, the RETIRED-is-observational caveat |
 | [docs/DECISION_TRACE.md](docs/DECISION_TRACE.md) | the decision trace: the record, ids, canonical JSON rules, the stream digest with its known answers, sinks, the pinned `explain()` block, store views, emission points in Python / Java / C++ / Rust, incident replay |
 | [API_CONTRACTS.md](API_CONTRACTS.md) | the contract layer: 22 typed contracts field by field, ids and canonical JSON, validation, the 18 Protocols and what satisfies them, versioning, the 17-schema index |
 | [API_TRADING.md](API_TRADING.md) | the Python reference ports of the hard risk engine (`iap.risk`) and the execution stack (`iap.execution`): public APIs, golden parity statements, what is pinned about each port |
@@ -863,7 +917,7 @@ IC (EQ01 0.149 shifted against 0.217, EQ03 0.116 against 0.110), because
 with flow spread over the whole session the signals persist from one
 decision to the next. That is persistence, not look-ahead, and the probe
 cannot tell the two apart at a cadence equal to the horizon. The
-cost-adjusted IC (−0.024 / −0.029) and the −81.53 USD session say the same
+cost-adjusted IC (−0.024 / −0.029) and the −82.84 USD session say the same
 thing the research reports say: a real feed would not be this kind, and
 even this one does not pay the spread.
 

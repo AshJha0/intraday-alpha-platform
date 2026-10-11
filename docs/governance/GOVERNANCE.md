@@ -85,9 +85,11 @@ job runs on pushes to `main` and on pull requests that change image inputs
 is skipped on other pull requests, so it is not a required status check. The
 workflow also runs a blocking C++ ASan+UBSan job over the full ctest suite,
 blocking lint (`cargo clippy -D warnings` in the `rust` job, `ruff check` in
-the `advisory` job) and two non-blocking audits (`pip-audit`, `cargo audit`)
-that report findings without failing the
-run, and `.github/workflows/codeql.yml` scans for vulnerabilities. A red `ci`
+the `advisory` job), and, since v1.14 (G-P1-7), the blocking `supply-chain`
+job (`pip-audit`, `cargo audit`, `cargo deny`, `trivy fs`/`trivy config`;
+`trivy image` runs in `images`), whose only escape hatch is a reasoned,
+expiring entry in `.github/audit-ignores.json`; `.github/workflows/codeql.yml`
+scans python, java-kotlin, c-cpp, rust and the workflows. A red `ci`
 run does not by itself prevent a merge until the branch ruleset exists.
 `CODEOWNERS` names the reviewers this table and SECURITY.md refer to (all
 `@AshJha0` today).
@@ -148,8 +150,8 @@ lives in `research/alpha_registry.json`. Since v1.5.0 the
 multiple-testing threshold the evidence carries (never below 3.0;
 `tstat_threshold = "fixed"` is the legacy rule), and the live sub-machine
 retires by the CUSUM rule (`breach_rule = "consecutive"` is the legacy
-rule). Bundled result: 24 CANDIDATE, 0
-beyond — every alpha fails `net_pnl_after_costs`, `net_pnl_bootstrap_ci` and
+rule). Bundled result (v1.14.0): 23 CANDIDATE, 0
+beyond, FX11 held in RESEARCH by the time-shift leakage gate — every candidate fails `net_pnl_after_costs`, `net_pnl_bootstrap_ci` and
 `capacity`. Gate 8 (cross-alpha correlation) is the lifecycle gate
 `cross_alpha_correlation` on CANDIDATE → VALIDATING since v1.5.0 (AF03): the
 largest absolute signal correlation with an alpha at or beyond VALIDATING
@@ -176,6 +178,9 @@ a change with no id; the CI check for it is backlog issue L05.
 | Reserve attempts capped per (alpha, horizon, code hash); unknown candidate fields refused | `ReserveEvaluator` | resetting the cap with a dummy field |
 | Committed board versions must be prefixes of the current board; `research/agents/anchors.json` names the commit holding each entry | `iap.agents.anchor`, `python -m iap.agents.cli verify-board` | re-chaining the hash chain |
 | Agent writes signed with Ed25519 (over agent, op, args digest, single-use nonce); the broker and verifiers hold only public keys (`research/agents/agent_pubkeys.json`), private keys live outside the repo; new HMAC requests refused | `iap.agents.signing`, `WriteBroker(pubkeys=...)`, `Blackboard.verify_signatures`, `cli agent-keygen` / `verify-board` | impersonating an agent id, replay, forgery by a verifier |
+| v1.14 (G-P1-4): a non-empty agent key registry is trusted only with a maintainer signature (`research/agents/agent_pubkeys.sig.json`) by a key in `research/agents/trust_roots.json`, and CI reads the trust roots from `origin/main` | `iap.agents.trust`, `cli maintainer-keygen` / `sign-registry`, `check_agent_keys.py --trust-ref` | a self-attesting registry: adding a key and signing as that agent in one change |
+| v1.14 (G-P1-4): new requests are `ed25519-v2`, binding the board head (`prev`) and board id; the broker refuses a stale head or another board; `prereg` refuses an unsigned write by a keyed agent; anchors and the board are verified against `origin/main` | `WriteBroker.authenticate` / `request_context`, `Blackboard.verify_signatures(board_id=)`, `anchor.verify(ref=)`, `verify-board --trust-ref` | replaying a signed request at another position or on another board; anchors that trust a rewritten local history |
+| v1.14 (G-P1-5): the multiple-testing ledger is hash-chained (`chain_head` over each entry's immutable identity, x-version 4); a ledger whose head does not match is refused on load, so Bonferroni never reads an edited ledger; every prereg records `ledger_head`; CI requires the head ledger to DESCEND from the base and every prereg head to be on the chain | `iap.validation.ledger.chain_heads`, `ExperimentLedger` (`LedgerIntegrityError`), `check_ledger_monotone.py` | dropping, reordering or editing looks to lower the Bonferroni denominator |
 | `--no-prereg` results carry an ineligibility reason | `ExperimentRunner(exploratory=True)` | exploratory runs used as promotion evidence |
 
 Not retroactive: pre-registrations written before v1.10 (the 2026 holdout
@@ -185,7 +190,10 @@ the committed ledger numbers do not move. Their code is anchored by commit
 then commit the board, then `python -m iap.agents.cli anchor` and commit
 `anchors.json`; `verify-board` before any gate run.
 
-**Signature schemes.** `auth.scheme` is `ed25519` for every new entry.
+**Signature schemes.** `auth.scheme` is `ed25519-v2` for every new entry
+since v1.14 (the signed message adds `prev` and `board`; sign with
+`broker.sign(..., **broker.request_context())`). `ed25519` entries (v1.10 to
+v1.13) stay verify-only.
 Entries without `scheme` are the legacy `hmac-sha256` scheme of the first
 v1.10 draft: still verifiable with the shared key
 (`verify-board --legacy-hmac-keyfile`), never accepted for new writes.
@@ -221,6 +229,15 @@ signed entries must have its Ed25519 public key in
    new agent id.
 
 An empty registry is accepted only while no board entry carries `auth`.
+
+**Trust roots (v1.14, G-P1-4).** A non-empty registry must also be signed by
+a maintainer: `python -m iap.agents.cli maintainer-keygen --maintainer <ID>
+--keyfile <PATH OUTSIDE THE REPO>` adds the maintainer's public key to
+`research/agents/trust_roots.json` (land it on `main` in its own reviewed
+pull request; CI reads the trust roots from `origin/main`, so a change cannot
+vouch for itself), then `sign-registry --maintainer <ID> --keyfile ...`
+writes `research/agents/agent_pubkeys.sig.json` after every registry change.
+Today both the registry and the trust roots are empty.
 
 ### 2c. Research branches: merging the ledger and the blackboard (v1.13, G-P1-1)
 
@@ -356,5 +373,21 @@ Auditable events and where they are recorded:
   config hash is reported by the running platform on `/status`, not in the
   manifest); rollbacks reference the prior manifest rather than rebuilding.
 
+- **Risk audit (runtime, v1.14, G-P0-1)**: every line of
+  `<state-dir>/risk_audit.jsonl` carries `seq` and `prev_sha256`, the
+  SHA-256 of the line before it, so the log is a hash chain from a genesis
+  of 64 zeros. `session_state.json` records the head at each checkpoint and
+  a resumed session continues the chain. Verify with
+  `iap.risk.events.verify_audit_chain` (COOKBOOK recipe 69,
+  RUNBOOK_incident_kill_switch.md §6). A loss-limit override needs
+  `overrides.min_approvers` distinct approvers and is capped at
+  `overrides.max_loss_override_multiple` times the configured limit; a
+  refused override is itself an audit line (`LOSS_LIMIT_OVERRIDE_REJECTED`).
+
 Audit logs are never edited in place. Corrections are new entries referencing
-the entry they correct.
+the entry they correct. The hash chains make that rule checkable for the
+risk audit, the blackboard and the look ledger. They make an edit visible,
+not impossible: a chain is only as trustworthy as the place its head is
+copied to, which is why heads are recorded in checkpoints, pre-registrations
+and git history on `main`, and why shipping the logs off-host (section 0,
+not implemented) is still on the list.

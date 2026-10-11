@@ -1,40 +1,40 @@
-{"decision":2,"reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","severity":3,"timestamp":1700000000000000000}
-{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","severity":1,"timestamp":1700000000000000000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000000000000000}
-{"decision":2,"reason":"qty 92377 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000000010084000}
-{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000000065084000}
-{"decision":2,"reason":"reference price age 5000000001ns exceeds 5000000000ns","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000005030084001}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000000145266000}
-{"decision":2,"reason":"qty must be > 0: -9223372036854775807","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000000145652000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000000190652000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000000191185000}
-{"decision":3,"reason":"venue 65535 disconnected","rule_id":"VENUE_DISCONNECT","scope":"VENUE","scope_id":"65535","severity":2,"timestamp":1700000000192082000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000001204082000}
-{"decision":1,"reason":"venue 65535 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"65535","severity":1,"timestamp":1700000001255656000}
-{"decision":1,"reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000001301656000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000001347093000}
-{"decision":2,"reason":"order_id 4 already used at ts 1700000000010084000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000001372093000}
-{"decision":2,"reason":"price_ticks must be >= 0: -9223372036854775808","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000001372599000}
-{"decision":2,"reason":"order_id 6 already used at ts 1700000000145266000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000001431245000}
-{"decision":2,"reason":"would cross own open order 8 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000001431245000}
-{"decision":2,"reason":"would cross own open order 10 at 2663","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000001458245000}
-{"decision":3,"reason":"ops halt","rule_id":"KILL_SWITCH_ENGAGED","scope":"INSTRUMENT","scope_id":"0002","severity":3,"timestamp":1700000001469245000}
-{"decision":1,"reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"99","severity":1,"timestamp":1700000003492245000}
-{"decision":2,"reason":"instrument 2 kill switch engaged","rule_id":"KILL_INSTRUMENT","scope":"INSTRUMENT","scope_id":"2","severity":3,"timestamp":1700000003493143000}
-{"decision":1,"reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"2","severity":1,"timestamp":1700000003493143000}
-{"decision":2,"reason":"would cross own open order 8 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000003493143000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"𐀀z","severity":1,"timestamp":1700000003493143000}
-{"decision":2,"reason":"order_id 10 already used at ts 1700000001204082000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S1","severity":2,"timestamp":1700000003526143000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000003576143000}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","severity":1,"timestamp":1700000003630143000}
-{"decision":2,"reason":"would cross own open order 10 at 2663","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000003630143000}
-{"decision":2,"reason":"order_id 14 already used at ts 1700000001458245000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S2","severity":2,"timestamp":1700000003630425000}
-{"decision":3,"reason":"ops halt","rule_id":"KILL_SWITCH_ENGAGED","scope":"STRATEGY","scope_id":"S1","severity":3,"timestamp":1700000003711425000}
-{"decision":1,"reason":"naïve café","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000006712120000}
-{"decision":2,"reason":"qty 113481 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"1","severity":2,"timestamp":1700000006712120000}
-{"decision":2,"reason":"would cross own open order 8 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000006712120000}
-{"decision":2,"reason":"would cross own open order 8 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000006712120000}
-{"decision":2,"reason":"would cross own open order 8 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000006712120000}
-{"decision":2,"reason":"would cross own open order 8 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","severity":2,"timestamp":1700000006712120000}
-{"decision":2,"reason":"strategy S3 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000006712120000}
-{"decision":2,"reason":"strategy S3 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000006712120000}
+{"decision":2,"prev_sha256":"0000000000000000000000000000000000000000000000000000000000000000","reason":"global kill switch engaged","rule_id":"KILL_GLOBAL","scope":"GLOBAL","scope_id":"","seq":1,"severity":3,"timestamp":1700000000000000000}
+{"decision":1,"prev_sha256":"4590d96c6336a070fb6b5f4cd02de64da77d36593bff7f68aff5e9eb2bba5498","reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"GLOBAL","scope_id":"","seq":2,"severity":1,"timestamp":1700000000000000000}
+{"decision":1,"prev_sha256":"a9d94c02e1688473d89ba4a583779c00c7f51e0b33105129966c7df7aa60930b","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","seq":3,"severity":1,"timestamp":1700000000000000000}
+{"decision":2,"prev_sha256":"8a62560b628c2a151945e6e1dbaca058fff814409e2da8f72ee78f6ec66ec255","reason":"qty 92377 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"1","seq":4,"severity":2,"timestamp":1700000000010084000}
+{"decision":1,"prev_sha256":"270fca8607801a1a700548f69d7af95f1d7c34c1288c24231555a173624d13cf","reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","seq":5,"severity":1,"timestamp":1700000000065084000}
+{"decision":2,"prev_sha256":"15d786c83abd13930255dc6f7fb45e6f65541503044ddbc6a17b58ef8f255d24","reason":"reference price age 5000000001ns exceeds 5000000000ns","rule_id":"STALE_PRICE","scope":"INSTRUMENT","scope_id":"2","seq":6,"severity":2,"timestamp":1700000005030084001}
+{"decision":1,"prev_sha256":"8205930fa0ba48b48a6ec5f0231895bae90b686868960cf636a183873e5eaefe","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","seq":7,"severity":1,"timestamp":1700000000145266000}
+{"decision":2,"prev_sha256":"a2f6c9c690fd8ba73c06c0418fef648e55c8841337a27047e10327d23d55b42e","reason":"qty must be > 0: -9223372036854775807","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S1","seq":8,"severity":2,"timestamp":1700000000145652000}
+{"decision":1,"prev_sha256":"521a60ec6366a9d2b1f92fb4f22dcc6b9087a10b49be15fe777c4a2eb2f05e40","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","seq":9,"severity":1,"timestamp":1700000000190652000}
+{"decision":1,"prev_sha256":"d19702f40db5b0991f73d0a73e38e7d81c44f1439d5293d67ba5a2e24721615c","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","seq":10,"severity":1,"timestamp":1700000000191185000}
+{"decision":3,"prev_sha256":"5849b93601687c2c522639f9442578509fe92c57b06c09b2f38d2629c178f885","reason":"venue 65535 disconnected","rule_id":"VENUE_DISCONNECT","scope":"VENUE","scope_id":"65535","seq":11,"severity":2,"timestamp":1700000000192082000}
+{"decision":1,"prev_sha256":"ace2c027635cebc1dbd7f8d2004ef2b726e25dd07d8c4545de6b0beee9246bfa","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","seq":12,"severity":1,"timestamp":1700000001204082000}
+{"decision":1,"prev_sha256":"61cabc08ad29bdc557a2abcfb8eafd0cc10be775d08a67f5775a641d5b0ff74b","reason":"venue 65535 reconnected","rule_id":"VENUE_RECONNECT","scope":"VENUE","scope_id":"65535","seq":13,"severity":1,"timestamp":1700000001255656000}
+{"decision":1,"prev_sha256":"dd9a77132ab6870d4376ea550fb6b5975394bb896d8819e48b3b412e47a43c1c","reason":"ops halt","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S2","seq":14,"severity":1,"timestamp":1700000001301656000}
+{"decision":1,"prev_sha256":"8c4c99a46d19531111c6ef6b335ef523c0f4c95c009d0b086164b4c7e06cd224","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","seq":15,"severity":1,"timestamp":1700000001347093000}
+{"decision":2,"prev_sha256":"91c0fa2620d56fe4c81d7bf64fd5a487c1110af227e1f10a30513a3933badcbd","reason":"order_id 4 already used at ts 1700000000010084000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S3","seq":16,"severity":2,"timestamp":1700000001372093000}
+{"decision":2,"prev_sha256":"3814d7a9b93a7821a04c4d7da0ce12c76a97ec0b6a42015063d45ea92485cb3c","reason":"price_ticks must be >= 0: -9223372036854775808","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S2","seq":17,"severity":2,"timestamp":1700000001372599000}
+{"decision":2,"prev_sha256":"96ae5ff7e4bbf2f1ad16bac70217604f8985dba317ce4c325975d1189bef7109","reason":"order_id 6 already used at ts 1700000000145266000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S1","seq":18,"severity":2,"timestamp":1700000001431245000}
+{"decision":2,"prev_sha256":"a16a99906127350c7e8dbe9abb7954bdc5def44a37c31177dd4d611178571e03","reason":"would cross own open order 8 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","seq":19,"severity":2,"timestamp":1700000001431245000}
+{"decision":2,"prev_sha256":"b199eb70a7b64f212776c380be86f8c844032ac7c26e943db93910abfd1a37b1","reason":"would cross own open order 10 at 2663","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"1","seq":20,"severity":2,"timestamp":1700000001458245000}
+{"decision":3,"prev_sha256":"04f0fb57bc609e28c440156d4a7c74961737e8b2ecc309f758c5db9005a25bd5","reason":"ops halt","rule_id":"KILL_SWITCH_ENGAGED","scope":"INSTRUMENT","scope_id":"0002","seq":21,"severity":3,"timestamp":1700000001469245000}
+{"decision":1,"prev_sha256":"56abdf143c8195b823983231062193ec66ab954b877171b8a3cbe56bd58a0cb3","reason":"desk request #42","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"99","seq":22,"severity":1,"timestamp":1700000001492245000}
+{"decision":2,"prev_sha256":"6aecd57d100877bc6f6c28bf06346b34660c083f751d03941016c26442f88856","reason":"instrument 2 kill switch engaged","rule_id":"KILL_INSTRUMENT","scope":"INSTRUMENT","scope_id":"2","seq":23,"severity":3,"timestamp":1700000001493143000}
+{"decision":1,"prev_sha256":"12e8e49110bbfef675d4c77d427a0120dbb07aa97fe25c5752ff3194253123ef","reason":"","rule_id":"KILL_SWITCH_CLEARED","scope":"INSTRUMENT","scope_id":"2","seq":24,"severity":1,"timestamp":1700000001493143000}
+{"decision":2,"prev_sha256":"6093a6c3166f83da24e44e1747f937a444c35afa0b7391d9a41b2252006b8f96","reason":"would cross own open order 8 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","seq":25,"severity":2,"timestamp":1700000001493143000}
+{"decision":1,"prev_sha256":"a550308add1ca11b4c0655954c95755403c39b5c5f4288763db1965faa673c87","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"𐀀z","seq":26,"severity":1,"timestamp":1700000001493143000}
+{"decision":2,"prev_sha256":"15c679df8eea8402234b4b7bbf05966df296706c60ac9c4b87bde3effe6a0789","reason":"order_id 10 already used at ts 1700000001204082000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S1","seq":27,"severity":2,"timestamp":1700000001526143000}
+{"decision":1,"prev_sha256":"0594ce064a9609f7096fd1a84931da44fbafeb07427b83a9cb3e429b047c0d15","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","seq":28,"severity":1,"timestamp":1700000001576143000}
+{"decision":1,"prev_sha256":"a5ab58e0eb99d3a87e5d5b75ad223335b31054eb335f9ea28aae45c89a803f02","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S3","seq":29,"severity":1,"timestamp":1700000001630143000}
+{"decision":2,"prev_sha256":"19fb67eda386f6bd7e5f185bc1c8298cbd9697893169ac8b07ae3538f624954b","reason":"would cross own open order 10 at 2663","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"1","seq":30,"severity":2,"timestamp":1700000001630143000}
+{"decision":2,"prev_sha256":"8f7a392c7417ae7dd3c6f0fb51cf3c223917f68c109da00b2fa5075e9f402a61","reason":"order_id 14 already used at ts 1700000001458245000","rule_id":"DUPLICATE_ORDER_ID","scope":"STRATEGY","scope_id":"S2","seq":31,"severity":2,"timestamp":1700000001630425000}
+{"decision":3,"prev_sha256":"9e870ce9506ad43fcb2b5d75240328d54402870fa95632847a449e5b18f80ff9","reason":"ops halt","rule_id":"KILL_SWITCH_ENGAGED","scope":"STRATEGY","scope_id":"S1","seq":32,"severity":3,"timestamp":1700000001711425000}
+{"decision":1,"prev_sha256":"eab971fb3df155df5af943ab52329846ddac85117489105e2ce52a94885d7424","reason":"naïve café","rule_id":"KILL_SWITCH_CLEARED","scope":"STRATEGY","scope_id":"S1","seq":33,"severity":1,"timestamp":1700000004712120000}
+{"decision":2,"prev_sha256":"ae1a0b2b392736f0190ffdf507a59242b142d88ff9224f7b388385cce9560e59","reason":"qty 113481 exceeds max_order_qty 50000","rule_id":"FAT_FINGER_QTY","scope":"INSTRUMENT","scope_id":"1","seq":34,"severity":2,"timestamp":1700000004712120000}
+{"decision":2,"prev_sha256":"ea502da8c09afffe60fcffd2a893aa7f1e7d72ec1bb25a20abbf7b8ffa451f67","reason":"would cross own open order 8 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","seq":35,"severity":2,"timestamp":1700000004712120000}
+{"decision":2,"prev_sha256":"640059b5e79277a2385e7032b1a119f84ab76cfb105cf37e96beb641b191f95e","reason":"would cross own open order 8 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","seq":36,"severity":2,"timestamp":1700000004712120000}
+{"decision":2,"prev_sha256":"6b7192e8b660f4484ff6843c77569c18b5b501c6c470b877e5e9877b0d4c8d33","reason":"would cross own open order 8 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","seq":37,"severity":2,"timestamp":1700000004712120000}
+{"decision":2,"prev_sha256":"07fbc4610f23eb612c6d903b6bf6d0ac1c94f76ea311999557be7ea841cb2c05","reason":"would cross own open order 8 at 0","rule_id":"SELF_MATCH","scope":"INSTRUMENT","scope_id":"2","seq":38,"severity":2,"timestamp":1700000004712120000}
+{"decision":2,"prev_sha256":"81db9bc2eec6ba8b73bdba3c7724f9597721eb9fb2cc0bdb5f837d712d2b4793","reason":"strategy S3 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S3","seq":39,"severity":2,"timestamp":1700000004712120000}
+{"decision":2,"prev_sha256":"1037c4bb69480b3264c40180b20853030f839635c1bb624cb2984758d9777033","reason":"strategy S3 exceeded 500.00 orders/s (burst 4.00)","rule_id":"RATE_THROTTLE","scope":"STRATEGY","scope_id":"S3","seq":40,"severity":2,"timestamp":1700000004712120000}

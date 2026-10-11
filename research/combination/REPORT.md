@@ -16,7 +16,7 @@ PROMOTE here would be a reason to look for leakage before anything else.
 - **Outer validation:** `validate_alpha`, 4 expanding walk-forward folds purged at the combination horizon, 60 s embargo, method bundle `v2` — the chain of the alpha reports.
 - **Weights:** fitted inside each fold's training window on the members' out-of-sample predictions from 3 inner walk-forward folds (same splitter); standardisation, weights, ridge penalty and scale never see a test row.
 - **Methods:** `equal_weight`, `ic_weighted`, `ridge`, `shrinkage_mv`; default `equal_weight` (the baseline). `ridge` and `shrinkage_mv` account for member correlation explicitly; `equal_weight` and `ic_weighted` do not, and nothing is orthogonalised.
-- **Looks:** each experiment debits `looks_per_validation(4) + K` (83 + members); this report declared 760 looks over 8 experiments on a ledger of 4,396 and was judged at 5,156 looks: PROMOTE needs gate t >= 4.424.
+- **Looks:** each experiment debits `looks_per_validation(4) + K` (83 + members); this report declared 104 looks over 8 experiments on a ledger of 5,214 and was judged at 5,318 looks: PROMOTE needs gate t >= 4.430.
 
 ## COMB_EQ — EQUITY, horizon 5s
 
@@ -29,60 +29,61 @@ member's committed report at its own horizon.
 
 | signal | gate IC | gate t | folds+ | hyp | leak | trades (all folds) | net P&L 1x last fold | net P&L 1x pooled | CI low | CI high | verdict | fails |
 |--------|---------|--------|--------|-----|------|--------------------|----------------------|-------------------|--------|---------|---------|-------|
-| **equal_weight** | +0.0105 | +1.98 | 1.00 | yes | pass | 0 | +0 | +0 | +0 | +0 | **ITERATE** | significance, cost |
-| **ic_weighted** | +0.0262 | +6.29 | 1.00 | yes | pass | 3 | +0 | -44 | -131 | +0 | **ITERATE** | cost |
-| **ridge** | +0.0429 | +7.06 | 1.00 | yes | pass | 6 | +0 | -73 | -189 | +0 | **ITERATE** | cost |
-| **shrinkage_mv** | +0.0413 | +6.38 | 1.00 | yes | pass | 6 | +0 | -73 | -189 | +0 | **ITERATE** | cost |
+| **equal_weight** | +0.0284 | +6.93 | 1.00 | yes | pass | 0 | +0 | +0 | +0 | +0 | **ITERATE** | cost |
+| **ic_weighted** | +0.0451 | +10.78 | 1.00 | yes | pass | 3 | +0 | -29 | -88 | +0 | **ITERATE** | cost |
+| **ridge** | +0.0541 | +11.58 | 1.00 | yes | pass | 7 | +0 | -200 | -572 | +0 | **ITERATE** | cost |
+| **shrinkage_mv** | +0.0532 | +11.45 | 1.00 | yes | pass | 6 | +0 | -33 | -95 | +0 | **ITERATE** | cost |
 
 | member | own horizon | own gate IC | own gate t | own verdict | gate IC here | gate t here | trades (all folds) | net P&L 1x (all folds) |
 |--------|-------------|-------------|------------|-------------|--------------|-------------|--------------------|------------------------|
-| EQ01 | 1s | +0.0105 | +1.59 | ITERATE | +0.0168 | +1.82 | 0 | +0 |
-| EQ02 | 5s | +0.0251 | +7.17 | ITERATE | +0.0251 | +7.17 | 0 | +0 |
-| EQ03 | 5s | +0.0189 | +5.16 | ITERATE | +0.0189 | +5.16 | 0 | +0 |
-| EQ04 | 5s | -0.0034 | -0.55 | REJECT | -0.0034 | -0.55 | 0 | +0 |
-| EQ05 | 1s | +0.0055 | +1.64 | ITERATE | +0.0149 | +4.05 | 0 | +0 |
-| EQ06 | 10s | +0.0277 | +4.36 | ITERATE | +0.0192 | +4.37 | 34 | -679 |
-| EQ07 | 10s | +0.0006 | +0.14 | REJECT | +0.0077 | +1.82 | 0 | +0 |
-| EQ08 | 10s | -0.0481 | -4.57 | REJECT | -0.0400 | -5.27 | 0 | +0 |
-| EQ09 | 10s | -0.0229 | -1.32 | REJECT | -0.0066 | -0.43 | 0 | +0 |
-| EQ10 | 1s | +0.0040 | +0.91 | REJECT | -0.0013 | -0.34 | 0 | +0 |
-| EQ11 | 15m | +0.0038 | +0.20 | REJECT | -0.0317 | -3.96 | 185 | -3151 |
-| EQ12 | 5s | +0.0261 | +7.20 | ITERATE | +0.0261 | +7.20 | 0 | +0 |
+| EQ01 | 1s | +0.0237 | +6.54 | ITERATE | +0.0380 | +6.37 | 0 | +0 |
+| EQ02 | 5s | +0.0362 | +10.92 | ITERATE | +0.0362 | +10.92 | 0 | +0 |
+| EQ03 | 5s | +0.0300 | +7.97 | ITERATE | +0.0300 | +7.97 | 0 | +0 |
+| EQ04 | 5s | -0.0101 | -1.89 | REJECT | -0.0101 | -1.89 | 0 | +0 |
+| EQ05 | 1s | +0.0102 | +3.16 | ITERATE | +0.0272 | +7.22 | 0 | +0 |
+| EQ06 | 10s | +0.0556 | +10.92 | ITERATE | +0.0371 | +7.94 | 59 | -1401 |
+| EQ07 | 10s | -0.0279 | -6.53 | REJECT | -0.0107 | -2.43 | 34 | -853 |
+| EQ08 | 10s | -0.0512 | -6.39 | REJECT | -0.0305 | -5.93 | 0 | +0 |
+| EQ09 | 10s | -0.0204 | -1.74 | REJECT | -0.0095 | -0.87 | 0 | +0 |
+| EQ10 | 1s | +0.0025 | +0.72 | REJECT | -0.0029 | -1.14 | 0 | +0 |
+| EQ11 | 15m | +0.0059 | +0.42 | REJECT | -0.0263 | -4.53 | 255 | -3864 |
+| EQ12 | 5s | +0.0377 | +10.91 | ITERATE | +0.0377 | +10.91 | 0 | +0 |
 
 ### Breadth: arithmetic vs measurement
 
-- Members with a defined IC: 12; mean member gate IC +0.0038, mean member gate t +1.75.
-- Mean pairwise signal correlation +0.069 (mean |rho| 0.158); effective independent bets 6.55 of 12 (eigenvalue participation ratio), 6.80 by `K / (1 + (K - 1) rho)`.
-- Expected equal-weight IC = mean IC x sqrt(breadth): +0.0132 if the members were independent, +0.0099 at the measured correlation. **Measured: +0.0105.**
-- Expected gate t = mean member t x sqrt(effective breadth): +4.57. **Measured: +1.98.**
+- Members with a defined IC: 12; mean member gate IC +0.0097, mean member gate t +2.88.
+- Mean pairwise signal correlation +0.072 (mean |rho| 0.165); effective independent bets 6.46 of 12 (eigenvalue participation ratio), 6.70 by `K / (1 + (K - 1) rho)`.
+- Expected equal-weight IC = mean IC x sqrt(breadth): +0.0335 if the members were independent, +0.0250 at the measured correlation. **Measured: +0.0284.**
+- Expected gate t = mean member t x sqrt(effective breadth): +7.45. **Measured: +6.93.**
 
 ### Signal correlation of the members (out-of-sample z, common rows)
 
 | | EQ01 | EQ02 | EQ03 | EQ04 | EQ05 | EQ06 | EQ07 | EQ08 | EQ09 | EQ10 | EQ11 | EQ12 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| EQ01 | +1.00 | +0.19 | +0.19 | +0.03 | +0.00 | -0.10 | +0.05 | +0.13 | +0.07 | -0.00 | +0.13 | +0.19 |
-| EQ02 | +0.19 | +1.00 | +0.95 | +0.01 | +0.16 | -0.16 | +0.34 | +0.02 | +0.07 | -0.00 | -0.02 | +1.00 |
-| EQ03 | +0.19 | +0.95 | +1.00 | +0.02 | +0.22 | -0.12 | +0.28 | +0.01 | +0.05 | -0.00 | -0.01 | +0.95 |
-| EQ04 | +0.03 | +0.01 | +0.02 | +1.00 | +0.06 | +0.08 | -0.02 | -0.00 | -0.02 | -0.00 | -0.01 | +0.01 |
-| EQ05 | +0.00 | +0.16 | +0.22 | +0.06 | +1.00 | +0.33 | -0.54 | -0.09 | -0.17 | -0.00 | -0.05 | +0.16 |
-| EQ06 | -0.10 | -0.16 | -0.12 | +0.08 | +0.33 | +1.00 | -0.54 | -0.22 | -0.48 | +0.00 | -0.19 | -0.15 |
-| EQ07 | +0.05 | +0.34 | +0.28 | -0.02 | -0.54 | -0.54 | +1.00 | +0.11 | +0.26 | +0.00 | +0.02 | +0.34 |
-| EQ08 | +0.13 | +0.02 | +0.01 | -0.00 | -0.09 | -0.22 | +0.11 | +1.00 | +0.22 | -0.00 | +0.57 | +0.01 |
-| EQ09 | +0.07 | +0.07 | +0.05 | -0.02 | -0.17 | -0.48 | +0.26 | +0.22 | +1.00 | +0.02 | +0.17 | +0.07 |
-| EQ10 | -0.00 | -0.00 | -0.00 | -0.00 | -0.00 | +0.00 | +0.00 | -0.00 | +0.02 | +1.00 | -0.00 | -0.00 |
-| EQ11 | +0.13 | -0.02 | -0.01 | -0.01 | -0.05 | -0.19 | +0.02 | +0.57 | +0.17 | -0.00 | +1.00 | -0.02 |
-| EQ12 | +0.19 | +1.00 | +0.95 | +0.01 | +0.16 | -0.15 | +0.34 | +0.01 | +0.07 | -0.00 | -0.02 | +1.00 |
+| EQ01 | +1.00 | +0.20 | +0.20 | +0.03 | +0.00 | -0.10 | +0.06 | +0.13 | +0.07 | -0.00 | +0.13 | +0.20 |
+| EQ02 | +0.20 | +1.00 | +0.96 | +0.04 | +0.14 | -0.16 | +0.32 | +0.02 | +0.07 | -0.00 | -0.02 | +1.00 |
+| EQ03 | +0.20 | +0.96 | +1.00 | +0.05 | +0.21 | -0.11 | +0.25 | +0.01 | +0.04 | -0.00 | -0.01 | +0.95 |
+| EQ04 | +0.03 | +0.04 | +0.05 | +1.00 | +0.24 | +0.08 | -0.05 | -0.00 | -0.02 | -0.00 | -0.01 | +0.03 |
+| EQ05 | +0.00 | +0.14 | +0.21 | +0.24 | +1.00 | +0.35 | -0.56 | -0.10 | -0.19 | -0.00 | -0.05 | +0.14 |
+| EQ06 | -0.10 | -0.16 | -0.11 | +0.08 | +0.35 | +1.00 | -0.57 | -0.23 | -0.48 | -0.00 | -0.20 | -0.15 |
+| EQ07 | +0.06 | +0.32 | +0.25 | -0.05 | -0.56 | -0.57 | +1.00 | +0.13 | +0.28 | +0.00 | +0.03 | +0.32 |
+| EQ08 | +0.13 | +0.02 | +0.01 | -0.00 | -0.10 | -0.23 | +0.13 | +1.00 | +0.23 | -0.00 | +0.58 | +0.02 |
+| EQ09 | +0.07 | +0.07 | +0.04 | -0.02 | -0.19 | -0.48 | +0.28 | +0.23 | +1.00 | +0.02 | +0.19 | +0.07 |
+| EQ10 | -0.00 | -0.00 | -0.00 | -0.00 | -0.00 | -0.00 | +0.00 | -0.00 | +0.02 | +1.00 | -0.00 | -0.00 |
+| EQ11 | +0.13 | -0.02 | -0.01 | -0.01 | -0.05 | -0.20 | +0.03 | +0.58 | +0.19 | -0.00 | +1.00 | -0.02 |
+| EQ12 | +0.20 | +1.00 | +0.95 | +0.03 | +0.14 | -0.15 | +0.32 | +0.02 | +0.07 | -0.00 | -0.02 | +1.00 |
 
-Pairs above the lifecycle's `max_cross_alpha_correlation` (0.7): EQ02/EQ03 (+0.95), EQ02/EQ12 (+1.00), EQ03/EQ12 (+0.95). Of such a pair the alpha with the larger id would be held at CANDIDATE once the other had reached the gate's peer state; today no alpha has, so the gate passes vacuously for all 24.
+Pairs above the lifecycle's `max_cross_alpha_correlation` (0.7): EQ02/EQ03 (+0.96), EQ02/EQ12 (+1.00), EQ03/EQ12 (+0.95). Of such a pair the alpha with the larger id would be held at CANDIDATE once the other had reached the gate's peer state; today no alpha has, so the gate passes vacuously for all 24.
 
 ### P&L correlation of the members (1-minute bar net P&L at 1x costs)
 
-2 of 12 members make any trade under the cost-aware policy; the correlation is undefined for the others.
+3 of 12 members make any trade under the cost-aware policy; the correlation is undefined for the others.
 
-| | EQ06 | EQ11 |
-|---|---|---|
-| EQ06 | +1.00 | -0.04 |
-| EQ11 | -0.04 | +1.00 |
+| | EQ06 | EQ07 | EQ11 |
+|---|---|---|---|
+| EQ06 | +1.00 | +0.39 | +0.02 |
+| EQ07 | +0.39 | +1.00 | -0.03 |
+| EQ11 | +0.02 | -0.03 | +1.00 |
 
 ### Weights per fold and their stability
 
@@ -95,40 +96,40 @@ Pairs above the lifecycle's `max_cross_alpha_correlation` (0.7): EQ02/EQ03 (+0.9
 | 3 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | yes | - |
 | 4 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | yes | - |
 
-**ic_weighted** — mean pairwise cosine of the fold weight vectors +0.870 (min +0.761); largest |signal correlation| with a member 0.93.
+**ic_weighted** — mean pairwise cosine of the fold weight vectors +0.862 (min +0.744); largest |signal correlation| with a member 0.89.
 
 | fold | EQ01 | EQ02 | EQ03 | EQ04 | EQ05 | EQ06 | EQ07 | EQ08 | EQ09 | EQ10 | EQ11 | EQ12 | beta > 0 | detail |
 |------|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | +0.000 | +0.175 | +0.160 | +0.114 | +0.159 | +0.035 | +0.015 | +0.000 | +0.162 | +0.000 | +0.000 | +0.178 | yes | - |
-| 2 | +0.018 | +0.210 | +0.205 | +0.000 | +0.155 | +0.184 | +0.019 | +0.000 | +0.000 | +0.000 | +0.000 | +0.209 | yes | - |
-| 3 | +0.135 | +0.195 | +0.152 | +0.000 | +0.132 | +0.164 | +0.029 | +0.000 | +0.000 | +0.000 | +0.000 | +0.193 | yes | - |
-| 4 | +0.125 | +0.199 | +0.152 | +0.000 | +0.114 | +0.128 | +0.075 | +0.000 | +0.000 | +0.000 | +0.000 | +0.206 | yes | - |
+| 1 | +0.000 | +0.163 | +0.145 | +0.120 | +0.174 | +0.060 | +0.000 | +0.000 | +0.171 | +0.000 | +0.000 | +0.166 | yes | - |
+| 2 | +0.004 | +0.197 | +0.193 | +0.000 | +0.166 | +0.242 | +0.000 | +0.000 | +0.000 | +0.000 | +0.000 | +0.199 | yes | - |
+| 3 | +0.121 | +0.187 | +0.145 | +0.000 | +0.144 | +0.214 | +0.000 | +0.000 | +0.000 | +0.000 | +0.000 | +0.189 | yes | - |
+| 4 | +0.125 | +0.203 | +0.159 | +0.000 | +0.127 | +0.176 | +0.000 | +0.000 | +0.000 | +0.000 | +0.000 | +0.210 | yes | - |
 
-**ridge** — mean pairwise cosine of the fold weight vectors +0.591 (min +0.322); largest |signal correlation| with a member 0.63.
-
-| fold | EQ01 | EQ02 | EQ03 | EQ04 | EQ05 | EQ06 | EQ07 | EQ08 | EQ09 | EQ10 | EQ11 | EQ12 | beta > 0 | detail |
-|------|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | -0.058 | +0.120 | +0.078 | +0.097 | +0.177 | +0.047 | +0.026 | -0.088 | +0.148 | -0.018 | +0.017 | +0.126 | yes | lambda 1 |
-| 2 | +0.011 | +0.108 | +0.093 | -0.015 | +0.101 | +0.161 | +0.052 | -0.153 | -0.106 | -0.011 | -0.085 | +0.103 | yes | lambda 1 |
-| 3 | +0.119 | +0.090 | +0.023 | -0.048 | +0.073 | +0.114 | +0.050 | -0.181 | -0.052 | -0.003 | -0.161 | +0.086 | yes | lambda 1 |
-| 4 | +0.097 | +0.078 | -0.107 | -0.053 | +0.077 | +0.089 | +0.112 | -0.165 | +0.019 | -0.005 | -0.098 | +0.101 | yes | lambda 0.1 |
-
-**shrinkage_mv** — mean pairwise cosine of the fold weight vectors +0.547 (min +0.193); largest |signal correlation| with a member 0.52.
+**ridge** — mean pairwise cosine of the fold weight vectors +0.618 (min +0.301); largest |signal correlation| with a member 0.58.
 
 | fold | EQ01 | EQ02 | EQ03 | EQ04 | EQ05 | EQ06 | EQ07 | EQ08 | EQ09 | EQ10 | EQ11 | EQ12 | beta > 0 | detail |
 |------|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | -0.035 | +0.068 | -0.128 | +0.087 | +0.122 | +0.052 | +0.058 | -0.068 | +0.174 | -0.009 | +0.040 | +0.158 | yes | shrinkage 0.001 |
-| 2 | +0.017 | +0.219 | -0.036 | -0.027 | +0.102 | +0.158 | +0.134 | -0.112 | -0.114 | -0.010 | -0.015 | -0.055 | yes | shrinkage 0.001 |
-| 3 | +0.073 | +0.266 | -0.196 | -0.045 | +0.062 | +0.077 | +0.071 | -0.082 | -0.035 | -0.002 | -0.062 | -0.029 | yes | shrinkage 0.000 |
-| 4 | +0.071 | +0.091 | -0.206 | -0.042 | +0.071 | +0.073 | +0.094 | -0.117 | +0.019 | -0.004 | -0.061 | +0.152 | yes | shrinkage 0.000 |
+| 1 | -0.068 | +0.118 | +0.063 | +0.095 | +0.175 | +0.057 | -0.027 | -0.093 | +0.158 | -0.017 | -0.006 | +0.123 | yes | lambda 1 |
+| 2 | +0.000 | +0.106 | +0.088 | -0.033 | +0.085 | +0.188 | -0.018 | -0.160 | -0.125 | -0.012 | -0.079 | +0.106 | yes | lambda 1 |
+| 3 | +0.106 | +0.089 | +0.022 | -0.071 | +0.064 | +0.131 | -0.008 | -0.173 | -0.060 | -0.003 | -0.182 | +0.090 | yes | lambda 1 |
+| 4 | +0.109 | +0.092 | +0.024 | -0.075 | +0.059 | +0.110 | +0.011 | -0.223 | +0.001 | -0.004 | -0.191 | +0.101 | yes | lambda 1 |
+
+**shrinkage_mv** — mean pairwise cosine of the fold weight vectors +0.638 (min +0.297); largest |signal correlation| with a member 0.54.
+
+| fold | EQ01 | EQ02 | EQ03 | EQ04 | EQ05 | EQ06 | EQ07 | EQ08 | EQ09 | EQ10 | EQ11 | EQ12 | beta > 0 | detail |
+|------|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | -0.040 | +0.118 | -0.177 | +0.068 | +0.101 | +0.048 | +0.007 | -0.064 | +0.183 | -0.008 | +0.023 | +0.162 | yes | shrinkage 0.001 |
+| 2 | +0.006 | +0.134 | -0.066 | -0.056 | +0.071 | +0.191 | +0.060 | -0.134 | -0.156 | -0.011 | -0.007 | +0.107 | yes | shrinkage 0.001 |
+| 3 | +0.071 | +0.204 | -0.220 | -0.065 | +0.050 | +0.082 | +0.025 | -0.075 | -0.043 | -0.002 | -0.087 | +0.076 | yes | shrinkage 0.000 |
+| 4 | +0.070 | +0.091 | -0.211 | -0.067 | +0.052 | +0.076 | +0.037 | -0.108 | +0.025 | -0.003 | -0.079 | +0.181 | yes | shrinkage 0.000 |
 
 ### Leakage checks
 
 - Fitted parameters of the last fold are identical when every label from the test start onwards is replaced by garbage: `equal_weight` yes, `ic_weighted` yes, `ridge` yes, `shrinkage_mv` yes.
-- `equal_weight`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0105 against the validation's +0.0105.
-- `ic_weighted`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0262 against the validation's +0.0262.
-- `ridge`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0429 against the validation's +0.0429.
-- `shrinkage_mv`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0413 against the validation's +0.0413.
+- `equal_weight`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0284 against the validation's +0.0284.
+- `ic_weighted`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0451 against the validation's +0.0451.
+- `ridge`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0541 against the validation's +0.0541.
+- `shrinkage_mv`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0532 against the validation's +0.0532.
 
 ## COMB_FX — FX, horizon 1m
 
@@ -141,49 +142,49 @@ member's committed report at its own horizon.
 
 | signal | gate IC | gate t | folds+ | hyp | leak | trades (all folds) | net P&L 1x last fold | net P&L 1x pooled | CI low | CI high | verdict | fails |
 |--------|---------|--------|--------|-----|------|--------------------|----------------------|-------------------|--------|---------|---------|-------|
-| **equal_weight** | +0.0315 | +3.22 | 1.00 | yes | pass | 15 | +0 | -13 | -42 | +0 | **ITERATE** | significance, cost |
-| **ic_weighted** | +0.0428 | +3.74 | 1.00 | yes | pass | 2713 | -153 | -929 | -1192 | -696 | **ITERATE** | significance, cost |
-| **ridge** | +0.0482 | +4.73 | 1.00 | yes | pass | 4444 | -273 | -1627 | -1886 | -1376 | **ITERATE** | cost |
-| **shrinkage_mv** | +0.0478 | +4.76 | 1.00 | yes | pass | 4419 | -271 | -1631 | -1884 | -1393 | **ITERATE** | cost |
+| **equal_weight** | +0.0501 | +5.91 | 1.00 | yes | pass | 2 | +0 | -1 | -3 | +0 | **ITERATE** | cost |
+| **ic_weighted** | +0.0577 | +5.42 | 1.00 | yes | pass | 4217 | -290 | -1511 | -1816 | -1200 | **ITERATE** | cost |
+| **ridge** | +0.0670 | +6.82 | 1.00 | no | pass | 6523 | -452 | -2434 | -2748 | -2096 | **ITERATE** | hypothesis, cost |
+| **shrinkage_mv** | +0.0663 | +6.84 | 1.00 | no | pass | 6518 | -466 | -2446 | -2770 | -2105 | **ITERATE** | hypothesis, cost |
 
 | member | own horizon | own gate IC | own gate t | own verdict | gate IC here | gate t here | trades (all folds) | net P&L 1x (all folds) |
 |--------|-------------|-------------|------------|-------------|--------------|-------------|--------------------|------------------------|
-| FX01 | 500ms | +0.0183 | +2.26 | ITERATE | +0.0480 | +5.07 | 0 | +0 |
-| FX02 | 1m | +0.0058 | +0.34 | REJECT | +0.0058 | +0.34 | 0 | +0 |
-| FX03 | 1m | +0.0112 | +1.13 | REJECT | +0.0112 | +1.13 | 0 | +0 |
-| FX04 | 30s | +0.0298 | +4.24 | ITERATE | +0.0280 | +3.11 | 0 | +0 |
-| FX05 | 5m | -0.0072 | -0.42 | REJECT | -0.0180 | -0.89 | 137 | -64 |
-| FX06 | 30s | +0.0210 | +1.47 | REJECT | +0.0111 | +0.58 | 0 | +0 |
-| FX07 | 1m | -0.0119 | -1.37 | REJECT | -0.0118 | -1.36 | 0 | +0 |
-| FX08 | 1m | +0.0407 | +3.84 | ITERATE | +0.0407 | +3.84 | 3789 | -1406 |
-| FX09 | 1m | -0.0471 | -5.75 | REJECT | -0.0471 | -5.75 | 3932 | -1441 |
-| FX10 | 1m | +0.0196 | +1.55 | ITERATE | +0.0196 | +1.55 | 840 | -340 |
-| FX11 | 5m | +0.0328 | +2.22 | ITERATE | +0.0351 | +2.93 | 5381 | -2047 |
-| FX12 | 1m | +0.0086 | +1.05 | REJECT | +0.0086 | +1.05 | 0 | +0 |
+| FX01 | 500ms | +0.0222 | +4.34 | ITERATE | +0.0671 | +9.24 | 0 | +0 |
+| FX02 | 1m | +0.0181 | +1.12 | REJECT | +0.0181 | +1.12 | 0 | +0 |
+| FX03 | 1m | +0.0237 | +2.57 | ITERATE | +0.0237 | +2.57 | 0 | +0 |
+| FX04 | 30s | +0.0548 | +8.69 | ITERATE | +0.0474 | +5.88 | 0 | +0 |
+| FX05 | 5m | -0.0125 | -0.68 | REJECT | -0.0075 | -0.37 | 244 | -160 |
+| FX06 | 30s | +0.0081 | +0.66 | REJECT | +0.0068 | +0.45 | 0 | +0 |
+| FX07 | 1m | -0.0117 | -1.05 | REJECT | -0.0119 | -1.06 | 0 | +0 |
+| FX08 | 1m | +0.0471 | +4.44 | ITERATE | +0.0471 | +4.44 | 4812 | -1746 |
+| FX09 | 1m | -0.0604 | -7.08 | REJECT | -0.0604 | -7.08 | 5679 | -2196 |
+| FX10 | 1m | +0.0219 | +2.38 | ITERATE | +0.0219 | +2.38 | 1119 | -478 |
+| FX11 | 5m | +0.0424 | +3.12 | REJECT | +0.0478 | +4.02 | 9119 | -3919 |
+| FX12 | 1m | +0.0205 | +2.51 | ITERATE | +0.0205 | +2.51 | 0 | +0 |
 
 ### Breadth: arithmetic vs measurement
 
-- Members with a defined IC: 12; mean member gate IC +0.0109, mean member gate t +0.97.
-- Mean pairwise signal correlation +0.017 (mean |rho| 0.078); effective independent bets 9.87 of 12 (eigenvalue participation ratio), 10.11 by `K / (1 + (K - 1) rho)`.
-- Expected equal-weight IC = mean IC x sqrt(breadth): +0.0379 if the members were independent, +0.0348 at the measured correlation. **Measured: +0.0315.**
-- Expected gate t = mean member t x sqrt(effective breadth): +3.08. **Measured: +3.22.**
+- Members with a defined IC: 12; mean member gate IC +0.0184, mean member gate t +2.01.
+- Mean pairwise signal correlation +0.017 (mean |rho| 0.081); effective independent bets 9.65 of 12 (eigenvalue participation ratio), 10.10 by `K / (1 + (K - 1) rho)`.
+- Expected equal-weight IC = mean IC x sqrt(breadth): +0.0637 if the members were independent, +0.0584 at the measured correlation. **Measured: +0.0501.**
+- Expected gate t = mean member t x sqrt(effective breadth): +6.38. **Measured: +5.91.**
 
 ### Signal correlation of the members (out-of-sample z, common rows)
 
 | | FX01 | FX02 | FX03 | FX04 | FX05 | FX06 | FX07 | FX08 | FX09 | FX10 | FX11 | FX12 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| FX01 | +1.00 | -0.03 | +0.04 | -0.00 | +0.02 | -0.01 | +0.01 | -0.07 | +0.04 | -0.03 | -0.02 | +0.03 |
-| FX02 | -0.03 | +1.00 | -0.01 | -0.00 | -0.03 | +0.00 | +0.01 | +0.02 | -0.02 | +0.03 | +0.03 | +0.01 |
-| FX03 | +0.04 | -0.01 | +1.00 | +0.37 | -0.00 | -0.01 | -0.00 | -0.02 | +0.12 | -0.03 | -0.05 | +0.29 |
-| FX04 | -0.00 | -0.00 | +0.37 | +1.00 | +0.00 | +0.00 | +0.01 | +0.02 | +0.08 | -0.00 | -0.02 | +0.46 |
-| FX05 | +0.02 | -0.03 | -0.00 | +0.00 | +1.00 | -0.01 | +0.13 | -0.22 | +0.09 | -0.12 | -0.25 | -0.01 |
-| FX06 | -0.01 | +0.00 | -0.01 | +0.00 | -0.01 | +1.00 | +0.02 | +0.11 | -0.05 | +0.05 | +0.23 | +0.00 |
-| FX07 | +0.01 | +0.01 | -0.00 | +0.01 | +0.13 | +0.02 | +1.00 | -0.02 | -0.00 | +0.01 | +0.01 | +0.01 |
-| FX08 | -0.07 | +0.02 | -0.02 | +0.02 | -0.22 | +0.11 | -0.02 | +1.00 | -0.36 | +0.26 | +0.39 | +0.01 |
-| FX09 | +0.04 | -0.02 | +0.12 | +0.08 | +0.09 | -0.05 | -0.00 | -0.36 | +1.00 | -0.21 | -0.40 | +0.06 |
-| FX10 | -0.03 | +0.03 | -0.03 | -0.00 | -0.12 | +0.05 | +0.01 | +0.26 | -0.21 | +1.00 | +0.21 | -0.00 |
-| FX11 | -0.02 | +0.03 | -0.05 | -0.02 | -0.25 | +0.23 | +0.01 | +0.39 | -0.40 | +0.21 | +1.00 | -0.01 |
-| FX12 | +0.03 | +0.01 | +0.29 | +0.46 | -0.01 | +0.00 | +0.01 | +0.01 | +0.06 | -0.00 | -0.01 | +1.00 |
+| FX01 | +1.00 | -0.04 | +0.05 | +0.00 | +0.01 | -0.01 | +0.01 | -0.06 | +0.03 | -0.02 | -0.02 | +0.03 |
+| FX02 | -0.04 | +1.00 | -0.01 | -0.01 | -0.02 | +0.00 | +0.01 | +0.02 | -0.02 | +0.03 | +0.03 | -0.00 |
+| FX03 | +0.05 | -0.01 | +1.00 | +0.41 | +0.00 | -0.00 | -0.00 | -0.01 | +0.09 | -0.02 | -0.04 | +0.29 |
+| FX04 | +0.00 | -0.01 | +0.41 | +1.00 | +0.00 | +0.01 | +0.01 | +0.03 | +0.06 | +0.00 | -0.01 | +0.45 |
+| FX05 | +0.01 | -0.02 | +0.00 | +0.00 | +1.00 | -0.01 | +0.18 | -0.23 | +0.11 | -0.12 | -0.26 | -0.01 |
+| FX06 | -0.01 | +0.00 | -0.00 | +0.01 | -0.01 | +1.00 | +0.02 | +0.11 | -0.06 | +0.05 | +0.22 | +0.00 |
+| FX07 | +0.01 | +0.01 | -0.00 | +0.01 | +0.18 | +0.02 | +1.00 | -0.02 | -0.00 | +0.01 | +0.01 | +0.00 |
+| FX08 | -0.06 | +0.02 | -0.01 | +0.03 | -0.23 | +0.11 | -0.02 | +1.00 | -0.41 | +0.26 | +0.43 | +0.01 |
+| FX09 | +0.03 | -0.02 | +0.09 | +0.06 | +0.11 | -0.06 | -0.00 | -0.41 | +1.00 | -0.23 | -0.43 | +0.04 |
+| FX10 | -0.02 | +0.03 | -0.02 | +0.00 | -0.12 | +0.05 | +0.01 | +0.26 | -0.23 | +1.00 | +0.24 | +0.00 |
+| FX11 | -0.02 | +0.03 | -0.04 | -0.01 | -0.26 | +0.22 | +0.01 | +0.43 | -0.43 | +0.24 | +1.00 | -0.01 |
+| FX12 | +0.03 | -0.00 | +0.29 | +0.45 | -0.01 | +0.00 | +0.00 | +0.01 | +0.04 | +0.00 | -0.01 | +1.00 |
 
 Pairs above the lifecycle's `max_cross_alpha_correlation` (0.7): none. Of such a pair the alpha with the larger id would be held at CANDIDATE once the other had reached the gate's peer state; today no alpha has, so the gate passes vacuously for all 24.
 
@@ -193,15 +194,15 @@ Pairs above the lifecycle's `max_cross_alpha_correlation` (0.7): none. Of such a
 
 | | FX05 | FX08 | FX09 | FX10 | FX11 |
 |---|---|---|---|---|---|
-| FX05 | +1.00 | -0.02 | -0.02 | +0.01 | +0.05 |
-| FX08 | -0.02 | +1.00 | +0.41 | +0.16 | +0.16 |
-| FX09 | -0.02 | +0.41 | +1.00 | +0.08 | +0.13 |
-| FX10 | +0.01 | +0.16 | +0.08 | +1.00 | +0.03 |
-| FX11 | +0.05 | +0.16 | +0.13 | +0.03 | +1.00 |
+| FX05 | +1.00 | -0.17 | -0.03 | +0.04 | +0.08 |
+| FX08 | -0.17 | +1.00 | +0.45 | +0.17 | +0.18 |
+| FX09 | -0.03 | +0.45 | +1.00 | +0.09 | +0.17 |
+| FX10 | +0.04 | +0.17 | +0.09 | +1.00 | +0.12 |
+| FX11 | +0.08 | +0.18 | +0.17 | +0.12 | +1.00 |
 
 ### Weights per fold and their stability
 
-**equal_weight** — mean pairwise cosine of the fold weight vectors +1.000 (min +1.000); largest |signal correlation| with a member 0.54.
+**equal_weight** — mean pairwise cosine of the fold weight vectors +1.000 (min +1.000); largest |signal correlation| with a member 0.55.
 
 | fold | FX01 | FX02 | FX03 | FX04 | FX05 | FX06 | FX07 | FX08 | FX09 | FX10 | FX11 | FX12 | beta > 0 | detail |
 |------|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -210,40 +211,40 @@ Pairs above the lifecycle's `max_cross_alpha_correlation` (0.7): none. Of such a
 | 3 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | yes | - |
 | 4 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | +0.083 | yes | - |
 
-**ic_weighted** — mean pairwise cosine of the fold weight vectors +0.975 (min +0.959); largest |signal correlation| with a member 0.83.
+**ic_weighted** — mean pairwise cosine of the fold weight vectors +0.975 (min +0.962); largest |signal correlation| with a member 0.83.
 
 | fold | FX01 | FX02 | FX03 | FX04 | FX05 | FX06 | FX07 | FX08 | FX09 | FX10 | FX11 | FX12 | beta > 0 | detail |
 |------|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | +0.000 | +0.000 | +0.022 | +0.038 | +0.000 | +0.008 | +0.037 | +0.375 | +0.000 | +0.215 | +0.267 | +0.038 | yes | - |
-| 2 | +0.000 | +0.000 | +0.000 | +0.063 | +0.019 | +0.063 | +0.000 | +0.337 | +0.000 | +0.254 | +0.215 | +0.048 | yes | - |
-| 3 | +0.000 | +0.000 | +0.000 | +0.036 | +0.000 | +0.077 | +0.000 | +0.360 | +0.000 | +0.267 | +0.226 | +0.033 | yes | - |
-| 4 | +0.032 | +0.000 | +0.000 | +0.019 | +0.000 | +0.104 | +0.000 | +0.363 | +0.000 | +0.168 | +0.299 | +0.015 | yes | - |
+| 1 | +0.000 | +0.000 | +0.000 | +0.057 | +0.000 | +0.016 | +0.032 | +0.386 | +0.000 | +0.208 | +0.260 | +0.042 | yes | - |
+| 2 | +0.000 | +0.000 | +0.000 | +0.073 | +0.000 | +0.103 | +0.000 | +0.327 | +0.000 | +0.228 | +0.221 | +0.047 | yes | - |
+| 3 | +0.000 | +0.000 | +0.000 | +0.059 | +0.000 | +0.077 | +0.000 | +0.336 | +0.000 | +0.248 | +0.253 | +0.026 | yes | - |
+| 4 | +0.053 | +0.000 | +0.000 | +0.047 | +0.000 | +0.100 | +0.000 | +0.325 | +0.000 | +0.158 | +0.303 | +0.013 | yes | - |
 
-**ridge** — mean pairwise cosine of the fold weight vectors +0.916 (min +0.878); largest |signal correlation| with a member 0.83.
-
-| fold | FX01 | FX02 | FX03 | FX04 | FX05 | FX06 | FX07 | FX08 | FX09 | FX10 | FX11 | FX12 | beta > 0 | detail |
-|------|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | +0.002 | -0.126 | +0.047 | +0.018 | +0.007 | -0.019 | +0.036 | +0.220 | -0.340 | +0.092 | +0.065 | +0.029 | yes | lambda 0.1 |
-| 2 | -0.027 | -0.061 | -0.020 | +0.057 | +0.024 | +0.037 | -0.030 | +0.194 | -0.287 | +0.149 | +0.078 | +0.037 | yes | lambda 1 |
-| 3 | -0.003 | -0.042 | -0.029 | +0.045 | -0.020 | +0.046 | -0.061 | +0.228 | -0.323 | +0.162 | +0.009 | +0.033 | yes | lambda 0.1 |
-| 4 | +0.061 | -0.011 | -0.009 | +0.032 | -0.084 | +0.061 | -0.035 | +0.236 | -0.292 | +0.054 | +0.110 | +0.015 | yes | lambda 0.1 |
-
-**shrinkage_mv** — mean pairwise cosine of the fold weight vectors +0.894 (min +0.813); largest |signal correlation| with a member 0.84.
+**ridge** — mean pairwise cosine of the fold weight vectors +0.915 (min +0.850); largest |signal correlation| with a member 0.87.
 
 | fold | FX01 | FX02 | FX03 | FX04 | FX05 | FX06 | FX07 | FX08 | FX09 | FX10 | FX11 | FX12 | beta > 0 | detail |
 |------|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | +0.003 | -0.143 | +0.049 | +0.016 | +0.009 | -0.019 | +0.036 | +0.216 | -0.345 | +0.086 | +0.049 | +0.029 | yes | shrinkage 0.011 |
-| 2 | -0.016 | -0.118 | -0.019 | +0.061 | +0.053 | +0.035 | -0.037 | +0.167 | -0.320 | +0.130 | -0.014 | +0.031 | yes | shrinkage 0.006 |
-| 3 | -0.000 | -0.048 | -0.028 | +0.045 | -0.021 | +0.046 | -0.060 | +0.222 | -0.326 | +0.156 | -0.014 | +0.033 | yes | shrinkage 0.004 |
-| 4 | +0.064 | -0.013 | -0.008 | +0.033 | -0.096 | +0.061 | -0.035 | +0.236 | -0.299 | +0.047 | +0.093 | +0.015 | yes | shrinkage 0.003 |
+| 1 | -0.025 | -0.127 | +0.017 | +0.036 | +0.026 | -0.016 | +0.030 | +0.218 | -0.374 | +0.074 | +0.041 | +0.017 | yes | lambda 0.1 |
+| 2 | -0.024 | -0.052 | -0.022 | +0.065 | +0.014 | +0.070 | -0.026 | +0.187 | -0.304 | +0.126 | +0.076 | +0.033 | yes | lambda 1 |
+| 3 | +0.022 | -0.033 | -0.040 | +0.082 | -0.033 | +0.041 | -0.056 | +0.174 | -0.349 | +0.132 | +0.029 | +0.009 | yes | lambda 0.1 |
+| 4 | +0.079 | -0.006 | -0.005 | +0.071 | -0.089 | +0.056 | -0.028 | +0.170 | -0.330 | +0.044 | +0.114 | -0.008 | yes | lambda 0.1 |
+
+**shrinkage_mv** — mean pairwise cosine of the fold weight vectors +0.899 (min +0.829); largest |signal correlation| with a member 0.89.
+
+| fold | FX01 | FX02 | FX03 | FX04 | FX05 | FX06 | FX07 | FX08 | FX09 | FX10 | FX11 | FX12 | beta > 0 | detail |
+|------|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | -0.023 | -0.145 | +0.019 | +0.035 | +0.032 | -0.015 | +0.030 | +0.214 | -0.381 | +0.068 | +0.023 | +0.015 | yes | shrinkage 0.009 |
+| 2 | -0.014 | -0.099 | -0.029 | +0.075 | +0.032 | +0.073 | -0.033 | +0.152 | -0.344 | +0.101 | -0.024 | +0.025 | yes | shrinkage 0.005 |
+| 3 | +0.024 | -0.038 | -0.043 | +0.088 | -0.037 | +0.043 | -0.057 | +0.168 | -0.361 | +0.129 | +0.006 | +0.006 | yes | shrinkage 0.003 |
+| 4 | +0.081 | -0.007 | -0.006 | +0.075 | -0.101 | +0.056 | -0.027 | +0.161 | -0.338 | +0.037 | +0.097 | -0.012 | yes | shrinkage 0.003 |
 
 ### Leakage checks
 
 - Fitted parameters of the last fold are identical when every label from the test start onwards is replaced by garbage: `equal_weight` yes, `ic_weighted` yes, `ridge` yes, `shrinkage_mv` yes.
-- `equal_weight`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0315 against the validation's +0.0315.
-- `ic_weighted`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0428 against the validation's +0.0428.
-- `ridge`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0482 against the validation's +0.0482.
-- `shrinkage_mv`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0478 against the validation's +0.0478.
+- `equal_weight`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0501 against the validation's +0.0501.
+- `ic_weighted`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0577 against the validation's +0.0577.
+- `ridge`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0670 against the validation's +0.0670.
+- `shrinkage_mv`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0663 against the validation's +0.0663.
 
 ## Result
 

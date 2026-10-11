@@ -1,6 +1,8 @@
 //! Golden suite for the native feature engine (API_FEATURES.md §5).
 //!
-//! Drives the pinned golden vectors through the engine at cadence 0 and
+//! Drives the pinned golden vectors through the engine at cadence 0
+//! (same-timestamp events coalesced, v1.14 D-P1-1: `group_ends` +
+//! `apply_grouped`, a row per (instrument, exchange_ts) group) and
 //! compares every checkpoint feature this engine computes natively — by
 //! registry name, valid flags exact, values at abs 1e-9 / rel 1e-9. Also
 //! verifies the registry contract (`registry_hash`, `registered_count`).
@@ -9,7 +11,7 @@ mod support;
 
 use std::collections::BTreeMap;
 
-use features::{FeatureEngine, FeatureVector, FEATURE_NAMES};
+use features::{group_ends, FeatureEngine, FeatureVector, FEATURE_NAMES};
 use marketdata::{read_jsonl, MarketEvent};
 use support::{golden_path, sha256_hex};
 
@@ -28,26 +30,33 @@ fn engine_for(instrument_id: u32, tick: f64) -> FeatureEngine {
     FeatureEngine::new(ticks, 0).expect("engine construction")
 }
 
-/// Run `events` through a fresh engine, returning the vector emitted after
-/// each event (cadence 0).
-fn run_vectors(events: &[MarketEvent], instrument_id: u32, tick: f64) -> Vec<FeatureVector> {
+/// Run `events` through a fresh engine (coalesced), returning per event the
+/// vector it emitted: `Some` exactly on the event closing its timestamp
+/// group (cadence 0).
+fn run_vectors(
+    events: &[MarketEvent],
+    instrument_id: u32,
+    tick: f64,
+) -> Vec<Option<FeatureVector>> {
     let mut eng = engine_for(instrument_id, tick);
-    events
+    let ends = group_ends(events);
+    let out: Vec<Option<FeatureVector>> = events
         .iter()
-        .map(|ev| {
-            eng.apply(ev)
-                .expect("golden events apply cleanly")
-                .expect("cadence 0 emits after every event")
-        })
-        .collect()
+        .zip(&ends)
+        .map(|(ev, &end)| eng.apply_grouped(ev, end).expect("golden events apply cleanly"))
+        .collect();
+    for (row, &end) in out.iter().zip(&ends) {
+        assert_eq!(row.is_some(), end, "cadence 0 emits exactly on group ends");
+    }
+    out
 }
 
-fn eq_vectors() -> Vec<FeatureVector> {
+fn eq_vectors() -> Vec<Option<FeatureVector>> {
     let events = read_jsonl(golden_path("events_eq_mbo.jsonl")).expect("EQ vector");
     run_vectors(&events, 1, 0.01)
 }
 
-fn fx_vectors() -> Vec<FeatureVector> {
+fn fx_vectors() -> Vec<Option<FeatureVector>> {
     let events = read_jsonl(golden_path("events_fx_quote.jsonl")).expect("FX vector");
     run_vectors(&events, 101, 1e-5)
 }
@@ -78,7 +87,18 @@ fn check_checkpoint(golden: &serde_json::Value, key: &str, index: &str, vec: &Fe
         if want_valid {
             let want = entry["value"].as_f64().expect("value");
             let got = vec.values[slot];
-            let tol = ABS_TOL + REL_TOL * want.abs();
+            let mut tol = ABS_TOL + REL_TOL * want.abs();
+            // rvol_w1m float residue / (rvol_w5m + EPS): see the burst check
+            if name == "vol_regime_ratio_v1"
+                && feats
+                    .get("rvol_w1m_v1")
+                    .and_then(|e| e["value"].as_f64())
+                    .map_or(true, |v| v.abs() <= 1e-9)
+            {
+                let rv5 = features::feature_index("rvol_w5m_v1").map_or(0.0, |i| vec.values[i]);
+                let rv5 = if rv5.is_nan() { 0.0 } else { rv5.abs() };
+                tol += 1e-9 / (rv5 + 1e-12);
+            }
             assert!(
                 (got - want).abs() <= tol,
                 "{key}@{index} {name}: got {got}, want {want} (tol {tol})"
@@ -97,9 +117,12 @@ fn check_checkpoint(golden: &serde_json::Value, key: &str, index: &str, vec: &Fe
 fn eq_golden_checkpoints_match() {
     let golden = load_json("expected_features.json");
     let vectors = eq_vectors();
-    for index in ["500", "1000", "1500", "2000"] {
+    let keys: Vec<String> = golden["eq"]["checkpoints"].as_object().unwrap().keys().cloned().collect();
+    assert_eq!(keys.len(), 4);
+    for index in &keys {
         let row: usize = index.parse::<usize>().unwrap() - 1;
-        check_checkpoint(&golden, "eq", index, &vectors[row]);
+        let vec = vectors[row].as_ref().expect("a checkpoint closes its timestamp group");
+        check_checkpoint(&golden, "eq", index, vec);
     }
 }
 
@@ -107,9 +130,12 @@ fn eq_golden_checkpoints_match() {
 fn fx_golden_checkpoints_match() {
     let golden = load_json("expected_features.json");
     let vectors = fx_vectors();
-    for index in ["400", "800"] {
+    let keys: Vec<String> = golden["fx"]["checkpoints"].as_object().unwrap().keys().cloned().collect();
+    assert_eq!(keys.len(), 2);
+    for index in &keys {
         let row: usize = index.parse::<usize>().unwrap() - 1;
-        check_checkpoint(&golden, "fx", index, &vectors[row]);
+        let vec = vectors[row].as_ref().expect("a checkpoint closes its timestamp group");
+        check_checkpoint(&golden, "fx", index, vec);
     }
 }
 
@@ -150,7 +176,7 @@ fn registry_contract_agrees() {
 
 #[test]
 fn nan_never_valid_and_bits_pack() {
-    for vec in eq_vectors().iter().chain(fx_vectors().iter()) {
+    for vec in eq_vectors().iter().chain(fx_vectors().iter()).flatten() {
         for (i, &v) in vec.values.iter().enumerate() {
             if vec.validity[i] {
                 assert!(v.is_finite(), "valid slot {i} carries non-finite {v}");
@@ -173,6 +199,7 @@ fn warmup_gates_windowed_features() {
     let w30 = features::feature_index("ofi_l1_w30s_v1").unwrap();
     let sv1m = features::feature_index("signed_volume_w1m_v1").unwrap();
     for (ev, vec) in events.iter().zip(&vectors) {
+        let Some(vec) = vec else { continue };
         let elapsed = ev.exchange_ts - first_ts;
         if elapsed < 30_000_000_000 {
             assert!(!vec.validity[w30], "ofi_l1_w30s valid during warmup");
@@ -184,7 +211,7 @@ fn warmup_gates_windowed_features() {
         }
     }
     // the 30s window becomes valid eventually
-    assert!(vectors.last().unwrap().validity[w30]);
+    assert!(vectors.last().unwrap().as_ref().unwrap().validity[w30]);
 }
 
 #[test]
@@ -230,8 +257,9 @@ fn check_anomaly_side(golden: &serde_json::Value, side: &str, tick: f64) {
     let mut eng = engine_for(instrument_id, tick);
     let cps = doc["checkpoints"].as_object().expect("checkpoints");
     let mut checked = 0usize;
+    let ends = group_ends(&events);
     for (i, ev) in events.iter().enumerate() {
-        let vec = eng.apply(ev).expect("anomaly events never error");
+        let vec = eng.apply_grouped(ev, ends[i]).expect("anomaly events never error");
         let key = (i + 1).to_string();
         let Some(cp) = cps.get(&key) else { continue };
         let vec = vec.unwrap_or_else(|| panic!("{side}@{key}: cadence 0 must emit"));
@@ -329,8 +357,9 @@ fn check_snapshot_burst_side(side: &str, tick: f64) {
     let cps = doc["checkpoints"].as_object().expect("checkpoints");
     let mut eng = engine_for(instrument_id, tick);
     let (mut seen, mut checked) = (0usize, 0usize);
+    let ends = group_ends(&events);
     for (i, ev) in events.iter().enumerate() {
-        let vec = eng.apply(ev).expect("anomaly events never error");
+        let vec = eng.apply_grouped(ev, ends[i]).expect("anomaly events never error");
         let key = (i + 1).to_string();
         let Some(cp) = cps.get(&key) else { continue };
         let vec = vec.unwrap_or_else(|| panic!("burst {side}@{key}: cadence 0 must emit"));

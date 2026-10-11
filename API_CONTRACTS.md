@@ -11,7 +11,7 @@ per type and is matched by the Java, Rust and C++ record ports.
 | what | where |
 |---|---|
 | Package | `python/src/iap/contracts/{__init__,ids,versions,types,protocols,validate,examples}.py` |
-| Schemas | 17 files under `schemas/<domain>/` (index: `schemas/README.md`); `iap.contracts.versions.SCHEMA_VERSIONS` lists all 17 with their `x-version` (all 1) |
+| Schemas | 17 files under `schemas/<domain>/` (index: `schemas/README.md`); `iap.contracts.versions.SCHEMA_VERSIONS` lists all 17 with their `x-version` (all 1 except `risk/risk_event.schema.json`, 2 since v1.14) |
 | Golden | `tests/golden/expected_contracts_examples.json` (x-version 1; 22 examples, the pinned `explain` block, the trace id, a `canonical_json` known answer; generator `python/tools/make_golden_contracts.py`, refuses overwrite without `--force`) |
 | Tests | `python/tests/test_contracts.py`, `python/tests/test_contracts_schema_golden.py` (`SCHEMA_VERSIONS` == the files on disk == every type's `x_version`) |
 | Ports of the record types | Java `com.iap.trace.*Rec` + `com.iap.contracts.{CanonicalJson,Trees,PyFormat}`; Rust `contracts::trace` (serde structs, `deny_unknown_fields`, `validate()`); C++ `iap::contracts::{Value, DecisionTrace, …}` — all against the same golden |
@@ -69,7 +69,9 @@ from iap.contracts.examples import all_examples, example_trace
 
 **PortfolioTarget** (`portfolio/portfolio_target.schema.json`): `strategy_id id, timestamp_ns i64, portfolio_version, feature_version, model_version sha256, solver_status SolverStatus{OPTIMAL, INFEASIBLE, MAX_ITER}, objective_value float, turnover float >= 0, targets tuple[PortfolioLeg]` sorted by unique `instrument_id`. From `PGDResult`: `status → solver_status` (`MAX_ITER` reserved for a budget-exhausted solve), `objective → objective_value`.
 
-**RiskDecision** (`risk/risk_decision.schema.json`): `order_id u64, strategy_id id, instrument_id u32, timestamp_ns i64, decision Decision{ALLOW=1, REJECT=2, KILL=3}, rule_id str, rule_index int [-1..65535], reason str`. Invariants: ALLOW ⇔ `rule_index == -1`; REJECT/KILL need `rule_index >= 0`. `RiskDecision.from_risk_event(event_dict, order_id=, strategy_id=, instrument_id=, rule_index=-1)` builds it from a `risk_event.schema.json` record; `rule_index` is the pinned check index of PLATFORM_CONVENTIONS.md §11.1 (`FX_RATE_MISSING` = 12, `FAT_FINGER_NOTIONAL … STRATEGY_LOSS` = 13..22).
+**RiskDecision** (`risk/risk_decision.schema.json`): `order_id u64, strategy_id id, instrument_id u32, timestamp_ns i64, decision Decision{ALLOW=1, REJECT=2, KILL=3}, rule_id str, rule_index int [-1..65535], reason str`. Invariants: ALLOW ⇔ `rule_index == -1`; REJECT/KILL need `rule_index >= 0`. `RiskDecision.from_risk_event(event_dict, order_id=, strategy_id=, instrument_id=, rule_index=-1)` builds it from a `risk_event.schema.json` record; `rule_index` is the pinned check index of PLATFORM_CONVENTIONS.md §11.1 (`FX_RATE_MISSING` = 12, `FAT_FINGER_NOTIONAL … STRATEGY_LOSS` = 13..22, and since v1.14 the SEC
+15c3-5 checks `RESTRICTED_INSTRUMENT … VENUE_MESSAGE_RATE` = 23..29). The range `[-1..65535]` already
+covered the new indices, so the contract and its schema did not change.
 
 **ParentOrder** (`order/parent_order.schema.json`): `parent_order_id u64, strategy_id id, alpha_id id, instrument_id u32, side Side{BID=0, ASK=1}, qty i64 >= 1, algo Algo{TWAP, VWAP, POV, IS}, decision_ts, arrival_ts, end_ts i64 (decision <= arrival <= end), urgency [0,1], limit_price_ticks i64 >= 0 (0 = unpriced), params dict[str, float]` (keys `^[A-Za-z_][A-Za-z0-9_]*$`; `participation` for POV).
 
@@ -168,7 +170,8 @@ protocol uses `state_summary` / `checkpoint` and deliberately has no
 
 ## 5. Versioning
 
-Every schema carries `x-version` (all 17 at 1). `SCHEMA_VERSIONS`
+Every schema carries `x-version` (16 at 1; `risk/risk_event.schema.json` at 2 since v1.14, when every
+risk event gained `seq` and `prev_sha256` for the audit hash chain). `SCHEMA_VERSIONS`
 (relpath → int) is the inventory; the golden test asserts it equals the
 files on disk and each type's `x_version`. A field change = bump the schema
 file, the constant and the type, regenerate the golden with `--force`, add a

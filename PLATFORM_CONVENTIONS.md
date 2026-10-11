@@ -339,7 +339,69 @@ implements it (`docs/SCENARIOS.md`, TRADING section).
   8 `VENUE_DISCONNECTED`; 9 `SEQUENCE_GAP`; 10 `STALE_PRICE`; 11 `FAT_FINGER_QTY`;
   12 `FX_RATE_MISSING`; 13 `FAT_FINGER_NOTIONAL`; 14 `PRICE_BAND`; 15 `RATE_THROTTLE`;
   16 `SELF_MATCH`; 17 `POSITION_LIMIT`; 18 `INSTRUMENT_NOTIONAL`; 19 `GROSS_NOTIONAL`;
-  20 `NET_NOTIONAL`; 21 `DAILY_LOSS`; 22 `STRATEGY_LOSS`; else `ALLOW`.
+  20 `NET_NOTIONAL`; 21 `DAILY_LOSS`; 22 `STRATEGY_LOSS`; then the SEC 15c3-5 set (v1.14,
+  each off unless its `pre_trade` key is configured) 23 `RESTRICTED_INSTRUMENT`;
+  24 `MAX_OPEN_ORDERS`; 25 `MAX_OPEN_NOTIONAL`; 26 `STRATEGY_POSITION`; 27 `PARTICIPATION`;
+  28 `CANCEL_RATE`; 29 `VENUE_MESSAGE_RATE`; else `ALLOW`. Check 7 also rejects
+  `STATE_CAPACITY` (rule index 30) when `pre_trade.max_tracked_keys` is reached.
+- **SEC 15c3-5 pre-trade controls (v1.14, review item G-P0-2; `risk.json` x-version 4)**. Every
+  x-version 4 key is optional: absent or `null` turns that control off, a present key is parsed
+  strictly in this order after `currency` (the first error names its key):
+  `market_data.max_mid_jump_ratio` (> 1), `pre_trade.{restricted_instruments (u32 array),
+  max_open_orders, max_open_notional, max_strategy_position_qty, max_participation_bps (+ required
+  participation_floor_qty), max_cancels_per_sec (+ required cancel_burst), max_venue_msgs_per_sec
+  (+ required venue_msg_burst), max_tracked_keys}`, `overrides.{max_loss_override_multiple,
+  min_approvers}`. The checks run after every legacy check, so an order a legacy rule rejects keeps
+  its rule id (no existing golden decision moved) and only an order about to be allowed spends a
+  venue message token. 24: open orders of the strategy + this one `> max_open_orders`. 25: the
+  strategy's open orders valued as in check 19 + this order's notional, `!(total <=
+  max_open_notional)`. 26: `lot pos + same-side open qty of the strategy ± qty` (symmetric i64;
+  overflow is `MALFORMED_ORDER`), `|projected| > max_strategy_position_qty`. 27: `executed qty
+  (session fills) + every open order's qty + qty` as f64 against `max(floor, market_volume ×
+  bps / 1e4)`; market volume comes from `on_market_trade(instrument, qty, ts)` (unknown
+  instrument or qty <= 0 dropped and counted; saturating), and `roll_session` zeroes both.
+  28: a strategy whose cancel bucket holds < 1 token rejects (the bucket refills like the
+  throttle; `on_cancel_request(strategy, venue, ts)` spends a token and may drive it below 0 —
+  a cancel is never refused). 29: per-venue token bucket, venue 0 (SOR) exempt; orders and
+  cancels spend. Reasons: `instrument <id> is on the restricted list`, `strategy <s> would have
+  <n> open orders, max_open_orders <m>`, `strategy <s> open notional <x> exceeds
+  max_open_notional <m>`, `strategy <s> projected position <p> exceeds
+  max_strategy_position_qty <m>`, `projected session qty <q> exceeds participation cap <c>
+  (<bps>bps of market volume <v>, floor <f>)`, `strategy <s> exceeded <r> cancels/s (burst
+  <b>)`, `venue <id> exceeded <r> messages/s (burst <b>)`, `risk state capacity <n> reached for
+  {seen order ids|open orders|strategies} (fail-closed)`. The repo config turns on every control
+  except participation (it needs the live gateway's trade-print feed) at values that do not bind
+  before the legacy limits.
+- **Reference-price sanity gate (v1.14, G-P2-6)**. `on_market` drops (and counts) an update for
+  a new instrument once `max_tracked_keys` markets exist, a regression (as before), a crossed
+  two-sided book (`bid > ask`, `risk_market_crossed_dropped_total`; a locked book is accepted),
+  and — with `max_mid_jump_ratio` — a two-sided update whose `bid + ask` is more than the ratio
+  above or below the stored two-sided one (f64 compare; an overflowing sum skips the test;
+  `risk_market_jump_dropped_total`). A dropped update leaves the previous mark, which then
+  ages into `STALE_PRICE`.
+- **Bounded state (v1.14, G-P2-7)**: with `max_tracked_keys`, check 7 rejects an order that
+  would add a seen order id, an open order or a strategy bucket beyond the bound
+  (`STATE_CAPACITY`, strategy scope); a market or cancel bucket beyond it is dropped and counted
+  (`risk_state_capacity_dropped_total`). Venue buckets are bounded by the u16 id space.
+- **Bounded, two-party loss override (v1.14, G-P2-3)**: with `overrides.min_approvers` the
+  `approver` argument is a comma-separated list whose distinct space-trimmed non-empty names must
+  number at least that many; with `max_loss_override_multiple` the new limit may not exceed that
+  multiple of the configured (not the current) limit. A refused override changes nothing, emits
+  `LOSS_LIMIT_OVERRIDE_REJECTED` (BREACH, REJECT) and fails: `loss limit override needs <n>
+  distinct approvers, got <k>: <approver>` / `loss limit override <x> exceeds cap <c> (<m>x the
+  configured <base>)`.
+- **Audit hash chain (v1.14, G-P0-1; `risk_event.schema.json` x-version 2)**. Every record an
+  engine emits carries `seq` (1, 2, 3, ...) and `prev_sha256`, the lowercase hex SHA-256 of the
+  previous record's JSONL line (UTF-8, no newline; 64 zeros for the first). The head
+  (`audit_chain_head()`) is not part of the snapshot (the snapshot is the trading state, identical
+  for an unbroken and a restored engine); `restore` with a chain head (`restore_chained` in Rust
+  and Java, `restore(..., chain=)` in Python) continues the chain, so `STATE_RESTORED` links to
+  the last record before the snapshot, and without one the restored engine starts a new chain.
+  The Java paper session records the head in `session_state.json`
+  (`risk_audit_seq`, `risk_audit_head_sha256`) and resumes chained, so `risk_audit.jsonl` is one
+  chain across restarts. `verify_audit_chain` (Python, Rust) checks a log; restore-tail parity
+  tests compare records without their chain fields (`unchained_line`). Snapshot x-version 2 adds
+  `open.*.strategy_id`, `venue_buckets`, `cancel_buckets`, `market_volume` and `executed`.
 - **Reference data**: `InstrumentRef{tick_size, qty_unit, quote_ccy}` per instrument, from
   `configs/instruments/instruments.json` (`qty_unit` = `lot_size` for FX, 1 for EQUITY/ETF — §1). An
   instrument without reference data is `UNKNOWN_INSTRUMENT`; an engine built from a missing or
@@ -384,7 +446,7 @@ implements it (`docs/SCENARIOS.md`, TRADING section).
 - **Fills**: `on_fill` validates (qty > 0, side ∈ {0,1}, price > 0, known instrument); a
   malformed fill is not applied (`MALFORMED_FILL` audit + `risk_malformed_fills_total`).
 - **Snapshot / restore / bootstrap**: `snapshot()` serialises the full mutable state
-  (`x-version` 1, sorted keys, `tests/golden/expected_risk_snapshot.json`); `restore` resumes it
+  (`x-version` 2 since v1.14, sorted keys, `tests/golden/expected_risk_snapshot.json`); `restore` resumes it
   with bit-identical subsequent decisions and audit lines; an engine created with
   `require_bootstrap` rejects everything with `NOT_BOOTSTRAPPED` until `bootstrap_positions` or
   `restore` (audited `BOOTSTRAP_COMPLETE` / `STATE_RESTORED`).
@@ -488,7 +550,7 @@ displayed top-10 depth, one fill per level, simulated fills never mutate the rep
 (3b) displayed liquidity consumed by an earlier child or by the crossing check is debited in an
 overlay and never re-used on the same display — a level refresh caps the overlay at
 `min(consumed, new displayed)`; (4) deterministic queue position (only book-APPLIED events are tracked;
-a cancel advances us only when the cancelled order is known to be ahead; trade-through, marketable-ADD expansion, crossing with the double-count exemption); (5) fees;
+a cancel, or a MODIFY size decrease (X-P1-1, v1.14), advances us only when that order is known to be ahead; trade-through, marketable-ADD expansion, crossing with the double-count exemption); (5) fees;
 (6) linear impact identical to the research cost model, `impact_bps = coeff × (qty × qty_unit /
 adv × 100)`; (7) cancels travel the same latency path, take effect at `max(cancel arrival, order
 arrival)`, `expire_ts` (time-in-force) expires pending or resting orders before activation,
@@ -631,7 +693,7 @@ may apply `lot_size` a second time and none may omit it. Consequences that are t
 
 - The platform's durable state lives under `--state-dir` (`$IAP_STATE_DIR`, default `<report
   dir>/state`), written with `fsync` via an atomic temp-file rename:
-  `risk_snapshot.json` (`RiskEngine.snapshot()`, schema `x-version 1`), `session_state.json`
+  `risk_snapshot.json` (`RiskEngine.snapshot()`, schema `x-version 2`), `session_state.json`
   (event cursor, positions, realized/gross P&L, equity peak, order-id sequence, restart count,
   `audit_lines`, `trace_lines` — `x-version 2` since 2026-09-19 — and, since 2026-10-03,
   `risk_snapshot_sha256`; still `x-version 2`, a state file without the field resumes
@@ -1075,7 +1137,7 @@ Artefacts:
 byte-deterministic, re-rendered byte-identically by
 the Rust and Java ports) and `research/lifecycle_transitions.jsonl` (canonical `LifecycleTransition`
 lines, schema-validated on write); `research/lifecycle_log.jsonl` is the adaptive study's policy
-comparison and never sets a state. The bundled result: 24 CANDIDATE / 0 beyond
+comparison and never sets a state. The bundled result: 23 CANDIDATE / 0 beyond
 (`net_pnl_after_costs` and `net_pnl_bootstrap_ci` fail for all 24 — 17 alphas make no trade, 7
 have a negative lower bound; `cross_alpha_correlation` passes vacuously for all 24, nobody being
 at VALIDATING). In the live Java loop the state is **observational**
@@ -1479,3 +1541,52 @@ agreed on the defect (§14.1 said the same of the simulator on 2026-09-20).
   only for a copy with no consumer in deployment/, CI, the MVP, a documented
   command or the golden harness. Parity tests are never weakened to retire
   anything. §5 (golden tests) and §11 (normative owners) are unchanged.
+
+## 17. Data mapping and feature semantics corrected in v1.14 (quality review 2026-10-11, D-items)
+
+v1.14 is a correctness release: each rule below replaces earlier behaviour
+**deliberately**, moves synthetic goldens and every real `dataset_version`,
+and is pinned by a test that fails under the old rule. `CHANGELOG.md`
+(v1.14.0) lists every number that moved and by how much.
+
+| item | corrected rule | normative text |
+|---|---|---|
+| D-P1-1 | the events of one instrument sharing an `exchange_ts` are ONE state change: applied and flow-folded one by one, then one refresh / sample / emission at the group's last event (`group_ends`); a trade's effective spread uses the pre-group mid; a venue stale inside the group is a recovery. Python / Rust / C++ (canonical) and Java (port) identical; per-event `apply(ev)` stays for streaming callers (MVP, alpha golden frames) | API_FEATURES §2.3 |
+| D-P1-2 | a post-2014 ITCH hidden print (`P`) is signed by the quote rule against the mapper's own best bid / ask (Lee–Ready), the tick rule only at the mid or without a two-sided quote | REAL_DATA §4.2 |
+| D-P1-3 | an off-grid TRADE price rounds half to even (not half up); residues histogrammed in the manifest | REAL_DATA §4.1 |
+| D-P1-4 | a dataset manifest of x-version 1 (pre-v1.14 rules) is refused by every reader with the reason | REAL_DATA §4, §7 |
+| D-P2-6 | side-less cross prints count in volume / participation / volume profile / volume clock, never in signed flow, trade counts or the effective spread (`--cross-prints fold`, default) | REAL_DATA §4.2 |
+| D-P2-8 | `ref_price` / `adv` per session (as-of: earlier sessions only) in `instruments.json` and the security master; the backtester's impact and the capacity proxy read them | REAL_DATA §7 |
+| D-P2-9 | `config_version` = sha256 over `configs/**` + `reference/**` of a dataset, in the manifest and on every new ledger entry of a `--dataset-dir` run (provenance, not identity) | REAL_DATA §7 |
+| D-P2-10 | an instrument quoted on the half-penny grid gets tick 0.005 (`auto`); a forced 0.01 is refused | REAL_DATA §4.1 |
+| D-P2-12 | ITCH `h` operational halts of the mapped market map to `STATUS HALT` | REAL_DATA §4.2 |
+| D-P2-13 | the feature store's label freshness defaults to `trailing` (causal); `whole_day` is the legacy store; `features_summary.json` records `store_version` 2, `label_freshness`, `same_ts` | API_FEATURES §6 |
+
+The v1.13 feature store is rebuilt exactly by
+`python -m iap.features --same-ts per_event --label-freshness whole_day
+--cross-prints omit` (`python/tests/test_legacy_methods.py` does so to keep
+reproducing the v1.4.0 alpha reports byte for byte).
+
+**Golden tolerance, one residue rule.** Feature goldens compare at
+abs 1e-9 + rel 1e-9. One documented exception, shared by the snapshot-burst
+checks, the pyo3 parity test and (since v1.14) the `expected_features.json`
+checkpoint comparisons of the Rust, C++ and Java ports: when the golden
+`rvol_w1m_v1` is <= 1e-9 (or invalid), `vol_regime_ratio_v1` is compared at
+an extra `1e-9 / (rvol_w5m + 1e-12)` — a zero 1-minute volatility leaves
+~1e-12 of float residue in one engine and an exact 0 in another, and the
+division amplifies it (coalesced FX checkpoint 800: 7.8e-8 vs 0).
+
+## 18. The other v1.14 changes, and where each is pinned
+
+§17 covers the data items. The rest of v1.14 is pinned in the sections it
+changed; this table is the index.
+
+| change | normative text | default |
+|---|---|---|
+| risk audit hash chain (`seq`, `prev_sha256`; chained restore) | §11.1; `risk_event.schema.json` x-version 2 | on |
+| SEC 15c3-5 checks 23-29, bounded two-party override, sanity gate, bounded state | §11.1; `risk.json` x-version 4 | each check off unless its key is set; the repo config sets all but participation |
+| MODIFY size-down credits `ahead_qty` | §11.2 rule 4; `execution.hpp` | on |
+| feed latency, routed exits, hidden prints, per-order markouts, size amends | API_TRADING.md §2.12 | off |
+| causal row block, automatic day-separated HAC, time-shift leakage, looks per gate decision, per-instrument scaling, fold-majority hypothesis | docs/RESEARCH_VALIDITY.md §4b | on in `v2` / `v3` / `v4`; the v1.13 rules as `*_v113` |
+| chained look ledger (x-version 4), trust roots, `ed25519-v2` | docs/governance/GOVERNANCE.md | on |
+| model content hash (`content.json`) | API_ADAPTIVE.md §9.1 | written for new records, backfilled by `verify_content` |

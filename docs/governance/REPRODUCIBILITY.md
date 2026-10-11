@@ -159,14 +159,16 @@ still spans the whole window (a weaker, disclosed protocol).
   §13.2), `report.json` and the stream sha256, refusing first if a
   reference document changed (`config_version`). The golden run is
   `tests/golden/expected_mvp.json`: seed 12345, run `58a10f2194a3c81c`,
-  digest `20d4ff76af0b631c53c488a1cc504c1bbf8d8488dd5c210a947f96d63e734a45`
-  (v1.5.0; the run id is unchanged from v1.3.0 because `mvp.json` and the
+  digest `6fdb3a2ce2d31481246a799112923b67ba8fdf043c4c4138ba75457e34d1cba5`
+  (v1.14.0; `2affe409…` at v1.5.0, `20d4ff76…` at v1.13.0; the run id is unchanged from v1.3.0 because `mvp.json` and the
   seed are. In v1.4.0 the stream, the fitted parameters and therefore the
   digest moved with the generator fix. In v1.5.0 the stream, every count
   and the P&L are identical to v1.4.0, and the digest moved only because
   `config_version`, which every trace carries, hashes `execution.json`,
   `alpha_params.json` and the registry: `f293e7e7…` became `439bbad5…`.
-  A run captured by v1.4.0 therefore replays only from the v1.4.0 tag).
+  A run captured by v1.4.0 therefore replays only from the v1.4.0 tag. In
+  v1.14.0 the refitted `alpha_params.json` moved a few counts and the P&L,
+  and `config_version` became `62d78a3b…`).
 - **A Java paper session** is reproduced by re-running `java/paper.sh` on
   the same vector and configuration: `decision_traces.jsonl` and the
   report's `trace.digest` are a pure function of the event stream
@@ -251,6 +253,27 @@ python3 tools/regenerate_dataset_artifacts.py --only goldens,tca
   `tests/replay/test_generator_determinism.py` pins the raw-file hashes of
   both. An `x-version` 1 generator config that does not name the
   calibration is refused rather than silently given the new default.
+
+## 3.4 What v1.14 added to reproducibility
+
+- **Real datasets carry their rules.** Manifest x-version 2 records
+  `ingest_rules_version` 2 and a `config_version` (sha256 over the
+  dataset's `configs/**` and `reference/**`). A dataset ingested under the
+  old rules is refused, not silently reused, and every `--dataset-dir`
+  ledger entry records the `config_version`.
+- **The look ledger is a hash chain** (x-version 4, `chain_head`,
+  `chain_length`). A pre-registration records the ledger head it was
+  written against, so you can tell which looks had been taken when a
+  hypothesis was registered.
+- **The risk audit log is a hash chain.** A paper session records the head
+  in `session_state.json`; a resumed session continues the chain.
+- **Models have a content hash.** `content_sha256` ignores library
+  versions, so two records of the same fitted model can be matched
+  (API_ADAPTIVE.md §9).
+- **Old rules stay runnable.** `--methods v2_v113` and the
+  `--same-ts per_event --label-freshness whole_day --cross-prints omit`
+  feature flags reproduce v1.13 outputs; `test_legacy_methods.py` keeps
+  the v1.4.0 alpha reports byte-identical through them.
 
 ## 4. Release manifests
 

@@ -1,6 +1,7 @@
 """The research method bundles: ``"v2"`` (the default), ``"legacy_v1"`` and
 the opt-in ``"v3"`` (v1.9 research-validity rules) and ``"v4"`` (v1.12
-overfitting statistics).
+overfitting statistics), each at the v1.14.0 statistics revision, plus the
+frozen v1.13.0 revisions ``"v2_v113"``, ``"v3_v113"`` and ``"v4_v113"``.
 
 Every method choice of the validation chain is an argument somewhere — a
 ``BacktestConfig`` field, a ``CostModel`` field, a ``validate_alpha`` keyword
@@ -46,6 +47,38 @@ data; the bundle debits more looks (``looks``).  The DSR trial count is
 the caller's (``deflated_sharpe_trials``; the research runner passes the
 ledger's distinct configurations).
 
+**Statistics revision v1.14.0 (the correctness release).**  ``v2``,
+``v3`` and ``v4`` carry the review fixes of v1.14.0 (all defaults of
+:mod:`iap.backtest.engine` and :func:`iap.validation.validate.validate_alpha`):
+
+==============================  ==========================  ==========================
+choice                          v1.14.0 (``v2``/``v3``/     v1.13.0 (``*_v113``)
+                                ``v4``)
+==============================  ==========================  ==========================
+backtest row block (R-P0-1)     ``causal``: decision-time   ``auto``: the rows the IC
+                                state only                  scores (label look-ahead)
+HAC bandwidth (R-P1-3)          automatic (>= horizon rule) horizon rule (L = 2)
+HAC across days (R-P1-3)        no lag product across a     adjacent across the
+                                session-day boundary;       overnight gap
+                                ``validity`` block always
+hypothesis_confirmed (R-P2-1)   >= 70 % of folds confirm    last fold's beta
+pooled scaling (R-P2-2)         per instrument              pooled
+leakage (R-P2-3)                + time-shift detector       row shift only
+ledger looks (R-P2-4)           one per gate decision       every report statistic
+==============================  ==========================  ==========================
+
+The bundle NAMES are unchanged, so the ``ExperimentSpec`` of an experiment
+under ``v2`` keeps its ``experiment_id``: a spec is the question, the
+revision is how it is answered.  A result committed before v1.14.0 under
+``v2`` / ``v3`` / ``v4`` was computed at the v1.13.0 revision and is
+reproduced by the matching ``*_v113`` bundle (a pre-registration written
+for v1.13.0 names that bundle to be run as registered).  Every report
+states the revision it was computed at (``methods.row_block``,
+``hac_bandwidth``, ``hac_day_separated``, ``hypothesis_rule``,
+``standardisation``, ``leakage_time_shift``) and the promotion pipeline
+puts :data:`STATS_REVISION` in its ledger identity, so a v1.14.0 run of
+the same alpha on the same data is a new look, never a silent rerun.
+
 ``ExperimentSpec.configuration["methods"]`` carries the bundle name, so it
 is part of an experiment's identity; the report pipelines put it in their
 ledger configuration for the same reason — a statistic computed under the
@@ -61,12 +94,14 @@ are not part of the bundle: they are configured where they live
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from typing import Any
 
 from iap.backtest.costs import DEFAULT_IMPACT_MODEL, LEGACY_IMPACT_MODEL, CostModel
 from iap.backtest.engine import (
     BLOCK_ROWS_AUTO,
+    BLOCK_ROWS_CAUSAL,
     DEFAULT_POSITION_POLICY,
     LEGACY_POSITION_POLICY,
     BacktestConfig,
@@ -77,11 +112,19 @@ from iap.validation.stress import STRESS_VERSION_CARRY, STRESS_VERSION_LEGACY
 from iap.validation.validate import (
     DEFAULT_CAPACITY,
     DEFAULT_GATE_IC_SOURCE,
+    DEFAULT_HAC_BANDWIDTH,
+    DEFAULT_HYPOTHESIS_RULE,
+    DEFAULT_LOOKS_RULE,
     DEFAULT_SIGNIFICANCE,
+    DEFAULT_STANDARDISATION,
     DEFAULT_TSTAT_THRESHOLD,
     LEGACY_CAPACITY,
     LEGACY_SIGNIFICANCE,
     LEGACY_TSTAT_THRESHOLD,
+    V113_HAC_BANDWIDTH,
+    V113_HYPOTHESIS_RULE,
+    V113_LOOKS_RULE,
+    V113_STANDARDISATION,
     looks_per_validation,
 )
 
@@ -92,7 +135,14 @@ __all__ = [
     "METHODS_V2",
     "METHODS_V3",
     "METHODS_V4",
+    "METHODS_V2_V113",
+    "METHODS_V3_V113",
+    "METHODS_V4_V113",
+    "STATS_REVISION",
+    "V113_REVISION",
     "ResearchMethods",
+    "ledger_bundle",
+    "ledger_config",
     "methods",
 ]
 
@@ -100,8 +150,16 @@ METHODS_V2 = "v2"
 METHODS_LEGACY = "legacy_v1"
 METHODS_V3 = "v3"
 METHODS_V4 = "v4"
+#: The frozen v1.13.0 revisions of ``v2`` / ``v3`` / ``v4`` (module docs).
+METHODS_V2_V113 = "v2_v113"
+METHODS_V3_V113 = "v3_v113"
+METHODS_V4_V113 = "v4_v113"
 #: The bundle a pipeline uses when it names none.
 DEFAULT_METHODS = METHODS_V2
+#: The statistics revision of the current ``v2`` / ``v3`` / ``v4``.
+STATS_REVISION = "v1.14"
+#: The revision of ``legacy_v1`` and the ``*_v113`` bundles.
+V113_REVISION = "v1.13"
 
 
 @dataclass(frozen=True)
@@ -125,14 +183,35 @@ class ResearchMethods:
     validity_diagnostics: bool = False
     cpcv: bool = False
     deflated_sharpe: bool = False
+    # v1.14.0 statistics revision (module docs); the field defaults are the
+    # v1.13.0 values, so a bundle that names none keeps the old rules.
+    causal_row_block: bool = False
+    hac_bandwidth: str = V113_HAC_BANDWIDTH
+    hac_day_separated: bool = False
+    hypothesis_rule: str = V113_HYPOTHESIS_RULE
+    standardisation: str = V113_STANDARDISATION
+    leakage_time_shift: bool = False
+    looks_rule: str = V113_LOOKS_RULE
+    revision: str = V113_REVISION
+
+    @property
+    def row_block(self) -> str:
+        """The report name of the backtest row block (``methods.row_block``)."""
+        if self.causal_row_block:
+            return "causal"
+        return "label_valid" if self.block_invalid_label_rows else "none"
 
     def backtest_config(self, **fields: Any) -> BacktestConfig:
         """A ``BacktestConfig`` under this bundle's backtest rules;
         ``fields`` are the protocol knobs (latency, decision age, ...)."""
+        if self.causal_row_block:
+            block: str | None = BLOCK_ROWS_CAUSAL
+        else:
+            block = BLOCK_ROWS_AUTO if self.block_invalid_label_rows else None
         return BacktestConfig(
             position_policy=self.position_policy,
             cap_fills_at_l1=self.cap_fills_at_l1,
-            block_rows_column=BLOCK_ROWS_AUTO if self.block_invalid_label_rows else None,
+            block_rows_column=block,
             **fields,
         )
 
@@ -167,12 +246,24 @@ class ResearchMethods:
             kw["cpcv"] = True
         if self.deflated_sharpe:
             kw["deflated_sharpe"] = True
+        # v1.14.0 statistics revision: named only when it differs from the
+        # validate_alpha default (so the v1.14 v2 keyword set is unchanged).
+        for key, default in (
+            ("hac_bandwidth", DEFAULT_HAC_BANDWIDTH),
+            ("hac_day_separated", True),
+            ("hypothesis_rule", DEFAULT_HYPOTHESIS_RULE),
+            ("standardisation", DEFAULT_STANDARDISATION),
+            ("leakage_time_shift", True),
+        ):
+            if getattr(self, key) != default:
+                kw[key] = getattr(self, key)
         return kw
 
     def looks(self, n_folds: int) -> int:
         """Looks one validation plus the caller's one out-of-sample backtest
         debits (:func:`iap.validation.validate.looks_per_validation` + 1):
-        84 under ``v2`` at four folds, 28 under ``legacy_v1``."""
+        2 under ``v2`` (one gate decision + the holdout, v1.14.0), 84 under
+        ``v2_v113`` at four folds, 28 under ``legacy_v1``."""
         return (
             looks_per_validation(
                 n_folds,
@@ -180,6 +271,7 @@ class ResearchMethods:
                 self.validity_diagnostics,
                 cpcv=self.cpcv,
                 deflated_sharpe=self.deflated_sharpe,
+                looks_rule=self.looks_rule,
             )
             + 1
         )
@@ -235,6 +327,35 @@ METHODS: dict[str, ResearchMethods] = {
 #: ``v4`` (v1.12, opt-in) = ``v3`` + the report-only R7 blocks.
 METHODS[METHODS_V4] = replace(METHODS[METHODS_V3], name=METHODS_V4, cpcv=True, deflated_sharpe=True)
 
+#: The v1.13.0 revisions, frozen under their own names (module docs).
+METHODS[METHODS_V2_V113] = replace(METHODS[METHODS_V2], name=METHODS_V2_V113)
+METHODS[METHODS_V3_V113] = replace(METHODS[METHODS_V3], name=METHODS_V3_V113)
+METHODS[METHODS_V4_V113] = replace(METHODS[METHODS_V4], name=METHODS_V4_V113)
+
+#: The v1.14.0 statistics revision (R-P0-1, R-P1-3, R-P2-1..4).
+_V114 = {
+    "causal_row_block": True,
+    "hac_bandwidth": DEFAULT_HAC_BANDWIDTH,
+    "hac_day_separated": True,
+    "hypothesis_rule": DEFAULT_HYPOTHESIS_RULE,
+    "standardisation": DEFAULT_STANDARDISATION,
+    "leakage_time_shift": True,
+    "looks_rule": DEFAULT_LOOKS_RULE,
+    "revision": STATS_REVISION,
+}
+# ``v2`` gains the validity block (R-P1-3: required whenever the data span
+# two or more session days; it debits no look under the decisions rule).
+METHODS[METHODS_V2] = replace(METHODS[METHODS_V2], validity_diagnostics=True, **_V114)
+METHODS[METHODS_V3] = replace(METHODS[METHODS_V3], **_V114)
+METHODS[METHODS_V4] = replace(METHODS[METHODS_V4], **_V114)
+
+#: Bundle name -> its v1.13.0 revision (itself when it has no other).
+V113_OF = {
+    METHODS_V2: METHODS_V2_V113,
+    METHODS_V3: METHODS_V3_V113,
+    METHODS_V4: METHODS_V4_V113,
+}
+
 
 def methods(name: str = DEFAULT_METHODS) -> ResearchMethods:
     """The bundle called ``name`` (``ValueError`` naming the known ones)."""
@@ -242,3 +363,33 @@ def methods(name: str = DEFAULT_METHODS) -> ResearchMethods:
         return METHODS[name]
     except KeyError:
         raise ValueError(f"unknown methods bundle {name!r}; known: {sorted(METHODS)}") from None
+
+
+def ledger_config(config: Mapping[str, Any], bundle: ResearchMethods) -> dict[str, Any]:
+    """``config`` (a pipeline's ledger identity) with the bundle's
+    statistics revision added when it is not v1.13.0: the same bundle name
+    at another revision is another look (module docs), and an identity
+    recorded before v1.14.0 stays exactly what it was."""
+    out = dict(config)
+    if bundle.revision != V113_REVISION:
+        out["stats_revision"] = bundle.revision
+    return out
+
+
+def ledger_bundle(config: Mapping[str, Any] | None) -> str:
+    """The bundle a ledger entry's ``config`` was recorded under, at its
+    revision: ``config["methods"]`` (or, for a runner entry, the spec's
+    ``configuration["methods"]``; ``legacy_v1`` when neither names one),
+    mapped to its frozen ``*_v113`` name when the entry carries no
+    ``stats_revision`` - an entry recorded under ``v2`` before v1.14.0 was
+    computed at the v1.13.0 revision (module docs)."""
+    cfg = dict(config or {})
+    name = cfg.get("methods")
+    if name is None:
+        name = (cfg.get("configuration") or {}).get("methods")
+    if name is None:
+        return METHODS_LEGACY
+    name = str(name)
+    if name in V113_OF and cfg.get("stats_revision") != METHODS[name].revision:
+        return V113_OF[name]
+    return name

@@ -269,19 +269,19 @@ public class RiskScenarioTest {
                         && e.decision() == Decision.KILL.code()).count();
         assertEquals(2, latches);
         // an override below the loss is legal but ineffective
-        eng.overrideLossLimit(Scope.STRATEGY, "S1", 51_000.0, T0 + 4 * NS, "cro");
+        eng.overrideLossLimit(Scope.STRATEGY, "S1", 51_000.0, T0 + 4 * NS, "cro, cfo");
         eng.clearKill(Scope.STRATEGY, "S1", T0 + 4 * NS, "ops clear #2");
         assertEquals(Rules.STRATEGY_LOSS,
                 eng.checkOrder(limit(4, 0, 100, 2450, T0 + 4 * NS)).ruleId());
         // override above the loss + clear -> ALLOW
-        eng.overrideLossLimit(Scope.STRATEGY, "S1", 75_000.0, T0 + 5 * NS, "cro");
+        eng.overrideLossLimit(Scope.STRATEGY, "S1", 75_000.0, T0 + 5 * NS, "cro, cfo");
         eng.clearKill(Scope.STRATEGY, "S1", T0 + 5 * NS, "ops clear INC-1");
         eng.onMarket(1, 2450, 2452, T0 + 5 * NS);
         assertTrue(eng.checkOrder(limit(5, 0, 100, 2450, T0 + 5 * NS)).allowed());
         RiskEvent ov = eng.audit().stream()
                 .filter(e -> e.ruleId().equals(Rules.LOSS_LIMIT_OVERRIDE))
                 .findFirst().orElseThrow();
-        assertEquals("daily loss limit 50000.00 -> 51000.00 approved by cro",
+        assertEquals("daily loss limit 50000.00 -> 51000.00 approved by cro, cfo",
                 ov.reason());
         assertEquals(Severity.WARN.code(), ov.severity());
         try {
@@ -305,7 +305,7 @@ public class RiskScenarioTest {
         eng.onFill(fill("S1", 1, 0, 95_000, 2452, T0 + 1));
         eng.onFill(fill("S2", 2, 0, 1_000, 3120, T0 + 1));
         eng.onFill(fill("S2", 2, 1, 1_000, 3110, T0 + 1));
-        eng.overrideLossLimit(Scope.GLOBAL, "", 400_000.0, T0, "cro");
+        eng.overrideLossLimit(Scope.GLOBAL, "", 400_000.0, T0, "cro, cfo");
         eng.engageKill(Scope.STRATEGY, "S2", T0, "manual");
         assertEquals(-1_050.0, eng.globalDailyPnl(), 1e-6);
         eng.rollSession(T0 + NS, "roll");
@@ -353,7 +353,7 @@ public class RiskScenarioTest {
         assertEquals(30, script(unbroken, 0, 30).size());
         String snapText = unbroken.snapshot();
         Map<String, Object> snap = Json.object(Json.parse(snapText));
-        assertEquals(1L, Json.asLong(snap.get("x-version")));
+        assertEquals(2L, Json.asLong(snap.get("x-version")));
         RiskLimits limits = RiskLimits.fromJson(configDoc());
         RiskEngine restored = RiskEngine.restore(limits, refs(), snap, T0 + 5 * NS);
         assertEquals(1, restored.audit().size());
@@ -361,8 +361,10 @@ public class RiskScenarioTest {
         List<String> a = script(unbroken, 30, 20);
         List<String> b = script(restored, 30, 20);
         assertEquals(a, b);
-        List<String> full = unbroken.auditJsonl().lines().toList();
-        List<String> tail = restored.auditJsonl().lines().skip(1).toList();
+        List<String> full = unbroken.auditJsonl().lines()
+                .map(RiskEvent::unchainedLine).toList();
+        List<String> tail = restored.auditJsonl().lines().skip(1)
+                .map(RiskEvent::unchainedLine).toList();
         assertEquals(full.subList(full.size() - tail.size(), full.size()), tail);
         assertEquals(Json.parse(unbroken.snapshot()), Json.parse(restored.snapshot()));
         // malformed snapshots are refused as a whole

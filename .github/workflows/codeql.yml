@@ -1,6 +1,6 @@
 # =============================================================================
-# CodeQL code scanning: python, java-kotlin, c-cpp and the workflows themselves
-# (actions). Runs on push to main, on pull requests, and weekly (new queries
+# CodeQL code scanning: python, java-kotlin, c-cpp, rust (v1.14, G-P1-7) and
+# the workflows themselves (actions). Runs on push to main, on pull requests, and weekly (new queries
 # land without a code change). Results go to the repository's code-scanning
 # alerts; the workflow has no secrets and reads the repository only.
 # Java and C++ are compiled with the repository's own build scripts
@@ -43,6 +43,8 @@ jobs:
           - language: c-cpp
             build-mode: manual
           - language: actions
+            build-mode: none
+          - language: rust
             build-mode: none
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

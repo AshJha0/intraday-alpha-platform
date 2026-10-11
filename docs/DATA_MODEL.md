@@ -11,7 +11,12 @@ JSON goldens (`tests/golden/`), the research JSON documents
 audits (`research/lifecycle_log.jsonl`, `research/lifecycle_transitions.jsonl`,
 the paper-trading `risk_audit.jsonl`, the decision-trace JSONL a session's
 `JsonlTraceSink` writes). They are deterministic, checksummed, reviewed and
-archived; nothing in this document changes that.
+archived; nothing in this document changes that. Since v1.14 two of them
+are hash chains as well: `risk_audit.jsonl` (`seq`, `prev_sha256` on every
+line) and `research/experiments.json` (`chain_head`, `chain_length`). The
+store indexes their content, not their chain fields; verify a chain against
+the source file (COOKBOOK recipes 69 and 74), never against the store,
+because the store is rebuilt and proves nothing about the file it read.
 
 The store is a **derived, rebuildable index** over those artefacts: one
 relational schema (`schemas/sql/iap_v2.sql`, x-version 2) that every contract
@@ -268,6 +273,20 @@ The files are the truth; the store is an index of them. Concretely:
 | `research/baselines/*.json` | `import_baselines` | `drift_baselines` | |
 | a session's trace JSONL / live `TraceSink` | `Store.insert_trace` / `iap.trace.StoreTraceSink` | `decision_traces` + the stage tables | the JSONL file (and its `TraceDigest`) is the durable record; the store rows are its index |
 
+**v1.14 fields the store does not index (D-P2-8, D-P2-9, D-P2-13).** An
+ingested dataset's `instruments.json` rows carry `ref_price_by_session` /
+`adv_by_session` (point-in-time values per session, also on its
+security-master records); `import_reference` keeps loading the scalar
+`ref_price` / `adv` into `instruments`, and per-session consumers (the
+backtester, the capacity proxy) read the file, never the store. Ledger
+entries of `--dataset-dir` runs carry `config_version` (sha256 over the
+dataset's `configs/` + `reference/` trees): it stays in the entry JSON and
+is not a `ledger_entries` column (it is provenance, not part of the key).
+`features_summary.json` records `store_version` (2 = coalesced
+same-timestamp events + trailing label freshness) beside the
+`feature_versions.registry_hash` the store indexes; a store row's numbers
+are only comparable across feature stores of the same `store_version`.
+
 `import_all` runs them in that order (alpha rows must exist before the
 state writers run). Each importer returns an `ImportReport(inserted={table:
 n}, warnings=(…))`.
@@ -418,13 +437,13 @@ FROM ledger_scopes ORDER BY dataset_version, methods;
 -- {"bonferroni_t":4.018,"dataset":"116b7787","looks":852,"methods":"legacy_v1","n_entries":69}
 -- {"bonferroni_t":4.322,"dataset":"116b7787","looks":3236,"methods":"v2","n_entries":77}
 -- {"bonferroni_t":4.071,"dataset":"203c8f54","looks":1068,"methods":"legacy_v1","n_entries":70}
--- (v1.5.0 snapshot: the 5,156 looks, by scope. bonferroni_t is the |t| each scope alone would demand.)
+-- (v1.5.0 snapshot: the 5,358 looks, by scope. bonferroni_t is the |t| each scope alone would demand.)
 
 SELECT kind, n_entries, n_alphas, total_count, n_promote, n_iterate, n_reject,
        max_gate_looks, ROUND(max_promote_t_threshold, 3) AS max_t_threshold
 FROM v_experiment_ledger_summary_current ORDER BY kind;
 -- {"kind":"adaptive_deployment","max_gate_looks":null,"max_t_threshold":null,"n_alphas":10,"n_entries":40,"n_iterate":0,"n_promote":0,"n_reject":0,"total_count":40}
--- {"kind":"combination","max_gate_looks":5156,"max_t_threshold":4.424,"n_alphas":2,"n_entries":8,"n_iterate":8,"n_promote":0,"n_reject":0,"total_count":760}
+-- {"kind":"combination","max_gate_looks":5156,"max_t_threshold":4.432,"n_alphas":2,"n_entries":8,"n_iterate":8,"n_promote":0,"n_reject":0,"total_count":760}
 -- {"kind":"experiment_runner","max_gate_looks":4356,"max_t_threshold":4.387,"n_alphas":3,"n_entries":5,"n_iterate":3,"n_promote":0,"n_reject":2,"total_count":420}
 -- {"kind":"promotion_pipeline","max_gate_looks":3936,"max_t_threshold":4.365,"n_alphas":24,"n_entries":24,"n_iterate":11,"n_promote":0,"n_reject":13,"total_count":2016}
 -- (v1.5.0 snapshot, the current scope: 24 alphas x 84 looks judged at |t| >= 4.365, 11 ITERATE / 13 REJECT —

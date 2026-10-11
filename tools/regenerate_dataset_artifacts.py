@@ -153,7 +153,7 @@ def _steps() -> list[tuple[str, list[tuple[Path, list[str]]]]]:
                 for alpha, horizon in RUNNER_EXPERIMENTS
             ],
         ),
-        ("combination", [(py_dir, [PY, "-m", "iap.research", "combine"])]),
+        ("combination", [(py_dir, [PY, "-m", "iap.research", "combine", "--no-prereg"])]),
         ("lifecycle", [(py_dir, [PY, "-m", "iap.lifecycle", "bootstrap", "--force"])]),
         ("ml", [(REPO, [PY, "research/ml_reports/run_ml.py"])]),
         ("adaptive", [(REPO, [PY, "research/adaptive_reports/run_adaptive.py"])]),
@@ -199,14 +199,18 @@ def _ledger_has_seen_current_dataset() -> tuple[bool, str, str]:
     sys.path.insert(0, str(REPO / "python" / "src"))
     from iap.experiment.tracker import data_version
     from iap.validation.ledger import ExperimentLedger
-    from iap.validation.methods import DEFAULT_METHODS
+    from iap.validation.methods import DEFAULT_METHODS, V113_REVISION, methods
 
     version = data_version(REPO)
     ledger = ExperimentLedger(REPO / "research" / "experiments.json")
+    # v1.14.0: the same bundle name at another statistics revision is
+    # another set of looks (iap.validation.methods), not a rerun.
+    revision = methods(DEFAULT_METHODS).revision
     seen = any(
         ExperimentLedger.entry_dataset_version(e) == version
         and e.get("kind") == "promotion_pipeline"
         and (e.get("config") or {}).get("methods") == DEFAULT_METHODS
+        and (e.get("config") or {}).get("stats_revision", V113_REVISION) == revision
         for e in ledger.entries
     )
     return seen, version, DEFAULT_METHODS

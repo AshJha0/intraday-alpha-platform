@@ -549,10 +549,10 @@ public class RiskRuleTest {
         com.iap.risk.RiskEvent ev = new com.iap.risk.RiskEvent(7,
                 Scope.GLOBAL, "", Rules.KILL_SWITCH_ENGAGED, 3, 3,
                 "a\bb\fc\nd\re\tf\u0001g\"h\\i");
-        assertEquals("{\"decision\":3,"
+        assertEquals("{\"decision\":3,\"prev_sha256\":\"\","
                 + "\"reason\":\"a\\bb\\fc\\nd\\re\\tf\\u0001g\\\"h\\\\i\","
                 + "\"rule_id\":\"KILL_SWITCH_ENGAGED\","
-                + "\"scope\":\"GLOBAL\",\"scope_id\":\"\","
+                + "\"scope\":\"GLOBAL\",\"scope_id\":\"\",\"seq\":0,"
                 + "\"severity\":3,\"timestamp\":7}", ev.toJsonLine());
     }
 
@@ -975,5 +975,131 @@ public class RiskRuleTest {
                 + "per_strategy.max_daily_loss must be > 0, got -5.5",
                 RiskEngine.fromConfig(doc, new TreeMap<>())
                         .checkOrder(limitBuy(1, 10, 2450, TS)).reason());
+    }
+
+    // ------------------------------------- v1.14: G-P0-1 / G-P0-2 / G-P2-*
+
+    /**
+     * G-P0-1: seq 1..n, each prev_sha256 the hash of the line before; a
+     * chained restore continues the chain.
+     */
+    @Test
+    public void auditChainLinksEveryRecordAndContinuesAcrossRestore() {
+        RiskEngine eng = engine();
+        eng.checkOrder(limitBuy(1, 100, 2450, TS + 1));
+        eng.checkOrder(limitBuy(2, 60_000, 2450, TS + 2));
+        eng.onVenueDisconnect(2, TS + 3);
+        String[] lines = eng.auditJsonl().split("\n");
+        assertEquals(3, lines.length);
+        String prev = com.iap.risk.RiskEvent.GENESIS_SHA256;
+        for (int i = 0; i < lines.length; i++) {
+            com.iap.risk.RiskEvent ev = eng.audit().get(i);
+            assertEquals(i + 1L, ev.seq());
+            assertEquals(prev, ev.prevSha256());
+            assertTrue(lines[i], lines[i].contains("\"prev_sha256\":\"" + prev + "\""));
+            prev = com.iap.risk.RiskEvent.lineSha256(lines[i]);
+        }
+        assertEquals(3L, eng.auditChainSeq());
+        assertEquals(prev, eng.auditChainHead());
+        RiskEngine restored = RiskEngine.restoreChained(RiskLimits.fromJson(configDoc()),
+                RiskEngine.equityRefs(Map.of(1L, 0.01, 2L, 0.01)),
+                Json.object(Json.parse(eng.snapshot())), TS + 4, 3L, prev);
+        com.iap.risk.RiskEvent first = restored.audit().get(0);
+        assertEquals(Rules.STATE_RESTORED, first.ruleId());
+        assertEquals(4L, first.seq());
+        assertEquals(prev, first.prevSha256());
+        assertEquals(com.iap.risk.RiskEvent.unchainedLine(lines[0]),
+                lines[0].replace(",\"prev_sha256\":\""
+                        + com.iap.risk.RiskEvent.GENESIS_SHA256 + "\"", "")
+                        .replace(",\"seq\":1,", ","));
+    }
+
+    /** x-version 4: every new key is optional and a present one is strict. */
+    @Test
+    public void xVersion4KeysAreOptionalAndStrict() {
+        Map<String, Object> doc = configDoc();
+        doc.remove("pre_trade");
+        doc.remove("overrides");
+        Json.object(doc.get("market_data")).remove("max_mid_jump_ratio");
+        RiskLimits off = RiskLimits.fromJson(doc);
+        assertEquals(null, off.maxOpenOrders());
+        assertEquals(null, off.minApprovers());
+        assertTrue(off.restrictedInstruments().isEmpty());
+        RiskLimits on = RiskLimits.fromJson(configDoc());
+        assertEquals(Long.valueOf(1000), on.maxOpenOrders());
+        assertEquals(Long.valueOf(2), on.minApprovers());
+        assertEquals(Double.valueOf(10.0), on.maxMidJumpRatio());
+        assertEquals(null, on.maxParticipationBps());
+        Object[][] cases = {
+            {"market_data", "max_mid_jump_ratio", 1.0, "max_mid_jump_ratio must be > 1, got 1"},
+            {"pre_trade", "max_open_orders", 0L, "pre_trade.max_open_orders must be > 0, got 0"},
+            {"pre_trade", "restricted_instruments", 5L, "restricted_instruments must be an array"},
+            {"pre_trade", "restricted_instruments", java.util.List.of(4_294_967_296L),
+                "must be u32 instrument ids"},
+            {"pre_trade", "max_participation_bps", 100.0,
+                "non-integer pre_trade.participation_floor_qty"},
+            {"overrides", "min_approvers", "two", "missing/non-integer overrides.min_approvers"},
+        };
+        for (Object[] c : cases) {
+            Map<String, Object> bad = configDoc();
+            Json.object(bad.get((String) c[0])).put((String) c[1], c[2]);
+            try {
+                RiskLimits.fromJson(bad);
+                throw new AssertionError("accepted " + c[0] + "." + c[1]);
+            } catch (IllegalArgumentException expected) {
+                assertTrue(expected.getMessage(),
+                        expected.getMessage().contains((String) c[3]));
+            }
+        }
+    }
+
+    /** G-P2-3: a refused override changes nothing and is audited. */
+    @Test
+    public void lossOverrideIsBoundedAndTwoParty() {
+        RiskEngine eng = engine();
+        Object[][] cases = {
+            {"cro", 300_000.0, "needs 2 distinct approvers, got 1: cro"},
+            {"cro, cro", 300_000.0, "needs 2 distinct approvers, got 1"},
+            {"cro,cfo", 500_000.01, "exceeds cap 500000.00 (2.00x the configured 250000.00)"},
+        };
+        for (Object[] c : cases) {
+            try {
+                eng.overrideLossLimit(Scope.GLOBAL, "", (Double) c[1], TS, (String) c[0]);
+                throw new AssertionError("accepted override by " + c[0]);
+            } catch (IllegalArgumentException expected) {
+                assertTrue(expected.getMessage(),
+                        expected.getMessage().contains((String) c[2]));
+            }
+            com.iap.risk.RiskEvent last = eng.audit().get(eng.audit().size() - 1);
+            assertEquals(Rules.LOSS_LIMIT_OVERRIDE_REJECTED, last.ruleId());
+            assertEquals(Severity.BREACH.code(), last.severity());
+        }
+        eng.overrideLossLimit(Scope.GLOBAL, "", 500_000.0, TS, "cro,cfo");
+        assertEquals(Rules.LOSS_LIMIT_OVERRIDE,
+                eng.audit().get(eng.audit().size() - 1).ruleId());
+    }
+
+    /** Checks 28/29: cancels spend the strategy and venue budgets. */
+    @Test
+    public void cancelRequestsSpendStrategyAndVenueBudgets() {
+        Map<String, Object> doc = configDoc();
+        Map<String, Object> pre = Json.object(doc.get("pre_trade"));
+        pre.put("max_cancels_per_sec", 1.0);
+        pre.put("cancel_burst", 1.0);
+        pre.put("venue_msg_burst", 2.0);
+        TreeMap<Long, Double> ticks = new TreeMap<>();
+        ticks.put(1L, 0.01);
+        RiskEngine eng = RiskEngine.fromConfigTicks(doc, ticks);
+        eng.onMarket(1, 2450, 2452, TS);
+        eng.onCancelRequest("S1", 1, TS);
+        expect(eng, new OrderRequest(1, 1, 0, 10, 2450, OrderRequest.LIMIT, 1, "S1", 0.5, TS),
+                Rules.CANCEL_RATE);
+        expect(eng, new OrderRequest(2, 1, 0, 10, 2450, OrderRequest.LIMIT, 1, "S2", 0.5, TS),
+                Rules.ALLOW);
+        expect(eng, new OrderRequest(3, 1, 0, 10, 2449, OrderRequest.LIMIT, 1, "S3", 0.5, TS),
+                Rules.VENUE_MESSAGE_RATE);
+        expect(eng, new OrderRequest(4, 1, 0, 10, 2448, OrderRequest.LIMIT, 1, "S1", 0.5,
+                TS + 1_000_000_000L), Rules.ALLOW);
+        assertEquals(1, eng.metrics.counterValue("risk_cancel_requests_total"));
     }
 }

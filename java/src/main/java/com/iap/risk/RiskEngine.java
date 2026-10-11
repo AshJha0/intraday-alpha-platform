@@ -28,8 +28,16 @@ import com.iap.monitoring.MetricsRegistry;
  *   <li>RATE_THROTTLE</li> <li>SELF_MATCH</li> <li>POSITION_LIMIT</li>
  *   <li>INSTRUMENT_NOTIONAL</li> <li>GROSS_NOTIONAL</li> <li>NET_NOTIONAL</li>
  *   <li>DAILY_LOSS</li> <li>STRATEGY_LOSS</li>
+ *   <li>RESTRICTED_INSTRUMENT</li> <li>MAX_OPEN_ORDERS</li>
+ *   <li>MAX_OPEN_NOTIONAL</li> <li>STRATEGY_POSITION</li>
+ *   <li>PARTICIPATION</li> <li>CANCEL_RATE</li> <li>VENUE_MESSAGE_RATE</li>
  * </ol>
- * — else ALLOW.
+ * — else ALLOW. Checks 23-29 are the SEC 15c3-5 set, each off unless its
+ * {@code pre_trade} key is configured; check 7 also rejects
+ * {@code STATE_CAPACITY} when a bounded state map is full. Every audit
+ * record is hash-chained ({@code seq}, {@code prev_sha256}; G-P0-1):
+ * {@link #auditChainHead} is the value to persist next to a snapshot and
+ * {@link #restoreChained} continues the chain.
  *
  * <p>Pinned semantics (the Rust module docs are normative; replicated):
  * fail-closed on any configuration error; every notional and P&amp;L
@@ -57,8 +65,9 @@ import com.iap.monitoring.MetricsRegistry;
  */
 public final class RiskEngine {
     static final double NS_PER_SEC = 1e9;
-    /** Snapshot schema version. */
-    public static final long SNAPSHOT_VERSION = 1;
+    /** Snapshot schema version (2: open-order strategy, the 15c3-5 buckets
+     *  and the session volume counters). */
+    public static final long SNAPSHOT_VERSION = 2;
 
     // Package-private (not private): LimitsEvaluator, KillSwitch and
     // RiskAudit in this same package continue RiskEngine's implementation
@@ -77,6 +86,28 @@ public final class RiskEngine {
         int side;
         long priceTicks; // 0 = unpriced
         long qty;
+        String strategyId = ""; // owning strategy (checks 24-26)
+    }
+
+    /**
+     * A 15c3-5 message bucket (checks 28/29): an event-time token bucket
+     * whose tokens a cancel may drive below zero (a cancel is never refused).
+     */
+    static final class Rate {
+        double tokens;
+        long lastTs;
+
+        /** Refill to {@code ts}; false (nothing changed) when the gap leaves i64. */
+        boolean refill(long ts, double rate, double burst) {
+            Long gap = tsSub(ts, lastTs);
+            if (gap == null) {
+                return false;
+            }
+            tokens = Math.min(tokens + (double) Math.max(gap, 0L) * rate / NS_PER_SEC,
+                    burst);
+            lastTs = Math.max(lastTs, ts);
+            return true;
+        }
     }
 
     static final class Bucket {
@@ -142,6 +173,17 @@ public final class RiskEngine {
     Double lossOverrideGlobal;
     final TreeMap<String, Double> lossOverrideStrategy =
             new TreeMap<>(CODE_POINT_ORDER);
+    /** Per-venue message buckets (check 29). */
+    final TreeMap<Integer, Rate> venueBuckets = new TreeMap<>();
+    /** Per-strategy cancel buckets (check 28). */
+    final TreeMap<String, Rate> cancelBuckets = new TreeMap<>(CODE_POINT_ORDER);
+    /** Session market volume per instrument ({@link #onMarketTrade}, check 27). */
+    final TreeMap<Long, Long> marketVolume = new TreeMap<>();
+    /** The firm's session executed quantity per instrument (check 27). */
+    final TreeMap<Long, Long> executed = new TreeMap<>();
+    /** Audit chain: seq of the last record and SHA-256 of its line. */
+    long auditSeq;
+    String auditHead = RiskEvent.GENESIS_SHA256;
     final List<RiskEvent> audit = new ArrayList<>();
     /** Engine metrics (decision counters, PnL + kill-switch gauges). */
     public final MetricsRegistry metrics;
@@ -345,14 +387,41 @@ public final class RiskEngine {
      */
     public void onMarket(long instrumentId, long bidTicks, long askTicks, long ts) {
         MarketState st = market.get(instrumentId);
-        if (st == null) {
-            st = new MarketState();
-            st.ts = ts;
-            market.put(instrumentId, st);
+        if (st == null && limits != null && limits.maxTrackedKeys() != null
+                && market.size() >= limits.maxTrackedKeys()) {
+            metrics.counter("risk_state_capacity_dropped_total").inc();
+            return;
         }
-        if (ts < st.ts) {
+        if (st != null && ts < st.ts) {
             metrics.counter("risk_market_regressions_dropped_total").inc();
             return;
+        }
+        // Reference-price sanity gate (G-P2-6): a crossed two-sided book is
+        // never a usable reference price, and (when configured) neither is a
+        // jump of more than max_mid_jump_ratio against the stored two-sided
+        // mark. A dropped update leaves the previous mark (which then ages
+        // into STALE_PRICE): fail-closed, never a guessed price.
+        if (bidTicks > 0 && askTicks > 0 && bidTicks > askTicks) {
+            metrics.counter("risk_market_crossed_dropped_total").inc();
+            return;
+        }
+        Double ratio = limits == null ? null : limits.maxMidJumpRatio();
+        if (ratio != null && st != null && bidTicks > 0 && askTicks > 0
+                && st.bidTicks > 0 && st.askTicks > 0) {
+            Long newSum = sumTicks(bidTicks, askTicks);
+            Long oldSum = sumTicks(st.bidTicks, st.askTicks);
+            if (newSum != null && oldSum != null) {
+                double n = (double) newSum.longValue();
+                double o = (double) oldSum.longValue();
+                if (n > ratio * o || n * ratio < o) {
+                    metrics.counter("risk_market_jump_dropped_total").inc();
+                    return;
+                }
+            }
+        }
+        if (st == null) {
+            st = new MarketState();
+            market.put(instrumentId, st);
         }
         st.bidTicks = bidTicks;
         st.askTicks = askTicks;
@@ -374,6 +443,13 @@ public final class RiskEngine {
      */
     public void onSequenceGap(long instrumentId, long ts) {
         long threshold = limits == null ? 0 : limits.maxSequenceGapBeforeHalt();
+        if (!market.containsKey(instrumentId) && limits != null
+                && limits.maxTrackedKeys() != null
+                && market.size() >= limits.maxTrackedKeys()) {
+            // no state => no mid => STALE_PRICE: still fail-closed
+            metrics.counter("risk_state_capacity_dropped_total").inc();
+            return;
+        }
         MarketState st = market.computeIfAbsent(instrumentId, k -> {
             MarketState m = new MarketState();
             m.ts = ts;
@@ -391,6 +467,68 @@ public final class RiskEngine {
         if (st != null) {
             st.gated = false;
             st.gaps = 0;
+        }
+    }
+
+    /**
+     * A market trade print (any participant): adds {@code qty} to the
+     * instrument's session market volume, the denominator of the
+     * participation cap (check 27). A print for an instrument without
+     * reference data or with {@code qty <= 0} is dropped and counted; the
+     * volume saturates at {@code Long.MAX_VALUE}. Reset by
+     * {@link #rollSession}.
+     */
+    public void onMarketTrade(long instrumentId, long qty, long ts) {
+        if (qty <= 0 || !instruments.containsKey(instrumentId)) {
+            metrics.counter("risk_market_trades_dropped_total").inc();
+            return;
+        }
+        marketVolume.put(instrumentId, satAdd(marketVolume.getOrDefault(instrumentId, 0L), qty));
+    }
+
+    /**
+     * A cancel (or cancel/replace) the strategy sends to {@code venueId}.
+     * Never refused (a cancel reduces risk); it spends one token of the
+     * strategy's cancel bucket (check 28) and, for a real venue, one of the
+     * venue's message bucket (check 29) — tokens may go below zero, and new
+     * orders reject until the bucket refills to 1. A timestamp difference
+     * that leaves i64 does not refill (fail-closed). No-op on a fail-closed
+     * engine or when neither control is configured.
+     */
+    public void onCancelRequest(String strategyId, int venueId, long ts) {
+        if (limits == null) {
+            return;
+        }
+        metrics.counter("risk_cancel_requests_total").inc();
+        if (limits.maxCancelsPerSec() != null && limits.cancelBurst() != null) {
+            Rate b = cancelBuckets.get(strategyId);
+            if (b == null) {
+                if (limits.maxTrackedKeys() != null
+                        && cancelBuckets.size() >= limits.maxTrackedKeys()) {
+                    metrics.counter("risk_state_capacity_dropped_total").inc();
+                } else {
+                    b = new Rate();
+                    b.tokens = limits.cancelBurst();
+                    b.lastTs = ts;
+                    cancelBuckets.put(strategyId, b);
+                }
+            }
+            if (b != null) {
+                b.refill(ts, limits.maxCancelsPerSec(), limits.cancelBurst());
+                b.tokens -= 1.0;
+            }
+        }
+        if (venueId != 0 && limits.maxVenueMsgsPerSec() != null
+                && limits.venueMsgBurst() != null) {
+            Rate vb = venueBuckets.get(venueId);
+            if (vb == null) {
+                vb = new Rate();
+                vb.tokens = limits.venueMsgBurst();
+                vb.lastTs = ts;
+                venueBuckets.put(venueId, vb);
+            }
+            vb.refill(ts, limits.maxVenueMsgsPerSec(), limits.venueMsgBurst());
+            vb.tokens -= 1.0;
         }
     }
 
@@ -564,6 +702,8 @@ public final class RiskEngine {
         realized.computeIfAbsent(fill.strategyId(),
                 k -> new TreeMap<>(CODE_POINT_ORDER))
                 .merge(ins.quoteCcy(), realizedPnl, Double::sum);
+        executed.put(fill.instrumentId(),
+                satAdd(executed.getOrDefault(fill.instrumentId(), 0L), fill.qty()));
         // open order reduction
         if (fill.orderId() != 0) {
             OpenOrder r = open.get(fill.orderId());
@@ -815,6 +955,20 @@ public final class RiskEngine {
         return List.copyOf(audit);
     }
 
+    /** Seq of the last audit record (0 before the first). */
+    public long auditChainSeq() {
+        return auditSeq;
+    }
+
+    /**
+     * SHA-256 of the last audit record's line ({@link RiskEvent#GENESIS_SHA256}
+     * before the first): with {@link #auditChainSeq} the value to persist next
+     * to a snapshot and to anchor externally (G-P0-1).
+     */
+    public String auditChainHead() {
+        return auditHead;
+    }
+
     /** Full audit log as JSONL (one RiskEvent per line, trailing newline). */
     public String auditJsonl() {
         return RiskAudit.auditJsonl(this);
@@ -850,6 +1004,7 @@ public final class RiskEngine {
             r.side = order.side();
             r.priceTicks = trackedPrice(order);
             r.qty = order.qty();
+            r.strategyId = order.strategyId();
             open.put(order.orderId(), r);
         }
         return outcome;
@@ -895,7 +1050,31 @@ public final class RiskEngine {
     public static RiskEngine restore(RiskLimits limits,
             Map<Long, InstrumentRef> instruments, Map<String, Object> snap,
             long ts, MetricsRegistry metrics) {
-        return RiskAudit.restore(limits, instruments, snap, ts, metrics);
+        return RiskAudit.restore(limits, instruments, snap, ts, metrics, 0L, null);
+    }
+
+    /**
+     * {@link #restore(RiskLimits, Map, Map, long, MetricsRegistry)} continuing
+     * the audit chain from {@code (chainSeq, chainHead)}, the
+     * {@link #auditChainSeq} / {@link #auditChainHead} of the engine that wrote
+     * the snapshot (the session store records them next to the snapshot). The
+     * head is deliberately not part of the snapshot: the snapshot is the
+     * trading state, identical for an unbroken and a restored engine.
+     */
+    public static RiskEngine restoreChained(RiskLimits limits,
+            Map<Long, InstrumentRef> instruments, Map<String, Object> snap,
+            long ts, MetricsRegistry metrics, long chainSeq, String chainHead) {
+        return RiskAudit.restore(limits, instruments, snap, ts, metrics, chainSeq,
+                chainHead);
+    }
+
+    /** {@link #restoreChained(RiskLimits, Map, Map, long, MetricsRegistry, long, String)}
+     *  with a fresh registry. */
+    public static RiskEngine restoreChained(RiskLimits limits,
+            Map<Long, InstrumentRef> instruments, Map<String, Object> snap, long ts,
+            long chainSeq, String chainHead) {
+        return restoreChained(limits, instruments, snap, ts, new MetricsRegistry(),
+                chainSeq, chainHead);
     }
 
     /** {@link #restore(RiskLimits, Map, Map, long, MetricsRegistry)} with a fresh registry. */

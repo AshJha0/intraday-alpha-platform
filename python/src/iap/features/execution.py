@@ -111,7 +111,7 @@ def compute(st, values: list[float], valid: list[bool]) -> None:
     put(values, valid, half, ok)
     v = None
     if ok and warm10 and (st.db10 + st.da10) > 0:
-        vol10 = st.trades["10s"].sums[1]
+        vol10 = st.traded_volume("10s")
         v = half * (1.0 + vol10 / (st.db10 + st.da10 + EPS)) ** 0.5
     put(values, valid, v, v is not None)
     decay = None

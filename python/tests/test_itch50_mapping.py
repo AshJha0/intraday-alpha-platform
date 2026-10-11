@@ -150,7 +150,9 @@ def test_hidden_execution_is_a_trade_that_does_not_touch_the_book(tmp_path):
     assert mapper.counters["hidden_trades"] == 1
     counters: dict = {}
     events = list(sequence_events(protos, [100], 101, counters))
-    assert events[-1].price_ticks == 15_001  # 150.005 rounds half up to a whole cent tick
+    # 150.005 is half a tick off the grid: half to even (v1.14, D-P1-3) -> 150.00
+    assert events[-1].price_ticks == 15_000
+    assert counters["trade_price_residue_histogram"] == {"50": 1}
     assert (counters["events"], counters["trade_prices_rounded_to_tick"]) == (5, 1)
     assert counters["off_tick_orders_rejected"] == 0
     book = OrderBook(1, 101)
@@ -178,6 +180,54 @@ def test_hidden_trade_side_uses_the_indicator_before_2014_and_the_tick_rule_afte
     # indicator = side of the resting hidden order; the aggressor is the other side
     assert [p[3] for p in legacy if p[2] == TRADE] == [BID, ASK, ASK, ASK, BID]
     assert mapper.counters["hidden_trades_signed_by_tick_rule"] == 0
+
+
+def test_hidden_trade_side_uses_the_quote_rule_then_the_tick_rule_at_the_mid(tmp_path):
+    """v1.14 (D-P1-2): after 2014 a hidden print is signed against the
+    mapper's own best bid / ask (Lee-Ready); at the mid, or without a
+    two-sided uncrossed quote, the tick rule decides."""
+    enc = _open_day()
+    enc.add(1, OPEN + 1, 11, "B", 500, "AAPL", 1_500_000)  # bid 150.00
+    enc.add(1, OPEN + 2, 12, "S", 500, "AAPL", 1_500_400)  # ask 150.04, mid 150.02
+    enc.trade(1, OPEN + 3, "B", 10, "AAPL", 1_500_300, 1)  # above the mid: buy
+    enc.trade(1, OPEN + 4, "B", 10, "AAPL", 1_500_100, 2)  # below the mid: sell
+    enc.trade(1, OPEN + 5, "B", 10, "AAPL", 1_500_200, 3)  # at the mid: uptick -> buy
+    enc.cancel(1, OPEN + 6, 12, 500)  # ask gone: one-sided book
+    enc.trade(1, OPEN + 7, "B", 10, "AAPL", 1_500_100, 4)  # tick rule: downtick -> sell
+    enc.add(1, OPEN + 8, 13, "S", 100, "AAPL", 1_500_100)  # new ask 150.01
+    enc.executed(1, OPEN + 9, 11, 500, 5)  # the bid trades away: best bid follows
+    enc.add(1, OPEN + 10, 14, "B", 100, "AAPL", 1_499_900)  # bid 149.99, mid 150.00
+    enc.trade(1, OPEN + 11, "B", 10, "AAPL", 1_499_950, 6)  # below the mid: sell
+    protos, mapper = _map(tmp_path, enc)
+    hidden = [p[3] for p in protos if p[2] == TRADE and p[7] in (1, 2, 3, 4, 6)]
+    assert hidden == [BID, ASK, BID, ASK, ASK]
+    assert mapper.counters["hidden_trades_signed_by_quote_rule"] == 3
+    assert mapper.counters["hidden_trades_signed_by_tick_rule"] == 2
+
+
+def test_operational_halt_of_the_mapped_market_halts_the_book(tmp_path):
+    """v1.14 (D-P2-12): ITCH ``h`` is decoded; a Nasdaq (Q) operational halt
+    maps to STATUS HALT until resumed, other markets are only counted."""
+    enc = _open_day()
+    enc.add(1, OPEN + 1, 11, "B", 100, "AAPL", 1_500_000)
+    enc.operational_halt(1, OPEN + 2, "AAPL", "X", "H")  # PSX: counted only
+    enc.operational_halt(1, OPEN + 3, "AAPL", "Q", "H")
+    enc.operational_halt(1, OPEN + 4, "AAPL", "Q", "?")
+    enc.operational_halt(1, OPEN + 5, "AAPL", "Q", "T")
+    protos, mapper = _map(tmp_path, enc)
+    assert [p[5] for p in protos if p[2] == STATUS] == [AUCTION, TRADING, HALT, TRADING]
+    assert mapper.counters["operational_halt_messages"] == 4
+    assert mapper.counters["operational_halts_other_markets"] == 1
+    assert mapper.counters["unknown_operational_halt_actions"] == 1
+    # a trading-action halt and an operational halt are independent: both must clear
+    enc = _open_day()
+    enc.trading_action(1, OPEN + 1, "AAPL", "H")
+    enc.operational_halt(1, OPEN + 2, "AAPL", "Q", "H")
+    enc.trading_action(1, OPEN + 3, "AAPL", "T")
+    enc.operational_halt(1, OPEN + 4, "AAPL", "Q", "T")
+    protos, _ = _map(tmp_path, enc)
+    status = [(p[1] - MID, p[5]) for p in protos if p[2] == STATUS]
+    assert status[-2:] == [(OPEN + 1, HALT), (OPEN + 4, TRADING)]
 
 
 def test_session_phases_map_to_status_and_after_hours_flow_is_dropped(tmp_path):

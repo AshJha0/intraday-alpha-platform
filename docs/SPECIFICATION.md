@@ -819,3 +819,29 @@ The platform should optimize for research truth, not backtest cosmetics.
 A lower Sharpe that survives realistic costs, latency, capacity and
 out-of-sample validation is more valuable than a spectacular backtest
 that depends on leakage, unrealistic fills or overfitting.
+
+---
+
+# Implementation notes (2026-10-11, v1.14.0)
+
+This specification is the governing text and is not edited to match the
+code. These notes record where the implementation goes beyond or falls
+short of it, so a reader does not have to infer it from the changelog.
+
+- **§16 Risk Engine.** Beyond the listed controls, v1.14 adds the SEC Rule
+  15c3-5 pre-trade set (restricted list, open orders and notional,
+  per-strategy position, participation, cancel rate, venue message rate),
+  a SHA-256 hash chain over the audit log, two-party capped loss
+  overrides, and bounded per-key state (PLATFORM_CONVENTIONS.md §11.1).
+  There is no live order gateway, so these controls guard a simulator.
+- **§13 Alpha Validation.** The defaults were revised in v1.5 and again in
+  v1.14 (docs/RESEARCH_VALIDITY.md §4b): causal row blocking, day-separated
+  HAC, a time-shift leakage test, one look per gate decision.
+- **§26 Security, Governance and Reproducibility.** Pre-registrations,
+  the blackboard and the look ledger are hash-chained; agent keys need a
+  maintainer signature read from `main`; supply-chain audits block CI
+  (docs/governance/GOVERNANCE.md).
+- **§20 Promotion.** No alpha has been promoted. The gates work as
+  specified; the alphas do not pay their costs.
+- **Not built:** a live venue gateway (Phase 2-3 items P1-P3), CBOE / NYSE /
+  FX ECN feeds, and multi-venue real data. See docs/ROADMAP.md §3.10.

@@ -283,7 +283,12 @@ def test_bootstrap_matches_committed_artefacts(tmp_path):
     assert "\n".join(lines) + "\n" == committed_log
     loaded = AlphaRegistry.load(ROOT / REGISTRY_RELPATH)
     assert loaded.render() == committed_registry
-    assert all(loaded.get(a).state is LifecycleState.CANDIDATE for a in loaded.alpha_ids())
+    # v1.14.0: FX11 fails the time-shift leakage detector and stays in RESEARCH
+    assert all(
+        loaded.get(a).state
+        is (LifecycleState.RESEARCH if a == "FX11" else LifecycleState.CANDIDATE)
+        for a in loaded.alpha_ids()
+    )
     assert len(loaded) == 24
 
 

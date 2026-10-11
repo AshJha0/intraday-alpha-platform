@@ -33,14 +33,45 @@ public class FeatureGoldenTest {
         TICKS.put(101L, 1e-05);
     }
 
-    private static final Map<String, List<FeatureVector>> CACHE = new HashMap<>();
+    private static final Map<String, Map<Integer, FeatureVector>> CACHE = new HashMap<>();
 
-    private static synchronized List<FeatureVector> rows(String vectorFile) {
+    /**
+     * The pinned group_ends rule (v1.14, D-P1-1): an event closes its
+     * timestamp group when the next event of the same instrument has another
+     * exchange_ts, or there is none.
+     */
+    static boolean[] groupEnds(List<MarketEvent> events) {
+        boolean[] ends = new boolean[events.size()];
+        Map<Long, Long> next = new HashMap<>();
+        for (int i = events.size() - 1; i >= 0; i--) {
+            MarketEvent ev = events.get(i);
+            Long nts = next.get(ev.instrumentId);
+            ends[i] = nts == null || nts != ev.exchangeTs;
+            next.put(ev.instrumentId, ev.exchangeTs);
+        }
+        return ends;
+    }
+
+    /** {1-based index of the emitting event: vector}, coalesced (D-P1-1). */
+    private static synchronized Map<Integer, FeatureVector> rows(String vectorFile) {
         return CACHE.computeIfAbsent(vectorFile, f -> {
             FeatureEngine engine = new FeatureEngine(TICKS, 0);
             List<MarketEvent> events =
                     f.startsWith("events_eq") ? Golden.eq() : Golden.fx();
-            return engine.run(events);
+            boolean[] ends = groupEnds(events);
+            Map<Integer, FeatureVector> out = new TreeMap<>();
+            FeatureVector vec = new FeatureVector();
+            for (int i = 0; i < events.size(); i++) {
+                boolean emitted = engine.apply(events.get(i), vec, ends[i]);
+                assertEquals("emits exactly on group ends", ends[i], emitted);
+                if (emitted) {
+                    out.put(i + 1, vec.copy());
+                }
+            }
+            // run(events, true) is the same coalesced stream
+            List<FeatureVector> viaRun = new FeatureEngine(TICKS, 0).run(events, true);
+            assertEquals(out.size(), viaRun.size());
+            return out;
         });
     }
 
@@ -49,10 +80,9 @@ public class FeatureGoldenTest {
         Map<String, Object> cp = Json.object(
                 Json.object(Json.object(golden.get(market)).get("checkpoints"))
                         .get(cpKey));
-        List<FeatureVector> all = rows(vectorFile);
-        int idx = Integer.parseInt(cpKey) - 1;
-        assertTrue("checkpoint index in range", idx < all.size());
-        FeatureVector vec = all.get(idx);
+        Map<Integer, FeatureVector> all = rows(vectorFile);
+        FeatureVector vec = all.get(Integer.parseInt(cpKey));
+        assertTrue("checkpoint closes its timestamp group", vec != null);
         assertEquals(Json.asLong(cp.get("timestamp")), vec.timestamp);
         int compared = 0;
         for (Map.Entry<String, Object> e : Json.object(cp.get("features")).entrySet()) {
@@ -73,9 +103,21 @@ public class FeatureGoldenTest {
             }
             double want = Json.asDouble(entry.get("value"));
             double got = vec.values[slot];
+            double tol = 1e-9 + 1e-9 * Math.abs(want);
+            // rvol_w1m float residue / (rvol_w5m + EPS): the residue rule of
+            // the burst check and the pyo3 parity test
+            Object rv1 = Json.object(cp.get("features")).get("rvol_w1m_v1");
+            if ("vol_regime_ratio_v1".equals(name) && rv1 != null) {
+                Object v1 = Json.object(rv1).get("value");
+                if (v1 == null || Math.abs(Json.asDouble(v1)) <= 1e-9) {
+                    double rv5 = Math.abs(vec.values[Features.index("rvol_w5m_v1")]);
+                    rv5 = Double.isNaN(rv5) ? 0.0 : rv5;
+                    tol += 1e-9 / (rv5 + 1e-12);
+                }
+            }
             assertTrue(market + " cp " + cpKey + " " + name + ": got " + got
                             + " want " + want,
-                    Math.abs(got - want) <= 1e-9 + 1e-9 * Math.abs(want));
+                    Math.abs(got - want) <= tol);
         }
         // 16 native names + vol_regime_ratio_v1 (aux) appear per checkpoint;
         // never silently compare fewer.
@@ -143,8 +185,9 @@ public class FeatureGoldenTest {
     }
 
     @Test
-    public void eqCheckpoint500() {
-        checkCheckpoint("eq", "500", "events_eq_mbo.jsonl");
+    public void eqCheckpoint501() {
+        // v1.14 (D-P1-1): 500 / 1500 moved to their group-closing events
+        checkCheckpoint("eq", "501", "events_eq_mbo.jsonl");
     }
 
     @Test
@@ -153,8 +196,8 @@ public class FeatureGoldenTest {
     }
 
     @Test
-    public void eqCheckpoint1500() {
-        checkCheckpoint("eq", "1500", "events_eq_mbo.jsonl");
+    public void eqCheckpoint1501() {
+        checkCheckpoint("eq", "1501", "events_eq_mbo.jsonl");
     }
 
     @Test
@@ -175,7 +218,7 @@ public class FeatureGoldenTest {
     @Test
     public void nanNeverLeaksIntoValidSlot() {
         for (String file : new String[] {"events_eq_mbo.jsonl", "events_fx_quote.jsonl"}) {
-            for (FeatureVector vec : rows(file)) {
+            for (FeatureVector vec : rows(file).values()) {
                 for (int i = 0; i < Features.COUNT; i++) {
                     if (vec.valid[i]) {
                         assertTrue(Features.name(i) + " at ts " + vec.timestamp,
@@ -339,8 +382,9 @@ public class FeatureGoldenTest {
         Map<String, Object> cps = Json.object(doc.get("checkpoints"));
         FeatureVector vec = new FeatureVector();
         int compared = 0;
+        boolean[] ends = groupEnds(events);
         for (int i = 0; i < events.size(); i++) {
-            boolean emitted = engine.apply(events.get(i), vec);
+            boolean emitted = engine.apply(events.get(i), vec, ends[i]);
             String key = Integer.toString(i + 1);
             Object raw = cps.get(key);
             if (raw == null) {
@@ -414,8 +458,9 @@ public class FeatureGoldenTest {
         FeatureVector vec = new FeatureVector();
         int seen = 0;
         int compared = 0;
+        boolean[] ends = groupEnds(events);
         for (int i = 0; i < events.size(); i++) {
-            boolean emitted = engine.apply(events.get(i), vec);
+            boolean emitted = engine.apply(events.get(i), vec, ends[i]);
             Object raw = cps.get(Integer.toString(i + 1));
             if (raw == null) {
                 continue;

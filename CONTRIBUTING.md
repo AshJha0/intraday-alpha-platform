@@ -119,8 +119,8 @@ abs and rel 1e-9; adaptive PSI/KS at 1e-10 with exact refit booleans and
 lifecycle state sequences; canonical-JSON lines, trace digests, the risk
 audit / snapshot and the lifecycle registry are byte-identical; the 7-state
 lifecycle golden is compared exactly, field by field. The v1.13.0 table
-(2026-10-11, counts from CI) reads python 2327 / cpp 302 / rust 358 /
-java 571 (golden 193/72/71/124), `integration` 35, `replay` 6.
+(2026-10-11, counts from CI) reads python 2385 / cpp 302 / rust 362 /
+java 575 (golden 193/72/71/124), `integration` 35, `replay` 6.
 
 ## 4. Golden regeneration protocol
 
@@ -223,14 +223,15 @@ Research truth is the product (spec §32). Two rules are mechanical:
    the SHA-256 of the canonical spec and writes
    `research/experiments/<id>/{spec,result}.json`) *before* its result is
    read, and every report prints the denominator and the expected max |t|
-   under the global null (5,156 looks / 216 configurations, max |t| ≈ 4.135 as
-   of 2026-10-04: the 1068 made on the v1.3.0 dataset, the 852 made on
-   the current one under the rules up to v1.4.0 and the 3,236 made on it
+   under the global null (5,358 looks / 293 configurations, max |t| ≈ 4.144
+   at v1.14.0: the 1068 made on the v1.3.0 dataset, the 852 made on
+   the current one under the rules up to v1.4.0, the 3,236 made on it
    under the v1.5.0 default methods, 760 of them by the signal-combination
-   report). An experiment runs under the default
+   report, and the 202 of the v1.14 statistics revision). An experiment runs under the default
    method bundle (`v2`) unless it names `--methods legacy_v1`; the bundle
-   is part of the experiment id, a `v2` validation costs 84 looks (28
-   under `legacy_v1`), and its PROMOTE t threshold is the ledger's
+   is part of the experiment id, a `v2` validation cost 84 looks under the
+   v1.13 rules (28 under `legacy_v1`; since v1.14 one look per gate decision,
+   2 per experiment, and the v1.13 count survives as `v2_v113`), and its PROMOTE t threshold is the ledger's
    multiple-testing threshold at the look count declared before the run,
    never below 3.0. A number quoted under a legacy rule says so. Runner entries are never de-duplicated against
    the report pipeline's entries even when the computation coincides, and a
@@ -263,6 +264,19 @@ Promotion requests use the **Alpha promotion request** issue form, one
 transition per request, with evidence per gate
 (`docs/governance/GOVERNANCE.md` §2). An alpha whose fitted sign contradicts
 its `Economic rationale:` docstring can at best be ITERATE.
+
+Since v1.14 the ledger is a hash chain (x-version 4: `chain_head`,
+`chain_length`). Do not edit `research/experiments.json` by hand: a
+loader raises `LedgerIntegrityError` on a head or total that does not
+match, and `check_ledger_monotone.py` requires the branch's chain to
+extend the base branch's. Combine ledgers from two branches with
+`tools/merge_ledger.py`, which appends.
+
+Supply-chain findings. The `supply-chain` job (pip-audit, cargo audit,
+cargo deny, Trivy) blocks the merge. If a finding is a false positive or
+has no fix yet, add it to `.github/audit-ignores.json` with a `reason` and
+an `expires` date; `tools/audit_ignores.py` fails the job once the date
+has passed, so an ignore is a decision with a deadline, not a mute button.
 
 ## 7. Epics and issues
 

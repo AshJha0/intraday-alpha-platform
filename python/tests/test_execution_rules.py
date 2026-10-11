@@ -206,12 +206,13 @@ def test_queue_cancel_ahead_reduces_position_deterministically():
     # A cancel at another level does nothing.
     sim.on_event(f.cancel(T0 + 2_100_000, 0, 99, 400, 12))
     assert sim.orders[oid].ahead_qty == 60
-    # MODIFY events never change queue position (pinned).
+    # X-P1-1 (v1.14): a MODIFY that decreases an order ahead of us keeps
+    # its priority and credits our position by the removed size (60 -> 10).
     sim.on_event(f.modify(T0 + 2_200_000, 0, 100, 10, 13))
-    assert sim.orders[oid].ahead_qty == 60
+    assert sim.orders[oid].ahead_qty == 10
     # An EXECUTE quoting 70 on order 13 trades only its remaining 10.
     sim.on_event(f.exec(T0 + 3_000_000, 0, 100, 70, 13))
-    assert sim.orders[oid].ahead_qty == 50
+    assert sim.orders[oid].ahead_qty == 0
     assert sim.fills == []
 
 
@@ -411,7 +412,7 @@ def test_queue_cancel_from_behind_does_not_advance_us():
     sim.on_event(f.cancel(T0 + 2_200_000, 0, 100, 80, 14))
     assert sim.orders[oid].ahead_qty == 300
     # A size increase re-queues order 11 at the tail (behind us); its
-    # later cancel does not advance us (MODIFY itself never changes ahead).
+    # later cancel does not advance us (a size increase never changes ahead).
     sim.on_event(f.modify(T0 + 2_300_000, 0, 100, 500, 11))
     sim.on_event(f.cancel(T0 + 2_400_000, 0, 100, 500, 11))
     assert sim.orders[oid].ahead_qty == 300

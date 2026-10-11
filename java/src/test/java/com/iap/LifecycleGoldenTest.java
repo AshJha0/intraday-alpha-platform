@@ -315,20 +315,30 @@ public class LifecycleGoldenTest {
         AlphaLifecycle machine = new AlphaLifecycle(cfg, registry);
         for (String id : registry.alphaIds()) {
             AlphaRecord rec = registry.get(id);
-            assertEquals(id, LifecycleState.CANDIDATE, rec.state());
+            // v1.14.0: FX11 fails the time-shift leakage detector and stays
+            // in RESEARCH; every other alpha is a CANDIDATE that loses to costs
+            assertEquals(id, expectedState(id), rec.state());
             assertTrue(id, rec.lastEvaluation().failedGates()
-                    .contains("net_pnl_after_costs"));
+                    .contains("FX11".equals(id) ? "leakage_clean" : "net_pnl_after_costs"));
         }
         // silence moves nothing (state and counters unchanged)
         for (String id : registry.alphaIds()) {
             AlphaRecord rec = registry.get(id);
             assertNull(machine.advance(id, rec.sinceTs() + 1, Evidence.empty()));
-            assertEquals(id, LifecycleState.CANDIDATE, rec.state());
+            assertEquals(id, expectedState(id), rec.state());
             assertEquals(id, 0, rec.consecutiveFailures());
         }
         assertEquals(24, machine.evaluations().size());
         for (GateEvaluation ev : machine.evaluations()) {
-            assertEquals(GateEvaluation.Outcome.NO_EVIDENCE, ev.outcome());
+            // a RESEARCH alpha (FX11) is held at its entry gates, not starved
+            assertEquals(ev.alphaId(),
+                    "FX11".equals(ev.alphaId()) ? GateEvaluation.Outcome.HOLD
+                            : GateEvaluation.Outcome.NO_EVIDENCE,
+                    ev.outcome());
         }
+    }
+
+    private static LifecycleState expectedState(String id) {
+        return "FX11".equals(id) ? LifecycleState.RESEARCH : LifecycleState.CANDIDATE;
     }
 }

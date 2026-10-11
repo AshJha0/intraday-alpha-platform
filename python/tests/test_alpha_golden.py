@@ -311,7 +311,12 @@ def _default_rules_run(blob: dict, models, eq_frame):
         max_pos_qty=cfg["max_pos_qty"],
         conf_min=cfg["conf_min"],
         latency_rows=cfg["latency_rows"],
+        # the golden pins the v1.5.0-v1.13.0 "auto" row block BY NAME (the
+        # ports take its mask as an input); the default is "causal" since
+        # v1.14.0 (R-P0-1), which needs no mask, so the golden is unchanged
+        block_rows_column=cfg["block_rows_column"],
     )
+    assert BacktestConfig().block_rows_column == "causal"
     assert config.position_policy == cfg["position_policy"] == "cost_aware"
     assert config.cap_fills_at_l1 is cfg["cap_fills_at_l1"] is True
     assert config.block_rows_column == cfg["block_rows_column"] == "auto"

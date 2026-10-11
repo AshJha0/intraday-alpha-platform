@@ -1,4 +1,4 @@
-"""Hard-risk limits (``configs/risk/risk.json``, x-version 3).
+"""Hard-risk limits (``configs/risk/risk.json``, x-version 4).
 
 Mirrors ``rust/risk/src/limits.rs`` (normative): the complete pinned limit
 set plus the currency block. Parsing is STRICT and checks the fields in the
@@ -27,7 +27,7 @@ from iap.risk.serialize import rust_display_f64
 __all__ = ["FxConversion", "RiskLimits", "RISK_CONFIG_VERSION"]
 
 #: The ``x-version`` of ``configs/risk/risk.json`` this parser reads.
-RISK_CONFIG_VERSION = 3
+RISK_CONFIG_VERSION = 4
 
 _U32_MAX = (1 << 32) - 1
 _I64_MAX = (1 << 63) - 1
@@ -88,6 +88,40 @@ class RiskLimits:
     #: Quote currency -> conversion source (``currency.conversion``); a quote
     #: currency equal to ``reporting_ccy`` needs no entry. Sorted mapping.
     fx_conversion: Mapping[str, FxConversion]
+    # ---- x-version 4: every key below is OPTIONAL (absent or null =
+    # ---- that control is off); a present key is parsed strictly.
+    #: ``market_data.max_mid_jump_ratio`` (> 1): a two-sided update whose
+    #: ``bid + ask`` is more than this factor above / below the stored
+    #: two-sided one is dropped (G-P2-6). Crossed books are always dropped.
+    max_mid_jump_ratio: float | None = None
+    #: ``pre_trade.restricted_instruments`` (check 23).
+    restricted_instruments: frozenset[int] = frozenset()
+    #: ``pre_trade.max_open_orders`` per strategy (check 24).
+    max_open_orders: int | None = None
+    #: ``pre_trade.max_open_notional`` per strategy (check 25).
+    max_open_notional: float | None = None
+    #: ``pre_trade.max_strategy_position_qty`` per (strategy, instrument) (check 26).
+    max_strategy_position_qty: int | None = None
+    #: ``pre_trade.max_participation_bps`` of session market volume (check 27).
+    max_participation_bps: float | None = None
+    #: ``pre_trade.participation_floor_qty`` (required with the bps).
+    participation_floor_qty: int | None = None
+    #: ``pre_trade.max_cancels_per_sec`` per strategy (check 28).
+    max_cancels_per_sec: float | None = None
+    #: ``pre_trade.cancel_burst`` (required with the rate).
+    cancel_burst: float | None = None
+    #: ``pre_trade.max_venue_msgs_per_sec`` per venue (check 29).
+    max_venue_msgs_per_sec: float | None = None
+    #: ``pre_trade.venue_msg_burst`` (required with the rate).
+    venue_msg_burst: float | None = None
+    #: ``pre_trade.max_tracked_keys``: bound of every per-key state map (G-P2-7).
+    max_tracked_keys: int | None = None
+    #: ``overrides.max_loss_override_multiple`` x the configured loss limit
+    #: caps an override (G-P2-3).
+    max_loss_override_multiple: float | None = None
+    #: ``overrides.min_approvers``: distinct comma-separated approvers an
+    #: override needs (G-P2-3).
+    min_approvers: int | None = None
 
     @classmethod
     def from_json(cls, doc: Any) -> RiskLimits:
@@ -119,6 +153,33 @@ class RiskLimits:
         if not isinstance(ccy, str) or not ccy:
             raise ValueError("risk.json: missing/empty currency.reporting_ccy")
         conversion = _parse_conversion(doc)
+        jump = _opt(doc, "market_data", "max_mid_jump_ratio", _need_pos_f64)
+        if jump is not None and not jump > 1.0:
+            raise ValueError(
+                f"risk.json: market_data.max_mid_jump_ratio must be > 1, got "
+                f"{rust_display_f64(jump)}"
+            )
+        restricted = _parse_restricted(doc)
+        max_open_orders = _opt(doc, "pre_trade", "max_open_orders", _need_pos_i64)
+        max_open_notional = _opt(doc, "pre_trade", "max_open_notional", _need_pos_f64)
+        max_strat_pos = _opt(doc, "pre_trade", "max_strategy_position_qty", _need_pos_i64)
+        part_bps = _opt(doc, "pre_trade", "max_participation_bps", _need_pos_f64)
+        part_floor = (
+            _need_pos_i64(doc, "pre_trade", "participation_floor_qty")
+            if part_bps is not None
+            else None
+        )
+        cancel_rate = _opt(doc, "pre_trade", "max_cancels_per_sec", _need_pos_f64)
+        cancel_burst = (
+            _need_pos_f64(doc, "pre_trade", "cancel_burst") if cancel_rate is not None else None
+        )
+        venue_rate = _opt(doc, "pre_trade", "max_venue_msgs_per_sec", _need_pos_f64)
+        venue_burst = (
+            _need_pos_f64(doc, "pre_trade", "venue_msg_burst") if venue_rate is not None else None
+        )
+        max_keys = _opt(doc, "pre_trade", "max_tracked_keys", _need_pos_i64)
+        override_mult = _opt(doc, "overrides", "max_loss_override_multiple", _need_pos_f64)
+        min_approvers = _opt(doc, "overrides", "min_approvers", _need_pos_i64)
         return cls(
             kill_switch_engaged=kill,
             max_gross_notional=max_gross,
@@ -138,6 +199,20 @@ class RiskLimits:
             stale_feed_timeout_ns=stale_timeout,
             reporting_ccy=ccy,
             fx_conversion=conversion,
+            max_mid_jump_ratio=jump,
+            restricted_instruments=restricted,
+            max_open_orders=max_open_orders,
+            max_open_notional=max_open_notional,
+            max_strategy_position_qty=max_strat_pos,
+            max_participation_bps=part_bps,
+            participation_floor_qty=part_floor,
+            max_cancels_per_sec=cancel_rate,
+            cancel_burst=cancel_burst,
+            max_venue_msgs_per_sec=venue_rate,
+            venue_msg_burst=venue_burst,
+            max_tracked_keys=max_keys,
+            max_loss_override_multiple=override_mult,
+            min_approvers=min_approvers,
         )
 
     @classmethod
@@ -216,6 +291,32 @@ def _need_bool(doc: Any, section: str, key: str) -> bool:
     if not isinstance(v, bool):
         raise ValueError(f"risk.json: missing/non-bool {section}.{key}")
     return v
+
+
+def _opt(doc: Any, section: str, key: str, need: Any) -> Any:
+    """An optional key: ``None`` when absent or null, else ``need``'s strict parse."""
+    if _lookup(doc, section, key) is None:
+        return None
+    return need(doc, section, key)
+
+
+def _parse_restricted(doc: Any) -> frozenset[int]:
+    """``pre_trade.restricted_instruments``: absent / null = empty; else an
+    array of u32 instrument ids."""
+    v = _lookup(doc, "pre_trade", "restricted_instruments")
+    if v is None:
+        return frozenset()
+    if not isinstance(v, list):
+        raise ValueError("risk.json: pre_trade.restricted_instruments must be an array")
+    out = set()
+    for item in v:
+        iid = _as_u64(item)
+        if iid is None or iid > _U32_MAX:
+            raise ValueError(
+                "risk.json: pre_trade.restricted_instruments entries must be u32 instrument ids"
+            )
+        out.add(iid)
+    return frozenset(out)
 
 
 def _parse_conversion(doc: Any) -> dict[str, FxConversion]:

@@ -86,6 +86,22 @@ Pinned rules (``QuotingBacktester.run_instrument``):
    every quoting decision) and ``frac_decisions_skew_changed_quote`` (share
    of quoting decisions whose wanted prices differ from the same decision
    with ``er = 0``), so an inert skew is visible.
+9. **v1.14 options** (off by default; the default run is byte-identical to
+   v1.13). ``feed_latency_ns`` (X-P1-6) adds the market-data feed leg to
+   every requote, cancel and flatten child (``decision_ts = t +
+   feed_latency_ns``). ``flatten_route="sim"`` (X-P1-6) sends each flatten
+   round as a MARKET child for ``|q|`` through the simulator (latency,
+   depth walk, taker fee and impact per fill, rule-8 gate) instead of
+   crossing the pre-event touch: one child in flight at a time, a remainder
+   re-sent at the next event, each fill recorded as a flatten row with the
+   mid before its filling event as ``m_f`` (the rule-6 identity is
+   unchanged); the end-of-stream remainder still crosses the last book.
+   ``amend_size_down`` (X-P2-12) keeps a quote whose price is unchanged and
+   whose wanted size is SMALLER in the queue: the simulator's
+   ``amend_down`` (a priority-keeping size-decrease replace, same latency
+   path as a cancel) replaces the cancel/new pair (``amends``).
+   ``hidden_print_fills`` (X-P2-7) passes ``hidden_prints=True`` to the
+   simulator. Their counters appear only when the option is on.
 """
 
 from __future__ import annotations
@@ -143,8 +159,22 @@ class QuotingConfig:
     #: ``ticks`` mode: extra inventory skew in ticks per ``qty`` of inventory
     #: (added to the rounded A-S term ``gamma * sigma2 * q * tau / tick``)
     inv_skew_ticks: float = 0.0
+    # ---- v1.14 options (rule 9; defaults = off, the v1.13 run) ----
+    #: X-P1-6: market-data feed latency added to every decision_ts
+    feed_latency_ns: int = 0
+    #: X-P1-6: ``"book"`` (default) crosses the pre-event touch outside the
+    #: simulator; ``"sim"`` sends each flatten round as a MARKET child
+    flatten_route: str = "book"
+    #: X-P2-12: a size-only decrease amends the quote in place (keeps priority)
+    amend_size_down: bool = False
+    #: X-P2-7: hidden (non-displayed) prints fill resting quotes
+    hidden_print_fills: bool = False
 
     def __post_init__(self) -> None:
+        if self.feed_latency_ns < 0:
+            raise ValueError("feed_latency_ns must be >= 0")
+        if self.flatten_route not in ("book", "sim"):
+            raise ValueError("flatten_route must be 'book' or 'sim'")
         if self.skew_mode not in ("as_dollars", "ticks"):
             raise ValueError("skew_mode must be 'as_dollars' or 'ticks'")
         if self.h_min_ticks is not None and self.h_min_ticks < 0:
@@ -262,7 +292,12 @@ class QuotingBacktester:
         tick, unit = ins.tick_size, ins.qty_unit
         flat_ts = cfg.flatten_ts if cfg.flatten_ts is not None else evs[-1].exchange_ts + 1
 
-        sim = ExecutionSimulator(self.exec_config, self.calibration)
+        sim = ExecutionSimulator(
+            self.exec_config, self.calibration, hidden_prints=cfg.hidden_print_fills
+        )
+        feed = cfg.feed_latency_ns
+        routed = cfg.flatten_route == "sim"
+        flat_orders: set[int] = set()
         c: dict[str, int] = dict.fromkeys(
             (
                 "decisions",
@@ -285,6 +320,10 @@ class QuotingBacktester:
         cx: dict[str, int] = {}  # rule-7 counters, reported only when used
         if fb is not None:
             cx.update(feedback_stood_down=0, feedback_widened=0, feedback_reduced=0)
+        if routed:
+            cx["flatten_market_orders"] = 0
+        if cfg.amend_size_down:
+            cx["amends"] = 0
         live: dict[int, int | None] = {0: None, 1: None}  # side -> current order id
         q = [0]
         fills: list[dict[str, Any]] = []
@@ -391,11 +430,22 @@ class QuotingBacktester:
                 size = max(0, min(cfg.qty, room))
                 if act is not None and not act.neutral:
                     size = min(size, act.size(cfg.qty))
-                if cur is not None and cur.limit_ticks == want[side] and cur.remaining == size:
-                    continue
+                if cur is not None and cur.limit_ticks == want[side]:
+                    cur_size = (
+                        sim.amend_target(cur.order_id) if cfg.amend_size_down else cur.remaining
+                    )
+                    if cur_size == size:
+                        continue
+                    if (
+                        cfg.amend_size_down
+                        and 0 < size < cur_size
+                        and sim.amend_down(cur.order_id, size, t + feed)
+                    ):
+                        cx["amends"] += 1  # X-P2-12: keeps its queue priority
+                        continue
                 if cur is not None:
                     if cur.cancel_arrival_ts == 0:
-                        sim.cancel(cur.order_id, t)
+                        sim.cancel(cur.order_id, t + feed)
                         c["cancels"] += 1
                     # the in-flight order still counts toward working size
                     room -= cur.remaining
@@ -416,7 +466,7 @@ class QuotingBacktester:
                         type=OrderType.LIMIT,
                         qty=size,
                         limit_ticks=want[side],
-                        decision_ts=t,
+                        decision_ts=t + feed,
                         post_only=cfg.post_only,
                     )
                 )
@@ -503,7 +553,9 @@ class QuotingBacktester:
                     record(f, mid, False)
 
         def any_working() -> bool:
-            return any(not sim.orders[o].is_terminal for o in mine)
+            return any(not sim.orders[o].is_terminal for o in mine) or any(
+                not sim.orders[o].is_terminal for o in flat_orders
+            )
 
         last_t = evs[0].exchange_ts
         ref_ts: int | None = None
@@ -523,7 +575,7 @@ class QuotingBacktester:
                     for o in sorted(mine):
                         oo = sim.orders[o]
                         if not oo.is_terminal and oo.cancel_arrival_ts == 0:
-                            sim.cancel(o, t)
+                            sim.cancel(o, t + feed)
                             c["cancels"] += 1
             if not started:
                 while r < n and ts[r] < t:
@@ -537,7 +589,25 @@ class QuotingBacktester:
             if pre_mid is not None:
                 last_mid = pre_mid
             if started and q[0] != 0 and bs is not None:
-                cross(t, bs, pre_mid)
+                if not routed:
+                    cross(t, bs, pre_mid)
+                elif not any(not sim.orders[o].is_terminal for o in flat_orders):
+                    # X-P1-6: the flatten round as a MARKET child (rule 9)
+                    d = -q[0]
+                    flat_orders.add(
+                        sim.submit(
+                            ChildOrder(
+                                instrument_id=instrument_id,
+                                venue_id=venue_id,
+                                side=0 if d > 0 else 1,
+                                type=OrderType.MARKET,
+                                qty=abs(d),
+                                decision_ts=t + feed,
+                            )
+                        )
+                    )
+                    c["flatten_rounds"] += 1
+                    cx["flatten_market_orders"] += 1
             if t != ref_ts:
                 # v1.13 (X-P1-4): MAKER markout reference = mid before the
                 # FIRST event of this exchange_ts (tca/markout.py MAKER rule,
@@ -555,6 +625,10 @@ class QuotingBacktester:
             while seen < len(fl):
                 f = fl[seen]
                 seen += 1
+                if f.order_id in flat_orders:
+                    flat_fills.append(len(fills))
+                    record(f, pre_mid if pre_mid is not None else last_mid, True)
+                    continue
                 if f.order_id in mine:
                     if started:
                         c["fills_during_cancel"] += 1
@@ -618,6 +692,8 @@ class QuotingBacktester:
             )
         if fb is not None:
             cx.update(fb.counters)
+        if cfg.hidden_print_fills:
+            cx["hidden_print_trades"] = sim.hidden_print_trades
         c.update(cx)
         inv = pd.DataFrame(inv_path + [(t_end, 0)], columns=["ts", "q"])
         out = QuotingResult(instrument_id, fdf, inv, pnl, c, as_bps, as_source)

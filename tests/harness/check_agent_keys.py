@@ -8,10 +8,16 @@ nothing to check the signature against.  An empty registry is tolerated
 only while the board holds no ``auth`` entries (today: six operator
 entries, none signed).  Every registry value must be a 32-byte hex key.
 
+v1.14 (G-P1-4): a non-empty registry must also carry a maintainer
+signature (``research/agents/agent_pubkeys.sig.json``) by a trust root of
+``research/agents/trust_roots.json``.  With ``--trust-ref REF`` (CI:
+``origin/main``) the trust roots are read from that ref, not the working
+tree, so a change cannot vouch for itself.
+
 Exit codes: 0 ok, 1 a problem (listed on stderr).
 
 Usage:
-    python tests/harness/check_agent_keys.py [--root .]
+    python tests/harness/check_agent_keys.py [--root .] [--trust-ref origin/main]
 """
 
 from __future__ import annotations
@@ -21,6 +27,8 @@ import json
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "python" / "src"))
 
 BOARD_RELPATH = Path("research") / "agents" / "blackboard.jsonl"
 PUBKEYS_RELPATH = Path("research") / "agents" / "agent_pubkeys.json"
@@ -60,9 +68,16 @@ def load(root: Path) -> tuple[list[dict], object]:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
+    ap.add_argument("--trust-ref", default=None, help="git ref to read the trust roots from")
     a = ap.parse_args(argv)
+    from iap.agents import trust
+
     entries, pubkeys = load(a.root)
     problems = check(entries, pubkeys)
+    if isinstance(pubkeys, dict):
+        sig = a.root / trust.REGISTRY_SIG_RELPATH
+        sig_doc = json.loads(sig.read_text(encoding="ascii")) if sig.is_file() else None
+        problems += trust.verify_registry(pubkeys, sig_doc, trust.read_roots(a.root, a.trust_ref))
     signed = sum(1 for e in entries if isinstance(e.get("auth"), dict))
     n_keys = len(pubkeys) if isinstance(pubkeys, dict) else 0
     print(f"board entries {len(entries)} (signed {signed}); registry keys {n_keys}")

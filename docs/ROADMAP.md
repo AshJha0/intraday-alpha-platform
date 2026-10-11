@@ -16,10 +16,10 @@ the YAML, every `done` evidence path on disk).
 | **Phase 0** — architecture and contracts | E01 contracts (canonical types, 17 schemas with `x-version`, JSONL + IAP1, determinism rules, `iap.contracts` types + Protocols), E02 repository engineering (CI, governance, CODEOWNERS, issue tooling) | done (2 of 9 issues sit in Backlog: C07 schema validation of every golden/config in CI, R04 the CI half of the pyproject install) | `schemas/` (17 files), `PLATFORM_CONVENTIONS.md` §1–§3, §13; `python/src/iap/contracts/`, `tests/golden/expected_contracts_examples.json`, `expected_canonical_json.json`; `.github/workflows/ci.yml`, `tools/github/`, `tests/integration/test_github_issue_plan.py`; [../API_CONTRACTS.md](../API_CONTRACTS.md) |
 | **Week 1** — market data + deterministic replay | E03 seeded generator + normalisation/QC, E04 replay as a flagship feature | done (RP05 incident capture bundle: backlog; M08 equity flow that reaches the close in the bundled dataset: done in v1.4.0 — the default `equities.flow.calibration = "session"` carries each equity stream to the close, `"legacy_budget"` reproduces the v1.3.0 dataset, §3.2) | `python/src/iap/marketdata/`, `data/normalized/qc_report.json` (308,975 events), `tests/replay/test_generator_determinism.py` (pins the raw-file hashes of the current and the v1.3.0 dataset), four replay engines + `expected_checkpoint_eq_1000.json`; `docs/runbooks/RUNBOOK_incident_replay.md` (the MVP capture → replay flow exists; a Java-side capture bundle tool does not) |
 | **Week 2** — order book + feature engine | E05 integer-tick L1/L2/MBO book (four languages, anomaly goldens), E06 205-feature registry / native 40 | done (F06 further native ports: backlog, on demand) | `expected_book_states.json`, `expected_anomaly_states.json`, `expected_features.json`; `data/reference/feature_registry.json` (205) |
-| **Week 3** — alphas + research framework | E07 24 flagship alphas, E08 validation (purged/embargoed walk-forward, leakage, NW t, ledger, hypothesis sign, costs, capacity) + `ExperimentRunner` | done (A07 EQ03 cost-aware iteration and A08 porting the other 18 alphas: backlog — the 6 golden alphas are ported, the rest wait for a CANDIDATE that clears the cost gate; V09 full deflated Sharpe: backlog) | `research/alpha_reports/REPORT.md` (0 PROMOTE / 11 ITERATE / 13 REJECT under the v1.5.0 default methods), `research/experiments.json` (5,156 looks / 216 configurations, two datasets, two method bundles), `python/src/iap/research/`, `research/experiments/<id>/` (15 runs: 5 on the v1.3.0 dataset, 5 on the current one under the rules up to v1.4.0, 5 under the default methods), `tests/golden/expected_experiment_golden_frame.json` |
+| **Week 3** — alphas + research framework | E07 24 flagship alphas, E08 validation (purged/embargoed walk-forward, leakage, NW t, ledger, hypothesis sign, costs, capacity) + `ExperimentRunner` | done (A07 EQ03 cost-aware iteration and A08 porting the other 18 alphas: backlog — the 6 golden alphas are ported, the rest wait for a CANDIDATE that clears the cost gate; V09 full deflated Sharpe: backlog) | `research/alpha_reports/REPORT.md` (0 PROMOTE / 11 ITERATE / 13 REJECT under the v1.5.0 default methods), `research/experiments.json` (5,358 looks / 293 configurations, two datasets, three method revisions, hash-chained), `python/src/iap/research/`, `research/experiments/<id>/` (15 runs: 5 on the v1.3.0 dataset, 5 on the current one under the rules up to v1.4.0, 5 under the default methods), `tests/golden/expected_experiment_golden_frame.json` |
 | **Week 4** — portfolio + hard risk | E09 PGD optimizer under 7 constraint families, E10 fail-closed risk engine (Rust reference, Java port, **Python reference port `iap.risk`**) | done; v1.3.0 closed four fail-open defects in all three engines (future-stamped marks, NaN, i64 overflow, venue-0 orders — §3) | `expected_portfolio.json`; `expected_risk_{decisions,snapshot}.json` + `expected_risk_audit.jsonl` matched by Rust, Java and Python; the edge golden `expected_risk_edge_decisions.json` + `expected_risk_edge_audit.jsonl` (v1.3.0); [../API_TRADING.md](../API_TRADING.md) §1 |
 | **Week 5** — execution + performance | E11 TWAP/VWAP/POV/IS, SOR, event-driven simulator (C++ reference, Java port, **Python reference port `iap.execution`**), E12 performance architecture | done (X08 PEG/MID order types, X09 closed-form Almgren–Chriss, H05 Rust/Java benchmark harnesses with percentiles: backlog); v1.3.0 corrected the simulator's crossing pool, applied-only queue tracking, execute cap and cancel rule in all three languages (§3) | `expected_replay_fills.json` matched by C++, Java and Python (reproduced unchanged by the v1.3.0 rules); `benchmarks/results_cpp.md` (generated); [../API_TRADING.md](../API_TRADING.md) §2 |
-| **Week 6** — TCA, parity, lifecycle, trace, store, MVP, testing | E13 TCA, E14 cross-language parity, E15 7-state lifecycle, E16 decision trace, E17 SQL data model + store, E18 end-to-end MVP, E19 six-level testing | done (T05 venue/algo TCA attribution, L04 RETIRED as a live allocation gate, L05 ledger-id CI check, O06 trace on the Java dashboards, D03 Postgres backend, Q04 more integration verticals: backlog) | `expected_tca.json`; the parity table (README, `run_all.sh`: python 2327 / cpp 302 / rust 358 / java 571; 193/72/71/124 golden); `expected_lifecycle.json` + `research/alpha_registry.json` (24 CANDIDATE / 0 beyond); `expected_canonical_json.json`, Java `decision_traces.jsonl`; `schemas/sql/iap_v1.sql` + `iap.store`; `expected_mvp.json` (15,805 events, 800 decisions, 235 parents, 169 fills, −81.53 USD, digest `20d4ff76…`); `tests/README.md` |
+| **Week 6** — TCA, parity, lifecycle, trace, store, MVP, testing | E13 TCA, E14 cross-language parity, E15 7-state lifecycle, E16 decision trace, E17 SQL data model + store, E18 end-to-end MVP, E19 six-level testing | done (T05 venue/algo TCA attribution, L04 RETIRED as a live allocation gate, L05 ledger-id CI check, O06 trace on the Java dashboards, D03 Postgres backend, Q04 more integration verticals: backlog) | `expected_tca.json`; the parity table (README, `run_all.sh`: python 2331 / cpp 302 / rust 362 / java 575; 193/72/71/124 golden); `expected_lifecycle.json` + `research/alpha_registry.json` (23 CANDIDATE / 0 beyond); `expected_canonical_json.json`, Java `decision_traces.jsonl`; `schemas/sql/iap_v1.sql` + `iap.store`; `expected_mvp.json` (15,805 events, 800 decisions, 231 parents, 163 fills, −82.84 USD, digest `6fdb3a2c…`); `tests/README.md` |
 
 ## 2. Phase 2 and Phase 3
 
@@ -116,7 +116,7 @@ The FX files are byte-identical to v1.3.0.
 | E21 adaptive | 126 drift-triggered refits | 122; FX01 still retired under every policy, still no ranking of the policies |
 | E08 power study | order-flow effect significant in 3 of 3 seeds at the reference size | significant in 1 of 3 at the reference size, 3 of 3 at twice that size, not detected at half; lead-lag not detected at any size; nothing promoted |
 | E18 MVP | 355 decisions, 55 fills, a loss of 22.65 USD | 800 decisions, 169 fills, a loss of 81.53 USD; flow covers the whole 15-minute session |
-| E15 lifecycle | 24 CANDIDATE, 0 beyond | 24 CANDIDATE, 0 beyond (the transition log was rebuilt; the old one is in `research/archive/`) |
+| E15 lifecycle | CANDIDATE for all 24, none beyond | CANDIDATE for all 24, none beyond (the transition log was rebuilt; the old one is in `research/archive/`) |
 
 No conclusion of §5 is reversed. Two statements that were true of the old
 data are no longer made: that the ML gate fails, and that the MVP's
@@ -150,7 +150,7 @@ artefact on the same dataset (`data_version` `116b7787…`).
 | E21 adaptive | 122 drift-triggered refits; policy totals not in USD (a currency defect in the runner) | 88; FX01 still retired under every policy; 19 of 40 deployments make no trade, 0 above zero; static policy total −3,921 USD; still no ranking of the policies |
 | E08 power study | planted order flow significant in 1 of 3 seeds at the reference size, 3 of 3 at twice that size | rate rework (20 seeds, 1 to 8 sessions): planted order flow detected at t ≥ 4.365 in 10 of 20 runs on 4 sessions and 20 of 20 on 8; planted lead-lag 0 of 20 at its declared 1 s label, 16 of 20 at a 5 s label on 8 sessions; null 0 of 20; nothing promoted |
 | E18 MVP | 800 decisions, 169 fills, a loss of 81.53 USD | identical; `config_version` and the trace digest changed because `execution.json` is hashed |
-| E15 lifecycle | 24 CANDIDATE, 0 beyond; gates failed: cost 24, significance 18, stability 13, IC 11 | 24 CANDIDATE, 0 beyond; gates failed: cost 24, capacity 24, significance 21, stability 14, IC 12 (registry x-version 2; the legacy-methods log is in `research/archive/`) |
+| E15 lifecycle | CANDIDATE for all 24, none beyond; gates failed: cost 24, significance 18, stability 13, IC 11 | CANDIDATE for all 24, none beyond; gates failed: cost 24, capacity 24, significance 21, stability 14, IC 12 (registry x-version 2; the legacy-methods log is in `research/archive/`) |
 
 No conclusion of §5 is reversed, and one is stated more directly: the
 alphas do not lose because a policy trades them on every row, they have no
@@ -414,7 +414,7 @@ numerically inert (`data/real/quoting_real/ABORTED.md`); a v2 protocol in
 ticks will be pre-registered. AUC01 done: no demonstrated edge in-sample
 (underpowered, MOC-cutoff caveat); 2026 holdout NOT CONFIRMED, 0 trades.
 
-**In progress: v1.14, the correctness release** (one regeneration of
+**v1.14, the correctness release** (done; §3.9) (one regeneration of
 goldens, stores and reports under new pre-registrations; every docs number
 re-read): causal row block for the backtest (R-P0-1), trailing labels by
 default, day-clustered inference with automatic bandwidth, coalesced
@@ -423,8 +423,8 @@ rounding, queue credit on MODIFY size-downs, feed latency, risk audit hash
 chain (G-P0-1), chained ledger and stronger key trust, shared replays and a
 study base class. The R7 confirmatory round runs on v1.14.
 
-**Later:** the SEC 15c3-5 pre-trade control set (G-P0-2; meaningful once the
-live gateway work P1-P3 exists), archiving the frozen Java copy, SOR/FX
+**Later (as planned at v1.13):** the SEC 15c3-5 pre-trade control set (G-P0-2;
+it shipped in v1.14 after all, §3.9), archiving the frozen Java copy, SOR/FX
 realism items (synthetic-only today).
 
 | Item | State |
@@ -435,6 +435,75 @@ realism items (synthetic-only today).
 | AI4 deep order-book baselines | not started |
 | E4-E5 | done in v1.13 |
 | P1-P3 | not started |
+
+## 3.9 v1.14.0 (2026-10-11): the correctness release
+
+v1.14 is the release §3.8 planned: every review finding that moves a
+published number, fixed once, with goldens, stores and reports regenerated
+together. It shipped as six pull requests (#83, #84, #86, #87, #88, #89);
+CHANGELOG.md lists every number that moved and why. The headline did not
+change: still 0 alphas promoted, no strategy that trades at 1x costs.
+
+**Done:**
+
+- Data (#83): same-timestamp events coalesced into one state change in all
+  four feature engines; hidden prints signed by the quote rule; midpoint
+  prints rounded half to even; manifest x-version 2, so every dataset
+  ingested before v1.14 is refused until it is re-ingested; half-penny
+  tick detection; ITCH operational halts; a `config_version` on every
+  dataset run; cross prints counted in volume but not in signed flow.
+- Research statistics (#88): a causal backtest row block (R-P0-1);
+  automatic HAC bandwidth with no lag product across session days; a
+  `few_sessions` reading for under four sessions; the time-shift leakage
+  detector; one ledger look per gate decision; per-instrument scaling;
+  `hypothesis_confirmed` by fold majority. The v1.13 rules stay reachable
+  as `v2_v113` / `v3_v113` / `v4_v113` (COOKBOOK recipe 72).
+- Execution (#86): queue credit on a MODIFY that shrinks an order ahead
+  (on by default, no golden moved); feed latency, simulator-routed exits,
+  hidden-print fills, per-touch-order adverse selection and priority-keeping
+  size amends, all opt-in (recipe 73).
+- Risk (#89): the audit log is a SHA-256 hash chain (G-P0-1, recipe 69);
+  the SEC 15c3-5 pre-trade set as checks 23-29 (G-P0-2, recipe 70), moved
+  forward from "later" because the checks are cheap to pin now and costly
+  to retrofit under a live gateway; two-party, capped loss overrides; a
+  sanity gate on crossed books and mark jumps; bounded per-key state.
+- Governance (#87): maintainer trust roots for the agent key registry,
+  read from `origin/main` (recipe 74); `ed25519-v2` signatures bound to the
+  board head; the look ledger as a hash chain (x-version 4); a blocking
+  `supply-chain` job (pip-audit, cargo audit, cargo deny, Trivy) and Rust
+  in CodeQL.
+- Engineering (#84): `SharedReplay` (one prepared stream per instrument,
+  replayed for every maker config), a numpy-backed event cursor,
+  `StudyBase` for study drivers, and a version-stable model content hash.
+  Behaviour-preserving: no golden, digest or model id moved.
+
+**Not done, and why:**
+
+- The execution-realism options are off by default. Switching them on
+  changes every maker number, so they are switched on in the v2
+  pre-registrations, not retroactively in a release.
+- The participation check (27) is off in the repo config: it needs the
+  market's trade prints, which only the live gateway (P1-P3) provides.
+- The study drivers on the `research/*` branches have not moved to
+  `StudyBase`; they adopt it after their running studies finish.
+- The R7 confirmatory round has not run. It needs the re-ingest under
+  manifest x-version 2, which is the first thing to do on v1.14.
+
+## 3.10 Next: v1.15 and after
+
+| Item | State |
+|---|---|
+| R7 confirmatory round (10 unseen Nasdaq sessions) | data partly downloaded; re-ingest under x-version 2, then run on v1.14 |
+| AI4 deep order-book baselines | code in review (PR #85), targeted at v1.15; no result yet |
+| A2 QQQ against its constituents (basis study) | code in review (PR #85), targeted at v1.15; needs the R7 ingest |
+| Maker v2 and quoting v2 pre-registrations | to write, with the v1.14 execution options switched on and the protocol in ticks |
+| A3 futures lead-lag | on hold (data cost) |
+| P1-P3 live gateway | not started |
+| Archive the frozen Java copy | later |
+
+Neither v1.15 study has produced a number. When they do, they go through
+the same gate and ledger as everything else; a deep model gets no
+exemption for being deep.
 
 ## 4. MVP success criteria
 
@@ -450,7 +519,7 @@ E18, each with its evidence:
 | a decision trace per decision, JSONL + SQLite, `explain` in four languages | done | `traces.jsonl`, `iap.sqlite`, `python -m iap.mvp explain`; the multi-signal `explain` rule tested in Python, Java, Rust, C++ |
 | realized IC pinned to the research label definition, leakage probed | done | `MvpEngine.realized_ic` over `iap.labels.compute_labels`; shift-by-one and truncation probes; the audit in docs/MVP.md §7.1. On the v1.4.0 session the shift-by-one IC does not collapse (EQ01 0.149 against 0.217): the signals persist across decisions, so the probe cannot separate persistence from look-ahead there, and the leak evidence is the pinned label definition and the truncation probe |
 | paper evidence for the lifecycle, registry untouched | done | `paper_evidence.json` (`PaperEvidence` x-version 3: `paper: null` when an IC is undefined ⇒ `NO_EVIDENCE`); the `paper_ic_tracking` gate fails EQ01, EQ03 and EQ06 on this data (realized-vs-research IC gaps 0.206 / 0.128 / 0.158 against a maximum of 0.01) — a finding, not a promotion |
-| honest result stated | done | −81.53 USD on 8,229 shares: +0.022 bps of alpha against −0.41 bps of execution cost; `alpha.cost_negative: true` in `report.json` |
+| honest result stated | done | −82.84 USD on 8,295 shares: +0.0245 bps of alpha against −0.4367 bps of execution cost; `alpha.cost_negative: true` in `report.json` |
 | golden pinned for ports | done | `tests/golden/expected_mvp.json` (x-version 1); docs/MVP.md §9 lists what a port must reproduce |
 | multi-instrument portfolio in the MVP command | out of scope by design | the Java paper vertical covers the universe; the MVP is one instrument, one session |
 
@@ -458,8 +527,8 @@ E18, each with its evidence:
 
 - "done" means the code, the test and the artefact exist on this branch and
   are named; it does not mean the result is good. The platform's central
-  findings are negative and stay in the headline: 0 PROMOTE, 24 CANDIDATE
-  held by `net_pnl_after_costs`, an MVP session that loses 81.53 USD, an
+  findings are negative and stay in the headline: 0 PROMOTE, 23 CANDIDATE
+  held by `net_pnl_after_costs`, an MVP session that loses 82.84 USD, an
   ML zoo in which no model earns its costs, a refit study that cannot rank
   its policies, and —
   since v1.3.0 — a power study in which no planted effect is promoted.

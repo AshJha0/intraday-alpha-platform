@@ -1051,7 +1051,7 @@
       "type": "market"
     },
     {
-      "approver": "cro@desk incident-0824",
+      "approver": "cro@desk, head-of-risk@desk incident-0824",
       "new_limit": 400000.0,
       "scope": "GLOBAL",
       "scope_id": "",
@@ -1153,7 +1153,7 @@
       "type": "order"
     },
     {
-      "approver": "cro@desk incident-0824b",
+      "approver": "cro@desk, head-of-risk@desk incident-0824b",
       "new_limit": 500000.0,
       "scope": "GLOBAL",
       "scope_id": "",

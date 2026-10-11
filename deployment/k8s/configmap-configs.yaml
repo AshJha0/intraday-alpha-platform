@@ -786,8 +786,8 @@ data:
     }
   risk__risk.json: |
     {
-      "x-version": 3,
-      "description": "Complete pinned hard-risk limit set (spec section 16), consumed by the Rust risk engine (rust/risk, normative) and its Java port. FAIL-CLOSED: a missing or invalid limit puts the engine in reject-everything mode; every decision is emitted as a RiskEvent (schemas/risk/risk_event.schema.json) to a JSONL audit log; decisions are deterministic and replayable. Money semantics (PLATFORM_CONVENTIONS.md section 11): every notional and loss figure is in currency.reporting_ccy; notional = qty x qty_unit x price_ticks x tick_size x fx_rate (qty_unit = lot_size for FX, 1 for EQUITY/ETF); quote currencies convert through currency.conversion (last consolidated mid of the named pair, inverted when the pair is REPORTING/CCY) and an order whose conversion is missing or stale is rejected with FX_RATE_MISSING. Loss limits act on daily P&L = realized (average cost) + unrealized (mark-to-market at the last consolidated mid) and latch the strategy/global kill switch on fills AND on mark updates. duplicate_order_window_ns 0 means the entire session; order rate is a per-strategy event-time token bucket (rate max_order_rate_per_sec, capacity order_rate_burst).",
+      "x-version": 4,
+      "description": "Complete pinned hard-risk limit set (spec section 16), consumed by the Rust risk engine (rust/risk, normative) and its Java port. FAIL-CLOSED: a missing or invalid limit puts the engine in reject-everything mode; every decision is emitted as a RiskEvent (schemas/risk/risk_event.schema.json) to a JSONL audit log; decisions are deterministic and replayable. Money semantics (PLATFORM_CONVENTIONS.md section 11): every notional and loss figure is in currency.reporting_ccy; notional = qty x qty_unit x price_ticks x tick_size x fx_rate (qty_unit = lot_size for FX, 1 for EQUITY/ETF); quote currencies convert through currency.conversion (last consolidated mid of the named pair, inverted when the pair is REPORTING/CCY) and an order whose conversion is missing or stale is rejected with FX_RATE_MISSING. Loss limits act on daily P&L = realized (average cost) + unrealized (mark-to-market at the last consolidated mid) and latch the strategy/global kill switch on fills AND on mark updates. duplicate_order_window_ns 0 means the entire session; order rate is a per-strategy event-time token bucket (rate max_order_rate_per_sec, capacity order_rate_burst). x-version 4 (v1.14): market_data.max_mid_jump_ratio drops a two-sided mark update more than that factor away from the stored one (crossed books are always dropped); pre_trade is the SEC 15c3-5 set, checks 23-29 after every legacy check (restricted list, open orders and open notional per strategy, per-strategy position, participation of session market volume, per-strategy cancel rate, per-venue message rate) plus max_tracked_keys, the bound of every per-key state map; overrides bounds a loss-limit override (max_loss_override_multiple x the configured limit, min_approvers distinct comma-separated approvers). Every x-version 4 key is optional: absent or null turns that control off. max_participation_bps is off here because it needs the market trade-print feed (RiskEngine.on_market_trade) that the live gateway supplies.",
       "global": {
         "kill_switch_engaged": false,
         "max_gross_notional": 5000000.0,
@@ -812,7 +812,8 @@ data:
       },
       "market_data": {
         "max_sequence_gap_before_halt": 1,
-        "stale_feed_timeout_ns": 5000000000
+        "stale_feed_timeout_ns": 5000000000,
+        "max_mid_jump_ratio": 10.0
       },
       "currency": {
         "reporting_ccy": "USD",
@@ -825,6 +826,21 @@ data:
           "CHF": {"instrument_id": 106, "invert": true},
           "NZD": {"instrument_id": 107, "invert": false}
         }
+      },
+      "pre_trade": {
+        "restricted_instruments": [],
+        "max_open_orders": 1000,
+        "max_open_notional": 5000000.0,
+        "max_strategy_position_qty": 100000,
+        "max_cancels_per_sec": 1000.0,
+        "cancel_burst": 100.0,
+        "max_venue_msgs_per_sec": 1000.0,
+        "venue_msg_burst": 100.0,
+        "max_tracked_keys": 1000000
+      },
+      "overrides": {
+        "max_loss_override_multiple": 2.0,
+        "min_approvers": 2
       }
     }
   strategies__alpha_params.json: |
@@ -832,14 +848,14 @@ data:
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
       "description": "Fitted flagship-alpha parameters (iap.alpha). model linear_z_v1: er = beta * clip((raw - mu)/(sigma + 1e-12), +-z_clip); conf = min(1, |z|/conf_scale); a dead alpha (sigma <= 0 or beta == 0) scores (0, 0) on every row. The provenance header identifies the feature registry, the data and the commit these numbers were fitted with; every loader rejects a feature_version that differs from its engine's registry hash. See /API_ALPHA.md section 2.",
       "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
-      "git_commit": "75fd4f7901025d172a18e62c93252ca1770aeb4c",
+      "git_commit": "85eb2bcf67e30c770c74ebfde80553226da1bf2a",
       "git_dirty": true,
       "git_dirty_hash": "a1cb60d7b06295999e581ea66f375d920881be62214f127fa2cb5c684632ebe9",
       "params": {
         "EQ01": {
           "alpha_id": "EQ01",
-          "beta": 5.84449379264817e-08,
-          "beta_fit": 5.84449379264817e-08,
+          "beta": 1.1068831705729134e-07,
+          "beta_fit": 1.1068831705729134e-07,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -849,9 +865,9 @@ data:
           "horizon": "1s",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": 0.01289768995965269,
-          "n_train": 80238,
-          "sigma": 1.433527721314541,
+          "mu": 0.01380455661246978,
+          "n_train": 80263,
+          "sigma": 1.4450104550656924,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -860,8 +876,8 @@ data:
         },
         "EQ02": {
           "alpha_id": "EQ02",
-          "beta": 2.858082900639863e-06,
-          "beta_fit": 2.858082900639863e-06,
+          "beta": 2.598364714259339e-06,
+          "beta_fit": 2.598364714259339e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -871,9 +887,9 @@ data:
           "horizon": "5s",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": -0.00039288399208881026,
-          "n_train": 79973,
-          "sigma": 0.28278680274391194,
+          "mu": -0.0002840408231238961,
+          "n_train": 80027,
+          "sigma": 0.3023968982985558,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -882,8 +898,8 @@ data:
         },
         "EQ03": {
           "alpha_id": "EQ03",
-          "beta": 2.3843836063294293e-06,
-          "beta_fit": 2.3843836063294293e-06,
+          "beta": 2.169274885144194e-06,
+          "beta_fit": 2.169274885144194e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -895,9 +911,9 @@ data:
           "horizon": "5s",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": -0.0002571942424055844,
-          "n_train": 79973,
-          "sigma": 0.15844419707850682,
+          "mu": -0.00014165970907901876,
+          "n_train": 80027,
+          "sigma": 0.16900684719126083,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -906,8 +922,8 @@ data:
         },
         "EQ04": {
           "alpha_id": "EQ04",
-          "beta": -4.6639911343519124e-07,
-          "beta_fit": -4.6639911343519124e-07,
+          "beta": -4.940415999148425e-07,
+          "beta_fit": -4.940415999148425e-07,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -917,9 +933,9 @@ data:
           "horizon": "5s",
           "hypothesis_confirmed": false,
           "model": "linear_z_v1",
-          "mu": -0.005906000644076835,
-          "n_train": 36251,
-          "sigma": 0.9180397767878333,
+          "mu": -0.004231434457915294,
+          "n_train": 43050,
+          "sigma": 0.9061214406619946,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -928,8 +944,8 @@ data:
         },
         "EQ05": {
           "alpha_id": "EQ05",
-          "beta": 3.1255142007509825e-07,
-          "beta_fit": 3.1255142007509825e-07,
+          "beta": 3.0739804815696524e-07,
+          "beta_fit": 3.0739804815696524e-07,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -942,9 +958,9 @@ data:
           "horizon": "1s",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": -0.00535011339304477,
-          "n_train": 80242,
-          "sigma": 0.648421966412934,
+          "mu": -0.005757957053767577,
+          "n_train": 80215,
+          "sigma": 0.6494510192311751,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -953,8 +969,8 @@ data:
         },
         "EQ06": {
           "alpha_id": "EQ06",
-          "beta": 6.08312181431125e-06,
-          "beta_fit": 6.08312181431125e-06,
+          "beta": 7.1646711756799976e-06,
+          "beta_fit": 7.1646711756799976e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -964,9 +980,9 @@ data:
           "horizon": "10s",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": 0.009272202106182985,
-          "n_train": 56441,
-          "sigma": 3.6814734421084916,
+          "mu": 0.006134256989074779,
+          "n_train": 56702,
+          "sigma": 3.6905512630554465,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -975,8 +991,8 @@ data:
         },
         "EQ07": {
           "alpha_id": "EQ07",
-          "beta": -1.188348563757847e-06,
-          "beta_fit": -1.188348563757847e-06,
+          "beta": -3.357586000265529e-06,
+          "beta_fit": -3.357586000265529e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -986,9 +1002,9 @@ data:
           "horizon": "10s",
           "hypothesis_confirmed": false,
           "model": "linear_z_v1",
-          "mu": -0.0005622499912300753,
-          "n_train": 56441,
-          "sigma": 1.8937179246046851,
+          "mu": -0.0004271203573374569,
+          "n_train": 56702,
+          "sigma": 2.007351615847936,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -997,8 +1013,8 @@ data:
         },
         "EQ08": {
           "alpha_id": "EQ08",
-          "beta": -9.367249881022218e-06,
-          "beta_fit": -9.367249881022218e-06,
+          "beta": -9.479596102689286e-06,
+          "beta_fit": -9.479596102689286e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1009,9 +1025,9 @@ data:
           "horizon": "10s",
           "hypothesis_confirmed": false,
           "model": "linear_z_v1",
-          "mu": 0.3059255946215191,
-          "n_train": 63945,
-          "sigma": 5.378637770336121,
+          "mu": 0.31216469460978163,
+          "n_train": 64190,
+          "sigma": 5.3758549488936085,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1020,8 +1036,8 @@ data:
         },
         "EQ09": {
           "alpha_id": "EQ09",
-          "beta": -6.91491308712436e-06,
-          "beta_fit": -6.91491308712436e-06,
+          "beta": -7.570863881692383e-06,
+          "beta_fit": -7.570863881692383e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1031,9 +1047,9 @@ data:
           "horizon": "10s",
           "hypothesis_confirmed": false,
           "model": "linear_z_v1",
-          "mu": 2.4933549132173555e-07,
-          "n_train": 22492,
-          "sigma": 0.00026574977380172915,
+          "mu": 1.7897728102131706e-07,
+          "n_train": 22563,
+          "sigma": 0.00027130957778274804,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1042,8 +1058,8 @@ data:
         },
         "EQ10": {
           "alpha_id": "EQ10",
-          "beta": -1.0382831773333301e-07,
-          "beta_fit": -1.0382831773333301e-07,
+          "beta": -1.0384579826760363e-07,
+          "beta_fit": -1.0384579826760363e-07,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1053,9 +1069,9 @@ data:
           "horizon": "1s",
           "hypothesis_confirmed": false,
           "model": "linear_z_v1",
-          "mu": -8.497863556144523e-10,
-          "n_train": 73086,
-          "sigma": 6.415846458099899e-06,
+          "mu": -8.496817235985752e-10,
+          "n_train": 73095,
+          "sigma": 6.415451462582801e-06,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1064,8 +1080,8 @@ data:
         },
         "EQ11": {
           "alpha_id": "EQ11",
-          "beta": 7.596592782546579e-05,
-          "beta_fit": 7.596592782546579e-05,
+          "beta": -4.028722611060179e-06,
+          "beta_fit": -4.028722611060179e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1073,11 +1089,11 @@ data:
           ],
           "fitted": true,
           "horizon": "15m",
-          "hypothesis_confirmed": true,
+          "hypothesis_confirmed": false,
           "model": "linear_z_v1",
-          "mu": -0.02394215245476243,
-          "n_train": 40730,
-          "sigma": 0.9512438512337923,
+          "mu": -0.0018332206252977216,
+          "n_train": 49823,
+          "sigma": 0.9835889969938453,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1086,8 +1102,8 @@ data:
         },
         "EQ12": {
           "alpha_id": "EQ12",
-          "beta": 2.8437574758648306e-06,
-          "beta_fit": 2.8437574758648306e-06,
+          "beta": 2.6303830367700187e-06,
+          "beta_fit": 2.6303830367700187e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1098,9 +1114,9 @@ data:
           "horizon": "5s",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": -0.00033390039599797637,
-          "n_train": 79190,
-          "sigma": 0.2867460000743925,
+          "mu": -0.00032212967153791473,
+          "n_train": 79257,
+          "sigma": 0.30927716408385636,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1109,8 +1125,8 @@ data:
         },
         "FX01": {
           "alpha_id": "FX01",
-          "beta": 3.8041723301634096e-08,
-          "beta_fit": 3.8041723301634096e-08,
+          "beta": 2.341201428937859e-08,
+          "beta_fit": 2.341201428937859e-08,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1120,9 +1136,9 @@ data:
           "horizon": "500ms",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": 0.0021402081557819006,
-          "n_train": 25468,
-          "sigma": 0.0947848486632872,
+          "mu": 0.00264244441720665,
+          "n_train": 25457,
+          "sigma": 0.09139176755028924,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1131,8 +1147,8 @@ data:
         },
         "FX02": {
           "alpha_id": "FX02",
-          "beta": -6.44992153351053e-07,
-          "beta_fit": -6.44992153351053e-07,
+          "beta": -6.706933381533298e-07,
+          "beta_fit": -6.706933381533298e-07,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1142,9 +1158,9 @@ data:
           "horizon": "1m",
           "hypothesis_confirmed": false,
           "model": "linear_z_v1",
-          "mu": -0.005190718273107998,
-          "n_train": 7094,
-          "sigma": 0.9573468590886867,
+          "mu": -0.004271753165608634,
+          "n_train": 7081,
+          "sigma": 0.9569217530021112,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1153,8 +1169,8 @@ data:
         },
         "FX03": {
           "alpha_id": "FX03",
-          "beta": -3.5848949856934903e-07,
-          "beta_fit": -3.5848949856934903e-07,
+          "beta": -2.4119060687415503e-07,
+          "beta_fit": -2.4119060687415503e-07,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1165,9 +1181,9 @@ data:
           "horizon": "1m",
           "hypothesis_confirmed": false,
           "model": "linear_z_v1",
-          "mu": -0.0285398739699695,
-          "n_train": 17894,
-          "sigma": 0.46319412922218584,
+          "mu": -0.007369643110510263,
+          "n_train": 17845,
+          "sigma": 0.494462061439517,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1176,8 +1192,8 @@ data:
         },
         "FX04": {
           "alpha_id": "FX04",
-          "beta": 1.9896962064165974e-07,
-          "beta_fit": 1.9896962064165974e-07,
+          "beta": 4.208625987175265e-07,
+          "beta_fit": 4.208625987175265e-07,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1188,9 +1204,9 @@ data:
           "horizon": "30s",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": 0.020110833134600214,
-          "n_train": 25385,
-          "sigma": 0.40378868300111825,
+          "mu": 0.01918175815456695,
+          "n_train": 24601,
+          "sigma": 0.39905569399711804,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1199,8 +1215,8 @@ data:
         },
         "FX05": {
           "alpha_id": "FX05",
-          "beta": -8.126983387133795e-07,
-          "beta_fit": -8.126983387133795e-07,
+          "beta": -6.302406377742795e-07,
+          "beta_fit": -6.302406377742795e-07,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1210,9 +1226,9 @@ data:
           "horizon": "5m",
           "hypothesis_confirmed": false,
           "model": "linear_z_v1",
-          "mu": 3.0260403758439625e-07,
-          "n_train": 7056,
-          "sigma": 1.583554586400797e-05,
+          "mu": 2.81198119328627e-07,
+          "n_train": 7074,
+          "sigma": 1.7526341559477277e-05,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1221,8 +1237,8 @@ data:
         },
         "FX06": {
           "alpha_id": "FX06",
-          "beta": 5.291869550376535e-07,
-          "beta_fit": 5.291869550376535e-07,
+          "beta": 6.632420704425298e-07,
+          "beta_fit": 6.632420704425298e-07,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1232,9 +1248,9 @@ data:
           "horizon": "30s",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": 5.070546573057738e-07,
-          "n_train": 25249,
-          "sigma": 1.926742617563642e-05,
+          "mu": 6.308846717893732e-07,
+          "n_train": 24470,
+          "sigma": 2.143747727708544e-05,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1243,8 +1259,8 @@ data:
         },
         "FX07": {
           "alpha_id": "FX07",
-          "beta": -2.4184849530287236e-07,
-          "beta_fit": -2.4184849530287236e-07,
+          "beta": -2.5833732586541145e-07,
+          "beta_fit": -2.5833732586541145e-07,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1254,9 +1270,9 @@ data:
           "horizon": "1m",
           "hypothesis_confirmed": false,
           "model": "linear_z_v1",
-          "mu": 4.927431822389211e-07,
-          "n_train": 17069,
-          "sigma": 1.699174252988891e-05,
+          "mu": 4.841717320377914e-07,
+          "n_train": 17029,
+          "sigma": 1.6900213173970254e-05,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1265,8 +1281,8 @@ data:
         },
         "FX08": {
           "alpha_id": "FX08",
-          "beta": 4.260932369978529e-06,
-          "beta_fit": 4.260932369978529e-06,
+          "beta": 4.507396637629723e-06,
+          "beta_fit": 4.507396637629723e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1277,9 +1293,9 @@ data:
           "horizon": "1m",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": 0.06600145041217502,
-          "n_train": 16030,
-          "sigma": 6.301576042158414,
+          "mu": 0.005242051817012538,
+          "n_train": 16959,
+          "sigma": 5.743999153428083,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1288,8 +1304,8 @@ data:
         },
         "FX09": {
           "alpha_id": "FX09",
-          "beta": -5.068478023388927e-06,
-          "beta_fit": -5.068478023388927e-06,
+          "beta": -5.577001798840196e-06,
+          "beta_fit": -5.577001798840196e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1300,9 +1316,9 @@ data:
           "horizon": "1m",
           "hypothesis_confirmed": false,
           "model": "linear_z_v1",
-          "mu": -0.04543161237090456,
-          "n_train": 15900,
-          "sigma": 5.519811021448105,
+          "mu": 0.06184371005435181,
+          "n_train": 16837,
+          "sigma": 6.202045046607035,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1311,8 +1327,8 @@ data:
         },
         "FX10": {
           "alpha_id": "FX10",
-          "beta": 2.3884646621265666e-06,
-          "beta_fit": 2.3884646621265666e-06,
+          "beta": 2.4234340569942158e-06,
+          "beta_fit": 2.4234340569942158e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1323,9 +1339,9 @@ data:
           "horizon": "1m",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": 0.08821200058813136,
-          "n_train": 16030,
-          "sigma": 3.556222614342482,
+          "mu": 0.03555117475711541,
+          "n_train": 16959,
+          "sigma": 3.2757660971437628,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1334,8 +1350,8 @@ data:
         },
         "FX11": {
           "alpha_id": "FX11",
-          "beta": 4.398526634537621e-06,
-          "beta_fit": 4.398526634537621e-06,
+          "beta": 5.316309541738691e-06,
+          "beta_fit": 5.316309541738691e-06,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1346,9 +1362,9 @@ data:
           "horizon": "5m",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": -0.11312898400897889,
-          "n_train": 15814,
-          "sigma": 6.616610180243762,
+          "mu": -0.16453503795100177,
+          "n_train": 16797,
+          "sigma": 6.930632223651231,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532
@@ -1357,8 +1373,8 @@ data:
         },
         "FX12": {
           "alpha_id": "FX12",
-          "beta": 3.064021524513832e-07,
-          "beta_fit": 3.064021524513832e-07,
+          "beta": 3.4185134648259466e-07,
+          "beta_fit": 3.4185134648259466e-07,
           "conf_scale": 2.0,
           "dead": false,
           "features": [
@@ -1369,9 +1385,9 @@ data:
           "horizon": "1m",
           "hypothesis_confirmed": true,
           "model": "linear_z_v1",
-          "mu": 0.004243704045798266,
-          "n_train": 19490,
-          "sigma": 0.10767439862537546,
+          "mu": 0.004914977268207311,
+          "n_train": 19428,
+          "sigma": 0.1148270738350692,
           "train_window": {
             "end_ts": 1787603100184527543,
             "start_ts": 1787529602028520532

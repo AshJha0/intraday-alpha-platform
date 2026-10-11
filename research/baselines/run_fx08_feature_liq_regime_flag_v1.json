@@ -12,12 +12,12 @@
     1.0
   ],
   "expected_frac": [
-    0.5441452723857232,
+    0.5569818409517846,
     0.0,
     0.0,
     0.0,
     0.0,
-    0.45585472761427676,
+    0.4430181590482154,
     0.0,
     0.0,
     0.0,
@@ -26,13 +26,13 @@
   "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
   "kind": "feature",
   "max": 1.0,
-  "mean": 0.45585472761427676,
+  "mean": 0.4430181590482154,
   "min": 0.0,
   "n": 3194,
   "n_buckets": 10,
   "name": "run_fx08_feature_liq_regime_flag_v1",
   "psi_eps": 1e-06,
   "source": "warmup window [1787529602028520532, 1787538602028520532) of the bundled feature frames, universe [101, 102, 103, 104, 105, 106, 107, 108]",
-  "std": 0.49804738220975553,
+  "std": 0.49674245822331864,
   "x-version": 2
 }

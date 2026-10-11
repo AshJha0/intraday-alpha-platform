@@ -1571,3 +1571,93 @@ and nothing else. `python/src/iap/marketdata`, `iap/features`,
   (`python3 tools/regenerate_dataset_artifacts.py --only power,power_extended`,
   on the CI runner for the committed files). A version-2 report cannot be
   converted.
+
+## 2026-10-11 — v1.14 risk: audit hash chain, SEC 15c3-5 controls (risk_event v1 -> v2, risk.json v3 -> v4, risk snapshot v1 -> v2, edge golden v1 -> v2)
+
+Quality-review items G-P0-1, G-P0-2, G-P2-3, G-P2-6, G-P2-7 (PLATFORM_CONVENTIONS.md §11.1).
+
+- **`schemas/risk/risk_event.schema.json` x-version 2**: two new required fields, `seq`
+  (u64, 1-based position in the engine's audit chain) and `prev_sha256` (hex SHA-256 of the
+  previous record's JSONL line, 64 zeros for the first). Sorted-key JSONL lines now read
+  `decision, prev_sha256, reason, rule_id, scope, scope_id, seq, severity, timestamp`. The Python
+  and Rust parsers accept a version-1 line (both fields default to 0 / "").
+  `iap.contracts.versions.RISK_EVENT_VERSION` 1 -> 2.
+- **`configs/risk/risk.json` x-version 4**: optional `market_data.max_mid_jump_ratio`, `pre_trade`
+  and `overrides` sections (absent or null = off). A version-3 document still parses, with every
+  new control off.
+- **Risk snapshot x-version 2** (`RiskEngine.snapshot()`): adds `open.*.strategy_id`,
+  `venue_buckets`, `cancel_buckets`, `market_volume`, `executed`. Restore is strict: a version-1
+  snapshot is refused (`risk snapshot: bad x-version`). The audit chain head is NOT in the
+  snapshot; the Java session store records it in `session_state.json` (`risk_audit_seq`,
+  `risk_audit_head_sha256`, optional on read).
+- **Goldens regenerated** (Python reference-equivalent port; the Rust generator
+  `make_risk_golden.rs` reproduces them):
+  - `expected_risk_audit.jsonl`: every line gains `seq` / `prev_sha256`; decisions, rule ids,
+    severities and reasons unchanged except the two override approvers, now two-party
+    (`cro@desk, head-of-risk@desk incident-0824[b]`) because the repo config requires 2.
+  - `expected_risk_decisions.json`: those two `approver` strings; every `expect` unchanged.
+  - `expected_risk_snapshot.json`: x-version 2 (`strategy_id` per open order, `venue_buckets`,
+    empty `cancel_buckets` / `market_volume` / `executed`).
+  - `expected_risk_edge_decisions.json` x-version 1 -> 2 (`python/tools/make_golden_risk_edge.py`):
+    `config_set`, step types `trade`, `cancel_request`, `bad_override`; restores continue the
+    audit chain; four new scenarios (15c3-5 controls, bounded two-party override, sanity gate,
+    bounded state). The eight existing scenarios' decisions are unchanged.
+    `expected_risk_edge_audit.jsonl` regenerated.
+  - `tests/golden/risk_fuzz/` regenerated (`make_risk_fuzz_corpus.py --force`): chained audit,
+    snapshot v2, override steps mostly two-party, `market_weird` no longer emits a crossed
+    `(i64::MAX, 1)` book (it would now be dropped) but `(1, i64::MAX)` followed by a probing order.
+  - `expected_mvp.json`: `config_version` and the trace digest only (the risk config is part of
+    the configuration hash); every count, P&L and float unchanged. Digest `20d4ff76…` ->
+    `5918f870…` in the docs that quote it.
+- Migration path: none for data. A paper session checkpointed before v1.14 cannot resume (its
+  risk snapshot is version 1); start a new session.
+
+## 2026-10-11 — v1.14.0 research statistics revision (R-P0-1, R-P1-3, R-P2-1..4); no wire schema changed, every research artefact regenerated
+
+The `v2` / `v3` / `v4` method bundles (`iap.validation.methods`) move to the
+v1.14.0 statistics revision; the v1.13.0 rules stay reachable, frozen, as
+`v2_v113` / `v3_v113` / `v4_v113`.
+
+- **Backtest row block (R-P0-1).** `BacktestConfig.block_rows_column`
+  default `"auto"` -> `"causal"`: rows are blocked only on decision-time
+  state (no positive mid, or an ANCHOR reason bit of `label_reason_<h>`),
+  never on whether the forward label later turns out valid. `"auto"` is
+  kept by name and reported as `net_pnl_1x_cost_label_block`.
+  `tests/golden/expected_backtest.json` names its row block explicitly, so
+  it and the Java/C++ ports are unchanged.
+- **Inference (R-P1-3).** `validate_alpha(hac_bandwidth="auto",
+  hac_day_separated=True)`: automatic HAC lags
+  (`metrics.auto_hac_lags`, never below the horizon rule) and no lag
+  product across a session day in the gate t; `v2` always carries the
+  `validity` block; a block of fewer than four session days carries
+  `few_sessions` (sign-and-replication reading).
+- **`hypothesis_confirmed` (R-P2-1)** reads the share of folds whose model
+  confirms the hypothesis (>= 0.70); `hypothesis_confirmed_last_fold` keeps
+  the old reading; fold rows gain `hypothesis_confirmed`.
+- **Scaling (R-P2-2).** `standardisation="instrument"`: signal and label are
+  divided by each instrument's own standard deviation (per fold) before any
+  pooled statistic.
+- **Leakage (R-P2-3).** The leakage block gains the time-shift detector:
+  `time_shift_ok` (`null` = not applicable), `ic_time_shifted`,
+  `time_shift_pairs`, `time_shift_lag_ns`, `required_time_shift_ratio`.
+- **Looks (R-P2-4).** `looks_per_validation(..., looks_rule="decisions")`:
+  one look per gate decision (a runner experiment / pipeline alpha debits
+  2, was 84).
+- **Report keys.** `methods` gains `row_block`, `hac_bandwidth`,
+  `hac_day_separated`, `hypothesis_rule`, `standardisation`,
+  `leakage_time_shift`; the report gains `nw_lags_rule`, `hypothesis_rule`,
+  `hypothesis_confirmed_last_fold`. A report without them was computed at
+  the v1.13.0 revision (`iap.store.importers` reads it so).
+- **Ledger identity.** Pipelines at the v1.14.0 revision add
+  `stats_revision: "v1.14"` to their ledger configuration
+  (`methods.ledger_config`), so the same alpha / spec / combination on the
+  same data is a NEW look, never a silent rerun; entries without it are
+  scoped to the `*_v113` bundle (`methods.ledger_bundle`). Experiment ids
+  are NOT changed: an `ExperimentSpec` names the bundle, not the revision,
+  so the five runner experiments keep their ids and are re-run in place
+  (their v1.13.0 directories were removed deliberately, as the runner's
+  drift guard requires). A v1.13.0 result is reproduced by building the
+  spec with `methods="v2_v113"` (a new id).
+- Migration path: `python3 tools/regenerate_dataset_artifacts.py` on the
+  CI runner (the `regenerate` job); its "already ledgered" check now also
+  compares `stats_revision`.

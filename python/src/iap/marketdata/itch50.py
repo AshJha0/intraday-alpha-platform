@@ -5,7 +5,7 @@ Two layers (docs/REAL_DATA.md is the user guide and holds the mapping table):
 * :class:`Itch50Reader` — a streaming parser for the historical file format:
   a sequence of ``2-byte big-endian length | message`` records, optionally
   gzip-compressed (detected by magic, not by file name).  It decodes the
-  message types the platform maps (``S R H Y L A F E C X D U P Q B``),
+  message types the platform maps (``S R H h Y L A F E C X D U P Q B``),
   length-checks and counts ``I`` (NOII; decoded only with the opt-in
   ``noii=True``, for ``iap.auction``), and skips every other type by its
   length prefix with a per-type counter.  With a symbol filter the stock
@@ -22,7 +22,9 @@ Two layers (docs/REAL_DATA.md is the user guide and holds the mapping table):
   the price still in the feed's integer 1/10000-dollar units and no
   sequence number.  ``iap.marketdata.ingest`` converts prices to ticks,
   numbers the streams and writes the platform's raw files.  The mapper's
-  only state is the set of live orders of the wanted symbols.
+  state is the set of live orders of the wanted symbols and, derived from
+  it, the resting quantity per price level (:class:`LevelBook`), which gives
+  the best bid / ask the hidden-print quote rule needs (v1.14, D-P1-2).
 
 No float touches a price or a timestamp: prices are the feed's integers,
 timestamps are ``midnight(America/New_York, date) + ns-since-midnight``.
@@ -35,6 +37,7 @@ import gzip
 import struct
 import zlib
 from collections.abc import Iterable, Iterator
+from heapq import heappop, heappush
 from pathlib import Path
 from typing import BinaryIO, NamedTuple
 from zoneinfo import ZoneInfo
@@ -64,6 +67,7 @@ _NS_PER_DAY = 86_400 * 1_000_000_000
 _S = struct.Struct(">xHHHIc")
 _R = struct.Struct(">xHHHI8sccIcc2scccccIc")
 _H = struct.Struct(">xHHHI8scc4s")
+_OH = struct.Struct(">xHHHI8scc")
 _Y = struct.Struct(">xHHHI8sc")
 _L = struct.Struct(">xHHHI4s8sccc")
 _A = struct.Struct(">xHHHIQcI8sI")
@@ -83,6 +87,7 @@ MESSAGE_LENGTHS: dict[str, int] = {
     "S": 12,
     "R": 39,
     "H": 25,
+    "h": 21,
     "Y": 20,
     "L": 26,
     "A": 36,
@@ -102,6 +107,7 @@ _STRUCTS = {
     "S": _S,
     "R": _R,
     "H": _H,
+    "h": _OH,
     "Y": _Y,
     "L": _L,
     "A": _A,
@@ -164,6 +170,17 @@ class TradingAction(NamedTuple):
     stock: str
     trading_state: str
     reason: str
+
+
+class OperationalHalt(NamedTuple):
+    """``h`` — operational halt of one market (``market_code`` Q Nasdaq,
+    B BX, X PSX); ``action`` H (halted) / T (resumed)."""
+
+    locate: int
+    ts: int
+    stock: str
+    market_code: str
+    action: str
 
 
 class RegShoRestriction(NamedTuple):
@@ -533,6 +550,11 @@ def _dec_h(buf: bytes, start: int) -> TradingAction:
     return TradingAction(loc, (hi << 32) | lo, _txt(stock), _txt(state), _txt(reason))
 
 
+def _dec_op_halt(buf: bytes, start: int) -> OperationalHalt:
+    loc, _, hi, lo, stock, market, action = _OH.unpack_from(buf, start)
+    return OperationalHalt(loc, (hi << 32) | lo, _txt(stock), _txt(market), _txt(action))
+
+
 def _dec_y(buf: bytes, start: int) -> RegShoRestriction:
     loc, _, hi, lo, stock, action = _Y.unpack_from(buf, start)
     return RegShoRestriction(loc, (hi << 32) | lo, _txt(stock), _txt(action))
@@ -638,6 +660,7 @@ def _dec_i(buf: bytes, start: int) -> NetOrderImbalance:
 _DECODERS = {
     ord("I"): _dec_i,
     ord("H"): _dec_h,
+    ord("h"): _dec_op_halt,
     ord("Y"): _dec_y,
     ord("L"): _dec_l,
     ord("A"): _dec_a,
@@ -682,6 +705,7 @@ MAPPING_COUNTERS = (
     "overcancelled_orders",
     "nonprintable_executions",
     "hidden_trades",
+    "hidden_trades_signed_by_quote_rule",
     "hidden_trades_signed_by_tick_rule",
     "cross_trades",
     "broken_trades",
@@ -690,7 +714,64 @@ MAPPING_COUNTERS = (
     "reg_sho_messages",
     "market_participant_messages",
     "unknown_trading_states",
+    "operational_halt_messages",
+    "operational_halts_other_markets",
+    "unknown_operational_halt_actions",
 )
+
+#: Market whose operational halts stop the mapped book (ITCH ``h`` market
+#: code; the feed is Nasdaq's own book, so a BX / PSX halt is only counted).
+OPERATIONAL_HALT_MARKET = "Q"
+
+
+class LevelBook:
+    """Resting quantity per price level of one instrument, both sides, with
+    the best price of a side from a lazy heap (emptied levels are popped
+    when they surface).  Side 0 = bid, 1 = ask; prices in any integer unit.
+
+    Shared by the mapper (best bid / ask for the hidden-print quote rule)
+    and the ingest consistency check (``iap.marketdata.ingest._CheckState``).
+    """
+
+    __slots__ = ("totals", "heaps")
+
+    def __init__(self) -> None:
+        #: per side: price -> resting quantity
+        self.totals: tuple[dict[int, int], dict[int, int]] = ({}, {})
+        #: per side: lazy heap of prices, best first (bids negated)
+        self.heaps: tuple[list[int], list[int]] = ([], [])
+
+    def add(self, side: int, price: int, qty: int) -> None:
+        totals = self.totals[side]
+        have = totals.get(price)
+        if have is None:
+            totals[price] = qty
+            heappush(self.heaps[side], -price if side == 0 else price)
+        else:
+            totals[price] = have + qty
+
+    def remove(self, side: int, price: int, qty: int) -> None:
+        totals = self.totals[side]
+        left = totals.get(price, 0) - qty
+        if left > 0:
+            totals[price] = left
+        else:
+            totals.pop(price, None)
+
+    def best(self, side: int) -> int | None:
+        """Best resting price of a side (lazy deletion of emptied levels)."""
+        heap, totals = self.heaps[side], self.totals[side]
+        sign = -1 if side == 0 else 1
+        while heap:
+            price = sign * heap[0]
+            if price in totals:
+                return price
+            heappop(heap)
+        return None
+
+    def crossed(self) -> bool:
+        bid, ask = self.best(0), self.best(1)
+        return bid is not None and ask is not None and bid > ask
 
 
 def session_midnight_ns(date: str, timezone: str = ITCH_TIMEZONE) -> int:
@@ -726,6 +807,10 @@ class Itch50Mapper:
         self._phase = _PRE_SYSTEM
         n = len(self.symbols)
         self._state = ["T"] * n
+        #: operational halt of the mapped market (ITCH ``h``, market Q)
+        self._op_halt = [False] * n
+        #: resting displayed quantity per level, per instrument (quote rule)
+        self._levels = [LevelBook() for _ in range(n)]
         self._emitted_status: list[int | None] = [None] * n
         self._last_price = [0] * n
         self._last_sign = [-1] * n
@@ -757,7 +842,7 @@ class Itch50Mapper:
         if self._dropping():
             return int(SessionStatus.CLOSE)
         state = self._state[inst]
-        if state in ("H", "P"):
+        if state in ("H", "P") or self._op_halt[inst]:
             return int(SessionStatus.HALT)
         if state == "Q":
             return int(SessionStatus.AUCTION)
@@ -822,6 +907,20 @@ class Itch50Mapper:
                 counters["broken_trades"] += 1
                 self.broken.append(m.match_number)
                 continue
+            if kind is OperationalHalt:
+                counters["operational_halt_messages"] += 1
+                if m.market_code != OPERATIONAL_HALT_MARKET:
+                    counters["operational_halts_other_markets"] += 1
+                    continue
+                if m.action not in ("H", "T"):
+                    counters["unknown_operational_halt_actions"] += 1
+                    continue
+                self._op_halt[inst] = m.action == "H"
+                if not self._dropping():
+                    ev = self._sync_status(inst, self._ts(m.ts))
+                    if ev is not None:
+                        yield ev
+                continue
             if kind is RegShoRestriction:
                 counters["reg_sho_messages"] += 1
                 continue
@@ -863,12 +962,14 @@ class Itch50Mapper:
                     counters["duplicate_order_refs"] += 1
                     continue
                 orders[ref] = [inst, side, m.price, m.shares]
+                self._levels[inst].add(side, m.price, m.shares)
                 yield (inst, ts, _ADD, side, m.price, m.shares, ref, 0)
             elif kind is OrderDelete:
                 order = orders.pop(m.order_ref, None)
                 if order is None:
                     counters["unknown_order_refs"] += 1
                     continue
+                self._levels[order[0]].remove(order[1], order[2], order[3])
                 yield (inst, ts, _CANCEL, order[1], order[2], 0, m.order_ref, 0)
             elif kind is OrderExecuted or kind is OrderExecutedWithPrice:
                 order = orders.get(m.order_ref)
@@ -883,6 +984,7 @@ class Itch50Mapper:
                     counters["overfilled_executions"] += 1
                     qty = order[3]
                 order[3] -= qty
+                self._levels[order[0]].remove(order[1], order[2], qty)
                 if order[3] == 0:
                     del orders[m.order_ref]
                 side, price = order[1], order[2]
@@ -922,6 +1024,7 @@ class Itch50Mapper:
                 if m.shares > order[3]:
                     counters["overcancelled_orders"] += 1
                 remaining = order[3] - m.shares
+                self._levels[order[0]].remove(order[1], order[2], min(m.shares, order[3]))
                 if remaining > 0:
                     order[3] = remaining
                     yield (inst, ts, _MODIFY, order[1], order[2], remaining, m.order_ref, 0)
@@ -934,6 +1037,7 @@ class Itch50Mapper:
                     counters["unknown_order_refs"] += 1
                     continue
                 side = order[1]
+                self._levels[order[0]].remove(side, order[2], order[3])
                 yield (inst, ts, _CANCEL, side, order[2], 0, m.orig_ref, 0)
                 new = m.new_ref
                 if m.shares <= 0 or m.price <= 0 or not (0 < new < SYNTHETIC_ID_BASE):
@@ -943,6 +1047,7 @@ class Itch50Mapper:
                     counters["duplicate_order_refs"] += 1
                     continue
                 orders[new] = [inst, side, m.price, m.shares]
+                self._levels[inst].add(side, m.price, m.shares)
                 yield (inst, ts, _ADD, side, m.price, m.shares, new, 0)
             elif kind is Trade:
                 if m.shares <= 0 or m.price <= 0:
@@ -963,10 +1068,27 @@ class Itch50Mapper:
                 )
 
     def _hidden_aggressor(self, inst: int, m: Trade) -> int:
-        """Aggressor side of a ``P`` print (docs/REAL_DATA.md §4, row P)."""
+        """Aggressor side of a ``P`` print (docs/REAL_DATA.md §4, row P).
+
+        Before 2014-07-14 the buy/sell indicator is the resting side.  From
+        then on it carries no information and the print is signed by the
+        Lee-Ready rule (v1.14, D-P1-2): against the mapper's own displayed
+        best bid / ask at the moment of the print, above the mid is a buy and
+        below it a sell; a print exactly at the mid, or with no two-sided,
+        unlocked, uncrossed quote, falls back to the tick rule against the
+        last print (counters ``hidden_trades_signed_by_quote_rule`` /
+        ``hidden_trades_signed_by_tick_rule``).
+        """
         from_indicator = _BID if m.side == "S" else _ASK
         if self._p_side_informative:
             return from_indicator
+        levels = self._levels[inst]
+        bid, ask = levels.best(0), levels.best(1)
+        if bid is not None and ask is not None and bid < ask:
+            twice = 2 * m.price
+            if twice != bid + ask:
+                self.counters["hidden_trades_signed_by_quote_rule"] += 1
+                return _BID if twice > bid + ask else _ASK
         self.counters["hidden_trades_signed_by_tick_rule"] += 1
         last = self._last_price[inst]
         if last == 0:

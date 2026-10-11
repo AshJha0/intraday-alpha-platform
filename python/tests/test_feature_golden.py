@@ -8,7 +8,7 @@ import pytest
 from conftest import GOLDEN_DIR, REPO_ROOT
 from iap.core.codec import read_jsonl
 from iap.features.context import build_contexts
-from iap.features.engine import FeatureEngine
+from iap.features.engine import FeatureEngine, group_ends
 from iap.features.registry import build_registry, feature_index, registry_hash
 
 TOL = 1e-9
@@ -29,8 +29,9 @@ def _run_checkpoints(vector_file, checkpoints, contexts):
     events = read_jsonl(GOLDEN_DIR / vector_file)
     engine = FeatureEngine(contexts, cadence_ns=0)
     out = {}
-    for i, ev in enumerate(events, start=1):
-        vec = engine.apply(ev)
+    # v1.14 (D-P1-1): the goldens are coalesced; checkpoints are group ends
+    for i, (ev, end) in enumerate(zip(events, group_ends(events), strict=True), start=1):
+        vec = engine.apply(ev, end)
         if i in checkpoints:
             out[i] = vec
     return out
@@ -86,7 +87,7 @@ def test_golden_covers_every_family(golden):
 
 def test_engine_determinism(golden, contexts):
     """Two independent runs produce bit-identical vectors at the checkpoints."""
-    cps = {500, 2000}
+    cps = {501, 2000}
     a = _run_checkpoints("events_eq_mbo.jsonl", cps, contexts)
     b = _run_checkpoints("events_eq_mbo.jsonl", cps, contexts)
     for cp in cps:
@@ -112,8 +113,8 @@ def _run_anomaly_side(side_doc, contexts):
     engine = FeatureEngine(contexts, cadence_ns=0)
     want = {int(k) for k in side_doc["checkpoints"]}
     out = {}
-    for i, ev in enumerate(events, start=1):
-        vec = engine.apply(ev)
+    for i, (ev, end) in enumerate(zip(events, group_ends(events), strict=True), start=1):
+        vec = engine.apply(ev, end)
         if i in want:
             st = engine.states[side_doc["instrument_id"]]
             out[i] = (

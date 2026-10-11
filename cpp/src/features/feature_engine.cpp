@@ -3,10 +3,23 @@
 
 #include "iap/features/feature_engine.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
 namespace iap {
+
+std::vector<bool> group_ends(const std::vector<MarketEvent>& events) {
+    std::vector<bool> out(events.size(), true);
+    std::map<std::uint32_t, std::int64_t> next;
+    for (std::size_t i = events.size(); i-- > 0;) {
+        const MarketEvent& ev = events[i];
+        auto it = next.find(ev.instrument_id);
+        out[i] = it == next.end() || it->second != ev.exchange_ts;
+        next[ev.instrument_id] = ev.exchange_ts;
+    }
+    return out;
+}
 
 namespace {
 
@@ -192,14 +205,16 @@ bool FeatureEngine::book_ok(std::uint32_t instrument_id) const {
 // `samples == false` is a *staleness refresh*: the merged view and book_ok
 // are recomputed because the stale-venue set changed, but no OFI / depth /
 // mid sample is recorded.  Returns true when the merged depth was oversized.
-bool FeatureEngine::refresh_book(InstState& st, std::uint16_t venue_id,
+bool FeatureEngine::refresh_book(InstState& st,
+                                 const std::vector<std::uint16_t>& venues,
                                  std::int64_t t, bool just_recovered,
                                  bool samples) {
     if (just_recovered) st.reset_rolling(t);
-    // Refresh this venue's cached top-10 depth.
+    // Refresh the cached top-10 depth of every venue the group touched.
     const auto& books = st.cons.books();
-    auto vb = books.find(venue_id);
-    if (vb != books.end()) {
+    for (const std::uint16_t venue_id : venues) {
+        auto vb = books.find(venue_id);
+        if (vb == books.end()) continue;
         auto& cache = st.venue_cache[venue_id];
         cache.first.clear();
         cache.second.clear();
@@ -347,7 +362,38 @@ bool FeatureEngine::refresh_book(InstState& st, std::uint16_t venue_id,
     return false;
 }
 
-bool FeatureEngine::apply(const MarketEvent& ev, FeatureVector& out) {
+namespace {
+// Record a venue for the closing refresh (sorted, unique).
+void mark_venue(std::vector<std::uint16_t>& venues, std::uint16_t venue_id) {
+    auto it = std::lower_bound(venues.begin(), venues.end(), venue_id);
+    if (it == venues.end() || *it != venue_id) venues.insert(it, venue_id);
+}
+}  // namespace
+
+bool FeatureEngine::close_group(InstState& st, std::uint32_t iid,
+                                std::int64_t t, bool group_end,
+                                FeatureVector& out) {
+    if (!group_end) return false;
+    const bool stale_changed = st.stale_touched;
+    const bool just_recovered =
+        (!st.stale_venues.empty() || st.stale_seen) && st.stale_running.empty();
+    st.stale_venues = st.stale_running;
+    st.stale_touched = false;
+    st.stale_seen = false;
+    bool oversized = false;
+    if (st.pending_refresh) {
+        oversized = refresh_book(st, st.pending_venues, t, just_recovered, true);
+    } else if (stale_changed) {
+        oversized = refresh_book(st, st.pending_venues, t, just_recovered, false);
+    }
+    if (oversized) ++oversized_depth_skipped_;
+    st.pending_refresh = false;
+    st.pending_venues.clear();
+    return emit_if_due(st, iid, t, out);
+}
+
+bool FeatureEngine::apply(const MarketEvent& ev, FeatureVector& out,
+                          bool group_end) {
     InstState& st = state(ev.instrument_id);
     const std::int64_t t = ev.exchange_ts;
     if (st.seen && t < st.last_ts) {
@@ -373,17 +419,16 @@ bool FeatureEngine::apply(const MarketEvent& ev, FeatureVector& out) {
     for (const auto& [vid, book] : st.cons.books()) {
         if (book.stale()) stale_now.push_back(vid);
     }
-    const bool stale_changed = stale_now != st.stale_venues;
-    const bool just_recovered = !st.stale_venues.empty() && stale_now.empty();
-    st.stale_venues.swap(stale_now);
+    if (stale_now != st.stale_running) {
+        mark_venue(st.pending_venues, ev.venue_id);
+        st.stale_running.swap(stale_now);
+        st.stale_touched = true;
+    }
+    if (!st.stale_running.empty()) st.stale_seen = true;
 
     if (status != ApplyStatus::APPLIED) {
         ++events_dropped_;
-        if (stale_changed &&
-            refresh_book(st, ev.venue_id, t, just_recovered, false)) {
-            ++oversized_depth_skipped_;
-        }
-        return emit_if_due(st, ev.instrument_id, t, out);
+        return close_group(st, ev.instrument_id, t, group_end, out);
     }
 
     const auto et = static_cast<EventType>(ev.event_type);
@@ -407,16 +452,10 @@ bool FeatureEngine::apply(const MarketEvent& ev, FeatureVector& out) {
         et == EventType::QUOTE ||
         (et == EventType::SNAPSHOT && ev.trade_id == 0);
     if (book_touch) {
-        if (refresh_book(st, ev.venue_id, t, just_recovered, true)) {
-            ++oversized_depth_skipped_;
-        }
-    } else if (stale_changed) {
-        if (refresh_book(st, ev.venue_id, t, just_recovered, false)) {
-            ++oversized_depth_skipped_;
-        }
+        st.pending_refresh = true;
+        mark_venue(st.pending_venues, ev.venue_id);
     }
-
-    return emit_if_due(st, ev.instrument_id, t, out);
+    return close_group(st, ev.instrument_id, t, group_end, out);
 }
 
 bool FeatureEngine::emit_if_due(InstState& st, std::uint32_t iid,
@@ -448,10 +487,14 @@ bool FeatureEngine::emit_if_due(InstState& st, std::uint32_t iid,
 }
 
 void FeatureEngine::run(const std::vector<MarketEvent>& events,
-                        std::vector<FeatureVector>* emitted) {
+                        std::vector<FeatureVector>* emitted, bool coalesce) {
     FeatureVector vec;
-    for (const auto& ev : events) {
-        if (apply(ev, vec) && emitted != nullptr) emitted->push_back(vec);
+    const std::vector<bool> ends =
+        coalesce ? group_ends(events) : std::vector<bool>(events.size(), true);
+    for (std::size_t i = 0; i < events.size(); ++i) {
+        if (apply(events[i], vec, ends[i]) && emitted != nullptr) {
+            emitted->push_back(vec);
+        }
     }
 }
 

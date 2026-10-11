@@ -174,12 +174,13 @@ TEST(ExecQueue, CancelAheadReducesPositionDeterministically) {
     // A cancel at another level does nothing.
     sim.on_event(f.cancel(T0 + 2'100'000, 0, 99, 400, 12));
     EXPECT_EQ(sim.orders().at(id).ahead_qty, 60);
-    // MODIFY events never change queue position (pinned).
+    // X-P1-1 (v1.14): a MODIFY that decreases an order ahead of us keeps
+    // its priority and credits our position by the removed size (60 -> 10).
     sim.on_event(f.modify(T0 + 2'200'000, 0, 100, 10, 13));
-    EXPECT_EQ(sim.orders().at(id).ahead_qty, 60);
+    EXPECT_EQ(sim.orders().at(id).ahead_qty, 10);
     // An EXECUTE quoting 70 on order 13 trades only its remaining 10.
     sim.on_event(f.exec(T0 + 3'000'000, 0, 100, 70, 13));
-    EXPECT_EQ(sim.orders().at(id).ahead_qty, 50);
+    EXPECT_EQ(sim.orders().at(id).ahead_qty, 0);
     EXPECT_TRUE(sim.fills().empty());
 }
 
@@ -397,7 +398,7 @@ TEST(ExecQueue, CancelFromBehindDoesNotAdvanceUs) {
     sim.on_event(f.cancel(T0 + 2'200'000, 0, 100, 80, 14));
     EXPECT_EQ(sim.orders().at(id).ahead_qty, 300);
     // A size increase re-queues order 11 at the tail (behind us); its later
-    // cancel does not advance us (MODIFY itself never changes ahead).
+    // cancel does not advance us (a size increase never changes ahead).
     sim.on_event(f.modify(T0 + 2'300'000, 0, 100, 500, 11));
     sim.on_event(f.cancel(T0 + 2'400'000, 0, 100, 500, 11));
     EXPECT_EQ(sim.orders().at(id).ahead_qty, 300);

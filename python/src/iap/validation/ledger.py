@@ -94,8 +94,50 @@ PINNED_ALPHA = 0.05
 #: ``x-version`` of ``research/experiments.json``: 2 since v1.4.0 (entries
 #: carry ``dataset_version``; the document lists ``datasets``); 3 since
 #: v1.5.0 (entries recorded under the ledger t-stat policy carry
-#: ``gate_looks``, the look count their threshold was derived from).
-LEDGER_X_VERSION = 3
+#: ``gate_looks``, the look count their threshold was derived from); 4 since
+#: v1.14 (G-P1-5: the document carries ``chain_head``/``chain_length``, the
+#: hash chain over the entries' immutable identity, see :func:`chain_heads`).
+LEDGER_X_VERSION = 4
+
+LEDGER_GENESIS = "0" * 64
+
+#: The immutable part of an entry, chained (G-P1-5).  ``result``, ``reruns``
+#: and ``gate_looks`` are updated in place by a rerun and are not chained;
+#: ``n`` is renumbered by ``tools/merge_ledger.py`` and is not chained.
+_CHAINED = ("key", "alpha_id", "kind", "count", "config", "dataset_version")
+
+
+class LedgerIntegrityError(ValueError):
+    """The ledger's recorded chain head does not match its entries."""
+
+
+def chain_link(prev: str, entry: dict) -> str:
+    """``sha256(canonical({prev} + the entry's immutable identity))``."""
+    doc = {k: entry.get(k) for k in _CHAINED}
+    doc["prev"] = prev
+    payload = json.dumps(doc, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(payload.encode("ascii")).hexdigest()
+
+
+def chain_heads(entries: Sequence[dict]) -> list[str]:
+    """The chain head after each entry (``heads[i]`` covers ``entries[:i+1]``).
+
+    G-P1-5: the Bonferroni denominator is read from this file, so an edit
+    that drops, reorders or rewrites an entry must be detectable.  The chain
+    makes a ledger's history a sequence: a ledger DESCENDS from another iff
+    the other's head is one of its prefix heads
+    (``tests/harness/check_ledger_monotone.py``), and every pre-registration
+    records the head it debited (``ledger_head``)."""
+    heads, prev = [], LEDGER_GENESIS
+    for e in entries:
+        prev = chain_link(prev, e)
+        heads.append(prev)
+    return heads
+
+
+def chain_head(entries: Sequence[dict]) -> str:
+    heads = chain_heads(entries)
+    return heads[-1] if heads else LEDGER_GENESIS
 
 
 def _norm_ppf(p: float) -> float:
@@ -148,13 +190,21 @@ class ExperimentLedger:
     """Persistent experiment counter + entries (research/experiments.json)."""
 
     def __init__(
-        self, path, lock_timeout_s: float = 30.0, dataset_version: str | None = None
+        self,
+        path,
+        lock_timeout_s: float = 30.0,
+        dataset_version: str | None = None,
+        config_version: str | None = None,
     ) -> None:
         self.path = Path(path)
         self.lock_timeout_s = float(lock_timeout_s)
         #: Dataset scope of every ``record`` of this instance (module docs);
         #: ``None`` = unscoped (identity is alpha, kind and config alone).
         self.dataset_version = dataset_version
+        #: v1.14 (D-P2-9): the ingested dataset's ``config_version`` (sha256
+        #: over its configs/ + reference/ trees), stamped on every NEW entry.
+        #: A provenance stamp, not part of the identity: the key is unchanged.
+        self.config_version = config_version
         self.entries: list[dict] = []
         self.total_experiments = 0
         self._index: dict[str, int] = {}
@@ -172,6 +222,7 @@ class ExperimentLedger:
             blob = json.loads(self.path.read_text())
             self.entries = list(blob.get("entries", []))
             self.total_experiments = int(blob.get("total_experiments", len(self.entries)))
+            self._check_integrity(blob)
             for i, e in enumerate(self.entries):
                 key = e.get("key") or self.experiment_key(
                     e.get("alpha_id", ""),
@@ -180,6 +231,31 @@ class ExperimentLedger:
                     e.get("dataset_version"),
                 )
                 self._index.setdefault(key, i)
+
+    def _check_integrity(self, blob: dict) -> None:
+        """G-P1-5: a ledger that records a chain head must match it, and its
+        total must be the sum of its entries' looks.  A ledger written before
+        v1.14 (no ``chain_head``) is accepted; the next ``save`` chains it."""
+        stored = blob.get("chain_head")
+        if stored is None:
+            return
+        head = chain_head(self.entries)
+        if stored != head or int(blob.get("chain_length", -1)) != len(self.entries):
+            raise LedgerIntegrityError(
+                f"{self.path}: chain_head does not match the entries (an entry was edited, "
+                "removed or reordered); the Bonferroni denominator cannot be trusted"
+            )
+        looks = sum(int(e.get("count", 1)) for e in self.entries)
+        if looks != self.total_experiments:
+            raise LedgerIntegrityError(
+                f"{self.path}: total_experiments {self.total_experiments} != sum of entry "
+                f"looks {looks}"
+            )
+
+    @property
+    def chain_head(self) -> str:
+        """The current chain head (G-P1-5; unsaved records included)."""
+        return chain_head(self.entries)
 
     @staticmethod
     def experiment_key(
@@ -258,6 +334,8 @@ class ExperimentLedger:
         }
         if self.dataset_version is not None:
             entry["dataset_version"] = self.dataset_version
+        if self.config_version is not None:
+            entry["config_version"] = self.config_version
         if gate_looks is not None:
             entry["gate_looks"] = int(gate_looks)
         self.entries.append(entry)
@@ -362,6 +440,8 @@ class ExperimentLedger:
                 "judged under the ledger t-stat policy carries `gate_looks`, "
                 "the look count its threshold was derived from."
             ),
+            "chain_head": self.chain_head,
+            "chain_length": len(self.entries),
             "datasets": self.datasets(),
             "distinct_experiments": self.distinct_experiments,
             "total_experiments": self.total_experiments,

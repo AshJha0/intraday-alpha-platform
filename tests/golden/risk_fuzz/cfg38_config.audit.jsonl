@@ -1,3 +1,3 @@
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","severity":1,"timestamp":1700000000000000000}
-{"decision":2,"reason":"LIMIT order needs price_ticks > 0: -9223372036854775808","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S3","severity":2,"timestamp":1700000005039442999}
-{"decision":1,"reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","severity":1,"timestamp":1700000005047442999}
+{"decision":1,"prev_sha256":"0000000000000000000000000000000000000000000000000000000000000000","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S2","seq":1,"severity":1,"timestamp":1700000000000000000}
+{"decision":2,"prev_sha256":"6e1880299bf2ad4d3a973dd7c5ea4c5062491587a4e80e023a54550d5671fb58","reason":"LIMIT order needs price_ticks > 0: -9223372036854775808","rule_id":"MALFORMED_ORDER","scope":"STRATEGY","scope_id":"S3","seq":2,"severity":2,"timestamp":1700000005039442999}
+{"decision":1,"prev_sha256":"2e275c35828d46517e5f735732329af9fed71d195da6667b9366afd79fcf9b1f","reason":"","rule_id":"ALLOW","scope":"STRATEGY","scope_id":"S1","seq":3,"severity":1,"timestamp":1700000005047442999}

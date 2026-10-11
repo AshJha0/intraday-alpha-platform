@@ -80,12 +80,26 @@ from iap.combine.weights import (
 from iap.contracts.versions import content_hash
 from iap.experiment import tracker
 from iap.labels.frames import scored_labels
+from iap.reference.refdata import session_meta
 from iap.validation.leakage import RecomputeSources
 from iap.validation.ledger import ExperimentLedger
-from iap.validation.methods import DEFAULT_METHODS, ResearchMethods, methods
-from iap.validation.metrics import HORIZONS_NS, ic, nw_lags, pooled_slope_hac_tstat
+from iap.validation.methods import DEFAULT_METHODS, ResearchMethods, ledger_config, methods
+from iap.validation.metrics import (
+    HORIZONS_NS,
+    auto_hac_lags,
+    ic,
+    n_ts_buckets,
+    nw_lags,
+    pooled_slope_hac_tstat,
+)
+from iap.validation.sessions import NS_DAY
 from iap.validation.splits import WalkForwardSplitter
-from iap.validation.validate import GATES, looks_per_validation, validate_alpha
+from iap.validation.validate import (
+    GATES,
+    _standardise_by_instrument,
+    looks_per_validation,
+    validate_alpha,
+)
 
 __all__ = [
     "ASSET_CLASSES",
@@ -174,6 +188,8 @@ def _load_meta(configs_dir: Path) -> dict[int, dict]:
             "ref_price": float(row.get("ref_price", 1.0)),
             "base_currency": row.get("base_currency"),
             "quote_currency": row.get("quote_currency", row.get("currency", "USD")),
+            # v1.14 (D-P2-8): per-session ref_price / adv of an ingested dataset
+            **session_meta(row, (cfg.get("calendar") or {}).get("timezone")),
         }
     return meta
 
@@ -191,15 +207,26 @@ def _backtester(bundle: ResearchMethods, meta: dict[int, dict], configs_dir: Pat
     )
 
 
-def _gate_stats(ts, x, y, crossed, horizon: str) -> dict[str, float | None]:
+def _gate_stats(
+    ts, x, y, crossed, horizon: str, groups=None, bundle: ResearchMethods | None = None
+) -> dict[str, float | None]:
     """IC and pooled-slope HAC t on the rows the gate reads (uncrossed when
-    that IC is finite) — the statistics ``validate_alpha`` gates on."""
+    that IC is finite) — the statistics ``validate_alpha`` gates on, under
+    ``bundle``'s statistics revision (v1.14.0: per-(fold, instrument)
+    scaling over ``groups``, automatic bandwidth, no lag across a day)."""
+    if bundle is not None and bundle.standardisation == "instrument" and groups is not None:
+        x, y = _standardise_by_instrument(groups, x, y)
     unc = ~crossed
     ic_all = ic(x, y)
     ic_unc = ic(x[unc], y[unc])
-    lags = nw_lags(HORIZONS_NS[horizon])
-    t_all = pooled_slope_hac_tstat(ts, x, y, lags=lags)
-    t_unc = pooled_slope_hac_tstat(ts[unc], x[unc], y[unc], lags=lags)
+    h_ns = HORIZONS_NS[horizon]
+    if bundle is not None and bundle.hac_bandwidth == "auto":
+        lags = auto_hac_lags(n_ts_buckets(ts[unc] if np.any(unc) else ts), h_ns)
+    else:
+        lags = nw_lags(h_ns)
+    day_ns = NS_DAY if bundle is not None and bundle.hac_day_separated else None
+    t_all = pooled_slope_hac_tstat(ts, x, y, lags=lags, day_ns=day_ns)
+    t_unc = pooled_slope_hac_tstat(ts[unc], x[unc], y[unc], lags=lags, day_ns=day_ns)
     return {
         "ic": _fnum(ic_all),
         "gate_ic": _fnum(ic_unc if np.isfinite(ic_unc) else ic_all),
@@ -268,7 +295,7 @@ def member_pass(
     universe = probe.universe(list(frames))
     uframes = {i: frames[i] for i in universe}
     splitter = WalkForwardSplitter(n_folds=n_folds, embargo_ns=embargo_ns)
-    z_all, y_all, ts_all, c_all = [], [], [], []
+    z_all, y_all, ts_all, c_all, g_all = [], [], [], [], []
     combined: dict[str, list[np.ndarray]] = {m: [] for m in method_names}
     weights: dict[str, list[dict[str, Any]]] = {m: [] for m in method_names}
     bars: dict[str, dict[int, float]] = {aid: {} for aid in ids}
@@ -300,6 +327,9 @@ def member_pass(
             else:
                 crossed.append(np.zeros(len(df), dtype=bool))
             stamps.append(df["exchange_ts"].to_numpy(dtype=np.int64))
+            # (fold, instrument) group of every row: the scaling unit of the
+            # v1.14.0 statistics (validate_alpha scales per fold)
+            g_all.append(np.full(len(df), int(fold.index) * 1_000_000 + int(i), dtype=np.int64))
         y_all.append(np.concatenate(labels))
         c_all.append(np.concatenate(crossed))
         ts_all.append(np.concatenate(stamps))
@@ -340,6 +370,7 @@ def member_pass(
         "y": np.concatenate(y_all),
         "ts": np.concatenate(ts_all),
         "crossed": np.concatenate(c_all),
+        "groups": np.concatenate(g_all),
         "combined": {m: np.concatenate(v) for m, v in combined.items()},
         "weights_by_fold": weights,
         "bars": bars,
@@ -526,6 +557,7 @@ def run_combination(
     dataset_version: str | None = None,
     feature_version: str | None = None,
     gate: Callable[[str, str], None] | None = None,
+    config_version: str | None = None,
 ) -> dict[str, Any]:
     """Evaluate the combinations (module docs) and return the report
     document together with the full validation reports
@@ -585,6 +617,10 @@ def run_combination(
                     "method": name,
                     "horizon": probe.horizon,
                     "config": config,
+                    # the ledger identity also names the statistics revision
+                    # (v1.14.0); the experiment id below does not, so it is
+                    # preserved across the revision
+                    "ledger_config": ledger_config(config, bundle),
                     "looks": combination_looks(len(ids)),
                     "experiment_id": content_hash(
                         {
@@ -604,13 +640,15 @@ def run_combination(
 
     # Declared before the first experiment is evaluated: one gate look count
     # for the whole report (iap.validation.ledger, "Gate look count").
-    ledger = ExperimentLedger(ledger_path, dataset_version=dataset_version)
-    identities = [(p["combination_id"], LEDGER_KIND, p["config"], p["looks"]) for p in plan]
+    ledger = ExperimentLedger(
+        ledger_path, dataset_version=dataset_version, config_version=config_version
+    )
+    identities = [(p["combination_id"], LEDGER_KIND, p["ledger_config"], p["looks"]) for p in plan]
     batch_total = ledger.batch_total(identities)
     seen: set[int] = set()
     for p in plan:
         p["gate_looks"] = ledger.gate_looks_for(
-            p["combination_id"], LEDGER_KIND, p["config"], batch_total
+            p["combination_id"], LEDGER_KIND, p["ledger_config"], batch_total
         )
         seen.add(p["gate_looks"])
     if len(seen) > 1:
@@ -649,7 +687,15 @@ def run_combination(
             member_table[aid] = {
                 "own_horizon": build(aid).horizon,
                 **_own_report(repo, aid),
-                **_gate_stats(mp["ts"], mp["z"][:, k], mp["y"], mp["crossed"], comb_horizon),
+                **_gate_stats(
+                    mp["ts"],
+                    mp["z"][:, k],
+                    mp["y"],
+                    mp["crossed"],
+                    comb_horizon,
+                    mp["groups"],
+                    bundle,
+                ),
                 "net_pnl_1x_all_folds": float(mp["net_pnl"][aid]),
                 "trade_count_all_folds": int(mp["trades"][aid]),
             }
@@ -679,7 +725,7 @@ def run_combination(
             ledger.record(
                 comb_id,
                 LEDGER_KIND,
-                config=p["config"],
+                config=p["ledger_config"],
                 result={
                     "experiment_id": p["experiment_id"],
                     "oos_ic": report["oos_ic"],
@@ -701,7 +747,7 @@ def run_combination(
                 "looks": p["looks"],
                 **_summary(report),
                 "member_pass_check": _gate_stats(
-                    mp["ts"], z_comb, mp["y"], mp["crossed"], comb_horizon
+                    mp["ts"], z_comb, mp["y"], mp["crossed"], comb_horizon, mp["groups"], bundle
                 ),
                 "weights_by_fold": mp["weights_by_fold"][name],
                 "weight_stability": _weight_stability(mp["weights_by_fold"][name], ids),

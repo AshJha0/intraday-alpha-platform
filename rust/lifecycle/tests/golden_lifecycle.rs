@@ -460,12 +460,14 @@ fn registry_file_round_trips_byte_identically() {
     )
     .expect("configs");
     let machine = AlphaLifecycle::new(config, registry).expect("machine");
+    // v1.14.0: FX11 fails the time-shift leakage detector and stays in RESEARCH
     for id in machine.registry().alpha_ids() {
-        assert_eq!(
-            machine.state(id).expect("known"),
-            LifecycleState::Candidate,
-            "{id}"
-        );
+        let want = if id == "FX11" {
+            LifecycleState::Research
+        } else {
+            LifecycleState::Candidate
+        };
+        assert_eq!(machine.state(id).expect("known"), want, "{id}");
     }
     assert_eq!(machine.into_registry().render().expect("finite"), text);
 }
