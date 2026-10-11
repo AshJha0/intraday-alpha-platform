@@ -1,0 +1,20 @@
+# gitleaks config (v1.13, G-P1-7): the default rules plus two reviewed
+# false-positive allowlists.  Keep each entry narrow and explained.
+title = "iap gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "research/experiments.json content keys are SHA-256 digests of the experiment spec, not credentials"
+condition = "AND"
+regexTarget = "line"
+regexes = ['''^\s*"key": "[0-9a-f]{64}",?\s*$''']
+paths = ['''^research/experiments\.json$''']
+
+[[allowlists]]
+description = "COOKBOOK demo of the local admin kill switch uses the documented placeholder bearer token dev-token"
+condition = "AND"
+regexTarget = "match"
+regexes = ['''dev-token''']
+paths = ['''^COOKBOOK\.md$''']

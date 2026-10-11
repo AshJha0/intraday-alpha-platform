@@ -134,6 +134,18 @@ def load_venues(path: PathLike) -> dict[int, VenueSpec]:
                 if "commission_per_million" in row
                 else 0.0
             ),
+            sell_notional_fee_bps=(
+                _number(row, "sell_notional_fee_bps", where)
+                if "sell_notional_fee_bps" in row
+                else 0.0
+            ),
+            per_share_fee_all=(
+                _number(row, "per_share_fee_all", where) if "per_share_fee_all" in row else 0.0
+            ),
+            per_share_fee_cap=(
+                _number(row, "per_share_fee_cap", where) if "per_share_fee_cap" in row else 0.0
+            ),
+            per_share_fee_sell_only=bool(row.get("per_share_fee_sell_only", True)),
             latency_mean_ns=_integer(lat, "mean_ns", f"{where} latency"),
             latency_jitter_ns=_integer(lat, "jitter_ns", f"{where} latency"),
         )

@@ -2,11 +2,20 @@
 
     python -m iap.lifecycle bootstrap [--dry-run] [--force]
     python -m iap.lifecycle status
-    python -m iap.lifecycle retire <ID> --reason "..." [--event-ts NS]
-    python -m iap.lifecycle reset  <ID> --reason "..." [--event-ts NS]
+    python -m iap.lifecycle retire <ID> --reason "..." --approval FILE --keyfile PATH
+    python -m iap.lifecycle reset  <ID> --reason "..." --approval FILE --keyfile PATH
 
 ``retire`` / ``reset`` are HUMAN actions on ``research/alpha_registry.json``
-and append to ``research/lifecycle_transitions.jsonl``.  That log is an
+and append to ``research/lifecycle_transitions.jsonl``.  Since v1.13
+(G-P1-3) they require a verified approval record
+(:mod:`iap.agents.approvals`, issued with ``python -m iap.agents.cli issue``):
+the approval must name the same alpha, action and reason, its signature is
+checked against ``--keyfile`` (outside the repository), and its nonce is
+burned on the blackboard - exactly what ``python -m iap.agents.cli apply``
+does, which these commands route through.  The event time of an approved
+action is the wall clock (as ``agents.cli apply``).  Without an approval
+the command is refused (exit 2).  Library callers that hold their own proof
+(tests, the golden replays) use ``cmd_manual(..., require_approval=False)``.  That log is an
 append-only audit: ``bootstrap`` refuses to truncate it while it holds
 transitions unless ``--force`` is given (exit code 3).  ``--event-ts`` is
 the event time of the action; when omitted it defaults to the registry's
@@ -75,7 +84,18 @@ def cmd_status(root: Path) -> int:
     return 0
 
 
-def cmd_manual(root: Path, alpha_id: str, reason: str, event_ts: int | None, action: str) -> int:
+def cmd_manual(
+    root: Path,
+    alpha_id: str,
+    reason: str,
+    event_ts: int | None,
+    action: str,
+    require_approval: bool = True,
+    approval: Path | None = None,
+    keyfile: Path | None = None,
+) -> int:
+    if require_approval or approval is not None:
+        return _approved_manual(root, alpha_id, reason, action, approval, keyfile)
     _, registry, machine = _load(root)
     ts = event_ts if event_ts is not None else _default_event_ts(registry)
     if action == "retire":
@@ -88,6 +108,53 @@ def cmd_manual(root: Path, alpha_id: str, reason: str, event_ts: int | None, act
         f"({tr.actor.value}): {tr.reason}"
     )
     return 0
+
+
+def _approved_manual(
+    root: Path,
+    alpha_id: str,
+    reason: str,
+    action: str,
+    approval: Path | None,
+    keyfile: Path | None,
+) -> int:
+    """G-P1-3: the HUMAN edge only with a verified, matching, unused approval."""
+    import json
+
+    if approval is None or keyfile is None:
+        print(
+            f"refused: `{action}` is a HUMAN action and needs a signed approval: "
+            "issue one with `python -m iap.agents.cli issue`, then pass "
+            "--approval FILE --keyfile PATH (or run `python -m iap.agents.cli apply`)",
+            file=sys.stderr,
+        )
+        return 2
+    from iap.agents import cli as agents_cli
+
+    try:
+        doc = json.loads(Path(approval).read_text(encoding="ascii"))
+    except (OSError, ValueError) as exc:
+        print(f"refused: cannot read approval {approval}: {exc}", file=sys.stderr)
+        return 2
+    want = {"alpha_id": alpha_id, "action": action, "reason": reason}
+    got = {k: doc.get(k) if isinstance(doc, dict) else None for k in want}
+    if got != want:
+        print(
+            f"refused: the approval is for {got}, not {want}",
+            file=sys.stderr,
+        )
+        return 2
+    return agents_cli.main(
+        [
+            "--root",
+            str(root),
+            "apply",
+            "--approval",
+            str(approval),
+            "--keyfile",
+            str(keyfile),
+        ]
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -112,7 +179,16 @@ def main(argv: list[str] | None = None) -> int:
         p = sub.add_parser(name, help=f"{name} an alpha (HUMAN action)")
         p.add_argument("alpha_id")
         p.add_argument("--reason", required=True)
-        p.add_argument("--event-ts", type=int, default=None)
+        p.add_argument(
+            "--event-ts",
+            type=int,
+            default=None,
+            help="unused with an approval (the approved edge is stamped like agents.cli apply)",
+        )
+        p.add_argument("--approval", type=Path, default=None, help="signed approval JSON")
+        p.add_argument(
+            "--keyfile", type=Path, default=None, help="approver key file (outside the repo)"
+        )
     args = parser.parse_args(argv)
     root = args.root if args.root is not None else repo_root()
     try:
@@ -120,7 +196,16 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_bootstrap(root, args.dry_run, args.force)
         if args.command == "status":
             return cmd_status(root)
-        return cmd_manual(root, args.alpha_id, args.reason, args.event_ts, args.command)
+        return cmd_manual(
+            root,
+            args.alpha_id,
+            args.reason,
+            args.event_ts,
+            args.command,
+            require_approval=True,
+            approval=args.approval,
+            keyfile=args.keyfile,
+        )
     except (ValueError, KeyError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

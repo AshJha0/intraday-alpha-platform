@@ -121,14 +121,17 @@ class FileLock:
 
 
 def atomic_write_text(
-    path, text: str, encoding: str | None = None, newline: str | None = None
+    path, text: str, encoding: str | None = None, newline: str | None = "\n"
 ) -> None:
-    """Replace ``path`` with ``text`` atomically (temp file + ``os.replace``).
+    r"""Replace ``path`` with ``text`` atomically (temp file + ``os.replace``).
 
     The temporary file lives in the target's directory (same file system, so
     the replace is a rename) and carries the writer's pid, so two writers
-    never share one.  ``encoding`` / ``newline`` are passed to ``open`` and
-    default to the platform's, exactly as ``Path.write_text`` does.
+    never share one.  ``encoding`` / ``newline`` are passed to ``open``;
+    ``newline`` defaults to ``"\n"`` so every caller writes LF on every OS (on Windows
+    the platform default would write CRLF and the bytes -- hence any content
+    hash -- would differ from Linux).  Pass ``newline=None`` explicitly to
+    get the platform translation.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)

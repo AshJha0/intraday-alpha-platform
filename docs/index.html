@@ -79,7 +79,7 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
 <div class="wrap">
   <h2>Measured, not claimed</h2>
   <div class="numbers">
-    Cross-language parity&nbsp;&nbsp;&nbsp; python 2250&nbsp; · cpp 302&nbsp; · rust 358&nbsp; · java 571 tests — 3,481 green, one command; golden groups 193/72/71/124<br>
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 2327&nbsp; · cpp 302&nbsp; · rust 358&nbsp; · java 571 tests — 3,558 green, one command; golden groups 193/72/71/124<br>
     Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in all four languages<br>
     C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
     Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly; the MVP run twice and replayed from its capture reproduces its trace digest<br>
@@ -240,7 +240,34 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
     pre-registered closing-cross strategy <code>AUC01</code>, exploratory and in-sample, shows
     <strong>no demonstrated edge</strong> (session-clustered mean +19.4 bp from 3 trades on 2 sessions, 95% CI −254 to +293 bp): an
     underpowered result, not a negative one. Its 2026 holdout and the maker and quoting studies
-    are <strong>running</strong>.
+    were then <strong>running</strong> (outcomes in the v1.13 box).
+  </div>
+
+  <div class="honest">
+    <strong>v1.13.0: an independent review, and the hardening it asked for.</strong>
+    Five independent read-only reviews of v1.12 found that no headline conclusion flips (0 alphas
+    promoted, no trade at 1x costs, no auction edge) but that some published statistics were
+    weaker than they read: the research backtest blocks rows by <em>future</em> label validity, the
+    gate t-statistics have no day clustering, and the 2026 holdout refit its parameters on 2026
+    rows although the write-up said "frozen" (the wording is now corrected). v1.13 is the part that
+    changes no published number: LF artefacts on every OS, an O(1) order lookup, CI on Python 3.11
+    and 3.12 with slow tests split out, hashed dependencies and a secrets scan; SEC Section 31 and
+    FINRA TAF fees (default 0), one markout reference convention, the auction MOC entry cutoff
+    enforced; frozen-parameter scoring and pre-registered thresholds; and a required
+    <code>governance</code> CI job that verifies the blackboard and checks ledgers only grow.
+    The quoting study was <strong>aborted before any result was read</strong>: its registered
+    Avellaneda–Stoikov parameters were numerically inert (every quote a fixed 1–2 ticks behind the
+    touch), so it could not test skew against no skew; a tick-based protocol will be
+    pre-registered. The maker study is still <strong>running</strong>. AUC01's 2026 holdout:
+    not confirmed, 0 trades. v1.14, the correctness release that regenerates goldens and reports
+    once (causal row block, day-clustered inference, data-mapping fixes, a hash-chained risk audit
+    log), is in progress.
+    <br><br><strong>Data terms.</strong> The real sessions are Nasdaq TotalView-ITCH sample files
+    from <code>emi.nasdaq.com</code> (no terms were shown on the directory as of 2026-10-11). Raw
+    and normalized data and feature stores are never committed or redistributed; only aggregate
+    derived statistics that cannot reconstruct the data are published. Commercial use would need a
+    Nasdaq data agreement
+    (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/REAL_DATA.md#21-data-source-and-terms-v113">REAL_DATA §2.1</a>).
   </div>
 
   <h2>Start here</h2>
@@ -258,7 +285,8 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
          code-bound pre-registration, a hidden-seed reserve, signed human approvals, a read-only
          MCP server, git anchoring and Ed25519 agent signatures. Since v1.11 one optional
          component calls a model, the research agent, and only when an operator runs it with a
-         key; no test or CI job does. The page says what would be theatre on this data.
+         key; no test or CI job does. Since v1.13 it may request only pinned model ids and its
+         numbers rule is stricter. The page says what would be theatre on this data.
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/HOW_IT_WORKS.md#6-ai-llms-and-agents-the-boundary-what-exists-what-is-planned">HOW_IT_WORKS §6</a></p></div>
     <div class="card"><h3>Research validity &amp; the power study</h3>
       <p>Corrected statistics and policies, added opt-in in v1.3.0 and the defaults since
@@ -359,20 +387,21 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
          fills reproduced exactly by Java and Python. The simulator never fills more than the
          market displayed or traded. Opt-in since v1.10 (Python only): an Almgren–Chriss IS
          trajectory and efficient frontier, alpha-driven urgency, and a VWAP on a forecast
-         volume curve.</p></div>
+         volume curve. Since v1.13, opt-in SEC Section 31 and FINRA TAF fees (default 0).</p></div>
     <div class="card"><h3>Maker economics &amp; quoting</h3>
       <p>A versioned calibration estimated from the event stream (fill rates, queue-depletion
          hazards, latency, maker markouts, impact) feeds the simulator. A maker backtest posts at
          the touch behind a gate on expected edge versus measured adverse selection, with a taker or
          passive exit; a two-sided quoter skews an Avellaneda–Stoikov reservation price with the
-         alpha. Both decompose P&amp;L exactly. Python research code, opt-in; results so far are
+         alpha. Both decompose P&amp;L exactly; since v1.13 quotes can be set in ticks and markouts
+         use one reference convention. Python research code, opt-in; results so far are
          synthetic (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/API_TRADING.md">API_TRADING §2.6–2.8</a>).</p></div>
     <div class="card"><h3>Auction imbalance</h3>
       <p>Nasdaq NOII and cross messages decoded in a separate opt-in pass, so the normalized
          dataset and its version do not change. Auction features (imbalance ratio,
          reference-price drift, far/near spread, time to cross), cross targets, and a
          closing-cross strategy with a purged, day-aligned walk-forward. The CLI refuses to
-         backtest without a pre-registration. First real-data result (v1.12, exploratory, in-sample, 7 sessions): no demonstrated edge on the closing or the opening cross, with only 21 decisions per cell; the declared 2026 holdout is running
+         backtest without a pre-registration. First real-data result (v1.12, exploratory, in-sample, 7 sessions): no demonstrated edge on the closing or the opening cross, with only 21 decisions per cell; the 2026 holdout was not confirmed (0 trades), and since v1.13 an exit at or after the MOC entry cutoff is priced as a taker trade
          (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/REAL_DATA.md">REAL_DATA §3.3</a>).</p></div>
     <div class="card"><h3>Overfitting statistics &amp; the deflated Sharpe</h3>
       <p>Combinatorial purged cross-validation (all C(N,k) splits, reassembled into backtest paths,
@@ -408,7 +437,10 @@ footer{margin:3rem 0 2rem;color:var(--muted);font-size:.85rem;text-align:center}
          pre-registration debits a look on the multiple-testing ledger and records a fingerprint
          of the alpha's code, features and pinned dependencies; the gate refuses a run if any
          changed. <code>verify-board</code> checks the chain, that each committed version is a
-         prefix of the current one, the git anchors, and every Ed25519 signature
+         prefix of the current one, the git anchors, and every Ed25519 signature. Since v1.13 a
+         required <code>governance</code> CI job runs it on every change, with checks that every
+         signer has a registered key and that ledgers and the board only grow; human lifecycle
+         edges need a signed approval
          (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/governance/GOVERNANCE.md">GOVERNANCE</a>).</p></div>
     <div class="card"><h3>Event-driven backtester</h3>
       <p>Replays every market event in event-time through book → features → alphas →

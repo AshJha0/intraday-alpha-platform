@@ -65,10 +65,15 @@ bucket and the four raw metric values; the parent then walks the days in
 order, folding those observations into the carried profiles and rewriting the
 four norm values + validity bits exactly as the serial engine would have.
 Labels, statistics and parquet writes stay serial and in file order, so the
-output is byte-identical to ``--workers 1`` (tested).  Memory: every worker
-holds one day's events and rows (several GB on a full real ITCH day), so on a
-16 GB machine use 2-3 workers for real data; the CLI clamps N to the number
-of files, the CPU count and ``physical RAM / --worker-mem-gb`` (default 5).
+output is byte-identical to ``--workers 1`` (tested).  The CLI clamps N to
+the number of files, the CPU count and ``physical RAM / --worker-mem-gb``
+(default 5); on a 16 GB machine use 2-3 workers for real data.
+
+Memory (v1.13.0, E5): events are streamed from the file, never held as a
+list; the label mid series, row timestamps and validity are typed arrays;
+the float64 row values are spooled to ``<out-dir>/.spool_<pid>`` and read
+back one instrument at a time when its row group is written (see
+:class:`_InstrumentBuffer`).  Output bytes are unchanged.
 """
 
 from __future__ import annotations
@@ -77,7 +82,9 @@ import argparse
 import importlib
 import json
 import os
+import shutil
 import sys
+import tempfile
 import time
 from array import array
 from concurrent.futures import ProcessPoolExecutor
@@ -88,7 +95,7 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from iap.core.codec import read_iap1, read_jsonl
+from iap.core.codec import iter_iap1, iter_jsonl
 from iap.features.context import build_contexts
 from iap.features.engine import FeatureEngine
 from iap.features.registry import build_registry, registry_hash, write_registry
@@ -100,8 +107,8 @@ from iap.labels.labels import (
     FRESHNESS_MODES,
     HORIZON_ORDER,
     LABEL_MAX_AGE_FLOOR_NS,
+    CompactMidSeries,
     LabelReason,
-    MidSeries,
     compute_labels,
     max_sample_age,
 )
@@ -110,34 +117,118 @@ _REPO = Path(__file__).resolve().parents[4]
 _NAN = float("nan")
 
 
+#: Rows of feature values buffered in RAM before they are appended to the
+#: instrument's spool file (v1.13, E5).
+_SPOOL_ROWS = 2048
+
+
 class _InstrumentBuffer:
-    """Accumulates emitted rows for one instrument within one input file."""
+    """Accumulates emitted rows for one instrument within one input file.
 
-    __slots__ = ("ts", "values", "bits", "series", "last_event_ts", "last_refresh_seq")
+    Memory layout (v1.13, E5): the timestamps live in an ``array('q')``, the
+    packed validity in a ``bytearray`` and the mid series in a
+    :class:`CompactMidSeries`; the float64 feature values -- by far the
+    largest part of a day (rows x features x 8 bytes) -- are appended to a
+    per-(file, instrument) spool file on disk in blocks of ``_SPOOL_ROWS``
+    rows and read back, one instrument at a time, only when that
+    instrument's row group is written.  Value rewrites that used to happen in
+    place (the Rust native overlay, the parallel build's norm_* patch) are
+    recorded as small per-column arrays and applied at flush time, in the
+    same order as before (overlay first, then norms).  The buffer pickles
+    (parallel workers return it) because the spool is a named file.
+    """
 
-    def __init__(self) -> None:
-        self.ts: list[int] = []
-        self.values = array("d")
+    __slots__ = (
+        "ts",
+        "bits",
+        "series",
+        "last_event_ts",
+        "last_refresh_seq",
+        "spool_path",
+        "_pending",
+        "_fh",
+        "rust_cols",
+        "rust_vals",
+        "norm_cols",
+        "norm_vals",
+    )
+
+    def __init__(self, spool_path: str | None = None) -> None:
+        self.ts = array("q")
         self.bits = bytearray()
-        self.series = MidSeries()
+        self.series = CompactMidSeries()
         self.last_event_ts = 0
         self.last_refresh_seq = 0
+        self.spool_path = spool_path
+        self._pending = array("d")
+        self._fh = None
+        self.rust_cols: list[int] | None = None
+        self.rust_vals: np.ndarray | None = None
+        self.norm_cols: list[int] | None = None
+        self.norm_vals: np.ndarray | None = None
+
+    def add_values(self, values, nfeat: int) -> None:
+        pending = self._pending
+        pending.extend(values)
+        if len(pending) >= _SPOOL_ROWS * nfeat:
+            self._spill()
+
+    def _spill(self) -> None:
+        if self._fh is None:
+            self._fh = open(self.spool_path, "wb")  # noqa: SIM115 - closed in close()
+        self._pending.tofile(self._fh)
+        del self._pending[:]
+
+    def close(self) -> None:
+        """Finish writing: everything is on disk, no file handle kept."""
+        if self._pending or self._fh is None:
+            self._spill()
+        self._fh.close()
+        self._fh = None
+
+    def load_values(self, nfeat: int) -> np.ndarray:
+        """The (rows, nfeat) float64 values with the deferred rewrites applied;
+        the spool file is deleted."""
+        rows = len(self.ts)
+        vals = np.fromfile(self.spool_path, dtype=np.float64).reshape(rows, nfeat)
+        os.unlink(self.spool_path)
+        if self.rust_cols is not None:
+            vals[:, self.rust_cols] = self.rust_vals
+        if self.norm_cols is not None:
+            vals[:, self.norm_cols] = self.norm_vals
+        return vals
+
+    def __getstate__(self):
+        return {k: getattr(self, k) for k in self.__slots__ if k != "_fh"}
+
+    def __setstate__(self, state) -> None:
+        for k, v in state.items():
+            setattr(self, k, v)
+        self._fh = None
 
 
 class _ProfileLog:
-    """Per-row profile observations recorded by a parallel worker."""
+    """Per-row profile observations recorded by a parallel worker.
 
-    __slots__ = ("buckets", "curs")
+    ``curs`` holds the PROFILE_METRICS values row-major as float64 and
+    ``have`` one byte per value (0 = the metric was not computable, i.e.
+    ``None``) -- typed arrays instead of a tuple of Python objects per row.
+    """
+
+    __slots__ = ("buckets", "curs", "have")
 
     def __init__(self) -> None:
-        self.buckets: list[int] = []
-        #: one tuple per row: the PROFILE_METRICS values (None = not computable)
-        self.curs: list[tuple] = []
+        self.buckets = array("q")
+        self.curs = array("d")
+        self.have = bytearray()
 
 
 def _overlay_rust(path: Path, contexts, cadence_ns: int, buffers, nfeat: int) -> bool:
     """Replace the native slots of ``buffers`` with the Rust engine's output
-    for the same file. Returns False (buffers untouched) if rows differ."""
+    for the same file. Returns False (buffers untouched) if rows differ.
+
+    The validity bits are rewritten now; the values are recorded on the
+    buffer (``rust_cols`` / ``rust_vals``) and applied when it is flushed."""
     from iap.features.native import NATIVE_NAMES, compute_native_file
     from iap.features.registry import feature_index
 
@@ -150,7 +241,7 @@ def _overlay_rust(path: Path, contexts, cadence_ns: int, buffers, nfeat: int) ->
         buf = buffers[iid]
         rows = np.flatnonzero(frame.instrument_id == iid)
         if len(rows) != len(buf.ts) or not np.array_equal(
-            frame.timestamp[rows], np.asarray(buf.ts, dtype=np.int64)
+            frame.timestamp[rows], np.frombuffer(buf.ts, dtype=np.int64)
         ):
             print(
                 f"{path.name}: rust rows differ for instrument {iid}; keeping python values",
@@ -159,12 +250,12 @@ def _overlay_rust(path: Path, contexts, cadence_ns: int, buffers, nfeat: int) ->
             return False
         plan.append((buf, rows))
     for buf, rows in plan:
-        vals = np.frombuffer(buf.values, dtype=np.float64).reshape(len(rows), nfeat)
         bits = np.frombuffer(buf.bits, dtype=np.uint8).reshape(len(rows), nbytes)
         rv = frame.values[rows]
         ok = frame.validity[rows]
+        buf.rust_cols = cols
+        buf.rust_vals = np.where(ok, rv, _NAN).astype(np.float64)
         for k, j in enumerate(cols):
-            vals[:, j] = np.where(ok[:, k], rv[:, k], _NAN)
             bit = np.uint8(1 << (j & 7))
             byte = bits[:, j >> 3]
             bits[:, j >> 3] = np.where(ok[:, k], byte | bit, byte & ~bit)
@@ -196,23 +287,34 @@ def _replay_file(
     record: bool,
     engine: str = "python",
     opts=None,
+    spool_dir: Path | None = None,
 ):
     """Replay one input file through a fresh engine.
 
     Returns ``(n_events, (events_processed, vectors_emitted), buffers, logs)``;
-    ``logs`` is ``{iid: _ProfileLog}`` when ``record`` (parallel mode).
+    ``logs`` is ``{iid: _ProfileLog}`` when ``record`` (parallel mode).  The
+    events are streamed from the file (never held as a list) and the row
+    values are spooled under ``spool_dir`` (default: ``iap_feature_spool`` in the
+    temp directory), see :class:`_InstrumentBuffer`.
     """
     backend = engine
-    events = _load_events(path)
     engine = _make_engine(contexts, cadence_ns, profiles, opts)
+    nfeat = len(engine.feature_names)
+    if spool_dir is None:
+        spool_dir = Path(tempfile.gettempdir()) / "iap_feature_spool"
+    spool_dir.mkdir(parents=True, exist_ok=True)
+    stem = f"{os.getpid()}_{path.name}"
     buffers: dict[int, _InstrumentBuffer] = {}
     logs: dict[int, _ProfileLog] = {}
-    for ev in events:
+    n_events = 0
+    nan = _NAN
+    for ev in _iter_events(path):
+        n_events += 1
         vec = engine.apply(ev)
         iid = ev.instrument_id
         buf = buffers.get(iid)
         if buf is None:
-            buf = buffers[iid] = _InstrumentBuffer()
+            buf = buffers[iid] = _InstrumentBuffer(str(spool_dir / f"{stem}_{iid}.f64"))
         buf.last_event_ts = ev.exchange_ts
         st = engine.states[iid]
         # One mid sample per BOOK REFRESH (API_FEATURES §6): a refresh
@@ -223,10 +325,10 @@ def _replay_file(
             if st.label_tradable:
                 buf.series.append(ev.exchange_ts, st.mid, st.spread_ticks * st.tick / 2.0, True)
             else:
-                buf.series.append(ev.exchange_ts, float("nan"), float("nan"), False)
+                buf.series.append(ev.exchange_ts, nan, nan, False)
         if vec is not None:
             buf.ts.append(vec.timestamp)
-            buf.values.extend(vec.values)
+            buf.add_values(vec.values, nfeat)
             buf.bits.extend(vec.validity_bits())
             if record:
                 # _emit is the last thing apply() does, so the state is still
@@ -237,18 +339,35 @@ def _replay_file(
                 if log is None:
                     log = logs[iid] = _ProfileLog()
                 log.buckets.append(SessionProfile.bucket_of(t, st.ctx.clock.offset_seconds(t)))
-                log.curs.append(tuple(_metric_value(st, m) for m in PROFILE_METRICS))
+                for m in PROFILE_METRICS:
+                    cur = _metric_value(st, m)
+                    if cur is None:
+                        log.curs.append(nan)
+                        log.have.append(0)
+                    else:
+                        log.curs.append(cur)
+                        log.have.append(1)
+    for buf in buffers.values():
+        if buf.ts:
+            buf.close()
     counts = (engine.events_processed, engine.vectors_emitted)
     if backend == "rust":
-        _overlay_rust(path, contexts, cadence_ns, buffers, len(engine.feature_names))
-    return len(events), counts, buffers, logs
+        _overlay_rust(path, contexts, cadence_ns, buffers, nfeat)
+    return n_events, counts, buffers, logs
 
 
 def _worker(job):
     """Process-pool entry point: replay one day against an empty profile."""
-    path, configs, cadence_ns, backend, opts = job
+    path, configs, cadence_ns, backend, opts, spool_dir = job
     return _replay_file(
-        Path(path), build_contexts(configs), cadence_ns, {}, record=True, engine=backend, opts=opts
+        Path(path),
+        build_contexts(configs),
+        cadence_ns,
+        {},
+        record=True,
+        engine=backend,
+        opts=opts,
+        spool_dir=Path(spool_dir),
     )
 
 
@@ -261,39 +380,50 @@ def _patch_norms(
 ) -> None:
     """Rewrite one worker day's norm_*_m5_v1 values/bits against the carried
     profiles, folding the day's observations in serial order (mirrors
-    timeofday.compute + FeatureEngine._emit + _famutil.put exactly)."""
+    timeofday.compute + FeatureEngine._emit + _famutil.put exactly).  The
+    bits are patched now, the values are recorded on the buffer
+    (``norm_cols`` / ``norm_vals``) and applied when it is flushed."""
     nbytes = (nfeat + 7) // 8
+    nm = len(PROFILE_METRICS)
     for iid in sorted(logs):
         log = logs[iid]
         buf = buffers[iid]
         prof = profiles.get(iid)
         if prof is None:
             prof = profiles[iid] = SessionProfile(PROFILE_METRICS)
-        for r, (bucket, curs) in enumerate(zip(log.buckets, log.curs, strict=True)):
-            base = r * nfeat
-            for m, cur, j in zip(PROFILE_METRICS, curs, norm_idx, strict=True):
+        rows = len(log.buckets)
+        out = np.empty((rows, nm), dtype=np.float64)
+        bits = buf.bits
+        curs = log.curs
+        have = log.have
+        for r in range(rows):
+            bucket = log.buckets[r]
+            base = r * nm
+            for q, (m, j) in enumerate(zip(PROFILE_METRICS, norm_idx, strict=True)):
                 v = None
-                if cur is not None:
+                if have[base + q]:
                     n, mean = prof.prior(m, bucket)
                     if n >= SessionProfile.MIN_OBS and mean > 0.0:
-                        v = cur / mean
+                        v = curs[base + q] / mean
                 ok = False
                 if v is not None:
                     fv = float(v)
                     if isfinite(fv):
-                        buf.values[base + j] = fv
+                        out[r, q] = fv
                         ok = True
                 if not ok:
-                    buf.values[base + j] = _NAN
+                    out[r, q] = _NAN
                 k = r * nbytes + (j >> 3)
                 bit = 1 << (j & 7)
                 if ok:
-                    buf.bits[k] |= bit
+                    bits[k] |= bit
                 else:
-                    buf.bits[k] &= ~bit & 0xFF
-            for m, cur in zip(PROFILE_METRICS, curs, strict=True):
-                if cur is not None:
-                    prof.update(m, bucket, float(cur))
+                    bits[k] &= ~bit & 0xFF
+            for q, m in enumerate(PROFILE_METRICS):
+                if have[base + q]:
+                    prof.update(m, bucket, curs[base + q])
+        buf.norm_cols = list(norm_idx)
+        buf.norm_vals = out
 
 
 def _total_ram_bytes() -> int | None:
@@ -338,10 +468,11 @@ def effective_workers(requested: int, n_files: int, worker_mem_gb: float) -> int
     return cap if requested <= 0 else max(1, min(requested, cap))
 
 
-def _load_events(path: Path):
+def _iter_events(path: Path):
+    """Stream one input file's events in file order (never a full list)."""
     if path.suffix == ".iap1":
-        return read_iap1(path)
-    return read_jsonl(path)
+        return iter_iap1(path)
+    return iter_jsonl(path)
 
 
 def _flush_file(
@@ -359,12 +490,12 @@ def _flush_file(
     nfeat = len(names)
     nbytes = (nfeat + 7) // 8
     for iid in sorted(buffers):
-        buf = buffers[iid]
+        buf = buffers.pop(iid)  # one instrument's rows in RAM at a time
         rows = len(buf.ts)
         if rows == 0:
             continue
-        vals = np.frombuffer(buf.values, dtype=np.float64).reshape(rows, nfeat)
-        packed = np.frombuffer(bytes(buf.bits), dtype=np.uint8).reshape(rows, nbytes)
+        vals = buf.load_values(nfeat)
+        packed = np.frombuffer(buf.bits, dtype=np.uint8).reshape(rows, nbytes)
         validity = np.unpackbits(packed, axis=1, bitorder="little")[:, :nfeat]
         fam_valid.setdefault(iid, np.zeros(nfeat, dtype=np.int64))
         fam_valid[iid] += validity.sum(axis=0, dtype=np.int64)
@@ -383,7 +514,7 @@ def _flush_file(
         # book (a stale LP quote makes spread_ticks < 0), how far apart the
         # rows are, and how many labels are exact zeros / why they are
         # invalid.
-        ts_arr = np.asarray(buf.ts, dtype=np.int64)
+        ts_arr = np.frombuffer(buf.ts, dtype=np.int64)
         gaps = np.diff(ts_arr)
         spread = vals[:, names.index("spread_ticks_v1")]
         spread_ok = validity[:, names.index("spread_ticks_v1")].astype(bool)
@@ -410,7 +541,9 @@ def _flush_file(
         stats["median_sample_gap_ns"] = buf.series.median_gap_ns()
         stats["label_max_age_ns"] = max_age
         stats["series_samples"] += len(buf.series)
-        stats["tradable_samples"] += int(sum(buf.series.tradable))
+        stats["tradable_samples"] += int(
+            np.count_nonzero(np.frombuffer(buf.series.tradable, np.uint8))
+        )
         for h in HORIZON_ORDER:
             lab = labels[h]
             hv = stats["by_horizon"][h]
@@ -424,14 +557,13 @@ def _flush_file(
                         hv["reason"][nm] = hv["reason"].get(nm, 0) + 1
 
         cols: dict[str, pa.Array] = {
-            "instrument_id": pa.array([iid] * rows, type=pa.uint32()),
-            "exchange_ts": pa.array(buf.ts, type=pa.int64()),
+            "instrument_id": pa.array(np.full(rows, iid, dtype=np.uint32), type=pa.uint32()),
+            "exchange_ts": pa.array(ts_arr, type=pa.int64()),
         }
         for j, name in enumerate(names):
             cols[name] = pa.array(vals[:, j], type=pa.float64())
-        cols["validity_bits"] = pa.array(
-            [bytes(buf.bits[i * nbytes : (i + 1) * nbytes]) for i in range(rows)],
-            type=pa.binary(nbytes),
+        cols["validity_bits"] = pa.FixedSizeBinaryArray.from_buffers(
+            pa.binary(nbytes), rows, [None, pa.py_buffer(buf.bits)]
         )
         for h in HORIZON_ORDER:
             lab = labels[h]
@@ -465,6 +597,42 @@ def _build_schema(names: list[str]) -> pa.Schema:
         fields.append(pa.field(f"label_reason_{h}", pa.uint8()))
         fields.append(pa.field(f"label_reopen_{h}", pa.float64()))
     return pa.schema(fields)
+
+
+def _build_days(
+    files, workers, spool, contexts, cadence_ns, profiles, backend, opts, names, configs, consume
+) -> None:
+    """Replay every day (serially, or ``workers`` processes) and hand each
+    day's buffers to ``consume`` in file (= trading-day) order."""
+    if workers <= 1:
+        for path in files:
+            n_events, counts, buffers, _ = _replay_file(
+                path,
+                contexts,
+                cadence_ns,
+                profiles,
+                record=False,
+                engine=backend,
+                opts=opts,
+                spool_dir=spool,
+            )
+            consume(path, n_events, counts, buffers)
+        return
+    norm_idx = [names.index(f"norm_{m}_m5_v1") for m in PROFILE_METRICS]
+    jobs = [(str(p), str(configs), cadence_ns, backend, opts, str(spool)) for p in files]
+    # Under `python -m iap.features` this file runs as `__main__`, and a
+    # spawn-start worker (Windows, macOS) does not re-import a package's
+    # `__main__`, so `__main__._worker` cannot be unpickled there. Submit
+    # the function from the importable module name instead.
+    worker = importlib.import_module("iap.features.__main__")._worker
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        # map() yields in submission (= trading-day) order, so the
+        # profile carry, labels and parquet row groups stay serial
+        for path, (n_events, counts, buffers, logs) in zip(
+            files, pool.map(worker, jobs), strict=True
+        ):
+            _patch_norms(buffers, logs, profiles, norm_idx, len(names))
+            consume(path, n_events, counts, buffers)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -604,28 +772,25 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(f"{path.name}: {n_events} events -> {counts[1]} vectors", file=sys.stderr)
 
-    if workers <= 1:
-        for path in files:
-            n_events, counts, buffers, _ = _replay_file(
-                path, contexts, cadence_ns, profiles, record=False, engine=backend, opts=opts
-            )
-            _consume(path, n_events, counts, buffers)
-    else:
-        norm_idx = [names.index(f"norm_{m}_m5_v1") for m in PROFILE_METRICS]
-        jobs = [(str(p), str(args.configs), cadence_ns, backend, opts) for p in files]
-        # Under `python -m iap.features` this file runs as `__main__`, and a
-        # spawn-start worker (Windows, macOS) does not re-import a package's
-        # `__main__`, so `__main__._worker` cannot be unpickled there. Submit
-        # the function from the importable module name instead.
-        worker = importlib.import_module("iap.features.__main__")._worker
-        with ProcessPoolExecutor(max_workers=workers) as pool:
-            # map() yields in submission (= trading-day) order, so the
-            # profile carry, labels and parquet row groups stay serial
-            for path, (n_events, counts, buffers, logs) in zip(
-                files, pool.map(worker, jobs), strict=True
-            ):
-                _patch_norms(buffers, logs, profiles, norm_idx, len(names))
-                _consume(path, n_events, counts, buffers)
+    # row values are spooled here while a day is replayed (see
+    # _InstrumentBuffer); removed when the build ends
+    spool = out_dir / f".spool_{os.getpid()}"
+    try:
+        _build_days(
+            files,
+            workers,
+            spool,
+            contexts,
+            cadence_ns,
+            profiles,
+            backend,
+            opts,
+            names,
+            args.configs,
+            _consume,
+        )
+    finally:
+        shutil.rmtree(spool, ignore_errors=True)
 
     for writer in writers.values():
         writer.close()

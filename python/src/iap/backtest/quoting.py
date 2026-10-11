@@ -74,6 +74,18 @@ Pinned rules (``QuotingBacktester.run_instrument``):
    quotes (``stand_down``), moves both ``widen_ticks`` further from the
    touch (``widen``) or quotes ``size_mult`` of the size (``reduce``).
    Their counters appear only when the option is on.
+8. **Ticks** (v1.13 X-P1-3, opt-in). At the registered parameters the
+   rule-2 terms are a fraction of a tick and the no-cross clamp absorbs the
+   alpha skew, so the skew can be numerically inert. ``skew_mode="ticks"``
+   quotes ``bid = best_bid - hb + skew - inv``, ``ask = best_ask + hb + skew
+   - inv`` with ``hb = h_min_ticks`` (0 = join), ``skew = round(alpha_weight
+   * er * mid / tick)``, ``inv = round(gamma * sigma2 * q * tau / tick +
+   inv_skew_ticks * q)``, then the AS floor (``bid <= floor((m - floor) /
+   tick)``, likewise the ask) and the same no-cross clamp. In either mode the
+   summary reports ``ticks_behind_touch_{mean,median,max}`` (both sides, at
+   every quoting decision) and ``frac_decisions_skew_changed_quote`` (share
+   of quoting decisions whose wanted prices differ from the same decision
+   with ``er = 0``), so an inert skew is visible.
 """
 
 from __future__ import annotations
@@ -121,8 +133,22 @@ class QuotingConfig:
     # ---- v1.12 X4 options (rule 7; defaults = off) ----
     post_only: str = ""
     feedback: FeedbackConfig | None = None
+    # ---- v1.13 X-P1-3 options (rule 8; defaults = the v1.12 quotes) ----
+    #: ``"as_dollars"`` (default): rule 2 unchanged. ``"ticks"``: quotes are
+    #: anchored on the touch and the alpha / inventory skews are whole ticks
+    skew_mode: str = "as_dollars"
+    #: minimum half-spread in ticks: ``as_dollars`` adds it to the rule-2
+    #: ``max``; ``ticks`` quotes ``h_min_ticks`` behind the touch (None = 0)
+    h_min_ticks: float | None = None
+    #: ``ticks`` mode: extra inventory skew in ticks per ``qty`` of inventory
+    #: (added to the rounded A-S term ``gamma * sigma2 * q * tau / tick``)
+    inv_skew_ticks: float = 0.0
 
     def __post_init__(self) -> None:
+        if self.skew_mode not in ("as_dollars", "ticks"):
+            raise ValueError("skew_mode must be 'as_dollars' or 'ticks'")
+        if self.h_min_ticks is not None and self.h_min_ticks < 0:
+            raise ValueError("h_min_ticks must be >= 0")
         if self.post_only not in ("", "reject", "slide"):
             raise ValueError("post_only must be '', 'reject' or 'slide'")
         if self.qty <= 0 or self.max_inventory < self.qty:
@@ -149,6 +175,8 @@ class QuotingResult:
     counters: dict[str, int]
     as_bps: float
     as_source: str
+    #: v1.13 X-P1-3 quote diagnostics (rule 8), merged into ``summary()``
+    diagnostics: dict[str, Any] = field(default_factory=dict)
 
     @property
     def net_pnl(self) -> float:
@@ -162,6 +190,7 @@ class QuotingResult:
         out: dict[str, Any] = {"instrument_id": self.instrument_id, **c, **self.pnl}
         out["as_bps_floor"] = self.as_bps
         out["as_source"] = self.as_source
+        out.update(self.diagnostics)
         for s, name in ((0, "bid"), (1, "ask")):
             posted = c[f"{name}_posted_qty"]
             filled = int(quotes.loc[quotes["side"] == s, "qty"].sum()) if len(quotes) else 0
@@ -287,6 +316,39 @@ class QuotingBacktester:
             )
 
         mine: set[int] = set()
+        diag = {"decisions_quoted": 0, "skew_changed": 0}
+        behind: list[int] = []
+
+        def quote_prices(
+            e: float, mid: float, s2: float, inv_units: float, bpx: int, apx: int
+        ) -> dict[int, int]:
+            """Rule 2 (``as_dollars``) or rule 8 (``ticks``) wanted prices."""
+            floor_h = cfg.min_half_spread_ticks * tick
+            if cfg.as_floor:
+                floor_h = max(floor_h, (as_bps - rebate_bps(mid)) * mid / 1e4)
+            if cfg.skew_mode == "ticks":
+                hb = int(round(cfg.h_min_ticks or 0.0))
+                sk = int(round(cfg.alpha_weight * e * mid / tick))
+                inv = int(
+                    round(
+                        cfg.gamma * s2 * inv_units * cfg.tau_s / tick
+                        + cfg.inv_skew_ticks * inv_units
+                    )
+                )
+                b = min(bpx - hb + sk - inv, math.floor((mid - floor_h) / tick + 1e-9))
+                a = max(apx + hb + sk - inv, math.ceil((mid + floor_h) / tick - 1e-9))
+                return {0: min(b, apx - 1), 1: max(a, bpx + 1)}
+            res = mid + cfg.alpha_weight * e * mid - cfg.gamma * s2 * inv_units * cfg.tau_s
+            h = 0.5 * cfg.gamma * s2 * cfg.tau_s + math.log1p(cfg.gamma / cfg.k) / cfg.gamma
+            h = max(h, cfg.min_half_spread_ticks * tick)
+            if cfg.h_min_ticks is not None:
+                h = max(h, cfg.h_min_ticks * tick)
+            if cfg.as_floor:
+                h = max(h, (as_bps - rebate_bps(mid)) * mid / 1e4)
+            return {
+                0: min(math.floor((res - h) / tick + 1e-9), apx - 1),
+                1: max(math.ceil((res + h) / tick - 1e-9), bpx + 1),
+            }
 
         def decide(r: int) -> None:
             c["decisions"] += 1
@@ -304,15 +366,12 @@ class QuotingBacktester:
             s2 = cfg.sigma**2 if cfg.sigma is not None else vol["var"]
             e = er[r] if math.isfinite(er[r]) else 0.0
             inv_units = q[0] / cfg.qty
-            res = mid + cfg.alpha_weight * e * mid - cfg.gamma * s2 * inv_units * cfg.tau_s
-            h = 0.5 * cfg.gamma * s2 * cfg.tau_s + math.log1p(cfg.gamma / cfg.k) / cfg.gamma
-            h = max(h, cfg.min_half_spread_ticks * tick)
-            if cfg.as_floor:
-                h = max(h, (as_bps - rebate_bps(mid)) * mid / 1e4)
-            want = {
-                0: min(math.floor((res - h) / tick + 1e-9), apx - 1),
-                1: max(math.ceil((res + h) / tick - 1e-9), bpx + 1),
-            }
+            want = quote_prices(e, mid, s2, inv_units, bpx, apx)
+            base = quote_prices(0.0, mid, s2, inv_units, bpx, apx)
+            diag["decisions_quoted"] += 1
+            diag["skew_changed"] += int(want != base)
+            behind.append(bpx - want[0])
+            behind.append(want[1] - apx)
             act = None
             if fb is not None:
                 fb.advance(t, mid)
@@ -447,6 +506,8 @@ class QuotingBacktester:
             return any(not sim.orders[o].is_terminal for o in mine)
 
         last_t = evs[0].exchange_ts
+        ref_ts: int | None = None
+        ref_mid: float | None = None
         for ev in evs:
             t = ev.exchange_ts
             if fb is not None:
@@ -477,7 +538,14 @@ class QuotingBacktester:
                 last_mid = pre_mid
             if started and q[0] != 0 and bs is not None:
                 cross(t, bs, pre_mid)
-            maker_mid = pre_mid
+            if t != ref_ts:
+                # v1.13 (X-P1-4): MAKER markout reference = mid before the
+                # FIRST event of this exchange_ts (tca/markout.py MAKER rule,
+                # calibration ``prevailing(ts - 1)``), not before the fill's
+                # own event inside a same-timestamp burst.
+                ref_ts = t
+                ref_mid = pre_mid
+            maker_mid = ref_mid
             sim.on_event(ev)
             post = book_state()
             if post is not None:
@@ -552,7 +620,16 @@ class QuotingBacktester:
             cx.update(fb.counters)
         c.update(cx)
         inv = pd.DataFrame(inv_path + [(t_end, 0)], columns=["ts", "q"])
-        return QuotingResult(instrument_id, fdf, inv, pnl, c, as_bps, as_source)
+        out = QuotingResult(instrument_id, fdf, inv, pnl, c, as_bps, as_source)
+        bh = np.asarray(behind, dtype=float)
+        nq = diag["decisions_quoted"]
+        out.diagnostics = {
+            "ticks_behind_touch_mean": float(bh.mean()) if bh.size else None,
+            "ticks_behind_touch_median": float(np.median(bh)) if bh.size else None,
+            "ticks_behind_touch_max": float(bh.max()) if bh.size else None,
+            "frac_decisions_skew_changed_quote": diag["skew_changed"] / nq if nq else None,
+        }
+        return out
 
     def run_days(
         self,

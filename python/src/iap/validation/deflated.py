@@ -57,7 +57,7 @@ Few observations (2-7 sessions is the platform's power bottleneck) make
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 import numpy as np
@@ -167,6 +167,38 @@ def effective_trials(ledger: ExperimentLedger, include_new: bool = True) -> int:
     configurations recorded, plus one for the run being judged when it is
     not recorded yet (``include_new``)."""
     return max(int(ledger.distinct_experiments) + (1 if include_new else 0), 1)
+
+
+#: ``trials_basis`` of :func:`registered_hypotheses_trials` (v1.13, R-P2-7).
+TRIALS_BASIS_REGISTERED = "registered_hypotheses"
+
+
+def registered_hypotheses_trials(entries: Iterable[Mapping[str, Any]], data_family: str) -> int:
+    """``N`` for DSR = the hypotheses pre-registered on the blackboard for
+    one data family (v1.13, R-P2-7; an option beside
+    :func:`effective_trials`, which stays the default).
+
+    ``entries`` are blackboard rows (``Blackboard(path).entries()``); a row
+    counts when its ``kind`` is ``"prereg"`` and its body names the family
+    in ``data_family``, or - for rows written before that field existed -
+    when ``data_family`` occurs in its ``hypothesis`` text.  Each distinct
+    ``prereg_id`` (else ``(alpha_id, horizon)``) counts once.  At least 1.
+    """
+    if not data_family:
+        raise ValueError("data_family must be a non-empty string")
+    seen: set[Any] = set()
+    for e in entries:
+        if e.get("kind") != "prereg":
+            continue
+        body = e.get("body") or {}
+        fam = body.get("data_family")
+        if fam is not None:
+            if fam != data_family:
+                continue
+        elif data_family not in str(body.get("hypothesis", "")):
+            continue
+        seen.add(body.get("prereg_id") or (body.get("alpha_id"), body.get("horizon")))
+    return max(len(seen), 1)
 
 
 def _fnum(v: float) -> float | None:

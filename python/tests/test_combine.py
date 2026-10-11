@@ -50,6 +50,10 @@ from iap.validation.metrics import HORIZONS_NS, ic
 from iap.validation.splits import WalkForwardSplitter
 from iap.validation.validate import looks_per_validation
 
+# E-P2-7: one of the slowest test files (CI --durations); run by the
+# python-slow CI job, deselected from the PR python job (-m 'not slow').
+pytestmark = pytest.mark.slow
+
 ROOT = Path(__file__).resolve().parents[2]
 COMBINATION_DIR = ROOT / "research" / "combination"
 HAS_DATA = (ROOT / "data" / "features" / "features_1.parquet").is_file()

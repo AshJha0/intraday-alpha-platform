@@ -11,6 +11,10 @@ from iap.marketdata.generator import (
     load_generator_config,
 )
 
+# E-P2-7: one of the slowest test files (CI --durations); run by the
+# python-slow CI job, deselected from the PR python job (-m 'not slow').
+pytestmark = pytest.mark.slow
+
 SMALL_CFG = {
     "seed": 777,
     "sessions": 1,

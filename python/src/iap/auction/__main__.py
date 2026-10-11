@@ -63,6 +63,7 @@ def _backtest(a: argparse.Namespace) -> int:
         exit=a.exit,
         qty=a.qty,
         default_half_spread_bps=a.half_spread_bps,
+        enforce_entry_cutoff=not a.no_entry_cutoff,
     )
     cm = CostModel.load(a.execution_config)
     report = {
@@ -97,6 +98,11 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--exit", choices=("cross", "taker"), default="cross")
     b.add_argument("--qty", type=int, default=100)
     b.add_argument("--half-spread-bps", type=float, default=1.0)
+    b.add_argument(
+        "--no-entry-cutoff",
+        action="store_true",
+        help="pre-v1.13 rule: allow exit=cross at/after the MOC/MOO entry cutoff",
+    )
     b.add_argument("--mids", default=None, help="CSV symbol,ts,mid[,half_spread]")
     b.add_argument(
         "--execution-config", default=str(REPO_ROOT / "configs/execution/execution.json")

@@ -1,4 +1,4 @@
-"""Event-time forward labels at pinned horizons (conventions §7, spec §13).
+"""Event-time forward labels at pinned horizons (conventions Â§7, spec Â§13).
 
 Given a per-instrument event-time mid series (one sample per BOOK REFRESH:
 ``(exchange_ts, mid, half_spread, tradable)`` in price units) and a sorted
@@ -11,26 +11,26 @@ for every anchor t and every horizon h in {10ms, 50ms, 100ms, 500ms, 1s, 5s,
              ends (buy at the ask now, sell at the bid later):
              ((m(t+h) - hs(t+h)) - (m(t) + hs(t))) / m(t)
 
-where m(t) / hs(t) is the mid / half-spread prevailing at t — the latest
+where m(t) / hs(t) is the mid / half-spread prevailing at t â€” the latest
 series sample with ts <= t.
 
-**Tradability (pinned, API_FEATURES §6).**  A series sample is ``tradable``
+**Tradability (pinned, API_FEATURES Â§6).**  A series sample is ``tradable``
 when, at that refresh, the merged book was two-sided (``book_ok``), NO venue
 of the instrument was stale, and no venue reported HALT or AUCTION.  A label
 is only a tradable forward return if the market was continuously observable
 and open across the whole horizon, so a label at (t, h) is VALID only when
 ALL of:
 
-1. the stream was observed through t+h (``last_event_ts >= t + h``) —
+1. the stream was observed through t+h (``last_event_ts >= t + h``) â€”
    horizons running past the end of the session are invalid, never
    extrapolated (bit ``NOT_OBSERVED``);
 2. an anchor sample exists with ``ts <= t``, its mid is > 0 (bit
    ``NO_ANCHOR``) and it is ``tradable`` (bit ``ANCHOR_NOT_TRADABLE``);
 3. a forward sample exists with ``ts <= t + h`` (bit ``NO_FORWARD``), it is
    ``tradable`` and it is FRESH: ``t + h - ts_forward <= max_age_ns``
-   (bit ``FORWARD_STALE``) — a mid frozen since the last quote of the day is
+   (bit ``FORWARD_STALE``) â€” a mid frozen since the last quote of the day is
    not a price you could have traded at;
-4. EVERY sample in ``(t, t + h]`` is tradable (bit ``BLACKOUT``) — a halt,
+4. EVERY sample in ``(t, t + h]`` is tradable (bit ``BLACKOUT``) â€” a halt,
    a re-opening auction or a stale-venue gap anywhere inside the horizon
    invalidates the label, so a pre-halt signal is never credited with the
    reopen jump.
@@ -48,7 +48,7 @@ judged stale or fresh with a bound that depends on the 15:00 quote rate.
 ``compute_labels(..., freshness="trailing")`` uses, for the forward sample
 ``k``, ``max(LABEL_MAX_AGE_FLOOR_NS, 2 x the median of the last
 LABEL_FRESHNESS_WINDOW distinct-timestamp gaps up to ts[k])``
-(:func:`trailing_max_sample_age`) — only quotes at or before the forward
+(:func:`trailing_max_sample_age`) â€” only quotes at or before the forward
 sample, so the bound is causal.  The default stays ``"whole_day"`` (the
 pinned rule above: every feature store, golden and published number was
 built with it); the effect is small on the equities, where the 5 s floor
@@ -61,11 +61,11 @@ No-lookahead alignment (pinned):
 
 - the anchor state uses only events with exchange_ts <= t (the present);
 - the forward state at t+h is the prevailing state after all events with
-  exchange_ts <= t+h — i.e. it is determined exclusively by the anchor state
+  exchange_ts <= t+h â€” i.e. it is determined exclusively by the anchor state
   plus events *strictly after* the anchor (mid changes between t and t+h).
 
 Implementation: one two-pointer sweep per horizon plus a prefix count of
-non-tradable samples — anchors are non-decreasing in time, so each of the 11
+non-tradable samples â€” anchors are non-decreasing in time, so each of the 11
 pointers only moves forward: O(len(anchors) * H + len(series)) total, no
 per-anchor binary search.
 """
@@ -73,8 +73,11 @@ per-anchor binary search.
 from __future__ import annotations
 
 import bisect
+from array import array
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+
+import numpy as np
 
 _NS_MS = 1_000_000
 _NS_S = 1_000_000_000
@@ -172,6 +175,34 @@ class MidSeries:
         return int(gaps[m // 2] if m % 2 else (gaps[m // 2 - 1] + gaps[m // 2]) // 2)
 
 
+class CompactMidSeries(MidSeries):
+    """:class:`MidSeries` held in typed arrays (v1.13, E5).
+
+    Same interface and the same element values as :class:`MidSeries`
+    (``ts`` int64, ``mid`` / ``half_spread`` float64, ``tradable`` one byte
+    of 0/1 per sample), so :func:`compute_labels` and friends produce
+    identical labels; a sample costs 25 bytes instead of ~100 bytes of list
+    slots plus boxed Python ints / floats.  Used by the feature build.
+    """
+
+    def __init__(self) -> None:  # noqa: D107 - dataclass fields replaced
+        self.ts = array("q")
+        self.mid = array("d")
+        self.half_spread = array("d")
+        self.tradable = bytearray()
+
+    def median_gap_ns(self) -> int:
+        if len(self.ts) < 2:
+            return 0
+        t = np.frombuffer(self.ts, dtype=np.int64)
+        d = np.diff(t)
+        gaps = np.sort(d[d != 0])  # non-decreasing: distinct-instant gaps
+        m = len(gaps)
+        if m < 1:
+            return 0
+        return int(gaps[m // 2] if m % 2 else (int(gaps[m // 2 - 1]) + int(gaps[m // 2])) // 2)
+
+
 def max_sample_age(series: MidSeries) -> int:
     """Pinned freshness bound for the prevailing mid of an instrument."""
     return max(LABEL_MAX_AGE_FLOOR_NS, LABEL_MAX_AGE_GAP_MULT * series.median_gap_ns())
@@ -189,7 +220,7 @@ def trailing_max_sample_age(series: MidSeries, window: int = LABEL_FRESHNESS_WIN
 
     Entry ``k`` is ``max(LABEL_MAX_AGE_FLOOR_NS, LABEL_MAX_AGE_GAP_MULT x
     median of the last <= window gaps between DISTINCT timestamps at or
-    before ts[k])`` — the floor alone until the series has a gap.  Uses no
+    before ts[k])`` â€” the floor alone until the series has a gap.  Uses no
     sample after ``k``.  O(len(series) x window) worst case.
     """
     if window < 1:
@@ -252,7 +283,7 @@ def compute_labels(
     themselves are the same either way) also fills
     :attr:`LabelResult.reopen_mid`: for an anchor whose label is invalid for
     ``BLACKOUT`` and nothing else, the return from the anchor mid to the
-    FIRST tradable mid at or after ``t + h`` — what the position was
+    FIRST tradable mid at or after ``t + h`` â€” what the position was
     actually worth once the market could be traded again.  It is not a
     tradable ``h``-horizon return (which is why the label stays invalid);
     it exists so the selection the BLACKOUT rule makes is measured in every
@@ -297,7 +328,7 @@ def compute_labels(
         bad[i + 1] = bad[i] + (0 if tradable[i] else 1)
 
     # next_tradable[i] = smallest index >= i of a tradable sample with a
-    # positive mid (m when none) — only needed for the reopen return
+    # positive mid (m when none) â€” only needed for the reopen return
     next_tradable = [m] * (m + 1)
     if blackout_reopen:
         for i in range(m - 1, -1, -1):

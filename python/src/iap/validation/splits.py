@@ -81,16 +81,58 @@ class Fold:
     #: leave-one-day-out: train on both sides of the test span
     two_sided: bool = False
 
-    def train_mask(self, ts: np.ndarray, horizon_ns: int, embargo_ns: int) -> np.ndarray:
+    def train_mask(
+        self,
+        ts: np.ndarray,
+        horizon_ns: int,
+        embargo_ns: int,
+        post_embargo_ns: int | None = None,
+    ) -> np.ndarray:
+        """``post_embargo_ns`` (v1.13, R-P1-6; two-sided folds only): the gap
+        after the test block, default ``embargo_ns``.  See
+        :func:`post_block_embargo_ns`."""
         ts = np.asarray(ts, dtype=np.int64)
         before = ts + horizon_ns + embargo_ns < self.test_start
         if not self.two_sided:
             return before
-        return before | (ts >= self.test_end + embargo_ns)
+        after = embargo_ns if post_embargo_ns is None else int(post_embargo_ns)
+        return before | (ts >= self.test_end + after)
 
     def test_mask(self, ts: np.ndarray) -> np.ndarray:
         ts = np.asarray(ts, dtype=np.int64)
         return (ts >= self.test_start) & (ts < self.test_end)
+
+
+def longest_feature_window_ns() -> int:
+    """The longest look-back window in the feature registry (``window`` /
+    ``horizon`` params, :data:`iap.features.spec.WINDOW_NS`): 5 m today."""
+    from iap.features.registry import build_registry
+    from iap.features.spec import WINDOW_NS
+
+    longest = 0
+    for spec in build_registry():
+        for key, value in spec.params:
+            if key in ("window", "horizon") and isinstance(value, str) and value in WINDOW_NS:
+                longest = max(longest, WINDOW_NS[value])
+    return longest
+
+
+def post_block_embargo_ns(embargo_ns: int, feature_window_ns: int | str | None) -> int:
+    """Embargo AFTER a test block on two-sided splits (v1.13, R-P1-6).
+
+    A train row just after a test block carries features whose look-back
+    window reaches into the block, so the post-block gap must be at least
+    the longest feature window: ``max(embargo_ns, feature_window_ns)``.
+    ``feature_window_ns="registry"`` reads it from the feature registry
+    (:func:`longest_feature_window_ns`); ``None`` keeps ``embargo_ns``
+    (the pre-v1.13 rule)."""
+    if feature_window_ns is None:
+        return int(embargo_ns)
+    if feature_window_ns == "registry":
+        feature_window_ns = longest_feature_window_ns()
+    if isinstance(feature_window_ns, str) or int(feature_window_ns) < 0:
+        raise ValueError("feature_window_ns must be None, 'registry' or an int >= 0")
+    return max(int(embargo_ns), int(feature_window_ns))
 
 
 class WalkForwardSplitter:
@@ -101,6 +143,7 @@ class WalkForwardSplitter:
         n_folds: int = 4,
         embargo_ns: int = 60_000_000_000,
         mode: str = "row_mass",
+        feature_window_ns: int | str | None = None,
     ) -> None:
         if n_folds < 1:
             raise ValueError("n_folds must be >= 1")
@@ -111,6 +154,8 @@ class WalkForwardSplitter:
         self.n_folds = n_folds
         self.embargo_ns = embargo_ns
         self.mode = mode
+        #: post-block embargo on two-sided folds (v1.13, opt-in)
+        self.post_embargo_ns = post_block_embargo_ns(embargo_ns, feature_window_ns)
 
     def folds(self, t0: int, t1: int) -> list[Fold]:
         """Fold boundaries over the closed event-time span [t0, t1]
@@ -217,8 +262,7 @@ class WalkForwardSplitter:
             test: dict[int, pd.DataFrame] = {}
             for iid, df in frames.items():
                 ts = df["exchange_ts"].to_numpy()
-                train[iid] = df[fold.train_mask(ts, horizon_ns, self.embargo_ns)].reset_index(
-                    drop=True
-                )
+                keep = fold.train_mask(ts, horizon_ns, self.embargo_ns, self.post_embargo_ns)
+                train[iid] = df[keep].reset_index(drop=True)
                 test[iid] = df[fold.test_mask(ts)].reset_index(drop=True)
             yield fold, train, test

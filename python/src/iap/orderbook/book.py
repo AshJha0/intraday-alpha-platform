@@ -610,6 +610,14 @@ class OrderBook:
                 out.append((oid, s, price, self._levels[(s, price)].orders[oid]))
         return out
 
+    def order(self, order_id: int) -> tuple[int, int, int] | None:
+        """``(side, price_ticks, qty)`` of resting ``order_id``, or ``None``. O(1)."""
+        loc = self._orders.get(order_id)
+        if loc is None:
+            return None
+        s, price = loc
+        return (s, price, self._levels[(s, price)].orders[order_id])
+
     def order_count_total(self) -> int:
         """Total number of resting orders in the book."""
         return len(self._orders)

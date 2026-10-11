@@ -10,6 +10,8 @@ from __future__ import annotations
 import datetime as dt
 import json
 import struct
+from dataclasses import replace
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -166,11 +168,14 @@ def test_targets_with_mids(stream):
 
 def test_backtest_follow_beats_fade_and_costs_apply(stream):
     lab = auction_targets(auction_features(stream.noii, "C"), stream.crosses)
-    cfg = AuctionStrategyConfig(decision_s=300, threshold=0.05)
+    # v1.13: these plumbing tests price the cross exit at C-300s, which the
+    # X-P1-5 entry cutoff now refuses by default; they opt back into the
+    # pre-v1.13 rule (the cutoff has its own tests below).
+    cfg = AuctionStrategyConfig(decision_s=300, threshold=0.05, enforce_entry_cutoff=False)
     dec = decision_rows(lab, cfg)
     assert len(dec) == 20 and (dec["time_to_cross_s"] <= 300).all()
     follow = backtest(lab, cfg).summary()
-    fade = backtest(lab, AuctionStrategyConfig(decision_s=300, threshold=0.05, orientation=-1))
+    fade = backtest(lab, replace(cfg, orientation=-1))
     assert follow["n_trades"] == 20
     assert follow["mean_net_bps"] > 0 > fade.summary()["mean_net_bps"]
     assert follow["mean_cost_bps"] > 0
@@ -181,7 +186,9 @@ def test_backtest_follow_beats_fade_and_costs_apply(stream):
 
 def test_walk_forward_learns_orientation_out_of_sample(stream):
     lab = auction_targets(auction_features(stream.noii, "C"), stream.crosses)
-    res = walk_forward(lab, AuctionStrategyConfig(decision_s=300), n_folds=4)
+    res = walk_forward(
+        lab, AuctionStrategyConfig(decision_s=300, enforce_entry_cutoff=False), n_folds=4
+    )
     assert len(res.folds) == 4
     assert all(f["orientation"] == 1 for f in res.folds)
     s = res.summary()
@@ -218,3 +225,34 @@ def test_cli_extract_and_backtest(tmp_path, capsys):
     assert doc["alpha"] == "AUC01" and doc["preregistered"] is False
     assert doc["in_sample"]["summary"]["n_trades"] > 0
     assert len(doc["walk_forward"]["folds"]) == 2
+
+
+# ---- v1.13 X-P1-5: MOC / MOO entry cutoff -------------------------------------
+
+
+def test_entry_cutoff_table_is_dated_and_mirrors_the_reference_config():
+    from iap.auction.strategy import DEFAULT_ENTRY_CUTOFFS, entry_cutoff_s, load_entry_cutoffs
+
+    ref = Path(__file__).resolve().parents[2] / "configs/reference/auction_entry_cutoffs.json"
+    assert load_entry_cutoffs(ref) == DEFAULT_ENTRY_CUTOFFS
+    assert entry_cutoff_s("C", "2019-07-30") == 300.0  # 15:55 ET since Oct 2018
+    assert entry_cutoff_s("C", "2018-06-01") == 600.0  # 15:50 ET before
+    assert entry_cutoff_s("O", "2026-03-02") == 120.0  # 09:28 ET
+    with pytest.raises(ValueError):
+        entry_cutoff_s("X", "2026-03-02")
+
+
+def test_cross_exit_at_or_after_the_cutoff_falls_back_to_taker(stream):
+    lab = auction_targets(auction_features(stream.noii, "C"), stream.crosses)
+    cross = backtest(lab, AuctionStrategyConfig(decision_s=300, threshold=0.05))
+    taker = backtest(lab, AuctionStrategyConfig(decision_s=300, threshold=0.05, exit="taker"))
+    t = cross.trades
+    assert len(t) and (t["exit_used"] == "taker").all()  # every row is at <= 300 s
+    np.testing.assert_allclose(t["net_bps"], taker.trades["net_bps"])
+    legacy = backtest(
+        lab, AuctionStrategyConfig(decision_s=300, threshold=0.05, enforce_entry_cutoff=False)
+    )
+    assert (legacy.trades["exit_used"] == "cross").all()
+    # a cutoff below every decision row admits the cross exit again
+    early = backtest(lab, AuctionStrategyConfig(decision_s=300, threshold=0.05, entry_cutoff_s=0.0))
+    np.testing.assert_allclose(early.trades["net_bps"], legacy.trades["net_bps"])

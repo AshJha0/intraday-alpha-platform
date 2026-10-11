@@ -53,7 +53,7 @@ spec:
           containers:
             - name: pipeline
               # Release step: pin by digest from release-manifest.json.
-              image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.12.0
+              image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.13.0
               imagePullPolicy: IfNotPresent
               # Configs from the ConfigMap (not the baked copy) so a config
               # change does not require an image rebuild; every config change
@@ -112,6 +112,10 @@ spec:
                     path: mvp/mvp_tiny.json
                   - key: mvp__venues.json
                     path: mvp/venues.json
+                  - key: reference__auction_entry_cutoffs.json
+                    path: reference/auction_entry_cutoffs.json
+                  - key: reference__event_calendar.json
+                    path: reference/event_calendar.json
                   - key: risk__risk.json
                     path: risk/risk.json
                   - key: strategies__alpha_params.json
@@ -120,6 +124,8 @@ spec:
                     path: strategies/lifecycle.json
                   - key: strategies__strategies.json
                     path: strategies/strategies.json
+                  - key: templates__regulatory_fees.json
+                    path: templates/regulatory_fees.json
                   - key: venues__venues.json
                     path: venues/venues.json
             - name: data

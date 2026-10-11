@@ -465,6 +465,7 @@ def run_session(
     messages: list[dict[str, Any]] = [{"role": "user", "content": task}]
     log.append("transcript.jsonl", {"t": clock(), "role": "user", "content": task})
     status = "max_turns"
+    served_models: set[str] = set()  # resp.model of every call (G-P2-12)
     for turn in range(max_turns):
         try:
             session.budget.check_model_call(model)
@@ -482,6 +483,9 @@ def run_session(
         if effort:
             kwargs["output_config"] = {"effort": effort}
         resp = client.messages.create(**kwargs)
+        served = getattr(resp, "model", None)
+        if served:
+            served_models.add(str(served))
         session.budget.charge(model, resp.usage)
         content = list(resp.content)
         log.append(
@@ -543,6 +547,7 @@ def run_session(
         "session": session.session_id,
         "agent": session.agent,
         "model": model,
+        "served_models": sorted(served_models),
         "status": status,
         "budget": session.budget.summary(),
         "datasets": sorted(session.datasets),

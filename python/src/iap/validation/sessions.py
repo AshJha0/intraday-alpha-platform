@@ -8,10 +8,11 @@ afternoons.  This module makes the choice of days an explicit, seeded,
 recorded step and lets every report be read with and without the event
 days:
 
-- :data:`FOMC_DAYS` / :data:`HOLIDAY_THIN_DAYS` — a small pinned calendar of
-  the sessions the platform has data for (2019 and the 2026 holdout year).
-  It is a research convenience, not a reference-data service: extend it
-  when a session outside these years is ingested.
+- :data:`FOMC_DAYS` / :data:`HOLIDAY_THIN_DAYS` — read (v1.13, R-P2-9) from
+  ``configs/reference/event_calendar.json``, which records a ``source`` and
+  ``as_of`` per year; :func:`event_calendar_for_year` fails closed on a year
+  it does not cover.  Extend the file when a session outside these years is
+  ingested.
 - :func:`day_tags` — ``{"fomc", "holiday_thin"}`` subset for one date.
 - :func:`session_days` — the UTC session date of each row timestamp (US
   equity sessions, 13:30-20:00 UTC, never straddle UTC midnight).
@@ -30,6 +31,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
+import os
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 
@@ -37,51 +39,71 @@ import numpy as np
 
 NS_DAY = 86_400 * 1_000_000_000
 
-#: FOMC statement days (scheduled meetings, decision day) of the years the
-#: platform holds sessions for.
-FOMC_DAYS: frozenset[str] = frozenset(
-    {
-        # 2019
-        "2019-01-30",
-        "2019-03-20",
-        "2019-05-01",
-        "2019-06-19",
-        "2019-07-31",
-        "2019-09-18",
-        "2019-10-30",
-        "2019-12-11",
-        # 2026
-        "2026-01-28",
-        "2026-03-18",
-        "2026-04-29",
-        "2026-06-17",
-        "2026-07-29",
-        "2026-09-16",
-        "2026-10-28",
-        "2026-12-09",
-    }
+#: The event calendar file (v1.13, R-P2-9): per-year FOMC and holiday-thin
+#: days with their ``source`` and ``as_of``.  ``IAP_EVENT_CALENDAR``
+#: overrides the path.
+EVENT_CALENDAR_PATH = (
+    Path(__file__).resolve().parents[4] / "configs" / "reference" / "event_calendar.json"
 )
 
-#: Early closes and holiday-thin sessions (between Christmas and New Year,
-#: the day after Thanksgiving, the eve of Independence Day).
-HOLIDAY_THIN_DAYS: frozenset[str] = frozenset(
-    {
-        "2019-07-03",
-        "2019-11-29",
-        "2019-12-24",
-        "2019-12-26",
-        "2019-12-27",
-        "2019-12-30",
-        "2019-12-31",
-        "2026-07-02",
-        "2026-11-27",
-        "2026-12-24",
-        "2026-12-28",
-        "2026-12-29",
-        "2026-12-30",
-        "2026-12-31",
-    }
-)
+
+class EventCalendarError(ValueError):
+    """The event calendar is missing, malformed or does not cover a year."""
+
+
+def _calendar_path() -> Path:
+    env = os.environ.get("IAP_EVENT_CALENDAR")
+    return Path(env) if env else EVENT_CALENDAR_PATH
+
+
+def load_event_calendar(path: str | Path | None = None) -> dict:
+    """The calendar document; every year must carry ``fomc``,
+    ``holiday_thin``, ``source`` and ``as_of`` (fail closed)."""
+    p = Path(path) if path is not None else _calendar_path()
+    if not p.is_file():
+        raise EventCalendarError(f"event calendar not found: {p}")
+    doc = json.loads(p.read_text(encoding="utf-8"))
+    years = doc.get("years")
+    if not isinstance(years, dict) or not years:
+        raise EventCalendarError(f"{p}: no 'years'")
+    for year, entry in years.items():
+        for key in ("fomc", "holiday_thin", "source", "as_of"):
+            if key not in entry:
+                raise EventCalendarError(f"{p}: year {year} has no {key!r}")
+        for key in ("fomc", "holiday_thin"):
+            for d in entry[key]:
+                if _dt.date.fromisoformat(d).year != int(year):
+                    raise EventCalendarError(f"{p}: {d} listed under year {year}")
+    return doc
+
+
+def event_calendar_for_year(year: int, path: str | Path | None = None) -> dict:
+    """One year's entry; raises :class:`EventCalendarError` for a year the
+    calendar does not cover (an uncovered year is not an event-free one)."""
+    years = load_event_calendar(path)["years"]
+    entry = years.get(str(int(year)))
+    if entry is None:
+        raise EventCalendarError(
+            f"event calendar does not cover {int(year)} (covered: {sorted(years)}); "
+            "add the year with its source to configs/reference/event_calendar.json"
+        )
+    return entry
+
+
+def _calendar_days(key: str) -> frozenset[str]:
+    try:
+        years = load_event_calendar()["years"]
+    except EventCalendarError:
+        return frozenset()
+    return frozenset(d for entry in years.values() for d in entry[key])
+
+
+#: FOMC statement days (scheduled meetings, decision day), read from the
+#: event calendar file.
+FOMC_DAYS: frozenset[str] = _calendar_days("fomc")
+
+#: Early closes and holiday-thin sessions, read from the event calendar file.
+HOLIDAY_THIN_DAYS: frozenset[str] = _calendar_days("holiday_thin")
 
 #: Tags an event-day split can exclude.
 EVENT_TAGS = ("fomc", "holiday_thin")

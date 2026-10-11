@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iap"
-version = "1.12.0"
+version = "1.13.0"
 description = "Intraday Alpha Platform - Python reference implementation"
 requires-python = ">=3.11"
 dependencies = [
@@ -15,7 +15,7 @@ dependencies = [
   "pyarrow>=25,<26",
   "jsonschema>=4.26,<5",
   "referencing>=0.37,<1",
-  "cryptography>=46,<51",
+  "cryptography>=50.0.2,<51",
 ]
 
 [project.optional-dependencies]
@@ -40,3 +40,23 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  "slow: long-running test file (the CI python-slow job runs these; the PR python job runs -m 'not slow')",
+]
+
+# Advisory static typing (v1.13, E-P1-5).  CI runs `mypy` from python/ with
+# this config, continue-on-error, and puts the error count in the job
+# summary; the path to blocking is in CONTRIBUTING.md.
+[tool.mypy]
+python_version = "3.12"  # numpy 2.4 stubs use PEP 695 `type` statements
+mypy_path = "src"
+files = [
+  "src/iap/core",
+  "src/iap/orderbook",
+  "src/iap/execution",
+  "src/iap/backtest",
+  "src/iap/features",
+]
+explicit_package_bases = true
+ignore_missing_imports = true
+follow_imports = "silent"

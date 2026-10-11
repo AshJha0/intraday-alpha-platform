@@ -19,6 +19,12 @@ docs/REAL_DATA.md) into a dataset directory of the same layout.
     python3 -m iap.marketdata merge DATASET DATASET... --out DATASET
 
 combines ingested datasets of disjoint sessions into one multi-day dataset.
+
+    python3 -m iap.marketdata {plan-ingest,verify-download,record-sampling} ...
+
+R7 data preparation (``iap.marketdata.r7plan``, docs/R7_DATA_PLAN.md):
+a resumable batch-ingest .cmd from a candidate manifest, size/sha256 checks
+of files the owner downloaded, and seeded day sampling into dataset.json.
 """
 
 from __future__ import annotations
@@ -46,6 +52,10 @@ def main(argv=None) -> int:
         from iap.marketdata.ingest import merge_main
 
         return merge_main(args_in[1:])
+    if args_in[:1] and args_in[0] in ("plan-ingest", "verify-download", "record-sampling"):
+        from iap.marketdata.r7plan import main as r7_main
+
+        return r7_main(args_in)
     parser = argparse.ArgumentParser(
         prog="python3 -m iap.marketdata",
         description="Generate synthetic raw market data and normalize it.",

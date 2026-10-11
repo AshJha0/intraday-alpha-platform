@@ -703,6 +703,87 @@ data:
         }
       ]
     }
+  reference__auction_entry_cutoffs.json: |
+    {
+      "x-version": 1,
+      "description": "Nasdaq cross order-entry cutoffs (v1.13, X-P1-5), as seconds BEFORE the cross. A market-on-close / on-open order (the AUC01 exit=\"cross\" leg) is only accepted while time_to_cross_s > cutoff_s. Rows are dated: the row with the latest valid_from <= the session date applies. iap.auction.strategy.DEFAULT_ENTRY_CUTOFFS mirrors this file (a test pins the two equal).",
+      "venue": "XNAS",
+      "cutoffs": [
+        {
+          "cross_type": "C",
+          "valid_from": "1900-01-01",
+          "cutoff_et": "15:50:00",
+          "cutoff_s": 600,
+          "source": "Pre-October-2018 rule: MOC/LOC cutoff and NOII start 3:50 p.m. ET, as described in SEC Release 34-85292 (https://www.sec.gov/files/rules/sro/nasdaq/2019/34-85292.pdf)"
+        },
+        {
+          "cross_type": "C",
+          "valid_from": "2018-10-01",
+          "cutoff_et": "15:55:00",
+          "cutoff_s": 300,
+          "source": "SEC Release 34-85292 (https://www.sec.gov/files/rules/sro/nasdaq/2019/34-85292.pdf): in October 2018 Nasdaq moved the Closing Cross cutoff (MOC entry) and NOII start to 3:55 p.m. ET; Nasdaq Closing Cross FAQ (https://www.nasdaqtrader.com/content/productsservices/Trading/ClosingCrossfaq.pdf): MOC accepted until 3:55 p.m. ET"
+        },
+        {
+          "cross_type": "O",
+          "valid_from": "1900-01-01",
+          "cutoff_et": "09:28:00",
+          "cutoff_s": 120,
+          "source": "Nasdaq Opening/Closing Cross quick guide (https://www.nasdaqtrader.com/content/technicalsupport/specifications/TradingProducts/openclosequickguide.pdf): MOO/LOO orders accepted until 9:28 a.m. ET"
+        }
+      ]
+    }
+  reference__event_calendar.json: |
+    {
+      "schema": "iap.event_calendar.v1",
+      "description": "Session-day event tags for iap.validation.sessions (v1.13, R-P2-9). fomc = scheduled FOMC statement (second, decision) day. holiday_thin = NYSE 1:00 pm early closes plus the platform's convention of the trading days between Christmas and New Year. A year missing here is not covered: iap.validation.sessions.event_calendar_for_year refuses it (fail closed).",
+      "years": {
+        "2019": {
+          "fomc": ["2019-01-30", "2019-03-20", "2019-05-01", "2019-06-19", "2019-07-31", "2019-09-18", "2019-10-30", "2019-12-11"],
+          "holiday_thin": ["2019-07-03", "2019-11-29", "2019-12-24", "2019-12-26", "2019-12-27", "2019-12-30", "2019-12-31"],
+          "source": {
+            "fomc": "https://www.federalreserve.gov/monetarypolicy/fomchistorical2019.htm (scheduled meetings; the 2019-10-04 conference call is unscheduled and not tagged)",
+            "holiday_thin": "early closes 2019-07-03, 2019-11-29, 2019-12-24 per the NYSE holiday calendar of that year (no longer on nyse.com/markets/hours-calendars, which lists 2026-2028; not re-verified); 2019-12-26..31 by convention"
+          },
+          "as_of": "2026-10-11"
+        },
+        "2020": {
+          "fomc": ["2020-01-29", "2020-04-29", "2020-06-10", "2020-07-29", "2020-09-16", "2020-11-05", "2020-12-16"],
+          "holiday_thin": ["2020-11-27", "2020-12-24", "2020-12-28", "2020-12-29", "2020-12-30", "2020-12-31"],
+          "source": {
+            "fomc": "https://www.federalreserve.gov/monetarypolicy/fomchistorical2020.htm (scheduled meetings; 2020-03-17/18 cancelled; unscheduled meetings and notation votes not tagged)",
+            "holiday_thin": "early closes 2020-11-27, 2020-12-24 per the NYSE holiday calendar of that year (not on the current nyse.com page; not re-verified); 2020-12-28..31 by convention"
+          },
+          "as_of": "2026-10-11"
+        },
+        "2021": {
+          "fomc": ["2021-01-27", "2021-03-17", "2021-04-28", "2021-06-16", "2021-07-28", "2021-09-22", "2021-11-03", "2021-12-15"],
+          "holiday_thin": ["2021-07-02", "2021-11-26", "2021-12-23", "2021-12-27", "2021-12-28", "2021-12-29", "2021-12-30", "2021-12-31"],
+          "source": {
+            "fomc": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+            "holiday_thin": "early close 2021-11-26 per the NYSE holiday calendar of that year (2021-12-24 was a full holiday; not on the current nyse.com page; not re-verified); 2021-12-27..31 by convention; 2021-07-02 and 2021-12-23 by convention (trading day before a full market holiday: 2021-07-05 observed Independence Day, 2021-12-24 Christmas), not exchange early closes"
+          },
+          "as_of": "2026-10-11"
+        },
+        "2025": {
+          "fomc": ["2025-01-29", "2025-03-19", "2025-05-07", "2025-06-18", "2025-07-30", "2025-09-17", "2025-10-29", "2025-12-10"],
+          "holiday_thin": ["2025-07-03", "2025-11-28", "2025-12-24", "2025-12-26", "2025-12-29", "2025-12-30", "2025-12-31"],
+          "source": {
+            "fomc": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+            "holiday_thin": "early closes 2025-07-03, 2025-11-28, 2025-12-24 per the NYSE 2025 holiday calendar (no longer on nyse.com/markets/hours-calendars; not re-verified); 2025-12-26..31 by convention"
+          },
+          "as_of": "2026-10-11"
+        },
+        "2026": {
+          "fomc": ["2026-01-28", "2026-03-18", "2026-04-29", "2026-06-17", "2026-07-29", "2026-09-16", "2026-10-28", "2026-12-09"],
+          "holiday_thin": ["2026-07-02", "2026-11-27", "2026-12-24", "2026-12-28", "2026-12-29", "2026-12-30", "2026-12-31"],
+          "source": {
+            "fomc": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm (verified 2026-10-11)",
+            "holiday_thin": "early closes 2026-11-27, 2026-12-24 verified on https://www.nyse.com/markets/hours-calendars 2026-10-11; 2026-07-02 (eve of the 2026-07-03 observed holiday) is NOT an NYSE early close and is kept as a platform convention; 2026-12-28..31 by convention"
+          },
+          "as_of": "2026-10-11"
+        }
+      }
+    }
   risk__risk.json: |
     {
       "x-version": 3,
@@ -1356,6 +1437,35 @@ data:
     strategy_id\": \"FX01_quote_imbalance\",\n      \"asset_class\": \"FX\",\n      \"model_version\"\
     : \"unset\"\n    },\n    {\n      \"strategy_id\": \"FX02_trade_flow\",\n      \"asset_class\": \"\
     FX\",\n      \"model_version\": \"unset\"\n    }\n  ]\n}\n"
+  templates__regulatory_fees.json: |
+    {
+      "x-version": 1,
+      "description": "TEMPLATE (v1.13, X-P1-2): documented US equity regulatory fee values for the opt-in VenueSpec / CostModel fields sell_notional_fee_bps, per_share_fee_all, per_share_fee_cap, per_share_fee_sell_only. Nothing loads this file by default; copy the block for the period you replay into a venue row (configs/venues) or pass it to CostModel.with_regulatory_fees. Defaults everywhere stay 0.",
+      "periods": [
+        {
+          "label": "2019 (Nasdaq TotalView-ITCH sample days)",
+          "valid_from": "2019-04-16",
+          "sell_notional_fee_bps": 0.207,
+          "sec_section31_usd_per_million": 20.70,
+          "sec_source": "https://www.sec.gov/news/press-release/2019-30 (Fee Rate Advisory #2 FY2019: $20.70 per million for charge dates on/after 2019-04-16; $13.00 before)",
+          "per_share_fee_all": 0.000119,
+          "per_share_fee_cap": 5.95,
+          "per_share_fee_sell_only": true,
+          "finra_source": "FINRA By-Laws Schedule A Section 1 (Trading Activity Fee, covered equity sales): $0.000119 per share, max $5.95 per trade, in force in 2019; see https://www.finra.org/rules-guidance/rule-filings/sr-finra-2024-019/fee-adjustment-schedule for the schedule history"
+        },
+        {
+          "label": "current (2026)",
+          "valid_from": "2026-04-04",
+          "sell_notional_fee_bps": 0.206,
+          "sec_section31_usd_per_million": 20.60,
+          "sec_source": "https://www.sec.gov/rules-regulations/fee-rate-advisories/2026-2 (FY2026: $0.00 per million through 2026-04-03, $20.60 per million on/after 2026-04-04)",
+          "per_share_fee_all": 0.000195,
+          "per_share_fee_cap": 9.79,
+          "per_share_fee_sell_only": true,
+          "finra_source": "https://www.finra.org/rules-guidance/rule-filings/sr-finra-2024-019/fee-adjustment-schedule (TAF covered equity sales 2026: $0.000195 per share, max $9.79 per trade)"
+        }
+      ]
+    }
   venues__venues.json: |
     {
       "x-version": 1,

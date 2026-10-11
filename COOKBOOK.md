@@ -1,7 +1,7 @@
 # COOKBOOK — task-oriented recipes
 
 Every recipe below is runnable from a fresh checkout of this repository in
-the standard environment (Python 3.11 + pyarrow, g++ 13/CMake, Rust 1.98.1,
+the standard environment (Python 3.11 + pyarrow, g++ 13/CMake, Rust 1.99.0,
 Java 21; see [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)). Paths are relative
 to the repo root unless a recipe says otherwise. Recipes that read
 `data/features/` need recipes 1 and 3 to have run first (the repo ships with
@@ -74,6 +74,9 @@ Contents:
 63. [A maker run on extended features, an event clock and a fill hazard (v1.12)](#63-a-maker-run-on-extended-features-an-event-clock-and-a-fill-hazard-v112)
 64. [The markout feedback loop on a toxic regime (v1.12)](#64-the-markout-feedback-loop-on-a-toxic-regime-v112)
 65. [Read the latency SLO burn rates by hand (v1.12)](#65-read-the-latency-slo-burn-rates-by-hand-v112)
+66. [Plan the R7 data load: candidate days, a resumable ingest, a seeded draw (v1.13)](#66-plan-the-r7-data-load-candidate-days-a-resumable-ingest-a-seeded-draw-v113)
+67. [Price a round trip with regulatory fees (v1.13)](#67-price-a-round-trip-with-regulatory-fees-v113)
+68. [Run the governance checks locally (v1.13)](#68-run-the-governance-checks-locally-v113)
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -772,7 +775,7 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. The v1.12.0 counts (CI): python 2250 / cpp 302 /
+the first line. The v1.13.0 counts (CI): python 2327 / cpp 302 /
 rust 358 / java 571 tests passed (golden groups 193/72/71/124), plus
 `integration` (35) and `replay` (6) rows for the repo-level pytest suites, a
 `deployment` row (26 structural checks passed in CI, where `promtool` and
@@ -2272,9 +2275,9 @@ maker adverse selection    1s: +0.80 bp (se 0.21, n 233)
 maker adverse selection   10s: +1.36 bp (se 0.40, n 214)
 labels: bid filled 0.17, not run over 0.07
 taker    posted   0 filled   0 gated out 698
-passive  posted  83 filled  22 gated out  22 | spread +5.90 AS +7.13 exit +5.72 net -6.71 bp/trip, -35.70 USD | exit filled passively 0.32, timeout cross 0.68
-taker*   posted 101 filled  27 gated out  38 | spread +3.36 AS +4.20 exit +10.16 net -11.41 bp/trip, -74.70 USD
-passive* posted  83 filled  22 gated out  22 | spread +5.90 AS +7.13 exit +5.72 net -6.71 bp/trip, -35.70 USD | exit filled passively 0.32, timeout cross 0.68
+passive  posted  83 filled  22 gated out  22 | spread +6.74 AS +7.98 exit +5.72 net -6.71 bp/trip, -35.70 USD | exit filled passively 0.32, timeout cross 0.68
+taker*   posted 101 filled  27 gated out  38 | spread +3.66 AS +4.50 exit +10.16 net -11.41 bp/trip, -74.70 USD
+passive* posted  83 filled  22 gated out  22 | spread +6.74 AS +7.98 exit +5.72 net -6.71 bp/trip, -35.70 USD | exit filled passively 0.32, timeout cross 0.68
 ```
 
 How to read it.
@@ -2288,13 +2291,18 @@ The passive exit changes the gate. It expects to earn the second
 half-spread and rebate with the calibrated touch fill probability (0.35
 here), and on these wide synthetic spreads it then admits nearly every row.
 The outcome does not support that: only 32% of exits fill passively, 68%
-time out and cross, and adverse selection on the trips (+7.1 bp) is far
+time out and cross, and adverse selection on the trips (+8.0 bp) is far
 above the calibrated +1.4 bp, because the trips that last are the ones the
 market ran over. Net is -6.7 bp per trip. That is better than the -11.4 bp
 of the ungated taker exit, but still a loss.
 
 The decomposition `gross = spread earned - adverse selection - exit slippage`
-holds for every row. With a passive exit, a fully passive exit shows
+holds for every row. (v1.13: the spread / AS columns moved — passive +5.90 /
++7.13 to +6.74 / +7.98, taker* +3.36 / +4.20 to +3.66 / +4.50 — because the
+markout reference of a maker fill is now the mid before the FIRST event of
+its `exchange_ts`, the rule `tca/markout.py` and the calibration already
+used (X-P1-4). Fills, exits and net are unchanged: only the split between
+the two columns moved.) With a passive exit, a fully passive exit shows
 negative slippage (the second half-spread earned) and a timeout pays it back.
 These are illustrations on a sparse synthetic stream (2,000 events in two
 hours), not results. To calibrate a real session, run
@@ -2350,10 +2358,19 @@ EOF
 
 ```
 skewed   fills  97 (bid 0.17 ask 0.19) max|q| 300 mean|q| 151 AS floor +0.80 bp (calibration:1s)
-         spread +205.50 markout -49.00 inventory -82.50 flatten -6.00 rebates +19.40 fees -0.90 = net +86.50 USD
+         spread +223.00 markout -66.50 inventory -82.50 flatten -6.00 rebates +19.40 fees -0.90 = net +86.50 USD
 no-skew  fills 104 (bid 0.19 ask 0.19) max|q| 300 mean|q| 142 AS floor +0.80 bp (calibration:1s)
-         spread +218.50 markout -45.50 inventory -69.00 flatten -4.00 rebates +20.80 fees -0.60 = net +120.20 USD
+         spread +236.50 markout -63.50 inventory -69.00 flatten -4.00 rebates +20.80 fees -0.60 = net +120.20 USD
 ```
+
+v1.13: spread and markout moved (skewed +205.50 / -49.00 to +223.00 /
+-66.50; no-skew +218.50 / -45.50 to +236.50 / -63.50) for the X-P1-4
+markout-reference change described under recipe 39; their sum, the fills
+and the net are unchanged. The summary also carries
+`ticks_behind_touch_{mean,median,max}` and
+`frac_decisions_skew_changed_quote`: a skew that never changes a quoted
+price is inert, and `QuotingConfig(skew_mode="ticks", h_min_ticks=...)`
+(rule 8) prices the alpha and inventory skews in whole ticks from the touch.
 
 How to read it. The five P&L terms add up to the gross exactly
 (`spread + markout + inventory + flatten`; the identity is tested), and the
@@ -2419,6 +2436,7 @@ an edge:
 cd python
 PYTHONUTF8=1 PYTHONPATH=src:tests python3 - <<'EOF'
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 from iap.auction import (AuctionStream, AuctionStrategyConfig, auction_features,
                          auction_targets, backtest, extract_auction_stream, walk_forward)
@@ -2430,9 +2448,13 @@ stream = AuctionStream.concat(
     for i, d in enumerate(_days(6)))
 labels = auction_targets(auction_features(stream.noii, "C"), stream.crosses)
 cfg = AuctionStrategyConfig(decision_s=300, threshold=0.1, exit="cross")
-s = backtest(labels, cfg).summary()
-print(f"in sample: {s['n_trades']} trades, net {s['mean_net_bps']:+.2f} bp (cost {s['mean_cost_bps']:.2f})")
-wf = walk_forward(labels, cfg, n_folds=3)
+s = backtest(labels, cfg)
+print(f"cutoff enforced: {s.summary()['n_trades']} trades, exits {sorted(set(s.trades['exit_used']))},"
+      f" net {s.summary()['mean_net_bps']:+.2f} bp (cost {s.summary()['mean_cost_bps']:.2f})")
+legacy = replace(cfg, enforce_entry_cutoff=False)  # the pre-v1.13 rule
+s = backtest(labels, legacy).summary()
+print(f"pre-v1.13 rule:  {s['n_trades']} trades, net {s['mean_net_bps']:+.2f} bp (cost {s['mean_cost_bps']:.2f})")
+wf = walk_forward(labels, legacy, n_folds=3)
 print("folds:", [(f["fold"], f["orientation"], f["threshold"], f["test_trades"]) for f in wf.folds])
 o = wf.summary()
 print(f"out of sample: {o['n_trades']} trades over {o['n_days']} days, net {o['mean_net_bps']:+.2f} bp")
@@ -2440,10 +2462,28 @@ EOF
 ```
 
 ```
-in sample: 12 trades, net +6.98 bp (cost 1.60)
+cutoff enforced: 12 trades, exits ['taker'], net -2.61 bp (cost 3.13)
+pre-v1.13 rule:  12 trades, net +6.98 bp (cost 1.60)
 folds: [(1, 1, 0.05, 2), (2, 1, 0.05, 2), (3, 1, 0.05, 2)]
 out of sample: 6 trades over 3 days, net +6.94 bp
 ```
+
+Since v1.13 (review R-P1-4) the walk-forward fits only the threshold: the
+orientation is the registered `cfg.orientation` (+1, follow the imbalance).
+`walk_forward(..., fit_orientation=True)` restores the +/-1 search, which
+doubles the configurations evaluated; either way `wf.looks_consumed` (and
+`looks_consumed` in `to_dict()`) reports how many were evaluated on train
+days, summed over folds (15 here: 3 folds x 5 thresholds).
+v1.13 (X-P1-5): a cross exit needs a market-on-close order, and Nasdaq
+accepts those only until 15:55 ET (300 s before the close, since October
+2018; dated table in `configs/reference/auction_entry_cutoffs.json`). A
+decision at `time_to_cross_s <= 300` therefore cannot exit in the cross: by
+default it is priced as `exit="taker"` (column `exit_used`), which is what
+the first line shows. The second line and the walk-forward use
+`enforce_entry_cutoff=False`, the pre-v1.13 rule, and reproduce the numbers
+this recipe printed before v1.13 (in-sample +6.98 bp, out of sample +6.94
+bp). On real data the closing NOII only starts at 15:55, so every closing
+decision is past the cutoff.
 
 Every fold learns to follow the imbalance (orientation `+1`), as planted.
 For real files, use the CLI: `python -m iap.auction extract`, then
@@ -3052,7 +3092,7 @@ attacks them and each ablation shows the failure getting through.
 
 Plan item E2. Recipe 49 uses the wheel; this recipe is how to build it on
 your own machine and check it before you trust it. It needs a Rust toolchain
-(the repository pins 1.98.1 in `rust/rust-toolchain.toml`) and Python 3.10
+(the repository pins 1.99.0 in `rust/rust-toolchain.toml`) and Python 3.10
 or newer. The commands below are the ones the CI job `rust-pyo3` runs; they
 were not run on the Windows machine this recipe was written on, which has no
 cargo, so no output is quoted for the build itself.
@@ -3975,3 +4015,146 @@ minutes, and so on for 8 cases. They run in CI
 machine has no `promtool`, so this recipe reproduces only the thresholds.
 In Prometheus the same reading is
 `job:order_path_latency_slo_errors:ratio_rate1h / 0.01`.
+
+## 66. Plan the R7 data load: candidate days, a resumable ingest, a seeded draw (v1.13)
+
+**Goal:** see what an R7 load would cost and what the batch would do,
+without downloading or ingesting anything (docs/R7_DATA_PLAN.md). From
+`python/`:
+
+```bash
+PYTHONUTF8=1 PYTHONPATH=src python -m iap.marketdata plan-ingest     --manifest ../research/r7/r7_candidates.json --vendor-dir ../data/vendor     --out-root ../data/real/r7 --dry-run | head -9
+```
+
+Output:
+
+```text
+{
+  "estimate": {
+    "days": 10,
+    "gz_gb": 88.75,
+    "dataset_gb": 150.9,
+    "features_gb": 6.0,
+    "ingest_hours": 5.4,
+    "features_hours": 3.3
+  },
+```
+
+The rest of the output lists each day with `"present": false` and the
+`.cmd` it would write. The tier-2 draw of the plan is R1's sampler over the
+2025-01-02..2026-09-30 trading days, minus the spent and tier-1 days:
+
+```python
+import datetime as dt
+from iap.marketdata.r7plan import SPENT_DAYS
+from iap.validation.sessions import stratified_day_sample
+
+HOLIDAYS = {"2025-01-01", "2025-01-09", "2025-01-20", "2025-02-17", "2025-04-18",
+            "2025-05-26", "2025-06-19", "2025-07-04", "2025-09-01", "2025-11-27",
+            "2025-12-25", "2026-01-01", "2026-01-19", "2026-02-16", "2026-04-03",
+            "2026-05-25", "2026-06-19", "2026-07-03", "2026-09-07"}
+TIER1 = {"2025-11-28", "2025-12-08", "2025-12-09", "2025-12-10", "2025-12-11",
+         "2025-12-12", "2026-06-12"}
+d, days = dt.date(2025, 1, 2), []
+while d <= dt.date(2026, 9, 30):
+    s = d.isoformat()
+    if d.weekday() < 5 and s not in HOLIDAYS | SPENT_DAYS | TIER1:
+        days.append(s)
+    d += dt.timedelta(days=1)
+r = stratified_day_sample(days, 40, seed=20261011, strata="month")
+print(len(days), r["selected"][:4], r["event_days"])
+```
+
+Output:
+
+```text
+428 ['2025-01-15', '2025-01-22', '2025-02-03', '2025-02-21'] {'2026-07-29': ['fomc']}
+```
+
+How to read it. The estimate uses the measured v1.8 rates (59 min and
+1.7x the gzip size per 2026-class day), so 88.75 GB of gzip needs about
+150 GB of datasets: more than this machine has free, hence the waves or the
+external disk in the plan. Nothing downloads: `tools/r7_download.py` exits
+2 without `--i-have-approval`. After an approved download,
+`verify-download` checks the size and records the sha256, and
+`record-sampling` writes the seeded draw into a merged dataset's
+`dataset.json` (the `dataset_version` is unchanged).
+
+## 67. Price a round trip with regulatory fees (v1.13)
+
+**Goal:** see what SEC Section 31 and the FINRA Trading Activity Fee add to
+an equity round trip. Both are opt-in fields of `CostModel` (and of
+`VenueSpec` in the simulator); the default is 0, so nothing published
+moves. Save as `python/recipe67.py` and run
+`cd python && PYTHONPATH=src python recipe67.py`:
+
+```python
+import json
+import numpy as np
+from iap.backtest.costs import CostModel
+
+base = CostModel.load("../configs/execution/execution.json")
+tpl = json.load(open("../configs/templates/regulatory_fees.json"))
+p = {x["label"]: x for x in tpl["periods"]}["current (2026)"]
+fees = base.with_regulatory_fees(p["sell_notional_fee_bps"], p["per_share_fee_all"],
+                                 p["per_share_fee_cap"], p["per_share_fee_sell_only"])
+qty, mid, hs = np.array([500.0, -500.0]), np.array([250.0, 250.0]), np.array([0.005, 0.005])
+for name, cm in (("no reg fees", base), ("2026 reg fees", fees)):
+    c = cm.cost_components(qty, mid, hs, "EQUITY", adv=5e7, lot_size=1)
+    rt = cm.round_trip_cost_return(mid[:1], hs[:1], "EQUITY")[0] * 1e4
+    print(f"{name:14s} fee buy {c['fee'][0]:.4f} sell {c['fee'][1]:.4f} USD; "
+          f"size-free round trip {rt:.4f} bp")
+```
+
+Output:
+
+```text
+no reg fees    fee buy 1.5000 sell 1.5000 USD; size-free round trip 0.6400 bp
+2026 reg fees  fee buy 1.5000 sell 4.1725 USD; size-free round trip 0.8538 bp
+```
+
+How to read it. Only the sale pays: Section 31 is 0.206 bp of the 125,000
+USD sold (2.575 USD) and TAF is 500 x 0.000195 = 0.0975 USD (capped at
+9.79 USD per trade), on top of the 0.003 USD/share taker fee. On the
+size-free hurdle (spread plus fees, no impact) that is about +0.21 bp per
+round trip at a 250 USD price: small, but 15-60% of the per-trip
+magnitudes the maker and auction studies measure, which is why the review
+asked for it. The 2019 row of the template (0.207 bp, 0.000119 USD/share,
+cap 5.95) is the one to use when replaying the 2019-20 sessions.
+
+## 68. Run the governance checks locally (v1.13)
+
+**Goal:** run what the required `governance` CI job runs, before pushing a
+branch that touches `research/`. From the repo root, with the base branch
+fetched (`git fetch origin main`):
+
+```bash
+PYTHONPATH=python/src python -m iap.agents.cli verify-board
+python tests/harness/check_agent_keys.py
+python tests/harness/check_ledger_monotone.py --base origin/main
+```
+
+Output (on the v1.13.0 release branch, 2026-10-11):
+
+```text
+{
+  "anchored": 6,
+  "entries": 6,
+  "ok": true,
+  "problems": [],
+  "unanchored": 0
+}
+board entries 6 (signed 0); registry keys 0
+ledgers and blackboard are monotone vs origin/main
+```
+
+How to read it. `verify-board` checks the blackboard's hash chain, its git
+anchors and any signatures. `check_agent_keys.py` passes with an empty key
+registry only because no entry on this branch is signed; the first signed
+entry needs its agent's public key in `research/agents/agent_pubkeys.json`.
+`check_ledger_monotone.py` fails if the branch has fewer experiments or
+models than the base, or if the base blackboard is not a byte-identical
+prefix of this one: research branches are merged, never rebased, and
+ledgers are combined with `tools/merge_ledger.py` (GOVERNANCE.md §2c). In CI
+a pull request is compared with its base branch and a push with the
+previous commit.
