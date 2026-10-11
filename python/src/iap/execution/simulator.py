@@ -149,14 +149,37 @@ POST_ONLY_MODES = ("reject", "slide")
 class ExecutionSimulator:
     """Simulates child-order lifecycles against the replayed market stream."""
 
-    def __init__(self, config: ExecConfig, calibration: ExecCalibration | None = None) -> None:
+    def __init__(
+        self,
+        config: ExecConfig,
+        calibration: ExecCalibration | None = None,
+        *,
+        hidden_prints: bool = False,
+    ) -> None:
         """``calibration`` (v1.9, opt-in; :mod:`iap.execution.calibration`)
         replaces the rule-1 venue leg ``latency_mean_ns + jitter`` by a draw
         from the calibrated latency table of that venue, still ONE SplitMix64
         draw per submit or cancel. ``None`` (the default) is the pinned
-        synthetic rule every golden uses."""
+        synthetic rule every golden uses.
+
+        ``hidden_prints`` (v1.14 X-P2-7, opt-in; Python only): a TRADE that
+        is NOT the print of the EXECUTE immediately before it on the same
+        venue book at the same ``exchange_ts`` is a non-displayed execution
+        (ITCH ``P``, LOBSTER type 5). With the option on it is tracked like
+        an EXECUTE of the resting side ``1 - side`` (the TRADE's side is the
+        aggressor) at its price: queue ahead first, then our fill at our
+        limit, through-prints included (rule 4). Off (the default) hidden
+        prints never fill, as every golden pins."""
         self._config = config
         self._calibration = calibration
+        self._hidden_prints = hidden_prints
+        # (instrument, venue) -> (exchange_ts, event_type) of the last event
+        self._last_kind: dict[tuple[int, int], tuple[int, int]] = {}
+        self._hidden_print_trades = 0
+        # v1.14 X-P2-12: (effective ts, order_id, new remaining), sorted
+        self._amends: list[tuple[int, int, int]] = []
+        self._amend_target: dict[int, int] = {}
+        self._amends_applied = 0
         self._rng = SplitMix64(config.seed)
         self._books: dict[int, ConsolidatedBook] = {}
         self._orders: dict[int, ChildOrder] = {}
@@ -289,6 +312,55 @@ class ExecutionSimulator:
         arrival = self._latency_to(self._venue(o.venue_id), cancel_ts)
         o.cancel_arrival_ts = max(arrival, o.arrival_ts)
         bisect.insort(self._cancels, (o.cancel_arrival_ts, order_id))
+
+    def amend_down(self, order_id: int, new_qty: int, amend_ts: int) -> bool:
+        """Reduce an order's open size to ``new_qty`` keeping its priority
+        (v1.14 X-P2-12, Python only; an exchange size-decrease replace).
+
+        Travels the cancel latency path (one jitter draw, never overtakes its
+        own order) and takes effect at the first event at/after arrival: the
+        open size becomes ``min(remaining, new_qty)`` with ``ahead_qty``
+        untouched; fills that land first count, and an order already at or
+        below ``new_qty`` is left alone. Returns False (and draws nothing)
+        for a terminal order, one with a cancel in flight, or ``new_qty``
+        not below the current target.
+        """
+        o = self._orders.get(order_id)
+        if o is None:
+            raise ValueError(f"unknown order_id {order_id}")
+        if new_qty <= 0:
+            raise ValueError("amend_down new_qty must be > 0 (cancel instead)")
+        if o.is_terminal or o.cancel_arrival_ts != 0:
+            return False
+        if new_qty >= self.amend_target(order_id):
+            return False
+        arrival = max(self._latency_to(self._venue(o.venue_id), amend_ts), o.arrival_ts)
+        bisect.insort(self._amends, (arrival, order_id, new_qty))
+        self._amend_target[order_id] = new_qty
+        return True
+
+    def amend_target(self, order_id: int) -> int:
+        """Open size the order will have once in-flight amends land."""
+        o = self._orders[order_id]
+        return min(o.remaining, self._amend_target.get(order_id, o.remaining))
+
+    @property
+    def amends_applied(self) -> int:
+        return self._amends_applied
+
+    @property
+    def hidden_print_trades(self) -> int:
+        """Hidden prints tracked against resting orders (``hidden_prints``)."""
+        return self._hidden_print_trades
+
+    def _apply_amends_due(self, t: int) -> None:
+        while self._amends and self._amends[0][0] <= t:
+            _, oid, qty = self._amends.pop(0)
+            o = self._orders[oid]
+            if o.is_terminal or o.remaining <= qty:
+                continue
+            o.remaining = qty
+            self._amends_applied += 1
 
     def cancel_all(self) -> None:
         """Cancel every non-terminal order (end of stream, immediate)."""
@@ -666,6 +738,8 @@ class ExecutionSimulator:
         #    against the pre-event book state.
         self._expire_due(t)
         self._activate_and_cancel_due(t)
+        if self._amends:
+            self._apply_amends_due(t)
 
         # 2. Capture the pre-event state queue tracking needs, snapshot the
         #    displayed sizes behind this venue's overlay entries, then apply
@@ -673,6 +747,12 @@ class ExecutionSimulator:
         et = ev.event_type
         pre = self.venue_book(ev.instrument_id, ev.venue_id)
         pre_open = self.venue_open(pre)
+        hidden_print = False
+        if self._hidden_prints:
+            vkey = (ev.instrument_id, ev.venue_id)
+            prev = self._last_kind.get(vkey)
+            hidden_print = et == EventType.TRADE and prev != (t, int(EventType.EXECUTE))
+            self._last_kind[vkey] = (t, int(et))
         add_depth: list[tuple[int, int]] = []
         if self._resting and pre_open and et == EventType.ADD:
             add_depth = pre.depth(1 if ev.side == 0 else 0, DEPTH_LEVELS)
@@ -705,6 +785,13 @@ class ExecutionSimulator:
                         min(ev.qty, exec_order[2]),
                         t,
                     )
+            elif hidden_print and pre_open and ev.qty > 0 and ev.side in (0, 1):
+                # X-P2-7 (opt-in): a non-displayed execution at ev.price_ticks
+                # against the resting side opposite the aggressor.
+                self._hidden_print_trades += 1
+                self._track_consumption(
+                    ev.instrument_id, ev.venue_id, 1 - ev.side, ev.price_ticks, ev.qty, t
+                )
             elif et == EventType.CANCEL:
                 for oid, before in level_before:
                     o = self._orders[oid]
