@@ -5,14 +5,14 @@
       "breadth": {
         "breadth_effective": 6.804819904403858,
         "breadth_if_independent": 12.0,
-        "expected_ic_at_measured_correlation": 0.009923739535314696,
-        "expected_ic_if_independent": 0.013178247573018338,
-        "expected_tstat_at_measured_correlation": 4.570618876193598,
+        "expected_ic_at_measured_correlation": 0.028179689794289482,
+        "expected_ic_if_independent": 0.03742126920184516,
+        "expected_tstat_at_measured_correlation": 8.427846547944885,
         "mean_pairwise_signal_correlation": 0.06940508437174053,
         "measured_ic_equal_weight": 0.030231571002493938,
         "measured_tstat_equal_weight": 7.666634663828908,
-        "member_gate_tstat_mean": 1.752131474008215,
-        "member_ic_mean": 0.003804232391864835,
+        "member_gate_tstat_mean": 3.2307868135055244,
+        "member_ic_mean": 0.010802589923551377,
         "n_effective_eigen": 6.54581480222202,
         "n_members_with_ic": 12
       },
@@ -40,9 +40,9 @@
       "horizon": "5s",
       "member_table": {
         "EQ01": {
-          "gate_ic": 0.016751522964429163,
-          "gate_tstat": 1.8192438985822514,
-          "ic": 0.01638194985336759,
+          "gate_ic": 0.037260566381364865,
+          "gate_tstat": 5.961194393755314,
+          "ic": 0.036580175718432945,
           "n_pairs": 128038,
           "net_pnl_1x_all_folds": 0.0,
           "own_gate_ic": 0.023400911817318754,
@@ -52,9 +52,9 @@
           "trade_count_all_folds": 0
         },
         "EQ02": {
-          "gate_ic": 0.02507627731154792,
-          "gate_tstat": 7.165268822035137,
-          "ic": 0.025102630954850384,
+          "gate_ic": 0.03517277233977837,
+          "gate_tstat": 11.300596289467016,
+          "ic": 0.03490755494683951,
           "n_pairs": 127768,
           "net_pnl_1x_all_folds": 0.0,
           "own_gate_ic": 0.03517277233977837,
@@ -64,9 +64,9 @@
           "trade_count_all_folds": 0
         },
         "EQ03": {
-          "gate_ic": 0.018850474014781494,
-          "gate_tstat": 5.162083476166736,
-          "ic": 0.018896473267164524,
+          "gate_ic": 0.028106782114102592,
+          "gate_tstat": 7.899266529889529,
+          "ic": 0.028080987972527626,
           "n_pairs": 127768,
           "net_pnl_1x_all_folds": 0.0,
           "own_gate_ic": 0.028106782114102592,
@@ -76,9 +76,9 @@
           "trade_count_all_folds": 0
         },
         "EQ04": {
-          "gate_ic": -0.0034041610495965232,
-          "gate_tstat": -0.5547422493172751,
-          "ic": -0.0031142984230095034,
+          "gate_ic": -0.006594037127939073,
+          "gate_tstat": -1.1819156181435757,
+          "ic": -0.0057803353314001445,
           "n_pairs": 57700,
           "net_pnl_1x_all_folds": 0.0,
           "own_gate_ic": -0.006594037127939073,
@@ -88,9 +88,9 @@
           "trade_count_all_folds": 0
         },
         "EQ05": {
-          "gate_ic": 0.014946173386803619,
-          "gate_tstat": 4.050519569066337,
-          "ic": 0.01547786702504249,
+          "gate_ic": 0.025491198108431087,
+          "gate_tstat": 6.979142472474116,
+          "ic": 0.026140648340889038,
           "n_pairs": 128041,
           "net_pnl_1x_all_folds": 0.0,
           "own_gate_ic": 0.010086325388654581,
@@ -100,9 +100,9 @@
           "trade_count_all_folds": 0
         },
         "EQ06": {
-          "gate_ic": 0.01919049350659697,
-          "gate_tstat": 4.369602515527541,
-          "ic": 0.020059793342598574,
+          "gate_ic": 0.030537765669954975,
+          "gate_tstat": 6.638073443638441,
+          "ic": 0.03203947688061209,
           "n_pairs": 112163,
           "net_pnl_1x_all_folds": -810.2117254141049,
           "own_gate_ic": 0.047801486655971184,
@@ -112,9 +112,9 @@
           "trade_count_all_folds": 44
         },
         "EQ07": {
-          "gate_ic": 0.007719373001857142,
-          "gate_tstat": 1.8200911223509648,
-          "ic": 0.006561060775332853,
+          "gate_ic": 0.004598591022253159,
+          "gate_tstat": 1.0601508203597008,
+          "ic": 0.0025630460318698564,
           "n_pairs": 112163,
           "net_pnl_1x_all_folds": 0.0,
           "own_gate_ic": -0.008741430506035555,
@@ -124,9 +124,9 @@
           "trade_count_all_folds": 0
         },
         "EQ08": {
-          "gate_ic": -0.0399500099780015,
-          "gate_tstat": -5.2731353871972315,
-          "ic": -0.04047935332279137,
+          "gate_ic": -0.029107013561476686,
+          "gate_tstat": -5.5523332232471265,
+          "ic": -0.029971470914629938,
           "n_pairs": 127817,
           "net_pnl_1x_all_folds": 0.0,
           "own_gate_ic": -0.04951219561916599,
@@ -136,9 +136,9 @@
           "trade_count_all_folds": 0
         },
         "EQ09": {
-          "gate_ic": -0.006609459682193989,
-          "gate_tstat": -0.43294019870362316,
-          "ic": -0.007824466223559557,
+          "gate_ic": -0.0052090158003772835,
+          "gate_tstat": -0.509930469038561,
+          "ic": -0.006289581750428829,
           "n_pairs": 43833,
           "net_pnl_1x_all_folds": 0.0,
           "own_gate_ic": -0.015395717938371935,
@@ -148,9 +148,9 @@
           "trade_count_all_folds": 0
         },
         "EQ10": {
-          "gate_ic": -0.0013243545492040297,
-          "gate_tstat": -0.3363332111204308,
-          "ic": -0.001370073158324484,
+          "gate_ic": -0.002982585428375864,
+          "gate_tstat": -1.157960397289658,
+          "ic": -0.0022479707601347197,
           "n_pairs": 116658,
           "net_pnl_1x_all_folds": 0.0,
           "own_gate_ic": 0.0022204034596068943,
@@ -160,9 +160,9 @@
           "trade_count_all_folds": 0
         },
         "EQ11": {
-          "gate_ic": -0.03165907881127141,
-          "gate_tstat": -3.9595346501737323,
-          "ic": -0.03208038117287318,
+          "gate_ic": -0.02428871076017548,
+          "gate_tstat": -4.0986096443094295,
+          "ic": -0.024644176318059017,
           "n_pairs": 115030,
           "net_pnl_1x_all_folds": -3021.3931714146856,
           "own_gate_ic": 0.0061314752714023545,
@@ -172,9 +172,9 @@
           "trade_count_all_folds": 190
         },
         "EQ12": {
-          "gate_ic": 0.026063538586629166,
-          "gate_tstat": 7.195453980881905,
-          "ic": 0.026050007016902747,
+          "gate_ic": 0.03664476612507588,
+          "gate_tstat": 11.43176716451052,
+          "ic": 0.03632018559789068,
           "n_pairs": 126372,
           "net_pnl_1x_all_folds": 0.0,
           "own_gate_ic": 0.03664476612507588,
@@ -221,9 +221,9 @@
           "looks": 13,
           "max_abs_correlation_with_a_member": 0.7949458515530641,
           "member_pass_check": {
-            "gate_ic": 0.010518093429434019,
-            "gate_tstat": 1.9788348516214693,
-            "ic": 0.010250674496662292,
+            "gate_ic": 0.030231571002493938,
+            "gate_tstat": 7.666634663828908,
+            "ic": 0.03003277788992577,
             "n_pairs": 128065
           },
           "n_folds_survive_1x_cost": 0,
@@ -420,9 +420,9 @@
           "looks": 13,
           "max_abs_correlation_with_a_member": 0.9253778251820935,
           "member_pass_check": {
-            "gate_ic": 0.02615739542631321,
-            "gate_tstat": 6.289484945087369,
-            "ic": 0.02642103555891312,
+            "gate_ic": 0.04094472898568218,
+            "gate_tstat": 10.832217345186923,
+            "ic": 0.04111741613323222,
             "n_pairs": 128062
           },
           "n_folds_survive_1x_cost": 0,
@@ -675,9 +675,9 @@
           "looks": 13,
           "max_abs_correlation_with_a_member": 0.6291636179586811,
           "member_pass_check": {
-            "gate_ic": 0.042871370591507946,
-            "gate_tstat": 7.055798964406287,
-            "ic": 0.04332550110689493,
+            "gate_ic": 0.05124812641653118,
+            "gate_tstat": 11.52110482257272,
+            "ic": 0.05158520820028974,
             "n_pairs": 128065
           },
           "n_folds_survive_1x_cost": 0,
@@ -970,9 +970,9 @@
           "looks": 13,
           "max_abs_correlation_with_a_member": 0.5219378757046356,
           "member_pass_check": {
-            "gate_ic": 0.04126968115537003,
-            "gate_tstat": 6.378132753845152,
-            "ic": 0.041677227303020516,
+            "gate_ic": 0.05165755348328853,
+            "gate_tstat": 12.15259034269001,
+            "ic": 0.051703366201398655,
             "n_pairs": 128065
           },
           "n_folds_survive_1x_cost": 0,
@@ -1784,14 +1784,14 @@
       "breadth": {
         "breadth_effective": 10.113610755086931,
         "breadth_if_independent": 12.0,
-        "expected_ic_at_measured_correlation": 0.03479911352719561,
-        "expected_ic_if_independent": 0.03790580171452375,
-        "expected_tstat_at_measured_correlation": 3.0788544173248997,
+        "expected_ic_at_measured_correlation": 0.043194393672050635,
+        "expected_ic_if_independent": 0.04705056984949521,
+        "expected_tstat_at_measured_correlation": 4.101375579882879,
         "mean_pairwise_signal_correlation": 0.016956350754301856,
         "measured_ic_equal_weight": 0.03568996028622874,
         "measured_tstat_equal_weight": 3.9646865240356672,
-        "member_gate_tstat_mean": 0.968135257435551,
-        "member_ic_mean": 0.010942462411864433,
+        "member_gate_tstat_mean": 1.2896635451570886,
+        "member_ic_mean": 0.013582329584065675,
         "n_effective_eigen": 9.87401855815383,
         "n_members_with_ic": 12
       },
@@ -1819,9 +1819,9 @@
       "horizon": "1m",
       "member_table": {
         "FX01": {
-          "gate_ic": 0.04800333553536946,
-          "gate_tstat": 5.074810998037187,
-          "ic": 0.021056881078761948,
+          "gate_ic": 0.049808884341686295,
+          "gate_tstat": 5.871900232445066,
+          "ic": 0.00344387540902295,
           "n_pairs": 31435,
           "net_pnl_1x_all_folds": 0.0,
           "own_gate_ic": 0.021375120099660555,
@@ -1831,9 +1831,9 @@
           "trade_count_all_folds": 0
         },
         "FX02": {
-          "gate_ic": 0.005839451711789481,
-          "gate_tstat": 0.3429080223694012,
-          "ic": 0.004796831118740663,
+          "gate_ic": 0.01368035798114619,
+          "gate_tstat": 0.7995521718294814,
+          "ic": 0.007320798374537499,
           "n_pairs": 11683,
           "net_pnl_1x_all_folds": 0.0,
           "own_gate_ic": 0.01368035798114619,
@@ -1843,9 +1843,9 @@
           "trade_count_all_folds": 0
         },
         "FX03": {
-          "gate_ic": 0.011233662272281127,
-          "gate_tstat": 1.1327063966195106,
-          "ic": -0.006214450288519527,
+          "gate_ic": 0.015830044940041737,
+          "gate_tstat": 1.6280068635655172,
+          "ic": -0.0025254064864284028,
           "n_pairs": 28767,
           "net_pnl_1x_all_folds": 0.0,
           "own_gate_ic": 0.015830044940041737,
@@ -1855,9 +1855,9 @@
           "trade_count_all_folds": 0
         },
         "FX04": {
-          "gate_ic": 0.027993730023631182,
-          "gate_tstat": 3.112182595066538,
-          "ic": 0.004719339956738509,
+          "gate_ic": 0.02907247896057963,
+          "gate_tstat": 3.456060730891322,
+          "ic": 0.011814302721529245,
           "n_pairs": 31435,
           "net_pnl_1x_all_folds": 0.0,
           "own_gate_ic": 0.034972769374972575,
@@ -1867,9 +1867,9 @@
           "trade_count_all_folds": 0
         },
         "FX05": {
-          "gate_ic": -0.017996337947728064,
-          "gate_tstat": -0.8889208581840541,
-          "ic": -0.05328314804246319,
+          "gate_ic": -0.013627369178279699,
+          "gate_tstat": -0.5688161377320774,
+          "ic": -0.04342239868625032,
           "n_pairs": 11277,
           "net_pnl_1x_all_folds": -95.28022919940746,
           "own_gate_ic": -0.01320278042615143,
@@ -1879,9 +1879,9 @@
           "trade_count_all_folds": 189
         },
         "FX06": {
-          "gate_ic": 0.011136994637382384,
-          "gate_tstat": 0.5771450267564568,
-          "ic": 0.043620540230225914,
+          "gate_ic": 0.014865636075230074,
+          "gate_tstat": 0.9455704802267306,
+          "ic": 0.04714693138991863,
           "n_pairs": 31104,
           "net_pnl_1x_all_folds": 0.0,
           "own_gate_ic": 0.012924327252678731,
@@ -1891,9 +1891,9 @@
           "trade_count_all_folds": 0
         },
         "FX07": {
-          "gate_ic": -0.01175701352340168,
-          "gate_tstat": -1.3575887688445507,
-          "ic": -0.005127540449156796,
+          "gate_ic": -0.016254386552644592,
+          "gate_tstat": -1.5751706528908282,
+          "ic": -0.006996077330955915,
           "n_pairs": 27458,
           "net_pnl_1x_all_folds": 0.0,
           "own_gate_ic": -0.016086750203829776,
@@ -1903,9 +1903,9 @@
           "trade_count_all_folds": 0
         },
         "FX08": {
-          "gate_ic": 0.04073126903648809,
-          "gate_tstat": 3.8443634723257953,
-          "ic": 0.11662389627660097,
+          "gate_ic": 0.050942901492996136,
+          "gate_tstat": 4.7392917600900235,
+          "ic": 0.12555552158326355,
           "n_pairs": 25590,
           "net_pnl_1x_all_folds": -1712.426231858531,
           "own_gate_ic": 0.050942901492996136,
@@ -1915,9 +1915,9 @@
           "trade_count_all_folds": 4746
         },
         "FX09": {
-          "gate_ic": -0.04714778475625588,
-          "gate_tstat": -5.745953956973862,
-          "ic": -0.1283819067707119,
+          "gate_ic": -0.06030862463031193,
+          "gate_tstat": -6.799369151035406,
+          "ic": -0.1377224926432814,
           "n_pairs": 25334,
           "net_pnl_1x_all_folds": -1820.0619062445676,
           "own_gate_ic": -0.06030862463031193,
@@ -1927,9 +1927,9 @@
           "trade_count_all_folds": 4926
         },
         "FX10": {
-          "gate_ic": 0.019599468429881008,
-          "gate_tstat": 1.545827450932388,
-          "ic": 0.06620554036852551,
+          "gate_ic": 0.0267693804628702,
+          "gate_tstat": 2.3713834339566655,
+          "ic": 0.06700281910610745,
           "n_pairs": 25590,
           "net_pnl_1x_all_folds": -407.8126671804286,
           "own_gate_ic": 0.0267693804628702,
@@ -1939,9 +1939,9 @@
           "trade_count_all_folds": 1032
         },
         "FX11": {
-          "gate_ic": 0.03508210011737292,
-          "gate_tstat": 2.9270210525082976,
-          "ic": 0.09463476374080852,
+          "gate_ic": 0.04249925192237506,
+          "gate_tstat": 3.3931195887018712,
+          "ic": 0.09811610805550447,
           "n_pairs": 25590,
           "net_pnl_1x_all_folds": -2881.9990611324083,
           "own_gate_ic": 0.040629625812313164,
@@ -1951,9 +1951,9 @@
           "trade_count_all_folds": 7217
         },
         "FX12": {
-          "gate_ic": 0.00859067340556318,
-          "gate_tstat": 1.053121658613505,
-          "ic": 0.0035545359932570874,
+          "gate_ic": 0.009709399193098989,
+          "gate_tstat": 1.2144332218366949,
+          "ic": 0.006571560071966251,
           "n_pairs": 31426,
           "net_pnl_1x_all_folds": 0.0,
           "own_gate_ic": 0.009709399193098989,
@@ -2000,9 +2000,9 @@
           "looks": 13,
           "max_abs_correlation_with_a_member": 0.5444391450829267,
           "member_pass_check": {
-            "gate_ic": 0.031529907598189064,
-            "gate_tstat": 3.2207867698126975,
-            "ic": 0.04898904393746585,
+            "gate_ic": 0.03568996028622874,
+            "gate_tstat": 3.9646865240356672,
+            "ic": 0.050990337217730275,
             "n_pairs": 31436
           },
           "n_folds_survive_1x_cost": 0,
@@ -2199,9 +2199,9 @@
           "looks": 13,
           "max_abs_correlation_with_a_member": 0.8305528418435073,
           "member_pass_check": {
-            "gate_ic": 0.04284644193001091,
-            "gate_tstat": 3.736114936869005,
-            "ic": 0.12496852475103366,
+            "gate_ic": 0.05336491614271438,
+            "gate_tstat": 4.767396389776241,
+            "ic": 0.131036532938794,
             "n_pairs": 31435
           },
           "n_folds_survive_1x_cost": 0,
@@ -2454,9 +2454,9 @@
           "looks": 13,
           "max_abs_correlation_with_a_member": 0.827505042983737,
           "member_pass_check": {
-            "gate_ic": 0.048184216195795354,
-            "gate_tstat": 4.729953408200635,
-            "ic": 0.14214914307023166,
+            "gate_ic": 0.06176466073132965,
+            "gate_tstat": 5.958203344701758,
+            "ic": 0.1513414857519904,
             "n_pairs": 31436
           },
           "n_folds_survive_1x_cost": 0,
@@ -2749,9 +2749,9 @@
           "looks": 13,
           "max_abs_correlation_with_a_member": 0.8429253540787907,
           "member_pass_check": {
-            "gate_ic": 0.04779945111720757,
-            "gate_tstat": 4.7608826758200244,
-            "ic": 0.14020530168439968,
+            "gate_ic": 0.06132946369665772,
+            "gate_tstat": 5.976664508040968,
+            "ic": 0.14965162356961478,
             "n_pairs": 31436
           },
           "n_folds_survive_1x_cost": 0,

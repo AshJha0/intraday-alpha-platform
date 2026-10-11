@@ -5884,6 +5884,7 @@
       "key": "0d418c066ea9bafa0cb737ceb9642a57433656aceb859df861ce6690b6cbdf33",
       "kind": "combination",
       "n": 5227,
+      "reruns": 1,
       "result": {
         "experiment_id": "b346f9dc8c1ec773",
         "gate_ic": 0.030231571002493938,
@@ -5931,6 +5932,7 @@
       "key": "d79d2b83cac916878b7953e821489dc61305d771ebf81f84ac619f09f06afafc",
       "kind": "combination",
       "n": 5240,
+      "reruns": 1,
       "result": {
         "experiment_id": "ae5d5b50061ccd3e",
         "gate_ic": 0.04094472898568218,
@@ -5978,6 +5980,7 @@
       "key": "a7db35b6f43af86142178c9061f128949fc283affcf6e60a147c8f79a421f2e2",
       "kind": "combination",
       "n": 5253,
+      "reruns": 1,
       "result": {
         "experiment_id": "dc1081c127aad53f",
         "gate_ic": 0.05124812641653118,
@@ -6025,6 +6028,7 @@
       "key": "dc00156eff9e79d1b75595dd98b72a5b2bad5da8bfcc5938b8845043d8b6c5a3",
       "kind": "combination",
       "n": 5266,
+      "reruns": 1,
       "result": {
         "experiment_id": "62914e8ea128a247",
         "gate_ic": 0.05165755348328853,
@@ -6072,6 +6076,7 @@
       "key": "950f9f31bc55242202d4ea3c0cabc00cdf0be43e47e52637d3e064807c98c2ad",
       "kind": "combination",
       "n": 5279,
+      "reruns": 1,
       "result": {
         "experiment_id": "056b02cd139eea15",
         "gate_ic": 0.03568996028622874,
@@ -6119,6 +6124,7 @@
       "key": "0238143db215c2dc5df15f564e519d7107ce2c048003fc7931dca938ae9afaa8",
       "kind": "combination",
       "n": 5292,
+      "reruns": 1,
       "result": {
         "experiment_id": "9220b5896d7cff3a",
         "gate_ic": 0.05336491614271438,
@@ -6166,6 +6172,7 @@
       "key": "3e400b16e82ba52c0ef473857418d1b577aec2bbdf74110e251ed14482289a12",
       "kind": "combination",
       "n": 5305,
+      "reruns": 1,
       "result": {
         "experiment_id": "70379e937bd00405",
         "gate_ic": 0.06176466073132965,
@@ -6213,6 +6220,7 @@
       "key": "d436a351da964abcacae7097745f6c5688c8a8710031161d680de43d49ed88a7",
       "kind": "combination",
       "n": 5318,
+      "reruns": 1,
       "result": {
         "experiment_id": "328a76c95164fb51",
         "gate_ic": 0.06132946369665772,
