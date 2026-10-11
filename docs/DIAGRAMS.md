@@ -42,10 +42,10 @@ flowchart TD
 
 ## 2. Cross-language golden-test topology
 
-How one validated Python reference pins four implementations. The parity table is
-printed by `tests/harness/run_all.sh` (python 2385 · cpp 302 · rust 362 · java 575
-tests; 193/72/71/124 in the golden groups — the Java gate runs all seventeen
-`*GoldenTest` classes, the Rust gate ten golden targets). Two goldens are
+How one validated Python reference pins three implementations. The parity table is
+printed by `tests/harness/run_all.sh` (python 2385 · cpp 302 · rust 362
+tests; 193/72/71 in the golden groups — the Rust gate runs ten golden
+targets; the Java engine is archived in v1.15, `archive/java/`). Two goldens are
 owned by a port language and consumed by Python as well: the fills golden
 (C++) by `iap.execution`, the risk goldens (Rust) by `iap.risk`.
 
@@ -63,15 +63,12 @@ flowchart LR
     GV --> PY["python: pytest -k golden<br/>193 tests"]
     GV --> CPP["cpp: ctest -R Golden<br/>72 tests"]
     GV --> RS["rust: 10 golden test targets<br/>71 tests"]
-    GV --> JV["java: all seventeen *GoldenTest (JUnitCore)<br/>124 golden-group tests"]
     EXP --> PY
     EXP --> CPP
     EXP --> RS
-    EXP --> JV
-    PY --> TAB["tests/harness/run_all.sh<br/>cross-language parity table<br/>exit 0 iff all four PASS"]
+    PY --> TAB["tests/harness/run_all.sh<br/>cross-language parity table<br/>exit 0 iff all three PASS"]
     CPP --> TAB
     RS --> TAB
-    JV --> TAB
     TOL["Tolerance policy (conventions §5):<br/>IAP1 encoding — byte-identical SHA-256<br/>integer state (ticks/sizes/counts/seq) — EXACT<br/>canonical JSON lines, audit JSONL, registry — byte-identical<br/>floats (features/alpha/portfolio/tca) — abs 1e-9 + rel 1e-9"] -.-> EXP
     MIG["regeneration: deliberate only,<br/>+ schemas/MIGRATIONS.md entry"] -.-> MG
 ```

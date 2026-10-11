@@ -45,7 +45,6 @@ is vendored at `/usr/share/java/junit4.jar`):
 cd python && PYTHONPATH=src python3 -m pytest -q && cd ..
 cd cpp    && bash build.sh && ctest --test-dir build --output-on-failure && cd ..
 cd rust   && cargo test --workspace && cd ..
-cd java   && bash build.sh && bash test.sh && cd ..
 python3 -m pytest -q tests/integration tests/replay      # repo-level suites
 python3 tests/harness/check_deployment.py --verbose      # deployment checks
 ruff check python tests tools research deployment        # lint (ruff==0.16.10, config: ruff.toml)
@@ -119,8 +118,8 @@ abs and rel 1e-9; adaptive PSI/KS at 1e-10 with exact refit booleans and
 lifecycle state sequences; canonical-JSON lines, trace digests, the risk
 audit / snapshot and the lifecycle registry are byte-identical; the 7-state
 lifecycle golden is compared exactly, field by field. The v1.13.0 table
-(2026-10-11, counts from CI) reads python 2385 / cpp 302 / rust 362 /
-java 575 (golden 193/72/71/124), `integration` 35, `replay` 6.
+(2026-10-11, counts from CI) reads python 2385 / cpp 302 / rust 362
+(golden 193/72/71; Java archived in v1.15), `integration` 35, `replay` 6.
 
 ## 4. Golden regeneration protocol
 

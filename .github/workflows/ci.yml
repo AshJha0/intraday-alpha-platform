@@ -9,7 +9,7 @@
 # This workflow is it (PLATFORM_CONVENTIONS.md §9, §12.7).
 #
 # Jobs:
-#   python | cpp | rust | java   one per language (python: a 3.11 + 3.12
+#   python | cpp | rust          one per language (python: a 3.11 + 3.12
 #                                matrix running -m "not slow"), the canonical commands from
 #                                docs/BUILD_NOTES.md, run in parallel; python
 #                                (and golden) first restore or regenerate the
@@ -23,7 +23,7 @@
 #                                `replay` rows of run_all.sh's parity table
 #   golden                       tests/harness/run_golden.sh — the promotion
 #                                gate 10 artefact (every language's golden
-#                                group, including ALL Java *GoldenTest classes)
+#                                group; Java archived in v1.15, archive/java/)
 #   deployment                   tests/harness/check_deployment.py: promtool
 #                                check rules/config, promtool test rules, the
 #                                Dockerfile/compose/k8s/ConfigMap/dashboard
@@ -53,7 +53,7 @@
 #                                that verifies them
 #   risk-fuzz                    manual only (workflow_dispatch with
 #                                risk_fuzz=true): the large differential-fuzz
-#                                run of the Rust, Java and Python risk engines
+#                                run of the Rust and Python risk engines
 #                                on freshly generated step scripts
 #                                (.github/workflows/risk-fuzz.yml, which also
 #                                runs nightly). The PR path replays the
@@ -163,8 +163,8 @@ jobs:
       # The risk differential-fuzz corpus (tests/golden/risk_fuzz) is written
       # by the Python engine. Regenerate it here (Linux, Python 3.11) and diff
       # it against the committed bytes: a corpus that is stale, or that depends
-      # on the platform it was generated on, fails before the Rust and Java
-      # replays trust it.
+      # on the platform it was generated on, fails before the Rust
+      # replay trusts it.
       - name: risk fuzz corpus is current (regenerate + diff)
         if: matrix.python-version == '3.11'
         run: python3 python/tools/make_risk_fuzz_corpus.py --check
@@ -467,36 +467,6 @@ jobs:
           f=$(ls ../data/normalized/*.normalized.iap1 | head -n 1)
           python tools/bench_native_features.py "$f" --max-events 200000 --cadence-ms 100             --repeat 1 --summary "$GITHUB_STEP_SUMMARY"
 
-  java:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
-        with:
-          distribution: temurin
-          java-version: "21"
-      - name: JUnit4 + Hamcrest (local jars — no Maven, see BUILD_NOTES.md)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends junit4
-          # java/test.sh pins both jars at /usr/share/java.
-          test -f /usr/share/java/junit4.jar
-          test -f /usr/share/java/hamcrest-core.jar
-      - name: build + test (javac -Xlint:all -Werror, JUnit4 suite)
-        working-directory: java
-        run: bash test.sh
-      # Coverage: no Maven/Gradle (Maven Central unreachable here, see
-      # docs/BUILD_NOTES.md) and no JaCoCo jar vendored in java/lib/, so
-      # instrumenting coverage would mean vendoring a new binary dependency
-      # sight-unseen. Skipped deliberately rather than done unsafely; if
-      # JaCoCo (agent + cli jars) is vendored and checksummed in java/lib/
-      # in a future wave, wire `java -javaagent:jacocoagent.jar=...` into
-      # test.sh here and drop this note.
-      - name: java coverage (skipped — no JaCoCo vendored)
-        run: |
-          echo "::notice::Java coverage skipped: no Maven/Gradle and no JaCoCo jar vendored in java/lib/ (see docs/BUILD_NOTES.md)"
-
   # Memory/UB sanitizers over the full C++ ctest suite, in a separate build
   # dir so the timed Release build and the coverage build are unaffected.
   # Blocking: it passed on the first CI run (285 of 285 tests, no sanitizer
@@ -626,10 +596,6 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
-        with:
-          distribution: temurin
-          java-version: "21"
       - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1 (toolchain pinned by input)
         with:
           toolchain: "1.99.0"      # == rust/rust-toolchain.toml (check_deployment.py enforces)
@@ -641,7 +607,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            g++ cmake make libgtest-dev libeigen3-dev junit4
+            g++ cmake make libgtest-dev libeigen3-dev
           python -m pip install --upgrade pip
           pip install --require-hashes -r python/requirements-ci.txt
       # Same seeded dataset as the python job (same cache key): the Python
@@ -874,7 +840,7 @@ jobs:
   images:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    needs: [python, python-slow, integration, cpp, rust, java, golden, deployment, changes]
+    needs: [python, python-slow, integration, cpp, rust, golden, deployment, changes]
     # Image builds are the merge-to-main promotion gate (GOVERNANCE gate 10).
     # They run on every push to main, and on a pull request only when it
     # changes image inputs (deployment/docker/**, any Dockerfile, the pinned

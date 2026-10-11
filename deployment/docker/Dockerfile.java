@@ -40,7 +40,9 @@
 FROM eclipse-temurin:25@sha256:8c0a84ea11c8f6ed52600fc19f1040121f2a162998e9f50a5faebbbad9172dcc AS build
 
 WORKDIR /build
-COPY java java
+# v1.15: the Java engine is archived (frozen at v1.14.0) under archive/java/;
+# the platform image still builds from that frozen copy.
+COPY archive/java java
 COPY tests/golden tests/golden
 COPY configs configs
 COPY research/baselines research/baselines

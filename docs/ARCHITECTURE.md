@@ -259,15 +259,12 @@ flowchart LR
     GV --> PY["python: pytest -k golden<br/>193 tests"]
     GV --> CPP["cpp: ctest -R Golden<br/>72 tests"]
     GV --> RS["rust: 10 golden test targets<br/>71 tests"]
-    GV --> JV["java: all seventeen *GoldenTest (JUnitCore)<br/>124 golden-group tests"]
     EXP --> PY
     EXP --> CPP
     EXP --> RS
-    EXP --> JV
-    PY --> TAB["tests/harness/run_all.sh<br/>cross-language parity table<br/>exit 0 iff all four PASS"]
+    PY --> TAB["tests/harness/run_all.sh<br/>cross-language parity table<br/>exit 0 iff all three PASS"]
     CPP --> TAB
     RS --> TAB
-    JV --> TAB
     TOL["Tolerance policy (conventions §5):<br/>IAP1 encoding — byte-identical SHA-256<br/>integer state (ticks/sizes/counts/seq) — EXACT<br/>canonical JSON lines, audit JSONL, registry — byte-identical<br/>floats (features/alpha/portfolio/tca) — abs 1e-9 + rel 1e-9"] -.-> EXP
     MIG["regeneration: deliberate only,<br/>+ schemas/MIGRATIONS.md entry"] -.-> MG
 ```
@@ -290,8 +287,8 @@ and are matched by Java, Rust and C++ (the trace and canonical-JSON ports)
 and by Java and Rust (the lifecycle ports). The harness
 (`tests/harness/run_all.sh`, with `run_golden.sh` as the golden-only alias)
 runs every suite with the canonical commands and prints the parity table; a
-v1.14.0 CI run (2026-10-11) passes 2385/302/362/575 tests (193/72/71/124
-golden) across python/cpp/rust/java, plus the repo-level `integration` (35)
+v1.14.0 CI run (2026-10-11) passes 2385/302/362 tests (193/72/71
+golden) across python/cpp/rust (Java archived in v1.15, `archive/java/`), plus the repo-level `integration` (35)
 and `replay` (6) rows — the same counts the README parity table records.
 
 ## 7. Hot-path engineering notes per language

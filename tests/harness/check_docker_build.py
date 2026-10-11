@@ -13,7 +13,7 @@ the next best thing, which is what actually catches the bug class:
   1. materialise a CLEAN checkout of the working tree into a temp dir: every
      file `git ls-files` tracks (so staged moves — `git mv` — are honoured
      before they are committed), at its working-tree content, and nothing
-     else — no cpp/build, no rust/target, no java/out, exactly what a fresh
+     else — no cpp/build, no rust/target, no archive/java/out, exactly what a fresh
      checkout plus `.dockerignore` gives Docker as a build context;
   2. apply the repository's `.dockerignore` to that clone, so the context is
      byte-for-byte what `docker build` would send;
@@ -22,7 +22,7 @@ the next best thing, which is what actually catches the bug class:
      resolve too — `<golden>/../../configs` for the C++ golden tests and
      bench_all, `../../configs` and `../../data/reference` for the Rust
      workspace tests, `/app/configs` for the Java entrypoint;
-  5. RUN the Java build stage's command (`cd java && bash build.sh`) inside
+  5. RUN the Java build stage's command (`cd archive/java && bash build.sh`) inside
      the clone, because that is the image that trades and javac is cheap.
      The C++/Rust build stages are compiled by tests/harness/run_all.sh in the
      same CI run, so their commands are covered there; this script asserts
@@ -194,7 +194,7 @@ def check_build_inputs(ctx: Path) -> None:
             problems.append(f"java: {rel} absent (the entrypoint reads it)")
 
     # The context must NOT carry host build state: that is the CMakeCache bug.
-    for rel in ["cpp/build", "rust/target", "java/out"]:
+    for rel in ["cpp/build", "rust/target", "archive/java/out"]:
         if (ctx / rel).exists():
             problems.append(f"{rel} leaked into the build context (.dockerignore must exclude it)")
     record(
@@ -209,8 +209,8 @@ def check_java_build_stage(ctx: Path) -> None:
     if not shutil.which("javac"):
         record("java_build_stage_runs", True, "javac absent — skipped")
         return
-    proc = run(["bash", "build.sh"], cwd=ctx / "java", timeout=900)
-    ok = proc.returncode == 0 and (ctx / "java" / "out" / "main").is_dir()
+    proc = run(["bash", "build.sh"], cwd=ctx / "archive" / "java", timeout=900)
+    ok = proc.returncode == 0 and (ctx / "archive" / "java" / "out" / "main").is_dir()
     record(
         "java_build_stage_runs",
         ok,

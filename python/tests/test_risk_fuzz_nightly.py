@@ -1,7 +1,7 @@
 """End-to-end test of the nightly differential-fuzz driver
 (``python/tools/risk_fuzz_nightly.py``) with a stand-in engine.
 
-The real engines of the nightly job are the Rust and Java golden replays,
+The real engines of the nightly job is the Rust golden replay,
 which only exist in CI. The driver does not care what an engine is — only
 that it speaks the replay protocol (``IAP_RISK_FUZZ_DIR`` in,
 ``IAP_RISK_FUZZ_OUT/<name>.tsv`` out) — so here the engine is the Python

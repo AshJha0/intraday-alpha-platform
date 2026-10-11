@@ -698,6 +698,10 @@ python3 tools/github/create_issues.py --dry-run   # the epics/issues plan (docs/
 
 ## Cross-language parity (the `tests/harness/run_all.sh` table, counts from CI)
 
+Since v1.15 the table has three language rows: the Java engine is archived
+under [archive/java/](archive/java/README.md), frozen at v1.14.0 (575 tests,
+124 golden at that tag), and no longer built or tested in CI.
+
 ```
 ===================== cross-language parity table =====================
 language | tests passed | golden passed  | time   | status
@@ -705,7 +709,6 @@ language | tests passed | golden passed  | time   | status
 python   | 2385         | 193            |    -s | PASS
 cpp      | 302          | 72             |    -s | PASS
 rust     | 362          | 71             |    -s | PASS
-java     | 575          | 124            |    -s | PASS
 integration | 35           | -              |    -s | PASS
 replay   | 6            | -              |    -s | PASS
 deployment | -            | -              |    -s | PASS

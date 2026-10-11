@@ -112,8 +112,13 @@ canonical-JSON byte parity the contracts / lifecycle goldens pin.
 
 ## Java — why there is NO Maven build
 
+> **Archived in v1.15** (G-P1-3): the Java engine lives in `archive/java/`,
+> frozen at v1.14.0, and CI no longer builds or tests it. See
+> [archive/java/README.md](../archive/java/README.md). The notes below
+> describe how it was built.
+
 ```bash
-cd java && bash build.sh && bash test.sh    # 575 tests; the seventeen *GoldenTest classes are 124 of them
+cd java && bash build.sh && bash test.sh    # at v1.14.0: 575 tests; the seventeen *GoldenTest classes are 124 of them
 ```
 
 **Maven/Gradle are deliberately not used: Maven Central is unreachable from
@@ -139,8 +144,8 @@ The cross-language contract ports added on 2026-09-19 — `com.iap.contracts`
 `explain()`), `com.iap.lifecycle` (alpha promotion lifecycle + registry) —
 use only the JDK (`java.security.MessageDigest`, `java.math`); the golden
 gates `CanonicalJsonGoldenTest`, `TraceGoldenTest`, `LifecycleGoldenTest`
-are listed in `tests/harness/run_all.sh` `JAVA_GOLDEN_CLASSES`, which
-`check_deployment.py` keeps equal to the `*GoldenTest.java` set on disk.
+were listed in `tests/harness/run_all.sh` `JAVA_GOLDEN_CLASSES` until the
+v1.15 archive (the list and its `check_deployment.py` check are gone).
 
 ## Benchmarks
 

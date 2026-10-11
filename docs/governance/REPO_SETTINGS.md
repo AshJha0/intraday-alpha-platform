@@ -18,10 +18,11 @@ repository applies these settings for you, by design.
 
 ## 1. Branch ruleset for `main`
 
-Requires a pull request, the seven CI jobs as status checks, and blocks force
+Requires a pull request, the six CI jobs as status checks, and blocks force
 pushes and branch deletion. The required check names are the job ids of
-`.github/workflows/ci.yml`: `python`, `integration`, `cpp`, `rust`, `java`,
-`golden`, `deployment`. Do **not** add `images` (it is skipped on pull requests
+`.github/workflows/ci.yml`: `python`, `integration`, `cpp`, `rust`,
+`golden`, `deployment`. (v1.15: the `java` job was removed when the Java
+engine was archived to `archive/java/`; drop `java` from an existing ruleset.) Do **not** add `images` (it is skipped on pull requests
 that do not touch image inputs, and a skipped required check blocks the merge)
 or, without a decision, the `advisory` job (ruff + gitleaks, both blocking). Since v1.14 the dependency audits run in the blocking `supply-chain` job, and CodeQL also analyses Rust (check `analyze (rust)`); both may be added to the required list. `cpp-sanitizers` is blocking in CI and may be added to the required list.
 
@@ -59,7 +60,6 @@ gh api -X POST repos/AshJha0/intraday-alpha-platform/rulesets --input - <<'JSON'
           { "context": "integration" },
           { "context": "cpp" },
           { "context": "rust" },
-          { "context": "java" },
           { "context": "golden" },
           { "context": "deployment" }
         ]

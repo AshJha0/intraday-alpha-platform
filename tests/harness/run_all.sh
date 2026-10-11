@@ -24,14 +24,12 @@
 #           integration-test file (golden_marketdata, golden_book,
 #           golden_features, golden_alpha, golden_risk, golden_risk_fuzz,
 #           golden_replay, golden_canonical_json, golden_trace, golden_lifecycle)
-#   java    JUnitCore on the *GoldenTest classes (CodecGoldenTest, BookGoldenTest,
-#           AnomalyGoldenTest, RiskGoldenTest, RiskFuzzGoldenTest,
-#           ReplayFillsGoldenTest, TcaGoldenTest, PortfolioGoldenTest)
+#   (java: archived in v1.15 under archive/java/, frozen at v1.14.0 — not run)
 #   The risk differential-fuzz corpus (tests/golden/risk_fuzz) is replayed by
-#   golden_risk_fuzz / RiskFuzzGoldenTest / test_risk_fuzz_golden.py.
+#   golden_risk_fuzz / test_risk_fuzz_golden.py.
 #
 # Repo-level rows (full mode only; skipped by --golden-only, which stays the
-# four-language golden parity check):
+# three-language golden parity check):
 #   integration  python3 -m pytest -q tests/integration   (cross-component runs)
 #   replay       python3 -m pytest -q tests/replay        (same seed => same bytes)
 #   Both are counted like the python row (pytest "N passed") and are part of
@@ -51,9 +49,6 @@ GOLDEN_ONLY=0
 
 # Rust golden integration-test targets: "<crate>:<test file>" pairs.
 RUST_GOLDEN_TARGETS="marketdata:golden_marketdata orderbook:golden_book features:golden_features alpha:golden_alpha risk:golden_risk risk:golden_risk_fuzz replay:golden_replay contracts:golden_canonical_json contracts:golden_trace lifecycle:golden_lifecycle"
-# Java golden test classes (JUnit4) — ALL of them (round-3 PLATFORM SEV-2:
-# the gate used to run 2 of the 10 classes while README claimed otherwise).
-JAVA_GOLDEN_CLASSES="com.iap.AdaptiveGoldenTest com.iap.AlphaGoldenTest com.iap.AnomalyGoldenTest com.iap.BacktestGoldenTest com.iap.BookGoldenTest com.iap.CanonicalJsonGoldenTest com.iap.CodecGoldenTest com.iap.FeatureGoldenTest com.iap.LifecycleGoldenTest com.iap.MarkoutGoldenTest com.iap.PortfolioGoldenTest com.iap.ReplayFillsGoldenTest com.iap.ReplayFillsPassiveGoldenTest com.iap.RiskFuzzGoldenTest com.iap.RiskGoldenTest com.iap.TcaGoldenTest com.iap.TraceGoldenTest"
 
 # Per-language results. TESTS/GOLDEN hold a NUMBER when the suite ran and the
 # count could be parsed, and "-" when it did not run or could not be parsed —
@@ -152,44 +147,6 @@ run_rust() {
     SECS[rust]=$((SECONDS - t0)); [ $ok -eq 1 ] || OVERALL=1
 }
 
-# ------------------------------------------------------------------- java ---
-run_java() {
-    local t0=$SECONDS ok=1 full="-" gold="-"
-    local JUNIT=/usr/share/java/junit4.jar HAMCREST=/usr/share/java/hamcrest-core.jar
-    if [ "$GOLDEN_ONLY" -eq 0 ]; then
-        note "java: bash build.sh && bash test.sh"
-        if run_logged "$LOG_DIR/java_full.log" env -C "$ROOT/java" bash test.sh; then
-            full=$(grep -Eo 'OK \([0-9]+ tests?\)' "$LOG_DIR/java_full.log" | grep -Eo '[0-9]+')
-            [ -n "$full" ] || { full="?"; ok=0; }
-        else ok=0; full="FAIL"; fi
-    else
-        note "java: bash build.sh + compile tests"
-        if ! run_logged "$LOG_DIR/java_build.log" env -C "$ROOT/java" bash build.sh; then
-            TESTS[java]="-"; GOLDEN[java]="-"; STATUS[java]="BUILD FAIL"
-            SECS[java]=$((SECONDS - t0)); OVERALL=1; return
-        fi
-        # compile the test sources (same as test.sh, without running the suite)
-        if ! ( cd "$ROOT/java" && rm -rf out/test && mkdir -p out/test && \
-               find src/test/java -name '*.java' | sort > out/test-sources.txt && \
-               javac -Xlint:all -Werror -cp "out/main:$JUNIT:$HAMCREST" -d out/test @out/test-sources.txt ) \
-             >>"$LOG_DIR/java_build.log" 2>&1; then
-            ok=0
-        fi
-    fi
-    note "java: JUnitCore $JAVA_GOLDEN_CLASSES"
-    # shellcheck disable=SC2086
-    if ( cd "$ROOT/java" && java -cp "out/test:out/main:$JUNIT:$HAMCREST" \
-             org.junit.runner.JUnitCore $JAVA_GOLDEN_CLASSES ) \
-         >"$LOG_DIR/java_golden.log" 2>&1; then
-        gold=$(grep -Eo 'OK \([0-9]+ tests?\)' "$LOG_DIR/java_golden.log" | grep -Eo '[0-9]+')
-        [ -n "$gold" ] || { gold="?"; ok=0; }
-    else ok=0; gold="FAIL"; fi
-    [ "$GOLDEN_ONLY" -eq 1 ] && full=$gold
-    TESTS[java]=$full; GOLDEN[java]=$gold
-    STATUS[java]=$([ $ok -eq 1 ] && echo PASS || echo FAIL)
-    SECS[java]=$((SECONDS - t0)); [ $ok -eq 1 ] || OVERALL=1
-}
-
 # ------------------------------------------------- integration / replay ---
 # Repo-level pytest suites, run from the repo root; tests/conftest.py puts
 # python/src on sys.path, so no PYTHONPATH is needed. They have no golden
@@ -215,7 +172,7 @@ run_replay() { run_pytest_dir replay tests/replay; }
 # validation used in CI", PLATFORM_CONVENTIONS.md §12.7): promtool rules +
 # config + rule unit tests, docker compose config, Dockerfile COPY sources,
 # k8s manifests and singleton shape, ConfigMap sync, dashboard metric
-# provenance, and the completeness of the Java golden gate.
+# provenance.
 run_deployment() {
     local t0=$SECONDS
     note "deployment: python3 tests/harness/check_deployment.py"
@@ -250,7 +207,6 @@ note "intraday-alpha-platform harness — $MODE (logs: $LOG_DIR)"
 run_python
 run_cpp
 run_rust
-run_java
 if [ "$GOLDEN_ONLY" -eq 0 ]; then
     run_integration
     run_replay
@@ -264,14 +220,14 @@ echo "===================== cross-language parity table ====================="
 if [ "$GOLDEN_ONLY" -eq 1 ]; then
     printf '%-8s | %-14s | %-6s | %s\n' language "golden passed" time status
     printf '%s\n' "---------+----------------+--------+-------"
-    for lang in python cpp rust java; do
+    for lang in python cpp rust; do
         printf '%-8s | %-14s | %4ss | %s\n' \
             "$lang" "${GOLDEN[$lang]}" "${SECS[$lang]}" "${STATUS[$lang]}"
     done
 else
     printf '%-8s | %-12s | %-14s | %-6s | %s\n' language "tests passed" "golden passed" time status
     printf '%s\n' "---------+--------------+----------------+--------+-------"
-    for lang in python cpp rust java integration replay; do
+    for lang in python cpp rust integration replay; do
         printf '%-8s | %-12s | %-14s | %4ss | %s\n' \
             "$lang" "${TESTS[$lang]}" "${GOLDEN[$lang]}" "${SECS[$lang]}" "${STATUS[$lang]}"
     done

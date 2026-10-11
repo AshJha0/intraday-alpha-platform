@@ -43,7 +43,6 @@ Checks (each one is a named case; exit code 0 iff no case FAILED):
                               configs/<domain>/ tree at IAP_CONFIG_DIR
   dashboards_valid            dashboard JSON parses, datasource uid stable, and
                               every panel expression names a real metric
-  java_golden_gate_complete   JAVA_GOLDEN_CLASSES == the *GoldenTest.java set
   alerting_wired              Prometheus -> Alertmanager in config, compose and
                               k8s, plus the always-firing Watchdog rule
   k8s_pod_hardening           automountServiceAccountToken false everywhere,
@@ -523,7 +522,16 @@ def check_config_dir_wiring() -> None:
     """§12.2 — IAP_CONFIG_DIR is honoured by the code, image and compose."""
     problems = []
     java = (
-        ROOT / "java" / "src" / "main" / "java" / "com" / "iap" / "config" / "ConfigService.java"
+        ROOT
+        / "archive"
+        / "java"
+        / "src"
+        / "main"
+        / "java"
+        / "com"
+        / "iap"
+        / "config"
+        / "ConfigService.java"
     ).read_text()
     if "IAP_CONFIG_DIR" not in java:
         problems.append("no Java code reads IAP_CONFIG_DIR")
@@ -564,7 +572,7 @@ def check_dockerignore() -> None:
         record("dockerignore_present", "FAIL", "no .dockerignore at the repo root")
         return
     pats = dockerignore_patterns()
-    required = ["cpp/build/", "rust/target/", "java/out/", ".git/"]
+    required = ["cpp/build/", "rust/target/", "archive/java/out/", ".git/"]
     missing = [r for r in required if r not in pats]
     record(
         "dockerignore_present",
@@ -791,33 +799,6 @@ def check_dashboards() -> None:
                         f"producer exports"
                     )
     record("dashboards_valid", "PASS" if not problems else "FAIL", "; ".join(problems[:5]))
-
-
-# -------------------------------------------------------------- harness ----
-def check_java_golden_gate() -> None:
-    """§12.7 / round-3 SEV-2 — the Java golden gate must cover every class."""
-    run_all = (ROOT / "tests" / "harness" / "run_all.sh").read_text()
-    m = re.search(r'JAVA_GOLDEN_CLASSES="([^"]*)"', run_all)
-    if not m:
-        record("java_golden_gate_complete", "FAIL", "JAVA_GOLDEN_CLASSES not found in run_all.sh")
-        return
-    listed = {c.split(".")[-1] for c in m.group(1).split()}
-    on_disk = {
-        p.stem
-        for p in (ROOT / "java" / "src" / "test" / "java" / "com" / "iap").glob("*GoldenTest.java")
-    }
-    missing = sorted(on_disk - listed)
-    extra = sorted(listed - on_disk)
-    detail = ""
-    if missing:
-        detail += "not in the golden gate: " + ", ".join(missing)
-    if extra:
-        detail += (" " if detail else "") + "listed but absent: " + ", ".join(extra)
-    record(
-        "java_golden_gate_complete",
-        "PASS" if not (missing or extra) else "FAIL",
-        detail or f"{len(on_disk)} golden classes",
-    )
 
 
 # ----------------------------------------------- governance hardening ------
@@ -1320,7 +1301,6 @@ def main() -> int:
     check_configmap_items_in_sync()
     print("grafana / harness:")
     check_dashboards()
-    check_java_golden_gate()
     print("governance hardening:")
     check_alerting_wired()
     check_alerting_secret_free()

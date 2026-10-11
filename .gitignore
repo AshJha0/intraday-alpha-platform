@@ -21,7 +21,7 @@ research/models/*/model.pkl
 /cpp/build/
 /rust/target/
 /rust/features_py/target/
-/java/out/
+/archive/java/out/
 
 # --- python
 __pycache__/
@@ -44,7 +44,7 @@ python/dist/
 
 # --- platform state (PLATFORM_CONVENTIONS.md §12.3): risk snapshots, session
 # accounting and audit JSONL are runtime artefacts of a session, not sources.
-/java/out/state/
+/archive/java/out/state/
 /data/state/
 
 # --- derived store (rebuild with `python -m iap.store build`; docs/DATA_MODEL.md)

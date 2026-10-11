@@ -155,8 +155,8 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
 
   <h2>Measured, not claimed</h2>
   <div class="numbers">
-    Cross-language parity&nbsp;&nbsp;&nbsp; python 2385&nbsp; · cpp 302&nbsp; · rust 362&nbsp; · java 575 tests — 3,624 green, one command; golden groups 193/72/71/124<br>
-    Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in all four languages<br>
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 2385&nbsp; · cpp 302&nbsp; · rust 362 tests — 3,049 green, one command; golden groups 193/72/71 (Java archived in v1.15)<br>
+    Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in python, cpp and rust (Java archived in v1.15)<br>
     C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
     Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly; the MVP run twice and replayed from its capture reproduces its trace digest<br>
     Contracts&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 17 JSON Schemas · 22 typed contracts · 18 Protocols; Python risk and execution ports proven by the Rust and C++ goldens (audit + snapshot byte-identical, fills bit-identical)<br>
@@ -614,7 +614,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
 # generate the deterministic synthetic dataset, then the feature/label store
 cd python && PYTHONPATH=src python3 -m iap.marketdata && PYTHONPATH=src python3 -m iap.features && cd ..
 
-# run everything — builds and tests all four languages, prints the parity table
+# run everything — builds and tests python, cpp and rust, prints the parity table
 bash tests/harness/run_all.sh
 
 # the whole trading loop on one instrument, fully traced; then replay it from its capture
@@ -622,10 +622,7 @@ cd python && PYTHONPATH=src python3 -m iap.mvp run && PYTHONPATH=src python3 -m 
 
 # research pipelines (honest reports in research/)
 PYTHONPATH=python/src python3 research/alpha_reports/run_all.py
-PYTHONPATH=python/src python3 research/ml_reports/run_ml.py
-
-# paper trading with live /metrics on :8080
-cd java && bash paper.sh</pre>
+PYTHONPATH=python/src python3 research/ml_reports/run_ml.py</pre>
 
   <footer>intraday-alpha-platform — a polyglot, golden-tested, honestly-validated trading
     platform built on a bundled seeded synthetic dataset, with an ingestion path for owner-supplied ITCH/LOBSTER files, for education and demonstration.

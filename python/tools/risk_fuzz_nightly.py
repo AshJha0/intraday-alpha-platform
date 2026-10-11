@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The large differential-fuzz run of the three risk engines (backlog epic
+"""The large differential-fuzz run of the Rust and Python risk engines (backlog epic
 E31) — the driver of the ``risk-fuzz`` CI job.
 
 1. Generate ``--count`` fresh scripts from ``--seed`` (profiles in rotation,
@@ -10,15 +10,15 @@ E31) — the driver of the ``risk-fuzz`` CI job.
    ``IAP_RISK_FUZZ_DIR`` and writes ``<name>.tsv`` (one ``OK`` / ``DIVERGED``
    line per script) and the audit it produced into ``IAP_RISK_FUZZ_OUT``. The
    Rust engine is its own golden test (``cargo test -p risk --test
-   golden_risk_fuzz``), the Java engine is ``RiskFuzzGoldenTest`` — no extra
-   binaries.
+   golden_risk_fuzz``) — no extra binaries. (The Java engine was archived in
+   v1.15, frozen at v1.14.0: ``archive/java/``.)
 3. No divergence: exit 0. Otherwise take the first diverging script, minimise
    it with the delta-debugging shrinker (each round writes the candidate
    scripts to a directory and starts each diverging engine once), write the
    original and the minimised script, their expected outputs, what each engine
    produced and a summary to ``--artifacts``, and exit 1.
 
-Usage (from the repo root; Rust and Java already built)::
+Usage (from the repo root; Rust already built)::
 
     python python/tools/risk_fuzz_nightly.py --seed 20261004 --count 400
 
@@ -46,14 +46,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import make_risk_fuzz_corpus as corpus_tool  # noqa: E402
 import risk_fuzz as rf  # noqa: E402
 
-JUNIT_CP = "out/test:out/main:/usr/share/java/junit4.jar:/usr/share/java/hamcrest-core.jar"
 DEFAULT_ENGINES = (
     (
         "rust",
         "rust",
         "cargo test --locked -q -p risk --test golden_risk_fuzz fuzz_corpus_replays_byte_for_byte",
     ),
-    ("java", "java", f"java -cp {JUNIT_CP} org.junit.runner.JUnitCore com.iap.RiskFuzzGoldenTest"),
 )
 
 
@@ -116,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
         nargs=3,
         action="append",
         metavar=("NAME", "CWD", "COMMAND"),
-        help="an engine command (default: the Rust and Java golden replays)",
+        help="an engine command (default: the Rust golden replay)",
     )
     args = ap.parse_args(argv)
     engines = [tuple(e) for e in args.engine] if args.engine else list(DEFAULT_ENGINES)
