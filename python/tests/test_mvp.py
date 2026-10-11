@@ -411,6 +411,16 @@ def test_engaged_kill_switch_rejects_every_child_and_nothing_fills(
     assert eng.risk_engine.open_order_count() == 0
 
 
+def test_risk_market_volume_is_the_tape(tiny_run: RunResult) -> None:
+    """v1.15 X-P1-3: the risk engine's session market volume (the 15c3-5
+    participation denominator) is fed from the TRADE prints of the stream,
+    the same tape the account counts, never EXECUTE + TRADE."""
+    eng = tiny_run.engine
+    tape = eng.account.session_volume
+    assert tape > 0
+    assert eng.risk_engine._market_volume == {eng.iid: tape}
+
+
 def test_paper_evidence_and_report_are_consistent(tiny_run: RunResult) -> None:
     ev = json.loads((tiny_run.out_dir / PAPER_EVIDENCE_FILE).read_text())
     assert ev["x-version"] == 3 and set(ev["alphas"]) == {"EQ01", "EQ03", "EQ06"}

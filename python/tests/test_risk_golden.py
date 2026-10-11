@@ -138,6 +138,8 @@ def apply(eng: RiskEngine, i: int, step: dict[str, Any], check: bool) -> None:
         eng.roll_session(ts, step.get("reason", ""))
     elif kind == "trade":
         eng.on_market_trade(step["instrument_id"], step["qty"], ts)
+    elif kind == "tape":
+        eng.on_market_event(step["instrument_id"], step["event_type"], step["qty"], ts)
     elif kind == "cancel_request":
         eng.on_cancel_request(step["strategy_id"], step["venue_id"], ts)
     elif kind == "order":

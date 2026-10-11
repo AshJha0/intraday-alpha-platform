@@ -127,7 +127,10 @@ from iap.risk.orders import Fill, OrderRequest, OrderType, order_validation_erro
 from iap.risk.refdata import InstrumentRef, equity_refs
 from iap.risk.serialize import to_canonical_json
 
-__all__ = ["RiskDecision", "RiskEngine", "RiskMetrics", "SNAPSHOT_VERSION"]
+__all__ = ["TAPE_EVENT_TYPE", "RiskDecision", "RiskEngine", "RiskMetrics", "SNAPSHOT_VERSION"]
+
+#: ``EventType.TRADE``: the only event type that is market volume (X-P1-3).
+TAPE_EVENT_TYPE = 5
 
 _NS_PER_SEC = 1e9
 #: Snapshot schema version (2: audit chain head, open-order strategy, the
@@ -582,6 +585,16 @@ class RiskEngine:
         self._market_volume[instrument_id] = min(
             self._market_volume.get(instrument_id, 0) + qty, _I64_MAX
         )
+
+    def on_market_event(self, instrument_id: int, event_type: int, qty: int, ts: int) -> None:
+        """v1.15 X-P1-3: one canonical market-data event (``EventType`` u8).
+        Only a TRADE print (5) is market volume and goes to
+        :meth:`on_market_trade`; EXECUTE (4) is the same trade seen from the
+        book and every other type moves no volume, so they are ignored
+        (counting EXECUTE and TRADE together double-counts the tape)."""
+        _require("event_type", event_type, 0, 255)
+        if event_type == TAPE_EVENT_TYPE:
+            self.on_market_trade(instrument_id, qty, ts)
 
     def on_cancel_request(self, strategy_id: str, venue_id: int, ts: int) -> None:
         """A cancel (or cancel/replace) the strategy sends to ``venue_id``.

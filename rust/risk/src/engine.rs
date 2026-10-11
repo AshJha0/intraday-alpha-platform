@@ -130,6 +130,9 @@ pub(crate) const NS_PER_SEC: f64 = 1e9;
 /// the session volume counters).
 pub const SNAPSHOT_VERSION: u64 = 2;
 
+/// `EventType::TRADE`: the only event type that is market volume (X-P1-3).
+pub const TAPE_EVENT_TYPE: u8 = 5;
+
 /// Per-instrument reference data the engine needs.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InstrumentRef {
@@ -619,6 +622,17 @@ impl RiskEngine {
         }
         let v = self.market_volume.entry(instrument_id).or_insert(0);
         *v = v.saturating_add(qty);
+    }
+
+    /// v1.15 X-P1-3: one canonical market-data event (`EventType` u8). Only
+    /// a TRADE print ([`TAPE_EVENT_TYPE`], 5) is market volume and goes to
+    /// [`RiskEngine::on_market_trade`]; EXECUTE (4) is the same trade seen
+    /// from the book and every other type moves no volume, so they are
+    /// ignored (counting EXECUTE and TRADE together double-counts the tape).
+    pub fn on_market_event(&mut self, instrument_id: u32, event_type: u8, qty: i64, ts: i64) {
+        if event_type == TAPE_EVENT_TYPE {
+            self.on_market_trade(instrument_id, qty, ts);
+        }
     }
 
     /// A cancel (or cancel/replace) the strategy sends to `venue_id`. Never

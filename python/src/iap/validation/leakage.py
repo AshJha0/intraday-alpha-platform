@@ -53,6 +53,29 @@ Two independent detectors, both mandatory in the promotion pipeline:
    ``time_shift_pairs`` the count) instead of passing silently; ``passed``
    needs it not to be ``False``.
 
+2c. **Time-shift failure triage** (v1.15, R-P1-3).  A time-shift failure
+   is ambiguous: look-ahead (a feature that sees information at or after
+   the label's anchor) and a genuinely FAST causal signal (predictive power
+   that decays within the lag) both collapse under a ``horizon / 4`` lag.
+   When ``time_shift_ok`` is ``False`` the result also carries
+   ``time_shift_profile`` (the IC with the score lagged by
+   :data:`TIME_SHIFT_PROFILE_FRACTIONS` of the horizon) and
+   ``time_shift_class``, from :func:`classify_time_shift_failure`:
+
+   - ``"causality_unproven"`` - the recompute probe (detector 4) did not
+     run, so nothing shows the inputs are causal;
+   - ``"leak_suspect"`` - a causal check failed (label guard, truncation,
+     recompute, row shift), or the lag profile has the leak shape: a cliff
+     at the first step (a leak confined to the near future vanishes as soon
+     as the lag clears it), a non-monotone profile or a sign flip;
+   - ``"fast_causal"`` - every causal check passed and the IC decays
+     gradually and monotonically, keeping its sign.
+
+   The class is a diagnosis for the human reviewer.  By default it does
+   NOT change ``passed``: a time-shift failure still blocks promotion.
+   ``LeakageTester(accept_fast_causal=True)`` (opt-in) lets a
+   ``"fast_causal"`` failure pass.  See ``docs/research/FX11_FINDING.md``.
+
 3. **Engine-level leak probe** (``truncation_probe``): re-score the model on
    frames truncated at each of several anchors and assert the score at the
    anchor is bit-identical to the score computed with the full frame.  A
@@ -135,6 +158,10 @@ class LeakageResult:
     time_shift_lag_ns: int = 0
     required_time_shift_ratio: float = 0.0
     time_shift: bool = False
+    #: detector 2c (v1.15): only set (and only reported) on a time-shift
+    #: failure - ``[{"lag_ns", "ic", "n_pairs"}]`` and the triage class
+    time_shift_profile: list[dict] | None = None
+    time_shift_class: str | None = None
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -148,6 +175,9 @@ class LeakageResult:
             ):
                 d.pop(k)
         d.pop("time_shift")
+        if self.time_shift_class is None:
+            d.pop("time_shift_profile")
+            d.pop("time_shift_class")
         return d
 
 
@@ -157,6 +187,47 @@ TIME_SHIFT_MIN_PAIRS = 256
 TIME_SHIFT_LAG_FRACTION = 0.25
 #: Oldest lagged score kept, as a fraction of the horizon.
 TIME_SHIFT_MAX_AGE_FRACTION = 0.5
+#: Lags of the triage profile (detector 2c), as fractions of the horizon.
+TIME_SHIFT_PROFILE_FRACTIONS = (1 / 16, 1 / 8, 1 / 4)
+#: A causal fast signal keeps at least this share of its IC at the first
+#: profile step; less is a cliff, the shape of a near-future leak.
+FAST_CAUSAL_FIRST_STEP_MIN = 0.25
+#: Tolerance (share of the unlagged |IC|) for monotone decay and sign.
+FAST_CAUSAL_TOL = 0.1
+
+
+def classify_time_shift_failure(
+    ic_unshifted: float,
+    lagged_ics: Sequence[float],
+    *,
+    label_guard_ok: bool,
+    truncation_ok: bool,
+    recompute_ok: bool | None,
+    shift_ok: bool = True,
+) -> str:
+    """Triage of a time-shift failure (module docs, 2c).
+
+    ``lagged_ics`` are the ICs at increasing lags (the first is the
+    shortest).  Returns ``"fast_causal"``, ``"leak_suspect"`` or
+    ``"causality_unproven"``."""
+    if not (label_guard_ok and truncation_ok and shift_ok) or recompute_ok is False:
+        return "leak_suspect"
+    if recompute_ok is None:
+        return "causality_unproven"
+    lagged = [float(x) for x in lagged_ics]
+    if not lagged or not np.isfinite(ic_unshifted) or ic_unshifted == 0.0:
+        return "leak_suspect"
+    if not all(np.isfinite(lagged)):
+        return "leak_suspect"
+    sign = 1.0 if ic_unshifted > 0 else -1.0
+    ratios = [sign * x / abs(ic_unshifted) for x in lagged]
+    if ratios[0] < FAST_CAUSAL_FIRST_STEP_MIN:
+        return "leak_suspect"  # cliff at the first step
+    if any(r < -FAST_CAUSAL_TOL for r in ratios):
+        return "leak_suspect"  # sign flip
+    if any(b > a + FAST_CAUSAL_TOL for a, b in zip(ratios, ratios[1:], strict=False)):
+        return "leak_suspect"  # non-monotone
+    return "fast_causal"
 
 
 @dataclass
@@ -385,11 +456,14 @@ class LeakageTester:
         collapse_ratio: float = 0.5,
         ic_rows: str = DEFAULT_IC_ROWS,
         time_shift: bool = True,
+        accept_fast_causal: bool = False,
     ) -> None:
         self.suspicious_ic = suspicious_ic
         self.collapse_ratio = collapse_ratio
         #: run detector 2b (v1.14.0); False = the v1.13.0 detector set
         self.time_shift = bool(time_shift)
+        #: detector 2c: let a "fast_causal" time-shift failure pass (opt-in)
+        self.accept_fast_causal = bool(accept_fast_causal)
         #: rows the shift test scores (:mod:`iap.labels.frames`)
         self.ic_rows = ic_rows
 
@@ -429,13 +503,20 @@ class LeakageTester:
         ic1 = ic(np.concatenate(xs_lag), np.concatenate(ys_lag))
         return {"ic_unshifted": ic0, "ic_shifted": ic1}
 
-    def time_shift_test(self, model, frames: Mapping[int, pd.DataFrame]) -> dict[str, float]:
+    def time_shift_test(
+        self,
+        model,
+        frames: Mapping[int, pd.DataFrame],
+        lag_fraction: float = TIME_SHIFT_LAG_FRACTION,
+        scores: Mapping[int, pd.DataFrame] | None = None,
+    ) -> dict[str, float]:
         """Detector 2b: ``{"ic_unshifted", "ic_time_shifted", "n_pairs",
         "lag_ns", "median_age_ns"}`` with the score lagged by
-        ``TIME_SHIFT_LAG_FRACTION x horizon`` in time (module docs)."""
-        scores = model.score(frames)
+        ``lag_fraction x horizon`` in time (module docs)."""
+        if scores is None:
+            scores = model.score(frames)
         h_ns = int(HORIZONS_NS[model.horizon])
-        lag = max(1, int(h_ns * TIME_SHIFT_LAG_FRACTION))
+        lag = max(1, int(h_ns * lag_fraction))
         max_age = int(h_ns * TIME_SHIFT_MAX_AGE_FRACTION)
         xs, ys, xl, yl, ages = [], [], [], [], []
         for iid, sc in scores.items():
@@ -620,14 +701,30 @@ class LeakageTester:
                 time_shift_ok = True
                 if abs(ic0) > self.suspicious_ic and req_t > 0:
                     time_shift_ok = bool(np.isfinite(ic_t) and abs(ic_t) >= req_t * abs(ic0))
-            ts_extra = {
-                "time_shift": True,
-                "time_shift_ok": time_shift_ok,
-                "ic_time_shifted": float(ic_t) if np.isfinite(ic_t) else None,
-                "time_shift_pairs": int(tst["n_pairs"]),
-                "time_shift_lag_ns": int(tst["lag_ns"]),
-                "required_time_shift_ratio": float(req_t),
-            }
+            if time_shift_ok is False:
+                scores = model.score(frames)
+                profile = []
+                for frac in TIME_SHIFT_PROFILE_FRACTIONS:
+                    p = self.time_shift_test(model, frames, lag_fraction=frac, scores=scores)
+                    v = p["ic_time_shifted"]
+                    profile.append(
+                        {
+                            "lag_ns": int(p["lag_ns"]),
+                            "ic": float(v) if np.isfinite(v) else None,
+                            "n_pairs": int(p["n_pairs"]),
+                        }
+                    )
+                ts_extra["time_shift_profile"] = profile
+            ts_extra.update(
+                {
+                    "time_shift": True,
+                    "time_shift_ok": time_shift_ok,
+                    "ic_time_shifted": float(ic_t) if np.isfinite(ic_t) else None,
+                    "time_shift_pairs": int(tst["n_pairs"]),
+                    "time_shift_lag_ns": int(tst["lag_ns"]),
+                    "required_time_shift_ratio": float(req_t),
+                }
+            )
         trunc_ok = self.truncation_probe(model, frames) if probe_truncation else True
         recompute_ok: bool | None = None
         n_anchors = 0
@@ -639,18 +736,27 @@ class LeakageTester:
             recompute_ok = bool(probe.ok)
             n_anchors = int(probe.n_anchors)
             mismatches = list(probe.mismatches[:RECOMPUTE_MISMATCHES_KEPT])
+        if "time_shift_profile" in ts_extra:
+            ts_extra["time_shift_class"] = classify_time_shift_failure(
+                ic0,
+                [
+                    p["ic"] if p["ic"] is not None else float("nan")
+                    for p in ts_extra["time_shift_profile"]
+                ],
+                label_guard_ok=guard,
+                truncation_ok=trunc_ok,
+                recompute_ok=recompute_ok,
+                shift_ok=shift_ok,
+            )
+        ts_pass = time_shift_ok is not False or (
+            self.accept_fast_causal and ts_extra.get("time_shift_class") == "fast_causal"
+        )
         return LeakageResult(
             label_guard_ok=guard,
             ic_unshifted=float(ic0) if np.isfinite(ic0) else float("nan"),
             ic_shifted=float(ic1) if np.isfinite(ic1) else float("nan"),
             shift_ok=shift_ok,
-            passed=(
-                guard
-                and shift_ok
-                and trunc_ok
-                and recompute_ok is not False
-                and time_shift_ok is not False
-            ),
+            passed=(guard and shift_ok and trunc_ok and recompute_ok is not False and ts_pass),
             truncation_ok=trunc_ok,
             suspicious_ic=float(self.suspicious_ic),
             required_shift_ratio=float(required),

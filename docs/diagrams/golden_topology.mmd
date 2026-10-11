@@ -10,7 +10,7 @@ flowchart LR
     RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference;<br/>Python iap.risk consumes it too)"] --> EXP
     GV --> PY["python: pytest -k golden<br/>193 tests"]
     GV --> CPP["cpp: ctest -R Golden<br/>72 tests"]
-    GV --> RS["rust: 10 golden test targets<br/>71 tests"]
+    GV --> RS["rust: 10 golden test targets<br/>72 tests"]
     EXP --> PY
     EXP --> CPP
     EXP --> RS
