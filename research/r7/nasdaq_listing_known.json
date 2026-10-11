@@ -1,0 +1,330 @@
+{
+ "schema": "iap.r7_nasdaq_listing_known/v1",
+ "source": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/",
+ "updated": "2026-10-11",
+ "note": "Every entry seen in the listing. Append with --update-known after owner review.",
+ "entries": [
+  {
+   "name": "01302018.NASDAQ_ITCH50.gz.md5sum",
+   "bytes": 72,
+   "listed": "2018-01-31T01:14",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "01302019.NASDAQ_ITCH50.gz",
+   "bytes": 4764426091,
+   "listed": "2019-01-31T01:18",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "01302019.NASDAQ_ITCH50.gz.md5sum",
+   "bytes": 72,
+   "listed": "2019-01-31T01:18",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "01302020.NASDAQ_ITCH50.gz",
+   "bytes": 5597158940,
+   "listed": "2020-01-31T01:18",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "01302020.NASDAQ_ITCH50.gz.md5sum",
+   "bytes": 72,
+   "listed": "2020-01-31T01:18",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "03272019.NASDAQ_ITCH50.gz",
+   "bytes": 5510131732,
+   "listed": "2019-03-28T14:26",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "03272019.NASDAQ_ITCH50.gz.md5sum",
+   "bytes": 67,
+   "listed": "2019-03-28T15:57",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "03292018.NASDAQ_ITCH50.gz.md5sum",
+   "bytes": 72,
+   "listed": "2018-03-31T00:15",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "05302018.NASDAQ_ITCH50.gz.md5sum",
+   "bytes": 72,
+   "listed": "2018-05-31T00:12",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "05302019.NASDAQ_ITCH50.gz.md5sum",
+   "bytes": 72,
+   "listed": "2019-05-31T00:15",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "07302018.NASDAQ_ITCH50.gz.md5sum",
+   "bytes": 72,
+   "listed": "2018-07-31T00:14",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "07302019.NASDAQ_ITCH50.gz",
+   "bytes": 3662140094,
+   "listed": "2019-07-31T00:15",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "07302019.NASDAQ_ITCH50.gz.md5sum",
+   "bytes": 72,
+   "listed": "2019-07-31T00:15",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "08302018.NASDAQ_ITCH50.gz.md5sum",
+   "bytes": 72,
+   "listed": "2018-08-31T00:12",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "08302019.NASDAQ_ITCH50.gz",
+   "bytes": 4075649457,
+   "listed": "2019-08-31T00:25",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "08302019.NASDAQ_ITCH50.gz.md5sum",
+   "bytes": 72,
+   "listed": "2019-08-31T00:25",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "10302018.NASDAQ_ITCH50.gz.md5sum",
+   "bytes": 72,
+   "listed": "2018-10-31T00:22",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "10302019.NASDAQ_ITCH50.gz",
+   "bytes": 3872931242,
+   "listed": "2019-10-31T00:14",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "10302019.NASDAQ_ITCH50.gz.md5sum",
+   "bytes": 72,
+   "listed": "2019-10-31T00:14",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "12282018.NASDAQ_ITCH50.gz.md5sum",
+   "bytes": 72,
+   "listed": "2018-12-31T03:18",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "12302019.NASDAQ_ITCH50.gz",
+   "bytes": 3524013057,
+   "listed": "2019-12-31T01:13",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "12302019.NASDAQ_ITCH50.gz.md5sum",
+   "bytes": 72,
+   "listed": "2019-12-31T01:13",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "FEB 2022 Files",
+   "bytes": null,
+   "listed": "2022-06-29T15:07",
+   "is_dir": true,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "NOII",
+   "bytes": null,
+   "listed": "2023-09-14T16:22",
+   "is_dir": true,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S010303-v2.zip",
+   "bytes": 58907174,
+   "listed": "2023-03-31T09:19",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S061226-v50.txt.gz",
+   "bytes": 17894268560,
+   "listed": "2026-06-23T15:17",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S071321-v50.txt.done",
+   "bytes": 13,
+   "listed": "2021-07-13T20:13",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S071321-v50.txt.gz",
+   "bytes": 5996745270,
+   "listed": "2021-07-13T20:13",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S081321-v50.txt.done",
+   "bytes": 13,
+   "listed": "2021-08-13T20:16",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S081321-v50.txt.gz",
+   "bytes": 4889328604,
+   "listed": "2021-08-13T20:16",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S101819-v50.txt.gz",
+   "bytes": 3951201663,
+   "listed": "2019-10-19T00:15",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S112825-v50.txt.done",
+   "bytes": 66,
+   "listed": "2026-08-05T10:34",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S112825-v50.txt.gz",
+   "bytes": 4735308661,
+   "listed": "2026-08-05T10:37",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S120825-v50.txt.done",
+   "bytes": 66,
+   "listed": "2026-08-05T11:01",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S120825-v50.txt.gz",
+   "bytes": 8775891119,
+   "listed": "2026-08-05T11:07",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S120925-v50.txt.done",
+   "bytes": 66,
+   "listed": "2026-08-05T11:09",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S120925-v50.txt.gz",
+   "bytes": 7929915419,
+   "listed": "2026-08-05T11:13",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S121025-v50.txt.done",
+   "bytes": 66,
+   "listed": "2026-08-05T11:23",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S121025-v50.txt.gz",
+   "bytes": 11557662295,
+   "listed": "2026-08-05T11:30",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S121125-v50.txt.done",
+   "bytes": 68,
+   "listed": "2026-08-05T11:34",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S121125-v50.txt.gz",
+   "bytes": 10471034001,
+   "listed": "2026-08-05T11:40",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S121225-v50.txt.done",
+   "bytes": 66,
+   "listed": "2026-08-05T11:40",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "S121225-v50.txt.gz",
+   "bytes": 12551644054,
+   "listed": "2026-08-05T11:59",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "itch50_05_15.gz",
+   "bytes": 13047496628,
+   "listed": "2026-06-09T15:13",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "itch50_05_18.gz",
+   "bytes": 16150095810,
+   "listed": "2026-06-09T15:30",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  },
+  {
+   "name": "tvagg.gz",
+   "bytes": 294755242,
+   "listed": "2023-05-15T03:59",
+   "is_dir": false,
+   "first_seen": "2026-10-11"
+  }
+ ]
+}
