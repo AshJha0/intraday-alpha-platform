@@ -177,9 +177,21 @@ def max_sample_age(series: MidSeries) -> int:
     return max(LABEL_MAX_AGE_FLOOR_NS, LABEL_MAX_AGE_GAP_MULT * series.median_gap_ns())
 
 
-#: Freshness-bound rules of :func:`compute_labels` (module docs): default first.
+#: Freshness-bound rules of :func:`compute_labels` (module docs).
 FRESHNESS_MODES = ("whole_day", "trailing")
+#: Argument default of :func:`compute_labels` (its callers pass an explicit
+#: ``max_age_ns``, which only ``whole_day`` accepts).
 DEFAULT_FRESHNESS = "whole_day"
+#: Default of the feature store (``python -m iap.features``) since v1.14
+#: (D-P2-13 / R-P1-1): the causal trailing bound.  ``whole_day`` derives the
+#: bound from the whole session's median gap, i.e. from samples after the
+#: row, and is kept as ``--label-freshness whole_day`` for the stores
+#: published before v1.14.
+STORE_FRESHNESS = "trailing"
+#: Feature-store layout / semantics version written to features_summary.json
+#: (2 = v1.14: trailing label freshness by default, same-timestamp events
+#: coalesced into one refresh / row).
+FEATURE_STORE_VERSION = 2
 #: Distinct-timestamp gaps the trailing median looks back over.
 LABEL_FRESHNESS_WINDOW = 256
 

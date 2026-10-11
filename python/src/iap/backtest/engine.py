@@ -141,6 +141,7 @@ import pandas as pd
 from iap.backtest.costs import CostModel
 from iap.labels.frames import scored_rows
 from iap.labels.labels import HORIZONS_NS
+from iap.reference.refdata import session_values
 
 NS_S = 1_000_000_000
 BAR_NS = 60 * NS_S
@@ -706,7 +707,8 @@ class Backtester:
                 mid[trade_rows],
                 hs[trade_rows],
                 meta["asset_class"],
-                float(meta["adv"]),
+                # the session's own as-of ADV per trade (D-P2-8; scalar on synthetic)
+                session_values(meta, "adv", ts[trade_rows]),
                 int(meta["lot_size"]),
             )
             costs[trade_rows] = comp["spread"] + comp["fee"] + comp["impact"]

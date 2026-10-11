@@ -170,7 +170,9 @@ def test_output_bytes_of_a_seeded_dataset_are_pinned(tmp_path, capsys):
         "8ae6f26fab7396727f0a7d66a58052faebbad3059fb0e6188214e322e31bb871"
     )
     assert manifest["sessions"][D1]["raw"]["trade_price_residue_histogram"] == {"50": 119}
-    assert manifest["config_version"] == config_version(out) and len(manifest["config_version"]) == 64
+    assert (
+        manifest["config_version"] == config_version(out) and len(manifest["config_version"]) == 64
+    )
     assert manifest["sessions"][D1]["raw"]["sha256"] == (
         "6060224180a376cffa22a78804353bea8fd6d866f9b4964e7d630cca05dea9c7"
     )
@@ -765,6 +767,27 @@ def test_research_runs_on_an_ingested_dataset_by_path(tmp_path, capsys):
     assert spec["feature_version"] == summary["registry_hash"]
     ledger = json.loads((out / "research" / "experiments.json").read_text())
     assert [d["dataset_version"] for d in ledger["datasets"]] == [version]
+    manifest = load_manifest(out)
+    # v1.14: the ledger entries carry the configs/reference hash (D-P2-9) ...
+    assert {e.get("config_version") for e in ledger["entries"]} == {manifest["config_version"]}
+    # ... the store records its version and label freshness (D-P2-13) and the
+    # side-less opening / closing crosses were folded into volume (D-P2-6)
+    assert summary["store_version"] == 2 and summary["label_freshness"] == "trailing"
+    n_crosses = sum(
+        len(per["crosses"])
+        for s in manifest["sessions"].values()
+        for per in s["per_symbol"].values()
+    )
+    assert summary["cross_prints"] == {"mode": "fold", "folded": n_crosses} and n_crosses > 0
+    # per-session reference values (D-P2-8): each session priced at its own
+    # open, the second session's ADV is the first session's volume (as of)
+    rows = json.loads((out / "configs" / "instruments" / "instruments.json").read_text())
+    aapl = next(r for r in rows["instruments"] if r["symbol"] == "AAPL")
+    vols = [manifest["sessions"][d]["per_symbol"]["AAPL"]["volume"] for d in (D1, D2)]
+    assert aapl["adv_by_session"] == {D1: vols[0], D2: vols[0]}
+    assert set(aapl["ref_price_by_session"]) == {D1, D2}
+    master = SecurityMaster.load(out / "reference" / "security_master.json")
+    assert master.as_of("AAPL", D2).adv == vols[0]
     assert (
         research_main(
             ["run", "--no-prereg", "--alpha", "EQ03", "--dataset-dir", str(tmp_path / "nope")]

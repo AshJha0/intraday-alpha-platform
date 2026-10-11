@@ -38,6 +38,12 @@ Run from python/ with PYTHONPATH=src:
 
 Golden values are pinned: regenerate ONLY on a deliberate, versioned change
 (schemas/MIGRATIONS.md); every other language must match these numbers.
+
+v1.14 (D-P1-1): the engine runs COALESCED (``group_ends``: one refresh /
+sample / emission per (instrument, exchange_ts)), so a checkpoint must be
+the last event of its group; the EQ checkpoints 500 / 1500 and the FX
+anomaly checkpoint 240 moved to 501 / 1501 / 241 (the next group end).  The
+brute-force cross-check samples the book at group ends only.
 """
 
 from __future__ import annotations
@@ -55,12 +61,12 @@ sys.path.insert(0, str(REPO / "python" / "src"))
 from iap.core.codec import read_jsonl  # noqa: E402
 from iap.core.events import EventType  # noqa: E402
 from iap.features.context import build_contexts  # noqa: E402
-from iap.features.engine import FeatureEngine  # noqa: E402
+from iap.features.engine import FeatureEngine, group_ends  # noqa: E402
 from iap.features.registry import build_registry, registry_hash  # noqa: E402
 from iap.orderbook.book import OrderBook  # noqa: E402
 
 GOLDEN_DIR = REPO / "tests" / "golden"
-EQ_CHECKPOINTS = (500, 1000, 1500, 2000)  # 1-based event indices
+EQ_CHECKPOINTS = (501, 1000, 1501, 2000)  # 1-based event indices (group ends)
 FX_CHECKPOINTS = (400, 800)
 TOL = 1e-9
 
@@ -180,7 +186,7 @@ NATIVE_45 = [
 #: Anomaly-vector checkpoints (1-based event indices; the last one is the
 #: final event of each vector).
 EQ_ANOMALY_CHECKPOINTS = (100, 300, 500, 700, 900, 1100, 1300, 1403)
-FX_ANOMALY_CHECKPOINTS = (60, 120, 240, 360, 480, 561)
+FX_ANOMALY_CHECKPOINTS = (60, 120, 241, 360, 480, 561)
 
 
 def close(a: float, b: float) -> bool:
@@ -188,12 +194,14 @@ def close(a: float, b: float) -> bool:
 
 
 def run_engine(events, checkpoints):
-    """Run the engine (emit every event); return {index: FeatureVector}."""
+    """Run the engine (cadence 0, coalesced); return {index: FeatureVector}."""
     engine = FeatureEngine(build_contexts(REPO / "configs"), cadence_ns=0)
     out = {}
-    for i, ev in enumerate(events, start=1):
-        vec = engine.apply(ev)
+    for i, (ev, end) in enumerate(zip(events, group_ends(events), strict=True), start=1):
+        vec = engine.apply(ev, end)
         if i in checkpoints:
+            if vec is None:
+                raise SystemExit(f"checkpoint {i} is not the last event of its timestamp group")
             out[i] = vec
     return engine, out
 
@@ -212,6 +220,8 @@ def brute_force_frames(events, tick: float):
     rows, trows, srows = [], [], []
     prev = None
     hist_mid2 = None  # last recorded mid-sample value
+    group_touch = False  # v1.14: the book is sampled once per timestamp group
+    ends = group_ends(events)
     for n, ev in enumerate(events, start=1):
         book.apply(ev)
         et = ev.event_type
@@ -226,8 +236,10 @@ def brute_force_frames(events, tick: float):
             EventType.EXECUTE,
             EventType.QUOTE,
         ) or (et == EventType.SNAPSHOT and ev.trade_id == 0)
-        if not touch:
+        group_touch = group_touch or touch
+        if not ends[n - 1] or not group_touch:
             continue
+        group_touch = False
         bb, ba = book.best_bid(), book.best_ask()
         row = {
             "ts": ev.exchange_ts,
@@ -329,8 +341,8 @@ def _anomaly_side(vector: str, checkpoints, instrument_id: int, names_idx):
     events = read_jsonl(GOLDEN_DIR / vector)
     engine = FeatureEngine(build_contexts(REPO / "configs"), cadence_ns=0)
     cps = {}
-    for i, ev in enumerate(events, start=1):
-        vec = engine.apply(ev)
+    for i, (ev, end) in enumerate(zip(events, group_ends(events), strict=True), start=1):
+        vec = engine.apply(ev, end)
         if i in checkpoints:
             if vec is None:
                 raise SystemExit(
@@ -376,7 +388,9 @@ def write_anomaly_golden(names_idx) -> None:
             "regressions).  Pins API_FEATURES section 2: only APPLIED events feed "
             "rolling state, ts regressions are dropped+counted, a stale->fresh "
             "recovery resets rolling state and re-anchors warmup, EPS-guarded "
-            "ratios stay invalid on a zero denominator.  Feature set = the "
+            "ratios stay invalid on a zero denominator.  Coalesced engine "
+            "(v1.14, D-P1-1): one refresh / row per (instrument, exchange_ts), "
+            "checkpoints on group ends.  Feature set = the "
             "native-45 sub-vector every port implements; value is null when "
             "valid is false.  Tolerance: abs 1e-9 / rel 1e-9."
         ),
@@ -434,7 +448,10 @@ def main() -> int:
         "description": "Feature-engine golden checkpoints: representative "
         "feature values (every family) after applying the "
         "first N events of each golden vector with emission "
-        "cadence = every event. value is null when valid is "
+        "cadence = every event, same-timestamp events coalesced "
+        "(v1.14, D-P1-1: one refresh / row per (instrument, "
+        "exchange_ts); every checkpoint is the last event of its "
+        "timestamp group). value is null when valid is "
         "false. Tolerance: abs 1e-9 / rel 1e-9. Validated "
         "against independent brute-force pandas recomputation "
         "before writing.",

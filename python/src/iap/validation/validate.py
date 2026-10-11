@@ -190,6 +190,7 @@ import pandas as pd
 
 from iap.backtest.engine import Backtester, BacktestResult
 from iap.labels.frames import DEFAULT_IC_ROWS, IC_ROWS, LEGACY_IC_ROWS, scored_labels
+from iap.reference.refdata import session_notional_adv
 from iap.validation.cpcv import (
     DEFAULT_CPCV_GROUPS,
     DEFAULT_CPCV_TEST_GROUPS,
@@ -292,6 +293,15 @@ DSR_LOOKS = 1
 VALIDITY_LOOKS = 4
 
 _KEY_1X = f"x{1.0:g}"
+
+
+def _proxy_adv(meta: Mapping) -> float:
+    """ADV for the capacity proxy: the scalar, or (an ingested dataset with
+    per-session values, D-P2-8) the notional ADV over the sessions, each at
+    its own reference price, expressed at the scalar reference price."""
+    if meta.get("adv_by_session"):
+        return session_notional_adv(meta) / float(meta["ref_price"])
+    return float(meta["adv"])
 
 
 def looks_per_validation(
@@ -464,7 +474,7 @@ def _capacity(
     under ``"breakeven"`` and the proxy under ``"participation"``."""
     proxy = {
         str(iid): capacity_proxy_usd(
-            float(capacity_meta[iid]["adv"]),
+            _proxy_adv(capacity_meta[iid]),
             float(capacity_meta[iid]["ref_price"]),
             max_participation,
             float(capacity_meta[iid].get("lot_value_multiplier", 1.0)),
@@ -481,7 +491,13 @@ def _capacity(
         rate = backtester.reference_rate(backtester.quote_currency(iid))
         # ADV is in base units (shares, or base currency for FX), so ADV x
         # price is quote-currency notional; ``rate`` takes it to USD.
-        cap_line = float(max_participation * adv * float(capacity_meta[iid]["ref_price"]) * rate)
+        if capacity_meta[iid].get("adv_by_session"):
+            # notional ADV over the sessions, each at its own price (D-P2-8)
+            cap_line = float(max_participation * session_notional_adv(capacity_meta[iid]) * rate)
+        else:
+            cap_line = float(
+                max_participation * adv * float(capacity_meta[iid]["ref_price"]) * rate
+            )
         row = {
             "edge_return": 0.0,
             "round_trips": 0.0,

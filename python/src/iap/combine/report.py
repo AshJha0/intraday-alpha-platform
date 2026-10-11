@@ -80,6 +80,7 @@ from iap.combine.weights import (
 from iap.contracts.versions import content_hash
 from iap.experiment import tracker
 from iap.labels.frames import scored_labels
+from iap.reference.refdata import session_meta
 from iap.validation.leakage import RecomputeSources
 from iap.validation.ledger import ExperimentLedger
 from iap.validation.methods import DEFAULT_METHODS, ResearchMethods, methods
@@ -174,6 +175,8 @@ def _load_meta(configs_dir: Path) -> dict[int, dict]:
             "ref_price": float(row.get("ref_price", 1.0)),
             "base_currency": row.get("base_currency"),
             "quote_currency": row.get("quote_currency", row.get("currency", "USD")),
+            # v1.14 (D-P2-8): per-session ref_price / adv of an ingested dataset
+            **session_meta(row, (cfg.get("calendar") or {}).get("timezone")),
         }
     return meta
 

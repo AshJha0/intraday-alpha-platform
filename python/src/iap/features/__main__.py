@@ -13,6 +13,16 @@ Usage (from python/ with PYTHONPATH=src):
                             [--feature-set default|extended]
                             [--sampling clock|events:N|volume:N]
 
+v1.14 defaults (store_version 2, recorded in features_summary.json):
+``--same-ts coalesce`` (D-P1-1: the events of one instrument sharing an
+exchange_ts are one state change: one refresh, one set of samples, one row
+at the group's last event; ``per_event`` is the v1.13 semantics),
+``--label-freshness trailing`` (D-P2-13: the causal freshness bound;
+``whole_day`` is the v1.13 store) and, on an ingested dataset,
+``--cross-prints fold`` (D-P2-6: the side-less cross prints of dataset.json
+count in volume, never in signed flow; ``omit`` is v1.13).  The v1.13 store
+is ``--same-ts per_event --label-freshness whole_day --cross-prints omit``.
+
 Opt-in (v1.12.0): ``--feature-set extended`` appends the Python-only
 extended families of :mod:`iap.features.extended` (own feature_version);
 ``--sampling events:N|volume:N`` emits rows on an event / volume clock
@@ -90,16 +100,17 @@ import pyarrow.parquet as pq
 
 from iap.core.codec import read_iap1, read_jsonl
 from iap.features.context import build_contexts
-from iap.features.engine import FeatureEngine
+from iap.features.engine import FeatureEngine, group_ends
 from iap.features.registry import build_registry, registry_hash, write_registry
 from iap.features.rolling import SessionProfile
 from iap.features.spec import FAMILY_ORDER
 from iap.features.timeofday import PROFILE_METRICS, _metric_value
 from iap.labels.labels import (
-    DEFAULT_FRESHNESS,
+    FEATURE_STORE_VERSION,
     FRESHNESS_MODES,
     HORIZON_ORDER,
     LABEL_MAX_AGE_FLOOR_NS,
+    STORE_FRESHNESS,
     LabelReason,
     MidSeries,
     compute_labels,
@@ -135,13 +146,15 @@ class _ProfileLog:
         self.curs: list[tuple] = []
 
 
-def _overlay_rust(path: Path, contexts, cadence_ns: int, buffers, nfeat: int) -> bool:
+def _overlay_rust(
+    path: Path, contexts, cadence_ns: int, buffers, nfeat: int, coalesce: bool = True
+) -> bool:
     """Replace the native slots of ``buffers`` with the Rust engine's output
     for the same file. Returns False (buffers untouched) if rows differ."""
     from iap.features.native import NATIVE_NAMES, compute_native_file
     from iap.features.registry import feature_index
 
-    frame = compute_native_file(path, contexts, cadence_ns, engine="rust")
+    frame = compute_native_file(path, contexts, cadence_ns, engine="rust", coalesce=coalesce)
     idx = feature_index()
     cols = [idx[n] for n in NATIVE_NAMES]
     nbytes = (nfeat + 7) // 8
@@ -188,6 +201,42 @@ def _make_engine(contexts, cadence_ns: int, profiles, opts):
     )
 
 
+#: ``--cross-prints`` modes (D-P2-6); the default folds them.
+CROSS_PRINT_MODES = ("fold", "omit")
+
+
+def cross_prints_for(path: Path, mode: str = "fold") -> list[tuple[int, int, int]]:
+    """``(exchange_ts, instrument_id, shares)`` of the side-less cross prints
+    (ITCH ``Q``: opening / closing / halt / IPO crosses) of the session of
+    one normalized file, from the ingested dataset's manifest
+    (``<path>/../../dataset.json``), sorted by time; empty for ``omit``,
+    for a synthetic dataset (no manifest) and for a file of no ingested
+    session.  Zero-share and zero-price crosses are not prints."""
+    if mode == "omit":
+        return []
+    root = Path(path).resolve().parent.parent
+    if not (root / "dataset.json").is_file():
+        return []
+    from iap.marketdata.ingest import load_manifest
+
+    manifest = load_manifest(root)  # refuses a pre-v1.14 dataset (D-P1-4)
+    stem = Path(path).name.split(".")[0]  # eq_YYYYMMDD
+    digits = stem.rpartition("_")[2]
+    if len(digits) != 8 or not digits.isdigit():
+        return []
+    session = manifest["sessions"].get(f"{digits[:4]}-{digits[4:6]}-{digits[6:]}")
+    if session is None:
+        return []
+    ids = {u["symbol"]: int(u["instrument_id"]) for u in manifest["universe"]}
+    out = [
+        (int(c["exchange_ts"]), ids[symbol], int(c["shares"]))
+        for symbol, per in session["per_symbol"].items()
+        for c in per.get("crosses", [])
+        if c.get("shares", 0) > 0 and c.get("price_e4", 0) > 0
+    ]
+    return sorted(out)
+
+
 def _replay_file(
     path: Path,
     contexts,
@@ -196,6 +245,8 @@ def _replay_file(
     record: bool,
     engine: str = "python",
     opts=None,
+    cross: str = "fold",
+    same_ts: str = "coalesce",
 ):
     """Replay one input file through a fresh engine.
 
@@ -207,8 +258,18 @@ def _replay_file(
     engine = _make_engine(contexts, cadence_ns, profiles, opts)
     buffers: dict[int, _InstrumentBuffer] = {}
     logs: dict[int, _ProfileLog] = {}
-    for ev in events:
-        vec = engine.apply(ev)
+    # v1.14 (D-P1-1): one refresh / sample / row per (instrument, exchange_ts)
+    ends = group_ends(events) if same_ts == "coalesce" else [True] * len(events)
+    # v1.14 (D-P2-6): side-less cross prints fold into volume at their time
+    crosses = cross_prints_for(path, cross)
+    ci = 0
+    for ev, end in zip(events, ends, strict=True):
+        while ci < len(crosses) and crosses[ci][0] < ev.exchange_ts:
+            ts, iid, qty = crosses[ci]
+            if iid in contexts:
+                engine.on_cross_print(iid, ts, qty)
+            ci += 1
+        vec = engine.apply(ev, end)
         iid = ev.instrument_id
         buf = buffers.get(iid)
         if buf is None:
@@ -238,17 +299,30 @@ def _replay_file(
                     log = logs[iid] = _ProfileLog()
                 log.buckets.append(SessionProfile.bucket_of(t, st.ctx.clock.offset_seconds(t)))
                 log.curs.append(tuple(_metric_value(st, m) for m in PROFILE_METRICS))
-    counts = (engine.events_processed, engine.vectors_emitted)
+    for ts, iid, qty in crosses[ci:]:  # after the last event (closing cross)
+        if iid in contexts:
+            engine.on_cross_print(iid, ts, qty)
+    counts = (engine.events_processed, engine.vectors_emitted, engine.cross_prints_folded)
     if backend == "rust":
-        _overlay_rust(path, contexts, cadence_ns, buffers, len(engine.feature_names))
+        _overlay_rust(
+            path, contexts, cadence_ns, buffers, len(engine.feature_names), same_ts == "coalesce"
+        )
     return len(events), counts, buffers, logs
 
 
 def _worker(job):
     """Process-pool entry point: replay one day against an empty profile."""
-    path, configs, cadence_ns, backend, opts = job
+    path, configs, cadence_ns, backend, opts, cross, same_ts = job
     return _replay_file(
-        Path(path), build_contexts(configs), cadence_ns, {}, record=True, engine=backend, opts=opts
+        Path(path),
+        build_contexts(configs),
+        cadence_ns,
+        {},
+        record=True,
+        engine=backend,
+        opts=opts,
+        cross=cross,
+        same_ts=same_ts,
     )
 
 
@@ -353,7 +427,7 @@ def _flush_file(
     fam_valid: dict[int, np.ndarray],
     row_counts: dict[int, int],
     label_stats: dict[int, dict],
-    label_freshness: str = DEFAULT_FRESHNESS,
+    label_freshness: str = STORE_FRESHNESS,
 ) -> None:
     """Write one row group per instrument for the just-processed file."""
     nfeat = len(names)
@@ -500,9 +574,25 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--label-freshness",
         choices=FRESHNESS_MODES,
-        default=DEFAULT_FRESHNESS,
-        help="label freshness bound: whole_day (default, published stores) or "
-        "trailing (causal, R5: trailing median quote gap)",
+        default=STORE_FRESHNESS,
+        help="label freshness bound: trailing (default since v1.14; causal, R5: trailing "
+        "median quote gap) or whole_day (legacy, the stores published before v1.14)",
+    )
+    ap.add_argument(
+        "--same-ts",
+        choices=("coalesce", "per_event"),
+        default="coalesce",
+        help="coalesce (default since v1.14, D-P1-1): one refresh / sample / row per "
+        "(instrument, exchange_ts); per_event: the v1.13 semantics, a refresh and a row "
+        "after every event (reproduces the stores published before v1.14)",
+    )
+    ap.add_argument(
+        "--cross-prints",
+        choices=CROSS_PRINT_MODES,
+        default="fold",
+        help="ingested datasets: fold the side-less opening / closing / halt cross prints "
+        "of dataset.json into volume, participation, the volume profile and the volume "
+        "clock, never into signed flow (fold, default since v1.14) or leave them out (omit)",
     )
     ap.add_argument(
         "--engine",
@@ -581,6 +671,7 @@ def main(argv: list[str] | None = None) -> int:
     label_stats: dict[int, dict] = {}
     total_events = 0
     total_vectors = 0
+    total_crosses = 0
 
     cadence_ns = args.cadence_ms * 1_000_000
     workers = effective_workers(args.workers, len(files), args.worker_mem_gb)
@@ -588,9 +679,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"--workers {args.workers} -> {workers} (files / CPUs / RAM cap)", file=sys.stderr)
 
     def _consume(path: Path, n_events: int, counts, buffers) -> None:
-        nonlocal total_events, total_vectors
+        nonlocal total_events, total_vectors, total_crosses
         total_events += counts[0]
         total_vectors += counts[1]
+        total_crosses += counts[2]
         _flush_file(
             writers,
             out_dir,
@@ -607,12 +699,23 @@ def main(argv: list[str] | None = None) -> int:
     if workers <= 1:
         for path in files:
             n_events, counts, buffers, _ = _replay_file(
-                path, contexts, cadence_ns, profiles, record=False, engine=backend, opts=opts
+                path,
+                contexts,
+                cadence_ns,
+                profiles,
+                record=False,
+                engine=backend,
+                opts=opts,
+                cross=args.cross_prints,
+                same_ts=args.same_ts,
             )
             _consume(path, n_events, counts, buffers)
     else:
         norm_idx = [names.index(f"norm_{m}_m5_v1") for m in PROFILE_METRICS]
-        jobs = [(str(p), str(args.configs), cadence_ns, backend, opts) for p in files]
+        jobs = [
+            (str(p), str(args.configs), cadence_ns, backend, opts, args.cross_prints, args.same_ts)
+            for p in files
+        ]
         # Under `python -m iap.features` this file runs as `__main__`, and a
         # spawn-start worker (Windows, macOS) does not re-import a package's
         # `__main__`, so `__main__._worker` cannot be unpickled there. Submit
@@ -671,6 +774,9 @@ def main(argv: list[str] | None = None) -> int:
             },
         }
     summary = {
+        "store_version": FEATURE_STORE_VERSION,
+        "label_freshness": args.label_freshness,
+        "same_ts": args.same_ts,
         "registry_hash": reg_hash,
         "registered_features": len(registry),
         "cadence_ms": args.cadence_ms,
@@ -687,6 +793,8 @@ def main(argv: list[str] | None = None) -> int:
         summary["sampling"] = args.sampling
     if backend != "python":  # key absent on the default path: summary bytes unchanged
         summary["native_engine"] = backend
+    if total_crosses or args.cross_prints != "fold":  # absent on synthetic data
+        summary["cross_prints"] = {"mode": args.cross_prints, "folded": total_crosses}
     with open(out_dir / "features_summary.json", "w") as f:
         json.dump(summary, f, indent=2)
         f.write("\n")

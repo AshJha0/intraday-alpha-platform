@@ -19,6 +19,11 @@ returns the same :class:`NativeFrame` (numpy arrays, slot order =
 is the fallback policy (``"rust"`` -> ``"python"`` with a warning when the
 extension is not importable).  The remaining 160 registry features exist only
 in Python.
+
+Both backends coalesce same-timestamp events by default (v1.14, D-P1-1:
+one refresh / sample / row per (instrument, exchange_ts), the row emitted
+at the group's last event); ``coalesce=False`` is the per-event legacy
+semantics.
 """
 
 from __future__ import annotations
@@ -160,9 +165,12 @@ def _from_ext(d: dict, engine: str = "rust") -> NativeFrame:
 
 
 def _python_frame(
-    events: Sequence[MarketEvent], contexts: dict[int, InstrumentContext], cadence_ns: int
+    events: Sequence[MarketEvent],
+    contexts: dict[int, InstrumentContext],
+    cadence_ns: int,
+    coalesce: bool = True,
 ) -> NativeFrame:
-    from iap.features.engine import FeatureEngine  # local: heavy import
+    from iap.features.engine import FeatureEngine, group_ends  # local: heavy import
     from iap.features.registry import feature_index
 
     idx = feature_index()
@@ -173,8 +181,10 @@ def _python_frame(
     ts: list[int] = []
     vals: list[list[float]] = []
     valid: list[list[bool]] = []
+    events = list(events)
+    ends = group_ends(events) if coalesce else [True] * len(events)
     for i, ev in enumerate(events):
-        vec = eng.apply(ev)
+        vec = eng.apply(ev, ends[i])
         if vec is not None:
             pos.append(i)
             iids.append(vec.instrument_id)
@@ -203,6 +213,7 @@ def compute_native(
     contexts: dict[int, InstrumentContext],
     cadence_ns: int = 0,
     engine: str = "python",
+    coalesce: bool = True,
 ) -> NativeFrame:
     """Replay ``events`` and return the 45 native slots with ``engine``.
 
@@ -210,14 +221,14 @@ def compute_native(
     selects the native columns; the Rust backend computes only the 45 slots.
     """
     if engine == "python":
-        return _python_frame(events, contexts, cadence_ns)
+        return _python_frame(events, contexts, cadence_ns, coalesce)
     if engine != "rust":
         raise ValueError(f"engine must be one of {ENGINES}, got {engine!r}")
     ext = rust_extension()
     if ext is None:
         raise RuntimeError("engine='rust' but the iap_features_rs extension is not installed")
     data = encode_iap1(list(events))
-    return _from_ext(ext.replay_bytes(data, _ticks(contexts), cadence_ns, "iap1"))
+    return _from_ext(ext.replay_bytes(data, _ticks(contexts), cadence_ns, "iap1", coalesce))
 
 
 def compute_native_file(
@@ -225,6 +236,7 @@ def compute_native_file(
     contexts: dict[int, InstrumentContext],
     cadence_ns: int = 0,
     engine: str = "python",
+    coalesce: bool = True,
 ) -> NativeFrame:
     """Like :func:`compute_native` on a normalized file (``.iap1`` or JSONL);
     the Rust backend reads and decodes the file natively."""
@@ -233,6 +245,6 @@ def compute_native_file(
         ext = rust_extension()
         if ext is None:
             raise RuntimeError("engine='rust' but the iap_features_rs extension is not installed")
-        return _from_ext(ext.replay_file(str(path), _ticks(contexts), cadence_ns))
+        return _from_ext(ext.replay_file(str(path), _ticks(contexts), cadence_ns, coalesce))
     events = read_iap1(path) if path.suffix == ".iap1" else read_jsonl(path)
-    return compute_native(events, contexts, cadence_ns, engine)
+    return compute_native(events, contexts, cadence_ns, engine, coalesce)

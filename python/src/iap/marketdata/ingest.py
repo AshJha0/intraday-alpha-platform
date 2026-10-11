@@ -33,6 +33,7 @@ iteration over an unordered container reaches a file.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import datetime as _dt
 import hashlib
 import json
@@ -158,8 +159,11 @@ def config_version(dataset_dir: str | Path) -> str:
     h = hashlib.sha256()
     h.update(b"iap.real-config.v1\n")
     files = [
-        f for sub in ("configs", "reference") if (root / sub).is_dir()
-        for f in (root / sub).rglob("*") if f.is_file()
+        f
+        for sub in ("configs", "reference")
+        if (root / sub).is_dir()
+        for f in (root / sub).rglob("*")
+        if f.is_file()
     ]
     for f in sorted(files, key=lambda p: p.relative_to(root).as_posix()):
         h.update(f.relative_to(root).as_posix().encode())
@@ -672,9 +676,7 @@ def sequence_rows(
     if counters is not None:
         counters["events"] = n
         counters["trade_prices_rounded_to_tick"] = rounded
-        counters["trade_price_residue_histogram"] = {
-            str(r): residues[r] for r in sorted(residues)
-        }
+        counters["trade_price_residue_histogram"] = {str(r): residues[r] for r in sorted(residues)}
         counters["off_tick_orders_rejected"] = sum(off_tick)
         counters["events_on_rejected_orders"] = followers
         counters["off_tick_orders_rejected_by_instrument"] = off_tick
@@ -741,8 +743,39 @@ def _raw_pass(
 # ------------------------------------------------------------------- configs
 
 
+def session_reference_values(manifest: dict, symbol: str) -> dict[str, dict]:
+    """Point-in-time ``{date: {"ref_price", "adv"}}`` of one symbol (D-P2-8).
+
+    ``ref_price`` is the session's own reference price (opening cross, else
+    first trade, else first displayed order: known at the open; ``None``
+    when the session has none).  ``adv`` is AS OF the session: the mean
+    volume of the dataset's EARLIER sessions, or the session's own volume
+    for the first one (no history; documented in docs/REAL_DATA.md), at
+    least 1.  A multi-year dataset therefore never prices 2020 at the 2019
+    open, and no session's ADV includes a later session.
+    """
+    out: dict[str, dict] = {}
+    volumes: list[int] = []
+    for date in sorted(manifest["sessions"]):
+        per = manifest["sessions"][date]["per_symbol"][symbol]
+        ref = per["ref_price_e4"]
+        history = volumes if volumes else [per["volume"]]
+        out[date] = {
+            "ref_price": ref / PRICE_SCALE if ref else None,
+            "adv": max(1, sum(history) // len(history)),
+        }
+        volumes.append(per["volume"])
+    return out
+
+
 def _instrument_rows(manifest: dict) -> list[dict]:
-    """instruments.json rows, derived from every session in the manifest."""
+    """instruments.json rows, derived from every session in the manifest.
+
+    ``ref_price`` / ``adv`` stay the dataset-level scalars of v1.13 (first
+    priced session; mean session volume) for consumers without a session;
+    ``ref_price_by_session`` / ``adv_by_session`` (v1.14, D-P2-8) are the
+    point-in-time values (:func:`session_reference_values`) the backtester
+    and the capacity proxy read per session."""
     sessions = [manifest["sessions"][d] for d in sorted(manifest["sessions"])]
     rows = []
     for entry in manifest["universe"]:
@@ -751,6 +784,7 @@ def _instrument_rows(manifest: dict) -> list[dict]:
         priced = [p for p in per_day if p["ref_price_e4"]]
         ref_price = priced[0]["ref_price_e4"] / PRICE_SCALE if priced else 1.0
         adv = max(1, sum(p["volume"] for p in per_day) // len(per_day))
+        by_session = session_reference_values(manifest, symbol)
         rows.append(
             {
                 "symbol": symbol,
@@ -761,6 +795,11 @@ def _instrument_rows(manifest: dict) -> list[dict]:
                 "lot_size": entry["lot_size"],
                 "ref_price": ref_price,
                 "adv": adv,
+                "ref_price_by_session": {
+                    d: v["ref_price"] if v["ref_price"] is not None else ref_price
+                    for d, v in by_session.items()
+                },
+                "adv_by_session": {d: v["adv"] for d, v in by_session.items()},
                 "venues": [manifest["source"]["venue"]],
             }
         )
@@ -784,7 +823,11 @@ def _write_configs(out: Path, manifest: dict, configs_dir: Path) -> None:
                 "Universe of an ingested real dataset (docs/REAL_DATA.md). tick_size, lot_size "
                 "and asset_class come from the feed; ref_price is the first session's opening "
                 "cross (else first trade, else first displayed order); adv is the mean "
-                "per-session volume ON THE SOURCE VENUE, not consolidated volume."
+                "per-session volume ON THE SOURCE VENUE, not consolidated volume. "
+                "ref_price_by_session / adv_by_session are the point-in-time values per "
+                "session (the session's own reference price; the mean volume of the EARLIER "
+                "sessions, the first session's own volume for the first) that per-session "
+                "consumers read (v1.14, D-P2-8)."
             ),
             "calendar": {
                 "trading_days": sorted(manifest["sessions"]),
@@ -833,6 +876,7 @@ def _security_records(
     for entry in manifest["universe"]:
         symbol = entry["symbol"]
         directory = facts[symbol]["directory"]
+        as_of = session_reference_values(manifest, symbol)[date]
         records.append(
             SecurityRecord(
                 symbol=symbol,
@@ -843,10 +887,29 @@ def _security_records(
                 tick_size=entry["tick_size"],
                 round_lot_size=facts[symbol]["lot_size"],
                 source=source_format,
+                ref_price=as_of["ref_price"],
+                adv=as_of["adv"],
                 **directory,
             )
         )
     return records
+
+
+def _restamp_session_values(master: SecurityMaster, manifest: dict) -> None:
+    """Set every session record's as-of ``ref_price`` / ``adv`` from the
+    dataset's sessions (D-P2-8): an earlier session ingested (or merged) after
+    a later one changes the later one's as-of ADV."""
+    for entry in manifest["universe"]:
+        symbol = entry["symbol"]
+        values = session_reference_values(manifest, symbol)
+        for date in master.dates(symbol):
+            if date in values:
+                rec = master.as_of(symbol, date)
+                master.upsert(
+                    dataclasses.replace(
+                        rec, ref_price=values[date]["ref_price"], adv=values[date]["adv"]
+                    )
+                )
 
 
 # ---------------------------------------------------------------------- ingest
@@ -1109,6 +1172,7 @@ def ingest(
     master = SecurityMaster.load(master_path) if master_path.is_file() else SecurityMaster()
     for record in _security_records(manifest, date, source_format, facts):
         master.upsert(record)
+    _restamp_session_values(master, manifest)
     master.save(master_path)
     if table is not None:
         target = out / "reference" / "corporate_actions.csv"
@@ -1215,6 +1279,7 @@ def merge_datasets(inputs: Iterable[str | Path], out: str | Path, configs_dir: P
             shutil.copyfile(f, staging / "normalized" / f.name)
         for rec in SecurityMaster.load(path / "reference" / "security_master.json").records():
             master.upsert(rec)
+    _restamp_session_values(master, merged)
     master.save(staging / "reference" / "security_master.json")
     _write_configs(staging, merged, configs_dir)
     merged["config_version"] = config_version(staging)

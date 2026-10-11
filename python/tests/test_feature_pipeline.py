@@ -50,7 +50,8 @@ def test_pipeline_outputs_exist(run_dir):
 
 def test_pipeline_parquet_schema_and_rows(run_dir):
     table = pq.read_table(run_dir / "features" / "features_1.parquet")
-    assert table.num_rows == 2000  # cadence 0 -> one row per event
+    # cadence 0 -> one row per (instrument, exchange_ts) group (v1.14, D-P1-1)
+    assert table.num_rows == 1591
     cols = set(table.column_names)
     for name in feature_names():
         assert name in cols

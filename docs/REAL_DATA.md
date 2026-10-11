@@ -404,6 +404,16 @@ ASK=1, integer `price_ticks`, integer `qty`, nanosecond timestamps, and the
 session status carried in the `qty` of a `STATUS` event (TRADING=1 HALT=2
 AUCTION=3 CLOSE=4).
 
+**v1.14 ingest rules (manifest x-version 2, `ingest_rules_version` 2).** Four
+mapping rules changed in v1.14 and are marked below: hidden prints are signed
+by the quote rule (D-P1-2), off-grid prints round half to even (D-P1-3), the
+half-penny tick is recognised (D-P2-10) and ITCH `h` operational halts are
+decoded (D-P2-12). A dataset ingested before v1.14 (manifest x-version 1) is
+**refused** by every reader (`load_manifest`: ingest into it, merge, feature
+build, research runs) with a message naming the old rules; re-ingest it
+(D-P1-4). The real-data numbers quoted in §3 were produced under the old
+rules and are re-read by the release owner after the stores are rebuilt.
+
 ### 4.1 Decisions common to both sources
 
 | Field | Decision |
@@ -411,8 +421,8 @@ AUCTION=3 CLOSE=4).
 | `instrument_id` | 1..N over the **sorted** `--symbols` universe; fixed for the dataset. A later session must have the same universe |
 | `venue_id` | 101, venue `XNAS`, for both sources (LOBSTER is built from Nasdaq ITCH). Every synthetic venue id is below 100; real venues start at 101 |
 | `price_ticks` | the feed's integer 1/10000-dollar price divided by the instrument's tick. No float touches a price |
-| tick size | Reg NMS Rule 612 sets the quoting increment by the **price of the quotation**: one cent at or above $1.00, $0.0001 below. The platform has one tick per instrument, so `--tick-size auto` (default) takes the increment of the price range the instrument **trades** in: **0.0001** when more of its trade prints in the session are below $1.00 than at or above it, otherwise **0.01**; an instrument with no print is judged by its displayed orders the same way. It is *not* "0.0001 if any displayed price is sub-penny": a real file carries far-from-market bids priced under a dollar (`$0.0001`, `$0.0010`, `$0.8769` — legally sub-penny) for stocks trading at hundreds of dollars, about one displayed order in 100,000, and under that rule they turned every instrument of the first real run into a sub-penny instrument with spreads of hundreds of ticks. One tick size per instrument for the whole dataset (`configs/instruments/instruments.json` holds one value); a later session that disagrees is refused. `--tick-size 0.01` / `0.0001` force it |
-| prices off the tick grid | The canonical price is a whole number of ticks — there is no finer price unit — so an off-grid price cannot be carried exactly, and **a resting order's price is never rounded** (a rounded stub bid would rest at a price nobody quoted). A displayed order (`ADD`, including the new side of a replace) whose price is not a multiple of the tick is **rejected and counted** (`raw.off_tick_orders_rejected`, per symbol `off_tick_orders_rejected`; `displayed_orders_below_one_dollar` shows how many sub-dollar orders the symbol had), and every later cancel, delete or execution of that order is dropped and counted (`raw.events_on_rejected_orders`) instead of being reported as an unknown order. A `TRADE` print off the grid — a non-displayed midpoint execution, or the print of an execution against a rejected order — rests nowhere: it is rounded **half up** to a whole tick and counted (`raw.trade_prices_rounded_to_tick`). On the real file, for AAPL, MSFT and QQQ: 30 displayed orders rejected, all of them sub-dollar bids, out of 5.4 million events; 4,423 midpoint prints rounded; spreads of 1–4 ticks through the regular session (median 2 for AAPL, 1 for MSFT and QQQ). A stock that really quotes below $1.00 gets tick 0.0001 and loses nothing |
+| tick size | Reg NMS Rule 612 sets the quoting increment by the **price of the quotation**: one cent at or above $1.00, $0.0001 below. The platform has one tick per instrument, so `--tick-size auto` (default) takes the increment of the price range the instrument **trades** in: **0.0001** when more of its trade prints in the session are below $1.00 than at or above it, otherwise **0.01** — or **0.005** (v1.14 half-penny guard, D-P2-10) when at least 100 and more than 1 % of its displayed orders at or above $1.00 sit on the half-penny grid ($x.xx50, the amended Rule 612 increment of tick-constrained stocks; per symbol `displayed_orders_on_half_penny`), and a forced `--tick-size 0.01` on such an instrument is refused instead of rejecting those orders as off-tick; an instrument with no print is judged by its displayed orders the same way. It is *not* "0.0001 if any displayed price is sub-penny": a real file carries far-from-market bids priced under a dollar (`$0.0001`, `$0.0010`, `$0.8769` — legally sub-penny) for stocks trading at hundreds of dollars, about one displayed order in 100,000, and under that rule they turned every instrument of the first real run into a sub-penny instrument with spreads of hundreds of ticks. One tick size per instrument for the whole dataset (`configs/instruments/instruments.json` holds one value); a later session that disagrees is refused. `--tick-size 0.01` / `0.005` / `0.0001` force it |
+| prices off the tick grid | The canonical price is a whole number of ticks — there is no finer price unit — so an off-grid price cannot be carried exactly, and **a resting order's price is never rounded** (a rounded stub bid would rest at a price nobody quoted). A displayed order (`ADD`, including the new side of a replace) whose price is not a multiple of the tick is **rejected and counted** (`raw.off_tick_orders_rejected`, per symbol `off_tick_orders_rejected`; `displayed_orders_below_one_dollar` shows how many sub-dollar orders the symbol had), and every later cancel, delete or execution of that order is dropped and counted (`raw.events_on_rejected_orders`) instead of being reported as an unknown order. A `TRADE` print off the grid — a non-displayed midpoint execution, or the print of an execution against a rejected order — rests nowhere: it is rounded to the nearest tick, **half to even** (v1.14, D-P1-3; until v1.13 half up, which moved every midpoint print of a one-tick market up by half a tick — a +0.5 tick bias in the session's prints), counted (`raw.trade_prices_rounded_to_tick`) and its residue (price mod tick, in 1/10000 dollars) histogrammed in `raw.trade_price_residue_histogram`. Half to even, not toward the resting side: the resting side of a hidden print is itself inferred (quote / tick rule below), and rounding toward it would feed that guess into the price; half to even is unbiased over a session whatever the signs. On the real file, for AAPL, MSFT and QQQ: 30 displayed orders rejected, all of them sub-dollar bids, out of 5.4 million events; 4,423 midpoint prints rounded; spreads of 1–4 ticks through the regular session (median 2 for AAPL, 1 for MSFT and QQQ). A stock that really quotes below $1.00 gets tick 0.0001 and loses nothing |
 | `qty` | shares, as in the feed. `lot_size` is the round lot from the stock directory (100 for LOBSTER); odd lots are ordinary quantities |
 | `exchange_ts` | midnight of `--date` in `America/New_York` (through `zoneinfo`, so DST is honoured) plus the feed's nanoseconds since midnight. LOBSTER's decimal seconds are parsed as a string — `"34200.004241176"` → 34 200 004 241 176 ns — never through a binary float |
 | `receive_ts` | equal to `exchange_ts`: the feeds carry exchange time only |
@@ -428,14 +438,15 @@ AUCTION=3 CLOSE=4).
 | `S` system event | `STATUS` per instrument when the effective status changes | default scope is the **regular session**: before `Q` (start of market hours) the status is `AUCTION` — the book builds, nothing is tradable for the feature engine; `Q` → `TRADING`; `M` (end of market hours) → `CLOSE`, and order flow after it is dropped and counted (`outside_session_dropped`). `--extended-hours` maps `S`..`E` (system hours) to `TRADING` instead |
 | `R` stock directory | none | becomes the security-master record of the session (§5): locate code, round lot, listing market, ETP flag (`Y` → asset class `ETF`), LULD tier… |
 | `H` trading action | `STATUS` | `H` halted and `P` paused → `HALT`; `Q` quotation-only → `AUCTION` (orders rest, nothing matches, the book may cross); `T` → the session-phase status above. An unknown state is counted, not guessed |
+| `h` operational halt (v1.14, D-P2-12) | `STATUS` | decoded since v1.14 (until v1.13 skipped by length). A halt of market `Q` (Nasdaq, the mapped book) → `HALT` until its `T` resume; it is independent of the `H` state, so both must clear before the book trades again. A BX / PSX halt is counted (`operational_halts_other_markets`), an unknown action counted (`unknown_operational_halt_actions`); `operational_halt_messages` counts all |
 | `A`, `F` add order | `ADD` | `F`'s MPID attribution is read and dropped: the canonical event has no participant field |
 | `E` order executed | `EXECUTE` (the resting order, at its own price, `trade_id` = match number) + `TRADE` (same price and quantity, `side` = the **aggressor**, i.e. the opposite of the resting order's side) | the generator emits the same pair; `EXECUTE` changes the book, `TRADE` only signed trade flow |
 | `C` executed with price | `EXECUTE` at the resting price + `TRADE` at the execution price **only if printable** | a non-printable `C` is part of a cross that `Q` reports in bulk; printing it too would double the volume. It still removes the shares from the book |
 | `X` order cancel | `MODIFY` to the remaining quantity (keeps queue position), or `CANCEL` when nothing is left | |
 | `D` order delete | `CANCEL` | |
 | `U` order replace | `CANCEL` of the original reference + `ADD` of the new reference at the new price and size, same side | the new order joins the **tail** of its level: a replace loses queue priority, as on the exchange. A canonical `MODIFY` cannot express this (it keeps the id and, for a decrease, the position) |
-| `P` trade (non-cross) | `TRADE` only | a non-displayed order was executed; the visible book is untouched. **Side is a judgement call:** before 2014-07-14 the buy/sell indicator names the resting order's side and the aggressor is the other side; from that date the indicator is always `B` and carries no information, so the aggressor is inferred with the **tick rule** against the instrument's last print (up → buy, down → sell, unchanged → same sign as the last print) and counted (`hidden_trades_signed_by_tick_rule`). Treat signed flow from hidden prints as an estimate |
-| `Q` cross trade | none on the event path; recorded per symbol in `dataset.json` (`crosses`: type, price, shares, time) and added to the session volume | an auction print has no aggressor, and `TRADE` is signed flow. The opening cross price is the instrument's `ref_price` |
+| `P` trade (non-cross) | `TRADE` only | a non-displayed order was executed; the visible book is untouched. **Side is a judgement call:** before 2014-07-14 the buy/sell indicator names the resting order's side and the aggressor is the other side; from that date the indicator is always `B` and carries no information, so the aggressor is inferred by the **Lee–Ready rule** (v1.14, D-P1-2): against the mapper's own displayed best bid / ask at that moment (the resting quantity per level of the mapped book, a lazy-heap best price shared with the ingest consistency check), a print above the mid is a buy and below it a sell (`hidden_trades_signed_by_quote_rule`); a print exactly at the mid, or without a two-sided unlocked uncrossed quote, falls back to the **tick rule** against the instrument's last print (up → buy, down → sell, unchanged → same sign as the last print; `hidden_trades_signed_by_tick_rule`). Until v1.13 every post-2014 hidden print used the tick rule alone — six times more hidden prints in 2026 than in 2019 made that the dominant source of signed-flow error. Treat signed flow from hidden prints as an estimate |
+| `Q` cross trade | none on the event path; recorded per symbol in `dataset.json` (`crosses`: type, price, shares, time; `cross_volume`) and added to the session volume | an auction print has no aggressor, and `TRADE` is signed flow. The opening cross price is the session's `ref_price`. Since v1.14 (D-P2-6) `python -m iap.features --cross-prints fold` (default) folds each cross print into the instrument's **volume** windows at its time — `traded_volume_*`, `participation_*`, the volume profile (`norm_volume_m5_v1`), the impact proxy and the `volume:N` clock — and never into signed volume, trade imbalance, trade counts or the effective spread (16 % of AAPL's volume on 2026-05-15 was cross volume). `--cross-prints omit` is the v1.13 behaviour; `features_summary.json` records `cross_prints` |
 | `B` broken trade | none; counted, match numbers listed in the manifest | a break cannot be un-applied to an event stream that has already been replayed |
 | `Y`, `L` | none; counted | |
 | `I` NOII | none; length-checked and counted | the normalized output never carries it. Since v1.10 `Itch50Reader(noii=True)` decodes it (opt-in) for the separate auction-imbalance stream of `iap.auction` (§3.3) |
@@ -593,7 +604,7 @@ why `clean` is the only verdict to rely on.
 `raw/` and `normalized/` are the files the synthetic generator pipeline
 writes, in the same formats, produced by the same `normalize_run`.
 
-`dataset.json` records, per session: the input files (name, sha256, size),
+`dataset.json` (x-version 2 since v1.14; `ingest_rules_version`) records, per session: the input files (name, sha256, size),
 the symbols, message counts per type, the skipped-unknown and
 filtered-other-symbols counts, every mapping counter, the system events,
 per-symbol events / volume / crosses / reference price, the raw file's
@@ -601,8 +612,29 @@ sha256, the book check and (LOBSTER) the verification report; and for the
 dataset: the universe, the normalized file hashes, the QC totals and
 `dataset_version`.
 
-**`dataset_version`** is sha256 over the prefix `iap.real-dataset.v1` and
-the name and sha256 of every normalized IAP1 file. It is pinned by content
+**`dataset_version`** is sha256 over the prefix `iap.real-dataset.v2`
+(`v1` until v1.13: every dataset version changes with the v1.14 rules) and
+the name and sha256 of every normalized IAP1 file.
+
+**`config_version`** (v1.14, D-P2-9) is sha256 over the prefix
+`iap.real-config.v1` and the relative path and sha256 of every file under
+the dataset's `configs/` and `reference/` trees. `dataset_version` pins the
+events only; the instruments (tick, lot, per-session reference values),
+venues, cost model, security master and corporate actions a run reads are
+pinned by `config_version`, which `--dataset-dir` runs stamp on every new
+ledger entry (`config_version`, provenance only: the experiment key is
+unchanged).
+
+**Per-session reference values** (v1.14, D-P2-8). `instruments.json` keeps
+the dataset-level `ref_price` (first priced session) and `adv` (mean session
+volume) for consumers without a session, and adds `ref_price_by_session`
+(each session's own opening cross / first trade / first displayed order)
+and `adv_by_session` (AS OF the session: the mean volume of the dataset's
+earlier sessions; the first session's own volume for the first). The
+security-master record of each session carries the same `ref_price` /
+`adv`. The backtester's impact cost reads the trade's own session ADV and
+the capacity proxy the mean of `adv x ref_price` over the sessions, so a
+2019-2026 dataset no longer prices 2026 at the 2019 open. It is pinned by content
 like the synthetic `data_version`, and the prefix makes it differ from the
 synthetic fingerprint of the same bytes, so no real dataset can share a
 version with a synthetic one.

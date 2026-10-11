@@ -32,7 +32,15 @@
 // - a windowed feature is invalid until t - warm_ts >= w (warmup);
 // - every x / (y + EPS) ratio is invalid when y <= 0;
 // - quantities above FEATURE_MAX_QTY are not folded into any window;
-// - NaN never appears with valid == true (single value funnel).
+// - NaN never appears with valid == true (single value funnel);
+// - same-timestamp coalescing (v1.14, D-P1-1): apply(ev, out, false) applies
+//   the event to the book and folds its trade flow but defers the refresh,
+//   the samples and the emission to the event that closes the instrument's
+//   (instrument, exchange_ts) group (group_ends); the closing refresh
+//   re-reads every venue the group touched (ascending venue_id), and a venue
+//   that went stale at any point of the group counts as a stale -> fresh
+//   recovery when none is stale at the close. apply(ev, out) (group_end =
+//   true on every event) is the per-event legacy semantics.
 //
 // Hot path: preallocated rolling buffers and merge scratch; no per-event
 // allocation after warmup (conventions section 8).
@@ -143,6 +151,11 @@ struct FeatureVector {
 // price cannot wrap before the FEATURE_MAX_QTY guard runs.
 using WideLevel = std::pair<std::int64_t, __int128>;
 
+// group_end flag of every event of a stream (pinned, D-P1-1): an event
+// closes its group when the NEXT event of the same instrument has a
+// different exchange_ts, or there is none.
+std::vector<bool> group_ends(const std::vector<MarketEvent>& events);
+
 class FeatureEngine {
 public:
     // instrument_id -> tick_size (real price per tick, reference data).
@@ -154,11 +167,17 @@ public:
 
     // Apply one event. Returns true when a vector was emitted; the emitted
     // vector is written into `out` (owned by the caller; no allocation).
-    bool apply(const MarketEvent& ev, FeatureVector& out);
+    // group_end == false leaves the instrument's timestamp group open
+    // (D-P1-1): no refresh, no sample, no emission until the closing event.
+    bool apply(const MarketEvent& ev, FeatureVector& out,
+               bool group_end = true);
 
     // Convenience: apply and copy the vector (allocation-friendly callers).
+    // coalesce == true closes same-timestamp groups at their last event
+    // (group_ends); the default is the per-event legacy semantics.
     void run(const std::vector<MarketEvent>& events,
-             std::vector<FeatureVector>* emitted = nullptr);
+             std::vector<FeatureVector>* emitted = nullptr,
+             bool coalesce = false);
 
     std::uint64_t events_processed() const { return events_processed_; }
     std::uint64_t vectors_emitted() const { return vectors_emitted_; }
@@ -198,8 +217,18 @@ private:
         std::int64_t warm_ts = 0;
         std::int64_t last_ts = 0;
         std::uint64_t recoveries = 0;
-        // sorted ids of this instrument's venues whose book is stale
+        // sorted ids of this instrument's venues whose book is stale, as of
+        // the last group close
         std::vector<std::uint16_t> stale_venues;
+        // the same set after the latest event (inside an open group)
+        std::vector<std::uint16_t> stale_running;
+        // an event of the open group changed the stale set / left a venue
+        // stale; an applied book-touching event awaits the group close
+        bool stale_touched = false;
+        bool stale_seen = false;
+        bool pending_refresh = false;
+        // venues the closing refresh re-reads (sorted, unique)
+        std::vector<std::uint16_t> pending_venues;
         bool has_emit = false;
         std::int64_t last_emit = 0;
         // merged top-10 view (refreshed on book-touching events)
@@ -241,8 +270,12 @@ private:
 
     InstState& state(std::uint32_t instrument_id);
     // Returns true when the merged depth was oversized (view unusable).
-    bool refresh_book(InstState& st, std::uint16_t venue_id, std::int64_t t,
-                      bool just_recovered, bool samples);
+    bool refresh_book(InstState& st, const std::vector<std::uint16_t>& venues,
+                      std::int64_t t, bool just_recovered, bool samples);
+    // Close the instrument's timestamp group (D-P1-1): one refresh over the
+    // venues the group touched, then the emission check.
+    bool close_group(InstState& st, std::uint32_t iid, std::int64_t t,
+                     bool group_end, FeatureVector& out);
     bool emit_if_due(InstState& st, std::uint32_t iid, std::int64_t t,
                      FeatureVector& out);
     void emit(InstState& st, std::uint32_t iid, std::int64_t t,

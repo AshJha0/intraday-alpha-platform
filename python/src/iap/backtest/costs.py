@@ -152,7 +152,7 @@ class CostModel:
             fee_cost = notional * self.fx_commission_per_million / 1e6
         else:
             raise ValueError(f"unknown asset class {asset_class!r}")
-        if adv <= 0:
+        if np.any(np.asarray(adv) <= 0):  # a scalar, or per row (per-session ADV)
             raise ValueError("adv must be positive")
         spread_cost = aq * unit * hs
         if self.impact_model == "sqrt":

@@ -123,6 +123,7 @@ from iap.contracts.types import ExperimentResult, ExperimentSpec, Verdict
 from iap.contracts.validate import validate_typed
 from iap.experiment import tracker
 from iap.experiment.locking import atomic_write_text
+from iap.reference.refdata import session_meta
 from iap.research.errors import ResearchError
 from iap.research.specs import (
     GateEligibility,
@@ -328,6 +329,8 @@ def load_instrument_meta(configs_dir: Path) -> dict[int, dict]:
             "ref_price": float(row.get("ref_price", 1.0)),
             "base_currency": row.get("base_currency"),
             "quote_currency": row.get("quote_currency", row.get("currency", "USD")),
+            # v1.14 (D-P2-8): per-session ref_price / adv of an ingested dataset
+            **session_meta(row, (cfg.get("calendar") or {}).get("timezone")),
         }
     return meta
 

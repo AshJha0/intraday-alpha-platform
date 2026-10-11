@@ -31,12 +31,20 @@ std::vector<MarketEvent> load_events(const std::string& name) {
     return iap::read_jsonl(iap_test::golden_path(name));
 }
 
-// Run a golden vector at cadence 0 and return the vector emitted after each
-// 1-based event index.
-std::vector<FeatureVector> run_vector(const std::string& name) {
+// Run a golden vector at cadence 0, same-timestamp events coalesced (v1.14,
+// D-P1-1), and return {1-based index of the emitting event: vector}; a row
+// is emitted exactly by the event closing its (instrument, exchange_ts) group.
+std::map<std::size_t, FeatureVector> run_vector(const std::string& name) {
     FeatureEngine engine(kTicks, 0);
-    std::vector<FeatureVector> rows;
-    engine.run(load_events(name), &rows);
+    const auto events = load_events(name);
+    const auto ends = iap::group_ends(events);
+    std::map<std::size_t, FeatureVector> rows;
+    FeatureVector vec;
+    for (std::size_t i = 0; i < events.size(); ++i) {
+        const bool emitted = engine.apply(events[i], vec, ends[i]);
+        EXPECT_EQ(emitted, static_cast<bool>(ends[i])) << name << " event " << i + 1;
+        if (emitted) rows[i + 1] = vec;
+    }
     return rows;
 }
 
@@ -46,9 +54,9 @@ void check_checkpoint(const std::string& market, const std::string& cp_key,
     const auto golden = iap_test::load_golden_json("expected_features.json");
     const auto& cp = golden[market]["checkpoints"][cp_key];
     const auto rows = run_vector(vector_file);
-    const std::size_t idx = static_cast<std::size_t>(std::stoul(cp_key)) - 1;
-    ASSERT_LT(idx, rows.size());
-    const FeatureVector& vec = rows[idx];
+    const std::size_t idx = static_cast<std::size_t>(std::stoul(cp_key));
+    ASSERT_EQ(rows.count(idx), 1u) << "checkpoint closes its timestamp group";
+    const FeatureVector& vec = rows.at(idx);
     EXPECT_EQ(vec.timestamp, cp["timestamp"].i64());
     int compared = 0;
     for (const auto& [name, entry] : cp["features"].obj) {
@@ -132,14 +140,16 @@ TEST(FeatureGolden, RegistryPinsAgree) {
     EXPECT_DOUBLE_EQ(golden["tolerance"]["rel"].num(), 1e-9);
 }
 
-TEST(FeatureGolden, EqCheckpoint500) {
-    check_checkpoint("eq", "500", "events_eq_mbo.jsonl");
+// v1.14 (D-P1-1): checkpoints 500 / 1500 moved to the closing events of
+// their timestamp groups (501 / 1501).
+TEST(FeatureGolden, EqCheckpoint501) {
+    check_checkpoint("eq", "501", "events_eq_mbo.jsonl");
 }
 TEST(FeatureGolden, EqCheckpoint1000) {
     check_checkpoint("eq", "1000", "events_eq_mbo.jsonl");
 }
-TEST(FeatureGolden, EqCheckpoint1500) {
-    check_checkpoint("eq", "1500", "events_eq_mbo.jsonl");
+TEST(FeatureGolden, EqCheckpoint1501) {
+    check_checkpoint("eq", "1501", "events_eq_mbo.jsonl");
 }
 TEST(FeatureGolden, EqCheckpoint2000) {
     check_checkpoint("eq", "2000", "events_eq_mbo.jsonl");
@@ -153,7 +163,8 @@ TEST(FeatureGolden, FxCheckpoint800) {
 
 TEST(FeatureGolden, NanNeverLeaksIntoValidSlot) {
     for (const char* file : {"events_eq_mbo.jsonl", "events_fx_quote.jsonl"}) {
-        for (const auto& vec : run_vector(file)) {
+        for (const auto& [index, vec] : run_vector(file)) {
+            (void)index;
             for (int i = 0; i < iap::NUM_FEATURES; ++i) {
                 const auto ui = static_cast<std::size_t>(i);
                 if (vec.valid[ui]) {
@@ -269,8 +280,9 @@ void check_anomaly_side(const std::string& side, double tick) {
     FeatureEngine engine(ticks, 0);
     FeatureVector vec;
     int compared = 0;
+    const auto ends = iap::group_ends(events);
     for (std::size_t i = 0; i < events.size(); ++i) {
-        const bool emitted = engine.apply(events[i], vec);
+        const bool emitted = engine.apply(events[i], vec, ends[i]);
         const std::string key = std::to_string(i + 1);
         if (!doc["checkpoints"].has(key)) continue;
         const auto& cp = doc["checkpoints"][key];
@@ -329,8 +341,9 @@ void check_burst_side(const std::string& side, double tick) {
     FeatureVector vec;
     std::size_t seen = 0;
     int compared = 0;
+    const auto ends = iap::group_ends(events);
     for (std::size_t i = 0; i < events.size(); ++i) {
-        const bool emitted = engine.apply(events[i], vec);
+        const bool emitted = engine.apply(events[i], vec, ends[i]);
         const std::string key = std::to_string(i + 1);
         if (!doc["checkpoints"].has(key)) continue;
         const auto& cp = doc["checkpoints"][key];

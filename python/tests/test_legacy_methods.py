@@ -26,6 +26,7 @@ import importlib.util
 import json
 import math
 import sys
+from pathlib import Path
 
 import pytest
 from conftest import GOLDEN_DIR, REPO_ROOT
@@ -60,12 +61,40 @@ def _run_all():
     return module
 
 
+def _v140_store(tmp_path_factory) -> Path:
+    """A feature store built the way v1.4.0's was.  Since v1.14 the default
+    store coalesces same-timestamp events (D-P1-1) and uses the trailing
+    label freshness (D-P2-13): v1.4.0's numbers come from the per-event /
+    whole-day store, rebuilt here from the same normalized data (~1 min)."""
+    summary = json.loads((FEATURES_DIR / "features_summary.json").read_text())
+    if summary.get("same_ts", "per_event") == "per_event" and (
+        summary.get("label_freshness", "whole_day") == "whole_day"
+    ):
+        return FEATURES_DIR
+    from iap.features.__main__ import main as features_main
+
+    out = tmp_path_factory.mktemp("v140_store")
+    rc = features_main(
+        [
+            "--data-dir", str(REPO_ROOT / "data" / "normalized"),
+            "--out-dir", str(out),
+            "--configs", str(REPO_ROOT / "configs"),
+            "--registry-out", str(out / "feature_registry.json"),
+            "--same-ts", "per_event",
+            "--label-freshness", "whole_day",
+            "--workers", "2",
+        ]
+    )  # fmt: skip
+    assert rc == 0
+    return out
+
+
 @pytest.fixture(scope="module")
-def pipeline():
+def pipeline(tmp_path_factory):
     run_all = _run_all()
     if not data_version(REPO_ROOT).startswith(V140_DATA_VERSION_PREFIX):
         pytest.skip("the bundled dataset is not the one v1.4.0 was computed on")
-    return run_all, load_features(FEATURES_DIR), run_all._load_meta()
+    return run_all, load_features(_v140_store(tmp_path_factory)), run_all._load_meta()
 
 
 def _flatten(doc, prefix=""):

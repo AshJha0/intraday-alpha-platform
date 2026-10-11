@@ -52,6 +52,11 @@ class SecurityRecord:
     etp_flag: str | None = None
     etp_leverage_factor: int | None = None
     inverse_indicator: str | None = None
+    #: v1.14 (D-P2-8): the session's reference price and its AS-OF average
+    #: daily volume (earlier sessions only); absent from records written
+    #: before v1.14 and from the file when unset
+    ref_price: float | None = None
+    adv: int | None = None
 
     def __post_init__(self) -> None:
         if not self.symbol:
@@ -65,7 +70,11 @@ class SecurityRecord:
             raise ValueError(f"security record {self.symbol}: tick_size must be > 0")
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        doc = asdict(self)
+        for key in ("ref_price", "adv"):  # v1.14 fields: written only when set
+            if doc[key] is None:
+                del doc[key]
+        return doc
 
     @classmethod
     def from_dict(cls, doc: dict) -> SecurityRecord:
