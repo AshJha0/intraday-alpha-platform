@@ -694,7 +694,7 @@ def test_import_all_counts(built: Store) -> None:
     log_rows = sum(
         1 for line in (RESEARCH / "lifecycle_log.jsonl").read_text().splitlines() if line.strip()
     )
-    assert counts["lifecycle_transitions"] >= log_rows == 300
+    assert counts["lifecycle_transitions"] >= log_rows == 310
     assert counts["experiments"] == counts["experiment_results"] >= 24
     # every warning is an "absent optional artefact", never a skipped record
     for step, rep in reports.items():
@@ -910,7 +910,7 @@ def test_import_experiments_ledger(store: Store) -> None:
 
 def test_import_lifecycle_log_gate_mapping(store: Store) -> None:
     rep = import_lifecycle_log(store, RESEARCH / "lifecycle_log.jsonl")
-    assert rep.inserted["lifecycle_transitions"] == 300 and not rep.warnings
+    assert rep.inserted["lifecycle_transitions"] == 310 and not rep.warnings
     rows = store.fetch(LifecycleTransition, alpha_id="EQ03", policy="static")
     assert rows and all(t.actor.value == "SYSTEM" for t in rows)
     first = rows[0]

@@ -1988,8 +1988,8 @@ def test_bootstrap_builds_both_blocks_from_the_artefacts(bootstrap, config):
         else:
             assert boot.value == block.ci_low < 0.0
             negative.append(row.alpha_id)
-    assert (len(no_trade), len(negative)) == (17, 7)
-    assert negative == ["EQ06", "EQ11", "FX05", "FX08", "FX09", "FX10", "FX11"]
+    assert (len(no_trade), len(negative)) == (16, 8)  # v1.14 store: EQ07 now trades
+    assert negative == ["EQ06", "EQ07", "EQ11", "FX05", "FX08", "FX09", "FX10", "FX11"]
     # no verdict or state moved because of the two gates: every alpha
     # already failed net_pnl_after_costs
     for row in bootstrap.rows:
