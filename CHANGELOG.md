@@ -8,6 +8,19 @@ that tag.
 
 ## Unreleased (v1.15)
 
+- **X-P1-2: the MVP on a real ITCH session** (`python -m iap.mvp.real
+  --dataset <dir> --date D --symbols ... --config configs/prereg/v2.json
+  --out <dir> [--limit-events N]`): an ingested dataset is streamed (3 passes,
+  never materialised) through the unchanged `MvpEngine` / `run_session`, one
+  engine per symbol, with a deterministic `run_manifest.json` (dataset version
+  + verified normalized sha256, prereg hash, config version, event count,
+  parents / children / fills / P&L, trace digest). The prereg opt-ins are
+  pinned by hash and listed as `not_applied`, because the MVP engine does not consume them yet.
+  Pre-v1.14 manifests need `--allow-legacy-dataset`. Tests:
+  `python/tests/test_mvp_real.py` (a tiny synthetic dataset in the ingest format,
+  determinism, `--limit-events`, CLI errors). The synthetic golden is unchanged
+  (`6fdb3a2c`). Smoke run on ds3_20190130 AAPL, first 200k events: 4,836
+  decisions, 946 fills, equity -414.57 USD (docs/MVP.md section 9).
 - **M-P1-2: conformal sizing (opt-in, Python research only)** —
   `iap.models.conformal`: split-conformal and adaptive conformal (ACI,
   rolling window) intervals on alpha forecasts, a confidence-scaled sizing
