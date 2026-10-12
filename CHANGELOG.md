@@ -188,12 +188,46 @@ that tag.
   cannot honour the registration as written (no real-data path; windows and
   labels cross sessions; static price z-score), so AI4 is not run in v1.15 and
   a new registration will supersede it; its spent look stays counted.
-- **Hygiene.** `tools/r7_holdout_check.py` (tracked pre-ingest check: signed
+- **Hygiene (#113).** `tools/r7_holdout_check.py` (tracked pre-ingest check: signed
   prereg required, `--allow-draft` opt-in with a warning, several signed files
   fail); `tools/jobs/jobs.example.json` gains the `r7_holdout_chain` entry;
   `tools/release.py publish` blocks on an `## Unreleased (vX.Y)` heading not
   renamed and fails on a missing or empty section; `R7_POWER.md` states the
   prereg file and signed state from the files on disk.
+
+- **Models / portfolio / LLM-budget hardening, opt-in (#112).** Normalized
+  split-conformal scores; ACI `alpha_t` clamped with a `saturations` counter;
+  `python -m iap.research.conformal_report`; optimizer `eta_max`; Ledoit-Wolf
+  covariance shrinkage and `condition_number`; LLM budget `context_growth`.
+  Tests: `tests/test_v115_models_portfolio_llm.py`.
+- **Report-only statistics (#114).** Day-cluster inference (normal + Student-t),
+  day-block bootstrap `low_power` flag, explicit `psr_error` / `dsr_error`,
+  instrument-demeaned bucket IC, shared `deflated.pnl_sharpe`, embargo check
+  warning, PBO drops constant columns. No verdict rule, threshold or ledger
+  change. (Its `beta_stability` addition was reverted in #117.)
+- **Execution review fixes (#115).** MVP kill switch cancels working children
+  (`post_kill_fills`, `kill_alerts`); regulatory fees cannot be charged twice;
+  `sor_v2.allocate_passive` keeps the lot remainder; opt-in ITCH `C` print
+  handling; `mvp/real.py` stages the fee schedule and records the impact model;
+  `FeedLatencyAsOrderLegWarning`. Defaults and the MVP golden unchanged.
+- **R7-CONFIRM-1 tooling (#116).** `tools/r7_confirm.py` (`--dry-run` checks
+  signature, fingerprints, sessions, dataset version, `prereg_gate.require`,
+  ledger threshold; `--i-am-the-owner` runs the one look),
+  `tools/r7_record_outcome.py`, and `research/r7/R7_DEVIATION_lot_size.md`.
+- **Registered code hash restored (#117).** `alpha/base.py` reverted to its
+  pre-#114 content so the prereg-pinned alpha `code_hash` matches again.
+- **Memory-safe CPCV block + EQ10 crash retry (#118).** `_cpcv_block` narrows
+  frames to the columns it reads (output identical);
+  `research/r7/R7_DEVIATION_crash_retry.md`.
+- **Memory-safe walk-forward + EQ05-only retry (#119).** `restrict_frames`
+  slices sorted windows; walk-forward train frames keep only the fit columns
+  (output identical); `research/r7/R7_DEVIATION_crash_retry2.md`.
+- **R7-CONFIRM-1 results (#120): EQ10@1s and EQ05@1s confirmed** on the 7
+  holdout sessions (IC +0.0838 / +0.0409, HAC t 13.66 / 13.20 vs 4.432, DSR
+  0.99995 / 0.9999998, 7/7 sessions positive). Net P&L at 1x cost 0
+  (descriptive): predictive, not yet tradable. Write-up:
+  `docs/research/R7_RESULTS.md`; drift report `research/r7/drift/`.
+- **MVP real full day: TBD** (placeholder; filled in when the run finishes).
 
 ## v1.14.0 — 2026-10-11
 

@@ -33,8 +33,11 @@ loop end to end.
 
 **v1.15 in progress (2026-10-12).** The R7 confirmatory pre-registration
 R7-CONFIRM-1 is **signed** (`research/r7/r7_confirm_prereg.json`: H4 tier 1,
-EQ10 @1s and EQ05 @1s, one look) and the unseen holdout sessions are being
-ingested; there is no R7 result yet. AI4-DEEPLOB-1 was signed but is
+EQ10 @1s and EQ05 @1s, one look) has run on the 7 unseen holdout sessions:
+**both confirmed** (EQ10@1s IC +0.0838, HAC t 13.66; EQ05@1s IC +0.0409,
+HAC t 13.20; threshold 4.432; 7/7 sessions positive). Net P&L at 1x cost is 0
+(descriptive): predictive, not yet tradable; v1.16 targets monetisation
+([docs/research/R7_RESULTS.md](docs/research/R7_RESULTS.md)). AI4-DEEPLOB-1 was signed but is
 deferred to v1.16 and not run ([research/r7/AI4_DEFERRED.md](research/r7/AI4_DEFERRED.md)).
 Merged v1.15 work is listed under "Unreleased (v1.15)" in
 [CHANGELOG.md](CHANGELOG.md). Numbers below are as of v1.14.0 unless stated;
