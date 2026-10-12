@@ -8,7 +8,7 @@ that tag.
 
 ## Unreleased (v1.15)
 
-- **R7 pre-registration hardening (DRAFT stays unsigned).** Power analysis
+- **R7 pre-registration hardening (drafted unsigned; later owner-signed in #111).** Power analysis
   `tools/r7_power.py` (`iap.research.r7_power`) writes
   `docs/research/R7_POWER.md` / `research/r7/r7_power.json`: power and minimum
   detectable effect per drafted hypothesis on tier 1 (7 sessions) and tier 1+2
@@ -138,6 +138,10 @@ that tag.
   declaration extractor left the polyglot policy (the override machinery stays
   for the Rust and C++ frozen copies).
 - Docs and site counts: parity is 2411 / 302 / 365 tests, 193 / 72 / 71
+  (rust 365 / 71 golden at the v1.14.0 tag: CI run 38142218467 golden table;
+  the v1.15 fee commits took rust to 366 / 72, the count the README parity
+  table now carries: `check_headline_numbers.py` static count and main CI run
+  38172001157 golden table)
   golden: 3,078 green (was 3,653 with Java's 575).
 - Ruleset: `java` dropped from the `protect-main` required checks
   (2026-10-11; docs/governance/REPO_SETTINGS.md updated).

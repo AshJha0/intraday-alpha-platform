@@ -26,8 +26,9 @@ cd python && PYTHONPATH=src python3 tools/make_golden.py   # regen goldens (deli
 ```
 
 - **Test counts.** The current per-language counts live in one place, the README parity
-  table (v1.14.0 CI run: 2411 python / 302 cpp / 366 rust, 193 / 72 / 72 golden; the same
-  numbers as docs/ARCHITECTURE.md §6); for anything newer see the latest `ci` run on main.
+  table (2411 python / 302 cpp / 366 rust, 193 / 72 / 72 golden; the same numbers as
+  docs/ARCHITECTURE.md §6; rust was 365 / 71 at the v1.14.0 tag, CI run 38142218467, and
+  366 / 72 after the v1.15 fee commits); for anything newer see the latest `ci` run on main.
   Every other count in this file is **historical**, recorded with the release it was measured on.
 - **Timing (historical, v1.5.0).** The suite was 1988 tests at v1.5.0 (192 in the `-k golden` group; 1573 and 166 at v1.4.0).
   Measured in CI on the `ubuntu-24.04` runner (4 vCPU), Python 3.11, on one

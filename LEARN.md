@@ -767,7 +767,7 @@ the canonical config, so the same 24 pipelines run under the new default
 rules are new looks at the same sample, added beside the v1.4.0 ones
 (ledger `x-version` 3). At v1.5.0 the ledger held 216 distinct
 configurations and a look count of 5,156, broken down below. At v1.14.0 it holds
-**293 distinct configurations / 5,358 looks**: v1.14.0 regenerated every statistic under its revised methods, and each one is a new look (`stats_revision`), adding 202 to the count over 77 configurations (the
+**296 distinct configurations / 5,361 looks**: v1.14.0 regenerated every statistic under its revised methods, and each one is a new look (`stats_revision`), adding 202 to the count over 77 configurations (the
 breakdown below is the v1.5.0 one, and every entry in it is still there):
 
 - on the v1.3.0 dataset (`203c8f54…`), 70 entries carrying 1,068 of the
@@ -804,7 +804,7 @@ on each entry as `gate_looks`. The committed report was judged at **3,936
 looks** (the 1,920 already recorded plus its own 2,016), which gives the
 threshold of **4.365** and a yardstick of 4.07; the runner and adaptive
 runs that followed brought the ledger to 4,396, and the combination
-experiments of §29 to 5,156, and the v1.14.0 regeneration to 5,358. The
+experiments of §29 to 5,156, and the v1.14.0 regeneration to 5,361. The
 threshold is not
 retroactive — later looks tighten later runs and do not re-judge a
 recorded one.
@@ -3124,7 +3124,7 @@ Dependabot bump is being asked to do.
 3. **Random splits on overlapping labels.** Walk-forward only, purge at the
    label horizon, 60 s embargo (§6.2).
 4. **Uncounted multiple testing.** A ledger de-duplicated by (alpha, kind,
-   config, dataset) — 293 distinct configurations, 5,358 looks at v1.14.0 — with a printed
+   config, dataset) — 296 distinct configurations, 5,361 looks at v1.14.0 — with a printed
    expected-max-|t| yardstick of 4.144; FX08's t = 3.84 is called what it is.
    Regenerating the dataset did not reset the count, and neither did
    changing the default methods: the looks already taken are kept and the
