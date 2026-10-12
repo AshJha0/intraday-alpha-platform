@@ -5,6 +5,15 @@ Prices are USD per million tokens (Anthropic first-party list prices as of
 bookkeeping figure the cap is enforced on, not an invoice.  Before every
 model call the next call is projected at the last call's input plus a full
 ``max_tokens_per_call`` output, so the cap is not overshot by one call.
+
+Opt-in growing-context projection (``context_growth=True``): in an agent loop
+the next request carries the whole previous request, the previous reply and
+the tool results appended since, so the next input is projected as
+``last_input + last_output + pending_tool_tokens`` (the caller reports tool
+result sizes via :meth:`Budget.add_pending_tool_tokens`); the first call is
+seeded with ``prompt_estimate_tokens``; and the projected input is priced at
+the cache-write rate (1.25x input), the most expensive way it can be billed.
+The default keeps the pinned v1.14 projection.
 """
 
 from __future__ import annotations
@@ -77,11 +86,17 @@ class Budget:
     preregs: int = 0
     model_calls: int = 0
     last_input_tokens: int = 0
+    last_output_tokens: int = 0
+    context_growth: bool = False
+    prompt_estimate_tokens: int = 0
+    pending_tool_tokens: int = 0
     refusals: list[str] = field(default_factory=list)
 
     def charge(self, model: str, usage: Any) -> None:
         self.model_calls += 1
         self.last_input_tokens = input_tokens(usage)
+        self.last_output_tokens = _u(usage, "output_tokens")
+        self.pending_tool_tokens = 0
         self.tokens += self.last_input_tokens + _u(usage, "output_tokens")
         self.usd += usage_cost(model, usage)
 
@@ -89,14 +104,29 @@ class Budget:
         if model not in PRICES:
             raise ValueError(f"no price for model {model!r}; add it to iap.llm.budget.PRICES")
         pin, pout, _ = PRICES[model]
-        projected = (self.last_input_tokens * pin + self.max_tokens_per_call * pout) / 1e6
+        next_in = self.projected_input_tokens()
+        in_price = pin * CACHE_WRITE_MULT if self.context_growth else pin
+        projected = (next_in * in_price + self.max_tokens_per_call * pout) / 1e6
         if self.usd + projected > self.max_usd:
             raise BudgetExceeded(
                 f"usd cap: spent ~${self.usd:.4f}; the next call could reach "
                 f"${self.usd + projected:.4f} > ${self.max_usd:.2f}"
             )
-        if self.tokens + self.last_input_tokens + self.max_tokens_per_call > self.max_tokens:
+        if self.tokens + next_in + self.max_tokens_per_call > self.max_tokens:
             raise BudgetExceeded(f"token cap: {self.tokens} of {self.max_tokens} used")
+
+    def add_pending_tool_tokens(self, n: int) -> None:
+        """Record the (estimated) size of a tool result to be sent next call."""
+        if n < 0:
+            raise ValueError("n must be >= 0")
+        self.pending_tool_tokens += int(n)
+
+    def projected_input_tokens(self) -> int:
+        if not self.context_growth:
+            return self.last_input_tokens
+        if self.model_calls == 0:
+            return max(self.prompt_estimate_tokens, 0) + self.pending_tool_tokens
+        return self.last_input_tokens + self.last_output_tokens + self.pending_tool_tokens
 
     def check_tool_call(self) -> None:
         if self.tool_calls >= self.max_tool_calls:
