@@ -264,11 +264,13 @@ from iap.validation.metrics import (
     HORIZON_ORDER,
     HORIZONS_NS,
     auto_hac_lags,
+    bucket_ics_demeaned,
     bucket_ics_with_counts,
     bucket_size_summary,
     capacity_breakeven,
     capacity_proxy_usd,
     day_block_bootstrap_tstat,
+    day_cluster_inference,
     day_cluster_tstat,
     decay_curve,
     hit_rate,
@@ -1344,6 +1346,8 @@ def _validity_block(
         )
     keep = ~event_day_mask(ts)
     boot = day_block_bootstrap_tstat(ts, x, y, seed=seed, n_boot=min(int(n_boot), 2000))
+    t_cluster = day_cluster_tstat(ts, x, y)
+    bic_dm, _ = bucket_ics_demeaned(ts, instrument_ids, x, y)
     extra: dict[str, object] = {}
     if few_sessions_rule and len(day_rows) < FEW_SESSIONS:
         # Fewer than four sessions: no t-statistic of a handful of day
@@ -1380,8 +1384,17 @@ def _validity_block(
         "tstat_pooled_slope_day_separated": _fnum(
             pooled_slope_hac_tstat(ts, x, y, lags=lags, day_ns=NS_DAY)
         ),
-        "tstat_day_cluster": _fnum(day_cluster_tstat(ts, x, y)),
-        "day_block_bootstrap": {k: _fnum(v) for k, v in boot.items()},
+        "tstat_day_cluster": _fnum(t_cluster),
+        # report-only: Student-t (G - 1 df) beside the normal reading
+        "tstat_day_cluster_inference": {
+            k: _fnum(v) for k, v in day_cluster_inference(t_cluster, len(day_rows)).items()
+        },
+        "day_block_bootstrap": {
+            k: (v if isinstance(v, bool) else _fnum(v)) for k, v in boot.items()
+        },
+        # report-only: instrument-demeaned (cross-sectional) bucket IC
+        "bucket_ic_demeaned_mean": _fnum(float(np.mean(bic_dm)) if bic_dm.size else float("nan")),
+        "bucket_ic_demeaned_n_buckets": int(bic_dm.size),
     }
 
 
