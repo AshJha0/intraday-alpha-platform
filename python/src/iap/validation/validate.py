@@ -768,9 +768,21 @@ def validate_alpha(
     last_scores = None
     last_cost: dict[str, dict] | None = None
     last_result_1x: BacktestResult | None = None
-    for fold, train, test in splitter.split_frames(uframes, horizon_ns):
+    # v1.15 (R7 memory): train frames keep only the columns a fit reads; a
+    # model that reads more is refit on the fold's full train frames.
+    train_cols = _cpcv_columns(model_factory, uframes)
+    for fold, train, test in splitter.split_frames(uframes, horizon_ns, train_cols):
         model = model_factory()
-        model.fit(train)
+        try:
+            model.fit(train)
+        except KeyError:
+            if train_cols is None:
+                raise
+            del train
+            model = model_factory()
+            model.fit(splitter.train_frames(uframes, fold, horizon_ns))
+        else:
+            del train
         scores = model.score(test)
         ts, er, y, crossed = _pooled_arrays(scores, test, horizon, ic_rows)
         iids = _pooled_instrument_ids(scores, test)

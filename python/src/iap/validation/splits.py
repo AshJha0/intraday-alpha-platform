@@ -242,8 +242,14 @@ class WalkForwardSplitter:
         self,
         frames: Mapping[int, pd.DataFrame],
         horizon_ns: int,
+        train_columns: set[str] | None = None,
     ) -> Iterator[tuple[Fold, dict[int, pd.DataFrame], dict[int, pd.DataFrame]]]:
-        """Yield (fold, train_frames, test_frames) with purge+embargo applied."""
+        """Yield (fold, train_frames, test_frames) with purge+embargo applied.
+
+        ``train_columns`` (v1.15, R7 memory): when given, the train frames keep
+        only those columns (in frame order) — the rows are the same; the test
+        frames are always whole.  :meth:`train_frames` rebuilds a fold's full
+        train frames for a model that needs more."""
         nonempty = [df for df in frames.values() if len(df)]
         if not nonempty:
             raise ValueError("no rows to split")
@@ -263,6 +269,22 @@ class WalkForwardSplitter:
             for iid, df in frames.items():
                 ts = df["exchange_ts"].to_numpy()
                 keep = fold.train_mask(ts, horizon_ns, self.embargo_ns, self.post_embargo_ns)
-                train[iid] = df[keep].reset_index(drop=True)
+                src = df if train_columns is None else df[_keep_cols(df, train_columns)]
+                train[iid] = src[keep].reset_index(drop=True)
                 test[iid] = df[fold.test_mask(ts)].reset_index(drop=True)
             yield fold, train, test
+
+    def train_frames(
+        self, frames: Mapping[int, pd.DataFrame], fold: Fold, horizon_ns: int
+    ) -> dict[int, pd.DataFrame]:
+        """The full (all-column) train frames of one fold of :meth:`split_frames`."""
+        out: dict[int, pd.DataFrame] = {}
+        for iid, df in frames.items():
+            ts = df["exchange_ts"].to_numpy()
+            keep = fold.train_mask(ts, horizon_ns, self.embargo_ns, self.post_embargo_ns)
+            out[iid] = df[keep].reset_index(drop=True)
+        return out
+
+
+def _keep_cols(df: pd.DataFrame, cols: set[str]) -> list[str]:
+    return [c for c in df.columns if c in cols]

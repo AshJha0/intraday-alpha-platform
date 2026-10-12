@@ -450,3 +450,53 @@ def test_crash_retry_refused_when_the_look_produced_output(tmp_path, no_board):
     (d / "spec.json").write_text("{}")
     with pytest.raises(rc.CheckError, match="produced output"):
         rc.preflight(root, ds, ok, retry=True)
+
+
+# ---------------------------------------- second retry, EQ05 only (2026-10-12)
+def _after_first_retry(tmp_path, monkeypatch):
+    """EQ10 confirmed on the first retry; EQ05 crashed (no output, no debit)."""
+    root, ds, ok = _crash(tmp_path)
+    (root / rc.RETRY_NOTE_REL).write_text("note", encoding="utf-8")
+    monkeypatch.setattr(
+        rc,
+        "analyse",
+        lambda a, look, *x: {
+            "alpha": f"{a}@1s",
+            "prereg_id": x[-1]["body"]["prereg_id"],
+            "experiment_id": look["experiment_id"],
+            "verdict": "confirmed",
+        },
+    )
+    run = FakeRun(ds, {"EQ10": 0, "EQ05": 1})
+    assert rc.live(root, ds, ok, runner=run, frames_loader=lambda d: {}, retry=1) == 1
+    led = {"entries": [{"alpha_id": "EQ10", "kind": "experiment_runner", "count": 2}]}
+    (ds / "research" / "experiments.json").write_text(json.dumps(led))
+    return root, ds, ok
+
+
+def test_retry2_runs_only_eq05_once_and_keeps_eq10(tmp_path, no_board, monkeypatch):
+    root, ds, ok = _after_first_retry(tmp_path, monkeypatch)
+    run = FakeRun(ds, {"EQ10": 0, "EQ05": 0})
+    with pytest.raises(rc.CheckError, match="crash_retry2.md missing"):
+        rc.live(root, ds, ok, runner=run, retry=2)
+    (root / rc.RETRY2_NOTE_REL).write_text("note", encoding="utf-8")
+    assert rc.live(root, ds, ok, runner=run, frames_loader=lambda d: {}, retry=2) == 0
+    assert [c[c.index("--alpha") + 1] for c in run.calls] == ["EQ05"]
+    doc = json.loads((root / rc.RESULT_REL).read_text())
+    assert [(r["alpha"], r["verdict"]) for r in doc["results"]] == [
+        ("EQ10@1s", "confirmed"),
+        ("EQ05@1s", "confirmed"),
+    ]
+    assert (root / "research" / "r7" / "r7_confirm_result_crash2.json").is_file()
+    with pytest.raises(rc.CheckError):  # never a third attempt
+        rc.live(root, ds, ok, runner=run, retry=2)
+    assert len(run.calls) == 1
+
+
+def test_retry2_refused_when_eq05_was_debited(tmp_path, no_board, monkeypatch):
+    root, ds, ok = _after_first_retry(tmp_path, monkeypatch)
+    (root / rc.RETRY2_NOTE_REL).write_text("note", encoding="utf-8")
+    led = {"entries": [{"alpha_id": "EQ05", "kind": "experiment_runner", "count": 2}]}
+    (ds / "research" / "experiments.json").write_text(json.dumps(led))
+    with pytest.raises(rc.CheckError, match="EQ05 entry"):
+        rc.preflight(root, ds, ok, retry=2)

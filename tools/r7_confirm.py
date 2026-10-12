@@ -219,6 +219,37 @@ def verify_crash_retry(root: Path, ds: Path) -> None:
         raise CheckError("the dataset ledger has entries: the look was debited; no retry")
 
 
+RETRY2_NOTE_REL = "research/r7/R7_DEVIATION_crash_retry2.md"
+RETRY2_ALPHA = "EQ05"
+
+
+def retry2_marker(ds: Path) -> Path:
+    return ds / "research" / f"R7_CONFIRM_LOOK_{RETRY2_ALPHA}_{HORIZON}.retry2"
+
+
+def verify_crash_retry2(root: Path, ds: Path) -> None:
+    """Owner-approved second retry, EQ05 only (2026-10-12: the first retry
+    crashed out of memory in the walk-forward split before any result).
+    Allowed only when: the retry-2 note is committed, EQ05's first retry was
+    taken (``.retry1``) and crashed, no ``.retry2`` exists, no EQ05 experiment
+    was written and the dataset ledger holds no EQ05 entry."""
+    if not (root / RETRY2_NOTE_REL).is_file():
+        raise CheckError(f"{RETRY2_NOTE_REL} missing (must be recorded before the retry)")
+    if not retry_marker(ds, RETRY2_ALPHA).exists():
+        raise CheckError("no first retry of EQ05 was taken")
+    if retry2_marker(ds).exists():
+        raise CheckError(f"{retry2_marker(ds)} exists: the second retry was already used")
+    d = experiments_dir(ds)
+    for spec in d.glob("*/spec.json") if d.is_dir() else []:
+        if json.loads(spec.read_text()).get("alpha_id") == RETRY2_ALPHA:
+            raise CheckError(f"{spec.parent} holds an EQ05 experiment: no retry")
+    led = ds / "research" / "experiments.json"
+    if led.exists():
+        entries = json.loads(led.read_text(encoding="utf-8")).get("entries", [])
+        if any(e.get("alpha_id") == RETRY2_ALPHA for e in entries):
+            raise CheckError("the dataset ledger has an EQ05 entry: the look was debited")
+
+
 def verify_no_prior_look(ds: Path, retry: bool = False) -> None:
     """Refuse when a look for these alphas was already taken on this dataset."""
     for a in ALPHAS:
@@ -272,7 +303,7 @@ def run_command(alpha: str, ds: Path) -> list[str]:
     ]
 
 
-def preflight(root: Path, ds: Path, signed_ok: Path, retry: bool = False) -> dict[str, Any]:
+def preflight(root: Path, ds: Path, signed_ok: Path, retry: int = 0) -> dict[str, Any]:
     """Every precondition; raises :class:`CheckError` on the first failure."""
     doc = load_prereg(root)
     verify_prereg(root, doc)
@@ -290,11 +321,15 @@ def preflight(root: Path, ds: Path, signed_ok: Path, retry: bool = False) -> dic
     entries = verify_gate(root, doc)
     for a, e in entries.items():
         print(f"ok  prereg gate {a}/{HORIZON}: blackboard entry {e['seq']}")
-    if retry:
-        verify_crash_retry(root, ds)
-        print(f"ok  crash retry allowed ({RETRY_NOTE_REL}; nothing computed or debited)")
-    verify_no_prior_look(ds, retry)
-    print("ok  no prior look on this dataset")
+    if retry == 2:
+        verify_crash_retry2(root, ds)
+        print(f"ok  EQ05 second retry allowed ({RETRY2_NOTE_REL}; nothing computed or debited)")
+    else:
+        if retry:
+            verify_crash_retry(root, ds)
+            print(f"ok  crash retry allowed ({RETRY_NOTE_REL}; nothing computed or debited)")
+        verify_no_prior_look(ds, bool(retry))
+        print("ok  no prior look on this dataset")
     thr = ledger_thresholds(root, ds)
     print(
         f"ok  ledger threshold in force: repo {thr['repo_ledger_total']} looks -> |t| >= "
@@ -618,13 +653,31 @@ def live(
     signed_ok: Path,
     runner=subprocess.run,
     frames_loader=None,
-    retry: bool = False,
+    retry: int = 0,
 ) -> int:
     from iap.agents.workflow import require_human
 
     require_human("owner", "confirmatory_run", set())
     pre = preflight(root, ds, signed_ok, retry)  # raises before the first look
-    if retry:
+    alphas = ALPHAS
+    kept: list[dict] = []
+    if retry == 2:
+        alphas = (RETRY2_ALPHA,)
+        retry2_marker(ds).write_text(
+            datetime.datetime.now(datetime.UTC).isoformat(), encoding="ascii"
+        )
+        prev = root / RESULT_REL
+        if prev.exists():
+            kept = [
+                r
+                for r in json.loads(prev.read_text(encoding="utf-8"))["results"]
+                if not r["alpha"].startswith(RETRY2_ALPHA)
+            ]
+            prev.replace(prev.with_name("r7_confirm_result_crash2.json"))
+            md = root / RESULT_MD_REL
+            if md.exists():
+                md.replace(md.with_name("r7_confirm_result_crash2.md"))
+    elif retry:
         for a in ALPHAS:
             retry_marker(ds, a).write_text(
                 datetime.datetime.now(datetime.UTC).isoformat(), encoding="ascii"
@@ -636,14 +689,14 @@ def live(
             if md.exists():
                 md.replace(md.with_name("r7_confirm_result_crash1.md"))
     looks = []
-    for alpha in ALPHAS:
+    for alpha in alphas:
         look = take_look(alpha, ds, root, runner)
         looks.append(look)
         if not look["ok"]:
             print(f"STOP: the {alpha} look failed (exit {look['exit_code']}); never rerun.")
             break
     frames = (frames_loader or load_frames)(ds) if any(x["ok"] for x in looks) else {}
-    results = []
+    results = list(kept)
     for look in looks:
         a = look["alpha"]
         if look["ok"]:
@@ -702,16 +755,22 @@ def main(argv: list[str] | None = None) -> int:
         help=f"the single owner-approved retry of a look that crashed before any result "
         f"({RETRY_NOTE_REL})",
     )
+    ap.add_argument(
+        "--retry2-eq05",
+        action="store_true",
+        help=f"the second owner-approved retry, EQ05 only ({RETRY2_NOTE_REL})",
+    )
     a = ap.parse_args(argv)
     root = a.root.resolve()
     ds = a.dataset_dir if a.dataset_dir.is_absolute() else root / a.dataset_dir
     signed_ok = a.signed_ok or root / SIGNED_OK_REL
     try:
-        retry = a.retry_crashed_look
+        retry = 2 if a.retry2_eq05 else int(a.retry_crashed_look)
         if a.dry_run:
             preflight(root, ds, signed_ok, retry)
             print("\nDRY RUN OK - no IC computed, nothing written. Live (owner only):")
-            print("   ", live_command(a.dataset_dir) + (" --retry-crashed-look" if retry else ""))
+            flag = {0: "", 1: " --retry-crashed-look", 2: " --retry2-eq05"}[retry]
+            print("   ", live_command(a.dataset_dir) + flag)
             return 0
         return live(root, ds, signed_ok, retry=retry)
     except CheckError as exc:

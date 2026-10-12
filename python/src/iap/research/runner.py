@@ -362,11 +362,22 @@ def holdout_capital_usd(
 def restrict_frames(
     frames: Mapping[int, pd.DataFrame], start_ts: int, end_ts: int
 ) -> dict[int, pd.DataFrame]:
-    """Rows with ``start_ts <= exchange_ts < end_ts`` per instrument."""
+    """Rows with ``start_ts <= exchange_ts < end_ts`` per instrument.
+
+    v1.15 (R7 memory): feature frames are time-sorted, so the window is one
+    contiguous row range; it is taken as an ``iloc`` slice, which pandas
+    copy-on-write keeps as a view (no copy of a multi-GB frame).  Unsorted
+    frames take the boolean mask as before.  The rows are identical."""
     out: dict[int, pd.DataFrame] = {}
     for iid in sorted(frames):
-        ts = frames[iid]["exchange_ts"].to_numpy(dtype=np.int64)
-        out[iid] = frames[iid][(ts >= start_ts) & (ts < end_ts)].reset_index(drop=True)
+        df = frames[iid]
+        ts = df["exchange_ts"].to_numpy(dtype=np.int64)
+        if ts.size == 0 or bool(np.all(ts[1:] >= ts[:-1])):
+            lo = int(np.searchsorted(ts, start_ts, side="left"))
+            hi = int(np.searchsorted(ts, end_ts, side="left"))
+            out[iid] = df.iloc[lo:hi].reset_index(drop=True)
+        else:
+            out[iid] = df[(ts >= start_ts) & (ts < end_ts)].reset_index(drop=True)
     return out
 
 
