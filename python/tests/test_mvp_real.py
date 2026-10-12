@@ -129,6 +129,32 @@ def test_real_runner_is_deterministic_and_writes_a_manifest(dataset: Path, tmp_p
     }
     assert m["results"]["decisions"] > 0
     assert m["trace_digest"] == a.result.trace_digest
+    # v1.15: public parent count, impact model and the staged fee schedule
+    assert m["results"]["parents"] == a.result.engine.parent_count
+    assert m["mvp"]["impact_model"]["model"] == "linear"
+    assert m["mvp"]["impact_model"]["impact_coeff_bps_per_pct_adv"] > 0
+    rel = m["mvp"]["regulatory_fee_schedule"]
+    staged = tmp_path / "a" / "TINY" / "reference_root" / rel
+    if not staged.is_file():  # layout: out/<SYMBOL>/reference_root or out/reference_root
+        staged = next((tmp_path / "a").rglob(Path(rel).name))
+    assert staged.read_bytes() == (REPO_ROOT / rel).read_bytes()
+
+
+def test_fee_schedule_is_hashed_into_config_version(dataset: Path, tmp_path: Path) -> None:
+    """Editing the staged schedule changes the MVP config_version: the run
+    is identified by the fee schedule it charged."""
+    from iap.mvp.config import MvpConfig
+
+    a = _run(dataset, tmp_path / "a", limit_events=200)
+    cfg = a.result.engine.cfg
+    assert cfg.config_version() == a.manifest["mvp"]["config_version"]
+    assert "regulatory_fees" in cfg.document["reference"]
+    sched = cfg.reference_path("regulatory_fees")
+    doc = json.loads(sched.read_text(encoding="utf-8"))
+    doc["edited_for_test"] = 1  # content_hash ignores description keys
+    sched.write_text(json.dumps(doc), encoding="utf-8")
+    changed = MvpConfig.from_document(cfg.document, repo_root=cfg.repo_root)
+    assert changed.config_version() != a.manifest["mvp"]["config_version"]
 
 
 def test_limit_events_truncates_the_stream(dataset: Path, tmp_path: Path) -> None:

@@ -137,3 +137,22 @@ def test_research_cost_model_dated_fees():
     assert cm.sell_notional_fee_bps == pytest.approx(0.206)
     assert (cm.per_share_fee_all, cm.per_share_fee_cap) == (0.000195, 9.79)
     assert base.sell_notional_fee_bps == 0.0  # default off
+
+
+def test_flat_and_dated_regulatory_fees_are_mutually_exclusive():
+    """v1.15: venue-level flat fees + a dated schedule would double charge."""
+    from iap.backtest.costs import CostModel
+    from iap.execution.config import ExecConfig
+
+    s = load_default_schedule(REPO / "configs")
+    cfg = load_exec_config(REPO / "configs")
+    vid, v = next(iter(cfg.venues.items()))
+    flat = {**cfg.venues, vid: replace(v, sell_notional_fee_bps=0.2)}
+    with pytest.raises(ValueError, match="charged twice"):
+        ExecConfig(venues=flat, instruments=cfg.instruments, regulatory_fees=s)
+    ExecConfig(venues=flat, instruments=cfg.instruments)  # flat alone: fine
+    ExecConfig(venues=cfg.venues, instruments=cfg.instruments, regulatory_fees=s)
+    base = CostModel.load(REPO / "configs" / "execution" / "execution.json")
+    dated = base.with_dated_regulatory_fees(s, 1781222400000000000)
+    with pytest.raises(ValueError, match="double count"):
+        dated.with_dated_regulatory_fees(s, 1781222400000000000)

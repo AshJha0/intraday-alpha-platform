@@ -1194,6 +1194,19 @@ class RiskEngine:
         """True when the global kill switch is engaged."""
         return self._kill_global
 
+    def kill_blocks(self, strategy_id: str, instrument_id: int, venue_id: int) -> bool:
+        """True when any latched kill switch (global, strategy, instrument
+        or venue) covers an order of ``strategy_id`` on ``instrument_id`` at
+        ``venue_id`` — the scopes of checks 1-4 of ``_evaluate``. Read-only
+        (v1.15: the MVP engine uses it to cancel working children of a
+        killed scope)."""
+        return (
+            self._kill_global
+            or self._strategy_killed(strategy_id)
+            or self._kill_instruments.get(instrument_id, False)
+            or self._kill_venues.get(venue_id, False)
+        )
+
     def position(self, instrument_id: int) -> int:
         """Aggregate position of an instrument."""
         return self._positions.get(instrument_id, 0)

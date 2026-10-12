@@ -361,6 +361,19 @@ class ExperimentLedger:
         n = max(int(total_experiments), 1)
         return abs(_norm_ppf(PINNED_ALPHA / n / 2.0))
 
+    @staticmethod
+    def bonferroni_t_threshold_student_at(total_experiments: int, df: int) -> float:
+        """Student-t (``df`` degrees of freedom) analogue of
+        :meth:`bonferroni_t_threshold_at` - REPORT-ONLY, for reading a
+        day-cluster t with G - 1 df beside the normal threshold.  No gate
+        uses it; NaN for ``df < 1``."""
+        if int(df) < 1:
+            return float("nan")
+        from scipy import stats
+
+        n = max(int(total_experiments), 1)
+        return float(stats.t.isf(PINNED_ALPHA / n / 2.0, int(df)))
+
     def would_add(self, alpha_id: str, kind: str, config: dict | None, count: int) -> int:
         """Looks a ``record`` of this identity would add right now: ``count``
         for a new identity, 0 for a rerun (de-duplicated)."""

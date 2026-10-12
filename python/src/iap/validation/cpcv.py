@@ -257,6 +257,15 @@ def probability_of_backtest_overfitting(
         raise ValueError("performance must be a T x M matrix with M >= 2 candidates")
     if n_blocks < 2 or n_blocks % 2:
         raise ValueError("n_blocks must be an even integer >= 2")
+    # Constant (zero-variance) candidates carry no ranking information and
+    # tie at Sharpe 0 in every split; drop them and report the count.  With
+    # fewer than two informative columns left, keep the full matrix.
+    keep = m.std(axis=0) != 0.0  # NaN (non-finite) columns stay for the check below
+    n_dropped = int((~keep).sum())
+    if int(keep.sum()) < 2:
+        n_dropped = 0
+    elif n_dropped:
+        m = m[:, keep]
     t, n_cand = m.shape
     if t < n_blocks * 2:
         raise ValueError(f"too few periods ({t}) for {n_blocks} blocks of >= 2 rows")
@@ -284,4 +293,5 @@ def probability_of_backtest_overfitting(
         "n_blocks": int(n_blocks),
         "n_candidates": int(n_cand),
         "n_periods": int(t),
+        "n_constant_dropped": n_dropped,
     }
