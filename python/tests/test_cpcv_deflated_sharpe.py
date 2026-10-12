@@ -286,3 +286,64 @@ def test_cpcv_block_falls_back_to_full_frames_on_missing_column(monkeypatch):
     expected = _v4(frames)["cpcv"]
     monkeypatch.setattr(v, "_cpcv_columns", lambda *a, **k: {"exchange_ts"})
     assert _v4(frames)["cpcv"] == expected
+
+
+def test_whole_v4_report_is_identical_with_narrowed_walk_forward_train(monkeypatch):
+    """v1.15 R7 (EQ05 OOM): walk-forward train frames keep only the columns a
+    fit reads.  The full v4 report must not change, with unrelated columns."""
+    import iap.validation.validate as v
+
+    frames = _multi_day_frames(per_day=500)
+    rng = np.random.default_rng(11)
+    for df in frames.values():
+        for j in range(30):
+            df[f"junk_{j}_v1"] = rng.standard_normal(len(df))
+    narrowed = _v4(frames)
+    monkeypatch.setattr(v, "_cpcv_columns", lambda *a, **k: None)
+    full = _v4(frames)
+    assert narrowed == full
+
+
+def test_walk_forward_refits_on_full_train_when_a_column_is_missing(monkeypatch):
+    import iap.validation.validate as v
+
+    frames = _multi_day_frames(per_day=500)
+    expected = _v4(frames)
+    monkeypatch.setattr(v, "_cpcv_columns", lambda *a, **k: {"exchange_ts"})
+    assert _v4(frames) == expected
+
+
+def test_split_frames_train_columns_keep_rows_and_order():
+    from iap.validation.splits import WalkForwardSplitter
+
+    frames = _multi_day_frames(per_day=300)
+    sp = WalkForwardSplitter(n_folds=3, embargo_ns=0)
+    cols = {
+        "exchange_ts",
+        next(c for c in next(iter(frames.values())).columns if c != "exchange_ts"),
+    }
+    full = list(sp.split_frames(frames, NS_S))
+    narrow = list(sp.split_frames(frames, NS_S, cols))
+    for (f1, tr1, te1), (f2, tr2, te2) in zip(full, narrow, strict=True):
+        assert f1 == f2
+        for iid in tr1:
+            assert list(tr2[iid].columns) == [c for c in tr1[iid].columns if c in cols]
+            pd.testing.assert_frame_equal(tr2[iid], tr1[iid][list(tr2[iid].columns)])
+            pd.testing.assert_frame_equal(te2[iid], te1[iid])
+        assert sp.train_frames(frames, f1, NS_S).keys() == tr1.keys()
+
+
+@pytest.mark.parametrize("shuffle", [False, True])
+def test_restrict_frames_slice_equals_mask(shuffle):
+    """v1.15 R7 memory: the sorted-path slice returns exactly the masked rows."""
+    from iap.research.runner import restrict_frames
+
+    rng = np.random.default_rng(3)
+    ts = np.sort(rng.integers(0, 10_000, 2_000)).astype(np.int64)
+    df = pd.DataFrame({"exchange_ts": ts, "x": rng.standard_normal(ts.size)})
+    if shuffle:
+        df = df.sample(frac=1.0, random_state=1).reset_index(drop=True)
+    for lo, hi in ((0, 10_000), (2_500, 7_500), (int(ts[100]), int(ts[100])), (-5, 3)):
+        got = restrict_frames({1: df}, lo, hi)[1]
+        m = (df["exchange_ts"] >= lo) & (df["exchange_ts"] < hi)
+        pd.testing.assert_frame_equal(got, df[m].reset_index(drop=True))
