@@ -59,7 +59,9 @@ class VenueSpec:
     rebate ``maker_rebate_per_share`` on passive fills; FX venues charge
     ``commission_per_million`` of notional on every fill (rule 5). The
     latency leg is ``latency_mean_ns`` + one SplitMix64 draw uniform on
-    ``[0, latency_jitter_ns]`` (rule 1).
+    ``[0, latency_jitter_ns]`` (rule 1). ``latency_mean_ns`` is therefore
+    the MINIMUM of the leg, not its mean (mean = ``latency_mean_ns +
+    latency_jitter_ns / 2``); the name is pinned by the shared goldens.
     """
 
     venue_id: int

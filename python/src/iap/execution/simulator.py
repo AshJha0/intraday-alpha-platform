@@ -9,6 +9,11 @@ this module is self-contained:
    ``decision_ts + decision_ns + risk_ns + wire_ns + venue.latency_mean_ns
    + jitter`` with ``jitter = SplitMix64(seed).below(venue.latency_jitter_ns
    + 1)`` — one draw per submitted order OR cancel, in submission order.
+   NOTE: despite its name ``latency_mean_ns`` is the MINIMUM venue leg,
+   not its mean: the leg is ``latency_mean_ns + U[0, latency_jitter_ns]``,
+   so its mean is ``latency_mean_ns + latency_jitter_ns / 2`` (the name and
+   the ``venues.json`` ``latency.mean_ns`` key are pinned by the goldens
+   shared with the C++ / Rust ports, so only the documentation changes).
 2. **Activation.** A pending order activates while processing the first
    market event with ``exchange_ts >= arrival_ts``, BEFORE that event is
    applied to the books; orders activate in ``(arrival_ts, order_id)``
@@ -114,6 +119,7 @@ Deterministic: same config + seed => identical fills, bit for bit
 from __future__ import annotations
 
 import bisect
+import warnings
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
@@ -158,6 +164,7 @@ class ExecutionSimulator:
         calibration: ExecCalibration | None = None,
         *,
         hidden_prints: bool = False,
+        exec_print_price: bool = False,
     ) -> None:
         """``calibration`` (v1.9, opt-in; :mod:`iap.execution.calibration`)
         replaces the rule-1 venue leg ``latency_mean_ns + jitter`` by a draw
@@ -172,12 +179,37 @@ class ExecutionSimulator:
         an EXECUTE of the resting side ``1 - side`` (the TRADE's side is the
         aggressor) at its price: queue ahead first, then our fill at our
         limit, through-prints included (rule 4). Off (the default) hidden
-        prints never fill, as every golden pins."""
+        prints never fill, as every golden pins. v1.15: a TRADE right after
+        an EXECUTE at the same ts is that EXECUTE's print only when their
+        ``trade_id`` agree (either 0 = unknown keeps the v1.14 reading), so
+        a hidden ``P`` that follows a NON-printable ``C`` execution (which
+        has no print of its own) is no longer swallowed; an ingest with
+        ``Itch50Mapper(exec_prints=True)`` removes the ambiguity at source.
+
+        ``exec_print_price`` (v1.15, opt-in; Python only): when an EXECUTE's
+        ``price_ticks`` differs from the resting order's book price (an ITCH
+        ``C`` price-improved execution ingested with ``exec_prints=True``),
+        our passive fills from it are at that PRINTED price instead of our
+        limit. Off (the default) keeps the pinned rule-4 fill at our limit."""
         self._config = config
         self._calibration = calibration
+        if calibration is not None:
+            feed = [v for v in calibration.feed_derived_latency_venues() if v in config.venues]
+            if feed:
+                from iap.execution.calibration import FeedLatencyAsOrderLegWarning
+
+                warnings.warn(
+                    f"latency tables of venues {feed} were estimated from FEED "
+                    "timestamps (receive_ts - exchange_ts) and are used here as the "
+                    "ORDER-ENTRY leg: a proxy, not order-entry latency "
+                    "(iap.execution.calibration docstring)",
+                    FeedLatencyAsOrderLegWarning,
+                    stacklevel=2,
+                )
         self._hidden_prints = hidden_prints
-        # (instrument, venue) -> (exchange_ts, event_type) of the last event
-        self._last_kind: dict[tuple[int, int], tuple[int, int]] = {}
+        self._exec_print_price = exec_print_price
+        # (instrument, venue) -> (exchange_ts, event_type, trade_id) of the last event
+        self._last_kind: dict[tuple[int, int], tuple[int, int, int]] = {}
         self._hidden_print_trades = 0
         # v1.14 X-P2-12: (effective ts, order_id, new remaining), sorted
         self._amends: list[tuple[int, int, int]] = []
@@ -609,6 +641,7 @@ class ExecutionSimulator:
         price_ticks: int,
         qty: int,
         ts: int,
+        fill_price: int | None = None,
     ) -> None:
         """Rule 4: one observed trade of ``qty`` at one level, budgeted once.
 
@@ -644,7 +677,8 @@ class ExecutionSimulator:
                     budget -= dec
                     if budget > 0:
                         fill = min(budget, o.remaining)
-                        self._emit_fill(o, o.limit_ticks, fill, ts, Liquidity.MAKER)
+                        px = o.limit_ticks if fill_price is None else fill_price
+                        self._emit_fill(o, px, fill, ts, Liquidity.MAKER)
                         budget -= fill
             if o.state == OrderState.FILLED:
                 del self._resting[i]
@@ -762,8 +796,14 @@ class ExecutionSimulator:
         if self._hidden_prints:
             vkey = (ev.instrument_id, ev.venue_id)
             prev = self._last_kind.get(vkey)
-            hidden_print = et == EventType.TRADE and prev != (t, int(EventType.EXECUTE))
-            self._last_kind[vkey] = (t, int(et))
+            is_print_of_prev = (
+                prev is not None
+                and prev[0] == t
+                and prev[1] == int(EventType.EXECUTE)
+                and (prev[2] == 0 or ev.trade_id == 0 or prev[2] == ev.trade_id)
+            )
+            hidden_print = et == EventType.TRADE and not is_print_of_prev
+            self._last_kind[vkey] = (t, int(et), ev.trade_id)
         add_depth: list[tuple[int, int]] = []
         if self._resting and pre_open and et == EventType.ADD:
             add_depth = pre.depth(1 if ev.side == 0 else 0, DEPTH_LEVELS)
@@ -788,6 +828,13 @@ class ExecutionSimulator:
             real_id = ev.order_id < SYNTHETIC_ID_BASE
             if et == EventType.EXECUTE:
                 if exec_order is not None:
+                    printed = None
+                    if (
+                        self._exec_print_price
+                        and ev.price_ticks > 0
+                        and ev.price_ticks != exec_order[1]
+                    ):
+                        printed = ev.price_ticks
                     self._track_consumption(
                         ev.instrument_id,
                         ev.venue_id,
@@ -795,6 +842,7 @@ class ExecutionSimulator:
                         exec_order[1],
                         min(ev.qty, exec_order[2]),
                         t,
+                        fill_price=printed,
                     )
             elif hidden_print and pre_open and ev.qty > 0 and ev.side in (0, 1):
                 # X-P2-7 (opt-in): a non-displayed execution at ev.price_ticks

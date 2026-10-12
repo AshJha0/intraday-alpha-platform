@@ -269,4 +269,12 @@ class CostAwareRouter:
         rem = lots - sum(alloc.values())
         for v in sorted(w, key=lambda v: (-(raw[v] - alloc[v]), v))[:rem]:
             alloc[v] += 1
-        return {v: a * o.lot for v, a in sorted(alloc.items()) if a > 0}
+        out = {v: a * o.lot for v, a in alloc.items()}
+        odd = qty - lots * o.lot
+        if odd:
+            # v1.15: the sub-lot remainder used to be dropped, so the split
+            # summed to less than ``qty``; it goes to the top-weight venue
+            # (lower venue id on a tie) - quantity is conserved.
+            top = min(w, key=lambda v: (-w[v], v))
+            out[top] += odd
+        return {v: a for v, a in sorted(out.items()) if a > 0}

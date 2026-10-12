@@ -58,6 +58,11 @@ _REFERENCE_KEYS = (
     "alpha_params",
     "alpha_registry",
 )
+#: Optional reference documents: hashed into ``config_version`` (and, being
+#: in the document, ``run_id``) only when the ``reference`` block names them,
+#: so a config without them (every pinned/golden one) is unchanged.
+#: ``regulatory_fees``: the dated fee schedule a real run stages (v1.15).
+_OPTIONAL_REFERENCE_KEYS = ("regulatory_fees",)
 _ALGOS = {a.value for a in Algo}
 _NS_PER_S = 1_000_000_000
 
@@ -367,6 +372,9 @@ class MvpConfig:
 
         r = d.sub("reference")
         reference = {k: r.string(k) for k in _REFERENCE_KEYS}
+        for k in _OPTIONAL_REFERENCE_KEYS:
+            if k in r.obj:
+                reference[k] = r.string(k)
         for key, rel in reference.items():
             if not (root / rel).is_file():
                 raise ValueError(f"{where}.reference.{key}: {rel} not found under {root}")
@@ -439,7 +447,9 @@ class MvpConfig:
     def reference_documents(self) -> dict[str, Any]:
         """Every referenced JSON document, keyed by its repository-relative path."""
         out: dict[str, Any] = {}
-        for key in _REFERENCE_KEYS:
+        for key in _REFERENCE_KEYS + tuple(
+            k for k in _OPTIONAL_REFERENCE_KEYS if k in self.reference
+        ):
             rel = self.reference[key]
             with open(self.repo_root / rel, encoding="utf-8") as fh:
                 out[rel] = json.load(fh)

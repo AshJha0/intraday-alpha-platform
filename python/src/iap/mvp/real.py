@@ -220,6 +220,13 @@ def _symbol_config(
         dst = stage / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(base.reference_path(key), dst)
+    # v1.15: stage the dated regulatory fee schedule too, and name it in the
+    # reference block, so it is hashed into config_version / run_id and the
+    # engine reads the staged copy (never the live repository file).
+    fee_rel = f"configs/{SCHEDULE_RELPATH}"
+    fee_dst = stage / fee_rel
+    fee_dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(base.repo_root / fee_rel, fee_dst)
 
     doc = json.loads(json.dumps(base.document))
     doc["instrument"] = symbol
@@ -230,7 +237,12 @@ def _symbol_config(
         "open": session["open"],
         "close": session["close"],
     }
-    doc["reference"] = dict(doc["reference"], instruments=_INSTRUMENTS_REL, venues=_VENUES_REL)
+    doc["reference"] = dict(
+        doc["reference"],
+        instruments=_INSTRUMENTS_REL,
+        venues=_VENUES_REL,
+        regulatory_fees=fee_rel,
+    )
     cfg = MvpConfig.from_document(doc, where=f"mvp.json (real {symbol})", repo_root=stage)
     return cfg, int(row["instrument_id"])
 
@@ -418,6 +430,18 @@ def run_symbol(
             "run_id": cfg.run_id,
             "session_id": cfg.session_id,
             "config_version": result.engine.config_version,
+            # v1.15: the impact rule in force - the MVP simulator charges the
+            # LINEAR rule-6 impact (ExecConfig.impact_coeff_bps_per_pct_adv),
+            # NOT the research CostModel's default square-root model, so
+            # results are not comparable to sqrt-cost research numbers.
+            "impact_model": {
+                "model": "linear",
+                "impact_coeff_bps_per_pct_adv": (
+                    result.engine.exec_config.impact_coeff_bps_per_pct_adv
+                ),
+                "research_default": "sqrt (iap.backtest.costs.CostModel)",
+            },
+            "regulatory_fee_schedule": cfg.reference.get("regulatory_fees"),
             "session": {
                 "timezone": cfg.session.timezone,
                 "open": cfg.session.open,
@@ -434,7 +458,7 @@ def run_symbol(
         },
         "results": {
             "decisions": counters.get("decisions"),
-            "parents": result.engine._next_parent_id - 1,
+            "parents": result.engine.parent_count,
             "parents_finalised": counters.get("parents_finalised"),
             "children_submitted": counters.get("child_orders_submitted"),
             "children_generated": counters.get("child_orders_generated"),

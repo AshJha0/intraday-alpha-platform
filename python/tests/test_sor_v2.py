@@ -167,6 +167,18 @@ def test_passive_allocation_by_fill_probability_and_lots():
     assert a[2] > a[1] and sum(a.values()) == 90
 
 
+def test_passive_allocation_conserves_sub_lot_remainder():
+    """v1.15: ``qty % lot`` goes to the top-weight venue, never dropped."""
+    f = three_venue_book()
+    m = models(v1={"p_fill_touch": 0.3}, v2={"p_fill_touch": 0.6}, v3={"p_fill_touch": 0.1})
+    r = CostAwareRouter(m, RouterOptions(lot=100))
+    for qty in (1, 99, 1050, 1099, 1234):
+        assert sum(r.allocate_passive(f.book, 0, qty).values()) == qty
+    alloc = r.allocate_passive(f.book, 0, 1050)
+    assert alloc[2] % 100 == 50 and alloc[1] % 100 == 0 and alloc[3] % 100 == 0
+    assert r.allocate_passive(f.book, 0, 50) == {2: 50}
+
+
 # ------------------------------------------------------------------ tiers
 def test_tier_transitions_monthly_and_deterministic():
     m = models(

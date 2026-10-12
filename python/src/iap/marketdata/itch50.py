@@ -792,8 +792,26 @@ class Itch50Mapper:
     ``TRADING`` instead.  Mapping decisions: docs/REAL_DATA.md §4.
     """
 
-    def __init__(self, date: str, symbols: Iterable[str], extended_hours: bool = False) -> None:
+    def __init__(
+        self,
+        date: str,
+        symbols: Iterable[str],
+        extended_hours: bool = False,
+        *,
+        exec_prints: bool = False,
+    ) -> None:
         self.date = date
+        #: v1.15 opt-in (default off: every golden/parity stream unchanged).
+        #: ``C`` (executed-with-price) messages then carry the PRINTED
+        #: execution price on their EXECUTE event (the book ignores an
+        #: EXECUTE's price; a passive-fill simulator with
+        #: ``exec_print_price=True`` fills at it), and a NON-printable ``C``
+        #: (e.g. a cross execution reported in the cross ``Q`` message) is
+        #: emitted as the order-size reduction it is for the book — MODIFY,
+        #: or CANCEL when it empties the order — never as an EXECUTE, so it
+        #: can neither fill a resting child nor be mistaken for the
+        #: displayed side of a following hidden ``P`` print.
+        self.exec_prints = bool(exec_prints)
         self.symbols = tuple(symbols)
         if len(set(self.symbols)) != len(self.symbols):
             raise ValueError("duplicate symbols in the universe")
@@ -988,6 +1006,28 @@ class Itch50Mapper:
                 if order[3] == 0:
                     del orders[m.order_ref]
                 side, price = order[1], order[2]
+                if self.exec_prints and kind is OrderExecutedWithPrice:
+                    if m.printable == "N" or m.price <= 0:
+                        counters["nonprintable_executions"] += 1
+                        if order[3] > 0:
+                            yield (inst, ts, _MODIFY, side, price, order[3], m.order_ref, 0)
+                        else:
+                            yield (inst, ts, _CANCEL, side, price, 0, m.order_ref, 0)
+                        continue
+                    yield (inst, ts, _EXECUTE, side, m.price, qty, m.order_ref, m.match_number)
+                    aggressor = _ASK if side == _BID else _BID
+                    self._print(inst, m.price, aggressor)
+                    yield (
+                        inst,
+                        ts,
+                        _TRADE,
+                        aggressor,
+                        m.price,
+                        qty,
+                        0,
+                        self._trade_id(m.match_number),
+                    )
+                    continue
                 yield (inst, ts, _EXECUTE, side, price, qty, m.order_ref, m.match_number)
                 aggressor = _ASK if side == _BID else _BID
                 if kind is OrderExecuted:

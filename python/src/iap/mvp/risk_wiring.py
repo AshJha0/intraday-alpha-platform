@@ -6,6 +6,7 @@ the reference mark, and the TCA market timeline.  Split out of
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 
 from iap.contracts.types import (
@@ -15,6 +16,8 @@ from iap.contracts.types import (
 from iap.core.events import EventType, MarketEvent, SessionStatus
 from iap.mvp.orders import _LiveParent
 from iap.risk.orders import Fill as RiskFill
+
+_log = logging.getLogger(__name__)
 
 
 class RiskWiringMixin:
@@ -41,6 +44,17 @@ class RiskWiringMixin:
                 if live is not None:
                     live.fill_fees += rep.fees
                     live.fill_impact += fill.impact_cost
+                if self.risk_engine.kill_blocks(self.strategy_id, self.iid, rep.venue_id):
+                    # A fill that raced the kill (the cancel was still on
+                    # the wire): it is real, so it is booked — but counted
+                    # and alerted, never silently absorbed.
+                    self.post_kill_fills += 1
+                    msg = (
+                        f"post-kill fill: child {rep.order_id} execution "
+                        f"{rep.execution_id} qty {rep.filled_qty} at ts {rep.exchange_ts}"
+                    )
+                    self.kill_alerts.append(msg)
+                    _log.warning(msg)
                 applied = self.risk_engine.on_fill(
                     RiskFill(
                         ts=rep.exchange_ts,
@@ -71,6 +85,22 @@ class RiskWiringMixin:
             # §12.1 (PaperUnitsTest): after EVERY fill the risk position equals
             # the account position and the risk daily P&L equals gross - spread.
             self.assert_pnl_identity()
+
+    def _enforce_kills(self, ts: int) -> None:
+        """v1.15: once the risk engine has latched a kill (loss / global /
+        strategy / instrument / venue) covering a working child, request its
+        cancel (simulator rule 7: the cancel travels the latency path, so a
+        fill can still race it — ``_process_reports`` counts and alerts
+        those). Each child is cancelled once."""
+        lives = ([] if self._live is None else [self._live]) + list(self._closing)
+        for live in lives:
+            for cid, child in live.children.items():
+                if cid in self._kill_cancelled or self.sim.open_qty(cid) <= 0:
+                    continue
+                if self.risk_engine.kill_blocks(self.strategy_id, self.iid, child.venue_id):
+                    self.sim.cancel(cid, ts)
+                    self._kill_cancelled.add(cid)
+                    self.kill_cancels += 1
 
     def _owner_of(self, child_order_id: int) -> _LiveParent | None:
         if self._live is not None and child_order_id in self._live.children:
