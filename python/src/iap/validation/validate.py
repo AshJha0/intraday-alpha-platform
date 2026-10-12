@@ -1421,7 +1421,64 @@ def _cpcv_block(
     embargo_ns: int,
 ) -> dict:
     """The ``cpcv`` report block (module docs): per-split and per-path
-    pooled IC of the standardized signal on all scored rows."""
+    pooled IC of the standardized signal on all scored rows.
+
+    Memory (v1.15, R7): every split copies its train/test rows, so the block
+    first narrows the frames to the columns it reads (:func:`_cpcv_columns`);
+    the result is identical.  If the alpha turns out to read a column outside
+    that set (KeyError), the block reruns on the full frames.
+    """
+    narrow = _cpcv_columns(model_factory, uframes)
+    if narrow is not None:
+        try:
+            return _cpcv_block_on(
+                model_factory,
+                {iid: df[[c for c in df.columns if c in narrow]] for iid, df in uframes.items()},
+                horizon,
+                horizon_ns,
+                ic_rows,
+                n_groups=n_groups,
+                k_test=k_test,
+                embargo_ns=embargo_ns,
+            )
+        except KeyError:
+            pass
+    return _cpcv_block_on(
+        model_factory,
+        uframes,
+        horizon,
+        horizon_ns,
+        ic_rows,
+        n_groups=n_groups,
+        k_test=k_test,
+        embargo_ns=embargo_ns,
+    )
+
+
+def _cpcv_columns(model_factory, uframes: Mapping[int, pd.DataFrame]) -> set[str] | None:
+    """Columns the cpcv block reads: ``exchange_ts``, every label column,
+    ``spread_ticks_v1`` (crossed flag) and the alpha's declared features;
+    ``None`` (no narrowing) when the alpha declares no feature list."""
+    feats = getattr(model_factory(), "features", None)
+    if not feats:
+        return None
+    cols = {"exchange_ts", "spread_ticks_v1", *feats}
+    for df in uframes.values():
+        cols.update(c for c in df.columns if c.startswith("label_"))
+    return cols
+
+
+def _cpcv_block_on(
+    model_factory,
+    uframes: Mapping[int, pd.DataFrame],
+    horizon: str,
+    horizon_ns: int,
+    ic_rows: str,
+    *,
+    n_groups: int,
+    k_test: int,
+    embargo_ns: int,
+) -> dict:
     splitter = CombinatorialPurgedSplitter(n_groups, k_test, embargo_ns)
     per_split: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
     splits = []

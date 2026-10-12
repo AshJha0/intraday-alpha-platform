@@ -192,10 +192,37 @@ def look_marker(ds: Path, alpha: str) -> Path:
     return ds / "research" / f"R7_CONFIRM_LOOK_{alpha}_{HORIZON}.started"
 
 
-def verify_no_prior_look(ds: Path) -> None:
+RETRY_NOTE_REL = "research/r7/R7_DEVIATION_crash_retry.md"
+
+
+def retry_marker(ds: Path, alpha: str) -> Path:
+    return ds / "research" / f"R7_CONFIRM_LOOK_{alpha}_{HORIZON}.retry1"
+
+
+def verify_crash_retry(root: Path, ds: Path) -> None:
+    """Owner-approved single retry of a look that crashed before any result
+    (2026-10-12: EQ10 out of memory in the report-only cpcv block).  Allowed
+    only when: the retry note is committed, the crashed look's marker exists,
+    no retry was taken before, no experiment directory was written and the
+    dataset ledger holds no entry (so nothing was computed or debited)."""
+    if not (root / RETRY_NOTE_REL).is_file():
+        raise CheckError(f"{RETRY_NOTE_REL} missing (must be recorded before the retry)")
+    if not any(look_marker(ds, a).exists() for a in ALPHAS):
+        raise CheckError("no crashed look to retry")
+    for a in ALPHAS:
+        if retry_marker(ds, a).exists():
+            raise CheckError(f"{retry_marker(ds, a)} exists: the single retry was already used")
+    d = experiments_dir(ds)
+    if d.is_dir() and any(d.glob("*/spec.json")):
+        raise CheckError(f"{d} holds an experiment: the look produced output; no retry")
+    if (ds / "research" / "experiments.json").exists():
+        raise CheckError("the dataset ledger has entries: the look was debited; no retry")
+
+
+def verify_no_prior_look(ds: Path, retry: bool = False) -> None:
     """Refuse when a look for these alphas was already taken on this dataset."""
     for a in ALPHAS:
-        if look_marker(ds, a).exists():
+        if look_marker(ds, a).exists() and not retry:
             raise CheckError(f"{look_marker(ds, a)} exists: the look was already taken")
     d = experiments_dir(ds)
     if d.is_dir():
@@ -245,7 +272,7 @@ def run_command(alpha: str, ds: Path) -> list[str]:
     ]
 
 
-def preflight(root: Path, ds: Path, signed_ok: Path) -> dict[str, Any]:
+def preflight(root: Path, ds: Path, signed_ok: Path, retry: bool = False) -> dict[str, Any]:
     """Every precondition; raises :class:`CheckError` on the first failure."""
     doc = load_prereg(root)
     verify_prereg(root, doc)
@@ -263,7 +290,10 @@ def preflight(root: Path, ds: Path, signed_ok: Path) -> dict[str, Any]:
     entries = verify_gate(root, doc)
     for a, e in entries.items():
         print(f"ok  prereg gate {a}/{HORIZON}: blackboard entry {e['seq']}")
-    verify_no_prior_look(ds)
+    if retry:
+        verify_crash_retry(root, ds)
+        print(f"ok  crash retry allowed ({RETRY_NOTE_REL}; nothing computed or debited)")
+    verify_no_prior_look(ds, retry)
     print("ok  no prior look on this dataset")
     thr = ledger_thresholds(root, ds)
     print(
@@ -582,11 +612,29 @@ def record_commands(results: Sequence[Mapping[str, Any]]) -> list[str]:
     ]
 
 
-def live(root: Path, ds: Path, signed_ok: Path, runner=subprocess.run, frames_loader=None) -> int:
+def live(
+    root: Path,
+    ds: Path,
+    signed_ok: Path,
+    runner=subprocess.run,
+    frames_loader=None,
+    retry: bool = False,
+) -> int:
     from iap.agents.workflow import require_human
 
     require_human("owner", "confirmatory_run", set())
-    pre = preflight(root, ds, signed_ok)  # raises before the first look
+    pre = preflight(root, ds, signed_ok, retry)  # raises before the first look
+    if retry:
+        for a in ALPHAS:
+            retry_marker(ds, a).write_text(
+                datetime.datetime.now(datetime.UTC).isoformat(), encoding="ascii"
+            )
+        prev = root / RESULT_REL
+        if prev.exists():
+            prev.replace(prev.with_name("r7_confirm_result_crash1.json"))
+            md = root / RESULT_MD_REL
+            if md.exists():
+                md.replace(md.with_name("r7_confirm_result_crash1.md"))
     looks = []
     for alpha in ALPHAS:
         look = take_look(alpha, ds, root, runner)
@@ -648,17 +696,24 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--dataset-dir", type=Path, default=DEFAULT_DATASET)
     ap.add_argument("--root", type=Path, default=REPO)
     ap.add_argument("--signed-ok", type=Path, default=None)
+    ap.add_argument(
+        "--retry-crashed-look",
+        action="store_true",
+        help=f"the single owner-approved retry of a look that crashed before any result "
+        f"({RETRY_NOTE_REL})",
+    )
     a = ap.parse_args(argv)
     root = a.root.resolve()
     ds = a.dataset_dir if a.dataset_dir.is_absolute() else root / a.dataset_dir
     signed_ok = a.signed_ok or root / SIGNED_OK_REL
     try:
+        retry = a.retry_crashed_look
         if a.dry_run:
-            preflight(root, ds, signed_ok)
+            preflight(root, ds, signed_ok, retry)
             print("\nDRY RUN OK - no IC computed, nothing written. Live (owner only):")
-            print("   ", live_command(a.dataset_dir))
+            print("   ", live_command(a.dataset_dir) + (" --retry-crashed-look" if retry else ""))
             return 0
-        return live(root, ds, signed_ok)
+        return live(root, ds, signed_ok, retry=retry)
     except CheckError as exc:
         print(f"ABORT (no look taken): {exc}", file=sys.stderr)
         return 2
