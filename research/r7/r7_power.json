@@ -449,5 +449,9 @@
       }
     }
   },
+  "prereg": {
+    "file": "research/r7/r7_confirm_prereg.json",
+    "signed": true
+  },
   "version": 1
 }

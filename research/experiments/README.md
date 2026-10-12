@@ -235,7 +235,7 @@ are read from the documents, which have not changed since v1.3.0.)
   (24 × 84), the five `v2` runs (5 × 84) and the adaptive study (40), for
   4,396; the signal-combination report (`research/combination/`) added eight
   experiments at 95 looks each, for
-  **5,358 looks over 293 distinct configurations** (Bonferroni |t| ≥ 4.432,
+  **5,361 looks over 296 distinct configurations** (Bonferroni |t| ≥ 4.432,
   expected max |t| ≈ 4.144). Entries are never de-duplicated across kinds or
   datasets — the denominator only grows.
 

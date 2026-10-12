@@ -264,6 +264,18 @@ def changelog_section(text: str, version: str) -> str:
     return body.strip() + "\n"
 
 
+def stale_unreleased(text: str, version: str) -> str | None:
+    """An ``## Unreleased ...`` heading still naming this release's vX.Y(.Z), if any.
+
+    A bare ``## Unreleased`` (the next cycle) is fine; ``## Unreleased (v1.15)``
+    while publishing 1.15.0 means the heading was not renamed.
+    """
+    major_minor = ".".join(version.split(".")[:2])
+    pat = re.compile(rf"^## +Unreleased\b.*\bv{re.escape(major_minor)}(?:\.\d+)?\b.*$", re.M | re.I)
+    m = pat.search(text)
+    return m.group(0).strip() if m else None
+
+
 def main_ci_green(r: Runner, sha: str, workflow: str = "ci.yml") -> bool:
     """A completed, successful push run of ``workflow`` on main for ``sha``.
 
@@ -347,11 +359,18 @@ def publish(
 
     if r.query(["git", "tag", "--list", tag]).strip():
         block(f"tag {tag} already exists")
+    changelog = r.query(["git", "show", f"{sha}:CHANGELOG.md"])
     try:
-        section = changelog_section(r.query(["git", "show", f"{sha}:CHANGELOG.md"]), version)
+        section = changelog_section(changelog, version)
     except ReleaseError as e:
         block(str(e))
         section = f"(CHANGELOG section for {tag} missing)\n"
+    stale = stale_unreleased(changelog, version)
+    if stale:
+        block(f"CHANGELOG.md heading {stale!r} not renamed to '## {tag} — <date>'")
+    if not section.strip() or section.startswith("(CHANGELOG section"):
+        if r.execute:
+            raise ReleaseError(f"CHANGELOG section for {tag} is missing or empty")
     if not main_ci_green(r, sha):
         block(f"no green ci run on main for {sha}: tag only after main CI is green")
     if not main_ci_green(r, sha, "codeql.yml"):

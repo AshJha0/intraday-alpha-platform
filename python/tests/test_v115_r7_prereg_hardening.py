@@ -138,3 +138,21 @@ def test_draft_fingerprints_cost_sensitivity_and_power():
     assert set(d["untested_insufficient_free_data"]["alphas"]) == {"EQ01@1s", "EQ02@5s", "EQ04@5s"}
     assert {"H2", "H3", "EQ07"} <= set(d["dropped"])
     assert not any("deflated-Sharpe gate reads for H3" in x for x in d["open_for_owner"])
+
+
+def test_power_report_prereg_status_text(tmp_path):
+    r7 = tmp_path
+    assert r7_power.prereg_status(r7)["file"] is None
+    (r7 / "r7_confirm_prereg_DRAFT.json").write_text("{}", encoding="utf-8")
+    st = r7_power.prereg_status(r7)
+    assert st == {"file": "research/r7/r7_confirm_prereg_DRAFT.json", "signed": False}
+    assert "DRAFT, unsigned" in r7_power._prereg_line(st)
+    (r7 / "r7_confirm_prereg.json").write_text(
+        json.dumps({"signed": True, "signature": {"sig": "x"}}), encoding="utf-8"
+    )
+    st = r7_power.prereg_status(r7)
+    assert st == {"file": "research/r7/r7_confirm_prereg.json", "signed": True}
+    assert "signed and registered" in r7_power._prereg_line(st)
+    committed = (REPO / "docs" / "research" / "R7_POWER.md").read_text(encoding="utf-8")
+    live = r7_power.prereg_status(REPO / "research" / "r7")
+    assert r7_power._prereg_line(live) in committed

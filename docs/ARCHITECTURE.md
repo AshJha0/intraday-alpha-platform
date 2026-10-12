@@ -132,7 +132,7 @@ flowchart TD
     FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
-    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,358 looks / 293 configs, two datasets, three method revisions)<br/>REPORT.md, ML_REPORT.md, model manifests"]
+    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,361 looks / 296 configs, two datasets, three method revisions)<br/>REPORT.md, ML_REPORT.md, model manifests"]
     RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 23 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```
@@ -288,7 +288,8 @@ and by Java and Rust (the lifecycle ports). The harness
 (`tests/harness/run_all.sh`, with `run_golden.sh` as the golden-only alias)
 runs every suite with the canonical commands and prints the parity table; a
 v1.14.0 CI run (2026-10-11) passes 2411/302/366 tests (193/72/72
-golden) across python/cpp/rust (Java archived in v1.15, `archive/java/`), plus the repo-level `integration` (35)
+golden; rust was 365/71 at the v1.14.0 tag itself, CI run 38142218467, and
+366/72 after the v1.15 fee commits) across python/cpp/rust (Java archived in v1.15, `archive/java/`), plus the repo-level `integration` (35)
 and `replay` (6) rows — the same counts the README parity table records.
 
 ## 7. Hot-path engineering notes per language
@@ -783,7 +784,7 @@ will find the cheapest path to a pass faster than a person: cheaper costs, a
 chosen holdout, uncounted looks. v1.3.0 closed those three in the tooling
 (LEARN.md §24) and measured what the validation chain can detect at all
 (the planted-signal power study, LEARN.md §23). It did not build the agents
-(v1.7.0 built the controls; v1.11.0 built the agent on top of them), and on two synthetic sessions whose ledger now holds 5,358 looks (1068 on
+(v1.7.0 built the controls; v1.11.0 built the agent on top of them), and on two synthetic sessions whose ledger now holds 5,361 looks (1068 on
 the v1.3.0 dataset, 852 on the regenerated v1.4.0 one, 3,236 on that same
 dataset under the v1.5.0 default methods, 202 under the v1.14 revision), more searching is not what the platform lacks (HOW_IT_WORKS.md §6.4
 lists what would be theatre on this data, and why). DIAGRAMS.md §19 draws

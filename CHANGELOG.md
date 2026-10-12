@@ -8,7 +8,7 @@ that tag.
 
 ## Unreleased (v1.15)
 
-- **R7 pre-registration hardening (DRAFT stays unsigned).** Power analysis
+- **R7 pre-registration hardening (drafted unsigned; later owner-signed in #111).** Power analysis
   `tools/r7_power.py` (`iap.research.r7_power`) writes
   `docs/research/R7_POWER.md` / `research/r7/r7_power.json`: power and minimum
   detectable effect per drafted hypothesis on tier 1 (7 sessions) and tier 1+2
@@ -138,9 +138,62 @@ that tag.
   declaration extractor left the polyglot policy (the override machinery stays
   for the Rust and C++ frozen copies).
 - Docs and site counts: parity is 2411 / 302 / 365 tests, 193 / 72 / 71
+  (rust 365 / 71 golden at the v1.14.0 tag: CI run 38142218467 golden table;
+  the v1.15 fee commits took rust to 366 / 72, the count the README parity
+  table now carries: `check_headline_numbers.py` static count and main CI run
+  38172001157 golden table)
   golden: 3,078 green (was 3,653 with Java's 575).
 - Ruleset: `java` dropped from the `protect-main` required checks
   (2026-10-11; docs/governance/REPO_SETTINGS.md updated).
+
+### Also merged in v1.15 (entries added in the hygiene pass)
+
+- **AI4 deep LOB models + A2 QQQ basket/basis study, code only (#85).**
+  `iap.models.deeplob` (numpy DeepLOB `(T, 4L)` dataset path, train-only
+  z-score, smoothed forward labels, causal windows, purged chronological
+  split, seeded `NumpyLOBSoftmax` baseline); `iap.models.deeplob_torch`
+  (DeepLOB and an MLP baseline, optional extra `deep = ["torch>=2.2"]`, torch
+  tests skip in CI); `iap.research.basis` (QQQ top-15 basket, basis in bps,
+  train-only beta residual, lead-lag, AR(1) half-life). No real data or
+  training run.
+- **Content-hash blocking at promotion (G-P0-1) + trust roots enabled
+  (G-P1-2) (#92).** `ModelRegistry.promote` raises on a missing or mismatched
+  content hash and writes `promotion.json`; `check_promotions` and
+  `python -m iap.mlops promote|check-promotions` in the governance job.
+  Maintainer `ashjha0` key in `research/agents/trust_roots.json`; the agent
+  registry is signed and CI passes `--require-signed`.
+  `docs/governance/TRUST_ROOTS.md` covers re-sign, rotation and restore.
+- **DBN MBO reader + R7 tier-2 Databento fetch tool, code only (#93).**
+  `iap.marketdata.dbn_mbo.DbnMboReader` translates Databento `XNAS.ITCH` MBO
+  records into ITCH 5.0 tuples for the unchanged `Itch50Mapper`;
+  `ingest --format dbn-mbo` (optional extra `iap[dbn]`).
+  `tools/r7_databento_fetch.py` prices the 40 tier-2 dates and downloads only
+  with `--i-have-approval` and a `--max-cost-usd` ceiling.
+- **Agents: propose -> draft prereg -> human sign-off (A-P0-1, A-P1-2,
+  A-P1-3) (#94).** `iap.agents.workflow`; `prereg_gate.require` refuses a
+  `prereg` written by any registered agent id; agent studies are exploratory
+  only (`"confirmatory": false`); proposals debit the chained ledger; agent
+  eval harness.
+- **Release automation (E-P1-1) (#96).** `tools/release.py`
+  `prepare-regenerate`, `apply-bundle`, `publish` (green main CI + CodeQL,
+  annotated tag from the CHANGELOG section, `gh release --verify-tag`,
+  `release.yml` watch with one rerun if `verify-ci` raced, site check), `flow`.
+  Dry run by default.
+- **R7-CONFIRM-1 and AI4-DEEPLOB-1 signed (#111).** Owner-signed
+  pre-registrations `research/r7/r7_confirm_prereg.json` (H4 tier 1: EQ10 @1s
+  and EQ05 @1s; board seq 7 and 8) and `research/r7/ai4_deeplob_prereg.json`
+  (board seq 9), written by `tools/r7_register_preregs.py` with an Ed25519
+  maintainer signature. This supersedes "DRAFT stays unsigned" above.
+  **AI4 is deferred to v1.16** (`research/r7/AI4_DEFERRED.md`): the pipeline
+  cannot honour the registration as written (no real-data path; windows and
+  labels cross sessions; static price z-score), so AI4 is not run in v1.15 and
+  a new registration will supersede it; its spent look stays counted.
+- **Hygiene.** `tools/r7_holdout_check.py` (tracked pre-ingest check: signed
+  prereg required, `--allow-draft` opt-in with a warning, several signed files
+  fail); `tools/jobs/jobs.example.json` gains the `r7_holdout_chain` entry;
+  `tools/release.py publish` blocks on an `## Unreleased (vX.Y)` heading not
+  renamed and fails on a missing or empty section; `R7_POWER.md` states the
+  prereg file and signed state from the files on disk.
 
 ## v1.14.0 — 2026-10-11
 

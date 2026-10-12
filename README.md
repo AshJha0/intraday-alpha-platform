@@ -29,7 +29,16 @@ implementation (`iap.risk`, `iap.execution`) proven by the same golden files
 the Java ports are proven by, so the loop the MVP runs is the reference
 loop end to end.
 
-## Current status (v1.14.0, 2026-10-11)
+## Current status (v1.14.0 released 2026-10-11; v1.15 in progress)
+
+**v1.15 in progress (2026-10-12).** The R7 confirmatory pre-registration
+R7-CONFIRM-1 is **signed** (`research/r7/r7_confirm_prereg.json`: H4 tier 1,
+EQ10 @1s and EQ05 @1s, one look) and the unseen holdout sessions are being
+ingested; there is no R7 result yet. AI4-DEEPLOB-1 was signed but is
+deferred to v1.16 and not run ([research/r7/AI4_DEFERRED.md](research/r7/AI4_DEFERRED.md)).
+Merged v1.15 work is listed under "Unreleased (v1.15)" in
+[CHANGELOG.md](CHANGELOG.md). Numbers below are as of v1.14.0 unless stated;
+test counts: the parity table below (v1.14.0) or the latest CI run.
 
 **Where the research stands.**
 
@@ -331,7 +340,7 @@ the full design, data flow, and diagrams.
 | Flagship alphas | **24** (EQ01–EQ12, FX01–FX12), each with an enforced `Economic rationale:` docstring | `python/src/iap/alpha/`, `research/alpha_reports/` |
 | Promotion verdicts | **0 PROMOTE / 12 ITERATE / 12 REJECT** (gated on the pooled *uncrossed* IC and its HAC t against the ledger threshold, 4.426 at the run's look count; the v1.14.0 methods: causal row block, automatic day-separated HAC, time-shift leakage; FX11 fails leakage) | `research/alpha_reports/REPORT.md` |
 | Lifecycle registry | **23 alphas at CANDIDATE, 0 beyond** (FX11 held in RESEARCH by the v1.14 time-shift leakage gate) — every candidate fails `net_pnl_after_costs` at 1× costs, its bootstrap bound `net_pnl_bootstrap_ci` and `capacity`; the cross-alpha correlation gate passes vacuously (7 states, 17 pinned edges, 20 gates) | `research/alpha_registry.json`, `research/lifecycle_transitions.jsonl`, `tests/golden/expected_lifecycle.json` |
-| Experiments ledger | 5,358 recorded looks over **293 distinct configurations** (de-duplicated by alpha × kind × config × dataset × statistics revision: 70 configurations holding 1,068 of the looks on the v1.3.0 dataset are kept as history, 223 holding 4,290 of them are on the current one, 77 of them added by the v1.14 regeneration); expected max \|t\| under the global null ≈ 4.144, Bonferroni per-test \|t\| ≥ 4.432; a hash chain since v1.14 | `research/experiments.json` |
+| Experiments ledger | 5,361 recorded looks over **296 distinct configurations** (de-duplicated by alpha × kind × config × dataset × statistics revision: 70 configurations holding 1,068 of the looks on the v1.3.0 dataset are kept as history, 223 holding 4,290 of them are on the current one, 77 of them added by the v1.14 regeneration); expected max \|t\| under the global null ≈ 4.144, Bonferroni per-test \|t\| ≥ 4.432; a hash chain since v1.14 | `research/experiments.json` |
 | Contracts | **17** JSON Schemas (all `x-version` 1 except `risk_event`, 2 since v1.14) mirrored by **22** typed Python contracts and **18** runtime-checkable Protocols; one pinned instance each | `schemas/`, `python/src/iap/contracts/`, `tests/golden/expected_contracts_examples.json` |
 | Python reference ports proven by the ports' own goldens | risk: `expected_risk_decisions.json` exact, audit JSONL + snapshot **byte-identical**; execution: `expected_replay_fills.json` **bit-identical** | `python/tests/test_risk_golden.py`, `python/tests/test_execution_golden.py` |
 | MVP golden run (`python -m iap.mvp run`, seed 12345) | **15,805** events · **800** decisions · **231** parent orders · **163** fills · P&L **−82.84 USD** (cost-negative: +0.0245 bps alpha vs −0.4367 bps execution cost) · trace digest `6fdb3a2c…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
@@ -503,7 +512,7 @@ conclusion. What moved:
 - **Ledger.** The 1920 already recorded are kept; the regenerated pipelines
   added 2,476 (84 per alpha per run under the default methods, 28 under the
   legacy ones), for 4,396; the eight signal-combination experiments added
-  760, for 5,156 (v1.5.0; v1.14.0 brought it to 5,358).
+  760, for 5,156 (v1.5.0; v1.14.0 brought it to 5,361).
 - **Ports.** Java and Rust implement the CUSUM and the consecutive
   retirement rule and the ledger and the fixed significance threshold, by
   name; the Java `ResearchBacktester` and `CostModel` default to the v1.5.0
