@@ -439,8 +439,7 @@ def test_committed_ledger_names_a_dataset_on_every_entry():
     # a pre-registration (kind "prereg", v1.15 R7/AI4) is filed before its
     # holdout dataset exists, so it is the one kind allowed no dataset stamp
     assert all(
-        ExperimentLedger.entry_dataset_version(e) or e["kind"] == "prereg"
-        for e in blob["entries"]
+        ExperimentLedger.entry_dataset_version(e) or e["kind"] == "prereg" for e in blob["entries"]
     )
     by_dataset = {d["dataset_version"]: d for d in blob["datasets"]}
     legacy = by_dataset["203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b"]
