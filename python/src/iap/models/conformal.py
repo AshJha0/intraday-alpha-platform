@@ -26,12 +26,15 @@ the parity path is unchanged.
 
 from __future__ import annotations
 
+import logging
 import math
 from collections import deque
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 
 import numpy as np
+
+_LOG = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -59,24 +62,56 @@ def _conformal_quantile(scores: np.ndarray, alpha: float) -> float:
 
 
 class SplitConformal:
-    """Split conformal intervals ``pred +/- q`` from absolute calibration residuals."""
+    """Split conformal intervals from calibration residual scores.
 
-    def __init__(self, alpha: float = 0.1) -> None:
+    ``score="absolute"`` (default): ``|y - pred|``, constant width ``pred +/- q``.
+    ``score="normalized"`` (opt-in): ``|y - pred| / sigma(x)`` with a caller
+    supplied per-row scale estimate ``sigma`` (e.g. rolling realised vol), so
+    the interval ``pred +/- q * sigma(x)`` widens and narrows with the input.
+    Coverage is still ``>= 1 - alpha`` under exchangeability of the scores.
+    """
+
+    def __init__(self, alpha: float = 0.1, score: str = "absolute", sigma_floor: float = 1e-12):
         if not 0.0 < alpha < 1.0:
             raise ValueError("alpha must be in (0, 1)")
+        if score not in ("absolute", "normalized"):
+            raise ValueError("score must be 'absolute' or 'normalized'")
+        if not sigma_floor > 0:
+            raise ValueError("sigma_floor must be > 0")
         self.alpha = alpha
+        self.score = score
+        self.sigma_floor = sigma_floor
         self.q: float | None = None
 
-    def fit(self, y_cal: Sequence[float], pred_cal: Sequence[float]) -> SplitConformal:
-        scores = np.abs(np.asarray(y_cal, float) - np.asarray(pred_cal, float))
+    def _sigma(self, sigma: object, like: np.ndarray) -> np.ndarray:
+        if self.score == "absolute":
+            return np.ones_like(like)
+        if sigma is None:
+            raise ValueError("score='normalized' requires sigma")
+        s = np.broadcast_to(np.asarray(sigma, float), like.shape)
+        if not np.all(np.isfinite(s)):
+            raise ValueError("sigma must be finite")
+        return np.maximum(s, self.sigma_floor)
+
+    def fit(
+        self,
+        y_cal: Sequence[float],
+        pred_cal: Sequence[float],
+        sigma_cal: Sequence[float] | None = None,
+    ) -> SplitConformal:
+        resid = np.abs(np.asarray(y_cal, float) - np.asarray(pred_cal, float))
+        scores = resid / self._sigma(sigma_cal, resid)
         self.q = _conformal_quantile(scores, self.alpha)
         return self
 
-    def interval(self, pred: float | np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def interval(
+        self, pred: float | np.ndarray, sigma: float | np.ndarray | None = None
+    ) -> tuple[np.ndarray, np.ndarray]:
         if self.q is None:
             raise RuntimeError("fit() first")
         p = np.asarray(pred, float)
-        return p - self.q, p + self.q
+        half = self.q * self._sigma(sigma, p)
+        return p - half, p + half
 
 
 @dataclass
@@ -85,12 +120,19 @@ class AdaptiveConformal:
 
     Call :meth:`interval` for the next forecast, then :meth:`update` with the
     realised value once it is known (no look-ahead).
+
+    ``alpha_t`` is clamped to ``[alpha / 10, 1 - 1e-9]``.  Unclamped, a long
+    miss streak drives ``alpha_t`` to or below zero (infinite width, zero
+    confidence, zero size) and a long cover streak to ``>= 1`` (zero width).
+    Every update that hits a clamp increments ``saturations`` and logs a
+    warning, so saturation is visible rather than a silent size collapse.
     """
 
     alpha: float = 0.1
     gamma: float = 0.005
     window: int = 500
     alpha_t: float = field(init=False)
+    saturations: int = field(init=False, default=0)
     _scores: deque = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -115,11 +157,25 @@ class AdaptiveConformal:
         q = self.half_width()
         return pred - q, pred + q
 
+    @property
+    def alpha_bounds(self) -> tuple[float, float]:
+        return self.alpha / 10.0, 1.0 - 1e-9
+
     def update(self, y: float, pred: float) -> bool:
         """Record the realised value; returns True if it was covered."""
         lo, hi = self.interval(pred)
         covered = lo <= y <= hi
-        self.alpha_t += self.gamma * (self.alpha - (0.0 if covered else 1.0))
+        raw = self.alpha_t + self.gamma * (self.alpha - (0.0 if covered else 1.0))
+        lo_a, hi_a = self.alpha_bounds
+        self.alpha_t = min(max(raw, lo_a), hi_a)
+        if self.alpha_t != raw:
+            self.saturations += 1
+            _LOG.warning(
+                "ACI alpha_t saturated at %.3g (raw %.3g); saturations=%d",
+                self.alpha_t,
+                raw,
+                self.saturations,
+            )
         self._scores.append(abs(float(y) - float(pred)))
         return covered
 

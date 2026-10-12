@@ -331,6 +331,7 @@ def solve(
     iters: int = 500,
     proj_passes: int = 8,
     feas_tol: float = 1e-7,
+    eta_max: float | None = None,
 ) -> PGDResult:
     """Deterministic PGD solve of the research portfolio problem.
 
@@ -340,6 +341,14 @@ def solve(
     ``eta0=None`` selects the pinned auto step ``1 / L`` with
     ``L = max(2 * risk_aversion * ||Sigma||_inf, 1e-6)`` (infinity-norm bound
     on the Hessian's largest eigenvalue) — itself deterministic.
+
+    With ``risk_aversion = 0`` (or a near-zero Sigma) the objective is
+    (piecewise) linear, the Hessian bound collapses to the ``1e-6`` floor and
+    the auto step becomes ``1e6``: each step jumps far outside the box and the
+    iterate is whatever the projection makes of it.  ``eta_max`` (opt-in,
+    default ``None`` = unchanged pinned behaviour) caps the auto step, e.g.
+    at the box width, so the linear case moves in sane increments.  An
+    explicit ``eta0`` is never altered.
     """
     alpha = np.asarray(alpha, dtype=np.float64)
     Sigma = np.asarray(Sigma, dtype=np.float64)
@@ -366,6 +375,10 @@ def solve(
     if eta0 is None:
         L = max(2.0 * risk_aversion * float(np.abs(Sigma).sum(axis=1).max()), 1e-6)
         eta0 = 1.0 / L
+        if eta_max is not None:
+            if not (np.isfinite(eta_max) and eta_max > 0):
+                raise ValueError("eta_max must be finite and > 0")
+            eta0 = min(eta0, float(eta_max))
     if iters < 1 or proj_passes < 1 or eta0 <= 0 or step_decay < 0:
         raise ValueError("bad solver parameters")
     if np.any(np.abs(Sigma - Sigma.T) > 1e-12):

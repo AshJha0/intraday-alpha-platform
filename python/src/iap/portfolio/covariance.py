@@ -10,6 +10,18 @@ RiskMetrics recursion with pinned decay ``lam = 0.94``:
 initialized with the sample covariance of the first ``init_window`` bars.
 A small ridge (``ridge * trace/n``) keeps Sigma positive definite for the
 optimizer.  Deterministic: sorted instruments, fixed bucket boundaries.
+
+Note on centring (pinned, documented rather than changed): the seed is the
+DEMEANED sample covariance (``np.cov``) of the first ``init_window`` bars,
+while each recursive update adds the RAW second moment ``r_t r_t'`` (the
+RiskMetrics zero-mean convention for short-horizon returns).  On 1-minute
+returns the mean is negligible next to the dispersion, so the two agree to
+within ``mean^2``; making them consistent would move the committed goldens.
+
+Opt-in shrinkage: ``shrinkage="ledoit_wolf"`` shrinks the EWMA matrix toward
+a constant-correlation target (Ledoit & Wolf 2004) with intensity
+``shrink_intensity`` (fixed, deterministic; default 0.1) before the ridge.
+:func:`condition_number` reports the 2-norm condition number.
 """
 
 from __future__ import annotations
@@ -75,8 +87,14 @@ def ewma_covariance(
     lam: float = 0.94,
     init_window: int = 20,
     ridge: float = 1e-6,
+    shrinkage: str | None = None,
+    shrink_intensity: float = 0.1,
 ) -> np.ndarray:
-    """RiskMetrics EWMA covariance of a (T, N) return matrix (per-bar units)."""
+    """RiskMetrics EWMA covariance of a (T, N) return matrix (per-bar units).
+
+    ``shrinkage=None`` (default) is the pinned estimator.  ``"ledoit_wolf"``
+    applies :func:`shrink_constant_correlation` before the ridge.
+    """
     returns = np.asarray(returns, dtype=np.float64)
     if returns.ndim != 2:
         raise ValueError("returns must be 2-D (T, N)")
@@ -93,5 +111,37 @@ def ewma_covariance(
         r = returns[t]
         S = lam * S + (1.0 - lam) * np.outer(r, r)
     S = 0.5 * (S + S.T)
+    if shrinkage is not None:
+        if shrinkage != "ledoit_wolf":
+            raise ValueError("shrinkage must be None or 'ledoit_wolf'")
+        S = shrink_constant_correlation(S, shrink_intensity)
     S += np.eye(n) * (ridge * (np.trace(S) / n if np.trace(S) > 0 else 1.0))
     return S
+
+
+def shrink_constant_correlation(S: np.ndarray, intensity: float) -> np.ndarray:
+    """``(1 - d) S + d F`` with F the constant-correlation target.
+
+    F keeps the diagonal of S and sets every off-diagonal to
+    ``rbar * s_i * s_j`` with ``rbar`` the mean pairwise correlation.
+    """
+    if not 0.0 <= intensity <= 1.0:
+        raise ValueError("shrink_intensity must be in [0, 1]")
+    S = np.asarray(S, dtype=np.float64)
+    n = S.shape[0]
+    sd = np.sqrt(np.clip(np.diag(S), 0.0, None))
+    if n < 2 or np.any(sd == 0):
+        return S.copy()
+    corr = S / np.outer(sd, sd)
+    rbar = (corr.sum() - n) / (n * (n - 1))
+    F = rbar * np.outer(sd, sd)
+    np.fill_diagonal(F, np.diag(S))
+    return (1.0 - intensity) * S + intensity * F
+
+
+def condition_number(S: np.ndarray) -> float:
+    """2-norm condition number ``lambda_max / lambda_min`` (inf if singular)."""
+    ev = np.linalg.eigvalsh(np.asarray(S, dtype=np.float64))
+    if ev[0] <= 0:
+        return float("inf")
+    return float(ev[-1] / ev[0])
