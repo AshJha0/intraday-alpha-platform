@@ -1,0 +1,230 @@
+{
+  "schema": "iap.r7_confirm_prereg/v1",
+  "id": "R7-CONFIRM-1",
+  "status": "REGISTERED - owner-approved, signed off and on the blackboard; approved for ONE confirmatory look",
+  "signed": true,
+  "on_blackboard": true,
+  "drafted": "2026-10-11",
+  "source": "docs/R7_DATA_PLAN.md section 6",
+  "symbols": [
+    "AAPL",
+    "MSFT",
+    "QQQ"
+  ],
+  "holdout_days": [
+    "2025-11-28",
+    "2025-12-08",
+    "2025-12-09",
+    "2025-12-10",
+    "2025-12-11",
+    "2025-12-12",
+    "2026-06-12"
+  ],
+  "holdout_files": {
+    "location": "data/real/itch/r7/ (git-ignored vendor files)",
+    "computed": "2026-10-11, streaming sha256 of the compressed .gz bytes as downloaded; files were not decompressed and no message content was read",
+    "check": "before ingest, each file must match bytes and sha256 exactly; any mismatch stops the run",
+    "files": [
+      {
+        "date": "2025-11-28",
+        "file": "S112825-v50.txt.gz",
+        "bytes": 4735308661,
+        "sha256": "e965ea6f9779c1b5d7b74de4549836ffe29a5f6ff64bb7894186a6f6404baaa4"
+      },
+      {
+        "date": "2025-12-08",
+        "file": "S120825-v50.txt.gz",
+        "bytes": 8775891119,
+        "sha256": "3e3d43c0c827b3d589eee64631b5e5401a39f9c922f29b18bad4a055eb922aa0"
+      },
+      {
+        "date": "2025-12-09",
+        "file": "S120925-v50.txt.gz",
+        "bytes": 7929915419,
+        "sha256": "b6bf2f5dbd87445e37a58951c6119908ef0ea559ca373be80a0346ab73e14d66"
+      },
+      {
+        "date": "2025-12-10",
+        "file": "S121025-v50.txt.gz",
+        "bytes": 11557662295,
+        "sha256": "5a64714a79df1b5ea987b66e12d70005beeefe1cf6cea8c151d1adc842275741"
+      },
+      {
+        "date": "2025-12-11",
+        "file": "S121125-v50.txt.gz",
+        "bytes": 10471034001,
+        "sha256": "de9058d8c600a6510ce087a000cdd3f513197688b7c8ebcc0c7baad9a6796c17"
+      },
+      {
+        "date": "2025-12-12",
+        "file": "S121225-v50.txt.gz",
+        "bytes": 12551644054,
+        "sha256": "46f42fb12f0e659814416713c4e22985dba1b062b0c13097ea9b5b003d612798"
+      },
+      {
+        "date": "2026-06-12",
+        "file": "S061226-v50.txt.gz",
+        "bytes": 17894268560,
+        "sha256": "1f9d35e12120ef37ea22df9f59dc5207fe51b075b6ccf1c9cdfd09fa566dc1d5"
+      }
+    ]
+  },
+  "dataset_version": "recorded at ingest",
+  "execution_config": "configs/prereg/v2.json",
+  "fingerprints": {
+    "algorithm": "sha256 of the file bytes at drafting (LF line endings, .gitattributes eol=lf)",
+    "research/r7/r7_candidates.json": "e8d5df8183644260c60f5c7db4365fc3641cc89515fad2100faba3939fb431dc",
+    "configs/prereg/v2.json": "db79bef71fe82399dd228e10c5ee79c0c91d59cb357b43ed944fe9392d647d60",
+    "configs/reference/regulatory_fee_schedule.json": "0b8e834ae2221261ee86756d9e1369f744fd0cc73b19ab89ce82c058e621800f"
+  },
+  "look": "ONE look per hypothesis; no parameter changes after registration",
+  "bundles": [
+    "validation v3 (R1 sampling, FOMC/holiday split)",
+    "validation v4 (CPCV, PBO, deflated Sharpe with N from the ledger)"
+  ],
+  "hypotheses": {
+    "H4": {
+      "name": "EQ",
+      "statement": "EQ10 1s and EQ05 1s pooled uncrossed IC > 0 (same horizons as the v1.8 holdout); tier 1 = the 7 holdout sessions",
+      "alphas": [
+        "EQ10@1s",
+        "EQ05@1s"
+      ],
+      "insample_estimate": {
+        "EQ10@1s": {
+          "gate_ic": 0.07563883669137826,
+          "gate_t": 13.242128568943206,
+          "fold_ic": [
+            0.07323932349107885,
+            0.06042185721196071,
+            0.10105254094214453,
+            0.07420601105641893
+          ],
+          "source": "data/real/multi7/research/alpha_reports/EQ10.json",
+          "source_sha256": "62325321910501b223e03ebf2b05c86eeeb03029678129ed98ea7d46bb3ec7e9"
+        },
+        "EQ05@1s": {
+          "gate_ic": 0.06274247436968561,
+          "gate_t": 24.201000263972293,
+          "fold_ic": [
+            0.05589183177559745,
+            0.061755139642636236,
+            0.0856461318280465,
+            0.05481397641646657
+          ],
+          "source": "data/real/multi7/research/alpha_reports/EQ05.json",
+          "source_sha256": "73f756b4cb77f5fec11d610b949f7cfe4e1f8afeeec580b369f1ea2ea68021c4"
+        }
+      },
+      "dsr_series": "per-session IC series (defined every session); net-of-cost P&L reported alongside, descriptive only"
+    }
+  },
+  "dropped": {
+    "H2": {
+      "name": "quoting",
+      "decision": "dropped by the owner 2026-10-11: the quoting study was aborted and has no in-sample estimate",
+      "future": "may get its own pre-registration later (v2 quoting prereg draft on research/step2)"
+    },
+    "EQ07": {
+      "name": "EQ07 reversal @10s",
+      "decision": "owner decision 2026-10-11 on docs/research/R7_POWER.md: dropped; the drafted sign (+) contradicts the in-sample IC (-0.012) and the v1.8 holdout (-0.021, contradicted); flipping the sign after seeing results would fit to seen data",
+      "future": "may return as a new idea with its own pre-registration"
+    },
+    "H3": {
+      "name": "auction",
+      "decision": "owner decision 2026-10-11 on docs/research/R7_POWER.md: dropped from R7; underpowered even on 47 sessions (joint power about 0.01; MDE about 51 bp, IC 0.41 on 141 decisions)",
+      "future": "needs a redesign (pooled / longer sample) and its own pre-registration"
+    },
+    "H1": {
+      "was": "M2/M6 maker policy, edge net of rebate and measured markout > 0",
+      "reason": "maker_real in-sample summary (6 sessions, data/real/maker_real/summary.json, status EXPLORATORY IN-SAMPLE): every traded cell has negative mean net edge (passive/gated bps: EQ01@1s -1.019, EQ02@5s -0.918, EQ05@1s -1.009, EQ10@1s -1.669; ungated cells all negative with |t| 20-65); verdict NO DEMONSTRATED MAKER EDGE in all gated cells. No positive in-sample effect to confirm. Owner decision 2026-10-11."
+    }
+  },
+  "gate": "HAC t >= ledger threshold in force; deflated Sharpe > 0.95 (H4: on the per-session IC series; net-of-cost P&L descriptive only); reported with and without 2025-12-10 (FOMC) and 2025-11-28 (holiday-thin)",
+  "decision": "a failure is final for that hypothesis on these sessions",
+  "sensitivity": {
+    "feed_latency_ns": [
+      10000
+    ],
+    "primary_feed_latency_ns": 100000,
+    "role": "reported alongside results only; never decides pass/fail; not a hypothesis, no ledger look (owner decision 2026-10-11)",
+    "applies_to": "none after H1 was dropped (H4 is an IC test, latency-independent); kept for the record"
+  },
+  "cost_sensitivity": {
+    "scales": [
+      0.5,
+      1.0,
+      1.5
+    ],
+    "primary_scale": 1.0,
+    "decides": "only the 1.0x (primary) run decides pass/fail",
+    "role": "reported alongside results only; never decides pass/fail; not a hypothesis, no ledger look",
+    "scaled": "explicit (exchange fee per share / FX commission) and implicit (spread, impact) components of the platform cost model under configs/prereg/v2.json",
+    "not_scaled": "regulatory fees (SEC Section 31, FINRA TAF) stay at configs/reference/regulatory_fee_schedule.json",
+    "hook": "iap.backtest.costs.CostModel.with_cost_sensitivity(scale) (field sensitivity_scale, default 1.0 = byte-identical; COST_SENSITIVITY_SCALES)"
+  },
+  "power": {
+    "report": "docs/research/R7_POWER.md",
+    "data": "research/r7/r7_power.json",
+    "tool": "tools/r7_power.py (iap.research.r7_power); rerun when the maker_real summary exists",
+    "role": "planning aid for the owner before sign-off; does not change the hypotheses; no look, nothing charged to the ledger",
+    "h1": "PLACEHOLDER until the maker_real summary is written",
+    "decisions": "owner decision 2026-10-11 on docs/research/R7_POWER.md: H4 tier 1 = EQ10, EQ05; EQ01/EQ02/EQ04 deferred to tier 2; EQ07 and H3 dropped"
+  },
+  "open_for_owner": [],
+  "untested_insufficient_free_data": {
+    "decision": "owner decisions 2026-10-11 on docs/research/R7_POWER.md and R7_MULTI_SYMBOL_PLAN.md",
+    "sessions": "not tested: the 47-session route (paid tier 2) was declined and more symbols on the 7 free sessions does not reach 0.8 power (docs/research/R7_MULTI_SYMBOL_PLAN.md); revisit only if new free sessions appear (tools/r7_watch_nasdaq.py)",
+    "alphas": {
+      "EQ01@1s": "joint power 0.26 on 7 sessions at the in-sample IC (0.00 at the v1.8 IC); MDE IC 0.175 vs 0.042 on 47",
+      "EQ02@5s": "joint power 0.49 on 7 sessions at the in-sample IC (0.00 at the v1.8 IC); MDE IC 0.057 vs 0.014 on 47",
+      "EQ04@5s": "joint power 0.04 on 7 sessions at the in-sample IC (0.70 at the v1.8 IC); MDE IC 0.031 vs 0.008 on 47"
+    },
+    "status": "UNTESTED (insufficient free data) - not a failure"
+  },
+  "registration": {
+    "approver": "owner (AshJha0)",
+    "approver_id": "ashjha0",
+    "signed_by": "Claude (owner-delegated in chat 2026-10-11)",
+    "approval": "owner approved the final text in chat on 2026-10-11 and delegated sign-off/registration; registration run by the owner",
+    "draft_file": "research/r7/r7_confirm_prereg_DRAFT.json",
+    "draft_sha256": "caa60c791552df319e36bb65c4194e4a7e424d6a410cd0bba0abb20f57ce10bb",
+    "draft_commit": "dffcf45 (main)",
+    "registered_utc": "2026-10-12T05:55:22+00:00",
+    "holdout_data_read": false,
+    "holdout_note": "no holdout data (data/real/itch/r7 S1128*, S120*, S121*, S0612*) was read, decompressed or ingested before this registration; only the sha256/bytes of the compressed files recorded in the draft were computed",
+    "path": "iap.agents.broker.WriteBroker.preregister (human writer, as the v1.8 holdout preregs; one look debited each on research/experiments.json)",
+    "blackboard": "research/agents/blackboard.jsonl",
+    "entries": [
+      {
+        "alpha_id": "EQ10",
+        "horizon": "1s",
+        "prereg_id": "a6c5af759082b68f",
+        "blackboard_seq": 7,
+        "blackboard_hash": "927d2d1b09404272d3c176cdc3352967619e3b4d53c3e8439ebb75bc33cf1b28",
+        "supersedes_seq": 3,
+        "ledger_total": 5359,
+        "ledger_head": "32dd4aaf5103395875ec8db88640251be25a59cc5bb732171253f06c043a100c"
+      },
+      {
+        "alpha_id": "EQ05",
+        "horizon": "1s",
+        "prereg_id": "de2488a2a245cf2c",
+        "blackboard_seq": 8,
+        "blackboard_hash": "17ca16a24b38d32d2f0d561566753e7b74547a8e65b8d6e3d94da3886df5f2f8",
+        "supersedes_seq": 4,
+        "ledger_total": 5360,
+        "ledger_head": "7bc4e9895e387e829f41708184a38a9a6b6a6501d00aeee375f27dbc33ac744f"
+      }
+    ]
+  },
+  "signature": {
+    "scheme": "ed25519",
+    "maintainer": "ashjha0",
+    "public_key": "02a3e278cda3efac7dcd266fb8a3821a1415f0725a73f8b255aac84083c2106c",
+    "trust_root": "research/agents/trust_roots.json",
+    "message": "iap.agents.blackboard.canonical(this document without 'signature')",
+    "message_sha256": "d773e912176b98946e9ec512e9ac441353eda41edca0bebcd3e4a88f22876ef2",
+    "sig": "a00af97cde512298d3bf945c8d663c95bc3ca5eacd3c4c5f4981200359aa3fca172f73616d2615d96994d669896172cd400e8db9d2c192295b0d6e84626ee205"
+  }
+}
