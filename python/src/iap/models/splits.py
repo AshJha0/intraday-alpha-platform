@@ -16,9 +16,28 @@ Splits are computed from timestamps only — random shuffling never occurs.
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
+
+
+def embargo_check(
+    embargo_ns: int, label_horizon_ns: int, max_feature_lookback_ns: int | None = None
+) -> list[str]:
+    """Reasons the embargo is shorter than it should be (empty = fine).
+
+    An embargo below the label horizon lets a test label window reach back
+    over the boundary; below the longest feature lookback, the first test
+    features are computed partly from train-period data.  Splits are
+    unchanged - this only reports.
+    """
+    out: list[str] = []
+    if embargo_ns < label_horizon_ns:
+        out.append(f"embargo_ns={embargo_ns} < label_horizon_ns={label_horizon_ns}")
+    if max_feature_lookback_ns is not None and embargo_ns < max_feature_lookback_ns:
+        out.append(f"embargo_ns={embargo_ns} < max_feature_lookback_ns={max_feature_lookback_ns}")
+    return out
 
 
 @dataclass(frozen=True)
@@ -46,6 +65,7 @@ class WalkForwardSplitter:
         n_folds: int = 4,
         embargo_ns: int = 60_000_000_000,
         label_horizon_ns: int = 5_000_000_000,
+        max_feature_lookback_ns: int | None = None,
     ) -> None:
         if n_folds < 1:
             raise ValueError(f"n_folds must be >= 1, got {n_folds}")
@@ -54,6 +74,10 @@ class WalkForwardSplitter:
         self.n_folds = n_folds
         self.embargo_ns = embargo_ns
         self.label_horizon_ns = label_horizon_ns
+        self.max_feature_lookback_ns = max_feature_lookback_ns
+        self.embargo_warnings = embargo_check(embargo_ns, label_horizon_ns, max_feature_lookback_ns)
+        for msg in self.embargo_warnings:
+            warnings.warn(msg, UserWarning, stacklevel=2)
 
     def split(self, ts: np.ndarray) -> list[Fold]:
         """Build folds from a (not necessarily sorted) int64 ns timestamp array.

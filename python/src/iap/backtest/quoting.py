@@ -121,6 +121,7 @@ from iap.execution.config import ExecConfig
 from iap.execution.markout_feedback import FeedbackConfig, MarkoutFeedback
 from iap.execution.simulator import ExecutionSimulator
 from iap.execution.types import ChildOrder, Liquidity, OrderType
+from iap.validation.deflated import DAYS_PER_YEAR, pnl_sharpe
 
 
 @dataclass(frozen=True)
@@ -722,10 +723,8 @@ class QuotingBacktester:
         return pd.DataFrame(rows)
 
 
-def sharpe_per_day(daily_net: Sequence[float], annualize: int = 252) -> float | None:
-    """Annualized Sharpe of per-day net P&L (None for < 2 days or zero std)."""
-    x = np.asarray(daily_net, dtype=float)
-    if x.size < 2:
-        return None
-    sd = x.std(ddof=1)
-    return None if sd == 0 else float(x.mean() / sd * math.sqrt(annualize))
+def sharpe_per_day(daily_net: Sequence[float], annualize: int = DAYS_PER_YEAR) -> float | None:
+    """Annualized P&L Sharpe of per-day net P&L (None for < 2 days or zero
+    std).  Delegates to the shared :func:`iap.validation.deflated.pnl_sharpe`
+    so quoting and validation annualise by the same :data:`DAYS_PER_YEAR`."""
+    return pnl_sharpe(daily_net, annualize)

@@ -590,6 +590,79 @@ def day_cluster_tstat(
     return float(slope * sxx / np.sqrt(meat))
 
 
+#: Fewer resampled days than this: the day-block bootstrap is flagged
+#: ``low_power`` (report-only; no rule reads it).
+BOOTSTRAP_LOW_POWER_DAYS = 10
+
+
+def day_cluster_inference(tstat: float, n_days: int, alpha: float = 0.05) -> dict[str, float]:
+    """Normal and Student-t (G - 1 df) readings of a day-cluster t (report-only).
+
+    :func:`day_cluster_tstat` has only G - 1 degrees of freedom; this puts
+    the two-sided Student-t p-value and critical value beside the normal
+    ones so a reader can see how much the small-G correction moves them.
+    No verdict rule reads these columns.
+    """
+    from scipy import stats
+
+    nan = float("nan")
+    df = int(n_days) - 1
+    out = {
+        "df": float(df) if df >= 1 else nan,
+        "p_normal": nan,
+        "p_student_t": nan,
+        "crit_normal": float(stats.norm.isf(alpha / 2.0)),
+        "crit_student_t": float(stats.t.isf(alpha / 2.0, df)) if df >= 1 else nan,
+    }
+    if np.isfinite(tstat):
+        out["p_normal"] = float(2.0 * stats.norm.sf(abs(tstat)))
+        if df >= 1:
+            out["p_student_t"] = float(2.0 * stats.t.sf(abs(tstat), df))
+    return out
+
+
+def bucket_ics_demeaned(
+    ts: np.ndarray,
+    instrument: np.ndarray,
+    scores: np.ndarray,
+    labels: np.ndarray,
+    bucket_ns: int = 300 * NS_S,
+    min_obs: int = 8,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Cross-sectional bucket IC: score and label demeaned per instrument
+    within each bucket before correlating (report-only column beside
+    :func:`bucket_ics_with_counts`).  Removes the between-instrument level
+    component so the IC reads the within-bucket cross-section only.
+    """
+    ts = np.asarray(ts, dtype=np.int64)
+    inst = np.asarray(instrument)
+    x = np.asarray(scores, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    if not (ts.shape == inst.shape == x.shape == y.shape):
+        raise ValueError("ts/instrument/score/label length mismatch")
+    ok = np.isfinite(x) & np.isfinite(y)
+    ts, inst, x, y = ts[ok], inst[ok], x[ok], y[ok]
+    if ts.size == 0:
+        return np.empty(0), np.empty(0, dtype=np.int64)
+    buckets = ts // bucket_ns
+    out: list[float] = []
+    counts: list[int] = []
+    for b in np.unique(buckets):
+        m = buckets == b
+        if m.sum() < min_obs:
+            continue
+        xb, yb, ib = x[m].copy(), y[m].copy(), inst[m]
+        for i in np.unique(ib):
+            k = ib == i
+            xb[k] -= xb[k].mean()
+            yb[k] -= yb[k].mean()
+        if xb.std() <= EPS or yb.std() <= EPS:
+            continue
+        out.append(float(np.corrcoef(xb, yb)[0, 1]))
+        counts.append(int(m.sum()))
+    return np.asarray(out), np.asarray(counts, dtype=np.int64)
+
+
 def day_block_bootstrap_tstat(
     ts: np.ndarray,
     scores: np.ndarray,
@@ -604,7 +677,9 @@ def day_block_bootstrap_tstat(
     Whole days are resampled with replacement (``numpy.random.default_rng
     (seed)``), the pooled IC is recomputed from per-day sufficient
     statistics, and ``t = IC / sd(IC*)``.  Returns ``{"ic", "se", "tstat",
-    "n_days", "p05", "p95"}`` (NaN where undefined).  Deterministic for a
+    "n_days", "p05", "p95", "low_power"}`` (NaN where undefined;
+    ``low_power`` is True below :data:`BOOTSTRAP_LOW_POWER_DAYS` days, where
+    resampling a handful of clusters understates the SE - report-only).  Deterministic for a
     seed; O(n_days) per resample, so cheap even on full real sessions.
     """
     days, n, sx, sy, sxx, syy, sxy = _day_moments(ts, scores, labels, day_ns)
@@ -612,7 +687,15 @@ def day_block_bootstrap_tstat(
     nan = float("nan")
     est = _corr_from_moments(n.sum(), sx.sum(), sy.sum(), sxx.sum(), syy.sum(), sxy.sum())
     if g < max(2, min_days) or not np.isfinite(est):
-        return {"ic": est, "se": nan, "tstat": nan, "n_days": g, "p05": nan, "p95": nan}
+        return {
+            "ic": est,
+            "se": nan,
+            "tstat": nan,
+            "n_days": g,
+            "p05": nan,
+            "p95": nan,
+            "low_power": g < BOOTSTRAP_LOW_POWER_DAYS,
+        }
     rng = np.random.default_rng(int(seed))
     draws = rng.integers(0, g, size=(int(n_boot), g))
     counts = np.stack([np.bincount(row, minlength=g) for row in draws]).astype(float)
@@ -620,7 +703,15 @@ def day_block_bootstrap_tstat(
     boot = np.array([_corr_from_moments(*row) for row in sums])
     boot = boot[np.isfinite(boot)]
     if boot.size < 2:
-        return {"ic": est, "se": nan, "tstat": nan, "n_days": g, "p05": nan, "p95": nan}
+        return {
+            "ic": est,
+            "se": nan,
+            "tstat": nan,
+            "n_days": g,
+            "p05": nan,
+            "p95": nan,
+            "low_power": g < BOOTSTRAP_LOW_POWER_DAYS,
+        }
     se = float(boot.std(ddof=1))
     return {
         "ic": est,
@@ -629,6 +720,7 @@ def day_block_bootstrap_tstat(
         "n_days": g,
         "p05": float(np.quantile(boot, 0.05)),
         "p95": float(np.quantile(boot, 0.95)),
+        "low_power": g < BOOTSTRAP_LOW_POWER_DAYS,
     }
 
 

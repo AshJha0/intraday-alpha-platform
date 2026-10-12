@@ -306,6 +306,18 @@ class _InstState:
             return None
         return now - past
 
+    def ref_ret_log_strict(self, h_ns: int) -> float | None:
+        """SENSITIVITY ONLY (not the default, never wired into a feature):
+        :meth:`ref_ret_log` with strictly-before reads, so a reference
+        update stamped at the SAME nanosecond as this instrument's event is
+        excluded.  The pinned feature keeps at-or-before (ties included)."""
+        ref = self.ref
+        now = ref.histlog.at_or_before(self.t - 1)
+        past = ref.histlog.at_or_before(self.t - h_ns - 1)
+        if now is None or past is None:
+            return None
+        return now - past
+
     def beta_w5m(self) -> float | None:
         """OLS beta vs the reference over 5m of contemporaneous 1s pairs."""
         if not self.warm(WINDOW_NS["5m"]):
