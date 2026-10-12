@@ -493,15 +493,15 @@ change: still 0 alphas promoted, no strategy that trades at 1x costs.
 
 | Item | State |
 |---|---|
-| R7 confirmatory round (10 unseen Nasdaq sessions) | data partly downloaded; re-ingest under x-version 2, then run on v1.14 |
-| AI4 deep order-book baselines | code in review (PR #85), targeted at v1.15; no result yet |
+| R7 confirmatory round (R7-CONFIRM-1, 7 unseen holdout sessions) | done in v1.15: EQ10@1s and EQ05@1s both confirmed; net P&L at 1x cost 0 (docs/research/R7_RESULTS.md) |
+| AI4 deep order-book baselines | signed, deferred to v1.16 (research/r7/AI4_DEFERRED.md) |
 | A2 QQQ against its constituents (basis study) | code in review (PR #85), targeted at v1.15; needs the R7 ingest |
 | Maker v2 and quoting v2 pre-registrations | to write, with the v1.14 execution options switched on and the protocol in ticks |
 | A3 futures lead-lag | on hold (data cost) |
 | P1-P3 live gateway | not started |
 | Archive the frozen Java copy | later |
 
-Neither v1.15 study has produced a number. When they do, they go through
+R7 has produced its result (both confirmed, predictive but not yet tradable; v1.16 = monetisation); AI4 and A2 have not. When they do, they go through
 the same gate and ledger as everything else; a deep model gets no
 exemption for being deep.
 

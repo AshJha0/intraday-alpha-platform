@@ -17,9 +17,9 @@ planned paths of the current release, **backlog** says what would prove it done.
 |---|---:|---:|
 | epics | 35 | |
 | issues | 197 | 651 |
-| issues `done` | 137 | 361.5 |
-| issues `in-progress` | 2 | 14 |
-| issues `backlog` | 58 | 275.5 |
+| issues `done` | 138 | 369.5 |
+| issues `in-progress` | 0 | 0 |
+| issues `backlog` | 59 | 281.5 |
 
 ### By milestone
 
@@ -38,7 +38,7 @@ planned paths of the current release, **backlog** says what would prove it done.
 | v1.12 | 1 | 5 | 5 | 0 | 0 |
 | v1.13 | 1 | 4 | 4 | 0 | 0 |
 | v1.14 | 1 | 5 | 5 | 0 | 0 |
-| v1.15 | 1 | 20 | 14 | 2 | 4 |
+| v1.15 | 1 | 20 | 15 | 0 | 5 |
 
 Issues are listed under their epic; an issue's own milestone can differ from
 the epic's (a backlog item under a finished epic sits in **Backlog**).
@@ -79,7 +79,7 @@ the epic's (a backlog item under a finished epic sits in **Backlog**).
 - [E32 — v1.12 - R7 statistics, latency benchmark, extended features, multi-venue router, alerting](#e32--v112---r7-statistics-latency-benchmark-extended-features-multi-venue-router-alerting) · v1.12 · done · 5 issues
 - [E33 — v1.13 - review-driven hardening](#e33--v113---review-driven-hardening) · v1.13 · done · 4 issues
 - [E34 — v1.14 - real-data mapping, 15c3-5 risk, execution realism, trust roots](#e34--v114---real-data-mapping-15c3-5-risk-execution-realism-trust-roots) · v1.14 · done · 5 issues
-- [E35 — v1.15 - research evidence, models, fees, governance enforcement, release automation](#e35--v115---research-evidence-models-fees-governance-enforcement-release-automation) · v1.15 · in-progress · 20 issues
+- [E35 — v1.15 - research evidence, models, fees, governance enforcement, release automation](#e35--v115---research-evidence-models-fees-governance-enforcement-release-automation) · v1.15 · partial · 20 issues
 
 ## Phase 0
 
@@ -940,7 +940,7 @@ In progress (IAP_v1.15_Plan.md): R7 confirmatory round, v2 realism config, model
 
 ### E35 — v1.15 - research evidence, models, fees, governance enforcement, release automation
 
-**Status:** in-progress · **Milestone:** v1.15 · **Issues:** 20 (done 14, in-progress 2, backlog 4) · **Estimate:** 54 days · **Labels:** `type:epic`, `area:research`, `phase:phase2`, `priority:p0`, `status:in-progress`
+**Status:** partial · **Milestone:** v1.15 · **Issues:** 20 (done 15, in-progress 0, backlog 5) · **Estimate:** 54 days · **Labels:** `type:epic`, `area:research`, `phase:phase2`, `priority:p0`, `status:partial`
 
 Release v1.15 per IAP_v1.15_Plan.md: run the R7 confirmatory round on unseen sessions with realism on, land the model work (DeepLOB, conformal sizing), add dated regulatory fees, make the governance controls blocking, narrow the agent job, archive the Java engine and automate the release flow. Item keys are the plan's IDs.
 
@@ -954,12 +954,12 @@ Release v1.15 per IAP_v1.15_Plan.md: run the R7 confirmatory round on unseen ses
 
 | key | title | status | est. (d) | milestone | evidence |
 |---|---|---|---:|---|---|
-| R-P0-1 | v1.15 R-P0-1: R7 confirmatory round on unseen sessions | in-progress | 8 | v1.15 | `research/r7/r7_confirm_prereg_DRAFT.json; tools/r7_download.py` |
+| R-P0-1 | v1.15 R-P0-1: R7 confirmatory round on unseen sessions | done | 8 | v1.15 | `research/r7/r7_confirm_result.json; docs/research/R7_RESULTS.md` |
 | R-P0-2 | v1.15 R-P0-2: v2 prereg turns the v1.14 realism opt-ins on | done | 2 | v1.15 | `configs/prereg/v2.json; python/tests/test_v115_prereg_realism.py` |
 | R-P1-3 | v1.15 R-P1-3: FX11 leak-vs-fast investigation and time-shift triage | done | 3 | v1.15 | `docs/research/FX11_FINDING.md; python/tests/test_fx11_time_shift.py` |
 | R-P1-4 | v1.15 R-P1-4: A2 QQQ vs top-15 basket basis on R7 | backlog | 5 | v1.15 | `planned: research/r7/ (A2 prereg)` |
 | R-P2-5 | v1.15 R-P2-5: maker study write-up | backlog | 1 | v1.15 | `planned: research/maker-real/` |
-| M-P0-1 | v1.15 M-P0-1: AI4 DeepLOB vs baselines, net of costs | in-progress | 6 | v1.15 | `python/src/iap/models/deeplob.py; python/src/iap/models/deeplob_baselines.py; research/r7/ai4_deeplob_prereg_DRAFT.json` |
+| M-P0-1 | v1.15 M-P0-1: AI4 DeepLOB vs baselines, net of costs | backlog | 6 | v1.15 | `python/src/iap/models/deeplob.py; python/src/iap/models/deeplob_baselines.py; research/r7/ai4_deeplob_prereg_DRAFT.json` |
 | M-P1-2 | v1.15 M-P1-2: conformal sizing (opt-in) | done | 3 | v1.15 | `python/src/iap/models/conformal.py` |
 | X-P1-1 | v1.15 X-P1-1: dated SEC Section 31 + FINRA TAF fees | done | 3 | v1.15 | `configs/reference/regulatory_fee_schedule.json; tests/golden/expected_regulatory_fees.json` |
 | X-P1-2 | v1.15 X-P1-2: MVP on a real ITCH session end to end | backlog | 2 | v1.15 | `planned: docs/ (real-session MVP digest)` |
