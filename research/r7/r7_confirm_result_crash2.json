@@ -1,0 +1,240 @@
+{
+  "cost_sensitivity": "not computed here: reported-only per prereg, never decides",
+  "dataset_dir": "C:/Work/Claude/intraday-alpha-platform/intraday-alpha-platform/data/real/r7_holdout",
+  "dataset_version": "ca5d079831be4e63aa76e350bb840a29a6964c0152f4bbbcce5010269a193854",
+  "decision_rule": "a failure is final for that hypothesis on these sessions",
+  "deviation_note": "research/r7/R7_DEVIATION_lot_size.md (owner option A, recorded before the look)",
+  "gate_rule": "HAC t >= ledger threshold in force; deflated Sharpe > 0.95 (H4: on the per-session IC series; net-of-cost P&L descriptive only); reported with and without 2025-12-10 (FOMC) and 2025-11-28 (holiday-thin)",
+  "git_commit": "24e90ca2320c565df8419580f1f9d6fa18091449",
+  "hypothesis": "H4",
+  "methods": "v4",
+  "outcome_recorded": false,
+  "prereg": "research/r7/r7_confirm_prereg.json",
+  "prereg_sha256": "1e6373eec5d16bdfbf3e9557fc536d736818fbc98d77efc5bea09f2d492d4eb4",
+  "record_commands": [
+    "python tools/r7_record_outcome.py --i-am-the-owner --prereg-id a6c5af759082b68f --outcome confirmed --ref research/r7/r7_confirm_result.json#EQ10@1s"
+  ],
+  "results": [
+    {
+      "alpha": "EQ10@1s",
+      "blackboard_seq": 7,
+      "dsr": {
+        "dsr": 0.999953795752005,
+        "dsr_at_looks": 0.9999134429090829,
+        "kurtosis": 3.275911684906522,
+        "min_track_record_days": 2.061982955643371,
+        "min_trl_alpha": 0.05,
+        "n_days": 7,
+        "n_looks": 2,
+        "n_trials": 1,
+        "psr": 0.999953795752005,
+        "sharpe_annualised": 85.30684482540616,
+        "sharpe_per_day": 5.37382610808576,
+        "skew": 1.134335295956232,
+        "sr0": 0.0,
+        "sr_benchmark": 0.0,
+        "trials_basis": "distinct_configurations",
+        "trials_sr_variance": 0.16666666666666666
+      },
+      "eligibility": {
+        "experiment_id": "fefeac6aa15f9e34",
+        "gate_eligible": false,
+        "methods": "v4",
+        "periods_verified": true,
+        "reasons": [
+          "configuration.methods='v4' must be 'v2' for a gate-eligible result"
+        ],
+        "significance_threshold": 3.0,
+        "threshold_looks": 2,
+        "x-version": 2
+      },
+      "exit_code": 0,
+      "experiment_id": "fefeac6aa15f9e34",
+      "gate": {
+        "passed": true,
+        "reasons": [],
+        "threshold": 4.432223697017295
+      },
+      "gate_threshold": {
+        "repo_ledger_t": 4.432223697017295,
+        "repo_ledger_total": 5361,
+        "rule": "max(run's ledger threshold, repo-ledger Bonferroni |t|)",
+        "run_significance_threshold": 3.0,
+        "run_threshold_looks": 2,
+        "used": 4.432223697017295
+      },
+      "net_pnl_descriptive": {
+        "gross_return_bps": 0.0,
+        "max_drawdown_bps": 0.0,
+        "net_return_bps": 0.0,
+        "sharpe": 0.0,
+        "transaction_cost_bps": 0.0
+      },
+      "per_session_ic": {
+        "2025-11-28": 0.06358762425907262,
+        "2025-12-08": 0.07172470360279212,
+        "2025-12-09": 0.06170926525679788,
+        "2025-12-10": 0.07391622926070256,
+        "2025-12-11": 0.07739275949259725,
+        "2025-12-12": 0.09937742320111734,
+        "2026-06-12": 0.06027692567269418
+      },
+      "prereg_id": "a6c5af759082b68f",
+      "result": {
+        "alpha_id": "EQ10",
+        "created_ts": 1781294399996756864,
+        "dataset_version": "ca5d079831be4e63aa76e350bb840a29a6964c0152f4bbbcce5010269a193854",
+        "experiment_id": "fefeac6aa15f9e34",
+        "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+        "fold_consistency": 1.0,
+        "git_commit": "24e90ca2320c565df8419580f1f9d6fa18091449",
+        "gross_return_bps": 0.0,
+        "hit_rate": 0.5421031926263484,
+        "hypothesis_sign_confirmed": true,
+        "ic": 0.08382159271580364,
+        "leakage_detail": {
+          "ic_shifted": 0.05370721715217694,
+          "ic_time_shifted": 0.035679392118497626,
+          "ic_unshifted": 0.09909344313849226,
+          "label_guard_ok": true,
+          "median_row_gap_ns": 149604443,
+          "passed": true,
+          "recompute_mismatches": [],
+          "recompute_n_anchors": 3,
+          "recompute_ok": true,
+          "required_shift_ratio": 0.4251977785,
+          "required_time_shift_ratio": 0.3339009635,
+          "shift_ok": true,
+          "suspicious_ic": 0.03,
+          "time_shift_lag_ns": 250000000,
+          "time_shift_ok": true,
+          "time_shift_pairs": 203714,
+          "truncation_ok": true
+        },
+        "leakage_passed": true,
+        "max_drawdown_bps": 0.0,
+        "model_version": "ac37fa05e2082fcb3d9a403921a62dd571fa65d6dc871e0ed5569993f58a0549",
+        "n_experiments_in_ledger": 2,
+        "n_folds": 4,
+        "net_return_bps": 0.0,
+        "nw_lags": 5,
+        "rank_ic": 0.09274362995624659,
+        "sharpe": 0.0,
+        "t_stat": 13.661621738967971,
+        "transaction_cost_bps": 0.0,
+        "turnover": 2996.0193617601044,
+        "verdict": "ITERATE"
+      },
+      "sensitivity": {
+        "all_sessions": {
+          "deflated_sharpe": {
+            "dsr": 0.999953795752005,
+            "dsr_at_looks": 0.9999134429090829,
+            "kurtosis": 3.275911684906522,
+            "min_track_record_days": 2.061982955643371,
+            "min_trl_alpha": 0.05,
+            "n_days": 7,
+            "n_looks": 2,
+            "n_trials": 1,
+            "psr": 0.999953795752005,
+            "sharpe_annualised": 85.30684482540616,
+            "sharpe_per_day": 5.37382610808576,
+            "skew": 1.134335295956232,
+            "sr0": 0.0,
+            "sr_benchmark": 0.0,
+            "trials_basis": "distinct_configurations",
+            "trials_sr_variance": 0.16666666666666666
+          },
+          "descriptive_gate_on_raw": {
+            "passed": true,
+            "reasons": [],
+            "threshold": 4.432223697017295
+          },
+          "excluded": [],
+          "hac_lags": 6,
+          "mean_session_ic": 0.07256927582082484,
+          "n_pairs": 1487705,
+          "per_session_ic": {
+            "2025-11-28": 0.06358762425907262,
+            "2025-12-08": 0.07172470360279212,
+            "2025-12-09": 0.06170926525679788,
+            "2025-12-10": 0.07391622926070256,
+            "2025-12-11": 0.07739275949259725,
+            "2025-12-12": 0.09937742320111734,
+            "2026-06-12": 0.06027692567269418
+          },
+          "raw_hac_t": 12.372668767670849,
+          "raw_ic": 0.07121120540049158,
+          "sessions": [
+            "2025-11-28",
+            "2025-12-08",
+            "2025-12-09",
+            "2025-12-10",
+            "2025-12-11",
+            "2025-12-12",
+            "2026-06-12"
+          ]
+        },
+        "excl_2025-12-10_2025-11-28": {
+          "deflated_sharpe": {
+            "dsr": 0.9999948316463741,
+            "dsr_at_looks": 0.9999844626614534,
+            "kurtosis": 2.343124111019495,
+            "min_track_record_days": 1.5564624475613154,
+            "min_trl_alpha": 0.05,
+            "n_days": 5,
+            "n_looks": 2,
+            "n_trials": 1,
+            "psr": 0.9999948316463741,
+            "sharpe_annualised": 74.39052055895061,
+            "sharpe_per_day": 4.686162316657642,
+            "skew": 0.8230925429705863,
+            "sr0": 0.0,
+            "sr_benchmark": 0.0,
+            "trials_basis": "distinct_configurations",
+            "trials_sr_variance": 0.25
+          },
+          "descriptive_gate_on_raw": {
+            "passed": true,
+            "reasons": [],
+            "threshold": 4.432223697017295
+          },
+          "excluded": [
+            "2025-12-10",
+            "2025-11-28"
+          ],
+          "hac_lags": 6,
+          "mean_session_ic": 0.07409621544519976,
+          "n_pairs": 1149534,
+          "per_session_ic": {
+            "2025-12-08": 0.07172470360279212,
+            "2025-12-09": 0.06170926525679788,
+            "2025-12-11": 0.07739275949259725,
+            "2025-12-12": 0.09937742320111734,
+            "2026-06-12": 0.06027692567269418
+          },
+          "raw_hac_t": 10.392147359665994,
+          "raw_ic": 0.07120718568582872,
+          "sessions": [
+            "2025-12-08",
+            "2025-12-09",
+            "2025-12-11",
+            "2025-12-12",
+            "2026-06-12"
+          ]
+        }
+      },
+      "verdict": "confirmed"
+    },
+    {
+      "alpha": "EQ05@1s",
+      "error": "look failed; see the run output",
+      "exit_code": 1,
+      "experiment_id": "c39e188e5d82da00",
+      "prereg_id": "de2488a2a245cf2c",
+      "verdict": "no_result"
+    }
+  ],
+  "run_utc": "2026-10-12T19:33:02+00:00",
+  "schema": "iap.r7_confirm_result/v1"
+}

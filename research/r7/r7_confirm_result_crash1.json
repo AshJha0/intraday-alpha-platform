@@ -1,0 +1,27 @@
+{
+  "cost_sensitivity": "not computed here: reported-only per prereg, never decides",
+  "dataset_dir": "C:/Work/Claude/intraday-alpha-platform/intraday-alpha-platform/data/real/r7_holdout",
+  "dataset_version": "ca5d079831be4e63aa76e350bb840a29a6964c0152f4bbbcce5010269a193854",
+  "decision_rule": "a failure is final for that hypothesis on these sessions",
+  "deviation_note": "research/r7/R7_DEVIATION_lot_size.md (owner option A, recorded before the look)",
+  "gate_rule": "HAC t >= ledger threshold in force; deflated Sharpe > 0.95 (H4: on the per-session IC series; net-of-cost P&L descriptive only); reported with and without 2025-12-10 (FOMC) and 2025-11-28 (holiday-thin)",
+  "git_commit": "c069eed16f4298928b03571301c800797710106e",
+  "hypothesis": "H4",
+  "methods": "v4",
+  "outcome_recorded": false,
+  "prereg": "research/r7/r7_confirm_prereg.json",
+  "prereg_sha256": "1e6373eec5d16bdfbf3e9557fc536d736818fbc98d77efc5bea09f2d492d4eb4",
+  "record_commands": [],
+  "results": [
+    {
+      "alpha": "EQ10@1s",
+      "error": "look failed; see the run output",
+      "exit_code": 1,
+      "experiment_id": "fefeac6aa15f9e34",
+      "prereg_id": "a6c5af759082b68f",
+      "verdict": "no_result"
+    }
+  ],
+  "run_utc": "2026-10-12T19:11:50+00:00",
+  "schema": "iap.r7_confirm_result/v1"
+}
