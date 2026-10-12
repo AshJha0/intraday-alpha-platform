@@ -6,9 +6,7 @@ import math
 import warnings
 
 import numpy as np
-import pandas as pd
 import pytest
-from iap.alpha.base import beta_stability
 from iap.backtest.quoting import sharpe_per_day
 from iap.features.engine import _InstState
 from iap.features.rolling import TimeSeries
@@ -138,25 +136,3 @@ def test_pbo_drops_constant_candidates():
     assert b["n_constant_dropped"] == 2
     assert b["n_candidates"] == 4
     assert b["pbo"] == a["pbo"]
-
-
-def test_beta_stability_diagnostic():
-    rng = np.random.default_rng(4)
-    items = []
-    for iid, beta in ((1, 0.5), (2, 0.4), (3, -0.2)):
-        n = 400
-        ts = np.concatenate([np.arange(200) * NS, DAY + np.arange(200) * NS])
-        sig = pd.Series(rng.standard_normal(n))
-        df = pd.DataFrame(
-            {
-                "exchange_ts": ts,
-                "label_mid_5s": beta * sig.to_numpy() + 0.1 * rng.standard_normal(n),
-                "label_valid_5s": True,
-            }
-        )
-        items.append((iid, df, sig))
-    r = beta_stability(items, "label_mid_5s", "label_valid_5s")
-    assert r["by_instrument"]["n"] == 3
-    assert r["by_instrument"]["sign_agreement"] == pytest.approx(2 / 3)
-    assert r["by_instrument_day"]["n"] == 6
-    assert beta_stability([], "a", "b")["by_instrument"]["n"] == 0

@@ -218,9 +218,6 @@ class LinearAlpha(AlphaModel):
         self.sigma: float = 0.0
         self.beta: float = 0.0
         self.beta_fit: float = 0.0
-        #: report-only per-instrument/per-day beta-stability diagnostic
-        #: (:func:`beta_stability`); never read by fit/score/params
-        self.beta_stability: dict | None = None
         self.n_train: int = 0
         self.z_clip: float = self.Z_CLIP
         self.conf_scale: float = self.CONF_SCALE
@@ -265,9 +262,6 @@ class LinearAlpha(AlphaModel):
             ys.append(y[ok])
         x = np.concatenate(xs) if xs else np.empty(0)
         y = np.concatenate(ys) if ys else np.empty(0)
-        self.beta_stability = beta_stability(
-            [(iid, train[iid], sigs[iid]) for iid in sigs], label_col, valid_col
-        )
         self.n_train = int(x.size)
         spans = [
             (int(df["exchange_ts"].iloc[0]), int(df["exchange_ts"].iloc[-1]))
@@ -413,70 +407,6 @@ class LinearAlpha(AlphaModel):
         tw = blob.get("train_window")
         self.train_window = dict(tw) if isinstance(tw, dict) else None
         self._fitted = True
-
-
-_NS_DAY = 86_400 * 1_000_000_000
-_BETA_MIN_OBS = 32
-
-
-def _slope(x: np.ndarray, y: np.ndarray) -> float | None:
-    if x.size < _BETA_MIN_OBS:
-        return None
-    var = float(np.var(x))
-    if var <= EPS:
-        return None
-    return float(np.mean((x - x.mean()) * (y - y.mean())) / var)
-
-
-def _summary(betas: list[float]) -> dict:
-    if not betas:
-        return dict.fromkeys(
-            ("pos_frac", "sign_agreement", "median", "iqr", "dispersion"), None
-        ) | {"n": 0}
-    b = np.asarray(betas, dtype=float)
-    med = float(np.median(b))
-    return {
-        "n": int(b.size),
-        # share of slices whose slope has the pooled-median sign
-        "pos_frac": float(np.mean(b > 0.0)),
-        "sign_agreement": float(np.mean(np.sign(b) == np.sign(med))) if med != 0 else None,
-        "median": med,
-        # robust dispersion (IQR / |median|; None at a zero median)
-        "iqr": float(np.quantile(b, 0.75) - np.quantile(b, 0.25)),
-        "dispersion": (
-            float((np.quantile(b, 0.75) - np.quantile(b, 0.25)) / abs(med)) if med != 0 else None
-        ),
-    }
-
-
-def beta_stability(
-    items: Sequence[tuple[int, pd.DataFrame, pd.Series]], label_col: str, valid_col: str
-) -> dict:
-    """Per-instrument and per-day OLS slopes of label on raw signal
-    (REPORT-ONLY diagnostic of how stable the pooled beta is; the fit is
-    unchanged).  Each slice needs >= 32 valid pairs.  Returns
-    ``{"by_instrument": summary, "by_day": summary}`` where a summary has
-    the slice count, share positive, sign agreement with the median,
-    median, IQR and IQR/|median| dispersion."""
-    per_inst: list[float] = []
-    per_day: list[float] = []
-    for _iid, df, sig in items:
-        if label_col not in df.columns or valid_col not in df.columns:
-            continue
-        x = sig.to_numpy(dtype=float)
-        y = df[label_col].to_numpy(dtype=float)
-        ok = np.isfinite(x) & np.isfinite(y) & df[valid_col].to_numpy(dtype=bool)
-        b = _slope(x[ok], y[ok])
-        if b is not None:
-            per_inst.append(b)
-        if "exchange_ts" in df.columns:
-            days = df["exchange_ts"].to_numpy(dtype=np.int64) // _NS_DAY
-            for d in np.unique(days[ok]):
-                m = ok & (days == d)
-                bd = _slope(x[m], y[m])
-                if bd is not None:
-                    per_day.append(bd)
-    return {"by_instrument": _summary(per_inst), "by_instrument_day": _summary(per_day)}
 
 
 def col(df: pd.DataFrame, name: str) -> pd.Series:
