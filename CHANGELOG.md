@@ -6,7 +6,15 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
-## Unreleased (v1.15)
+## v1.15.0 — 2026-10-13
+
+The R7 confirmatory release: EQ10@1s and EQ05@1s are confirmed on 7 owner-signed
+holdout sessions (2025-11 to 2026-06), six years after the in-sample data, and the
+full MVP loop runs end to end on a real ITCH day. Both results say the same thing:
+the alphas predict, but at today's turnover they do not survive costs, so v1.16 is
+about monetisation. Also: the review-driven execution, statistics, models and
+hygiene fixes (#112-#115), memory-safe validation (#118, #119) and AI4 deferred to
+v1.16.
 
 - **R7 pre-registration hardening (drafted unsigned; later owner-signed in #111).** Power analysis
   `tools/r7_power.py` (`iap.research.r7_power`) writes
@@ -227,7 +235,13 @@ that tag.
   0.99995 / 0.9999998, 7/7 sessions positive). Net P&L at 1x cost 0
   (descriptive): predictive, not yet tradable. Write-up:
   `docs/research/R7_RESULTS.md`; drift report `research/r7/drift/`.
-- **MVP real full day: TBD** (placeholder; filled in when the run finishes).
+- **MVP real full day** (2019-10-18, AAPL/MSFT/QQQ, `configs/prereg/v2.json`, main @ b0c7a2c):
+  ~6.0 M events in 2 h 29 m, exit 0, every parent finalised. Gross P&L +$801 (positive
+  on all three symbols), execution cost incl. fees $10,027 (fees $3,615), net −$9,226:
+  ~70 k parent orders in one day, so costs swamp the edge ~12x on the current,
+  known-optimistic cost model. One in-sample day: an integration test and cost
+  baseline, not statistical evidence. No end-of-day flatten in the MVP loop (open
+  positions marked to market). Write-up: `docs/research/MVP_REAL_20191018.md`.
 
 ## v1.14.0 — 2026-10-11
 

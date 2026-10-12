@@ -29,9 +29,9 @@ implementation (`iap.risk`, `iap.execution`) proven by the same golden files
 the Java ports are proven by, so the loop the MVP runs is the reference
 loop end to end.
 
-## Current status (v1.14.0 released 2026-10-11; v1.15 in progress)
+## Current status (v1.15.0 released 2026-10-13)
 
-**v1.15 in progress (2026-10-12).** The R7 confirmatory pre-registration
+**v1.15.0 (2026-10-13).** The R7 confirmatory pre-registration
 R7-CONFIRM-1 is **signed** (`research/r7/r7_confirm_prereg.json`: H4 tier 1,
 EQ10 @1s and EQ05 @1s, one look) has run on the 7 unseen holdout sessions:
 **both confirmed** (EQ10@1s IC +0.0838, HAC t 13.66; EQ05@1s IC +0.0409,
@@ -39,8 +39,11 @@ HAC t 13.20; threshold 4.432; 7/7 sessions positive). Net P&L at 1x cost is 0
 (descriptive): predictive, not yet tradable; v1.16 targets monetisation
 ([docs/research/R7_RESULTS.md](docs/research/R7_RESULTS.md)). AI4-DEEPLOB-1 was signed but is
 deferred to v1.16 and not run ([research/r7/AI4_DEFERRED.md](research/r7/AI4_DEFERRED.md)).
-Merged v1.15 work is listed under "Unreleased (v1.15)" in
-[CHANGELOG.md](CHANGELOG.md). Numbers below are as of v1.14.0 unless stated;
+The full MVP loop ran end to end on a real ITCH day (2019-10-18,
+AAPL/MSFT/QQQ): gross +$801, net −$9,226 at ~70 k parent orders, so costs swamp the
+edge at today's turnover
+([docs/research/MVP_REAL_20191018.md](docs/research/MVP_REAL_20191018.md)).
+v1.15 is listed under "v1.15.0" in [CHANGELOG.md](CHANGELOG.md). Numbers below are as of v1.14.0 unless stated;
 test counts: the parity table below (v1.14.0) or the latest CI run.
 
 **Where the research stands.**
