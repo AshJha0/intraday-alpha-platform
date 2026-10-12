@@ -41,6 +41,9 @@ import re
 import sys
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 ROOT = Path(__file__).resolve().parents[2]
 
 DOCS = {
@@ -92,7 +95,7 @@ CHECKED = 0
 
 
 def texts() -> dict[str, str]:
-    return {name: p.read_text() for name, p in DOCS.items() if p.exists()}
+    return {name: p.read_text(encoding="utf-8") for name, p in DOCS.items() if p.exists()}
 
 
 def num_variants(value: int) -> list[str]:
@@ -121,7 +124,7 @@ def check_platform(docs: dict[str, str]) -> None:
     print("platform numbers (derived from committed artefacts):")
 
     # --- cookbook recipe count -------------------------------------------
-    cookbook = (ROOT / "COOKBOOK.md").read_text()
+    cookbook = (ROOT / "COOKBOOK.md").read_text(encoding="utf-8")
     recipes = len(re.findall(r"^## \d+\. ", cookbook, re.M))
     claims = {}
     for name, text in docs.items():
@@ -138,7 +141,7 @@ def check_platform(docs: dict[str, str]) -> None:
     # --- feature registry -------------------------------------------------
     reg = ROOT / "data" / "reference" / "feature_registry.json"
     if reg.exists():
-        doc = json.loads(reg.read_text())
+        doc = json.loads(reg.read_text(encoding="utf-8"))
         features = len(doc.get("features", doc if isinstance(doc, list) else []))
         mentioned = {
             name: bool(
@@ -170,7 +173,7 @@ def check_platform(docs: dict[str, str]) -> None:
     # --- C++ benchmark table ---------------------------------------------
     bench = ROOT / "benchmarks" / "results_cpp.md"
     rows = {}
-    for line in bench.read_text().splitlines():
+    for line in bench.read_text(encoding="utf-8").splitlines():
         m = re.match(r"\|\s*([^|]+?)\s*\|\s*([\d.]+)\s*\|", line)
         if m:
             rows[m.group(1)] = float(m.group(2))
@@ -181,7 +184,7 @@ def check_platform(docs: dict[str, str]) -> None:
     feats = next((v for k, v in rows.items() if k.startswith("feature engine (eq")), None)
     alpha = next((v for k, v in rows.items() if k.startswith("alpha scoring")), None)
     trace_us = None
-    for line in bench.read_text().splitlines():
+    for line in bench.read_text(encoding="utf-8").splitlines():
         m = re.match(r"\|\s*replay engine[^|]*\|\s*([\d.]+)\s*\|\s*(\d+)\s*\|", line)
         if m:
             replay_m = round(int(m.group(2)) / 1e6, 1)
@@ -241,7 +244,7 @@ def check_platform(docs: dict[str, str]) -> None:
     # --- QC report totals -------------------------------------------------
     qc = ROOT / "data" / "normalized" / "qc_report.json"
     if qc.exists():
-        doc = json.loads(qc.read_text())
+        doc = json.loads(qc.read_text(encoding="utf-8"))
         total = doc.get("total_events") or doc.get("events")
         if isinstance(total, int):
             problems = [
@@ -382,8 +385,8 @@ def check_lifecycle_numbers(docs: dict[str, str]) -> None:
     if not reg_path.exists() or not gold_path.exists():
         report("lifecycle_numbers", True, "registry or golden absent — skipped", PLATFORM_FAILURES)
         return
-    reg = json.loads(reg_path.read_text())
-    gold = json.loads(gold_path.read_text())
+    reg = json.loads(reg_path.read_text(encoding="utf-8"))
+    gold = json.loads(gold_path.read_text(encoding="utf-8"))
     alphas = reg["alphas"]
     n_alphas = len(alphas)
     by_state: dict[str, int] = {}
@@ -436,7 +439,7 @@ def check_mvp_golden_numbers(docs: dict[str, str]) -> None:
     if not path.exists():
         report("mvp_golden_numbers", True, "expected_mvp.json absent — skipped", PLATFORM_FAILURES)
         return
-    g = json.loads(path.read_text())
+    g = json.loads(path.read_text(encoding="utf-8"))
     rep = g["report"]
     n_events, n_dec = g["n_events"], g["n_traces"]
     n_parents = rep["counts"]["n_parent_orders"]
@@ -501,13 +504,15 @@ def check_mermaid_sync() -> None:
     if not diagram_dir.is_dir():
         report("mermaid_sources_in_sync", True, "docs/diagrams absent — skipped", PLATFORM_FAILURES)
         return
-    sources = {p.name: p.read_text().strip() for p in sorted(diagram_dir.glob("*.mmd"))}
+    sources = {
+        p.name: p.read_text(encoding="utf-8").strip() for p in sorted(diagram_dir.glob("*.mmd"))
+    }
     embedded: list[tuple[str, str]] = []
     for doc in ("docs/DIAGRAMS.md", "docs/ARCHITECTURE.md"):
         path = ROOT / doc
         if not path.exists():
             continue
-        for m in re.finditer(r"```mermaid\n(.*?)```", path.read_text(), re.S):
+        for m in re.finditer(r"```mermaid\n(.*?)```", path.read_text(encoding="utf-8"), re.S):
             embedded.append((doc, m.group(1).strip()))
 
     problems = []
@@ -566,7 +571,7 @@ def parity_table_counts() -> tuple[dict[str, int], dict[str, int]] | None:
         return None
     tests: dict[str, int] = {}
     golden: dict[str, int] = {}
-    for line in readme.read_text().splitlines():
+    for line in readme.read_text(encoding="utf-8").splitlines():
         m = re.match(r"\s*(python|cpp|rust)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|", line)
         if m:
             tests[m.group(1)] = int(m.group(2))
@@ -580,7 +585,7 @@ def count_sources(docs: dict[str, str]) -> dict[str, str]:
     out = dict(docs)
     for name, path in EXTRA_COUNT_SOURCES.items():
         if path.exists():
-            out[name] = path.read_text()
+            out[name] = path.read_text(encoding="utf-8")
     return out
 
 
@@ -620,7 +625,7 @@ def check_test_counts(docs: dict[str, str]) -> None:
 def check_repo_level_rows(sources: dict[str, str]) -> None:
     """`integration | 13` / `replay | 4` in README's table vs every prose quote
     of the form "integration (13)" / "`replay` (4)"."""
-    readme = DOCS["README.md"].read_text()
+    readme = DOCS["README.md"].read_text(encoding="utf-8")
     rows: dict[str, int] = {}
     for line in readme.splitlines():
         m = re.match(r"\s*(integration|replay)\s*\|\s*(\d+)\s*\|", line)
@@ -704,7 +709,7 @@ def check_golden_topology_diagram(sources: dict[str, str], golden: dict[str, int
         "cpp": r"cpp: ctest -R Golden<br/>(\d+) tests",
         "rust": r"rust: \d+ golden test targets<br/>(\d+) tests",
     }
-    run_all = (ROOT / "tests" / "harness" / "run_all.sh").read_text()
+    run_all = (ROOT / "tests" / "harness" / "run_all.sh").read_text(encoding="utf-8")
     m_targets = re.search(r'RUST_GOLDEN_TARGETS="([^"]*)"', run_all)
     n_targets = len(m_targets.group(1).split()) if m_targets else None
     problems = []
@@ -785,12 +790,15 @@ def check_parity_table_vs_tree(tests: dict[str, int], golden: dict[str, int]) ->
     rust_dir = ROOT / "rust"
     if rust_dir.is_dir():
         rs = [p for p in rust_dir.rglob("*.rs") if "target" not in p.parts]
-        total = sum(len(re.findall(r"#\[test\]", p.read_text(errors="ignore"))) for p in rs)
-        run_all = (ROOT / "tests" / "harness" / "run_all.sh").read_text()
+        total = sum(
+            len(re.findall(r"#\[test\]", p.read_text(encoding="utf-8", errors="ignore")))
+            for p in rs
+        )
+        run_all = (ROOT / "tests" / "harness" / "run_all.sh").read_text(encoding="utf-8")
         m = re.search(r'RUST_GOLDEN_TARGETS="([^"]*)"', run_all)
         targets = [pair.split(":")[-1] for pair in m.group(1).split()] if m else []
         gold = sum(
-            len(re.findall(r"#\[test\]", p.read_text(errors="ignore")))
+            len(re.findall(r"#\[test\]", p.read_text(encoding="utf-8", errors="ignore")))
             for p in rs
             if p.stem in targets
         )
@@ -818,7 +826,7 @@ def check_research(docs: dict[str, str]) -> None:
             "experiment_ledger", True, "research/experiments.json absent — skipped", RESEARCH_STALE
         )
         return
-    doc = json.loads(ledger.read_text())
+    doc = json.loads(ledger.read_text(encoding="utf-8"))
     total = doc["total_experiments"]
     distinct = doc["distinct_experiments"]
     max_t = doc["expected_max_null_t"]

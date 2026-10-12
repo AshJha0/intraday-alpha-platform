@@ -65,6 +65,11 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def free_gb(path: Path) -> float:
+    """Free space (GB) on the volume holding ``path``; monkeypatchable in tests."""
+    return shutil.disk_usage(path).free / 1e9
+
+
 def check(
     gz: Path,
     data_dir: Path,
@@ -80,7 +85,7 @@ def check(
         raise PrecheckError(f"size mismatch {gz.name}")
     if _sha256(gz) != entry["sha256"]:
         raise PrecheckError(f"sha256 mismatch {gz.name}")
-    free = shutil.disk_usage(data_dir).free / 1e9
+    free = free_gb(data_dir)
     if free < min_free_gb:
         raise PrecheckError(f"free disk {free:.1f} GB < {min_free_gb:g}")
     return f"PRECHECK OK {gz.name} bytes+sha256 match ({src.name}), free {free:.1f} GB"
