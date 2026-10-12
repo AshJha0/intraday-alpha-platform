@@ -22,6 +22,16 @@ document the simulator and the maker backtest can consume:
   events where it is positive (a FEED latency proxy; ITCH files carry no
   receive stamp, so on them this is absent and the venue config, or an
   explicit :func:`parametric_latency` tail, is what the simulator uses).
+
+  **Feed latency is not order-entry latency.** ``receive_ts - exchange_ts``
+  measures how late a MARKET-DATA message reaches us (venue matching engine
+  -> feed handler). The simulator's rule-1 venue leg is the ORDER-ENTRY path
+  (our gateway -> venue matching engine), a different wire with different
+  queueing; the two are only loosely related. A table whose ``source`` is
+  ``"feed_receive_minus_exchange"`` is therefore a proxy when used as the
+  order leg: :class:`~iap.execution.simulator.ExecutionSimulator` warns
+  (:class:`FeedLatencyAsOrderLegWarning`) when handed one. Order-entry
+  latency proper comes from the venue config or a ``parametric_tail``.
 - ``markouts`` — the passive side of every EXECUTE is a maker fill at the
   resting price; its adverse selection ``s * (m_f - m_h)`` in bps at each
   horizon (``iap.tca.markout`` definitions and undefined-window rules,
@@ -155,6 +165,15 @@ def parametric_latency(
     return {"probs": list(LATENCY_PROBS), "quantiles_ns": q, "source": "parametric_tail"}
 
 
+#: ``source`` of a latency table estimated from feed timestamps.
+FEED_LATENCY_SOURCE = "feed_receive_minus_exchange"
+
+
+class FeedLatencyAsOrderLegWarning(UserWarning):
+    """A feed-derived latency table is being used as the order-entry leg
+    (module docstring: feed latency is not order-entry latency)."""
+
+
 @dataclass(frozen=True)
 class LatencyTable:
     """Empirical latency distribution: inverse CDF by linear interpolation."""
@@ -215,6 +234,18 @@ class ExecCalibration:
 
     def latency_for(self, venue_id: int) -> LatencyTable | None:
         return self.latency.get(venue_id)
+
+    def feed_derived_latency_venues(self) -> tuple[int, ...]:
+        """Venues whose latency table was estimated from FEED timestamps
+        (``source == FEED_LATENCY_SOURCE``): a proxy, not order entry."""
+        rows = self.doc.get("latency") or {}
+        return tuple(
+            sorted(
+                int(v)
+                for v, row in rows.items()
+                if row is not None and row.get("source") == FEED_LATENCY_SOURCE
+            )
+        )
 
     def adverse_selection_bps(self, horizon: str, instrument_id: int | None = None) -> float | None:
         """Mean maker adverse selection at ``horizon`` (bps, positive = bad);
@@ -499,7 +530,7 @@ def estimate_calibration(
             "probs": list(LATENCY_PROBS),
             "quantiles_ns": [int(round(_quantile(s, p))) for p in LATENCY_PROBS],
             "n": len(s),
-            "source": "feed_receive_minus_exchange",
+            "source": FEED_LATENCY_SOURCE,
         }
     for vid, table in sorted((latency_tail or {}).items()):
         if str(vid) not in latency:

@@ -83,7 +83,7 @@ from iap.core.events import EventType, MarketEvent
 from iap.execution.config import ExecConfig, SorOptions, load_sor_options
 from iap.execution.passive import ExecPolicy, PassiveStats, max_behind_qty, post_price
 from iap.execution.realism import RealismOptIns
-from iap.execution.regulatory import load_default_schedule
+from iap.execution.regulatory import RegulatoryFeeSchedule, load_default_schedule
 from iap.execution.simulator import ExecutionSimulator
 from iap.execution.sor import SmartOrderRouter
 from iap.execution.types import (
@@ -239,7 +239,14 @@ class MvpEngine(RiskWiringMixin, SizingMixin, EngineMetricsMixin):
             if realism.regulatory_fees:
                 self.exec_config = replace(
                     self.exec_config,
-                    regulatory_fees=load_default_schedule(REPO_ROOT / "configs"),
+                    # v1.15: the schedule staged with the config (a real
+                    # run copies it into its reference root, hashed into
+                    # config_version) when named, else the shipped one.
+                    regulatory_fees=(
+                        RegulatoryFeeSchedule.load(cfg.reference_path("regulatory_fees"))
+                        if "regulatory_fees" in cfg.reference
+                        else load_default_schedule(REPO_ROOT / "configs")
+                    ),
                 )
             sim_kwargs = realism.simulator_kwargs()
         self.sim = SimulatorAdapter(ExecutionSimulator(self.exec_config, **sim_kwargs))
@@ -337,6 +344,19 @@ class MvpEngine(RiskWiringMixin, SizingMixin, EngineMetricsMixin):
         self._finished = False
         self.trace_ids: list[str] = []
         self._trace_id_set: set[str] = set()
+        #: v1.15 kill enforcement (not part of the pinned report): children
+        #: cancelled because a kill latched, fills that raced such a cancel,
+        #: and the alert messages of those fills.
+        self._kill_cancelled: set[int] = set()
+        self.kill_cancels = 0
+        self.post_kill_fills = 0
+        self.kill_alerts: list[str] = []
+
+    @property
+    def parent_count(self) -> int:
+        """Number of parent orders created so far (public; replaces reads
+        of the private id counter)."""
+        return self._next_parent_id - 1
 
     # ------------------------------------------------------------- id pools
 
@@ -369,6 +389,7 @@ class MvpEngine(RiskWiringMixin, SizingMixin, EngineMetricsMixin):
         self.counters.events += 1
         # 1. simulator + reports (fills -> account + risk, terminals -> risk)
         self._process_reports(self.sim.on_market_event(ev))
+        self._enforce_kills(t)
         # 2. session volume — the TAPE, counted once.
         # The equity generator emits an EXECUTE *and* a matching TRADE print
         # for the same trade, so summing both counted every equity trade
@@ -385,6 +406,7 @@ class MvpEngine(RiskWiringMixin, SizingMixin, EngineMetricsMixin):
         self.risk_engine.on_market_event(self.iid, int(ev.event_type), ev.qty, t)
         # 3. risk wiring: stale transitions + reference price + account mark
         self._on_market(ev)
+        self._enforce_kills(t)
         # 4. TCA timeline
         self._record_timeline(ev)
         # 5. finalise closed parents

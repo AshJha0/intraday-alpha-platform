@@ -63,6 +63,21 @@ class ExecConfig:
         # Freeze the maps in ascending key order (deterministic iteration).
         object.__setattr__(self, "instruments", dict(sorted(self.instruments.items())))
         object.__setattr__(self, "venues", dict(sorted(self.venues.items())))
+        if self.regulatory_fees is not None:
+            # v1.15: the venue-level flat fees (v1.13 X-P1-2) and the dated
+            # schedule (X-P1-1) model the SAME Section 31 + TAF charges;
+            # setting both would charge them twice.
+            both = sorted(
+                vid
+                for vid, v in self.venues.items()
+                if v.sell_notional_fee_bps or v.per_share_fee_all
+            )
+            if both:
+                raise ValueError(
+                    "regulatory_fees schedule set together with venue-level "
+                    f"sell_notional_fee_bps/per_share_fee_all on venues {both}: "
+                    "the fees would be charged twice; use one or the other"
+                )
 
     def venue(self, venue_id: int) -> VenueSpec:
         """Venue profile; raises ValueError on an unknown venue_id."""

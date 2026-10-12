@@ -169,7 +169,15 @@ class CostModel:
         """v1.15 X-P1-1: the regulatory fees in force at ``ts`` (ns, UTC) from
         a dated :class:`iap.execution.regulatory.RegulatoryFeeSchedule`
         (Section 31 USD per million -> bps = rate / 100; TAF per share and
-        per-trade cap; sells only). Raises if no period covers ``ts``."""
+        per-trade cap; sells only). Raises if no period covers ``ts``, or
+        (v1.15) if this model already carries flat regulatory fees — applying
+        the dated schedule on top would double count them."""
+        if self.sell_notional_fee_bps or self.per_share_fee_all:
+            raise ValueError(
+                "with_dated_regulatory_fees: model already sets "
+                "sell_notional_fee_bps/per_share_fee_all; the dated schedule "
+                "would double count them"
+            )
         sec = schedule.sec_rate(ts)
         taf = schedule.taf_rate(ts)
         return self.with_regulatory_fees(
