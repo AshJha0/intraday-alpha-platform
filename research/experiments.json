@@ -1,8 +1,8 @@
 {
-  "bonferroni_p_threshold": 9.331840238895111e-06,
-  "bonferroni_t_threshold": 4.432103038291247,
-  "chain_head": "9b85e86dd76f3aed04b0cd8a242422d9aa764c7a36ccd7742c80be8587221f22",
-  "chain_length": 293,
+  "bonferroni_p_threshold": 9.326618168252193e-06,
+  "bonferroni_t_threshold": 4.432223697017295,
+  "chain_head": "d36f4a99d577df90eeddb3929f12becce44f47342fe93829d5168ea9937cd2ef",
+  "chain_length": 296,
   "datasets": [
     {
       "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
@@ -13,10 +13,15 @@
       "dataset_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
       "entries": 223,
       "looks": 4290
+    },
+    {
+      "dataset_version": null,
+      "entries": 3,
+      "looks": 3
     }
   ],
   "description": "Multiple-testing ledger (spec \u00a713). Deterministic: no wall-clock; identical rerun => identical file. Experiments are de-duplicated by (alpha_id, kind, canonical config, dataset_version): re-running the same script on the same dataset does not inflate the Bonferroni denominator; the same configuration on a new dataset is a new look, and the looks of earlier datasets are kept (`datasets`). An entry judged under the ledger t-stat policy carries `gate_looks`, the look count its threshold was derived from.",
-  "distinct_experiments": 293,
+  "distinct_experiments": 296,
   "entries": [
     {
       "alpha_id": "ALL",
@@ -7192,10 +7197,52 @@
         "net_pnl": 0.0,
         "refits": 5
       }
+    },
+    {
+      "alpha_id": "EQ10",
+      "config": {
+        "code_hash": "35332637fab6598abfda6cf0ca6f07b19125a084dce3f9a2ec4ce28f52330c8f",
+        "feature_hash": "511d5f579c699cef184415bb650d1b92be3442750487663600a40c12b5e6a638",
+        "horizon": "1s",
+        "prereg_id": "a6c5af759082b68f"
+      },
+      "count": 1,
+      "key": "cf27f88054afa4b86c487aeb8590b1a6fad2d8732dd8e07864defc8a3379403a",
+      "kind": "prereg",
+      "n": 5359,
+      "result": {}
+    },
+    {
+      "alpha_id": "EQ05",
+      "config": {
+        "code_hash": "35332637fab6598abfda6cf0ca6f07b19125a084dce3f9a2ec4ce28f52330c8f",
+        "feature_hash": "94854443c46625e0329b971c88c0c4ca0f91e2ae93a19aeed29d855932221737",
+        "horizon": "1s",
+        "prereg_id": "de2488a2a245cf2c"
+      },
+      "count": 1,
+      "key": "b9cf519a0fe95a438df7ddde951c921c3f4685c7c87f843127ef48a9982601ed",
+      "kind": "prereg",
+      "n": 5360,
+      "result": {}
+    },
+    {
+      "alpha_id": "AI4-deeplob",
+      "config": {
+        "code_hash": null,
+        "feature_hash": null,
+        "horizon": "50ev",
+        "prereg_id": "6451202523456726"
+      },
+      "count": 1,
+      "key": "3060ab238569f955e086a4d30267ddc5ec1fc7e9f84ea71efba9bc24454bdbff",
+      "kind": "prereg",
+      "n": 5361,
+      "result": {}
     }
   ],
-  "expected_max_null_t": 4.143994703207174,
+  "expected_max_null_t": 4.144129776883812,
   "pinned_alpha": 0.05,
-  "total_experiments": 5358,
+  "total_experiments": 5361,
   "x-version": 4
 }

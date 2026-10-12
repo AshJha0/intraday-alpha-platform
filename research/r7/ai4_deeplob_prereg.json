@@ -1,0 +1,112 @@
+{
+  "schema": "iap.ai4_prereg/v1",
+  "status": "REGISTERED - owner-approved, signed off and on the blackboard; approved for ONE confirmatory look",
+  "signed": true,
+  "on_blackboard": true,
+  "plan_item": "M-P0-1 (IAP_v1.15_Plan.md)",
+  "drafted": "2026-10-11",
+  "owner_decisions": {
+    "date": "2026-10-11",
+    "decided": [
+      "sampling clock",
+      "window",
+      "horizon",
+      "cost model",
+      "min_confidence"
+    ],
+    "note": "values approved by the owner; the file stays DRAFT and unsigned until sign-off and blackboard registration"
+  },
+  "hypothesis": "On the R7 holdout sessions, the DeepLOB classifier (iap.models.deeplob_torch.DeepLOBClassifier, arch 'deeplob') earns a positive mean net-of-cost P&L per non-overlapping taker trade, with a one-sided 95% lower bound above zero, and a higher mean than both baselines on the same features and split.",
+  "candidate": "deeplob",
+  "baselines": [
+    "linear",
+    "gbm"
+  ],
+  "baseline_code": "iap.models.deeplob_baselines.BASELINES",
+  "symbols": [
+    "AAPL",
+    "MSFT",
+    "QQQ"
+  ],
+  "insample_role": "insample days of research/r7/r7_candidates.json (training and model selection only)",
+  "holdout_days": [
+    "2025-11-28",
+    "2025-12-08",
+    "2025-12-09",
+    "2025-12-10",
+    "2025-12-11",
+    "2025-12-12",
+    "2026-06-12"
+  ],
+  "dataset": {
+    "builder": "iap.models.deeplob.build_lob_dataset",
+    "sampling_clock": "event: one step per order-book event",
+    "levels": 10,
+    "window": 100,
+    "window_unit": "events",
+    "horizon_rows": 50,
+    "horizon_unit": "events",
+    "label_threshold": 2e-05,
+    "normaliser": "fitted on insample rows only",
+    "training": "pooled across AAPL, MSFT, QQQ (one model; owner decision 2026-10-11)",
+    "evaluation": "acceptance reported per symbol and pooled"
+  },
+  "acceptance": {
+    "code": "iap.models.deeplob_baselines.accept",
+    "metric": "iap.models.deeplob_baselines.net_of_cost (taker, non-overlapping trades), costs from the platform cost model including SEC Section 31 and FINRA TAF regulatory fees",
+    "cost_model": {
+      "execution_config": "configs/prereg/v2.json",
+      "regulatory_fees": true,
+      "fee_schedule": "configs/reference/regulatory_fee_schedule.json",
+      "flat_fee_bp": null,
+      "note": "not a flat fee_bp: load_exec_config(..., regulatory_fees=True) as configs/prereg/v2.json prescribes"
+    },
+    "min_confidence": 0.6,
+    "min_trades": 30,
+    "rules": [
+      "mean_net_positive",
+      "lower95_positive",
+      "enough_trades",
+      "beats_baselines"
+    ],
+    "unit": "per symbol; the hypothesis holds only if it is accepted on every symbol (no pooling across symbols after the fact)"
+  },
+  "looks": "one confirmatory look on the holdout; any re-run counts as a new look in the ledger",
+  "promotion": "none without a holdout pass; a pass makes AI4 eligible for review, not promoted",
+  "open_for_owner": [],
+  "registration": {
+    "approver": "owner (AshJha0)",
+    "approver_id": "ashjha0",
+    "signed_by": "Claude (owner-delegated in chat 2026-10-11)",
+    "approval": "owner approved the final text in chat on 2026-10-11 and delegated sign-off/registration; registration run by the owner",
+    "draft_file": "research/r7/ai4_deeplob_prereg_DRAFT.json",
+    "draft_sha256": "aeb1b1d3eceb80a6911082336a034e03c2736881415feef8bc581bae7f3b9dc2",
+    "draft_commit": "dffcf45 (main)",
+    "registered_utc": "2026-10-12T05:55:22+00:00",
+    "holdout_data_read": false,
+    "holdout_note": "no holdout data (data/real/itch/r7 S1128*, S120*, S121*, S0612*) was read, decompressed or ingested before this registration; only the sha256/bytes of the compressed files recorded in the draft were computed",
+    "path": "iap.agents.broker.WriteBroker.preregister (human writer, as the v1.8 holdout preregs; one look debited each on research/experiments.json)",
+    "blackboard": "research/agents/blackboard.jsonl",
+    "entries": [
+      {
+        "alpha_id": "AI4-deeplob",
+        "horizon": "50ev",
+        "prereg_id": "6451202523456726",
+        "blackboard_seq": 9,
+        "blackboard_hash": "4f125811d80a6898a1666625b15726d78d286969b13f7cc95e3ffbd0e293d1d9",
+        "supersedes_seq": null,
+        "ledger_total": 5361,
+        "ledger_head": "d36f4a99d577df90eeddb3929f12becce44f47342fe93829d5168ea9937cd2ef"
+      }
+    ]
+  },
+  "signature": {
+    "scheme": "ed25519",
+    "maintainer": "ashjha0",
+    "public_key": "02a3e278cda3efac7dcd266fb8a3821a1415f0725a73f8b255aac84083c2106c",
+    "trust_root": "research/agents/trust_roots.json",
+    "message": "iap.agents.blackboard.canonical(this document without 'signature')",
+    "message_sha256": "d362f789ea3875c9a68dd1f6b8ea6ef4cf2a7284338273733c1f52d8278e31eb",
+    "sig": "a81d267b6f6db574dd3f88b2d2eed1d26e1eb1a82379d63d10bf89b2002724548a8ed87b2c2a41e4123bab2ea888fb5db9a2883b9429986583b4ab386b196701"
+  }
+}

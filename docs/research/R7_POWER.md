@@ -6,8 +6,8 @@ This is a planning aid for the owner before sign-off. It does not change the dra
 
 ## Gate modelled
 
-- HAC t >= 4.432: the Bonferroni threshold of the committed ledger (5,358 looks). The R7 looks themselves will raise it slightly; a threshold fixed in the pre-registration (`threshold_policy="prereg"`) would freeze it.
-- Deflated Sharpe > 0.95: N = 294 (ledger distinct experiments + 1), V = 1/(S-1), normal moments, on the per-session series.
+- HAC t >= 4.432: the Bonferroni threshold of the committed ledger (5,361 looks). The R7 looks themselves will raise it slightly; a threshold fixed in the pre-registration (`threshold_policy="prereg"`) would freeze it.
+- Deflated Sharpe > 0.95: N = 297 (ledger distinct experiments + 1), V = 1/(S-1), normal moments, on the per-session series.
 - Tier 1 = 7 holdout sessions; tier 2 = 47 (7 + 40 approved dates).
 - Power = P(pass | true effect); MDE = smallest effect passed with 80 % probability. `joint <=` is the smaller of the two component powers (an upper bound on passing both).
 
@@ -34,13 +34,13 @@ The tables below are the analysis the decisions were taken on; they still list e
 
 | alpha | effect (IC) | sd/session | S | power HAC | power DSR | joint <= | MDE HAC | MDE DSR | MDE joint |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| EQ01 @1s (in-sample) | +0.1051 | 0.0502 | 7 | 1.00 | 0.26 | 0.26 | 0.0386 | 0.1750 | 0.1750 |
+| EQ01 @1s (in-sample) | +0.1051 | 0.0502 | 7 | 1.00 | 0.25 | 0.25 | 0.0386 | 0.1751 | 0.1751 |
 | EQ01 @1s (in-sample) | +0.1051 | 0.0502 | 47 | 1.00 | 1.00 | 1.00 | 0.0149 | 0.0422 | 0.0422 |
-| EQ01 @1s (v1.8 decayed) | +0.0368 | 0.0502 | 7 | 0.77 | 0.00 | 0.00 | 0.0386 | 0.1750 | 0.1750 |
+| EQ01 @1s (v1.8 decayed) | +0.0368 | 0.0502 | 7 | 0.77 | 0.00 | 0.00 | 0.0386 | 0.1751 | 0.1751 |
 | EQ01 @1s (v1.8 decayed) | +0.0368 | 0.0502 | 47 | 1.00 | 0.59 | 0.59 | 0.0149 | 0.0422 | 0.0422 |
-| EQ02 @5s (in-sample) | +0.0419 | 0.0163 | 7 | 1.00 | 0.49 | 0.49 | 0.0126 | 0.0570 | 0.0570 |
+| EQ02 @5s (in-sample) | +0.0419 | 0.0163 | 7 | 1.00 | 0.49 | 0.49 | 0.0126 | 0.0571 | 0.0571 |
 | EQ02 @5s (in-sample) | +0.0419 | 0.0163 | 47 | 1.00 | 1.00 | 1.00 | 0.0049 | 0.0137 | 0.0137 |
-| EQ02 @5s (v1.8 decayed) | +0.0161 | 0.0163 | 7 | 0.92 | 0.00 | 0.00 | 0.0126 | 0.0570 | 0.0570 |
+| EQ02 @5s (v1.8 decayed) | +0.0161 | 0.0163 | 7 | 0.92 | 0.00 | 0.00 | 0.0126 | 0.0571 | 0.0571 |
 | EQ02 @5s (v1.8 decayed) | +0.0161 | 0.0163 | 47 | 1.00 | 0.95 | 0.95 | 0.0049 | 0.0137 | 0.0137 |
 | EQ04 @5s (in-sample) | +0.0137 | 0.0089 | 7 | 0.27 | 0.04 | 0.04 | 0.0211 | 0.0310 | 0.0310 |
 | EQ04 @5s (in-sample) | +0.0137 | 0.0089 | 47 | 1.00 | 1.00 | 1.00 | 0.0081 | 0.0075 | 0.0081 |
@@ -51,9 +51,9 @@ The tables below are the analysis the decisions were taken on; they still list e
 | EQ05 @1s (v1.8 decayed) | +0.0331 | 0.0176 | 7 | 1.00 | 0.15 | 0.15 | 0.0175 | 0.0616 | 0.0616 |
 | EQ05 @1s (v1.8 decayed) | +0.0331 | 0.0176 | 47 | 1.00 | 1.00 | 1.00 | 0.0068 | 0.0148 | 0.0148 |
 | EQ07 @10s (in-sample) | -0.0120 | 0.0159 | 7 | 0.00 | 0.00 | 0.00 | 0.0236 | 0.0554 | 0.0554 |
-| EQ07 @10s (in-sample) | -0.0120 | 0.0159 | 47 | 0.00 | 0.00 | 0.00 | 0.0091 | 0.0133 | 0.0133 |
+| EQ07 @10s (in-sample) | -0.0120 | 0.0159 | 47 | 0.00 | 0.00 | 0.00 | 0.0091 | 0.0134 | 0.0134 |
 | EQ07 @10s (v1.8 decayed) | -0.0206 | 0.0159 | 7 | 0.00 | 0.00 | 0.00 | 0.0236 | 0.0554 | 0.0554 |
-| EQ07 @10s (v1.8 decayed) | -0.0206 | 0.0159 | 47 | 0.00 | 0.00 | 0.00 | 0.0091 | 0.0133 | 0.0133 |
+| EQ07 @10s (v1.8 decayed) | -0.0206 | 0.0159 | 47 | 0.00 | 0.00 | 0.00 | 0.0091 | 0.0134 | 0.0134 |
 | EQ10 @1s (in-sample) | +0.0756 | 0.0209 | 7 | 1.00 | 0.82 | 0.82 | 0.0335 | 0.0730 | 0.0730 |
 | EQ10 @1s (in-sample) | +0.0756 | 0.0209 | 47 | 1.00 | 1.00 | 1.00 | 0.0129 | 0.0176 | 0.0176 |
 | EQ10 @1s (v1.8 decayed) | +0.0966 | 0.0209 | 7 | 1.00 | 0.93 | 0.93 | 0.0335 | 0.0730 | 0.0730 |
@@ -74,7 +74,7 @@ No in-sample IC exists for AUC01: the in-sample statistic is the session-cluster
 
 | S | active S | power t-gate | power DSR | joint <= | MDE (bp) | MDE IC (n decisions) |
 |---:|---:|---:|---:|---:|---:|---:|
-| 7 | 3 | 0.00 | 0.00 | 0.00 | 626.4 | 0.77 (21) |
+| 7 | 3 | 0.00 | 0.00 | 0.00 | 627.1 | 0.77 (21) |
 | 47 | 16 | 0.03 | 0.01 | 0.01 | 50.7 | 0.41 (141) |
 
 Recommendation: **underpowered even on tier 2**.

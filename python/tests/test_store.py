@@ -699,7 +699,8 @@ def test_import_all_counts(built: Store) -> None:
     # every warning is an "absent optional artefact", never a skipped record
     for step, rep in reports.items():
         for w in rep.warnings:
-            assert "absent" in w, (step, w)
+            # ...or a pre-registration filed before its dataset exists
+            assert "absent" in w or "filed as 'unstamped'" in w, (step, w)
 
 
 def test_ledger_denominator_and_summary_view(built: Store) -> None:
@@ -711,7 +712,8 @@ def test_ledger_denominator_and_summary_view(built: Store) -> None:
     assert sum(r["total_count"] for r in view) == doc["total_experiments"]
     # one row per scope AND kind: the pipeline was run in every scope
     pipeline = [r for r in view if r["kind"] == "promotion_pipeline"]
-    assert len(pipeline) == len({(r["dataset_version"], r["methods"]) for r in view}) >= 3
+    scopes_run = {(r["dataset_version"], r["methods"]) for r in view if r["kind"] != "prereg"}
+    assert len(pipeline) == len(scopes_run) >= 3
     assert all(r["n_alphas"] == 24 and r["n_promote"] == 0 for r in pipeline)
     (current,) = built.query(
         "SELECT * FROM v_experiment_ledger_summary_current WHERE kind = 'promotion_pipeline'"
@@ -1275,7 +1277,10 @@ def test_built_store_keeps_legacy_and_archived_scopes_out_of_the_current_numbers
     # every look of the ledger is in exactly one scope
     scopes = built.query("SELECT * FROM ledger_scopes")
     assert sum(r["looks"] for r in scopes) == doc["total_experiments"]
-    assert {r["dataset_version"] for r in scopes} == {d["dataset_version"] for d in doc["datasets"]}
+    # the ledger lists pre-registrations under dataset null; the store files them as "unstamped"
+    assert {r["dataset_version"] for r in scopes} == {
+        d["dataset_version"] or "unstamped" for d in doc["datasets"]
+    }
     assert {(r["dataset_version"], r["methods"]) for r in scopes} >= {
         current_scope,
         (params["data_version"], LEGACY_METHODS),
@@ -1283,7 +1288,7 @@ def test_built_store_keeps_legacy_and_archived_scopes_out_of_the_current_numbers
     by_dataset: dict = {}
     for r in scopes:
         by_dataset[r["dataset_version"]] = by_dataset.get(r["dataset_version"], 0) + r["looks"]
-    assert by_dataset == {d["dataset_version"]: d["looks"] for d in doc["datasets"]}
+    assert by_dataset == {d["dataset_version"] or "unstamped": d["looks"] for d in doc["datasets"]}
 
     current = built.query("SELECT * FROM v_alpha_scorecard_current ORDER BY alpha_id")
     assert len(current) == 24
@@ -1473,7 +1478,8 @@ def test_cli_selects_the_scope(tmp_path: Path, capsys: pytest.CaptureFixture[str
     )
     everything = lines(["scorecard", "--db", str(db), "--all-scopes"])
     # four repository scopes (v1.14.0 adds v2_v113) + the ingested dataset's two
-    assert len(everything) == 24 * 4 + 2
+    # + the v1.15 R7 pre-registrations' unstamped scope (EQ10, EQ05)
+    assert len(everything) == 24 * 4 + 2 + 2
     # sql binds :dataset_version / :methods to the selected scope
     query = (
         "SELECT COUNT(*) AS n, SUM(count) AS looks FROM ledger_entries "
