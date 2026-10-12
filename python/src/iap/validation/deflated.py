@@ -73,6 +73,21 @@ DEFAULT_MIN_TRL_ALPHA = 0.05
 MIN_OBSERVATIONS = 3
 
 
+def pnl_sharpe(daily: Sequence[float], annualize: int | None = DAYS_PER_YEAR) -> float | None:
+    """P&L Sharpe of a per-day P&L series (mean / sd, ddof=1), annualised by
+    ``sqrt(annualize)`` (:data:`DAYS_PER_YEAR` by default; ``None`` = per
+    day).  The single shared helper: a Sharpe of P&L, not of returns on
+    capital.  None for < 2 days or zero spread."""
+    x = np.asarray(daily, dtype=float)
+    if x.size < 2:
+        return None
+    sd = x.std(ddof=1)
+    if sd == 0:
+        return None
+    s = float(x.mean() / sd)
+    return s * math.sqrt(annualize) if annualize else s
+
+
 def norm_cdf(x: float) -> float:
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
 
@@ -247,6 +262,9 @@ def deflated_sharpe_block(
         return out
     try:
         out["psr"] = probabilistic_sharpe_ratio(sr, sr_benchmark, n, mom["skew"], mom["kurtosis"])
+    except ValueError as exc:
+        out["psr_error"] = str(exc)
+    try:
         d = deflated_sharpe_ratio(sr, n, n_trials, mom["skew"], mom["kurtosis"], trials_sr_variance)
         out["dsr"], out["sr0"] = d["dsr"], d["sr0"]
         out["trials_sr_variance"] = d["trials_sr_variance"]
@@ -257,8 +275,9 @@ def deflated_sharpe_block(
             out["dsr_at_looks"] = deflated_sharpe_ratio(
                 sr, n, n_looks, mom["skew"], mom["kurtosis"], trials_sr_variance
             )["dsr"]
-    except ValueError:
-        pass
+    except ValueError as exc:
+        # recorded, not swallowed: a None DSR now says why (report-only)
+        out["dsr_error"] = str(exc)
     return out
 
 
