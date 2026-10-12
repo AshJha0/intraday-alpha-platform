@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 
+import pytest
 from conftest import REPO_ROOT
 
 _spec = importlib.util.spec_from_file_location(
@@ -40,6 +41,12 @@ def _setup(tmp_path, signed=True, draft=True, extra_signed=False, payload=PAYLOA
             json.dumps({"signed": False, "holdout_files": files}), encoding="utf-8"
         )
     return gz, data
+
+
+@pytest.fixture(autouse=True)
+def _plenty_of_disk(monkeypatch):
+    # never depend on the real machine's free space
+    monkeypatch.setattr(hc, "free_gb", lambda _p: 1000.0)
 
 
 def test_signed_ok(tmp_path, capsys):
@@ -94,3 +101,10 @@ def test_low_disk(tmp_path):
         assert "free disk" in str(e)
     else:
         raise AssertionError("expected PrecheckError")
+
+
+def test_low_disk_main_fails(tmp_path, monkeypatch, capsys):
+    gz, data = _setup(tmp_path)
+    monkeypatch.setattr(hc, "free_gb", lambda _p: 10.0)
+    assert hc.main([str(gz), str(data)]) == 1
+    assert "free disk 10.0 GB < 25" in capsys.readouterr().out
