@@ -282,7 +282,7 @@ def test_publish_dry_run_reports_all_blockers_and_prints_plan(tmp_path):
     r, fake = _runner(tmp_path, answers)
     with pytest.raises(rel.ReleaseError, match="CHANGELOG.md has no.*main CI is green"):
         rel.publish(r, "1.15.0")
-    assert sum(x.startswith("BLOCKER") for x in r.log) == 2
+    assert sum(x.startswith("BLOCKER") for x in r.log) == 3  # missing, not renamed, CI
     assert any(x.startswith("would run: gh release create v1.15.0") for x in r.log)
     assert not any(c[:2] == ["git", "tag"] and "-a" in c for c in fake.calls)
 
@@ -317,3 +317,34 @@ def test_publish_requires_green_codeql(tmp_path, codeql):
         rel.publish(r, "1.15.0", fetch=lambda u: "", sleep=lambda s: None)
     assert not any(c[:3] == ["git", "tag", "-a"] or c[:2] == ["gh", "release"] for c in fake.calls)
     assert ["gh", "run", "list", "--workflow", "codeql.yml"] == fake.calls[-1][:5]
+
+
+def test_stale_unreleased_heading():
+    assert rel.stale_unreleased(CHANGELOG, "1.15.0") is None  # bare Unreleased = next cycle
+    text = "# C\n\n## Unreleased (v1.15)\n\n- x\n\n## v1.15.0 — d\n\n- y\n"
+    assert rel.stale_unreleased(text, "1.15.0") == "## Unreleased (v1.15)"
+    assert rel.stale_unreleased(text, "1.16.0") is None
+    assert rel.stale_unreleased(text.replace("v1.15)", "v1.150)"), "1.15.0") is None
+
+
+def test_publish_execute_fails_on_unrenamed_unreleased(tmp_path):
+    answers = _publish_answers()
+    answers[("git", "show")] = "# Changelog\n\n## Unreleased (v1.15)\n\n- x\n"
+    r, fake = _runner(tmp_path, answers, execute=True)
+    with pytest.raises(rel.ReleaseError, match="no '## v1.15.0' section"):
+        rel.publish(r, "1.15.0", fetch=lambda u: "", sleep=lambda s: None)
+    answers[("git", "show")] = CHANGELOG.replace("## Unreleased", "## Unreleased (v1.15.0)")
+    r, fake = _runner(tmp_path, answers, execute=True)
+    with pytest.raises(rel.ReleaseError, match="not renamed"):
+        rel.publish(r, "1.15.0", fetch=lambda u: "", sleep=lambda s: None)
+    assert not any(c[:2] == ["git", "tag"] and "-a" in c for c in fake.calls)
+    assert not any(c[:2] == ["gh", "release"] for c in fake.calls)
+
+
+def test_publish_execute_fails_on_empty_section(tmp_path):
+    answers = _publish_answers()
+    answers[("git", "show")] = "# Changelog\n\n## v1.15.0 — d\n\n## v1.14.0\n\nold\n"
+    r, fake = _runner(tmp_path, answers, execute=True)
+    with pytest.raises(rel.ReleaseError, match="missing or empty"):
+        rel.publish(r, "1.15.0", fetch=lambda u: "", sleep=lambda s: None)
+    assert not any(c[:2] == ["gh", "release"] for c in fake.calls)

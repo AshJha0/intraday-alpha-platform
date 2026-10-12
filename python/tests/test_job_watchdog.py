@@ -174,7 +174,7 @@ def test_watchdog_own_process_is_ignored(tmp_path):
 
 def test_example_registry_loads():
     reg = wd.load_registry(REPO_ROOT / "tools/jobs/jobs.example.json")
-    assert {j.name for j in reg.jobs} == {"maker_real", "r7_insample_chain"}
+    assert {j.name for j in reg.jobs} == {"maker_real", "r7_insample_chain", "r7_holdout_chain"}
     assert all(not j.restart_safe for j in reg.jobs)
 
 
@@ -209,3 +209,20 @@ def test_launch_uses_wmi_create(monkeypatch):
     wd.launch_detached(r"C:\x\run it.cmd")
     ps = seen["cmd"][-1]
     assert "Win32_Process" in ps and "Create" in ps and r"C:\x\run it.cmd" in ps
+
+
+def test_example_holdout_chain_pattern_and_done_regex(tmp_path):
+    ex = wd.load_registry(REPO_ROOT / "tools/jobs/jobs.example.json")
+    job = next(j for j in ex.jobs if j.name == "r7_holdout_chain")
+    reg = _registry(tmp_path, process_pattern=job.process_pattern, done_regex=job.done_regex)
+    j = reg.jobs[0]
+    wrapper = [(9, r"cmd /c C:\d\run_r7_holdout_chain.cmd")]
+    # bracket trick: a command line containing the literal pattern text is not a match
+    grep = [(10, "findstr run_r7_holdout_chai[n] x")]
+    _log(tmp_path, "WAIT\nSTART 2025-11-28\n")
+    assert wd.classify(j, wrapper, NOW).state == "running"
+    assert wd.classify(j, grep, NOW).state == "died"
+    _log(tmp_path, "START 2025-11-28\nEXIT 0\nCHAIN DONE Mon\n")
+    assert wd.classify(j, [], NOW).state == "done"
+    _log(tmp_path, "START 2025-11-28\nSKIP 2025-11-28 precheck failed\n")
+    assert wd.classify(j, [], NOW).state == "died"

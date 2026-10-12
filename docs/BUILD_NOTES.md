@@ -17,15 +17,19 @@ gated on all of them. Run the whole thing locally with
 ## Python (reference implementation)
 
 ```bash
-cd python && PYTHONPATH=src python3 -m pytest -q          # full suite (1988 tests; CI runs it as `-n auto --dist loadfile` with coverage, 306-359 s on a 4-vCPU runner)
-cd python && PYTHONPATH=src python3 -m pytest -q -k golden # the golden group (192)
+cd python && PYTHONPATH=src python3 -m pytest -q          # full suite (current count: README parity table / latest CI run; CI runs it as `-n auto --dist loadfile` with coverage, 306-359 s on a 4-vCPU runner)
+cd python && PYTHONPATH=src python3 -m pytest -q -k golden # the golden group (count: README parity table)
 cd python && PYTHONPATH=src python3 -m iap.marketdata      # end-to-end pipeline
 cd python && PYTHONPATH=src python3 -m iap.mvp run         # the traced MVP loop (under a minute)
 cd python && PYTHONPATH=src python3 tools/make_golden.py   # regen goldens (deliberate only; every
                                                            # make_golden_*.py refuses to overwrite without --force)
 ```
 
-- **Timing.** The suite is 1988 tests at v1.5.0 (192 in the `-k golden` group; 1573 and 166 at v1.4.0).
+- **Test counts.** The current per-language counts live in one place, the README parity
+  table (v1.14.0 CI run: 2411 python / 302 cpp / 366 rust, 193 / 72 / 72 golden; the same
+  numbers as docs/ARCHITECTURE.md §6); for anything newer see the latest `ci` run on main.
+  Every other count in this file is **historical**, recorded with the release it was measured on.
+- **Timing (historical, v1.5.0).** The suite was 1988 tests at v1.5.0 (192 in the `-k golden` group; 1573 and 166 at v1.4.0).
   Measured in CI on the `ubuntu-24.04` runner (4 vCPU), Python 3.11, on one
   tree, 2026-10-04 (pull request #23, when the suite was 1672 tests — before
   the other v1.5.0 branches were merged):

@@ -26,6 +26,7 @@ from iap.research.r7_power import (  # noqa: E402
     analyse,
     analyse_multi_symbol,
     ledger_gate,
+    prereg_status,
     render_markdown,
     render_multi_symbol_markdown,
 )
@@ -66,6 +67,7 @@ def main(argv: list[str] | None = None) -> int:
     if a.h1_mean_bps is not None:
         h1 = {"mean_edge_bps": a.h1_mean_bps, "session_sd_bps": a.h1_sd_bps}
     res = analyse(inputs, gate, h1)
+    res["prereg"] = prereg_status(ROOT / "research/r7")
     _write(
         a.out_md or str(ROOT / "docs/research/R7_POWER.md"),
         a.out_json or str(ROOT / "research/r7/r7_power.json"),
