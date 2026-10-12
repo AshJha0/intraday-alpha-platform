@@ -246,3 +246,43 @@ def test_validate_with_cpcv_and_dsr_keeps_the_v3_verdict():
     d = v4["deflated_sharpe"]
     assert d["n_trials"] == 7 and d["n_looks"] == 88 and d["n_days"] >= 1
     assert "cpcv" not in v3 and "deflated_sharpe" not in v3
+
+
+# ----------------------------------------------- v1.15 memory: narrowed frames
+
+
+def _v4(frames):
+    return _validate(
+        frames, **methods(METHODS_V4).validate_kwargs(), cpcv_groups=5, deflated_sharpe_trials=7
+    )
+
+
+def test_cpcv_block_on_narrowed_frames_is_identical(monkeypatch):
+    """The cpcv block narrows the frames to the columns it reads (R7 OOM fix);
+    the report must equal the one computed on the full frames, also when the
+    frames carry many unrelated columns."""
+    import iap.validation.validate as v
+
+    frames = _multi_day_frames(per_day=500)
+    rng = np.random.default_rng(7)
+    for df in frames.values():
+        for j in range(30):
+            df[f"junk_{j}_v1"] = rng.standard_normal(len(df))
+    seen = []
+    real = v._cpcv_columns
+    monkeypatch.setattr(v, "_cpcv_columns", lambda *a: seen.append(real(*a)) or seen[-1])
+    narrowed = _v4(frames)["cpcv"]
+    assert seen and seen[0] is not None and not any(c.startswith("junk_") for c in seen[0])
+    monkeypatch.setattr(v, "_cpcv_columns", lambda *a, **k: None)
+    full = _v4(frames)["cpcv"]
+    assert narrowed == full
+
+
+def test_cpcv_block_falls_back_to_full_frames_on_missing_column(monkeypatch):
+    """An alpha that reads a column outside the narrowed set gets the full frames."""
+    import iap.validation.validate as v
+
+    frames = _multi_day_frames(per_day=500)
+    expected = _v4(frames)["cpcv"]
+    monkeypatch.setattr(v, "_cpcv_columns", lambda *a, **k: {"exchange_ts"})
+    assert _v4(frames)["cpcv"] == expected

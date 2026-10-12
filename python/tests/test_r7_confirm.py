@@ -402,3 +402,51 @@ def test_record_outcome_refuses_a_verdict_other_than_the_computed_one(tmp_path):
                 str(tmp_path),
             ]
         )
+
+
+# ------------------------------------------------- owner-approved crash retry --
+def _crash(tmp_path):
+    root, ds, ok = _make_root(tmp_path)
+    run = FakeRun(ds, {"EQ10": 1, "EQ05": 0})
+    assert rc.live(root, ds, ok, runner=run, frames_loader=lambda d: {}) == 1
+    return root, ds, ok
+
+
+def test_crash_retry_needs_the_note_and_runs_once(tmp_path, no_board, monkeypatch):
+    root, ds, ok = _crash(tmp_path)
+    run = FakeRun(ds, {"EQ10": 0, "EQ05": 0})
+    with pytest.raises(rc.CheckError, match="crash_retry.md missing"):
+        rc.live(root, ds, ok, runner=run, retry=True)
+    assert run.calls == []
+    (root / rc.RETRY_NOTE_REL).write_text("note", encoding="utf-8")
+    monkeypatch.setattr(
+        rc,
+        "analyse",
+        lambda a, look, *x: {
+            "alpha": f"{a}@1s",
+            "prereg_id": x[-1]["body"]["prereg_id"],
+            "experiment_id": look["experiment_id"],
+            "verdict": "confirmed",
+        },
+    )
+    assert rc.live(root, ds, ok, runner=run, frames_loader=lambda d: {}, retry=True) == 0
+    assert [c[c.index("--alpha") + 1] for c in run.calls] == ["EQ10", "EQ05"]
+    assert (root / "research" / "r7" / "r7_confirm_result_crash1.json").is_file()
+    assert rc.retry_marker(ds, "EQ10").exists()
+    with pytest.raises(rc.CheckError):  # never a second retry
+        rc.live(root, ds, ok, runner=run, retry=True)
+    assert len(run.calls) == 2
+
+
+def test_crash_retry_refused_when_the_look_produced_output(tmp_path, no_board):
+    root, ds, ok = _crash(tmp_path)
+    (root / rc.RETRY_NOTE_REL).write_text("note", encoding="utf-8")
+    (ds / "research" / "experiments.json").write_text("{}")
+    with pytest.raises(rc.CheckError, match="debited"):
+        rc.preflight(root, ds, ok, retry=True)
+    (ds / "research" / "experiments.json").unlink()
+    d = ds / "research" / "experiments" / "x"
+    d.mkdir(parents=True)
+    (d / "spec.json").write_text("{}")
+    with pytest.raises(rc.CheckError, match="produced output"):
+        rc.preflight(root, ds, ok, retry=True)
