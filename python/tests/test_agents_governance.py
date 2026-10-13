@@ -347,3 +347,75 @@ def test_no_prereg_results_are_not_gate_eligible():
     finally:
         specs._configuration_violations = orig
     assert not e.eligible and EXPLORATORY_REASON in e.reasons
+
+
+# -- v1.15 option A: a prereg with a recorded outcome is closed ---------------
+
+
+_CLOCK = Clock()
+
+
+def _shared(tmp_path, code):
+    return WriteBroker(tmp_path, {"alice"}, clock=_CLOCK, fingerprinter=code)
+
+
+def _record(tmp_path, prereg_id, outcome="confirmed", writer=None):
+    from iap.agents.workflow import OUTCOME_WRITER
+
+    b = WriteBroker(
+        tmp_path, {"alice"}, trusted={writer or OUTCOME_WRITER}, clock=_CLOCK, fingerprinter=Code()
+    )
+    body = {"prereg_id": prereg_id, "outcome": outcome, "ref": "r", "recorded_by": "owner"}
+    b.write_trusted(writer or OUTCOME_WRITER, "outcome", body)
+
+
+def test_closed_prereg_no_longer_blocks_on_code_or_deps(tmp_path, code):
+    from iap.agents.prereg_gate import is_closed
+
+    b = _shared(tmp_path, code)
+    b.preregister("alice", "EQ01", "1s", "h", 1)
+    e = require(tmp_path, "EQ01", "1s", fingerprinter=code)
+    assert not is_closed(e)
+    code.v = "b"  # code changed: an OPEN prereg refuses
+    with pytest.raises(PreregistrationError, match="code_hash changed"):
+        require(tmp_path, "EQ01", "1s", fingerprinter=code)
+    _record(tmp_path, e["body"]["prereg_id"])
+    closed = require(tmp_path, "EQ01", "1s", fingerprinter=code)
+    assert is_closed(closed) and closed["seq"] == e["seq"]
+    assert closed["closed"]["outcome"] == "confirmed" and closed["closed"]["outcome_seq"] > e["seq"]
+
+
+def test_outcome_for_another_prereg_does_not_close(tmp_path, code):
+    b = _shared(tmp_path, code)
+    b.preregister("alice", "EQ01", "1s", "h", 1)
+    _record(tmp_path, "0" * 16)
+    code.v = "b"
+    with pytest.raises(PreregistrationError, match="code_hash changed"):
+        require(tmp_path, "EQ01", "1s", fingerprinter=code)
+
+
+def test_superseding_prereg_reopens_the_pair(tmp_path, code):
+    """An outcome closes the prereg it names; a later superseding prereg is open."""
+    from iap.agents.prereg_gate import is_closed
+
+    b = _shared(tmp_path, code)
+    b.preregister("alice", "EQ01", "1s", "h", 1)
+    first = require(tmp_path, "EQ01", "1s", fingerprinter=code)
+    _record(tmp_path, first["body"]["prereg_id"])
+    code.v = "b"
+    b = _shared(tmp_path, code)
+    b.preregister("alice", "EQ01", "1s", "h2", 1, supersede=True)
+    second = require(tmp_path, "EQ01", "1s", fingerprinter=code)
+    assert second["seq"] > first["seq"] and not is_closed(second)
+    code.v = "c"
+    with pytest.raises(PreregistrationError, match="code_hash changed"):
+        require(tmp_path, "EQ01", "1s", fingerprinter=code)
+
+
+def test_committed_r7_preregs_are_closed():
+    """EQ10/1s and EQ05/1s: R7-CONFIRM-1 outcomes are on the committed board."""
+    from iap.agents.prereg_gate import is_closed
+
+    for alpha in ("EQ10", "EQ05"):
+        e = require(REPO_ROOT, alpha, "1s", fingerprinter=lambda a: {"deps": {"numpy": "0"}})
+        assert is_closed(e) and e["closed"]["outcome"] == "confirmed"

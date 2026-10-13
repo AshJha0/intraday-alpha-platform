@@ -34,6 +34,28 @@ def _current(alpha_id: str) -> dict[str, Any] | None:
     return fingerprint(alpha_id)
 
 
+def _closing_outcome(bb: Blackboard, prereg_id: str, prereg_seq: int) -> dict | None:
+    """The latest outcome entry recorded for ``prereg_id`` after its
+    registration by the outcomes writer, or ``None`` (the prereg is open)."""
+    from iap.agents.workflow import OUTCOME_WRITER
+
+    found = None
+    for e in bb.entries():
+        if (
+            e["kind"] == "outcome"
+            and e.get("agent") == OUTCOME_WRITER
+            and e["seq"] > prereg_seq
+            and e["body"].get("prereg_id") == prereg_id
+        ):
+            found = e
+    return found
+
+
+def is_closed(entry: dict) -> bool:
+    """True for an entry :func:`require` returned for a closed prereg."""
+    return bool(entry.get("closed"))
+
+
 def require(
     repo_root: Path,
     alpha_id: str,
@@ -73,6 +95,21 @@ def require(
             f"{found['seq']}); an agent pre-registration needs human sign-off "
             "(iap.agents.workflow.Workflow.sign_off) before a confirmatory run"
         )
+    # v1.15 (owner decision 2026-10-12, option A): a prereg whose confirmatory
+    # outcome is recorded on the board (kind "outcome", written by the
+    # outcomes writer, after the prereg) is CLOSED.  Its look is spent, so the
+    # code / deps fingerprint no longer blocks later runs of the pair; they are
+    # post-confirmation runs, labelled as such, never evidence for that look.
+    outcome = _closing_outcome(bb, pid, found["seq"])
+    if outcome is not None:
+        return {
+            **found,
+            "closed": {
+                "outcome": outcome["body"]["outcome"],
+                "outcome_seq": outcome["seq"],
+                "ref": outcome["body"].get("ref"),
+            },
+        }
     registered = found["body"].get("code")
     if registered is not None:
         now = (fingerprinter or _current)(alpha_id)
