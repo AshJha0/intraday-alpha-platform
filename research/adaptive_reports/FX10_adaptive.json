@@ -6,7 +6,7 @@
   "n_blocks": 169,
   "policies": {
     "drift_triggered": {
-      "deployed_ic": 0.07086576089394923,
+      "deployed_ic": 0.07086576089394926,
       "drift_event_count": 156,
       "final_state": "ACTIVE",
       "gross_pnl": -78.8304225097589,
@@ -383,7 +383,7 @@
       "trade_count": 1192
     },
     "scheduled_daily": {
-      "deployed_ic": 0.07308780177744688,
+      "deployed_ic": 0.07308780177744681,
       "drift_event_count": 156,
       "final_state": "ACTIVE",
       "gross_pnl": -52.241241793911755,
