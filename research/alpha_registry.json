@@ -74,12 +74,12 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.023715054750760297
+            "value": 0.023715054750760255
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.546662458862033
+            "value": 0.5466624588620357
           },
           "statistical_significance": {
             "passed": true,
@@ -192,12 +192,12 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.03615667524798832
+            "value": 0.036156675247988296
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.18464649613556355
+            "value": 0.18464649613556308
           },
           "statistical_significance": {
             "passed": true,
@@ -432,12 +432,12 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.01009290085663633
+            "value": -0.010092900856636321
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.637786159471055
+            "value": 0.6377861594710547
           },
           "statistical_significance": {
             "passed": false,
@@ -551,12 +551,12 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.010238611171428906
+            "value": 0.010238611171428913
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.7259323219207682
+            "value": 0.7259323219207671
           },
           "statistical_significance": {
             "passed": false,
@@ -791,12 +791,12 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.027920793561234523
+            "value": -0.027920793561234548
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.35159484816609204
+            "value": 0.3515948481660909
           },
           "statistical_significance": {
             "passed": false,
@@ -1036,12 +1036,12 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.020390348662252485
+            "value": -0.020390348662252502
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 1.6902306935194207
+            "value": 1.6902306935194182
           },
           "statistical_significance": {
             "passed": false,
@@ -1157,12 +1157,12 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": 0.002520382594774899
+            "value": 0.002520382594774914
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.033446653419111363
+            "value": 0.03344665341910514
           },
           "statistical_significance": {
             "passed": false,
@@ -1280,12 +1280,12 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": 0.005928771738486058
+            "value": 0.005928771738486084
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 1.088197190186195
+            "value": 1.0881971901861947
           },
           "statistical_significance": {
             "passed": false,
@@ -1398,12 +1398,12 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.03765375914692193
+            "value": 0.03765375914692194
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.21111143339036742
+            "value": 0.2111114333903677
           },
           "statistical_significance": {
             "passed": true,
@@ -1518,12 +1518,12 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.022178665280762035
+            "value": 0.022178665280762077
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.6056587781970905
+            "value": 0.6056587781970912
           },
           "statistical_significance": {
             "passed": false,
@@ -1638,12 +1638,12 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.018087426932042724
+            "value": 0.018087426932042714
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.12018019998746336
+            "value": 0.12018019998746285
           },
           "statistical_significance": {
             "passed": false,
@@ -1759,12 +1759,12 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.023717590474316912
+            "value": 0.023717590474316923
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.33484373504276027
+            "value": 0.33484373504275966
           },
           "statistical_significance": {
             "passed": false,
@@ -1877,12 +1877,12 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.054802313837150646
+            "value": 0.05480231383715072
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.17233522096060333
+            "value": 0.17233522096060447
           },
           "statistical_significance": {
             "passed": true,
@@ -2000,17 +2000,17 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.012513882965842896
+            "value": -0.01251388296584287
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 3.0730370352002963
+            "value": 3.0731736607946605
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.425812536056746,
-            "value": -0.6837468172378826
+            "value": -0.6837468172378829
           }
         },
         "outcome": "HOLD",
@@ -2038,7 +2038,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "6d2e9d05f238b43533cb3b50565427cc522c872b3e289d2258a0ed41b9b5da60",
+      "model_version": "583d12d1eb4b28da86be0277c0482511a954e6d0124b77e7701105e17c278b53",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -2121,17 +2121,17 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": 0.008065958601219544
+            "value": 0.00806595860121954
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 2.698045656503848
+            "value": 2.6980456565032993
           },
           "statistical_significance": {
             "passed": false,
             "threshold": 4.425812536056746,
-            "value": 0.6610107802022356
+            "value": 0.6610107802022355
           }
         },
         "outcome": "HOLD",
@@ -2159,7 +2159,7 @@
         "reason": "all 2 gates passed: RESEARCH -> CANDIDATE",
         "to_state": "CANDIDATE"
       },
-      "model_version": "6890998962879d073b0626e9c6a89fdf409a275768f3c878b51c17fadce7ed3c",
+      "model_version": "86e51f7b56b5a3380a8c538d23e09cfd68dcd30ea5fb3e2dd76b3810d57c5668",
       "recovery_count": 0,
       "since_ts": 1787691480577291027,
       "state": "CANDIDATE",
@@ -2243,12 +2243,12 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.011695064635264202
+            "value": -0.0116950646352642
           },
           "stability": {
             "passed": true,
             "threshold": 1.0,
-            "value": 0.8607151580785795
+            "value": 0.8607151580785797
           },
           "statistical_significance": {
             "passed": false,
@@ -2362,12 +2362,12 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.04711541356263969
+            "value": 0.04711541356263967
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 1.732220994165755
+            "value": 1.7322209941657554
           },
           "statistical_significance": {
             "passed": true,
@@ -2485,12 +2485,12 @@
           "oos_ic": {
             "passed": false,
             "threshold": 0.01,
-            "value": -0.06043687252015987
+            "value": -0.06043687252015979
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 1.9848235603156625
+            "value": 1.984823560315666
           },
           "statistical_significance": {
             "passed": false,
@@ -2605,12 +2605,12 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.02189832315185954
+            "value": 0.021898323151859543
           },
           "stability": {
             "passed": false,
             "threshold": 1.0,
-            "value": 1.919707153590122
+            "value": 1.9197071535901213
           },
           "statistical_significance": {
             "passed": false,
@@ -2767,7 +2767,7 @@
           "oos_ic": {
             "passed": true,
             "threshold": 0.01,
-            "value": 0.020484713552572344
+            "value": 0.020484713552572364
           },
           "stability": {
             "passed": false,

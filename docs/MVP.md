@@ -270,7 +270,7 @@ possible.
 Run id `58a10f2194a3c81c`, 15,805 events, 800 decisions, 231 parent orders,
 496 children generated / 347 submitted, 163 fills, fill rate 15.4 %
 (v1.14.0). Trace digest
-`6fdb3a2ce2d31481246a799112923b67ba8fdf043c4c4138ba75457e34d1cba5`
+`3f2b117ecea959222a8126811e336961cd615159ce411c4cbab1a5ed2ba695ca`
 (`config_version` `62d78a3b…`).
 Wall time: about 2.2× the v1.3.0 session on the same machine (27 s → 59 s on
 the laptop this was measured on; 0.8 s of that is feed generation and
@@ -491,7 +491,7 @@ python -m iap.mvp.real --dataset data/real/<dataset> --date 2019-01-30 \
 `iap.mvp.real` feeds the normalized stream of a dataset directory written by
 `iap.marketdata.ingest` (docs/REAL_DATA.md) through the same `MvpEngine` and
 `run_session` as the synthetic run. The loop is unchanged; only the feed and
-the reference data differ, so the synthetic golden (digest `6fdb3a2c`) does not
+the reference data differ, so the synthetic golden (digest `3f2b117e`) does not
 move. The MVP trades one instrument, so each symbol gets its own engine and
 its own `<out>/<SYMBOL>/` directory.
 
@@ -521,7 +521,7 @@ its own `<out>/<SYMBOL>/` directory.
 - **Pre-registration.** `--config` is pinned by hash and its opt-ins that
   the MVP loop exercises are applied through `MvpEngine(realism=...)` (an
   opt-in keyword; the synthetic run, the golden and the C++/Rust parity path
-  never set it, so the golden digest `6fdb3a2c` is unchanged):
+  never set it, so the golden digest `3f2b117e` is unchanged):
   `regulatory_fees` (SEC Section 31 + FINRA TAF on sell fills, dated by fill
   time, `ExecConfig.regulatory_fees`), `hidden_print_fills`
   (`ExecutionSimulator(hidden_prints=True)`) and `feed_latency_ns` (added to

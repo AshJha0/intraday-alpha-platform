@@ -29,9 +29,9 @@ implementation (`iap.risk`, `iap.execution`) proven by the same golden files
 the Java ports are proven by, so the loop the MVP runs is the reference
 loop end to end.
 
-## Current status (v1.14.0 released 2026-10-11; v1.15 in progress)
+## Current status (v1.15.0 released 2026-10-13)
 
-**v1.15 in progress (2026-10-12).** The R7 confirmatory pre-registration
+**v1.15.0 (2026-10-13).** The R7 confirmatory pre-registration
 R7-CONFIRM-1 is **signed** (`research/r7/r7_confirm_prereg.json`: H4 tier 1,
 EQ10 @1s and EQ05 @1s, one look) has run on the 7 unseen holdout sessions:
 **both confirmed** (EQ10@1s IC +0.0838, HAC t 13.66; EQ05@1s IC +0.0409,
@@ -39,8 +39,11 @@ HAC t 13.20; threshold 4.432; 7/7 sessions positive). Net P&L at 1x cost is 0
 (descriptive): predictive, not yet tradable; v1.16 targets monetisation
 ([docs/research/R7_RESULTS.md](docs/research/R7_RESULTS.md)). AI4-DEEPLOB-1 was signed but is
 deferred to v1.16 and not run ([research/r7/AI4_DEFERRED.md](research/r7/AI4_DEFERRED.md)).
-Merged v1.15 work is listed under "Unreleased (v1.15)" in
-[CHANGELOG.md](CHANGELOG.md). Numbers below are as of v1.14.0 unless stated;
+The full MVP loop ran end to end on a real ITCH day (2019-10-18,
+AAPL/MSFT/QQQ): gross +$801, net −$9,226 at ~70 k parent orders, so costs swamp the
+edge at today's turnover
+([docs/research/MVP_REAL_20191018.md](docs/research/MVP_REAL_20191018.md)).
+v1.15 is listed under "v1.15.0" in [CHANGELOG.md](CHANGELOG.md). Numbers below are as of v1.14.0 unless stated;
 test counts: the parity table below (v1.14.0) or the latest CI run.
 
 **Where the research stands.**
@@ -346,7 +349,7 @@ the full design, data flow, and diagrams.
 | Experiments ledger | 5,361 recorded looks over **296 distinct configurations** (de-duplicated by alpha × kind × config × dataset × statistics revision: 70 configurations holding 1,068 of the looks on the v1.3.0 dataset are kept as history, 223 holding 4,290 of them are on the current one, 77 of them added by the v1.14 regeneration); expected max \|t\| under the global null ≈ 4.144, Bonferroni per-test \|t\| ≥ 4.432; a hash chain since v1.14 | `research/experiments.json` |
 | Contracts | **17** JSON Schemas (all `x-version` 1 except `risk_event`, 2 since v1.14) mirrored by **22** typed Python contracts and **18** runtime-checkable Protocols; one pinned instance each | `schemas/`, `python/src/iap/contracts/`, `tests/golden/expected_contracts_examples.json` |
 | Python reference ports proven by the ports' own goldens | risk: `expected_risk_decisions.json` exact, audit JSONL + snapshot **byte-identical**; execution: `expected_replay_fills.json` **bit-identical** | `python/tests/test_risk_golden.py`, `python/tests/test_execution_golden.py` |
-| MVP golden run (`python -m iap.mvp run`, seed 12345) | **15,805** events · **800** decisions · **231** parent orders · **163** fills · P&L **−82.84 USD** (cost-negative: +0.0245 bps alpha vs −0.4367 bps execution cost) · trace digest `6fdb3a2c…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
+| MVP golden run (`python -m iap.mvp run`, seed 12345) | **15,805** events · **800** decisions · **231** parent orders · **163** fills · P&L **−82.84 USD** (cost-negative: +0.0245 bps alpha vs −0.4367 bps execution cost) · trace digest `3f2b117e…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
 | Adaptive deployment study | 4 refit policies × 10 alphas; 88 drift-triggered refits; FX01 retired under every policy; 19 of 40 deployments make no trade, none ends above zero | `research/adaptive_reports/ADAPTIVE_REPORT.md` |
 | Bundled dataset | 2 synthetic sessions, 19 instruments, 308,975 normalized events (`data_version` `116b7787…`; equity flow runs to the close since v1.4.0) | `data/normalized/qc_report.json` |
 | Feature emission | 213,021 vectors at 100 ms cadence | `data/features/features_summary.json` |

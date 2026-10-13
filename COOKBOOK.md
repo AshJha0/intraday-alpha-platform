@@ -1174,7 +1174,7 @@ synthetic equity `SYN.EQ.AAPL` and writes every artefact under
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.mvp run                       # configs/mvp/mvp.json, seed 12345
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=231 children=347 fills=163 pnl=-82.837333 USD digest=6fdb3a2ce2d31481... out=.../data/mvp/58a10f2194a3c81c
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=231 children=347 fills=163 pnl=-82.837333 USD digest=3f2b117ecea95922... out=.../data/mvp/58a10f2194a3c81c
 PYTHONPATH=src python3 -m iap.mvp run --seed 7 --out /tmp/mvp7          # another seed, explicit directory
 PYTHONPATH=src python3 -m iap.mvp verify                                  # run twice from scratch, compare digest/report/stream
 cat ../data/mvp/58a10f2194a3c81c/report.md                                # the honest numbers (cost-negative)
@@ -1204,7 +1204,7 @@ with it the trace digest (`f51890da…` in v1.4.0, `2affe409…` in v1.5.0,
 `20d4ff76…` in v1.13.0), because every trace carries `config_version`. In v1.14.0 the
 counts and P&L moved slightly (231 parents, 347 children submitted, 163
 fills, −82.84 USD; it was 235 / 348 / 169 / −81.53) and the digest became
-`6fdb3a2c…` with `config_version` `62d78a3b…`: `alpha_params.json` and the
+`3f2b117e…` with `config_version` `62d78a3b…`: `alpha_params.json` and the
 risk configuration are hashed, and both changed in the v1.14 regeneration. The summary line was re-run for this
 page with `--out` pointing at a scratch directory; `replay` (recipe 23)
 and `explain` (recipe 24) were re-run against that directory.

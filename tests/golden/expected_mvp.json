@@ -13,7 +13,7 @@
     "XV3": 5738
   },
   "config_path": "configs/mvp/mvp.json",
-  "config_version": "62d78a3b6357f66259e5cb773c3fe34cfabbfcb74deb5da73bb6b5b9afded64f",
+  "config_version": "c4b4f980a16a09195d5ed48eef60adf5fd81fbf22701c88f3b750f922336fd95",
   "data_version": "0e0fe161016eea4327083e697510885768fe33620f95b814fa5703f6ac3d4a7b",
   "description": "MVP golden (python -m iap.mvp run on configs/mvp/mvp.json): the seeded feed, the full loop (book -> features -> EQ01/EQ03/EQ06 ensemble -> portfolio -> hard risk -> TWAP/POV/IS -> SOR -> simulator -> TCA -> attribution -> trace) and its report. Ports reproduce every value: integers and hashes exactly, floats at abs/rel 1e-9. Regenerate only on a deliberate, versioned change: PYTHONPATH=src python3 tools/make_golden_mvp.py --force.",
   "events_iap1_sha256": "0e0fe161016eea4327083e697510885768fe33620f95b814fa5703f6ac3d4a7b",
@@ -65,7 +65,7 @@
           },
           "beta": 1.1068831705729134e-07,
           "horizon": "1s",
-          "ic_gap": 0.1932911689141215,
+          "ic_gap": 0.19329116891412154,
           "lifecycle_state": "CANDIDATE",
           "n_ic_samples": 790,
           "n_signals": 799,
@@ -74,7 +74,7 @@
           "realized_ic_cost": -0.023643067352093067,
           "realized_ic_shifted": 0.1487422837992385,
           "research_horizon": "1s",
-          "research_ic": 0.023715054750760297
+          "research_ic": 0.023715054750760255
         },
         "EQ03": {
           "at_research_horizon": {
@@ -310,7 +310,7 @@
         "EQ03",
         "EQ06"
       ],
-      "config_version": "62d78a3b6357f66259e5cb773c3fe34cfabbfcb74deb5da73bb6b5b9afded64f",
+      "config_version": "c4b4f980a16a09195d5ed48eef60adf5fd81fbf22701c88f3b750f922336fd95",
       "data_version": "0e0fe161016eea4327083e697510885768fe33620f95b814fa5703f6ac3d4a7b",
       "decision_cadence_ns": 1000000000,
       "events_sha256": "7e57c1afd1763c22f71f3e0a2523edaae052360546fe47a58907f3d2ddae1056",
@@ -326,7 +326,7 @@
       "seed": 12345,
       "session_id": "mvp-58a10f2194a3c81c",
       "strategy_id": "MVP",
-      "trace_digest": "6fdb3a2ce2d31481246a799112923b67ba8fdf043c4c4138ba75457e34d1cba5",
+      "trace_digest": "3f2b117ecea959222a8126811e336961cd615159ce411c4cbab1a5ed2ba695ca",
       "venues": [
         "XV1",
         "XV2",
@@ -334,7 +334,7 @@
       ]
     },
     "trace": {
-      "digest": "6fdb3a2ce2d31481246a799112923b67ba8fdf043c4c4138ba75457e34d1cba5",
+      "digest": "3f2b117ecea959222a8126811e336961cd615159ce411c4cbab1a5ed2ba695ca",
       "first_trace_ids": [
         "403020d9da592210fad79613f87ffa19",
         "79968f20da6647bb7a4fd9325850a2f1",
@@ -352,6 +352,6 @@
   "run_id": "58a10f2194a3c81c",
   "seed": 12345,
   "session_id": "mvp-58a10f2194a3c81c",
-  "trace_digest": "6fdb3a2ce2d31481246a799112923b67ba8fdf043c4c4138ba75457e34d1cba5",
+  "trace_digest": "3f2b117ecea959222a8126811e336961cd615159ce411c4cbab1a5ed2ba695ca",
   "x-version": 1
 }

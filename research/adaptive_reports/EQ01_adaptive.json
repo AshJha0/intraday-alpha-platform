@@ -8,8 +8,8 @@
     "bucket_ns": 300000000000,
     "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
     "horizon": "1s",
-    "ic_mean": 0.00019005242876216113,
-    "ic_std": 0.059353177123689656,
+    "ic_mean": 0.00019005242876209103,
+    "ic_std": 0.059353177123689524,
     "kind": "ic",
     "n_buckets_baseline": 10,
     "name": "run_eq01_ic",
@@ -19,7 +19,7 @@
   "n_blocks": 112,
   "policies": {
     "drift_triggered": {
-      "deployed_ic": 0.012786169519546645,
+      "deployed_ic": 0.012786169519546652,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
       "gross_pnl": 0.0,
@@ -33,7 +33,7 @@
           "from": "ACTIVE",
           "policy": "drift_triggered",
           "reason": "rolling_ic -0.001027 < watch gate 0.0",
-          "rolling_ic": -0.0010272210223181318,
+          "rolling_ic": -0.001027221022318094,
           "to": "WATCH"
         },
         {
@@ -43,7 +43,7 @@
           "from": "WATCH",
           "policy": "drift_triggered",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.025819735481794955,
+          "rolling_ic": 0.02581973548179498,
           "to": "ACTIVE"
         }
       ],
@@ -69,12 +69,12 @@
         }
       ],
       "rolling_ic_mean": 0.02013234476696907,
-      "rolling_ic_std": 0.018451124789475047,
+      "rolling_ic_std": 0.018451124789475012,
       "total_costs": 0.0,
       "trade_count": 0
     },
     "scheduled_daily": {
-      "deployed_ic": 0.003785465549860495,
+      "deployed_ic": 0.0037854655498605074,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
       "gross_pnl": 0.0,
@@ -88,7 +88,7 @@
           "from": "ACTIVE",
           "policy": "scheduled_daily",
           "reason": "rolling_ic -0.001027 < watch gate 0.0",
-          "rolling_ic": -0.0010272210223181318,
+          "rolling_ic": -0.001027221022318094,
           "to": "WATCH"
         },
         {
@@ -98,7 +98,7 @@
           "from": "WATCH",
           "policy": "scheduled_daily",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.02622311641079713,
+          "rolling_ic": 0.026223116410797227,
           "to": "ACTIVE"
         }
       ],
@@ -129,13 +129,13 @@
           "ts": 1787616000000000000
         }
       ],
-      "rolling_ic_mean": 0.020185541200678458,
-      "rolling_ic_std": 0.018526608205884556,
+      "rolling_ic_mean": 0.020185541200678482,
+      "rolling_ic_std": 0.018526608205884525,
       "total_costs": 0.0,
       "trade_count": 0
     },
     "scheduled_weekly": {
-      "deployed_ic": 0.012786169519546645,
+      "deployed_ic": 0.012786169519546652,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
       "gross_pnl": 0.0,
@@ -149,7 +149,7 @@
           "from": "ACTIVE",
           "policy": "scheduled_weekly",
           "reason": "rolling_ic -0.001027 < watch gate 0.0",
-          "rolling_ic": -0.0010272210223181318,
+          "rolling_ic": -0.001027221022318094,
           "to": "WATCH"
         },
         {
@@ -159,7 +159,7 @@
           "from": "WATCH",
           "policy": "scheduled_weekly",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.025819735481794955,
+          "rolling_ic": 0.02581973548179498,
           "to": "ACTIVE"
         }
       ],
@@ -183,12 +183,12 @@
         }
       ],
       "rolling_ic_mean": 0.02013234476696907,
-      "rolling_ic_std": 0.018451124789475047,
+      "rolling_ic_std": 0.018451124789475012,
       "total_costs": 0.0,
       "trade_count": 0
     },
     "static": {
-      "deployed_ic": 0.012786169519546645,
+      "deployed_ic": 0.012786169519546652,
       "drift_event_count": 0,
       "final_state": "ACTIVE",
       "gross_pnl": 0.0,
@@ -202,7 +202,7 @@
           "from": "ACTIVE",
           "policy": "static",
           "reason": "rolling_ic -0.001027 < watch gate 0.0",
-          "rolling_ic": -0.0010272210223181318,
+          "rolling_ic": -0.001027221022318094,
           "to": "WATCH"
         },
         {
@@ -212,7 +212,7 @@
           "from": "WATCH",
           "policy": "static",
           "reason": "re-activation: 3 consecutive evals >= reactivate gate 0.005",
-          "rolling_ic": 0.025819735481794955,
+          "rolling_ic": 0.02581973548179498,
           "to": "ACTIVE"
         }
       ],
@@ -235,7 +235,7 @@
         }
       ],
       "rolling_ic_mean": 0.02013234476696907,
-      "rolling_ic_std": 0.018451124789475047,
+      "rolling_ic_std": 0.018451124789475012,
       "total_costs": 0.0,
       "trade_count": 0
     }
