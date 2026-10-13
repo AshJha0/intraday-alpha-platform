@@ -122,6 +122,28 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
   </table></div>
 
   <div class="honest new">
+    <strong>v1.15.0 (2026-10-13): the confirmatory release.</strong>
+    The pre-registered confirmatory round R7-CONFIRM-1, owner-signed before any data was read, ran
+    once on 7 unseen Nasdaq sessions (2025-11 to 2026-06), six years after the in-sample data.
+    <ul>
+      <li><strong>Both hypotheses confirmed.</strong> EQ10 (index lead-lag) at 1s: IC +0.084, HAC t 13.7
+          against a threshold of 4.43, deflated Sharpe 0.9999; EQ05 (queue dynamics) at 1s: IC +0.041,
+          t 13.2. Every one of the 7 sessions is positive for both. EQ05 is about two-thirds of its
+          in-sample IC, consistent with the drift in MSFT's queue rates.</li>
+      <li><strong>Still not tradable.</strong> Net P&amp;L at 1x cost is 0 for both, and the full MVP loop
+          on a real day (2019-10-18, AAPL/MSFT/QQQ) earns +$801 before costs and loses $9,226 after,
+          at about 70,000 parent orders: the edge is real, the turnover is far too high.</li>
+      <li><strong>Deviations, recorded before the look.</strong> Lot sizes differ across holdout sessions
+          (round-lot reform); two infrastructure crashes (out of memory) happened before any statistic
+          was computed and were retried once each, with notes. AI4 (deep order book) is deferred to
+          v1.16.</li>
+    </ul>
+    Write-ups: <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/research/R7_RESULTS.md">R7_RESULTS</a>,
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/research/MVP_REAL_20191018.md">MVP_REAL_20191018</a>.
+    Next, in v1.16: monetisation &mdash; realistic execution costs first, then a cost-aware strategy
+    tested once on fresh sessions.
+  </div>
+  <div class="honest">
     <strong>v1.14.0 (2026-10-11): the correctness release.</strong>
     An independent review of v1.12 listed every place where a published number was weaker than it
     read. v1.13 fixed what could be fixed without moving a number; v1.14 fixes the rest, once, and
