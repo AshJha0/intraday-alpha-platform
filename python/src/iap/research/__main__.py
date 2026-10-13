@@ -284,9 +284,20 @@ def _check_prereg(args: argparse.Namespace) -> dict | None:
         raise ResearchError(str(exc), code="not_preregistered") from exc
     print(
         f"pre-registered: {args.alpha}/{horizon} on {args.prereg_board or board_path(root)} "
-        f"(entry {entry['seq']})"
+        f"(entry {entry['seq']}){_closed_note(entry)}"
     )
     return entry
+
+
+def _closed_note(entry: dict) -> str:
+    """Label for a run of a CLOSED prereg (its outcome is recorded; option A)."""
+    closed = entry.get("closed")
+    if not closed:
+        return ""
+    return (
+        f" - CLOSED: outcome {closed['outcome']!r} recorded (entry {closed['outcome_seq']}); "
+        "post-confirmation run, not evidence for that look"
+    )
 
 
 def _check_prereg_pairs(args: argparse.Namespace, pairs: list[tuple[str, str]], what: str) -> None:
@@ -307,7 +318,7 @@ def _check_prereg_pairs(args: argparse.Namespace, pairs: list[tuple[str, str]], 
             raise ResearchError(str(exc), code="not_preregistered") from exc
         print(
             f"pre-registered: {alpha_id}/{horizon} on "
-            f"{args.prereg_board or board_path(root)} (entry {entry['seq']})",
+            f"{args.prereg_board or board_path(root)} (entry {entry['seq']}){_closed_note(entry)}",
             file=sys.stderr,
         )
 
