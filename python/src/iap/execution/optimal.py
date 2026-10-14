@@ -67,6 +67,7 @@ def ac_params_from_calibration(
     adv_per_day: float | None = None,
     horizon_s: float | None = None,
     session_s: float = 23_400.0,
+    impact_source: str = "slope",
 ) -> ACParams:
     """Map the simulator's linear impact coefficient to ``eta``.
 
@@ -92,6 +93,12 @@ def ac_params_from_calibration(
     Anything else (both ``adv`` and ``adv_per_day``, ``horizon_s`` with
     ``adv`` or with ``horizon``, ``adv_per_day`` without ``horizon_s``, or no
     ADV) raises ``ValueError``.
+
+    ``impact_source`` (v1.16 P0-5): ``"slope"`` (default) reads the v1.9
+    full-move slope as above; ``"residual"`` reads the LINEAR fit of the
+    residual move after the depth walk (``impact.residual``, estimated with
+    ``estimate_calibration(impact_fit=True)``, item P0-2) at its reference
+    horizon, and raises ``ValueError`` when the calibration has none.
     """
     from iap.execution.config import ExecConfig
 
@@ -112,7 +119,18 @@ def ac_params_from_calibration(
         horizon = 1.0
     if adv <= 0 or price <= 0:
         raise ValueError("adv and price must be > 0")
-    coeff = calibration.impact_coeff_bps_per_pct_adv if calibration is not None else None
+    if impact_source not in ("slope", "residual"):
+        raise ValueError(f"impact_source must be 'slope' or 'residual', got {impact_source!r}")
+    if impact_source == "residual":
+        res = (calibration.doc.get("impact") or {}).get("residual") if calibration else None
+        lin = ((res or {}).get("by_horizon", {}).get((res or {}).get("horizon")) or {}).get(
+            "linear"
+        )
+        if not lin:
+            raise ValueError("impact_source='residual' needs a calibration with impact.residual")
+        coeff = lin["coeff_bps_per_pct_adv"]
+    else:
+        coeff = calibration.impact_coeff_bps_per_pct_adv if calibration is not None else None
     if coeff is None:
         coeff = (config or ExecConfig()).impact_coeff_bps_per_pct_adv
     eta = float(coeff) * 1e-2 * price / adv
