@@ -818,6 +818,67 @@ retroactively.
   latency path; `QuotingConfig.amend_size_down` uses it instead of
   cancel-and-replace.
 
+### 2.13 Realistic execution opt-ins (v1.16 P0-1..P0-5, Python only)
+
+Every switch below is off by default, so default runs, the pinned simulator
+rules and every execution golden (Python, C++, Rust) are byte-identical. The
+C++ simulator and the C++ SOR parity are unchanged; none of this is a port
+contract.
+
+- **Impact on the parent (P0-1, simulator rule 6b).**
+  `ExecConfig(impact_model="parent", impact_exponent=1.0,
+  permanent_impact_bps_per_pct_adv=0.0)`. `"child"` (default) is rule 6:
+  impact sized on each child alone. `"parent"` charges the temporary leg on
+  the parent's cumulative taker quantity, `coeff * x**impact_exponent` with
+  `x` the participation in % of ADV (`impact_exponent` in (0, 1]: 1 linear,
+  0.5 square root), so splitting a parent cannot lower its cost, and adds a
+  permanent leg on the instrument's cumulative signed taker flow.
+  `impact_exponent != 1` or a permanent coefficient without `"parent"` raises
+  `ValueError`.
+- **Residual-move impact calibration (P0-2).**
+  `estimate_calibration(events, tick_sizes, ..., impact_fit=False,
+  impact_fit_bins=10)` (CLI `python -m iap.execution.calibration
+  --impact-fit`): with `impact_fit=True` the document gains `impact.residual`,
+  the mid move after the depth walk against participation in % of a tape ADV
+  (non-displayed prints included), with linear and square-root
+  through-origin fits (HC0 standard errors) and a log-log power fit per
+  horizon. `apply_impact_fit(config, calibration, shape="sqrt",
+  horizon=None)` returns `config` switched to rule 6b with the fitted
+  coefficient and exponent (`shape` in `"linear"`, `"sqrt"`, `"power"`);
+  it raises when there is no residual block or the fit is not positive.
+- **Net-of-cost prereg realism keys (P0-3).** `iap.execution.realism.
+  RealismOptIns` gains, all absent in `configs/prereg/v2.json` (so v2 runs
+  are unchanged) and set in `configs/prereg/v3.json` (owner-approved
+  2026-10-14): `venue_latency` (`mean_ns`, `jitter_ns`, optional `tail_prob`
+  / `tail_mult`; ASSUMED, real ITCH carries no order-entry latency),
+  `latency_stress` (multipliers, must include 1; `stressed_exec_configs(cfg,
+  calibration=None)` returns `{multiplier: config}`), `fee_tier` +
+  `fee_tier_sensitivity` (names in `configs/reference/fee_tiers.json`, an
+  assumed table; `fee_tier_configs(cfg, calibration=None)` returns
+  `{tier: config}`), `exec_prints` (`ExecutionSimulator(exec_print_price=)`
+  and `Itch50Mapper(exec_prints=)`), and `impact_model` / `impact_shape`
+  (`"parent"` needs a shape; applied through the residual fit). Read with
+  `load_prereg(path)`. The MVP applies venue latency, fee tier and exec
+  prints and lists the rest as not applied.
+- **SOR opt-ins (P0-4, `iap.execution.sor_v2`).**
+  `RouterOptions(sweep_rank="all_in")` makes `plan_sweep(book, side, qty, ts,
+  *, limit_ticks=None, candidates=None, tick=None)` take levels by all-in
+  price including the taker fee (needs `tick`); the default `"price"` keeps
+  displayed price first with the fee as tie-break. `passive_costs` /
+  `route_passive` take an optional `fill_prob(vid, side, queue_qty) -> p |
+  None` in place of the model's touch fill probability;
+  `hazard_fill_prob(hazard_per_s, horizon_s)` builds one from a
+  queue-depletion hazard (`p = 1 - exp(-hazard * horizon_s)`, `None` skips
+  the venue). `iap.execution.sor.SmartOrderRouter` is unchanged.
+- **Algos (P0-5).** `ParentOrder.pov_exact` (default `False`): the POV target
+  becomes `floor(p / (1 - p) * V)`, so we trade `p` of the total volume
+  including our own fills, and the whole deficit is caught up at once in
+  children of at most `max_child_qty`; needs `0 < participation < 1`.
+  `ac_params_from_calibration(..., impact_source="slope")`: `"residual"`
+  reads Almgren-Chriss `eta` from the residual-move linear fit (P0-2) and
+  raises without an `impact.residual` block. VWAP by time of day was already
+  in place (§2.8).
+
 ## 3. Where the rules live
 
 | rule set | normative text | Python port entry |

@@ -2,7 +2,7 @@
 
 Scope: events / codec / order book / replay / reference data. The Python
 package `iap` (`python/src/iap/`) is the reference; C++ (`cpp/`), Rust
-(`rust/`) and Java (`java/`, `com.iap.*`) must reproduce the semantics below
+(`rust/`) and Java (`archive/java/`, `com.iap.*`; archived in v1.15, frozen at v1.14.0) must reproduce the semantics below
 **exactly** and pass the golden suite. Normative companions:
 `PLATFORM_CONVENTIONS.md` (binding), `schemas/FORMAT.md` (wire layout),
 `schemas/<domain>/*.schema.json` (contracts, all `"x-version": 1`; index in `schemas/README.md`), `docs/SCENARIOS.md`
