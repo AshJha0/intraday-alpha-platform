@@ -126,6 +126,10 @@ digest are those of a different run
 `research/execution/EXECUTION_REPORT.md` §5 has the three sessions side by
 side).
 
+Since v1.16 step 7 has an opt-in branch: with `execution.eod_flatten_lead_ns`
+set, decisions near the close target flat and work the residual as one
+most-urgent parent (§10). The golden run leaves it off.
+
 ## 4. Wiring rules honoured (PLATFORM_CONVENTIONS.md §11.4, §12.1)
 
 Reviewed line by line against `PaperTrading.RiskWiring.onMarket` /
@@ -537,4 +541,50 @@ manifest, before the prereg opt-ins were wired, so v1 costs). The first 200,000 
 children submitted, 946 fills, gross P&L USD +219.78, fees USD 64.63,
 execution cost USD 634.35, equity USD -414.57 (a loss), trace digest `88bb4218…`,
 359 s wall time. This run checks the plumbing only. It is not a research
-result; the full-day runs come after the maker study.
+result.
+
+Full day (v1.15, 2019-10-18, AAPL / MSFT / QQQ, `configs/prereg/v2.json`):
+about 6.0 M events in 2 h 29 m, gross P&L USD +801, execution cost incl. fees
+USD 10,027, net USD -9,226 (about 70 k parents in one day; costs swamp the
+edge). One in-sample day: an integration test and a cost baseline, not
+evidence. It ran without an end-of-day flatten, so open positions were marked
+to market (§10 adds the flatten). Write-up: `docs/research/MVP_REAL_20191018.md`.
+
+### 9.1 v3 pre-registration keys in the MVP (v1.16, P0-3)
+
+With `--config configs/prereg/v3.json` the run also applies three v3 keys and
+lists them under `applied`: `venue_latency` (assumed mean, jitter and
+parametric tail), `fee_tier` (from the assumed table
+`configs/reference/fee_tiers.json`, its sha256 recorded) and `exec_prints`
+(`ExecutionSimulator(exec_print_price=True)`). `latency_stress` and
+`fee_tier_sensitivity` are sensitivity grids for research reports
+(`RealismOptIns.stressed_exec_configs` / `fee_tier_configs`), and
+`impact_model` needs a residual impact calibration, so they are listed under
+`not_applied` with the reason (`iap/mvp/real.py`). Diagram: DIAGRAMS.md §37.
+
+## 10. End-of-day flatten (v1.16 item 17, opt-in)
+
+`execution.eod_flatten_lead_ns` in `configs/mvp/mvp.json` (absent by default)
+turns it on. The pinned golden run does not set it, so the golden numbers in
+§7 and the digest `3f2b117e` are unchanged, and the report carries no
+`counts.eod_flatten` block
+(`python/tests/test_v116_mvp_eod_flatten.py::test_default_is_off_and_unreported`).
+
+When it is set, every decision at or after `session close - lead`
+(`MvpEngine._decide_eod_flatten`) targets flat instead of solving the
+portfolio:
+
+1. the residual is `position + in-flight` child quantity; if it is zero the
+   decision is flat;
+2. if a parent is still live, the decision waits for it;
+3. at or after the close the decision is counted as `too_late`;
+4. otherwise ONE parent for the whole residual is opened with urgency 1.0
+   (the most urgent algo), ending at the session close. Its children go
+   through the same SOR, controls and risk checks as any other, and its costs
+   are charged like any other parent.
+
+The report gains `counts.eod_flatten` (`decisions`, `parents`, `too_late`,
+`residual_position`) only when the option is on. On a tiny test config with a
+lead of a third of the session, the end position goes from -413 to 0
+(CHANGELOG, v1.16 item 17). The config refuses a lead that is not positive.
+Diagram: DIAGRAMS.md §10 (`diagrams/mvp_loop.mmd`, the branch after step 7).

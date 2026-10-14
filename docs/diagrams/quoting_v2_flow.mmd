@@ -1,0 +1,19 @@
+sequenceDiagram
+    %% v1.16 option 1: M5 quoting study v2. Sources: tools/quoting_v2_register.py, iap.research.quoting_real (verify_signed_v2, check_prereg_v2, summarise).
+    autonumber
+    participant O as owner (maintainer key outside the repo)
+    participant D as prereg_v2_DRAFT.json
+    participant T as tools/quoting_v2_register.py
+    participant B as main blackboard + ledger
+    participant S as prereg_v2.json (signed)
+    participant Q as iap.research.quoting_real
+    O->>D: approve values (alpha_weight EQ01 7 / EQ05 15 / EQ10 12,<br/>inv_skew_ticks 1, validity gate 0.10)
+    O->>T: run (OWNER ONLY, --dry-run first)
+    T->>B: WriteBroker.preregister per cell (EQ01, EQ05, EQ10, QNOSKEW)<br/>at 1s:quoting-v2-insample, one look each
+    T->>S: write the signed file (Ed25519, key checked against trust_roots.json)<br/>draft sha256 in every hypothesis
+    Q->>S: verify_signed_v2: signed, on_blackboard, no open owner items,<br/>trust-root key, valid signature, draft sha256 unchanged
+    Q->>B: prereg_gate.require each cell under horizon:horizon_tag
+    Q->>Q: quoting_config keys checked against QuotingConfig,<br/>configs/prereg/v2.json realism applied
+    Q->>Q: run units (session x symbol), checkpoint every cell
+    Q->>Q: summarise: mean frac_decisions_skew_changed_quote >= gate?<br/>no: SKEW INERT (validity gate failed, no verdict)
+    Q->>Q: else verdict EXISTS (in-sample) or NO DEMONSTRATED QUOTING EDGE,<br/>plus skew minus control (QNOSKEW)
