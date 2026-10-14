@@ -228,3 +228,17 @@ def test_v2_realism_changes_the_run(dataset: Path, tmp_path: Path) -> None:
     assert v2.result.trace_digest != plain.result.trace_digest
     assert v2.result.engine.realism is not None
     assert v2.result.engine.realism.feed_latency_ns == 100_000
+
+
+def test_v3_prereg_records_the_net_of_cost_keys(dataset: Path, tmp_path: Path) -> None:
+    v3 = PREREG.parent / "v3.json"
+    run = run_symbol(dataset, DATE, "TINY", tmp_path / "v3", prereg=v3, mvp_config=TINY_CONFIG)
+    p = run.manifest["prereg"]
+    assert p["methods"] == "v3"
+    assert {"venue_latency", "fee_tier", "exec_prints"} <= set(p["applied"])
+    assert len(p["applied"]["fee_tier"]["table_sha256"]) == 64
+    assert {"latency_stress", "fee_tier_sensitivity", "impact_model", "impact_shape"} <= set(
+        p["not_applied"]
+    )
+    v = run.result.engine.exec_config.venues
+    assert all(s.latency_mean_ns == 250_000 for s in v.values() if not s.is_fx)

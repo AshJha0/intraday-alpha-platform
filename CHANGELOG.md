@@ -19,6 +19,13 @@ that tag.
   through-origin fits with HC0 SEs and a log-log power fit per horizon.
   `apply_impact_fit(config, calibration, shape)` switches a config to parent rule 6b with the
   fitted coefficient/exponent. Off by default: existing calibration documents are unchanged.
+- v1.16 P0-3: net-of-cost prereg realism keys in `RealismOptIns` (absent in v2, so v2 runs
+  are unchanged): `venue_latency` (assumed mean/jitter + parametric tail), `latency_stress`
+  ({0,1,5}x grid, `stressed_exec_configs`), `fee_tier` + `fee_tier_sensitivity` (assumed table
+  `configs/reference/fee_tiers.json`, `fee_tier_configs`), `exec_prints`
+  (`exec_print_price`), `impact_model`/`impact_shape` (parent rule 6b via the residual fit).
+  New `configs/prereg/v3.json` (values approved by the owner 2026-10-14). The MVP applies
+  venue latency, fee tier and exec prints and records the rest as not applied.
 
 ## v1.15.0 — 2026-10-13
 

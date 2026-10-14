@@ -1,0 +1,34 @@
+{
+  "x-version": 1,
+  "description": "v3 pre-registration config (v1.16 P0-3; values approved by the owner 2026-10-14): v2 plus the net-of-cost realism keys \u2014 assumed venue latency with a parametric tail, latency stress grid, assumed fee tier with lower-tier sensitivity, ITCH exec-print fills, and parent-order impact from the residual-move calibration fit. Read with iap.execution.realism.load_prereg.",
+  "methods": "v3",
+  "regulatory_fees": true,
+  "execution_realism": {
+    "description": "v1.14 options, OFF in code defaults, ON for v2. feed_latency_ns is an assumed market-data feed leg (real ITCH has exchange timestamps only), not a measurement. modify_queue_credit has no switch (always on since v1.14) and is recorded for completeness. v1.16: venue_latency is ASSUMED (real ITCH carries no order-entry latency); latency_stress {0,1,5}x is reported, the 1x case is primary; fee_tier from configs/reference/fee_tiers.json (assumed), sensitivity at the lower 'base' tier is reported only; impact_model parent + impact_shape sqrt needs estimate_calibration(impact_fit=True).",
+    "modify_queue_credit": true,
+    "feed_latency_ns": 100000,
+    "exit_route": "sim",
+    "flatten_route": "sim",
+    "hidden_print_fills": true,
+    "markout_unit": "touch_order",
+    "amend_size_down": true,
+    "venue_latency": {
+      "mean_ns": 250000,
+      "jitter_ns": 100000,
+      "tail_prob": 0.01,
+      "tail_mult": 10.0
+    },
+    "latency_stress": [
+      0,
+      1,
+      5
+    ],
+    "fee_tier": "mid",
+    "fee_tier_sensitivity": [
+      "base"
+    ],
+    "exec_prints": true,
+    "impact_model": "parent",
+    "impact_shape": "sqrt"
+  }
+}
