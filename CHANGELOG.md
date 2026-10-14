@@ -13,6 +13,11 @@ that tag.
   per-event scan of every pending and resting order; rule 9 order and ties unchanged, fills
   byte-identical (`tools/bench_exec_simulator.py` digest). The ITCH throughput test's
   wall-clock floors are replaced by count-based guards (rates still printed).
+- v1.16 item 13 (native): C++ `OrderBook::depth_into` caller-buffer overloads (`LevelEntry*`
+  + cap, and a fixed `DepthBuffer`); the execution simulator's aggressive-fill and
+  marketable-ADD paths use it, so they no longer allocate per call (`depth()` kept). Rust:
+  dependency-free `risk/benches/check_order.rs` (`harness = false`, no lockfile change); CI
+  compiles all benches with `cargo bench --no-run`. No behaviour change; goldens identical.
 - v1.16 item 9 (code): forward paper trade as infrastructure, `python -m iap.paper.daily
   (--date D | --pending)`. Per new real session: locate or ingest (`--itch`; R7 holdout datasets
   refused), the MVP loop per symbol with `configs/prereg/v3.json` realism and the opt-in EOD
