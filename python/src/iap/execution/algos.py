@@ -46,6 +46,7 @@ the pinned schedules): ``is_model=ISModel.ALMGREN_CHRISS`` + ``ac_params``
 replaces the IS decay with the closed-form Almgren-Chriss trajectory
 (``iap.execution.optimal``); ``volume_curve`` replaces the VWAP ``1 + x^2``
 curve with a forecast curve (``iap.execution.volume_curve``).
+v1.16 opt-in: ``pov_exact`` (exact participation + catch-up, see the field).
 """
 
 from __future__ import annotations
@@ -106,6 +107,14 @@ class ParentOrder:
     #: Forecast VWAP volume curve (``iap.execution.volume_curve``, v1.10,
     #: opt-in); ``None`` keeps the pinned ``1 + x^2`` curve.
     volume_curve: tuple[float, ...] | None = None
+    #: POV exact participation + catch-up (v1.16 P0-5, opt-in; Python only).
+    #: Off: the pinned ``floor(participation * V)`` with one child of at most
+    #: ``max_child_qty`` per TRADE. On: the target counts our own fills in
+    #: the total (``floor(p / (1 - p) * V)``, ``V`` = market TRADE volume,
+    #: which never contains our simulated fills), so we trade ``p`` of the
+    #: total, and the whole deficit is covered at once in children of at
+    #: most ``max_child_qty`` (catch-up after expiries or missed fills).
+    pov_exact: bool = False
 
 
 def slice_weights(parent: ParentOrder) -> list[float]:

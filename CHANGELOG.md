@@ -30,6 +30,11 @@ that tag.
   parity are unchanged): `SmartOrderRouter.allocate_aggressive` splits a size across eligible
   venues by walking displayed depth net of taker fees; `route_passive_queue` picks the resting
   venue by fill probability from a queue-depletion hazard (`p*rebate - (1-p)*miss_cost`).
+- v1.16 P0-5: algos (Python only, opt-in): `ParentOrder.pov_exact` — POV target
+  `floor(p/(1-p)*V)` so we trade `p` of the TOTAL volume (market + ours), and the whole deficit
+  is caught up at once in children of at most `max_child_qty`; `ac_params_from_calibration(...,
+  impact_source="residual")` — Almgren-Chriss `eta` from the residual-move linear fit (P0-2).
+  VWAP by time of day was already in place (forecast curves + exchange-local sessions, v1.10/v1.13).
 
 ## v1.15.0 — 2026-10-13
 

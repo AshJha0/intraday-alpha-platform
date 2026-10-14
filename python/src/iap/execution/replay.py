@@ -95,6 +95,16 @@ class ParentReport:
         }
 
 
+def _pov_target(p: ParentOrder, market_volume: int) -> int:
+    """POV target qty: pinned ``floor(p * V)``; ``pov_exact`` counts our own
+    fills in the total, ``floor(p / (1 - p) * V)`` (v1.16 P0-5)."""
+    if p.pov_exact:
+        if not 0.0 < p.participation < 1.0:
+            raise ValueError(f"pov_exact needs 0 < participation < 1, got {p.participation!r}")
+        return int(math.floor(p.participation / (1.0 - p.participation) * float(market_volume)))
+    return int(math.floor(p.participation * float(market_volume)))
+
+
 @dataclass(slots=True)
 class ExecReplayResult:
     """Outcome of one ``ExecutionReplay.run``."""
@@ -366,13 +376,14 @@ class ExecutionReplay:
             )
             if in_window:
                 ps.pov_volume += ev.qty
-                target = int(math.floor(p.participation * float(ps.pov_volume)))
-                ps.scheduled_qty = min(target, p.qty)
+                ps.scheduled_qty = min(_pov_target(p, ps.pov_volume), p.qty)
             self._work_passive(ps, t)
             if in_window:
                 deficit = ps.scheduled_qty - self._committed_qty(ps)
-                if deficit > 0:
-                    self._post(ps, min(deficit, p.max_child_qty), t, 0)
+                while deficit > 0:
+                    q = min(deficit, p.max_child_qty)
+                    self._post(ps, q, t, 0)
+                    deficit = deficit - q if p.pov_exact else 0
             return
         while ps.next_slice < len(ps.slice_due) and t >= ps.slice_due[ps.next_slice]:
             q = ps.slice_qty[ps.next_slice]
@@ -401,11 +412,12 @@ class ExecutionReplay:
             ):
                 return
             ps.pov_volume += ev.qty
-            target = int(math.floor(p.participation * float(ps.pov_volume)))
             # Deficit against FILLED + in-flight qty, never sent qty (pinned).
-            deficit = min(target, p.qty) - self._committed_qty(ps)
-            if deficit > 0:
-                self._issue_child(ps, min(deficit, p.max_child_qty), t, False)
+            deficit = min(_pov_target(p, ps.pov_volume), p.qty) - self._committed_qty(ps)
+            while deficit > 0:
+                q = min(deficit, p.max_child_qty)
+                self._issue_child(ps, q, t, False)
+                deficit = deficit - q if p.pov_exact else 0
             return
         # TWAP / VWAP / IS: issue every slice that has come due (inside the
         # window only — a slice due at/after end_ts would expire on arrival).
