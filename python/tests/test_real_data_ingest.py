@@ -827,8 +827,8 @@ def _bulk_file(path: Path, n_messages: int) -> int:
 
 
 def test_parser_throughput_smoke_and_bounded_memory(tmp_path):
-    """Generous lower bounds only (CI runners vary); the measured rates are
-    printed with ``-s`` / ``-rP`` and quoted in docs/REAL_DATA.md."""
+    """Rates are printed with ``-s`` / ``-rP`` (quoted in docs/REAL_DATA.md)
+    but not asserted: the guards are count-based, so they never flake."""
     path = tmp_path / "bulk.itch"
     n = _bulk_file(path, 300_000)
     size = path.stat().st_size
@@ -850,7 +850,12 @@ def test_parser_throughput_smoke_and_bounded_memory(tmp_path):
         f"filtered to 1 of 4 symbols {filtered_rate:,.0f} msg/s; decode all {decode_rate:,.0f} "
         f"msg/s; filter + map to canonical events {mapped_rate:,.0f} msg/s ({events:,} events)"
     )
-    assert filtered_rate > 20_000 and decode_rate > 10_000 and mapped_rate > 10_000
+    # v1.16 item 13: no wall-clock floor (flaky on shared runners); the rates
+    # above are informational. Deterministic count guards instead: the
+    # symbol filter skips decoding, so the wanted symbol is a quarter of
+    # the add/cancel/delete cycles, and every yielded message maps.
+    assert 0 < yielded < n // 3
+    assert 0 < events <= yielded
     assert mapper.live_orders == 0  # state is the live orders only
 
     # bounded memory: streaming the whole file keeps a small, size-independent peak
