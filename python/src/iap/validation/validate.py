@@ -773,7 +773,7 @@ def validate_alpha(
     # v1.15/v1.16 (R7 memory): train frames keep only the columns a fit
     # reads, test frames only the columns scoring, labels, stress and decay
     # read; a model that reads an undeclared column fails loudly.
-    train_cols = _cpcv_columns(model_factory, uframes, horizon)
+    train_cols = _cpcv_columns(model_factory, uframes)
     test_cols = _test_columns(model_factory, uframes)
     for fold in splitter.split_folds(uframes):
         # drop the previous fold's test frames before this fold's are built
@@ -1441,7 +1441,7 @@ def _cpcv_block(
     (:func:`_cpcv_columns`); the result is identical.  An alpha that reads a
     column outside that set fails loudly (it used to rerun at full width).
     """
-    narrow = _cpcv_columns(model_factory, uframes, horizon)
+    narrow = _cpcv_columns(model_factory, uframes)
     if narrow is not None:
         uframes = {iid: df[[c for c in df.columns if c in narrow]] for iid, df in uframes.items()}
     with _narrowed("cpcv", narrow):
@@ -1457,20 +1457,18 @@ def _cpcv_block(
         )
 
 
-def _cpcv_columns(
-    model_factory, uframes: Mapping[int, pd.DataFrame], horizon: str
-) -> set[str] | None:
+def _cpcv_columns(model_factory, uframes: Mapping[int, pd.DataFrame]) -> set[str] | None:
     """Columns the cpcv block (and a walk-forward fit) reads: ``exchange_ts``,
-    the label columns of ``horizon``, ``spread_ticks_v1`` (crossed flag) and
-    the alpha's declared features; ``None`` (no narrowing) when the alpha
-    declares no feature list."""
+    every label column, ``spread_ticks_v1`` (crossed flag) and the alpha's
+    declared features; ``None`` (no narrowing) when the alpha declares no
+    feature list.  Labels of every horizon are kept, not only ``horizon``'s:
+    a combined alpha fits each member at the member's own horizon."""
     feats = getattr(model_factory(), "features", None)
     if not feats:
         return None
     cols = {"exchange_ts", "spread_ticks_v1", *feats}
-    suffix = f"_{horizon}"
     for df in uframes.values():
-        cols.update(c for c in df.columns if c.startswith("label_") and c.endswith(suffix))
+        cols.update(c for c in df.columns if c.startswith("label_"))
     return cols
 
 

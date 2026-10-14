@@ -328,6 +328,28 @@ def test_walk_forward_test_columns_drop_unread_features():
     assert {c for df in frames.values() for c in df.columns if c.startswith("label_")} <= cols
 
 
+def test_narrowed_frames_keep_labels_of_other_horizons(monkeypatch):
+    """PR #148 CI regression: a combined alpha fits each member at the member's
+    own horizon, so train/CPCV frames must keep the labels of every horizon,
+    not only the validated alpha's."""
+    import iap.validation.validate as v
+
+    frames = _multi_day_frames(per_day=500)
+    for df in frames.values():
+        df["label_mid_1m"] = 0.0
+    seen = []
+    fit = _TwoInstrumentAlpha.fit
+
+    def fit_reading_other_horizon(self, train):
+        seen.append(all("label_mid_1m" in df.columns for df in train.values()))
+        return fit(self, train)
+
+    monkeypatch.setattr(_TwoInstrumentAlpha, "fit", fit_reading_other_horizon)
+    _v4(frames)
+    assert seen and all(seen)
+    assert "label_mid_1m" in v._cpcv_columns(_TwoInstrumentAlpha, frames)
+
+
 def test_walk_forward_fails_loudly_when_a_column_is_missing(monkeypatch):
     """v1.16: no silent full-width refit when a fit reads an undeclared column."""
     import iap.validation.validate as v
