@@ -50,7 +50,18 @@ pinned order box -> participation -> net -> currency -> gross -> turnover ->
 vol.  Gross/turnover use the exact sort-based L1-ball projection; net and
 currency use exact halfspace projections; the vol cap uses radial scaling
 (a pinned feasible retraction, not the exact ellipsoidal projection —
-documented and mirrored by production).  Everything is deterministic: fixed
+documented and mirrored by production).
+
+Opt-in ``projection="dykstra"`` (default ``"cyclic"`` = the pinned path
+above) replaces the fixed cyclic passes with Dykstra's alternating
+projection over the same sets in the same order: each set keeps a correction
+increment, so the limit is the EXACT Euclidean projection onto the
+intersection (plain cyclic projection only finds SOME point of it).  It
+stops when a full sweep moves the iterate by at most ``dykstra_tol``
+(inf-norm) or after ``dykstra_max_iter`` sweeps.  Exactness needs every step
+to be a true projection, so it holds when ``vol_target`` is off; with it on,
+the radial retraction is used as-is and the result is feasible-seeking only.
+Everything is deterministic: fixed
 iteration counts, no RNG, no unordered iteration.
 """
 
@@ -260,6 +271,86 @@ def project(
     return w
 
 
+def _projectors(cons: Constraints, w_prev: np.ndarray, Sigma: np.ndarray | None) -> list:
+    """The individual set projections of :func:`project`, in the pinned order."""
+    n = len(w_prev)
+    ps = [lambda w: np.clip(w, cons.w_min, cons.w_max)]
+    if cons.participation is not None:
+        lo = w_prev - cons.participation
+        hi = w_prev + cons.participation
+        ps.append(lambda w: np.clip(w, lo, hi))
+    if cons.net_cap is not None:
+
+        def p_net(w: np.ndarray) -> np.ndarray:
+            s = w.sum()
+            if abs(s) > cons.net_cap:
+                return w - (s - np.sign(s) * cons.net_cap) / n
+            return w
+
+        ps.append(p_net)
+    if cons.currency_matrix is not None:
+        for c in range(cons.currency_matrix.shape[0]):
+            e = cons.currency_matrix[c]
+            denom = float(e @ e)
+            if denom == 0.0:
+                continue
+            bound = float(cons.currency_bounds[c])
+
+            def p_ccy(w: np.ndarray, e=e, denom=denom, bound=bound) -> np.ndarray:
+                val = float(e @ w)
+                if abs(val) > bound:
+                    return w - ((val - np.sign(val) * bound) / denom) * e
+                return w
+
+            ps.append(p_ccy)
+    if cons.gross_cap is not None:
+        ps.append(lambda w: project_l1_ball(w, cons.gross_cap))
+    if cons.turnover_cap is not None:
+        ps.append(lambda w: w_prev + project_l1_ball(w - w_prev, cons.turnover_cap))
+    if cons.vol_target is not None:
+        if Sigma is None:
+            raise ValueError("vol_target requires Sigma")
+
+        def p_vol(w: np.ndarray) -> np.ndarray:
+            q = float(w @ Sigma @ w)
+            if q > cons.vol_target * cons.vol_target:
+                return w * (cons.vol_target / np.sqrt(q))
+            return w
+
+        ps.append(p_vol)
+    return ps
+
+
+def project_dykstra(
+    v: np.ndarray,
+    cons: Constraints,
+    w_prev: np.ndarray,
+    Sigma: np.ndarray | None,
+    tol: float = 1e-12,
+    max_iter: int = 10_000,
+) -> np.ndarray:
+    """Dykstra's alternating projection onto the constraint intersection (opt-in).
+
+    Same sets and order as :func:`project`; converges to the exact Euclidean
+    projection of ``v`` when every set step is a true projection (i.e. no
+    ``vol_target``).  Deterministic: fixed order, no RNG.
+    """
+    if not (np.isfinite(tol) and tol >= 0) or max_iter < 1:
+        raise ValueError("dykstra tol must be finite >= 0 and max_iter >= 1")
+    ps = _projectors(cons, np.asarray(w_prev, dtype=np.float64), Sigma)
+    x = np.asarray(v, dtype=np.float64).copy()
+    incs = [np.zeros_like(x) for _ in ps]
+    for _ in range(max_iter):
+        x_start = x
+        for i, p in enumerate(ps):
+            y = x + incs[i]
+            x = p(y)
+            incs[i] = y - x
+        if float(np.max(np.abs(x - x_start))) <= tol:
+            break
+    return x
+
+
 def violation_breakdown(
     w: np.ndarray, cons: Constraints, w_prev: np.ndarray, Sigma: np.ndarray | None
 ) -> dict[str, float]:
@@ -332,6 +423,9 @@ def solve(
     proj_passes: int = 8,
     feas_tol: float = 1e-7,
     eta_max: float | None = None,
+    projection: str = "cyclic",
+    dykstra_tol: float = 1e-12,
+    dykstra_max_iter: int = 10_000,
 ) -> PGDResult:
     """Deterministic PGD solve of the research portfolio problem.
 
@@ -349,6 +443,10 @@ def solve(
     default ``None`` = unchanged pinned behaviour) caps the auto step, e.g.
     at the box width, so the linear case moves in sane increments.  An
     explicit ``eta0`` is never altered.
+
+    ``projection="dykstra"`` (opt-in) projects with :func:`project_dykstra`
+    (``dykstra_tol``, ``dykstra_max_iter``) instead of ``proj_passes`` cyclic
+    passes; the default ``"cyclic"`` is the pinned behaviour.
     """
     alpha = np.asarray(alpha, dtype=np.float64)
     Sigma = np.asarray(Sigma, dtype=np.float64)
@@ -384,6 +482,18 @@ def solve(
     if np.any(np.abs(Sigma - Sigma.T) > 1e-12):
         raise ValueError("Sigma must be symmetric")
     constraints.validate(n)
+    if projection == "cyclic":
+
+        def proj(x: np.ndarray) -> np.ndarray:
+            return project(x, constraints, w_prev, Sigma, proj_passes)
+
+    elif projection == "dykstra":
+
+        def proj(x: np.ndarray) -> np.ndarray:
+            return project_dykstra(x, constraints, w_prev, Sigma, dykstra_tol, dykstra_max_iter)
+
+    else:
+        raise ValueError("projection must be 'cyclic' or 'dykstra'")
 
     def f(w: np.ndarray) -> float:
         return objective(w, alpha, Sigma, w_prev, risk_aversion, tc_linear)
@@ -413,7 +523,7 @@ def solve(
     least_rank = rank(least_w)
     least_k = -1
 
-    w = project(w_prev, constraints, w_prev, Sigma, proj_passes)
+    w = proj(w_prev)
     best_w = w.copy()
     feasible = max_violation(w, constraints, w_prev, Sigma) <= feas_tol
     best_f = f(w) if feasible else -np.inf
@@ -428,7 +538,7 @@ def solve(
         d = v - w_prev
         d = np.sign(d) * np.maximum(np.abs(d) - eta * tc_linear, 0.0)
         v = w_prev + d
-        w = project(v, constraints, w_prev, Sigma, proj_passes)
+        w = proj(v)
         fw = f(w)
         trajectory.append(fw)
         if max_violation(w, constraints, w_prev, Sigma) <= feas_tol and fw > best_f:
