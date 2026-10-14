@@ -41,12 +41,27 @@ def feature_drift(
     return rep
 
 
-def drift_alerts(rep: Mapping[str, Any]) -> list[str]:
-    """One alert per group with drifted features."""
+def drift_alerts(rep: Mapping[str, Any], top: int = 5) -> list[str]:
+    """One compact alert per group with drifted features: the count and the
+    ``top`` features by PSI (the full list is in ``monitors.json``)."""
     out = []
+    groups = rep.get("groups") or {}
     for group, s in sorted((rep.get("summary") or {}).items()):
-        if s.get("drifted"):
-            out.append(f"feature drift [{group}]: {', '.join(s['drifted'])}")
+        drifted = s.get("drifted") or []
+        if not drifted:
+            continue
+        rows = groups.get(group) or {}
+
+        def psi(f: str, rows: Mapping[str, Any] = rows) -> float:
+            v = (rows.get(f) or {}).get("psi")
+            return float(v) if isinstance(v, (int, float)) and math.isfinite(v) else -1.0
+
+        worst = sorted(drifted, key=lambda f: (-psi(f), f))[:top]
+        more = f" (+{len(drifted) - len(worst)} more)" if len(drifted) > len(worst) else ""
+        out.append(
+            f"feature drift [{group}]: {len(drifted)}/{s.get('features')} features; "
+            f"top by PSI: {', '.join(worst)}{more}"
+        )
     return out
 
 
