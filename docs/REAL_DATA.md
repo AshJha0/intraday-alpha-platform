@@ -194,6 +194,15 @@ ingested under an older cost model is brought up to date. `events.parquet`
 is not merged. Alphas of an asset class the dataset does not hold (FX on an
 equity feed) have nothing to trade.
 
+Two opt-in flags (v1.16, item 12; both off by default, the merge is then
+byte-identical to v1.15): `--allow-lot-size-differences` lets the inputs
+differ in `lot_size` only (for example across the 2025 round-lot reform; the
+merged universe keeps the first input's lot sizes and the manifest records
+`lot_size_by_session`), and `--link` hard-links the raw and normalized files
+instead of copying them (same volume only). The Python API is
+`merge_datasets(inputs, out, configs_dir, *, allow_lot_size_differences=False,
+link=False)` in `iap.marketdata.ingest`.
+
 `power-real` (`iap.research.power_real`) is the real-data counterpart of the
 synthetic power study. Real prices cannot be regenerated, so an effect of
 known information coefficient is planted in the stored labels — on a
