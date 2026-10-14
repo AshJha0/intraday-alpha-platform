@@ -42,6 +42,7 @@ __all__ = [
     "HOLDOUT_DATES",
     "WindowIndex",
     "build_cache",
+    "iter_events",
     "fit_column_normalizer",
     "load_unit",
     "session_snapshots",
@@ -61,6 +62,46 @@ HOLDOUT_DATES = (
 HOLDOUT_DIRS = ("r7_holdout", "holdout2026")
 
 
+EVENT_COLS = (
+    "event_id",
+    "instrument_id",
+    "venue_id",
+    "exchange_ts",
+    "receive_ts",
+    "sequence",
+    "event_type",
+    "side",
+    "price_ticks",
+    "qty",
+    "order_id",
+    "trade_id",
+)
+
+
+def iter_events(session_dir: Path, iid: int, end_ns: int | None = None) -> Iterable:
+    """``MarketEvent``s of one instrument, streamed row group by row group
+    (never the whole session in memory; file order = event order)."""
+    import pyarrow.compute as pc
+    import pyarrow.parquet as pq
+
+    from iap.core.events import MarketEvent
+
+    pf = pq.ParquetFile(Path(session_dir) / "normalized" / "events.parquet")
+    for rg in range(pf.num_row_groups):
+        t = pf.read_row_group(rg, columns=list(EVENT_COLS))
+        mask = pc.equal(t.column("instrument_id"), iid)
+        if end_ns is not None:
+            mask = pc.and_(mask, pc.less_equal(t.column("exchange_ts"), end_ns))
+        t = t.filter(mask)
+        if not t.num_rows:
+            continue
+        cols = [t.column(c).to_numpy() for c in EVENT_COLS]
+        del t
+        for k in range(len(cols[0])):
+            yield MarketEvent(*(int(c[k]) for c in cols))
+        del cols
+
+
 def _refuse_holdout(name: str) -> None:
     if any(d in name for d in HOLDOUT_DATES) or any(h in name for h in HOLDOUT_DIRS):
         raise ValueError(f"{name}: R7 holdout session, refused for AI4 development")
@@ -78,11 +119,17 @@ def session_snapshots(
     from iap.orderbook.book import ApplyStatus, ConsolidatedBook
 
     cons: ConsolidatedBook | None = None
-    ts_out: list[int] = []
-    mid_out: list[float] = []
-    rows: list[np.ndarray] = []
-    empty_out: list[int] = []
     width = 4 * levels
+    chunk = 200_000
+    xs: list[np.ndarray] = []
+    tss: list[np.ndarray] = []
+    mids: list[np.ndarray] = []
+    emps: list[np.ndarray] = []
+    buf = np.empty((chunk, width), dtype=np.float32)
+    bts = np.empty(chunk, dtype=np.int64)
+    bmid = np.empty(chunk, dtype=np.float64)
+    bemp = np.empty(chunk, dtype=np.int16)
+    n = 0
     for ev in events:
         if cons is None:
             cons = ConsolidatedBook(ev.instrument_id)
@@ -96,7 +143,7 @@ def session_snapshots(
         if not asks or not bids or asks[0][0] <= bids[0][0]:
             continue
         mid_t = 0.5 * (asks[0][0] + bids[0][0])  # in ticks
-        row = np.empty(width, dtype=np.float32)
+        row = buf[n]
         empty = 0
         for k in range(levels):
             if k < len(asks):
@@ -113,18 +160,29 @@ def session_snapshots(
             row[4 * k + 1] = np.log1p(aq)
             row[4 * k + 2] = bp - mid_t
             row[4 * k + 3] = np.log1p(bq)
-        ts_out.append(int(ev.exchange_ts))
-        mid_out.append(mid_t * tick)
-        rows.append(row)
-        empty_out.append(empty)
-    if not rows:
-        return (np.empty(0, np.int64), np.empty(0), np.empty((0, width), np.float32), np.empty(0, np.int16))
-    return (
-        np.asarray(ts_out, dtype=np.int64),
-        np.asarray(mid_out, dtype=np.float64),
-        np.vstack(rows),
-        np.asarray(empty_out, dtype=np.int16),
-    )
+        bts[n] = int(ev.exchange_ts)
+        bmid[n] = mid_t * tick
+        bemp[n] = empty
+        n += 1
+        if n == chunk:
+            xs.append(buf.copy())
+            tss.append(bts.copy())
+            mids.append(bmid.copy())
+            emps.append(bemp.copy())
+            n = 0
+    if n:
+        xs.append(buf[:n].copy())
+        tss.append(bts[:n].copy())
+        mids.append(bmid[:n].copy())
+        emps.append(bemp[:n].copy())
+    if not xs:
+        return (
+            np.empty(0, np.int64),
+            np.empty(0),
+            np.empty((0, width), np.float32),
+            np.empty(0, np.int16),
+        )
+    return np.concatenate(tss), np.concatenate(mids), np.concatenate(xs), np.concatenate(emps)
 
 
 @dataclass(frozen=True)
@@ -224,8 +282,6 @@ def build_cache(
     min_free_gb: float = 8.0,
 ) -> list[dict]:
     """One ``<session>_<symbol>.npz`` per unit (skips units already cached)."""
-    from iap.research.maker_real import load_events
-
     out.mkdir(parents=True, exist_ok=True)
     done = []
     for sess in sessions:
@@ -242,14 +298,18 @@ def build_cache(
                 continue
             free = shutil.disk_usage(out).free / 1e9
             if free < min_free_gb:
-                raise RuntimeError(f"only {free:.1f} GB free (< {min_free_gb}); stopping before {path.name}")
-            ev = load_events(sdir, iid)
-            ts, mid, x, empty = session_snapshots(ev, ticks[iid], levels)
-            del ev
+                raise RuntimeError(
+                    f"only {free:.1f} GB free (< {min_free_gb}); stopping before {path.name}"
+                )
+            ts, mid, x, empty = session_snapshots(iter_events(sdir, iid), ticks[iid], levels)
             tmp = path.with_suffix(".partial.npz")
             np.savez(tmp, ts=ts, mid=mid, X=x.astype(np.float16), n_empty=empty)
             tmp.replace(path)
-            info = {"unit": path.name, "rows": int(len(ts)), "empty_level_frac": float(empty.mean() / (2 * levels)) if len(empty) else None}
+            info = {
+                "unit": path.name,
+                "rows": int(len(ts)),
+                "empty_level_frac": float(empty.mean() / (2 * levels)) if len(empty) else None,
+            }
             done.append(info)
             print(json.dumps(info), flush=True)
     return done

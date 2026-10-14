@@ -82,6 +82,12 @@ that tag.
 - v1.16: `tools/release.py apply-bundle` extracts with Python `tarfile` (members path-checked, `data`
   filter) instead of the system `tar --force-local` (bsdtar on Windows has no `--force-local`; the
   v1.15 release had to extract by hand).
+- v1.16 item 10 (AI4 rebuild, part 1): `iap.models.lob_real`, the real-data adapter AI4-DEEPLOB-1 lacked
+  (research/r7/AI4_DEFERRED.md): streamed per-session book replay of normalised ITCH into the DeepLOB
+  (T, 4L) layout with MID-RELATIVE tick offsets and log1p sizes, empty-level masking, rows only while the
+  book is open and two-sided; per-session labels and lazy `WindowIndex` windows (no window or label crosses
+  a session); train-only streaming normaliser; `python -m iap.models.lob_real` cache builder (float16,
+  refuses the R7 holdout sessions and low disk). No training or holdout data used yet.
 
 ## v1.15.0 — 2026-10-13
 
