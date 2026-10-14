@@ -607,6 +607,23 @@ std::vector<LevelEntry> OrderBook::depth(Side side, int levels) const {
     return out;
 }
 
+std::size_t OrderBook::depth_into(Side side, int levels, LevelEntry* out,
+                                  std::size_t cap) const {
+    const auto& v = side_levels_[static_cast<int>(side)];
+    const std::size_t n = std::min<std::size_t>(
+        std::min<std::size_t>(v.size(), cap),
+        levels < 0 ? 0 : static_cast<std::size_t>(levels));
+    for (std::size_t i = 0; i < n; ++i) {
+        out[i] = LevelEntry(levels_[v[i]].price, levels_[v[i]].total_qty);
+    }
+    return n;
+}
+
+void OrderBook::depth_into(Side side, DepthBuffer& out) const {
+    out.size = depth_into(side, DEPTH_LEVELS, out.levels.data(),
+                          out.levels.size());
+}
+
 void OrderBook::depth_into(Side side, int levels,
                            std::vector<LevelEntry>& out) const {
     const auto& v = side_levels_[static_cast<int>(side)];
