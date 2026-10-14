@@ -10,7 +10,10 @@ to the institutional specification in [docs/SPECIFICATION.md](docs/SPECIFICATION
   implementation* every port must match, and the executable MVP that runs
   the whole loop (`python -m iap.mvp`);
 - **Java** — institutional strategy/platform layer (portfolio, TCA, risk
-  orchestration, backtest, paper trading, monitoring/API);
+  orchestration, backtest, paper trading, monitoring/API); archived since
+  v1.15 in [archive/java/](archive/java/README.md), frozen at v1.14.0 and no
+  longer built or tested in CI (the `java` platform image still builds from
+  the frozen copy);
 - **C++** — latency-critical HFT path (codec, book, features, alpha,
   execution simulator, SOR, replay);
 - **Rust** — safety-critical infrastructure (hard risk engine, event bus,
@@ -29,7 +32,76 @@ implementation (`iap.risk`, `iap.execution`) proven by the same golden files
 the Java ports are proven by, so the loop the MVP runs is the reference
 loop end to end.
 
-## Current status (v1.15.0 released 2026-10-13)
+## Docs map
+
+| if you want to… | read |
+|---|---|
+| understand the platform | [LEARN.md](LEARN.md), [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DIAGRAMS.md](docs/DIAGRAMS.md) |
+| run something | [COOKBOOK.md](COOKBOOK.md), [Quick start](#quick-start), [docs/MVP.md](docs/MVP.md), [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md) |
+| use real data | [docs/REAL_DATA.md](docs/REAL_DATA.md), [docs/R7_DATA_PLAN.md](docs/R7_DATA_PLAN.md), [docs/research/](docs/research/) |
+| check the research methods | [docs/RESEARCH_VALIDITY.md](docs/RESEARCH_VALIDITY.md), [docs/LIFECYCLE.md](docs/LIFECYCLE.md), [research/alpha_reports/REPORT.md](research/alpha_reports/REPORT.md) |
+| port or call an API | [API_CORE.md](API_CORE.md), [API_FEATURES.md](API_FEATURES.md), [API_ALPHA.md](API_ALPHA.md), [API_PORTFOLIO_TCA.md](API_PORTFOLIO_TCA.md), [API_ADAPTIVE.md](API_ADAPTIVE.md), [API_CONTRACTS.md](API_CONTRACTS.md), [API_TRADING.md](API_TRADING.md), [python/src/iap/README.md](python/src/iap/README.md) |
+| follow the rules | [PLATFORM_CONVENTIONS.md](PLATFORM_CONVENTIONS.md), [CONTRIBUTING.md](CONTRIBUTING.md), [docs/POLYGLOT.md](docs/POLYGLOT.md), [docs/governance/](docs/governance/), [docs/SPECIFICATION.md](docs/SPECIFICATION.md) |
+| operate it | [docs/runbooks/](docs/runbooks/), [docs/SCENARIOS.md](docs/SCENARIOS.md), [docs/DECISION_TRACE.md](docs/DECISION_TRACE.md), [docs/DATA_MODEL.md](docs/DATA_MODEL.md) |
+| see the plan and the history | [docs/ROADMAP.md](docs/ROADMAP.md), [docs/EPICS.md](docs/EPICS.md), [CHANGELOG.md](CHANGELOG.md) |
+
+The full list with descriptions is the [Documentation index](#documentation-index).
+
+## Current status (v1.16 in progress; v1.15.0 released 2026-10-13)
+
+**v1.16, the monetisation release (in progress, not released).** v1.15
+proved the alphas predict on unseen data; v1.16 asks whether any of that
+survives realistic costs, and at what size. So far the answer for a taker is
+no: in-sample, with a stricter cost model, no cell of the study trades and
+no cell of the capacity curve breaks even. Two results are still pending: the
+M5 quoting study v2 (two-sided skewed quoting, running) and AI4 DeepLOB on
+real data (in progress). Item-by-item status:
+[docs/ROADMAP.md](docs/ROADMAP.md) §3.11 and [docs/EPICS.md](docs/EPICS.md)
+(E36); the details are under "## Unreleased" in [CHANGELOG.md](CHANGELOG.md).
+
+**New in v1.16 so far** (on main unless a PR is named; every switch is
+opt-in and off by default, so no default run, golden or published number moved):
+
+- **Realistic execution, P0-1..P0-5 (Python only).** Impact on the parent
+  order (simulator rule 6b, `ExecConfig.impact_model="parent"`, so splitting
+  a parent cannot lower its cost) with a permanent leg; impact calibrated on
+  the residual mid move after the depth walk (`estimate_calibration(...,
+  impact_fit=True)`, `apply_impact_fit`); net-of-cost pre-registration keys
+  in `configs/prereg/v3.json` (assumed venue latency with a tail, a {0, 1, 5}x
+  latency stress grid, an assumed fee tier with a lower-tier sensitivity,
+  ITCH exec prints, parent square-root impact); router opt-ins in
+  `iap.execution.sor_v2` (all-in price sweep, fill-probability passive
+  routing); exact POV participation with catch-up and Almgren-Chriss `eta`
+  from the residual fit ([API_TRADING.md](API_TRADING.md) §2.13).
+- **In-sample monetisation study (P0-6): no-go.** EQ10 / EQ05 as a taker on
+  the 10 in-sample sessions, 480 cells: zero trades in every cell, because
+  the forecast is several times smaller than the round-trip cost. The owner
+  decided not to buy fresh data, so item 8 (a net-of-cost pre-registration on
+  fresh sessions) is not triggered
+  ([research/v116/MONETISATION_P0-6.md](research/v116/MONETISATION_P0-6.md)).
+- **Capacity curve (item 7, PR #149, pending merge):** 0 of 45 cells break
+  even; the best (EQ10, AAPL, 1 min, top 0.1% of signals) earns 0.92 bp
+  against 2.4 bp of fixed cost.
+- **Quoting v2:** after the taker no-go, the M5 skewed-quoting study was made
+  runnable (owner-approved values, ticks, a validity gate) and registered;
+  its in-sample run is in progress and has no result yet.
+- **AI4 DeepLOB on real data:** in progress (real-data adapter and streaming
+  training in PR #151; a new pre-registration to be signed by the owner).
+- **Research hygiene:** `research/maker-real` and `research/step2` merged
+  onto main with their blackboards archived unchanged; `beta_stability`
+  moved out of fingerprinted alpha code; a CI warning when a PR touches code
+  an open pre-registration fingerprints; `merge --allow-lot-size-differences
+  / --link`; a memory review of the research pipeline
+  ([docs/research/MEMORY_REVIEW_v116.md](docs/research/MEMORY_REVIEW_v116.md)).
+- **Engineering:** heap-based simulator queues and count-based throughput
+  guards; an allocation-free C++ `depth_into`; a Rust `check_order` bench;
+  report-only multiple-testing columns (Holm, Benjamini-Hochberg,
+  Romano-Wolf; `iap.validation.multiple_testing`); an opt-in MVP end-of-day
+  flatten (`execution.eod_flatten_lead_ns`); `tools/release.py` extracts with
+  Python `tarfile`. Pending in PRs: the forward paper-trade driver (#144), the
+  optimiser's Dykstra projection and estimated Ledoit-Wolf intensity (#147),
+  blocking mypy and agent evals (#143), memory follow-ups (#148) and a
+  registration environment pinned to the CI lock (#152).
 
 **v1.15.0 (2026-10-13).** The R7 confirmatory pre-registration
 R7-CONFIRM-1 is **signed** (`research/r7/r7_confirm_prereg.json`: H4 tier 1,
@@ -66,16 +138,15 @@ test counts: the parity table below (v1.14.0) or the latest CI run.
   EQ02 8.02, EQ10 8.08, EQ05 9.51) and both controls behaved as registered.
   No run traded at 1x costs. Those two days are now spent
   ([docs/REAL_DATA.md](docs/REAL_DATA.md) §3.2, [LEARN.md](LEARN.md) §33).
-- **Maker side (v1.9-v1.10), in progress:** because a taker cannot pay
-  0.7 bp for a 0.07 bp edge, the platform now has a calibrated maker
-  backtest and a skewed two-sided quoter. Measured so far on synthetic data
-  only: the maker backtest loses 6.7 bp per trip with a passive exit (11.4 bp
-  crossing out); the quoter with a toy score nets +86.50 USD skewed against
-  +120.20 USD unskewed. A pre-registered, in-sample maker study on the seven
-  real sessions is **running** (due about 2026-10-12 evening); it has no
-  result yet, and by its own
-  verdict rule a positive in-sample result would only justify an
-  out-of-sample test ([LEARN.md](LEARN.md) §31, §34).
+- **Maker side (v1.9-v1.10):** because a taker cannot pay
+  0.7 bp for a 0.07 bp edge, the platform has a calibrated maker
+  backtest and a skewed two-sided quoter. On synthetic data the maker
+  backtest loses 6.7 bp per trip with a passive exit (11.4 bp crossing out);
+  the quoter with a toy score nets +86.50 USD skewed against +120.20 USD
+  unskewed. The pre-registered in-sample maker study on the seven real
+  sessions finished in v1.15 with **no maker edge**: every traded cell was
+  negative, so its hypothesis was dropped from R7 ([LEARN.md](LEARN.md) §31,
+  §34).
 - **Auction study `AUC01`, first result (v1.12): no demonstrated edge.**
   Pre-registered, exploratory and in-sample on the seven real sessions
   (branch `research/step2`). Primary cell, closing cross 300 s before
@@ -92,13 +163,12 @@ test counts: the parity table below (v1.14.0) or the latest CI run.
   that caveat. The declared 2026 holdout (frozen `C-300s` fit): **NOT
   CONFIRMED**, 0 trades.
 - **Maker and quoting studies on real files:** the maker study (EQ01 /
-  EQ02 / EQ05 / EQ10, taker and passive exits) is running and has no
-  result yet. The M5 quoting study was **aborted on 2026-10-11 before any
-  result was read**: the quality review found its registered
-  Avellaneda-Stoikov parameters numerically inert (every quote a fixed 1-2
-  ticks behind the touch), so skew vs no-skew could not be tested
-  (`data/real/quoting_real/ABORTED.md`). A v2 protocol in ticks will be
-  pre-registered.
+  EQ02 / EQ05 / EQ10, taker and passive exits) found no maker edge (v1.15).
+  The M5 quoting study v1 was **aborted on 2026-10-11 before any result was
+  read**: its registered Avellaneda-Stoikov parameters were numerically inert
+  (every quote a fixed 1-2 ticks behind the touch), so skew vs no-skew could
+  not be tested. The v2 protocol in ticks is registered and running in v1.16
+  (see above).
 
 **New in v1.9.0** (all opt-in; no default, golden or published number moved):
 
@@ -299,16 +369,19 @@ stores: no real dataset has been re-ingested under x-version 2 yet
 ([docs/REAL_DATA.md](docs/REAL_DATA.md) §4). Expect the day-separated HAC
 to report lower t values than 21 and 25 when it is.
 
-**Next: v1.15.** The R7 confirmatory round on unseen sessions (re-ingest
-first), deep order-book baselines (AI4) and the QQQ basis study (A2),
-whose code is in review; maker and quoting v2 pre-registrations with the
-execution options switched on ([docs/ROADMAP.md](docs/ROADMAP.md) §3.9-3.10).
+**Next: finish v1.16, then v1.17.** v1.16 closes with the quoting v2
+verdict, the AI4 result and the open PRs. The v1.17 direction depends on
+them: if no net-positive rule appears, widen the data (more symbols and
+sessions, a paid-data decision) or pivot to the execution-quality product
+(algos and SOR judged on implementation shortfall); if one does, several
+weeks of forward paper trade with capacity limits and monitoring
+([docs/ROADMAP.md](docs/ROADMAP.md) §3.11-3.12).
 
 ## What this is, and what it is not
 
 It is a research platform that tries hard not to fool its owner: one
 seeded generator, integer contracts, byte-identical goldens across Python,
-C++, Rust and Java, a look ledger that prices every statistic computed, and
+C++ and Rust (and Java until its archive at v1.14.0), a look ledger that prices every statistic computed, and
 pre-registration that is checked by code. It runs the full loop from
 market data to TCA on one instrument and paper-trades a universe.
 
@@ -317,8 +390,9 @@ documents say so at the top rather than in a footnote. It is not connected
 to a live venue: there is no order gateway, so the 15c3-5 checks guard a
 simulator. The real data is seven (plus two holdout) Nasdaq sessions on
 three symbols, which is enough to find statistically strong signals and
-not enough to say much about their size. The Java tree is largely a frozen
-copy kept for parity, not a production service.
+not enough to say much about their size. The Java tree is an archived
+copy frozen at v1.14.0 ([archive/java/](archive/java/README.md)), not a
+production service.
 
 ## Architecture in one line
 
@@ -641,8 +715,8 @@ intraday-alpha-platform/
                             lifecycle (alpha promotion state machine + registry);
                             rust/features_py: the pyo3 wheel iap_features_rs, built
                             outside the workspace (v1.11)
-  java/                     javac build: com.iap.* — full platform layer + paper trading
-                            (+ contracts, trace, lifecycle; PaperTrading emits decision traces)
+  archive/java/             the Java engine, archived in v1.15 and frozen at v1.14.0
+                            (com.iap.*: platform layer + paper trading; not built in CI)
   research/                 alpha_reports/, ml_reports/, adaptive_reports/, baselines/,
                             tca/, models/, experiments/<id>/{spec,result}.json
                             (+ eligibility.json for runs made since v1.3.0),
@@ -650,16 +724,17 @@ intraday-alpha-platform/
                             lifecycle_transitions.jsonl, lifecycle_log.jsonl,
                             power/ (planted-signal power study: generator config + report)
   deployment/               docker/, k8s/, grafana/, prometheus/, alertmanager/
-  tools/github/             issues.yaml (epics/issues source of truth) + create_issues.py
+  tools/                    release.py, merge_ledger.py, prereg_touch_check.py, the R7 and
+                            v1.16 study / registration scripts; github/issues.yaml (epics/
+                            issues source of truth) + create_issues.py
 ```
 
 ## Quick start
 
 Prerequisites are already the environment baseline: Python 3.11 (+ pyarrow),
 g++ 13 / CMake / GoogleTest, Rust (the toolchain is pinned to 1.99.0 in
-`rust/rust-toolchain.toml`), Java 21 (JUnit4 jar at
-`/usr/share/java/junit4.jar` — there is deliberately **no Maven**; see
-[docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)).
+`rust/rust-toolchain.toml`). Java 21 is needed only for the archived Java
+engine (`archive/java/`, no Maven; see [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)).
 
 ```bash
 # 1. Generate the seeded synthetic dataset (raw → normalized → Parquet + QC)
@@ -669,9 +744,8 @@ cd python && PYTHONPATH=src python3 -m iap.marketdata && cd ..
 cd python && PYTHONPATH=src python3 -m pytest -q && cd ..
 cd cpp    && bash build.sh && ctest --test-dir build --output-on-failure && cd ..
 cd rust   && cargo test && cd ..
-cd java   && bash build.sh && bash test.sh && cd ..
 
-# 3. Or all four + the repo-level integration/replay suites + the parity table
+# 3. Or all three + the repo-level integration/replay suites + the parity table
 bash tests/harness/run_all.sh              # add --golden-only for the fast parity check
 python3 -m pytest -q tests/integration tests/replay   # the two repo-level suites alone
 
@@ -697,13 +771,9 @@ PYTHONPATH=python/src python3 research/ml_reports/run_ml.py      # gated ML + me
 PYTHONPATH=python/src python3 research/adaptive_reports/run_adaptive.py  # adaptive policy study
 cd python && PYTHONPATH=src python3 -m iap.tca && cd ..          # TCA report
 
-# 7. Paper trading (Java platform: book → features → alphas → portfolio →
-#    risk → execution → decision trace, with /metrics, /health, /ready, /status on :8080)
-bash java/paper.sh                          # asap replay of the golden vector
-bash java/paper.sh --mode realtime --speed 60   # paced session you can scrape
-bash java/paper.sh --resume                 # continue from java/out/state
-#   (positions, realized P&L, any latched kill switch and the decision-trace
-#    digest survive a restart — PLATFORM_CONVENTIONS.md §12.3)
+# 7. Paper trading: the Java platform vertical (archive/java/paper.sh) is archived and
+#    frozen at v1.14.0 (archive/java/README.md says how to restore it); the deployed
+#    `java` image still builds from it. The MVP (step 4) is the maintained loop.
 
 # 8. Validate the deployment the way CI does, and the build plan
 python3 tests/harness/check_deployment.py
@@ -801,8 +871,8 @@ figure in this README — test and golden counts, the ledger denominator, the
 24 alphas / 23 CANDIDATE, the MVP counts and P&L, the schema, contract and
 Protocol counts, the benchmark figures — from the artefact that produces it.
 
-Four independent implementations of one pinned semantics, held identical by
-golden tests — the engineering discipline this repo is built around
+Independent implementations of one pinned semantics (three maintained,
+plus the archived Java port), held identical by golden tests — the engineering discipline this repo is built around
 (spec §21; [paper 6](docs/papers/06_cpp_vs_rust_vs_java_event_driven.md)).
 
 ## Documentation index
@@ -814,13 +884,15 @@ golden tests — the engineering discipline this repo is built around
 | [COOKBOOK.md](COOKBOOK.md) | 74 task-oriented recipes with runnable commands (39-61: maker backtest, quoting, optimal execution, auctions, parallel features, the `v3` validity block, calibrating and backtesting a real session, signed pre-registration, the Almgren-Chriss frontier, the Rust feature engine from Python and building its wheel with maturin, the model registry, shadow mode and week-by-week monitoring, the LLM research agent, its evals and a guarded session with the scripted client, the `POLYGLOT-OVERRIDE` workflow, combinatorial purged CV, PBO and the deflated Sharpe ratio, tick-to-trade percentiles, extended features and event clocks, the multi-venue router, alert routing and SLOs, the fill hazard with post-only and markout feedback; 62-65: deflating a study's Sharpe, a maker run combining extended features and the hazard, the feedback loop on a toxic regime, reading the SLO burn rates; 66: planning the R7 data load; 67-68: regulatory fees on a round trip, the governance checks run locally; 69-74 (v1.14): verifying the risk audit hash chain, the 15c3-5 pre-trade controls, a v1.13 feature store next to a v1.14 one, the `*_v113` method bundles, per-touch-order adverse selection, maintainer trust roots) |
 | [docs/REAL_DATA.md](docs/REAL_DATA.md) | real historical data: what `python -m iap.marketdata ingest` reads (Nasdaq TotalView-ITCH 5.0, LOBSTER), how to obtain files yourself (nothing is bundled), the commands from a downloaded file to an alpha report, the mapping table to canonical events, the point-in-time security master and corporate-actions table, known limitations, and what a first real-data study can and cannot conclude |
 | [docs/RESEARCH_VALIDITY.md](docs/RESEARCH_VALIDITY.md) + [research/power/POWER_REPORT.md](research/power/POWER_REPORT.md) | the corrected research methods (the defaults since v1.5.0, each with its named legacy rule), the research store under parallel writers, gate eligibility; the planted-signal power study of the validation chain |
-| [CHANGELOG.md](CHANGELOG.md) | release notes, newest first (v1.11.0: the Rust feature engine via pyo3, the polyglot policy, the model registry, the LLM research agent and its evals; v1.10.0: skewed quoting, auctions, optimal execution, governance G1-G4; v1.9.0: research validity options, parallel features, maker economics; v1.8.0: the 2026 holdout and the ingest memory fix; v1.6.0-v1.7.2: real data, the agent layer, signal combination, real-data power; v1.5.0: the corrected research methods become the defaults, every old rule keeps a legacy name, every dataset-derived artefact regenerated; v1.4.0: the generator's equity flow calibration fixed so flow reaches the close, and every dataset-derived artefact regenerated; v1.3.0: fail-closed risk, simulator fill rules, paper-platform safety, governance and deployment hardening, research validity) |
+| [CHANGELOG.md](CHANGELOG.md) | release notes, newest first ("Unreleased": v1.16 so far; v1.15.0: R7 confirmed, the MVP on a real ITCH day, Java archived; v1.14.0: the correctness release; v1.13.0: review-driven hardening; v1.12.0: R7 statistics, tick-to-trade, the multi-venue router; v1.11.0: the Rust feature engine via pyo3, the polyglot policy, the model registry, the LLM research agent and its evals; v1.10.0: skewed quoting, auctions, optimal execution, governance G1-G4; v1.9.0: research validity options, parallel features, maker economics; v1.8.0: the 2026 holdout and the ingest memory fix; v1.6.0-v1.7.2: real data, the agent layer, signal combination, real-data power; v1.5.0: the corrected research methods become the defaults, every old rule keeps a legacy name, every dataset-derived artefact regenerated; v1.4.0: the generator's equity flow calibration fixed so flow reaches the close, and every dataset-derived artefact regenerated; v1.3.0: fail-closed risk, simulator fill rules, paper-platform safety, governance and deployment hardening, research validity) |
 | [docs/MVP.md](docs/MVP.md) | the executable MVP (`python -m iap.mvp run / replay / verify / explain`): one deterministic, fully traced trading loop on a synthetic equity — the loop module by module, the §11.4 wiring rules with code references, the determinism contract, the incident replay flow, the honest golden-run results (cost-negative) with the realized-IC audit, and the success-criteria table |
 | [docs/LIFECYCLE.md](docs/LIFECYCLE.md) | the 7-state promotion lifecycle: states, the 17-edge transition table, the 20 gates with config keys and defaults, evidence documents, registry and transition-log formats, the bootstrap result (23 CANDIDATE / 0 beyond), the golden, the Java/Rust ports, the RETIRED-is-observational caveat |
 | [docs/DECISION_TRACE.md](docs/DECISION_TRACE.md) | the decision trace: the record, ids, canonical JSON rules, the stream digest with its known answers, sinks, the pinned `explain()` block, store views, emission points in Python / Java / C++ / Rust, incident replay |
 | [API_CONTRACTS.md](API_CONTRACTS.md) | the contract layer: 22 typed contracts field by field, ids and canonical JSON, validation, the 18 Protocols and what satisfies them, versioning, the 17-schema index |
 | [API_TRADING.md](API_TRADING.md) | the Python reference ports of the hard risk engine (`iap.risk`) and the execution stack (`iap.execution`): public APIs, golden parity statements, what is pinned about each port |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | the six-week plan (Phase 0 → Week 6) and Phase 2/3 mapped to what exists with evidence, what is backlog, the MVP success criteria; §3.6 is v1.11 (done, running, deferred) |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | the six-week plan (Phase 0 → Week 6) and Phase 2/3 mapped to what exists with evidence, what is backlog, the MVP success criteria; one section per release, §3.11 is v1.16 (done, in PR, running, closed) and §3.12 the v1.17 direction |
+| [docs/research/](docs/research/) | research write-ups: [R7_RESULTS.md](docs/research/R7_RESULTS.md) (the confirmatory result), [R7_POWER.md](docs/research/R7_POWER.md), [MVP_REAL_20191018.md](docs/research/MVP_REAL_20191018.md) (the MVP on a real day), [FX11_FINDING.md](docs/research/FX11_FINDING.md), [AGENT_EVAL_LIVE.md](docs/research/AGENT_EVAL_LIVE.md), [MEMORY_REVIEW_v116.md](docs/research/MEMORY_REVIEW_v116.md); the v1.16 study in [research/v116/MONETISATION_P0-6.md](research/v116/MONETISATION_P0-6.md) |
+| [docs/R7_DATA_PLAN.md](docs/R7_DATA_PLAN.md) | the R7 data plan: unseen sessions, tiers, download and ingest |
 | [docs/POLYGLOT.md](docs/POLYGLOT.md) | which language copy of each duplicated component is canonical and which is frozen (v1.11.0, plan E3): inventory, golden pins, consumers, the `POLYGLOT-OVERRIDE:` rule enforced by `tests/harness/check_polyglot_policy.py` (COOKBOOK 53) |
 | [docs/governance/GOVERNANCE.md](docs/governance/GOVERNANCE.md) §2b | the LLM research agent's controls (v1.11.0, AI1-AI2): tool allowlist, a signing key the model never sees, pre-registration caps, the numbers rule, budgets, persisted transcripts, the evals and what they do not cover |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | system design, per-language responsibilities, contracts, the research → trading → execution → adaptive loop with lifecycle and trace, determinism, golden topology, hot-path notes, observability, the MVP vertical, deployment, the AI / agent boundary (what is pinned, what exists, what is backlog), failure modes and fail-closed design, the research-store concurrency model, and the distance to a production system |
@@ -839,9 +911,10 @@ golden tests — the engineering discipline this repo is built around
 | [research/tca/TCA_REPORT.md](research/tca/TCA_REPORT.md) | simulated parent-order TCA |
 | [research/experiments/README.md](research/experiments/README.md) | the ExperimentRunner's spec / result documents and the fifteen committed experiments (five under the default methods, five under the rules up to v1.4.0, five kept from the v1.3.0 dataset) |
 | [benchmarks/RESULTS.md](benchmarks/RESULTS.md) | benchmark index; C++ table in [results_cpp.md](benchmarks/results_cpp.md) + methodology |
-| [docs/runbooks/](docs/runbooks/) | data pipeline, backtest, paper trading, kill-switch incident, incident replay runbooks |
-| [docs/governance/](docs/governance/) | governance, reproducibility, security |
-| [docs/EPICS.md](docs/EPICS.md) + [CONTRIBUTING.md](CONTRIBUTING.md) | the build plan as epics/issues with honest done / backlog status (generated from `tools/github/issues.yaml`; nothing in progress as of 2026-10-04); how to contribute |
+| [docs/runbooks/](docs/runbooks/) | data pipeline, backtest, paper trading, kill-switch incident, incident replay, alerting, job watchdog and Nasdaq-watch runbooks |
+| [docs/governance/](docs/governance/) | governance, reproducibility, security, maintainer trust roots, repository settings (branch protection, required checks) |
+| [docs/EPICS.md](docs/EPICS.md) + [CONTRIBUTING.md](CONTRIBUTING.md) | the build plan as epics/issues with honest done / in-progress / backlog status (generated from `tools/github/issues.yaml`; E36 is v1.16); how to contribute |
+| [archive/java/README.md](archive/java/README.md) | the archived Java engine: state at v1.14.0, what archiving means, how to restore it |
 | [schemas/README.md](schemas/README.md) / [schemas/FORMAT.md](schemas/FORMAT.md) / [schemas/MIGRATIONS.md](schemas/MIGRATIONS.md) | the 17-schema index + the SQL DDL; normative wire layout (JSONL + IAP1 binary); every versioned change |
 | [tests/README.md](tests/README.md) | the six-level testing strategy with exact commands and the golden inventory |
 | [deployment/grafana/README.md](deployment/grafana/README.md) | dashboards and observability stack (incl. the trace metrics) |

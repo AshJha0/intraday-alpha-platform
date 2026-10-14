@@ -32,7 +32,7 @@ cd python && PYTHONPATH=src python3 -m iap.mvp run                 # -> ../data/
 # mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=231 children=347 fills=163 pnl=-82.837333 USD digest=3f2b117ecea95922... out=.../data/mvp/58a10f2194a3c81c
 ```
 
-**Java paper vertical** (`java/paper.sh`, state directory `--state-dir` /
+**Java paper vertical** (`archive/java/paper.sh` (archived, frozen at v1.14.0), state directory `--state-dir` /
 `$IAP_STATE_DIR`, `/data/state` in the deployments; `RUNBOOK_paper_trading.md`
 §4–§5, PLATFORM_CONVENTIONS.md §12.3):
 
@@ -74,7 +74,7 @@ replays only from the v1.4.0 tag. The same holds across v1.14.0, whose
 and `research/alpha_registry.json` under `/app` — add `--repo-root /app`.
 
 For a Java session the equivalent is a second run over the same input and
-configuration: `bash java/paper.sh` on the same vector produces the same
+configuration: `bash archive/java/paper.sh` on the same vector produces the same
 `decision_traces.jsonl` bytes and the same `trace.digest`
 (`PaperTraceTest`: emission is a pure function of the event stream).
 Re-derive the digest of an archived file with `TraceDigest.ofJsonl` (Java)
