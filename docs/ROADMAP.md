@@ -1,8 +1,8 @@
 # ROADMAP — the six-week build plan against what exists
 
 The plan behind `tools/github/issues.yaml` (rendered as
-[EPICS.md](EPICS.md): 31 epics, 163 issues — 109 done, 0 in progress, 54
-backlog as of 2026-10-04, the v1.5.0 release), mapped phase by phase to the code, the tests and
+[EPICS.md](EPICS.md): 36 epics, 215 issues — 153 done, 4 in progress, 58
+backlog as of 2026-10-14, v1.16 in progress), mapped phase by phase to the code, the tests and
 the artefacts that prove each step, and stated the same way the research
 is: what is done cites evidence; what is not done says what would prove it.
 Every count in this file is re-derived by `tests/harness/check_headline_numbers.py`
@@ -489,21 +489,60 @@ change: still 0 alphas promoted, no strategy that trades at 1x costs.
 - The R7 confirmatory round has not run. It needs the re-ingest under
   manifest x-version 2, which is the first thing to do on v1.14.
 
-## 3.10 Next: v1.15 and after
+## 3.10 v1.15.0 (2026-10-13): the confirmatory release
 
 | Item | State |
 |---|---|
-| R7 confirmatory round (R7-CONFIRM-1, 7 unseen holdout sessions) | done in v1.15: EQ10@1s and EQ05@1s both confirmed; net P&L at 1x cost 0 (docs/research/R7_RESULTS.md) |
-| AI4 deep order-book baselines | signed, deferred to v1.16 (research/r7/AI4_DEFERRED.md) |
-| A2 QQQ against its constituents (basis study) | code in review (PR #85), targeted at v1.15; needs the R7 ingest |
-| Maker v2 and quoting v2 pre-registrations | to write, with the v1.14 execution options switched on and the protocol in ticks |
+| R7 confirmatory round (R7-CONFIRM-1, 7 unseen holdout sessions) | done: EQ10@1s and EQ05@1s both confirmed; net P&L at 1x cost 0 (docs/research/R7_RESULTS.md) |
+| MVP on a real ITCH day (2019-10-18, AAPL/MSFT/QQQ) | done: gross +801 USD, net -9,226 USD (docs/research/MVP_REAL_20191018.md) |
+| AI4 deep order-book baselines | signed, deferred to v1.16 and not run (research/r7/AI4_DEFERRED.md) |
+| Java engine | archived in `archive/java/`, frozen at v1.14.0 |
+| A2 QQQ against its constituents (basis study) | code merged (#85); no real-data run |
 | A3 futures lead-lag | on hold (data cost) |
 | P1-P3 live gateway | not started |
-| Archive the frozen Java copy | later |
 
-R7 has produced its result (both confirmed, predictive but not yet tradable; v1.16 = monetisation); AI4 and A2 have not. When they do, they go through
-the same gate and ledger as everything else; a deep model gets no
-exemption for being deep.
+## 3.11 v1.16 (in progress): monetisation
+
+The question: does the confirmed EQ10/EQ05 edge survive realistic costs, and
+at what size? Plan: `IAP_v1.16_Plan.md` (18 items, owner-approved
+2026-10-14); item status is in [EPICS.md](EPICS.md) (E36). On main, unless
+a PR is named.
+
+| Item | State |
+|---|---|
+| 1-5 realistic execution (parent impact, residual impact fit, v3 prereg realism keys, SOR and algo opt-ins) | done, all opt-in (#126-#130, #135; API_TRADING.md §2.13) |
+| 6 in-sample monetisation study (taker, 10 sessions, 480 cells) | done: zero trades in every cell; **no-go** on buying data (research/v116/MONETISATION_P0-6.md) |
+| 7 capacity curve | done: 0 of 45 cells break even (best 0.92 bp against 2.4 bp); tool and results in PR #149 |
+| 8 net-of-cost prereg on fresh data | not triggered (no net-positive in-sample cell) |
+| M5 quoting study v2 (two-sided skewed quoting, after the taker no-go) | registered (#134); in-sample run in progress, no result yet |
+| 9 forward paper-trade driver (infrastructure) | in PR #144 |
+| 10 AI4 DeepLOB on real data | in progress: adapter and training in PR #151; new prereg to be signed by the owner; no result yet |
+| 11 research branches merged onto main | done (#131, #132) |
+| 12 R7 follow-ups | done (#140); memory follow-ups in PR #148 |
+| 13 engineering performance | done (#145, #146) |
+| 14 optimiser (Dykstra, estimated Ledoit-Wolf) | in PR #147 |
+| 15 multiple-testing report columns | done (#142) |
+| 16 blocking mypy and agent-evals | in PR #143 |
+| 17 MVP end-of-day flatten | done (#139) |
+| 18 release.py tar fix; process-and-delete pipeline | tar fix done (#141); the pipeline is not needed (item 8 not triggered) |
+| registration environment pinned to the CI lock | in PR #152 |
+
+## 3.12 v1.17 direction (depends on v1.16)
+
+From the plan's v1.17 sketch. The taker study was a no-go, so unless the
+quoting study or AI4 finds a net-positive rule:
+
+- widen the data (more symbols and sessions; a paid-data decision), or
+- pivot to the execution-quality product: algos and SOR judged on
+  implementation shortfall.
+
+If a net-positive rule does appear: several weeks of forward paper trade,
+capacity limits in the portfolio layer, a monitoring runbook (drift, decay,
+cost creep) and an agent daily report. Either way: retire what v1.16 drops,
+a reproducible-build check, and a docs and site refresh.
+
+Every result still goes through the same gate and ledger; a deep model gets
+no exemption for being deep.
 
 ## 4. MVP success criteria
 

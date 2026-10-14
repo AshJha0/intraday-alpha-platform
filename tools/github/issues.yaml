@@ -108,7 +108,9 @@ milestones:
   - title: "v1.14"
     description: "Released 2026-10-11: real-data mapping and feature store, SEC 15c3-5 pre-trade risk set and tamper-evident audit, execution-realism opt-ins, trust roots and chained ledger, shared research engines."
   - title: "v1.15"
-    description: "In progress (IAP_v1.15_Plan.md): R7 confirmatory round, v2 realism config, models (DeepLOB, conformal sizing), regulatory fees, governance enforcement, narrower agent job, Java archive, release automation."
+    description: "Released 2026-10-13 (IAP_v1.15_Plan.md): R7 confirmatory round, v2 realism config, models (DeepLOB, conformal sizing), regulatory fees, governance enforcement, narrower agent job, Java archive, release automation."
+  - title: "v1.16"
+    description: "In progress (IAP_v1.16_Plan.md), the monetisation release: realistic execution P0-1..P0-5, in-sample monetisation study (no-go) and capacity curve, quoting v2, forward paper-trade infrastructure, AI4 on real data, research hygiene and engineering."
 
 # ----------------------------------------------------------------------------
 epics:
@@ -790,6 +792,26 @@ epics:
       - "Every plan item is done or carried to v1.16 with a reason; the release is cut with tools/release.py"
     out_of_scope:
       - "v1.16 direction (decided by the R7 outcome)"
+
+
+  - key: E36
+    title: "Epic: v1.16 - monetisation: realistic execution, cost-aware study, capacity, AI4"
+    labels: [type:epic, area:execution, phase:phase2, priority:p0]
+    milestone: "v1.16"
+    objective: >
+      Release v1.16 per IAP_v1.16_Plan.md (18 items, owner-approved
+      2026-10-14): make the cost model credible, then ask whether the
+      confirmed EQ10/EQ05 edge survives realistic costs and at what size.
+      Item keys are the plan's item numbers.
+    scope:
+      - "P0 execution (items 1-5): parent impact, residual impact calibration, v3 prereg realism keys, SOR and algo opt-ins"
+      - "P0 study (6-8, 18): in-sample monetisation study, capacity curve, net-of-cost prereg on fresh data"
+      - "P1: forward paper trade (9), AI4 DeepLOB on real data (10), research hygiene (11-12)"
+      - "P2 engineering (13-17)"
+    acceptance:
+      - "Every plan item is done, closed with a recorded reason or carried to v1.17; the release is cut with tools/release.py"
+    out_of_scope:
+      - "Buying fresh data (only on a net-positive in-sample study; the study was a no-go)"
 
 # ----------------------------------------------------------------------------
 issues:
@@ -3972,14 +3994,14 @@ issues:
     title: "v1.15 R-P2-5: maker study write-up"
     labels: [type:docs, area:research, priority:p2]
     milestone: "v1.15"
-    status: backlog
+    status: done
     estimate_days: 1
     context: >
-      Write up the detached maker study when it finishes.
+      The maker study finished with no maker edge (H1 dropped); its driver and prereg reached main with research/maker-real in v1.16 item 11.
     acceptance:
       - "Report in research/maker-real, merged"
     evidence:
-      - "planned: research/maker-real/"
+      - "research/maker_real/prereg.json; research/agents/forks/maker-real/"
 
   - key: M-P0-1
     epic: E35
@@ -3989,11 +4011,11 @@ issues:
     status: backlog
     estimate_days: 6
     context: >
-      Deferred to v1.16 (research/r7/AI4_DEFERRED.md): the signed prereg is not run in v1.15; a real-data adapter with per-session windows and a new registration come first.
+      Signed but deferred to v1.16 by the owner and not run (research/r7/AI4_DEFERRED.md); carried to v1.16 item 10.
     acceptance:
       - "Pre-registered net-of-cost comparison against the baselines"
     evidence:
-      - "python/src/iap/models/deeplob.py; python/src/iap/models/deeplob_baselines.py; research/r7/ai4_deeplob_prereg_DRAFT.json"
+      - "planned: v1.16 item 10 (V116-10)"
 
   - key: M-P1-2
     epic: E35
@@ -4028,14 +4050,14 @@ issues:
     title: "v1.15 X-P1-2: MVP on a real ITCH session end to end"
     labels: [type:feature, area:mvp, lang:python, priority:p1]
     milestone: "v1.15"
-    status: backlog
+    status: done
     estimate_days: 2
     context: >
-      Run the MVP loop on a real ITCH session instead of synthetic data.
+      python -m iap.mvp.real streams an ingested dataset through the unchanged MvpEngine; full day 2019-10-18 AAPL/MSFT/QQQ: gross +801 USD, net -9,226 USD.
     acceptance:
       - "Digest recorded; site shows it"
     evidence:
-      - "planned: docs/ (real-session MVP digest)"
+      - "python/src/iap/mvp/real.py; python/tests/test_mvp_real.py; docs/research/MVP_REAL_20191018.md"
 
   - key: X-P1-3
     epic: E35
@@ -4190,3 +4212,257 @@ issues:
       - "Done and recorded"
     evidence:
       - "planned: research/ (step-2 abort entries)"
+
+  # ---------------------------------------------------------------- E36 ----
+  - key: V116-1
+    epic: E36
+    title: "v1.16 item 1: impact on the parent order (simulator rule 6b)"
+    labels: [type:feature, area:execution, lang:python, priority:p0]
+    milestone: "v1.16"
+    status: done
+    estimate_days: 1
+    context: >
+      Opt-in ExecConfig.impact_model='parent' with impact_exponent and permanent_impact_bps_per_pct_adv (#126). Default 'child' keeps rule 6 and every golden.
+    acceptance:
+      - "Splitting a parent cannot lower its cost; goldens unchanged"
+    evidence:
+      - "python/src/iap/execution/simulator.py; python/tests/test_v116_parent_impact.py"
+
+  - key: V116-2
+    epic: E36
+    title: "v1.16 item 2: residual-move impact calibration"
+    labels: [type:feature, area:execution, lang:python, priority:p0]
+    milestone: "v1.16"
+    status: done
+    estimate_days: 2
+    context: >
+      estimate_calibration(impact_fit=True) / --impact-fit and apply_impact_fit (#127). Off by default.
+    acceptance:
+      - "Linear, sqrt and power fits with SEs per horizon"
+    evidence:
+      - "python/src/iap/execution/calibration.py; python/tests/test_v116_impact_calibration.py"
+
+  - key: V116-3
+    epic: E36
+    title: "v1.16 item 3: v3 prereg realism keys and latency stress grid"
+    labels: [type:feature, area:execution, lang:python, area:research, priority:p0]
+    milestone: "v1.16"
+    status: done
+    estimate_days: 1.5
+    context: >
+      RealismOptIns v3 keys and configs/prereg/v3.json, values owner-approved 2026-10-14 (#128).
+    acceptance:
+      - "v2 runs unchanged; v3 loads and validates"
+    evidence:
+      - "configs/prereg/v3.json; python/tests/test_v116_prereg_realism.py"
+
+  - key: V116-4
+    epic: E36
+    title: "v1.16 item 4: SOR opt-ins on the cost-aware router"
+    labels: [type:feature, area:execution, lang:python, priority:p0]
+    milestone: "v1.16"
+    status: done
+    estimate_days: 2
+    context: >
+      sweep_rank='all_in' and fill_prob / hazard_fill_prob in iap.execution.sor_v2 (#129, deduplicated in #135).
+    acceptance:
+      - "Pinned routes and C++ parity unchanged"
+    evidence:
+      - "python/src/iap/execution/sor_v2.py; python/tests/test_v116_sor.py"
+
+  - key: V116-5
+    epic: E36
+    title: "v1.16 item 5: algos: POV exact participation, AC eta from the residual fit"
+    labels: [type:feature, area:execution, lang:python, priority:p0]
+    milestone: "v1.16"
+    status: done
+    estimate_days: 2
+    context: >
+      ParentOrder.pov_exact and ac_params_from_calibration(impact_source='residual') (#130); VWAP by time of day already existed.
+    acceptance:
+      - "Opt-in; pinned POV unchanged"
+    evidence:
+      - "python/src/iap/execution/algos.py; python/tests/test_v116_algos.py"
+
+  - key: V116-6
+    epic: E36
+    title: "v1.16 item 6: in-sample monetisation study (taker)"
+    labels: [type:research, area:research, lang:python, priority:p0]
+    milestone: "v1.16"
+    status: done
+    estimate_days: 3
+    context: >
+      P0-6 grid on 10 in-sample sessions, 480 cells: zero trades in every cell; the forecast is far below the round-trip cost. No-go on buying data (owner, 2026-10-14) (#138).
+    acceptance:
+      - "Result recorded and reviewed by the owner"
+    evidence:
+      - "research/v116/MONETISATION_P0-6.md; research/v116/monetisation_summary.json"
+
+  - key: V116-7
+    epic: E36
+    title: "v1.16 item 7: taker capacity curve and break-even participation"
+    labels: [type:research, area:research, lang:python, priority:p0]
+    milestone: "v1.16"
+    status: done
+    estimate_days: 1
+    context: >
+      0 of 45 cells break even (best EQ10 AAPL 1m top 0.1%: 0.92 bp against 2.4 bp fixed cost). The tool and results are in PR #149, pending merge.
+    acceptance:
+      - "Capacity per instrument reported"
+    evidence:
+      - "research/v116/MONETISATION_P0-6.md"
+      - "PR #149: tools/v116_capacity_curve.py (pending merge)"
+
+  - key: V116-8
+    epic: E36
+    title: "v1.16 item 8: net-of-cost prereg on fresh sessions"
+    labels: [type:research, area:research, priority:p0]
+    milestone: "v1.16"
+    status: backlog
+    estimate_days: 2
+    context: >
+      Not triggered: the in-sample study (item 6) and the capacity curve (item 7) found no net-positive cell, so no data is bought and no prereg is signed.
+    acceptance:
+      - "Only after a net-positive in-sample study"
+    evidence:
+      - "planned: none (not triggered in v1.16)"
+
+  - key: V116-9
+    epic: E36
+    title: "v1.16 item 9: forward paper-trade daily driver (infrastructure)"
+    labels: [type:feature, area:mvp, lang:python, priority:p1]
+    milestone: "v1.16"
+    status: in-progress
+    estimate_days: 2
+    context: >
+      Daily driver and live-vs-backtest TCA as infrastructure, in PR #144. The owner registers the daily task.
+    acceptance:
+      - "Daily run produces a TCA report"
+    evidence:
+      - "planned: PR #144 (forward paper-trade driver)"
+
+  - key: V116-10
+    epic: E36
+    title: "v1.16 item 10: AI4 DeepLOB on real data"
+    labels: [type:research, area:ml, lang:python, priority:p1]
+    milestone: "v1.16"
+    status: in-progress
+    estimate_days: 3
+    context: >
+      Parts 1-2 (streaming real-data LOB adapter, streaming training and evaluation) in PR #151; a new prereg superseding AI4-DEEPLOB-1 needs the owner's signature; no development on R7 holdout sessions.
+    acceptance:
+      - "One holdout test against baselines after costs"
+    evidence:
+      - "planned: PR #151 (iap.models.lob_real, iap.models.lob_train)"
+
+  - key: V116-11
+    epic: E36
+    title: "v1.16 item 11: merge research/maker-real and research/step2"
+    labels: [type:feature, area:repo, area:research, priority:p1]
+    milestone: "v1.16"
+    status: done
+    estimate_days: 1
+    context: >
+      Code merged; fork blackboards archived unchanged with FORK.json; ledger merged with tools/merge_ledger.py (#131, anchors #132).
+    acceptance:
+      - "Results reproducible from main"
+    evidence:
+      - "research/agents/forks/; python/tests/test_v116_fork_archive.py"
+
+  - key: V116-12
+    epic: E36
+    title: "v1.16 item 12: R7 follow-ups"
+    labels: [type:feature, area:research, lang:python, priority:p1]
+    milestone: "v1.16"
+    status: done
+    estimate_days: 1.5
+    context: >
+      beta_stability outside hashed alpha code, open-prereg touch warning in CI, merge --allow-lot-size-differences / --link, memory review (#140). Memory follow-ups 2-7 are in PR #148.
+    acceptance:
+      - "Each follow-up tested"
+    evidence:
+      - "python/src/iap/validation/beta_stability.py; tools/prereg_touch_check.py; docs/research/MEMORY_REVIEW_v116.md"
+
+  - key: V116-13
+    epic: E36
+    title: "v1.16 item 13: engineering performance items"
+    labels: [type:feature, area:performance, lang:python, lang:cpp, lang:rust, priority:p2]
+    milestone: "v1.16"
+    status: done
+    estimate_days: 2
+    context: >
+      Heap-based simulator queues and count-based ITCH guards (#145); allocation-free C++ depth_into and a Rust check_order bench (#146). Fills byte-identical.
+    acceptance:
+      - "No behaviour change; goldens identical"
+    evidence:
+      - "rust/risk/benches/check_order.rs; python/tools/bench_exec_simulator.py"
+
+  - key: V116-14
+    epic: E36
+    title: "v1.16 item 14: optimiser: Dykstra projection, estimated Ledoit-Wolf intensity"
+    labels: [type:feature, area:portfolio, lang:python, priority:p2]
+    milestone: "v1.16"
+    status: in-progress
+    estimate_days: 1
+    context: >
+      Opt-in; in PR #147.
+    acceptance:
+      - "Defaults unchanged"
+    evidence:
+      - "planned: PR #147"
+
+  - key: V116-15
+    epic: E36
+    title: "v1.16 item 15: multiple testing report columns"
+    labels: [type:feature, area:research, lang:python, priority:p2]
+    milestone: "v1.16"
+    status: done
+    estimate_days: 1
+    context: >
+      iap.validation.multiple_testing and a report-only table in the 24-alpha REPORT.md (#142); the promotion gate is unchanged.
+    acceptance:
+      - "Report-only; gate unchanged"
+    evidence:
+      - "python/src/iap/validation/multiple_testing.py; python/tests/test_v116_multiple_testing.py"
+
+  - key: V116-16
+    epic: E36
+    title: "v1.16 item 16: blocking mypy and agent-evals; Java image decision (N-7)"
+    labels: [type:feature, area:testing, priority:p2]
+    milestone: "v1.16"
+    status: in-progress
+    estimate_days: 0.5
+    context: >
+      In PR #143.
+    acceptance:
+      - "CI jobs blocking"
+    evidence:
+      - "planned: PR #143"
+
+  - key: V116-17
+    epic: E36
+    title: "v1.16 item 17: MVP end-of-day flatten"
+    labels: [type:feature, area:mvp, lang:python, priority:p2]
+    milestone: "v1.16"
+    status: done
+    estimate_days: 0.5
+    context: >
+      Opt-in execution.eod_flatten_lead_ns in mvp.json (#139); absent = the pinned golden run.
+    acceptance:
+      - "End position flat on the tiny config; golden unchanged"
+    evidence:
+      - "python/src/iap/mvp/engine.py; python/tests/test_v116_mvp_eod_flatten.py"
+
+  - key: V116-18
+    epic: E36
+    title: "v1.16 item 18: release.py tarfile extract; process-and-delete pipeline"
+    labels: [type:feature, area:repo, lang:python, priority:p2]
+    milestone: "v1.16"
+    status: done
+    estimate_days: 1
+    context: >
+      release.py apply-bundle extracts with Python tarfile (#141). The process-and-delete data pipeline is not needed: item 8 was not triggered.
+    acceptance:
+      - "Release bundle extracts on Windows"
+    evidence:
+      - "tools/release.py; python/tests/test_release_tool.py"
