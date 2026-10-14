@@ -402,7 +402,8 @@ def engine_frame_builder(
             rows.setdefault(vec.instrument_id, []).append(vals)
         out: dict[int, pd.DataFrame] = {}
         for iid in sorted(rows):
-            frame = pd.DataFrame(np.vstack(rows[iid]), columns=names)
+            # pop: each instrument's row list is freed once stacked (memory, v1.16)
+            frame = pd.DataFrame(np.vstack(rows.pop(iid)), columns=names)
             frame.insert(0, "exchange_ts", np.asarray(ts[iid], dtype=np.int64))
             out[iid] = frame
         return out
@@ -419,7 +420,7 @@ def _same(a, b) -> bool:
 def _obfuscate_labels(frames: Mapping[int, pd.DataFrame]) -> dict[int, pd.DataFrame]:
     out: dict[int, pd.DataFrame] = {}
     for iid, df in frames.items():
-        df2 = df.copy()
+        df2 = df.copy(deep=False)  # only label columns are replaced (v1.16)
         for c in df2.columns:
             if c.startswith(("label_mid_", "label_cost_", "label_reopen_")):
                 df2[c] = _GARBAGE
