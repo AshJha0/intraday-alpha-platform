@@ -247,6 +247,28 @@ port contract: a port reproduces scores, and the ports' backtest golden
 (`expected_backtest.json`) names its row block explicitly, so it did not
 move either.
 
+### 7.2 Report-only diagnostics added in v1.16 (Python research; not a port contract)
+
+Neither module changes a fit, a score, a gate or a verdict.
+
+- `iap.validation.multiple_testing` (item 15): `p_two_sided(t)`,
+  `holm(pvalues)`, `benjamini_hochberg(pvalues)`, `romano_wolf(t_obs,
+  t_boot)` (step-down max-t from bootstrap t statistics centred at the
+  null), `fold_bootstrap_t(fold_stats, n_boot=2000, seed=20261014)` (joint
+  fold resampling, `(F, m)` input) and `report_family(reports)`. Values come
+  back in input order; `None` or non-finite inputs give `None` and leave the
+  family. The 24-alpha `REPORT.md` gains a "Multiple testing across this
+  report" table (Bonferroni / Holm / BH q / Romano-Wolf per alpha) at its
+  next regeneration; the promotion gate keeps the ledger-wide Bonferroni
+  threshold.
+- `iap.validation.beta_stability` (item 12a): `beta_stability(items,
+  label_col, valid_col)` (per-instrument and per-instrument-day OLS slopes
+  of the label on the raw signal, at least 32 valid pairs per slice) and
+  `alpha_beta_stability(alpha, frames)`. It lives outside `iap.alpha`
+  because the alpha code fingerprint of open pre-registrations covers
+  `alpha/base.py` and `alpha/equity.py`; a test keeps `iap.alpha` from
+  importing it.
+
 ## 8. Signal combination — `iap.combine` (Python research; not a port contract)
 
 `CombinedAlpha(member_ids, method="equal_weight", *, asset_class=None,
