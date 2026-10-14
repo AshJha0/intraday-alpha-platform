@@ -1,0 +1,55 @@
+{
+  "x-version": 1,
+  "description": "Forward paper trade (v1.16 item 9, infrastructure): the rule, realism and monitor thresholds read by python -m iap.paper.daily. Paths are repository-relative; reference feature stores are relative to --data-root. docs/runbooks/RUNBOOK_paper_trade.md.",
+  "prereg": "configs/prereg/v3.json",
+  "mvp_config": "configs/mvp/mvp.json",
+  "execution_config": "configs/execution/execution.json",
+  "symbols": [
+    "AAPL",
+    "MSFT",
+    "QQQ"
+  ],
+  "eod_flatten_lead_ns": 300000000000,
+  "forbidden_datasets": [
+    "r7_holdout",
+    "r7_2025*",
+    "r7_20260612",
+    "holdout2026"
+  ],
+  "tca": {
+    "is_gap_alert_bps": 2.0
+  },
+  "drift": {
+    "reference_features": [
+      "r7_20210713/features",
+      "r7_20210813/features"
+    ],
+    "thresholds": {
+      "psi_warn": 0.1,
+      "psi_alert": 0.25,
+      "ks_alert": 0.1,
+      "mean_shift_alert": 0.5,
+      "std_ratio_alert": 2.0,
+      "min_rows": 100
+    }
+  },
+  "ic": {
+    "horizon": "1s",
+    "methods": "v4",
+    "alphas": {
+      "EQ10": {
+        "holdout_ic": 0.0838
+      },
+      "EQ05": {
+        "holdout_ic": 0.0409
+      }
+    },
+    "min_ratio": 0.25,
+    "rolling_window": 20,
+    "min_rolling_days": 5
+  },
+  "drill": {
+    "symbol": null,
+    "max_events_after_kill": 5000
+  }
+}
