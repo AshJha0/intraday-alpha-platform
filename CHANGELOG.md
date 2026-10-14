@@ -26,6 +26,16 @@ that tag.
   marketable-ADD paths use it, so they no longer allocate per call (`depth()` kept). Rust:
   dependency-free `risk/benches/check_order.rs` (`harness = false`, no lockfile change); CI
   compiles all benches with `cargo bench --no-run`. No behaviour change; goldens identical.
+- v1.16 item 9 (code): forward paper trade as infrastructure, `python -m iap.paper.daily
+  (--date D | --pending)`. Per new real session: locate or ingest (`--itch`; R7 holdout datasets
+  refused), the MVP loop per symbol with `configs/prereg/v3.json` realism and the opt-in EOD
+  flatten, a live-vs-backtest TCA comparison against the research `CostModel` (per parent, per
+  algo, aggregate), feature-drift (reuses `iap.research.drift`) and EQ10/EQ05 realised-IC vs
+  holdout-IC monitors, and a dry kill-switch drill; dated report under `data/real/paper/<D>/`,
+  idempotent unless `--force`. New `configs/paper/paper_trade.json` (thresholds),
+  `tools/run_paper_daily.cmd`, docs/runbooks/RUNBOOK_paper_trade.md (schtasks line + jobs.json
+  entry; not registered). `iap.mvp.real.run_symbol` gains opt-in `eod_flatten_lead_ns` and a
+  `prepare_symbol` helper; default runs unchanged.
 - v1.16 P0-1: opt-in simulator rule 6b, impact on the parent order
   (`ExecConfig.impact_model = "parent"`, `impact_exponent`, `permanent_impact_bps_per_pct_adv`):
   temporary impact on the parent's cumulative taker qty (splitting a parent cannot lower its
