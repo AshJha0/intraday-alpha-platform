@@ -21,6 +21,16 @@ within ``mean^2``; making them consistent would move the committed goldens.
 Opt-in shrinkage: ``shrinkage="ledoit_wolf"`` shrinks the EWMA matrix toward
 a constant-correlation target (Ledoit & Wolf 2004) with intensity
 ``shrink_intensity`` (fixed, deterministic; default 0.1) before the ridge.
+``shrinkage="ledoit_wolf_estimated"`` (opt-in) instead uses the estimated
+Ledoit-Wolf (2004) intensity from :func:`iap.core.shrinkage.ledoit_wolf`
+(the same estimator the combiner uses; scaled-identity target ``mu * I``).
+The intensity ``delta`` is ESTIMATED ON THE EQUALLY-WEIGHTED, DEMEANED SAMPLE
+COVARIANCE of all ``T`` return rows (the Lemma 3.2-3.4 formulas assume
+i.i.d. rows and have no EWMA analogue); it is then APPLIED to the EWMA
+matrix, ``(1 - delta) S_ewma + delta * mu_ewma * I`` with
+``mu_ewma = trace(S_ewma) / N``.  The EWMA's effective sample is smaller
+than ``T`` (about ``(1 + lam) / (1 - lam)`` = 32 bars at 0.94), so this
+``delta`` is on the low side for the EWMA matrix.
 :func:`condition_number` reports the 2-norm condition number.
 """
 
@@ -31,6 +41,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+from iap.core.shrinkage import ledoit_wolf
 
 _REPO = Path(__file__).resolve().parents[4]
 _BAR_NS = 60_000_000_000
@@ -93,7 +105,9 @@ def ewma_covariance(
     """RiskMetrics EWMA covariance of a (T, N) return matrix (per-bar units).
 
     ``shrinkage=None`` (default) is the pinned estimator.  ``"ledoit_wolf"``
-    applies :func:`shrink_constant_correlation` before the ridge.
+    applies :func:`shrink_constant_correlation` before the ridge;
+    ``"ledoit_wolf_estimated"`` applies the estimated LW intensity toward
+    ``mu * I`` (see the module docstring; ``shrink_intensity`` is ignored).
     """
     returns = np.asarray(returns, dtype=np.float64)
     if returns.ndim != 2:
@@ -112,9 +126,12 @@ def ewma_covariance(
         S = lam * S + (1.0 - lam) * np.outer(r, r)
     S = 0.5 * (S + S.T)
     if shrinkage is not None:
-        if shrinkage != "ledoit_wolf":
-            raise ValueError("shrinkage must be None or 'ledoit_wolf'")
-        S = shrink_constant_correlation(S, shrink_intensity)
+        if shrinkage == "ledoit_wolf":
+            S = shrink_constant_correlation(S, shrink_intensity)
+        elif shrinkage == "ledoit_wolf_estimated":
+            S = shrink_identity(S, estimated_lw_intensity(returns))
+        else:
+            raise ValueError("shrinkage must be None, 'ledoit_wolf' or 'ledoit_wolf_estimated'")
     S += np.eye(n) * (ridge * (np.trace(S) / n if np.trace(S) > 0 else 1.0))
     return S
 
@@ -145,3 +162,18 @@ def condition_number(S: np.ndarray) -> float:
     if ev[0] <= 0:
         return float("inf")
     return float(ev[-1] / ev[0])
+
+
+def estimated_lw_intensity(returns: np.ndarray) -> float:
+    """Ledoit-Wolf (2004) intensity estimated on the sample covariance of ``returns``."""
+    return ledoit_wolf(np.asarray(returns, dtype=np.float64))[1]
+
+
+def shrink_identity(S: np.ndarray, intensity: float) -> np.ndarray:
+    """``(1 - d) S + d * mu * I`` with ``mu = trace(S) / n``."""
+    if not 0.0 <= intensity <= 1.0:
+        raise ValueError("intensity must be in [0, 1]")
+    S = np.asarray(S, dtype=np.float64)
+    n = S.shape[0]
+    mu = float(np.trace(S)) / n
+    return (1.0 - intensity) * S + intensity * mu * np.eye(n)
