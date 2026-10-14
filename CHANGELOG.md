@@ -8,6 +8,11 @@ that tag.
 
 ## Unreleased
 
+- v1.16 item 13 (native): C++ `OrderBook::depth_into` caller-buffer overloads (`LevelEntry*`
+  + cap, and a fixed `DepthBuffer`); the execution simulator's aggressive-fill and
+  marketable-ADD paths use it, so they no longer allocate per call (`depth()` kept). Rust:
+  dependency-free `risk/benches/check_order.rs` (`harness = false`, no lockfile change); CI
+  compiles all benches with `cargo bench --no-run`. No behaviour change; goldens identical.
 - v1.16 P0-1: opt-in simulator rule 6b, impact on the parent order
   (`ExecConfig.impact_model = "parent"`, `impact_exponent`, `permanent_impact_bps_per_pct_adv`):
   temporary impact on the parent's cumulative taker qty (splitting a parent cannot lower its
