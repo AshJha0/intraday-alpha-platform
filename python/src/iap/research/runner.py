@@ -109,7 +109,7 @@ import json
 import math
 import os
 import shutil
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -118,7 +118,7 @@ import pandas as pd
 
 from iap.alpha import build
 from iap.alpha.base import AlphaModel
-from iap.alpha.data import load_features
+from iap.alpha.data import load_features, slim_columns
 from iap.backtest import BacktestConfig, Backtester, CostModel
 from iap.contracts.types import ExperimentResult, ExperimentSpec, Verdict
 from iap.contracts.validate import validate_typed
@@ -520,6 +520,8 @@ class ExperimentRunner:
         self._frames: dict[int, pd.DataFrame] | None = (
             {int(k): v for k, v in frames.items()} if frames is not None else None
         )
+        self._injected = frames is not None
+        self._frames_key: frozenset[str] | None = None
         self.meta = load_instrument_meta(self.configs_dir)
         exec_cfg = json.loads((self.configs_dir / "execution" / "execution.json").read_text())
         self.max_participation = float(exec_cfg["defaults"]["max_participation"])
@@ -531,10 +533,24 @@ class ExperimentRunner:
 
     # -- inputs ---------------------------------------------------------
 
-    def frames(self) -> dict[int, pd.DataFrame]:
-        """The full feature store (loaded once)."""
-        if self._frames is None:
-            self._frames = load_features(self.feature_store_dir)
+    def frames(self, needed: Sequence[str] | None = None) -> dict[int, pd.DataFrame]:
+        """The feature store (loaded once per column set).
+
+        ``needed`` (v1.16 item 12, memory): the feature columns the experiment
+        reads; ids, labels and market columns are always kept
+        (:func:`iap.alpha.data.slim_columns`), every other feature column is
+        dropped, so a pooled multi-day real store is not held at full width
+        (263 columns x ~3M rows per instrument ~ 6 GB). ``None`` loads every
+        column. Frames injected at construction are returned as given. Only
+        the latest column set is cached."""
+        if self._injected:
+            return self._frames
+        key = None if needed is None else frozenset(needed)
+        if self._frames is None or key != self._frames_key:
+            self._frames = None  # free the previous set before loading
+            cols = None if key is None else slim_columns(sorted(key))
+            self._frames = load_features(self.feature_store_dir, columns=cols)
+            self._frames_key = key
         return self._frames
 
     def _validate_kwargs(self, bundle: ResearchMethods) -> dict:
@@ -802,6 +818,9 @@ class ExperimentRunner:
         self._check_spec(spec)
         factory = self._model_factory(spec)
         probe = factory()
+        # v1.16 (memory): only the probe's feature columns (+ ids, labels,
+        # market columns); a model without declared features loads them all
+        needed = tuple(getattr(probe, "features", ()) or ()) or None
         # Two windows, because they answer two different questions.
         #
         # ``full_window`` spans train..test end and belongs to the holdout
@@ -820,7 +839,7 @@ class ExperimentRunner:
         # ``validation_period`` the boundary it claims to be;
         # ``_assert_holdout_is_held_out`` stops it regressing.
         full_window = restrict_frames(
-            self.frames(), spec.train_period.start_ts, spec.test_period.end_ts
+            self.frames(needed), spec.train_period.start_ts, spec.test_period.end_ts
         )
         universe = probe.universe(sorted(full_window))
         full_window = {iid: full_window[iid] for iid in universe}
@@ -902,7 +921,7 @@ class ExperimentRunner:
             )
         eligibility = gate_eligibility(
             spec,
-            self.frames(),
+            self.frames(needed),
             run_reasons=run_reasons,
             significance_threshold=float(report["gates"]["min_nw_tstat"]),
             threshold_looks=gate_looks,

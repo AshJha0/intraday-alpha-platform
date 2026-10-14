@@ -722,6 +722,10 @@ jobs:
         env:
           PYTHONPATH: python/src
         run: python -m iap.agents.cli verify-board --trust-ref origin/main
+      # v1.16 (item 12): non-blocking warning when a PR changes code that an
+      # OPEN pre-registration fingerprints (the registered run would be refused).
+      - name: open pre-registrations' fingerprinted code unchanged (warning only)
+        run: python tools/prereg_touch_check.py
       - name: agent public-key registry covers every signed writer, maintainer-signed
         run: python tests/harness/check_agent_keys.py --trust-ref origin/main --require-signed
       # v1.15 (G-P0-1): every promoted model's content hash matches its artefact.
