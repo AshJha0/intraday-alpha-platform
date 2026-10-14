@@ -80,6 +80,13 @@ that tag.
     (manifest `lot_size_by_session`) and `--link` (hard links); off by default (byte-identical).
   - (d) Memory review `docs/research/MEMORY_REVIEW_v116.md`; `ResearchRunner.frames(needed)` loads
     only the experiment's features plus id, label and market columns (was full width).
+- v1.16 item 15: `iap.validation.multiple_testing` (Holm, Benjamini-Hochberg, Romano-Wolf step-down
+  max-t, joint fold bootstrap) and a report-only "Multiple testing across this report" table in the
+  24-alpha `REPORT.md` (Bonferroni / Holm / BH q / Romano-Wolf per alpha; the promotion gate is
+  unchanged). The committed REPORT.md gains the section at the next regenerate.
+- v1.16: `tools/release.py apply-bundle` extracts with Python `tarfile` (members path-checked, `data`
+  filter) instead of the system `tar --force-local` (bsdtar on Windows has no `--force-local`; the
+  v1.15 release had to extract by hand).
 
 ## v1.15.0 — 2026-10-13
 

@@ -158,9 +158,19 @@ def test_apply_bundle_skips_crlf_only_feature_goldens(tmp_path):
         "research/experiments.json",
     ]
     assert any("skip CRLF-only change: tests/golden/expected_features.json" in x for x in r.log)
-    tar_line = next(x for x in r.log if x.startswith("would run: tar"))
-    assert "--force-local -xzf" in tar_line
-    assert fake.calls == []  # bundle already present: no download; dry run: no tar
+    tar_line = next(x for x in r.log if x.startswith("would run: extract"))
+    assert "python tarfile" in tar_line
+    assert fake.calls == []  # bundle already present: no download; dry run: no extract
+    assert not (repo / "research" / "experiments.json").exists()
+    # --execute extracts with tarfile (no system tar); the CRLF-only member is left alone
+    r2, fake2 = _runner(repo, {}, execute=True)
+    rel.apply_bundle(r2, "123", dl)
+    assert (repo / "research" / "experiments.json").read_bytes() == b"{}\n"
+    anomalies = repo / "tests" / "golden" / "expected_features_anomalies.json"
+    assert anomalies.read_bytes() == b'{"a": 2}\n'
+    crlf = repo / "tests" / "golden" / "expected_features.json"
+    assert crlf.read_bytes() == b'{\r\n"a": 1\r\n}\r\n'
+    assert fake2.calls == []
 
 
 def test_apply_bundle_rejects_unsafe_paths(tmp_path):
@@ -262,7 +272,7 @@ def test_publish_does_not_rerun_other_failures(tmp_path):
 def test_cli_flow_and_default_dry_run(capsys):
     assert rel.main(["flow"]) == 0
     out = capsys.readouterr().out
-    assert "regenerate_allow_rerun=true" in out and "--force-local" in out
+    assert "regenerate_allow_rerun=true" in out and "python tarfile" in out
     r = rel.Runner(exec_fn=FakeExec(_publish_answers()))
     assert rel.main(["publish", "--version", "1.15.0"], runner=r) == 0
     assert r.execute is False
