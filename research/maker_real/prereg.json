@@ -1,0 +1,27 @@
+{
+  "schema": "iap.maker_real_prereg",
+  "version": 1,
+  "title": "v1.9 maker backtest on the 7 real XNAS ITCH sessions (exploratory, IN-SAMPLE)",
+  "status_of_data": "IN-SAMPLE. The 7 sessions (2019-01-30, 2019-03-27, 2019-07-30, 2019-08-30, 2019-10-30, 2019-12-30, 2020-01-30; AAPL, MSFT, QQQ) were already used to design, fit and select every alpha. This is an exploratory in-sample maker study, not a confirmation. A positive result here can only motivate a fresh out-of-sample test; the 2026 holdout (2026-05-15, 2026-05-18) is SPENT and is not used.",
+  "cells": [
+    {"alpha": "EQ01", "horizon": "1s", "as_horizon": "1s"},
+    {"alpha": "EQ02", "horizon": "5s", "as_horizon": "10s"},
+    {"alpha": "EQ05", "horizon": "1s", "as_horizon": "1s"},
+    {"alpha": "EQ10", "horizon": "1s", "as_horizon": "1s"}
+  ],
+  "exit_modes": ["taker", "passive"],
+  "variants": {
+    "gated": "PRIMARY. MakerBacktester with the v1.9 gate: |er| + half_spread + rebate - exit_cost > adverse_selection + margin_bps (margin_bps = 0), adverse_selection = the PREVIOUS session's calibrated maker markout for that symbol at as_horizon (causal).",
+    "gated_filter": "SECONDARY. gated AND MakerFilter('meta_gbm', tau=0.5) allow mask, the filter trained only on sessions strictly before the test session (target: the alpha-side M3 not_run_over label at 1s on a 1 s decision grid; features: z, spread_ticks, imbalance_l1, queue depletion/replenish rates w1s both sides, micro_mid_dev_bps).",
+    "ungated": "DIAGNOSTIC ONLY (margin_bps = -1e9). Never a strategy and never counted toward the verdict."
+  },
+  "walk_forward": "Sessions in date order. Alpha parameters (LinearAlpha fit, pooled over the alpha's universe) are fitted on sessions strictly before the test session; the gate's adverse selection comes from the previous session's calibration; the MakerFilter is fitted on sessions strictly before. Session 1 (2019-01-30) is warm-up only, so the test sessions are the 6 later ones.",
+  "scores": "LinearAlpha.score_uncapped(z_cap=None) on the feature rows of the test session (multi7 features), with z = (raw - mu) / sigma added; rows outside continuous trading (is_trading_v1 != 1 or is_auction_v1 == 1 or is_halt_v1 == 1) are dropped.",
+  "maker_config": {"qty": 100, "ttl_ns": "= horizon", "horizon_ns": "= alpha horizon", "margin_bps": 0.0, "passive": {"exit_timeout_ns": "= horizon", "exit_reprices": 1}},
+  "calibration": "estimate_calibration (the python -m iap.execution.calibration code path) per session and symbol on that symbol's events, tick from instruments.json.",
+  "latency_ASSUMED": {"mean_ns": 100000, "jitter_ns": 50000, "tail_prob": 0.01, "tail_mult": 10.0, "venue_id": 101, "note": "ASSUMED, not measured: ITCH carries no receive stamp (receive_ts == exchange_ts). Injected as the calibration's latency table via parametric_latency."},
+  "fees": "configs of the multi7 dataset: XNAS taker 0.003 USD/share, maker rebate 0.002 USD/share (indicative list prices).",
+  "statistic": "Per (alpha, exit, variant): per-session net per round trip in bps of entry notional (net_bps: after rebates, fees, impact and the adverse-selection markout realised on the trip), pooled over symbols within a session as the trip-weighted mean. Inference is clustered by session: mean of the session means, Student-t CI with (sessions - 1) df. Sessions with zero trips are reported and excluded from the mean.",
+  "verdict_rule": "Maker edge EXISTS for a cell (alpha, exit) iff the PRIMARY gated variant has: the session-clustered mean net per trip > 0 AND its CI excludes 0 at the Bonferroni level over the 8 primary cells (two-sided 0.05/8), AND at least 4 of the 6 test sessions have trips. The plain 95% CI is also reported. Anything else = no demonstrated maker edge. Secondary and diagnostic variants are descriptive. Because the data are in-sample, even EXISTS reads 'worth an out-of-sample test', never 'profitable'.",
+  "sampling": "Full sessions; if a (session, symbol) unit would exceed about 6 GB peak memory it is time-sampled and the sample is reported."
+}
