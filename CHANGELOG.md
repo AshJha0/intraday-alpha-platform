@@ -118,6 +118,12 @@ that tag.
   100 - 30,000 shares, 1s / 10s / 1m holds. **0 of 45 cells have any break-even size**; best tail edge
   0.92 bp (EQ10 AAPL 1m, top 0.1%) against a 2.4 bp fixed round-trip cost. Results
   `research/v116/CAPACITY_CURVE.md` / `capacity_curve.json`.
+- v1.16 M5 quoting study v2 RESULT (exploratory, in-sample, 6 test sessions): validity gate passed for
+  all skewed cells (skew changed 40-49% of quotes). **No quoting edge**: every cell loses $5.0-6.9k per
+  session (Bonferroni CIs below 0); adverse selection is about 4x the spread captured. Skew with EQ01 /
+  EQ05 reduces the loss by about $750-920 per session vs the no-skew control (significant); EQ10 not
+  significant. `research/quoting_real/QUOTING_V2_RESULT.md`, `v2_summary.json`; outcomes recorded by the
+  owner with `tools/quoting_v2_record_outcome.py` (derived from the verdicts, never typed).
 - v1.16 item 10 (AI4 rebuild, part 1): `iap.models.lob_real`, the real-data adapter AI4-DEEPLOB-1 lacked
   (research/r7/AI4_DEFERRED.md): streamed per-session book replay of normalised ITCH into the DeepLOB
   (T, 4L) layout with MID-RELATIVE tick offsets and log1p sizes, empty-level masking, rows only while the
