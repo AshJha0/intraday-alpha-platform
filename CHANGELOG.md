@@ -26,6 +26,10 @@ that tag.
   (`exec_print_price`), `impact_model`/`impact_shape` (parent rule 6b via the residual fit).
   New `configs/prereg/v3.json` (values approved by the owner 2026-10-14). The MVP applies
   venue latency, fee tier and exec prints and records the rest as not applied.
+- v1.16 P0-4: SOR opt-ins (Python only; `route_aggressive` / `route_passive` and the C++
+  parity are unchanged): `SmartOrderRouter.allocate_aggressive` splits a size across eligible
+  venues by walking displayed depth net of taker fees; `route_passive_queue` picks the resting
+  venue by fill probability from a queue-depletion hazard (`p*rebate - (1-p)*miss_cost`).
 
 ## v1.15.0 — 2026-10-13
 
