@@ -278,6 +278,16 @@ def build_report(
                 else 0.0
             ),
             "counters": counters.to_dict(),
+            **(
+                {
+                    "eod_flatten": {
+                        **engine.eod_flatten,
+                        "residual_position": engine.account.position,
+                    }
+                }
+                if engine.cfg.execution.eod_flatten_lead_ns is not None
+                else {}
+            ),
             "qc_totals": dict(sorted(feed.qc_totals.items())),
             "simulator": engine.sim.simulator.counters.to_dict(),
             "features": {

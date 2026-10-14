@@ -219,6 +219,11 @@ class ExecutionSpec:
     #: NATIVE with the default parameters, which is the pinned golden run.
     child_policy: ExecPolicy = ExecPolicy.NATIVE
     passive: PassiveParams = PassiveParams()
+    #: v1.16 (item 17, opt-in): from ``session close - eod_flatten_lead_ns``
+    #: every decision targets a FLAT position (no new exposure) and works the
+    #: residual as one most-urgent parent ending at the close; ``None`` (the
+    #: OPTIONAL key absent, the pinned golden run) keeps v1.15 behaviour.
+    eod_flatten_lead_ns: int | None = None
 
     def algo_for(self, urgency: float) -> Algo:
         """The algo of the first band whose ``max_urgency`` covers ``urgency``."""
@@ -326,6 +331,9 @@ class MvpConfig:
                 "curve the MVP does not carry; use TWAP / POV / IS"
             )
         lat = e.sub("latency")
+        eod_lead = None
+        if "eod_flatten_lead_ns" in e.obj:
+            eod_lead = e.integer("eod_flatten_lead_ns", 1, 24 * 3600 * 10**9)
         child_policy = ExecPolicy.NATIVE
         if "child_policy" in e.obj:
             name = e.string("child_policy")
@@ -359,6 +367,7 @@ class MvpConfig:
             latency_risk_ns=lat.integer("risk_ns", 0, (1 << 62)),
             latency_wire_ns=lat.integer("wire_ns", 0, (1 << 62)),
             child_policy=child_policy,
+            eod_flatten_lead_ns=eod_lead,
             passive=passive,
         )
         if execution.parent_window_ns > cadence:
@@ -422,6 +431,7 @@ class MvpConfig:
         instrument: str | None = None,
         child_policy: str | None = None,
         passive: Mapping[str, Any] | None = None,
+        eod_flatten_lead_ns: int | None = None,
     ) -> MvpConfig:
         """A new config with ``seed`` / ``instrument`` / the child execution
         policy replaced (re-validated). The overridden document is what
@@ -436,6 +446,8 @@ class MvpConfig:
             doc["execution"]["child_policy"] = child_policy
         if passive is not None:
             doc["execution"]["passive"] = dict(passive)
+        if eod_flatten_lead_ns is not None:
+            doc["execution"]["eod_flatten_lead_ns"] = int(eod_flatten_lead_ns)
         return MvpConfig.from_document(doc, where="mvp.json (overridden)", repo_root=self.repo_root)
 
     # ---------------------------------------------------------- documents
