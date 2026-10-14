@@ -13,6 +13,12 @@ that tag.
   temporary impact on the parent's cumulative taker qty (splitting a parent cannot lower its
   cost) plus a permanent leg on the instrument's cumulative signed flow. Default `"child"` keeps
   rule 6 and every golden unchanged. Python only.
+- v1.16 P0-2: residual-move impact calibration (`estimate_calibration(..., impact_fit=True)`,
+  CLI `--impact-fit`): new `impact.residual` block — mid move after the depth walk vs
+  participation in % of a tape ADV (incl. non-displayed prints); linear and square-root
+  through-origin fits with HC0 SEs and a log-log power fit per horizon.
+  `apply_impact_fit(config, calibration, shape)` switches a config to parent rule 6b with the
+  fitted coefficient/exponent. Off by default: existing calibration documents are unchanged.
 
 ## v1.15.0 — 2026-10-13
 
