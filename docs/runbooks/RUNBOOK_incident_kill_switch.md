@@ -49,7 +49,7 @@ mounting a tokens file is an operator change to the deployment.
 
 **Where the call can come from (since v1.3.0).** The listener binds
 `127.0.0.1` unless `IAP_BIND_ADDR` names another address. A process started
-with `java/paper.sh` is therefore reachable from the same host only. The
+with `archive/java/paper.sh` (archived, frozen at v1.14.0) is therefore reachable from the same host only. The
 container image, compose and the k8s manifest set `IAP_BIND_ADDR=0.0.0.0`;
 in Kubernetes the NetworkPolicy then admits the admin port only from
 Prometheus and from pods labelled `iap.role=operator`, so run the `curl`

@@ -58,7 +58,7 @@ intraday-alpha-platform/
                             DecisionTrace, JSONL sink + digest, explain), lifecycle (the 7-state machine,
                             gates, registry) — no Rust execution crate: the C++ simulator is the
                             execution reference, Java and Python the ports
-  java/                     javac build (build.sh/test.sh): com.iap.* — marketdata, orderbook, features,
+  archive/java/             (archived in v1.15, frozen at v1.14.0) javac build (build.sh/test.sh): com.iap.* — marketdata, orderbook, features,
                             alpha, portfolio, risk, execution, sor, tca, backtest, replay, config,
                             monitoring, api, platform, adaptive + contracts, trace, lifecycle
                             (PaperTrading emits decision_traces.jsonl)
@@ -281,7 +281,7 @@ hot paths allocation-conscious (primitive arrays, no boxing). All: no dead code,
 - python: `cd python && PYTHONPATH=src python3 -m pytest -q`
 - cpp: `cd cpp && bash build.sh && ctest --test-dir build --output-on-failure`
 - rust: `cd rust && cargo test` (workspace)
-- java: `cd java && bash build.sh && bash test.sh`  (javac + JUnit4 jar at /usr/share/java/junit4.jar; NO Maven — Maven Central unreachable here; document in README that pom.xml equivalents are listed in docs/BUILD_NOTES.md)
+- java (archived in v1.15, frozen at v1.14.0, not run by CI): `cd archive/java && bash build.sh && bash test.sh`  (javac + JUnit4 jar at /usr/share/java/junit4.jar; NO Maven; pom.xml equivalents in docs/BUILD_NOTES.md)
 - integration / replay (repo root, no PYTHONPATH — `tests/conftest.py`):
   `python3 -m pytest -q tests/integration` (pipeline smoke chain, the GitHub issue plan,
   `python -m iap.mvp` end to end as a subprocess) and `python3 -m pytest -q tests/replay`
@@ -910,7 +910,7 @@ Admin endpoints (`RUNBOOK_incident_kill_switch.md` §2 — the manual ENGAGE pat
 
 ### 12.7 Deployment artefacts
 
-- **Build context**: `.dockerignore` excludes `cpp/build`, `rust/target`, `java/out`, `data/raw`,
+- **Build context**: `.dockerignore` excludes `cpp/build`, `rust/target`, `archive/java/out`, `data/raw`,
   `data/normalized`, `data/features`, `data/orderbooks`, `.git`, `__pycache__`. Every image's build
   stage copies the inputs its build *and its build-time test step* read — in particular
   `configs/` and `data/reference/` for the C++ and Rust images, whose golden tests resolve
@@ -970,7 +970,7 @@ Admin endpoints (`RUNBOOK_incident_kill_switch.md` §2 — the manual ENGAGE pat
   API, token still required), DNS for every pod, and Alertmanager → tcp/443 on non-private
   addresses. Enforcement needs a CNI that implements NetworkPolicy.
 - **CI** (`.github/workflows/ci.yml`) runs the commands of `tests/harness/run_all.sh` as parallel
-  jobs (all four languages plus the `integration` and `replay` rows), `tests/harness/run_golden.sh`,
+  jobs (python, cpp and rust since v1.15, plus the `integration` and `replay` rows), `tests/harness/run_golden.sh`,
   and `tests/harness/check_deployment.py` (YAML/compose/promtool/Dockerfile/configmap checks, and
   since 2026-10-03 image pinning, workflow supply-chain shape, the Rust toolchain pin, network
   policy and exposure checks), a manual `regenerate` job (`workflow_dispatch` with
