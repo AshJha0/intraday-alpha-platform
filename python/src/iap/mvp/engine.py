@@ -248,6 +248,9 @@ class MvpEngine(RiskWiringMixin, SizingMixin, EngineMetricsMixin):
                         else load_default_schedule(REPO_ROOT / "configs")
                     ),
                 )
+            # v1.16 P0-3: prereg venue latency + fee tier (the impact rule
+            # needs a calibration the MVP does not run: not applied).
+            self.exec_config = realism.exec_config(self.exec_config, impact=False)
             sim_kwargs = realism.simulator_kwargs()
         self.sim = SimulatorAdapter(ExecutionSimulator(self.exec_config, **sim_kwargs))
         self.book: ConsolidatedBook = self.sim.simulator.instrument_book(self.iid)

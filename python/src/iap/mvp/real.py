@@ -308,6 +308,13 @@ _NOT_APPLIED_REASONS = {
     "flatten_route": "the MVP has no quoting flatten leg (QuotingConfig only)",
     "amend_size_down": "the MVP never amends a resting child (QuotingConfig only)",
     "markout_unit": "the MVP runs no execution calibration (estimate_calibration only)",
+    "latency_stress": "the MVP runs the 1x case only; the grid is a research report "
+    "(RealismOptIns.stressed_exec_configs)",
+    "fee_tier_sensitivity": "the MVP runs the prereg tier only; sensitivity tiers are a "
+    "research report (RealismOptIns.fee_tier_configs)",
+    "impact_model": "the MVP runs no execution calibration, so the parent rule has no "
+    "fitted coefficient (rule 6 stays)",
+    "impact_shape": "see impact_model",
 }
 
 
@@ -344,6 +351,24 @@ def _prereg_block(path: Path | None) -> tuple[dict[str, Any] | None, RealismOptI
         applied["hidden_print_fills"] = {
             "value": True,
             "where": "ExecutionSimulator(hidden_prints=True)",
+        }
+    if opts.venue_latency is not None:
+        applied["venue_latency"] = {
+            "value": dict(opts.venue_latency),
+            "where": "every venue's latency_mean_ns / latency_jitter_ns (assumed, the "
+            "tail is used by calibrations only)",
+        }
+    if opts.fee_tier is not None:
+        applied["fee_tier"] = {
+            "value": opts.fee_tier,
+            "where": "equity venues' taker fee / maker rebate from the fee-tier table",
+            "table": "configs/reference/fee_tiers.json",
+            "table_sha256": sha256_file(REPO_ROOT / "configs" / "reference" / "fee_tiers.json"),
+        }
+    if opts.exec_prints:
+        applied["exec_prints"] = {
+            "value": True,
+            "where": "ExecutionSimulator(exec_print_price=True)",
         }
     applied["modify_queue_credit"] = {
         "value": True,
