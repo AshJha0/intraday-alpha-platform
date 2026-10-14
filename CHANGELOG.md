@@ -113,6 +113,11 @@ that tag.
   intensity toward `mu * I`, estimated on the sample covariance of the returns and applied to the
   EWMA matrix. `ledoit_wolf` moved to `iap.core.shrinkage` (re-exported from `iap.combine.weights`).
   Defaults (`"cyclic"`, `shrinkage=None`, fixed-0.1 `"ledoit_wolf"`) and every golden unchanged.
+- v1.16 item 7: taker capacity curve for EQ10 / EQ05 (`tools/v116_capacity_curve.py`, in-sample,
+  descriptive): realised edge in the top 10% / 1% / 0.1% signal tails vs spread + fees + 2 x impact at
+  100 - 30,000 shares, 1s / 10s / 1m holds. **0 of 45 cells have any break-even size**; best tail edge
+  0.92 bp (EQ10 AAPL 1m, top 0.1%) against a 2.4 bp fixed round-trip cost. Results
+  `research/v116/CAPACITY_CURVE.md` / `capacity_curve.json`.
 
 ## v1.15.0 — 2026-10-13
 
