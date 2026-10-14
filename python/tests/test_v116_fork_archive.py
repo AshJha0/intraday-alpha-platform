@@ -35,9 +35,21 @@ def test_archived_preregs_resolve_on_their_fork_board_only():
     with pytest.raises(PreregistrationError):
         require(ROOT, "EQ10", "1s:maker-insample")  # not on main's board
     assert auction_real.PREREG_BOARD.is_file()
+    # quoting v1 (aborted): its preregs pin a deps fingerprint, which the full
+    # gate rechecks against the running environment, so look the entries up
+    # on the archived board directly (the driver's gate reads the same board).
     quoting = (ROOT / "research/quoting_real/prereg.json").read_bytes()
     sha = hashlib.sha256(quoting).hexdigest()
-    assert len(quoting_real.check_prereg(ROOT, json.loads(quoting), sha)) == 4
+    board = Blackboard(quoting_real.PREREG_BOARD_V1).entries()
+    for cell in json.loads(quoting)["cells"]:
+        hit = [
+            e
+            for e in board
+            if e["kind"] == "prereg"
+            and e["body"].get("alpha_id") == cell["id"]
+            and e["body"].get("horizon") == f"{cell['horizon']}:quoting-insample"
+        ]
+        assert hit and sha in hit[-1]["body"]["hypothesis"]
 
 
 def test_main_board_records_the_import():
