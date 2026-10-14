@@ -8,6 +8,11 @@ that tag.
 
 ## Unreleased
 
+- v1.16 item 13 (Python): the execution simulator's activation, cancel and amend queues are
+  min-heaps with lazy deletion and expiries use an `(expire_ts, order_id)` heap instead of a
+  per-event scan of every pending and resting order; rule 9 order and ties unchanged, fills
+  byte-identical (`tools/bench_exec_simulator.py` digest). The ITCH throughput test's
+  wall-clock floors are replaced by count-based guards (rates still printed).
 - v1.16 item 16: mypy is blocking. The scoped mypy run (core/orderbook/execution/backtest/features,
   mypy 2.3.1) went from 102 errors to 0 with local type fixes (annotations, narrowing asserts on
   invariants already checked, renamed reused variables; four targeted `# type: ignore[code]`
