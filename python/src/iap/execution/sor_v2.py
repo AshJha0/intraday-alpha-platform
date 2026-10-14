@@ -24,7 +24,11 @@ Expected all-in costs, in bps of the consolidated mid, positive = cost
 
   i.e. fees - rebate + toxicity - fill-probability-weighted spread capture,
   with ``miss_cost_bps`` (default: cross later, half spread + mean taker
-  fee) charged when the post does not fill.
+  fee) charged when the post does not fill. ``p_v`` is the model's
+  ``p_fill_touch`` unless the caller passes ``fill_prob(vid, side,
+  queue_qty)`` (v1.16 P0-4: queue-position aware, e.g.
+  :func:`hazard_fill_prob` over the calibration's queue-depletion hazard;
+  ``None`` = unknown, the venue is skipped).
 
 Policies:
 
@@ -34,7 +38,11 @@ Policies:
 (b) :meth:`CostAwareRouter.plan_sweep` — a marketable order across the
     displayed depth of every eligible venue, best price first (ties: lower
     all-in price incl. taker fee, then lower venue_id), up to ``qty`` and
-    the limit. With ``stagger="sync_arrival"`` each child's send offset is
+    the limit. With ``sweep_rank="all_in"`` (v1.16 P0-4) levels are taken
+    by all-in price per share instead (``px * tick + taker`` for a buy,
+    proceeds ``px * tick - taker`` for a sell; ties: lower venue_id, then
+    better price), so a fee can outweigh a tick; ``plan_sweep`` then needs
+    ``tick``. With ``stagger="sync_arrival"`` each child's send offset is
     ``max_latency - latency_v`` so all children arrive together (the slow
     venue is sent first; a fast venue cannot leak the sweep). With
     ``stagger="none"`` every offset is 0.
@@ -47,7 +55,8 @@ Policies:
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+import math
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
 from iap.execution.config import SorOptions
@@ -56,6 +65,28 @@ from iap.execution.venues_model import DEFAULT_TOX_HORIZON, FeeLedger, VenueMode
 from iap.orderbook.book import ConsolidatedBook
 
 STAGGER_MODES = ("sync_arrival", "none")
+SWEEP_RANKS = ("price", "all_in")
+
+#: ``(venue_id, side, queue_qty_ahead) -> fill probability or None``.
+FillProb = Callable[[int, int, int], "float | None"]
+
+
+def hazard_fill_prob(
+    hazard_per_s: Callable[[int, int, int], float | None], horizon_s: float
+) -> FillProb:
+    """``p = 1 - exp(-hazard * horizon_s)`` from a queue-depletion hazard.
+
+    E.g. ``hazard_fill_prob(lambda v, s, q: cal.queue_depletion_hazard(s, q), 1.0)``;
+    a ``None`` hazard stays ``None`` (venue skipped).
+    """
+    if horizon_s <= 0:
+        raise ValueError("hazard_fill_prob: horizon_s must be > 0")
+
+    def fill_prob(vid: int, side: int, q: int) -> float | None:
+        lam = hazard_per_s(vid, side, q)
+        return None if lam is None else 1.0 - math.exp(-max(lam, 0.0) * horizon_s)
+
+    return fill_prob
 
 
 @dataclass(frozen=True)
@@ -67,6 +98,8 @@ class RouterOptions:
     #: cost of a passive post that does not fill; None = half spread + taker fee
     miss_cost_bps: float | None = None
     stagger: str = "sync_arrival"
+    #: sweep order: displayed price first ("price") or all-in incl. taker fee
+    sweep_rank: str = "price"
     sweep_levels: int = 10
     max_toxicity_bps: float = float("inf")
     tox_scale_bps: float = 1.0
@@ -75,6 +108,8 @@ class RouterOptions:
     def __post_init__(self) -> None:
         if self.stagger not in STAGGER_MODES:
             raise ValueError(f"stagger must be one of {STAGGER_MODES}")
+        if self.sweep_rank not in SWEEP_RANKS:
+            raise ValueError(f"sweep_rank must be one of {SWEEP_RANKS}")
         if self.sweep_levels <= 0 or self.lot <= 0 or self.tox_scale_bps <= 0:
             raise ValueError("sweep_levels, lot and tox_scale_bps must be > 0")
 
@@ -158,7 +193,13 @@ class CostAwareRouter:
         return out
 
     def passive_costs(
-        self, book, side: int, ts: int, tick: float, candidates=None
+        self,
+        book,
+        side: int,
+        ts: int,
+        tick: float,
+        candidates=None,
+        fill_prob: FillProb | None = None,
     ) -> dict[int, float]:
         mid = self._mid(book)
         if mid is None:
@@ -173,12 +214,15 @@ class CostAwareRouter:
         else:
             miss = o.miss_cost_bps
         out = {}
-        for vid, _, (px, _) in touches:
+        for vid, _, (px, q) in touches:
             m = self.models[vid]
+            p = m.p_fill_touch if fill_prob is None else fill_prob(vid, side, q)
+            if p is None:
+                continue
             _, rebate_bps = self._fee_bps(vid, ts, mid, tick)
             capture = 1e4 * s * (mid - px) / mid
             fill_cost = -rebate_bps - capture + m.toxicity(o.tox_horizon)
-            out[vid] = m.p_fill_touch * fill_cost + (1.0 - m.p_fill_touch) * miss
+            out[vid] = p * fill_cost + (1.0 - p) * miss
         return out
 
     @staticmethod
@@ -194,9 +238,15 @@ class CostAwareRouter:
         return self._argmin(self.aggressive_costs(book, side, ts, tick, candidates))
 
     def route_passive(
-        self, book: ConsolidatedBook, side: int, ts: int, tick: float, candidates=None
+        self,
+        book: ConsolidatedBook,
+        side: int,
+        ts: int,
+        tick: float,
+        candidates=None,
+        fill_prob: FillProb | None = None,
     ) -> int:
-        return self._argmin(self.passive_costs(book, side, ts, tick, candidates))
+        return self._argmin(self.passive_costs(book, side, ts, tick, candidates, fill_prob))
 
     # ------------------------------------------------------------ (b) sweep
     def plan_sweep(
@@ -208,10 +258,14 @@ class CostAwareRouter:
         *,
         limit_ticks: int | None = None,
         candidates=None,
+        tick: float | None = None,
     ) -> list[SweepChild]:
         """Children across displayed depth, best price first (module docstring)."""
         if qty <= 0:
             raise ValueError("sweep qty must be > 0")
+        all_in = self.options.sweep_rank == "all_in"
+        if all_in and tick is None:
+            raise ValueError('sweep_rank="all_in" needs tick')
         levels = []
         for vid, vb, _ in self._touches(book, 1 - side, candidates):
             taker, _ = self.ledger.quote(vid, ts)
@@ -221,11 +275,16 @@ class CostAwareRouter:
                 ):
                     break
                 key_px = px if side == 0 else -px
-                levels.append((key_px, taker, vid, px, q))
+                if all_in:
+                    # cost per share for a buy, minus proceeds for a sell
+                    key = key_px * tick + taker
+                    levels.append((key, vid, key_px, vid, px, q))
+                else:
+                    levels.append((key_px, taker, vid, vid, px, q))
         levels.sort(key=lambda r: (r[0], r[1], r[2]))
         take: dict[tuple[int, int], int] = {}
         left = qty
-        for _, _, vid, px, q in levels:
+        for *_, vid, px, q in levels:
             if left <= 0:
                 break
             n = min(q, left)
@@ -235,7 +294,7 @@ class CostAwareRouter:
         lat = {v: self.models[v].one_way_latency_ns for v in used}
         max_lat = max(lat.values(), default=0)
         children = []
-        for _, _, vid, px, _ in levels:
+        for *_, vid, px, _ in levels:
             n = take.pop((vid, px), 0)
             if n == 0:
                 continue
