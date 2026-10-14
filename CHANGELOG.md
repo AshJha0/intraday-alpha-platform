@@ -55,6 +55,11 @@ that tag.
   main's board under `1s:quoting-v2-insample`), quoting_config keys checked against `QuotingConfig`,
   `configs/prereg/v2.json` realism applied, `summarise` validity gate ("SKEW INERT", no verdict).
   `tools/quoting_v2_register.py` registers and signs it; OWNER ONLY.
+- v1.16 item 17: MVP end-of-day flatten, opt-in `execution.eod_flatten_lead_ns` in mvp.json (absent =
+  the pinned golden run). From `close - lead` every decision targets flat (no new exposure) and the
+  residual (position + in-flight) is worked as one most-urgent parent ending at the close, costs charged;
+  the report gains `counts.eod_flatten` (decisions, parents, too_late, residual_position) only when on.
+  Tiny config, lead = 1/3 session: end position -413 -> 0.
 
 ## v1.15.0 — 2026-10-13
 
