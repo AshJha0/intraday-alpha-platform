@@ -6,11 +6,10 @@ import math
 from dataclasses import replace
 
 import pytest
-from test_execution_rules import LAT, T0, Feeder, child, make_config, seed_book
-
 from iap.execution.config import ExecConfig
 from iap.execution.simulator import ExecutionSimulator
 from iap.execution.types import OrderType
+from test_execution_rules import LAT, T0, Feeder, child, make_config, seed_book
 
 
 def parent_config(exponent: float = 1.0, perm: float = 0.0) -> ExecConfig:
