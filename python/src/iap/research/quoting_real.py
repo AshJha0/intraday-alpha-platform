@@ -26,6 +26,19 @@ structure of :mod:`iap.research.maker_real`):
 
 ``summarise`` pools units into session-clustered statistics and the
 pre-registered verdicts.
+
+**v2 protocol (v1.16).** ``--prereg research/quoting_real/prereg_v2.json``
+(the SIGNED file written by ``tools/quoting_v2_register.py``, which only the
+owner runs): the document must carry a valid Ed25519 maintainer signature
+under ``research/agents/trust_roots.json``; its ``registration.draft_sha256``
+must be the sha256 of the draft on disk and appear in every cell's
+hypothesis; the cells are looked up on MAIN's board under
+``<horizon>:<horizon_tag>``. The quoting parameters come from
+``quoting_config`` (non-field keys refused), each cell's ``alpha_weight``
+from the cell, and the execution realism of ``configs/prereg/v2.json``
+(regulatory fees + the quoting opt-ins) is applied. ``summarise`` applies
+the ``validity_gate_threshold`` on ``frac_decisions_skew_changed_quote``
+before any verdict.
 """
 
 from __future__ import annotations
@@ -143,6 +156,47 @@ def check_prereg(
     return entries
 
 
+def verify_signed_v2(repo_root: Path, doc: Mapping[str, Any]) -> str:
+    """v2: the signed prereg's maintainer signature; returns the draft sha256."""
+    import hashlib
+
+    from iap.agents import signing, trust
+    from iap.agents.blackboard import canonical
+
+    if doc.get("signed") is not True or doc.get("on_blackboard") is not True:
+        raise SystemExit("v2 prereg is not signed / not on the blackboard")
+    if doc.get("open_for_owner"):
+        raise SystemExit(f"v2 prereg has open owner items: {doc['open_for_owner']}")
+    sig = doc.get("signature") or {}
+    pub = ((trust.read_roots(repo_root) or {}).get("maintainers") or {}).get(sig.get("maintainer"))
+    if pub is None or pub != sig.get("public_key"):
+        raise SystemExit("v2 prereg signing key is not the trust-root maintainer key")
+    msg = canonical({k: v for k, v in doc.items() if k != "signature"}).encode("ascii")
+    if hashlib.sha256(msg).hexdigest() != sig.get("message_sha256") or not signing.verify_ed25519(
+        pub, msg, sig.get("sig", "")
+    ):
+        raise SystemExit("v2 prereg signature INVALID (document changed after signing?)")
+    reg = doc.get("registration") or {}
+    draft = repo_root / str(reg.get("draft_file", ""))
+    want = str(reg.get("draft_sha256", ""))
+    if not draft.is_file() or file_sha256(draft) != want:
+        raise SystemExit("v2 prereg draft file missing or changed since registration")
+    return want
+
+
+def check_prereg_v2(repo_root: Path, prereg: Mapping[str, Any]) -> list[dict]:
+    """v2: signature, draft sha and every cell on main's board."""
+    from iap.agents.prereg_gate import require
+
+    draft_sha = verify_signed_v2(repo_root, prereg)
+    tag = prereg["horizon_tag"]
+    entries = [require(repo_root, c["id"], f"{c['horizon']}:{tag}") for c in prereg["cells"]]
+    for e in entries:
+        if draft_sha not in e["body"]["hypothesis"]:
+            raise SystemExit(f"draft sha256 {draft_sha} is not the registered one")
+    return entries
+
+
 def ns_at(session: str, hhmmss: str) -> int:
     date = session.split("_")[1]
     return int(pd.Timestamp(f"{date} {hhmmss}", tz=TZ).value)
@@ -158,9 +212,14 @@ def second_grid(feats: pd.DataFrame, start_ns: int, end_ns: int) -> pd.DataFrame
 
 
 def quoting_config(prereg: Mapping[str, Any], alpha_weight: float, flatten_ts: int):
+    from dataclasses import fields
+
     from iap.backtest.quoting import QuotingConfig
 
     c = {k: v for k, v in prereg["quoting_config"].items() if k != "flatten_ts"}
+    unknown = sorted(set(c) - {f.name for f in fields(QuotingConfig)})
+    if unknown:
+        raise SystemExit(f"prereg quoting_config has unknown keys {unknown}")
     return QuotingConfig(**c, alpha_weight=float(alpha_weight), flatten_ts=int(flatten_ts))
 
 
@@ -199,7 +258,16 @@ class Study:
         self.prereg = json.loads(Path(args.prereg).read_text(encoding="utf-8"))
         self.prereg_sha = file_sha256(Path(args.prereg))
         configure_universe(self.data / "multi7" / "configs" / "instruments" / "instruments.json")
-        self.exec_config = load_exec_config(self.data / "multi7" / "configs")
+        self.realism = None
+        if int(self.prereg.get("version", 1)) >= 2:
+            from iap.execution.realism import load_prereg
+
+            # v2: the execution realism of configs/prereg/v2.json
+            self.realism = load_prereg(ROOT / "configs" / "prereg" / "v2.json")
+        self.exec_config = load_exec_config(
+            self.data / "multi7" / "configs",
+            **(self.realism.exec_config_kwargs() if self.realism else {}),
+        )
         self._alpha_cache: dict[tuple[str, int], Any] = {}
 
     def calib_path(self, day: int, symbol: str) -> Path | None:
@@ -330,6 +398,8 @@ class Study:
             )
             fit = None
         qc = quoting_config(self.prereg, cell["alpha_weight"], flat)
+        if self.realism is not None:
+            qc = self.realism.quoting_config(qc)
         with Heartbeat(label, n_events=len(events), n_decisions=len(sc)):
             res = QuotingBacktester(self.exec_config, qc, cal).run_instrument(events, sc, iid)
         s = run_summary(res)
@@ -473,6 +543,19 @@ def summarise(units_dir: Path, prereg: Mapping[str, Any]) -> dict[str, Any]:
             "sharpe_per_day": sharpe_per_day(list(nets.values())),
             "verdict": verdict(st_active),
         }
+        gate = prereg.get("validity_gate_threshold")
+        if cell["alpha"] and gate is not None:
+            fr = [
+                float(u["results"][cell["id"]]["frac_decisions_skew_changed_quote"])
+                for u in units
+                if not u["warmup_only"]
+                and cell["id"] in u["results"]
+                and u["results"][cell["id"]].get("frac_decisions_skew_changed_quote") is not None
+            ]
+            row["frac_decisions_skew_changed_quote"] = sum(fr) / len(fr) if fr else None
+            row["valid"] = bool(fr) and sum(fr) / len(fr) >= float(gate)
+            if not row["valid"]:
+                row["verdict"] = "SKEW INERT (validity gate failed; no verdict)"
         if cell["alpha"]:
             syms = {s for a in per.values() for s in a["symbols"]}
             ctl = per_session(units, control, syms)
@@ -501,7 +584,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = ap.parse_args(list(argv) if argv is not None else None)
     prereg = json.loads(Path(args.prereg).read_text(encoding="utf-8"))
     sha = file_sha256(Path(args.prereg))
-    entries = check_prereg(ROOT, prereg, sha)
+    if int(prereg.get("version", 1)) >= 2:
+        entries = check_prereg_v2(ROOT, prereg)
+    else:
+        entries = check_prereg(ROOT, prereg, sha)
     log(f"prereg verified ({len(entries)} cells, sha256 {sha[:12]})")
     if args.summary_only:
         print(json.dumps(summarise(Path(args.out) / "units", prereg), indent=2, sort_keys=True))

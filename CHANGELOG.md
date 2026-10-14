@@ -42,6 +42,13 @@ that tag.
   The study drivers gate on their archived fork board (`PREREG_BOARD`). Ledger merged with
   `tools/merge_ledger.py` (+7 looks from step2, total 5368); `docs/research/R7_POWER.md` regenerated
   (threshold 4.432 -> 4.433, DSR N 297 -> 304; R7 itself is closed and used its registered threshold).
+- v1.16 option 1 (after the P0-6 taker no-go): M5 quoting study v2 made runnable. Owner-approved values in
+  `research/quoting_real/prereg_v2_DRAFT.json` (alpha_weight EQ01 7 / EQ05 15 / EQ10 12 so every
+  symbol's median skew is >= 1 tick, inv_skew_ticks 1 per qty, validity gate 0.10). `quoting_real` v2 path:
+  signed-prereg check (maintainer Ed25519 under the trust root, draft sha256 in every hypothesis, cells on
+  main's board under `1s:quoting-v2-insample`), quoting_config keys checked against `QuotingConfig`,
+  `configs/prereg/v2.json` realism applied, `summarise` validity gate ("SKEW INERT", no verdict).
+  `tools/quoting_v2_register.py` registers and signs it; OWNER ONLY.
 
 ## v1.15.0 — 2026-10-13
 
