@@ -137,6 +137,23 @@ iap/
     urgency.py     (v1.10, X2) apply_alpha_urgency.
     volume_curve.py (v1.10, X3) forecast intraday volume curve (iap.volume_curve
                    v1 JSON; `python -m iap.execution.volume_curve`).
+    sor_v2.py      (v1.12, X5) CostAwareRouter: fill probability, toxicity,
+                   latency and fee tiers per venue; plan_sweep, passive_costs,
+                   route_passive. v1.16 opt-ins: RouterOptions(sweep_rank=
+                   "all_in"), fill_prob callbacks, hazard_fill_prob.
+    venues_model.py (v1.12, X5) the venue model the router reads.
+    fill_hazard.py (v1.12, X4) cloglog fill-hazard model (iap.fill_hazard/1).
+    markout_feedback.py (v1.12, X4) markout feedback for passive entries.
+    regulatory.py  (v1.15) dated SEC Section 31 + FINRA TAF fee schedule.
+    realism.py     RealismOptIns + load_prereg: the execution-realism switches
+                   of a pre-registration (configs/prereg/v2.json; v1.16 adds the
+                   v3 keys: venue latency, latency stress, fee tier, exec
+                   prints, parent impact; configs/prereg/v3.json).
+                   v1.16 opt-ins elsewhere (API_TRADING.md §2.13):
+                   ExecConfig.impact_model="parent" (simulator rule 6b),
+                   estimate_calibration(impact_fit=True) + apply_impact_fit,
+                   ParentOrder.pov_exact, ac_params_from_calibration(
+                   impact_source="residual").
   features/        The 205-feature factory (API_FEATURES.md): registry.py (the
                    pinned registry + its hash = feature_version), engine.py
                    (event-driven FeatureEngine, validity bitset, cadence),
@@ -196,6 +213,11 @@ iap/
                    ResearchMethods, methods(name)), sessions.py (v1.9, R1:
                    FOMC / holiday-thin calendar, stratified_day_sample,
                    record_day_sampling, book_scope_for_dataset).
+                   cpcv.py and deflated.py (v1.12: combinatorial purged
+                   CV, PBO, PSR / DSR / minimum track record);
+                   multiple_testing.py (v1.16, report-only Holm / BH /
+                   Romano-Wolf); beta_stability.py (v1.16, report-only, kept
+                   outside the fingerprinted alpha code).
   experiment/      tracker.py — data_version() (sha256 over the normalized IAP1
                    bytes), feature_version() (registry hash), git_commit(),
                    hardware_summary(), ExperimentTracker.write_manifest()
@@ -210,6 +232,10 @@ iap/
                    gate; build_meta_features(impute_nan=False) since v1.5.0 —
                    missing values stay missing for the tree model, True is
                    the legacy zero imputation), economics.py, pipeline.py.
+                   conformal.py (v1.15, opt-in conformal sizing);
+                   deeplob.py / deeplob_baselines.py / deeplob_torch.py (AI4
+                   DeepLOB dataset, numpy baseline, optional torch models;
+                   the real-data adapter is pending in PR #151).
   portfolio/       The reference optimizer (API_PORTFOLIO_TCA.md §1):
                    optimizer.py (projected-gradient mean-variance with
                    transaction costs under 7 constraint families, INFEASIBLE
@@ -470,6 +496,11 @@ iap/
                    compare_runs (the replay/verify diff).
     golden.py      golden_document / render behind tests/golden/expected_mvp.json
                    (python/tools/make_golden_mvp.py, tests/test_mvp_golden.py).
+    real.py        (v1.15) `python -m iap.mvp.real --dataset <dir> --date D
+                   --symbols ... --out <dir>`: the unchanged engine on an
+                   ingested real session, streamed (docs/MVP.md §9).
+                   v1.16: opt-in execution.eod_flatten_lead_ns in mvp.json
+                   (end-of-day flatten; absent = the pinned golden run).
     __main__.py    `python -m iap.mvp run [--config] [--seed] [--instrument]
                    [--out] [--repo-root] | replay --run <dir> [--repo-root] |
                    verify | explain --run <dir> ID`.

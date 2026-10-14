@@ -3,14 +3,16 @@
 `GOVERNANCE.md` and `SECURITY.md` describe controls. Some of them are enforced
 by a file in this repository (CI, `CODEOWNERS`, the structural checks in
 `tests/harness/check_deployment.py`); the ones below are **repository or
-operations settings that live outside the tree** and are **not yet configured**
-as of 2026-10-03. Until they are, the corresponding sentence in the governance
-documents is a requirement, not a fact.
+operations settings that live outside the tree**. Until one is configured, the
+corresponding sentence in the governance documents is a requirement, not a fact.
 
-Verified on 2026-10-03 with `gh api`: `main` has no branch protection
-(`GET /branches/main/protection` returns 404), `GET /rulesets` returns `[]`,
-secret scanning and push protection are enabled, Dependabot security updates
-are disabled. Re-check before relying on any of this.
+Verified on 2026-10-14 with `gh api`: the ruleset `protect-main` is active on
+`main` and requires the checks `python`, `integration`, `cpp`, `rust`,
+`golden`, `deployment`, `CodeQL`, `governance`, `advisory`, `rust-pyo3`,
+`python-slow`, `supply-chain` and `analyze (rust)` (`java` was dropped on
+2026-10-11). The rest of this page (secret scanning, Dependabot and the
+operational settings) was last checked on 2026-10-03. Re-check before relying
+on any of this.
 
 Everything below is run by the repository owner (`AshJha0`), once, with an
 authenticated `gh` that has admin rights on the repository. Nothing in this
