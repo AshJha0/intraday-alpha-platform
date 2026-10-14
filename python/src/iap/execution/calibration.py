@@ -41,6 +41,16 @@ document the simulator and the maker backtest can consume:
   through-the-origin least-squares slope in bps per % of ADV (ADV proxy =
   executed quantity per session day in the data), which
   :func:`apply_calibration` can hand to the simulator's linear impact rule.
+- ``impact.residual`` (v1.16 P0-2, opt-in ``impact_fit=True``; absent
+  otherwise so older documents are unchanged) — the RESIDUAL move after the
+  depth walk: ``s * (m_h - m_post) / m0`` in bps, ``m_post`` the mid once
+  every event of the sweep's timestamp is applied (the walk itself is
+  already paid through fill prices), against participation in % of a TAPE
+  ADV (displayed executions plus non-displayed TRADE prints that are not the
+  print of the EXECUTE right before them). Per horizon: a linear and a
+  square-root through-the-origin fit, each with an HC0 standard error, and a
+  log-log power fit (exponent + SE) over participation quantile bins.
+  :func:`apply_impact_fit` turns it into the simulator's parent rule 6b.
 
 Nothing here changes the simulator's pinned rules or any cross-language
 parity golden: :class:`ExecutionSimulator` uses a calibration only when one
@@ -366,6 +376,8 @@ def estimate_calibration(
     source: Mapping | None = None,
     fill_within_ns: Sequence[int] = (),
     markout_unit: str = "message",
+    impact_fit: bool = False,
+    impact_fit_bins: int = 10,
 ) -> dict:
     """Estimate a calibration document from one ordered event stream.
 
@@ -402,6 +414,8 @@ def estimate_calibration(
     sweeps: dict[tuple[int, int, int], int] = {}  # (iid, ts, aggressor side) -> qty
     days: set[int] = set()
     exec_qty: dict[int, int] = {}
+    tape_qty: dict[int, int] = {}  # exec_qty + non-displayed prints (impact_fit)
+    prev_exec: dict[int, tuple[int, int]] = {}  # venue -> (ts, trade_id) of last EXECUTE
     n_events = 0
 
     def close_episode(key, ep: _Episode, t: int, depleted: bool) -> None:
@@ -438,10 +452,24 @@ def estimate_calibration(
             if at_or_better:
                 joined.touch = True
                 touch_orders.append((iid, joined))
+        if impact_fit and et == EventType.TRADE:
+            last = prev_exec.get(ev.venue_id)
+            own_print = (
+                last is not None
+                and last[0] == ev.exchange_ts
+                and (last[1] == 0 or ev.trade_id == 0 or last[1] == ev.trade_id)
+            )
+            if not own_print:
+                tape_qty[iid] = tape_qty.get(iid, 0) + ev.qty
+                days.add(ev.exchange_ts // _NS_PER_DAY)
+        if et != EventType.EXECUTE:
+            prev_exec.pop(ev.venue_id, None)
         status = cons.apply(ev)
         if status != ApplyStatus.APPLIED:
             continue
         t = ev.exchange_ts
+        if et == EventType.EXECUTE:
+            prev_exec[ev.venue_id] = (t, ev.trade_id)
         if joined is not None:
             orders[okey] = joined
         elif et == EventType.EXECUTE:
@@ -461,6 +489,7 @@ def estimate_calibration(
                 aggr = 1 - o.side
                 sweeps[(iid, t, aggr)] = sweeps.get((iid, t, aggr), 0) + q
                 exec_qty[iid] = exec_qty.get(iid, 0) + q
+                tape_qty[iid] = tape_qty.get(iid, 0) + q
                 days.add(t // _NS_PER_DAY)
         elif et == EventType.CANCEL:
             o = orders.get(okey)
@@ -611,6 +640,10 @@ def estimate_calibration(
     ref_h = "1s" if "1s" in hz else next(iter(hz))
     impact["slope_bps_per_pct_adv"] = impact["by_horizon"][ref_h]["slope_bps_per_pct_adv"]
     impact["slope_horizon"] = ref_h
+    if impact_fit:
+        impact["residual"] = _residual_impact(
+            sweeps, timelines, tape_qty, n_days, hz, ref_h, impact_fit_bins
+        )
 
     return {
         "schema": SCHEMA,
@@ -626,6 +659,144 @@ def estimate_calibration(
         "markouts": markouts,
         "impact": impact,
     }
+
+
+def _through_origin(xs: Sequence[float], ys: Sequence[float]) -> tuple[float, float] | None:
+    """``y = b * x`` least squares: ``(b, HC0 se)``, or None when degenerate."""
+    sxx = math.fsum(x * x for x in xs)
+    if sxx <= 0:
+        return None
+    b = math.fsum(x * y for x, y in zip(xs, ys, strict=True)) / sxx
+    meat = math.fsum((x * (y - b * x)) ** 2 for x, y in zip(xs, ys, strict=True))
+    return b, math.sqrt(meat) / sxx
+
+
+def _power_fit(xs: Sequence[float], ys: Sequence[float], bins: int) -> dict:
+    """``log(mean y) = log c + k * log(mean x)`` over participation quantile
+    bins with a positive mean move (OLS, classical SE of ``k``)."""
+    pts = sorted(zip(xs, ys, strict=True))
+    n = len(pts)
+    pairs: list[tuple[float, float]] = []
+    for b in range(bins):
+        cell = pts[b * n // bins : (b + 1) * n // bins]
+        if not cell:
+            continue
+        mx = math.fsum(p[0] for p in cell) / len(cell)
+        my = math.fsum(p[1] for p in cell) / len(cell)
+        if mx > 0 and my > 0:
+            pairs.append((math.log(mx), math.log(my)))
+    out: dict = {"bins_used": len(pairs), "exponent": None, "exponent_se": None, "coeff": None}
+    if len(pairs) < 3:
+        return out
+    lx = [p[0] for p in pairs]
+    ly = [p[1] for p in pairs]
+    mx, my = math.fsum(lx) / len(lx), math.fsum(ly) / len(ly)
+    sxx = math.fsum((x - mx) ** 2 for x in lx)
+    if sxx <= 0:
+        return out
+    k = math.fsum((x - mx) * (y - my) for x, y in zip(lx, ly, strict=True)) / sxx
+    a = my - k * mx
+    rss = math.fsum((y - a - k * x) ** 2 for x, y in zip(lx, ly, strict=True))
+    out.update(exponent=k, exponent_se=math.sqrt(rss / (len(pairs) - 2) / sxx), coeff=math.exp(a))
+    return out
+
+
+def _residual_impact(
+    sweeps: Mapping[tuple[int, int, int], int],
+    timelines: Mapping,
+    tape_qty: Mapping[int, int],
+    n_days: int,
+    hz: Mapping[str, int],
+    ref_h: str,
+    bins: int,
+) -> dict:
+    """The ``impact.residual`` block (module docstring)."""
+    xs: dict[str, list[float]] = {h: [] for h in hz}
+    ys: dict[str, list[float]] = {h: [] for h in hz}
+    n_sweeps = 0
+    for (iid, ts, aggr), q in sorted(sweeps.items()):
+        tl = timelines[iid]
+        adv = tape_qty.get(iid, 0) / n_days
+        i0 = tl.prevailing(ts - 1)
+        i1 = tl.prevailing(ts)
+        if adv <= 0 or i0 is None or i1 is None:
+            continue
+        if any(tl.ts[i0] < g <= ts for g in tl.halts):
+            continue
+        n_sweeps += 1
+        m0, m_post = tl.mid(i0), tl.mid(i1)
+        s = 1.0 if aggr == 0 else -1.0
+        pct = 100.0 * q / adv
+        for h, h_ns in hz.items():
+            m_h = markout_mid(tl, ts, h_ns)
+            if m_h is None:
+                continue
+            xs[h].append(pct)
+            ys[h].append(1e4 * s * (m_h - m_post) / m0)
+    by_h: dict[str, dict] = {}
+    for h in hz:
+        x, y = xs[h], ys[h]
+        cell: dict = {"n": len(y), "linear": None, "sqrt": None, "power": None}
+        if len(y) >= MIN_SAMPLES:
+            lin = _through_origin(x, y)
+            sq = _through_origin([math.sqrt(v) for v in x], y)
+            if lin is not None:
+                cell["linear"] = {"coeff_bps_per_pct_adv": lin[0], "se": lin[1]}
+            if sq is not None:
+                cell["sqrt"] = {"coeff_bps_per_sqrt_pct_adv": sq[0], "se": sq[1]}
+            cell["power"] = _power_fit(x, y, bins)
+        by_h[h] = cell
+    return {
+        "definition": "s*(m_h - m_post)/m0 in bps; m_post = mid after the sweep timestamp",
+        "adv": "tape",
+        "adv_days": n_days,
+        "n_sweeps": n_sweeps,
+        "horizon": ref_h,
+        "by_horizon": by_h,
+    }
+
+
+#: ``apply_impact_fit`` shapes.
+IMPACT_SHAPES = ("linear", "sqrt", "power")
+
+
+def apply_impact_fit(
+    config: ExecConfig,
+    calibration: ExecCalibration,
+    shape: str = "sqrt",
+    horizon: str | None = None,
+) -> ExecConfig:
+    """``config`` switched to the parent impact rule 6b with the residual fit.
+
+    ``shape``: ``"linear"`` (exponent 1), ``"sqrt"`` (0.5) or ``"power"``
+    (the fitted exponent, which must lie in (0, 1]). Raises ValueError when
+    the calibration has no residual fit, the chosen cell is empty or the
+    fitted coefficient is not positive."""
+    if shape not in IMPACT_SHAPES:
+        raise ValueError(f"shape must be one of {IMPACT_SHAPES}, got {shape!r}")
+    res = (calibration.doc.get("impact") or {}).get("residual")
+    if not res:
+        raise ValueError("calibration has no impact.residual block (estimate with impact_fit)")
+    h = horizon or res["horizon"]
+    fit = (res["by_horizon"].get(h) or {}).get(shape)
+    if not fit:
+        raise ValueError(f"no {shape} impact fit at horizon {h!r}")
+    if shape == "linear":
+        coeff, k = fit["coeff_bps_per_pct_adv"], 1.0
+    elif shape == "sqrt":
+        coeff, k = fit["coeff_bps_per_sqrt_pct_adv"], 0.5
+    else:
+        coeff, k = fit["coeff"], fit["exponent"]
+        if coeff is None or k is None:
+            raise ValueError("power fit has too few positive bins")
+    if coeff <= 0:
+        raise ValueError(f"fitted {shape} impact coefficient {coeff!r} is not positive")
+    return replace(
+        config,
+        impact_model="parent",
+        impact_coeff_bps_per_pct_adv=float(coeff),
+        impact_exponent=float(k),
+    )
 
 
 def _read_events(path: str) -> list[MarketEvent]:
@@ -646,6 +817,11 @@ def main(argv: Iterable[str] | None = None) -> int:
         default="message",
         help="maker AS observation unit (v1.14 X-P2-9)",
     )
+    ap.add_argument(
+        "--impact-fit",
+        action="store_true",
+        help="add the residual-move impact fit (impact.residual, v1.16 P0-2)",
+    )
     args = ap.parse_args(list(argv) if argv is not None else None)
     ticks = {int(k): float(v) for k, v in (t.split("=", 1) for t in args.tick)}
     events: list[MarketEvent] = []
@@ -656,6 +832,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         ticks,
         source={"files": [Path(p).name for p in args.events]},
         markout_unit=args.markout_unit,
+        impact_fit=args.impact_fit,
     )
     write_calibration(doc, args.out)
     print(f"wrote {args.out}: {doc['n_events']} events, {len(doc['instruments'])} instruments")
