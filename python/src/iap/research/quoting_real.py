@@ -264,10 +264,17 @@ class Study:
 
             # v2: the execution realism of configs/prereg/v2.json
             self.realism = load_prereg(ROOT / "configs" / "prereg" / "v2.json")
-        self.exec_config = load_exec_config(
-            self.data / "multi7" / "configs",
-            **(self.realism.exec_config_kwargs() if self.realism else {}),
-        )
+        self.exec_config = load_exec_config(self.data / "multi7" / "configs")
+        if self.realism is not None and self.realism.regulatory_fees:
+            from dataclasses import replace as _replace
+
+            from iap.execution.regulatory import load_default_schedule
+
+            # the dated SEC Section 31 + FINRA TAF schedule lives in the
+            # repository's configs/reference (the dataset configs carry none)
+            self.exec_config = _replace(
+                self.exec_config, regulatory_fees=load_default_schedule(ROOT / "configs")
+            )
         self._alpha_cache: dict[tuple[str, int], Any] = {}
 
     def calib_path(self, day: int, symbol: str) -> Path | None:
