@@ -166,7 +166,8 @@ def shift_labels(frames: Mapping[int, pd.DataFrame], seed: int) -> dict[int, pd.
     rng = SplitMix64(seed)
     out: dict[int, pd.DataFrame] = {}
     for iid in sorted(frames):
-        df = frames[iid].copy()
+        # shallow copy: only the label columns are replaced (memory, v1.16)
+        df = frames[iid].copy(deep=False)
         cols = _label_columns(df)
         day = df["exchange_ts"].to_numpy(dtype=np.int64) // power_stats.DAY_NS
         for d in np.unique(day):
@@ -194,7 +195,8 @@ def plant(
     after."""
     if not 0.0 <= level < 1.0:
         raise _fail(f"level must be an IC in [0, 1): {level}")
-    out = {iid: frames[iid].copy() for iid in frames}
+    # shallow copies: only label columns are replaced (memory, v1.16)
+    out = {iid: frames[iid].copy(deep=False) for iid in frames}
     if level == 0.0:
         return out
     scale = level / math.sqrt(1.0 - level * level)

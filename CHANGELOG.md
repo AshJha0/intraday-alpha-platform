@@ -36,6 +36,15 @@ that tag.
   `tools/run_paper_daily.cmd`, docs/runbooks/RUNBOOK_paper_trade.md (schtasks line + jobs.json
   entry; not registered). `iap.mvp.real.run_symbol` gains opt-in `eod_flatten_lead_ns` and a
   `prepare_symbol` helper; default runs unchanged.
+- v1.16 item 12 follow-ups (research memory, `docs/research/MEMORY_REVIEW_v116.md` items 2-7):
+  walk-forward test frames keep only ids, labels, market columns and the alpha's features, and
+  the previous fold's test frames are dropped before the next fold is built; train/CPCV frames
+  keep every `label_*` column but no unread feature columns; an alpha reading an undeclared column now raises
+  a clear `ValueError` instead of silently rerunning at full width; CPCV keeps per-group (z, y)
+  instead of per-split (ts, z, y); `power_real.shift_labels`/`plant` and leakage label
+  obfuscation use shallow copies; the leakage frame builder frees each instrument's row list
+  once stacked. Reports are byte-identical; float32 was not adopted (it would move committed
+  numbers).
 - v1.16 item 16: mypy is blocking. The scoped mypy run (core/orderbook/execution/backtest/features,
   mypy 2.3.1) went from 102 errors to 0 with local type fixes (annotations, narrowing asserts on
   invariants already checked, renamed reused variables; four targeted `# type: ignore[code]`
@@ -131,6 +140,18 @@ that tag.
   EQ05 reduces the loss by about $750-920 per session vs the no-skew control (significant); EQ10 not
   significant. `research/quoting_real/QUOTING_V2_RESULT.md`, `v2_summary.json`; outcomes recorded by the
   owner with `tools/quoting_v2_record_outcome.py` (derived from the verdicts, never typed).
+- v1.16 item 10 (AI4 rebuild, part 1): `iap.models.lob_real`, the real-data adapter AI4-DEEPLOB-1 lacked
+  (research/r7/AI4_DEFERRED.md): streamed per-session book replay of normalised ITCH into the DeepLOB
+  (T, 4L) layout with MID-RELATIVE tick offsets and log1p sizes, empty-level masking, rows only while the
+  book is open and two-sided; per-session labels and lazy `WindowIndex` windows (no window or label crosses
+  a session); train-only streaming normaliser; `python -m iap.models.lob_real` cache builder (float16,
+  refuses the R7 holdout sessions and low disk). No training or holdout data used yet.
+- v1.16 item 10 (AI4 rebuild, part 2): cache stored as memory-mapped float16 `.npy` + meta, windows
+  normalised lazily (memory O(batch)); `iap.models.lob_train` streams DeepLOB / MLP training from
+  `WindowIndex` and fits the sklearn baselines on capped subsamples; chronological train / validation
+  split by session (default: last two sessions), pooled across symbols; `net_of_cost_mid` scores
+  non-overlapping taker trades every `horizon` events on the cache's mid and rebuilt spread plus a taker
+  fee; `accept` reported per symbol. IN-SAMPLE model selection only (no ledger entry); holdout units refused.
 
 ## v1.15.0 — 2026-10-13
 

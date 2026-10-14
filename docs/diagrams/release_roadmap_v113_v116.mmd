@@ -1,0 +1,25 @@
+flowchart LR
+    %% Release roadmap v1.13 to v1.16. Source: CHANGELOG.md (v1.13.0 to v1.15.0, Unreleased). Sibling of release_roadmap_v19_v111.mmd.
+    subgraph V113["v1.13.0, released"]
+        H["quality-review hardening:<br/>CI layout, hashed locks, LF artefacts"]
+    end
+    subgraph V114["v1.14.0 (2026-10-11), released"]
+        C["correctness: same-ts coalescing, causal rows,<br/>automatic HAC, time-shift gate, 15c3-5 risk set"]
+    end
+    subgraph V115["v1.15.0 (2026-10-13), released"]
+        R7["R7 confirmed: EQ10@1s, EQ05@1s on 7 holdout sessions"]
+        MR["MVP on a real ITCH day; Java archived"]
+    end
+    subgraph V116["v1.16, Unreleased (on main)"]
+        P0["P0-1..P0-5 cost realism:<br/>rule 6b, residual fit, prereg v3, SOR opt-ins, exact POV"]
+        P6["P0-6 monetisation study: NO-GO (taker)"]
+        QV2["M5 quoting v2 registered"]
+        EOD["MVP end-of-day flatten (opt-in)"]
+        GV["fork-board archive, prereg touch check,<br/>multiple-testing table, simulator heaps"]
+    end
+    subgraph DEF["deferred, not on main"]
+        AI4["AI4 deep LOB on real data<br/>(new registration needed)"]
+    end
+    H --> C --> R7 --> P0 --> P6 --> QV2
+    MR --> EOD
+    R7 -. "deferred" .-> AI4
