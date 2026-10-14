@@ -82,7 +82,15 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("root", type=Path)
     ap.add_argument("--dry-run", action="store_true", help="checks only; no writes, no signing")
+    ap.add_argument(
+        "--require-ci-env",
+        action="store_true",
+        help="refuse unless numpy/pandas/scipy match python/requirements-ci.txt",
+    )
     a = ap.parse_args()
+    from iap.agents.fingerprint import check_registration_env
+
+    check_registration_env(require_ci_env=a.require_ci_env)
     root = a.root.resolve()
     key = json.loads(KEYFILE.read_text(encoding="ascii"))[APPROVER]
     pub = trust.read_roots(root)["maintainers"][APPROVER]

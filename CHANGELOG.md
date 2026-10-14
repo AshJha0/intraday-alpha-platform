@@ -8,6 +8,14 @@ that tag.
 
 ## Unreleased
 
+- v1.16 (opt-in): registration-time CI-environment check. `iap.agents.fingerprint`
+  gains `ci_lock_deps()` (numpy/pandas/scipy pins parsed from `python/requirements-ci.txt`),
+  `compare_deps()` and `check_registration_env()`; `tools/quoting_v2_register.py` and
+  `tools/r7_register_preregs.py` print a warning when local deps differ from the lock and
+  refuse with `--require-ci-env`. New `docs/runbooks/RUNBOOK_prereg_environment.md` (build a
+  `.venv-ci` from the lock and register from it). `prereg_gate` semantics and existing
+  registrations unchanged.
+
 - v1.16 item 13 (Python): the execution simulator's activation, cancel and amend queues are
   min-heaps with lazy deletion and expiries use an `(expire_ts, order_id)` heap instead of a
   per-event scan of every pending and resting order; rule 9 order and ties unchanged, fills
