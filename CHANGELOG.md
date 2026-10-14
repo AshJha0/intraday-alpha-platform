@@ -26,10 +26,16 @@ that tag.
   (`exec_print_price`), `impact_model`/`impact_shape` (parent rule 6b via the residual fit).
   New `configs/prereg/v3.json` (values approved by the owner 2026-10-14). The MVP applies
   venue latency, fee tier and exec prints and records the rest as not applied.
-- v1.16 P0-4: SOR opt-ins (Python only; `route_aggressive` / `route_passive` and the C++
-  parity are unchanged): `SmartOrderRouter.allocate_aggressive` splits a size across eligible
-  venues by walking displayed depth net of taker fees; `route_passive_queue` picks the resting
-  venue by fill probability from a queue-depletion hazard (`p*rebate - (1-p)*miss_cost`).
+- v1.16 P0-4: SOR opt-ins on the v1.12 cost-aware router (`iap.execution.sor_v2`, Python only;
+  `SmartOrderRouter.route_aggressive` / `route_passive` and the C++ parity are unchanged).
+  Depth-for-size sweeps and fill-probability passive routing already existed there
+  (`plan_sweep`, `passive_costs`), so the duplicate `SmartOrderRouter.allocate_aggressive` /
+  `route_passive_queue` from #129 are removed and only the new behaviour is kept:
+  `RouterOptions(sweep_rank="all_in")` makes `plan_sweep(..., tick=)` take levels by all-in price
+  incl. taker fee (default `"price"` = displayed price first, fee as tie-break, unchanged), and
+  `route_passive` / `passive_costs` take an optional `fill_prob(vid, side, queue_qty)` in place
+  of the model's `p_fill_touch` (`hazard_fill_prob(hazard, horizon_s)` turns a queue-depletion
+  hazard into one; `None` skips the venue).
 - v1.16 P0-5: algos (Python only, opt-in): `ParentOrder.pov_exact` — POV target
   `floor(p/(1-p)*V)` so we trade `p` of the TOTAL volume (market + ours), and the whole deficit
   is caught up at once in children of at most `max_child_qty`; `ac_params_from_calibration(...,
