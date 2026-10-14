@@ -55,6 +55,9 @@ that tag.
   main's board under `1s:quoting-v2-insample`), quoting_config keys checked against `QuotingConfig`,
   `configs/prereg/v2.json` realism applied, `summarise` validity gate ("SKEW INERT", no verdict).
   `tools/quoting_v2_register.py` registers and signs it; OWNER ONLY.
+- v1.16: `tools/release.py apply-bundle` extracts with Python `tarfile` (members path-checked, `data`
+  filter) instead of the system `tar --force-local` (bsdtar on Windows has no `--force-local`; the
+  v1.15 release had to extract by hand).
 
 ## v1.15.0 — 2026-10-13
 
