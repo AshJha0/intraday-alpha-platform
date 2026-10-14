@@ -21,9 +21,10 @@ lessons of the v1.14.0 release (2026-10-11):
        -f regenerate_allow_rerun=true``.
 
 ``apply-bundle --run-id N``  download the ``regenerated-artefacts``
-    artifact of run N and extract it with ``tar --force-local`` (a
-    Windows path with a drive colon is otherwise read as a remote host),
-    skipping every ``expected_features*`` file whose only difference from
+    artifact of run N and extract it with Python's ``tarfile`` (v1.16:
+    the system ``tar`` on Windows is bsdtar, which has no
+    ``--force-local``; members are pre-checked and extracted with the
+    ``data`` filter), skipping every ``expected_features*`` file whose only difference from
     the working tree is line endings (CRLF-only churn).
 
 ``publish --version X.Y.Z``  after the release PR is merged:
@@ -233,6 +234,14 @@ def bundle_plan(bundle: Path, repo: Path) -> tuple[list[str], list[str]]:
     return extract, skipped
 
 
+def _extract(bundle: Path, dest: Path, names: Sequence[str]) -> None:
+    """Extract ``names`` (already path-checked by :func:`bundle_plan`)."""
+    want = set(names)
+    with tarfile.open(bundle, "r:gz") as tar:
+        members = [m for m in tar.getmembers() if m.name in want]
+        tar.extractall(dest, members=members, filter="data")
+
+
 def apply_bundle(r: Runner, run_id: str, download_dir: Path | None = None) -> list[str]:
     work = download_dir or Path(tempfile.mkdtemp(prefix="iap-regen-"))
     bundle = work / BUNDLE_FILE
@@ -245,7 +254,14 @@ def apply_bundle(r: Runner, run_id: str, download_dir: Path | None = None) -> li
     for name in skipped:
         r.note(f"skip CRLF-only change: {name}")
     if extract:
-        r.act(["tar", "--force-local", "-xzf", str(bundle), "-C", str(r.cwd), *extract])
+        line = f"extract {len(extract)} files from {bundle} into {r.cwd} (python tarfile)"
+        if not r.execute:
+            r.log.append(f"would run: {line}")
+            print(f"[dry-run] {line}")
+        else:
+            r.log.append(f"run: {line}")
+            print(f"$ {line}")
+            _extract(bundle, r.cwd, extract)
     r.note(f"{len(extract)} files to apply, {len(skipped)} skipped (CRLF only)")
     return extract
 
@@ -423,7 +439,7 @@ release flow (tools/release.py, dry-run by default; --execute to act):
       reset research/experiments.json to origin/main, drop the 5 runner dirs,
       commit + push, gh workflow run ci.yml -f regenerate=true -f regenerate_allow_rerun=true
  3. python tools/release.py apply-bundle --run-id <regenerate run id>
-      gh run download -n regenerated-artefacts; tar --force-local -xzf,
+      gh run download -n regenerated-artefacts; extract with python tarfile,
       skipping CRLF-only expected_features*; review the diff, commit, push
  4. owner merges the release PR (merge commit)
  5. python tools/release.py publish --version X.Y.Z
