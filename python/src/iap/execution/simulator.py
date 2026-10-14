@@ -130,7 +130,7 @@ Deterministic: same config + seed => identical fills, bit for bit
 
 from __future__ import annotations
 
-import bisect
+import heapq
 import warnings
 from dataclasses import replace
 from typing import TYPE_CHECKING
@@ -227,19 +227,25 @@ class ExecutionSimulator:
         # (instrument, venue) -> (exchange_ts, event_type, trade_id) of the last event
         self._last_kind: dict[tuple[int, int], tuple[int, int, int]] = {}
         self._hidden_print_trades = 0
-        # v1.14 X-P2-12: (effective ts, order_id, new remaining), sorted
+        # v1.14 X-P2-12: (effective ts, order_id, new remaining), min-heap
         self._amends: list[tuple[int, int, int]] = []
         self._amend_target: dict[int, int] = {}
         self._amends_applied = 0
         self._rng = SplitMix64(config.seed)
         self._books: dict[int, ConsolidatedBook] = {}
         self._orders: dict[int, ChildOrder] = {}
-        # (arrival_ts, order_id), sorted — the activation queue (rule 2).
+        # (arrival_ts, order_id) min-heap — the activation queue (rule 2).
+        # Lazy deletion: an entry whose order is no longer PENDING is stale
+        # and skipped when it reaches the top (v1.16 item 13).
         self._pending: list[tuple[int, int]] = []
         # ACTIVE order ids in activation order (rule 4 tracking order).
         self._resting: list[int] = []
-        # (cancel effective ts, order_id), sorted (rule 7).
+        # (cancel effective ts, order_id) min-heap (rule 7); entries of
+        # terminal orders are stale and skipped lazily.
         self._cancels: list[tuple[int, int]] = []
+        # (expire_ts, order_id) min-heap of every child with expire_ts != 0
+        # (rule 7); entries of terminal orders are stale and skipped.
+        self._expiries: list[tuple[int, int]] = []
         # Rule 3b overlay: consumed displayed size per level.
         self._consumed: dict[OverlayKey, int] = {}
         # Rule 4: per resting order, the market order ids that joined its
@@ -344,7 +350,9 @@ class ExecutionSimulator:
             cancel_arrival_ts=0,
         )
         self._orders[order_id] = o
-        bisect.insort(self._pending, (o.arrival_ts, order_id))
+        heapq.heappush(self._pending, (o.arrival_ts, order_id))
+        if o.expire_ts != 0:
+            heapq.heappush(self._expiries, (o.expire_ts, order_id))
         return order_id
 
     def cancel(self, order_id: int, cancel_ts: int) -> None:
@@ -362,7 +370,7 @@ class ExecutionSimulator:
         # overtakes its own order.
         arrival = self._latency_to(self._venue(o.venue_id), cancel_ts)
         o.cancel_arrival_ts = max(arrival, o.arrival_ts)
-        bisect.insort(self._cancels, (o.cancel_arrival_ts, order_id))
+        heapq.heappush(self._cancels, (o.cancel_arrival_ts, order_id))
 
     def amend_down(self, order_id: int, new_qty: int, amend_ts: int) -> bool:
         """Reduce an order's open size to ``new_qty`` keeping its priority
@@ -386,7 +394,7 @@ class ExecutionSimulator:
         if new_qty >= self.amend_target(order_id):
             return False
         arrival = max(self._latency_to(self._venue(o.venue_id), amend_ts), o.arrival_ts)
-        bisect.insort(self._amends, (arrival, order_id, new_qty))
+        heapq.heappush(self._amends, (arrival, order_id, new_qty))
         self._amend_target[order_id] = new_qty
         return True
 
@@ -406,7 +414,7 @@ class ExecutionSimulator:
 
     def _apply_amends_due(self, t: int) -> None:
         while self._amends and self._amends[0][0] <= t:
-            _, oid, qty = self._amends.pop(0)
+            _, oid, qty = heapq.heappop(self._amends)
             o = self._orders[oid]
             if o.is_terminal or o.remaining <= qty:
                 continue
@@ -416,21 +424,31 @@ class ExecutionSimulator:
     def cancel_all(self) -> None:
         """Cancel every non-terminal order (end of stream, immediate)."""
         while self._pending:
-            self._terminate(self._orders[self._pending[0][1]], CancelReason.END_OF_STREAM)
-        while self._resting:
-            self._terminate(self._orders[self._resting[0]], CancelReason.END_OF_STREAM)
+            _, oid = heapq.heappop(self._pending)
+            o = self._orders[oid]
+            if o.state == OrderState.PENDING:
+                self._terminate(o, CancelReason.END_OF_STREAM)
+        for oid in self._resting:
+            o = self._orders[oid]
+            o.state = OrderState.CANCELLED
+            o.cancel_reason = CancelReason.END_OF_STREAM
+            o.resting = False
+            self._behind.pop(oid, None)
+        self._resting.clear()
         self._cancels.clear()
+        self._expiries.clear()
 
     # ----------------------------------------------------------- lifecycle
 
     def _terminate(self, o: ChildOrder, reason: CancelReason) -> None:
+        was_resting = o.state == OrderState.ACTIVE
         o.state = OrderState.CANCELLED
         o.cancel_reason = reason
         o.resting = False
         self._behind.pop(o.order_id, None)
-        self._pending = [e for e in self._pending if e[1] != o.order_id]
-        self._resting = [i for i in self._resting if i != o.order_id]
-        self._cancels = [e for e in self._cancels if e[1] != o.order_id]
+        # _pending / _cancels / _expiries entries go stale (lazy deletion).
+        if was_resting:
+            self._resting.remove(o.order_id)
 
     def _fill_fee(
         self, o: ChildOrder, price_ticks: int, qty: int, liq: Liquidity, ts: int = 0
@@ -520,7 +538,6 @@ class ExecutionSimulator:
             o.state = OrderState.FILLED
             o.resting = False
             self._behind.pop(o.order_id, None)
-            self._cancels = [e for e in self._cancels if e[1] != o.order_id]
 
     def _consumed_at(self, instrument_id: int, venue_id: int, side: int, price_ticks: int) -> int:
         return self._consumed.get((instrument_id, venue_id, side, price_ticks), 0)
@@ -646,13 +663,9 @@ class ExecutionSimulator:
     def _expire_due(self, t: int) -> None:
         """Rule 7: time-in-force, pending or resting, before any activation."""
         due: list[int] = []
-        for _, oid in self._pending:
-            o = self._orders[oid]
-            if o.expire_ts != 0 and o.expire_ts <= t:
-                due.append(oid)
-        for oid in self._resting:
-            o = self._orders[oid]
-            if o.expire_ts != 0 and o.expire_ts <= t:
+        while self._expiries and self._expiries[0][0] <= t:
+            _, oid = heapq.heappop(self._expiries)
+            if not self._orders[oid].is_terminal:
                 due.append(oid)
         for oid in sorted(due):
             self._counters.expired_orders += 1
@@ -660,7 +673,12 @@ class ExecutionSimulator:
 
     def _activate_and_cancel_due(self, t: int) -> None:
         """Rules 2 + 7: activations and cancel arrivals merged by time."""
+        pending, cancels, orders = self._pending, self._cancels, self._orders
         while True:
+            while pending and orders[pending[0][1]].state != OrderState.PENDING:
+                heapq.heappop(pending)
+            while cancels and orders[cancels[0][1]].is_terminal:
+                heapq.heappop(cancels)
             have_act = bool(self._pending) and self._pending[0][0] <= t
             have_cxl = bool(self._cancels) and self._cancels[0][0] <= t
             if not have_act and not have_cxl:
@@ -669,10 +687,10 @@ class ExecutionSimulator:
             if have_act and have_cxl:
                 do_act = self._pending[0][0] <= self._cancels[0][0]
             if do_act:
-                _, oid = self._pending.pop(0)
+                _, oid = heapq.heappop(pending)
                 self._activate(self._orders[oid])
             else:
-                _, oid = self._cancels.pop(0)
+                _, oid = heapq.heappop(cancels)
                 self._apply_cancel_arrival(self._orders[oid])
 
     def _track_consumption(

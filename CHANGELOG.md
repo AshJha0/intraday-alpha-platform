@@ -8,6 +8,11 @@ that tag.
 
 ## Unreleased
 
+- v1.16 item 13 (Python): the execution simulator's activation, cancel and amend queues are
+  min-heaps with lazy deletion and expiries use an `(expire_ts, order_id)` heap instead of a
+  per-event scan of every pending and resting order; rule 9 order and ties unchanged, fills
+  byte-identical (`tools/bench_exec_simulator.py` digest). The ITCH throughput test's
+  wall-clock floors are replaced by count-based guards (rates still printed).
 - v1.16 item 9 (code): forward paper trade as infrastructure, `python -m iap.paper.daily
   (--date D | --pending)`. Per new real session: locate or ingest (`--itch`; R7 holdout datasets
   refused), the MVP loop per symbol with `configs/prereg/v3.json` realism and the opt-in EOD
