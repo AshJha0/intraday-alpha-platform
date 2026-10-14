@@ -8,6 +8,15 @@ that tag.
 
 ## Unreleased
 
+- v1.16 item 12 follow-ups (research memory, `docs/research/MEMORY_REVIEW_v116.md` items 2-7):
+  walk-forward test frames keep only ids, labels, market columns and the alpha's features, and
+  the previous fold's test frames are dropped before the next fold is built; train/CPCV frames
+  keep only the horizon's `label_*` columns; an alpha reading an undeclared column now raises
+  a clear `ValueError` instead of silently rerunning at full width; CPCV keeps per-group (z, y)
+  instead of per-split (ts, z, y); `power_real.shift_labels`/`plant` and leakage label
+  obfuscation use shallow copies; the leakage frame builder frees each instrument's row list
+  once stacked. Reports are byte-identical; float32 was not adopted (it would move committed
+  numbers).
 - v1.16 P0-1: opt-in simulator rule 6b, impact on the parent order
   (`ExecConfig.impact_model = "parent"`, `impact_exponent`, `permanent_impact_bps_per_pct_adv`):
   temporary impact on the parent's cumulative taker qty (splitting a parent cannot lower its

@@ -238,40 +238,55 @@ class WalkForwardSplitter:
             )
         return out
 
-    def split_frames(
-        self,
-        frames: Mapping[int, pd.DataFrame],
-        horizon_ns: int,
-        train_columns: set[str] | None = None,
-    ) -> Iterator[tuple[Fold, dict[int, pd.DataFrame], dict[int, pd.DataFrame]]]:
-        """Yield (fold, train_frames, test_frames) with purge+embargo applied.
-
-        ``train_columns`` (v1.15, R7 memory): when given, the train frames keep
-        only those columns (in frame order) — the rows are the same; the test
-        frames are always whole.  :meth:`train_frames` rebuilds a fold's full
-        train frames for a model that needs more."""
+    def split_folds(self, frames: Mapping[int, pd.DataFrame]) -> list[Fold]:
+        """The folds :meth:`split_frames` yields, without building any frame."""
         nonempty = [df for df in frames.values() if len(df)]
         if not nonempty:
             raise ValueError("no rows to split")
         if self.mode == "row_mass":
             pooled = np.concatenate([df["exchange_ts"].to_numpy(dtype=np.int64) for df in nonempty])
-            folds = self.folds_by_row_mass(pooled)
-        elif self.mode in ("day_aligned", "leave_one_day_out"):
+            return self.folds_by_row_mass(pooled)
+        if self.mode in ("day_aligned", "leave_one_day_out"):
             pooled = np.concatenate([df["exchange_ts"].to_numpy(dtype=np.int64) for df in nonempty])
-            folds = self.folds_by_day(pooled)
-        else:
-            t0 = min(int(df["exchange_ts"].iloc[0]) for df in nonempty)
-            t1 = max(int(df["exchange_ts"].iloc[-1]) for df in nonempty)
-            folds = self.folds(t0, t1)
-        for fold in folds:
-            train: dict[int, pd.DataFrame] = {}
-            test: dict[int, pd.DataFrame] = {}
-            for iid, df in frames.items():
-                ts = df["exchange_ts"].to_numpy()
-                keep = fold.train_mask(ts, horizon_ns, self.embargo_ns, self.post_embargo_ns)
-                src = df if train_columns is None else df[_keep_cols(df, train_columns)]
-                train[iid] = src[keep].reset_index(drop=True)
-                test[iid] = df[fold.test_mask(ts)].reset_index(drop=True)
+            return self.folds_by_day(pooled)
+        t0 = min(int(df["exchange_ts"].iloc[0]) for df in nonempty)
+        t1 = max(int(df["exchange_ts"].iloc[-1]) for df in nonempty)
+        return self.folds(t0, t1)
+
+    def fold_frames(
+        self,
+        frames: Mapping[int, pd.DataFrame],
+        fold: Fold,
+        horizon_ns: int,
+        train_columns: set[str] | None = None,
+        test_columns: set[str] | None = None,
+    ) -> tuple[dict[int, pd.DataFrame], dict[int, pd.DataFrame]]:
+        """``(train_frames, test_frames)`` of one fold of :meth:`split_folds`
+        (the frames :meth:`split_frames` yields for it)."""
+        train: dict[int, pd.DataFrame] = {}
+        test: dict[int, pd.DataFrame] = {}
+        for iid, df in frames.items():
+            ts = df["exchange_ts"].to_numpy()
+            keep = fold.train_mask(ts, horizon_ns, self.embargo_ns, self.post_embargo_ns)
+            train[iid] = _rows(df, keep, train_columns)
+            test[iid] = _rows(df, fold.test_mask(ts), test_columns)
+        return train, test
+
+    def split_frames(
+        self,
+        frames: Mapping[int, pd.DataFrame],
+        horizon_ns: int,
+        train_columns: set[str] | None = None,
+        test_columns: set[str] | None = None,
+    ) -> Iterator[tuple[Fold, dict[int, pd.DataFrame], dict[int, pd.DataFrame]]]:
+        """Yield (fold, train_frames, test_frames) with purge+embargo applied.
+
+        ``train_columns`` (v1.15, R7 memory) / ``test_columns`` (v1.16): when
+        given, the train / test frames keep only those columns (in frame
+        order) - the rows are the same.  :meth:`train_frames` rebuilds a
+        fold's full train frames for a model that needs more."""
+        for fold in self.split_folds(frames):
+            train, test = self.fold_frames(frames, fold, horizon_ns, train_columns, test_columns)
             yield fold, train, test
 
     def train_frames(
@@ -288,3 +303,10 @@ class WalkForwardSplitter:
 
 def _keep_cols(df: pd.DataFrame, cols: set[str]) -> list[str]:
     return [c for c in df.columns if c in cols]
+
+
+def _rows(df: pd.DataFrame, mask: np.ndarray, cols: set[str] | None) -> pd.DataFrame:
+    """The masked rows of ``df`` (only ``cols``, in frame order, when given)
+    as a fresh frame with a 0..n-1 index: one copy, never a full-width one."""
+    src = df if cols is None else df[_keep_cols(df, cols)]
+    return src[mask].reset_index(drop=True)

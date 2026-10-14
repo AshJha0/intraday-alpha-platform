@@ -35,7 +35,7 @@ from iap.validation.deflated import (
 from iap.validation.ledger import ExperimentLedger
 from iap.validation.methods import METHODS_V3, METHODS_V4, methods
 from iap.validation.validate import CPCV_LOOKS, DSR_LOOKS, looks_per_validation
-from test_research_validity_v19 import _multi_day_frames, _validate
+from test_research_validity_v19 import _multi_day_frames, _TwoInstrumentAlpha, _validate
 
 NS_S = 1_000_000_000
 NS_DAY = 86_400 * NS_S
@@ -278,14 +278,22 @@ def test_cpcv_block_on_narrowed_frames_is_identical(monkeypatch):
     assert narrowed == full
 
 
-def test_cpcv_block_falls_back_to_full_frames_on_missing_column(monkeypatch):
-    """An alpha that reads a column outside the narrowed set gets the full frames."""
+def test_cpcv_block_fails_loudly_on_missing_column(monkeypatch):
+    """v1.16: an alpha that reads a column outside the narrowed set raises
+    (it used to rerun silently on full-width frames, the R7 OOM path)."""
     import iap.validation.validate as v
 
     frames = _multi_day_frames(per_day=500)
-    expected = _v4(frames)["cpcv"]
-    monkeypatch.setattr(v, "_cpcv_columns", lambda *a, **k: {"exchange_ts"})
-    assert _v4(frames)["cpcv"] == expected
+    real = v._cpcv_columns
+    calls = []
+
+    def narrow_cpcv_only(*a, **k):
+        calls.append(1)
+        return real(*a, **k) if len(calls) == 1 else {"exchange_ts"}
+
+    monkeypatch.setattr(v, "_cpcv_columns", narrow_cpcv_only)
+    with pytest.raises(ValueError, match="cpcv: the alpha read column"):
+        _v4(frames)
 
 
 def test_whole_v4_report_is_identical_with_narrowed_walk_forward_train(monkeypatch):
@@ -300,17 +308,34 @@ def test_whole_v4_report_is_identical_with_narrowed_walk_forward_train(monkeypat
             df[f"junk_{j}_v1"] = rng.standard_normal(len(df))
     narrowed = _v4(frames)
     monkeypatch.setattr(v, "_cpcv_columns", lambda *a, **k: None)
+    monkeypatch.setattr(v, "_test_columns", lambda *a, **k: None)
     full = _v4(frames)
     assert narrowed == full
 
 
-def test_walk_forward_refits_on_full_train_when_a_column_is_missing(monkeypatch):
+def test_walk_forward_test_columns_drop_unread_features():
+    """v1.16: walk-forward test frames keep ids, every label, the market
+    columns and the alpha's features - never the unrelated feature columns."""
+    import iap.validation.validate as v
+
+    frames = _multi_day_frames(per_day=300)
+    for df in frames.values():
+        df["junk_0_v1"] = 0.0
+    model = _TwoInstrumentAlpha()
+    cols = v._test_columns(lambda: model, frames)
+    assert "junk_0_v1" not in cols
+    assert set(model.features) <= cols
+    assert {c for df in frames.values() for c in df.columns if c.startswith("label_")} <= cols
+
+
+def test_walk_forward_fails_loudly_when_a_column_is_missing(monkeypatch):
+    """v1.16: no silent full-width refit when a fit reads an undeclared column."""
     import iap.validation.validate as v
 
     frames = _multi_day_frames(per_day=500)
-    expected = _v4(frames)
     monkeypatch.setattr(v, "_cpcv_columns", lambda *a, **k: {"exchange_ts"})
-    assert _v4(frames) == expected
+    with pytest.raises(ValueError, match="walk-forward fit: the alpha read column"):
+        _v4(frames)
 
 
 def test_split_frames_train_columns_keep_rows_and_order():
