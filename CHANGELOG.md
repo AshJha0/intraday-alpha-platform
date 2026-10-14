@@ -55,6 +55,16 @@ that tag.
   main's board under `1s:quoting-v2-insample`), quoting_config keys checked against `QuotingConfig`,
   `configs/prereg/v2.json` realism applied, `summarise` validity gate ("SKEW INERT", no verdict).
   `tools/quoting_v2_register.py` registers and signs it; OWNER ONLY.
+- v1.16 item 12 (R7 follow-ups):
+  - (a) `iap.validation.beta_stability`: the report-only beta-stability diagnostic, outside the
+    fingerprinted alpha modules (only `alpha/base.py` and `alpha/equity.py` are hashed); a test
+    keeps `iap.alpha` from importing it.
+  - (b) `tools/prereg_touch_check.py` + a non-blocking CI step: a `::warning::` when a PR changes
+    the code or feature fingerprint of an OPEN pre-registration (`--strict` for local use).
+  - (c) `merge_datasets` / `python -m iap.marketdata merge`: `--allow-lot-size-differences`
+    (manifest `lot_size_by_session`) and `--link` (hard links); off by default (byte-identical).
+  - (d) Memory review `docs/research/MEMORY_REVIEW_v116.md`; `ResearchRunner.frames(needed)` loads
+    only the experiment's features plus id, label and market columns (was full width).
 
 ## v1.15.0 — 2026-10-13
 
