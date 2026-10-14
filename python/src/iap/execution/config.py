@@ -43,6 +43,10 @@ class SorOptions:
     max_venue_latency_ns: int = (1 << 63) - 1
 
 
+#: Simulator impact rules (``ExecConfig.impact_model``).
+IMPACT_MODELS = ("child", "parent")
+
+
 @dataclass(frozen=True)
 class ExecConfig:
     """Simulator configuration; treated as immutable once handed to a simulator."""
@@ -56,10 +60,36 @@ class ExecConfig:
     #: SELL fills of equity venues by fill time (``iap.execution.regulatory``).
     #: ``None`` (the default) keeps rule 5 byte-identical to v1.
     regulatory_fees: RegulatoryFeeSchedule | None = None
+    #: v1.16 P0-1 (opt-in): ``"child"`` (the default, rule 6 as pinned by
+    #: every golden) sizes impact on each child alone; ``"parent"`` charges
+    #: the temporary leg on the parent's cumulative taker quantity and adds
+    #: a permanent leg on the instrument's cumulative signed taker flow
+    #: (simulator rule 6b), so splitting a parent cannot reduce its cost.
+    impact_model: str = "child"
+    #: Parent-mode temporary impact shape: ``impact_bps = coeff * x**exponent``
+    #: with ``x`` the participation in % of ADV (1.0 linear, 0.5 square root).
+    impact_exponent: float = 1.0
+    #: Parent-mode permanent impact, bps per % of ADV of the instrument's
+    #: cumulative signed taker flow (0 = none).
+    permanent_impact_bps_per_pct_adv: float = 0.0
 
     def __post_init__(self) -> None:
         if not isinstance(self.seed, int) or self.seed < 0:
             raise ValueError(f"seed must be a non-negative int, got {self.seed!r}")
+        if self.impact_model not in IMPACT_MODELS:
+            raise ValueError(
+                f"impact_model must be one of {IMPACT_MODELS}, got {self.impact_model!r}"
+            )
+        if not 0.0 < self.impact_exponent <= 1.0:
+            raise ValueError(f"impact_exponent must be in (0, 1], got {self.impact_exponent!r}")
+        if self.permanent_impact_bps_per_pct_adv < 0.0:
+            raise ValueError("permanent_impact_bps_per_pct_adv must be >= 0")
+        if self.impact_model == "child" and (
+            self.impact_exponent != 1.0 or self.permanent_impact_bps_per_pct_adv
+        ):
+            raise ValueError(
+                "impact_exponent / permanent_impact_bps_per_pct_adv need impact_model='parent'"
+            )
         # Freeze the maps in ascending key order (deterministic iteration).
         object.__setattr__(self, "instruments", dict(sorted(self.instruments.items())))
         object.__setattr__(self, "venues", dict(sorted(self.venues.items())))

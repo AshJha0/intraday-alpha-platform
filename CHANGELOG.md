@@ -6,6 +6,14 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## Unreleased
+
+- v1.16 P0-1: opt-in simulator rule 6b, impact on the parent order
+  (`ExecConfig.impact_model = "parent"`, `impact_exponent`, `permanent_impact_bps_per_pct_adv`):
+  temporary impact on the parent's cumulative taker qty (splitting a parent cannot lower its
+  cost) plus a permanent leg on the instrument's cumulative signed flow. Default `"child"` keeps
+  rule 6 and every golden unchanged. Python only.
+
 ## v1.15.0 — 2026-10-13
 
 The R7 confirmatory release: EQ10@1s and EQ05@1s are confirmed on 7 owner-signed
