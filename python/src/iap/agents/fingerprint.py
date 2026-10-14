@@ -158,3 +158,73 @@ def fingerprint(alpha_id: str, src_root: Path = SRC_ROOT) -> dict[str, Any] | No
         "feature_hash": _sha(feat),
         "deps": _deps(),
     }
+
+
+# --- registration-time CI-environment check (v1.16, opt-in) -----------------
+# A pre-registration records ``deps``; prereg_gate refuses a run whose deps
+# differ.  CI installs python/requirements-ci.txt, so a prereg registered with
+# other numpy/pandas/scipy versions is refused there (R7, v1.15).  These
+# helpers let a registration script warn (or, with --require-ci-env, refuse)
+# BEFORE signing.  They never change what the gate does.
+
+CI_LOCK = SRC_ROOT.parent / "requirements-ci.txt"
+
+
+def _norm_dist(name: str) -> str:
+    return name.strip().lower().replace("_", "-").replace(".", "-")
+
+
+def ci_lock_deps(path: Path = CI_LOCK) -> dict[str, str | None]:
+    """``{dist: version}`` pinned (``name==version``) in a pip lock file for
+    :data:`PINNED_DISTRIBUTIONS`; ``None`` for a distribution not pinned."""
+    pins: dict[str, str] = {}
+    for raw in Path(path).read_text(encoding="utf-8").splitlines():
+        line = raw.split("#", 1)[0].strip().rstrip("\\").strip()
+        if "==" not in line or line.startswith("-"):
+            continue
+        name, ver = line.split("==", 1)
+        name = name.split("[", 1)[0]
+        ver = ver.split(";", 1)[0].split()[0] if ver.split() else ""
+        if ver:
+            pins[_norm_dist(name)] = ver
+    return {d: pins.get(_norm_dist(d)) for d in PINNED_DISTRIBUTIONS}
+
+
+def compare_deps(
+    local: dict[str, str | None], ci: dict[str, str | None]
+) -> list[tuple[str, str | None, str | None]]:
+    """Mismatches as ``(dist, local, ci)`` over :data:`PINNED_DISTRIBUTIONS`."""
+    return [(d, local.get(d), ci.get(d)) for d in PINNED_DISTRIBUTIONS if local.get(d) != ci.get(d)]
+
+
+def check_registration_env(
+    require_ci_env: bool = False,
+    lock: Path = CI_LOCK,
+    local: dict[str, str | None] | None = None,
+    out: Any = None,
+) -> bool:
+    """Compare the installed deps with the CI lock and print the result.
+
+    Returns ``True`` when they match.  On a mismatch prints a warning (to
+    ``out``, default stderr) and returns ``False``; with ``require_ci_env``
+    raises ``SystemExit(2)`` instead.  See
+    docs/runbooks/RUNBOOK_prereg_environment.md.
+    """
+    import sys
+
+    out = out or sys.stderr
+    bad = compare_deps(_deps() if local is None else local, ci_lock_deps(lock))
+    if not bad:
+        print(f"[ci-env] deps match {Path(lock).name}: OK", file=out)
+        return True
+    rows = "; ".join(f"{d} local={lv} ci={cv}" for d, lv, cv in bad)
+    print(
+        f"[ci-env] WARNING: deps differ from {Path(lock).name}: {rows}. A prereg registered "
+        "here will be refused by CI's prereg gate ('deps changed since pre-registration'). "
+        "Register from the CI venv: docs/runbooks/RUNBOOK_prereg_environment.md",
+        file=out,
+    )
+    if require_ci_env:
+        print("[ci-env] --require-ci-env: refusing to register.", file=out)
+        raise SystemExit(2)
+    return False

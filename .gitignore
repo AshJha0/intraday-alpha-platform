@@ -80,3 +80,6 @@ deployment/alertmanager/*.url
 # --- v1.13 G-P2-1: transient writer locks of the blackboard / ledgers
 research/**/*.jsonl.lock
 research/**/*.json.lock
+
+# CI-lock venv for registering pre-registrations (docs/runbooks/RUNBOOK_prereg_environment.md)
+.venv-ci/
