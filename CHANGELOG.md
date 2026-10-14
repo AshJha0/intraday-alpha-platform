@@ -70,6 +70,14 @@ that tag.
     (manifest `lot_size_by_session`) and `--link` (hard links); off by default (byte-identical).
   - (d) Memory review `docs/research/MEMORY_REVIEW_v116.md`; `ResearchRunner.frames(needed)` loads
     only the experiment's features plus id, label and market columns (was full width).
+- v1.16 item 14 (portfolio, Python only, opt-in): `solve(..., projection="dykstra", dykstra_tol,
+  dykstra_max_iter)` / `project_dykstra` — Dykstra's alternating projection over the same sets and
+  order as the pinned cyclic `project`, giving the exact Euclidean projection onto the intersection
+  (exact when `vol_target` is off; the radial vol retraction is not a projection).
+  `ewma_covariance(..., shrinkage="ledoit_wolf_estimated")` — the estimated Ledoit-Wolf (2004)
+  intensity toward `mu * I`, estimated on the sample covariance of the returns and applied to the
+  EWMA matrix. `ledoit_wolf` moved to `iap.core.shrinkage` (re-exported from `iap.combine.weights`).
+  Defaults (`"cyclic"`, `shrinkage=None`, fixed-0.1 `"ledoit_wolf"`) and every golden unchanged.
 
 ## v1.15.0 — 2026-10-13
 
