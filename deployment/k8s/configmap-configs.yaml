@@ -720,6 +720,41 @@ data:
         "amend_size_down": true
       }
     }
+  prereg__v3.json: |
+    {
+      "x-version": 1,
+      "description": "v3 pre-registration config (v1.16 P0-3; values approved by the owner 2026-10-14): v2 plus the net-of-cost realism keys \u2014 assumed venue latency with a parametric tail, latency stress grid, assumed fee tier with lower-tier sensitivity, ITCH exec-print fills, and parent-order impact from the residual-move calibration fit. Read with iap.execution.realism.load_prereg.",
+      "methods": "v3",
+      "regulatory_fees": true,
+      "execution_realism": {
+        "description": "v1.14 options, OFF in code defaults, ON for v2. feed_latency_ns is an assumed market-data feed leg (real ITCH has exchange timestamps only), not a measurement. modify_queue_credit has no switch (always on since v1.14) and is recorded for completeness. v1.16: venue_latency is ASSUMED (real ITCH carries no order-entry latency); latency_stress {0,1,5}x is reported, the 1x case is primary; fee_tier from configs/reference/fee_tiers.json (assumed), sensitivity at the lower 'base' tier is reported only; impact_model parent + impact_shape sqrt needs estimate_calibration(impact_fit=True).",
+        "modify_queue_credit": true,
+        "feed_latency_ns": 100000,
+        "exit_route": "sim",
+        "flatten_route": "sim",
+        "hidden_print_fills": true,
+        "markout_unit": "touch_order",
+        "amend_size_down": true,
+        "venue_latency": {
+          "mean_ns": 250000,
+          "jitter_ns": 100000,
+          "tail_prob": 0.01,
+          "tail_mult": 10.0
+        },
+        "latency_stress": [
+          0,
+          1,
+          5
+        ],
+        "fee_tier": "mid",
+        "fee_tier_sensitivity": [
+          "base"
+        ],
+        "exec_prints": true,
+        "impact_model": "parent",
+        "impact_shape": "sqrt"
+      }
+    }
   reference__auction_entry_cutoffs.json: |
     {
       "x-version": 1,
@@ -799,6 +834,16 @@ data:
           },
           "as_of": "2026-10-11"
         }
+      }
+    }
+  reference__fee_tiers.json: |
+    {
+      "x-version": 1,
+      "description": "v1.16 P0-3: ASSUMED equity per-share fee tiers for prereg fee_tier / fee_tier_sensitivity (iap.execution.realism.load_fee_tiers). Not a quoted exchange price list: taker fee at the Reg NMS access-fee cap, maker rebate falling with the volume tier. 'top' equals the synthetic venue default (configs/venues/venues.json XV1).",
+      "tiers": {
+        "top": {"taker_fee_per_share": 0.003, "maker_rebate_per_share": 0.002},
+        "mid": {"taker_fee_per_share": 0.003, "maker_rebate_per_share": 0.0015},
+        "base": {"taker_fee_per_share": 0.003, "maker_rebate_per_share": 0.001}
       }
     }
   reference__regulatory_fee_schedule.json: |

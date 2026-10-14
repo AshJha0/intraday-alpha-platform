@@ -218,10 +218,14 @@ spec:
                 path: mvp/venues.json
               - key: prereg__v2.json
                 path: prereg/v2.json
+              - key: prereg__v3.json
+                path: prereg/v3.json
               - key: reference__auction_entry_cutoffs.json
                 path: reference/auction_entry_cutoffs.json
               - key: reference__event_calendar.json
                 path: reference/event_calendar.json
+              - key: reference__fee_tiers.json
+                path: reference/fee_tiers.json
               - key: reference__regulatory_fee_schedule.json
                 path: reference/regulatory_fee_schedule.json
               - key: risk__risk.json
