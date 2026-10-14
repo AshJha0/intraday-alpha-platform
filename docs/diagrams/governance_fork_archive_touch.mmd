@@ -1,0 +1,19 @@
+flowchart TD
+    %% v1.16 item 11 (fork-board archive) and item 12b (prereg touch check).
+    %% Sources: research/agents/forks/*/FORK.json, tools/merge_ledger.py, tools/prereg_touch_check.py, .github/workflows/ci.yml.
+    subgraph MERGE["merging a research branch onto main (item 11)"]
+        FB["fork branch board<br/>(research/maker-real, research/step2)"] --> Q1{"replay its entries onto main?"}
+        Q1 -- "no: signed entries bind the previous hash" --> ARC["archive unchanged under<br/>research/agents/forks/BRANCH/<br/>+ FORK.json (fork point seq, head hash, file sha256s)"]
+        ARC --> OPF["main board: one operator finding"]
+        FB --> LED["tools/merge_ledger.py<br/>(+7 looks from step2; 5368 at merge)"]
+        ARC --> GATE["study drivers gate on their<br/>archived fork board (PREREG_BOARD)"]
+        ARC --> VER["verify: Blackboard(path).verify()<br/>+ signatures against that directory agent_pubkeys.json"]
+    end
+    subgraph TOUCH["every pull request (item 12b)"]
+        PR["PR changes code"] --> TC["tools/prereg_touch_check.py (CI step)"]
+        TC --> OPEN["open preregs: no outcome on the board,<br/>fingerprinted (code_hash, feature_hash)"]
+        OPEN --> CMP{"recomputed fingerprint matches?"}
+        CMP -- yes --> OK["silent"]
+        CMP -- no --> WARN["::warning:: (never fails the job;<br/>--strict exits 1 for local use)"]
+        WARN -. "unfixed, prereg_gate.require refuses<br/>the registered run later (as R7 in PR 117)" .-> FIX["fix before merge, or accept the loss"]
+    end

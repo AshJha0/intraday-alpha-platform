@@ -35,7 +35,7 @@ flowchart TD
     FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
-    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,361 looks / 296 configs, two datasets, three method revisions)<br/>REPORT.md, ML_REPORT.md, model manifests"]
+    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,372 looks / 307 configs, two datasets, three method revisions)<br/>REPORT.md, ML_REPORT.md, model manifests"]
     RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 23 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```
@@ -628,8 +628,12 @@ flowchart TD
     VOL --> MARK["4. risk wiring: stale transitions → on_sequence_gap / on_feed_recovered<br/>reference mid over NON-STALE venue books → on_market"]
     MARK --> TL["5. TCA MarketTimeline (crossed skipped + counted)"]
     TL --> FIN["6. parent finalisation → TCAResult + Attribution"]
-    FIN --> FEAT["7. FeatureEngine.apply (1 s cadence) + label mid series<br/>→ EQ01 / EQ03 / EQ06 LinearZAlpha + AlphaEnsemble<br/>→ SingleStockPortfolio (PGD + EWMA) → PortfolioTarget<br/>→ delta → one ParentOrder (TWAP / POV / IS by urgency)"]
-    FEAT --> CHILD["8. per child: AlgoScheduler → SorAdapter.route (3 venues)<br/>→ controls (slice interval, latency budget, participation)<br/>→ RiskEngineAdapter.evaluate (RiskDecision) → submit<br/>a REJECT is never submitted"]
+    FIN --> FEAT["7. FeatureEngine.apply (1 s cadence) + label mid series<br/>→ EQ01 / EQ03 / EQ06 LinearZAlpha + AlphaEnsemble"]
+    FEAT --> EOD{"execution.eod_flatten_lead_ns set (v1.16 opt-in)<br/>and t >= session close - lead?"}
+    EOD -- "no (golden run: key absent)" --> PORT["SingleStockPortfolio (PGD + EWMA) → PortfolioTarget<br/>→ delta → one ParentOrder (TWAP / POV / IS by urgency)"]
+    EOD -- yes --> FLAT["target flat, no portfolio solve: residual = position + in flight<br/>→ one most-urgent ParentOrder ending at the close<br/>(skipped if flat or a parent is live; too_late at or after the close)<br/>counts.eod_flatten in the report"]
+    PORT --> CHILD
+    FLAT --> CHILD["8. per child: AlgoScheduler → SorAdapter.route (3 venues)<br/>→ controls (slice interval, latency budget, participation)<br/>→ RiskEngineAdapter.evaluate (RiskDecision) → submit<br/>a REJECT is never submitted"]
     CHILD --> TRACE["9. TraceBuilder per decision → JsonlTraceSink + StoreTraceSink + TraceDigest"]
     TRACE --> OUT["data/mvp/RUN_ID/: traces.jsonl · iap.sqlite · risk_audit.jsonl<br/>report.json / report.md · paper_evidence.json · config.json"]
     OUT --> VERIFY["python -m iap.mvp verify — run twice, identical bytes<br/>python -m iap.mvp replay --run … — same digest from the captured stream<br/>golden: tests/golden/expected_mvp.json (15,805 events, 800 decisions,<br/>231 parents, 163 fills, P&L −82.84 USD, digest 3f2b117e…)"]
@@ -1545,7 +1549,174 @@ flowchart LR
     HIST --> GUARD["CI guard: p50 / p99 within 8x<br/>of the committed baseline"]
 ```
 
-## 36. Where to go deeper
+## 36. Simulator impact: child rule 6 vs parent rule 6b, and the residual fit (v1.16, P0-1/P0-2)
+
+Rule 6 (default) charges linear impact on each child's own size, so splitting a parent into more children lowers its modelled cost. Opt-in rule 6b (`ExecConfig.impact_model = "parent"`) charges temporary impact on the parent's cumulative taker quantity, incrementally, plus an optional permanent leg on the instrument's cumulative signed flow. `estimate_calibration(..., impact_fit=True)` fits the coefficient and exponent from residual mid moves; `apply_impact_fit` switches a config to rule 6b. Python only; every golden keeps rule 6.
+
+Source: [`diagrams/simulator_parent_impact.mmd`](diagrams/simulator_parent_impact.mmd).
+
+```mermaid
+flowchart TD
+    %% v1.16 P0-1 / P0-2: simulator rule 6 vs opt-in rule 6b, and the residual-impact calibration that feeds it.
+    %% Sources: iap.execution.simulator (_emit_fill, _parent_impact), iap.execution.calibration (impact_fit, apply_impact_fit).
+    FILL["taker fill of a child order<br/>(ExecutionSimulator._emit_fill)"] --> MODEL{"ExecConfig.impact_model"}
+    MODEL -- "child (default, every golden)" --> R6["rule 6: linear impact on the CHILD size<br/>impact_coeff_bps_per_pct_adv x child % of ADV"]
+    MODEL -- "parent (opt-in)" --> R6B["rule 6b: temporary impact on the PARENT cumulative taker qty<br/>exponent impact_exponent, charged incrementally f(q1) - f(q0)<br/>(splitting a parent cannot lower its cost)"]
+    R6B --> PERM{"permanent_impact_bps_per_pct_adv > 0?"}
+    PERM -- yes --> PL["+ permanent leg on the instrument<br/>cumulative signed flow"]
+    PERM -- no --> COST["impact cost on the fill"]
+    PL --> COST
+    R6 --> COST
+    subgraph CAL["residual-move calibration (opt-in)"]
+        EV["ITCH events + tape ADV<br/>(incl. non-displayed prints)"] --> EST["estimate_calibration(..., impact_fit=True)<br/>CLI --impact-fit"]
+        EST --> RES["impact.residual block:<br/>mid move after the depth walk vs participation<br/>linear + sqrt through-origin fits (HC0 SE),<br/>log-log power fit per horizon"]
+        RES --> APPLY["apply_impact_fit(config, calibration, shape)"]
+    end
+    APPLY -- "impact_model = parent,<br/>fitted coefficient and exponent" --> MODEL
+    RES -. "impact_source = residual" .-> AC["ac_params_from_calibration:<br/>Almgren-Chriss eta (P0-5)"]
+```
+
+## 37. Pre-registration realism v3: what each key changes (v1.16, P0-3)
+
+`configs/prereg/v3.json` is v2 plus the net-of-cost keys of `RealismOptIns` (`iap.execution.realism`). The keys are absent from v2, so v2 runs are unchanged. Venue latency and the fee table are ASSUMED values (real ITCH has no order-entry latency). `python -m iap.mvp.real` applies venue latency, fee tier and exec prints and lists the rest under `not_applied`.
+
+Source: [`diagrams/prereg_realism_v3.mmd`](diagrams/prereg_realism_v3.mmd).
+
+```mermaid
+flowchart LR
+    %% v1.16 P0-3: configs/prereg/v3.json = v2 + net-of-cost realism keys; read by iap.execution.realism.load_prereg into RealismOptIns.
+    V3["configs/prereg/v3.json<br/>methods v3, regulatory_fees, v2 execution_realism"] --> LOAD["realism.load_prereg → RealismOptIns<br/>(keys absent in v2: v2 runs unchanged)"]
+    LOAD --> VL["venue_latency<br/>mean 250 us, jitter 100 us,<br/>tail_prob 0.01, tail_mult 10 (ASSUMED)"]
+    LOAD --> LS["latency_stress 0, 1, 5 x<br/>1x primary, others reported"]
+    LOAD --> FT["fee_tier mid<br/>configs/reference/fee_tiers.json (ASSUMED)"]
+    LOAD --> FTS["fee_tier_sensitivity base<br/>reported only"]
+    LOAD --> EP["exec_prints true"]
+    LOAD --> IM["impact_model parent<br/>impact_shape sqrt"]
+    VL --> EC["RealismOptIns.exec_config(cfg, calibration)"]
+    FT --> EC
+    IM --> EC
+    LS --> SEC["RealismOptIns.stressed_exec_configs"]
+    FTS --> FTC["RealismOptIns.fee_tier_configs"]
+    EP --> SIMP["ExecutionSimulator(exec_print_price=True)<br/>+ Itch50Mapper(exec_prints=)"]
+    IM -. "needs estimate_calibration(impact_fit=True)" .-> CALN["apply_impact_fit → rule 6b"]
+    EC --> MVP["python -m iap.mvp.real:<br/>applies venue latency, fee tier, exec prints;<br/>the rest listed under not_applied with a reason"]
+    SEC --> RPT["research reports (sensitivity)"]
+    FTC --> RPT
+```
+
+## 38. The v1.16 monetisation decision (P0-6 → quoting v2)
+
+R7 showed the alphas predict but do not survive costs. The P0-6 in-sample grid (`research/v116/MONETISATION_P0-6.md`) produced zero trades in all 480 cells: the expected return never clears the round-trip cost. The owner's no-go (2026-10-14) leaves the M5 quoting study v2 as the remaining monetisation test. AI4 stays deferred: main has no real-data path for it (`research/r7/AI4_DEFERRED.md`).
+
+Source: [`diagrams/v116_monetisation_decision.mmd`](diagrams/v116_monetisation_decision.mmd).
+
+```mermaid
+flowchart TD
+    %% v1.16 monetisation path. Sources: docs/research/R7_RESULTS.md, research/v116/MONETISATION_P0-6.md,
+    %% research/quoting_real/prereg_v2*.json, research/r7/AI4_DEFERRED.md.
+    R7["R7 confirmed (v1.15): EQ10@1s, EQ05@1s<br/>predictive on 7 holdout sessions; net P&L at 1x cost 0"] --> P0["v1.16 P0-1..P0-5 cost realism<br/>(parent impact, residual fit, v3 prereg keys, SOR opt-ins, exact POV)"]
+    P0 --> STUDY["P0-6 in-sample monetisation study<br/>tools/v116_monetisation_study.py<br/>480 cells: hold x band x signal x sizing x cost x latency<br/>10 in-sample sessions, R7 holdout refused"]
+    STUDY --> RES["zero trades in every cell:<br/>expected return ~0.1-0.2 bp vs round trip ~0.8-1.2 bp"]
+    RES --> GO{"owner decision 2026-10-14"}
+    GO -- "NO-GO for a taker strategy" --> NOD["plan item 8 (paid fresh data,<br/>net-of-cost prereg) not triggered"]
+    GO -- "option 1" --> Q2["M5 two-sided skewed quoting v2<br/>registered (board seq 16-19), in-sample run"]
+    Q2 --> QV{"validity gate, then verdict"}
+    QV -- "EXISTS (in-sample)" --> OOS["worth an out-of-sample test<br/>(needs its own registration)"]
+    QV -- "NO DEMONSTRATED QUOTING EDGE<br/>or SKEW INERT" --> STOP["record the outcome; no monetisation claim"]
+    AI4["AI4 deep LOB (deferred from v1.15):<br/>registration cannot be honoured as written;<br/>no real-data path on main"] -. "separate track; a new registration<br/>would supersede the signed one" .-> GO
+```
+
+## 39. Quoting study v2: registration and the validity gate (v1.16)
+
+Only the owner runs `tools/quoting_v2_register.py`. The driver refuses to run unless the signed file verifies against the trust root and the draft is byte-identical to the registered one. `summarise` applies the validity gate (does the skew actually move quotes?) before any verdict, so an inert skew cannot produce a "no edge" verdict.
+
+Source: [`diagrams/quoting_v2_flow.mmd`](diagrams/quoting_v2_flow.mmd).
+
+```mermaid
+sequenceDiagram
+    %% v1.16 option 1: M5 quoting study v2. Sources: tools/quoting_v2_register.py, iap.research.quoting_real (verify_signed_v2, check_prereg_v2, summarise).
+    autonumber
+    participant O as owner (maintainer key outside the repo)
+    participant D as prereg_v2_DRAFT.json
+    participant T as tools/quoting_v2_register.py
+    participant B as main blackboard + ledger
+    participant S as prereg_v2.json (signed)
+    participant Q as iap.research.quoting_real
+    O->>D: approve values (alpha_weight EQ01 7 / EQ05 15 / EQ10 12,<br/>inv_skew_ticks 1, validity gate 0.10)
+    O->>T: run (OWNER ONLY, --dry-run first)
+    T->>B: WriteBroker.preregister per cell (EQ01, EQ05, EQ10, QNOSKEW)<br/>at 1s:quoting-v2-insample, one look each
+    T->>S: write the signed file (Ed25519, key checked against trust_roots.json)<br/>draft sha256 in every hypothesis
+    Q->>S: verify_signed_v2: signed, on_blackboard, no open owner items,<br/>trust-root key, valid signature, draft sha256 unchanged
+    Q->>B: prereg_gate.require each cell under horizon:horizon_tag
+    Q->>Q: quoting_config keys checked against QuotingConfig,<br/>configs/prereg/v2.json realism applied
+    Q->>Q: run units (session x symbol), checkpoint every cell
+    Q->>Q: summarise: mean frac_decisions_skew_changed_quote >= gate?<br/>no: SKEW INERT (validity gate failed, no verdict)
+    Q->>Q: else verdict EXISTS (in-sample) or NO DEMONSTRATED QUOTING EDGE,<br/>plus skew minus control (QNOSKEW)
+```
+
+## 40. Governance after merge: fork-board archive and the prereg touch check (v1.16, items 11 and 12b)
+
+Signed board entries bind the previous hash, so a research branch's board cannot be replayed onto main without re-signing. It is archived unchanged with a `FORK.json`. Separately, every PR runs a non-blocking check that warns when it changes code an open pre-registration fingerprints.
+
+Source: [`diagrams/governance_fork_archive_touch.mmd`](diagrams/governance_fork_archive_touch.mmd).
+
+```mermaid
+flowchart TD
+    %% v1.16 item 11 (fork-board archive) and item 12b (prereg touch check).
+    %% Sources: research/agents/forks/*/FORK.json, tools/merge_ledger.py, tools/prereg_touch_check.py, .github/workflows/ci.yml.
+    subgraph MERGE["merging a research branch onto main (item 11)"]
+        FB["fork branch board<br/>(research/maker-real, research/step2)"] --> Q1{"replay its entries onto main?"}
+        Q1 -- "no: signed entries bind the previous hash" --> ARC["archive unchanged under<br/>research/agents/forks/BRANCH/<br/>+ FORK.json (fork point seq, head hash, file sha256s)"]
+        ARC --> OPF["main board: one operator finding"]
+        FB --> LED["tools/merge_ledger.py<br/>(+7 looks from step2; 5368 at merge)"]
+        ARC --> GATE["study drivers gate on their<br/>archived fork board (PREREG_BOARD)"]
+        ARC --> VER["verify: Blackboard(path).verify()<br/>+ signatures against that directory agent_pubkeys.json"]
+    end
+    subgraph TOUCH["every pull request (item 12b)"]
+        PR["PR changes code"] --> TC["tools/prereg_touch_check.py (CI step)"]
+        TC --> OPEN["open preregs: no outcome on the board,<br/>fingerprinted (code_hash, feature_hash)"]
+        OPEN --> CMP{"recomputed fingerprint matches?"}
+        CMP -- yes --> OK["silent"]
+        CMP -- no --> WARN["::warning:: (never fails the job;<br/>--strict exits 1 for local use)"]
+        WARN -. "unfixed, prereg_gate.require refuses<br/>the registered run later (as R7 in PR 117)" .-> FIX["fix before merge, or accept the loss"]
+    end
+```
+
+## 41. Release roadmap, v1.13 to v1.16
+
+Successor of §25. v1.16 is Unreleased on main; AI4 on real data is deferred and not on main.
+
+Source: [`diagrams/release_roadmap_v113_v116.mmd`](diagrams/release_roadmap_v113_v116.mmd).
+
+```mermaid
+flowchart LR
+    %% Release roadmap v1.13 to v1.16. Source: CHANGELOG.md (v1.13.0 to v1.15.0, Unreleased). Sibling of release_roadmap_v19_v111.mmd.
+    subgraph V113["v1.13.0, released"]
+        H["quality-review hardening:<br/>CI layout, hashed locks, LF artefacts"]
+    end
+    subgraph V114["v1.14.0 (2026-10-11), released"]
+        C["correctness: same-ts coalescing, causal rows,<br/>automatic HAC, time-shift gate, 15c3-5 risk set"]
+    end
+    subgraph V115["v1.15.0 (2026-10-13), released"]
+        R7["R7 confirmed: EQ10@1s, EQ05@1s on 7 holdout sessions"]
+        MR["MVP on a real ITCH day; Java archived"]
+    end
+    subgraph V116["v1.16, Unreleased (on main)"]
+        P0["P0-1..P0-5 cost realism:<br/>rule 6b, residual fit, prereg v3, SOR opt-ins, exact POV"]
+        P6["P0-6 monetisation study: NO-GO (taker)"]
+        QV2["M5 quoting v2 registered"]
+        EOD["MVP end-of-day flatten (opt-in)"]
+        GV["fork-board archive, prereg touch check,<br/>multiple-testing table, simulator heaps"]
+    end
+    subgraph DEF["deferred, not on main"]
+        AI4["AI4 deep LOB on real data<br/>(new registration needed)"]
+    end
+    H --> C --> R7 --> P0 --> P6 --> QV2
+    MR --> EOD
+    R7 -. "deferred" .-> AI4
+```
+
+## 42. Where to go deeper
 
 | topic | document |
 |---|---|
