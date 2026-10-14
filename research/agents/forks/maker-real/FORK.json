@@ -1,0 +1,16 @@
+{
+  "schema": "iap.board_fork_archive",
+  "version": 1,
+  "fork": "research/maker-real",
+  "fork_commit": "6dd13d73d5cc96653fca9c9b4a401c3cd787b85e",
+  "fork_point_commit": "919c9dfcc175c88230f06dda2ede4886b7b89435",
+  "fork_point_seq": 6,
+  "entries": 10,
+  "entries_after_fork_point": 4,
+  "head_seq": 10,
+  "head_hash": "4d3d71d93a89510d3e291e8a305e513c8c3d2ac79ab0bd7f1068092bce9ff925",
+  "files": {
+    "blackboard.jsonl": "acfa33feec7ead4dff67aa7c59cdd61ec6d4985aa03e8ea193cb61ed63c92896"
+  },
+  "why": "v1.16 item 11 (owner decision 2026-10-14, option 1): signed entries bind the previous hash, so the fork's entries are archived as their own verifiable chain instead of being re-signed onto main. Verify with Blackboard(path).verify() and verify_signatures(pubkeys from this directory's agent_pubkeys.json)."
+}

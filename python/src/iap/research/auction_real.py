@@ -37,6 +37,11 @@ import pandas as pd
 
 from iap.research.maker_real import ROOT, cluster_stats, file_sha256, log
 
+#: v1.16 item 11: the AUC01 pre-registrations were made on the
+#: research/step2 fork board, archived unchanged under
+#: research/agents/forks/step2/ (FORK.json); the gate reads that board.
+PREREG_BOARD = ROOT / "research" / "agents" / "forks" / "step2" / "blackboard.jsonl"
+
 N_FOLDS = 6
 MIN_SESSIONS = 4
 
@@ -256,7 +261,7 @@ def holdout_verdict(fitted: bool, net_bps: np.ndarray) -> dict[str, Any]:
 def _require(horizon: str) -> dict:
     from iap.agents.prereg_gate import require
 
-    return require(ROOT, "AUC01", horizon)
+    return require(ROOT, "AUC01", horizon, board=PREREG_BOARD)
 
 
 def _check_sha(entry: Mapping[str, Any], sha: str) -> None:

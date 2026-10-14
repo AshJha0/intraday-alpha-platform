@@ -42,6 +42,10 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[4]
+#: v1.16 item 11: this study's pre-registrations were made on the
+#: research/maker-real fork board, archived unchanged (not replayed onto main) under
+#: research/agents/forks/maker-real/ (FORK.json); the gate reads that board.
+PREREG_BOARD = ROOT / "research" / "agents" / "forks" / "maker-real" / "blackboard.jsonl"
 SESSIONS = (
     "ds3_20190130",
     "ds3_20190327",
@@ -112,12 +116,17 @@ def file_sha256(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def check_prereg(repo_root: Path, prereg: Mapping[str, Any]) -> list[dict]:
-    """The blackboard entries of every pre-registered cell (raises if missing)."""
+def check_prereg(
+    repo_root: Path, prereg: Mapping[str, Any], board: Path | None = None
+) -> list[dict]:
+    """The blackboard entries of every pre-registered cell (raises if missing);
+    ``board`` defaults to :data:`PREREG_BOARD` (the archived fork board)."""
     from iap.agents.prereg_gate import require
 
+    b = PREREG_BOARD if board is None else board
     return [
-        require(repo_root, c["alpha"], f"{c['horizon']}:maker-insample") for c in prereg["cells"]
+        require(repo_root, c["alpha"], f"{c['horizon']}:maker-insample", board=b)
+        for c in prereg["cells"]
     ]
 
 

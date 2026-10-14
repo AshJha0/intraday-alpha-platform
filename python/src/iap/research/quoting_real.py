@@ -114,11 +114,28 @@ def load_or_compute(path: Path, compute) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def check_prereg(repo_root: Path, prereg: Mapping[str, Any], sha: str) -> list[dict]:
+#: v1.16 item 11: the v1 quoting pre-registrations were made on the
+#: research/step2 fork board, archived unchanged under
+#: research/agents/forks/step2/ (FORK.json). A v2 protocol is registered
+#: fresh on main's board, so callers pass ``board=None`` for it.
+PREREG_BOARD_V1 = (
+    Path(__file__).resolve().parents[4]
+    / "research"
+    / "agents"
+    / "forks"
+    / "step2"
+    / "blackboard.jsonl"
+)
+
+
+def check_prereg(
+    repo_root: Path, prereg: Mapping[str, Any], sha: str, board: Path | None = PREREG_BOARD_V1
+) -> list[dict]:
     from iap.agents.prereg_gate import require
 
     entries = [
-        require(repo_root, c["id"], f"{c['horizon']}:quoting-insample") for c in prereg["cells"]
+        require(repo_root, c["id"], f"{c['horizon']}:quoting-insample", board=board)
+        for c in prereg["cells"]
     ]
     for e in entries:
         if sha not in e["body"]["hypothesis"]:
