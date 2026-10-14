@@ -8,6 +8,16 @@ that tag.
 
 ## Unreleased
 
+- v1.16 item 13 (Python): the execution simulator's activation, cancel and amend queues are
+  min-heaps with lazy deletion and expiries use an `(expire_ts, order_id)` heap instead of a
+  per-event scan of every pending and resting order; rule 9 order and ties unchanged, fills
+  byte-identical (`tools/bench_exec_simulator.py` digest). The ITCH throughput test's
+  wall-clock floors are replaced by count-based guards (rates still printed).
+- v1.16 item 13 (native): C++ `OrderBook::depth_into` caller-buffer overloads (`LevelEntry*`
+  + cap, and a fixed `DepthBuffer`); the execution simulator's aggressive-fill and
+  marketable-ADD paths use it, so they no longer allocate per call (`depth()` kept). Rust:
+  dependency-free `risk/benches/check_order.rs` (`harness = false`, no lockfile change); CI
+  compiles all benches with `cargo bench --no-run`. No behaviour change; goldens identical.
 - v1.16 item 12 follow-ups (research memory, `docs/research/MEMORY_REVIEW_v116.md` items 2-7):
   walk-forward test frames keep only ids, labels, market columns and the alpha's features, and
   the previous fold's test frames are dropped before the next fold is built; train/CPCV frames
@@ -79,6 +89,13 @@ that tag.
     (manifest `lot_size_by_session`) and `--link` (hard links); off by default (byte-identical).
   - (d) Memory review `docs/research/MEMORY_REVIEW_v116.md`; `ResearchRunner.frames(needed)` loads
     only the experiment's features plus id, label and market columns (was full width).
+- v1.16 item 15: `iap.validation.multiple_testing` (Holm, Benjamini-Hochberg, Romano-Wolf step-down
+  max-t, joint fold bootstrap) and a report-only "Multiple testing across this report" table in the
+  24-alpha `REPORT.md` (Bonferroni / Holm / BH q / Romano-Wolf per alpha; the promotion gate is
+  unchanged). The committed REPORT.md gains the section at the next regenerate.
+- v1.16: `tools/release.py apply-bundle` extracts with Python `tarfile` (members path-checked, `data`
+  filter) instead of the system `tar --force-local` (bsdtar on Windows has no `--force-local`; the
+  v1.15 release had to extract by hand).
 
 ## v1.15.0 — 2026-10-13
 
