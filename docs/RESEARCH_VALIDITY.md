@@ -454,6 +454,26 @@ estimator gives a reliable day-level t. The `few_sessions` reading says so
 instead of printing a t. The time-shift detector flags; it cannot prove a
 leak, and a slow-moving causal signal can fail it.
 
+## 4c. v1.16 report-only additions
+
+Nothing here changes a gate, a threshold or a verdict.
+
+- **Multiple testing across a report** (`iap.validation.multiple_testing`,
+  item 15): the 24-alpha `REPORT.md` gains a table with each gate t's
+  two-sided p and its Bonferroni, Holm, Benjamini-Hochberg q and
+  Romano-Wolf (joint fold-IC bootstrap per asset class) adjustments. The
+  promotion gate keeps the ledger-wide Bonferroni threshold. The committed
+  REPORT.md gains the section at its next regeneration.
+- **Beta stability** (`iap.validation.beta_stability`, item 12a): per
+  instrument and per instrument-day OLS slopes of the label on the raw
+  signal. It sits outside `iap.alpha` so it cannot move the code fingerprint
+  of an open pre-registration.
+- **Open-prereg touch warning** (`tools/prereg_touch_check.py`, item 12b): a
+  non-blocking CI `::warning::` when a pull request changes code or features
+  that an OPEN pre-registration fingerprints (`--strict` fails locally).
+
+API: [API_ALPHA.md](../API_ALPHA.md) §7.2.
+
 ## 5. Tooling
 
 - `python -m iap.research run --methods {v2,v3,v4,legacy_v1,v2_v113,v3_v113,v4_v113}`: the method
