@@ -745,6 +745,29 @@ def _write_report(
     a("")
     a("- " + (", ".join(below) if below else "none"))
     a("")
+    # v1.16 (item 15): report-only family-wise / FDR adjustments of this table
+    from iap.validation.multiple_testing import report_family
+
+    a("## Multiple testing across this report (report-only)")
+    a("")
+    a(
+        "Adjusted two-sided p-values of each gate t over the alphas in THIS report "
+        "(the promotion gate keeps the ledger-wide Bonferroni threshold above). "
+        "Holm and Bonferroni control the family-wise error, BH the false discovery "
+        "rate; Romano-Wolf (step-down max-t) uses the joint dependence of the fold "
+        "ICs within each asset class, from a seeded bootstrap of only the "
+        "walk-forward folds, so read it as coarse."
+    )
+    a("")
+    a("| alpha | gate t | p | Bonferroni | Holm | BH q | Romano-Wolf (folds) |")
+    a("|---|---:|---:|---:|---:|---:|---:|")
+    for row in report_family(reports):
+        a(
+            f"| {row['alpha_id']} | {_fmt(row['gate_t'], '.2f')} | {_fmt(row['p'], '.2e')} | "
+            f"{_fmt(row['bonferroni'], '.3f')} | {_fmt(row['holm'], '.3f')} | "
+            f"{_fmt(row['bh'], '.3f')} | {_fmt(row['romano_wolf_fold'], '.3f')} |"
+        )
+    a("")
     (reports_dir / "REPORT.md").write_text("\n".join(lines) + "\n")
 
 
