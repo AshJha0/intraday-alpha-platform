@@ -552,13 +552,14 @@ class MakerBacktester:
                 ts_ns=t,
             )
             horizon = cfg.ttl_ns if within_ns is None else within_ns
+            assert self.fill_hazard is not None  # __init__: required when p_fill is used
             return float(self.fill_hazard.p_fill_within(x, horizon))
 
         def submit_entry(t: int, side: int, qty: int, limit: int) -> None:
             oid = sim.submit(
                 ChildOrder(
                     instrument_id=instrument_id,
-                    venue_id=venue_id,
+                    venue_id=venue_id,  # type: ignore[arg-type]  # int after the check in run_instrument; closures lose the narrowing
                     side=side,
                     type=OrderType.LIMIT,
                     qty=qty,
@@ -580,7 +581,7 @@ class MakerBacktester:
             st["order"] = sim.submit(
                 ChildOrder(
                     instrument_id=instrument_id,
-                    venue_id=venue_id,
+                    venue_id=venue_id,  # type: ignore[arg-type]  # as above
                     side=ctx["side"],
                     type=OrderType.MARKET,
                     qty=ctx["qty"],
@@ -650,12 +651,14 @@ class MakerBacktester:
             # M4 tails
             tail_ok = apx - bpx >= cfg.min_spread_ticks and abs(e) >= cfg.min_abs_er
             if tail_ok and cfg.min_abs_z is not None:
+                assert z is not None  # checked above: min_abs_z needs a 'z' column
                 tail_ok = math.isfinite(z[r]) and abs(z[r]) >= cfg.min_abs_z
             if tail_ok and cfg.min_queue_imbalance is not None:
                 ours, far = (bq, aq) if side == 0 else (aq, bq)
                 tail_ok = ours + far > 0 and ours / (ours + far) >= cfg.min_queue_imbalance
             if tail_ok and cfg.min_p_far_deplete is not None:
                 far_side, far_q = (1, aq) if side == 0 else (0, bq)
+                assert self.calibration is not None  # checked above for min_p_far_deplete
                 lam = self.calibration.queue_depletion_hazard(far_side, far_q)
                 p = None if lam is None else 1.0 - math.exp(-lam * cfg.horizon_ns / 1e9)
                 tail_ok = p is not None and p >= cfg.min_p_far_deplete
@@ -750,7 +753,8 @@ class MakerBacktester:
                         cross_px = (bpx if st["side"] == 0 else apx) * tick
                         crossed_at_book = True
             else:
-                exit_mid = mid_hint if mid_hint is not None else last_mid[0]
+                # A position implies a book was seen, so last_mid[0] is set.
+                exit_mid = mid_hint if mid_hint is not None else last_mid[0]  # type: ignore[assignment]
             eo = st["exit_order"]
             if eo is not None and not sim.orders[eo].is_terminal:
                 sim.cancel(eo, t)

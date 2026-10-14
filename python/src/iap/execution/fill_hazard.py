@@ -268,6 +268,7 @@ class FillHazardModel:
     def bucket_hazards(self, features: pd.DataFrame | Mapping[str, float]) -> np.ndarray:
         """``h_b(x)``, shape (rows, buckets)."""
         self._check()
+        assert self.alpha is not None and self.beta is not None  # _check
         frame = pd.DataFrame([features]) if isinstance(features, Mapping) else features
         z = (_design(frame) - self.mean) / self.std
         eta = self.alpha[None, :] + (z @ self.beta)[:, None]
@@ -292,6 +293,7 @@ class FillHazardModel:
     # --------------------------------------------------------- persistence
     def to_dict(self) -> dict[str, Any]:
         self._check()
+        assert self.alpha is not None and self.beta is not None  # _check
         return {
             "schema": SCHEMA,
             "link": self.link,

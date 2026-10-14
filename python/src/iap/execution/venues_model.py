@@ -225,7 +225,7 @@ def toxicity_from_markouts(
         return {}
     rep = markout_report(maker, timeline, horizons=hz, min_fills=min_fills)
     out: dict[int, dict[str, float]] = {}
-    for vid, cell in rep["by_venue"].items():  # type: ignore[union-attr]
+    for vid, cell in rep["by_venue"].items():  # type: ignore[attr-defined]
         row = {}
         for h in hz:
             pi = cell["horizons"][h]["price_impact_bps"]

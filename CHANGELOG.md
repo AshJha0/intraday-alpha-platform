@@ -45,6 +45,13 @@ that tag.
   obfuscation use shallow copies; the leakage frame builder frees each instrument's row list
   once stacked. Reports are byte-identical; float32 was not adopted (it would move committed
   numbers).
+- v1.16 item 16: mypy is blocking. The scoped mypy run (core/orderbook/execution/backtest/features,
+  mypy 2.3.1) went from 102 errors to 0 with local type fixes (annotations, narrowing asserts on
+  invariants already checked, renamed reused variables; four targeted `# type: ignore[code]`
+  with reasons, one existing ignore code corrected), no behaviour change; the CI step drops `continue-on-error`. `agent-evals` is
+  blocking too (deterministic stub-model harness, green on every recent main run). N-7 closed:
+  `docs/release/DECISION_N7_JAVA_IMAGE.md` proposes keeping the Java image frozen until a Python
+  process takes over `/metrics`, with an explicit retirement trigger.
 - v1.16 P0-1: opt-in simulator rule 6b, impact on the parent order
   (`ExecConfig.impact_model = "parent"`, `impact_exponent`, `permanent_impact_bps_per_pct_adv`):
   temporary impact on the parent's cumulative taker qty (splitting a parent cannot lower its

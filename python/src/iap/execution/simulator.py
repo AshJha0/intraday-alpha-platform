@@ -610,9 +610,9 @@ class ExecutionSimulator:
         """Rule 2 (with rules 3 and 8) for one arrived order."""
         book = self.venue_book(o.instrument_id, o.venue_id)
         is_open = self.venue_open(book)
-        if o.post_only and is_open and not self._post_only_admit(o, book):
+        if o.post_only and is_open and book is not None and not self._post_only_admit(o, book):
             return  # rule 10: rejected rather than crossing
-        if is_open:
+        if is_open and book is not None:
             self._aggressive_fill(o, book)
         if o.remaining == 0:
             return  # fully filled aggressively
@@ -640,7 +640,7 @@ class ExecutionSimulator:
             # our aggressive leg just consumed (rule 4). While the venue is
             # gated (rule 8) nothing was consumed: no exemption.
             o.cross_exempt = False
-            if is_open:
+            if is_open and book is not None:
                 opp = book.best_ask() if o.side == 0 else book.best_bid()
                 o.cross_exempt = opp is not None and (
                     opp[0] <= o.limit_ticks if o.side == 0 else opp[0] >= o.limit_ticks
@@ -787,7 +787,7 @@ class ExecutionSimulator:
                 crossed = opp is not None and (
                     opp[0] <= o.limit_ticks if o.side == 0 else opp[0] >= o.limit_ticks
                 )
-                if not crossed:
+                if opp is None or not crossed:
                     o.cross_exempt = False  # display uncrossed: exemption ends
                 elif reopened or not o.cross_exempt:
                     # The queue ahead of us would have been served by that
@@ -816,7 +816,7 @@ class ExecutionSimulator:
         # Debit the overlay so the same display is not consumed again.
         for our_side, opp in ((0, best_ask), (1, best_bid)):
             used = pool_start[our_side] - budget[our_side]
-            if used > 0:
+            if used > 0 and opp is not None:
                 key = (ev.instrument_id, ev.venue_id, 1 - our_side, opp[0])
                 self._consumed[key] = self._consumed.get(key, 0) + used
 
@@ -865,11 +865,11 @@ class ExecutionSimulator:
             hidden_print = et == EventType.TRADE and not is_print_of_prev
             self._last_kind[vkey] = (t, int(et), ev.trade_id)
         add_depth: list[tuple[int, int]] = []
-        if self._resting and pre_open and et == EventType.ADD:
+        if self._resting and pre_open and pre is not None and et == EventType.ADD:
             add_depth = pre.depth(1 if ev.side == 0 else 0, DEPTH_LEVELS)
         # The book's own record of the order an EXECUTE names (side, price, qty).
         exec_order: tuple[int, int, int] | None = None
-        if self._resting and pre_open and et == EventType.EXECUTE:
+        if self._resting and pre_open and pre is not None and et == EventType.EXECUTE:
             exec_order = pre.order(ev.order_id)
         level_before: list[tuple[int, int]] = []
         if self._resting and et in (EventType.CANCEL, EventType.MODIFY):
@@ -881,6 +881,7 @@ class ExecutionSimulator:
                 watched.append((key, before))
         applied = self.instrument_book(ev.instrument_id).apply(ev) == ApplyStatus.APPLIED
         book = self.venue_book(ev.instrument_id, ev.venue_id)
+        assert book is not None  # apply() created the venue book
 
         # 3. Passive queue tracking (rule 4) — only for an event the book
         #    APPLIED; fills only while the venue was open (rule 8).
@@ -973,14 +974,14 @@ class ExecutionSimulator:
         for key, before in watched:
             after = 0 if book is None else book.level_qty(key[2], key[3])
             if after != before:
-                consumed = self._consumed.get(key)
-                if consumed is None:
+                prior = self._consumed.get(key)
+                if prior is None:
                     continue
-                consumed = min(consumed, after)
-                if consumed <= 0:
+                capped = min(prior, after)
+                if capped <= 0:
                     del self._consumed[key]
                 else:
-                    self._consumed[key] = consumed
+                    self._consumed[key] = capped
 
         # 4. Post-apply crossing check (rule 4 last bullet / rule 8 reopen).
         if self.venue_open(book):

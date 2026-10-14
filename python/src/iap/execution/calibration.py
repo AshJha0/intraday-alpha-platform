@@ -72,6 +72,7 @@ import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+from typing import Any
 
 from iap.core.events import EventType, MarketEvent
 from iap.execution.config import ExecConfig
@@ -154,7 +155,7 @@ def _mean_se(values: Sequence[float]) -> tuple[float | None, float | None]:
 
 def parametric_latency(
     mean_ns: int, jitter_ns: int, tail_prob: float = 0.01, tail_mult: float = 10.0
-) -> dict[str, list]:
+) -> dict[str, Any]:
     """A latency quantile table with an explicit tail, for data without a
     receive stamp: the body is ``mean + U[0, jitter]`` (the venue config
     rule) and the top ``tail_prob`` of the mass stretches linearly up to
@@ -508,6 +509,7 @@ def estimate_calibration(
                     o.remaining = ev.qty
         # touch episodes on the venue book after the event
         book = cons.books.get(ev.venue_id)
+        assert book is not None  # the consolidator just applied ev to it
         for side in (0, 1):
             key = (iid, ev.venue_id, side)
             best = book.best_bid() if side == 0 else book.best_ask()
@@ -554,11 +556,11 @@ def estimate_calibration(
     for vid, vals in sorted(lat.items()):
         if len(vals) < MIN_SAMPLES:
             continue
-        s = sorted(vals)
+        sv = sorted(vals)
         latency[str(vid)] = {
             "probs": list(LATENCY_PROBS),
-            "quantiles_ns": [int(round(_quantile(s, p))) for p in LATENCY_PROBS],
-            "n": len(s),
+            "quantiles_ns": [int(round(_quantile(sv, p))) for p in LATENCY_PROBS],
+            "n": len(sv),
             "source": FEED_LATENCY_SOURCE,
         }
     for vid, table in sorted((latency_tail or {}).items()):

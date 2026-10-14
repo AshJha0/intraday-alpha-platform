@@ -331,7 +331,8 @@ class QuotingBacktester:
         inv_path: list[tuple[int, int]] = [(evs[0].exchange_ts, 0)]
         mids_ts: list[int] = []
         mids: list[float] = []
-        vol = {"mid": None, "t": None, "var": cfg.sigma_init}
+        # Mutable EWMA state shared with decide(): mid/t are None until the first quote.
+        vol: dict[str, Any] = {"mid": None, "t": None, "var": cfg.sigma_init}
         alpha_ewm = 1.0 - 0.5 ** (1.0 / cfg.sigma_halflife)
 
         def book_state():

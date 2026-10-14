@@ -26,7 +26,7 @@ pushes and branch deletion. The required check names are the job ids of
 `golden`, `deployment`. (v1.15: the `java` job was removed when the Java
 engine was archived to `archive/java/`; drop `java` from an existing ruleset.) Do **not** add `images` (it is skipped on pull requests
 that do not touch image inputs, and a skipped required check blocks the merge)
-or, without a decision, the `advisory` job (ruff + gitleaks, both blocking). Since v1.14 the dependency audits run in the blocking `supply-chain` job, and CodeQL also analyses Rust (check `analyze (rust)`); both may be added to the required list. `cpp-sanitizers` is blocking in CI and may be added to the required list.
+or, without a decision, the `advisory` job (ruff + gitleaks, both blocking). Since v1.14 the dependency audits run in the blocking `supply-chain` job, and CodeQL also analyses Rust (check `analyze (rust)`); both may be added to the required list. `cpp-sanitizers` is blocking in CI and may be added to the required list. Since v1.16 `agent-evals` is blocking in CI (no `continue-on-error`) and may be added to the required list.
 
 `required_approving_review_count` is 0 below because GitHub does not let an
 author approve their own pull request, and this repository currently has one

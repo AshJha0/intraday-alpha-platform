@@ -185,12 +185,11 @@ jobs:
         run: >
           python -m pytest -q -n auto --dist loadfile --durations=25
           -m "not slow"
-      # E-P1-5 (advisory): mypy on core/orderbook/execution/backtest/features
-      # (config: python/pyproject.toml [tool.mypy]); the error count goes to
-      # the job summary.  Non-blocking until the count is 0 (CONTRIBUTING.md).
-      - name: mypy (advisory)
+      # E-P1-5: mypy on core/orderbook/execution/backtest/features (config:
+      # python/pyproject.toml [tool.mypy]); the error count goes to the job
+      # summary.  BLOCKING since v1.16 (item 16): the count reached 0.
+      - name: mypy
         if: matrix.python-version == '3.12'
-        continue-on-error: true
         working-directory: python
         run: |
           python -m pip install mypy==2.3.1
@@ -200,7 +199,7 @@ jobs:
           tail -n 1 /tmp/mypy.txt
           n=$(grep -c ": error:" /tmp/mypy.txt)
           {
-            echo "### mypy (advisory)"
+            echo "### mypy"
             echo ""
             echo "errors: **$n** -- $(tail -n 1 /tmp/mypy.txt)"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -761,15 +760,14 @@ jobs:
   # generated where they are checked: this runner, Python 3.11, the pinned
   # requirements, plus the `ml` extra (python/pyproject.toml) at pinned
   # versions for the gated tree models of research/ml_reports.
-  # v1.15 (A-P1-3), ADVISORY: the agent eval harness - a fixed task set run
-  # with a stub model (no network, no key, no spend), scored deterministically
-  # and compared with research/agents/eval_baseline.json.  A score drop or a
-  # check that passed in the baseline and fails now is reported here; not a
-  # required check.
+  # v1.15 (A-P1-3): the agent eval harness - a fixed task set run with a
+  # stub model (no network, no key, no spend), scored deterministically and
+  # compared with research/agents/eval_baseline.json.  A score drop or a check
+  # that passed in the baseline and fails now fails the job.  BLOCKING since
+  # v1.16 (item 16): deterministic, green on every main run before the switch.
   agent-evals:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -779,7 +777,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install --require-hashes -r python/requirements-ci.txt
-      - name: agent eval harness vs baseline (advisory)
+      - name: agent eval harness vs baseline
         env:
           PYTHONPATH: python/src
           PYTHONUTF8: "1"
@@ -789,7 +787,7 @@ jobs:
       - name: summary
         if: always()
         run: |
-          echo "### agent eval harness (advisory)" >> "$GITHUB_STEP_SUMMARY"
+          echo "### agent eval harness" >> "$GITHUB_STEP_SUMMARY"
           tail -n 20 /tmp/agent-evals.txt >> "$GITHUB_STEP_SUMMARY" || true
 
   regenerate:

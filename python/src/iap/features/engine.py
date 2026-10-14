@@ -495,7 +495,7 @@ class FeatureEngine:
         st.venue_last_ts[ev.venue_id] = t
         st.venue_updates.add(t, ev.venue_id)
 
-        et = ev.event_type
+        et: int | None = ev.event_type
         oversized = ev.qty > FEATURE_MAX_QTY
         if oversized:
             # Oversized quantity (pinned §2.2): the book may hold it, but no
