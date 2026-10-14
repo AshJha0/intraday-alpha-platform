@@ -8,6 +8,11 @@ that tag.
 
 ## Unreleased
 
+- v1.16 item 13 (Python): the execution simulator's activation, cancel and amend queues are
+  min-heaps with lazy deletion and expiries use an `(expire_ts, order_id)` heap instead of a
+  per-event scan of every pending and resting order; rule 9 order and ties unchanged, fills
+  byte-identical (`tools/bench_exec_simulator.py` digest). The ITCH throughput test's
+  wall-clock floors are replaced by count-based guards (rates still printed).
 - v1.16 item 13 (native): C++ `OrderBook::depth_into` caller-buffer overloads (`LevelEntry*`
   + cap, and a fixed `DepthBuffer`); the execution simulator's aggressive-fill and
   marketable-ADD paths use it, so they no longer allocate per call (`depth()` kept). Rust:
