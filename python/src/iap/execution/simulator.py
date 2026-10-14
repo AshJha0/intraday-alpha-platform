@@ -82,6 +82,18 @@ this module is self-contained:
    since v1.5.0 — this simulator rule did not change):
    ``impact_bps = coeff * (child_qty * qty_unit / adv * 100)``; each taker
    fill is charged ``impact_bps * 1e-4 * its own notional``.
+6b. **Parent impact** (v1.16 opt-in, ``ExecConfig.impact_model = "parent"``;
+   Python only). With ``f(Q) = coeff * (Q * qty_unit / adv * 100) **
+   impact_exponent`` (bps) the parent's total temporary cost at constant
+   price is ``f(Q) * 1e-4 * Q * notional_per_share``; each taker fill of
+   ``q`` moving the parent's cumulative taker qty from ``Q`` to ``Q + q`` is
+   charged the increment ``(f(Q+q)*(Q+q) - f(Q)*Q) * 1e-4 * qty_unit * price``,
+   so splitting a parent into children cannot lower its cost (equal at
+   constant price). Permanent leg: with ``S`` the instrument's cumulative
+   signed taker qty (buys +), a fill moving it to ``S'`` pays
+   ``perm * (S'^2 - S^2) / 2 / (adv/qty_unit) * 100 * 1e-4 * qty_unit * price``
+   (``m(S) = perm * S`` integrated over ``dS``, buys and sells alike) —
+   trading against one's own earlier flow is credited. ``parent_id == 0`` children are each their own parent.
 7. **Cancels** travel the same latency path (one jitter draw) and take
    effect at ``max(cancel arrival, order arrival)`` while processing the
    first event at/after that time, merged with activations in timestamp
@@ -193,6 +205,10 @@ class ExecutionSimulator:
         limit. Off (the default) keeps the pinned rule-4 fill at our limit."""
         self._config = config
         self._calibration = calibration
+        #: rule 6b state: cumulative taker qty per (instrument, parent) and
+        #: cumulative signed taker qty per instrument.
+        self._parent_qty: dict[tuple[int, int], int] = {}
+        self._signed_flow: dict[int, int] = {}
         if calibration is not None:
             feed = [v for v in calibration.feed_derived_latency_venues() if v in config.venues]
             if feed:
@@ -444,11 +460,37 @@ class ExecutionSimulator:
             base += sched.fee(o.side, float(qty), notional, ts)
         return base
 
+    def _parent_impact(self, o: ChildOrder, price_ticks: int, qty: int) -> float:
+        """Rule 6b: incremental parent temporary + instrument permanent impact."""
+        cfg = self._config
+        ins = self._instrument(o.instrument_id)
+        unit_price = ins.qty_unit * float(price_ticks) * ins.tick_size
+        pct = ins.qty_unit / ins.adv * 100.0  # % of ADV per share
+        key = (o.instrument_id, o.parent_id) if o.parent_id else (o.instrument_id, -o.order_id)
+        q0 = self._parent_qty.get(key, 0)
+        q1 = q0 + qty
+        self._parent_qty[key] = q1
+
+        def total_bps_qty(q: int) -> float:
+            return cfg.impact_coeff_bps_per_pct_adv * (q * pct) ** cfg.impact_exponent * q
+
+        cost = (total_bps_qty(q1) - total_bps_qty(q0)) * 1e-4 * unit_price
+        if cfg.permanent_impact_bps_per_pct_adv:
+            sign = 1 if o.side == 0 else -1
+            s0 = self._signed_flow.get(o.instrument_id, 0)
+            s1 = s0 + sign * qty
+            self._signed_flow[o.instrument_id] = s1
+            perm = cfg.permanent_impact_bps_per_pct_adv * pct * (s1 * s1 - s0 * s0) / 2.0
+            cost += perm * 1e-4 * unit_price
+        return cost
+
     def _emit_fill(
         self, o: ChildOrder, price_ticks: int, qty: int, ts: int, liq: Liquidity
     ) -> None:
         impact_cost = 0.0
-        if liq == Liquidity.TAKER:
+        if liq == Liquidity.TAKER and self._config.impact_model == "parent":
+            impact_cost = self._parent_impact(o, price_ticks, qty)
+        elif liq == Liquidity.TAKER:
             # Rule 6: linear impact from the child's total size in base units.
             ins = self._instrument(o.instrument_id)
             impact_bps = self._config.impact_coeff_bps_per_pct_adv * (
