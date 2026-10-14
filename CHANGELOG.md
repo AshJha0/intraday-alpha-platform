@@ -74,6 +74,9 @@ that tag.
   max-t, joint fold bootstrap) and a report-only "Multiple testing across this report" table in the
   24-alpha `REPORT.md` (Bonferroni / Holm / BH q / Romano-Wolf per alpha; the promotion gate is
   unchanged). The committed REPORT.md gains the section at the next regenerate.
+- v1.16: `tools/release.py apply-bundle` extracts with Python `tarfile` (members path-checked, `data`
+  filter) instead of the system `tar --force-local` (bsdtar on Windows has no `--force-local`; the
+  v1.15 release had to extract by hand).
 
 ## v1.15.0 — 2026-10-13
 
