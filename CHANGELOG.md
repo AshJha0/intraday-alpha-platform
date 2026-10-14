@@ -133,6 +133,18 @@ that tag.
   EQ05 reduces the loss by about $750-920 per session vs the no-skew control (significant); EQ10 not
   significant. `research/quoting_real/QUOTING_V2_RESULT.md`, `v2_summary.json`; outcomes recorded by the
   owner with `tools/quoting_v2_record_outcome.py` (derived from the verdicts, never typed).
+- v1.16 item 10 (AI4 rebuild, part 1): `iap.models.lob_real`, the real-data adapter AI4-DEEPLOB-1 lacked
+  (research/r7/AI4_DEFERRED.md): streamed per-session book replay of normalised ITCH into the DeepLOB
+  (T, 4L) layout with MID-RELATIVE tick offsets and log1p sizes, empty-level masking, rows only while the
+  book is open and two-sided; per-session labels and lazy `WindowIndex` windows (no window or label crosses
+  a session); train-only streaming normaliser; `python -m iap.models.lob_real` cache builder (float16,
+  refuses the R7 holdout sessions and low disk). No training or holdout data used yet.
+- v1.16 item 10 (AI4 rebuild, part 2): cache stored as memory-mapped float16 `.npy` + meta, windows
+  normalised lazily (memory O(batch)); `iap.models.lob_train` streams DeepLOB / MLP training from
+  `WindowIndex` and fits the sklearn baselines on capped subsamples; chronological train / validation
+  split by session (default: last two sessions), pooled across symbols; `net_of_cost_mid` scores
+  non-overlapping taker trades every `horizon` events on the cache's mid and rebuilt spread plus a taker
+  fee; `accept` reported per symbol. IN-SAMPLE model selection only (no ledger entry); holdout units refused.
 
 ## v1.15.0 — 2026-10-13
 
