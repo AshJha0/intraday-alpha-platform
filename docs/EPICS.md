@@ -15,11 +15,11 @@ planned paths of the current release, **backlog** says what would prove it done.
 
 | | count | estimate (days) |
 |---|---:|---:|
-| epics | 35 | |
-| issues | 197 | 651 |
-| issues `done` | 138 | 369.5 |
-| issues `in-progress` | 0 | 0 |
-| issues `backlog` | 59 | 281.5 |
+| epics | 36 | |
+| issues | 215 | 679 |
+| issues `done` | 153 | 392 |
+| issues `in-progress` | 4 | 6.5 |
+| issues `backlog` | 58 | 280.5 |
 
 ### By milestone
 
@@ -38,7 +38,8 @@ planned paths of the current release, **backlog** says what would prove it done.
 | v1.12 | 1 | 5 | 5 | 0 | 0 |
 | v1.13 | 1 | 4 | 4 | 0 | 0 |
 | v1.14 | 1 | 5 | 5 | 0 | 0 |
-| v1.15 | 1 | 20 | 15 | 0 | 5 |
+| v1.15 | 1 | 20 | 17 | 0 | 3 |
+| v1.16 | 1 | 18 | 13 | 4 | 1 |
 
 Issues are listed under their epic; an issue's own milestone can differ from
 the epic's (a backlog item under a finished epic sits in **Backlog**).
@@ -80,6 +81,7 @@ the epic's (a backlog item under a finished epic sits in **Backlog**).
 - [E33 — v1.13 - review-driven hardening](#e33--v113---review-driven-hardening) · v1.13 · done · 4 issues
 - [E34 — v1.14 - real-data mapping, 15c3-5 risk, execution realism, trust roots](#e34--v114---real-data-mapping-15c3-5-risk-execution-realism-trust-roots) · v1.14 · done · 5 issues
 - [E35 — v1.15 - research evidence, models, fees, governance enforcement, release automation](#e35--v115---research-evidence-models-fees-governance-enforcement-release-automation) · v1.15 · partial · 20 issues
+- [E36 — v1.16 - monetisation: realistic execution, cost-aware study, capacity, AI4](#e36--v116---monetisation-realistic-execution-cost-aware-study-capacity-ai4) · v1.16 · in-progress · 18 issues
 
 ## Phase 0
 
@@ -936,11 +938,11 @@ Release v1.14.0 (2026-10-11): correct the real-data mapping and feature store, a
 
 ## v1.15
 
-In progress (IAP_v1.15_Plan.md): R7 confirmatory round, v2 realism config, models (DeepLOB, conformal sizing), regulatory fees, governance enforcement, narrower agent job, Java archive, release automation.
+Released 2026-10-13 (IAP_v1.15_Plan.md): R7 confirmatory round, v2 realism config, models (DeepLOB, conformal sizing), regulatory fees, governance enforcement, narrower agent job, Java archive, release automation.
 
 ### E35 — v1.15 - research evidence, models, fees, governance enforcement, release automation
 
-**Status:** partial · **Milestone:** v1.15 · **Issues:** 20 (done 15, in-progress 0, backlog 5) · **Estimate:** 54 days · **Labels:** `type:epic`, `area:research`, `phase:phase2`, `priority:p0`, `status:partial`
+**Status:** partial · **Milestone:** v1.15 · **Issues:** 20 (done 17, in-progress 0, backlog 3) · **Estimate:** 54 days · **Labels:** `type:epic`, `area:research`, `phase:phase2`, `priority:p0`, `status:partial`
 
 Release v1.15 per IAP_v1.15_Plan.md: run the R7 confirmatory round on unseen sessions with realism on, land the model work (DeepLOB, conformal sizing), add dated regulatory fees, make the governance controls blocking, narrow the agent job, archive the Java engine and automate the release flow. Item keys are the plan's IDs.
 
@@ -958,11 +960,11 @@ Release v1.15 per IAP_v1.15_Plan.md: run the R7 confirmatory round on unseen ses
 | R-P0-2 | v1.15 R-P0-2: v2 prereg turns the v1.14 realism opt-ins on | done | 2 | v1.15 | `configs/prereg/v2.json; python/tests/test_v115_prereg_realism.py` |
 | R-P1-3 | v1.15 R-P1-3: FX11 leak-vs-fast investigation and time-shift triage | done | 3 | v1.15 | `docs/research/FX11_FINDING.md; python/tests/test_fx11_time_shift.py` |
 | R-P1-4 | v1.15 R-P1-4: A2 QQQ vs top-15 basket basis on R7 | backlog | 5 | v1.15 | `planned: research/r7/ (A2 prereg)` |
-| R-P2-5 | v1.15 R-P2-5: maker study write-up | backlog | 1 | v1.15 | `planned: research/maker-real/` |
-| M-P0-1 | v1.15 M-P0-1: AI4 DeepLOB vs baselines, net of costs | backlog | 6 | v1.15 | `python/src/iap/models/deeplob.py; python/src/iap/models/deeplob_baselines.py; research/r7/ai4_deeplob_prereg_DRAFT.json` |
+| R-P2-5 | v1.15 R-P2-5: maker study write-up | done | 1 | v1.15 | `research/maker_real/prereg.json; research/agents/forks/maker-real/` |
+| M-P0-1 | v1.15 M-P0-1: AI4 DeepLOB vs baselines, net of costs | backlog | 6 | v1.15 | `planned: v1.16 item 10 (V116-10)` |
 | M-P1-2 | v1.15 M-P1-2: conformal sizing (opt-in) | done | 3 | v1.15 | `python/src/iap/models/conformal.py` |
 | X-P1-1 | v1.15 X-P1-1: dated SEC Section 31 + FINRA TAF fees | done | 3 | v1.15 | `configs/reference/regulatory_fee_schedule.json; tests/golden/expected_regulatory_fees.json` |
-| X-P1-2 | v1.15 X-P1-2: MVP on a real ITCH session end to end | backlog | 2 | v1.15 | `planned: docs/ (real-session MVP digest)` |
+| X-P1-2 | v1.15 X-P1-2: MVP on a real ITCH session end to end | done | 2 | v1.15 | `python/src/iap/mvp/real.py; python/tests/test_mvp_real.py; docs/research/MVP_REAL_20191018.md` |
 | X-P1-3 | v1.15 X-P1-3: market-trade prints feed the risk participation cap | done | 2 | v1.15 | `tests/golden/expected_risk_participation_prints.json` |
 | G-P0-1 | v1.15 G-P0-1: registry content hash and model card enforced at promotion | done | 2 | v1.15 | `python/src/iap/mlops/registry.py; python/src/iap/mlops/model_card.py` |
 | G-P1-2 | v1.15 G-P1-2: trust roots enabled, registry signed, verification blocking | done | 2 | v1.15 | `python/src/iap/agents/signing.py; python/src/iap/agents/trust.py` |
@@ -974,6 +976,45 @@ Release v1.15 per IAP_v1.15_Plan.md: run the R7 confirmatory round on unseen ses
 | E-P1-1 | v1.15 E-P1-1: release automation (tools/release.py) | done | 2 | v1.15 | `tools/release.py; python/tests/test_release_tool.py; docs/release/V1150_REHEARSAL.md` |
 | E-P2-2 | v1.15 E-P2-2: EPICS.md regeneration | done | 1 | v1.15 | `tools/github/issues.yaml; docs/EPICS.md` |
 | E-P2-3 | v1.15 E-P2-3: housekeeping (stale worktree, step-2 abort entries, v2 quoting prereg in ticks) | backlog | 1 | v1.15 | `planned: research/ (step-2 abort entries)` |
+
+## v1.16
+
+In progress (IAP_v1.16_Plan.md), the monetisation release: realistic execution P0-1..P0-5, in-sample monetisation study (no-go) and capacity curve, quoting v2, forward paper-trade infrastructure, AI4 on real data, research hygiene and engineering.
+
+### E36 — v1.16 - monetisation: realistic execution, cost-aware study, capacity, AI4
+
+**Status:** in-progress · **Milestone:** v1.16 · **Issues:** 18 (done 13, in-progress 4, backlog 1) · **Estimate:** 28 days · **Labels:** `type:epic`, `area:execution`, `phase:phase2`, `priority:p0`, `status:in-progress`
+
+Release v1.16 per IAP_v1.16_Plan.md (18 items, owner-approved 2026-10-14): make the cost model credible, then ask whether the confirmed EQ10/EQ05 edge survives realistic costs and at what size. Item keys are the plan's item numbers.
+
+**Scope:** P0 execution (items 1-5): parent impact, residual impact calibration, v3 prereg realism keys, SOR and algo opt-ins; P0 study (6-8, 18): in-sample monetisation study, capacity curve, net-of-cost prereg on fresh data; P1: forward paper trade (9), AI4 DeepLOB on real data (10), research hygiene (11-12); P2 engineering (13-17).
+
+**Acceptance criteria:**
+
+- [ ] Every plan item is done, closed with a recorded reason or carried to v1.17; the release is cut with tools/release.py
+
+**Out of scope:** Buying fresh data (only on a net-positive in-sample study; the study was a no-go).
+
+| key | title | status | est. (d) | milestone | evidence |
+|---|---|---|---:|---|---|
+| V116-1 | v1.16 item 1: impact on the parent order (simulator rule 6b) | done | 1 | v1.16 | `python/src/iap/execution/simulator.py; python/tests/test_v116_parent_impact.py` |
+| V116-2 | v1.16 item 2: residual-move impact calibration | done | 2 | v1.16 | `python/src/iap/execution/calibration.py; python/tests/test_v116_impact_calibration.py` |
+| V116-3 | v1.16 item 3: v3 prereg realism keys and latency stress grid | done | 1.5 | v1.16 | `configs/prereg/v3.json; python/tests/test_v116_prereg_realism.py` |
+| V116-4 | v1.16 item 4: SOR opt-ins on the cost-aware router | done | 2 | v1.16 | `python/src/iap/execution/sor_v2.py; python/tests/test_v116_sor.py` |
+| V116-5 | v1.16 item 5: algos: POV exact participation, AC eta from the residual fit | done | 2 | v1.16 | `python/src/iap/execution/algos.py; python/tests/test_v116_algos.py` |
+| V116-6 | v1.16 item 6: in-sample monetisation study (taker) | done | 3 | v1.16 | `research/v116/MONETISATION_P0-6.md; research/v116/monetisation_summary.json` |
+| V116-7 | v1.16 item 7: taker capacity curve and break-even participation | done | 1 | v1.16 | `research/v116/MONETISATION_P0-6.md`<br>`PR #149: tools/v116_capacity_curve.py (pending merge)` |
+| V116-8 | v1.16 item 8: net-of-cost prereg on fresh sessions | backlog | 2 | v1.16 | `planned: none (not triggered in v1.16)` |
+| V116-9 | v1.16 item 9: forward paper-trade daily driver (infrastructure) | in-progress | 2 | v1.16 | `planned: PR #144 (forward paper-trade driver)` |
+| V116-10 | v1.16 item 10: AI4 DeepLOB on real data | in-progress | 3 | v1.16 | `planned: PR #151 (iap.models.lob_real, iap.models.lob_train)` |
+| V116-11 | v1.16 item 11: merge research/maker-real and research/step2 | done | 1 | v1.16 | `research/agents/forks/; python/tests/test_v116_fork_archive.py` |
+| V116-12 | v1.16 item 12: R7 follow-ups | done | 1.5 | v1.16 | `python/src/iap/validation/beta_stability.py; tools/prereg_touch_check.py; docs/research/MEMORY_REVIEW_v116.md` |
+| V116-13 | v1.16 item 13: engineering performance items | done | 2 | v1.16 | `rust/risk/benches/check_order.rs; python/tools/bench_exec_simulator.py` |
+| V116-14 | v1.16 item 14: optimiser: Dykstra projection, estimated Ledoit-Wolf intensity | in-progress | 1 | v1.16 | `planned: PR #147` |
+| V116-15 | v1.16 item 15: multiple testing report columns | done | 1 | v1.16 | `python/src/iap/validation/multiple_testing.py; python/tests/test_v116_multiple_testing.py` |
+| V116-16 | v1.16 item 16: blocking mypy and agent-evals; Java image decision (N-7) | in-progress | 0.5 | v1.16 | `planned: PR #143` |
+| V116-17 | v1.16 item 17: MVP end-of-day flatten | done | 0.5 | v1.16 | `python/src/iap/mvp/engine.py; python/tests/test_v116_mvp_eod_flatten.py` |
+| V116-18 | v1.16 item 18: release.py tarfile extract; process-and-delete pipeline | done | 1 | v1.16 | `tools/release.py; python/tests/test_release_tool.py` |
 
 ## Labels
 
