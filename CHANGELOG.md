@@ -60,6 +60,16 @@ that tag.
   residual (position + in-flight) is worked as one most-urgent parent ending at the close, costs charged;
   the report gains `counts.eod_flatten` (decisions, parents, too_late, residual_position) only when on.
   Tiny config, lead = 1/3 session: end position -413 -> 0.
+- v1.16 item 12 (R7 follow-ups):
+  - (a) `iap.validation.beta_stability`: the report-only beta-stability diagnostic, outside the
+    fingerprinted alpha modules (only `alpha/base.py` and `alpha/equity.py` are hashed); a test
+    keeps `iap.alpha` from importing it.
+  - (b) `tools/prereg_touch_check.py` + a non-blocking CI step: a `::warning::` when a PR changes
+    the code or feature fingerprint of an OPEN pre-registration (`--strict` for local use).
+  - (c) `merge_datasets` / `python -m iap.marketdata merge`: `--allow-lot-size-differences`
+    (manifest `lot_size_by_session`) and `--link` (hard links); off by default (byte-identical).
+  - (d) Memory review `docs/research/MEMORY_REVIEW_v116.md`; `ResearchRunner.frames(needed)` loads
+    only the experiment's features plus id, label and market columns (was full width).
 - v1.16 item 15: `iap.validation.multiple_testing` (Holm, Benjamini-Hochberg, Romano-Wolf step-down
   max-t, joint fold bootstrap) and a report-only "Multiple testing across this report" table in the
   24-alpha `REPORT.md` (Bonferroni / Holm / BH q / Romano-Wolf per alpha; the promotion gate is

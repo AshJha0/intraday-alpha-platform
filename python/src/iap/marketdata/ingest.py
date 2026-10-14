@@ -1254,7 +1254,18 @@ def ingest(
 # ---------------------------------------------------------------- merging
 
 
-def merge_datasets(inputs: Iterable[str | Path], out: str | Path, configs_dir: Path) -> dict:
+def _strip_lot(universe: list) -> list:
+    return [{k: v for k, v in u.items() if k != "lot_size"} for u in universe]
+
+
+def merge_datasets(
+    inputs: Iterable[str | Path],
+    out: str | Path,
+    configs_dir: Path,
+    *,
+    allow_lot_size_differences: bool = False,
+    link: bool = False,
+) -> dict:
     """Combine single- or multi-day ingested datasets into one dataset.
 
     The result is what ingesting every session into ``out`` one by one would
@@ -1266,6 +1277,16 @@ def merge_datasets(inputs: Iterable[str | Path], out: str | Path, configs_dir: P
     merged manifest and the CURRENT execution template in ``configs_dir``,
     so a dataset ingested under an older cost model is brought up to date.
     ``events.parquet`` is not merged (nothing downstream reads it).
+
+    v1.16 (item 12, the R7 deviation made an option): with
+    ``allow_lot_size_differences`` the inputs may differ in ``lot_size`` only
+    (e.g. the 2025 round-lot reform); the merged universe keeps the FIRST
+    input's lot sizes, the per-session values stay in the security master,
+    and the manifest records ``lot_size_by_session`` ({symbol: {date: lot}}).
+    Features do not read ``lot_size``; anything that does must use the
+    per-session value.  ``link`` hard-links the raw/normalized files instead
+    of copying them (same bytes, no extra disk; same volume only).  Both
+    default off: the merge is then byte-identical to v1.15.
     """
     inputs = [Path(p) for p in inputs]
     out = Path(out)
@@ -1285,11 +1306,15 @@ def merge_datasets(inputs: Iterable[str | Path], out: str | Path, configs_dir: P
     }
     qc_files: dict = {}
     qc_totals: dict[str, int] = {}
+    lots: dict[str, dict[str, int]] = {}
     for path, m in zip(inputs, manifests, strict=True):
         if m.get("normalized") is None or "dataset_version" not in m:
             raise IngestError(f"{path}: not normalised (finish its ingest first)")
         for key in ("source", "universe", "x-version"):
-            if m[key] != first[key]:
+            a, b = m[key], first[key]
+            if key == "universe" and allow_lot_size_differences:
+                a, b = _strip_lot(a), _strip_lot(b)
+            if a != b:
                 raise IngestError(f"{path}: {key} differs from {inputs[0]}")
         if "corporate_actions" in m:
             raise IngestError(f"{path}: merging corporate-action tables is not supported")
@@ -1297,11 +1322,20 @@ def merge_datasets(inputs: Iterable[str | Path], out: str | Path, configs_dir: P
             if date in merged["sessions"]:
                 raise IngestError(f"session {date} is in more than one input")
             merged["sessions"][date] = session
+            if allow_lot_size_differences:
+                for u in m["universe"]:
+                    lots.setdefault(u["symbol"], {})[date] = u["lot_size"]
         qc = json.loads((path / "normalized" / "qc_report.json").read_text(encoding="utf-8"))
         qc_files.update(qc["files"])
         for k, v in m["normalized"]["qc_totals"].items():
             qc_totals[k] = qc_totals.get(k, 0) + int(v)
     merged["sessions"] = {d: merged["sessions"][d] for d in sorted(merged["sessions"])}
+    first_lot = {u["symbol"]: u["lot_size"] for u in first["universe"]}
+    if any(lot != first_lot.get(sym) for sym, v in lots.items() for lot in v.values()):
+        merged["lot_size_by_session"] = {
+            s: dict(sorted(v.items())) for s, v in sorted(lots.items())
+        }
+    place = os.link if link else shutil.copyfile
 
     staging = out.with_name(out.name + ".partial")
     if staging.exists():
@@ -1311,9 +1345,9 @@ def merge_datasets(inputs: Iterable[str | Path], out: str | Path, configs_dir: P
     master = SecurityMaster()
     for path in inputs:
         for f in sorted((path / "raw").glob("*.jsonl")):
-            shutil.copyfile(f, staging / "raw" / f.name)
+            place(f, staging / "raw" / f.name)
         for f in sorted((path / "normalized").glob("*.normalized.*")):
-            shutil.copyfile(f, staging / "normalized" / f.name)
+            place(f, staging / "normalized" / f.name)
         for rec in SecurityMaster.load(path / "reference" / "security_master.json").records():
             master.upsert(rec)
     _restamp_session_values(master, merged)
@@ -1359,9 +1393,21 @@ def merge_main(argv: list[str] | None = None) -> int:
         default=str(_REPO_ROOT / "configs"),
         help="configs/ tree holding the execution/execution.json template",
     )
+    p.add_argument(
+        "--allow-lot-size-differences",
+        action="store_true",
+        help="inputs may differ in lot_size only (recorded as lot_size_by_session)",
+    )
+    p.add_argument("--link", action="store_true", help="hard-link files instead of copying")
     args = p.parse_args(argv)
     try:
-        m = merge_datasets(args.inputs, args.out, Path(args.configs_dir))
+        m = merge_datasets(
+            args.inputs,
+            args.out,
+            Path(args.configs_dir),
+            allow_lot_size_differences=args.allow_lot_size_differences,
+            link=args.link,
+        )
     except IngestError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

@@ -941,6 +941,32 @@ def test_merging_single_day_datasets_equals_ingesting_them_together(tmp_path, ca
     assert "session 2019-12-30 is in more than one input" in capsys.readouterr().err
 
 
+def test_merge_lot_size_differences_and_hard_links(tmp_path, capsys):
+    """v1.16 item 12: --allow-lot-size-differences (the R7 deviation as an
+    option) and --link; both off keeps the v1.15 refusal."""
+    d1, d2 = _day(tmp_path, 7, "d1.itch"), _day(tmp_path, 8, "d2.itch")
+    assert _ingest_cli(d1, D1, tmp_path / "a") == 0
+    assert _ingest_cli(d2, D2, tmp_path / "b") == 0
+    man = tmp_path / "b" / "dataset.json"
+    doc = json.loads(man.read_text(encoding="utf-8"))
+    sym = doc["universe"][0]["symbol"]
+    doc["universe"][0]["lot_size"] = 40
+    man.write_text(json.dumps(doc), encoding="utf-8")
+    base = ["merge", str(tmp_path / "a"), str(tmp_path / "b")]
+    assert marketdata_main([*base, "--out", str(tmp_path / "m0")]) == 1
+    assert "universe differs" in capsys.readouterr().err
+    out = tmp_path / "m1"
+    assert (
+        marketdata_main([*base, "--out", str(out), "--allow-lot-size-differences", "--link"]) == 0
+    )
+    capsys.readouterr()
+    m = load_manifest(out)
+    assert m["lot_size_by_session"][sym] == {D1: 100, D2: 40}
+    assert m["universe"][0]["lot_size"] == 100  # the first input's
+    f = next((out / "normalized").glob("*.normalized.*"))
+    assert os.stat(f).st_nlink >= 2  # hard link, not a copy
+
+
 def test_batch_and_real_power_run_on_an_ingested_dataset(tmp_path, capsys):
     """v1.6.0: the 24-alpha batch (run_all.py --dataset-dir) and the real-data
     power study run end to end on an ingested dataset, with the ETF read from
