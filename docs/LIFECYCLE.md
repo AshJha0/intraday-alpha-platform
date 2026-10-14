@@ -689,6 +689,18 @@ a superseded bundle are ranked below current ones rather than discarded,
 so the bootstrap still finds evidence for every alpha. Human edges still
 need a signed approval (GOVERNANCE.md).
 
+### 8.2 v1.15, v1.16 and the lifecycle
+
+No change. `python/src/iap/lifecycle` has no commit after v1.14, and the
+state machine still has 7 states, 17 edges and 20 gates
+(`tests/harness/check_headline_numbers.py` `lifecycle_numbers`). The bundled
+research still bootstraps to 23 CANDIDATE and 0 beyond. R7 confirmed EQ10@1s
+and EQ05@1s as predictive on the holdout (v1.15), but the cost gate is
+unchanged and the v1.16 monetisation study found no tradable taker
+configuration (HOW_IT_WORKS.md §3.13), so nothing moves to VALIDATING. The
+v1.16 multiple-testing table in `REPORT.md` is report-only; the promotion
+gate is unchanged.
+
 ## 9. Where the pieces are pinned
 
 | topic | document |

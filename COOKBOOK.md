@@ -2,7 +2,7 @@
 
 Every recipe below is runnable from a fresh checkout of this repository in
 the standard environment (Python 3.11 + pyarrow, g++ 13/CMake, Rust 1.99.0,
-Java 21; see [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)). Paths are relative
+Java 21 only for the archived engine in `archive/java/`; see [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)). Paths are relative
 to the repo root unless a recipe says otherwise. Recipes that read
 `data/features/` need recipes 1 and 3 to have run first (the repo ships with
 their outputs already generated).
@@ -10,7 +10,7 @@ their outputs already generated).
 Contents:
 
 1. [Regenerate the dataset from scratch](#1-regenerate-the-dataset-from-scratch)
-2. [Replay and inspect an order book (all four languages)](#2-replay-and-inspect-an-order-book-all-four-languages)
+2. [Replay and inspect an order book (all three languages)](#2-replay-and-inspect-an-order-book-all-three-languages)
 3. [Compute features (and inspect one instrument)](#3-compute-features-and-inspect-one-instrument)
 4. [Run one alpha's full validation](#4-run-one-alphas-full-validation)
 5. [Run the full 24-alpha promotion report](#5-run-the-full-24-alpha-promotion-report)
@@ -83,13 +83,52 @@ Contents:
 72. [Reproduce a v1.13 statistic under the `*_v113` bundles (v1.14)](#72-reproduce-a-v113-statistic-under-the-_v113-bundles-v114)
 73. [Count adverse selection per touch order, not per message (v1.14)](#73-count-adverse-selection-per-touch-order-not-per-message-v114)
 74. [Add a maintainer trust root and verify the board against main (v1.14)](#74-add-a-maintainer-trust-root-and-verify-the-board-against-main-v114)
+75. [Charge impact on the parent order, not each child (v1.16, opt-in)](#75-charge-impact-on-the-parent-order-not-each-child-v116-opt-in)
+76. [Calibrate impact from the residual move after the depth walk (v1.16, opt-in)](#76-calibrate-impact-from-the-residual-move-after-the-depth-walk-v116-opt-in)
+77. [Almgren-Chriss `eta` from the residual fit (v1.16, opt-in)](#77-almgren-chriss-eta-from-the-residual-fit-v116-opt-in)
+78. [POV with exact participation and catch-up (v1.16, opt-in)](#78-pov-with-exact-participation-and-catch-up-v116-opt-in)
+79. [Pre-register with the v3 realism: latency stress, fee tiers, parent impact (v1.16)](#79-pre-register-with-the-v3-realism-latency-stress-fee-tiers-parent-impact-v116)
+80. [The cost-aware router's v1.16 opt-ins: all-in sweep ranking and a queue-aware fill probability](#80-the-cost-aware-routers-v116-opt-ins-all-in-sweep-ranking-and-a-queue-aware-fill-probability)
+81. [Holm, Benjamini-Hochberg and Romano-Wolf across a family of alphas (v1.16, report-only)](#81-holm-benjamini-hochberg-and-romano-wolf-across-a-family-of-alphas-v116-report-only)
+82. [Check whether a linear alpha's beta is stable (v1.16, report-only)](#82-check-whether-a-linear-alphas-beta-is-stable-v116-report-only)
+83. [Warn when a change touches an open pre-registration's code (v1.16)](#83-warn-when-a-change-touches-an-open-pre-registrations-code-v116)
+84. [Merge ingested datasets across a lot-size change, with hard links (v1.16, opt-in)](#84-merge-ingested-datasets-across-a-lot-size-change-with-hard-links-v116-opt-in)
+85. [Merge a research branch's ledger without losing or double-counting looks](#85-merge-a-research-branchs-ledger-without-losing-or-double-counting-looks)
+86. [Flatten the MVP before the close (v1.16, opt-in)](#86-flatten-the-mvp-before-the-close-v116-opt-in)
+87. [Apply a CI regeneration bundle with `tools/release.py` (v1.16 fix)](#87-apply-a-ci-regeneration-bundle-with-toolsreleasepy-v116-fix)
+88. [Verify an archived fork blackboard (v1.16)](#88-verify-an-archived-fork-blackboard-v116)
+89. [Register the M5 quoting study v2 (owner only) and read its validity gate (v1.16)](#89-register-the-m5-quoting-study-v2-owner-only-and-read-its-validity-gate-v116)
+90. [Read the in-sample monetisation study (v1.16 P0-6)](#90-read-the-in-sample-monetisation-study-v116-p0-6)
+91. [Size by conformal confidence and check coverage (v1.15, opt-in)](#91-size-by-conformal-confidence-and-check-coverage-v115-opt-in)
+92. [Measure feature drift between two periods before a confirmatory run (v1.15)](#92-measure-feature-drift-between-two-periods-before-a-confirmatory-run-v115)
+93. [Run the MVP loop on a real ITCH session (v1.15)](#93-run-the-mvp-loop-on-a-real-itch-session-v115)
+94. [Pre-check a holdout file and dry-run a confirmatory look (v1.15, owner flow)](#94-pre-check-a-holdout-file-and-dry-run-a-confirmatory-look-v115-owner-flow)
+95. [Build a DeepLOB dataset and fit the numpy baseline (v1.15, code only)](#95-build-a-deeplob-dataset-and-fit-the-numpy-baseline-v115-code-only)
+96. [Report a result at 0.5x, 1x and 1.5x cost (v1.15)](#96-report-a-result-at-05x-1x-and-15x-cost-v115)
+97. [Triage a time-shift leakage failure: fast signal or leak? (v1.15)](#97-triage-a-time-shift-leakage-failure-fast-signal-or-leak-v115)
+98. [Shrink the EWMA covariance and watch the condition number (v1.15, opt-in)](#98-shrink-the-ewma-covariance-and-watch-the-condition-number-v115-opt-in)
+99. [Verify main's board, anchors and signed agent registry as CI does (v1.16)](#99-verify-mains-board-anchors-and-signed-agent-registry-as-ci-does-v116)
+100. [Promote a model only with a model card (v1.15)](#100-promote-a-model-only-with-a-model-card-v115)
 
 Where to start: if you are new, run recipes 1, 2, 3, 4 and 22 in that
 order. They generate the data, show a book, build features, validate one
 alpha and run the whole loop on one instrument. Then read 29 and 35 (what
 a gate threshold is, and when a result counts as evidence) before any
 recipe whose number you might quote. Recipes 69 to 74 cover v1.14; each
-says what moved and which flag gives the old behaviour back.
+says what moved and which flag gives the old behaviour back. Recipes 75 to
+100 cover v1.15 and v1.16 (execution realism, the router and algo opt-ins,
+report-only statistics, governance and release tooling). Python blocks with
+no save-as line run from the repo root with `PYTHONPATH=python/src`.
+
+The Java engine was archived in v1.15 (`archive/java/`, frozen at
+v1.14.0, no longer in CI). Recipes that still show a Java command run the
+frozen copy; the live engines are Python, C++ and Rust.
+
+Recipes 75–100 cover v1.15 and v1.16. Their command blocks were run as
+printed on main before they were written down, except where a recipe says it
+is a how-to (real data, owner-only steps or a multi-hour study). Every v1.16
+execution and statistics option they use is **opt-in**: off by default, so
+no golden and no published number moves unless you turn it on.
 
 Recipes 27–35 were added with v1.3.0. Every command block in them was run
 as printed, from a clean checkout of the release, before it was written
@@ -204,7 +243,7 @@ reproduces them to the documented tolerances, not to the byte
 individual steps; use them one at a time only for a deliberate,
 single-report change.
 
-## 2. Replay and inspect an order book (all four languages)
+## 2. Replay and inspect an order book (all three languages)
 
 **Python** — the reference `ReplayEngine` over the golden equity vector:
 
@@ -261,10 +300,10 @@ print(json.dumps(cp)[:200])
 PY
 ```
 
-**Java** — the replay demo (golden vectors, codec SHA-256s, throughput):
+**Java (archived in `archive/java/`, frozen at v1.14)** — the replay demo (golden vectors, codec SHA-256s, throughput):
 
 ```bash
-bash java/demo.sh
+bash archive/java/demo.sh
 ```
 
 **C++** — book/replay correctness runs as tests; throughput via the bench:
@@ -526,12 +565,12 @@ Cross-language versions of the same check:
 
 ```bash
 cd python && PYTHONPATH=src python3 -m pytest -q tests/test_portfolio_golden.py
-cd java && bash build.sh && bash test.sh          # includes PortfolioGoldenTest
+cd archive/java && bash build.sh && bash test.sh          # includes PortfolioGoldenTest
 ```
 
 ## 9. Run risk checks against the golden decisions
 
-The Rust engine is the reference; Java and Python (`iap.risk`,
+The Rust engine is the reference; the archived Java engine and Python (`iap.risk`,
 [API_TRADING.md](API_TRADING.md) §1) port it. The golden replays a full
 step sequence (orders, fills, market moves, gaps, venue outages, kill
 switches, loss-limit overrides, session rolls, a mid-stream snapshot) and
@@ -542,7 +581,7 @@ snapshot (`expected_risk_snapshot.json`, restored by Java):
 ```bash
 cd rust && cargo test -p risk --test golden_risk     # reference
 cd rust && cargo test -p risk --test rules           # per-rule unit tests
-cd java && bash build.sh && rm -rf out/test && mkdir -p out/test && \
+cd archive/java && bash build.sh && rm -rf out/test && mkdir -p out/test && \
   find src/test/java -name '*.java' | sort > out/test-sources.txt && \
   javac -cp "out/main:/usr/share/java/junit4.jar:/usr/share/java/hamcrest-core.jar" \
         -d out/test @out/test-sources.txt && \
@@ -582,12 +621,12 @@ cd cpp && bash build.sh
 ctest --test-dir build --output-on-failure -R 'ReplayFillsGolden|Exec'
 ```
 
-Java and Python must reproduce the same fills to the tick (Python's golden
+Python (and the archived Java engine) must reproduce the same fills to the tick (Python's golden
 test additionally asserts every money field bit-identical —
 [API_TRADING.md](API_TRADING.md) §2):
 
 ```bash
-cd java && bash build.sh && bash test.sh    # includes ReplayFillsGoldenTest, ExecutionSimTest, AlgosTest
+cd archive/java && bash build.sh && bash test.sh    # includes ReplayFillsGoldenTest, ExecutionSimTest, AlgosTest
 cd python && PYTHONPATH=src python3 -m pytest -q tests/test_execution_golden.py tests/test_execution_rules.py tests/test_exec_algos.py tests/test_sor.py
 ```
 
@@ -676,7 +715,7 @@ The Java platform streams events through book → features → alphas →
 portfolio → risk → execution with the monitoring endpoints live:
 
 ```bash
-bash java/paper.sh                              # asap replay of the golden EQ vector
+bash archive/java/paper.sh                              # asap replay of the golden EQ vector
 # prints e.g.:
 # paper session: events=2000 orders=420 fills=421 pnl=-100.801250 \
 #   risk[allowed=420 rejected=5] status=FINISHED port=8080 \
@@ -701,16 +740,16 @@ event (PLATFORM_CONVENTIONS.md §12.3). It leaves its durable state behind in
 report), `config_audit.jsonl`, `admin_audit.jsonl`:
 
 ```bash
-sha256sum java/out/state/risk_audit.jsonl
-python3 -c "import json;print(json.load(open('java/out/paper_session_report.json'))['risk']['audit_sha256'])"
-bash java/paper.sh --resume     # continue from the checkpoint (positions,
+sha256sum archive/java/out/state/risk_audit.jsonl
+python3 -c "import json;print(json.load(open('archive/java/out/paper_session_report.json'))['risk']['audit_sha256'])"
+bash archive/java/paper.sh --resume     # continue from the checkpoint (positions,
                                 # realized P&L and any latched kill switch)
 ```
 
 For a session you can scrape while it runs, pace it in real time (60×):
 
 ```bash
-bash java/paper.sh --mode realtime --speed 60 &
+bash archive/java/paper.sh --mode realtime --speed 60 &
 sleep 5
 curl -s localhost:8080/health              # {"status":"ok"}
 curl -s localhost:8080/status | python3 -m json.tool
@@ -733,19 +772,19 @@ curl -s localhost:8080/metrics | grep -E '^(platform_|md_event_time_gap|risk_lim
 Halt it the way the runbook does (needs a token, else the routes are 404):
 
 ```bash
-IAP_ADMIN_TOKEN=dev-token bash java/paper.sh --mode realtime --speed 60 &
+IAP_ADMIN_TOKEN=dev-token bash archive/java/paper.sh --mode realtime --speed 60 &
 sleep 5
 curl -sS -X POST localhost:8080/admin/kill \
   -H "Authorization: Bearer dev-token" \
   -d 'scope=global' --data-urlencode 'reason=COOKBOOK demo'
 curl -s localhost:8080/metrics | grep '^risk_kill_switch_engaged'   # 1
-tail -1 java/out/state/admin_audit.jsonl                            # audited
+tail -1 archive/java/out/state/admin_audit.jsonl                            # audited
 ```
 
 The port comes from `configs/execution/execution.json` `monitoring.port` (default
 8080 — the Grafana/Prometheus contract; `deployment/prometheus/` scrapes it
 in the docker-compose stack). The session report lands in
-`java/out/paper_session_report.json`. Full ops procedure:
+`archive/java/out/paper_session_report.json`. Full ops procedure:
 `docs/runbooks/RUNBOOK_paper_trading.md`. Note the honest P&L: paper
 trading the golden vector *loses* money — consistent with the promotion
 report, not an embarrassment to be tuned away.
@@ -756,7 +795,7 @@ report, not an embarrassment to be tuned away.
 cd cpp && bash build.sh && ./build/bench_all                       # full C++ pass
 ./build/bench_all ../benchmarks/results_cpp.md                  # persist the table
 cd rust && cargo run --release --bin demo                       # replay throughput
-bash java/demo.sh                                                    # Java replay throughput
+bash archive/java/demo.sh                                                    # Java replay throughput
 ```
 
 Methodology matters more than the numbers (spec §22): the committed
@@ -810,7 +849,7 @@ timeline or across a halt is `null`, never the last mid). The exact §2.2
 records and the timeline cases (crossed states skipped, MAKER fills against
 the pre-event state, undefined markouts) are golden-tested
 (`tests/golden/expected_tca.json` v2, regenerate with
-`python/tools/make_golden_tca.py --force`) in Python and Java.
+`python/tools/make_golden_tca.py --force`) in Python (the Java copy is archived).
 
 ## 16. Add a NEW alpha (full walkthrough)
 
@@ -867,7 +906,7 @@ the report moves accordingly.
 against `configs/strategies/alpha_params.json` (ports never fit —
 API_ALPHA.md §2), add golden cases via
 `python/tools/make_golden_alpha.py` + a `schemas/MIGRATIONS.md` entry, and
-make the C++/Rust/Java golden groups reproduce your cases before any paper
+make the C++/Rust golden groups reproduce your cases before any paper
 deployment.
 
 ## 17. Add a new feature to the registry
@@ -884,7 +923,7 @@ the pinned semantics of API_FEATURES.md §2: sample at the right refresh kind
 (mid-change vs every book_ok refresh vs every refresh), half-open windows
 `(t−w, t]`, integer sums for integer inputs, at-or-before history lookups,
 and explicit validity (warmup, book_ok, defined inputs). **NaN must never
-appear with valid=true** — `tests/test_feature_validity.py` will hold you to
+appear with valid=true** — `python/tests/test_feature_validity.py` will hold you to
 it.
 
 **Step 3 — regenerate the registry** (the pipeline writes it):
@@ -909,8 +948,8 @@ brute-force comparison suite.
 
 **Step 5 — parity**: if the feature belongs in the native 40 (an alpha input
 for a production port), implement it in `cpp/src/features/`,
-`rust/features/` and `java/.../features/` and re-run
-`tests/harness/run_all.sh` — the feature golden groups in all four languages
+`rust/features/` and re-run
+`tests/harness/run_all.sh` — the feature golden groups in all three languages
 must agree at 1e-9. Otherwise it remains a Python research feature until its
 family is ported (API_FEATURES.md §1).
 
@@ -974,7 +1013,7 @@ three per-alpha gauges alongside the usual metrics. Run a paced session
 and scrape them:
 
 ```bash
-bash java/paper.sh --mode realtime --speed 60 &
+bash archive/java/paper.sh --mode realtime --speed 60 &
 sleep 25                # drift PSI appears once its 256-signal window fills;
                         # rolling IC once >= 4 matured event-time buckets exist
 curl -s localhost:8080/health               # {"status":"ok"}
@@ -2959,7 +2998,7 @@ For the feature store, `python3 -m iap.features --engine rust` takes the
 45 native columns from Rust and records `"native_engine": "rust"` in
 `features_summary.json`; the other 160 features still come from Python.
 Measure the speed on your machine with
-`python tools/bench_native_features.py` (CI: about 150x on the golden
+`cd python && PYTHONPATH=src python tools/bench_native_features.py` (CI: about 150x on the golden
 vectors). The anomaly vectors match on every row too (API_FEATURES.md
 §7.1).
 
@@ -3164,7 +3203,7 @@ faster, because 160 features still run in Python.
 ## 53. Change a frozen copy: the `POLYGLOT-OVERRIDE` workflow (v1.11)
 
 Plan item E3. `docs/POLYGLOT.md` freezes 24 paths (Rust codec, book,
-replay, alpha, contracts, lifecycle; C++ contracts; the Java ports); new
+replay, alpha, contracts, lifecycle; C++ contracts; the Java ports, removed from the policy in v1.15 when Java was archived); new
 behaviour lands in the canonical copy. The gate is
 `tests/harness/check_polyglot_policy.py`. First its built-in known answers
 and the check of the v1.11.0 release branch against `main`:
@@ -3601,8 +3640,8 @@ displayed price and breaks ties on fees; the opt-in
 (`iap.execution.venues_model`: fill probability at the touch, maker
 toxicity, latency, volume-tiered fees from
 `research/execution/venue_model.json`). Two synthetic equity venues, XV1 and
-XV2, quote one instrument. Save as `python/recipe56.py` and run
-`cd python && PYTHONUTF8=1 PYTHONPATH=src python recipe56.py`:
+XV2, quote one instrument. Save as `python/recipe59.py` and run
+`cd python && PYTHONUTF8=1 PYTHONPATH=src python recipe59.py`:
 
 ```python
 from iap.core.events import EventType, MarketEvent
@@ -3732,8 +3771,8 @@ Plan item X4 (API_TRADING.md §2.9). The fill-hazard model is fitted on the
 v1.9 M3 maker labels of one synthetic stream, saved as versioned JSON, and
 drives the hazard reprice policy of the maker backtest on another stream,
 together with post-only posts and markout feedback. Everything is opt-in:
-the `default` row is the v1.11 maker backtest. Save as `python/recipe56.py`
-and run `cd python && PYTHONUTF8=1 PYTHONPATH=src python recipe56.py`:
+the `default` row is the v1.11 maker backtest. Save as `python/recipe61.py`
+and run `cd python && PYTHONUTF8=1 PYTHONPATH=src python recipe61.py`:
 
 ```python
 import sys
@@ -4217,10 +4256,10 @@ only, so a log rewritten with CRLF fails too.
 What the chain does not do. It detects edits; it does not prevent them.
 Someone who can rewrite the whole file can recompute every hash. The
 protection is to copy the head somewhere the writer cannot reach: a live
-engine exposes it as `engine.audit_chain_head()`, and the Java paper
+engine exposes it as `engine.audit_chain_head()`, and the archived Java paper
 session stores it in `session_state.json`. A restore continues the chain
 (`RiskEngine.restore(..., chain=engine.audit_chain_head())` in Python,
-`restore_chained` in Rust and Java), so one log stays one chain across
+`restore_chained` in Rust and the archived Java engine), so one log stays one chain across
 restarts. The head is deliberately not part of the snapshot: an engine
 that never stopped and one that was restored must produce the same
 snapshot bytes.
@@ -4262,7 +4301,7 @@ python -c "import json; d=json.load(open('configs/risk/risk.json')); print(json.
 | 28 | `CANCEL_RATE` | `on_cancel_request` (token bucket per strategy) |
 | 29 | `VENUE_MESSAGE_RATE` | orders and cancels (token bucket per venue) |
 
-Why they run last: checks 1 to 22 are pinned by goldens in Rust, Java and
+Why they run last: checks 1 to 22 are pinned by goldens in Rust, the archived Java engine and
 Python. Putting the new checks after them meant no existing rule id or
 decision moved, which is what let the old goldens prove the ports. The
 cost is that an order breaking both an old and a new limit is reported
@@ -4433,11 +4472,1099 @@ The same flag makes `verify-board` require every anchor commit to be an
 ancestor of `origin/main`, and the board on `main` to be a prefix of the
 current board.
 
-Today both files are empty, so nothing needs a signature, and the last
-command reports `"ok": true` with 6 anchored entries. Two related v1.14
+When v1.14 shipped both files were empty. Since v1.15 (#92) the maintainer
+`ashjha0` is in `trust_roots.json`, the registry is signed and CI also runs
+`python tests/harness/check_agent_keys.py --trust-ref origin/main --require-signed`;
+on main at v1.16 the last command reports `"ok": true` with 19 of 19 entries
+anchored (recipe 99). Two related v1.14
 rules: new signed requests use the `ed25519-v2` scheme, which binds the
 board head (`prev`) and the board id, so a signature cannot be replayed
 onto another board or position; and `research/experiments.json` is now a
 hash chain (`chain_head`, `chain_length`), so an edited ledger fails on
 load with `LedgerIntegrityError` before any Bonferroni threshold is
 computed from it.
+
+## 75. Charge impact on the parent order, not each child (v1.16, opt-in)
+
+**Goal:** stop the simulator rewarding a parent for being cut into small
+children. Under the pinned rule 6 each child's impact is sized on the child
+alone, so four children of 250 cost less than one child of 1,000. The opt-in
+rule 6b (`ExecConfig.impact_model="parent"`) sizes the temporary leg on the
+parent's cumulative taker quantity. It can also add a permanent leg on the
+instrument's cumulative signed flow (`permanent_impact_bps_per_pct_adv`).
+Python only. Save as `python/recipe75.py` and run
+`cd python && PYTHONPATH=src python recipe75.py`. It reuses the tiny book
+from the simulator-rule tests, so it must run from `python/`:
+
+```python
+import sys
+sys.path.insert(0, "tests")  # the simulator-rule test helpers
+from dataclasses import replace
+from test_v116_parent_impact import run_buys
+from test_execution_rules import make_config
+
+child = make_config()  # rule 6, the pinned default
+for name, cfg in (("child", child),
+                  ("parent", replace(child, impact_model="parent")),
+                  ("parent sqrt", replace(child, impact_model="parent", impact_exponent=0.5))):
+    whole, split = run_buys(cfg, [1000]), run_buys(cfg, [250] * 4)
+    print(f"{name:12s} 1 x 1000: {whole:.4f}  4 x 250: {split:.4f} USD impact")
+try:
+    replace(child, impact_exponent=0.5)
+except ValueError as e:
+    print("refused:", e)
+```
+
+Output:
+
+```text
+child        1 x 1000: 0.0202  4 x 250: 0.0051 USD impact
+parent       1 x 1000: 0.0202  4 x 250: 0.0202 USD impact
+parent sqrt  1 x 1000: 0.0639  4 x 250: 0.0639 USD impact
+refused: impact_exponent / permanent_impact_bps_per_pct_adv need impact_model='parent'
+```
+
+**Pitfalls:**
+- `impact_exponent` must lie in (0, 1]. As the last line shows, it is only
+  accepted with `impact_model="parent"`.
+- The C++ and Rust simulators have no rule 6b, so a parent-impact run has
+  no cross-language parity.
+- Recipe 76 shows where a fitted coefficient and exponent come from.
+
+## 76. Calibrate impact from the residual move after the depth walk (v1.16, opt-in)
+
+**Goal:** estimate how far the mid keeps moving after a sweep, as a
+function of the sweep's size in % of ADV, then switch a config to rule 6b
+with that fit. The ADV is a tape ADV that includes non-displayed prints.
+`--impact-fit` (or `estimate_calibration(..., impact_fit=True)` in Python)
+adds an `impact.residual` block with three fits per horizon:
+- linear and square-root through-origin fits, with HC0 standard errors;
+- a log-log power fit.
+
+```bash
+PYTHONPATH=python/src python -m iap.execution.calibration \
+    --events tests/golden/events_eq_mbo.jsonl --tick 1=0.01 \
+    --impact-fit --out /tmp/cal_fit.json
+python -c "import json; r=json.load(open('/tmp/cal_fit.json'))['impact']['residual']; print(r['n_sweeps'], r['horizon'], json.dumps(r['by_horizon'][r['horizon']]))"
+```
+
+Output on the 2,000-event golden vector (numbers rounded and the JSON
+wrapped here):
+
+```text
+wrote /tmp/cal_fit.json: 2000 events, 1 instruments
+234 1s {"linear": {"coeff_bps_per_pct_adv": 0.328, "se": 0.395}, "n": 233,
+        "power": {"bins_used": 2, "coeff": null, "exponent": null, "exponent_se": null},
+        "sqrt": {"coeff_bps_per_sqrt_pct_adv": 0.191, "se": 0.236}}
+```
+
+Then apply the fit:
+
+```python
+from iap.execution.calibration import apply_impact_fit, load_calibration
+from iap.execution.config import ExecConfig
+
+cal = load_calibration("/tmp/cal_fit.json")
+cfg = apply_impact_fit(ExecConfig(), cal, shape="sqrt")      # or "linear" / "power"
+print(cfg.impact_model, round(cfg.impact_coeff_bps_per_pct_adv, 4), cfg.impact_exponent)
+# parent 0.1908 0.5
+```
+
+**Pitfalls:**
+- On the golden vector the standard errors are larger than the
+  coefficients. Treat the output as a demonstration, not a usable number.
+- `shape="power"` raises `ValueError: power fit has too few positive bins`
+  here; the power fit needs a real session.
+- `apply_impact_fit` also refuses a calibration without the
+  `impact.residual` block, or one whose coefficient is not positive.
+- Calibration documents written without `--impact-fit` do not change.
+
+## 77. Almgren-Chriss `eta` from the residual fit (v1.16, opt-in)
+
+**Goal:** drive the Almgren-Chriss trajectory (recipes 41 and 48) with the
+residual-move coefficient from recipe 76, instead of the v1.9 full-move
+slope. With the calibration from recipe 76 at `/tmp/cal_fit.json`:
+
+```python
+from iap.execution.calibration import load_calibration
+from iap.execution.optimal import ac_params_from_calibration
+
+cal = load_calibration("/tmp/cal_fit.json")
+for src in ("slope", "residual"):
+    p = ac_params_from_calibration(sigma=0.02, adv_per_day=5e6, horizon_s=600, price=100.0,
+                                   calibration=cal, impact_source=src)
+    print(src, p.eta)
+```
+
+Output:
+
+```text
+slope 3.7193626220133436e-07
+residual 6.566319875376026e-08
+```
+
+The formula is `eta = coeff * 1e-2 * price / adv`, so the ratio of the two
+lines is the ratio of the two coefficients. On this vector the residual
+move is about a sixth of the full move. Most of what the slope charged was
+the depth walk itself, and the simulator already charges that through the
+book.
+
+**Pitfalls:**
+- `impact_source="residual"` reads the LINEAR fit at the block's reference
+  horizon. It raises `ValueError` when the calibration has no
+  `impact.residual` block.
+- The v1.13 unit rules still apply: pass `adv_per_day` with `horizon_s`,
+  or `adv` with `horizon` in one time unit. Never mix the two forms.
+
+## 78. POV with exact participation and catch-up (v1.16, opt-in)
+
+**Goal:** trade `p` of the TOTAL volume, ours included, and recover from
+missed fills.
+
+The pinned POV has two shortfalls:
+- it targets `floor(p * V)` of market volume `V`, so it trades less than
+  `p` of the total;
+- it sends at most one child of `max_child_qty` per TRADE, so it falls
+  behind when children are capped.
+
+`ParentOrder(pov_exact=True)` fixes both. It targets
+`floor(p / (1 - p) * V)` and covers the whole deficit at once, in children
+of at most `max_child_qty`. Python only. Save as `python/recipe78.py` and
+run `cd python && PYTHONPATH=src python recipe78.py`:
+
+```python
+import sys
+sys.path.insert(0, "tests")
+from iap.execution import AlgoType, ExecutionReplay
+from test_exec_algos import algo_config, algo_stream, parent
+
+def filled(**kw):
+    p = parent(AlgoType.POV, 2000, 1, **kw)
+    return ExecutionReplay(algo_config(), [p]).run(algo_stream()).parents[1].filled_qty
+
+for cap in (1000, 5):
+    a = filled(participation=0.2, max_child_qty=cap)
+    b = filled(participation=0.2, max_child_qty=cap, pov_exact=True)
+    print(f"max_child_qty={cap:4d}  pinned {a:5d}  pov_exact {b:5d}  share of total {b / (4000 + b):.3f}")
+```
+
+Output (the window holds 100 TRADEs of 40 shares, 4,000 in all):
+
+```text
+max_child_qty=1000  pinned   800  pov_exact  1000  share of total 0.200
+max_child_qty=   5  pinned   500  pov_exact  1000  share of total 0.200
+```
+
+**Pitfalls:**
+- With `pov_exact`, `participation` must be strictly inside (0, 1).
+- Catch-up can send several children at one event, which is more visible
+  than the pinned one-child pace.
+- VWAP by time of day needs no new switch: it is the forecast volume curve
+  from recipe 41, with exchange-local sessions.
+
+## 79. Pre-register with the v3 realism: latency stress, fee tiers, parent impact (v1.16)
+
+**Goal:** see what `configs/prereg/v3.json` turns on, and build the
+per-cell simulator configs that a net-of-cost study must report.
+
+v3 is v2 plus five `RealismOptIns` keys. None of them exists in v2, so v2
+runs do not move:
+
+| key | v3 value | what it adds |
+|---|---|---|
+| `venue_latency` | parametric, with a tail | an ASSUMED order-entry leg; real ITCH carries no order-entry latency |
+| `latency_stress` | `[0, 1, 5]` | a latency stress grid; the 1x case is primary |
+| `fee_tier` / `fee_tier_sensitivity` | `"mid"` / `["base"]` | assumed tiers from `configs/reference/fee_tiers.json`, not a quoted price list |
+| `exec_prints` | `true` | ITCH exec-print fills |
+| `impact_model` / `impact_shape` | `"parent"` / `"sqrt"` | parent rule 6b from the residual fit (recipes 75 and 76) |
+
+With `/tmp/cal_fit.json` from recipe 76:
+
+```python
+from iap.execution.calibration import load_calibration
+from iap.execution.config import load_exec_config
+from iap.execution.realism import load_prereg
+
+ri = load_prereg("configs/prereg/v3.json")
+cal = load_calibration("/tmp/cal_fit.json")
+base = load_exec_config("configs", **ri.exec_config_kwargs())
+cfg = ri.exec_config(base, cal)
+print(cfg.impact_model, cfg.impact_exponent, round(cfg.impact_coeff_bps_per_pct_adv, 4))
+for m, c in ri.stressed_exec_configs(base, cal).items():
+    print("stress", m, {v: s.latency_mean_ns for v, s in c.venues.items()})
+for t, c in ri.fee_tier_configs(base, cal).items():
+    print("tier", t, (c.venues[1].taker_fee_per_share, c.venues[1].maker_rebate_per_share))
+print(ri.calibration_kwargs())
+```
+
+Output:
+
+```text
+parent 0.5 0.1908
+stress 0 {1: 0, 2: 0, 10: 0, 11: 0, 12: 0}
+stress 1 {1: 250000, 2: 250000, 10: 250000, 11: 250000, 12: 250000}
+stress 5 {1: 1250000, 2: 1250000, 10: 1250000, 11: 1250000, 12: 1250000}
+tier mid (0.003, 0.0015)
+tier base (0.003, 0.001)
+{'markout_unit': 'touch_order', 'impact_fit': True}
+```
+
+**Pitfalls:**
+- `load_exec_config` takes the `configs/` directory, not the JSON file.
+- Without a calibration from recipe 76, `exec_config` raises `prereg
+  impact_model 'parent' needs a calibration with impact_fit`. A loop that
+  has no calibration (the MVP) passes `impact=False` and records the impact
+  rule as not applied.
+- The fee tiers change only the equity venues, 1 and 2.
+
+## 80. The cost-aware router's v1.16 opt-ins: all-in sweep ranking and a queue-aware fill probability
+
+**Goal:** use the two `sor_v2` additions on the router from recipe 59.
+- **All-in sweep ranking.** `RouterOptions(sweep_rank="all_in")` makes
+  `plan_sweep` take levels by price per share including the taker fee, so a
+  fee can outweigh a tick. `plan_sweep` then needs `tick=`.
+- **Queue-aware fill probability.** `route_passive` and `passive_costs`
+  accept a `fill_prob(venue_id, side, queue_qty)` in place of the model's
+  `p_fill_touch`. `hazard_fill_prob(hazard, horizon_s)` turns a
+  queue-depletion hazard into one.
+
+Both are off by default. The pinned `SmartOrderRouter` and its C++ parity
+do not change. Build `book`, `models` and `T0` as in recipe 59, then:
+
+```python
+from iap.execution.sor_v2 import CostAwareRouter, RouterOptions, hazard_fill_prob
+
+for rank in ("price", "all_in"):
+    r = CostAwareRouter(models, RouterOptions(lot=100, sweep_rank=rank))
+    print(rank, [(k.venue_id, k.price_ticks, k.qty) for k in r.plan_sweep(book, 0, 600, T0, tick=0.01)])
+
+r = CostAwareRouter(models, RouterOptions(lot=100))
+haz = {1: 0.2, 2: 1.5}  # per-second queue-depletion hazard by venue (toy numbers)
+fp = hazard_fill_prob(lambda v, s, q: haz.get(v), horizon_s=1.0)
+print("costs, model p  :", {v: round(c, 3) for v, c in r.passive_costs(book, 0, T0, 0.01).items()})
+print("costs, hazard p :", {v: round(c, 3) for v, c in r.passive_costs(book, 0, T0, 0.01, fill_prob=fp).items()})
+print("route           :", r.route_passive(book, 0, T0, 0.01, fill_prob=fp))
+```
+
+Output:
+
+```text
+price [(2, 10001, 100), (1, 10001, 200), (1, 10002, 300)]
+all_in [(2, 10001, 100), (1, 10001, 200), (1, 10002, 300)]
+costs, model p  : {1: 0.44, 2: 0.168}
+costs, hazard p : {1: 0.947, 2: -0.295}
+route           : 2
+```
+
+The two sweeps are identical here because XV1 and XV2 charge the same taker
+fee. The ranking only differs when the fees differ by more than the price
+gap. With a fast-depleting queue on XV2, its expected passive cost turns
+into a gain: a negative cost means we expect to capture spread and rebate.
+
+**Pitfalls:**
+- A `fill_prob` that returns `None` skips that venue.
+- The hazards above are made up. In a study they come from the
+  `ExecCalibration.queue_depletion_hazard` of a calibration (not the fill-hazard
+  model of recipe 61), for example
+  `hazard_fill_prob(lambda v, s, q: cal.queue_depletion_hazard(s, q), 1.0)`.
+
+## 81. Holm, Benjamini-Hochberg and Romano-Wolf across a family of alphas (v1.16, report-only)
+
+**Goal:** see how a set of alphas tested side by side looks under the
+standard family-wise and false-discovery corrections.
+`iap.validation.multiple_testing` is REPORT-ONLY: no gate, threshold or
+verdict reads it. Promotion keeps the ledger-wide Bonferroni `|t|` of
+recipe 29.
+
+```python
+import numpy as np
+from iap.validation.multiple_testing import (
+    benjamini_hochberg, fold_bootstrap_t, holm, p_two_sided, romano_wolf)
+
+t = [5.2, 3.1, 2.4, 1.1, None]                  # gate t per alpha; None = no t
+p = [p_two_sided(x) for x in t]
+fmt = lambda xs: [None if v is None else f"{v:.3g}" for v in xs]
+print("p   ", fmt(p))
+print("holm", fmt(holm(p)))
+print("bh  ", fmt(benjamini_hochberg(p)))
+
+rng = np.random.default_rng(0)
+folds = rng.normal([0.02, 0.01, 0.0], 0.01, size=(6, 3))   # fold IC: 6 folds x 3 alphas
+t_obs, t_boot = fold_bootstrap_t(folds)                     # folds resampled jointly, seeded
+print("t_obs", [round(v, 2) for v in t_obs])
+print("rw   ", fmt(romano_wolf(t_obs, t_boot)))
+```
+
+Output:
+
+```text
+p    ['1.99e-07', '0.00194', '0.0164', '0.271', None]
+holm ['7.97e-07', '0.00581', '0.0328', '0.271', None]
+bh   ['7.97e-07', '0.00387', '0.0219', '0.271', None]
+t_obs [2.98, 3.4, -0.71]
+rw   ['0.147', '0.147', '0.47']
+```
+
+A `None` input gives `None` and is left out of the family size, which is
+why the Holm factor is 4, not 5. Romano-Wolf uses the joint dependence of
+the bootstrap t statistics. With only six folds its null distribution is
+coarse, so label it as fold-based wherever you quote it.
+
+`report_family(reports)` builds one row per alpha (gate t, p, Bonferroni,
+Holm, BH and a Romano-Wolf p within each asset class) from a dict of alpha
+reports. The v1.16 CHANGELOG describes a "Multiple testing across this
+report" table in the 24-alpha `REPORT.md`. On main nothing outside the
+module and its tests calls `report_family` yet, so the committed `REPORT.md`
+does not have that table.
+
+**Pitfalls:** `p_two_sided` uses the normal distribution, not Student t.
+`romano_wolf` expects bootstrap statistics that are CENTRED at the null,
+which `fold_bootstrap_t` provides.
+
+## 82. Check whether a linear alpha's beta is stable (v1.16, report-only)
+
+**Goal:** see whether an alpha's slope keeps its sign and size across
+instruments and days.
+- `beta_stability(items, label_col, valid_col)` fits a per-instrument and
+  a per-instrument-day OLS slope of the label on the raw signal. Each slice
+  needs at least 32 valid pairs.
+- `alpha_beta_stability(alpha, frames)` runs the same check for a
+  `LinearAlpha` at its own horizon.
+
+The module lives in `iap.validation`, outside the fingerprinted alpha
+modules, so importing it cannot change an open pre-registration's
+`code_hash` (the v1.15 #117 lesson). A synthetic example:
+
+```python
+import numpy as np, pandas as pd
+from iap.validation.beta_stability import beta_stability
+
+rng = np.random.default_rng(7)
+day = 86_400 * 10**9
+items = []
+for iid, beta in ((1, 0.8), (2, 1.1), (3, -0.2)):           # instrument 3 flips sign
+    ts = np.repeat(np.arange(5) * day, 400) + np.tile(np.arange(400), 5)
+    sig = rng.normal(size=ts.size)
+    df = pd.DataFrame({"exchange_ts": ts,
+                       "label_mid_1s": beta * sig + rng.normal(size=ts.size),
+                       "label_valid_1s": True})
+    items.append((iid, df, pd.Series(sig)))
+for k, v in beta_stability(items, "label_mid_1s", "label_valid_1s").items():
+    print(k, {a: (round(b, 3) if isinstance(b, float) else b) for a, b in v.items()})
+```
+
+Output:
+
+```text
+by_instrument {'n': 3, 'pos_frac': 0.667, 'sign_agreement': 0.667, 'median': 0.808, 'iqr': 0.663, 'dispersion': 0.821}
+by_instrument_day {'n': 15, 'pos_frac': 0.667, 'sign_agreement': 0.667, 'median': 0.795, 'iqr': 1.279, 'dispersion': 1.609}
+```
+
+`dispersion` is IQR / |median|. Anything near 1 or above means the "beta"
+is not one number. On real data, call
+`alpha_beta_stability(registry_alpha, load_features("data/features"))`.
+That needs `data/features/` (recipes 1 and 3).
+
+**Pitfall:** never import this module from `iap.alpha`. A test fails if you
+do, because the import would change every alpha's fingerprint.
+
+## 83. Warn when a change touches an open pre-registration's code (v1.16)
+
+**Goal:** catch a PR that silently invalidates an open registration before
+it merges. An open prereg (no outcome on the board) commits to the alpha's
+code and feature fingerprints. Change that code, and `prereg_gate.require`
+refuses the registered run, which is what happened to R7 in v1.15 (#117).
+
+```bash
+python tools/prereg_touch_check.py            # CI form: ::warning:: lines, always exit 0
+python tools/prereg_touch_check.py --strict   # local form: exit 1 on a mismatch
+```
+
+Output on main:
+
+```text
+prereg touch check: no open pre-registration's fingerprinted code changed
+```
+
+On a mismatch it prints one GitHub Actions `::warning::` per open prereg.
+The CI step is non-blocking, so read the warnings on the PR yourself.
+
+**Pitfall:** `--board` defaults to `research/agents/blackboard.jsonl`, the
+main board. Preregs that live on an archived fork board (recipe 88) are not
+covered unless you pass `--board research/agents/forks/<branch>/blackboard.jsonl`.
+
+## 84. Merge ingested datasets across a lot-size change, with hard links (v1.16, opt-in)
+
+**Goal:** combine single-day datasets into one when the sessions straddle a
+round-lot reform, without doubling disk use. This is a how-to: it needs
+ingested real datasets (recipe 66 and [docs/REAL_DATA.md](docs/REAL_DATA.md)).
+
+```bash
+cd python
+PYTHONPATH=src python -m iap.marketdata merge \
+    ../data/real/ds_2025-11-03 ../data/real/ds_2026-06-01 \
+    --out ../data/real/r7_holdout \
+    --allow-lot-size-differences --link
+# {"dataset_dir": "../data/real/r7_holdout", "dataset_version": "...", "sessions": [...]}
+```
+
+- `--allow-lot-size-differences`: the inputs may differ in `lot_size` only.
+  The merged universe keeps the FIRST input's lot sizes. The manifest
+  records `lot_size_by_session` (`{symbol: {date: lot}}`), and the
+  per-session values stay in the security master.
+- `--link`: hard-links the raw and normalized files instead of copying
+  them. Same bytes, no extra disk, but it only works on the same volume.
+
+With both flags off, the merge is byte-identical to v1.15.
+
+**Pitfalls:**
+- Features do not read `lot_size`. Anything that does must use the
+  per-session value.
+- With `--link`, deleting or editing an input file changes the merged
+  dataset too.
+- Inputs must hold disjoint sessions and already be normalized.
+
+## 85. Merge a research branch's ledger without losing or double-counting looks
+
+**Goal:** bring a branch's `research/experiments.json` back onto main.
+`tools/merge_ledger.py` merges by entry identity:
+- every entry of `--ours` is kept as it is;
+- entries that only `--theirs` has are appended, and their looks are added;
+- an entry in both is counted once, and a differing result is reported as
+  a conflict. Nothing is overwritten.
+
+`--dry-run` writes nothing:
+
+```bash
+git show research/step2:research/experiments.json > /tmp/theirs.json   # any branch's ledger
+python tools/merge_ledger.py --ours research/experiments.json --theirs /tmp/theirs.json --dry-run
+```
+
+Output when `--theirs` is the same ledger (a quick sanity run):
+
+```text
+{
+  "appended_entries": 0,
+  "appended_looks": 0,
+  "merged_total": 5372,
+  "ours_entries": 307,
+  "ours_total": 5372,
+  "result_conflicts": [],
+  "theirs_entries": 307,
+  "theirs_total": 5372
+}
+```
+
+v1.16 merged the step2 branch this way: +7 looks, which raised the R7 power
+threshold from 4.432 to 4.433.
+
+**Pitfalls:**
+- The total only grows, which is what `check_ledger_monotone.py` wants.
+- Resolve every `result_conflicts` entry by hand before you write `--out`.
+- Your ledger total will be larger than 5372 once more looks are spent.
+
+## 86. Flatten the MVP before the close (v1.16, opt-in)
+
+**Goal:** end the session flat instead of marking open positions to
+market. Set `execution.eod_flatten_lead_ns` in the MVP config. When the
+key is absent, you get the pinned golden run. From `close - lead`:
+- every decision targets flat, so no new exposure is opened;
+- the residual (position plus in-flight orders) is worked as one
+  most-urgent parent that ends at the close, with its costs charged.
+
+Save as `python/recipe86.py` and run
+`cd python && PYTHONPATH=src python recipe86.py` (about a minute):
+
+```python
+import tempfile
+from pathlib import Path
+from iap.mvp.config import MvpConfig
+from iap.mvp.feed import generate_feed
+from iap.mvp.session import run_session
+
+repo, out = Path("..").resolve(), Path(tempfile.mkdtemp())
+cfg = MvpConfig.load(repo / "configs/mvp/mvp_tiny.json", repo_root=repo)
+feed = generate_feed(cfg, out / "feed")
+flat = cfg.with_overrides(eod_flatten_lead_ns=cfg.session.length_ns // 3)
+base, eod = run_session(cfg, feed, out / "base"), run_session(flat, feed, out / "eod")
+print("base end position:", base.engine.account.position, "| eod_flatten in report:", "eod_flatten" in base.report["counts"])
+print("eod  end position:", eod.engine.account.position, "|", eod.report["counts"]["eod_flatten"])
+```
+
+Output:
+
+```text
+base end position: -413 | eod_flatten in report: False
+eod  end position: 0 | {'decisions': 144, 'parents': 1, 'too_late': 0, 'residual_position': 0}
+```
+
+**Pitfalls:**
+- The override changes `config_version`, and with it the run id and the
+  trace digest. A flatten run is a different run from recipe 22's golden.
+- `too_late` counts flatten attempts with no time left before the close.
+  If it is non-zero, use a longer lead.
+- The lead must be positive. `eod_flatten_lead_ns=0` is refused.
+
+## 87. Apply a CI regeneration bundle with `tools/release.py` (v1.16 fix)
+
+**Goal:** pull the `regenerated-artefacts` artifact of a CI `regenerate`
+run into the release branch. Since v1.16, `apply-bundle` extracts with
+Python `tarfile`, with member paths checked and the `data` filter. v1.15
+used the system `tar --force-local`, which bsdtar on Windows does not
+support. Every subcommand is a dry run unless you pass `--execute` BEFORE
+the subcommand:
+
+```bash
+python tools/release.py apply-bundle --run-id 38172001157            # downloads to a temp dir, prints what it would change
+python tools/release.py --execute apply-bundle --run-id 38172001157  # extracts into the working tree
+python tools/release.py flow                                          # the whole release, as a checklist
+```
+
+The extract skips every `expected_features*` file whose only difference
+from the working tree is line endings. The other subcommands are
+`prepare-regenerate --branch B` and `publish --version X.Y.Z`;
+the module docstring of `tools/release.py` has the full flow.
+
+**Pitfalls:**
+- It needs an authenticated `gh` CLI.
+- `--execute` after the subcommand is an argparse error.
+- `publish` refuses an `## Unreleased` CHANGELOG heading that has not been
+  renamed. The owner merges the release PR; tag only after main CI is green.
+
+## 88. Verify an archived fork blackboard (v1.16)
+
+**Goal:** check the research boards of `research/maker-real` and
+`research/step2`. They were NOT replayed onto main's board, because a signed
+entry binds the previous hash and re-chaining would break every signature.
+Instead, each one is archived unchanged under
+`research/agents/forks/<branch>/`, with a `FORK.json` that records the fork
+point, the head and the file hashes. The maker and auction drivers gate on
+their archived board (`PREREG_BOARD` in `iap.research.maker_real` and
+`iap.research.auction_real`).
+
+```python
+import json
+from pathlib import Path
+from iap.agents.blackboard import Blackboard
+
+for fork in ("maker-real", "step2"):
+    d = Path("research/agents/forks") / fork
+    meta = json.loads((d / "FORK.json").read_text())
+    print(fork, "entries", Blackboard(d / "blackboard.jsonl").verify(),
+          "head_seq", meta["head_seq"], "fork_point_seq", meta["fork_point_seq"])
+d = Path("research/agents/forks/step2")
+keys = json.loads((d / "agent_pubkeys.json").read_text())
+print("step2 signature problems:", Blackboard(d / "blackboard.jsonl").verify_signatures(keys))
+```
+
+Output:
+
+```text
+maker-real entries 10 head_seq 10 fork_point_seq 6
+step2 entries 21 head_seq 21 fork_point_seq 6
+step2 signature problems: []
+```
+
+`verify()` returns the entry count when the chain is intact and raises
+`BlackboardError` otherwise. Entries up to `fork_point_seq` are shared with
+main's board. Main's board records the archive itself as one operator
+finding.
+
+**Pitfalls:**
+- Never append to an archived board. It is evidence, not a live board.
+- `maker-real` has no `agent_pubkeys.json`: its entries are unsigned
+  operator and trusted-writer entries, so there are no signatures to check.
+
+## 89. Register the M5 quoting study v2 (owner only) and read its validity gate (v1.16)
+
+**Goal:** know what the quoting v2 registration does and how its result is
+gated. The values were owner-approved in
+`research/quoting_real/prereg_v2_DRAFT.json`:
+- `alpha_weight` EQ01 7, EQ05 15 and EQ10 12, so every symbol's median
+  skew is at least one tick;
+- `inv_skew_ticks` 1 per unit of quantity;
+- a validity gate of 0.10.
+
+`tools/quoting_v2_register.py` is run by the OWNER, never by an agent:
+
+```bash
+python tools/quoting_v2_register.py . --dry-run   # checks only: no writes, no signing
+python tools/quoting_v2_register.py .             # OWNER: 4 board entries + signed prereg_v2.json
+```
+
+Without `--dry-run` it does two things:
+- writes one prereg entry per cell (EQ01, EQ05, EQ10 and the QNOSKEW
+  control at `1s:quoting-v2-insample`) on MAIN's board, each debiting one
+  look;
+- writes `research/quoting_real/prereg_v2.json` with an Ed25519 maintainer
+  signature, checked against `research/agents/trust_roots.json`.
+
+The draft's sha256 is in every hypothesis. This was done on 2026-10-14
+(board seq 16-19). The study then runs against it (a multi-hour real-data
+run; run it detached):
+
+```bash
+cd python
+PYTHONPATH=src python -m iap.research.quoting_real --data-root ../data/real \
+    --out ../data/real/quoting_v2 --prereg ../research/quoting_real/prereg_v2.json
+PYTHONPATH=src python -m iap.research.quoting_real --data-root ../data/real \
+    --out ../data/real/quoting_v2 --prereg ../research/quoting_real/prereg_v2.json --summary-only
+```
+
+A version-2 prereg is checked by `check_prereg_v2`:
+- the signature;
+- the draft hash;
+- the cells on main's board;
+- the `quoting_config` keys against `QuotingConfig`.
+
+`configs/prereg/v2.json` realism is applied. In the summary, a cell whose
+`frac_decisions_skew_changed_quote` is below the gate reads `SKEW INERT
+(validity gate failed; no verdict)`: the skew never moved a quote, so the
+test says nothing.
+
+**Pitfalls:**
+- The script's key path is the owner's machine.
+- If it fails part-way, do not re-run it blindly, because a re-run spends
+  more looks. Inspect the board first.
+- `--slice HH:MM-HH:MM` and `--sessions` / `--symbols` are for smoke runs
+  only.
+
+## 90. Read the in-sample monetisation study (v1.16 P0-6)
+
+**Goal:** see whether EQ10 and EQ05 can pay for crossing the spread at
+any holding period, band or size. `tools/v116_monetisation_study.py` runs
+an owner-approved grid of 480 cells:
+- hold {1s, 5s, 10s, 30s, 1m};
+- band {1, 1.5, 2, 3} x round-trip cost;
+- signal {EQ10, EQ05, ensemble};
+- sizing {conf_min 0.5, 0.8};
+- cost {1x, 1.5x};
+- latency {400 us from the v3 prereg legs, the 1 s protocol default}.
+
+It runs IN-SAMPLE only: the 7 multi7 sessions plus 3 R7 in-sample days.
+The R7 holdout sessions are refused. Alphas are refitted leave-one-session-out.
+The full run took 3.3 h, so run it detached. The committed outputs are cheap
+to read:
+
+```bash
+python -c "import json; d=json.load(open('research/v116/monetisation_summary.json')); print(d['n_cells'], 'cells,', sum(c['trades_per_day'] for c in d['cells']), 'trades/day in total;', d['gate_reference'])"
+```
+
+Output:
+
+```text
+480 cells, 0.0 trades/day in total; one-sided 95% LB of daily net P&L > 0 at 1.5x cost (owner-accepted)
+```
+
+Zero trades in every cell. The cost-aware rule only enters when the
+expected return clears the round trip. The largest expected return is about
+0.1-0.2 bp, against a median round trip of about 0.8-1.2 bp. The write-up
+is `research/v116/MONETISATION_P0-6.md`. The owner's decision was no-go on
+paid data for a taker strategy, and to run the two-sided quoting study
+(recipe 89) instead.
+
+To smoke-test the driver, run
+`cd python && PYTHONPATH=src python ../tools/v116_monetisation_study.py --sessions-limit 1 --out /tmp/mon`.
+It still needs `data/real/` and several GB of memory.
+
+**Pitfalls:**
+- The grid size is recorded so a later selection can be deflated
+  (recipe 62). Do not pick the best cell and quote it undeflated.
+- `--datasets` is for smoke tests only.
+
+## 91. Size by conformal confidence and check coverage (v1.15, opt-in)
+
+**Goal:** shrink a position when the forecast interval is wide, and check
+that the intervals cover what they claim. `iap.models.conformal` has
+split-conformal and adaptive (ACI) intervals, plus a sizing rule. It is
+research-only, off by default (`ConformalSizingConfig.enabled=False`), not
+in `configs/prereg/v2.json`, and not wired into the MVP engine.
+
+```bash
+PYTHONPATH=python/src python -m iap.research.conformal_report --synthetic 4000 --method adaptive
+```
+
+Output (abridged):
+
+```text
+"overall": {"coverage": 0.8992857142857142, "gap": -0.0007142857142857784,
+            "mean_width": 4.596496288397397, "n": 2800, "nominal": 0.9}
+"config":  {"alpha": 0.1, "cal_rows": 1200, "eval_rows": 2800,
+            "final_alpha_t": 0.09, "method": "adaptive", "saturations": 0, ...}
+```
+
+The report also has a `by_session` block (S1 to S3, coverage 0.894-0.904).
+For your own forecasts, pass `--input` with a CSV or parquet file that has
+`y`, `pred` and `session` columns (and optionally `sigma`). The sizing
+rule:
+
+```python
+from iap.models.conformal import confidence_from_width, conformal_size
+
+for w in (0.5, 1.0, 2.0, 4.0):        # interval width; ref_width 1.0 = full confidence
+    c = confidence_from_width(w, 1.0)
+    print(w, c, conformal_size(1000, c, max_position=800, lot=100))
+```
+
+Output:
+
+```text
+0.5 1.0 800
+1.0 1.0 800
+2.0 0.5 500
+4.0 0.25 200
+```
+
+The size is monotone in confidence and never above the base target or
+`max_position`. It rounds toward zero in whole lots.
+
+**Pitfalls:**
+- `--method adaptive` supports `--score absolute` only. `normalized`
+  needs `--method split`.
+- A non-zero `saturations` count means ACI's `alpha_t` hit its clamp, so
+  its coverage claim is weaker.
+
+## 92. Measure feature drift between two periods before a confirmatory run (v1.15)
+
+**Goal:** see whether the holdout's features look like the in-sample
+features before you spend the look. `python -m iap.research.drift` streams
+two feature stores in record batches (the result does not depend on chunk
+size). Per feature, per symbol and pooled, it computes PSI, KS, the mean
+shift (in reference-std units) and the std ratio. This is a how-to: it
+needs two feature stores built from real data, and the paths below are
+illustrative.
+
+```bash
+cd python
+PYTHONPATH=src python -m iap.research.drift \
+    --ref ../data/real/multi7/features --target ../data/real/r7_holdout/features \
+    --out ../research/r7/drift_scratch --pooled-only
+# writes drift_report.json and drift_report.md under --out
+```
+
+`--features a b c` restricts the columns. `--psi-bins`, `--fine-bins` and
+`--batch-rows` tune the estimate. Every `DriftThresholds` field is also a
+flag (run `--help` for the list). The R7 run's report is committed under
+`research/r7/drift/`.
+
+**Pitfalls:**
+- The report is descriptive only. A PSI alert does not block anything, and
+  must not be used to pick sessions after you have seen results.
+- Point `--out` at a scratch path. Do not overwrite the committed R7
+  report.
+
+## 93. Run the MVP loop on a real ITCH session (v1.15)
+
+**Goal:** push one real day through the unchanged `MvpEngine`: one engine
+per symbol, with the dataset streamed in three passes and never loaded
+whole. This is a how-to: it needs an ingested dataset. Start with
+`--limit-events`, because a full day of AAPL, MSFT and QQQ took 2 h 29 m:
+
+```bash
+cd python
+PYTHONPATH=src python -m iap.mvp.real --dataset ../data/real/ds3_20190130 \
+    --date 2019-01-30 --symbols AAPL --config ../configs/prereg/v2.json \
+    --out /tmp/mvp_real --limit-events 200000
+```
+
+The output is a deterministic `run_manifest.json` that records:
+- the dataset version and its verified normalized sha256;
+- the prereg hash and the config version;
+- the event count, parents, children, fills and P&L;
+- the trace digest.
+
+The v2 opt-ins the loop can use are applied: regulatory fees on sell fills,
+hidden-print fills and feed latency. Maker, quoting and calibration-only
+options are listed as `not_applied`, with a reason. With
+`configs/prereg/v3.json`, venue latency, fee tier and exec prints are
+applied, and the parent impact rule is recorded as not applied (no
+calibration, recipe 79). The smoke run on AAPL (first 200k events) gave
+4,836 decisions, 946 fills and an equity of USD -414.57
+([docs/MVP.md](docs/MVP.md) section 9).
+
+**Pitfalls:**
+- Datasets ingested before v1.14 need `--allow-legacy-dataset`, and the run
+  is then recorded as legacy.
+- One day is an integration test and a cost baseline, not evidence.
+  `docs/research/MVP_REAL_20191018.md` shows costs swamping the edge by
+  about 12x.
+- Add the opt-in end-of-day flatten (recipe 86) through `--mvp-config` if
+  you want to end the day flat.
+
+## 94. Pre-check a holdout file and dry-run a confirmatory look (v1.15, owner flow)
+
+**Goal:** prove a holdout download and the registration are in order before
+the one confirmatory look. Two tools:
+
+```bash
+python -I tools/r7_holdout_check.py data/vendor/20251103.NASDAQ_ITCH50.gz data/real
+# PRECHECK OK / PRECHECK FAIL (exit 0 / 1)
+python tools/r7_confirm.py --dry-run
+```
+
+`r7_holdout_check.py` checks the file's bytes and streaming sha256
+(the `.gz` is never decompressed) against the SIGNED prereg
+(`research/r7/r7_confirm_prereg.json`), and checks that at least 25 GB of
+disk is free. `--allow-draft` falls back to the DRAFT with a loud warning;
+never use it for the real look.
+
+`r7_confirm.py --dry-run` checks the following and spends no look:
+- the signature and the fingerprints;
+- the sessions and the dataset version;
+- `prereg_gate.require`;
+- the ledger threshold.
+
+`--i-am-the-owner` runs THE look, once. `tools/r7_record_outcome.py`
+records the outcome on the board.
+
+**Pitfalls:**
+- R7 is closed: EQ10@1s and EQ05@1s were confirmed in v1.15
+  ([docs/research/R7_RESULTS.md](docs/research/R7_RESULTS.md)). Treat this
+  recipe as the pattern for the next confirmatory study, not something to
+  re-run.
+- `--retry-crashed-look` and `--retry2-eq05` were one-off owner-approved
+  retries. Each has a deviation note under `research/r7/`.
+
+## 95. Build a DeepLOB dataset and fit the numpy baseline (v1.15, code only)
+
+**Goal:** get a leak-free `(T, 4L)` limit-order-book window dataset and a
+deterministic baseline, without torch. `build_lob_dataset` does four
+things:
+- splits the rows chronologically;
+- fits a train-only z-score;
+- builds three-way smoothed forward labels (0 = DOWN, 1 = FLAT, 2 = UP);
+- keeps a train window only if its label horizon ends before the cut, and
+  a test window only if it starts after the cut.
+
+```python
+import numpy as np
+from iap.models.deeplob import NumpyLOBSoftmax, build_lob_dataset, synthetic_lob
+
+snaps = synthetic_lob(6000, levels=10, seed=1)
+ds = build_lob_dataset(snaps, window=50, horizon=10, threshold=2e-5, train_frac=0.7)
+print({k: v.shape for k, v in ds.items() if k.startswith(("X", "y"))})
+print("train/test gap:", int(ds["end_test"].min() - ds["end_train"].max()))
+m = NumpyLOBSoftmax(epochs=200, seed=0).fit(ds["X_train"], ds["y_train"])
+print("labels", np.unique(ds["y_test"], return_counts=True),
+      "test accuracy", round(float((m.predict(ds["X_test"]) == ds["y_test"]).mean()), 3))
+```
+
+Output:
+
+```text
+{'X_train': (4141, 50, 40), 'y_train': (4141,), 'X_test': (1741, 50, 40), 'y_test': (1741,)}
+train/test gap: 60
+labels (array([0, 1, 2]), array([924,  39, 778])) test accuracy 0.573
+```
+
+The gap of 60 rows is the window (50) plus the horizon (10): no test
+feature or train label crosses the cut. The torch models (DeepLOB and an
+MLP) are in `iap.models.deeplob_torch`, behind the optional extra
+`deep = ["torch>=2.2"]`.
+
+**Pitfalls:**
+- AI4 is deferred (`research/r7/AI4_DEFERRED.md`). This pipeline has no
+  real-data path, its windows and labels can cross sessions, and its price
+  z-score is static. No real AI4 run exists, and a new registration will
+  supersede the signed one.
+- With `threshold=2e-5` almost no rows are FLAT. Choose the threshold from
+  the spread, not from the accuracy it gives.
+
+## 96. Report a result at 0.5x, 1x and 1.5x cost (v1.15)
+
+**Goal:** show how sensitive a net number is to the cost model, as the
+R7 prereg reports it. `CostModel.with_cost_sensitivity(scale)` scales the
+explicit and implicit costs and leaves regulatory fees at their schedule.
+The default of 1.0 is byte-identical to before.
+
+```python
+import numpy as np
+from iap.backtest.costs import COST_SENSITIVITY_SCALES, CostModel
+
+base = CostModel.load("configs/execution/execution.json")
+mid, hs = np.array([250.0]), np.array([0.005])
+for s in COST_SENSITIVITY_SCALES:
+    rt = base.with_cost_sensitivity(s).round_trip_cost_return(mid, hs, "EQUITY")[0] * 1e4
+    print(f"scale {s:3.1f}  round trip {rt:.4f} bp")
+```
+
+Output:
+
+```text
+scale 0.5  round trip 0.3200 bp
+scale 1.0  round trip 0.6400 bp
+scale 1.5  round trip 0.9600 bp
+```
+
+**Pitfalls:**
+- This is not `with_multiplier`. The 1.5x cell of the monetisation study
+  (recipe 90) uses `with_multiplier`, the v1.4 cost-stress knob.
+- Sensitivity rows are reporting-only. The primary result is at 1.0.
+
+## 97. Triage a time-shift leakage failure: fast signal or leak? (v1.15)
+
+**Goal:** read what the leakage tester says when an alpha fails the
+time-shift detector. The detector cannot tell a short leak from a fast
+causal signal on its own, so a failure now carries a `time_shift_profile`
+(the IC with the score lagged by fractions of the horizon) and a
+`time_shift_class`. The classifier is a pure function:
+
+```python
+from iap.validation.leakage import classify_time_shift_failure as cls
+
+ok = dict(label_guard_ok=True, truncation_ok=True)
+print("gradual decay  ", cls(0.05, [0.04, 0.03, 0.02], recompute_ok=True, **ok))
+print("cliff at lag 1 ", cls(0.05, [0.001, 0.0, 0.0], recompute_ok=True, **ok))
+print("no recompute   ", cls(0.05, [0.04, 0.03, 0.02], recompute_ok=None, **ok))
+print("recompute fails", cls(0.05, [0.04, 0.03, 0.02], recompute_ok=False, **ok))
+```
+
+Output:
+
+```text
+gradual decay   fast_causal
+cliff at lag 1  leak_suspect
+no recompute    causality_unproven
+recompute fails leak_suspect
+```
+
+The class is a diagnosis for a human reviewer. By default it does not
+change `passed`: a time-shift failure still blocks promotion.
+`LeakageTester(accept_fast_causal=True)` is the opt-in that lets a
+`fast_causal` failure pass. FX11 is the worked case
+([docs/research/FX11_FINDING.md](docs/research/FX11_FINDING.md)): "fast,
+not leak", still RESEARCH pending review.
+
+**Pitfall:** `causality_unproven` means the recompute probe (recipe 30) did
+not run. Run it rather than accepting the failure.
+
+## 98. Shrink the EWMA covariance and watch the condition number (v1.15, opt-in)
+
+**Goal:** make the optimizer's covariance better conditioned when there
+are few bars per asset. `ewma_covariance(..., shrinkage="ledoit_wolf")`
+shrinks the RiskMetrics EWMA matrix toward constant correlation with a
+FIXED `shrink_intensity` (default 0.1). The name follows the target, but
+the intensity is not estimated. `shrinkage=None` is the pinned estimator.
+
+```python
+import numpy as np
+from iap.portfolio.covariance import condition_number, ewma_covariance
+
+rng = np.random.default_rng(3)
+f = rng.normal(size=(60, 1))
+r = 0.9 * f + 0.1 * rng.normal(size=(60, 12))          # 12 assets, one strong factor, 60 bars
+for sh in (None, "ledoit_wolf"):
+    S = ewma_covariance(r, shrinkage=sh, shrink_intensity=0.3)
+    print(f"shrinkage={sh!s:12s} condition number {condition_number(S):,.0f}")
+```
+
+Output:
+
+```text
+shrinkage=None         condition number 3,430
+shrinkage=ledoit_wolf  condition number 2,025
+```
+
+The optimizer's matching v1.15 opt-in is `eta_max` (a cap on the first
+step size of the projected-gradient solver in `iap.portfolio.optimizer`).
+
+**Pitfall:** shrinkage changes every weight, so it is a different portfolio
+from the pinned golden (recipe 8). Leave it off where parity matters.
+
+## 99. Verify main's board, anchors and signed agent registry as CI does (v1.16)
+
+**Goal:** run the two governance checks that guard the research board on
+main. Since v1.15 the maintainer `ashjha0` is the trust root, and the agent
+registry must be signed (recipe 74).
+
+```bash
+git fetch origin main
+PYTHONPATH=python/src python -m iap.agents.cli verify-board --trust-ref origin/main
+PYTHONPATH=python/src python tests/harness/check_agent_keys.py --trust-ref origin/main --require-signed
+```
+
+Output on main at v1.16:
+
+```text
+{
+  "anchored": 19,
+  "entries": 19,
+  "ok": true,
+  "problems": [],
+  "unanchored": 0
+}
+board entries 19 (signed 0); registry keys 0
+```
+
+`verify-board` checks four things:
+- the hash chain;
+- that main's board is a prefix of yours;
+- that every entry is anchored in a commit that is an ancestor of
+  `origin/main` (`research/agents/anchors.json`);
+- every signed request.
+
+Entries 16-19 are the quoting v2 cells (recipe 89). Fork boards are
+checked separately (recipe 88). Once a new entry is committed, run
+`python -m iap.agents.cli anchor`, which records the first commit that holds
+each entry, and commit `anchors.json`.
+
+**Pitfalls:**
+- Without `fetch-depth: 0` (or a fresh `git fetch`), the ancestor check
+  fails on a shallow clone.
+- `--require-signed` belongs to `check_agent_keys.py`, not to
+  `verify-board`.
+
+## 100. Promote a model only with a model card (v1.15)
+
+**Goal:** see the promotion guard. `ModelRegistry.promote` raises
+`RegistryError` if the model has no valid model card, or if its content hash
+is missing or mismatched. `promotion.json` records the card hash. Recipe 50
+shows registration. Save as `python/recipe100.py` and run
+`cd python && PYTHONPATH=src python recipe100.py`:
+
+```python
+import tempfile
+from pathlib import Path
+import numpy as np
+from iap.agents.blackboard import Blackboard, digest
+from iap.backtest.maker import MakerFilter
+from iap.mlops import ModelRegistry
+from iap.mlops.registry import RegistryError
+
+rng = np.random.default_rng(0)
+X = rng.normal(size=(3000, 3))
+y = (rng.random(3000) < 1 / (1 + np.exp(-(1.5 * X[:, 0] - X[:, 1])))).astype(float)
+tmp = Path(tempfile.mkdtemp())
+entry = Blackboard(tmp / "bb.jsonl").append(
+    "prereg", "research", 1, {"prereg_id": digest({"alpha": "EQ01", "horizon": "1m"})[:16]})
+reg = ModelRegistry(tmp / "reg")
+rec = MakerFilter("meta_gbm", tau=0.5).fit(X, y).register(
+    reg, prereg=entry, dataset_version="synthetic-v1",
+    date_range=("2026-01-02", "2026-03-31"), features=["f0", "f1", "f2"], seed=0)
+try:
+    reg.promote(rec.model_id)
+except RegistryError as e:
+    print("refused:", e)
+reg.write_card(rec.model_id, metrics_net_of_costs={"net_bps_per_trade": -0.4},
+               known_limitations=["synthetic data only"], intended_use="recipe demo",
+               owner_signoff="alice 2026-10-14")
+print(sorted(reg.promote(rec.model_id)))
+print("check_promotions problems:", reg.check_promotions())
+```
+
+Output (model id shortened):
+
+```text
+refused: model 0e091b55...: no model card (model_card.json); promotion requires one
+['card_hash', 'content_sha256', 'model_id', 'record_hash']
+check_promotions problems: []
+```
+
+From the shell, the same steps are
+`python -m iap.mlops --registry <dir> card <model_id> --spec card.json`
+(the spec is a JSON object of the keyword arguments above),
+`promote <model_id>` and `check-promotions`. The governance CI job runs the
+last one.
+
+**Pitfall:** the card must report metrics NET of costs. A card that only
+quotes gross accuracy is valid JSON but tells a reviewer nothing.

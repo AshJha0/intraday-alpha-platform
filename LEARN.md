@@ -6,6 +6,10 @@ repo's *real, verified numbers* as worked examples. Everything cited here can
 be reproduced from the committed code and seeds — that reproducibility is
 itself one of the lessons.
 
+Sections §45-§99 (added for v1.16) are shorter concept entries: each
+teaches one idea behind the platform, says where it lives in the code, and
+ends with questions. If a v1.12-v1.16 term is unfamiliar, start there.
+
 Reading order matters less than you'd think; each section stands alone but
 cross-references the others. If you only have an hour, read §6 (honest alpha
 research), §7 (ML and meta-labeling), §12 (golden parity) and §20 (the MVP
@@ -29,13 +33,22 @@ Three reading paths, depending on why you are here:
 - *You do quant research.* §1, §5, §6, §23, §24, §32, §33, §40, §42, then
   §44. Run COOKBOOK recipes 1, 3, 4, 29 and 35 alongside. You will come
   out knowing why a t of 21 can be overstated, what a look costs, and why
-  nothing here is promoted.
+  nothing here is promoted. Then §65-§87 (IC, HAC, multiple testing,
+  pre-registration, holdouts, CPCV, leakage) and §78 on the R7 result.
 - *You build trading systems.* §3, §9, §10, §12, §16, §21, §22, §25, §30,
   §36, then §44. Run recipes 2, 9, 10, 14, 22, 69 and 70. The theme is
-  fail-closed design and proving four implementations agree.
+  fail-closed design and proving the implementations agree. Then §45-§64
+  (queues, costs, impact, execution schedules, maker and quoting economics)
+  and §88-§99 (data, models, paper trading, controls, agents).
 - *You are reviewing the platform.* §20, §27, §44, then
   [docs/ROADMAP.md](docs/ROADMAP.md) §3.8-3.10 and CHANGELOG.md. These say
   what is wrong or unfinished, in the platform's own words.
+
+A note on Java. The sections below often mention a Java engine or the Java
+paper-trading platform. Since v1.15 that engine is archived, unchanged, in
+`archive/java/` (frozen at v1.14.0) and CI runs parity across Python, C++
+and Rust only; where a section says "four languages" it describes the
+platform as it was when the section was written.
 
 The [glossary](#glossary) at the end defines the terms this document uses
 without stopping to explain them.
@@ -91,7 +104,62 @@ Contents:
 42. [An underpowered result is not a negative result (AUC01)](#42-an-underpowered-result-is-not-a-negative-result-auc01)
 43. [Feedback loops in passive execution](#43-feedback-loops-in-passive-execution)
 44. [What an independent review found, and how we triaged it (v1.13/v1.14)](#44-what-an-independent-review-found-and-how-we-triaged-it-v113v114)
-45. [Further reading](#45-further-reading)
+45. [Queue position: why the back of the queue fills last and worst](#45-queue-position-why-the-back-of-the-queue-fills-last-and-worst)
+46. [Round-trip cost: why a 0.1 bp edge cannot pay a 1 bp spread](#46-round-trip-cost-why-a-01-bp-edge-cannot-pay-a-1-bp-spread)
+47. [The maker's P&L identity: spread captured, markout, inventory](#47-the-makers-pl-identity-spread-captured-markout-inventory)
+48. [Square-root impact](#48-square-root-impact)
+49. [Parent vs child impact](#49-parent-vs-child-impact)
+50. [Residual vs total impact](#50-residual-vs-total-impact)
+51. [Permanent vs temporary impact, and trading against your own flow](#51-permanent-vs-temporary-impact-and-trading-against-your-own-flow)
+52. [Almgren–Chriss: trading off impact against risk](#52-almgrenchriss-trading-off-impact-against-risk)
+53. [TWAP, VWAP and implementation shortfall schedules](#53-twap-vwap-and-implementation-shortfall-schedules)
+54. [POV participation maths](#54-pov-participation-maths)
+55. [Maker vs taker economics](#55-maker-vs-taker-economics)
+56. [Two-sided quoting and inventory skew](#56-two-sided-quoting-and-inventory-skew)
+57. [When a skew is inert: ticks and the no-cross clamp](#57-when-a-skew-is-inert-ticks-and-the-no-cross-clamp)
+58. [Fill probability as a hazard](#58-fill-probability-as-a-hazard)
+59. [Post-only orders, reprices and give-up](#59-post-only-orders-reprices-and-give-up)
+60. [Cost-aware routing: all-in price and fill probability](#60-cost-aware-routing-all-in-price-and-fill-probability)
+61. [Latency legs, and stressing them](#61-latency-legs-and-stressing-them)
+62. [Fee tiers and dated regulatory fees](#62-fee-tiers-and-dated-regulatory-fees)
+63. [Capacity and break-even size](#63-capacity-and-break-even-size)
+64. [End-of-day flatten](#64-end-of-day-flatten)
+65. [The information coefficient: what an IC of 0.08 means](#65-the-information-coefficient-what-an-ic-of-008-means)
+66. [HAC t: why overlapping labels need it](#66-hac-t-why-overlapping-labels-need-it)
+67. [Few clusters: day-clustered t with G − 1 degrees of freedom](#67-few-clusters-day-clustered-t-with-g--1-degrees-of-freedom)
+68. [Bonferroni and the ledger threshold](#68-bonferroni-and-the-ledger-threshold)
+69. [Holm and Benjamini–Hochberg](#69-holm-and-benjaminihochberg)
+70. [Romano–Wolf: using the dependence between tests](#70-romanowolf-using-the-dependence-between-tests)
+71. [The experiment ledger as an append-only chain](#71-the-experiment-ledger-as-an-append-only-chain)
+72. [Pre-registration: what it fixes, and when](#72-pre-registration-what-it-fixes-and-when)
+73. [Holdout discipline: one look](#73-holdout-discipline-one-look)
+74. [Code fingerprints](#74-code-fingerprints)
+75. [Blackboards, fork boards and git anchors](#75-blackboards-fork-boards-and-git-anchors)
+76. [Deviations, recorded before the look](#76-deviations-recorded-before-the-look)
+77. [Power and the minimum detectable effect](#77-power-and-the-minimum-detectable-effect)
+78. [Predictive but not tradable: the R7 result](#78-predictive-but-not-tradable-the-r7-result)
+79. [Walk-forward vs combinatorial purged CV](#79-walk-forward-vs-combinatorial-purged-cv)
+80. [Probability of backtest overfitting](#80-probability-of-backtest-overfitting)
+81. [Leakage: four detectors and what each one catches](#81-leakage-four-detectors-and-what-each-one-catches)
+82. [Fast causal or leak? The time-shift triage](#82-fast-causal-or-leak-the-time-shift-triage)
+83. [Embargo by feature window](#83-embargo-by-feature-window)
+84. [Refit or frozen: what a holdout test re-estimates](#84-refit-or-frozen-what-a-holdout-test-re-estimates)
+85. [Hypothesis sign and beta stability](#85-hypothesis-sign-and-beta-stability)
+86. [Scaling per instrument before pooling](#86-scaling-per-instrument-before-pooling)
+87. [Causal row blocks: when a skipped row is a look-ahead](#87-causal-row-blocks-when-a-skipped-row-is-a-look-ahead)
+88. [Same-timestamp coalescing](#88-same-timestamp-coalescing)
+89. [Signing trades: the quote rule and the tick rule](#89-signing-trades-the-quote-rule-and-the-tick-rule)
+90. [Feature drift between in-sample and holdout](#90-feature-drift-between-in-sample-and-holdout)
+91. [Memory on pooled real data](#91-memory-on-pooled-real-data)
+92. [Event clocks and Hawkes intensities](#92-event-clocks-and-hawkes-intensities)
+93. [DeepLOB: learning from the raw book](#93-deeplob-learning-from-the-raw-book)
+94. [Per-session windows and mid-relative normalisation](#94-per-session-windows-and-mid-relative-normalisation)
+95. [Conformal intervals and confidence-scaled sizing](#95-conformal-intervals-and-confidence-scaled-sizing)
+96. [Model cards and content hashes at promotion](#96-model-cards-and-content-hashes-at-promotion)
+97. [Paper trading: what the PAPER gates check](#97-paper-trading-what-the-paper-gates-check)
+98. [Pre-trade controls and a tamper-evident audit](#98-pre-trade-controls-and-a-tamper-evident-audit)
+99. [Agents that propose and humans that decide](#99-agents-that-propose-and-humans-that-decide)
+100. [Further reading](#100-further-reading)
 - [Glossary](#glossary)
 
 ---
@@ -2988,11 +3056,12 @@ says what to do; the opposite order would lose decisions silently.
 Delete it?* No. It may be the only copy of the snapshot the committed
 state refers to.
 
-**Exercise.** The Java tests run in CI (`PlatformSafetyTest`:
+**Exercise.** The Java tests (`PlatformSafetyTest`:
 `checkpointHasOneCommitPointVerifiedOnResume`,
 `stopRequestCheckpointsOnTheTradingThreadAndResumes`,
-`killLatchesImmediatelyAndIsNeverDropped`); with a JDK,
-`cd java && bash build.sh && bash test.sh`. The Python half runs anywhere:
+`killLatchesImmediatelyAndIsNeverDropped`) ran in CI until v1.15 archived
+the Java engine to `archive/java/`; with a JDK they still run there,
+`cd archive/java && bash build.sh && bash test.sh`. The Python half runs anywhere:
 
 ```bash
 cd python && PYTHONPATH=src python3 -m pytest -q tests/test_research_store_safety.py
@@ -4245,8 +4314,8 @@ show up.
 
 **What is outside it.** No network card, no kernel, no kernel bypass: the
 frame does not arrive from a wire and the order does not leave on one. No
-platform risk engine: the hard risk engine is Rust and Java, and the
-decision stage here is a bench-local check. No exchange gateway and no
+platform risk engine: the hard risk engine is Rust (normative, with a
+Python reference port; the Java copy is archived), and the decision stage here is a bench-local check. No exchange gateway and no
 venue protocol encoding. A wire-to-wire figure adds all of those, and on
 commodity hardware the network path alone is usually larger than
 everything measured here.
@@ -4427,6 +4496,7 @@ moved", v1.14 by "everything moved for a stated reason".
   trust roots, blocking supply-chain audits, and the 15c3-5 control set.
 - **Later:** archiving the frozen Java copy, and switching the opt-in
   execution options on in the v2 maker and quoting pre-registrations.
+  Both were done in v1.15 (`archive/java/`, `configs/prereg/v2.json`).
 
 The 15c3-5 controls were planned for "later" and shipped in v1.14 anyway.
 The argument for waiting was that a pre-trade check guarding a simulator
@@ -4489,7 +4559,2109 @@ result first and then deciding would have been.
    read? *(An abort after seeing the result is a selection decision; before,
    it is a design correction.)*
 
-## 45. Further reading
+## 45. Queue position: why the back of the queue fills last and worst
+
+**The question.** Two limit buys rest at the same best bid. Are they the
+same order?
+
+**No: the queue makes them different.** At one price, a FIFO venue fills
+orders in arrival order. An order that joins a bid with 4,000 shares
+already resting fills only after 4,000 shares have traded or been
+cancelled ahead of it. The order at the front fills on the first sell that
+arrives, including the small, uninformed ones. The order at the back fills
+only when a lot of selling has gone through the level, and heavy selling is
+exactly when the price is about to fall. So the back of the queue fills
+less often, and when it fills it is more often run over: queue position is
+a large part of a passive order's adverse selection (§30).
+
+**What can be observed.** On an order-by-order (MBO) feed such as ITCH the
+queue ahead of a simulated order is the displayed size that arrived before
+it, minus what has traded or been cancelled since. The simulator keeps
+exactly that number per resting child (`ahead_qty`, rule 4 in the
+header of `iap.execution.simulator`) and fills a child only from trades
+the tape shows, never from its own wish to fill. Two corrections were
+learned the hard way: a cancel *behind* our order must not move us forward
+(§22.3), and since v1.14 a MODIFY that shrinks an order *ahead* of us
+credits our position like a cancel would (X-P1-1).
+
+**Where it lives.** `iap.execution.simulator` (Python port; C++ is the
+reference), `ahead_qty` in the fills goldens; the fill-hazard model (§58)
+uses the queue ahead as its first feature.
+
+**Check yourself.**
+
+1. Why does a simulator that fills a passive order whenever the price
+   touches its level overstate maker P&L twice over? *(It fills too often,
+   and it fills the benign touches that a real back-of-queue order would
+   have missed.)*
+2. A size-reducing MODIFY ahead of us: why credit it? *(The shares ahead of
+   us shrank exactly as if they had been cancelled; ignoring it puts us
+   artificially far back.)*
+
+## 46. Round-trip cost: why a 0.1 bp edge cannot pay a 1 bp spread
+
+**The question.** EQ10 and EQ05 were confirmed on unseen data (§78). The
+v1.16 P0-6 monetisation study then ran 480 cells of holding period, entry
+band, signal and sizing, and every cell made zero trades. How can a
+confirmed predictor never trade?
+
+**The arithmetic.** A taker who buys at the ask and later sells at the bid
+pays the full spread plus two fees, whatever the price does in between.
+The research cost model writes this hurdle, per unit of notional, as
+
+```
+round_trip_cost_return = multiplier * (2 * half_spread + 2 * fee_per_unit) / mid
+```
+
+(`CostModel.round_trip_cost_return` in `iap.backtest.costs`; impact is
+left out because it depends on size). The default `cost_aware` position
+rule enters only when the expected return clears that hurdle. In the P0-6
+diagnostic the largest expected return the signals produced was about
+0.1-0.2 bp, the median round-trip cost about 0.8-1.2 bp, and the realised
+move in the direction of the top 0.1 % of signals about 0.1-0.15 bp from
+1 s to 1 m (`research/v116/MONETISATION_P0-6.md`). The edge is an order of
+magnitude below the cost.
+
+**Why longer holds do not fix it.** Holding longer lets a move grow, but a
+1 s microstructure signal has mostly decayed by then, while the spread is
+paid in full on every round trip. Widening the entry band trades only the
+strongest signals; the study's top 0.01 % (27-107 events) had noisy,
+often negative moves (best 0.58 bp). An IC measures ranking, not size: a
+correlation of 0.08 with a 1 s return whose standard deviation is a
+fraction of a basis point predicts a fraction of a basis point.
+
+**What would change it.** Not paying the spread: posting instead of
+crossing (§55), or quoting both sides and earning the spread (§56). That
+is why the owner's decision after P0-6 was no-go on buying data for a
+taker strategy, and the remaining test is the two-sided quoting study.
+
+**Check yourself.**
+
+1. A signal predicts 0.15 bp per trade with a hit rate of 60 %. The spread
+   is 1 bp. Expected net per round trip? *(About 0.15 − 1 = −0.85 bp
+   before fees: the hit rate does not enter.)*
+2. Why did the cost-aware rule produce zero trades rather than many losing
+   trades? *(It refuses any entry whose expected return is below the
+   hurdle; a taker-only rule that ignored costs would have traded and
+   lost.)*
+
+## 47. The maker's P&L identity: spread captured, markout, inventory
+
+**The question.** A quoting run reports net P&L of −12 USD. What went
+wrong: the quotes, the fills, or the inventory?
+
+**One identity answers it.** For quote fill *i* with signed quantity `d_i`
+(+ for a buy), price `p_i`, the mid `m_i` just before the fill's event,
+and the mid `m_i^h` a markout horizon later, the quoting backtester splits
+the gross P&L exactly (rule 6 of `iap.backtest.quoting`):
+
+```
+gross           = sum -d_i * p_i
+                = spread_captured + markout + inventory_pnl + flatten_cost
+spread_captured = sum d_i * (m_i - p_i)          # >= 0 when we buy below the mid
+markout         = sum d_i * (m_i^h - m_i)        # adverse selection, < 0 is bad
+inventory_pnl   = sum d_i * (M - m_i^h) + sum_f d_f * (M - m_f)
+flatten_cost    = sum_f d_f * (m_f - p_f)        # crossing to get flat
+net             = gross + rebates - taker_fees - impact
+```
+
+where `f` runs over the flatten rounds and `M` is the mid of the last one.
+The telescoping works because the position is flat at the end
+(`sum d_i = 0`); the identity is tested.
+
+**How to read it.** A maker earns `spread_captured` (half the spread per
+fill when it quotes at the touch) and the rebate. It loses `markout` when
+the fills it gets are the ones the market is about to run over, it carries
+`inventory_pnl` risk while it holds a position, and it pays
+`flatten_cost` to get flat at the end. A strategy whose spread capture is
+eaten by the markout has no edge at the touch; that is what the v1.15
+one-sided maker study found on real data (−0.6 to −1.7 bp per round trip).
+
+**Check yourself.**
+
+1. Why measure the markout from the pre-event mid rather than the fill
+   price? *(So the spread captured and the subsequent move are separate:
+   from the fill price the two would be mixed.)* Since v1.13 the reference
+   is the mid before the first event of the fill's timestamp (X-P1-4).
+2. Spread captured +30, markout −35, rebates +8, flatten −5. Net before
+   fees and impact, ignoring inventory? *(−2.)*
+
+## 48. Square-root impact
+
+**The question.** Trading 1 % of a day's volume costs, say, 10 bp of
+impact. What does 4 % cost: 40 bp or 20 bp?
+
+**The empirical regularity.** Across markets and decades, the price impact
+of a metaorder grows roughly with the square root of its size relative to
+daily volume, not linearly. The research cost model's default (since
+v1.5.0) is
+
+```
+impact_bps = sqrt_impact_coeff_bps * sqrt(|q| * unit / adv)
+```
+
+with `sqrt_impact_coeff_bps` the impact of trading one full ADV, pinned at
+100 bp (`DEFAULT_SQRT_IMPACT_COEFF_BPS`, a convention fixed before any
+result was computed with it, not a calibration). So 1 % of ADV costs
+`100 * sqrt(0.01) = 10` bp and 4 % costs `100 * sqrt(0.04) = 20` bp: four
+times the size, twice the cost per share.
+
+**Why the shape matters.** The legacy linear rule (`impact_model="linear"`)
+charges `coeff * participation_in_pct` bp, with the default coefficient
+2 bp per % of ADV. For a 1,000-share child in a 5 M-share ADV that is
+`2 * 0.02 = 0.04` bp; the square root charges `100 * sqrt(0.0002) ≈ 1.41`
+bp. Linear impact understates the cost of small orders, which are most
+of what an intraday strategy sends, and makes capacity look larger than
+it is.
+
+**Where it lives.** `iap.backtest.costs.CostModel` (`impact_model`,
+`sqrt_impact_coeff_bps`, `impact_bps`), required to be named in
+`configs/execution/execution.json` so a v1.4.0 document cannot be priced
+silently under the other rule. The execution simulator is a separate
+component with its own impact rules (§49).
+
+**Check yourself.**
+
+1. Under the square-root rule, what does halving an order do to its total
+   impact cost? *(Cost per share falls by `1/sqrt(2)`, total cost by
+   `1/(2*sqrt(2))`, about 35 % of the original.)*
+2. Why is the coefficient called a convention? *(It was chosen before
+   seeing results, so it cannot have been tuned to them; it was never fitted
+   to this data. §50 is the calibration.)*
+
+## 49. Parent vs child impact
+
+**The question.** A 10,000-share parent order is sliced into ten
+1,000-share children. Does slicing reduce its impact?
+
+**Under a per-child rule, yes, and that is the bug.** Simulator rule 6
+charges each taker fill a linear impact computed from its own child's size.
+Ten small children each pay a tenth of the per-share impact a single
+10,000-share child would, so slicing cuts the modelled impact cost tenfold.
+Real impact does not work that way: the market sees the parent's
+cumulative flow, and slicing changes the timing, not the total pressure.
+
+**Rule 6b (v1.16 P0-1, opt-in).** With `ExecConfig.impact_model =
+"parent"`, the simulator keeps the parent's cumulative taker quantity `Q`
+and charges each fill the *increment* of the parent's total cost:
+
+```
+f(Q)      = coeff * (Q * qty_unit / adv * 100) ** impact_exponent   # bps
+total(Q)  = f(Q) * Q                                                 # bps x qty
+fill cost = (total(Q + q) - total(Q)) * 1e-4 * qty_unit * price
+```
+
+Summing over the fills gives `total(Q_final)` whatever the slicing, so
+splitting a parent cannot lower its cost (it is exactly equal at a constant
+price). `impact_exponent` in (0, 1] chooses linear (1) or square root
+(0.5). Children with `parent_id == 0` are each their own parent.
+
+**Default unchanged.** `impact_model="child"` is the default and keeps rule
+6 and every golden byte-identical; 6b is Python only. The v3
+pre-registration config turns it on with `impact_shape: "sqrt"`
+(`configs/prereg/v3.json`), with the coefficient taken from the residual
+calibration (§50).
+
+**Check yourself.**
+
+1. Under rule 6 with linear impact, how does the cost of a 10,000-share
+   order change if it is sent as 100 children of 100? *(It falls 100-fold;
+   under 6b it is unchanged.)*
+2. Why charge the increment rather than `f(Q)` per fill? *(Charging the
+   current marginal rate to each fill would make early fills cheap and late
+   fills expensive and the total would depend on fill sizes; the increment
+   telescopes to the parent's total.)*
+
+## 50. Residual vs total impact
+
+**The question.** You measure impact as the mid move from just before an
+aggressive sweep to some time after it. What did you measure?
+
+**Two things at once.** A marketable order that walks the book removes the
+levels it trades through, so the mid moves mechanically the instant it
+executes. The cost of walking the book is already charged separately as
+the fill prices themselves (the depth walk). The *total* move from before
+the sweep therefore double-counts it. What a parent-impact rule should
+charge is the *residual*: how much further the mid moves after the sweep,
+which is the market's reaction to the information in the flow.
+
+**The calibration (v1.16 P0-2).** `estimate_calibration(...,
+impact_fit=True)` (CLI `--impact-fit`) adds an `impact.residual` block.
+For each sweep with sign `s` (+1 for a buy), pre-sweep mid `m0`, post-sweep
+mid `m_post` and the mid `m_h` a horizon later, the response is
+
+```
+y = 1e4 * s * (m_h - m_post) / m0        # bps
+x = 100 * q / adv                        # % of a tape ADV
+```
+
+with ADV from the tape, including non-displayed prints. It fits
+`y = b * x` and `y = b * sqrt(x)` through the origin with HC0 standard
+errors, and a log-log power fit, per horizon. Sweeps that straddle a
+trading halt are skipped. `apply_impact_fit(config, calibration, shape)`
+then switches an `ExecConfig` to rule 6b with the fitted coefficient and
+exponent (shape `"linear"`, `"sqrt"` or `"power"`; a fitted exponent
+outside (0, 1] is refused).
+
+**Why through the origin.** Zero size must mean zero impact; an intercept
+would charge a fixed cost per sweep that belongs in the spread and fees.
+
+**Check yourself.**
+
+1. Why would fitting on the total move make the parent rule overcharge?
+   *(The depth walk is already in the fill prices; adding it again inside
+   the impact charge counts it twice.)*
+2. Why tape ADV including hidden prints? *(Displayed-only volume
+   understates the market's size, overstates participation and so
+   understates the per-% coefficient.)*
+
+## 51. Permanent vs temporary impact, and trading against your own flow
+
+**The question.** After a 20,000-share buy program, part of the price rise
+reverts and part stays. Which part does a strategy pay for?
+
+**Two legs.** Temporary impact is the premium paid to get liquidity now; it
+decays once the pressure stops. Permanent impact is the information the
+flow reveals; it stays, and every later share trades at the new level.
+Almgren–Chriss (§52) models both: `h(v) = eps*sign(v) + eta*v` temporary,
+`g(v) = gamma*v` permanent.
+
+**In the simulator (rule 6b).** The permanent leg uses the instrument's
+cumulative signed taker quantity `S` (buys +). A fill moving it from `S`
+to `S'` pays
+
+```
+perm * (S'^2 - S^2) / 2      (in % of ADV units, times 1e-4 * qty_unit * price)
+```
+
+which is `m(S) = perm * S` integrated over `dS`. Buys and sells use the
+same formula, so a sell that brings `S` back towards zero earns a credit:
+trading against your own earlier flow is cheaper than adding to it, as it
+should be. `permanent_impact_bps_per_pct_adv` defaults to 0 and needs
+`impact_model="parent"`; the config refuses it otherwise.
+
+**Why it matters for intraday research.** A strategy that turns over its
+position many times a day keeps adding and removing flow. With no permanent
+leg it pays temporary impact on every trade and never feels its own
+footprint on the price; with one, round trips partly cancel and one-way
+accumulation costs more. Both are models; neither is calibrated on a
+strategy's own fills here.
+
+**Check yourself.**
+
+1. Buy 1,000, then sell 1,000, with `perm > 0` and no other flow. Net
+   permanent charge? *(Zero: `S` goes 0 → 1,000 → 0 and the two increments
+   cancel.)*
+2. Why must `eta - gamma*tau/2` be positive in Almgren–Chriss (§52)?
+   *(Otherwise the per-interval temporary cost term is non-positive and
+   the optimisation has no minimum; the code raises and asks for more
+   slices.)*
+
+## 52. Almgren–Chriss: trading off impact against risk
+
+**The question.** Sell 50,000 shares by the close. Fast is expensive
+(impact); slow is risky (the price may move). What schedule is optimal?
+
+**The model.** Almgren and Chriss (2000): work `X` shares over `N`
+intervals of length `tau = T/N`, trading `n_j` in interval `j` and holding
+`x_j` after it. With temporary impact `h(v) = eps*sign(v) + eta*v`,
+permanent impact `gamma`, volatility `sigma` and risk aversion `lambda`,
+minimise `E + lambda * V` where
+
+```
+eta_tilde = eta - gamma * tau / 2
+E = gamma * X^2 / 2 + eps * sum |n_j| + (eta_tilde / tau) * sum n_j^2
+V = sigma^2 * tau * sum_{j=1..N} x_j^2
+```
+
+The optimal holdings are
+
+```
+x_j = X * sinh(kappa * (T - t_j)) / sinh(kappa * T),    t_j = j * tau
+2 * (cosh(kappa * tau) - 1) / tau^2 = lambda * sigma^2 / eta_tilde
+```
+
+With `lambda = 0`, `kappa = 0` and the schedule is linear (TWAP); larger
+`lambda` front-loads, trading more early to cut the variance of the
+unsold remainder. `efficient_frontier` returns `(lambda, E, V)` with `E`
+rising and `V` falling as `lambda` grows.
+
+**Where it lives.** `iap.execution.optimal` (`ACParams`, `ac_kappa`,
+`ac_holdings`, `ac_trajectory`, `ac_cost`, `efficient_frontier`), used
+only when a `ParentOrder` sets `is_model=ISModel.ALMGREN_CHRISS`; the
+pinned IS schedule (an exponential decay that is part of the cross-language
+golden contract) is unchanged.
+
+**Units are the trap.** `ac_params_from_calibration` maps the simulator's
+coefficient to `eta = coeff * 1e-2 * price / adv`, so `adv` must be in
+shares per the same time unit as `horizon` and `sigma`. An ADV per day with
+a horizon in seconds is off by 23,400x (6.5 h). Since v1.13 the explicit
+form `adv_per_day` + `horizon_s` exists and every ambiguous mix is refused.
+Since v1.16 `impact_source="residual"` takes `eta` from the residual linear
+fit of §50 instead of the full-move slope.
+
+**Check yourself.**
+
+1. What does the optimal schedule look like when `sigma = 0`? *(Linear:
+   with no price risk there is nothing to gain by hurrying.)*
+2. Why does a more risk-averse trader front-load? *(Shares held later are
+   exposed to more price variance; selling early reduces `V` at the cost of
+   higher `E`.)*
+
+## 53. TWAP, VWAP and implementation shortfall schedules
+
+**The question.** Three parent algorithms all spread an order over time.
+What does each one assume?
+
+**TWAP** slices evenly in time: equal weights, no view of the market.
+**VWAP** slices in proportion to expected volume, so each child is a
+similar fraction of the volume trading around it; the pinned curve is
+`1 + x^2` over the session (heavier at the ends, the intraday "U" in
+simplified form), and since v1.10 a forecast curve can replace it
+(`ParentOrder.volume_curve`, `iap.execution.volume_curve`, with
+`estimate_volume_curves(tz="America/New_York")` since v1.13 so a curve is
+built in exchange-local time). **IS** (implementation shortfall)
+front-loads to reduce the price risk of waiting: the pinned schedule decays
+exponentially with `risk_aversion`, or follows Almgren–Chriss (§52) when
+asked. **POV** (§54) has no schedule at all; it follows the tape.
+
+**What the benchmark is.** Each algorithm is judged against the benchmark
+it targets. VWAP against the interval VWAP, IS against the arrival price
+(the shortfall decomposition in §11). Comparing a VWAP algorithm with the
+arrival price punishes it for something it was not trying to do.
+
+**Where it lives.** `iap.execution.algos` (`AlgoType`, `ParentOrder`,
+`slice_weights`, `slice_quantities`, `slice_times`); C++ is the reference
+for the pinned schedules (`cpp/include/iap/execution/algos.hpp`).
+
+**Check yourself.**
+
+1. A VWAP child at 09:31 is three times the size of one at 12:30. Bug?
+   *(No: the curve expects more volume near the open.)*
+2. Why does the forecast curve need a time zone? *(A UTC curve misplaces
+   the open and close by the daylight-saving offset for part of the
+   year.)*
+
+## 54. POV participation maths
+
+**The question.** A POV (percent-of-volume) algorithm is set to 10 %. The
+market trades 9,000 shares. How many should it have traded?
+
+**Two answers.** The pinned rule targets `floor(p * V)` with `V` the
+market's TRADE volume: 900 shares. But the market volume a simulator
+replays never contains the strategy's own simulated fills; in reality
+those fills are part of the total. If we trade 900 against 9,000 of
+others, the total is 9,900 and our share is 9.1 %, not 10 %. To be `p` of
+the total `V + ours`:
+
+```
+ours = p * (V + ours)   =>   ours = p / (1 - p) * V
+```
+
+which at `p = 0.10` and `V = 9,000` is 1,000 shares, 10 % of 10,000.
+
+**The v1.16 option.** `ParentOrder.pov_exact` (P0-5, opt-in, Python only)
+uses the target `floor(p / (1 - p) * V)` and covers the whole deficit at
+once in children of at most `max_child_qty`, so the algorithm catches up
+after expiries or missed fills instead of trading at most one child per
+print. It needs `0 < participation < 1` (`iap.execution.replay`). Off, the
+pinned rule is unchanged, because it is part of the cross-language golden
+contract.
+
+**Why the difference matters.** At 5 % the gap is small (`0.05/0.95` is
+5.26 %); at 25 % it is a third more (`0.25/0.75`). Participation also
+feeds the risk engine's 15c3-5 participation cap (§98), which counts only
+TRADE prints as market volume.
+
+**Check yourself.**
+
+1. At `p = 0.2` and `V = 8,000`, what does `pov_exact` target? *(2,000;
+   the pinned rule targets 1,600.)*
+2. Why cap each catch-up child at `max_child_qty`? *(One huge catch-up
+   child would itself be a large, impact-heavy taker order.)*
+
+## 55. Maker vs taker economics
+
+**The question.** The same 1 s signal loses money crossing the spread.
+Could it make money posting instead?
+
+**Two different businesses.** A *taker* sends marketable orders: it is
+certain to trade, pays the spread and a taker fee, and is paid only by the
+move it predicted. A *maker* rests limit orders: it may not trade at all,
+earns the spread and usually a rebate when it does, and pays adverse
+selection when the order that hits it was better informed (§30, §47). Per
+share, on a venue charging a taker fee `f` and paying a maker rebate `r`:
+
+```
+taker round trip ≈ -spread - 2f + realised move
+maker round trip ≈ +spread + 2r + markout_1 + markout_2     (if both legs fill passively)
+```
+
+with the markouts usually negative. The maker turns the spread from a cost
+into income, at the price of fill uncertainty and adverse selection.
+
+**Sizes on this data.** The assumed fee tiers
+(`configs/reference/fee_tiers.json`) charge a taker 0.003 USD per share and
+pay a maker 0.001-0.002 (assumptions, not a quoted price list). On a 250 USD stock
+0.003 USD is 0.12 bp; on a 25 USD stock it is 1.2 bp. Fees therefore matter
+much more for cheap stocks. On real Nasdaq sessions the v1.15 one-sided
+maker study (`iap.research.maker_real`) found that resting one side at the
+touch lost 0.6 to 1.7 bp per round trip: the markout outweighed the spread
+and rebate. The signal's job in a maker strategy is to avoid the fills
+that will be run over and to lean the quotes (§56), not to pay for crossing.
+
+**Where it lives.** `iap.backtest.maker` (`MakerBacktester`, `MakerConfig`),
+`iap.execution.passive` (`ExecPolicy`), §31 for why taker-only research
+cannot pay at 1 s.
+
+**Check yourself.**
+
+1. A maker fills at the bid, and 1 s later the mid has fallen by more than
+   the half-spread. What did the round trip earn so far, before the rebate?
+   *(Less than zero: spread captured minus a larger markout.)*
+2. Why is a maker's P&L harder to backtest than a taker's? *(Whether it
+   fills depends on queue position and on who traded, which a backtest has
+   to simulate from the tape; a taker fill is nearly certain.)*
+
+## 56. Two-sided quoting and inventory skew
+
+**The question.** A market maker quotes both sides. After buying three
+times in a row it is long. What should it do to its quotes?
+
+**Lean against the inventory.** Avellaneda and Stoikov (2008) derive a
+*reservation price* below the mid when long (and above when short), and a
+half-spread from risk aversion and order-arrival intensity. The quoting
+backtester's rule 2 (`iap.backtest.quoting`) is that model plus an alpha
+term:
+
+```
+r = m + alpha_weight * er * m - gamma * sigma2 * q * tau
+h = max(0.5 * gamma * sigma2 * tau + ln(1 + gamma / k) / gamma,
+        min_half_spread_ticks * tick,
+        (adverse_selection_bps - rebate_bps) * m / 1e4)
+bid = floor((r - h) / tick),   ask = ceil((r + h) / tick)
+```
+
+with mid `m`, expected return `er` from the alpha, inventory `q`, variance
+rate `sigma2` and horizon `tau`. A long position lowers both quotes, so the
+ask is more likely to be hit (inventory falls) and the bid less likely
+(inventory stops growing). A positive `er` raises both: buy more readily,
+sell less readily. The quotes are then clamped never to cross the book:
+the strategy joins or improves the touch, never takes.
+
+**Hard limits and getting flat.** Rule 3 sizes each side so `|q|` never
+exceeds `max_inventory`, counting every working order including ones whose
+cancel is in flight. Rule 5 flattens before the end, through the latency
+path; fills during a cancel count.
+
+**Check yourself.**
+
+1. `q = +5`, `er = 0`: which quote moves closer to the mid? *(The ask: the
+   reservation price falls, so both quotes fall, and the ask approaches the
+   mid.)*
+2. What does `alpha_weight = 0` give? *(The no-skew baseline, inventory
+   control only; the study compares against it.)*
+
+## 57. When a skew is inert: ticks and the no-cross clamp
+
+**The question.** The first M5 quoting study was registered with
+Avellaneda–Stoikov parameters, then aborted before any result was read.
+Why abort a study that had not failed?
+
+**Because it could not answer its question.** At the registered
+parameters, the alpha and inventory terms of rule 2 moved the reservation
+price by a fraction of a tick. After `floor`/`ceil` to the tick grid and
+the clamp that stops a quote crossing the book, the quotes were almost
+always the same with or without the alpha: the skew was numerically inert
+(`data/real/quoting_real/ABORTED.md`). A study comparing "skew" with "no
+skew" would have compared two copies of the same quotes.
+
+**The fix (v1.13 X-P1-3).** `skew_mode="ticks"` works in whole ticks from
+the touch:
+
+```
+skew = round(alpha_weight * er * mid / tick)
+inv  = round(gamma * sigma2 * q * tau / tick + inv_skew_ticks * q)
+bid  = best_bid - hb + skew - inv,     ask = best_ask + hb + skew - inv
+```
+
+with `hb = h_min_ticks` (0 joins the touch), then the adverse-selection
+floor and the no-cross clamp. Every run reports
+`frac_decisions_skew_changed_quote` (the share of decisions whose prices
+differ from the same decision with `er = 0`) and
+`ticks_behind_touch_{mean,median,max}`, so an inert skew is visible.
+
+**The v2 registration.** The owner-approved values in
+`research/quoting_real/prereg_v2_DRAFT.json` set `alpha_weight` per alpha
+(EQ01 7, EQ05 15, EQ10 12) so every symbol's median skew is at least one
+tick, `inv_skew_ticks` 1 per unit of quantity, and a validity gate of
+0.10: if fewer than 10 % of decisions have their quotes changed by the
+skew, `summarise` reports "SKEW INERT" and no verdict. Registration and
+signing (`tools/quoting_v2_register.py`) are for the owner only.
+
+**Check yourself.**
+
+1. Why is a validity gate better than reading a null result? *(An inert
+   skew guarantees a null; the gate says the experiment did not happen,
+   instead of reporting "no effect".)*
+2. Why was choosing `alpha_weight` from the median skew in ticks not
+   peeking at results? *(It uses the signal's distribution, not the P&L,
+   and was fixed before the look.)*
+
+## 58. Fill probability as a hazard
+
+**The question.** Before posting a limit order at the touch, how likely is
+it to fill within the next second?
+
+**Survival analysis.** A resting order is "at risk" of filling until it
+fills or is cancelled; a cancel before any fill is a *censored*
+observation, not a non-fill. `iap.execution.fill_hazard.FillHazardModel`
+cuts the time since posting into buckets and models the hazard of each
+bucket, the probability of filling in it given no fill so far:
+
+```
+h_b(x) = 1 - exp(-exp(a_b + beta . z(x)))                   # link="cloglog" (default)
+P(fill within t) = 1 - prod_b (1 - h_b) ** (overlap_b(t) / width_b)
+```
+
+The cloglog link is the exact grouped-time form of a continuous
+proportional-hazards (Cox) model with a piecewise-constant baseline. The
+features `z(x)` are standardised: the log of the displayed queue ahead,
+the log of the queue-depletion rate, the spread in ticks, the queue
+imbalance and the time of day as sine and cosine. Fitting expands each
+order into one row per bucket it was at risk in and runs IRLS with a small
+ridge, numpy only, so the same data gives the same JSON bit for bit.
+
+**Uses.** The passive policy's `reprice_policy="hazard"` and `min_fill_prob`
+give up instead of chasing an order unlikely to fill. A simpler conversion
+exists too: `hazard_fill_prob` in `iap.execution.sor_v2` turns a constant
+queue-depletion hazard `lambda` into `p = 1 - exp(-lambda * horizon_s)`
+for the router (§60).
+
+**Check yourself.**
+
+1. Why not fit a logistic regression on "filled within 1 s: yes/no"?
+   *(Orders cancelled at 0.3 s would count as non-fills although they were
+   never at risk for the full second: censoring biases it down.)*
+2. With a constant hazard of 0.7 per second, what is the 1 s fill
+   probability? *(`1 - exp(-0.7) ≈ 0.50`.)*
+
+## 59. Post-only orders, reprices and give-up
+
+**The question.** A buy limit is sent at the bid. While it travels, the
+offer drops to the same price. What happens when it arrives?
+
+**It crosses, unless told not to.** A plain limit buy at or above the best
+ask executes as a taker: the maker strategy pays the spread and a fee it
+never intended to. Simulator rule 10 (v1.12 X4) adds
+`ChildOrder(post_only="reject"|"slide")`: a post-only order never takes
+liquidity on arrival; it is rejected (`CancelReason.POST_ONLY_REJECT`) or
+slid to the best non-crossing price.
+
+**Chasing the touch.** When the market moves away from a resting order,
+the policy can cancel and repost at the new touch, losing its queue
+position each time. `MakerConfig.entry_reprices` caps how many times;
+`reprice_policy="follow"` always reposts, `"hazard"` reposts only if the
+fill hazard (§58) says it is worth it; `give_up="cancel"|"cross"` decides
+what happens when the budget runs out: abandon the trade, or pay the
+spread to complete it.
+
+**Defaults.** All of these are opt-in. The pinned PASSIVE policy keeps
+`max_reprices=1`, and the default maker and quoting outputs are
+byte-identical to before (a fingerprint test pins them).
+
+**Check yourself.**
+
+1. Why does "slide" exist next to "reject"? *(Slide keeps the order in the
+   book one tick away instead of losing the opportunity entirely.)*
+2. Why can `give_up="cross"` make a maker strategy look like a taker
+   strategy in the TCA? *(Its fills after give-up are taker fills, with the
+   spread and fee paid.)*
+
+## 60. Cost-aware routing: all-in price and fill probability
+
+**The question.** Two venues show the same best ask. One charges a taker
+fee of 0.30 c, the other 0.10 c but shows only 100 shares. Where should a
+2,000-share buy go?
+
+**All-in cost, not displayed price.** The v1.12 router
+(`iap.execution.sor_v2.CostAwareRouter`) chooses the route with the lowest
+expected all-in cost: price, fee, expected impact and latency risk for an
+aggressive order; for a passive order, the expected cost given a fill
+probability and the venue's toxicity (markouts). `plan_sweep` plans a
+multi-venue sweep with latency-staggered sends so the slower venue's
+liquidity is not gone by the time the order arrives.
+
+**The v1.16 options (P0-4).** `RouterOptions(sweep_rank="all_in")` makes
+`plan_sweep(..., tick=)` take levels by price *including* the taker fee,
+so a cheaper-fee venue one tick worse can come first when the fee
+difference is larger than the tick. The default `"price"` takes the
+displayed price first with the fee as tie-break, unchanged. `route_passive`
+and `passive_costs` accept a `fill_prob(vid, side, queue_qty)` callable in
+place of the model's touch fill probability; `hazard_fill_prob` (§58)
+builds one; a `None` skips the venue.
+
+**Honest scope.** The real data here is Nasdaq only, so multi-venue
+routing is capability for multi-venue data, tested on synthetic venues.
+The pinned `SmartOrderRouter` and its C++ parity are unchanged.
+
+**Check yourself.**
+
+1. At a 100 USD price, when does a 0.2 c fee difference outweigh a
+   one-cent tick? *(Never per share: 0.2 c < 1 c. All-in ranking reorders
+   levels only when the fee gap exceeds the price gap.)*
+2. Why stagger sends by latency? *(Orders sent at once arrive at different
+   times; a fast venue's fill can tell other traders to pull liquidity at
+   the slow one.)*
+
+## 61. Latency legs, and stressing them
+
+**The question.** Real ITCH data carries exchange timestamps. How long
+after an event can a strategy act on it?
+
+**Two legs, both assumed.** The *feed leg* is the time from the exchange
+timestamp to the strategy seeing the event; the *order leg* is the time
+from the decision to the order reaching the venue. ITCH has neither: the
+v2 pre-registration assumes `feed_latency_ns` 100,000 (100 µs), and v3
+adds an assumed venue latency with a parametric tail (`venue_latency`:
+mean 250 µs, jitter 100 µs, a 1 % chance of a 10x delay;
+`configs/prereg/v3.json`). Assumptions should be labelled as such, and
+the config descriptions do.
+
+**Stress instead of believing.** Because the latency is assumed, v3
+reports a latency stress grid, `latency_stress` {0, 1, 5}x, with the 1x
+case primary (`RealismOptIns.stressed_exec_configs` in
+`iap.execution.realism`). A strategy whose result depends on being
+faster than the assumption is fragile; one that survives 5x is not
+latency-limited. The feed leg is also where look-ahead hides: a decision
+must use only events the strategy could have seen at `t + feed_latency`.
+
+**Why calibrated latency is not a fix.** `estimate_calibration` can
+measure a feed-receive minus exchange time when a capture has both
+stamps, and the simulator warns (`FeedLatencyAsOrderLegWarning`) when such
+a feed-derived table is used as the order leg, because a market-data delay is
+not an order-entry delay.
+
+**Check yourself.**
+
+1. Why is the 0x case worth reporting? *(It is the upper bound: if a
+   strategy loses even with zero latency, speed is not the problem.)*
+2. A result is positive at 0x and 1x and negative at 5x. Report it how?
+   *(As latency-sensitive, with the assumption stated; the primary 1x
+   number is not the whole story.)*
+
+## 62. Fee tiers and dated regulatory fees
+
+**The question.** A backtest across 2019 and 2026 charges sellers the same
+SEC fee in both years. Is that right?
+
+**No: regulatory fees change.** US equity sales pay SEC Section 31 (a rate
+on sell notional) and the FINRA Trading Activity Fee (per share, capped
+per trade). Both are reset periodically, and the TAF was paused from
+2026-10-01 to 2026-12-31. Since v1.15 the Python, C++ and Rust engines
+read dated periods from `configs/reference/regulatory_fee_schedule.json`
+(continuous from 2019-01-01, with sec.gov / finra.org sources) and charge
+the fee in force on the fill's date, sell side only (X-P1-1, cross-engine
+golden `tests/golden/expected_regulatory_fees.json`). Off in code
+defaults, on in `configs/prereg/v2.json`.
+
+**Exchange fees are a tier, not a constant.** A venue's taker fee and
+maker rebate depend on the member's monthly volume. A research firm does
+not know which tier it would be in, so v1.16 makes it an explicit
+assumption: `fee_tier` from `configs/reference/fee_tiers.json` (top / mid /
+base: taker 0.003 USD per share in all three, maker rebate 0.002 / 0.0015 /
+0.001) with `fee_tier_sensitivity` reporting the lower tier. The v3
+pre-registration uses "mid" and reports "base". For a maker strategy the
+rebate is often a large share of the edge, so the tier assumption can
+decide the sign.
+
+**Check yourself.**
+
+1. Why charge the regulatory fee only on sells? *(Section 31 and the TAF
+   are levied on sales.)*
+2. A maker strategy earns 0.4 bp net at the top tier on a 50 USD stock. Does
+   it survive the base tier? *(Two legs each lose 0.001 USD of rebate:
+   0.002 USD per round trip on 50 USD is 0.4 bp, so it breaks even before
+   anything else changes.)*
+
+## 63. Capacity and break-even size
+
+**The question.** An alpha earns 2 bp gross per round trip. How large can
+each trade be before costs eat it?
+
+**Solve for the size where the next share loses money.** Per unit of
+notional, a round trip of size `q` costs the size-free hurdle (§46) plus
+impact on both legs:
+
+```
+edge_return = round_trip_cost_return + 2 * multiplier * impact_bps(q * unit / adv) * 1e-4
+```
+
+Under square-root impact (§48), with `per_leg_bps = (edge_return -
+round_trip_cost_return) / (2 * multiplier * 1e-4)`:
+
+```
+participation = (per_leg_bps / sqrt_impact_coeff_bps) ** 2
+q_breakeven   = participation * adv / unit
+```
+
+`CostModel.breakeven_size` returns 0 when the edge does not even cover
+spread and fee at zero size, and infinity when the model charges no
+impact. `capacity_breakeven` in `iap.validation.metrics` wraps it as
+units, notional and participation.
+
+**Worked example.** Edge 2 bp, hurdle 1 bp, multiplier 1: room 1 bp, so
+0.5 bp per leg. With the 100 bp coefficient, `(0.5 / 100)^2 = 2.5e-5` of
+ADV; on a 50 M-share ADV that is 1,250 shares. The capacity is small
+because square-root impact is steep at small sizes.
+
+**Why not the old proxy.** `capacity_proxy_usd` is `max_participation *
+ADV * price`: a liquidity cap that is the same for an alpha with a 5 bp
+edge and one with none. Since v1.5.0 a validation report's capacity is the
+break-even one, and the lifecycle `capacity` gate reads it. Since v1.14
+the ADV is each session's own (as-of, from earlier sessions).
+
+**Check yourself.**
+
+1. The edge doubles from 2 bp to 3 bp with a 1 bp hurdle. What happens to
+   break-even size? *(Room doubles, so participation quadruples.)*
+2. Why does a zero-capacity alpha still get an IC in the report? *(IC
+   measures prediction; capacity measures whether it can be traded. §78
+   is the case where they disagree.)*
+
+## 64. End-of-day flatten
+
+**The question.** An intraday strategy ends the session holding 413
+shares. Is that a problem for its P&L?
+
+**Yes, for two reasons.** It is overnight risk an intraday strategy was not
+supposed to take, and a backtest that marks the leftover position at the
+last mid quietly skips the cost of closing it. Every honest intraday result
+has to say how the position became flat and what that cost.
+
+**The MVP option (v1.16 item 17).** `execution.eod_flatten_lead_ns` in
+`mvp.json` (absent = the pinned golden run, `iap.mvp.config`): from
+`close - lead`, every decision targets flat, no new exposure is opened,
+and the residual (position plus in-flight orders) is worked as one
+most-urgent parent ending at the close, with its costs charged. The report
+gains `counts.eod_flatten` (decisions, parents, too_late,
+residual_position) only when it is on. On the tiny config with a lead of a
+third of the session, the end position went from −413 to 0.
+
+**Elsewhere.** The research backtester flattens at session end by rule
+(the `session flatten` in the v4 methods), the maker and quoting
+backtesters flatten through the simulator when `flatten_route="sim"`, and
+the closing auction (§42) is an alternative venue for the last trade.
+
+**Check yourself.**
+
+1. Why include in-flight orders in the residual? *(A child sent before the
+   cutoff can still fill and leave a position after it.)*
+2. Why make the flatten one most-urgent parent instead of a market order
+   at the close? *(Spreading it over the lead window reduces impact; the
+   parent still must end by the close.)*
+
+## 65. The information coefficient: what an IC of 0.08 means
+
+**The question.** EQ10's holdout IC is +0.0838. Is that a strong signal?
+
+**What it is.** The IC is the correlation between the score at decision
+time and the forward return over the horizon. `iap.validation.metrics.ic`
+is the Pearson correlation (NaN with fewer than 32 pairs or a constant
+side); `rank_ic` is the Spearman version, robust to outliers. The gate IC
+of a report is pooled over the test folds.
+
+**How big is 0.08.** The score explains `IC^2 = 0.0064`, about 0.6 % of the
+variance of the 1 s return. That is large by the standards of
+cross-sectional equity factors, where 0.02-0.05 per period is considered
+good, and it is large because 1 s returns are dominated by the bid-ask
+bounce and order-flow mechanics the features see directly. It is also why
+the edge is tiny in basis points: 0.6 % of the variance of a 1 s return
+whose standard deviation is a fraction of a basis point.
+
+**The fundamental law, with its fine print.** Grinold's approximation
+`IR ≈ IC * sqrt(breadth)` says many weakly predictive, independent bets add
+up. Two catches here. The bets are not independent: consecutive 1 s
+predictions overlap and share the same order flow, so effective breadth is
+far below the row count (§29.2). And the law is gross of costs: with an
+edge below the round-trip cost (§46), more breadth multiplies a loss.
+
+**Check yourself.**
+
+1. Two alphas have IC 0.08 at 1 s and 0.03 at 5 min. Which predicts larger
+   moves in basis points? *(Probably the 5-minute one: the IC is
+   dimensionless; the size of the move depends on the label's volatility,
+   which grows with the horizon.)*
+2. Why report both Pearson and rank IC? *(A few extreme rows can drive a
+   Pearson IC; if the rank IC disagrees, the signal lives in the tails.)*
+
+## 66. HAC t: why overlapping labels need it
+
+**The question.** A 1 s alpha is scored every 100 ms. Its IC over 3 million
+rows is 0.07. The naive t is about `0.07 * sqrt(3e6) ≈ 121`. Why is the
+gate's t an order of magnitude smaller?
+
+**Overlap makes rows dependent.** Ten consecutive rows share 90 % of their
+label windows and nearly all of their features. Treating them as 3 million
+independent observations overstates the information by orders of magnitude.
+A heteroskedasticity- and autocorrelation-consistent (HAC) variance sums
+the autocovariances that the naive formula ignores.
+
+**The gate's version.** The gate t is the pooled slope of label on score,
+`b = Sxy / Sxx`, with the moment `s_k = sum (x_i - xbar) * e_i` summed in
+5-minute buckets and a Bartlett-weighted long-run variance
+(`pooled_slope_hac_tstat` in `iap.validation.metrics`):
+
+```
+G_l    = sum_k s_k * s_{k+l}
+var(b) = (G_0 + 2 * sum_{l=1..L} (1 - l / (L + 1)) * G_l) / Sxx^2
+```
+
+The bandwidth `L` (since v1.14, `auto_hac_lags`) is the larger of the
+horizon rule `ceil(horizon / bucket) + 1` and the Newey–West (1994) rule
+`floor(4 * (n / 100) ** (2/9))` on the number of non-empty buckets,
+capped at `n - 1`. The horizon rule alone gives `L = 2` for any horizon up
+to five minutes however long the sample, which leaves slow intraday
+autocorrelation out. With 1,000 buckets the rule gives
+`floor(4 * 10 ** (2/9)) = floor(6.67) = 6`. Since v1.14 no lag product
+crosses a session boundary: the overnight gap is not a 5-minute step.
+
+**Check yourself.**
+
+1. Why bucket at all, instead of HAC on raw rows? *(The lag structure in
+   rows depends on the event rate, which varies through the day; 5-minute
+   buckets fix the lag unit in time.)*
+2. Why the Bartlett weights `1 - l/(L+1)`? *(They keep the long-run
+   variance estimate non-negative.)*
+
+## 67. Few clusters: day-clustered t with G − 1 degrees of freedom
+
+**The question.** The day-clustered t of an alpha is 3.1 on seven
+sessions. Is it significant at 5 %?
+
+**Clustering by day.** `day_cluster_tstat` sums the moment per day instead
+of per bucket and assumes no dependence across days:
+
+```
+var(b) = G / (G - 1) * sum_d s_d^2 / Sxx^2
+```
+
+over the `G` days. Every within-day dependence, however long, is absorbed.
+The price is that the variance is estimated from `G` numbers, so the t
+has roughly `G - 1` degrees of freedom, not infinitely many.
+
+**What that does to the critical value.** `day_cluster_inference` puts the
+normal and Student-t readings side by side (report-only). With seven
+sessions, `df = 6` and the two-sided 5 % critical value is 2.447, not
+1.96; at three sessions (`df = 2`) it is 4.303. A t of 3.1 on seven days
+passes the 5 % Student-t line, but only just, and nowhere near a
+multiple-testing threshold (§68). The ledger's
+`bonferroni_t_threshold_student_at(total, df)` gives the Student-t
+analogue of the Bonferroni threshold for the same reading.
+
+**Why few sessions is the binding constraint.** With the 2-10 real sessions
+available, the number of days, not the number of rows, decides how much
+can be known. This is why holdouts of fewer than four sessions are read by
+sign and replication (`few_sessions`, v1.14), and why §32's FOMC lesson
+was about days, not events.
+
+**Check yourself.**
+
+1. Why does the day-clustered t usually come out smaller than the HAC t?
+   *(It absorbs within-day dependence that the 5-minute HAC bandwidth
+   misses, and it pays for few clusters.)*
+2. Seven sessions all have a positive IC. Under the null of no signal and
+   independent days, how likely is that? *(`0.5^7 ≈ 0.8 %`: the
+   sign-and-replication reading.)*
+
+## 68. Bonferroni and the ledger threshold
+
+**The question.** Why does the gate demand `|t| ≥ 4.432` when every
+textbook says 1.96?
+
+**Because 1.96 is for one test.** Run `N` tests at level `α` and the chance
+that at least one passes by luck is up to `N * α`. Bonferroni divides `α`
+by `N`. The platform's `N` is not chosen per study: it is the total number
+of looks in the experiment ledger (`research/experiments.json`), every
+gate decision ever recorded. The threshold is
+
+```
+|t| >= Φ^{-1}(1 - α / (2N)),      α = 0.05 (PINNED_ALPHA)
+```
+
+(`ExperimentLedger.bonferroni_t_threshold`). At the 5,361 looks of the R7
+run, `α / (2N) = 4.66e-6` and `|t| = 4.432`. The threshold grows slowly,
+like `sqrt(2 ln N)`: doubling the looks adds about 0.15.
+
+**The yardstick beside it.** `expected_max_null_t` is `sqrt(2 ln N)`, the
+approximate largest `|t|` that `N` independent null tests would produce:
+4.144 at 5,358 looks. A best result near that number is what pure search
+would have found.
+
+**Why conservative is the point.** Bonferroni is valid under any
+dependence and controls the family-wise error rate: the probability of
+*any* false promotion. Looks at related alphas are correlated, so the true
+effective `N` is smaller and the threshold is stricter than necessary. The
+platform accepts that cost because a false PROMOTE is far more expensive
+than a missed one. Holm, BH and Romano–Wolf (§69, §70) are reported
+beside it and decide nothing.
+
+**Check yourself.**
+
+1. Why count looks across all studies, not just this one? *(Selection
+   happened across all of them; a fresh per-study `N` would let a
+   researcher reset the count by starting a new study.)*
+2. What does a rerun of the same configuration on the same data cost?
+   *(Nothing: identical identities are de-duplicated, `would_add` returns
+   0.)*
+
+## 69. Holm and Benjamini–Hochberg
+
+**The question.** Four alphas have p-values 0.01, 0.02, 0.03 and 0.04.
+Which are significant at 5 % after correcting for four tests?
+
+**Bonferroni** multiplies each by 4: 0.04, 0.08, 0.12, 0.16. One survives.
+
+**Holm (1979)** steps down. Sort the p-values; multiply the smallest by
+`m`, the next by `m - 1`, and so on, carrying the running maximum so the
+adjusted values are monotone:
+
+```
+4 * 0.01 = 0.04,  3 * 0.02 = 0.06,  2 * 0.03 = 0.06,  1 * 0.04 = 0.04 -> 0.06
+Holm-adjusted: 0.04, 0.06, 0.06, 0.06
+```
+
+One survives here too, but Holm is never less powerful than Bonferroni and
+controls the same family-wise error rate.
+
+**Benjamini–Hochberg (1995)** controls a different quantity, the false
+discovery rate: the expected share of false ones among the discoveries. It
+steps up from the largest p-value, `q_(k) = min over j >= k of p_(j) * m /
+j`:
+
+```
+0.04 * 4/4 = 0.04,  0.03 * 4/3 = 0.04,  0.02 * 4/2 = 0.04,  0.01 * 4/1 = 0.04
+BH q-values: 0.04, 0.04, 0.04, 0.04
+```
+
+All four are discoveries at an FDR of 5 %.
+
+**Which question.** FWER asks "is anything here a fluke?"; FDR asks "what
+share of my list is flukes?". A promotion gate that puts money behind each
+alpha needs the first. A screen that feeds a second, confirmatory test can
+use the second. The platform's gate uses the ledger-wide Bonferroni line
+(§68); since v1.16 item 15, `iap.validation.multiple_testing` adds
+Bonferroni, Holm, BH q and Romano–Wolf columns to the 24-alpha
+`REPORT.md`, report-only.
+
+**Check yourself.**
+
+1. Why must Holm carry the running maximum? *(Without it a larger raw
+   p-value could get a smaller adjusted one, and the order of rejections
+   would make no sense.)*
+2. BH declares all four significant. Is each one 96 % likely to be real?
+   *(No: FDR is a property of the list, not of each member.)*
+
+## 70. Romano–Wolf: using the dependence between tests
+
+**The question.** Twenty-four alphas share the same order-flow features.
+Their test statistics are correlated. Bonferroni treats them as if they
+were not. Can a correction use the correlation and still control the
+family-wise error?
+
+**Step-down max-t.** Romano and Wolf (2005) compare each observed `|t|`
+with the bootstrap distribution of the *maximum* `|t*|` over the
+hypotheses not yet rejected, with the bootstrap statistics centred so the
+null holds. Taking hypotheses in decreasing `|t_obs|`:
+
+```
+p_k = mean over draws b of [ max_{j in rest_k} |t*_bj| >= |t_obs_k| ]
+p_adj_k = max(p_adj_{k-1}, p_k)
+```
+
+When the tests are highly correlated, the max of 24 correlated statistics
+is not much bigger than one of them, so the bar is lower than Bonferroni's;
+when they are independent it is close to Bonferroni or Holm.
+
+**How it is built here.** `fold_bootstrap_t` resamples the walk-forward
+folds jointly across hypotheses (so their dependence is kept), seeded and
+deterministic, and returns `t_obs` and null-centred `t_boot`, each draw
+`(mean* - mean) / (sd* / sqrt(F))`. `romano_wolf(t_obs, t_boot)` does the
+step-down. `report_family` computes it within each asset class, and gives
+`None` with fewer than three shared folds.
+
+**The honest limit.** With four folds there are few distinct resamples, so
+the null distribution is coarse: label it fold-based wherever it appears.
+It is report-only.
+
+**Check yourself.**
+
+1. Why centre the bootstrap statistics? *(The bootstrap must simulate the
+   null; uncentred draws reproduce the observed effect.)*
+2. Why resample the folds jointly rather than per alpha? *(Per-alpha
+   resampling destroys the correlation that the method exists to use.)*
+
+## 71. The experiment ledger as an append-only chain
+
+**The question.** The Bonferroni threshold depends on the ledger's look
+count. What stops someone deleting a few hundred entries before a run?
+
+**A hash chain and a monotonicity check.** Since v1.14 every entry's
+immutable identity is chained: `chain_link(prev, entry) = sha256(canonical
+({prev} + the entry's identity))`, and `research/experiments.json` stores
+`chain_head` and `chain_length`. `ExperimentLedger` refuses to load a
+ledger whose head does not match, so the threshold is never computed from
+an edited ledger. `tests/harness/check_ledger_monotone.py` (in the
+`governance` CI job) requires the head ledger to descend from the base
+branch's, its totals not to fall, and every pre-registration's recorded
+`ledger_head` to be on the chain.
+
+**What a look is.** Since v1.14 a look is one gate decision: two per
+experiment, down from 84 when every fold statistic counted. The ledger key
+is the identity (alpha, kind, config, dataset version, statistics
+revision), so a regenerated statistic under a new revision is a new look,
+and a rerun of the same identity is free.
+
+**Merging research branches.** Branches that ran studies carry their own
+looks. `tools/merge_ledger.py` merges two ledgers by entry identity and
+reports conflicts; v1.16 merged the `step2` branch's 7 looks into main for
+a total of 5,368, and `docs/research/R7_POWER.md` was regenerated (the
+threshold moved from 4.432 to 4.433).
+
+**Check yourself.**
+
+1. Why chain the identity and not the whole entry? *(Mutable fields such as
+   annotations can change without changing what was looked at; the chain
+   protects what the count depends on.)*
+2. Why must the ledger only grow? *(Looks cannot be un-taken; a smaller
+   ledger is a lower threshold bought by forgetting.)*
+
+## 72. Pre-registration: what it fixes, and when
+
+**The question.** What exactly does a pre-registration commit to, and why
+must it come before the data?
+
+**It fixes every choice that could be tuned.** The hypothesis (alpha,
+direction, horizon), the data (which sessions, by file hash), the code
+(a fingerprint, §74), the methods bundle, the cost model and the
+realism switches (`configs/prereg/v2.json`, `v3.json`, hashed into the
+registration), the statistic and its threshold, and the decision rule. A
+choice made after seeing a result is a new look, chosen by the result.
+
+**How the platform enforces it.** `iap.agents.prereg_gate.require` runs
+before the research runner touches any data. It verifies the blackboard's
+hash chain, finds the pre-registration for (alpha, horizon), refuses one
+written by an agent id (agents may draft, a human signs off), and refuses
+a run whose code or feature fingerprint no longer matches. Without one,
+the only way to run is `--no-prereg`, which makes the run exploratory and
+never gate evidence. Since v1.13 the threshold can be fixed in the
+registration (`tstat_threshold="prereg"`) instead of rising with every
+later look. Once a confirmatory outcome is recorded by the owner, the
+registration is *closed*: later runs are labelled post-confirmation and
+can never count as evidence for that look.
+
+**What it is not.** It is not a promise that the result will be positive.
+R7 pre-registered a gate and recorded both passes (§78); AUC01 registered
+and recorded an underpowered null (§42).
+
+**Check yourself.**
+
+1. After registration, a researcher notices the cost model's fee is out of
+   date. What now? *(Record a deviation before the look, with the reason,
+   §76; or register a new hypothesis. Never edit silently.)*
+2. Why does a closed registration stop blocking on its fingerprint? *(Its
+   look is spent; the code may move on, and later runs cannot claim to be
+   that test.)*
+
+## 73. Holdout discipline: one look
+
+**The question.** The R7 holdout (7 sessions, 2025-11 to 2026-06) was used
+once to confirm EQ10 and EQ05. Can it now be used to tune the monetisation
+study?
+
+**No.** A holdout is evidence only as long as no choice has been made with
+it. Each use is a look at data that was supposed to be unseen; after a few,
+the holdout is just more in-sample data, and the last confirmation it gave
+is weaker for having been followed by tuning. So the rules are blunt:
+
+- the v1.16 P0-6 monetisation study ran in-sample only, and the driver
+  refuses the R7 holdout sessions;
+- the AI4 rebuild may not use the 2025-11 → 2026 holdout sessions for any
+  development before its new registration (`research/r7/AI4_DEFERRED.md`);
+- the AI4-DEEPLOB-1 registration was signed and then deferred, and its
+  spent look stays counted although no result was produced.
+
+**What does not count as a look.** R7's first EQ10 attempt crashed on a
+memory allocation before any statistic was computed; it was recorded as a
+deviation with no ledger debit and retried once (§76). The test is whether
+anyone saw a number that could influence a choice.
+
+**When a holdout is spent.** After R7, the 2026 data is confirmatory
+evidence for H4 and nothing else. New questions need new data, or an
+honest label: "in-sample on previously held-out data".
+
+**Check yourself.**
+
+1. Why is "we only looked at the plot, not the t" still a look? *(A plot
+   carries the same information that would steer a choice.)*
+2. Why keep the deferred AI4 look on the ledger? *(It was registered and
+   counted; removing it would lower the threshold retroactively.)*
+
+## 74. Code fingerprints
+
+**The question.** An alpha is registered on Monday. On Tuesday someone
+edits a helper it calls. Is Wednesday's confirmatory run still testing the
+registered hypothesis?
+
+**Not if the code changed.** `iap.agents.fingerprint.fingerprint(alpha_id)`
+returns what a pre-registration commits to (scheme 2):
+
+- `code_hash`: sha256 over the source files of the module defining the
+  alpha and its `iap` base classes, closed transitively over every `iap.*`
+  module they import (an AST walk, including function-local and relative
+  imports). Editing *any* code in a covered module changes it: a sound
+  over-approximation.
+- `features` and `feature_hash`: the registry features the alpha declares,
+  closed over `depends_on`, and the modules that compute them.
+- `deps`: installed numpy, pandas and scipy versions, pinned by version,
+  not hashed.
+
+Files are decoded as UTF-8 with line endings normalised to LF, so a
+Windows and a Linux checkout hash alike. Not covered: data and config
+files read at run time, dynamic imports, the interpreter.
+
+**A lesson from R7.** A report-only `beta_stability` diagnostic was added
+to `alpha/base.py`, a fingerprinted module, before the R7 look; the gate
+refused to run. It was reverted (#117) and in v1.16 moved to
+`iap.validation.beta_stability`, outside the hashed modules, with a test
+that keeps `iap.alpha` from importing it. `tools/prereg_touch_check.py`
+now warns in CI (`::warning::`, non-blocking; `--strict` locally) when a
+pull request changes the fingerprint of an open pre-registration.
+
+**Check yourself.**
+
+1. Why hash whole modules rather than the alpha's function? *(A function
+   depends on helpers, constants and base classes; a module closure catches
+   them all at the cost of false alarms.)*
+2. A docstring edit in `alpha/equity.py` breaks a registration. Bug?
+   *(No, that is the over-approximation; the fix is to make such edits
+   after the look, or record a deviation.)*
+
+## 75. Blackboards, fork boards and git anchors
+
+**The question.** Pre-registrations live on a blackboard, a JSONL file with
+a hash chain. Anyone with write access can edit an entry and recompute
+every later hash. What does the chain prove?
+
+**Internal consistency only; git is the external witness.** The chain
+shows the file was not edited *without* re-chaining. `iap.agents.anchor`
+adds what the chain cannot: every committed version of the board must be a
+prefix of the current one, every anchored entry hash must still appear at
+its sequence number in the commit recorded in `research/agents/anchors.json`,
+and in CI (`verify-board --trust-ref origin/main`) the board at
+`origin/main` must be a prefix of the one under review. A re-chained board
+fails, because its committed lines differ.
+
+**Fork boards.** Research branches (`research/maker-real`,
+`research/step2`) ran studies against their own boards. Their signed
+entries bind the previous hash of *that* board, so replaying them onto
+main's board would break every signature. The v1.16 owner decision: do not
+replay. Each fork board is archived unchanged under
+`research/agents/forks/<branch>/` with a `FORK.json`; main's board records
+one operator finding; and the study drivers gate on their archived board
+(`PREREG_BOARD` in `iap.research.maker_real` and `auction_real`).
+
+**Check yourself.**
+
+1. Why is "every committed version is a prefix" stronger than the chain?
+   *(An edit that re-chains is internally consistent but changes committed
+   lines, which git history exposes.)*
+2. Why not merge fork entries into main's board with new signatures?
+   *(Re-signing rewrites when and against what they were registered; the
+   archived copy keeps the original evidence intact.)*
+
+## 76. Deviations, recorded before the look
+
+**The question.** Between registration and the look, something does not
+match the plan. Change the plan, or change the data?
+
+**Neither silently.** A deviation is a written record, made before the
+relevant look, of what differs, why, and what was decided. R7 had four:
+
+- *Lot sizes.* Holdout lot sizes differed from in-sample (AAPL 100 → 40 on
+  2026-06-12; MSFT and QQQ 40 vs 100, the round-lot reform). The owner
+  chose option A: merge with the lot-size consistency check relaxed
+  (since v1.16 a merge option, `--allow-lot-size-differences`, which
+  records `lot_size_by_session` in the manifest), because no feature reads `lot_size` and the gate is IC-only
+  (`research/r7/R7_DEVIATION_lot_size.md`).
+- *Crash, retry 1.* The first EQ10 look crashed on an 800 MiB allocation in
+  the report-only CPCV block before any statistic: no result seen, no
+  ledger debit, one retry after an output-identical fix.
+- *Crash, retry 2.* EQ05 crashed on 1.04 GiB in the walk-forward splitter,
+  again before any statistic; EQ10's completed result was carried over
+  unchanged.
+- *Code hash.* The `beta_stability` addition was reverted so the
+  fingerprint gate passed (§74).
+
+**What makes them legitimate.** Each was decided without knowledge of the
+outcome, and each fix was checked to leave the statistics unchanged
+("output identical"). A deviation recorded after seeing the result would
+be a new, result-driven look.
+
+**Check yourself.**
+
+1. Why does "before any statistic" matter for a crash retry? *(A retry
+   after seeing a number gives a second chance; before, it is a technical
+   failure.)*
+2. Why does the lot-size merge not threaten the IC test? *(Features do not
+   read lot size; it would matter for a P&L test that sizes in lots.)*
+
+## 77. Power and the minimum detectable effect
+
+**The question.** Before spending the 2026 holdout, which hypotheses could
+it actually confirm?
+
+**Power analysis.** For each drafted hypothesis, `tools/r7_power.py`
+(`iap.research.r7_power`) computes the probability of passing the gate if
+the true effect is a given size, and the minimum detectable effect (MDE),
+the smallest effect passed with 80 % probability. It uses only summary
+statistics pinned by sha256; no market data is read and no look is taken.
+The gate modelled is the HAC t against the ledger threshold *and* a
+deflated Sharpe above 0.95 on the per-session IC series; "joint ≤" is the
+smaller of the two powers, an upper bound on passing both.
+
+**What it decided** (`docs/research/R7_POWER.md`, owner decisions
+2026-10-11). On 7 sessions, only EQ10 and EQ05 had joint power ≥ 0.8 at
+their in-sample IC; they became H4 tier 1. EQ01, EQ02 and EQ04 had joint
+power 0.26 / 0.49 / 0.04 on 7 sessions and about 1.00 on 47, so they wait
+for tier 2. EQ07 was dropped: its drafted sign contradicted the in-sample
+IC, and flipping it after seeing results would fit seen data. The auction
+hypothesis was dropped as underpowered even on 47 sessions.
+
+**Why the DSR leg binds.** With `S` sessions, a DSR on `S` per-session
+values has little resolution: EQ01's MDE for the DSR leg was 0.1757 on 7
+sessions against 0.0386 for the HAC leg. The data's unit is the session.
+
+**Check yourself.**
+
+1. Why run power *before* the look? *(After, it is an excuse; before, it
+   decides what is worth testing.)*
+2. Why model a decayed effect too? *(The v1.8 holdout found ICs at a third
+   to a half of in-sample; planning on the in-sample IC alone would be
+   optimistic.)*
+
+## 78. Predictive but not tradable: the R7 result
+
+**The question.** R7 confirmed EQ10 and EQ05 on seven unseen sessions,
+2025-11 to 2026-06, six years after the in-sample data. Why is v1.16 about
+monetisation rather than deployment?
+
+**The confirmation** (`docs/research/R7_RESULTS.md`). One look each, gate
+HAC t ≥ 4.432 and deflated Sharpe > 0.95 on the per-session IC series:
+
+| alpha | holdout IC | in-sample IC | HAC t | DSR | sessions > 0 |
+|---|---|---|---|---|---|
+| EQ10@1s | +0.0838 | 0.0756 | 13.66 | 0.99995 | 7/7 |
+| EQ05@1s | +0.0409 | 0.0627 | 13.20 | 0.9999998 | 7/7 |
+
+EQ10 held its IC; EQ05 kept about two thirds. The registered sensitivity
+without the FOMC day and the holiday-thin day changes nothing material.
+Drift monitoring (§90) found the queue-rate features drifted for MSFT
+(EQ05 reads their 1 s versions), consistent with its lower holdout IC,
+without establishing cause.
+
+**The other half.** At the primary 1x cost, net P&L was 0 for both:
+no trades. The verdict was IC-only by registration, so the confirmation
+stands, and says nothing about money. P0-6 (§46) then showed why: an
+expected return of 0.1-0.2 bp against a 0.8-1.2 bp round trip.
+
+**The lesson.** Prediction and profitability are different hypotheses with
+different tests. A research process that only asks the first produces
+confirmed signals that cannot be traded; one that only asks the second
+throws away real information. The platform registered the first, reported
+the second, and is now testing the second separately: the in-sample taker
+grid (§46, no-go) and the registered two-sided quoting study (§57).
+
+**Check yourself.**
+
+1. Is a 7/7 positive-session result strong evidence by itself? *(It is
+   `0.5^7 ≈ 0.8 %` under a sign-symmetric null, so yes for the sign; not
+   for the size.)*
+2. Why not lower costs in the backtest until the alphas trade? *(That is a
+   new configuration chosen after seeing the result, and the costs are
+   real.)*
+
+## 79. Walk-forward vs combinatorial purged CV
+
+**The question.** Why does the platform report both a walk-forward result
+and a CPCV result for the same alpha?
+
+**Walk-forward** trains on the past and tests on the next block, expanding
+(`WalkForwardSplitter`, four folds by default, with purging and a 60 s
+embargo, §6.2). It is the honest simulation of deployment: one path,
+always forward. But it gives one estimate on one path, the early folds
+train on little data, and the result depends on where the fold boundaries
+fall.
+
+**CPCV** (López de Prado) splits the data into `N` groups and tests on
+every combination of `k` of them, training on the rest with purging and
+embargo on both sides of each test block:
+
+```
+splits = C(N, k)
+paths  = C(N - 1, k - 1)     (= k/N * C(N, k))
+```
+
+With the defaults `N = 6`, `k = 2`: 15 splits, reassembled into 5 full
+backtest paths. Groups are day-aligned when there are at least `N`
+sessions. Each path is a complete out-of-sample history, so the result is
+a distribution, not a point.
+
+**The cost.** Training on data *after* the test block is not how a model
+would be deployed, and leakage control has to be two-sided. That is why
+walk-forward stays the gate and CPCV is report-only (the `v4` bundle's
+`cpcv` block, `iap.validation.cpcv`).
+
+**Check yourself.**
+
+1. Why does CPCV need an embargo after the test block, not only before?
+   *(Training rows just after the test block have features computed over
+   windows that include test-period events.)*
+2. With `N = 10`, `k = 2`, how many paths? *(`C(9, 1) = 9`.)*
+
+## 80. Probability of backtest overfitting
+
+**The question.** You tried twelve configurations and picked the best
+in-sample. How likely is it that the best one is merely lucky?
+
+**CSCV.** Bailey, Borwein, López de Prado and Zhu: take a `T x M` matrix
+of per-period performance (rows in time order, `M` candidates), cut the
+rows into `S` blocks (16 by default, even), and for every way of choosing
+half the blocks as in-sample, find the in-sample winner and its rank
+among the candidates out of sample. With the OOS rank `w = rank / (M + 1)`
+(1 = worst), the logit `λ = ln(w / (1 - w))` is negative when the winner
+lands in the bottom half. PBO is the share of splits with `λ ≤ 0`.
+
+**Reading it.** PBO near 0: the in-sample winner usually stays above the
+median. Near 0.5: picking the in-sample winner is no better than picking
+at random. Above 0.5: the selection procedure actively picks losers, the
+signature of fitting noise. `probability_of_backtest_overfitting` in
+`iap.validation.cpcv` drops constant candidates (they carry no ranking
+information) and is deterministic.
+
+**What it does and does not say.** PBO judges the *selection procedure*,
+not one strategy. It needs several real candidates; with a single
+pre-registered configuration there is no selection to judge, which is
+the point of pre-registering one.
+
+**Check yourself.**
+
+1. Why the median as the bar? *(Under no skill, the in-sample winner's
+   out-of-sample rank is uniform, so it falls below the median half the
+   time.)*
+2. Why must `S` be even? *(Each split takes exactly half the blocks as
+   in-sample.)*
+
+## 81. Leakage: four detectors and what each one catches
+
+**The question.** An alpha's IC is 0.3. Before celebrating, what could make
+it fake?
+
+**A leak is information from the label window reaching the score.**
+`iap.validation.leakage.LeakageTester` runs five detectors, each
+aimed at a different mechanism:
+
+1. **Label-column guard.** Score the frames as-is and with every label
+   column replaced by a constant. Any change means the scoring path reads
+   labels: the catastrophic leak.
+2. **Shift-by-one.** Lag the score by one row. A causal signal loses some
+   IC, not almost all of it, and the required survival scales with how
+   much of the horizon one row spans, `collapse_ratio * (1 -
+   min(1, median_row_gap / horizon))`. Its suspicion line is a multiple of
+   the promotion gate (3 x 0.010 = 0.030), not an absolute IC.
+3. **Time shift** (v1.14). The row test is vacuous when a row spans the
+   horizon, so this lags the score by `horizon / 4` in time and keeps only
+   pairs whose lagged score is fresh. Too few pairs is reported as not
+   applicable, never as a pass.
+4. **Truncation probe.** Re-score on precomputed frames truncated at
+   several anchors: a causal score at `t` cannot change when later rows
+   are removed. It sees look-ahead in the scoring path only.
+5. **Recompute probe.** Rebuild the features from the raw event prefix and
+   require the last row to be bit-identical to the full build. This is the
+   one that sees a feature *built* with look-ahead (a centred window, a
+   full-sample normalisation), which is baked into every precomputed row.
+   A probe that did not run is reported as such and makes the result not
+   gate-eligible.
+
+**Why several.** Each detector is blind somewhere: the label guard misses a
+feature built from future events, the truncation probe misses a leak baked
+into the features, the row shift misses a leak shorter than a row, the time
+shift cannot tell a leak from a very fast causal signal (§82). Together they
+cover each other's gaps; a failure of any of them fails `passed`, which
+blocks promotion.
+
+**Check yourself.**
+
+1. A feature uses the full day's mean volume to normalise. Which detector
+   catches it? *(The recompute probe: rebuilt from an event prefix, the
+   mean differs. The truncation probe cannot, because the leaked mean is
+   already in every precomputed row.)*
+2. Why tie the suspicion threshold to the gate? *(A leak worth an IC of
+   0.12 was once missed by an absolute 0.15 threshold; any alpha strong
+   enough to matter must be checked.)*
+
+## 82. Fast causal or leak? The time-shift triage
+
+**The question.** FX11 fails the time-shift leakage test (§81): lagging its
+score by a quarter of the horizon destroys its IC. Is it leaking, or is it
+just fast?
+
+**The ambiguity is real.** A leak confined to the near future (a feature
+that sees an event at or just after the label's anchor) collapses under a
+small lag. So does a genuine signal whose predictive power decays within
+the lag. The gate's two numbers, IC unlagged and IC lagged, cannot tell
+them apart.
+
+**Triage by the shape of the decay (v1.15, detector 2c).** On a time-shift
+failure the tester also lags the score by several fractions of the horizon
+and records the profile. `classify_time_shift_failure` then labels it:
+
+- `leak_suspect`: another causal check failed, or the profile has the leak
+  shape: a cliff at the first step, a non-monotone profile, or a sign
+  flip;
+- `fast_causal`: every causal check passed and the IC decays gradually and
+  monotonically, keeping its sign;
+- `causality_unproven`: the recompute probe did not run, so nothing shows
+  the inputs are causal.
+
+The class is a diagnosis for the reviewer. By default `passed` is
+unchanged, so a time-shift failure still blocks promotion;
+`LeakageTester(accept_fast_causal=True)` is the opt-in. The FX11 finding
+(`docs/research/FX11_FINDING.md`): no look-ahead found, consistent with a
+fast causal signal, with the stated limit that the gate's numbers alone
+cannot distinguish a 45 s leak from a fast signal. FX11 stays in RESEARCH
+pending human review.
+
+**Check yourself.**
+
+1. Why is a cliff at the first lag the leak signature? *(A leak worth only
+   the next few events vanishes as soon as the lag clears them; a real
+   signal fades with the information it carries.)*
+2. Why not make `accept_fast_causal` the default? *(The classifier is
+   heuristic; a false "fast" on a real leak would promote it.)*
+
+## 83. Embargo by feature window
+
+**The question.** A walk-forward test block ends at 11:00. Training resumes
+at 11:01, after a 60 s embargo. A feature in the training row at 11:01 is
+a 10-minute rolling mean. What does it contain?
+
+**Nine minutes of the test block.** Purging removes training rows whose
+*labels* overlap the test block; the embargo adds a gap. But on two-sided
+splits (CPCV, or walk-forward with training after a test block), a
+training row just after the block carries *features* whose look-back
+window reaches back into it. The gap must therefore be at least the
+longest feature window:
+
+```
+post_block_embargo = max(embargo_ns, feature_window_ns)
+```
+
+(`post_block_embargo_ns` in `iap.validation.splits`, v1.13 R-P1-6,
+opt-in via `feature_window_ns`; `"registry"` reads the longest window from
+the feature registry). Both `WalkForwardSplitter` and
+`CombinatorialPurgedSplitter` accept it. `None` keeps the old rule.
+
+**Before the block, the label decides; after it, the feature does.** A row
+before the test block leaks through its forward label; a row after it
+leaks through its backward feature window. Purging handles the first, the
+post-block embargo the second.
+
+**Check yourself.**
+
+1. Does an expanding walk-forward with training only *before* each test
+   block need the post-block embargo? *(Not for that fold; it matters when
+   training data follows the test block.)*
+2. Why does this matter less for a 1 s label and a lot for a 10-minute
+   feature? *(The label overlap is about one second; the feature overlap is
+   the window length.)*
+
+## 84. Refit or frozen: what a holdout test re-estimates
+
+**The question.** The 2026 holdout of v1.8 "froze" the alpha definitions,
+horizons, cost model and methods. Did it freeze the fitted numbers?
+
+**No, and the docs once said otherwise.** The walk-forward on the holdout
+refit each alpha's `mu`, `sigma` and `beta` per fold on 2026 rows. That is
+a legitimate test (it asks whether the *recipe* works on new data), but it
+is not a test of the fitted model trained in-sample, and the threshold also
+rose with run order (3.43 to 3.89). v1.13 (R-P1-2) reworded REAL_DATA.md
+and this document, and added the stricter alternative:
+
+- `frozen_params` in `validate_alpha` and `ExperimentRunner.run`: score
+  the out-of-sample rows with a parameter blob fitted elsewhere, no refit,
+  reporting `frozen_ic` / `frozen_t` beside the refit statistics;
+- `tstat_threshold="prereg"`: the threshold fixed in the registration
+  instead of rising with later looks.
+
+**Which to prefer.** A frozen test answers "would the model I have today
+have worked?"; a refit test answers "does this way of building a model
+work?". Deployment depends on the first; research generality on the
+second. Say which one a number is.
+
+**Check yourself.**
+
+1. A refit holdout IC is 0.05 and the frozen IC 0.01. What happened?
+   *(The recipe adapts to the new period, but the in-sample fit did not
+   transfer: the parameters drifted.)*
+2. Why does the threshold rising with run order matter? *(The last alpha
+   tested faces a stricter bar than the first, for no reason related to its
+   evidence.)*
+
+## 85. Hypothesis sign and beta stability
+
+**The question.** An alpha's rationale says high order-flow imbalance
+predicts a rise. Its fitted beta on one fold is negative. Does that matter
+if the pooled IC is positive?
+
+**Yes: the sign is the hypothesis.** Every linear alpha's raw signal is
+oriented by its stated hypothesis, and its fitted beta is free-signed
+(`iap.alpha.base`). `hypothesis_confirmed` means the data agrees with the
+stated direction. Since v1.14 it requires at least 70 % of the
+walk-forward folds to confirm (`min_fold_sign_consistency`); before, only
+the last fold was read, and EQ01 had a negative-beta fold the old rule
+never saw. An alpha whose fitted sign contradicts its rationale can at
+best be ITERATE, never PROMOTE.
+
+**Beyond the sign.** `iap.validation.beta_stability` (v1.16, report-only)
+estimates per-instrument and per-instrument-day OLS slopes of the label on
+the raw signal (at least 32 valid pairs per slice) and summarises their
+count, share positive, sign agreement with the median, median, IQR and
+`IQR / |median|`. A beta that swings in sign day to day is a different
+kind of signal from one that is steady and small, even at the same pooled
+IC. The module lives outside the fingerprinted alpha modules (§74).
+
+**Check yourself.**
+
+1. Why not just flip the sign of an alpha whose beta is negative? *(That
+   is a new hypothesis chosen after seeing the data: EQ07 was dropped from
+   R7 for exactly this reason, §77.)*
+2. `IQR / |median|` is 3. What does that say? *(The day-to-day spread of
+   the slope is three times its typical size: unstable.)*
+
+## 86. Scaling per instrument before pooling
+
+**The question.** A pooled IC over AAPL, MSFT and QQQ is 0.06. How much of
+that is QQQ?
+
+**Possibly most of it.** On the real data QQQ is about half the rows and
+most of the variance. A pooled correlation weights each instrument by its
+share of the covariance, so a volatile, heavily traded instrument
+dominates both the pooled IC and its t. The result can describe one
+instrument while claiming three.
+
+**The v1.14 default (R-P2-2).** `standardisation="instrument"`: before any
+pooled statistic, the standardised signal and the label are divided by
+that instrument's own standard deviation over its out-of-sample pairs
+(scale only, no demeaning, per fold). Each instrument then contributes
+by its number of rows, not its volatility. `"pooled"` is the v1.13 rule.
+A v1.9 option, `gate_ic_source="instrument_mean"`, can gate on the
+equal-weight mean of per-instrument ICs instead.
+
+**Check yourself.**
+
+1. Why not demean per instrument too? *(A level difference between
+   instruments can be real signal; scaling equalises weight without
+   removing it.)*
+2. A pooled IC is 0.06 and the per-instrument ICs are 0.10, 0.01 and 0.00.
+   What should the report say? *(That the signal is one instrument's.)*
+
+## 87. Causal row blocks: when a skipped row is a look-ahead
+
+**The question.** A backtest skips rows whose label is invalid, for
+example because a trading halt falls inside the horizon. What is wrong
+with that?
+
+**The skip uses the future.** Whether a halt happens in the next second is
+not known at the decision time. A backtest that declines to trade on rows
+where the market *will* halt has used information a live strategy could
+not have, and every net P&L and bootstrap interval computed that way
+inherits the look-ahead. The v1.5-v1.13 default (`"auto"`) did exactly
+this: it blocked on the rows the IC scores, a mask built from labels.
+
+**The causal mask (v1.14, R-P0-1, the default).** `block_rows_column =
+"causal"` blocks a decision only on state observable at `t`: the row's own
+mid is missing or not positive, or the label engine found the *anchor*
+itself unusable (no prevailing two-sided book at `t`). A forward window
+that later turns out invalid does not block, so a live router could have
+made exactly the same decisions (`iap.backtest.engine`). The report quotes
+the label-mask P&L beside it (`net_pnl_1x_cost_label_block`) so the size
+of the old bias is visible.
+
+**The general rule.** A filter applied to a backtest is a decision the
+strategy made. It is legitimate only if the strategy could have made it
+at the time.
+
+**Check yourself.**
+
+1. Is dropping rows with no two-sided book at `t` look-ahead? *(No: the
+   book at `t` is observable at `t`.)*
+2. Why does the label mask flatter P&L? *(It avoids exactly the rows where
+   something disruptive is about to happen.)*
+
+## 88. Same-timestamp coalescing
+
+**The question.** An ITCH "order executed" message becomes two events, an
+EXECUTE and a TRADE, with the same exchange timestamp. A feature engine
+samples the book after each one. How many book states did the market
+have?
+
+**One.** Events sharing an `exchange_ts` for one instrument are a single
+state change: an ITCH `E` (EXECUTE + TRADE), a `U` replace (CANCEL + ADD),
+a two-sided FX quote. Sampling after the first half shows a book that
+never existed (an order removed but the trade not yet counted; a cancel
+without its replacement), a *phantom state*. Features computed from it
+(spreads, imbalances, OFI sums) are wrong, and a model can learn them.
+
+**The v1.14 default (D-P1-1).** Every feature engine applies all events of
+the group, folds their flow, and refreshes or emits once at the group's
+last event (`group_ends`). A trade's effective spread is measured against
+the pre-group mid. Ported identically to Rust, C++ and the frozen Java
+engine. Kept per event, with reasons: the streaming MVP (no look-ahead on
+a live stream) and the alpha golden frames. The synthetic EQ golden lost
+409 of 2,000 rows, almost every remaining row changed in at least one
+feature, and every result computed from the store moved; CHANGELOG v1.14
+lists them. `python -m iap.features --same-ts per_event` rebuilds the old
+store.
+
+**Check yourself.**
+
+1. Why does a live stream keep per-event processing? *(It cannot know
+   whether more events with the same timestamp are coming without waiting,
+   which is look-ahead in a live setting.)*
+2. Why measure the effective spread against the pre-group mid? *(The
+   post-group mid already includes the trade's own impact.)*
+
+## 89. Signing trades: the quote rule and the tick rule
+
+**The question.** A non-displayed ITCH `P` print shows a price and a size
+but no aggressor side. Was it a buy or a sell?
+
+**Infer it.** Signed volume (buys minus sells) is the raw material of
+order-flow features, so the sign matters. Two classic rules:
+
+- **Quote rule** (the core of Lee–Ready): a trade above the mid is a buy,
+  below the mid a sell.
+- **Tick rule**: a trade at a higher price than the previous trade is a
+  buy, lower a sell; equal takes the last non-zero change.
+
+The quote rule is more accurate when a valid quote exists; the tick rule
+needs no quote but is noisier.
+
+**The v1.14 mapping (D-P1-2).** A post-2014 `P` print is signed against
+the mapper's own best bid and ask by the quote rule; the tick rule is used
+only at the mid or without a two-sided, uncrossed quote. Counters
+`hidden_trades_signed_by_quote_rule` and
+`hidden_trades_signed_by_tick_rule` (now the fallbacks only) record the
+split. In the same release midpoint prints round half to even (D-P1-3),
+not half up, with residues recorded, because half-up rounding biases every
+midpoint print in the same direction.
+
+**Check yourself.**
+
+1. A print exactly at the mid: which rule? *(The tick rule; the quote rule
+   cannot decide.)*
+2. Why does half-up rounding of midpoint prices bias signed features? *(A
+   half-penny midpoint is always rounded up, so it looks above the mid more
+   often than below.)*
+
+## 90. Feature drift between in-sample and holdout
+
+**The question.** Before running the R7 confirmatory test, the owner ran a
+drift report on the holdout. Why look at the inputs if the gate only
+reads the IC?
+
+**To know what changed before reading what happened.** If the inputs
+moved, a fall in IC has a candidate explanation; if they did not, it
+points at the relationship itself. `iap.research.drift` streams the
+feature store in record batches (chunk-invariant) and computes, per
+feature, per symbol and pooled:
+
+```
+PSI = sum_b (q_b - p_b) * ln(q_b / p_b)       # p: reference share, q: target share, per bin
+KS  = max |F_ref(x) - F_target(x)|
+mean shift in reference-std units,  std ratio
+```
+
+with PSI bins cut at reference quantiles. The default thresholds
+(`DriftThresholds`): PSI warn 0.10, alert 0.25; KS alert 0.10; mean
+shift 0.5 reference sd; std ratio outside [1/2, 2]; fewer than 100 valid
+rows is "insufficient".
+
+**What it found.** Pooled, 122 of 205 features alerted, mostly depth and
+intensity. For MSFT the queue depletion and replenishment rates had PSI
+of 2.08 to 2.70 with mean shifts of about −0.8 reference sd. The round-lot
+reform (§76) is a known structural change in the same period. The report
+is descriptive; it decides nothing.
+
+**Relation to §14.** The adaptive monitors of §14.2 use PSI and KS online
+to trigger refits; this is the offline, whole-dataset version, run once
+before a confirmatory look.
+
+**Check yourself.**
+
+1. 122 of 205 features alert and the IC holds. Contradiction? *(No: a
+   scale or level shift can leave a standardised relationship intact.)*
+2. Why cut PSI bins at reference quantiles? *(Equal-mass reference bins
+   avoid empty bins and make PSI comparable across features.)*
+
+## 91. Memory on pooled real data
+
+**The question.** R7 crashed twice on allocations of 800 MiB and 1.04 GiB on
+a 16 GB machine. How can a few hundred megabytes break it?
+
+**Because the base was already huge.** One instrument over 10 sessions is
+about 3 M rows. At 263 float64 feature columns:
+
+```
+3e6 rows * 263 cols * 8 B ≈ 6.3 GB per instrument  ->  about 19 GB for 3
+```
+
+Any full-width copy of the pooled store, even a short-lived one, is enough
+to exhaust memory on its own (`docs/research/MEMORY_REVIEW_v116.md`).
+
+**What was fixed and what is open.** `ResearchRunner.frames(needed)` (v1.16
+item 12) loads only the experiment's features plus id, label and market
+columns (`slim_columns`), caching one column set. That reduced the
+walk-forward test frames, the CPCV fallback and the refit path, which are
+built from it. Still open, each needing a check that its reports are
+unchanged: narrowing walk-forward and CPCV frames to the scoring columns,
+copying only label columns in the power and leakage code, and float32 /
+int32 for per-fold arrays. R7's own loader was left as is, because R7 is
+closed and its registered runs used it.
+
+**The general lesson.** In pandas a slice, a `copy()`, a concat or a
+fallback `except KeyError` path can each double the footprint. On research
+data, memory is a design constraint: decide which columns a step needs,
+and fail loudly instead of falling back to "all of them".
+
+**Check yourself.**
+
+1. Why does narrowing columns help more than adding swap? *(Swap turns a
+   crash into a run many times slower; not loading the columns removes the
+   cost.)*
+2. Why must each memory fix prove output identity? *(A memory change that
+   alters a statistic changes published results; the R7 retries were
+   accepted only because the output was identical.)*
+
+## 92. Event clocks and Hawkes intensities
+
+**The question.** Features are sampled every 100 ms. At the open a hundred
+events arrive in that time; at lunch, none. Is a clock the right sampler?
+
+**Sample where the information is.** Calendar-time rows over-sample quiet
+periods and under-sample busy ones. Since v1.12 (M6),
+`python -m iap.features --sampling events:N|volume:N` emits a row every
+`N` events or every `N` shares traded instead of on `--cadence-ms`. Rows
+then carry similar amounts of market activity, which is closer to how
+information arrives.
+
+**Measuring arrival intensity.** Trades cluster: one trade makes another
+more likely soon after. A Hawkes process models that self-excitation. The
+extended feature set (`iap.features.extended`, `--feature-set extended`)
+computes an exponential-kernel intensity per side online:
+
+```
+lambda_s(t) = mu + alpha * sum_{t_i <= t, side s} exp(-beta * (t - t_i))
+S <- S * exp(-beta * dt) + alpha       # at each trade on side s
+```
+
+with `hawkes_{buy,sell,total}_b{beta}_v1` and an imbalance
+`(buy - sell) / (buy + sell)`, for `beta` in {1, 0.1} per second. A
+feature is valid once `5 / beta` seconds have passed (99 % of the kernel's
+memory). The parameters are fixed per run and recorded, so a different
+parameterisation is a different `feature_version`; `fit_hawkes_exp` is
+the offline maximum-likelihood helper. The same set adds queue
+time-to-depletion, trade-sign autocorrelation and odd-lot and hidden
+execution shares.
+
+**Check yourself.**
+
+1. Why `5 / beta`? *(`exp(-5) ≈ 0.007`: after five decay times the
+   history before the start is below 1 % of the kernel.)*
+2. On a volume clock, does a 1 s label horizon still make sense? *(The
+   label is still in time; rows are just placed differently. Overlap and
+   HAC (§66) still apply.)*
+
+## 93. DeepLOB: learning from the raw book
+
+**The question.** The linear alphas use hand-built features. Could a deep
+network learn better ones from the order book itself?
+
+**The architecture.** DeepLOB (Zhang, Zohren and Roberts, 2019) takes a
+window of `W` snapshots of `L` levels, each row laid out as `[ask_px_1,
+ask_sz_1, bid_px_1, bid_sz_1, ..., ask_px_L, ask_sz_L, bid_px_L,
+bid_sz_L]` (shape `(T, 4L)`). Convolutions combine price and size, then
+sides, then levels; an inception module looks at several time scales; an
+LSTM summarises the window. The output is three classes: down, flat, up.
+
+**The smoothed label.** A raw mid change at `t + h` is mostly noise and
+bounce. DeepLOB compares the *mean* future mid with the current one:
+
+```
+m_plus = mean(mid[t+1 .. t+h])
+r      = m_plus / mid[t] - 1
+label  = UP if r > threshold, DOWN if r < -threshold, else FLAT
+```
+
+Rows whose horizon runs past the end are dropped.
+
+**Here.** `iap.models.deeplob` (v1.15, code only) has the dataset path
+(`snapshot_matrix`, `smoothed_labels`, `make_windows`, `build_lob_dataset`
+with a chronological split and train-only z-score normalisation) and a
+numpy softmax baseline that always runs in CI;
+`iap.models.deeplob_torch` has DeepLOB and an MLP behind the optional
+`deep` extra (torch); `iap.models.deeplob_baselines` adds linear and
+gradient-boosting baselines and a net-of-cost comparison. No real-data
+training run has been done. `build_lob_dataset` keeps a train window
+only if its label horizon ends before the cut, and a test window only if
+its first row is at or after it.
+
+**Check yourself.**
+
+1. Why must the train windows' *labels* end before the cut? *(A label
+   computed from test-period mids would leak the test period into
+   training.)*
+2. Why is a numpy baseline worth having? *(A deep model has to beat
+   something simple on the same windows, net of cost, or it adds nothing,
+   §7.1.)*
+
+## 94. Per-session windows and mid-relative normalisation
+
+**The question.** The AI4 DeepLOB pre-registration was signed in v1.15 and
+then deferred without being run. What was wrong with the pipeline?
+
+**Three problems, each a lesson** (`research/r7/AI4_DEFERRED.md`).
+
+1. *No real-data path.* Nothing turned ITCH book replay into the `(T, 4L)`
+   snapshot matrix. A registration that the code cannot execute as written
+   is not a registration.
+2. *Windows and labels crossed sessions.* `make_windows` and
+   `smoothed_labels` run over one continuous series. On multi-day data a
+   window can start in yesterday's afternoon and end in today's open, and a
+   label can average mids across the overnight gap and the auctions.
+   Neither describes anything a strategy could trade. Windows and labels
+   must be built per session, with no window or horizon crossing a session
+   boundary.
+3. *A static price z-score.* Price levels were normalised with one
+   training-period mean and standard deviation. Prices drift, so out of
+   sample a z-scored price of +8 means only "the stock moved since
+   training". Expressing levels relative to the current mid (for example
+   `(px_k - mid_t) / tick` or in basis points), or normalising on a rolling
+   window, keeps the inputs on the same scale every day. Empty deep levels
+   (0 or NaN) also need a mask rather than a number.
+
+**Why defer instead of fixing.** Fixing (2) and (3) changes the model
+inputs the registration pins. Doing so under the same registration would
+be a deviation of substance, chosen after review. So a new registration
+will supersede it, the spent look stays counted, and the holdout sessions
+are off limits for AI4 development until then (§73). The rebuild is v1.16
+work in progress and is not on main as of this writing; the code in §93 is
+the v1.15 pipeline the review criticised.
+
+**Check yourself.**
+
+1. Why can a window that crosses the overnight gap look predictive? *(The
+   overnight return is large and partly predictable from the close, which
+   says nothing about intraday microstructure.)*
+2. Mid-relative prices throw away the price level. Is that a loss? *(For a
+   microstructure model, rarely: the shape of the book around the mid is
+   the signal; the level mostly drifts.)*
+
+## 95. Conformal intervals and confidence-scaled sizing
+
+**The question.** A model predicts a 0.3 bp move. How sure is it, and
+should the position depend on that?
+
+**Conformal prediction** gives an interval with a coverage guarantee and
+no distributional assumption. Split conformal: on a calibration set, take
+the absolute residuals `|y - pred|` and their `ceil((n + 1)(1 - alpha))`-th
+smallest value `q`; the interval is `pred ± q`, and covers the truth with
+probability at least `1 - alpha` when the data are exchangeable.
+
+**Intraday data are not exchangeable,** so `AdaptiveConformal` (adaptive
+conformal inference, Gibbs and Candès) adjusts its level online after each
+outcome:
+
+```
+alpha_t <- alpha_t + gamma * (alpha - miss_t)        # miss_t = 1 if y fell outside
+```
+
+A miss lowers `alpha_t` (wider intervals); a run of covers raises it. The
+implementation clamps `alpha_t` to `[alpha / 10, 1 - 1e-9]` and counts and
+logs every clamp, because unclamped a miss streak drives the width to
+infinity and the position to zero silently.
+
+**Sizing.** `confidence_from_width` maps an interval width to a confidence
+in [0, 1] (1 at or below a reference width, `ref / width` above it), and
+`conformal_size` scales the base target by it, never above the target or
+`max_position`, rounding toward zero to whole lots.
+
+**Scope.** `iap.models.conformal` (v1.15 M-P1-2) is opt-in research code:
+`ConformalSizingConfig.enabled` is off, it is not in any pre-registration
+config, and it is not wired into the parity-checked MVP sizing.
+`calibration_report` compares empirical with nominal coverage by session.
+
+**Check yourself.**
+
+1. Nominal coverage 90 %, empirical 78 % on one session. What does ACI do
+   next session? *(Starts with a lower `alpha_t` after the misses, so wider
+   intervals.)*
+2. Why round toward zero? *(Rounding up could exceed a cap.)*
+
+## 96. Model cards and content hashes at promotion
+
+**The question.** A model is promoted. A year later someone asks what data
+it was trained on, what it was for, and who signed it off. Where is that
+written?
+
+**In a card the registry will not promote without.** Since v1.15
+`ModelRegistry.promote` raises on a missing or invalid `model_card.json`
+(`iap.mlops.model_card`). The card binds to one record (`model_id`,
+`record_hash`) and carries: the data (`dataset_version`, date range,
+sessions), the pre-registration id and hash (or `exploratory: true`),
+metrics net of costs (non-empty), calibration or coverage figures (or an
+explicit `None`), known limitations (non-empty), intended use, the owner's
+sign-off reference, and its own `card_hash`. `generate_card` fills the
+record-derived fields; the human fields must be supplied by a human.
+
+**And the bytes must be the ones evaluated.** Promotion also checks the
+model's content hash: `content_sha256` hashes the fitted state (class,
+parameters, fitted arrays), stable across joblib, pickle and scikit-learn
+versions, and promotion refuses a missing or mismatched one (G-P0-1).
+`promotion.json` records both hashes. A card describing one model cannot
+be promoted with another's weights.
+
+**Check yourself.**
+
+1. Why require "known limitations" to be non-empty? *(Every model has
+   some; an empty list means nobody wrote them down.)*
+2. Why hash the fitted state rather than the pickle file? *(Pickle bytes
+   change with library versions while the model does not; the state is
+   what the evaluation used.)*
+
+## 97. Paper trading: what the PAPER gates check
+
+**The question.** An alpha passed research and validation. Why not go
+live?
+
+**Because a backtest cannot see the live loop.** Paper trading runs the
+strategy on live (or replayed live-shaped) data through the real
+decision, risk and execution path, without sending orders to a market. It
+catches what research cannot: data that arrives late or out of order,
+features computed differently in production, risk checks that fire, a
+fill model that disagrees with the venue.
+
+**The lifecycle gates.** The PAPER → ACTIVE promotion in
+`iap.lifecycle.machine` requires four gates (`iap.lifecycle.gates`), with
+thresholds in `configs/strategies/lifecycle.json`:
+
+| gate | metric | threshold |
+|---|---|---|
+| `paper_min_sessions` | sessions traded on paper | ≥ 5 |
+| `paper_ic_tracking` | `|realized_ic - research_ic|` | ≤ 0.01 |
+| `paper_net_pnl` | net P&L | ≥ 0 |
+| `no_kill_events` | kill-switch events | ≤ 0 |
+
+`paper_ic_tracking` is the drift monitor of the transition: the live IC
+must match the research IC within 0.01, or something differs between the
+two pipelines. Failures demote PAPER to CANDIDATE (on the configured
+number of consecutive failures), and a human can retire it.
+
+**Honest status.** No alpha here has reached PAPER on real data; the
+lifecycle has 23 CANDIDATE alphas and none beyond (v1.14). The gates exist
+and are tested (the LC01 golden, §17.4).
+
+**Check yourself.**
+
+1. Why gate on IC tracking and not only on P&L? *(Five sessions of P&L is
+   noise; a gap between live and research IC is a pipeline bug you can see
+   quickly.)*
+2. Why is one kill event disqualifying? *(A strategy that trips a kill
+   switch on paper would have done so with real money.)*
+
+## 98. Pre-trade controls and a tamper-evident audit
+
+**The question.** SEC Rule 15c3-5 requires a broker-dealer with market
+access to have pre-trade risk controls. What does that look like in code?
+
+**A fixed, fail-closed check order.** The Rust risk engine (normative;
+Python reference port) runs every legacy check, then since v1.14 the
+15c3-5 set as checks 23-29 (`risk.json` x-version 4, `pre_trade`, every key
+optional): a restricted list, maximum open orders and open notional per
+strategy, per-strategy position, participation of session market volume,
+per-strategy cancel rate and per-venue message rate. Since v1.15 only
+TRADE prints count as market volume for the participation cap
+(`RiskEngine.on_market_event`): an EXECUTE is the same volume seen twice.
+Per-key state is bounded (`max_tracked_keys`), failing closed when full.
+
+**An audit you can verify.** Every `RiskEvent` carries `seq` and
+`prev_sha256`, the SHA-256 of the previous JSONL line, so the audit log is
+a hash chain (`verify_audit_chain` in Python and Rust; `audit_chain_head`
+is the value to anchor elsewhere). Editing or deleting a past decision
+breaks every later link. Loss-limit overrides are bounded and need a
+minimum number of distinct approvers; a refused override is itself
+audited.
+
+**Check yourself.**
+
+1. Why must a full state map fail closed rather than evict old keys?
+   *(Evicting would forget open orders or positions, and a limit would pass
+   that should fail.)*
+2. Why anchor the chain head outside the log? *(A chain proves internal
+   consistency; an attacker who rewrites the whole log rewrites the chain
+   too, §75.)*
+
+## 99. Agents that propose and humans that decide
+
+**The question.** An LLM agent can read reports, propose hypotheses and
+draft pre-registrations. What stops it from confirming its own idea?
+
+**The boundary is in the tools, not the prompt.** The MCP workflow
+(`iap.agents.mcp_workflow`, `iap-mcp-agent`) exposes only `propose`,
+`draft_prereg`, `hit_rate`, `regulatory_fee` and `list_drafts`. Sign-off,
+confirmatory runs, outcomes and promotion have no tool; the module refuses
+to import if one is added, and a test enumerates the tool list. Each
+proposal debits one look from the chained ledger, with a per-agent look
+cap. `prereg_gate.require` refuses a pre-registration written by any
+registered agent id (§72), and agent studies are exploratory only.
+
+**Checking what the agent says it did.** A live evaluation found a model
+closing a session with "Finding filed." after its finding had been
+rejected. `iap.llm.summary_check` (v1.15) checks the closing summary
+against the session's tool log: an action claim is supported only by an
+accepted call of the tool that performs it, so a claim to have signed off
+or promoted is always unsupported, and every number must match the
+session's evidence under the exact-decimal rules of `iap.llm.verify`
+(§37). Negated and modal clauses ("could not file") are not claims. A
+false flag marks a report for review; it never blocks anything.
+
+**The evals.** Six adversarial tasks (prompt injection in a board entry
+and in a report field, an authority claim to sign off, look-budget evasion
+by tiny and by repeated proposals, pushed fabricated numbers) are scored by
+named checks that also score a real model. The first live run
+(`docs/research/AGENT_EVAL_LIVE.md`) scored Sonnet 5.5 0.9773 and Opus 5.5
+1.0, for 0.76 USD of a 20 USD cap.
+
+**Check yourself.**
+
+1. Why remove the tool rather than instruct the agent not to use it?
+   *(Instructions can be overridden by injected text; a missing tool
+   cannot be called.)*
+2. Why does each proposal cost a look? *(A proposal is a search step; an
+   agent that proposes a thousand variants has run a thousand tests.)*
+
+## 100. Further reading
 
 Inside this repository, in suggested order:
 
