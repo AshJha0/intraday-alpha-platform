@@ -1,7 +1,8 @@
 # Contributing
 
-This repository holds four independent implementations of one pinned
-semantics. Contributing means changing that semantics in the reference,
+This repository holds three maintained implementations of one pinned
+semantics (Python, C++, Rust; the Java port is archived in `archive/java/`,
+frozen at v1.14.0). Contributing means changing that semantics in the reference,
 proving it with a golden vector, and re-matching every port — or leaving the
 semantics alone and proving that too. The binding rules live in
 [PLATFORM_CONVENTIONS.md](PLATFORM_CONVENTIONS.md); the review policy in
@@ -10,11 +11,10 @@ the working procedure.
 
 ## 1. Branching
 
-- `main` is meant to be protected: pull requests only, CI green
-  (`.github/workflows/ci.yml`), the reviewers `CODEOWNERS` names for the
-  paths touched. That protection is a repository setting that is **not yet
-  configured** (`docs/governance/REPO_SETTINGS.md`), so for now it is a
-  convention the maintainer follows.
+- `main` is protected by the `protect-main` ruleset: pull requests only,
+  the required CI checks green (`.github/workflows/ci.yml`; the list is in
+  `docs/governance/REPO_SETTINGS.md`), and the reviewers `CODEOWNERS` names
+  for the paths touched. The owner merges in the GitHub UI.
 - Branch names carry the area and the plan key or issue number:
   `feat/execution-X07-python-port`, `fix/orderbook-B03-reorder-window`,
   `docs/EPICS-refresh`, `research/EQ03-cost-threshold`.
@@ -38,8 +38,8 @@ the working procedure.
 
 ## 2. Build and test — the commands CI runs
 
-From `docs/BUILD_NOTES.md` and `PLATFORM_CONVENTIONS.md` §9 (no Maven; JUnit4
-is vendored at `/usr/share/java/junit4.jar`):
+From `docs/BUILD_NOTES.md` and `PLATFORM_CONVENTIONS.md` §9 (the archived
+Java engine is not built by CI):
 
 ```bash
 cd python && PYTHONPATH=src python3 -m pytest -q && cd ..
@@ -117,8 +117,8 @@ fills are exact integers; features, alphas, portfolio and TCA compare at
 abs and rel 1e-9; adaptive PSI/KS at 1e-10 with exact refit booleans and
 lifecycle state sequences; canonical-JSON lines, trace digests, the risk
 audit / snapshot and the lifecycle registry are byte-identical; the 7-state
-lifecycle golden is compared exactly, field by field. The v1.13.0 table
-(2026-10-11, counts from CI) reads python 2411 / cpp 302 / rust 366
+lifecycle golden is compared exactly, field by field. The README's table
+(v1.15 counts, from CI) reads python 2411 / cpp 302 / rust 366
 (golden 193/72/72; Java archived in v1.15), `integration` 35, `replay` 6.
 
 ## 4. Golden regeneration protocol
