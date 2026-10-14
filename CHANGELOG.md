@@ -87,6 +87,14 @@ that tag.
 - v1.16: `tools/release.py apply-bundle` extracts with Python `tarfile` (members path-checked, `data`
   filter) instead of the system `tar --force-local` (bsdtar on Windows has no `--force-local`; the
   v1.15 release had to extract by hand).
+- v1.16 item 14 (portfolio, Python only, opt-in): `solve(..., projection="dykstra", dykstra_tol,
+  dykstra_max_iter)` / `project_dykstra` — Dykstra's alternating projection over the same sets and
+  order as the pinned cyclic `project`, giving the exact Euclidean projection onto the intersection
+  (exact when `vol_target` is off; the radial vol retraction is not a projection).
+  `ewma_covariance(..., shrinkage="ledoit_wolf_estimated")` — the estimated Ledoit-Wolf (2004)
+  intensity toward `mu * I`, estimated on the sample covariance of the returns and applied to the
+  EWMA matrix. `ledoit_wolf` moved to `iap.core.shrinkage` (re-exported from `iap.combine.weights`).
+  Defaults (`"cyclic"`, `shrinkage=None`, fixed-0.1 `"ledoit_wolf"`) and every golden unchanged.
 - v1.16 item 7: taker capacity curve for EQ10 / EQ05 (`tools/v116_capacity_curve.py`, in-sample,
   descriptive): realised edge in the top 10% / 1% / 0.1% signal tails vs spread + fees + 2 x impact at
   100 - 30,000 shares, 1s / 10s / 1m holds. **0 of 45 cells have any break-even size**; best tail edge
