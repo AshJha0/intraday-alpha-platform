@@ -55,6 +55,10 @@ that tag.
   main's board under `1s:quoting-v2-insample`), quoting_config keys checked against `QuotingConfig`,
   `configs/prereg/v2.json` realism applied, `summarise` validity gate ("SKEW INERT", no verdict).
   `tools/quoting_v2_register.py` registers and signs it; OWNER ONLY.
+- v1.16 item 15: `iap.validation.multiple_testing` (Holm, Benjamini-Hochberg, Romano-Wolf step-down
+  max-t, joint fold bootstrap) and a report-only "Multiple testing across this report" table in the
+  24-alpha `REPORT.md` (Bonferroni / Holm / BH q / Romano-Wolf per alpha; the promotion gate is
+  unchanged). The committed REPORT.md gains the section at the next regenerate.
 
 ## v1.15.0 — 2026-10-13
 
