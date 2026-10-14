@@ -1,0 +1,21 @@
+{
+  "schema": "iap.auction_real_prereg",
+  "version": 1,
+  "title": "A1 auction-imbalance strategy AUC01 on real XNAS ITCH NOII: in-sample walk-forward (exploratory) + 2026 two-day holdout",
+  "status_of_data": {
+    "in_sample": "The 7 sessions 2019-01-30, 2019-03-27, 2019-07-30, 2019-08-30, 2019-10-30, 2019-12-30, 2020-01-30 (AAPL, MSFT, QQQ). AUC01 has never been run on them and their NOII messages have never been extracted, but the sessions were already seen (the continuous-trading alphas were designed and fitted on them), so the in-sample result is EXPLORATORY.",
+    "holdout": "2026-05-15 and 2026-05-18 (AAPL, MSFT, QQQ). They are SPENT for the registered continuous-trading hypotheses EQ01/02/04/05/07/10 but AUC01 has never been tested on them and their NOII stream has never been extracted. They are designated here, before any extraction, as the AUC01 holdout. They are extracted only after the in-sample summary is written and final; the frozen rule below is applied once."
+  },
+  "cells": [
+    {"horizon": "C-300s", "cross_type": "C", "decision_s": 300, "exit": "cross", "role": "PRIMARY"},
+    {"horizon": "O-300s", "cross_type": "O", "decision_s": 300, "exit": "cross", "role": "SECONDARY"}
+  ],
+  "strategy": "iap.auction.strategy (v1.10): one decision per (date, symbol, cross type) at the first NOII snapshot with 0 < time_to_cross_s <= 300; side = orientation * sign(imbalance_ratio) when |imbalance_ratio| >= threshold; entry at the touch (CostModel taker cost: spread + fee + impact), exit in the cross (cross_fee_per_share 0.0010).",
+  "config": {"qty": 100, "adv_shares": 5000000.0, "default_half_spread_bps": 1.0, "cross_fee_per_share": 0.001, "cost_model": "configs/execution/execution.json (the CLI default)"},
+  "mids": "Real mid and half-spread from the normalized dataset of that session (iap.research.auction_real mids: one streaming pass over the normalized JSONL, ConsolidatedBook per symbol, best bid/ask prevailing at each NOII snapshot ts, backward as-of). The mid is NaN when the book is not two-sided or is locked/crossed (e.g. pre-open), so such decisions are not traded (invalid in iap.auction.strategy). mid_pre_cross is the last such mid strictly before the scheduled cross.",
+  "walk_forward": "iap.auction.strategy.walk_forward, day_aligned, n_folds = 6 (every in-sample day after the first is a test day once), embargo 0, threshold grid (0.05, 0.1, 0.2, 0.3, 0.5) x orientation (+1, -1), min_train_trades 5, fitted on purged train days strictly before the test day. A fold with no admissible fit stays flat.",
+  "statistic": "Per cell: per test session the mean net_bps per trade (pooled over symbols); session-clustered mean of those means over sessions with >= 1 trade, Student-t CI with (sessions - 1) df. Also reported: trade count, gross/cost, hit rate, total USD, the stationary-bootstrap CI of walk_forward and the fitted (orientation, threshold) per fold.",
+  "verdict_rule_in_sample": "AUC01 edge EXISTS (in-sample, exploratory) for a cell iff the session-clustered mean net per trade > 0 AND its CI excludes 0 at the Bonferroni level over the 2 cells (two-sided 0.05/2) AND at least 4 of the 6 test sessions have trades. Anything else = no demonstrated edge. The verdict of the PRIMARY cell C-300s is the headline; O-300s is secondary.",
+  "holdout_rule": "C-300s only (O-300s descriptive). Frozen fit: (orientation, threshold) chosen by the same grid and score (mean net_bps * sqrt(n), min_train_trades 5) on ALL 7 in-sample sessions; applied unchanged to 2026-05-15 and 2026-05-18 with the same mids helper and cost model. CONFIRMED iff the in-sample fit exists AND the holdout has >= 3 trades AND holdout mean net per trade > 0 AND the trade-level one-sided t >= 1.645. With at most 6 trades this is badly underpowered: CONFIRMED reads 'consistent', NOT CONFIRMED is the default and is not evidence of no effect.",
+  "sampling": "Full sessions; the NOII extraction is one streaming pass per raw file, one file at a time."
+}
