@@ -112,6 +112,8 @@ spec:
                     path: mvp/mvp_tiny.json
                   - key: mvp__venues.json
                     path: mvp/venues.json
+                  - key: paper__paper_trade.json
+                    path: paper/paper_trade.json
                   - key: prereg__v2.json
                     path: prereg/v2.json
                   - key: prereg__v3.json
