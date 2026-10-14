@@ -8,6 +8,11 @@ that tag.
 
 ## Unreleased
 
+- v1.16 item 13 (Python): the execution simulator's activation, cancel and amend queues are
+  min-heaps with lazy deletion and expiries use an `(expire_ts, order_id)` heap instead of a
+  per-event scan of every pending and resting order; rule 9 order and ties unchanged, fills
+  byte-identical (`tools/bench_exec_simulator.py` digest). The ITCH throughput test's
+  wall-clock floors are replaced by count-based guards (rates still printed).
 - v1.16 P0-1: opt-in simulator rule 6b, impact on the parent order
   (`ExecConfig.impact_model = "parent"`, `impact_exponent`, `permanent_impact_bps_per_pct_adv`):
   temporary impact on the parent's cumulative taker qty (splitting a parent cannot lower its
@@ -70,6 +75,13 @@ that tag.
     (manifest `lot_size_by_session`) and `--link` (hard links); off by default (byte-identical).
   - (d) Memory review `docs/research/MEMORY_REVIEW_v116.md`; `ResearchRunner.frames(needed)` loads
     only the experiment's features plus id, label and market columns (was full width).
+- v1.16 item 15: `iap.validation.multiple_testing` (Holm, Benjamini-Hochberg, Romano-Wolf step-down
+  max-t, joint fold bootstrap) and a report-only "Multiple testing across this report" table in the
+  24-alpha `REPORT.md` (Bonferroni / Holm / BH q / Romano-Wolf per alpha; the promotion gate is
+  unchanged). The committed REPORT.md gains the section at the next regenerate.
+- v1.16: `tools/release.py apply-bundle` extracts with Python `tarfile` (members path-checked, `data`
+  filter) instead of the system `tar --force-local` (bsdtar on Windows has no `--force-local`; the
+  v1.15 release had to extract by hand).
 
 ## v1.15.0 — 2026-10-13
 
