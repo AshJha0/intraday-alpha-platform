@@ -1,7 +1,7 @@
 {
   "schema": "iap.quoting_real_prereg",
   "version": 2,
-  "status": "DRAFT - not signed, not on the blackboard, not approved for any run",
+  "status": "DRAFT - values owner-approved 2026-10-14; not signed, not on the blackboard, not approved for any run until the owner runs tools/quoting_v2_register.py",
   "signed": false,
   "on_blackboard": false,
   "drafted": "2026-10-11",
@@ -10,17 +10,39 @@
   "code": "main at v1.14 or later (skew_mode='ticks' and the ticks_behind_touch / frac_decisions_skew_changed_quote diagnostics are NOT on research/step2); the code fingerprint is recorded at registration",
   "status_of_data": "IN-SAMPLE, exploratory, the same 7 XNAS ITCH sessions as v1 (2019-01-30, 2019-03-27, 2019-07-30, 2019-08-30, 2019-10-30, 2019-12-30, 2020-01-30; AAPL, MSFT, QQQ). The 3 v1 cells computed before the abort are not reused or cited. A positive result only motivates an out-of-sample test.",
   "cells": [
-    {"id": "EQ01", "alpha": "EQ01", "horizon": "1s", "role": "skewed"},
-    {"id": "EQ05", "alpha": "EQ05", "horizon": "1s", "role": "skewed"},
-    {"id": "EQ10", "alpha": "EQ10", "horizon": "1s", "role": "skewed"},
-    {"id": "QNOSKEW", "alpha": null, "horizon": "1s", "alpha_weight": 0.0, "role": "control: same tick quoter on every symbol with expected_return = 0"}
+    {
+      "id": "EQ01",
+      "alpha": "EQ01",
+      "horizon": "1s",
+      "role": "skewed",
+      "alpha_weight": 7.0
+    },
+    {
+      "id": "EQ05",
+      "alpha": "EQ05",
+      "horizon": "1s",
+      "role": "skewed",
+      "alpha_weight": 15.0
+    },
+    {
+      "id": "EQ10",
+      "alpha": "EQ10",
+      "horizon": "1s",
+      "role": "skewed",
+      "alpha_weight": 12.0
+    },
+    {
+      "id": "QNOSKEW",
+      "alpha": null,
+      "horizon": "1s",
+      "alpha_weight": 0.0,
+      "role": "control: same tick quoter on every symbol with expected_return = 0"
+    }
   ],
   "quoting_config": {
     "skew_mode": "ticks",
     "h_min_ticks": 0,
-    "h_min_ticks_meaning": "join the touch (0 ticks behind) before the skew and inventory terms",
-    "inv_skew_ticks": "TO_CONFIRM (ticks per qty of inventory; v1 had no explicit inventory skew)",
-    "alpha_weight": "TO_CONFIRM: skew_ticks = round(alpha_weight * er * mid / tick); at weight 1.0 er*mid is ~0.14 cents (< half a tick) so the skew rounds to 0. Fix a weight (or an er-to-ticks scale) from the in-sample er distribution BEFORE registration so the median |skew| is >= 1 tick, and record it here",
+    "inv_skew_ticks": 1.0,
     "qty": 100,
     "max_inventory": 300,
     "gamma": 0.1,
@@ -39,15 +61,30 @@
   "execution_config": "configs/prereg/v2.json on main (realism opt-ins incl. SEC Section 31 + FINRA TAF regulatory fees)",
   "decisions": "As v1: 1 s grid 09:31:00-15:59:00 New York on continuous-trading rows; skewed cells use the alpha fitted on sessions strictly before the test session (frozen-parameter scoring); control uses er = 0 on all 3 symbols.",
   "walk_forward": "As v1: session 1 warm-up only; 6 test sessions; previous session's calibration per symbol.",
-  "latency_ASSUMED": {"mean_ns": 100000, "jitter_ns": 50000, "tail_prob": 0.01, "tail_mult": 10.0, "venue_id": 101, "note": "ASSUMED, not measured: ITCH carries no receive stamp."},
+  "latency_ASSUMED": {
+    "mean_ns": 100000,
+    "jitter_ns": 50000,
+    "tail_prob": 0.01,
+    "tail_mult": 10.0,
+    "venue_id": 101,
+    "note": "ASSUMED, not measured: ITCH carries no receive stamp."
+  },
   "statistic": "As v1 (session-clustered mean net USD per session, Student-t CI with sessions-1 df, full P&L decomposition), plus ticks_behind_touch_{mean,median,max} and frac_decisions_skew_changed_quote per cell.",
-  "validity_gate": "Before any P&L is read: a skewed cell is VALID only if frac_decisions_skew_changed_quote >= TO_CONFIRM (proposed 0.10); an invalid cell reports 'skew inert' and gets no verdict.",
+  "validity_gate": "Before any P&L is read: a skewed cell is VALID only if frac_decisions_skew_changed_quote >= 0.10 (pooled over its test units); an invalid cell reports 'skew inert' and gets no verdict.",
   "verdict_rule": "As v1: quoting edge EXISTS for a cell iff mean net USD/session > 0 AND its Bonferroni CI over the 4 cells excludes 0 AND >= 4 of 6 test sessions have quote fills. Skew HELPS iff mean(skewed - control) > 0 with its Bonferroni CI excluding 0 (testable only on VALID cells). In-sample: EXISTS reads 'worth an out-of-sample test'. No tuning after results; no sweep.",
   "schedule": "run after the maker study finishes",
   "open_for_owner": [
-    "alpha_weight / er-to-ticks scale",
-    "inv_skew_ticks",
-    "validity_gate threshold",
-    "sign-off and blackboard registration (WriteBroker.preregister, new horizon tag such as '1s:quoting-v2-insample') before any run"
-  ]
+    "sign-off and blackboard registration: run tools/quoting_v2_register.py (owner only)"
+  ],
+  "values_approved": "2026-10-14 (owner, in chat)",
+  "horizon_tag": "quoting-v2-insample",
+  "registration_board": "research/agents/blackboard.jsonl (main; the v1 entries live on the archived research/step2 fork board)",
+  "alpha_weight_derivation": "skew_ticks = round(alpha_weight * er * mid / tick). On the 7 in-sample sessions (continuous trading, LinearAlpha fitted on all 7, score() with the pinned clip) the per-symbol median |er|*mid/tick was: EQ01 AAPL 0.136 / MSFT 0.077 / QQQ 0.087; EQ05 0.063 / 0.035 / 0.037; EQ10 AAPL 0.066 / MSFT 0.043. alpha_weight = 0.5 / min(median) rounded up, so every symbol's median |skew| is >= 1 tick: EQ01 7 (need 6.5), EQ05 15 (14.2), EQ10 12 (11.5). This deliberately scales the forecasts 7-15x so the skew can move quotes; it is a design constant, not a fitted edge.",
+  "quoting_config_notes": {
+    "h_min_ticks": "0 = join the touch before the skew and inventory terms",
+    "inv_skew_ticks": "1 tick per qty (100 shares) of inventory, on top of the rounded A-S term; max_inventory 300 -> up to 3 ticks",
+    "alpha_weight": "per cell (see cells and alpha_weight_derivation)",
+    "flatten_ts": "16:00:00 America/New_York of the session (the driver computes it)"
+  },
+  "validity_gate_threshold": 0.1
 }
