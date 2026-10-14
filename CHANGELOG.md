@@ -88,6 +88,12 @@ that tag.
   book is open and two-sided; per-session labels and lazy `WindowIndex` windows (no window or label crosses
   a session); train-only streaming normaliser; `python -m iap.models.lob_real` cache builder (float16,
   refuses the R7 holdout sessions and low disk). No training or holdout data used yet.
+- v1.16 item 10 (AI4 rebuild, part 2): cache stored as memory-mapped float16 `.npy` + meta, windows
+  normalised lazily (memory O(batch)); `iap.models.lob_train` streams DeepLOB / MLP training from
+  `WindowIndex` and fits the sklearn baselines on capped subsamples; chronological train / validation
+  split by session (default: last two sessions), pooled across symbols; `net_of_cost_mid` scores
+  non-overlapping taker trades every `horizon` events on the cache's mid and rebuilt spread plus a taker
+  fee; `accept` reported per symbol. IN-SAMPLE model selection only (no ledger entry); holdout units refused.
 
 ## v1.15.0 — 2026-10-13
 

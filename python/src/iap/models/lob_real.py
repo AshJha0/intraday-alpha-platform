@@ -19,8 +19,10 @@ Fixes the three gaps that deferred AI4-DEEPLOB-1 (research/r7/AI4_DEFERRED.md):
    beyond the previous level (monotone ladder), and a per-row count of
    empty levels is kept for audit.
 
-Cache: :func:`build_cache` writes one ``<session>_<symbol>.npz`` per unit
-(``X`` float16, ``mid`` float64, ``ts`` int64) and refuses the R7 holdout
+Cache: :func:`build_cache` writes per unit ``<session>_<symbol>.X.npy``
+(float16, memory-mappable) and ``<session>_<symbol>.meta.npz`` (``ts``,
+``mid``, ``n_empty``, ``tick``; written last, so it marks a complete unit),
+and refuses the R7 holdout
 sessions and units that would leave less than ``min_free_gb`` of disk.
 """
 
@@ -45,6 +47,7 @@ __all__ = [
     "iter_events",
     "fit_column_normalizer",
     "load_unit",
+    "unit_paths",
     "session_snapshots",
 ]
 
@@ -221,6 +224,8 @@ class WindowIndex:
     unit separately. ``__getitem__(i)`` returns ``(window (W, F) float32,
     label)``; ``stride`` > 1 keeps every stride-th window end (to bound the
     epoch size; the label horizons of kept windows may still overlap).
+    Units are kept as given (a float16 memory map is fine): each window is
+    cast to float32 and normalised when it is read, so memory is O(batch).
     """
 
     def __init__(
@@ -236,15 +241,16 @@ class WindowIndex:
         if window < 1 or horizon < 1 or stride < 1:
             raise ValueError("window, horizon and stride must be >= 1")
         self.window = window
+        self.normalizer = normalizer
         self.units: list[np.ndarray] = []
         self.labels: list[np.ndarray] = []
         ends_u: list[np.ndarray] = []
         ends_t: list[np.ndarray] = []
         for u, (x, mid) in enumerate(units):
-            lab = smoothed_labels(mid, horizon, threshold)
+            lab = smoothed_labels(mid, horizon, threshold).astype(np.int8)
             ends = np.arange(window - 1, len(lab))
             ends = ends[lab[ends] >= 0][::stride]
-            self.units.append(normalizer.transform(x) if normalizer else np.asarray(x, np.float32))
+            self.units.append(x)  # raw; may be a read-only memory map
             self.labels.append(lab)
             ends_u.append(np.full(len(ends), u, dtype=np.int32))
             ends_t.append(ends.astype(np.int64))
@@ -256,7 +262,14 @@ class WindowIndex:
 
     def __getitem__(self, i: int) -> tuple[np.ndarray, int]:
         u, t = int(self._u[i]), int(self._t[i])
-        return self.units[u][t - self.window + 1 : t + 1], int(self.labels[u][t])
+        w = np.asarray(self.units[u][t - self.window + 1 : t + 1], dtype=np.float32)
+        if self.normalizer is not None:
+            w = self.normalizer.transform(w)
+        return w, int(self.labels[u][t])
+
+    def ends(self) -> tuple[np.ndarray, np.ndarray]:
+        """``(unit, end_row)`` of every window, in index order."""
+        return self._u, self._t
 
     def label_array(self) -> np.ndarray:
         return np.asarray([self.labels[u][t] for u, t in zip(self._u, self._t, strict=True)])
@@ -266,10 +279,20 @@ class WindowIndex:
         return np.stack(xs), np.asarray(ys, dtype=np.int64)
 
 
-def load_unit(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """``(ts, mid, X float32)`` of a cached unit."""
-    with np.load(path) as z:
-        return z["ts"], z["mid"], z["X"].astype(np.float32)
+def load_unit(path: Path, mmap: bool = True) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """``(ts, mid, X)`` of a cached unit (``<unit>.meta.npz`` + ``<unit>.X.npy``);
+    ``X`` is a read-only float16 memory map unless ``mmap`` is False."""
+    path = Path(path)
+    stem = path.name.removesuffix(".meta.npz").removesuffix(".X.npy")
+    with np.load(path.parent / f"{stem}.meta.npz") as z:
+        ts, mid = z["ts"], z["mid"]
+    x = np.load(path.parent / f"{stem}.X.npy", mmap_mode="r" if mmap else None)
+    return ts, mid, x
+
+
+def unit_paths(cache: Path) -> list[Path]:
+    """Cached units, sorted (one ``.meta.npz`` per unit)."""
+    return sorted(Path(cache).glob("*.meta.npz"))
 
 
 def build_cache(
@@ -293,7 +316,7 @@ def build_cache(
         rows = instruments.get("instruments", instruments)
         ticks = {int(r["instrument_id"]): float(r["tick_size"]) for r in rows}
         for sym, iid in symbols.items():
-            path = out / f"{sess}_{sym}.npz"
+            path = out / f"{sess}_{sym}.meta.npz"
             if path.is_file():
                 continue
             free = shutil.disk_usage(out).free / 1e9
@@ -302,9 +325,12 @@ def build_cache(
                     f"only {free:.1f} GB free (< {min_free_gb}); stopping before {path.name}"
                 )
             ts, mid, x, empty = session_snapshots(iter_events(sdir, iid), ticks[iid], levels)
-            tmp = path.with_suffix(".partial.npz")
-            np.savez(tmp, ts=ts, mid=mid, X=x.astype(np.float16), n_empty=empty)
-            tmp.replace(path)
+            xpath = out / f"{sess}_{sym}.X.npy"
+            np.save(xpath, x.astype(np.float16))
+            del x
+            tmp = out / f"{sess}_{sym}.partial.npz"
+            np.savez(tmp, ts=ts, mid=mid, n_empty=empty, tick=np.float64(ticks[iid]))
+            tmp.replace(path)  # the meta file last: its presence marks a complete unit
             info = {
                 "unit": path.name,
                 "rows": int(len(ts)),
