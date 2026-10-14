@@ -123,7 +123,7 @@ canonical-JSON byte parity the contracts / lifecycle goldens pin.
 > describe how it was built.
 
 ```bash
-cd java && bash build.sh && bash test.sh    # at v1.14.0: 575 tests; the seventeen *GoldenTest classes are 124 of them
+cd archive/java && bash build.sh && bash test.sh    # at v1.14.0: 575 tests; the seventeen *GoldenTest classes are 124 of them
 ```
 
 **Maven/Gradle are deliberately not used: Maven Central is unreachable from

@@ -169,7 +169,7 @@ still spans the whole window (a weaker, disclosed protocol).
   A run captured by v1.4.0 therefore replays only from the v1.4.0 tag. In
   v1.14.0 the refitted `alpha_params.json` moved a few counts and the P&L,
   and `config_version` became `62d78a3b…`).
-- **A Java paper session** is reproduced by re-running `java/paper.sh` on
+- **A Java paper session** is reproduced by re-running `archive/java/paper.sh` (archived, frozen at v1.14.0) on
   the same vector and configuration: `decision_traces.jsonl` and the
   report's `trace.digest` are a pure function of the event stream
   (`PaperTraceTest`); `TraceDigest.ofJsonl` (Java) or
