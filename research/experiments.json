@@ -1,8 +1,8 @@
 {
-  "bonferroni_p_threshold": 9.314456035767511e-06,
-  "bonferroni_t_threshold": 4.432504959970387,
-  "chain_head": "8db34949f0c7c1b17073f862277a87b3a7fa15f387791a600a0f651b41b70c79",
-  "chain_length": 303,
+  "bonferroni_p_threshold": 9.30752047654505e-06,
+  "bonferroni_t_threshold": 4.432665509689233,
+  "chain_head": "99084dfad9fd66e7e14e926fc83d1e6f22e7c2dab37a024111f72a3fd1ebcf4a",
+  "chain_length": 307,
   "datasets": [
     {
       "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
@@ -16,12 +16,12 @@
     },
     {
       "dataset_version": null,
-      "entries": 10,
-      "looks": 10
+      "entries": 14,
+      "looks": 14
     }
   ],
   "description": "Multiple-testing ledger (spec \u00a713). Deterministic: no wall-clock; identical rerun => identical file. Experiments are de-duplicated by (alpha_id, kind, canonical config, dataset_version): re-running the same script on the same dataset does not inflate the Bonferroni denominator; the same configuration on a new dataset is a new look, and the looks of earlier datasets are kept (`datasets`). An entry judged under the ledger t-stat policy carries `gate_looks`, the look count its threshold was derived from.",
-  "distinct_experiments": 303,
+  "distinct_experiments": 307,
   "entries": [
     {
       "alpha_id": "ALL",
@@ -7414,10 +7414,66 @@
       "kind": "prereg",
       "n": 5368,
       "result": {}
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "code_hash": "35332637fab6598abfda6cf0ca6f07b19125a084dce3f9a2ec4ce28f52330c8f",
+        "feature_hash": "e0a861a2183199a43b4d33a66c1c12bf1ddef5a685357f25c753f33943e6a65c",
+        "horizon": "1s:quoting-v2-insample",
+        "prereg_id": "73040b2572d0e6eb"
+      },
+      "count": 1,
+      "key": "e20d3daf290b05f94230ed6f781e54b1394e5f9dd92dff4626c7c5aa1aeb702e",
+      "kind": "prereg",
+      "n": 5369,
+      "result": {}
+    },
+    {
+      "alpha_id": "EQ05",
+      "config": {
+        "code_hash": "35332637fab6598abfda6cf0ca6f07b19125a084dce3f9a2ec4ce28f52330c8f",
+        "feature_hash": "94854443c46625e0329b971c88c0c4ca0f91e2ae93a19aeed29d855932221737",
+        "horizon": "1s:quoting-v2-insample",
+        "prereg_id": "1b2ad44bfe8931d6"
+      },
+      "count": 1,
+      "key": "8ad0a83ef5a62853f4b1ffe43d09247ad0eb57c5d3d2b943dbc31ca24e43abae",
+      "kind": "prereg",
+      "n": 5370,
+      "result": {}
+    },
+    {
+      "alpha_id": "EQ10",
+      "config": {
+        "code_hash": "35332637fab6598abfda6cf0ca6f07b19125a084dce3f9a2ec4ce28f52330c8f",
+        "feature_hash": "511d5f579c699cef184415bb650d1b92be3442750487663600a40c12b5e6a638",
+        "horizon": "1s:quoting-v2-insample",
+        "prereg_id": "9f6ec016f87483d4"
+      },
+      "count": 1,
+      "key": "0fe20e5d5b024beb80ee96ef22a223c1becb809336e53255bd1d20beb3ecd0c5",
+      "kind": "prereg",
+      "n": 5371,
+      "result": {}
+    },
+    {
+      "alpha_id": "QNOSKEW",
+      "config": {
+        "code_hash": null,
+        "feature_hash": null,
+        "horizon": "1s:quoting-v2-insample",
+        "prereg_id": "a0d96514ea2d3f62"
+      },
+      "count": 1,
+      "key": "12a6305ff32d8bc1b697a6875c231a221409b4c0d16d856a2dac94839cb4cb72",
+      "kind": "prereg",
+      "n": 5372,
+      "result": {}
     }
   ],
-  "expected_max_null_t": 4.144444637982637,
+  "expected_max_null_t": 4.144624363592707,
   "pinned_alpha": 0.05,
-  "total_experiments": 5368,
+  "total_experiments": 5372,
   "x-version": 4
 }
