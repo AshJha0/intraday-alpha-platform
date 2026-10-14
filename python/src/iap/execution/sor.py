@@ -21,13 +21,19 @@ Deterministic venue selection over the per-venue books of one instrument
   side. The caller MUST NOT submit (``ExecutionReplay`` skips the child and
   counts ``sor_no_route``). An empty candidate list raises ValueError.
 
+v1.16 P0-4 (opt-in, Python only): ``allocate_aggressive`` splits a size
+across venues by walking displayed depth net of taker fees, and
+``route_passive_queue`` picks the resting venue by fill probability from a
+queue-depletion hazard (see each method).
+
 All iteration is in ascending venue_id order — same candidates + same
 books => same route.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+import math
+from collections.abc import Callable, Mapping, Sequence
 
 from iap.execution.config import SorOptions
 from iap.execution.simulator import ExecutionSimulator
@@ -123,3 +129,93 @@ class SmartOrderRouter:
                 best_rebate = rebate
                 best_comm = comm
         return best_vid if have else NO_ROUTE
+
+    # ------------------------------------------------- v1.16 P0-4 (opt-in)
+    # Python only; the C++ reference and the parity goldens use the two
+    # routes above, which are unchanged.
+
+    def allocate_aggressive(
+        self,
+        book: ConsolidatedBook,
+        side: int,
+        qty: int,
+        candidates: Sequence[int],
+        tick_size: float,
+        levels: int = 10,
+    ) -> list[tuple[int, int]]:
+        """Depth-for-size split of an aggressive ``qty`` across eligible venues.
+
+        Every displayed opposite level of every eligible venue (top
+        ``levels`` per venue) is a slice priced per share at ``price *
+        tick_size + taker_fee`` for a buy (``price * tick_size - taker_fee``
+        proceeds for a sell); slices are taken cheapest first (best
+        proceeds first for a sell; ties: lower venue_id, then better price)
+        until ``qty`` is covered. Returns ``[(venue_id, qty), ...]`` in
+        ascending venue_id, summing to at most ``qty`` (less when displayed
+        depth runs out); ``[]`` when no eligible venue quotes the side.
+        """
+        if qty <= 0:
+            raise ValueError("allocate_aggressive: qty must be > 0")
+        slices: list[tuple[float, int, int, int]] = []  # (key, vid, price, size)
+        for vid in _sorted_candidates(candidates):
+            vb = self._eligible(book, vid)
+            if vb is None:
+                continue
+            spec = self._venues.get(vid)
+            fee = 0.0 if spec is None else spec.taker_fee_per_share
+            for price, size in vb.depth(1 if side == 0 else 0, levels):
+                per_share = price * tick_size + (fee if side == 0 else -fee)
+                key = per_share if side == 0 else -per_share
+                slices.append((key, vid, price if side == 0 else -price, size))
+        slices.sort()
+        alloc: dict[int, int] = {}
+        left = qty
+        for _, vid, _, size in slices:
+            if left == 0:
+                break
+            take = min(size, left)
+            alloc[vid] = alloc.get(vid, 0) + take
+            left -= take
+        return sorted(alloc.items())
+
+    def route_passive_queue(
+        self,
+        book: ConsolidatedBook,
+        side: int,
+        candidates: Sequence[int],
+        hazard_per_s: Callable[[int, int, int], float | None],
+        horizon_s: float,
+        miss_cost_per_share: float,
+    ) -> int:
+        """Queue-position-aware passive venue (fill hazard).
+
+        Joining venue ``v``'s touch behind ``q`` displayed shares fills
+        within ``horizon_s`` with ``p = 1 - exp(-hazard_per_s(v, side, q) *
+        horizon_s)`` (the queue-depletion hazard of the execution
+        calibration, e.g. ``lambda v, s, q: cal.queue_depletion_hazard(s, q)``;
+        ``None`` = unknown, the venue is skipped). Score per share =
+        ``p * maker_rebate - (1 - p) * miss_cost_per_share`` (the miss cost
+        is what the unfilled remainder costs to complete, e.g. a spread plus
+        a taker fee); the highest score wins, ties to the lower venue_id.
+        ``NO_ROUTE`` when no eligible venue quotes our side with a hazard.
+        """
+        if horizon_s <= 0 or miss_cost_per_share < 0:
+            raise ValueError("route_passive_queue: horizon_s > 0 and miss_cost >= 0 required")
+        best_vid, best_score = NO_ROUTE, -math.inf
+        for vid in _sorted_candidates(candidates):
+            vb = self._eligible(book, vid)
+            if vb is None:
+                continue
+            quote = vb.best_bid() if side == 0 else vb.best_ask()
+            if quote is None:
+                continue
+            lam = hazard_per_s(vid, side, quote[1])
+            if lam is None:
+                continue
+            p = 1.0 - math.exp(-max(lam, 0.0) * horizon_s)
+            spec = self._venues.get(vid)
+            rebate = 0.0 if spec is None else spec.maker_rebate_per_share
+            score = p * rebate - (1.0 - p) * miss_cost_per_share
+            if score > best_score:
+                best_vid, best_score = vid, score
+        return best_vid
