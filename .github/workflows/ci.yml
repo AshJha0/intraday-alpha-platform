@@ -388,6 +388,10 @@ jobs:
       - name: cargo test (workspace)
         working-directory: rust
         run: cargo test --workspace --locked
+      # v1.16 item 13: benches (risk check_order) must keep compiling.
+      - name: cargo bench --no-run (workspace)
+        working-directory: rust
+        run: cargo bench --workspace --locked --no-run
       # BLOCKING: the workspace is clippy-clean; any new finding fails the job.
       - name: cargo clippy
         working-directory: rust

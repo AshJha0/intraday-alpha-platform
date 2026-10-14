@@ -1,6 +1,7 @@
 // Order book unit tests: every pinned semantic and error path
 // (PLATFORM_CONVENTIONS.md section 4; API_CORE.md section 4).
 
+#include <algorithm>
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -573,6 +574,27 @@ TEST(Book, DepthTopNBestFirstAndCapped) {
     }
     EXPECT_EQ(book.depth(Side::BID, 3).size(), 3u);
     EXPECT_EQ(book.order_count(Side::ASK, 4).size(), 4u);
+}
+
+TEST(Book, DepthIntoBuffersMatchDepth) {
+    OrderBook book(1, 1);
+    Stream s;
+    for (int i = 0; i < 15; ++i) {
+        book.apply(s.ev(ADD, BID, 100 - i, 10 + i, static_cast<std::uint64_t>(i + 1)));
+    }
+    iap::DepthBuffer buf;
+    book.depth_into(Side::BID, buf);
+    const auto ref = book.depth(Side::BID);
+    ASSERT_EQ(buf.size, ref.size());
+    EXPECT_TRUE(std::equal(buf.begin(), buf.end(), ref.begin()));
+    book.depth_into(Side::ASK, buf);  // empty side resets the size
+    EXPECT_EQ(buf.size, 0u);
+    iap::LevelEntry raw[4];
+    EXPECT_EQ(book.depth_into(Side::BID, 10, raw, 4), 4u);  // capped by cap
+    EXPECT_EQ(book.depth_into(Side::BID, 2, raw, 4), 2u);   // capped by levels
+    EXPECT_EQ(book.depth_into(Side::BID, -1, raw, 4), 0u);
+    const auto top2 = book.depth(Side::BID, 2);
+    EXPECT_TRUE(std::equal(raw, raw + 2, top2.begin()));
 }
 
 // -------------------------------------------------------------- checkpoints
