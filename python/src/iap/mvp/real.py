@@ -79,7 +79,15 @@ from iap.mvp.config import DEFAULT_CONFIG_PATH, REPO_ROOT, MvpConfig
 from iap.mvp.feed import FeedResult
 from iap.mvp.session import RunResult, run_session
 
-__all__ = ["RUN_MANIFEST", "RealRun", "run_real", "run_symbol", "main"]
+__all__ = [
+    "RUN_MANIFEST",
+    "PreparedSymbol",
+    "RealRun",
+    "main",
+    "prepare_symbol",
+    "run_real",
+    "run_symbol",
+]
 
 RUN_MANIFEST = "run_manifest.json"
 _MANIFEST_VERSION = 1
@@ -397,10 +405,62 @@ def run_symbol(
     mvp_config: str | Path | None = None,
     limit_events: int | None = None,
     allow_legacy: bool = False,
+    eod_flatten_lead_ns: int | None = None,
 ) -> RealRun:
-    """Run the MVP loop on one symbol of a real dataset (module docstring)."""
-    dataset = Path(dataset)
+    """Run the MVP loop on one symbol of a real dataset (module docstring).
+
+    ``eod_flatten_lead_ns`` (v1.16, opt-in) sets the MVP end-of-day flatten
+    lead on the base config (``execution.eod_flatten_lead_ns``); ``None``
+    keeps the base config's value."""
     out = Path(out_dir)
+    prep = prepare_symbol(
+        dataset,
+        date,
+        symbol,
+        out / "reference_root",
+        prereg=prereg,
+        mvp_config=mvp_config,
+        limit_events=limit_events,
+        allow_legacy=allow_legacy,
+        eod_flatten_lead_ns=eod_flatten_lead_ns,
+    )
+    return _run_prepared(prep, out)
+
+
+@dataclass(frozen=True)
+class PreparedSymbol:
+    """Everything needed to drive one symbol's engine (config, feed, realism)."""
+
+    dataset: Path
+    date: str
+    symbol: str
+    cfg: MvpConfig
+    feed: FeedResult
+    realism: RealismOptIns | None
+    prereg_block: dict[str, Any] | None
+    ds_manifest: dict[str, Any]
+    legacy: bool
+    source: Path
+    source_sha: str
+    instrument_id: int
+    limit_events: int | None
+
+
+def prepare_symbol(
+    dataset: str | Path,
+    date: str,
+    symbol: str,
+    stage: str | Path,
+    *,
+    prereg: str | Path | None = None,
+    mvp_config: str | Path | None = None,
+    limit_events: int | None = None,
+    allow_legacy: bool = False,
+    eod_flatten_lead_ns: int | None = None,
+) -> PreparedSymbol:
+    """Stage the reference root under ``stage`` and build the streamed feed
+    (passes 1 and 2 of the module docstring) without running the engine."""
+    dataset = Path(dataset)
     if limit_events is not None and limit_events < 1:
         raise ValueError("--limit-events must be >= 1")
     ds_manifest, legacy = _read_dataset_manifest(dataset, allow_legacy)
@@ -409,7 +469,9 @@ def run_symbol(
     source, source_sha = _normalized_source(dataset, ds_manifest)
     prereg_block, realism = _prereg_block(None if prereg is None else Path(prereg))
     base = MvpConfig.load(mvp_config or DEFAULT_CONFIG_PATH)
-    cfg, iid = _symbol_config(base, dataset, date, symbol, out / "reference_root")
+    if eod_flatten_lead_ns is not None:
+        base = base.with_overrides(eod_flatten_lead_ns=eod_flatten_lead_ns)
+    cfg, iid = _symbol_config(base, dataset, date, symbol, Path(stage))
 
     factory = _make_factory(source, iid, limit_events)
     n = 0
@@ -432,7 +494,36 @@ def run_symbol(
         generator_stats={},
         qc_totals=dict(sorted((ds_manifest.get("normalized") or {}).get("qc_totals", {}).items())),
     )
-    result = run_session(cfg, feed, out, realism=realism)  # pass 3
+    return PreparedSymbol(
+        dataset=dataset,
+        date=date,
+        symbol=symbol,
+        cfg=cfg,
+        feed=feed,
+        realism=realism,
+        prereg_block=prereg_block,
+        ds_manifest=ds_manifest,
+        legacy=legacy,
+        source=source,
+        source_sha=source_sha,
+        instrument_id=iid,
+        limit_events=limit_events,
+    )
+
+
+def _run_prepared(prep: PreparedSymbol, out: Path) -> RealRun:
+    dataset, date, symbol, cfg, feed = prep.dataset, prep.date, prep.symbol, prep.cfg, prep.feed
+    ds_manifest, legacy, source, source_sha = (
+        prep.ds_manifest,
+        prep.legacy,
+        prep.source,
+        prep.source_sha,
+    )
+    prereg_block, iid, limit_events = prep.prereg_block, prep.instrument_id, prep.limit_events
+    n = feed.n_events_generated
+    first, last = feed.events[0], feed.events[-1]
+    data_version, events_sha = feed.data_version, feed.events_sha256
+    result = run_session(cfg, feed, out, realism=prep.realism)  # pass 3
     rep = result.report
     counters = rep["counts"]["counters"]
     manifest = {
@@ -467,6 +558,7 @@ def run_symbol(
                 "research_default": "sqrt (iap.backtest.costs.CostModel)",
             },
             "regulatory_fee_schedule": cfg.reference.get("regulatory_fees"),
+            "eod_flatten_lead_ns": cfg.execution.eod_flatten_lead_ns,
             "session": {
                 "timezone": cfg.session.timezone,
                 "open": cfg.session.open,
