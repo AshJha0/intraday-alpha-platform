@@ -13,6 +13,11 @@ that tag.
   per-event scan of every pending and resting order; rule 9 order and ties unchanged, fills
   byte-identical (`tools/bench_exec_simulator.py` digest). The ITCH throughput test's
   wall-clock floors are replaced by count-based guards (rates still printed).
+- v1.16 item 13 (native): C++ `OrderBook::depth_into` caller-buffer overloads (`LevelEntry*`
+  + cap, and a fixed `DepthBuffer`); the execution simulator's aggressive-fill and
+  marketable-ADD paths use it, so they no longer allocate per call (`depth()` kept). Rust:
+  dependency-free `risk/benches/check_order.rs` (`harness = false`, no lockfile change); CI
+  compiles all benches with `cargo bench --no-run`. No behaviour change; goldens identical.
 - v1.16 item 16: mypy is blocking. The scoped mypy run (core/orderbook/execution/backtest/features,
   mypy 2.3.1) went from 102 errors to 0 with local type fixes (annotations, narrowing asserts on
   invariants already checked, renamed reused variables; four targeted `# type: ignore[code]`

@@ -261,7 +261,8 @@ void ExecutionSimulator::aggressive_fill(ChildOrder& o, const OrderBook& book) {
     const std::uint8_t opp_side = o.side == 0 ? 1 : 0;
     // Displayed opposite depth, best first (pinned rule 3), net of what our
     // own earlier fills already consumed (rule 3b).
-    const auto depth = book.depth(opp, DEPTH_LEVELS);
+    DepthBuffer depth;  // allocation-free (v1.16 item 13)
+    book.depth_into(opp, depth);
     auto within_limit = [&](std::int64_t price) {
         if (o.type == OrderType::MARKET) return true;
         return o.side == 0 ? price <= o.limit_ticks : price >= o.limit_ticks;
@@ -536,10 +537,9 @@ void ExecutionSimulator::on_event(const MarketEvent& ev) {
     const auto et = static_cast<EventType>(ev.event_type);
     const OrderBook* pre = venue_book(ev.instrument_id, ev.venue_id);
     const bool pre_open = venue_open(pre);
-    std::vector<LevelEntry> add_depth;
+    DepthBuffer add_depth;  // allocation-free (v1.16 item 13)
     if (!resting_.empty() && pre_open && et == EventType::ADD) {
-        add_depth =
-            pre->depth(ev.side == 0 ? Side::ASK : Side::BID, DEPTH_LEVELS);
+        pre->depth_into(ev.side == 0 ? Side::ASK : Side::BID, add_depth);
     }
     // The book's own record of the order an EXECUTE names.
     bool have_exec_order = false;
