@@ -1,0 +1,18 @@
+{
+  "schema": "iap.board_fork_archive",
+  "version": 1,
+  "fork": "research/step2",
+  "fork_commit": "7b18a323e3ae7ea45e3a2a3a677fb44bf293b8df",
+  "fork_point_commit": "39d2f1d3ad927406b35034f2c8492a40ee19ca14",
+  "fork_point_seq": 6,
+  "entries": 21,
+  "entries_after_fork_point": 15,
+  "head_seq": 21,
+  "head_hash": "e981ccf01756d8b01f4e87d0af278399696d9c7932b690fe30c9e6b79cf162b0",
+  "files": {
+    "agent_pubkeys.json": "7b307e8f9b706a2621f1069ce9408d58630f1e29750bf84125760352122951ec",
+    "anchors.json": "59a2ccd0b246411dec10523fd002292c81a177551bddd8221955491e8e3dd244",
+    "blackboard.jsonl": "00efa36a8382dedd8b43ca1ef773b1b7b4783b91ae35ef29fe75185d8e6a668f"
+  },
+  "why": "v1.16 item 11 (owner decision 2026-10-14, option 1): signed entries bind the previous hash, so the fork's entries are archived as their own verifiable chain instead of being re-signed onto main. Verify with Blackboard(path).verify() and verify_signatures(pubkeys from this directory's agent_pubkeys.json)."
+}

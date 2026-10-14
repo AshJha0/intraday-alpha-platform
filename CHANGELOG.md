@@ -35,6 +35,13 @@ that tag.
   is caught up at once in children of at most `max_child_qty`; `ac_params_from_calibration(...,
   impact_source="residual")` — Almgren-Chriss `eta` from the residual-move linear fit (P0-2).
   VWAP by time of day was already in place (forecast curves + exchange-local sessions, v1.10/v1.13).
+- v1.16 item 11: `research/maker-real` and `research/step2` merged onto main (maker, AUC01
+  auction and M5 quoting drivers, preregs, the quoting v2 DRAFT). Fork blackboards are NOT replayed
+  (signed entries bind the previous hash; owner decision): each is archived unchanged under
+  `research/agents/forks/<branch>/` with `FORK.json`, and main's board records one operator finding.
+  The study drivers gate on their archived fork board (`PREREG_BOARD`). Ledger merged with
+  `tools/merge_ledger.py` (+7 looks from step2, total 5368); `docs/research/R7_POWER.md` regenerated
+  (threshold 4.432 -> 4.433, DSR N 297 -> 304; R7 itself is closed and used its registered threshold).
 
 ## v1.15.0 — 2026-10-13
 
