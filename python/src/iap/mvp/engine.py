@@ -331,6 +331,8 @@ class MvpEngine(RiskWiringMixin, SizingMixin, EngineMetricsMixin):
         self.bar_returns: list[float] = []
         self._decisions: list[_Decision] = []
         self._live: _LiveParent | None = None
+        #: v1.16 end-of-day flatten counters (reported only when enabled)
+        self.eod_flatten: dict[str, int] = {"decisions": 0, "parents": 0, "too_late": 0}
         self._closing: list[_LiveParent] = []
         self.outcomes: list[OrderOutcome] = []
         #: (decision index, expected_return) of every confidence > 0 signal
@@ -492,6 +494,10 @@ class MvpEngine(RiskWiringMixin, SizingMixin, EngineMetricsMixin):
         for alpha in self.ensemble.members:
             builder.add_signal(member_signals[alpha.alpha_id])
 
+        lead = self.cfg.execution.eod_flatten_lead_ns
+        if lead is not None and t >= self.session_close_ts - lead:
+            self._decide_eod_flatten(t, signal, decision)
+            return
         state = PortfolioState(
             self.iid, t, self.account.position, self.account.mark, tuple(self.bar_returns)
         )
@@ -537,6 +543,48 @@ class MvpEngine(RiskWiringMixin, SizingMixin, EngineMetricsMixin):
         self._next_parent_id += 1
         self.counters.parent_orders += 1
         builder.add_parent_order(parent)
+        self.scheduler.open(parent)
+        self._live = _LiveParent(parent=parent, signal=signal, decision=decision)
+
+    def _decide_eod_flatten(self, t: int, signal: AlphaSignal, decision: _Decision) -> None:
+        """v1.16 end-of-day flatten (``execution.eod_flatten_lead_ns``): target
+        flat, no portfolio solve; the residual (position + in-flight) is worked
+        as ONE most-urgent parent ending at the session close, its costs
+        charged like any other parent."""
+        self.eod_flatten["decisions"] += 1
+        delta = -(self.account.position + self._inflight_signed())
+        if delta == 0:
+            self.counters.decisions_flat += 1
+            decision.ready = True
+            return
+        if self._live is not None and self._live.parent.end_ts > t:
+            self.counters.decisions_parent_live += 1
+            decision.ready = True
+            return
+        if t >= self.session_close_ts:
+            self.eod_flatten["too_late"] += 1
+            decision.ready = True
+            return
+        algo = self.cfg.execution.algo_for(1.0)
+        parent = ParentOrder(
+            parent_order_id=self._next_parent_id,
+            strategy_id=self.strategy_id,
+            alpha_id=self.ensemble.alpha_id,
+            instrument_id=self.iid,
+            side=Side.BID if delta > 0 else Side.ASK,
+            qty=abs(delta),
+            algo=algo,
+            decision_ts=t,
+            arrival_ts=t + self.exec_config.latency.internal_ns + self.min_venue_latency_ns,
+            end_ts=self.session_close_ts,
+            urgency=1.0,
+            limit_price_ticks=0,
+            params=self.scheduler.params_for(algo),
+        )
+        self._next_parent_id += 1
+        self.counters.parent_orders += 1
+        self.eod_flatten["parents"] += 1
+        decision.builder.add_parent_order(parent)
         self.scheduler.open(parent)
         self._live = _LiveParent(parent=parent, signal=signal, decision=decision)
 
