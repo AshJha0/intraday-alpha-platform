@@ -71,6 +71,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from math import exp, log
 from pathlib import Path
+from typing import Any
 
 from iap.core.events import EventType, MarketEvent
 from iap.features._famutil import put
@@ -149,7 +150,7 @@ def specs(cfg: ExtendedConfig = DEFAULT_CONFIG) -> list[FeatureSpec]:
         )
     for beta in cfg.hawkes_betas:
         b = _beta_label(beta)
-        prm = {"mu": cfg.hawkes_mu, "alpha": cfg.hawkes_alpha, "beta": beta}
+        prm: dict[str, Any] = {"mu": cfg.hawkes_mu, "alpha": cfg.hawkes_alpha, "beta": beta}
         for kind, doc in (
             ("buy", "buyer-initiated trades"),
             ("sell", "seller-initiated trades"),
@@ -414,9 +415,9 @@ class ExtendedFeatureEngine(FeatureEngine):
             xs.recoveries = st.recoveries
             xs.reset()
         usable = applied and ev is not None and ev.qty <= FEATURE_MAX_QTY
-        if usable and not recovered:
+        if ev is not None and usable and not recovered:
             xs.on_event(ev)
-        if usable and self.sampling != "clock":
+        if ev is not None and usable and self.sampling != "clock":
             if self.sampling == "events":
                 self._acc[iid] = self._acc.get(iid, 0) + 1
             elif ev.event_type == EventType.TRADE:

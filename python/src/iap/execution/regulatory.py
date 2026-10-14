@@ -75,8 +75,8 @@ class RegulatoryFeeSchedule:
         for p in self.sec:
             if p.usd_per_million < 0:
                 raise ValueError("sec_section31 rate must be >= 0")
-        for p in self.taf:
-            if p.per_share < 0 or p.max_per_trade < 0:
+        for t in self.taf:
+            if t.per_share < 0 or t.max_per_trade < 0:
                 raise ValueError("finra_taf rates must be >= 0")
 
     @classmethod

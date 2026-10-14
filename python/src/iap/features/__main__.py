@@ -100,6 +100,7 @@ from array import array
 from concurrent.futures import ProcessPoolExecutor
 from math import isfinite
 from pathlib import Path
+from typing import BinaryIO
 
 import numpy as np
 import pyarrow as pa
@@ -164,7 +165,7 @@ class _InstrumentBuffer:
         "norm_vals",
     )
 
-    def __init__(self, spool_path: str | None = None) -> None:
+    def __init__(self, spool_path: str) -> None:
         self.ts = array("q")
         self.bits = bytearray()
         self.series = CompactMidSeries()
@@ -172,7 +173,7 @@ class _InstrumentBuffer:
         self.last_refresh_seq = 0
         self.spool_path = spool_path
         self._pending = array("d")
-        self._fh = None
+        self._fh: BinaryIO | None = None
         self.rust_cols: list[int] | None = None
         self.rust_vals: np.ndarray | None = None
         self.norm_cols: list[int] | None = None
@@ -194,6 +195,7 @@ class _InstrumentBuffer:
         """Finish writing: everything is on disk, no file handle kept."""
         if self._pending or self._fh is None:
             self._spill()
+        assert self._fh is not None  # opened by _spill
         self._fh.close()
         self._fh = None
 
@@ -349,8 +351,8 @@ def _replay_file(
     temp directory), see :class:`_InstrumentBuffer`.
     """
     backend = engine
-    engine = _make_engine(contexts, cadence_ns, profiles, opts)
-    nfeat = len(engine.feature_names)
+    fe = _make_engine(contexts, cadence_ns, profiles, opts)
+    nfeat = len(fe.feature_names)
     if spool_dir is None:
         spool_dir = Path(tempfile.gettempdir()) / "iap_feature_spool"
     spool_dir.mkdir(parents=True, exist_ok=True)
@@ -370,15 +372,15 @@ def _replay_file(
         while ci < len(crosses) and crosses[ci][0] < ev.exchange_ts:
             ts, cid, qty = crosses[ci]
             if cid in contexts:
-                engine.on_cross_print(cid, ts, qty)
+                fe.on_cross_print(cid, ts, qty)
             ci += 1
-        vec = engine.apply(ev, end)
+        vec = fe.apply(ev, end)
         iid = ev.instrument_id
         buf = buffers.get(iid)
         if buf is None:
             buf = buffers[iid] = _InstrumentBuffer(str(spool_dir / f"{stem}_{iid}.f64"))
         buf.last_event_ts = ev.exchange_ts
-        st = engine.states[iid]
+        st = fe.states[iid]
         # One mid sample per BOOK REFRESH (API_FEATURES §6): a refresh
         # that left the merged view one-sided / stale / halted is
         # recorded as a NON-TRADABLE sample so labels cannot span it.
@@ -414,8 +416,8 @@ def _replay_file(
             buf.close()
     for ts, cid, qty in crosses[ci:]:  # after the last event (closing cross)
         if cid in contexts:
-            engine.on_cross_print(cid, ts, qty)
-    counts = (engine.events_processed, engine.vectors_emitted, engine.cross_prints_folded)
+            fe.on_cross_print(cid, ts, qty)
+    counts = (fe.events_processed, fe.vectors_emitted, fe.cross_prints_folded)
     if backend == "rust":
         _overlay_rust(path, contexts, cadence_ns, buffers, nfeat, same_ts == "coalesce")
     return n_events, counts, buffers, logs
@@ -609,7 +611,8 @@ def _flush_file(
         stats["label_max_age_ns"] = max_age
         stats["series_samples"] += len(buf.series)
         stats["tradable_samples"] += int(
-            np.count_nonzero(np.frombuffer(buf.series.tradable, np.uint8))
+            # CompactMidSeries stores tradable as a bytearray (MidSeries: list).
+            np.count_nonzero(np.frombuffer(buf.series.tradable, np.uint8))  # type: ignore[call-overload]
         )
         for h in HORIZON_ORDER:
             lab = labels[h]
@@ -831,7 +834,7 @@ def main(argv: list[str] | None = None) -> int:
 
         write_extended_registry(args.registry_out)
         registry = extended_registry()
-        family_order = FAMILY_ORDER + EXT_FAMILY_ORDER
+        family_order: tuple[str, ...] = FAMILY_ORDER + EXT_FAMILY_ORDER
         reg_hash = extended_registry_hash()
     else:
         write_registry(args.registry_out)

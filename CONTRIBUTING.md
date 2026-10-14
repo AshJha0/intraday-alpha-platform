@@ -77,16 +77,17 @@ keeps the check name `python`, the 3.12 entry is `python-312`) runs `-m "not slo
 before asking for review. Mark a file `slow` only when its tests take tens of
 seconds; a new marked file must still be green in `python-slow`.
 
-### 2.2 Static typing (advisory, v1.13)
+### 2.2 Static typing (blocking since v1.16)
 
-`cd python && python -m mypy` (config: `[tool.mypy]` in `python/pyproject.toml`)
-checks `iap.core`, `iap.orderbook`, `iap.execution`, `iap.backtest` and
-`iap.features`. The CI step is `continue-on-error` and writes the error count
-to the job summary (baseline at introduction: 87 errors in 13 files). Path to
-blocking: (1) do not add new errors in touched files; (2) burn the baseline
-down package by package (`attr-defined` / `union-attr` first); (3) when the
-count is 0, drop `continue-on-error` and add the `mypy` step to the required
-checks; (4) then widen `files` to the rest of `iap`.
+`cd python && python -m mypy` (config: `[tool.mypy]` in `python/pyproject.toml`,
+pinned `mypy==2.3.1`) checks `iap.core`, `iap.orderbook`, `iap.execution`,
+`iap.backtest` and `iap.features`. The count reached 0 in v1.16 (from 87 at
+introduction in v1.13, 102 just before the burn-down), and the `mypy` step of
+the `python` job (3.12) is now blocking: a new error fails CI. Fix the type,
+don't silence it; a targeted `# type: ignore[code]` with a reason on the same
+line is acceptable where the checker cannot follow the code (e.g. narrowing
+lost inside a closure). Next step: widen `files` to the rest of `iap`, one
+package at a time, each brought to 0 first.
 
 ### 2.3 Hashed requirements (v1.13)
 

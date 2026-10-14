@@ -48,6 +48,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -72,6 +73,9 @@ from iap.adaptive.lifecycle import (
 from iap.adaptive.refit import RefitContext, RefitPolicy
 from iap.backtest.engine import Backtester, BacktestResult
 from iap.validation.metrics import HORIZONS_NS, ic
+
+if TYPE_CHECKING:
+    from iap.alpha.base import AlphaModel
 
 #: Fraction of the warmup used to FIT the model whose out-of-sample tail
 #: pins the IC baseline (pinned, API_ADAPTIVE section 4).
@@ -116,7 +120,7 @@ class AdaptiveDeployment:
 
     def __init__(
         self,
-        model_factory: Callable[[], object],
+        model_factory: Callable[[], AlphaModel],
         frames: Mapping[int, pd.DataFrame],
         adaptive_cfg: dict,
         backtester: Backtester,

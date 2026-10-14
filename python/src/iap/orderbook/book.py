@@ -225,6 +225,21 @@ class OrderBook:
         "events_applied",
     )
 
+    # Counters (COUNTER_NAMES): set by the loop in __init__; declared here for
+    # type checkers.  Annotation-only, so compatible with __slots__.
+    duplicates_dropped: int
+    gaps_detected: int
+    dropped_while_stale: int
+    unknown_order_events: int
+    invalid_side_dropped: int
+    invalid_payload_dropped: int
+    unknown_type_dropped: int
+    modify_price_mismatch: int
+    snapshot_restarts: int
+    sequence_resets: int
+    late_recovered: int
+    events_applied: int
+
     def __init__(self, instrument_id: int, venue_id: int, reorder_window: int = 0) -> None:
         if not (0 <= reorder_window <= MAX_REORDER_WINDOW):
             raise ValueError(

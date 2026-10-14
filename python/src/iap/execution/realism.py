@@ -186,6 +186,7 @@ class RealismOptIns:
         )
 
     def _with_fees(self, cfg, tier: str):
+        assert self.fee_tiers is not None  # loaded by __post_init__ with fee_tier
         row = self.fee_tiers[tier]
         venues = {vid: v if v.is_fx else replace(v, **row) for vid, v in cfg.venues.items()}
         return replace(cfg, venues=venues)
@@ -216,6 +217,7 @@ class RealismOptIns:
                 raise ValueError("prereg impact_model 'parent' needs a calibration with impact_fit")
             from iap.execution.calibration import apply_impact_fit
 
+            assert self.impact_shape is not None  # __post_init__: required with 'parent'
             cfg = apply_impact_fit(cfg, calibration, self.impact_shape)
         return cfg
 

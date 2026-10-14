@@ -141,6 +141,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -235,7 +236,7 @@ class BacktestConfig:
         """The v1.4.0 rules, named: ``position_policy="sign"``, fills not
         capped at displayed size, every row traded.  ``overrides`` are the
         other fields (latency, decision age, ...)."""
-        fields = {
+        fields: dict[str, Any] = {
             "position_policy": LEGACY_POSITION_POLICY,
             "cap_fills_at_l1": False,
             "block_rows_column": None,
@@ -874,6 +875,7 @@ def ensemble_scores(
             c = sc["confidence"].to_numpy(dtype=float)
             zsum = z if zsum is None else zsum + z
             csum = c if csum is None else csum + c
+        assert zsum is not None and csum is not None  # members is non-empty
         z = zsum / len(members)
         conf = csum / len(members)
         base = all_scores[members[0]][iid]
