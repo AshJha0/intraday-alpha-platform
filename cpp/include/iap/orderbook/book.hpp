@@ -46,6 +46,15 @@ inline std::uint64_t synthetic_order_id(std::uint8_t side, std::uint64_t ordinal
 // (price_ticks, total_size) or (price_ticks, order_count).
 using LevelEntry = std::pair<std::int64_t, std::int64_t>;
 
+// Fixed-capacity top-of-book buffer (v1.16 item 13): filled by
+// OrderBook::depth_into without touching the heap; iterable best first.
+struct DepthBuffer {
+    std::array<LevelEntry, DEPTH_LEVELS> levels{};
+    std::size_t size = 0;
+    const LevelEntry* begin() const { return levels.data(); }
+    const LevelEntry* end() const { return levels.data() + size; }
+};
+
 // QC counters — exactly the Python reference's 12 counters, pinned order.
 struct BookCounters {
     std::uint64_t duplicates_dropped = 0;
@@ -221,6 +230,12 @@ public:
     // Allocation-free variant: clears `out` and fills it (capacity reused —
     // feature/execution hot paths, conventions section 8).
     void depth_into(Side side, int levels, std::vector<LevelEntry>& out) const;
+    // Caller-buffer variant: writes the top min(levels, cap) levels to
+    // `out` and returns how many were written. Never allocates.
+    std::size_t depth_into(Side side, int levels, LevelEntry* out,
+                           std::size_t cap) const;
+    // Top DEPTH_LEVELS into a fixed buffer (same as depth(side)).
+    void depth_into(Side side, DepthBuffer& out) const;
     // Total resting size at an exact price level (0 when the level is absent).
     std::int64_t level_qty(Side side, std::int64_t price_ticks) const;
     // Top-N (price, order_count), best first.
