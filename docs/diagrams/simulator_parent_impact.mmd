@@ -1,0 +1,18 @@
+flowchart TD
+    %% v1.16 P0-1 / P0-2: simulator rule 6 vs opt-in rule 6b, and the residual-impact calibration that feeds it.
+    %% Sources: iap.execution.simulator (_emit_fill, _parent_impact), iap.execution.calibration (impact_fit, apply_impact_fit).
+    FILL["taker fill of a child order<br/>(ExecutionSimulator._emit_fill)"] --> MODEL{"ExecConfig.impact_model"}
+    MODEL -- "child (default, every golden)" --> R6["rule 6: linear impact on the CHILD size<br/>impact_coeff_bps_per_pct_adv x child % of ADV"]
+    MODEL -- "parent (opt-in)" --> R6B["rule 6b: temporary impact on the PARENT cumulative taker qty<br/>exponent impact_exponent, charged incrementally f(q1) - f(q0)<br/>(splitting a parent cannot lower its cost)"]
+    R6B --> PERM{"permanent_impact_bps_per_pct_adv > 0?"}
+    PERM -- yes --> PL["+ permanent leg on the instrument<br/>cumulative signed flow"]
+    PERM -- no --> COST["impact cost on the fill"]
+    PL --> COST
+    R6 --> COST
+    subgraph CAL["residual-move calibration (opt-in)"]
+        EV["ITCH events + tape ADV<br/>(incl. non-displayed prints)"] --> EST["estimate_calibration(..., impact_fit=True)<br/>CLI --impact-fit"]
+        EST --> RES["impact.residual block:<br/>mid move after the depth walk vs participation<br/>linear + sqrt through-origin fits (HC0 SE),<br/>log-log power fit per horizon"]
+        RES --> APPLY["apply_impact_fit(config, calibration, shape)"]
+    end
+    APPLY -- "impact_model = parent,<br/>fitted coefficient and exponent" --> MODEL
+    RES -. "impact_source = residual" .-> AC["ac_params_from_calibration:<br/>Almgren-Chriss eta (P0-5)"]

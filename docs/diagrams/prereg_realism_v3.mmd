@@ -1,0 +1,19 @@
+flowchart LR
+    %% v1.16 P0-3: configs/prereg/v3.json = v2 + net-of-cost realism keys; read by iap.execution.realism.load_prereg into RealismOptIns.
+    V3["configs/prereg/v3.json<br/>methods v3, regulatory_fees, v2 execution_realism"] --> LOAD["realism.load_prereg → RealismOptIns<br/>(keys absent in v2: v2 runs unchanged)"]
+    LOAD --> VL["venue_latency<br/>mean 250 us, jitter 100 us,<br/>tail_prob 0.01, tail_mult 10 (ASSUMED)"]
+    LOAD --> LS["latency_stress 0, 1, 5 x<br/>1x primary, others reported"]
+    LOAD --> FT["fee_tier mid<br/>configs/reference/fee_tiers.json (ASSUMED)"]
+    LOAD --> FTS["fee_tier_sensitivity base<br/>reported only"]
+    LOAD --> EP["exec_prints true"]
+    LOAD --> IM["impact_model parent<br/>impact_shape sqrt"]
+    VL --> EC["RealismOptIns.exec_config(cfg, calibration)"]
+    FT --> EC
+    IM --> EC
+    LS --> SEC["RealismOptIns.stressed_exec_configs"]
+    FTS --> FTC["RealismOptIns.fee_tier_configs"]
+    EP --> SIMP["ExecutionSimulator(exec_print_price=True)<br/>+ Itch50Mapper(exec_prints=)"]
+    IM -. "needs estimate_calibration(impact_fit=True)" .-> CALN["apply_impact_fit → rule 6b"]
+    EC --> MVP["python -m iap.mvp.real:<br/>applies venue latency, fee tier, exec prints;<br/>the rest listed under not_applied with a reason"]
+    SEC --> RPT["research reports (sensitivity)"]
+    FTC --> RPT

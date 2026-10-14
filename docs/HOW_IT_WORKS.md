@@ -1047,6 +1047,53 @@ gained the SEC 15c3-5 pre-trade set as checks 23-29, run after the 22
 legacy checks so that no existing decision moved (COOKBOOK recipes 69 and
 70).
 
+### 3.13 What v1.16 changed: cost realism, and the monetisation answer
+
+v1.15 showed that EQ10 and EQ05 predict on the holdout but earn nothing
+after costs. v1.16 makes the cost side more realistic (all opt-in, Python
+only, every golden unchanged) and then asks whether any trading rule can
+monetise the signal.
+
+- **Parent impact (P0-1, simulator rule 6b).** Rule 6 charges impact on each
+  child's own size, so slicing a parent into more children lowered its
+  modelled cost. With `ExecConfig.impact_model = "parent"`, temporary impact
+  is charged on the parent's cumulative taker quantity, as the increment
+  f(q1) - f(q0) with exponent `impact_exponent`, so splitting cannot lower the
+  cost. An optional permanent leg (`permanent_impact_bps_per_pct_adv`) follows
+  the instrument's cumulative signed flow. DIAGRAMS.md §36.
+- **Residual impact calibration (P0-2).** `estimate_calibration(...,
+  impact_fit=True)` (CLI `--impact-fit`) regresses the mid move left after
+  the depth walk on participation in % of a tape ADV that includes
+  non-displayed prints: linear and square-root fits through the origin with
+  HC0 standard errors, and a log-log power fit per horizon.
+  `apply_impact_fit(config, calibration, shape)` switches a config to rule 6b
+  with the fitted numbers; `ac_params_from_calibration(...,
+  impact_source="residual")` takes the Almgren-Chriss `eta` from the linear fit.
+- **Pre-registration v3 (P0-3).** `configs/prereg/v3.json` adds venue latency
+  with a parametric tail, a {0, 1, 5}x latency stress, an assumed fee tier with
+  a lower-tier sensitivity, ITCH exec-print fill prices, and parent impact.
+  The latency and fee values are assumptions, stated as such in the file.
+  DIAGRAMS.md §37.
+- **Routing and algos (P0-4, P0-5).** `RouterOptions(sweep_rank="all_in")`
+  (`iap.execution.sor_v2`) ranks sweep levels by price including the taker
+  fee; passive routing can take a queue fill probability
+  (`hazard_fill_prob`). `ParentOrder.pov_exact` targets p of total volume
+  including our own (`floor(p/(1-p)*V)`).
+- **The answer (P0-6).** An in-sample grid of 480 cells (holding period, entry
+  band, signal, sizing, cost, latency) over 10 in-sample sessions, the R7
+  holdout refused, produced **zero trades**: the largest expected return
+  (about 0.1-0.2 bp) never clears the round-trip cost (about 0.8-1.2 bp). The
+  owner's decision (2026-10-14) is no-go for a taker strategy
+  (`research/v116/MONETISATION_P0-6.md`). DIAGRAMS.md §38.
+- **What is left: quoting v2.** The M5 two-sided skewed quoting study was
+  re-registered with skews large enough to move a quote (alpha weights EQ01 7,
+  EQ05 15, EQ10 12, so every symbol's median skew is at least one tick) and a
+  validity gate: if the skew changes the quote in fewer than 10% of decisions,
+  the result is "SKEW INERT" and no verdict is given. Only the owner registers
+  it (`tools/quoting_v2_register.py`); the driver refuses to run unless the
+  signed file and the registered draft verify. It is in-sample and
+  exploratory; no result is reported here. DIAGRAMS.md §39.
+
 ## 4. Risk: the engine that says no
 
 ### 4.1 The rule order
@@ -1440,7 +1487,12 @@ files with `--require-hashes`. GOVERNANCE.md §0 and §2c.
 ### 6.3 What is still planned
 
 Deep order-book baselines (AI4) are deferred: on this data a
-higher-capacity model has nothing to find (§6.4). The model registry and
+higher-capacity model has nothing to find (§6.4). The model code exists
+(`iap.models.deeplob`, `deeplob_torch`, `deeplob_baselines`), but main has
+no real-data path for it: the signed AI4 registration cannot be honoured as
+written (windows and labels cross sessions, a static price z-score;
+`research/r7/AI4_DEFERRED.md`), so a new registration must supersede it
+before any run. The model registry and
 drift checks that were planned here shipped in v1.11 (§5.4). The boundary
 in §6.1 does not move: the agent acts on the research record, never on the
 trading path.

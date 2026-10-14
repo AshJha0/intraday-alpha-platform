@@ -1,0 +1,13 @@
+flowchart TD
+    %% v1.16 monetisation path. Sources: docs/research/R7_RESULTS.md, research/v116/MONETISATION_P0-6.md,
+    %% research/quoting_real/prereg_v2*.json, research/r7/AI4_DEFERRED.md.
+    R7["R7 confirmed (v1.15): EQ10@1s, EQ05@1s<br/>predictive on 7 holdout sessions; net P&L at 1x cost 0"] --> P0["v1.16 P0-1..P0-5 cost realism<br/>(parent impact, residual fit, v3 prereg keys, SOR opt-ins, exact POV)"]
+    P0 --> STUDY["P0-6 in-sample monetisation study<br/>tools/v116_monetisation_study.py<br/>480 cells: hold x band x signal x sizing x cost x latency<br/>10 in-sample sessions, R7 holdout refused"]
+    STUDY --> RES["zero trades in every cell:<br/>expected return ~0.1-0.2 bp vs round trip ~0.8-1.2 bp"]
+    RES --> GO{"owner decision 2026-10-14"}
+    GO -- "NO-GO for a taker strategy" --> NOD["plan item 8 (paid fresh data,<br/>net-of-cost prereg) not triggered"]
+    GO -- "option 1" --> Q2["M5 two-sided skewed quoting v2<br/>registered (board seq 16-19), in-sample run"]
+    Q2 --> QV{"validity gate, then verdict"}
+    QV -- "EXISTS (in-sample)" --> OOS["worth an out-of-sample test<br/>(needs its own registration)"]
+    QV -- "NO DEMONSTRATED QUOTING EDGE<br/>or SKEW INERT" --> STOP["record the outcome; no monetisation claim"]
+    AI4["AI4 deep LOB (deferred from v1.15):<br/>registration cannot be honoured as written;<br/>no real-data path on main"] -. "separate track; a new registration<br/>would supersede the signed one" .-> GO

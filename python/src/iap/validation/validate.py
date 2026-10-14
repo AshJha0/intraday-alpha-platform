@@ -232,12 +232,14 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
+from contextlib import contextmanager
 from dataclasses import replace
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
+from iap.alpha.data import slim_columns
 from iap.backtest.engine import (
     BLOCK_ROWS_AUTO,
     BLOCK_ROWS_CAUSAL,
@@ -768,22 +770,21 @@ def validate_alpha(
     last_scores = None
     last_cost: dict[str, dict] | None = None
     last_result_1x: BacktestResult | None = None
-    # v1.15 (R7 memory): train frames keep only the columns a fit reads; a
-    # model that reads more is refit on the fold's full train frames.
+    # v1.15/v1.16 (R7 memory): train frames keep only the columns a fit
+    # reads, test frames only the columns scoring, labels, stress and decay
+    # read; a model that reads an undeclared column fails loudly.
     train_cols = _cpcv_columns(model_factory, uframes)
-    for fold, train, test in splitter.split_frames(uframes, horizon_ns, train_cols):
+    test_cols = _test_columns(model_factory, uframes)
+    for fold in splitter.split_folds(uframes):
+        # drop the previous fold's test frames before this fold's are built
+        test = scores = last_test = last_scores = None
+        train, test = splitter.fold_frames(uframes, fold, horizon_ns, train_cols, test_cols)
         model = model_factory()
-        try:
+        with _narrowed("walk-forward fit", train_cols):
             model.fit(train)
-        except KeyError:
-            if train_cols is None:
-                raise
-            del train
-            model = model_factory()
-            model.fit(splitter.train_frames(uframes, fold, horizon_ns))
-        else:
-            del train
-        scores = model.score(test)
+        del train
+        with _narrowed("walk-forward score", test_cols):
+            scores = model.score(test)
         ts, er, y, crossed = _pooled_arrays(scores, test, horizon, ic_rows)
         iids = _pooled_instrument_ids(scores, test)
         if single_venue:
@@ -1435,42 +1436,33 @@ def _cpcv_block(
     """The ``cpcv`` report block (module docs): per-split and per-path
     pooled IC of the standardized signal on all scored rows.
 
-    Memory (v1.15, R7): every split copies its train/test rows, so the block
-    first narrows the frames to the columns it reads (:func:`_cpcv_columns`);
-    the result is identical.  If the alpha turns out to read a column outside
-    that set (KeyError), the block reruns on the full frames.
+    Memory (v1.15/v1.16, R7): every split copies its train/test rows, so the
+    block first narrows the frames to the columns it reads
+    (:func:`_cpcv_columns`); the result is identical.  An alpha that reads a
+    column outside that set fails loudly (it used to rerun at full width).
     """
     narrow = _cpcv_columns(model_factory, uframes)
     if narrow is not None:
-        try:
-            return _cpcv_block_on(
-                model_factory,
-                {iid: df[[c for c in df.columns if c in narrow]] for iid, df in uframes.items()},
-                horizon,
-                horizon_ns,
-                ic_rows,
-                n_groups=n_groups,
-                k_test=k_test,
-                embargo_ns=embargo_ns,
-            )
-        except KeyError:
-            pass
-    return _cpcv_block_on(
-        model_factory,
-        uframes,
-        horizon,
-        horizon_ns,
-        ic_rows,
-        n_groups=n_groups,
-        k_test=k_test,
-        embargo_ns=embargo_ns,
-    )
+        uframes = {iid: df[[c for c in df.columns if c in narrow]] for iid, df in uframes.items()}
+    with _narrowed("cpcv", narrow):
+        return _cpcv_block_on(
+            model_factory,
+            uframes,
+            horizon,
+            horizon_ns,
+            ic_rows,
+            n_groups=n_groups,
+            k_test=k_test,
+            embargo_ns=embargo_ns,
+        )
 
 
 def _cpcv_columns(model_factory, uframes: Mapping[int, pd.DataFrame]) -> set[str] | None:
-    """Columns the cpcv block reads: ``exchange_ts``, every label column,
-    ``spread_ticks_v1`` (crossed flag) and the alpha's declared features;
-    ``None`` (no narrowing) when the alpha declares no feature list."""
+    """Columns the cpcv block (and a walk-forward fit) reads: ``exchange_ts``,
+    every label column, ``spread_ticks_v1`` (crossed flag) and the alpha's
+    declared features; ``None`` (no narrowing) when the alpha declares no
+    feature list.  Labels of every horizon are kept, not only ``horizon``'s:
+    a combined alpha fits each member at the member's own horizon."""
     feats = getattr(model_factory(), "features", None)
     if not feats:
         return None
@@ -1478,6 +1470,39 @@ def _cpcv_columns(model_factory, uframes: Mapping[int, pd.DataFrame]) -> set[str
     for df in uframes.values():
         cols.update(c for c in df.columns if c.startswith("label_"))
     return cols
+
+
+def _test_columns(model_factory, uframes: Mapping[int, pd.DataFrame]) -> set[str] | None:
+    """Columns a walk-forward test frame keeps (v1.16): every id and label
+    column (decay reads every horizon), the market columns the backtester and
+    stress read, and the alpha's declared features - the
+    :func:`iap.alpha.data.slim_columns` rule.  ``None`` (whole frames) when
+    the alpha declares no feature list."""
+    feats = getattr(model_factory(), "features", None)
+    if not feats:
+        return None
+    keep = slim_columns(list(feats))
+    cols: set[str] = set()
+    for df in uframes.values():
+        cols.update(keep(list(df.columns)))
+    return cols
+
+
+@contextmanager
+def _narrowed(where: str, cols: set[str] | None):
+    """Turn a ``KeyError`` raised on narrowed frames into a clear error: the
+    alpha read a column outside the set it declares (v1.16; it used to be
+    retried silently on full-width frames, the R7 out-of-memory path)."""
+    try:
+        yield
+    except KeyError as exc:
+        if cols is None:
+            raise
+        raise ValueError(
+            f"{where}: the alpha read column {exc} outside its narrowed column set "
+            "(exchange_ts, its horizon's labels, market columns and its declared "
+            "`features`); declare every column it reads in `features`"
+        ) from exc
 
 
 def _cpcv_block_on(
@@ -1492,8 +1517,8 @@ def _cpcv_block_on(
     embargo_ns: int,
 ) -> dict:
     splitter = CombinatorialPurgedSplitter(n_groups, k_test, embargo_ns)
-    per_split: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
-    splits = []
+    # per split, the (z, y) rows of each of its test groups - all a path reads
+    per_split: dict[int, dict[int, tuple[np.ndarray, np.ndarray]]] = {}
     split_rows = []
     for split, train, test in splitter.split_frames(uframes, horizon_ns):
         model = model_factory()
@@ -1502,8 +1527,11 @@ def _cpcv_block_on(
         ts, er, y, _ = _pooled_arrays(scores, test, horizon, ic_rows)
         beta = float(model.params().get("beta", 0.0) or 0.0)
         z = er / beta if beta != 0.0 else er
-        per_split[split.index] = (ts, z, y)
-        splits.append(split)
+        groups: dict[int, tuple[np.ndarray, np.ndarray]] = {}
+        for g in split.test_groups:
+            m = split.group_mask(ts, g)
+            groups[g] = (z[m], y[m])
+        per_split[split.index] = groups
         split_rows.append(
             {
                 "split": split.index,
@@ -1517,10 +1545,9 @@ def _cpcv_block_on(
     for assignment in splitter.path_assignment():
         zs, ys = [], []
         for g, i in sorted(assignment.items()):
-            ts, z, y = per_split[i]
-            m = splits[i].group_mask(ts, g)
-            zs.append(z[m])
-            ys.append(y[m])
+            z, y = per_split[i][g]
+            zs.append(z)
+            ys.append(y)
         path_ics.append(_fnum(ic(np.concatenate(zs), np.concatenate(ys))))
     finite = np.array([v for v in path_ics if v is not None], dtype=float)
     return {

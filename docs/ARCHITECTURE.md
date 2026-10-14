@@ -132,7 +132,7 @@ flowchart TD
     FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
-    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,361 looks / 296 configs, two datasets, three method revisions)<br/>REPORT.md, ML_REPORT.md, model manifests"]
+    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,372 looks / 307 configs, two datasets, three method revisions)<br/>REPORT.md, ML_REPORT.md, model manifests"]
     RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 23 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```
@@ -784,9 +784,9 @@ will find the cheapest path to a pass faster than a person: cheaper costs, a
 chosen holdout, uncounted looks. v1.3.0 closed those three in the tooling
 (LEARN.md §24) and measured what the validation chain can detect at all
 (the planted-signal power study, LEARN.md §23). It did not build the agents
-(v1.7.0 built the controls; v1.11.0 built the agent on top of them), and on two synthetic sessions whose ledger now holds 5,361 looks (1068 on
+(v1.7.0 built the controls; v1.11.0 built the agent on top of them), and on two synthetic sessions whose ledger now holds 5,372 looks (1068 on
 the v1.3.0 dataset, 852 on the regenerated v1.4.0 one, 3,236 on that same
-dataset under the v1.5.0 default methods, 202 under the v1.14 revision), more searching is not what the platform lacks (HOW_IT_WORKS.md §6.4
+dataset under the v1.5.0 default methods, 202 under the v1.14 revision, the rest pre-registrations and real-data study looks), more searching is not what the platform lacks (HOW_IT_WORKS.md §6.4
 lists what would be theatre on this data, and why). DIAGRAMS.md §19 draws
 the layer as planned at v1.3.0, and §26 the agent loop as built in v1.11.
 
@@ -1246,3 +1246,50 @@ places below.
 v1.14 is the correctness release (ROADMAP.md §3.8): causal row blocking,
 data-mapping fixes, the risk audit hash chain, and one regeneration of
 goldens, stores and reports.
+
+## 20. v1.15: the confirmatory release
+
+- **R7 confirmed** EQ10@1s and EQ05@1s on 7 owner-signed holdout sessions
+  (`docs/research/R7_RESULTS.md`), through `tools/r7_confirm.py` (one look,
+  `--i-am-the-owner`) after a `--dry-run` that checks signature, data
+  fingerprints, dataset version, `prereg_gate.require` and the ledger
+  threshold. Net P&L at 1x cost was 0: predictive, not yet tradable.
+- **The MVP on real ITCH** (`iap.mvp.real`, MVP.md §9): the unchanged
+  `MvpEngine`, streamed in three passes, one engine per symbol, with a
+  deterministic `run_manifest.json`.
+- **v2 pre-registration** (`configs/prereg/v2.json`) switches on the v1.14
+  execution-realism opt-ins and dated SEC Section 31 / FINRA TAF fees
+  (`configs/reference/regulatory_fee_schedule.json`), read through
+  `iap.execution.realism.load_prereg`. Code defaults stay off.
+- **Agents over MCP** (`iap.agents.mcp_workflow`): propose, draft a prereg,
+  read hit rates and fees; sign-off, confirmatory runs, outcomes and
+  promotion have no tool.
+- **Java archived** to `archive/java/`; parity is three languages (python,
+  cpp, rust).
+
+## 21. v1.16: cost realism and the monetisation question
+
+Everything below is opt-in and Python only unless stated; no golden moved.
+Diagrams: DIAGRAMS.md §36-§41.
+
+| piece | where | what it changes |
+|---|---|---|
+| simulator rule 6b, parent impact | `iap.execution.simulator` (`ExecConfig.impact_model = "parent"`) | impact on the parent's cumulative taker qty + optional permanent leg (§36) |
+| residual impact fit | `iap.execution.calibration` (`impact_fit=True`, `apply_impact_fit`) | fits the rule 6b coefficient and exponent from residual mid moves |
+| prereg v3 | `configs/prereg/v3.json`, `iap.execution.realism.RealismOptIns` | venue latency, latency stress, fee tier, exec prints, parent impact (§37) |
+| SOR opt-ins | `iap.execution.sor_v2` (`RouterOptions`, `hazard_fill_prob`) | all-in sweep ranking; fill-probability passive routing |
+| exact POV, AC eta from the residual fit | `iap.execution.algos` (`ParentOrder.pov_exact`), `iap.execution.optimal.ac_params_from_calibration` | POV of total volume; Almgren-Chriss eta from data |
+| MVP end-of-day flatten | `iap.mvp` (`execution.eod_flatten_lead_ns`) | residual worked as one urgent parent ending at the close (MVP.md §10) |
+| monetisation study | `tools/v116_monetisation_study.py`, `research/v116/` | in-sample grid; zero trades; owner no-go for a taker strategy (§38) |
+| quoting study v2 | `iap.research.quoting_real`, `tools/quoting_v2_register.py` | signed v2 prereg checks and a validity gate before any verdict (§39) |
+| fork-board archive | `research/agents/forks/<branch>/FORK.json`, `tools/merge_ledger.py` | research branches merged without replaying signed entries (§40) |
+| prereg touch check | `tools/prereg_touch_check.py`, CI step in `ci.yml` | a `::warning::` when a PR changes code an open prereg fingerprints (§40) |
+| multiple testing | `iap.validation.multiple_testing` | report-only Holm / BH / Romano-Wolf table in `REPORT.md`; gate unchanged |
+| beta stability | `iap.validation.beta_stability` | report-only; kept outside the fingerprinted alpha modules |
+| simulator queues | `iap.execution.simulator` | min-heaps with lazy deletion; fills byte-identical |
+| allocation-free depth (C++) | `OrderBook::depth_into` | caller-buffer depth; no behaviour change |
+
+Not on main: an AI4 real-data path (LOB windows built from real
+sessions). `iap.models.deeplob` works on synthetic and in-memory snapshots
+only, and the signed AI4 registration is deferred
+(`research/r7/AI4_DEFERRED.md`).
