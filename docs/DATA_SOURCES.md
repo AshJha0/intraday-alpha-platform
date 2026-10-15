@@ -122,14 +122,33 @@ under `data/real`, which is not committed, so **no wall-clock or peak-disk
 figure for a completed 100-name day is quoted here** (placeholder for the G5
 truth pass, from the first completed day's `process_report.json`).
 
-## 5. The A4 IEX overlap set (placeholder for the day table)
+## 5. The A4 IEX overlap set
 
-The plan's A4 selects IEX days that overlap Nasdaq in-sample or fresh days so
-a two-venue comparison and the B7 gate sessions have data. Placeholder for the
-G5 truth pass: the table of dates, feeds (DEEP+, DEEP, TOPS), sizes and
-sha256 once A4 lands, and whether each day is on disk or deleted. No day is
-claimed here.
+The nine Nasdaq 2025/26 sessions on disk are also on IEX HIST. `python -m
+iap.marketdata process-iex-day` (RUNBOOK_process_and_delete.md, IEX section)
+pairs each with the same day's IEX book for AAPL, MSFT, QQQ: DEEP+ is the
+book feed, TOPS its oracle (`book_verification`); the TOPS capture is read
+once for the three names' quotes and deleted before DEEP+ is downloaded (one
+vendor file on disk at a time), and after the feature build only features,
+manifests and `KEEP.json` stay. Approval (owner, 2026-10-15, verbatim in
+`research/v117/iex_overlap_manifest.json`): "A4 (IEX overlap days, needs your
+download approvals), = approved". Sizes are the HIST index of 2026-10-15; the
+sha256 of each capture is recorded in the day's `process_report.json` and in
+docs/research/IEX_OVERLAP_SET.md as the detached chain finishes the day.
 
-| date | feed | size | sha256 | state |
-|---|---|---|---|---|
-| (filled by G5) | | | | |
+| date | Nasdaq dataset | TOPS gz | DEEP+ gz | DEEP gz (not downloaded) | state |
+|---|---|---|---|---|---|
+| 2025-11-28 | r7_20251128 | 4.37 GB | 4.31 GB | 4.60 GB | running (chain day 1) |
+| 2025-12-08 | r7_20251208 | 9.30 GB | 8.99 GB | 9.43 GB | queued |
+| 2025-12-09 | r7_20251209 | 8.61 GB | 8.43 GB | 8.89 GB | queued |
+| 2025-12-10 | r7_20251210 | 12.29 GB | 11.45 GB | 11.74 GB | queued |
+| 2025-12-11 | r7_20251211 | 11.15 GB | 10.55 GB | 11.00 GB | queued |
+| 2025-12-12 | r7_20251212 | 13.67 GB | 12.71 GB | 12.98 GB | queued |
+| 2026-05-15 | holdout2026 | 12.15 GB | 11.91 GB | 12.60 GB | queued |
+| 2026-05-18 | holdout2026 | 14.87 GB | 14.21 GB | 14.90 GB | queued |
+| 2026-06-12 | r7_20260612 | 15.62 GB | 14.69 GB | 15.33 GB | queued |
+
+The rolling "recent IEX days" list (`tools/iex_hist.py recent --n 5`: the
+latest five HIST days with TOPS and DEEP+, `research/v117/iex_recent_manifest.json`)
+is listed only: no approval sentence, not downloaded, and `tools/iex_download.py`
+refuses it.

@@ -78,6 +78,7 @@ by the owner (``tools/r7_download.py`` style, data/real) and passed in.
 from __future__ import annotations
 
 import gzip
+import json
 import struct
 from collections.abc import Iterable, Iterator
 from pathlib import Path
@@ -103,6 +104,7 @@ from iap.marketdata.itch50 import (
 
 __all__ = [
     "PROTOCOL_DEEP",
+    "TOPS_EXTRACT_SUFFIX",
     "PROTOCOL_DEEP_PLUS",
     "PROTOCOL_TOPS",
     "VENUE",
@@ -123,6 +125,9 @@ PROTOCOL_NAMES = {PROTOCOL_TOPS: "TOPS", PROTOCOL_DEEP: "DEEP", PROTOCOL_DEEP_PL
 #: The venue of an IEX dataset (real venue ids start at 101; Nasdaq is 101).
 VENUE = "IEXG"
 VENUE_ID = 102
+#: A TOPS extract (:meth:`TopsQuotes.save`): the universe's quotes only.
+TOPS_EXTRACT_SUFFIX = ".tops.json.gz"
+TOPS_EXTRACT_SCHEMA = "iap.iex.tops_extract/v1"
 
 _NS_PER_DAY = 86_400 * 1_000_000_000
 _H = 3600 * 1_000_000_000
@@ -732,9 +737,17 @@ class TopsQuotes:
         self.by_symbol: dict[str, dict[int, tuple[int, int, int, int]]] = {}
         self.quotes = 0
         self.protocol: int | None = None
+        #: the capture an extract was taken from (:meth:`load_extract`)
+        self.source: dict = {}
 
     @classmethod
     def load(cls, path: str | Path, symbols: Iterable[str], midnight: int) -> TopsQuotes:
+        """The universe's quotes from the day's TOPS capture, or from an
+        extract written by :meth:`save` (``*.tops.json.gz``: the process-and-
+        delete chain reads the capture once, keeps the universe's quotes and
+        deletes the capture before the book feed is downloaded)."""
+        if Path(path).name.endswith(TOPS_EXTRACT_SUFFIX):
+            return cls.load_extract(path, symbols)
         out = cls()
         wanted = set(symbols)
         stats = PcapStats()
@@ -766,6 +779,45 @@ class TopsQuotes:
 
     def get(self, symbol: str, ts: int) -> tuple[int, int, int, int] | None:
         return self.by_symbol.get(symbol, {}).get(ts)
+
+    def save(self, path: str | Path, *, source: dict | None = None) -> Path:
+        """Write the loaded quotes as a gzip JSON extract (v1.17 A4); ``source``
+        names the capture they came from (file, bytes, sha256)."""
+        p = Path(path)
+        if not p.name.endswith(TOPS_EXTRACT_SUFFIX):
+            raise IngestError(f"a TOPS extract must end with {TOPS_EXTRACT_SUFFIX}: {p.name}")
+        doc = {
+            "schema": TOPS_EXTRACT_SCHEMA,
+            "source": source or {},
+            "quotes": self.quotes,
+            "by_symbol": {
+                s: [[ts, *q] for ts, q in sorted(rows.items())]
+                for s, rows in self.by_symbol.items()
+            },
+        }
+        with gzip.open(p, "wt", encoding="utf-8") as f:
+            json.dump(doc, f, separators=(",", ":"))
+        return p
+
+    @classmethod
+    def load_extract(cls, path: str | Path, symbols: Iterable[str]) -> TopsQuotes:
+        """Read an extract of :meth:`save`; refuses one that lacks a universe symbol."""
+        with gzip.open(path, "rt", encoding="utf-8") as f:
+            doc = json.load(f)
+        if doc.get("schema") != TOPS_EXTRACT_SCHEMA:
+            raise IngestError(f"{Path(path).name}: not a TOPS extract ({doc.get('schema')!r})")
+        missing = [s for s in symbols if s not in doc["by_symbol"]]
+        if missing:
+            raise IngestError(f"{Path(path).name}: the TOPS extract has no quotes for {missing}")
+        out = cls()
+        out.protocol = PROTOCOL_TOPS
+        out.quotes = int(doc["quotes"])
+        out.by_symbol = {
+            s: {int(r[0]): (int(r[1]), int(r[2]), int(r[3]), int(r[4])) for r in rows}
+            for s, rows in doc["by_symbol"].items()
+        }
+        out.source = dict(doc.get("source") or {})
+        return out
 
 
 class TopsOracle:

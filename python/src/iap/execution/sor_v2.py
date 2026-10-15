@@ -78,6 +78,13 @@ def hazard_fill_prob(
 
     E.g. ``hazard_fill_prob(lambda v, s, q: cal.queue_depletion_hazard(s, q), 1.0)``;
     a ``None`` hazard stays ``None`` (venue skipped).
+
+    Review X-4 (v1.17 B5): the pooled ``queue_depletion_hazard`` counts a
+    level that emptied because the orders ahead CANCELLED as a depletion,
+    so it overstates the fill rate. Pass the execution rate instead —
+    ``lambda v, s, q: cal.queue_exec_depletion_hazard(s, q)`` from a
+    calibration estimated with ``depletion_split=True``. The signature and
+    the default callers are unchanged (opt-in).
     """
     if horizon_s <= 0:
         raise ValueError("hazard_fill_prob: horizon_s must be > 0")

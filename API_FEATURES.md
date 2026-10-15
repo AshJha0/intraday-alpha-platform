@@ -667,22 +667,26 @@ burst, AR(1)-sign autocorrelation, depletion time for a planted cancel
 rate, odd-lot / hidden shares and their degradation, event / volume row
 counts, causality by perturbing the future, default hash unchanged).
 
-## 9. Feature spec v2 and labels v2 — 15 m / 30 m / 1 h (opt-in, v1.17 C4)
+## 9. Feature spec v2 and labels v2 — long windows, share normalisation (opt-in, v1.17 C4 / A5)
 
 Everything here is **opt-in** and additive: the default registry (205
 features, hash `585dd7b9...`), `WINDOW_NS`, the engine, the golden vectors
 of §5, the v1 labels of §6 (`HORIZONS_NS`, 10 ms–15 m) and
 `iap.alpha.base.VALID_HORIZONS` are unchanged; the open pre-registrations'
-fingerprints do not move. No port computes these; the feature store CLI
-does not write them.
+fingerprints do not move. No port computes these (Python-reference only,
+pending F7 / F8; conventions §11.7); the feature store CLI does not write
+them.
 
 ### 9.1 Features — `iap.features.feature_v2`
 
-One family, `longwin`, 12 features over the windows `WINDOWS_V2_NS` =
-`15m`, `30m`, `1h` (names end `_v2`); registry `specs_v2()`, hash
-`v2_registry_hash()` = sha256 of the canonical JSON of
-`[{"base_registry_hash": <default hash>}, *specs]`, so the v2 set is
-defined on top of a specific registered set.
+Two families, `FAMILIES_V2 = ("longwin", "sharenorm")` (names end `_v2`);
+registry `specs_v2(families=None)`, hash `v2_registry_hash(families)` =
+sha256 of the canonical JSON of `[{"base_registry_hash": <default hash>},
+*specs]`, so a v2 set is defined on top of a specific registered set and
+by the families chosen (family order pinned).
+
+**`longwin` (C4)** — 12 features over the windows `WINDOWS_V2_NS` =
+`15m`, `30m`, `1h`:
 
 | feature | definition | valid when |
 |---|---|---|
@@ -694,26 +698,74 @@ defined on top of a specific registered set.
 Sampling follows the registered 10 s / 1 m / 5 m volatility and trend
 features (log mid recorded at mid changes; windows half-open in event time).
 
+**`sharenorm` (A5, review D-P1-5)** — 14 features: volumes and depths
+divided by a share count, so the values compare across instruments of any
+size. Two normalisers: the instrument's **session ADV** (a
+`SessionAdvTable`, `iap.reference.session_adv`: the AS-OF value of the
+session the emission falls in, from the dataset's `adv_by_session`; a
+static `{instrument_id: adv}` map; or `None` = every `*_adv_*` feature
+invalid) and the **running session volume** (shares printed so far in the
+session-local day). Windows `WINDOWS_SHARENORM_NS` = `1m`, `5m`, `15m`.
+Quantities and ADV are in the `instruments.json` units (shares; FX: lots).
+
+| feature | definition | valid when |
+|---|---|---|
+| `session_volume_adv_v2` | shares printed so far this session / ADV | ADV known |
+| `traded_volume_adv_w<w>_v2` | shares printed in `(t − w, t]` / ADV | ADV known, window warm |
+| `signed_volume_adv_w<w>_v2` | (buy − sell shares in `(t − w, t]`) / ADV | ADV known, window warm |
+| `traded_volume_session_w<w>_v2` | shares printed in `(t − w, t]` / shares printed so far this session | window warm, session volume > 0 |
+| `depth_l1_adv_v2`, `depth_l10_adv_v2` | merged displayed bid + ask over 1 / 10 levels / ADV | book two-sided, ADV known |
+| `depth_diff_l1_adv_v2`, `depth_diff_l10_adv_v2` | merged displayed bid − ask over 1 / 10 levels / ADV | book two-sided, ADV known |
+
+"Shares printed" are the continuous `TRADE` prints the base engine
+applied (same bounds as §2: an `exchange_ts` regression, a duplicate
+sequence, an invalid payload or an oversized quantity contributes nothing)
+plus the side-less cross prints folded through `on_cross_print` (§2,
+D-P2-6; in the volumes, never in the signed volume).
+
+**Busts (A5, review X-11).** A `TRADE_BUST` event (API_CORE §4; ITCH `B`,
+IEX trade break) names an earlier print by `trade_id`. From the bust's own
+time forward the `sharenorm` volumes exclude that print: every window it
+is still inside loses its shares and signed shares, and the session volume
+loses them for the rest of the session; emissions before the bust are what
+they were (the print was on the tape then). A bust naming a print the
+extension did not record (a cross print, a print before the session reset,
+an unknown id, a bust with a regressed timestamp) is counted
+(`busts_unmatched`) and changes nothing. **The registered features never
+see a bust**: `FeatureEngine.apply` skips it before the book (it reaches
+no rolling window and emits nothing of its own; a bust that ends a
+same-timestamp group closes it exactly as the group's last real event
+would have, so a stream with its busts removed yields byte-identical
+vectors; `trade_busts_skipped` counts them; the Rust and C++ engines do
+the same). The `longwin` family reads no volume, so a bust changes
+`sharenorm` only.
+
 **Session-spanning rule (pinned).** A v2 window never spans a session: an
 instrument's v2 state is cleared and its warmup anchor moved to the
 current event at the first emission of a new SESSION-LOCAL day
 (`SessionClock`, §3) and at every stale→fresh recovery (§2.1). A window is
 warm when `t − anchor ≥ w`: on a 09:30 New York open the 1 h features exist
-from 10:30 and never read the previous close. The rule is the session, not
-the engine instance, so one engine per day and one per month give the same
-values.
+from 10:30 and never read the previous close. The running session volume
+is cleared at the new day only (after a recovery it keeps what was seen
+before the gap). The rule is the session, not the engine instance, so one
+engine per day and one per month give the same values.
 
-**Opt-in.** `FeatureV2Extension(engine, on_vector=None, keep=False)`
-attaches to a running `FeatureEngine` / `ExtendedFeatureEngine` through its
-`on_vector` hook: per base emission it reads the merged-book state and
-emits a second `FeatureVector` (`feature_version = v2_registry_hash()`);
+**Opt-in.** `FeatureV2Extension(engine, on_vector=None, keep=False,
+families=None, adv=None)` attaches to a running `FeatureEngine` /
+`ExtendedFeatureEngine` through its `on_vector` hook, and wraps the
+engine's `apply` and `on_cross_print` to see the prints and the busts: per
+base emission it reads the merged-book state and emits a second
+`FeatureVector` (`feature_version = v2_registry_hash(families)`);
 `on_vector(base_vector, v2_vector)`; the engine's previous callback still
 receives the base vector first, which is byte-identical with or without
-the extension; `detach()` restores it; `v2_frame(vectors)` builds the
-per-instrument frame (`exchange_ts` + 12 float64 columns, NaN where
-invalid). Golden: `tests/golden/expected_features_v2.json` (synthetic
-2.5-hour one-venue book, `python/tests/test_feature_v2.py`, cross-checked
-against a brute-force recomputation; regenerate with
+the extension; `detach()` restores all three; `v2_frame(vectors,
+families)` builds the per-instrument frame (`exchange_ts` + one float64
+column per feature, 26 with both families, NaN where invalid). Counters:
+`prints_recorded`, `busts_applied`, `busts_unmatched`, `session_resets`.
+Golden: `tests/golden/expected_features_v2.json` (x-version 2: both
+families, static ADV 2e6 shares; synthetic 2.5-hour one-venue book,
+`python/tests/test_feature_v2.py`, cross-checked against a brute-force
+recomputation of both families and of the bust rule; regenerate with
 `IAP_REGEN_V2_GOLDEN=1`).
 
 ### 9.2 Labels — `iap.labels.labels_v2`

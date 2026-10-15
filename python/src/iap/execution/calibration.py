@@ -17,7 +17,17 @@ document the simulator and the maker backtest can consume:
   stays the same): hazard ``lambda = depletions / exposure seconds`` where a
   depletion is the episode ending with the touch moving AWAY from the
   spread (bid down / ask up, or the side emptying), per starting
-  queue-size bucket, with ``p_deplete_1s = 1 - exp(-lambda)``.
+  queue-size bucket, with ``p_deplete_1s = 1 - exp(-lambda)``. With
+  ``depletion_split=True`` (v1.17 B5, review X-4; opt-in, the document is
+  unchanged otherwise) every cell also splits the depletions by the event
+  that emptied or moved the level: ``exec_depletions`` (an EXECUTE, or a
+  crossing ADD the book matched internally — the orders ahead were
+  FILLED) vs ``cancel_depletions`` (a CANCEL or a MODIFY — they LEFT), with
+  ``exec_hazard_per_s`` / ``cancel_hazard_per_s`` over the same exposure
+  and ``exec_share``. A passive fill probability must use the execution
+  rate: :meth:`ExecCalibration.queue_exec_depletion_hazard` into
+  :func:`iap.execution.sor_v2.hazard_fill_prob` — the pooled rate counts
+  a level that emptied through cancels as if it had traded.
 - ``latency`` — per venue, quantiles of ``receive_ts - exchange_ts`` over
   events where it is positive (a FEED latency proxy; ITCH files carry no
   receive stamp, so on them this is absent and the venue config, or an
@@ -271,14 +281,35 @@ class ExecCalibration:
             return float(cell["mean_bps"])
         return None
 
-    def queue_depletion_hazard(self, side: int, queue_qty: int) -> float | None:
-        """Depletions per second of a touch level of ``queue_qty`` on ``side``."""
+    def _depletion_cell(self, side: int, queue_qty: int) -> dict | None:
         cells = (self.doc.get("queue_depletion") or {}).get("bid" if side == 0 else "ask") or {}
         edges = tuple(self.doc.get("queue_edges") or DEFAULT_QUEUE_EDGES)
-        cell = cells.get(queue_bucket(queue_qty, edges))
+        return cells.get(queue_bucket(queue_qty, edges)) or None
+
+    def queue_depletion_hazard(self, side: int, queue_qty: int) -> float | None:
+        """Depletions per second of a touch level of ``queue_qty`` on ``side``
+        (executions AND cancels pooled: the v1.9 rate; see X-4 below)."""
+        cell = self._depletion_cell(side, queue_qty)
         if not cell or cell.get("hazard_per_s") is None:
             return None
         return float(cell["hazard_per_s"])
+
+    def queue_exec_depletion_hazard(self, side: int, queue_qty: int) -> float | None:
+        """EXECUTION depletions per second (v1.17 B5, X-4): the rate at
+        which a level of ``queue_qty`` ahead of us is traded through, which
+        is the rate that fills a resting order. ``None`` when the document
+        was estimated without ``depletion_split`` or the cell is empty."""
+        cell = self._depletion_cell(side, queue_qty)
+        if not cell or cell.get("exec_hazard_per_s") is None:
+            return None
+        return float(cell["exec_hazard_per_s"])
+
+    def queue_cancel_depletion_hazard(self, side: int, queue_qty: int) -> float | None:
+        """CANCEL depletions per second (X-4): the orders ahead left."""
+        cell = self._depletion_cell(side, queue_qty)
+        if not cell or cell.get("cancel_hazard_per_s") is None:
+            return None
+        return float(cell["cancel_hazard_per_s"])
 
 
 def load_calibration(path: str | Path | None) -> ExecCalibration | None:
@@ -379,8 +410,14 @@ def estimate_calibration(
     markout_unit: str = "message",
     impact_fit: bool = False,
     impact_fit_bins: int = 10,
+    depletion_split: bool = False,
 ) -> dict:
     """Estimate a calibration document from one ordered event stream.
+
+    ``depletion_split`` (v1.17 B5, review X-4, opt-in; the document is
+    unchanged when False): each ``queue_depletion`` cell also carries
+    ``exec_depletions`` / ``cancel_depletions`` and the two rates
+    ``exec_hazard_per_s`` / ``cancel_hazard_per_s`` (module docstring).
 
     ``fill_within_ns`` (v1.13 X-P2-8, opt-in; empty = the document is
     unchanged): for each TTL, ``fill_rates.all.p_fill_within[str(ttl)] =
@@ -409,7 +446,8 @@ def estimate_calibration(
     orders: dict[tuple[int, int, int], _Order] = {}
     touch_orders: list[tuple[int, _Order]] = []
     episodes: dict[tuple[int, int, int], _Episode] = {}
-    exposure: dict[tuple[int, str], list[float]] = {}  # (side, bucket) -> [secs, depletions]
+    # (side, bucket) -> [secs, depletions, exec depletions, cancel depletions]
+    exposure: dict[tuple[int, str], list[float]] = {}
     lat: dict[int, list[int]] = {}
     maker_fills: list[tuple[int, int, int, float]] = []  # (iid, ts, side, price)
     sweeps: dict[tuple[int, int, int], int] = {}  # (iid, ts, aggressor side) -> qty
@@ -419,12 +457,17 @@ def estimate_calibration(
     prev_exec: dict[int, tuple[int, int]] = {}  # venue -> (ts, trade_id) of last EXECUTE
     n_events = 0
 
-    def close_episode(key, ep: _Episode, t: int, depleted: bool) -> None:
+    def close_episode(key, ep: _Episode, t: int, depleted: bool, by_exec: bool = False) -> None:
         side = key[2]
         b = queue_bucket(ep.start_qty, edges)
-        cell = exposure.setdefault((side, b), [0.0, 0.0])
+        cell = exposure.setdefault((side, b), [0.0, 0.0, 0.0, 0.0])
         cell[0] += max(t - ep.start_ts, 0) / 1e9
         cell[1] += 1.0 if depleted else 0.0
+        if depleted:
+            # X-4: the event that moved the touch away says whether the
+            # orders ahead were filled (EXECUTE, or a crossing ADD the book
+            # matched) or left (CANCEL / MODIFY).
+            cell[2 if by_exec else 3] += 1.0
 
     for ev in events:
         iid = ev.instrument_id
@@ -516,7 +559,7 @@ def estimate_calibration(
             ep = episodes.get(key)
             if ep is not None and (best is None or best[0] != ep.price):
                 away = best is None or (best[0] < ep.price if side == 0 else best[0] > ep.price)
-                close_episode(key, ep, t, away)
+                close_episode(key, ep, t, away, et in (EventType.EXECUTE, EventType.ADD))
                 ep = None
                 del episodes[key]
             if ep is None and best is not None:
@@ -543,13 +586,20 @@ def estimate_calibration(
 
     # queue depletion hazards
     qd: dict[str, dict] = {"bid": {}, "ask": {}}
-    for (side, b), (secs, dep) in sorted(exposure.items()):
-        qd["bid" if side == 0 else "ask"][b] = {
+    for (side, b), (secs, dep, dep_x, dep_c) in sorted(exposure.items()):
+        row = {
             "exposure_s": secs,
             "depletions": int(dep),
             "hazard_per_s": dep / secs if secs > 0 and dep >= 1 else (0.0 if secs > 0 else None),
             "p_deplete_1s": (1.0 - math.exp(-dep / secs)) if secs > 0 else None,
         }
+        if depletion_split:
+            row["exec_depletions"] = int(dep_x)
+            row["cancel_depletions"] = int(dep_c)
+            row["exec_hazard_per_s"] = dep_x / secs if secs > 0 else None
+            row["cancel_hazard_per_s"] = dep_c / secs if secs > 0 else None
+            row["exec_share"] = dep_x / dep if dep >= 1 else None
+        qd["bid" if side == 0 else "ask"][b] = row
 
     # latency
     latency: dict[str, dict | None] = {}

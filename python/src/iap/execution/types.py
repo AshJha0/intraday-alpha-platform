@@ -293,6 +293,15 @@ class ChildOrder:
     urgency_regime: str = ""
     signal_z: float = 0.0
     pacing_scale: float = 1.0
+    #: v1.17 B4 / B5 provenance (set by the replay, outside any golden):
+    #: the rule that pulled this resting child
+    #: (``iap.execution.fading.CANCEL_RULES``; ``""`` = none), when it
+    #: decided, and the order this child re-sent the remainder of (a
+    #: reprice, a cross or a pull re-send; 0 = a fresh step). B6 reads them
+    #: to type each fill (``iap.tca.markout_decomposition.fill_type``).
+    cancel_rule: str = ""
+    cancel_rule_ts: int = 0
+    replaces_order_id: int = 0
 
     @property
     def is_terminal(self) -> bool:

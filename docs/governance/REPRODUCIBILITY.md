@@ -275,6 +275,31 @@ python3 tools/regenerate_dataset_artifacts.py --only goldens,tca
   feature flags reproduce v1.13 outputs; `test_legacy_methods.py` keeps
   the v1.4.0 alpha reports byte-identical through them.
 
+## 3.5 The committed real slice (v1.17, F4 / F5)
+
+The CI latency and memory guards run on a committed real-session workload,
+`benchmarks/slices/itch50_20190130_AAPL`, written by
+`tools/extract_real_slice.py` as a self-contained ingested dataset
+(`dataset.json` x-version 2, `normalized/eq_20190130.normalized.iap1`,
+`configs/`, `reference/`). Its provenance is in the manifest
+(`sessions.2019-01-30.slice`) and in its `SLICE.md`: the source dataset
+and its `dataset_version`, the source normalized file sha256, the vendor
+file (`01302019.NASDAQ_ITCH50.gz`) and its sha256, day, symbol, instrument
+and venue ids, the window start (09:30:00 ET, the open), the window's
+original sequence range, the prefix / window event counts, the book depth
+at the window start and at the end, the output sha256 and byte size, and
+the exact command. The slice's own `dataset_version` is the usual content
+hash of its events, so a re-cut slice is a different dataset by
+construction; `test_v117_f4_slice_latency.py` pins the manifest to the
+bytes, and the normaliser reproduces the slice byte for byte from a raw
+JSONL of its events (checked by `tests/harness/check_slice_memory.py`).
+The slice is a benchmark workload with recorded provenance, not a research
+dataset: it appears in no pre-registration and no ledger entry, and the
+guards derived from it (`benchmarks/latency_budget.json`,
+`benchmarks/memory_budget.json`, the `t2t realslice` rows of
+`benchmarks/results_tick_to_trade.md`) record the CI run and runner CPU
+they were measured on, like the F1 coverage floor.
+
 ## 4. Release manifests
 
 A production release additionally records: the four language build

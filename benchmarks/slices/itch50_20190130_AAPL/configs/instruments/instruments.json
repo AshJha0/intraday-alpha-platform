@@ -1,0 +1,41 @@
+{
+  "calendar": {
+    "timezone": "America/New_York",
+    "trading_days": [
+      "2019-01-30"
+    ]
+  },
+  "description": "Universe of the committed sample slice itch50_20190130_AAPL (one symbol of ds3_20190130; tools/extract_real_slice.py).",
+  "instruments": [
+    {
+      "adv": 14451444,
+      "asset_class": "EQUITY",
+      "currency": "USD",
+      "instrument_id": 1,
+      "lot_size": 100,
+      "ref_price": 163.22,
+      "symbol": "AAPL",
+      "tick_size": 0.01,
+      "venues": [
+        "XNAS"
+      ]
+    }
+  ],
+  "sessions": {
+    "EQUITY": {
+      "close": "16:00:00",
+      "close_auction": "16:00:00",
+      "open": "09:30:00",
+      "open_auction": "09:30:00",
+      "timezone": "America/New_York"
+    },
+    "ETF": {
+      "close": "16:00:00",
+      "close_auction": "16:00:00",
+      "open": "09:30:00",
+      "open_auction": "09:30:00",
+      "timezone": "America/New_York"
+    }
+  },
+  "x-version": 1
+}

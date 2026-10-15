@@ -373,6 +373,7 @@ void mark_venue(std::vector<std::uint16_t>& venues, std::uint16_t venue_id) {
 bool FeatureEngine::close_group(InstState& st, std::uint32_t iid,
                                 std::int64_t t, bool group_end,
                                 FeatureVector& out) {
+    st.group_open = !group_end;
     if (!group_end) return false;
     const bool stale_changed = st.stale_touched;
     const bool just_recovered =
@@ -394,6 +395,18 @@ bool FeatureEngine::close_group(InstState& st, std::uint32_t iid,
 
 bool FeatureEngine::apply(const MarketEvent& ev, FeatureVector& out,
                           bool group_end) {
+    if (static_cast<EventType>(ev.event_type) == EventType::TRADE_BUST) {
+        // v1.17 (A5): neither the book nor a window sees a bust; it only
+        // closes a same-timestamp group it happens to end.
+        ++trade_busts_skipped_;
+        auto it = states_.find(ev.instrument_id);
+        if (group_end && it != states_.end() && it->second.group_open &&
+            ev.exchange_ts >= it->second.last_ts) {
+            return close_group(it->second, ev.instrument_id, ev.exchange_ts,
+                               true, out);
+        }
+        return false;
+    }
     InstState& st = state(ev.instrument_id);
     const std::int64_t t = ev.exchange_ts;
     if (st.seen && t < st.last_ts) {

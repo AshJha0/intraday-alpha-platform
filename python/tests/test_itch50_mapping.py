@@ -311,16 +311,29 @@ def test_trading_actions_map_to_halt_auction_trading(tmp_path):
     assert crossed_while_quoting and book.order_count_total() == 0
 
 
-def test_broken_trades_reg_sho_and_participant_messages_are_counted_not_mapped(tmp_path):
+def test_reg_sho_and_participant_messages_are_counted_not_mapped(tmp_path):
     enc = _open_day()
     enc.reg_sho(1, OPEN + 1, "AAPL", "1")
     enc.market_participant(1, OPEN + 2, "AAPL")
-    enc.broken(1, OPEN + 3, 4242)
     protos, mapper = _map(tmp_path, enc)
     assert [p[2] for p in protos] == [STATUS, STATUS]
     assert mapper.counters["reg_sho_messages"] == 1
     assert mapper.counters["market_participant_messages"] == 1
-    assert mapper.counters["broken_trades"] == 1 and mapper.broken == [4242]
+
+
+def test_broken_trade_maps_to_a_trade_bust_naming_the_print(tmp_path):
+    """v1.17 (A5, X-11): ``B`` is a TRADE_BUST event at the break's time,
+    ``trade_id`` = the match number of the broken print; still counted and
+    listed in the manifest.  A zero match number names no print."""
+    enc = _open_day()
+    enc.broken(1, OPEN + 3, 4242)
+    enc.broken(1, OPEN + 4, 0)
+    protos, mapper = _map(tmp_path, enc)
+    assert [p[2] for p in protos] == [STATUS, STATUS, int(EventType.TRADE_BUST)]
+    bust = protos[-1]
+    assert bust[1] == MID + OPEN + 3 and bust[3:] == (0, 0, 0, 0, 4242)
+    assert mapper.counters["broken_trades"] == 2 and mapper.broken == [4242, 0]
+    assert mapper.counters["invalid_broken_trades"] == 1
 
 
 def test_inconsistent_references_are_counted_never_guessed(tmp_path):

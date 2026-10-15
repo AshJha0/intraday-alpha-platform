@@ -14,6 +14,9 @@ own caveats.
 | [results_cpp.md](results_cpp.md) | the full C++ `bench_all` stage table (codec, book, replay, features, alpha, execution sim, traced execution sim) + the decision-trace path table + methodology header. Regenerate: `cpp/build/bench_all benchmarks/results_cpp.md` |
 | Rust replay demo | `cd rust && cargo run --release --bin demo` — demo-scale replay throughput over the golden vectors, streamed from a decoder thread through the bounded SPSC event bus into the engine (round-3 slab/intrusive-list book, O(1) cancels; a recent container run: ≈ 6.5M events/s equity, ≈ 5.1M events/s FX including the cross-thread hand-off; single timed pass, high variance) |
 | [results_tick_to_trade.md](results_tick_to_trade.md) | v1.12: per-event tick-to-trade percentiles (p50/p90/p99/p99.9/max) end to end and per stage, from a CI runner; also the baseline of the p50/p99 CI guard. Regenerate: `cpp/build/bench_tick_to_trade benchmarks/results_tick_to_trade.md` (on a CI runner, or download the `bench-tick-to-trade` artifact of the cpp job) |
+| [slices/itch50_20190130_AAPL](slices/itch50_20190130_AAPL/SLICE.md) | v1.17 (F4/F5): the committed REAL slice every CI guard below runs on — Nasdaq ITCH 5.0, AAPL, 2019-01-30 from the 09:30 open, 1,132 book-reconstruction ADDs + 64,000 real events (4.69 MB; the book reaches ~2,700 price levels per side); provenance in its `SLICE.md` / `dataset.json`, cut by `tools/extract_real_slice.py` (docs/governance/REPRODUCIBILITY.md §3.5) |
+| [latency_budget.json](latency_budget.json) | v1.17 (F4): the Python MVP loop per-event latency budget (`iap.mvp.latency`, guard `tests/harness/check_mvp_latency_budget.py`): a measured CI p50 / p99 on the slice with run id and runner CPU, and the limits derived from them |
+| [memory_budget.json](memory_budget.json) | v1.17 (F5): peak RSS of the normaliser and the feature build on the slice (guard `tests/harness/check_slice_memory.py`), measured on CI with provenance, and the limits derived |
 | Python tick-to-trade | `python3 tools/tick_to_trade_py.py` — the same path through the Python reference implementation (events/s and percentiles in µs; laptop-scale, not committed) |
 | Java replay demo | `java/demo.sh` — 25 timed full replays after 5 warmups (a recent container run: ≈ 3.5M events/s), plus the golden IAP1 SHA-256 digests |
 
@@ -211,6 +214,54 @@ figure. The factor is large because the runner CPU and its load change from
 run to run (the 2× p99 swing above was two consecutive runs of the same
 commit); like the `bench_all` guard it exists for algorithmic regressions (a
 per-event allocation storm, an O(n) scan in the book), not for drift.
+
+**Real-depth workload (v1.17, F4).** The third workload is the committed
+real slice `slices/itch50_20190130_AAPL` (Nasdaq ITCH 5.0, AAPL, 2019-01-30
+from the 09:30 open: 1,132 book-reconstruction ADDs then 64,000 real events;
+the book grows to ~40,000 resting orders over ~2,700 price levels per side,
+so the level map, the free lists and the feature engine's book view run at
+real depth instead of the handful of levels of the synthetic streams), 10
+timed passes; its `t2t realslice p50 / p99` rows are guarded like the other
+two. Provenance: the slice's `SLICE.md` and `docs/governance/REPRODUCIBILITY.md`
+§3.5. Same CI-machine caveat as above: a shared runner, CPU model varying
+between runs. Committed run (CI 38805495578, AMD EPYC 7763, 2026-10-15;
+651,320 samples, book drops 0), nanoseconds:
+
+| path, real slice | p50 | p90 | p99 | p99.9 | max | mean |
+|---|---:|---:|---:|---:|---:|---:|
+| **tick-to-trade** | 1,535 | 1,919 | 2,943 | 12,799 | 1,166,452 | 1,631.1 |
+| decode (frame + CRC) | 255 | 271 | 335 | 543 | 25,578 | 259.9 |
+| book update | 103 | 255 | 383 | 1,983 | 602,171 | 158.6 |
+| native features (48) | 991 | 1,215 | 1,855 | 11,775 | 901,699 | 1,077.8 |
+| alpha score (3 alphas) | 103 | 111 | 143 | 215 | 21,470 | 104.4 |
+| decision + pre-trade check | 30 | 41 | 51 | 71 | 15,799 | 30.3 |
+
+Real depth costs about 20% at the median and 15-75% at the p99 against the
+synthetic streams, nearly all of it in the book update (p90 255 vs 135 ns,
+p99 383 vs 223 ns: a 2,700-level map instead of ten) and in the feature
+engine's own book view; decode, alpha and decision are unchanged, as they
+should be. The 1.2 ms max is one runner preemption in 651,320 samples.
+
+**Python MVP loop budget (v1.17, F4).** `iap.mvp.latency` times every
+`MvpEngine.on_event` of the slice through the whole pinned loop (simulator,
+risk wiring, TCA timeline, features, decision, children, traces) and
+`tests/harness/check_mvp_latency_budget.py` compares p50 / p99 with
+`latency_budget.json` in the `python` CI job. First CI measurement
+(run 38803984951, AMD EPYC 7763, Python 3.11): p50 117 µs, p90 148 µs,
+p99 1.79 ms, p99.9 21.9 ms, mean 294 µs over 65,132 events (19.3 s). The
+p99 is the decision events (feature vector + ensemble + portfolio solve +
+parent); p99.9 and max are runner preemption and are not guarded. Limits =
+measured × 4 (p50 500 µs, p99 8 ms): a coarse guard for a lost index or an
+O(n) scan in the loop, not for drift. Local figures on a loaded laptop ran
+2× higher (p50 255 µs, p99 3.8 ms) and are not a baseline.
+
+**Peak RSS guard (v1.17, F5).** `tests/harness/check_slice_memory.py` runs
+the normaliser (over a raw JSONL of the slice's events; the output must
+reproduce the slice bytes) and `python -m iap.features --workers 1` on the
+slice in fresh child processes and compares each peak RSS with
+`memory_budget.json`: CI-measured 194 MB (ingest) and 173 MB (features),
+limits 2× (400 MB / 360 MB). The guard exists for the v1.16 failure mode
+(a path holding the day in memory again), not for drift.
 
 **Python reference path.** `tools/tick_to_trade_py.py` runs the same five
 stages through the Python reference implementation (the generated day uses

@@ -20,7 +20,8 @@ Two physical formats, identical semantics.
   `uint32 instrument_id`, `uint16 venue_id`, `uint64 sequence` (per venue+instrument
   stream, gap-checkable).
 - Enums (u8): side `{BID=0, ASK=1}`; event_type `{ADD=1, MODIFY=2, CANCEL=3, EXECUTE=4,
-  TRADE=5, QUOTE=6, SNAPSHOT=7, STATUS=8, HEARTBEAT=9}`; STATUS payload uses the qty
+  TRADE=5, QUOTE=6, SNAPSHOT=7, STATUS=8, HEARTBEAT=9, TRADE_BUST=10}` (`TRADE_BUST` since
+  v1.17 A5; a record layout unchanged); STATUS payload uses the qty
   field: `{TRADING=1, HALT=2, AUCTION=3, CLOSE=4}`.
 
 ## 1. JSONL (`*.jsonl`) — research + golden format
@@ -131,6 +132,14 @@ adds a `schemas/MIGRATIONS.md` entry.
   It never affects sequencing (a session roll is signalled by a SNAPSHOT burst restarting
   the sequence, or by the explicit `reset_sequence()` API).
 - `HEARTBEAT`: all payload fields 0 except ids/timestamps/sequence.
+- `TRADE_BUST` (v1.17 A5, review X-11): an earlier tape print was broken (ITCH `B`, IEX
+  trade break). `trade_id` = the print's trade id (required, non-zero); `side`, `price_ticks`,
+  `qty` and `order_id` are 0 (the validator rejects anything else). Stamped at the break's own
+  time, in sequence with the venue stream. A tape correction, not a book event: every book
+  applies it as a no-op (also while stale; `trade_flow` is NOT reversed), the registered
+  feature engine skips it, and only the opt-in v2 `sharenorm` features (API_FEATURES §9.1)
+  remove the print from the bust time forward. An older reader that does not know the code
+  drops it as an unknown type (`unknown_type_dropped`), which is the pre-v1.17 behaviour.
 - Negative prices (spreads, 2020 WTI) are representable on the wire (`i64`) but rejected by
   the validator and the book for ADD/QUOTE/SNAPSHOT/TRADE in this version; instruments that
   can trade negative need a price-offset convention in reference data (documented gap).

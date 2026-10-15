@@ -64,6 +64,10 @@ def main(argv=None) -> int:
         from iap.marketdata.process_delete import main as process_main
 
         return process_main(args_in[1:])
+    if args_in[:1] == ["process-iex-day"]:
+        from iap.marketdata.process_iex import main as process_iex_main
+
+        return process_iex_main(args_in[1:])
     parser = argparse.ArgumentParser(
         prog="python3 -m iap.marketdata",
         description="Generate synthetic raw market data and normalize it.",

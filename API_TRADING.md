@@ -960,6 +960,159 @@ the thresholds (1 z, gain 0.5) and the alpha (the registered EQ10 `beta`
 was fitted on synthetic data and is negative, while its in-sample real IC
 is positive: `--signal-refit` shows the other sign).
 
+### 2.15 Per-session ADV in the simulator (v1.17 A5, review X-9, Python only)
+
+Until v1.17 the simulator divided by the one dataset-level `adv` of
+`InstrumentSpec` for every fill of a multi-session replay (the backtester
+had read the per-session values since v1.14, D-P2-8). `ExecConfig.adv_by_session`
+(default `None`) is an `iap.reference.session_adv.SessionAdvTable`: per
+(instrument, session) ADV keyed `YYYY-MM-DD` in the table's zone
+(`America/New_York` unless the table says otherwise), built from an
+ingested dataset's `instruments.json` (`adv_by_session`,
+`SessionAdvTable.from_instruments_json`) or a plain table file
+(`{"adv_by_session": {"<instrument_id>": {"<date>": adv}}, "adv": {...},
+"timezone": ...}`, `from_json`; `from_path` picks by shape).
+`ExecConfig.session_adv(instrument_id, exchange_ts)` is the ADV the
+simulator divides by: the fill session's value, the static `adv` when the
+table lacks that session or instrument. It enters rule 6 (child impact),
+rule 6b (`pct` of the parent adder, so a parent spanning sessions is
+charged each fill at its own session's scale) and the X-3 support check
+(`impact_fit_support_pct_adv`). Fills, fees and queue positions do not
+read ADV and are unchanged. Loading: `load_exec_config(config_dir,
+adv_table=True)` reads the directory's own `instruments.json`; a path reads
+that file; the execution benchmark takes `--adv-table static|instruments|<path>`
+and records the choice in its provenance block. Without a table every
+rule is byte-identical to v1.16 (`expected_replay_fills.json` unchanged);
+the C++ rule text keeps the static `adv`.
+
+### 2.16 Quote fading, queue-aware cancels, markout decomposition (v1.17 WS-B items B4 / B5 / B6, Python only)
+
+Every option here is off by default. A `ParentOrder` without `fade` /
+`queue_cancel` replays byte-identically (every golden; a PASSIVE parent with
+a `signal_source` attached and no opt-in too, `test_v117_fading_cancels_markout.py`),
+a calibration estimated without `depletion_split` is the same document, and
+a fill-hazard model built without a `clock` is the v1.12 UTC model. Python is
+the reference; the C++ ports are F7 (PLATFORM_CONVENTIONS.md §11.3).
+
+**B4 — quote fading (`iap.execution.fading.FadeParams`).**
+`ParentOrder(fade=FadeParams(threshold_z=1.0, pressure_threshold=0.0,
+action="hold", max_fades=3, max_age_ns=10 s, latency_ns=0))` on a parent
+whose children are posted through the PASSIVE state machine (`policy=PASSIVE`,
+or the B2 *agree* posts of `urgency_policy="alpha"`; anything else is a
+`ValueError`). At every event a resting child is tested — after the BEHIND
+test, before its deadline — by `fade_rule(side, z, threshold_z, pressure,
+pressure_threshold)`: the *signal* leg (needs `signal_source`; `z` read as of
+`t - latency_ns`, stale after `max_age_ns`) fires when
+`regime_from_z(side, z, threshold_z) == "adverse"` — the price is about to run
+against the resting order; the *pressure* leg fires when
+`book_pressure(own_L1, opp_L1) = opp / (own + opp)` on the child's venue is
+at least `pressure_threshold` (in `(0.5, 1]`; a buy at the bid is pulled when
+the ask side is heavy). A zero threshold turns that leg off; at least one leg
+must be on. A hit sends an ordinary `cancel` (simulator rule 7: one latency
+draw, effective at the venue one latency later, **and it can lose the race**
+to a fill that lands first), stamps `ChildOrder.cancel_rule`
+(`"fade:signal"` / `"fade:pressure"`) and `cancel_rule_ts`, and opens a
+`PullRecord`. Once the cancel resolves, `action` decides the remainder:
+`"hold"` keeps it off the book and re-posts it at the first event where the
+fade rule no longer fires (or crosses it at the PASSIVE end margin, like any
+remainder; a held quantity counts as committed for the POV deficit);
+`"repost"` posts it again at once at the current post price; `"cross"` sends
+it as MARKET. A chain of posts fades at most `max_fades` times. Every
+re-sent child carries `replaces_order_id`.
+
+**B5 — queue-aware cancels (`QueueCancelParams`).**
+`ParentOrder(queue_cancel=QueueCancelParams(max_ahead_qty=0, min_p_fill=0.0,
+horizon_ns=1 s, action="cross", hazard=None, depletion_per_s=None,
+min_rest_ns=0))`, same parent condition as B4; evaluated after the fade rule.
+`queue_cancel_rule(ahead_qty, max_ahead_qty, p_fill, min_p_fill)`: the
+queue-position leg fires when the simulator's deterministic `ahead_qty`
+(rule 4) exceeds `max_ahead_qty`; the probability leg when
+`hazard.p_fill_within(x, horizon_ns) < min_p_fill` with `x =
+hazard.features(queue_ahead=ahead_qty, spread_ticks, imbalance = own / (own +
+opp), depletion_per_s=depletion_per_s(side, ahead_qty), ts_ns=t)` — the
+features of §2.10 on the model's own clock. Only an ACTIVE child older than
+`min_rest_ns` is tested. `action="cross"` sends the remainder as MARKET (the
+queue was the problem), `"repost"` posts it again. `cancel_rule` is
+`"queue:ahead"` / `"queue:p_fill"`.
+
+**X-4 — execution vs cancel depletion in the hazard.**
+`estimate_calibration(..., depletion_split=True)` (default False: the
+document is unchanged) adds to every `queue_depletion` cell
+`exec_depletions` / `cancel_depletions` (a touch episode that ended because
+an EXECUTE, or a crossing ADD the book matched, emptied or moved the level
+vs one ended by a CANCEL / MODIFY), `exec_hazard_per_s` /
+`cancel_hazard_per_s` over the same exposure and `exec_share`.
+`ExecCalibration.queue_exec_depletion_hazard(side, q)` /
+`queue_cancel_depletion_hazard(side, q)` read them (`None` without the
+split); `queue_depletion_hazard` stays the pooled v1.9 rate. The fill
+probability of a resting order is the EXECUTION rate: pass
+`lambda v, s, q: cal.queue_exec_depletion_hazard(s, q)` to
+`sor_v2.hazard_fill_prob` and `cal.queue_exec_depletion_hazard` as
+`QueueCancelParams.depletion_per_s`; the pooled rate counts a level that
+emptied through cancels as if it had traded.
+
+**Accounting.** `ExecReplayResult.pulls` lists every `PullRecord`
+(`parent_id`, `order_id`, `side`, `price_ticks`, `qty_at_decision`,
+`decision_ts`, `rule`, `ahead_qty`, `signal_z`, `pressure`, `p_fill`,
+`effect_ts` = the cancel's venue arrival, `pulled_qty`, `filled_in_flight`,
+`outcome` ∈ `pulled` / `partial` / `lost_race`); `ParentReport.pulls` /
+`pulled_qty` (by rule), `pulls_lost_race`, `held_unsent_qty` are in
+`diagnostics()` (outside every golden row). **Fades saved vs fills missed:**
+`pull_outcomes(pulls, timeline, tick_size, horizons_ns=..., rules=...)` (=
+`pull_summary(pull_rows(...))`, poolable across sessions) prices every pulled
+quantity after the fact: per horizon `h`, whether the opposite best reached
+the pulled price inside `[effect_ts, effect_ts + h]` (`would_have_filled`:
+the touch-through proxy for "it would have filled") and, when it did, the
+markout `s * (m_h - p)` of the fill the pull forwent — `saved` (it would
+have been adverse: `|markout|`, mean bps and currency) vs `missed` (it would
+have been favourable), `net_ccy` and `net_bps` of the would-fill notional.
+Labelled a counterfactual: the replayed book never saw our order.
+
+**B6 — markout decomposition (`iap.tca.markout_decomposition`).**
+`fill_type(fill, order)` ∈ `FILL_TYPES = (passive, aggressive, faded,
+cancelled_replaced)`: TAKER → `aggressive`; a MAKER fill with `fill.ts >=
+order.cancel_rule_ts` of a child with a `cancel_rule` → `faded` (the cancel
+lost the race); a MAKER fill of a child with `replaces_order_id` →
+`cancelled_replaced`; else `passive`. `regime_of(order)` is the B2
+`urgency_regime`, `plain` without one. `fill_rows(fills, orders, timeline,
+tick_size, qty_unit=1, horizons_ns=None, cluster=None, day_ns=1 day)` prices
+each fill (`markout_bps[h]`, `price_impact_bps[h]`, the §2.9 definitions,
+`None` where undefined) and tags it with its cluster (the fill's day, or a
+caller label such as the session); `decompose(rows, horizons)` gives `all`,
+`by_fill_type`, `by_regime`, `by_fill_type_and_regime` (`"type|regime"`) and
+`fill_type_share_of_qty`, every cell `cluster_mean(values, clusters)`: the
+equal-weight mean with the **day-clustered CR1 standard error** of the v1.17
+gate form (one cluster per day, `G/(G-1) * sum_g (sum_{i in g} (x_i -
+mean))^2 / N^2`, Student-t with `G - 1` df via `day_cluster_inference`;
+`se` is `None` with one cluster). `markout_decomposition(...)` is both steps
+on one timeline.
+
+**X-8 — the hazard clock.** `FillHazardModel(..., clock="utc",
+capture_offset_s=0)`: `clock` is `"utc"` (the pinned v1.12 day fraction) or
+an IANA zone (`"America/New_York"`: the exchange-local time of day, DST per
+event, as `volume_curve` does); `capture_offset_s` is subtracted first when
+the stream's stamps are not UTC — the IEX HIST capture clock is TAI, 37 s
+ahead (`IEX_TAI_OFFSET_S`); Nasdaq ITCH stamps are local-midnight based, so
+the zone alone is right. `time_of_day(ts, clock, capture_offset_s)`,
+`hazard_features(..., clock, capture_offset_s)`,
+`samples_from_maker_labels(..., clock, capture_offset_s)` and
+`model.features(...)` (the model's own clock) build the feature;
+`to_dict()` names `clock` and `capture_offset_s` in the result (schema
+`iap.fill_hazard/1` unchanged; a document without the keys loads as UTC).
+
+**Benchmark.** `python -m iap.research.execution_benchmark ... --policies
+passive,passive+fade,passive+qcancel,passive+fade_qcancel` (the pull
+variants need the `passive` base) with `--fade-threshold-z Z` (needs
+`--signal`), `--fade-pressure P`, `--fade-action hold|repost|cross`,
+`--fade-max N`, `--qcancel-max-ahead Q`, `--qcancel-min-pfill P
+--qcancel-hazard model.json [--qcancel-calibration cal.json]`,
+`--qcancel-action cross|repost`, `--markout-horizons 1s,5s,30s`. Each
+variant pairs with plain `passive` on the same windows; the report adds
+`pull_rules`, per-cell `fill_type_share_of_filled` and `pulls`, the
+`fades_saved_vs_fills_missed` block per policy (fade and queue rules apart)
+and `markout_decomposition` per policy (clusters = sessions). Multi7
+command (not run in the PR): see CHANGELOG / HOW_IT_WORKS §3.5.
+
 ## 3. Where the rules live
 
 | rule set | normative text | Python port entry |

@@ -1,0 +1,32 @@
+{
+  "x-version": 1,
+  "what": "Peak RSS of the normaliser ingest and of the feature build on the committed real slice (v1.17 F5). Guard: tests/harness/check_slice_memory.py (each job in a fresh child process; Windows PeakWorkingSetSize / POSIX ru_maxrss). A budget is a MEASURED CI figure times a margin with its provenance recorded.",
+  "slice": "benchmarks/slices/itch50_20190130_AAPL",
+  "slice_dataset_version": "ce37133c2b41dfaf038df9bfc51126404674603cdf387b8d44f4cbd976b47848",
+  "provenance": {
+    "run_id": "38803984951",
+    "workflow": "ci (PR #188, first advisory run)",
+    "date": "2026-10-15",
+    "cpu_model": "AMD EPYC 7763 64-Core Processor",
+    "cpu_count": 4,
+    "python": "3.11.17",
+    "runner": "GitHub-hosted ubuntu-24.04",
+    "measured_bytes": {
+      "ingest": 203681792,
+      "features": 181170176
+    },
+    "measured_wall_s": {
+      "ingest": 1.17,
+      "features": 3.30
+    },
+    "local_reference": "Windows laptop, python 3.12: ingest 119 MB, features 130 MB (the Linux figures include the larger numpy / pyarrow import footprint)"
+  },
+  "budget": {
+    "rule": "limit = measured x margin, rounded up; catches a path that holds the day in memory again (v1.16 failure mode), not drift",
+    "margin": 2,
+    "limits_bytes": {
+      "ingest": 419430400,
+      "features": 377487360
+    }
+  }
+}

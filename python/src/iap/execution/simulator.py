@@ -504,12 +504,17 @@ class ExecutionSimulator:
             base += sched.fee(o.side, float(qty), notional, ts)
         return base
 
-    def _parent_impact(self, o: ChildOrder, price_ticks: int, qty: int) -> float:
-        """Rule 6b: incremental parent temporary + instrument permanent impact."""
+    def _parent_impact(self, o: ChildOrder, price_ticks: int, qty: int, ts: int) -> float:
+        """Rule 6b: incremental parent temporary + instrument permanent impact.
+
+        v1.17 A5 (X-9): ``pct`` divides by the ADV of the session the fill
+        ``ts`` falls in (``ExecConfig.session_adv``), the static ADV without
+        a table; a parent spanning sessions is charged each fill at its
+        own session's scale."""
         cfg = self._config
         ins = self._instrument(o.instrument_id)
         unit_price = ins.qty_unit * float(price_ticks) * ins.tick_size
-        pct = ins.qty_unit / ins.adv * 100.0  # % of ADV per share
+        pct = ins.qty_unit / cfg.session_adv(o.instrument_id, ts) * 100.0  # % of ADV per share
         key = (o.instrument_id, o.parent_id) if o.parent_id else (o.instrument_id, -o.order_id)
         q0 = self._parent_qty.get(key, 0)
         q1 = q0 + qty
@@ -542,12 +547,13 @@ class ExecutionSimulator:
     ) -> None:
         impact_cost = 0.0
         if liq == Liquidity.TAKER and self._config.impact_model == "parent":
-            impact_cost = self._parent_impact(o, price_ticks, qty)
+            impact_cost = self._parent_impact(o, price_ticks, qty, ts)
         elif liq == Liquidity.TAKER:
-            # Rule 6: linear impact from the child's total size in base units.
+            # Rule 6: linear impact from the child's total size in base units
+            # (v1.17 A5, X-9: over the fill's session ADV when a table is set).
             ins = self._instrument(o.instrument_id)
             impact_bps = self._config.impact_coeff_bps_per_pct_adv * (
-                float(o.qty) * ins.qty_unit / ins.adv * 100.0
+                float(o.qty) * ins.qty_unit / self._config.session_adv(o.instrument_id, ts) * 100.0
             )
             notional = float(qty) * ins.qty_unit * float(price_ticks) * ins.tick_size
             impact_cost = impact_bps * 1e-4 * notional

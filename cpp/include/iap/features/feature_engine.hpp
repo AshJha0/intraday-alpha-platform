@@ -187,6 +187,8 @@ public:
     std::uint64_t ts_regressions_dropped() const {
         return ts_regressions_dropped_;
     }
+    // v1.17 (A5, X-11): TRADE_BUST events skipped before the book.
+    std::uint64_t trade_busts_skipped() const { return trade_busts_skipped_; }
     // Applied events whose qty exceeded FEATURE_MAX_QTY (not folded).
     std::uint64_t oversized_qty_dropped() const {
         return oversized_qty_dropped_;
@@ -227,6 +229,9 @@ private:
         bool stale_touched = false;
         bool stale_seen = false;
         bool pending_refresh = false;
+        // the last event left its same-timestamp group open (a TRADE_BUST
+        // closing the group closes it in the event's place, v1.17 A5)
+        bool group_open = false;
         // venues the closing refresh re-reads (sorted, unique)
         std::vector<std::uint16_t> pending_venues;
         bool has_emit = false;
@@ -290,6 +295,7 @@ private:
     std::uint64_t events_processed_ = 0;
     std::uint64_t events_dropped_ = 0;
     std::uint64_t ts_regressions_dropped_ = 0;
+    std::uint64_t trade_busts_skipped_ = 0;
     std::uint64_t oversized_qty_dropped_ = 0;
     std::uint64_t oversized_depth_skipped_ = 0;
     std::uint64_t vectors_emitted_ = 0;

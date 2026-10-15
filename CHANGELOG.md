@@ -8,8 +8,87 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-F items F4 and F5 (#188). **The committed real slice**
+  `benchmarks/slices/itch50_20190130_AAPL` (`tools/extract_real_slice.py`; Nasdaq ITCH 5.0, AAPL,
+  2019-01-30 from the 09:30 open: 1,132 book-reconstruction ADDs + 64,000 real events, 4.69 MB,
+  book to ~2,700 price levels per side; a self-contained ingested dataset with its provenance in
+  `SLICE.md` / `dataset.json`, REPRODUCIBILITY.md §3.5). **F4**: `bench_tick_to_trade` replays the
+  slice as a third workload (`t2t realslice p50/p99` guard rows in `results_tick_to_trade.md`); the
+  Python MVP loop latency budget (`iap.mvp.latency`, `tests/harness/check_mvp_latency_budget.py`,
+  `benchmarks/latency_budget.json`: CI-measured p50 117 µs / p99 1.79 ms per event, limits 4x,
+  blocking in the `python` job); `ExecutionReplay` X-6 follow-up (open count + amortised compaction
+  of the PASSIVE working list, `_committed_qty` over the not-yet-terminal children only; outputs
+  unchanged, goldens pass; 12 parents on the slice 239 -> 59 µs/event). **F5**:
+  `tests/harness/check_slice_memory.py` guards the peak RSS of the normaliser and the feature build
+  on the slice (`benchmarks/memory_budget.json`: CI-measured 194 MB / 173 MB, limits 2x); the
+  remaining v1.16 memory-review items are closed or stated in `MEMORY_REVIEW_v116.md` (F5 status).
+- v1.17 WS-A item A5 (review rows D-P1-5, X-9, X-11), additive and opt-in; the registered
+  feature code, its goldens and the pre-registration fingerprints are untouched. **D-P1-5**:
+  the v2 spec gains a second family, `sharenorm` (14 `_v2` features, `iap.features.feature_v2`,
+  API_FEATURES §9.1): volumes and depths over the session ADV (`iap.reference.session_adv.
+  SessionAdvTable`, the dataset's `adv_by_session`) and over the running session volume;
+  `FeatureV2Extension(families=, adv=)`; v2 golden regenerated at x-version 2 (26 columns).
+  Python-reference only, pending F7 / F8 (conventions §11.7). **X-9**: `ExecConfig.adv_by_session`
+  / `load_exec_config(adv_table=)` / benchmark `--adv-table` make rules 6 / 6b and the X-3
+  support check divide by the ADV of the fill's session (API_TRADING §2.15); default static,
+  byte-identical, `expected_replay_fills.json` unchanged. **X-11**: new canonical event kind
+  `TRADE_BUST = 10` (`schemas/FORMAT.md` §4, API_CORE §4) for ITCH `B` broken trades and IEX
+  trade breaks: the mapper emits it, the normaliser carries it into the IAP1 file, the JSONL
+  twin and Parquet, every book (Python, Rust, C++) applies it as a no-op, the feature engines
+  (Python, Rust, C++) skip it before the book so registered vectors are byte-identical with or
+  without busts, and the `sharenorm` volumes remove the print from the bust time forward. The
+  anomaly fixture's two deliberately unknown events use code 250 instead of 10 (expected states
+  and feature checkpoints unchanged); the mapping counter `invalid_broken_trades` is new.
+  Also: the `python-slow` coverage floor (F1) goes from 55 to 54 — main at 4eea5d5 already
+  measured 54.76 % in that job (run 38805345163, after the wave-3 merges) and this PR 54.47 %;
+  the 55.90 % the floor was taken from predates modules that only the fast job covers.
+- v1.17 WS-B items B4, B5 and B6, every piece opt-in and byte-identical off (every execution
+  golden, the B1/B2/B3 driver tests and the X4 fingerprint unchanged). **B4 quote fading**
+  (`iap.execution.fading.FadeParams`, `ParentOrder.fade`): a child posted through the PASSIVE
+  state machine is pulled when the signal turns adverse by `threshold_z` (signal units) or the
+  opposite side's share of the two L1 sizes reaches `pressure_threshold`; the cancel goes
+  through simulator rule 7 (one latency draw, can lose the race), the remainder is held off the
+  book until the rule clears (`hold`), re-posted or crossed; every pull is a `PullRecord`
+  (`ExecReplayResult.pulls`, `ParentReport.diagnostics()`), and `pull_outcomes` /
+  `pull_rows` + `pull_summary` price the **fades saved vs fills missed** counterfactual
+  (touch-through proxy, labelled). **B5 queue-aware cancels** (`QueueCancelParams`,
+  `ParentOrder.queue_cancel`): cancel on `ahead_qty > max_ahead_qty` or
+  `FillHazardModel.p_fill_within < min_p_fill`, then cross or re-post; review X-4:
+  `estimate_calibration(depletion_split=True)` splits every `queue_depletion` cell into
+  execution vs cancel depletions with both rates (`ExecCalibration.queue_exec_depletion_hazard`
+  / `queue_cancel_depletion_hazard`; the pooled rate overstated the fill probability of
+  `sor_v2.hazard_fill_prob`, which now documents the execution rate as its input). **B6
+  markout decomposition** (`iap.tca.markout_decomposition`): `fill_type` (passive /
+  aggressive / faded / cancelled_replaced from the new `ChildOrder.cancel_rule`,
+  `cancel_rule_ts`, `replaces_order_id`), by B2 regime, `cluster_mean` = the v1.17
+  gate-statistic form (CR1 SE, one cluster per day, Student-t `G - 1`); review X-8:
+  `FillHazardModel(clock="America/New_York", capture_offset_s=IEX_TAI_OFFSET_S)` fits the
+  time-of-day feature on the exchange clock (the IEX capture clock is TAI + 37 s; Nasdaq is
+  local) and `to_dict` names the clock (`"utc"` default, v1.12 documents load unchanged). The
+  benchmark driver gains `passive+fade`, `passive+qcancel`, `passive+fade_qcancel` with
+  `--fade-threshold-z`, `--fade-pressure`, `--fade-action`, `--fade-max`,
+  `--qcancel-max-ahead`, `--qcancel-min-pfill`, `--qcancel-horizon-s`, `--qcancel-hazard`,
+  `--qcancel-calibration`, `--qcancel-action`, `--markout-horizons`, and reports
+  `fades_saved_vs_fills_missed` and `markout_decomposition` per policy (not run on multi7 in
+  this PR; the command is in HOW_IT_WORKS §3.5). PLATFORM_CONVENTIONS §11.3 lists the owning
+  language of each new rule (Python reference, C++ pending F7). Tests:
+  `python/tests/test_v117_fading_cancels_markout.py`.
+
 - v1.17 WS-G item G2: four topical documents, docs only, no code and no number moved. `docs/EXECUTION_QUALITY.md` (the shortfall benchmark, the multi7 and depth-50 results with their artefact paths, signal-aware urgency and pacing, the realism layer), `docs/PORTFOLIO_BREADTH.md` extended (universe rule, the measured 2019-01-30 universe, the breadth holdout rule, committed book results), `docs/SIGNAL_RESEARCH.md` (statistics revision, `linear_z_v2`, long horizons, regime model and gate, GBM, meta-labelling split, conformal sizing, zoo gates, each with its opt-in), `docs/DATA_SOURCES.md` (free Nasdaq days, IEX HIST, process-and-delete, the download approval rule); `iap.paper` in ARCHITECTURE section 9.2 and API_TRADING section 4; linked from the README docs table, ARCHITECTURE, DIAGRAMS and the site nav. B4-B10, C6/C8, the A4 overlap table and the first completed 100-name day are marked placeholders for the G5 truth pass.
 
+- v1.17 WS-A item A4: the IEX overlap set. `python -m iap.marketdata process-iex-day` runs one
+  IEX HIST day (TOPS download -> universe quote extract (`TopsQuotes.save` / `*.tops.json.gz`,
+  read back by `--tops`) -> TOPS deleted -> DEEP+ download -> `ingest --format iex-deep-plus`
+  with the extract as the `book_verification` oracle -> features -> `KEEP.json` -> delete), one
+  vendor file on disk at a time, resumable markers, a `--render-cmd` chain over several dates
+  and a watchdog entry. `tools/iex_hist.py index` writes the manifest from the HIST index with
+  the owner's approval sentence; `recent --n 5` is the rolling "recent IEX days" rule (latest N
+  HIST days with TOPS and DEEP+; a list, not a download: no approval sentence, and
+  `tools/iex_download.py` refuses a manifest without one). The nine overlap days
+  (`research/v117/iex_overlap_manifest.json`, approved 2026-10-15) and their results:
+  docs/research/IEX_OVERLAP_SET.md. The recent days are listed only (not approved). `test_iex_codec.py` and `test_process_iex.py`
+  carry the `slow` marker so the python-slow coverage floor counts the IEX codec and chain.
+- v1.17 WS-G item G2: four topical documents, docs only, no code and no number moved. `docs/EXECUTION_QUALITY.md` (the shortfall benchmark, the multi7 and depth-50 results with their artefact paths, signal-aware urgency and pacing, the realism layer), `docs/PORTFOLIO_BREADTH.md` extended (universe rule, the measured 2019-01-30 universe, the breadth holdout rule, committed book results), `docs/SIGNAL_RESEARCH.md` (statistics revision, `linear_z_v2`, long horizons, regime model and gate, GBM, meta-labelling split, conformal sizing, zoo gates, each with its opt-in), `docs/DATA_SOURCES.md` (free Nasdaq days, IEX HIST, process-and-delete, the download approval rule); `iap.paper` in ARCHITECTURE section 9.2 and API_TRADING section 4; linked from the README docs table, ARCHITECTURE, DIAGRAMS and the site nav. B4-B10, C6/C8, the A4 overlap table and the first completed 100-name day are marked placeholders for the G5 truth pass.
 - v1.17 WS-B item B7 (prerequisite): depth-cap vs book re-run of the multi7 shortfall
   benchmark with `--walk-depth 50` (and a `--max-child-qty 300` variant), summaries
   `research/execution/benchmark/{benchmark,BENCHMARK}_multi7_depth50*` and the comparison

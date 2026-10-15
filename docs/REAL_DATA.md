@@ -483,6 +483,21 @@ and the vendor file. Every step has a marker and resumes; nothing is
 deleted before the kept files verify. The `plan-ingest` batch of section
 3.4 stays for the three-name datasets.
 
+### 3.6 The IEX overlap set and the rolling IEX days (v1.17, A4)
+
+The nine Nasdaq 2025/26 sessions on disk (2025-11-28, 2025-12-08..12,
+2026-05-15, 2026-05-18, 2026-06-12) are also on IEX HIST, free. `python -m
+iap.marketdata process-iex-day` (RUNBOOK_process_and_delete.md, IEX section)
+builds the same day's IEX dataset for the same three names, venue `IEXG`:
+the TOPS capture is read once for the universe's quotes (the oracle), deleted,
+then the DEEP+ capture is ingested with that oracle as `book_verification`,
+features are built and everything but features, manifests and hashes is
+deleted, one vendor file on disk at a time. `tools/iex_hist.py index` writes
+the manifest from the HIST index with the owner's approval sentence;
+`tools/iex_hist.py recent --n 5` writes the rolling list (the latest five HIST
+days with TOPS and DEEP+) without one, so it is a list until approved. The
+per-day results are in docs/research/IEX_OVERLAP_SET.md.
+
 ## 4. Mapping to canonical events
 
 The canonical contract is the twelve-field `MarketEvent`
@@ -535,7 +550,7 @@ rules and are re-read by the release owner after the stores are rebuilt.
 | `U` order replace | `CANCEL` of the original reference + `ADD` of the new reference at the new price and size, same side | the new order joins the **tail** of its level: a replace loses queue priority, as on the exchange. A canonical `MODIFY` cannot express this (it keeps the id and, for a decrease, the position) |
 | `P` trade (non-cross) | `TRADE` only | a non-displayed order was executed; the visible book is untouched. **Side is a judgement call:** before 2014-07-14 the buy/sell indicator names the resting order's side and the aggressor is the other side; from that date the indicator is always `B` and carries no information, so the aggressor is inferred by the **Lee–Ready rule** (v1.14, D-P1-2): against the mapper's own displayed best bid / ask at that moment (the resting quantity per level of the mapped book, a lazy-heap best price shared with the ingest consistency check), a print above the mid is a buy and below it a sell (`hidden_trades_signed_by_quote_rule`); a print exactly at the mid, or without a two-sided unlocked uncrossed quote, falls back to the **tick rule** against the instrument's last print (up → buy, down → sell, unchanged → same sign as the last print; `hidden_trades_signed_by_tick_rule`). Until v1.13 every post-2014 hidden print used the tick rule alone — six times more hidden prints in 2026 than in 2019 made that the dominant source of signed-flow error. Treat signed flow from hidden prints as an estimate |
 | `Q` cross trade | none on the event path; recorded per symbol in `dataset.json` (`crosses`: type, price, shares, time; `cross_volume`) and added to the session volume | an auction print has no aggressor, and `TRADE` is signed flow. The opening cross price is the session's `ref_price`. Since v1.14 (D-P2-6) `python -m iap.features --cross-prints fold` (default) folds each cross print into the instrument's **volume** windows at its time — `traded_volume_*`, `participation_*`, the volume profile (`norm_volume_m5_v1`), the impact proxy and the `volume:N` clock — and never into signed volume, trade imbalance, trade counts or the effective spread (16 % of AAPL's volume on 2026-05-15 was cross volume). `--cross-prints omit` is the v1.13 behaviour; `features_summary.json` records `cross_prints` |
-| `B` broken trade | none; counted, match numbers listed in the manifest | a break cannot be un-applied to an event stream that has already been replayed |
+| `B` broken trade | `TRADE_BUST` (v1.17 A5, review X-11): `trade_id` = the match number, other payload 0, at the break's own time; still counted (`broken_trades`) and listed in the manifest (`broken_trade_match_numbers`); a zero match number names no print (`invalid_broken_trades`, no event); outside the session it is dropped with the session's events | a break cannot be un-applied to a book that has already replayed the print, so the book applies it as a no-op and the registered features ignore it; only the opt-in v2 `sharenorm` volumes remove the print from the bust time forward (API_FEATURES §9.1). The manifest's per-symbol `volume` (and so `adv` / `adv_by_session`) still counts the broken print. The IEX trade break (`iap.marketdata.iex`) maps the same way |
 | `Y`, `L` | none; counted | |
 | `I` NOII | none; length-checked and counted | the normalized output never carries it. Since v1.10 `Itch50Reader(noii=True)` decodes it (opt-in) for the separate auction-imbalance stream of `iap.auction` (§3.3) |
 | anything else | skipped by length; counted per type in `messages.skipped_unknown_by_type` | |
@@ -811,7 +826,9 @@ volume) for consumers without a session, and adds `ref_price_by_session`
 and `adv_by_session` (AS OF the session: the mean volume of the dataset's
 earlier sessions; the first session's own volume for the first). The
 security-master record of each session carries the same `ref_price` /
-`adv`. The backtester's impact cost reads the trade's own session ADV and
+`adv`. The backtester's impact cost reads the trade's own session ADV,
+the execution simulator does so too when asked (v1.17 A5, `--adv-table
+instruments`, API_TRADING §2.15) and
 the capacity proxy the mean of `adv x ref_price` over the sessions, so a
 2019-2026 dataset no longer prices 2026 at the 2019 open. It is pinned by content
 like the synthetic `data_version`, and the prefix makes it differ from the

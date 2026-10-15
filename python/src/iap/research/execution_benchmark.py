@@ -56,6 +56,27 @@ on ``<data-dir>/features``, standardised per instrument to signal units;
 ``--signal-refit`` fits in-sample instead, labelled) or ``synthetic`` (a
 deterministic sine wave in signal units, for tests). The report carries
 the urgency-regime shares per cell (why each child got its urgency).
+
+**Quote fading and queue-aware cancels (v1.17 B4 / B5).** Three more
+variants on the ``passive`` base (they act on posted children):
+``passive+fade`` pulls a resting child when the signal turns adverse by
+``--fade-threshold-z`` (needs ``--signal``) or the opposite-side book
+pressure reaches ``--fade-pressure`` (works without a signal), and holds /
+re-posts / crosses the remainder per ``--fade-action``;
+``passive+qcancel`` cancels a resting child whose queue is hopeless
+(``--qcancel-max-ahead`` shares ahead, or hazard ``P(fill within
+--qcancel-horizon-s) < --qcancel-min-pfill`` with ``--qcancel-hazard`` and
+the X-4 execution depletion rate of ``--qcancel-calibration``) and crosses
+/ re-posts it per ``--qcancel-action``; ``passive+fade_qcancel`` runs both.
+Each pairs with plain ``passive`` on the same windows. The report adds, per
+policy, the **fades saved vs fills missed** counterfactual
+(:func:`iap.execution.fading.pull_summary`: for every pulled quantity,
+whether the market traded through the pulled price inside the horizon and
+the markout of the fill the pull forwent, split into adverse fills avoided
+and favourable fills missed; labelled a proxy) and the **markout
+decomposition** by fill type (passive / aggressive / faded /
+cancelled-replaced) and B2 regime with day-clustered standard errors
+(v1.17 B6, :mod:`iap.tca.markout_decomposition`), at ``--markout-horizons``.
 """
 
 from __future__ import annotations
@@ -78,16 +99,22 @@ from iap.execution import (
     ArraySignalSource,
     ExecPolicy,
     ExecutionReplay,
+    FadeParams,
+    FillHazardModel,
     ISModel,
     PacingParams,
     ParentOrder,
+    QueueCancelParams,
     load_exec_config,
     load_sor_options,
 )
+from iap.execution.calibration import load_calibration
+from iap.execution.fading import CANCEL_RULES, pull_rows, pull_summary
 from iap.execution.optimal import ac_params_from_calibration
 from iap.execution.signal import URGENCY_REGIMES, AlphaUrgencySource
 from iap.execution.types import FILL_PROVENANCES
-from iap.tca.markout import build_gated_timeline
+from iap.tca.markout import DEFAULT_HORIZONS_NS, build_gated_timeline
+from iap.tca.markout_decomposition import FILL_TYPES, decompose, fill_rows, fill_type
 from iap.tca.shortfall import parent_costs
 from iap.validation.metrics import BOOTSTRAP_LOW_POWER_DAYS, day_cluster_inference
 
@@ -107,7 +134,13 @@ VARIANTS: dict[str, str | None] = {
     "pacing": None,  #: B3: pov_signal_pacing / slice_signal_tilt
     "ac": None,  #: plain Almgren-Chriss IS (the ac_drift control; IS cells only)
     "ac_drift": "ac",  #: B3: AC with the signal as the drift (IS cells only)
+    "fade": None,  #: B4: quote fading on posted children (passive base only)
+    "qcancel": None,  #: B5: queue-aware cancels on posted children (passive base only)
+    "fade_qcancel": None,  #: B4 + B5 together (passive base only)
 }
+#: the variants that pull resting children: they need the ``passive`` base
+PULL_VARIANTS: tuple[str, ...] = ("fade", "qcancel", "fade_qcancel")
+DEFAULT_MARKOUT_HORIZONS: tuple[str, ...] = ("1s", "5s", "30s")
 SYNTHETIC_SIGNAL = "synthetic"
 SYNTHETIC_PERIOD_S = 300.0
 SYNTHETIC_AMPLITUDE_Z = 1.5
@@ -210,6 +243,8 @@ def parse_policy(name: str) -> tuple[str, str | None]:
         raise SystemExit(f"unknown policy {name!r}; bases are {sorted(POLICIES)}")
     if variant and variant not in VARIANTS:
         raise SystemExit(f"unknown variant {variant!r} in {name!r}; choose from {sorted(VARIANTS)}")
+    if variant in PULL_VARIANTS and base != "passive":
+        raise SystemExit(f"{name!r}: the {variant} variant acts on posted children (passive base)")
     return base, variant or None
 
 
@@ -244,12 +279,26 @@ def signal_variant(
     urgency: AlphaUrgencyPolicy,
     pacing: PacingParams,
     ac_params,
+    fade: FadeParams | None = None,
+    queue_cancel: QueueCancelParams | None = None,
 ) -> ParentOrder | None:
     """``p`` worked under policy ``name``; ``None`` when the variant does not
     apply to this parent's algo (AC variants are IS-only)."""
     base, variant = parse_policy(name)
     p = replace(p, policy=POLICIES[base])
     if variant is None:
+        return p
+    if variant in PULL_VARIANTS:
+        if variant in ("fade", "fade_qcancel"):
+            if fade is None:
+                raise SystemExit("the fade variant needs --fade-threshold-z or --fade-pressure")
+            p = replace(p, fade=fade, signal_source=source)
+        if variant in ("qcancel", "fade_qcancel"):
+            if queue_cancel is None:
+                raise SystemExit(
+                    "the qcancel variant needs --qcancel-max-ahead or --qcancel-min-pfill"
+                )
+            p = replace(p, queue_cancel=queue_cancel)
         return p
     if variant == "urgency":
         return replace(p, signal_source=source, urgency_policy="alpha", alpha_urgency=urgency)
@@ -374,9 +423,18 @@ def _cell_summary(rows: list[dict], seed: int) -> dict[str, object]:
     prov: dict[str, int] = {}
     urg: dict[str, int] = {}
     urg_qty: dict[str, int] = {}
+    types: dict[str, int] = {}
+    pulls: dict[str, int] = {}
+    pulled: dict[str, int] = {}
     for r in rows:
         for k, v in r["provenance_qty"].items():
             prov[k] = prov.get(k, 0) + v
+        for k, v in r.get("fill_type_qty", {}).items():
+            types[k] = types.get(k, 0) + v
+        for k, v in r.get("pulls", {}).items():
+            pulls[k] = pulls.get(k, 0) + v
+        for k, v in r.get("pulled_qty", {}).items():
+            pulled[k] = pulled.get(k, 0) + v
         for k, v in r.get("urgency_children", {}).items():
             urg[k] = urg.get(k, 0) + v
         for k, v in r.get("urgency_qty", {}).items():
@@ -402,6 +460,17 @@ def _cell_summary(rows: list[dict], seed: int) -> dict[str, object]:
             ),
         },
         "provenance_share_of_filled": {k: prov[k] / filled for k in sorted(prov)} if filled else {},
+        # v1.17 B6: which kind of fill the filled quantity was
+        "fill_type_share_of_filled": (
+            {k: types[k] / filled for k in FILL_TYPES if k in types} if filled else {}
+        ),
+        # v1.17 B4 / B5: pulls of resting children by rule (empty for a plain cell)
+        "pulls": {
+            "children": {k: pulls[k] for k in CANCEL_RULES if k in pulls},
+            "pulled_qty": {k: pulled[k] for k in CANCEL_RULES if k in pulled},
+            "lost_race": sum(r.get("pulls_lost_race", 0) for r in rows),
+            "held_unsent_qty": sum(r.get("held_unsent_qty", 0) for r in rows),
+        },
         # v1.17 B2 / B3: why the children got their urgency (empty for a plain cell)
         "urgency_share_of_children": (
             {k: urg[k] / n_children for k in sorted(urg)} if n_children else {}
@@ -457,6 +526,7 @@ def run_benchmark(
     impact_model: str = "child",
     impact_exponent: float = 1.0,
     walk_depth_levels: int = 10,
+    adv_table: Path | bool | None = None,
     baseline_policy: str = "native",
     max_events: int = 0,
     allow_holdout: bool = False,
@@ -471,8 +541,27 @@ def run_benchmark(
     signal_max_age_s: float = 10.0,
     ac_risk_aversion: float = 1e-6,
     ac_daily_vol: float = 0.015,
+    fade_threshold_z: float = 0.0,
+    fade_pressure: float = 0.0,
+    fade_action: str = "hold",
+    fade_max: int = 3,
+    qcancel_max_ahead: int = 0,
+    qcancel_min_pfill: float = 0.0,
+    qcancel_horizon_s: float = 1.0,
+    qcancel_hazard: Path | None = None,
+    qcancel_calibration: Path | None = None,
+    qcancel_action: str = "cross",
+    markout_horizons: tuple[str, ...] = DEFAULT_MARKOUT_HORIZONS,
 ) -> dict[str, object]:
     """Run the grid; returns the JSON document (see the module docstring).
+
+    ``fade_*`` / ``qcancel_*`` build the B4 :class:`FadeParams` and B5
+    :class:`QueueCancelParams` of the ``fade`` / ``qcancel`` variants (a zero
+    knob is that leg off; the fade's signal leg needs ``signal``; the
+    hazard leg needs ``qcancel_hazard``, a ``FillHazardModel`` JSON, and
+    reads the X-4 execution depletion rate from ``qcancel_calibration`` when
+    given). ``markout_horizons`` name the B6 decomposition horizons
+    (``iap.tca.markout.DEFAULT_HORIZONS_NS`` keys).
 
     ``signal`` names the B2 / B3 signal source: ``"none"`` (no variant
     policy allowed), ``"synthetic"`` or an alpha id. The ``signal_*`` knobs
@@ -497,8 +586,70 @@ def run_benchmark(
         parse_policy(pol)
     if baseline_policy not in policies:
         raise SystemExit(f"baseline policy {baseline_policy!r} is not in --policies")
-    if signal == "none" and any(parse_policy(pol)[1] for pol in policies):
+    if signal == "none" and any(
+        parse_policy(pol)[1] not in (None, *PULL_VARIANTS) for pol in policies
+    ):
         raise SystemExit("signal-aware policies need --signal (an alpha id or 'synthetic')")
+    pull_variants_used = {parse_policy(pol)[1] for pol in policies} & set(PULL_VARIANTS)
+    fade_params: FadeParams | None = None
+    if fade_threshold_z > 0.0 or fade_pressure > 0.0:
+        if fade_threshold_z > 0.0 and signal == "none":
+            raise SystemExit("--fade-threshold-z needs --signal (or use --fade-pressure alone)")
+        fade_params = FadeParams(
+            threshold_z=fade_threshold_z,
+            pressure_threshold=fade_pressure,
+            action=fade_action,
+            max_fades=fade_max,
+            max_age_ns=int(signal_max_age_s * SEC),
+        )
+    qcancel_params: QueueCancelParams | None = None
+    if qcancel_max_ahead > 0 or qcancel_min_pfill > 0.0:
+        hazard = None if qcancel_hazard is None else FillHazardModel.load(qcancel_hazard)
+        cal = load_calibration(qcancel_calibration)
+        dep = None
+        if cal is not None:
+            dep = cal.queue_exec_depletion_hazard  # X-4: executions only
+        qcancel_params = QueueCancelParams(
+            max_ahead_qty=qcancel_max_ahead,
+            min_p_fill=qcancel_min_pfill,
+            horizon_ns=int(qcancel_horizon_s * SEC),
+            action=qcancel_action,
+            hazard=hazard,
+            depletion_per_s=dep,
+        )
+    for name in markout_horizons:
+        if name not in DEFAULT_HORIZONS_NS:
+            raise SystemExit(
+                f"unknown markout horizon {name!r}; choose from {list(DEFAULT_HORIZONS_NS)}"
+            )
+    mk_horizons = {h: DEFAULT_HORIZONS_NS[h] for h in markout_horizons}
+    pull_doc: dict[str, object] = {
+        "variants": sorted(pull_variants_used),
+        "fade": None
+        if fade_params is None
+        else {
+            "threshold_z": fade_params.threshold_z,
+            "pressure_threshold": fade_params.pressure_threshold,
+            "action": fade_params.action,
+            "max_fades": fade_params.max_fades,
+            "max_age_s": signal_max_age_s,
+        },
+        "queue_cancel": None
+        if qcancel_params is None
+        else {
+            "max_ahead_qty": qcancel_params.max_ahead_qty,
+            "min_p_fill": qcancel_params.min_p_fill,
+            "horizon_s": qcancel_horizon_s,
+            "action": qcancel_params.action,
+            "hazard": None if qcancel_hazard is None else str(qcancel_hazard),
+            "hazard_clock": None if qcancel_params.hazard is None else qcancel_params.hazard.clock,
+            "depletion_rate": (
+                "none (0)" if qcancel_params.depletion_per_s is None else "exec_hazard_per_s (X-4)"
+            ),
+            "calibration": None if qcancel_calibration is None else str(qcancel_calibration),
+        },
+        "rules": list(CANCEL_RULES),
+    }
     urgency_policy = AlphaUrgencyPolicy(
         threshold_z=signal_threshold_z,
         passive_urgency=signal_passive_urgency,
@@ -506,7 +657,7 @@ def run_benchmark(
     )
     pacing_params = PacingParams(gain=signal_gain, max_age_ns=int(signal_max_age_s * SEC))
     algo_types = tuple(AlgoType[a] for a in algos)
-    cfg = load_exec_config(config_dir)
+    cfg = load_exec_config(config_dir, adv_table=adv_table)
     cfg = replace(
         cfg,
         seed=seed,
@@ -529,6 +680,9 @@ def run_benchmark(
     warmup_ns = int(warmup_min * 60 * SEC)
     rng = SplitMix64(seed)
     rows: dict[str, list[dict]] = {p: [] for p in policies}
+    pull_rows_of: dict[str, list[dict]] = {p: [] for p in policies}
+    pull_lost: dict[str, int] = {p: 0 for p in policies}
+    mk_rows_of: dict[str, list[dict]] = {p: [] for p in policies}
     session_labels: list[str] = []
     n_events = 0
     source = None
@@ -620,7 +774,14 @@ def run_benchmark(
                                 config=cfg,
                             )
                     q = signal_variant(
-                        p, pol, src, urgency=urgency_policy, pacing=pacing_params, ac_params=acp
+                        p,
+                        pol,
+                        src,
+                        urgency=urgency_policy,
+                        pacing=pacing_params,
+                        ac_params=acp,
+                        fade=fade_params,
+                        queue_cancel=qcancel_params,
                     )
                     if q is not None:
                         worked.append(q)
@@ -631,9 +792,40 @@ def run_benchmark(
                 fills_of: dict[int, list] = {p.parent_id: [] for p in worked}
                 for f in res.fills:
                     fills_of[f.parent_id].append(f)
+                orders_of = {o.order_id: o for kids in res.children.values() for o in kids}
+                # v1.17 B6: every fill priced by type / regime, clustered by session
+                mk_rows_of[pol].extend(
+                    fill_rows(
+                        res.fills,
+                        orders_of,
+                        timeline,
+                        ins.tick_size,
+                        qty_unit=ins.qty_unit,
+                        horizons_ns=mk_horizons,
+                        cluster=label,
+                    )
+                )
+                # v1.17 B4: the pulls, priced after the fact (counterfactual)
+                if res.pulls:
+                    pull_rows_of[pol].extend(
+                        pull_rows(
+                            res.pulls,
+                            timeline,
+                            ins.tick_size,
+                            horizons_ns=mk_horizons,
+                            qty_unit=ins.qty_unit,
+                            rules=CANCEL_RULES,
+                            cluster=label,
+                        )
+                    )
+                    pull_lost[pol] += sum(1 for r in res.pulls if r.outcome == "lost_race")
                 for (p0, pct), p in zip(cells_of, worked, strict=True):
                     row = parent_costs(p, fills_of[p.parent_id], timeline, ins.tick_size, taker_fee)
                     rep = res.parents[p.parent_id]
+                    type_qty: dict[str, int] = {}
+                    for f in fills_of[p.parent_id]:
+                        k = fill_type(f, orders_of[f.order_id])
+                        type_qty[k] = type_qty.get(k, 0) + f.qty
                     row.update(
                         {
                             "session": label,
@@ -651,6 +843,11 @@ def run_benchmark(
                             "urgency_children": rep.urgency_children,
                             "urgency_qty": rep.urgency_qty,
                             "sor_no_route": res.sor_no_route,
+                            "fill_type_qty": type_qty,
+                            "pulls": rep.pulls,
+                            "pulled_qty": rep.pulled_qty,
+                            "pulls_lost_race": rep.pulls_lost_race,
+                            "held_unsent_qty": rep.held_unsent_qty,
                         }
                     )
                     rows[pol].append(row)
@@ -685,6 +882,26 @@ def run_benchmark(
                         paired[f"{pol}-{control}|{algo}|{pct:g}"] = _paired_summary(
                             base, other, seed
                         )
+    fades: dict[str, object] = {}
+    markouts: dict[str, object] = {}
+    for pol in policies:
+        if pull_rows_of[pol]:
+            fades[pol] = {
+                "fade": pull_summary(
+                    [r for r in pull_rows_of[pol] if str(r["rule"]).startswith("fade:")],
+                    list(mk_horizons),
+                    lost_race=pull_lost[pol],
+                    rules=("fade:signal", "fade:pressure"),
+                ),
+                "queue": pull_summary(
+                    [r for r in pull_rows_of[pol] if str(r["rule"]).startswith("queue:")],
+                    list(mk_horizons),
+                    lost_race=pull_lost[pol],
+                    rules=("queue:ahead", "queue:p_fill"),
+                ),
+            }
+        if mk_rows_of[pol]:
+            markouts[pol] = decompose(mk_rows_of[pol], list(mk_horizons))
     doc: dict[str, object] = {
         "schema": "iap.execution_benchmark/v1",
         "item": "v1.17 WS-B B1",
@@ -708,6 +925,11 @@ def run_benchmark(
         },
         "simulator": {
             "impact_model": impact_model,
+            "adv_table": (
+                "static"
+                if cfg.adv_by_session is None
+                else ("instruments.json" if adv_table is True else str(adv_table))
+            ),
             "impact_exponent": cfg.impact_exponent,
             "walk_depth_levels": walk_depth_levels,
             "cost_label": cfg.impact_label(),
@@ -726,6 +948,12 @@ def run_benchmark(
         "cells": cells,
         "cells_by_symbol": by_symbol,
         "paired_vs_baseline": paired,
+        # v1.17 B4 / B5 / B6
+        "pull_rules": pull_doc,
+        "fill_types": list(FILL_TYPES),
+        "markout_horizons": list(mk_horizons),
+        "fades_saved_vs_fills_missed": fades,
+        "markout_decomposition": markouts,
     }
     if timestamp:
         doc["generated"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -818,6 +1046,49 @@ def render(doc: dict) -> str:
                 f"{_stat(p['costs_bps']['shortfall'])} | {_stat(p['costs_bps']['completion'])} | "
                 f"{_stat(p['fill_rate_diff'])} |"
             )
+    fades = doc.get("fades_saved_vs_fills_missed", {})
+    if fades:
+        lines += [
+            "",
+            "## Fades saved vs fills missed (v1.17 B4 / B5; counterfactual, touch-through proxy)",
+            "",
+            "| policy | rules | pulls | pulled qty | lost race | horizon | would fill | saved (n, mean bps, ccy) | missed (n, mean bps, ccy) | net bps of would-fill notional |",
+            "|---|---|---|---|---|---|---|---|---|---|",
+        ]
+        for pol, blocks in fades.items():
+            for kind, fs in blocks.items():
+                if not fs["n_pulls"]:
+                    continue
+                for h, row in fs["horizons"].items():
+                    sv, ms = row["saved"], row["missed"]
+                    lines.append(
+                        f"| {pol} | {kind} | {fs['n_pulls']} | {fs['pulled_qty']} | {fs['lost_race']} | {h} | "
+                        f"{row['would_fill']} ({row['would_fill_qty']}) | "
+                        f"{sv['n']}, {_f(sv['bps_mean'])}, {_f(sv['ccy'])} | "
+                        f"{ms['n']}, {_f(ms['bps_mean'])}, {_f(ms['ccy'])} | {_f(row['net_bps'])} |"
+                    )
+    mkd = doc.get("markout_decomposition", {})
+    if mkd:
+        lines += [
+            "",
+            "## Markout by fill type and regime (v1.17 B6; bps, ± day-clustered SE)",
+            "",
+            "| policy | cell | fills | qty | "
+            + " | ".join(f"markout {h}" for h in doc["markout_horizons"])
+            + " | "
+            + " | ".join(f"price impact {h}" for h in doc["markout_horizons"])
+            + " |",
+            "|---|---|---|---|" + "---|" * (2 * len(doc["markout_horizons"])),
+        ]
+        for pol, d in mkd.items():
+            cells_ = [("all", d["all"])]
+            cells_ += [(f"type {k}", v) for k, v in d["by_fill_type"].items()]
+            cells_ += [(f"regime {k}", v) for k, v in d["by_regime"].items()]
+            for name, c in cells_:
+                hs = c["horizons"]
+                mk = " | ".join(_stat(hs[h]["markout"]) for h in doc["markout_horizons"])
+                pi = " | ".join(_stat(hs[h]["price_impact"]) for h in doc["markout_horizons"])
+                lines.append(f"| {pol} | {name} | {c['n_fills']} | {c['qty']} | {mk} | {pi} |")
     lines += [
         "",
         "## Reading it",
@@ -836,6 +1107,15 @@ def render(doc: dict) -> str:
         "- urgency shares (B2 / B3): why each child of a signal-aware parent got its urgency "
         "(agree = posted on a favourable signal, adverse = crossed on an adverse one, neutral = "
         "inside the threshold, no_signal / stale = no usable reading, plain = a pacing-only arm).",
+        "- fades saved vs fills missed (B4 / B5): for every quantity a rule pulled, whether the "
+        "market traded THROUGH the pulled price inside the horizon (the proxy for 'it would have "
+        "filled') and the markout of that forgone fill — `saved` = it would have been adverse, "
+        "`missed` = it would have been favourable; `lost race` = the fill landed before the "
+        "cancel arrived (simulator rule 7). A counterfactual on a book our order never moved.",
+        "- markout by fill type (B6): passive = a first post that rested and filled, aggressive "
+        "= a taker fill, faded = a maker fill that landed after a pull cancel was sent, "
+        "cancelled_replaced = a maker fill of a child re-sent after a cancel; regimes are the "
+        "B2 urgency regimes (plain without a signal). SEs cluster by session.",
         "",
     ]
     return "\n".join(lines)
@@ -872,6 +1152,7 @@ def prereg_draft(doc: dict) -> dict[str, object]:
         },
         "simulator": doc["simulator"],
         "signal": doc.get("signal", {"source": "none"}),
+        "pull_rules": doc.get("pull_rules"),
         "expected_effect": "to be filled from the in-sample run before signing (B2/B3)",
         "primary_metric": "all_in bps per parent (shortfall + fees_net + sim_impact + completion), "
         "labelled " + doc["simulator"]["cost_label"],
@@ -937,6 +1218,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--impact-model", choices=("child", "parent"), default="child")
     ap.add_argument("--impact-exponent", type=float, default=1.0)
     ap.add_argument("--walk-depth", type=int, default=10)
+    ap.add_argument(
+        "--adv-table",
+        default="static",
+        help="v1.17 A5 (X-9): per-session ADV for the impact adders: 'static' (default, the "
+        "dataset-level adv), 'instruments' (the config dir's instruments.json adv_by_session) "
+        "or a path (an instruments.json or a plain ADV table, iap.reference.session_adv)",
+    )
     ap.add_argument("--baseline-policy", default="native")
     ap.add_argument("--max-events", type=int, default=0, help="per session (smoke runs / tests)")
     ap.add_argument("--allow-holdout", action="store_true")
@@ -966,6 +1254,50 @@ def main(argv: list[str] | None = None) -> int:
     sg.add_argument("--signal-max-age-s", type=float, default=10.0)
     sg.add_argument("--ac-risk-aversion", type=float, default=1e-6)
     sg.add_argument("--ac-daily-vol", type=float, default=0.015)
+    fg = ap.add_argument_group("quote fading / queue-aware cancels / markouts (v1.17 B4-B6)")
+    fg.add_argument(
+        "--fade-threshold-z",
+        type=float,
+        default=0.0,
+        help="B4: pull a resting child when the signal is adverse by this many signal units "
+        "(needs --signal; 0 = off)",
+    )
+    fg.add_argument(
+        "--fade-pressure",
+        type=float,
+        default=0.0,
+        help="B4: pull when the opposite side's share of the two L1 sizes >= this (0.5-1; 0 = off)",
+    )
+    fg.add_argument("--fade-action", choices=("hold", "repost", "cross"), default="hold")
+    fg.add_argument("--fade-max", type=int, default=3, help="fades per chain of posts")
+    fg.add_argument(
+        "--qcancel-max-ahead",
+        type=int,
+        default=0,
+        help="B5: cancel when ahead_qty > this (0 = off)",
+    )
+    fg.add_argument(
+        "--qcancel-min-pfill",
+        type=float,
+        default=0.0,
+        help="B5: cancel when hazard P(fill within --qcancel-horizon-s) < this (0 = off)",
+    )
+    fg.add_argument("--qcancel-horizon-s", type=float, default=1.0)
+    fg.add_argument(
+        "--qcancel-hazard", type=Path, default=None, help="FillHazardModel JSON (iap.fill_hazard/1)"
+    )
+    fg.add_argument(
+        "--qcancel-calibration",
+        type=Path,
+        default=None,
+        help="calibration JSON estimated with depletion_split=True (X-4 execution depletion rate)",
+    )
+    fg.add_argument("--qcancel-action", choices=("cross", "repost"), default="cross")
+    fg.add_argument(
+        "--markout-horizons",
+        default=",".join(DEFAULT_MARKOUT_HORIZONS),
+        help="B6 decomposition horizons (keys of iap.tca.markout.DEFAULT_HORIZONS_NS)",
+    )
     args = ap.parse_args(argv)
     doc = run_benchmark(
         args.data_dir,
@@ -985,6 +1317,11 @@ def main(argv: list[str] | None = None) -> int:
         impact_model=args.impact_model,
         impact_exponent=args.impact_exponent,
         walk_depth_levels=args.walk_depth,
+        adv_table=(
+            None
+            if args.adv_table == "static"
+            else (True if args.adv_table == "instruments" else Path(args.adv_table))
+        ),
         baseline_policy=args.baseline_policy,
         max_events=args.max_events,
         allow_holdout=args.allow_holdout,
@@ -999,6 +1336,17 @@ def main(argv: list[str] | None = None) -> int:
         signal_max_age_s=args.signal_max_age_s,
         ac_risk_aversion=args.ac_risk_aversion,
         ac_daily_vol=args.ac_daily_vol,
+        fade_threshold_z=args.fade_threshold_z,
+        fade_pressure=args.fade_pressure,
+        fade_action=args.fade_action,
+        fade_max=args.fade_max,
+        qcancel_max_ahead=args.qcancel_max_ahead,
+        qcancel_min_pfill=args.qcancel_min_pfill,
+        qcancel_horizon_s=args.qcancel_horizon_s,
+        qcancel_hazard=args.qcancel_hazard,
+        qcancel_calibration=args.qcancel_calibration,
+        qcancel_action=args.qcancel_action,
+        markout_horizons=_csv(args.markout_horizons),
     )
     tag = args.tag or Path(args.data_dir).name
     args.out.mkdir(parents=True, exist_ok=True)

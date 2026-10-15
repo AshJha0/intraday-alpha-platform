@@ -65,6 +65,7 @@ from typing import TYPE_CHECKING
 from iap.execution.passive import ExecPolicy, PassiveParams
 
 if TYPE_CHECKING:  # pragma: no cover
+    from iap.execution.fading import FadeParams, QueueCancelParams
     from iap.execution.optimal import ACParams
     from iap.execution.pacing import PacingParams
     from iap.execution.signal import SignalSource
@@ -148,6 +149,17 @@ class ParentOrder:
     #: B3: Almgren-Chriss IS re-solved per slice with the signal as the drift.
     ac_signal_drift: bool = False
     pacing: PacingParams | None = None
+    #: B4 quote fading / B5 queue-aware cancels (``iap.execution.fading``,
+    #: Python only, opt-in): rules on the children this parent posts through
+    #: the PASSIVE state machine (``policy=PASSIVE`` or the B2 *agree*
+    #: posts). ``None`` = off (the pinned behaviour).
+    fade: FadeParams | None = None
+    queue_cancel: QueueCancelParams | None = None
+
+    @property
+    def pulls_resting(self) -> bool:
+        """True when a B4 / B5 pull rule is on."""
+        return self.fade is not None or self.queue_cancel is not None
 
     @property
     def signal_aware(self) -> bool:

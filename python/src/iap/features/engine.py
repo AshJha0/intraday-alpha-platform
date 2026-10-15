@@ -203,6 +203,9 @@ class _InstState:
         #: venues whose depth cache the closing refresh must re-read
         self.pending_refresh = False
         self.pending_venues: set[int] = set()
+        #: the last event left its same-timestamp group open (a TRADE_BUST
+        #: closing the group closes it in the event's place, v1.17 A5)
+        self.group_open = False
         #: monotone counter of merged-view refreshes (label sampling hook)
         self.refresh_seq = 0
         #: events the book dropped/held (never folded into rolling state)
@@ -419,6 +422,14 @@ class FeatureEngine:
         #: side-less cross prints folded into volume (D-P2-6) / dropped
         self.cross_prints_folded = 0
         self.cross_prints_dropped = 0
+        #: v1.17 (A5, X-11): TRADE_BUST events seen.  The registered
+        #: features never see a bust: it reaches neither the book nor a
+        #: rolling window and emits nothing of its own (a stream with its
+        #: busts removed yields byte-identical vectors); a bust that closes
+        #: an open same-timestamp group closes it exactly as the group's
+        #: last real event would have.  ``iap.features.feature_v2`` reads
+        #: busts through its own ``apply`` wrapper.
+        self.trade_busts_skipped = 0
 
     # ---------------------------------------------------------------- states
 
@@ -456,6 +467,17 @@ class FeatureEngine:
         but records no flow/mid samples.  An emission still happens on the
         engine's cadence so the vector stream stays aligned with the events.
         """
+        if ev.event_type == EventType.TRADE_BUST:
+            self.trade_busts_skipped += 1
+            st_open = self.states.get(ev.instrument_id)
+            if (
+                group_end
+                and st_open is not None
+                and st_open.group_open
+                and ev.exchange_ts >= st_open.last_ts
+            ):
+                return self._close_group(st_open, ev.exchange_ts, True)
+            return None
         st = self._state(ev.instrument_id)
         t = ev.exchange_ts
         if st.first_ts is not None and t < st.last_ts:
@@ -549,6 +571,7 @@ class FeatureEngine:
         """Close the instrument's same-timestamp group (D-P1-1): one refresh
         over the venues the group touched, then the emission check.  With
         ``group_end=False`` the group stays open and nothing is emitted."""
+        st.group_open = not group_end
         if not group_end:
             self._group_event(st)
             return None

@@ -1,0 +1,36 @@
+{
+  "x-version": 1,
+  "what": "Python MVP loop per-event latency budget on the committed real slice (v1.17 F4). Guard: tests/harness/check_mvp_latency_budget.py; measurement: iap.mvp.latency.measure_loop_latency. A budget is a MEASURED CI figure times a margin with its provenance recorded, never a number typed in.",
+  "slice": "benchmarks/slices/itch50_20190130_AAPL",
+  "slice_dataset_version": "ce37133c2b41dfaf038df9bfc51126404674603cdf387b8d44f4cbd976b47848",
+  "provenance": {
+    "run_id": "38803984951",
+    "workflow": "ci (PR #188, first advisory run)",
+    "date": "2026-10-15",
+    "cpu_model": "AMD EPYC 7763 64-Core Processor",
+    "cpu_count": 4,
+    "python": "3.11.17",
+    "runner": "GitHub-hosted ubuntu-24.04 (shared VM, no pinning)",
+    "events": 65132,
+    "measured_ns": {
+      "p50": 116659,
+      "p90": 148499,
+      "p99": 1794957,
+      "p99.9": 21938614,
+      "max": 61420254,
+      "mean": 294032.1
+    },
+    "total_s": 19.298,
+    "local_reference": "Windows laptop (12 CPUs, detached jobs running) the same day: p50 255 us, p99 3.8 ms"
+  },
+  "budget": {
+    "rule": "limit = measured x margin, rounded up to a round number; only p50 and p99 are guarded (never p99.9 / max: shared-runner outliers)",
+    "margin": 4,
+    "measured_p50_ns": 116659,
+    "measured_p99_ns": 1794957,
+    "limits_ns": {
+      "p50": 500000,
+      "p99": 8000000
+    }
+  }
+}

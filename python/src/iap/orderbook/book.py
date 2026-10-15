@@ -157,6 +157,8 @@ _APPLIED_WHILE_STALE = frozenset(
         int(EventType.STATUS),
         int(EventType.TRADE),
         int(EventType.HEARTBEAT),
+        # v1.17 (A5): a tape correction, never book state
+        int(EventType.TRADE_BUST),
     }
 )
 

@@ -60,7 +60,7 @@ TEST(Validation, UnknownEventTypeFails) {
     MarketEvent ev = base_add();
     ev.event_type = 0;
     EXPECT_NE(validation_error(ev), "");
-    ev.event_type = 10;
+    ev.event_type = 250;
     EXPECT_NE(validation_error(ev), "");
 }
 
