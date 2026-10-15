@@ -5,6 +5,15 @@
 
 #pragma once
 
+// GCC 13 (-O2, -Werror=maybe-uninitialized) reports a false positive on
+// std::variant temporaries pushed into a contracts::Array (the Value
+// returned by a port, e.g. cluster_mean, moved into the result tree);
+// the sanitizer build sees no uninitialised read. Test-only translation
+// units, so the diagnostic is silenced here for every F7 test.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+
 #include <gtest/gtest.h>
 
 #include <cmath>

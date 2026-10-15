@@ -16,6 +16,12 @@ Blocks the Python derives from SciPy (Student-t readings of B6) are kept
 apart under ``expected_tol`` and compared to a tolerance (the generator
 says so in each file's description).
 
+The committed bytes are the ones the CI runner's Linux Python (glibc libm,
+numpy / OpenBLAS Haswell) writes, taken from the `f7-goldens-linux` artifact
+of the python job: a Windows regeneration differs in the last bit of a few
+libm results (pow, exp, acosh) and in the seeded hazard fit, which is why
+`--check` on a laptop may report differences that CI does not.
+
 Two kinds of vectors per rule: fixed vectors (small synthetic books and
 scalar cases) and a sampled slice of the committed real session
 ``benchmarks/slices/itch50_20190130_AAPL`` (F4; provenance in its

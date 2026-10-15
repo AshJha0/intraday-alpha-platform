@@ -48,6 +48,9 @@ COPY cpp cpp
 COPY tests/golden tests/golden
 COPY configs configs
 COPY data/reference data/reference
+# v1.17 (F7): the parity tests replay the committed real slice
+# (benchmarks/slices/itch50_20190130_AAPL, 4.7 MB) at <golden>/../../benchmarks.
+COPY benchmarks/slices benchmarks/slices
 
 # Exactly cpp/build.sh (Release, -j2 — 2-CPU baseline, BUILD_NOTES.md).
 RUN cd cpp && bash build.sh

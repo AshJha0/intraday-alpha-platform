@@ -120,7 +120,8 @@ TEST(F7MarkoutDecomposition, ClusterMean) {
         for (const Value& v : c.at("values").as_array()) vals.push_back(v.as_number());
         for (const Value& v : c.at("clusters").as_array()) cl.push_back(v.as_string());
         try {
-            got.push_back(iap::cluster_mean(vals, cl));
+            Value cm = iap::cluster_mean(vals, cl);
+            got.push_back(std::move(cm));
         } catch (const std::invalid_argument& e) {
             Object o;
             o["error"] = vs(e.what());
