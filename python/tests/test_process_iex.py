@@ -18,6 +18,10 @@ from iap.marketdata.iex import PROTOCOL_DEEP_PLUS, PROTOCOL_TOPS, TopsQuotes
 from iap.marketdata.itch50 import session_midnight_ns
 from itch50_encoder import hms_ns
 
+# v1.17 A4: the IEX codec and chain files run in the python-slow CI job (the
+# coverage floor is measured there); the PR python job deselects them (-m 'not slow').
+pytestmark = pytest.mark.slow
+
 DATE = "2025-11-28"
 MID = session_midnight_ns(DATE)
 OPEN = hms_ns(9, 30)

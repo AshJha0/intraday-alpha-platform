@@ -31,6 +31,10 @@ from iap.marketdata.ingest import ingest
 from iap.marketdata.itch50 import Itch50Mapper, Itch50Reader, session_midnight_ns
 from itch50_encoder import Itch50Encoder, hms_ns
 
+# v1.17 A4: the IEX codec and chain files run in the python-slow CI job (the
+# coverage floor is measured there); the PR python job deselects them (-m 'not slow').
+pytestmark = pytest.mark.slow
+
 DATE = "2025-01-15"
 MID = session_midnight_ns(DATE)
 OPEN = hms_ns(9, 30)
