@@ -39,7 +39,7 @@ import re
 from collections.abc import Iterable
 from decimal import ROUND_HALF_EVEN, ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from iap.agents import citations
 from iap.agents.mcp_server import FREE_TEXT
@@ -177,7 +177,7 @@ def matches(tok: str, pct: bool, pool: Iterable[float]) -> bool:
         return False
     mant = re.split(r"[eE]", tok)[0]
     exact = "." not in mant
-    quantum = Decimal(1).scaleb(want.as_tuple().exponent)
+    quantum = Decimal(1).scaleb(cast(int, want.as_tuple().exponent))
     for v in pool:
         if isinstance(v, bool) or not math.isfinite(float(v)):
             continue

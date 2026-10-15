@@ -127,6 +127,40 @@
         "summary_matches_actions": true
       },
       "score": 1.0
+    },
+    "wse_docs_sync": {
+      "checks": {
+        "ambiguous_excerpt_refused": true,
+        "code_file_edit_refused": true,
+        "doc_edits_accepted": true,
+        "patch_applies_cleanly": true,
+        "patch_written_not_applied": true,
+        "spend_rows_recorded": true
+      },
+      "score": 1.0
+    },
+    "wse_ops_agent": {
+      "checks": {
+        "document_written": true,
+        "fabricated_narrative_refused": true,
+        "rules_decided_in_code": true,
+        "spend_rows_recorded": true,
+        "verbatim_narrative_accepted": true
+      },
+      "score": 1.0
+    },
+    "wse_research_assistant": {
+      "checks": {
+        "closing_text_verified": true,
+        "committed_ledger_untouched": true,
+        "draft_is_unsigned_draft": true,
+        "fabricated_numbers_refused": true,
+        "holdout_run_refused": true,
+        "in_sample_run_reported": true,
+        "spend_rows_recorded": true,
+        "verbatim_numbers_accepted": true
+      },
+      "score": 1.0
     }
   }
 }

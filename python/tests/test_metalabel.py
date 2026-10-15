@@ -214,7 +214,14 @@ def test_split_purges_label_horizon_at_both_boundaries():
     exp_train = int((ts + TARGET_HORIZON_NS <= b1).sum())
     exp_cal = int(((ts > b1 + _EMBARGO_NS) & (ts + TARGET_HORIZON_NS <= b2)).sum())
     exp_test = int((ts > b2 + _EMBARGO_NS).sum())
-    assert res["segments"] == {"train": exp_train, "calibration": exp_cal, "test": exp_test}
+    # v1.17: legacy mode reports its selection rows too (= the calibration rows)
+    assert res["segments"] == {
+        "train": exp_train,
+        "calibration": exp_cal,
+        "select": exp_cal,
+        "test": exp_test,
+    }
+    assert res["split_mode"] == "legacy" and res["selection_segment"] == "calibration"
     # the purge really removes something vs the unpurged boundaries (rows
     # exist whose label window would straddle each boundary)
     assert exp_train < int((ts <= b1).sum())

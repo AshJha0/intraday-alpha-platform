@@ -28,6 +28,7 @@ from iap.execution.config import (
 )
 from iap.execution.fill_hazard import FillHazardModel
 from iap.execution.markout_feedback import FeedbackConfig, MarkoutFeedback
+from iap.execution.pacing import PacingParams
 from iap.execution.passive import (
     POLICY_NAMES,
     ExecPolicy,
@@ -38,6 +39,7 @@ from iap.execution.passive import (
     post_price,
 )
 from iap.execution.replay import ExecReplayResult, ExecutionReplay, ParentReport
+from iap.execution.signal import AlphaUrgencySource, ArraySignalSource, SignalReading
 from iap.execution.simulator import ExecutionSimulator
 from iap.execution.sor import NO_ROUTE, SmartOrderRouter
 from iap.execution.types import (
@@ -52,9 +54,15 @@ from iap.execution.types import (
     OrderType,
     VenueSpec,
 )
+from iap.execution.urgency import AlphaUrgencyPolicy
 
 __all__ = [
     "AlgoType",
+    "AlphaUrgencyPolicy",
+    "AlphaUrgencySource",
+    "ArraySignalSource",
+    "PacingParams",
+    "SignalReading",
     "CancelReason",
     "ChildOrder",
     "EXECUTION_FILE",

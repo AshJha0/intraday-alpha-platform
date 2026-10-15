@@ -5573,3 +5573,66 @@ last one.
 
 **Pitfall:** the card must report metrics NET of costs. A card that only
 quotes gross accuracy is valid JSON but tells a reviewer nothing.
+
+## 101. Run the shortfall benchmark with signal-aware urgency and pacing (v1.17 B2 / B3, opt-in)
+
+**Goal:** see whether a real alpha signal, re-read at every child decision,
+lowers implementation shortfall against the plain algo on the SAME windows.
+The B1 benchmark (API_TRADING.md §2.14) works each parent under a plain
+policy and under `base+variant` arms — `urgency` (B2: agree → post, adverse
+→ cross, in signal units), `pacing` (B3: POV participation / slice tilt),
+`ac` and `ac_drift` (B3: Almgren-Chriss with the signal as the drift, IS
+cells only) — and pairs every variant with its own control, day-clustered.
+In-sample only (`data/real/multi7`); the signed B7 test runs once on the
+fresh days.
+
+```bash
+cd python && PYTHONPATH=src python -m iap.research.execution_benchmark \
+  --data-dir ../data/real/multi7 --out ../research/execution/benchmark --tag multi7_signal \
+  --walk-depth 50 --window-min 30 --signal EQ10 --signal-threshold-z 1.0 --signal-gain 0.5 \
+  --policies native,native+urgency,native+pacing,native+ac,native+ac_drift
+```
+
+`--signal EQ10` scores the registered EQ10 parameters on
+`<data-dir>/features/features_*.parquet` and standardises the scores per
+instrument, so `--signal-threshold-z 1.0` means one standard deviation of
+EQ10's own scores; QQQ (the ETF) is outside EQ10's universe and every
+decision on it is `no_signal` (the plain style). The report
+(`BENCHMARK_multi7_signal.md`) adds a column of urgency shares per cell and
+rows such as `native+urgency-native | TWAP | 0.5` with the paired all-in
+difference and its 95 % CI. A smoke on one session and one symbol takes
+about a minute:
+
+```bash
+cd python && PYTHONPATH=src python -m iap.research.execution_benchmark \
+  --data-dir ../data/real/multi7 --out /tmp/sig --sessions 20190730 --symbols MSFT \
+  --max-events 1500000 --walk-depth 50 --signal EQ10 \
+  --policies native,native+urgency,native+pacing
+```
+
+Output (abridged; one window per cell, so no CI):
+
+```text
+native+urgency|TWAP|0.1 all-in 28.8 bps  urgency shares: adverse 60 %, agree 20 %, neutral 20 %
+native|TWAP|0.1         all-in 27.3 bps
+native+urgency-native|TWAP|0.1  all-in diff +1.56 bps (1 pair)
+```
+
+The same opt-ins on one parent, without the driver:
+
+```python
+from iap.execution import AlphaUrgencyPolicy, AlphaUrgencySource, PacingParams, ParentOrder
+src = AlphaUrgencySource.from_dataset("EQ10", "data/real/multi7/features",
+                                      instruments_json="data/real/multi7/configs/instruments/instruments.json")
+aware = ParentOrder(parent_id=1, instrument_id=2, side=0, qty=38_000, start_ts=t0, end_ts=t0 + 1800 * 10**9,
+                    signal_source=src, urgency_policy="alpha",
+                    alpha_urgency=AlphaUrgencyPolicy(threshold_z=1.0, passive_urgency=0.1),
+                    slice_signal_tilt=True, pacing=PacingParams(gain=0.5))
+```
+
+**Pitfall:** the registered EQ10 `beta` was fitted on the synthetic bundle
+and is negative, while EQ10's in-sample IC on the real sessions is
+positive; `--signal-refit` fits in-sample (labelled `refit:in-sample`) and
+flips the sign. Which alpha and which thresholds go into the signed B7
+draft is the owner's decision; the benchmark reports both arms, it does not
+choose.

@@ -14,10 +14,15 @@ Runs, in order:
 
 Usage: ``python3 research/ml_reports/run_ml.py`` (from the repo root or
 anywhere — paths are resolved relative to this file).  Budget: < 5 minutes.
+``--gate clustered [--gate-t-threshold 2.0]`` (v1.17 WS-D, R-6; opt-in,
+the committed report is the literal rule) gates the zoo on the fold-mean
+rank IC with the day-clustered t; both readings are in the report either
+way.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import time
@@ -38,7 +43,12 @@ from iap.models.metalabel import (  # noqa: E402
     MIN_ISOTONIC_POSITIVES,
     run_meta_labeling,
 )
-from iap.models.pipeline import run_model_comparison  # noqa: E402
+from iap.models.pipeline import (  # noqa: E402
+    DEFAULT_GATE_RULE,
+    DEFAULT_GATE_T_THRESHOLD,
+    GATE_RULES,
+    run_model_comparison,
+)
 from iap.models.zoo import TREE_FALLBACK_ACTIVE, model_names  # noqa: E402
 from iap.validation import ExperimentLedger  # noqa: E402
 
@@ -52,7 +62,11 @@ def _fmt(x, nd: int = 4) -> str:
     return "n/a" if x is None else f"{x:.{nd}f}"
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--gate", choices=list(GATE_RULES), default=DEFAULT_GATE_RULE)
+    parser.add_argument("--gate-t-threshold", type=float, default=DEFAULT_GATE_T_THRESHOLD)
+    args = parser.parse_args(argv)
     warnings.filterwarnings("ignore")
     t0 = time.time()
     tracker = ExperimentTracker()
@@ -68,7 +82,9 @@ def main() -> None:
     ledger = ExperimentLedger(LEDGER_PATH, dataset_version=data_version(_REPO))
 
     print("running gated model comparison ...")
-    results = run_model_comparison(ds, tracker=tracker, ledger=ledger)
+    results = run_model_comparison(
+        ds, tracker=tracker, ledger=ledger, gate=args.gate, gate_t_threshold=args.gate_t_threshold
+    )
     gate = results["gate"]
 
     trained = [n for n in results["models"]]
@@ -181,6 +197,15 @@ def main() -> None:
         f"{_fmt(gate['best_linear_mean_oos_ic'])} — that target embeds "
         "the observable half-spread, so gating on it passed trivially "
         "and it is no longer the gate)."
+    )
+    # v1.17 WS-D (R-6): the other reading, whichever rule decided.
+    cl = gate["clustered"]
+    L.append(
+        f'- Clustered reading (`gate="clustered"`, v1.17 R-6): `{cl["best_linear_model"]}` '
+        f"fold-mean rank IC vs mid {_fmt(cl['mean_rank_ic_vs_mid'])}, day-clustered t "
+        f"{_fmt(cl['tstat_day_cluster'], 2)} over {cl['n_days']} session days, threshold "
+        f"{cl['t_threshold']:g} → would **{'PASS' if cl['passed'] else 'FAIL'}**; the rule that "
+        f"decided this report: `{gate['gate_rule']}`."
     )
     if gate["skipped_models"]:
         L.append(f"- Skipped models: {gate['skipped_models']}.")

@@ -41,7 +41,7 @@ import ast
 import hashlib
 from importlib import metadata
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from iap.agents.blackboard import canonical
 
@@ -131,7 +131,7 @@ def fingerprint(alpha_id: str, src_root: Path = SRC_ROOT) -> dict[str, Any] | No
 
     if alpha_id not in alpha.ALPHA_CLASSES:
         return None
-    cls = alpha.ALPHA_CLASSES[alpha_id]
+    cls = cast("type[alpha.AlphaModel]", alpha.ALPHA_CLASSES[alpha_id])
     roots = sorted({c.__module__ for c in cls.__mro__ if c.__module__.startswith("iap.")})
     modules = module_closure(roots, src_root)
     specs = {s.name: s for s in registry.build_registry()}

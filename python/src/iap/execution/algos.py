@@ -47,6 +47,12 @@ replaces the IS decay with the closed-form Almgren-Chriss trajectory
 (``iap.execution.optimal``); ``volume_curve`` replaces the VWAP ``1 + x^2``
 curve with a forecast curve (``iap.execution.volume_curve``).
 v1.16 opt-in: ``pov_exact`` (exact participation + catch-up, see the field).
+v1.17 WS-B opt-ins (B2 / B3): ``urgency_policy="alpha"`` re-evaluates the
+child style from a real alpha signal at every decision
+(``iap.execution.urgency.AlphaUrgencyPolicy``); ``pov_signal_pacing``,
+``slice_signal_tilt`` and ``ac_signal_drift`` modulate the schedule from the
+same signal (``iap.execution.pacing``). All read ``signal_source``
+(``iap.execution.signal``) and are off by default.
 """
 
 from __future__ import annotations
@@ -60,6 +66,12 @@ from iap.execution.passive import ExecPolicy, PassiveParams
 
 if TYPE_CHECKING:  # pragma: no cover
     from iap.execution.optimal import ACParams
+    from iap.execution.pacing import PacingParams
+    from iap.execution.signal import SignalSource
+    from iap.execution.urgency import AlphaUrgencyPolicy
+
+#: ``ParentOrder.urgency_policy`` values.
+URGENCY_POLICIES: tuple[str, ...] = ("fixed", "alpha")
 
 
 class AlgoType(IntEnum):
@@ -120,6 +132,32 @@ class ParentOrder:
     #: total, and the whole deficit is covered at once in children of at
     #: most ``max_child_qty`` (catch-up after expiries or missed fills).
     pov_exact: bool = False
+    # ---- v1.17 WS-B signal-aware opt-ins (Python only; defaults = the plain algo) ----
+    #: The signal every opt-in below reads (``iap.execution.signal``); required
+    #: by any of them, ignored otherwise. Not part of the parent's identity.
+    signal_source: SignalSource | None = None
+    #: B2: ``"fixed"`` (the pinned behaviour: ``policy`` / ``urgency`` as set)
+    #: or ``"alpha"`` (re-evaluated per child from ``signal_source`` with
+    #: ``alpha_urgency``; the base ``policy`` is the neutral child style).
+    urgency_policy: str = "fixed"
+    alpha_urgency: AlphaUrgencyPolicy | None = None
+    #: B3: per-event POV participation scaled by the signal.
+    pov_signal_pacing: bool = False
+    #: B3: TWAP / VWAP / IS slice quantities tilted by the signal at each slice.
+    slice_signal_tilt: bool = False
+    #: B3: Almgren-Chriss IS re-solved per slice with the signal as the drift.
+    ac_signal_drift: bool = False
+    pacing: PacingParams | None = None
+
+    @property
+    def signal_aware(self) -> bool:
+        """True when any v1.17 signal opt-in is on."""
+        return (
+            self.urgency_policy != "fixed"
+            or self.pov_signal_pacing
+            or self.slice_signal_tilt
+            or self.ac_signal_drift
+        )
 
 
 def slice_weights(parent: ParentOrder) -> list[float]:

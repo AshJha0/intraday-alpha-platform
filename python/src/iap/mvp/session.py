@@ -21,9 +21,9 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from iap.alpha import ALPHA_CLASSES
+from iap.alpha import ALPHA_CLASSES, AlphaModel
 from iap.contracts.versions import canonical_json
 from iap.execution.realism import RealismOptIns
 from iap.features.registry import registry_dicts
@@ -125,7 +125,7 @@ def _import_reference(
         },
     )
     for alpha in engine.alphas:
-        cls = ALPHA_CLASSES[alpha.alpha_id]
+        cls = cast("type[AlphaModel]", ALPHA_CLASSES[alpha.alpha_id])
         state = (
             registry.get(alpha.alpha_id).state.name if alpha.alpha_id in registry else "RESEARCH"
         )

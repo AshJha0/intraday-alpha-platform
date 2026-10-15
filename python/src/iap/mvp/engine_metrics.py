@@ -5,9 +5,16 @@ realized IC.  Split out of :class:`~iap.mvp.engine.MvpEngine` as a mixin
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from iap.labels.labels import HORIZONS_NS, LabelResult, compute_labels, max_sample_age
 from iap.mvp.metrics import IcResult, pearson
 from iap.risk.events import Decision as RiskDecisionCode
+
+if TYPE_CHECKING:
+    from iap.labels.labels import MidSeries
+    from iap.mvp.accounting import Account
+    from iap.risk.engine import RiskEngine
 
 _PNL_IDENTITY_TOL = 1e-9
 
@@ -15,6 +22,19 @@ _PNL_IDENTITY_TOL = 1e-9
 class EngineMetricsMixin:
     """Mixin of :class:`~iap.mvp.engine.MvpEngine` (module docstring); it
     reads and writes the engine's own attributes."""
+
+    if TYPE_CHECKING:
+        # The engine attributes this mixin touches, declared for the type
+        # checker only (F3); MvpEngine.__init__ assigns them.
+        iid: int
+        horizon: str
+        account: Account
+        risk_engine: RiskEngine
+        last_ts: int | None
+        decision_ts: list[int]
+        mid_series: MidSeries
+        ic_samples: dict[str, list[tuple[int, float]]]
+        _labels: dict[str, tuple[tuple[int, int, int], LabelResult]]
 
     # -------------------------------------------------------------- results
 

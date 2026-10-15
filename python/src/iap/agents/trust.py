@@ -87,7 +87,7 @@ def verify_registry(
     if not isinstance(sig_doc, dict):
         return [f"the registry is not signed ({REGISTRY_SIG_RELPATH} missing)"]
     who = sig_doc.get("maintainer")
-    pub = maintainers.get(who)
+    pub = maintainers.get(who) if who is not None else None
     if pub is None:
         return [f"registry signed by {who!r}, who is not a trust root"]
     if sig_doc.get("registry_digest") != digest(dict(pubkeys)):

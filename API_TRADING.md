@@ -879,6 +879,87 @@ contract.
   raises without an `impact.residual` block. VWAP by time of day was already
   in place (§2.8).
 
+### 2.14 Signal-aware urgency and pacing (v1.17 WS-B items B2 / B3, Python only)
+
+Every option here is off by default: a `ParentOrder` without a signal
+opt-in replays byte-identically (every golden, every published number), and
+attaching a `signal_source` without an opt-in changes nothing either
+(`test_v117_signal_aware.py`). Nothing is a port contract (F7 ports it
+later).
+
+**Signal units (`iap.execution.signal`).** A `SignalSource` answers
+`at(instrument_id, t) -> SignalReading | None`: the last reading with
+`ts <= t` (causal, never a later row), carrying `z`, `expected_return` and
+`horizon_s`. `z` is the **z-score of the alpha's own score distribution**
+on the dataset (mean / std of `expected_return` over the alpha's scored
+rows of that instrument), so every threshold below is "so many standard
+deviations of this alpha's scores", whatever its `beta`. The sign is the
+alpha's (positive = price expected to rise). `AlphaUrgencySource.
+from_dataset(alpha_id, features_dir, params_path=None, instruments_json=None,
+refit=False)` scores a flagship alpha (`EQ10`, `EQ05`, ...) with the
+registered parameters of `configs/strategies/alpha_params.json` (its
+`feature_version` must match the registry) over `features_*.parquet`;
+`refit=True` fits in-sample first and labels the source `refit:in-sample`
+(a research variant, never a gate arm). `describe()` records the per-
+instrument scale. `ArraySignalSource({iid: [(ts, z, er), ...]})` is the
+explicit form for tests and planted signals. `URGENCY_REGIMES` lists the
+provenance values.
+
+**B2 — alpha urgency re-evaluated through the parent's life.**
+`ParentOrder(signal_source=src, urgency_policy="alpha",
+alpha_urgency=AlphaUrgencyPolicy(threshold_z=1.0, passive_urgency=0.1,
+max_age_ns=10 s, latency_ns=0))`. At EVERY child decision (each TWAP /
+VWAP / IS slice, each POV deficit) the replay reads the signal as of
+`t - latency_ns` and classifies the alignment (`-z` for a buy, `+z` for a
+sell): `>= threshold_z` *agree* — the child is POSTED through the PASSIVE
+state machine (§2.5) with the patience of `passive_urgency`; `<=
+-threshold_z` *adverse* — the child crosses (MARKET); otherwise *neutral*,
+or *no_signal* / *stale* (no reading, or one older than `max_age_ns`) —
+the parent's own `policy` child style (NATIVE, AGGRESSIVE or PASSIVE at its
+own `urgency`). A re-posted or crossed remainder inherits the regime of the
+decision it came from. `urgency_policy="fixed"` (default) is the v1.10
+one-shot `apply_alpha_urgency` world: nothing re-evaluated.
+
+**B3 — signal-aware pacing (`iap.execution.pacing`).** `PacingParams(gain=
+0.5, min_scale=0.25, max_scale=3.0, max_participation=0.5, max_age_ns,
+latency_ns)`; `scale = clip(1 - gain * alignment, min_scale, max_scale)`,
+`1` without a reading. Three named opt-ins, each with the plain algo as
+its control: `pov_signal_pacing` (POV) accumulates the target as
+`sum(p_t * dV)` with `p_t = min(p * scale, max_participation)` per TRADE
+(adverse: participate more now; favourable: less; `pov_exact` keeps its
+`p/(1-p)` form); `slice_signal_tilt` (TWAP / VWAP / IS) re-apportions the
+REMAINING quantity over the remaining slices at each slice with the current
+weight times `scale` (largest remainder, never negative, the last slice
+takes the rest); `ac_signal_drift` (IS with `is_model=ALMGREN_CHRISS`)
+re-solves the Almgren-Chriss trajectory at each slice over the remaining
+window with `ac_trajectory(qty, params, n, drift)`, `drift =
+ac_drift_from_signal(side, expected_return, mid, remaining_horizon)` = the
+alpha's expected move taken as the total over the remaining window (never
+extrapolated per unit time from its horizon), in the favours-waiting sign:
+a positive drift holds more in the middle of the window, a negative one
+front-loads (`ac_holdings(..., drift=0.0)` is the v1.10 trajectory). The
+tilt and the AC drift are alternatives on one parent.
+
+**Provenance.** Every child of a signal-aware parent carries
+`ChildOrder.urgency_regime` (`agree` / `adverse` / `neutral` / `no_signal`
+/ `stale`, or `plain` for a pacing-only parent), `signal_z` and
+`pacing_scale`; `ParentReport.urgency_children` / `urgency_qty` count them
+(`diagnostics()`, outside every golden row).
+
+**Benchmark.** `python -m iap.research.execution_benchmark ... --signal
+EQ10 --policies native,native+urgency,native+pacing,native+ac,native+ac_drift`
+works the SAME parents under each `base+variant`, pairs every variant with
+its own control on the same windows (`native+urgency-native`,
+`native+ac_drift-native+ac`; the AC variants cover IS cells only) with
+day-clustered CIs, and reports the urgency-regime shares per cell. Knobs:
+`--signal-threshold-z`, `--signal-passive-urgency`, `--signal-gain`,
+`--signal-max-age-s`, `--signal-refit`, `--signal-params`,
+`--ac-risk-aversion`, `--ac-daily-vol`; `--signal synthetic` is a
+deterministic sine wave for tests. Open for the owner before B7 signs:
+the thresholds (1 z, gain 0.5) and the alpha (the registered EQ10 `beta`
+was fitted on synthetic data and is negative, while its in-sample real IC
+is positive: `--signal-refit` shows the other sign).
+
 ## 3. Where the rules live
 
 | rule set | normative text | Python port entry |

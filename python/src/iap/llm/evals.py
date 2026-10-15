@@ -342,7 +342,7 @@ def run_scenario(
     model: str = EVAL_MODEL,
     max_usd: float = 0.5,
     control: bool = True,
-    fingerprinter: Callable[[str], dict[str, Any]] | None = fake_fingerprint,
+    fingerprinter: Callable[[str], dict[str, Any] | None] | None = fake_fingerprint,
     secret: str | None = None,
 ) -> dict[str, Any]:
     """One scenario.  ``client_factory`` None = mocked (the scripted model);

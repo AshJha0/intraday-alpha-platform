@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from iap.contracts.types import (
     ExecStatus,
@@ -17,12 +18,43 @@ from iap.core.events import EventType, MarketEvent, SessionStatus
 from iap.mvp.orders import _LiveParent
 from iap.risk.orders import Fill as RiskFill
 
+if TYPE_CHECKING:
+    from iap.mvp.accounting import Account, Counters
+    from iap.mvp.adapters import SimulatorAdapter
+    from iap.orderbook.book import ConsolidatedBook
+    from iap.risk.engine import RiskEngine
+    from iap.tca.fills import MarketTimeline
+
 _log = logging.getLogger(__name__)
 
 
 class RiskWiringMixin:
     """Mixin of :class:`~iap.mvp.engine.MvpEngine` (module docstring); it
     reads and writes the engine's own attributes."""
+
+    if TYPE_CHECKING:
+        # The engine attributes this mixin touches, declared for the type
+        # checker only (F3); MvpEngine.__init__ assigns them.
+        sim: SimulatorAdapter
+        tick: float
+        iid: int
+        strategy_id: str
+        account: Account
+        counters: Counters
+        risk_engine: RiskEngine
+        book: ConsolidatedBook
+        timeline: MarketTimeline
+        post_kill_fills: int
+        kill_cancels: int
+        kill_alerts: list[str]
+        _kill_cancelled: set[int]
+        _live: _LiveParent | None
+        _closing: list[_LiveParent]
+        _venue_stale: dict[int, bool]
+        _last_data_ts: dict[int, int]
+        _mark_ts: int | None
+
+        def assert_pnl_identity(self) -> None: ...
 
     # -------------------------------------------------------------- reports
 

@@ -127,12 +127,13 @@ def verify(
                     f"anchor seq {row['seq']}: commit {row['commit'][:12]} is not on {ref}"
                 )
     if ref is not None:
+        ref_text: str | None
         try:
-            text = _git(repo, "show", f"{ref}:{rel}")
+            ref_text = _git(repo, "show", f"{ref}:{rel}")
         except BlackboardError:
-            text = None
-        if text is not None:
-            lines = [ln for ln in text.splitlines() if ln.strip()]
+            ref_text = None
+        if ref_text is not None:
+            lines = [ln for ln in ref_text.splitlines() if ln.strip()]
             if current[: len(lines)] != lines:
                 problems.append(f"the board on {ref} is not a prefix of the current board")
     return {

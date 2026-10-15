@@ -140,6 +140,30 @@ def _hms(text: str, where: str) -> tuple[int, int, int]:
     return h, m, s
 
 
+def _conformal_spec(p: _Doc) -> ConformalSpec | None:
+    """The OPTIONAL ``portfolio.conformal`` block (v1.17 D3); ``None`` when
+    absent or ``enabled`` is false."""
+    if "conformal" not in p.obj:
+        return None
+    c = p.sub("conformal")
+    if "enabled" in c.obj and not c.boolean("enabled"):
+        return None
+    method = c.string("method") if "method" in c.obj else "adaptive"
+    if method not in CONFORMAL_METHODS:
+        raise ValueError(f"{c.where}.method: unknown method {method!r}; known: {CONFORMAL_METHODS}")
+    ref_width = None
+    if "ref_width" in c.obj and c.obj["ref_width"] is not None:
+        ref_width = c.number("ref_width", 0.0, 1e9, lo_open=True)
+    return ConformalSpec(
+        alpha=c.number("alpha", 0.0, 1.0, lo_open=True) if "alpha" in c.obj else 0.1,
+        method=method,
+        gamma=c.number("gamma", 0.0, 1.0) if "gamma" in c.obj else 0.005,
+        window=c.integer("window", 2, 1_000_000) if "window" in c.obj else 500,
+        warmup=c.integer("warmup", 2, 1_000_000) if "warmup" in c.obj else 30,
+        ref_width=ref_width,
+    )
+
+
 @dataclass(frozen=True)
 class SessionSpec:
     """The single MVP trading session (event time; UTC bounds via zoneinfo)."""
@@ -167,6 +191,29 @@ class SolverSpec:
     feas_tol: float
 
 
+#: Conformal methods of :class:`ConformalSpec` (``iap.models.conformal``).
+CONFORMAL_METHODS = ("adaptive", "split")
+
+
+@dataclass(frozen=True)
+class ConformalSpec:
+    """v1.17 WS-D item D3 (opt-in): conformal sizing in the MVP engine
+    (:class:`iap.mvp.sizing.SizingMixin`).  ``portfolio.conformal`` is an
+    OPTIONAL key of mvp.json: absent (every pinned / golden config) means no
+    conformal scaling and the byte-identical golden run.  ``method``
+    ``"adaptive"`` is ACI with step ``gamma``; ``"split"`` is the rolling
+    split-conformal quantile (``gamma`` ignored).  ``ref_width`` ``None`` =
+    the median width of the rolling residual window once ``warmup``
+    residuals are in."""
+
+    alpha: float = 0.1
+    method: str = "adaptive"
+    gamma: float = 0.005
+    window: int = 500
+    warmup: int = 30
+    ref_width: float | None = None
+
+
 @dataclass(frozen=True)
 class PortfolioSpec:
     """Single-stock mean-variance sizing."""
@@ -181,6 +228,8 @@ class PortfolioSpec:
     min_bars: int
     conf_min: float
     solver: SolverSpec
+    #: v1.17 D3 (opt-in): ``None`` = the pinned golden sizing path
+    conformal: ConformalSpec | None = None
 
 
 @dataclass(frozen=True)
@@ -307,6 +356,7 @@ class MvpConfig:
             min_bars=p.integer("min_bars", 2, 100_000),
             conf_min=p.number("conf_min", 0.0, 1.0),
             solver=solver,
+            conformal=_conformal_spec(p),
         )
         if portfolio.ewma_lambda >= 1.0:
             raise ValueError(f"{where}.portfolio.ewma_lambda: must be < 1")
@@ -432,9 +482,10 @@ class MvpConfig:
         child_policy: str | None = None,
         passive: Mapping[str, Any] | None = None,
         eod_flatten_lead_ns: int | None = None,
+        conformal: Mapping[str, Any] | None = None,
     ) -> MvpConfig:
         """A new config with ``seed`` / ``instrument`` / the child execution
-        policy replaced (re-validated). The overridden document is what
+        policy / the conformal sizing block (v1.17 D3) replaced (re-validated). The overridden document is what
         ``run_id`` and ``config_version`` hash, so a policy run is a
         different run from the pinned NATIVE one."""
         doc = json.loads(json.dumps(self.document))
@@ -448,6 +499,8 @@ class MvpConfig:
             doc["execution"]["passive"] = dict(passive)
         if eod_flatten_lead_ns is not None:
             doc["execution"]["eod_flatten_lead_ns"] = int(eod_flatten_lead_ns)
+        if conformal is not None:
+            doc["portfolio"]["conformal"] = dict(conformal)
         return MvpConfig.from_document(doc, where="mvp.json (overridden)", repo_root=self.repo_root)
 
     # ---------------------------------------------------------- documents

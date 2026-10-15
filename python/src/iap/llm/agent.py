@@ -48,7 +48,7 @@ from iap.agents.workflow import Workflow, WorkflowError
 from iap.llm import summary_check, verify
 from iap.llm.budget import DEFAULT_MODEL, Budget, BudgetExceeded
 from iap.llm.envfile import redact
-from iap.llm.prices import load_llm_config
+from iap.llm.prices import ModelPin, load_llm_config
 from iap.llm.runners import PLANTED_DATASET, T_THRESHOLD, Runner, verdict
 
 #: the only datasets an agent session may run (A-P0-1: exploratory, never confirmatory)
@@ -351,7 +351,7 @@ class Session:
             if problems:
                 self.rejected.append({"title": title, "text": text, "refs": refs, "why": problems})
                 raise ToolRefused("finding rejected: " + "; ".join(problems))
-        task_args = {
+        task_args: dict[str, Any] = {
             "title": f"llm {self.session_id}: {title}"[:200],
             "spec": {"session": self.session_id, "n": len(self.findings) + 1},
         }
@@ -506,7 +506,8 @@ def _wire_spend(client: Any, session: Session, model: str) -> None:
         cfg = load_llm_config()
         pins = [p for p in cfg.pins.values() if p.model == model]
         pref = [p for p in pins if p.role == b.role]
-        b.pin = (pref or pins or [None])[0]
+        none_pin: list[ModelPin | None] = [None]
+        b.pin = (pref or pins or none_pin)[0]
 
 
 def run_session(

@@ -41,6 +41,7 @@ import secrets
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 from iap.agents import approvals
 from iap.agents.broker import WriteBroker
@@ -175,7 +176,7 @@ def cmd_maintainer_keygen(a: argparse.Namespace) -> int:
     path = _outside(a.keyfile, a.root)
     keys = _keys(path)
     roots_path = a.root / trust.TRUST_ROOTS_RELPATH
-    roots = _keys(roots_path) or {"maintainers": {}}
+    roots: dict[str, Any] = _keys(roots_path) or {"maintainers": {}}
     if a.maintainer in keys or a.maintainer in roots["maintainers"]:
         raise SystemExit(f"maintainer {a.maintainer!r} already has a key")
     priv, pub = signing.generate_keypair()
