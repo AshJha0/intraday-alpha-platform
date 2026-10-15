@@ -63,6 +63,24 @@ to be a true projection, so it holds when ``vol_target`` is off; with it on,
 the radial retraction is used as-is and the result is feasible-seeking only.
 Everything is deterministic: fixed
 iteration counts, no RNG, no unordered iteration.
+
+Opt-in ``impact`` (v1.17 C2, default ``None`` = the pinned objective above):
+an :class:`ImpactTerm` adds a concave-in-size market-impact COST
+
+    sum_i kappa_i * |w_i - w_prev_i| ** (1 + k_i)
+
+to the objective (the cost of a trade of ``d`` is ``kappa * d ** (1 + k)``:
+per-unit impact ``kappa * d ** k`` times the quantity ``d``; ``k = 0.5`` is
+the square-root rule, ``k = 1`` quadratic).  It enters the SAME proximal step
+as the linear t-cost (step 2c): the per-asset prox of
+``eta * (tc * |x| + kappa * |x| ** (1 + k))`` is the soft threshold followed
+by the unique root of ``x + eta * kappa * (1 + k) * x ** k = s`` on
+``[0, s]`` (:func:`prox_power`, a fixed 64-step bisection — deterministic,
+no tolerance parameter).  :meth:`ImpactTerm.from_cost_model` reads the
+research :class:`~iap.backtest.costs.CostModel` (sqrt or linear rule) and
+:meth:`ImpactTerm.from_impact_fit` the calibration's ``impact.residual``
+fit (coefficient in bps per (% ADV) ** k, parent level, v1.16 P0-2), both
+at a stated book notional so a weight is a participation.
 """
 
 from __future__ import annotations
@@ -147,6 +165,112 @@ class Constraints:
 
 
 @dataclass
+class ImpactTerm:
+    """Opt-in impact cost ``sum_i kappa_i * |d_i| ** (1 + exponent)`` of a
+    trade vector ``d = w - w_prev`` (module docstring).
+
+    ``kappa`` is per asset, in return units of the book per unit weight
+    traded to the power ``1 + exponent``; ``exponent`` (``k``) is the size
+    exponent of the per-unit impact, ``0 < k <= 1``.
+    """
+
+    kappa: np.ndarray
+    exponent: float = 0.5
+
+    def validate(self, n: int) -> None:
+        self.kappa = np.asarray(self.kappa, dtype=np.float64)
+        if self.kappa.shape != (n,):
+            raise ValueError("impact kappa must have shape (n,)")
+        if not np.all(np.isfinite(self.kappa)) or np.any(self.kappa < 0):
+            raise ValueError("impact kappa must be finite and >= 0")
+        k = float(self.exponent)
+        if not (math.isfinite(k) and 0.0 < k <= 1.0):
+            raise ValueError("impact exponent must lie in (0, 1]")
+        self.exponent = k
+
+    def cost(self, d: np.ndarray) -> float:
+        """The impact cost of the trade ``d`` (return units of the book)."""
+        a = np.abs(np.asarray(d, dtype=np.float64))
+        return float(np.sum(self.kappa * a ** (1.0 + self.exponent)))
+
+    @classmethod
+    def from_cost_model(cls, cost_model, notional: float, adv_notional: np.ndarray) -> ImpactTerm:
+        """The research cost model's impact rule as a term on weights.
+
+        Under ``impact_model="sqrt"`` the per-unit impact of trading a
+        participation ``p = |d| * notional / adv_notional`` is
+        ``multiplier * sqrt_impact_coeff_bps * 1e-4 * sqrt(p)``, so
+        ``kappa = multiplier * coeff * 1e-4 * (notional / adv_notional) ** 0.5``
+        with exponent 0.5; the legacy linear rule gives exponent 1 with
+        ``impact_coeff_bps_per_pct_adv * 100``.  ``sensitivity_scale`` is
+        applied like the cost model does.
+        """
+        adv = np.asarray(adv_notional, dtype=np.float64)
+        if not (math.isfinite(notional) and notional > 0):
+            raise ValueError("notional must be finite and > 0")
+        if np.any(~np.isfinite(adv)) or np.any(adv <= 0):
+            raise ValueError("adv_notional must be finite and > 0")
+        scale = cost_model.multiplier * cost_model.sensitivity_scale
+        if cost_model.impact_model == "sqrt":
+            coeff_bps, k = cost_model.sqrt_impact_coeff_bps, 0.5
+        else:
+            coeff_bps, k = cost_model.impact_coeff_bps_per_pct_adv * 100.0, 1.0
+        kappa = scale * coeff_bps * 1e-4 * (notional / adv) ** k
+        return cls(kappa=kappa, exponent=k)
+
+    @classmethod
+    def from_impact_fit(
+        cls,
+        coeff_bps_per_pct_adv_pow: float,
+        exponent: float,
+        notional: float,
+        adv_notional: np.ndarray,
+    ) -> ImpactTerm:
+        """A fitted residual-impact rule ``impact_bps = coeff * (% ADV) ** k``
+        (:func:`iap.execution.calibration.apply_impact_fit` units: the
+        calibration's ``linear`` / ``sqrt`` / ``power`` cells, parent level)
+        as a term on weights: ``% ADV = 100 * |d| * notional / adv_notional``.
+        """
+        adv = np.asarray(adv_notional, dtype=np.float64)
+        if not (math.isfinite(notional) and notional > 0):
+            raise ValueError("notional must be finite and > 0")
+        if np.any(~np.isfinite(adv)) or np.any(adv <= 0):
+            raise ValueError("adv_notional must be finite and > 0")
+        if not (math.isfinite(coeff_bps_per_pct_adv_pow) and coeff_bps_per_pct_adv_pow >= 0):
+            raise ValueError("impact coefficient must be finite and >= 0")
+        k = float(exponent)
+        kappa = coeff_bps_per_pct_adv_pow * 1e-4 * (100.0 * notional / adv) ** k
+        return cls(kappa=kappa, exponent=k)
+
+
+def prox_power(s: np.ndarray, c: np.ndarray, k: float, steps: int = 64) -> np.ndarray:
+    """Elementwise ``argmin_x >= 0  0.5 (x - s)^2 + c * x ** (1 + k)`` for
+    ``s >= 0``, ``c >= 0``: the root of ``x + c (1 + k) x ** k = s`` on
+    ``[0, s]`` (the left side is increasing in ``x``): in closed form for
+    ``k = 1`` (``s / (1 + 2c)``) and ``k = 0.5`` (a quadratic in ``sqrt(x)``),
+    else by ``steps`` bisection halvings — fixed count, deterministic, exact
+    to ~``s * 2 ** -steps``."""
+    s = np.asarray(s, dtype=np.float64)
+    c = np.asarray(c, dtype=np.float64)
+    g = c * (1.0 + k)
+    if k == 1.0:  # closed form: x (1 + g) = s
+        return np.where(g == 0.0, s, s / (1.0 + g))
+    if k == 0.5:  # closed form: sqrt(x) solves y^2 + g y - s = 0
+        y = 0.5 * (-g + np.sqrt(g * g + 4.0 * s))
+        return np.where(g == 0.0, s, y * y)
+    lo = np.zeros_like(s)
+    hi = s.copy()
+    for _ in range(steps):
+        mid = 0.5 * (lo + hi)
+        f = mid + g * mid**k - s
+        up = f < 0.0
+        lo = np.where(up, mid, lo)
+        hi = np.where(up, hi, mid)
+    out = 0.5 * (lo + hi)
+    return np.where(g == 0.0, s, out)
+
+
+@dataclass
 class PGDResult:
     """Solver output: best feasible iterate + audit trail (see module
     docstring, step 4, for the pinned INFEASIBLE result)."""
@@ -196,10 +320,15 @@ def objective(
     w_prev: np.ndarray,
     risk_aversion: float,
     tc_linear: np.ndarray,
+    impact: ImpactTerm | None = None,
 ) -> float:
-    """The research objective f(w) (see module docstring)."""
+    """The research objective f(w) (see module docstring); ``impact``
+    (opt-in) subtracts :meth:`ImpactTerm.cost` of ``w - w_prev``."""
     w = np.asarray(w, dtype=np.float64)
-    return float(alpha @ w - risk_aversion * (w @ Sigma @ w) - tc_linear @ np.abs(w - w_prev))
+    f = float(alpha @ w - risk_aversion * (w @ Sigma @ w) - tc_linear @ np.abs(w - w_prev))
+    if impact is not None:
+        f -= impact.cost(w - w_prev)
+    return f
 
 
 def project_l1_ball(v: np.ndarray, radius: float) -> np.ndarray:
@@ -271,23 +400,40 @@ def project(
     return w
 
 
-def _projectors(cons: Constraints, w_prev: np.ndarray, Sigma: np.ndarray | None) -> list:
-    """The individual set projections of :func:`project`, in the pinned order."""
+def _projectors(
+    cons: Constraints,
+    w_prev: np.ndarray,
+    Sigma: np.ndarray | None,
+    merge_equalities: bool = False,
+) -> list:
+    """The individual set projections of :func:`project`, in the pinned order.
+
+    ``merge_equalities`` (opt-in, v1.17 C1): the net row when ``net_cap ==
+    0`` and every currency row with bound 0 form ONE affine subspace
+    ``A w = 0``, projected exactly in one step (``w - A^+ A w``, pseudo-inverse
+    so dependent rows — sector rows that sum to the net row — are fine) in
+    the net row's slot; the remaining rows stay halfspace pairs.  The
+    intersection is unchanged, so Dykstra's limit is the same point; it is
+    reached in far fewer sweeps."""
     n = len(w_prev)
     ps = [lambda w: np.clip(w, cons.w_min, cons.w_max)]
     if cons.participation is not None:
         lo = w_prev - cons.participation
         hi = w_prev + cons.participation
         ps.append(lambda w: np.clip(w, lo, hi))
+    eq_rows: list[np.ndarray] = []
     if cons.net_cap is not None:
+        if merge_equalities and cons.net_cap == 0.0:
+            eq_rows.append(np.ones(n))
+        else:
 
-        def p_net(w: np.ndarray) -> np.ndarray:
-            s = w.sum()
-            if abs(s) > cons.net_cap:
-                return w - (s - np.sign(s) * cons.net_cap) / n
-            return w
+            def p_net(w: np.ndarray) -> np.ndarray:
+                s = w.sum()
+                if abs(s) > cons.net_cap:
+                    return w - (s - np.sign(s) * cons.net_cap) / n
+                return w
 
-        ps.append(p_net)
+            ps.append(p_net)
     if cons.currency_matrix is not None:
         for c in range(cons.currency_matrix.shape[0]):
             e = cons.currency_matrix[c]
@@ -295,6 +441,9 @@ def _projectors(cons: Constraints, w_prev: np.ndarray, Sigma: np.ndarray | None)
             if denom == 0.0:
                 continue
             bound = float(cons.currency_bounds[c])
+            if merge_equalities and bound == 0.0:
+                eq_rows.append(np.asarray(e, dtype=np.float64))
+                continue
 
             def p_ccy(w: np.ndarray, e=e, denom=denom, bound=bound) -> np.ndarray:
                 val = float(e @ w)
@@ -303,6 +452,10 @@ def _projectors(cons: Constraints, w_prev: np.ndarray, Sigma: np.ndarray | None)
                 return w
 
             ps.append(p_ccy)
+    if eq_rows:
+        A = np.vstack(eq_rows)
+        P = A.T @ np.linalg.pinv(A @ A.T) @ A  # projector onto the row space
+        ps.insert(1 + int(cons.participation is not None), lambda w: w - P @ w)
     if cons.gross_cap is not None:
         ps.append(lambda w: project_l1_ball(w, cons.gross_cap))
     if cons.turnover_cap is not None:
@@ -328,16 +481,19 @@ def project_dykstra(
     Sigma: np.ndarray | None,
     tol: float = 1e-12,
     max_iter: int = 10_000,
+    merge_equalities: bool = False,
 ) -> np.ndarray:
     """Dykstra's alternating projection onto the constraint intersection (opt-in).
 
     Same sets and order as :func:`project`; converges to the exact Euclidean
     projection of ``v`` when every set step is a true projection (i.e. no
     ``vol_target``).  Deterministic: fixed order, no RNG.
+    ``merge_equalities`` (opt-in) projects the zero-bound rows as one
+    affine subspace (:func:`_projectors`).
     """
     if not (np.isfinite(tol) and tol >= 0) or max_iter < 1:
         raise ValueError("dykstra tol must be finite >= 0 and max_iter >= 1")
-    ps = _projectors(cons, np.asarray(w_prev, dtype=np.float64), Sigma)
+    ps = _projectors(cons, np.asarray(w_prev, dtype=np.float64), Sigma, merge_equalities)
     x = np.asarray(v, dtype=np.float64).copy()
     incs = [np.zeros_like(x) for _ in ps]
     for _ in range(max_iter):
@@ -426,6 +582,8 @@ def solve(
     projection: str = "cyclic",
     dykstra_tol: float = 1e-12,
     dykstra_max_iter: int = 10_000,
+    impact: ImpactTerm | None = None,
+    merge_equalities: bool = False,
 ) -> PGDResult:
     """Deterministic PGD solve of the research portfolio problem.
 
@@ -447,6 +605,12 @@ def solve(
     ``projection="dykstra"`` (opt-in) projects with :func:`project_dykstra`
     (``dykstra_tol``, ``dykstra_max_iter``) instead of ``proj_passes`` cyclic
     passes; the default ``"cyclic"`` is the pinned behaviour.
+
+    ``impact`` (opt-in, v1.17 C2) adds the :class:`ImpactTerm` cost to the
+    objective and its prox to step 2c (module docstring); ``None`` leaves
+    every number of the pinned path unchanged.  ``merge_equalities``
+    (opt-in, Dykstra only) projects the zero-bound net / exposure rows as
+    one affine subspace (:func:`project_dykstra`).
     """
     alpha = np.asarray(alpha, dtype=np.float64)
     Sigma = np.asarray(Sigma, dtype=np.float64)
@@ -482,6 +646,8 @@ def solve(
     if np.any(np.abs(Sigma - Sigma.T) > 1e-12):
         raise ValueError("Sigma must be symmetric")
     constraints.validate(n)
+    if impact is not None:
+        impact.validate(n)
     if projection == "cyclic":
 
         def proj(x: np.ndarray) -> np.ndarray:
@@ -490,13 +656,15 @@ def solve(
     elif projection == "dykstra":
 
         def proj(x: np.ndarray) -> np.ndarray:
-            return project_dykstra(x, constraints, w_prev, Sigma, dykstra_tol, dykstra_max_iter)
+            return project_dykstra(
+                x, constraints, w_prev, Sigma, dykstra_tol, dykstra_max_iter, merge_equalities
+            )
 
     else:
         raise ValueError("projection must be 'cyclic' or 'dykstra'")
 
     def f(w: np.ndarray) -> float:
-        return objective(w, alpha, Sigma, w_prev, risk_aversion, tc_linear)
+        return objective(w, alpha, Sigma, w_prev, risk_aversion, tc_linear, impact)
 
     def rank(cand: np.ndarray) -> tuple[float, float]:
         b = violation_breakdown(cand, constraints, w_prev, Sigma)
@@ -536,7 +704,10 @@ def solve(
         grad = alpha - 2.0 * risk_aversion * (Sigma @ w)
         v = w + eta * grad
         d = v - w_prev
-        d = np.sign(d) * np.maximum(np.abs(d) - eta * tc_linear, 0.0)
+        mag = np.maximum(np.abs(d) - eta * tc_linear, 0.0)
+        if impact is not None:
+            mag = prox_power(mag, eta * impact.kappa, impact.exponent)
+        d = np.sign(d) * mag
         v = w_prev + d
         w = proj(v)
         fw = f(w)

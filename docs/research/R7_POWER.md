@@ -6,8 +6,8 @@ This is a planning aid for the owner before sign-off. It does not change the dra
 
 ## Gate modelled
 
-- HAC t >= 4.441: the Bonferroni threshold of the committed ledger (5,574 looks). The R7 looks themselves will raise it slightly; a threshold fixed in the pre-registration (`threshold_policy="prereg"`) would freeze it.
-- Deflated Sharpe > 0.95: N = 385 (ledger distinct experiments + 1), V = 1/(S-1), normal moments, on the per-session series.
+- HAC t >= 4.441: the Bonferroni threshold of the committed ledger (5,576 looks). The R7 looks themselves will raise it slightly; a threshold fixed in the pre-registration (`threshold_policy="prereg"`) would freeze it.
+- Deflated Sharpe > 0.95: N = 387 (ledger distinct experiments + 1), V = 1/(S-1), normal moments, on the per-session series.
 - Tier 1 = 7 holdout sessions; tier 2 = 47 (7 + 40 approved dates).
 - Power = P(pass | true effect); MDE = smallest effect passed with 80 % probability. `joint <=` is the smaller of the two component powers (an upper bound on passing both).
 
@@ -34,10 +34,10 @@ The tables below are the analysis the decisions were taken on; they still list e
 
 | alpha | effect (IC) | sd/session | S | power HAC | power DSR | joint <= | MDE HAC | MDE DSR | MDE joint |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| EQ01 @1s (in-sample) | +0.1051 | 0.0502 | 7 | 1.00 | 0.23 | 0.23 | 0.0387 | 0.1788 | 0.1788 |
+| EQ01 @1s (in-sample) | +0.1051 | 0.0502 | 7 | 1.00 | 0.23 | 0.23 | 0.0387 | 0.1789 | 0.1789 |
 | EQ01 @1s (in-sample) | +0.1051 | 0.0502 | 47 | 1.00 | 1.00 | 1.00 | 0.0149 | 0.0429 | 0.0429 |
-| EQ01 @1s (v1.8 decayed) | +0.0368 | 0.0502 | 7 | 0.77 | 0.00 | 0.00 | 0.0387 | 0.1788 | 0.1788 |
-| EQ01 @1s (v1.8 decayed) | +0.0368 | 0.0502 | 47 | 1.00 | 0.56 | 0.56 | 0.0149 | 0.0429 | 0.0429 |
+| EQ01 @1s (v1.8 decayed) | +0.0368 | 0.0502 | 7 | 0.77 | 0.00 | 0.00 | 0.0387 | 0.1789 | 0.1789 |
+| EQ01 @1s (v1.8 decayed) | +0.0368 | 0.0502 | 47 | 1.00 | 0.55 | 0.55 | 0.0149 | 0.0429 | 0.0429 |
 | EQ02 @5s (in-sample) | +0.0419 | 0.0163 | 7 | 1.00 | 0.47 | 0.47 | 0.0126 | 0.0583 | 0.0583 |
 | EQ02 @5s (in-sample) | +0.0419 | 0.0163 | 47 | 1.00 | 1.00 | 1.00 | 0.0049 | 0.0140 | 0.0140 |
 | EQ02 @5s (v1.8 decayed) | +0.0161 | 0.0163 | 7 | 0.92 | 0.00 | 0.00 | 0.0126 | 0.0583 | 0.0583 |
@@ -74,7 +74,7 @@ No in-sample IC exists for AUC01: the in-sample statistic is the session-cluster
 
 | S | active S | power t-gate | power DSR | joint <= | MDE (bp) | MDE IC (n decisions) |
 |---:|---:|---:|---:|---:|---:|---:|
-| 7 | 3 | 0.00 | 0.00 | 0.00 | 643.4 | 0.77 (21) |
+| 7 | 3 | 0.00 | 0.00 | 0.00 | 643.8 | 0.77 (21) |
 | 47 | 16 | 0.03 | 0.01 | 0.01 | 51.6 | 0.41 (141) |
 
 Recommendation: **underpowered even on tier 2**.
@@ -91,9 +91,9 @@ Recommendation: **underpowered even on tier 2**.
 | 0.5 | 47 | 0.16 | 0.09 | 0.09 |
 | 1.0 | 7 | 0.04 | 0.00 | 0.00 |
 | 1.0 | 47 | 0.99 | 0.95 | 0.95 |
-| 2.0 | 7 | 0.80 | 0.19 | 0.19 |
+| 2.0 | 7 | 0.80 | 0.18 | 0.18 |
 | 2.0 | 47 | 1.00 | 1.00 | 1.00 |
 
-MDE (d, 80 %): 3.56 on tier 1, 0.85 on tier 2.
+MDE (d, 80 %): 3.57 on tier 1, 0.85 on tier 2.
 
 Recommendation: **PENDING maker_real summary (rerun with --h1-mean-bps/--h1-sd-bps)**.

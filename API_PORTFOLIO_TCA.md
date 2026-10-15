@@ -136,6 +136,45 @@ constraint `{name, value, bound, slack, binding}` with
 `-slack`, 0 when feasible). Position/participation rows are emitted only
 when binding (n can be large); aggregate rows always.
 
+### 1.8 Impact term (v1.17 C2, opt-in; Python only — not part of any parity contract)
+
+`iap.portfolio.optimizer.ImpactTerm(kappa, exponent)` adds a concave
+market-impact cost `sum_i kappa_i |w_i - w_prev_i| ** (1 + k)` to the
+objective (`objective(..., impact=term)`, `solve(..., impact=term)`; the
+default `None` leaves the pinned path byte-identical). The term enters the
+proximal step beside the linear t-cost: soft threshold, then
+`prox_power(s, eta * kappa, k)`, the root of `x + eta kappa (1 + k) x^k = s`
+(closed form for `k = 1` and `k = 0.5`, a fixed 64-step bisection otherwise).
+
+| builder | units |
+|---|---|
+| `ImpactTerm.from_cost_model(cost_model, notional, adv_notional)` | the research `CostModel` rule: `sqrt` → `k = 0.5`, `kappa = multiplier * sqrt_impact_coeff_bps * 1e-4 * (notional / adv_notional) ** 0.5`; `linear` → `k = 1` |
+| `ImpactTerm.from_impact_fit(coeff, exponent, notional, adv_notional)` | a calibration `impact.residual` cell (`iap.execution.calibration.apply_impact_fit` units: bps per `(% ADV) ** k`, parent level) |
+
+Tests: `tests/test_v117_breadth_book.py` — the term lowers turnover at a
+given alpha; the optimum matches a brute-force grid on a 3-asset case for
+`k` in {0.5, 0.7, 1}.
+
+### 1.9 Exposure-matrix builder and merged equality projection (v1.17 C1, opt-in)
+
+`iap.portfolio.exposures.build_exposure_matrix(ids, betas, sectors,
+beta_row=True, sector_rows=True, bound=0.0, min_members=2)` returns an
+`ExposureMatrix(matrix, bounds, labels, missing_beta, sector_of)` whose rows
+go into `Constraints.currency_matrix / currency_bounds` (the general
+`|E w| <= b` constraint): one `beta` row (a missing beta reads as 1 and is
+listed) and one `sector:<name>` row per sector with at least `min_members`
+members (smaller sectors and unnamed instruments fall into
+`sector_unknown`, which gets a row). Dollar neutrality stays `net_cap`.
+`load_sectors()` reads `configs/reference/sectors.json` (`sectors`,
+`source`, `as_of`).
+
+`solve(..., projection="dykstra", merge_equalities=True)` (and
+`project_dykstra(..., merge_equalities=True)`) projects the zero-bound rows
+(the net row when `net_cap == 0`, every exposure row with bound 0) as ONE
+affine subspace `w - A^+ A w` in the net row's slot instead of a halfspace
+pair each; the intersection and Dykstra's limit are unchanged, the sweep
+count is not. Default `False`.
+
 ## 2. TCA (spec §19)
 
 Sign convention everywhere: `s = +1` buy, `-1` sell; **costs are positive

@@ -69,6 +69,40 @@ that tag.
   resolve by import, status-text freshness vs the last tag) in a new advisory `docs` CI job with a
   lychee step. E5: `docs/AGENTS.md`, `API_AGENTS.md`, `API_LLM.md`, `API_PAPER.md`. agent-evals gains
   one eval per agent (`iap.agents.wse_evals`; baseline regenerated).
+- v1.17 WS-C items C3 / C4 / C5 (all opt-in; no registered alpha, feature registry, label, golden,
+  prereg fingerprint or published number moves). C3: `iap.alpha.linear_v2` — model `linear_z_v2`,
+  per-instrument causal standardisation (rolling mean/std over a declared window, default 30 m, 32
+  obs minimum; R-7) as the twins `EQ01_z2 … FX12_z2` of the registered `linear_z_v1` alphas;
+  `research/preregs/linear_z_v2_prereg_DRAFT.json` (DRAFT, unsigned). Combiner (R-8): `ridge` /
+  `shrinkage_mv` solve on pairwise-complete moments (a no-opinion row no longer enters `Z'Z/n` as
+  0) and the ridge penalty search re-standardises inside each forward-chained split; new
+  `decay_aware` method (IC-weighted × survival ratio at the combination horizon; the stack carries
+  purge-masked own-horizon labels); `STACKING_REVISION = "v1.17"` is written into every NEW
+  combination experiment identity (`experiment_identity(stacking=...)`; existing identities
+  reproduce byte for byte) and `run_combination` presents `decay_aware` as the default method.
+  C4: `iap.features.feature_v2` (`FeatureV2Extension`: `longwin` family, 12 features at 15 m / 30 m
+  / 1 h over a running engine, own registry hash, windows reset per session-local day and on
+  recovery) and `iap.labels.labels_v2` (15 m / 30 m / 1 h labels truncated at the session close and
+  flagged, `AFTER_CLOSE` reason); goldens `tests/golden/expected_features_v2.json`,
+  `expected_labels_v2.json`. C5: `iap.alpha.regime_conditioned.RegimeConditionedAlpha` (per-regime
+  beta or interaction terms over the existing regime flags, id `<member>_rc`) and
+  `iap.validation.regime_gate` (per-regime `gate_statistics` blocks and a gate decision; nothing
+  calls it by default). Docs: API_ALPHA.md §8 / §10, API_FEATURES.md §9,
+  docs/research/V117_WSC_MODELS.md. C6–C8 remain.
+
+
+- v1.17 WS-C items C1, C2, C7 (opt-in, report-only): `python -m iap.research.breadth_book` — the
+  cross-sectional book backtest through the optimizer (EQ11 or a demeaned beta-gap EQ10 score, linear
+  or decile rank-to-weight map, costs inside the objective, dollar / beta / sector neutrality through the
+  new `iap.portfolio.exposures` builder with `configs/reference/sectors.json`, participation and
+  turnover caps, exact P&L accounting net of the cost model, session-end flatten, one ledger look of kind
+  `breadth_book` per run, `--dataset-dir` for ingested datasets); `ImpactTerm` + `prox_power` in
+  `iap.portfolio.optimizer` (sqrt / power impact from the cost model or a calibration's residual fit, in
+  the proximal step; `solve(impact=None)` unchanged) and `merge_equalities` for the Dykstra path;
+  `iap.research.breadth_report` (breadth, effective bets, fundamental-law yardstick, net Sharpe at size,
+  break-even notional, capacity at horizon, day-clustered SEs) with `research/breadth/book/` outputs for
+  the synthetic dataset and the 3-name multi7 smoke test; `docs/PORTFOLIO_BREADTH.md`. No pinned
+  number moves.
 - v1.17 WS-D items D1 and D4 (review findings R-6, R-9; all opt-in, no published number moves).
   D1: `iap.alpha.gbm.GbmAlpha` (alpha id `ML01`) puts gradient-boosted trees behind the `AlphaModel`
   interface: `hist_gbdt` backend by default (`xgboost` / `lightgbm` when installed, named in the
@@ -87,6 +121,7 @@ that tag.
   path before pooling; `path_ics_demeaned` and its summary sit beside the pooled reading in every
   `cpcv` block, `path_ic_rule` names the headline; a test shows the pooled rule biased by a fit of
   another scale and the demeaned one not. Docs: RESEARCH_VALIDITY §4d, API_ALPHA §7.3, LEARN §100.
+
 
 - v1.17 WS-A item A2b: slim ingest for breadth datasets. `ingest --slim` / `normalize_run(write_normalized_jsonl=False)`
   writes no `*.normalized.jsonl` twin of the IAP1 file (3x its bytes; the feature build and the MVP read the

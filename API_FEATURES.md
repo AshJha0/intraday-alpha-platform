@@ -666,3 +666,79 @@ Tests: `python/tests/test_features_extended.py` (closed-form Hawkes after a
 burst, AR(1)-sign autocorrelation, depletion time for a planted cancel
 rate, odd-lot / hidden shares and their degradation, event / volume row
 counts, causality by perturbing the future, default hash unchanged).
+
+## 9. Feature spec v2 and labels v2 — 15 m / 30 m / 1 h (opt-in, v1.17 C4)
+
+Everything here is **opt-in** and additive: the default registry (205
+features, hash `585dd7b9...`), `WINDOW_NS`, the engine, the golden vectors
+of §5, the v1 labels of §6 (`HORIZONS_NS`, 10 ms–15 m) and
+`iap.alpha.base.VALID_HORIZONS` are unchanged; the open pre-registrations'
+fingerprints do not move. No port computes these; the feature store CLI
+does not write them.
+
+### 9.1 Features — `iap.features.feature_v2`
+
+One family, `longwin`, 12 features over the windows `WINDOWS_V2_NS` =
+`15m`, `30m`, `1h` (names end `_v2`); registry `specs_v2()`, hash
+`v2_registry_hash()` = sha256 of the canonical JSON of
+`[{"base_registry_hash": <default hash>}, *specs]`, so the v2 set is
+defined on top of a specific registered set.
+
+| feature | definition | valid when |
+|---|---|---|
+| `ret_log_w<w>_v2` | `ln mid(t) − ln mid(t − w)` (latest mid-change sample at or before `t − w`) | book two-sided, window warm, such a sample exists |
+| `rvol_w<w>_v2` | `sqrt(Σ (Δ ln mid)² over mid changes in (t − w, t] / w_s)` | book two-sided, window warm |
+| `trend_score_w<w>_v2` | `ret_log_w / (rvol_w · sqrt(w_s) + EPS)` | both valid and `rvol_w > 0` (§4 EPS guard) |
+| `range_w<w>_v2` | `max − min` of `ln mid` over the emissions in `(t − w, t]` | book two-sided, window warm |
+
+Sampling follows the registered 10 s / 1 m / 5 m volatility and trend
+features (log mid recorded at mid changes; windows half-open in event time).
+
+**Session-spanning rule (pinned).** A v2 window never spans a session: an
+instrument's v2 state is cleared and its warmup anchor moved to the
+current event at the first emission of a new SESSION-LOCAL day
+(`SessionClock`, §3) and at every stale→fresh recovery (§2.1). A window is
+warm when `t − anchor ≥ w`: on a 09:30 New York open the 1 h features exist
+from 10:30 and never read the previous close. The rule is the session, not
+the engine instance, so one engine per day and one per month give the same
+values.
+
+**Opt-in.** `FeatureV2Extension(engine, on_vector=None, keep=False)`
+attaches to a running `FeatureEngine` / `ExtendedFeatureEngine` through its
+`on_vector` hook: per base emission it reads the merged-book state and
+emits a second `FeatureVector` (`feature_version = v2_registry_hash()`);
+`on_vector(base_vector, v2_vector)`; the engine's previous callback still
+receives the base vector first, which is byte-identical with or without
+the extension; `detach()` restores it; `v2_frame(vectors)` builds the
+per-instrument frame (`exchange_ts` + 12 float64 columns, NaN where
+invalid). Golden: `tests/golden/expected_features_v2.json` (synthetic
+2.5-hour one-venue book, `python/tests/test_feature_v2.py`, cross-checked
+against a brute-force recomputation; regenerate with
+`IAP_REGEN_V2_GOLDEN=1`).
+
+### 9.2 Labels — `iap.labels.labels_v2`
+
+`compute_labels_v2(anchors_ts, series, last_event_ts, session_close,
+horizons=HORIZON_V2_ORDER, max_age_ns=None, freshness="whole_day")` →
+`{horizon: LabelResultV2}` at `HORIZONS_V2_NS` = `15m`, `30m`, `1h`
+(`15m` computed here carries the v2 session rule and is a different label
+from the v1 `15m` in the last 15 minutes of a session). `session_close` is
+one instant or one per anchor (non-decreasing); `session_close_ts(ts,
+close_second_of_day, utc_offset_s)` derives it from a session definition.
+
+**Session-spanning rule (pinned).** No horizon crosses the session close.
+For anchor `t`: `t ≥ close` → invalid, bit `AFTER_CLOSE` (`1 << 6`,
+`LabelReasonV2`); `t + h ≤ close` → the v1 forward instant; `t + h > close`
+→ the forward instant is `close`, the label is **truncated** (`truncated =
+True`, `effective_horizon_ns = close − t`) and VALID when the v1 rules hold
+to that instant (observed, both ends tradable, fresh forward sample, no
+blackout inside `(t, close]`). A truncated label is a tradable return over
+a shorter horizon — the position was flat at the close — not an `h`
+return; filter on `truncated` for full-horizon labels. The mid and cost
+formulas and every other v1 rule (§6) are unchanged.
+
+Frame columns (`label_columns_v2(h)`): `label_mid_<h>_v2`,
+`label_cost_<h>_v2`, `label_valid_<h>_v2`, `label_reason_<h>_v2`,
+`label_truncated_<h>_v2`, `label_horizon_ns_<h>_v2`. Golden:
+`tests/golden/expected_labels_v2.json` (`python/tests/test_labels_v2.py`,
+exact equality; inside a session the 15 m v2 label equals the v1 label).

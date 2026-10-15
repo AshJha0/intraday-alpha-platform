@@ -1,0 +1,209 @@
+{
+ "description": "iap.features.feature_v2 golden: a synthetic one-venue 150-minute book (test_feature_v2._events, SplitMix64 seed 3, 5 s requotes one tick either side of a two-tick random-walk mid, one trade a minute) through FeatureEngine(cadence 0) with the FeatureV2Extension attached; per checkpoint (emission index) every v2 feature's value (null when invalid) and validity. Tolerance abs/rel 1e-9. Validated against an independent pandas-free brute-force recomputation in the same test.",
+ "x-version": 1,
+ "v2_registry_hash": "4cf9b110ef0b34031190baee7a29120475fb6d4b38fc449d8888c168730f2c16",
+ "base_registry_hash": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
+ "feature_names": [
+  "ret_log_w15m_v2",
+  "rvol_w15m_v2",
+  "trend_score_w15m_v2",
+  "range_w15m_v2",
+  "ret_log_w30m_v2",
+  "rvol_w30m_v2",
+  "trend_score_w30m_v2",
+  "range_w30m_v2",
+  "ret_log_w1h_v2",
+  "rvol_w1h_v2",
+  "trend_score_w1h_v2",
+  "range_w1h_v2"
+ ],
+ "n_vectors": 7348,
+ "checkpoints": {
+  "1224": {
+   "timestamp": 1787579700000000000,
+   "values": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "validity": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false
+   ]
+  },
+  "2449": {
+   "timestamp": 1787581200000000000,
+   "values": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "validity": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false
+   ]
+  },
+  "3674": {
+   "timestamp": 1787582700000000000,
+   "values": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "validity": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false
+   ]
+  },
+  "4898": {
+   "timestamp": 1787584200000000000,
+   "values": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "validity": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false
+   ]
+  },
+  "6123": {
+   "timestamp": 1787585700000000000,
+   "values": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "validity": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false
+   ]
+  },
+  "7347": {
+   "timestamp": 1787587195000000000,
+   "values": [
+    -0.0034057931348314696,
+    7.103350077633366e-05,
+    -1.5982098099304964,
+    0.0038080013948729174,
+    -0.0026054729640634378,
+    6.825940149896575e-05,
+    -0.8996795361975234,
+    0.004008021397538641,
+    -0.0032057731321657457,
+    6.836033763118125e-05,
+    -0.7815870143591145,
+    0.0066046472448046956
+   ],
+   "validity": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ]
+  }
+ }
+}
