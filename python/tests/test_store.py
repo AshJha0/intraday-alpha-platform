@@ -1489,8 +1489,10 @@ def test_cli_selects_the_scope(tmp_path: Path, capsys: pytest.CaptureFixture[str
     # five repository scopes (v1.14.0 adds v2_v113, v1.17 v2_v114) + the ingested dataset's two
     # + the unstamped pre-registration scope: EQ10, EQ05 (v1.15 R7) and EQ01
     # (v1.16 item 11: the merged step2 quoting preregs; AUC01 / QNOSKEW are
-    # not registry alphas, so they add no scorecard row)
-    assert len(everything) == 24 * 5 + 2 + 3
+    # not registry alphas, so they add no scorecard row) + the v1.17 C1
+    # `breadth_book` look of EQ11 on the multi7 dataset (a research-only
+    # scope the promotion pipeline never ran on: one row, EQ11)
+    assert len(everything) == 24 * 5 + 2 + 3 + 1
     # sql binds :dataset_version / :methods to the selected scope
     query = (
         "SELECT COUNT(*) AS n, SUM(count) AS looks FROM ledger_entries "
