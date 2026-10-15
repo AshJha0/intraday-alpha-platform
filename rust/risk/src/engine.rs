@@ -820,7 +820,7 @@ impl RiskEngine {
         *self.positions.entry(fill.instrument_id).or_insert(0) += signed;
         *self
             .realized
-            .entry((fill.strategy_id.clone(), ccy))
+            .entry((fill.strategy_id.clone(), ccy.clone()))
             .or_insert(0.0) += realized;
         let done = self.executed.entry(fill.instrument_id).or_insert(0);
         *done = done.saturating_add(fill.qty);

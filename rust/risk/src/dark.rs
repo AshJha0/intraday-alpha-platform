@@ -49,7 +49,11 @@ impl DarkControls {
     /// `Some(reason)` when the controls are not a valid configuration (the
     /// Python constructor's `ValueError`s).
     pub fn validation_error(&self) -> Option<&'static str> {
-        if !(self.max_participation >= 0.0) || !(self.max_dark_notional >= 0.0) {
+        if self.max_participation.is_nan()
+            || self.max_participation < 0.0
+            || self.max_dark_notional.is_nan()
+            || self.max_dark_notional < 0.0
+        {
             return Some("DarkControls: max_participation / max_dark_notional must be >= 0");
         }
         if self.participation_window_ns <= 0 {
