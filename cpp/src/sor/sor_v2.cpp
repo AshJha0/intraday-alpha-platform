@@ -170,12 +170,37 @@ std::vector<CostAwareRouter::Touch> CostAwareRouter::touches(
     return out;
 }
 
+namespace {
+
+// The consolidated best PRICE on `side`: the best of the per-venue bests
+// over the non-stale venues — the price ConsolidatedBook::best_bid /
+// best_ask report (their merged() aggregates every level of every venue
+// into a map, O(levels) per call: on the real slice's ~2,700-level book
+// that put the passive route at ~400 us; the router needs only the touch
+// prices, which per-venue bests give in O(venues)). Same value, same rule
+// (non-stale venues only, whatever their status).
+std::optional<std::int64_t> consolidated_touch(const ConsolidatedBook& book, Side side) {
+    std::optional<std::int64_t> best;
+    for (const auto& [vid, vb] : book.books()) {
+        (void)vid;
+        if (vb.stale()) continue;
+        const std::optional<LevelEntry> q = side == Side::BID ? vb.best_bid() : vb.best_ask();
+        if (!q.has_value()) continue;
+        if (!best.has_value() || (side == Side::BID ? q->first > *best : q->first < *best)) {
+            best = q->first;
+        }
+    }
+    return best;
+}
+
+}  // namespace
+
 std::optional<double> CostAwareRouter::mid(const ConsolidatedBook& book) {
-    const auto bb = book.best_bid();
-    const auto ba = book.best_ask();
+    const auto bb = consolidated_touch(book, Side::BID);
+    const auto ba = consolidated_touch(book, Side::ASK);
     if (!bb.has_value() || !ba.has_value()) return std::nullopt;
     // Python: 0.5 * (bb[0] + ba[0]) — the integer sum, then one multiply.
-    return 0.5 * static_cast<double>(bb->first + ba->first);
+    return 0.5 * static_cast<double>(*bb + *ba);
 }
 
 std::pair<double, double> CostAwareRouter::fee_bps(std::uint16_t vid,
@@ -221,7 +246,8 @@ std::map<std::uint16_t, double> CostAwareRouter::passive_costs(
         for (const Touch& t : tch) fees_sum += fee_bps(t.vid, ts, *m, tick).first;
         const double half =
             1e4 * 0.5 *
-            static_cast<double>(book.best_ask()->first - book.best_bid()->first) / *m;
+            static_cast<double>(*consolidated_touch(book, Side::ASK) -
+                                *consolidated_touch(book, Side::BID)) / *m;
         miss = half + (tch.empty() ? 0.0 : fees_sum / static_cast<double>(tch.size()));
     } else {
         miss = *o.miss_cost_bps;
