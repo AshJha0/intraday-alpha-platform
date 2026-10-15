@@ -1730,6 +1730,10 @@ flowchart LR
 | Typed contracts, Protocols, schema index, validation | [../API_CONTRACTS.md](../API_CONTRACTS.md) |
 | Python risk / execution reference ports and their golden parity | [../API_TRADING.md](../API_TRADING.md) |
 | Roadmap: what exists, with evidence; what is backlog | [ROADMAP.md](ROADMAP.md) |
+| v1.17 execution quality: the shortfall benchmark, signal-aware urgency and pacing, the realism layer | [EXECUTION_QUALITY.md](EXECUTION_QUALITY.md) |
+| v1.17 breadth: the universe rule and the cross-sectional book | [PORTFOLIO_BREADTH.md](PORTFOLIO_BREADTH.md) |
+| v1.17 signal research: the statistics revision, new models and gates | [SIGNAL_RESEARCH.md](SIGNAL_RESEARCH.md) |
+| v1.17 data sources: free Nasdaq and IEX days, process-and-delete | [DATA_SOURCES.md](DATA_SOURCES.md) |
 | Which language copy is canonical, which frozen; the `POLYGLOT-OVERRIDE` rule | [POLYGLOT.md](POLYGLOT.md) |
 | Research governance and the LLM agent's controls | [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2a-§2b |
 | The research methods (defaults since v1.5.0, with their legacy rules), the safe research store, gate eligibility | [RESEARCH_VALIDITY.md](RESEARCH_VALIDITY.md) |

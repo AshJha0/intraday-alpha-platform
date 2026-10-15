@@ -4,6 +4,49 @@ Status: in-sample, report-only, opt-in. Nothing here gates a promotion;
 the breadth pre-registration (plan C8) is the owner's, and the 2025/26
 Nasdaq days are its holdout for every name outside AAPL / MSFT / QQQ.
 
+## The breadth universe (A3)
+
+The universe is fixed before any breadth statistic exists, by a written rule
+(`research/breadth/UNIVERSE_RULE.md`, rule version `breadth_universe/v1`):
+
+- the top 100 Nasdaq-listed symbols by **displayed continuous-session volume**
+  on **2019-01-30** (shares executed against displayed orders, ITCH `E` and
+  printable `C`, between system events `Q` and `M`);
+- ETFs (`etp_flag Y`) are kept and flagged; test securities (`authenticity T`)
+  are excluded; opening / closing crosses and non-displayed prints are
+  reported beside the ranking and do not rank;
+- the list is fixed on the selection day. A symbol that later delists, halts
+  or changes id stays in the list and is reported as missing on that day:
+  survivorship is explicit, not repaired.
+
+Measured on the owner-approved 2019-01-30 full-market file by
+`python -m iap.marketdata breadth-universe` (`iap.marketdata.breadth`, one
+streaming pass; artefacts `research/breadth/universe.json` and
+`research/breadth/UNIVERSE_2019-01-30.md`): 368,366,634 messages read, 8,713
+symbols with a directory row, 27 test securities excluded, 100 names of which
+29 are ETFs. AAPL, QQQ and MSFT rank 6, 12 and 15, so the three-name datasets
+are inside the universe. Rank 1 is AMD (30,969,573 displayed shares), rank 100
+is ABEV (1,637,752). The rule ranks **share** volume, not notional, so
+low-priced names rank high (HMNY at rank 2 in 2019); that is the rule as
+registered. A notional-ranked variant would be a new rule version and a new
+look. `universe.json` also holds every symbol's three volumes, the source
+file's sha256 and the next 50 names.
+
+`research/breadth/candidates.json` lists the ten in-sample full-market days
+(2019-01-30, 2019-03-27, 2019-07-30, 2019-08-30, 2019-10-18, 2019-10-30,
+2019-12-30, 2020-01-30, 2021-07-13, 2021-08-13); each download needs the
+owner's approval. How a day is ingested and deleted is in
+[DATA_SOURCES.md](DATA_SOURCES.md).
+
+## The breadth holdout rule
+
+Names outside AAPL / MSFT / QQQ have never had a statistic computed on the
+2025/26 Nasdaq days. Those days are the holdout of the breadth
+pre-registration (plan item C8) for every such name, and are not in the
+candidates manifest. A `--dataset-dir` whose path contains `holdout` is refused
+by the book driver, so an in-sample report cannot read it by accident. AAPL,
+MSFT and QQQ are already spent on the R7 holdout and do not count as unseen.
+
 ## What the book does
 
 `python -m iap.research.breadth_book` (`iap.research.breadth_book.run_book`)
@@ -61,6 +104,23 @@ Same driver, three datasets:
 | `data/real/multi7` | 3 | 7 | a smoke test — a breadth of 3 is not breadth; sector neutrality is off (two sectors of one and two names pin the book at zero) |
 | `data/real/breadth/ds_20190130` (`--dataset-dir`, when its features exist) | 100 | 1 | the first real breadth day; sector neutrality from `sectors.json` |
 
+Measured outputs committed so far (in-sample, report-only; every number is net
+of the cost model the optimizer saw):
+
+| artefact | book | result |
+|---|---|---|
+| `research/breadth/book/BOOK_synthetic.md` / `book_synthetic.json` | 11 names, 2 sessions, EQ11, linear, 5 min, notional 1,000,000 | net P&L -12,092.74; mean rank IC -0.0745 (day-clustered t -1.68, df 1); net daily Sharpe -124.94; effective bets 10.33 of 11. The generator has no cross-sectional edge: a plumbing check |
+| `research/breadth/book/BOOK_multi7.md` / `book_multi7.json` | 3 names (AAPL, MSFT, QQQ), 7 sessions, 905 rebalances | gross P&L 1,042.67 against spread 3,651.02 + fee 1,246.04 + impact 5,698.64: net -9,553.03; mean rank IC 0.0626 (day-clustered t 2.73, df 6); effective bets 1.46 of 3; net daily Sharpe -30.10 |
+
+**Reading, stated plainly.** On the three-name smoke test the score has a
+positive rank IC but the book is **net negative at every size from 0.25x to 4x
+the base notional** (net bps -77.63 to -99.08 in the size sweep), the
+break-even notional is below the smallest size tried, and the single-name
+capacity proxy is zero shares. This is a negative result for EQ11 as a
+three-name book after costs; a breadth of 3 is not breadth, so it says
+nothing about a 100-name book. Nothing here is a statement about breadth
+itself until the 100-name day has been run (placeholder below).
+
 ## What it does not do
 
 - It is not a statement about EQ11 or EQ10: the scores are the first
@@ -94,6 +154,16 @@ Same driver, three datasets:
 3. The sector taxonomy source: `configs/reference/sectors.json` is a
    public-knowledge GICS-style classification with an `ETF` bucket and two
    `unknown` names; the pre-registration should cite a vendor file.
+
+## What C6 and C8 will add (placeholder for the G5 truth pass)
+
+- **C6**: the pre-registered net-of-cost screen over all folds.
+- **C8**: the breadth-book pre-registration (the owner approves and signs; the
+  `linear_z_v2` draft feeds it, see [SIGNAL_RESEARCH.md](SIGNAL_RESEARCH.md)),
+  with the 2025/26 days as its holdout.
+- **The first 100-name day**: the 2019-01-30 dataset run through
+  `breadth_book --dataset-dir` and its report. Placeholder for the day's
+  numbers; none are claimed here.
 
 Tests: `python/tests/test_v117_breadth_book.py`. API: `API_PORTFOLIO_TCA.md`
 sections 1.8 and 1.9.
