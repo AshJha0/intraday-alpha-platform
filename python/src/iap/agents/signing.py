@@ -94,6 +94,7 @@ def sign(
     sig = priv.sign(message(agent, op, digest(args), nonce, prev, board))
     if prev is None:
         return {"scheme": ED25519, "nonce": nonce, "sig": sig.hex()}
+    assert board is not None  # bound to prev (checked above); narrows for the type checker
     return {"scheme": ED25519_V2, "nonce": nonce, "sig": sig.hex(), "prev": prev, "board": board}
 
 

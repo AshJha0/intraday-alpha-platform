@@ -40,6 +40,22 @@ register tool before any fresh-day run).
 Deterministic: same dataset + same arguments => same JSON bytes (sorted
 keys; the only wall-clock field is ``generated``, which is omitted when
 ``--no-timestamp`` is given, as the tests do).
+
+**Signal-aware policies (v1.17 B2 / B3).** A policy name may carry a
+variant, ``base+variant``: ``native+urgency`` works the same parents with
+``urgency_policy="alpha"`` (B2) on top of the ``native`` child style,
+``native+pacing`` with ``pov_signal_pacing`` (POV) / ``slice_signal_tilt``
+(TWAP, VWAP, IS) (B3), ``native+ac`` turns the IS parents into plain
+Almgren-Chriss parents (the control) and ``native+ac_drift`` adds the
+signal as the AC drift term (IS cells only). Every variant pairs with its
+own control on the SAME windows (``native+urgency-native``,
+``native+ac_drift-native+ac``, ...) beside the baseline pairing. The
+signal comes from ``--signal``: an alpha id (``EQ10``, ``EQ05``: the
+registered parameters of ``configs/strategies/alpha_params.json`` scored
+on ``<data-dir>/features``, standardised per instrument to signal units;
+``--signal-refit`` fits in-sample instead, labelled) or ``synthetic`` (a
+deterministic sine wave in signal units, for tests). The report carries
+the urgency-regime shares per cell (why each child got its urgency).
 """
 
 from __future__ import annotations
@@ -58,12 +74,18 @@ from iap.core.codec import read_iap1, read_jsonl
 from iap.core.rng import SplitMix64
 from iap.execution import (
     AlgoType,
+    AlphaUrgencyPolicy,
+    ArraySignalSource,
     ExecPolicy,
     ExecutionReplay,
+    ISModel,
+    PacingParams,
     ParentOrder,
     load_exec_config,
     load_sor_options,
 )
+from iap.execution.optimal import ac_params_from_calibration
+from iap.execution.signal import URGENCY_REGIMES, AlphaUrgencySource
 from iap.execution.types import FILL_PROVENANCES
 from iap.tca.markout import build_gated_timeline
 from iap.tca.shortfall import parent_costs
@@ -78,6 +100,17 @@ POLICIES: dict[str, ExecPolicy] = {
     "aggressive": ExecPolicy.AGGRESSIVE,
     "passive": ExecPolicy.PASSIVE,
 }
+#: v1.17 B2 / B3 policy variants (``base+variant``) and the variant each
+#: one is the signal-aware arm of (its control; ``None`` = the base policy).
+VARIANTS: dict[str, str | None] = {
+    "urgency": None,  #: B2: urgency_policy="alpha"
+    "pacing": None,  #: B3: pov_signal_pacing / slice_signal_tilt
+    "ac": None,  #: plain Almgren-Chriss IS (the ac_drift control; IS cells only)
+    "ac_drift": "ac",  #: B3: AC with the signal as the drift (IS cells only)
+}
+SYNTHETIC_SIGNAL = "synthetic"
+SYNTHETIC_PERIOD_S = 300.0
+SYNTHETIC_AMPLITUDE_Z = 1.5
 #: costs reported per cell, in bps of the arrival notional
 REPORT_COSTS = (
     "all_in",
@@ -168,6 +201,68 @@ def cluster_mean_stats(
 def parent_qty(adv: float, pct_adv: float, lot: int = 100) -> int:
     """``pct_adv`` % of ``adv`` rounded to the nearest ``lot``, at least one lot."""
     return max(lot, int(round(pct_adv / 100.0 * adv / lot)) * lot)
+
+
+def parse_policy(name: str) -> tuple[str, str | None]:
+    """``"native+urgency"`` -> ``("native", "urgency")``; ``"native"`` -> ``("native", None)``."""
+    base, _, variant = name.partition("+")
+    if base not in POLICIES:
+        raise SystemExit(f"unknown policy {name!r}; bases are {sorted(POLICIES)}")
+    if variant and variant not in VARIANTS:
+        raise SystemExit(f"unknown variant {variant!r} in {name!r}; choose from {sorted(VARIANTS)}")
+    return base, variant or None
+
+
+def control_policy(name: str) -> str | None:
+    """The control a signal-aware policy pairs with (``None`` for a base policy)."""
+    base, variant = parse_policy(name)
+    if variant is None:
+        return None
+    ctrl = VARIANTS[variant]
+    return base if ctrl is None else f"{base}+{ctrl}"
+
+
+def synthetic_signal(instrument_ids, first_ts: int, last_ts: int) -> ArraySignalSource:
+    """A deterministic signal in signal units for tests: one reading per
+    second, ``z = A sin(2 pi t / P)`` with ``P`` = 300 s, ``A`` = 1.5."""
+    rows = []
+    t = first_ts
+    while t <= last_ts:
+        z = SYNTHETIC_AMPLITUDE_Z * math.sin(
+            2.0 * math.pi * ((t - first_ts) / SEC) / SYNTHETIC_PERIOD_S
+        )
+        rows.append((t, z, z * 1e-4))
+        t += SEC
+    return ArraySignalSource({iid: list(rows) for iid in instrument_ids}, label=SYNTHETIC_SIGNAL)
+
+
+def signal_variant(
+    p: ParentOrder,
+    name: str,
+    source,
+    *,
+    urgency: AlphaUrgencyPolicy,
+    pacing: PacingParams,
+    ac_params,
+) -> ParentOrder | None:
+    """``p`` worked under policy ``name``; ``None`` when the variant does not
+    apply to this parent's algo (AC variants are IS-only)."""
+    base, variant = parse_policy(name)
+    p = replace(p, policy=POLICIES[base])
+    if variant is None:
+        return p
+    if variant == "urgency":
+        return replace(p, signal_source=source, urgency_policy="alpha", alpha_urgency=urgency)
+    if variant == "pacing":
+        if p.algo == AlgoType.POV:
+            return replace(p, signal_source=source, pov_signal_pacing=True, pacing=pacing)
+        return replace(p, signal_source=source, slice_signal_tilt=True, pacing=pacing)
+    if p.algo != AlgoType.IS or ac_params is None:
+        return None
+    p = replace(p, is_model=ISModel.ALMGREN_CHRISS, ac_params=ac_params)
+    if variant == "ac":
+        return p
+    return replace(p, signal_source=source, ac_signal_drift=True, pacing=pacing)
 
 
 def cut_windows(first_ts: int, last_ts: int, window_ns: int, warmup_ns: int) -> list[int]:
@@ -277,9 +372,17 @@ def _cell_summary(rows: list[dict], seed: int) -> dict[str, object]:
     filled = sum(r["filled_qty"] for r in rows)
     maker = sum(r["maker_qty"] for r in rows)
     prov: dict[str, int] = {}
+    urg: dict[str, int] = {}
+    urg_qty: dict[str, int] = {}
     for r in rows:
         for k, v in r["provenance_qty"].items():
             prov[k] = prov.get(k, 0) + v
+        for k, v in r.get("urgency_children", {}).items():
+            urg[k] = urg.get(k, 0) + v
+        for k, v in r.get("urgency_qty", {}).items():
+            urg_qty[k] = urg_qty.get(k, 0) + v
+    n_children = sum(urg.values())
+    n_urg_qty = sum(urg_qty.values())
     out: dict[str, object] = {
         "n_parents": len(rows),
         "n_sessions": len(set(clusters)),
@@ -299,6 +402,13 @@ def _cell_summary(rows: list[dict], seed: int) -> dict[str, object]:
             ),
         },
         "provenance_share_of_filled": {k: prov[k] / filled for k in sorted(prov)} if filled else {},
+        # v1.17 B2 / B3: why the children got their urgency (empty for a plain cell)
+        "urgency_share_of_children": (
+            {k: urg[k] / n_children for k in sorted(urg)} if n_children else {}
+        ),
+        "urgency_share_of_qty": (
+            {k: urg_qty[k] / n_urg_qty for k in sorted(urg_qty)} if n_urg_qty else {}
+        ),
         "costs_bps": {
             key: cluster_mean_stats([_bps(r, key) for r in rows], clusters, seed=seed)
             for key in REPORT_COSTS
@@ -351,8 +461,27 @@ def run_benchmark(
     max_events: int = 0,
     allow_holdout: bool = False,
     timestamp: bool = True,
+    signal: str = "none",
+    signal_features: Path | None = None,
+    signal_params: Path | None = None,
+    signal_refit: bool = False,
+    signal_threshold_z: float = 1.0,
+    signal_passive_urgency: float = 0.1,
+    signal_gain: float = 0.5,
+    signal_max_age_s: float = 10.0,
+    ac_risk_aversion: float = 1e-6,
+    ac_daily_vol: float = 0.015,
 ) -> dict[str, object]:
-    """Run the grid; returns the JSON document (see the module docstring)."""
+    """Run the grid; returns the JSON document (see the module docstring).
+
+    ``signal`` names the B2 / B3 signal source: ``"none"`` (no variant
+    policy allowed), ``"synthetic"`` or an alpha id. The ``signal_*`` knobs
+    are the thresholds in signal units (``AlphaUrgencyPolicy`` /
+    ``PacingParams``); ``ac_*`` build the Almgren-Chriss parameters of the
+    ``ac`` / ``ac_drift`` variants from the simulator's impact slope
+    (``sigma = price * ac_daily_vol`` per sqrt(trading day), ADV from the
+    instrument spec, horizon = the window).
+    """
     data_dir = Path(data_dir)
     if "holdout" in str(data_dir).lower() and not allow_holdout:
         raise SystemExit(
@@ -365,10 +494,17 @@ def run_benchmark(
             config_dir = Path(__file__).resolve().parents[4] / "configs"
     config_dir = Path(config_dir)
     for pol in policies:
-        if pol not in POLICIES:
-            raise SystemExit(f"unknown policy {pol!r}; choose from {sorted(POLICIES)}")
+        parse_policy(pol)
     if baseline_policy not in policies:
         raise SystemExit(f"baseline policy {baseline_policy!r} is not in --policies")
+    if signal == "none" and any(parse_policy(pol)[1] for pol in policies):
+        raise SystemExit("signal-aware policies need --signal (an alpha id or 'synthetic')")
+    urgency_policy = AlphaUrgencyPolicy(
+        threshold_z=signal_threshold_z,
+        passive_urgency=signal_passive_urgency,
+        max_age_ns=int(signal_max_age_s * SEC),
+    )
+    pacing_params = PacingParams(gain=signal_gain, max_age_ns=int(signal_max_age_s * SEC))
     algo_types = tuple(AlgoType[a] for a in algos)
     cfg = load_exec_config(config_dir)
     cfg = replace(
@@ -395,6 +531,38 @@ def run_benchmark(
     rows: dict[str, list[dict]] = {p: [] for p in policies}
     session_labels: list[str] = []
     n_events = 0
+    source = None
+    signal_doc: dict[str, object] = {"source": "none"}
+    if signal not in ("none", SYNTHETIC_SIGNAL):
+        source = AlphaUrgencySource.from_dataset(
+            signal,
+            signal_features or (data_dir / "features"),
+            params_path=signal_params,
+            instruments_json=config_dir / "instruments" / "instruments.json",
+            refit=signal_refit,
+        )
+        signal_doc = source.describe()
+    elif signal == SYNTHETIC_SIGNAL:
+        signal_doc = {
+            "source": SYNTHETIC_SIGNAL,
+            "period_s": SYNTHETIC_PERIOD_S,
+            "amplitude_z": SYNTHETIC_AMPLITUDE_Z,
+            "note": "deterministic sine wave in signal units (tests only, no alpha)",
+        }
+    if signal != "none":
+        signal_doc.update(
+            {
+                "threshold_z": signal_threshold_z,
+                "passive_urgency": signal_passive_urgency,
+                "pacing_gain": signal_gain,
+                "pacing_min_scale": pacing_params.min_scale,
+                "pacing_max_scale": pacing_params.max_scale,
+                "max_age_s": signal_max_age_s,
+                "ac_risk_aversion": ac_risk_aversion,
+                "ac_daily_vol": ac_daily_vol,
+                "units": "z-score of the alpha's expected_return per instrument on this dataset",
+            }
+        )
     for s_index, path in enumerate(files):
         label = _session_label(path)
         session_labels.append(label)
@@ -432,13 +600,38 @@ def run_benchmark(
             )
             if not parents:
                 continue
+            src = source
+            if signal == SYNTHETIC_SIGNAL:
+                src = synthetic_signal([iid], timeline.ts[0], timeline.ts[-1])
             for pol in policies:
-                worked = [replace(p, policy=POLICIES[pol]) for p, _ in parents]
+                worked = []
+                cells_of = []
+                for p, pct in parents:
+                    acp = None
+                    if parse_policy(pol)[1] in ("ac", "ac_drift") and p.algo == AlgoType.IS:
+                        price = timeline.mid_at(p.start_ts)
+                        if math.isfinite(price) and price > 0:
+                            acp = ac_params_from_calibration(
+                                sigma=price * ac_daily_vol,
+                                adv_per_day=ins.adv,
+                                price=price,
+                                horizon_s=window_ns / SEC,
+                                risk_aversion=ac_risk_aversion,
+                                config=cfg,
+                            )
+                    q = signal_variant(
+                        p, pol, src, urgency=urgency_policy, pacing=pacing_params, ac_params=acp
+                    )
+                    if q is not None:
+                        worked.append(q)
+                        cells_of.append((p, pct))
+                if not worked:
+                    continue
                 res = ExecutionReplay(cfg, worked, sor).run(evs)
                 fills_of: dict[int, list] = {p.parent_id: [] for p in worked}
                 for f in res.fills:
                     fills_of[f.parent_id].append(f)
-                for (p0, pct), p in zip(parents, worked, strict=True):
+                for (p0, pct), p in zip(cells_of, worked, strict=True):
                     row = parent_costs(p, fills_of[p.parent_id], timeline, ins.tick_size, taker_fee)
                     rep = res.parents[p.parent_id]
                     row.update(
@@ -455,6 +648,8 @@ def run_benchmark(
                             "depth_exhausted": rep.depth_exhausted,
                             "depth_exhausted_qty": rep.depth_exhausted_qty,
                             "provenance_qty": rep.provenance_qty,
+                            "urgency_children": rep.urgency_children,
+                            "urgency_qty": rep.urgency_qty,
                             "sor_no_route": res.sor_no_route,
                         }
                     )
@@ -475,20 +670,21 @@ def run_benchmark(
                     )
     paired: dict[str, object] = {}
     for pol in policies:
-        if pol == baseline_policy:
-            continue
-        for algo in algos:
-            for pct in sizes_pct:
-                base = [
-                    r
-                    for r in rows[baseline_policy]
-                    if r["algo"] == algo and r["size_pct_adv"] == pct
-                ]
-                other = [r for r in rows[pol] if r["algo"] == algo and r["size_pct_adv"] == pct]
-                if base and other:
-                    paired[f"{pol}-{baseline_policy}|{algo}|{pct:g}"] = _paired_summary(
-                        base, other, seed
-                    )
+        controls = [] if pol == baseline_policy else [baseline_policy]
+        ctrl = control_policy(pol)
+        if ctrl is not None and ctrl in rows and ctrl not in controls and ctrl != pol:
+            controls.append(ctrl)
+        for control in controls:
+            for algo in algos:
+                for pct in sizes_pct:
+                    base = [
+                        r for r in rows[control] if r["algo"] == algo and r["size_pct_adv"] == pct
+                    ]
+                    other = [r for r in rows[pol] if r["algo"] == algo and r["size_pct_adv"] == pct]
+                    if base and other:
+                        paired[f"{pol}-{control}|{algo}|{pct:g}"] = _paired_summary(
+                            base, other, seed
+                        )
     doc: dict[str, object] = {
         "schema": "iap.execution_benchmark/v1",
         "item": "v1.17 WS-B B1",
@@ -524,6 +720,8 @@ def run_benchmark(
             "low_power_below_sessions": BOOTSTRAP_LOW_POWER_DAYS,
         },
         "provenances": list(FILL_PROVENANCES),
+        "urgency_regimes": [*URGENCY_REGIMES, "plain"],
+        "signal": signal_doc,
         "n_parents": {pol: len(rows[pol]) for pol in policies},
         "cells": cells,
         "cells_by_symbol": by_symbol,
@@ -571,37 +769,54 @@ def render(doc: dict) -> str:
         f"[95 % Student-t CI, {doc['inference']['se']}]. Cells with fewer than "
         f"{doc['inference']['low_power_below_sessions']} sessions are low-power.",
         "",
+    ]
+    sig = doc.get("signal", {"source": "none"})
+    if sig.get("source", "none") != "none":
+        lines += [
+            f"Signal-aware arms (v1.17 B2 / B3): source `{sig['source']}` "
+            f"({sig.get('units', 'signal units')}); urgency threshold |z| ≥ "
+            f"{sig['threshold_z']:g}, agree posts at urgency {sig['passive_urgency']:g}; "
+            f"pacing scale = clip(1 − {sig['pacing_gain']:g} · alignment, "
+            f"{sig['pacing_min_scale']:g}, {sig['pacing_max_scale']:g}); readings older than "
+            f"{sig['max_age_s']:g} s are stale. A `base+variant` policy works the SAME windows as "
+            "`base` and pairs with it below; `ac_drift` pairs with `ac`.",
+            "",
+        ]
+    lines += [
         "## Cells (pooled over symbols)",
         "",
-        "| policy | algo | size % ADV | n | sessions | all-in | shortfall | spread | fees | sim impact | completion | fill rate | maker share | depth-exhausted parents | depth-exhausted qty share of unfilled | provenance shares of filled |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "| policy | algo | size % ADV | n | sessions | all-in | shortfall | spread | fees | sim impact | completion | fill rate | maker share | depth-exhausted parents | depth-exhausted qty share of unfilled | provenance shares of filled | urgency shares of children |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for key, c in doc["cells"].items():
         pol, algo, pct = key.split("|")
         cb = c["costs_bps"]
         de = c["depth_exhausted"]
         prov = ", ".join(f"{k} {v:.0%}" for k, v in c["provenance_share_of_filled"].items())
+        urg = ", ".join(f"{k} {v:.0%}" for k, v in c.get("urgency_share_of_children", {}).items())
         lines.append(
             f"| {pol} | {algo} | {pct} | {c['n_parents']} | {c['n_sessions']} | "
             f"{_stat(cb['all_in'])} | {_stat(cb['shortfall'])} | {_stat(cb['spread'])} | "
             f"{_stat(cb['fees_net'])} | {_stat(cb['sim_impact'])} | {_stat(cb['completion'])} | "
             f"{_f(c['fill_rate'], 3)} | {_f(c['maker_share_of_filled'], 3)} | "
             f"{de['parents']} ({de['parent_share']:.0%}) | {_f(de['qty_share_of_unfilled'], 3)} | "
-            f"{prov or 'none'} |"
+            f"{prov or 'none'} | {urg or '—'} |"
         )
     if doc["paired_vs_baseline"]:
         lines += [
             "",
-            f"## Paired vs `{g['baseline_policy']}` (same windows; other − baseline, bps)",
+            f"## Paired (same windows; `other − control`, bps; baseline `{g['baseline_policy']}`, "
+            "signal-aware arms also against their own plain control)",
             "",
-            "| comparison | algo | size % ADV | pairs | all-in diff | shortfall diff | fill-rate diff |",
-            "|---|---|---|---|---|---|---|",
+            "| comparison | algo | size % ADV | pairs | all-in diff | shortfall diff | completion diff | fill-rate diff |",
+            "|---|---|---|---|---|---|---|---|",
         ]
         for key, p in doc["paired_vs_baseline"].items():
             cmp, algo, pct = key.split("|")
             lines.append(
                 f"| {cmp} | {algo} | {pct} | {p['n_pairs']} | {_stat(p['costs_bps']['all_in'])} | "
-                f"{_stat(p['costs_bps']['shortfall'])} | {_stat(p['fill_rate_diff'])} |"
+                f"{_stat(p['costs_bps']['shortfall'])} | {_stat(p['costs_bps']['completion'])} | "
+                f"{_stat(p['fill_rate_diff'])} |"
             )
     lines += [
         "",
@@ -618,6 +833,9 @@ def render(doc: dict) -> str:
         "(aggressive_walk, exec_print, marketable_add, hidden_print, cross, reopen_touch).",
         "- Standard errors cluster by session; with few sessions the Student-t CI is wide by "
         "design and `low_power` is set in the JSON.",
+        "- urgency shares (B2 / B3): why each child of a signal-aware parent got its urgency "
+        "(agree = posted on a favourable signal, adverse = crossed on an adverse one, neutral = "
+        "inside the threshold, no_signal / stale = no usable reading, plain = a pacing-only arm).",
         "",
     ]
     return "\n".join(lines)
@@ -653,6 +871,8 @@ def prereg_draft(doc: dict) -> dict[str, object]:
             "seed": g["seed"],
         },
         "simulator": doc["simulator"],
+        "signal": doc.get("signal", {"source": "none"}),
+        "expected_effect": "to be filled from the in-sample run before signing (B2/B3)",
         "primary_metric": "all_in bps per parent (shortfall + fees_net + sim_impact + completion), "
         "labelled " + doc["simulator"]["cost_label"],
         "gate_B7": {
@@ -722,6 +942,30 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--allow-holdout", action="store_true")
     ap.add_argument("--no-timestamp", action="store_true")
     ap.add_argument("--write-prereg-draft", action="store_true")
+    sg = ap.add_argument_group("signal-aware arms (v1.17 B2 / B3)")
+    sg.add_argument(
+        "--signal",
+        default="none",
+        help="'none', 'synthetic' or an alpha id (EQ10, EQ05, ...) scored on --signal-features",
+    )
+    sg.add_argument(
+        "--signal-features", type=Path, default=None, help="default <data-dir>/features"
+    )
+    sg.add_argument(
+        "--signal-params",
+        type=Path,
+        default=None,
+        help="default configs/strategies/alpha_params.json",
+    )
+    sg.add_argument(
+        "--signal-refit", action="store_true", help="fit the alpha in-sample (labelled)"
+    )
+    sg.add_argument("--signal-threshold-z", type=float, default=1.0)
+    sg.add_argument("--signal-passive-urgency", type=float, default=0.1)
+    sg.add_argument("--signal-gain", type=float, default=0.5)
+    sg.add_argument("--signal-max-age-s", type=float, default=10.0)
+    sg.add_argument("--ac-risk-aversion", type=float, default=1e-6)
+    sg.add_argument("--ac-daily-vol", type=float, default=0.015)
     args = ap.parse_args(argv)
     doc = run_benchmark(
         args.data_dir,
@@ -745,6 +989,16 @@ def main(argv: list[str] | None = None) -> int:
         max_events=args.max_events,
         allow_holdout=args.allow_holdout,
         timestamp=not args.no_timestamp,
+        signal=args.signal,
+        signal_features=args.signal_features,
+        signal_params=args.signal_params,
+        signal_refit=args.signal_refit,
+        signal_threshold_z=args.signal_threshold_z,
+        signal_passive_urgency=args.signal_passive_urgency,
+        signal_gain=args.signal_gain,
+        signal_max_age_s=args.signal_max_age_s,
+        ac_risk_aversion=args.ac_risk_aversion,
+        ac_daily_vol=args.ac_daily_vol,
     )
     tag = args.tag or Path(args.data_dir).name
     args.out.mkdir(parents=True, exist_ok=True)

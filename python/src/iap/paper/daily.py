@@ -121,7 +121,7 @@ def _instrument_rows(ds: Path) -> dict[str, dict[str, Any]]:
 
 def _ic_history(out_root: Path, date: str, alpha: str) -> list[float]:
     """Previous dated reports' realised IC of ``alpha``, oldest first."""
-    vals = []
+    vals: list[float] = []
     if not out_root.is_dir():
         return vals
     for d in sorted(p for p in out_root.iterdir() if p.is_dir() and p.name < date):

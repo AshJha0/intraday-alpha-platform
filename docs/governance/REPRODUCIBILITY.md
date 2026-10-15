@@ -283,6 +283,36 @@ in `deployment/docker/docker-compose.yml` / `deployment/k8s/`, and the
 `configs/` tree hash. Deployment rollback = redeploy a prior release
 manifest; never rebuild-and-hope.
 
+### 4.1 The second build (v1.17, F1)
+
+`.github/workflows/ci.yml` job `reproducible-build` builds the Python wheel
+twice on every push and pull request with `SOURCE_DATE_EPOCH` set to the
+commit date (`git log -1 --format=%ct`; setuptools from the hashed image
+lock, `pip wheel --no-build-isolation`) and compares the two sha256 digests:
+a mismatch **fails the job**. It then builds `Dockerfile.python` twice with
+BuildKit (`--no-cache --provenance=false --sbom=false`, the same
+`SOURCE_DATE_EPOCH`, `rewrite-timestamp=true` on an OCI output) and compares
+the OCI manifest digests. That comparison is **report-only** (a `::warning`
+and a job-summary row, never a failure): the base image is already pinned by
+digest (SECURITY.md section 1) and the layer timestamps are rewritten, but
+what `pip install` writes inside a `RUN` layer (`.pyc` headers and other
+install-time state) is not under the build's control. Both results are
+written to the job summary as a table (artefact, digest 1, digest 2,
+MATCH / MISMATCH); the first runs on the pull request that added the job
+are recorded in CHANGELOG.md under v1.17.
+
+### 4.2 SBOMs (v1.17, F1)
+
+Every GitHub release carries CycloneDX JSON SBOMs as assets next to
+`release-manifest.json`: `sbom-image-{python,cpp,rust}.cdx.json` (syft over
+the pushed image by digest, attested with `actions/attest-sbom` and pushed to
+GHCR next to the build-provenance attestation) and
+`sbom-python-requirements-{image,ci}.cdx.json` (`cyclonedx-bom` over the
+hashed lock files, each component carrying the pin and its sha256; attested
+with the lock file as subject). Verify an image's attestations, provenance
+and SBOM alike, with
+`gh attestation verify oci://ghcr.io/ashjha0/intraday-alpha-platform-python@<digest> --repo AshJha0/intraday-alpha-platform`.
+
 ## 5. Non-negotiables
 
 - No wall-clock on deterministic paths; no unordered-map iteration

@@ -1,20 +1,45 @@
-# lychee configuration (v1.17 E4): the advisory external-link step of the
-# `docs` CI job. Relative links are checked by tests/harness/check_docs.py.
+# lychee link-check configuration (v1.17 F1 + E4): the ADVISORY link steps of
+# the `advisory` and `docs` jobs in .github/workflows/ci.yml, run over every
+# tracked *.md and docs/*.html; relative links are checked by
+# tests/harness/check_docs.py.
+# Local run:  lychee --config lychee.toml './**/*.md' 'docs/*.html'
 no_progress = true
 max_concurrency = 8
-timeout = 20
 max_retries = 2
-accept = ["200..=204", "429"]
-exclude_path = ["research", "archive", "data", "deployment", "python", "cpp", "rust", "benchmarks"]
+timeout = 20
+# 429 (rate limited) is not a dead link
+accept = ["200..=206", "429"]
+# mailto: links are not checked
+exclude_mail = true
+# localhost / 127.0.0.1 / [::1] and private or internal hosts (the runbooks
+# name prometheus:9090, grafana:3000 and friends)
+exclude_loopback = true
+exclude_private = true
 exclude = [
+  # the GitHub API (rate limited, answers 4xx without a token)
+  "^https://api\\.github\\.com",
   "^https?://localhost",
-  "^https?://127\.0\.0\.1",
-  "^https?://\[::1\]",
-  "^https?://[a-z-]+\.local(host)?",
-  "^https?://example\.com",
+  "^https?://127\\.0\\.0\\.1",
+  "^https?://\\[::1\\]",
+  "^https?://0\\.0\\.0\\.0",
+  "^https?://[a-z-]+\\.local(host)?",
   "^https?://platform-metrics",
-  "^mailto:",
+  # placeholders in the runbooks and templates
+  "^https?://example\\.com",
+  "^https?://[^/]*\\.example\\b",
   # github.com rejects anonymous rate-limited bursts; the repo's own links are
   # checked by their relative form in check_docs.py
-  "^https?://github\.com/AshJha0/intraday-alpha-platform/(pull|issues|actions|settings|releases)",
+  "^https?://github\\.com/AshJha0/intraday-alpha-platform/(pull|issues|actions|settings|releases)",
+]
+exclude_path = [
+  # frozen archive and generated research artefacts are not maintained docs
+  "archive",
+  "research/experiments",
+  "research/models",
+  "data",
+  "deployment",
+  "python",
+  "cpp",
+  "rust",
+  "benchmarks",
 ]

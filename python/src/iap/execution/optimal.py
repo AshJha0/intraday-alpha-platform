@@ -162,26 +162,67 @@ def ac_kappa(p: ACParams, n: int) -> float:
     return math.acosh(1.0 + k2 * tau * tau / 2.0) / tau
 
 
-def ac_holdings(qty: float, p: ACParams, n: int) -> list[float]:
-    """Holdings ``x_0 = qty, ..., x_n = 0`` of the optimal trajectory."""
+def ac_holdings(qty: float, p: ACParams, n: int, drift: float = 0.0) -> list[float]:
+    """Holdings ``x_0 = qty, ..., x_n = 0`` of the optimal trajectory.
+
+    ``drift`` (v1.17 B3, default 0 = the v1.10 trajectory, byte-identical)
+    is the expected price drift per time unit in the direction that
+    FAVOURS WAITING (for the AC sell program, an expected rise): the
+    Euler-Lagrange solution of ``2 eta_tilde x'' = 2 lam sigma^2 x - drift``
+    with ``x(0) = X``, ``x(T) = 0`` is ``x(t) = (X - xb) sinh(k (T - t)) /
+    sinh(k T) - xb sinh(k t) / sinh(k T) + xb`` with ``xb = drift / (2 lam
+    sigma^2)``; for ``k = 0`` (risk-neutral) the limit is ``X (T - t) / T +
+    drift t (T - t) / (4 eta_tilde)``. A positive drift holds MORE in the
+    middle of the window (trades later), a negative one front-loads;
+    holdings are not clamped here (``slice_weights`` floors the trades).
+    """
     kappa = ac_kappa(p, n)
     t_end = p.horizon
     tau = t_end / n
     out = []
+    risk = p.risk_aversion * p.sigma**2
     for j in range(n + 1):
         t = j * tau
         if kappa * t_end < 1e-12:
-            out.append(qty * (t_end - t) / t_end)
+            x = qty * (t_end - t) / t_end
+            if drift != 0.0:
+                x += drift * t * (t_end - t) / (4.0 * _eta_tilde(p, tau))
         else:
-            out.append(qty * math.sinh(kappa * (t_end - t)) / math.sinh(kappa * t_end))
+            s_t = math.sinh(kappa * t_end)
+            x = qty * math.sinh(kappa * (t_end - t)) / s_t
+            if drift != 0.0 and risk > 0.0:
+                xb = drift / (2.0 * risk)
+                x += xb * (1.0 - (math.sinh(kappa * (t_end - t)) + math.sinh(kappa * t)) / s_t)
+        out.append(x)
     out[-1] = 0.0
     return out
 
 
-def ac_trajectory(qty: float, p: ACParams, n: int) -> list[float]:
-    """Trade list ``n_1..n_N`` (sums to ``qty``)."""
-    x = ac_holdings(qty, p, n)
+def ac_trajectory(qty: float, p: ACParams, n: int, drift: float = 0.0) -> list[float]:
+    """Trade list ``n_1..n_N`` (sums to ``qty``); ``drift`` as in :func:`ac_holdings`."""
+    x = ac_holdings(qty, p, n, drift)
     return [x[j - 1] - x[j] for j in range(1, n + 1)]
+
+
+def ac_drift_from_signal(
+    side: int, expected_return: float, price: float, remaining_horizon: float
+) -> float:
+    """The AC ``drift`` (price per time unit, favours-waiting sign) of a
+    signal that expects ``expected_return`` (dimensionless, the alpha's
+    sign: positive = rise) to be realised over the parent's remaining
+    window of ``remaining_horizon`` time units (v1.17 B3).
+
+    A buy is hurt by a rise, a sell helped: ``drift = alignment * price /
+    remaining_horizon`` with ``alignment = -er`` (buy) / ``+er`` (sell)
+    (``iap.execution.urgency.alignment``).  The alpha's expected move is
+    taken as the total over the remaining window — never extrapolated per
+    unit time from its (much shorter) horizon.
+    """
+    from iap.execution.urgency import alignment
+
+    if remaining_horizon <= 0 or price <= 0:
+        raise ValueError("remaining_horizon and price must be > 0")
+    return alignment(side, expected_return) * price / remaining_horizon
 
 
 def ac_cost(

@@ -3,6 +3,14 @@
 # the image digests in release-manifest.json, attest build provenance for
 # each image, and attach the manifest to the GitHub release.
 #
+# SBOMs (v1.17, F1): a CycloneDX SBOM per image (syft, from the pushed
+# image by digest; attested with actions/attest-sbom and pushed to the
+# registry next to the provenance) and one per hashed Python lock file
+# (cyclonedx-bom, requirements-image.txt = what the python image installs,
+# requirements-ci.txt = what CI tests against; attested with the lock file as
+# subject). All of them are release assets: sbom-image-{python,cpp,rust}.cdx.json,
+# sbom-python-requirements-{image,ci}.cdx.json.
+#
 #   images:  ghcr.io/ashjha0/intraday-alpha-platform-{python,cpp,rust}:<tag>
 #   manifest: release-manifest.json  (tag, commit, per-image reference+digest;
 #             schema: {tag, commit, built_at, images: [{language, name,
@@ -124,6 +132,30 @@ jobs:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+      # v1.17 (F1): CycloneDX SBOM of the pushed image. syft's release tarball
+      # is pinned by SHA-256 (the gitleaks/trivy pattern); it reads the
+      # registry with the docker login above.
+      - name: syft SBOM of the image (CycloneDX JSON)
+        run: |
+          curl -fsSL -o /tmp/syft.tar.gz \
+            https://github.com/anchore/syft/releases/download/v1.54.1/syft_1.54.1_linux_amd64.tar.gz
+          echo "c069905b391cc4c20a5ba65ad5c10be2a7ba074f8ea6ad203e24d14e303dad47  /tmp/syft.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/syft.tar.gz -C /tmp syft
+          /tmp/syft "${IMAGE}@${{ steps.push.outputs.digest }}" \
+            -o "cyclonedx-json=sbom-image-${{ matrix.lang }}.cdx.json"
+          jq -e '.bomFormat == "CycloneDX" and (.components | length > 0)' "sbom-image-${{ matrix.lang }}.cdx.json"
+      - name: attest the image SBOM
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          sbom-path: sbom-image-${{ matrix.lang }}.cdx.json
+          push-to-registry: true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-image-${{ matrix.lang }}
+          path: sbom-image-${{ matrix.lang }}.cdx.json
+          if-no-files-found: error
       - name: record the digest
         run: |
           mkdir -p digest
@@ -138,15 +170,50 @@ jobs:
     needs: images
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: write
+      id-token: write        # attest-sbom (the Python lock-file SBOMs)
+      attestations: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false   # gh uses GH_TOKEN; nothing here pushes
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: digest-*
           path: digests
           merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: sbom-image-*
+          path: sboms
+          merge-multiple: true
+      # v1.17 (F1): CycloneDX SBOM of each hashed Python lock file (the pins
+      # AND their sha256 hashes become component hashes).
+      - name: cyclonedx-bom SBOMs of the Python lock files
+        run: |
+          python -m pip install cyclonedx-bom==7.5.0
+          for lock in image ci; do
+            cyclonedx-py requirements -i "python/requirements-$lock.txt" \
+              --of JSON -o "sboms/sbom-python-requirements-$lock.cdx.json"
+            jq -e '.bomFormat == "CycloneDX" and (.components | length > 0)' \
+              "sboms/sbom-python-requirements-$lock.cdx.json"
+          done
+          ls -l sboms
+      - name: attest the requirements-image SBOM (subject = the lock file)
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-path: python/requirements-image.txt
+          sbom-path: sboms/sbom-python-requirements-image.cdx.json
+      - name: attest the requirements-ci SBOM (subject = the lock file)
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-path: python/requirements-ci.txt
+          sbom-path: sboms/sbom-python-requirements-ci.cdx.json
       - name: write release-manifest.json
         run: |
           jq -n \
@@ -166,7 +233,7 @@ jobs:
             > release-manifest.json
           cat release-manifest.json
           jq -e '.images | length == 3 and all(.digest | test("^sha256:[0-9a-f]{64}$"))' release-manifest.json
-      - name: create the release if absent, attach the manifest
+      - name: create the release if absent, attach the manifest and the SBOMs
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -174,5 +241,5 @@ jobs:
             gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
               --verify-tag --title "$GITHUB_REF_NAME" --generate-notes
           fi
-          gh release upload "$GITHUB_REF_NAME" release-manifest.json \
+          gh release upload "$GITHUB_REF_NAME" release-manifest.json sboms/*.cdx.json \
             --repo "$GITHUB_REPOSITORY" --clobber

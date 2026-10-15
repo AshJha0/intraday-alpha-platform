@@ -140,7 +140,7 @@ def fake_paper_report(
 ) -> Path:
     d = root / date
     d.mkdir(parents=True, exist_ok=True)
-    rep = {
+    rep: dict[str, Any] = {
         "status": "complete",
         "date": date,
         "runs": {"AAPL": {"pnl_equity": 12.5, "fees": 9.0, "final_position": 0}},

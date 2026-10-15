@@ -23,15 +23,21 @@ actors**:
   in v1.15 and the ruleset read on 2026-10-15 does not list it);
 - `non_fast_forward` (no force-push) and `deletion` (no branch deletion).
 
-Not required today: `python-312` (the Python 3.12 entry), `cpp-sanitizers`,
-`agent-evals`, `images`, `docs` (v1.17 E4: the documentation checks; add it to the
-ruleset once it has been green on main).
+Since 2026-10-15 (owner item 0.8) `python-312`, `cpp-sanitizers` and
+`agent-evals` are required as well (16 required checks). Not required today:
+`images`, `docs` (v1.17 E4: the documentation checks; add it to the ruleset
+once it has been green on main) and `reproducible-build` (v1.17 F1: the wheel
+built twice must match; the python image is report-only). The lychee link
+check is an advisory step (`continue-on-error`), so a dead link annotates the
+run and does not block a merge. No required check was renamed in v1.17:
+`python` still carries the blocking mypy step, whose scope grew to `agents`,
+`llm`, `mvp` and `paper` (F3).
 
 **Recommended owner actions** (repository settings; code cannot do them):
 
 1. require 1 approving review (and code-owner review) as soon as a second
    maintainer exists;
-2. consider adding `python-312` and `cpp-sanitizers` as required checks;
+2. consider adding `docs` and `reproducible-build` as required checks once green on main;
 3. restrict merge methods to merge commits for research branches, or at
    least never rebase them (section 2c).
 

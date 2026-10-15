@@ -33,7 +33,8 @@
 #                                and the events/s benchmark (job summary)
 #   cpp-sanitizers               ASan+UBSan ctest (blocking; green on first run)
 #   advisory                     ruff (blocking), gitleaks (blocking);
-#                                clippy is a blocking step of the rust job
+#                                clippy is a blocking step of the rust job;
+#                                lychee link check (ADVISORY step, v1.17 F1)
 #   supply-chain                 v1.14 (G-P1-7), all BLOCKING: pip-audit of
 #                                both pinned requirement files, cargo audit
 #                                and cargo deny (bans/licenses/sources) of the
@@ -41,6 +42,9 @@
 #                                (lockfile vulns + Dockerfile/k8s misconfig).
 #                                Ignores only via .github/audit-ignores.json
 #                                (reason + expiry, tools/audit_ignores.py)
+#   reproducible-build           v1.17 (F1): the wheel built twice with
+#                                SOURCE_DATE_EPOCH (sha256 must match) and
+#                                the python image built twice (report-only)
 #   images                       builds the three images (python, cpp, rust;
 #                                the java image was retired in v1.17, F9);
 #                                needs every other job;
@@ -191,9 +195,10 @@ jobs:
         run: >
           python -m pytest -q -n auto --dist loadfile --durations=25
           -m "not slow"
-      # E-P1-5: mypy on core/orderbook/execution/backtest/features (config:
-      # python/pyproject.toml [tool.mypy]); the error count goes to the job
-      # summary.  BLOCKING since v1.16 (item 16): the count reached 0.
+      # E-P1-5: mypy on core/orderbook/execution/backtest/features and, since
+      # v1.17 (F3), agents/llm/mvp/paper (config: python/pyproject.toml
+      # [tool.mypy]); the error count goes to the job summary.  BLOCKING since
+      # v1.16 (item 16): the count reached 0 (and is 0 on the F3 scope too).
       - name: mypy
         if: matrix.python-version == '3.12'
         working-directory: python
@@ -259,6 +264,13 @@ jobs:
       # E-P2-7: the files marked `slow` (python/tests, pytestmark), with
       # coverage; runs in parallel with the python job.  The coverage
       # report therefore covers the slow files' tests.
+      # v1.17 (F1): coverage floor. --cov-fail-under=55 is the figure this
+      # job measured on the wave-2 integration PR #183 on 2026-10-15 (ci run
+      # 38794738398: TOTAL 39638 statements, 17482 missed, 55.90%), rounded
+      # down to the whole percent.  (58% was the pre-integration figure on
+      # main at 6814b2d; the B2/B3, D2/D3 and E2-E5 modules are covered by
+      # the fast `python` job, which this slow run does not count.)  Raise it
+      # when coverage rises; never lower it without a CHANGELOG line.
       - name: pytest (slow)
         working-directory: python
         env:
@@ -267,6 +279,7 @@ jobs:
           python -m pytest -q -n auto --dist loadfile --durations=25 -m slow
           --cov=iap --cov-report=term-missing
           --cov-report=xml:../coverage-python.xml
+          --cov-fail-under=55
       - name: upload python coverage report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -530,6 +543,19 @@ jobs:
           python -m pip install ruff==0.16.10
           ruff check python tests tools research deployment --output-format=concise
           ruff format --check python tests tools research deployment
+      # v1.17 (F1): link check over every tracked Markdown file and the docs
+      # HTML. ADVISORY: `continue-on-error`, so a dead or rate-limited link
+      # annotates the run and never fails this (required) job. The config
+      # (lychee.toml) excludes the GitHub API, localhost/loopback and private
+      # hosts; the token raises the github.com rate limit.
+      - name: lychee link check (advisory)
+        continue-on-error: true
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: --config lychee.toml --no-progress './**/*.md' 'docs/*.html'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fail: true
+          failIfEmpty: false
 
   # v1.14 (G-P1-7): BLOCKING dependency and configuration audits. A finding
   # fails the job; the only way past one is a bumped dependency or a reviewed,
@@ -909,6 +935,88 @@ jobs:
     with:
       seed: ${{ inputs.risk_fuzz_seed }}
       count: ${{ inputs.risk_fuzz_count }}
+
+  # v1.17 (F1): the Python wheel and the python image are each built TWICE
+  # with SOURCE_DATE_EPOCH pinned to the commit date, and compared.
+  #   wheel  BLOCKING: the two wheels' sha256 must match. setuptools' bdist
+  #          honours SOURCE_DATE_EPOCH for the zip entry timestamps, so the
+  #          bytes are a function of the tree alone; the pinned setuptools
+  #          comes from the hashed image lock (requirements-image.txt).
+  #   image  REPORT-ONLY (a mismatch is a ::warning and a job-summary row,
+  #          never a failure): the base image IS pinned by digest already
+  #          (SECURITY.md section 1), BuildKit rewrites every layer file
+  #          timestamp to SOURCE_DATE_EPOCH (rewrite-timestamp) and the
+  #          provenance/SBOM attestation manifests (which carry wall-clock
+  #          timestamps) are disabled; what can still differ is the content
+  #          `pip install` writes inside a RUN layer (for example .pyc headers
+  #          and other install-time state). docs/governance/REPRODUCIBILITY.md
+  #          section 4 records which of the two matched on the first runs.
+  # Not a required check until the owner adds it to the protect-main ruleset
+  # (docs/governance/GOVERNANCE.md section 0).
+  reproducible-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: SOURCE_DATE_EPOCH = the commit date
+        run: |
+          sde=$(git log -1 --format=%ct)
+          echo "SOURCE_DATE_EPOCH=$sde" >> "$GITHUB_ENV"
+          echo "SOURCE_DATE_EPOCH=$sde ($(date -u -d "@$sde" +%Y-%m-%dT%H:%M:%SZ))"
+      - name: build the wheel twice (blocking compare)
+        run: |
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r python/requirements-image.txt
+          for i in 1 2; do
+            rm -rf python/build python/src/iap.egg-info "dist$i"
+            pip wheel --no-deps --no-build-isolation --no-cache-dir -w "dist$i" ./python
+          done
+          ls -l dist1 dist2
+          w1=$(ls dist1/*.whl); w2=$(ls dist2/*.whl)
+          s1=$(sha256sum "$w1" | cut -d' ' -f1); s2=$(sha256sum "$w2" | cut -d' ' -f1)
+          {
+            echo "### reproducible build (SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH)"
+            echo ""
+            echo "| artefact | build 1 | build 2 | result |"
+            echo "|---|---|---|---|"
+            if [ "$(basename "$w1")" = "$(basename "$w2")" ] && [ "$s1" = "$s2" ]; then
+              echo "| wheel $(basename "$w1") | $s1 | $s2 | MATCH |"
+            else
+              echo "| wheel $(basename "$w1") / $(basename "$w2") | $s1 | $s2 | MISMATCH |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$(basename "$w1")" != "$(basename "$w2")" ] || [ "$s1" != "$s2" ]; then
+            echo "::error::the Python wheel is not reproducible: $s1 != $s2"
+            unzip -l "$w1" > /tmp/l1.txt; unzip -l "$w2" > /tmp/l2.txt; diff /tmp/l1.txt /tmp/l2.txt || true
+            exit 1
+          fi
+          echo "wheel: MATCH ($s1)"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: build the python image twice (report-only compare)
+        run: |
+          for i in 1 2; do
+            docker buildx build --no-cache --provenance=false --sbom=false \
+              --build-arg SOURCE_DATE_EPOCH="$SOURCE_DATE_EPOCH" \
+              -f deployment/docker/Dockerfile.python \
+              --output "type=oci,dest=$RUNNER_TEMP/python-$i.tar,rewrite-timestamp=true" .
+            tar -xOf "$RUNNER_TEMP/python-$i.tar" index.json \
+              | jq -r '.manifests[0].digest' > "image-digest-$i.txt"
+          done
+          d1=$(cat image-digest-1.txt); d2=$(cat image-digest-2.txt)
+          if [ "$d1" = "$d2" ]; then res=MATCH; else res="MISMATCH (report-only)"; fi
+          echo "| python image (OCI manifest) | $d1 | $d2 | $res |" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$d1" != "$d2" ]; then
+            echo "::warning::the python image is not bit-reproducible ($d1 vs $d2); report-only, see the job summary"
+            for i in 1 2; do
+              m=$(cat "image-digest-$i.txt" | sed 's/^sha256://')
+              echo "--- build $i layers"
+              tar -xOf "$RUNNER_TEMP/python-$i.tar" "blobs/sha256/$m" | jq -r '.config.digest, (.layers[] | .digest + " " + (.size|tostring))'
+            done
+          fi
+          echo "image: $res"
 
   # Which PRs touch image inputs: the image build runs on those, not on every PR.
   changes:

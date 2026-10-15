@@ -8,6 +8,53 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-F items F1 and F3. **F1**: `reproducible-build` CI job (the wheel built twice under
+  `SOURCE_DATE_EPOCH` = commit date, sha256 must match; the python image built twice with BuildKit
+  `rewrite-timestamp`, report-only); CycloneDX SBOMs on every release (syft per image, attested and
+  pushed to GHCR next to the provenance; `cyclonedx-bom` per hashed Python lock file, attested with
+  the lock as subject; all uploaded as release assets); coverage floor `--cov-fail-under=55` in
+  `python-slow` (55.90% measured on the wave-2 integration PR #183, run 38794738398, rounded
+  down; 58% on main before the B2/B3, D2/D3, E2-E5 modules landed); advisory lychee
+  link check (`lychee.toml`, excludes the GitHub API, loopback and private hosts). **F3**: the mypy
+  scope grew from core/orderbook/execution/backtest/features to also `agents`, `llm`, `mvp` and
+  `paper`: 258 errors to 0 with type-only changes (`dataclass_transform` on `@contract`, which
+  alone removed the 191 "unexpected keyword argument" / `replace` errors in `mvp`; `TYPE_CHECKING`
+  attribute declarations on the three MVP engine mixins; annotations, two casts, three narrowing
+  asserts/helpers) and one `type: ignore[attr-defined]` (`paper/monitors.py`: `signals()` lives on
+  the concrete alpha classes, not the `AlphaModel` ABC). `reproducible-build` is not a required
+  check until the owner adds it to the ruleset (GOVERNANCE.md section 0).
+
+- v1.17 WS-B items B2 + B3: signal-aware urgency and pacing, both opt-in and byte-identical off.
+  `iap.execution.signal` (`SignalSource`, `ArraySignalSource`, `AlphaUrgencySource.from_dataset`:
+  a flagship alpha's registered parameters scored on a dataset's feature frames, causal readings
+  in signal units = the z-score of the alpha's own scores); `ParentOrder(urgency_policy="alpha",
+  alpha_urgency=AlphaUrgencyPolicy(threshold_z, passive_urgency, max_age_ns, latency_ns))`
+  re-evaluates agree -> post / adverse -> cross / neutral -> the base style at EVERY child
+  decision through the parent's life, each child recording `urgency_regime`, `signal_z` and
+  `pacing_scale`; `iap.execution.pacing` (`PacingParams`) with `pov_signal_pacing`
+  (per-TRADE participation scaled by the signal), `slice_signal_tilt` (remaining quantity
+  re-apportioned at each slice, never negative) and `ac_signal_drift` (Almgren-Chriss re-solved
+  per slice with the signal as the drift; `ac_holdings` / `ac_trajectory` gain `drift=0.0`,
+  `ac_drift_from_signal`). The B1 benchmark driver takes `--signal EQ10|EQ05|synthetic` and
+  `base+variant` policies (`native+urgency`, `native+pacing`, `native+ac`, `native+ac_drift`),
+  pairs every variant with its own plain control on the same windows (day-clustered) and
+  reports urgency-regime shares per cell. API_TRADING.md section 2.14, COOKBOOK recipe 101,
+  `python/tests/test_v117_signal_aware.py`.
+- v1.17 WS-D items D2 and D3 (review finding R-5): meta-labelling with a calibrate/select split and
+  conformal sizing, every piece opt-in. `run_meta_labeling(split_mode="calibrate_select")` splits the OOS
+  region 40/20/20/20 train / calibration / select / test so `best_tau` is chosen on rows the calibrator
+  never saw; `primary_selection_window` purges the primary signal's selection fold from the calibration
+  fold and the result records the split, the windows and the purge count (`"legacy"`, the default, is the
+  v1.16 three-way split, unchanged). `Backtester(sizing_hook=)` scales each decision row's target by a
+  multiplier in [0, 1] at the decision row (`SignalRow`, `SizingHook`, `InstrumentResult.sizing_multipliers`);
+  `meta_probability_hook` (gate / linear over a calibrated probability column) and `conformal_sizing_hook`
+  (split-conformal interval width mapped to size, `confidence_from_width`) are the providers.
+  `coverage_by_regime`: empirical coverage per regime vs nominal with the day-clustered t of the shortfall
+  (the v1.17 gate-statistic form), reported, not enforced (`passed: null`). The MVP engine takes the same
+  conformal rule through the optional `portfolio.conformal` block (`ConformalSpec`; absent from every pinned
+  config, golden byte-identical). The ML ledger records `split_mode` / `primary_selection_window` in the
+  `metalabel_tau` look and a `conformal_coverage_gate` look. API_ALPHA.md §9-§10, RESEARCH_VALIDITY.md
+  §4e, MVP.md §11; no registered result changes.
 - v1.17 WS-E items E2-E5: the three WS-E agents on one generic, budgeted, ledgered tool loop
   (`iap.llm.loop`; every call charged to the E1 spend ledger). E2 research assistant
   (`python -m iap.agents research`, `claude-sonnet-5-5`): in-sample runs through the research CLI

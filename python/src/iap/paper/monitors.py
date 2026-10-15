@@ -86,7 +86,8 @@ def realised_ic(
     model.horizon = horizon
     ic_rows = methods(methods_name).ic_rows
     universe = model.universe(sorted(frames))
-    sigs = model.signals({i: frames[i] for i in universe})
+    # signals() is defined by every concrete alpha class, not by the AlphaModel ABC
+    sigs = model.signals({i: frames[i] for i in universe})  # type: ignore[attr-defined]
     xs, ys = [], []
     for iid, sig in sigs.items():
         df = frames[iid]

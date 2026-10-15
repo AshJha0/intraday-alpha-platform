@@ -406,3 +406,83 @@ a research run.
 
 Kept out of `iap.mvp.sizing` because that path is parity-checked against the
 C++/Rust engines; a multiplier there would move every engine's goldens.
+
+v1.17 WS-D item D3 adds, all opt-in and all off in every registered
+configuration:
+
+- `SplitConformal.fit(...)` also records `n_cal` and `cal_median_width`
+  (the median `hi − lo` over the calibration rows).
+- `conformal_sizing_hook(calibrator, *, ref_width=None, sigma_column=None,
+  missing=0.0)` → a `SizingHook` (§10): the row's `expected_return` is the
+  point forecast, the interval is `calibrator.interval(pred[, sigma])`
+  (`sigma` from the scores-frame column `sigma_column` for the normalised
+  score) and the multiplier is `confidence_from_width(hi − lo, ref_width)`
+  (`ref_width` defaults to `cal_median_width`). A missing or non-finite
+  `sigma` returns `missing`.
+- `coverage_by_regime(ts, y, lo, hi, regime, alpha, *, threshold=2.0,
+  enforce=False, day_ns, ledger=None, alpha_id="CONFORMAL", config=None)`
+  — the coverage-by-regime gate: per regime label `n_pairs`, `n_days`,
+  `coverage`, `nominal`, `gap`, `tstat_day_cluster` (the day-clustered t of
+  the mean shortfall `1{covered} − nominal`, the v1.17 gate-statistic form:
+  one cluster per day, `G/(G−1)` correction, NaN below two days) with the
+  `inference_*` readings of `day_cluster_inference`, and `under_coverage`
+  (t < −threshold). `enforced` is `false` and `passed` is `null` by default
+  (reported, not enforced); `enforce=True` sets `passed` to whether no
+  regime is under-covered. Nothing in the platform enforces it. With a
+  ledger the read is ONE look of kind `conformal_coverage_gate`.
+- The MVP engine: `portfolio.conformal` in `mvp.json`
+  (`iap.mvp.config.ConformalSpec`: `alpha`, `method` `adaptive | split`,
+  `gamma`, `window`, `warmup`, `ref_width`, `enabled`) turns on
+  `iap.mvp.sizing.SizingMixin._conformal_scale` over the solved target
+  (docs/MVP.md §11). The key is absent from `configs/mvp/mvp.json` and
+  `mvp_tiny.json`, so the golden run is byte-identical; a config with the
+  block has a different `config_version` and `run_id`.
+
+## 10. Backtester sizing hook and meta-label sizing — `iap.backtest`, `iap.models.metalabel` (Python research; not a port contract)
+
+v1.17 WS-D item D2 (review finding R-5). Opt-in; `sizing_hook=None` and
+`split_mode="legacy"` are the pinned behaviour of every released result.
+
+- `SizingHook = Callable[[SignalRow], float]`; `Backtester(cost_model,
+  instrument_meta, config, reporting_ccy, sizing_hook=None)`, carried by
+  `for_horizon`. The hook is called once per decision row with a finite
+  non-zero target, at the DECISION row (before latency, the row block, the
+  session flatten and the fill cap), and returns a multiplier in `[0, 1]`
+  that scales that row's target; anything else (NaN, outside `[0, 1]`, not a
+  number) is a `ValueError`. `InstrumentResult.sizing_multipliers` holds the
+  per-row multiplier (1.0 where the hook was not called; `None` without a
+  hook).
+- `SignalRow(instrument_id, row, ts, expected_return, confidence, mid,
+  half_spread, target_qty, scores)` — `target_qty` is the policy's signed
+  target before the hook; `scores` maps every other column of the
+  instrument's scores frame at this row (`meta_prob`, `sigma`, ...) to a
+  float. Decision-time state only.
+- `meta_probability_hook(tau, column="meta_prob", mode="gate", missing=0.0)`
+  — a `SizingHook` over a calibrated probability column: `gate` → 1 when
+  `p ≥ tau` else 0; `linear` → `(p − tau) / (1 − tau)` clipped to `[0, 1]`;
+  a missing or non-finite `p` → `missing`. The caller scores the frame's
+  rows with the calibrator and writes the column before the backtest.
+- `run_meta_labeling(..., split_mode="legacy", primary_selection_window=None,
+  return_model=False)`:
+  - `split_mode="calibrate_select"` splits the OOS region four ways
+    (40/20/20/20 row mass, purged and embargoed at every boundary): the
+    calibrator is fitted on *calibration*, `best_tau` is chosen on the
+    disjoint *select* segment and both taus are read on *test*.
+    `"legacy"` is the v1.16 three-way split (tau chosen on the calibration
+    rows), unchanged.
+  - `primary_selection_window=(start_ts, end_ts)` names the fold the
+    primary signal was selected on; calibration rows inside it are purged
+    and counted (`n_calibration_rows_purged_for_primary_selection`), so the
+    calibration fold never overlaps that fold
+    (`calibration_overlaps_primary_selection: false`).
+  - The result document records `split_mode`, `segments` (`train`,
+    `calibration`, `select`, `test`), `segment_windows`,
+    `selection_segment` and `primary_selection_window`; the ledger look
+    (`metalabel_tau`) carries `split_mode`, `selection` and
+    `primary_selection_window` in its identity and `segments` in its
+    result; the tracker manifest's `folds` gain a `select` segment in the
+    new mode. `return_model=True` adds the fitted calibrator under
+    `"calibrator"` (not JSON).
+
+No registered result changes: the hook is off, the split mode defaults to
+the v1.16 rule, the prereg hashes and feature code are untouched.

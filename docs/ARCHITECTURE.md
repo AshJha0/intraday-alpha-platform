@@ -1231,9 +1231,13 @@ places below.
   test files with coverage. `governance` verifies the blackboard
   (`verify-board`), checks every signed agent has a registered key, and
   checks the ledger and blackboard only grow against the base branch.
-  `advisory` adds gitleaks. mypy is a blocking step of the `python` job
-  (scoped to core/orderbook/execution/backtest/features; 0 errors since
-  v1.16, item 16). The required checks are listed in GOVERNANCE.md §0.
+  `advisory` adds gitleaks and an advisory lychee link check. mypy is a
+  blocking step of the `python` job (scope: core/orderbook/execution/
+  backtest/features since v1.16, item 16, plus agents/llm/mvp/paper since
+  v1.17, F3; 0 errors on both). `reproducible-build` (v1.17, F1) builds the
+  wheel twice under a fixed SOURCE_DATE_EPOCH and fails on a sha256
+  mismatch; `python-slow` enforces the coverage floor (`--cov-fail-under`).
+  The required checks are listed in GOVERNANCE.md §0.
 - **Dependencies.** Python installs come from hashed lock files
   (`requirements-ci.txt`, `requirements-image.txt`) with
   `--require-hashes`; the Rust toolchain is 1.99.0 everywhere.

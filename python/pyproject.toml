@@ -63,6 +63,11 @@ files = [
   "src/iap/execution",
   "src/iap/backtest",
   "src/iap/features",
+  # v1.17 F3: the agent, LLM, MVP and paper-trading packages joined the scope
+  "src/iap/agents",
+  "src/iap/llm",
+  "src/iap/mvp",
+  "src/iap/paper",
 ]
 explicit_package_bases = true
 ignore_missing_imports = true

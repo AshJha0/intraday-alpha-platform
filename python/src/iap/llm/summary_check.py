@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -118,7 +118,7 @@ def _refs(log: Iterable[Mapping[str, Any]]) -> list[str]:
 
 
 def _pool(
-    log: list[Mapping[str, Any]], root: Path, session_id: str
+    log: Sequence[Mapping[str, Any]], root: Path, session_id: str
 ) -> list[tuple[str | None, float]]:
     from iap.agents import citations
 
@@ -138,7 +138,7 @@ def _pool(
 
 
 def check_summary(
-    text: str, log: list[Mapping[str, Any]], root: Path, session_id: str
+    text: str, log: Sequence[Mapping[str, Any]], root: Path, session_id: str
 ) -> dict[str, Any]:
     """``{"summary_claims_verified": bool, "unsupported_claims": [...], "claims": [...]}``."""
     ok_tools = _accepted(log)
