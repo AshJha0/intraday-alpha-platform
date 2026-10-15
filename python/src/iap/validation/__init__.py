@@ -71,6 +71,7 @@ from iap.validation.metrics import (  # noqa: F401
     day_block_bootstrap_tstat,
     day_cluster_tstat,
     decay_curve,
+    gate_statistics,
     hac_mean_variance,
     hit_rate,
     ic,

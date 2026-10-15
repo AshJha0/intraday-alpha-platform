@@ -621,6 +621,85 @@ def day_cluster_inference(tstat: float, n_days: int, alpha: float = 0.05) -> dic
     return out
 
 
+#: HAC bandwidth rules of :func:`gate_statistics`: ``"auto"`` is
+#: :func:`auto_hac_lags` on the rows given, ``"horizon"`` the pinned
+#: :func:`nw_lags` (``iap.validation.validate`` uses the same names).
+GATE_HAC_BANDWIDTHS = ("auto", "horizon")
+
+
+def gate_statistics(
+    ts: np.ndarray,
+    scores: np.ndarray,
+    labels: np.ndarray,
+    *,
+    horizon_ns: int | None = None,
+    hac_bandwidth: str = "auto",
+    day_separated: bool = True,
+    lags: int | None = None,
+    bucket_ns: int = 300 * NS_S,
+    day_ns: int = 86_400 * NS_S,
+) -> dict[str, float | int | str | bool]:
+    """The statistics a gate reads, computed ONCE for every caller (v1.17, R-2).
+
+    Before v1.17 the gate statistic lived in four copies - the walk-forward
+    gate in ``validate_alpha``, ``frozen_params_block`` (which still used
+    the v1.13 lag rule and no day separation), the ``validity`` block and
+    ``tools/r7_confirm.py`` - and two of them had drifted.  Every one of
+    them now calls this function on the rows it reads, so a "frozen t", a
+    "gate t" and a "confirmatory t" are the same statistic on different
+    rows, never different statistics.
+
+    ``ic`` is the pooled Pearson IC (:func:`ic`); ``tstat_hac`` the
+    pooled-slope HAC t (:func:`pooled_slope_hac_tstat`) at ``hac_lags``
+    Bartlett lags - ``lags`` when given, else :func:`auto_hac_lags` on the
+    non-empty ``bucket_ns`` buckets of ``ts`` under ``"auto"`` or
+    :func:`nw_lags` under ``"horizon"`` (``horizon_ns`` is then required) -
+    with no lag product across a ``day_ns`` boundary when
+    ``day_separated``; ``tstat_day_cluster`` is the day-clustered t of the
+    same slope (:func:`day_cluster_tstat`), reported BESIDE the HAC t in
+    every gate (R-P1-3; read it as a robustness bound with ``n_days - 1``
+    degrees of freedom, :func:`day_cluster_inference`).  ``n_pairs`` and
+    ``n_days`` count the finite (score, label) pairs and the days they
+    span.  NaN where a statistic is undefined; never raises on empty rows.
+    """
+    ts = np.asarray(ts, dtype=np.int64)
+    x = np.asarray(scores, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    if not (ts.shape == x.shape == y.shape):
+        raise ValueError("ts/score/label length mismatch")
+    if hac_bandwidth not in GATE_HAC_BANDWIDTHS:
+        raise ValueError(f"unknown hac_bandwidth {hac_bandwidth!r}; known: {GATE_HAC_BANDWIDTHS}")
+    ok = np.isfinite(x) & np.isfinite(y)
+    n_pairs = int(ok.sum())
+    n_days = int(np.unique(ts[ok] // int(day_ns)).size) if n_pairs else 0
+    if lags is None:
+        if horizon_ns is None:
+            raise ValueError("gate_statistics needs horizon_ns when lags is not given")
+        if hac_bandwidth == "auto":
+            lags = auto_hac_lags(n_ts_buckets(ts, bucket_ns), int(horizon_ns), bucket_ns)
+        else:
+            lags = nw_lags(int(horizon_ns), bucket_ns)
+    nan = float("nan")
+    t_hac = (
+        pooled_slope_hac_tstat(
+            ts, x, y, lags=int(lags), bucket_ns=bucket_ns, day_ns=day_ns if day_separated else None
+        )
+        if ts.size
+        else nan
+    )
+    t_day = day_cluster_tstat(ts, x, y, day_ns=day_ns) if ts.size else nan
+    return {
+        "ic": float(ic(x, y)) if ts.size else nan,
+        "tstat_hac": float(t_hac),
+        "hac_lags": int(lags),
+        "hac_bandwidth": hac_bandwidth,
+        "hac_day_separated": bool(day_separated),
+        "tstat_day_cluster": float(t_day),
+        "n_pairs": n_pairs,
+        "n_days": n_days,
+    }
+
+
 def bucket_ics_demeaned(
     ts: np.ndarray,
     instrument: np.ndarray,

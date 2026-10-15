@@ -1,0 +1,329 @@
+{
+  "deviation_note": "research/r7/R7_DEVIATION_dsr_trials.md",
+  "git_commit": "4c90f8cfae08d3169061d4b8569bfd329e60f525",
+  "note": "No new look: the deflated Sharpe of the RECORDED per-session IC series re-evaluated at the registered trial count (repo ledger distinct configurations + the look; R-1, v1.17). The recorded result is unchanged.",
+  "results": [
+    {
+      "alpha": "EQ10@1s",
+      "by_trial_count": {
+        "as_recorded": {
+          "deflated_sharpe": {
+            "dsr": 0.999953795752005,
+            "dsr_at_looks": 0.9999134429090829,
+            "kurtosis": 3.275911684906522,
+            "min_track_record_days": 2.061982955643371,
+            "min_trl_alpha": 0.05,
+            "n_days": 7,
+            "n_looks": 2,
+            "n_trials": 1,
+            "psr": 0.999953795752005,
+            "sharpe_annualised": 85.30684482540616,
+            "sharpe_per_day": 5.37382610808576,
+            "skew": 1.134335295956232,
+            "sr0": 0.0,
+            "sr_benchmark": 0.0,
+            "trials_basis": "distinct_configurations",
+            "trials_sr_variance": 0.16666666666666666
+          },
+          "gate": {
+            "passed": true,
+            "reasons": [],
+            "threshold": 4.432223697017295
+          },
+          "n_trials": 1,
+          "sensitivity": {
+            "all_sessions": {
+              "descriptive_gate_on_raw": {
+                "passed": true,
+                "reasons": [],
+                "threshold": 4.432223697017295
+              },
+              "dsr": 0.999953795752005,
+              "psr": 0.999953795752005,
+              "sr0": 0.0
+            },
+            "excl_2025-12-10_2025-11-28": {
+              "descriptive_gate_on_raw": {
+                "passed": true,
+                "reasons": [],
+                "threshold": 4.432223697017295
+              },
+              "dsr": 0.9999948316463741,
+              "psr": 0.9999948316463741,
+              "sr0": 0.0
+            }
+          },
+          "verdict": "confirmed"
+        },
+        "registered_at_look": {
+          "deflated_sharpe": {
+            "dsr": 0.9988581720635296,
+            "dsr_at_looks": 0.9999134429090829,
+            "kurtosis": 3.275911684906522,
+            "min_track_record_days": 2.061982955643371,
+            "min_trl_alpha": 0.05,
+            "n_days": 7,
+            "n_looks": 2,
+            "n_trials": 297,
+            "psr": 0.999953795752005,
+            "sharpe_annualised": 85.30684482540616,
+            "sharpe_per_day": 5.37382610808576,
+            "skew": 1.134335295956232,
+            "sr0": 1.180792648073081,
+            "sr_benchmark": 0.0,
+            "trials_basis": "distinct_configurations",
+            "trials_sr_variance": 0.16666666666666666
+          },
+          "gate": {
+            "passed": true,
+            "reasons": [],
+            "threshold": 4.432223697017295
+          },
+          "n_trials": 297,
+          "sensitivity": {
+            "all_sessions": {
+              "descriptive_gate_on_raw": {
+                "passed": true,
+                "reasons": [],
+                "threshold": 4.432223697017295
+              },
+              "dsr": 0.9988581720635296,
+              "psr": 0.999953795752005,
+              "sr0": 1.180792648073081
+            },
+            "excl_2025-12-10_2025-11-28": {
+              "descriptive_gate_on_raw": {
+                "passed": true,
+                "reasons": [],
+                "threshold": 4.432223697017295
+              },
+              "dsr": 0.9988522078844506,
+              "psr": 0.9999948316463741,
+              "sr0": 1.4461697399043996
+            }
+          },
+          "verdict": "confirmed"
+        },
+        "repo_ledger_today": {
+          "deflated_sharpe": {
+            "dsr": 0.998845197908477,
+            "dsr_at_looks": 0.9999134429090829,
+            "kurtosis": 3.275911684906522,
+            "min_track_record_days": 2.061982955643371,
+            "min_trl_alpha": 0.05,
+            "n_days": 7,
+            "n_looks": 2,
+            "n_trials": 308,
+            "psr": 0.999953795752005,
+            "sharpe_annualised": 85.30684482540616,
+            "sharpe_per_day": 5.37382610808576,
+            "skew": 1.134335295956232,
+            "sr0": 1.185458157302144,
+            "sr_benchmark": 0.0,
+            "trials_basis": "distinct_configurations",
+            "trials_sr_variance": 0.16666666666666666
+          },
+          "gate": {
+            "passed": true,
+            "reasons": [],
+            "threshold": 4.432223697017295
+          },
+          "n_trials": 308,
+          "sensitivity": {
+            "all_sessions": {
+              "descriptive_gate_on_raw": {
+                "passed": true,
+                "reasons": [],
+                "threshold": 4.432223697017295
+              },
+              "dsr": 0.998845197908477,
+              "psr": 0.999953795752005,
+              "sr0": 1.185458157302144
+            },
+            "excl_2025-12-10_2025-11-28": {
+              "descriptive_gate_on_raw": {
+                "passed": true,
+                "reasons": [],
+                "threshold": 4.432223697017295
+              },
+              "dsr": 0.9988314934932998,
+              "psr": 0.9999948316463741,
+              "sr0": 1.4518837984051245
+            }
+          },
+          "verdict": "confirmed"
+        }
+      },
+      "experiment_id": "fefeac6aa15f9e34",
+      "recorded_dsr": 0.999953795752005,
+      "recorded_verdict": "confirmed",
+      "repo_ledger_distinct_at_look": 296,
+      "repo_ledger_distinct_today": 307,
+      "repo_ledger_total_at_look": 5361,
+      "verdict_unchanged": true
+    },
+    {
+      "alpha": "EQ05@1s",
+      "by_trial_count": {
+        "as_recorded": {
+          "deflated_sharpe": {
+            "dsr": 0.9999997741015421,
+            "dsr_at_looks": 0.9999991958914984,
+            "kurtosis": 1.4711311752727756,
+            "min_track_record_days": 1.5804672221929656,
+            "min_trl_alpha": 0.05,
+            "n_days": 7,
+            "n_looks": 4,
+            "n_trials": 2,
+            "psr": 0.9999999382623748,
+            "sharpe_annualised": 73.44164235294555,
+            "sharpe_per_day": 4.626388608143868,
+            "skew": -0.2315191984629346,
+            "sr0": 0.212189230681051,
+            "sr_benchmark": 0.0,
+            "trials_basis": "distinct_configurations",
+            "trials_sr_variance": 0.16666666666666666
+          },
+          "gate": {
+            "passed": true,
+            "reasons": [],
+            "threshold": 4.432223697017295
+          },
+          "n_trials": 2,
+          "sensitivity": {
+            "all_sessions": {
+              "descriptive_gate_on_raw": {
+                "passed": true,
+                "reasons": [],
+                "threshold": 4.432223697017295
+              },
+              "dsr": 0.9999997741015421,
+              "psr": 0.9999999382623748,
+              "sr0": 0.212189230681051
+            },
+            "excl_2025-12-10_2025-11-28": {
+              "descriptive_gate_on_raw": {
+                "passed": true,
+                "reasons": [],
+                "threshold": 4.432223697017295
+              },
+              "dsr": 0.9883807036264054,
+              "psr": 0.9916327776682594,
+              "sr0": 0.25987767204114404
+            }
+          },
+          "verdict": "confirmed"
+        },
+        "registered_at_look": {
+          "deflated_sharpe": {
+            "dsr": 0.9999590121002433,
+            "dsr_at_looks": 0.9999991958914984,
+            "kurtosis": 1.4711311752727756,
+            "min_track_record_days": 1.5804672221929656,
+            "min_trl_alpha": 0.05,
+            "n_days": 7,
+            "n_looks": 4,
+            "n_trials": 297,
+            "psr": 0.9999999382623748,
+            "sharpe_annualised": 73.44164235294555,
+            "sharpe_per_day": 4.626388608143868,
+            "skew": -0.2315191984629346,
+            "sr0": 1.180792648073081,
+            "sr_benchmark": 0.0,
+            "trials_basis": "distinct_configurations",
+            "trials_sr_variance": 0.16666666666666666
+          },
+          "gate": {
+            "passed": true,
+            "reasons": [],
+            "threshold": 4.432223697017295
+          },
+          "n_trials": 297,
+          "sensitivity": {
+            "all_sessions": {
+              "descriptive_gate_on_raw": {
+                "passed": true,
+                "reasons": [],
+                "threshold": 4.432223697017295
+              },
+              "dsr": 0.9999590121002433,
+              "psr": 0.9999999382623748,
+              "sr0": 1.180792648073081
+            },
+            "excl_2025-12-10_2025-11-28": {
+              "descriptive_gate_on_raw": {
+                "passed": true,
+                "reasons": [],
+                "threshold": 4.432223697017295
+              },
+              "dsr": 0.9561827636046349,
+              "psr": 0.9916327776682594,
+              "sr0": 1.4461697399043996
+            }
+          },
+          "verdict": "confirmed"
+        },
+        "repo_ledger_today": {
+          "deflated_sharpe": {
+            "dsr": 0.9999580916015764,
+            "dsr_at_looks": 0.9999991958914984,
+            "kurtosis": 1.4711311752727756,
+            "min_track_record_days": 1.5804672221929656,
+            "min_trl_alpha": 0.05,
+            "n_days": 7,
+            "n_looks": 4,
+            "n_trials": 308,
+            "psr": 0.9999999382623748,
+            "sharpe_annualised": 73.44164235294555,
+            "sharpe_per_day": 4.626388608143868,
+            "skew": -0.2315191984629346,
+            "sr0": 1.185458157302144,
+            "sr_benchmark": 0.0,
+            "trials_basis": "distinct_configurations",
+            "trials_sr_variance": 0.16666666666666666
+          },
+          "gate": {
+            "passed": true,
+            "reasons": [],
+            "threshold": 4.432223697017295
+          },
+          "n_trials": 308,
+          "sensitivity": {
+            "all_sessions": {
+              "descriptive_gate_on_raw": {
+                "passed": true,
+                "reasons": [],
+                "threshold": 4.432223697017295
+              },
+              "dsr": 0.9999580916015764,
+              "psr": 0.9999999382623748,
+              "sr0": 1.185458157302144
+            },
+            "excl_2025-12-10_2025-11-28": {
+              "descriptive_gate_on_raw": {
+                "passed": true,
+                "reasons": [],
+                "threshold": 4.432223697017295
+              },
+              "dsr": 0.9559312761271483,
+              "psr": 0.9916327776682594,
+              "sr0": 1.4518837984051245
+            }
+          },
+          "verdict": "confirmed"
+        }
+      },
+      "experiment_id": "c39e188e5d82da00",
+      "recorded_dsr": 0.9999997741015421,
+      "recorded_verdict": "confirmed",
+      "repo_ledger_distinct_at_look": 296,
+      "repo_ledger_distinct_today": 307,
+      "repo_ledger_total_at_look": 5361,
+      "verdict_unchanged": true
+    }
+  ],
+  "run_utc": "2026-10-15T07:03:02+00:00",
+  "schema": "iap.r7_confirm_dsr_recompute/v1",
+  "source": "research/r7/r7_confirm_result.json",
+  "source_sha256": "a5489ef0f3d34296d8e5ecb2b64621f47e6b80000653ac76da110c58436b586a"
+}

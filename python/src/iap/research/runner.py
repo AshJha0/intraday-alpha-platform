@@ -140,10 +140,13 @@ from iap.validation.methods import (
     METHODS_LEGACY,
     METHODS_V2,
     METHODS_V2_V113,
+    METHODS_V2_V114,
     METHODS_V3,
     METHODS_V3_V113,
+    METHODS_V3_V114,
     METHODS_V4,
     METHODS_V4_V113,
+    METHODS_V4_V114,
     ResearchMethods,
     ledger_config,
     methods,
@@ -224,8 +227,16 @@ _REPORT_METRICS = {
 _REPORT_METRICS[METHODS_V3] = _REPORT_METRICS[METHODS_V2]
 #: ``v4`` (v1.12, opt-in) adds report-only blocks to ``v3``.
 _REPORT_METRICS[METHODS_V4] = _REPORT_METRICS[METHODS_V2]
-#: The frozen v1.13.0 revisions (iap.validation.methods) map like their bundle.
-for _name in (METHODS_V2_V113, METHODS_V3_V113, METHODS_V4_V113):
+#: The frozen v1.13.0 / v1.14.0 revisions (iap.validation.methods) map like
+#: their bundle.
+for _name in (
+    METHODS_V2_V113,
+    METHODS_V3_V113,
+    METHODS_V4_V113,
+    METHODS_V2_V114,
+    METHODS_V3_V114,
+    METHODS_V4_V114,
+):
     _REPORT_METRICS[_name] = _REPORT_METRICS[METHODS_V2]
 
 #: Result fields a rerun may legitimately change (provenance, not evidence).
@@ -912,6 +923,9 @@ class ExperimentRunner:
                 METHODS_V2_V113,
                 METHODS_V3_V113,
                 METHODS_V4_V113,
+                METHODS_V2_V114,
+                METHODS_V3_V114,
+                METHODS_V4_V114,
             )
             and not report["label_reopen_available"]
         ):

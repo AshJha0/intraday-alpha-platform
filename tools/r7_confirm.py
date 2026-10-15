@@ -2,10 +2,20 @@
 
 Implements the signed pre-registration ``research/r7/r7_confirm_prereg.json``.
 
-Two modes::
+Three modes::
 
     python tools/r7_confirm.py --dry-run [--dataset-dir data/real/r7_holdout]
     python tools/r7_confirm.py --i-am-the-owner [--dataset-dir data/real/r7_holdout]
+    python tools/r7_confirm.py --recompute-dsr
+
+``--recompute-dsr`` (v1.17, review finding R-1; read-only on data, no look):
+the recorded result judged its deflated Sharpe at the holdout dataset's own
+ledger count (N = 1 for the first look) instead of the registered N - the
+repo ledger's distinct configurations plus the look.  This mode re-evaluates
+the DSR of the RECORDED per-session IC series at the registered N (at the
+time of the look, and today) and writes
+``research/r7/r7_confirm_result_dsr_recompute.json`` / ``.md``; the recorded
+result file is never modified.  Live runs since v1.17 use the registered N.
 
 ``--dry-run`` (safe, read-only): verifies the prereg (signed, Ed25519 signature
 against research/agents/trust_roots.json, fingerprints), data/real/R7_SIGNED.ok,
@@ -398,26 +408,59 @@ def per_session_ic(rows: Mapping[str, np.ndarray]) -> dict[str, float | None]:
 
 
 def pooled_stats(rows: Mapping[str, np.ndarray], keep: np.ndarray, horizon: str) -> dict:
-    """Descriptive pooled uncrossed raw-signal IC and its pooled-slope HAC t."""
-    from iap.validation.metrics import (
-        HORIZONS_NS,
-        auto_hac_lags,
-        ic,
-        n_ts_buckets,
-        pooled_slope_hac_tstat,
-    )
+    """Descriptive pooled uncrossed raw-signal IC, its pooled-slope HAC t and
+    the day-cluster t - the gate's own function
+    (``iap.validation.metrics.gate_statistics``, v1.17 R-2: automatic
+    bandwidth, day-separated, as the walk-forward gate computes them)."""
+    from iap.validation.metrics import HORIZONS_NS, gate_statistics
 
     m = keep & rows["unc"]
     ts, x, y = rows["ts"][m], rows["x"][m], rows["y"][m]
-    lags = auto_hac_lags(n_ts_buckets(ts), HORIZONS_NS[horizon])
-    v = ic(x, y)
-    t = pooled_slope_hac_tstat(ts, x, y, lags=lags, day_ns=NS_DAY) if ts.size else float("nan")
+    s = gate_statistics(
+        ts, x, y, horizon_ns=HORIZONS_NS[horizon], hac_bandwidth="auto", day_separated=True
+    )
+
+    def num(v: float) -> float | None:
+        return float(v) if math.isfinite(v) else None
+
     return {
-        "raw_ic": float(v) if math.isfinite(v) else None,
-        "raw_hac_t": float(t) if math.isfinite(t) else None,
-        "hac_lags": int(lags),
-        "n_pairs": int(np.sum(np.isfinite(x) & np.isfinite(y))),
+        "raw_ic": num(float(s["ic"])),
+        "raw_hac_t": num(float(s["tstat_hac"])),
+        "raw_day_cluster_t": num(float(s["tstat_day_cluster"])),
+        "hac_lags": int(s["hac_lags"]),
+        "n_pairs": int(s["n_pairs"]),
+        "n_days": int(s["n_days"]),
     }
+
+
+def registered_trials(root: Path, dataset_ledger) -> tuple[int, dict[str, Any]]:
+    """The DSR ``N`` the pre-registration means (v1.17, R-1): the distinct
+    configurations of the REPO ledger (``research/experiments.json``, where
+    the prereg debited its looks and every in-sample trial lives) plus one
+    for the confirmatory look itself, which the dataset ledger records and
+    the repo ledger does not.  Until v1.17 ``analyse`` read the holdout
+    dataset's own ledger, so the first look was judged at N = 1
+    (``research/r7/R7_DEVIATION_dsr_trials.md``)."""
+    from iap.validation.deflated import effective_trials
+    from iap.validation.ledger import ExperimentLedger
+
+    repo = ExperimentLedger(root / "research" / "experiments.json")
+    n = effective_trials(repo, include_new=True)
+    return n, {
+        "basis": "repo ledger distinct configurations + this look",
+        "repo_distinct": int(repo.distinct_experiments),
+        "repo_total": int(repo.total_experiments),
+        "dataset_distinct": int(dataset_ledger.distinct_experiments),
+        "dataset_total": int(dataset_ledger.total_experiments),
+    }
+
+
+def trials_at_total(ledger, total_experiments: int) -> int:
+    """Distinct configurations the ledger held when its running total was
+    ``total_experiments`` (every entry carries the running total ``n`` it
+    brought the ledger to, so the entries with ``n <= total`` are the ones
+    that existed then)."""
+    return sum(1 for e in ledger.entries if int(e["n"]) <= int(total_experiments))
 
 
 def dsr_block(series: Sequence[float | None], n_trials: int, n_looks: int | None) -> dict:
@@ -544,6 +587,7 @@ def analyse(
     ds: Path,
     thresholds: Mapping[str, Any],
     entry: Mapping[str, Any],
+    root: Path | None = None,
 ) -> dict[str, Any]:
     from iap.alpha import build
     from iap.validation.deflated import effective_trials
@@ -551,12 +595,18 @@ def analyse(
     from iap.validation.methods import methods
     from iap.validation.sessions import book_scope_for_dataset
 
+    if root is None:
+        raise CheckError("analyse needs the repo root: the DSR N is the repo ledger's (R-1)")
     res = look.get("result") or {}
     elig = look.get("eligibility") or {}
     run_t = elig.get("significance_threshold")
     threshold = max(float(thresholds["repo_ledger_t"]), float(run_t or 0.0))
     dsl = ExperimentLedger(ds / "research" / "experiments.json")
-    n_trials = effective_trials(dsl, include_new=False)  # the look is recorded already
+    # v1.17 (R-1): N is the registered trial count - the repo ledger's
+    # distinct configurations plus this look - never the holdout dataset's
+    # own (first-look) count, which is kept beside it for the record.
+    n_trials, trials_detail = registered_trials(root, dsl)
+    n_trials_dataset = effective_trials(dsl, include_new=False)  # the look is recorded already
     n_looks = dsl.total_experiments
     model = build(alpha)
     model.horizon = HORIZON
@@ -583,7 +633,13 @@ def analyse(
             "repo_ledger_total": thresholds["repo_ledger_total"],
             "rule": "max(run's ledger threshold, repo-ledger Bonferroni |t|)",
         },
-        "dsr": {"n_trials": n_trials, "n_looks": n_looks, **d},
+        "dsr": {
+            "n_trials": n_trials,
+            "n_trials_detail": trials_detail,
+            "n_trials_dataset_ledger": n_trials_dataset,
+            "n_looks": n_looks,
+            **d,
+        },
         "per_session_ic": ics,
         "gate": g,
         "verdict": verdict(bool(look.get("ok")), g),
@@ -626,9 +682,15 @@ def render_md(doc: Mapping[str, Any]) -> str:
             lines.append(f"- gate passed: {r['gate']['passed']}; reasons: {r['gate']['reasons']}")
         for d, v in (r.get("per_session_ic") or {}).items():
             lines.append(f"- session {d}: IC {v}")
+        if r.get("dsr"):
+            lines.append(
+                f"- DSR N (trials): {r['dsr'].get('n_trials')} "
+                f"({(r['dsr'].get('n_trials_detail') or {}).get('basis', 'as recorded')})"
+            )
         for k, s in (r.get("sensitivity") or {}).items():
             lines.append(
                 f"- sensitivity {k}: raw IC {s['raw_ic']}, raw HAC t {s['raw_hac_t']}, "
+                f"day-cluster t {s.get('raw_day_cluster_t')}, "
                 f"mean session IC {s['mean_session_ic']}, DSR {s['deflated_sharpe'].get('dsr')} "
                 "(descriptive, never decides)"
             )
@@ -636,6 +698,157 @@ def render_md(doc: Mapping[str, Any]) -> str:
     lines += ["", "Outcome NOT recorded. Human-only commands:", ""]
     lines += [f"    {c}" for c in doc["record_commands"]]
     return "\n".join(lines) + "\n"
+
+
+# ------------------------------------------------ DSR recompute (v1.17) --
+
+RECOMPUTE_REL = "research/r7/r7_confirm_result_dsr_recompute.json"
+RECOMPUTE_MD_REL = "research/r7/r7_confirm_result_dsr_recompute.md"
+DSR_DEVIATION_REL = "research/r7/R7_DEVIATION_dsr_trials.md"
+
+
+def recompute_dsr(root: Path, result_rel: str = RESULT_REL) -> dict[str, Any]:
+    """Re-evaluate the recorded result's deflated Sharpe at the registered
+    N (v1.17, R-1) from the per-session IC series it already holds.
+
+    No data is read, no model is scored and no look is taken: the Sharpe
+    of the recorded series is deflated at three trial counts - as recorded
+    (the dataset ledger's own count), the repo ledger's distinct
+    configurations when the look was taken (the entries whose running
+    total is at most the ``repo_ledger_total`` the result recorded, plus
+    the look itself) and the repo ledger today - and the registered gate
+    is re-read at each.  The recorded result file is never modified."""
+    from iap.validation.ledger import ExperimentLedger
+
+    src = root / result_rel
+    doc = json.loads(src.read_text(encoding="utf-8"))
+    repo = ExperimentLedger(root / "research" / "experiments.json")
+    results = []
+    for r in doc["results"]:
+        if r.get("verdict") == "no_result" or not r.get("dsr"):
+            continue
+        res = r.get("result") or {}
+        threshold = float(r["gate_threshold"]["used"])
+        total_at_look = int(r["gate_threshold"]["repo_ledger_total"])
+        distinct_at_look = trials_at_total(repo, total_at_look)
+        n_looks = r["dsr"].get("n_looks")
+        counts = {
+            "as_recorded": int(r["dsr"]["n_trials"]),
+            "registered_at_look": distinct_at_look + 1,
+            "repo_ledger_today": int(repo.distinct_experiments) + 1,
+        }
+        by_count: dict[str, Any] = {}
+        for label, n in counts.items():
+            sens = {}
+            for key, s in (r.get("sensitivity") or {}).items():
+                d = dsr_block(list(s["per_session_ic"].values()), n, n_looks)
+                sens[key] = {
+                    "dsr": d.get("dsr"),
+                    "sr0": d.get("sr0"),
+                    "psr": d.get("psr"),
+                    "descriptive_gate_on_raw": gate(
+                        s["raw_ic"], s["raw_hac_t"], threshold, d.get("dsr")
+                    ),
+                }
+            primary = dsr_block(list(r["per_session_ic"].values()), n, n_looks)
+            g = gate(res.get("ic"), res.get("t_stat"), threshold, primary.get("dsr"))
+            by_count[label] = {
+                "n_trials": n,
+                "deflated_sharpe": primary,
+                "gate": g,
+                "verdict": verdict(True, g),
+                "sensitivity": sens,
+            }
+        results.append(
+            {
+                "alpha": r["alpha"],
+                "experiment_id": r.get("experiment_id"),
+                "recorded_verdict": r.get("verdict"),
+                "recorded_dsr": r["dsr"].get("dsr"),
+                "repo_ledger_total_at_look": total_at_look,
+                "repo_ledger_distinct_at_look": distinct_at_look,
+                "repo_ledger_distinct_today": int(repo.distinct_experiments),
+                "by_trial_count": by_count,
+                "verdict_unchanged": all(
+                    v["verdict"] == r.get("verdict") for v in by_count.values()
+                ),
+            }
+        )
+    return {
+        "schema": "iap.r7_confirm_dsr_recompute/v1",
+        "source": result_rel,
+        "source_sha256": sha256(src),
+        "git_commit": git_commit(root),
+        "run_utc": datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"),
+        "deviation_note": DSR_DEVIATION_REL,
+        "note": (
+            "No new look: the deflated Sharpe of the RECORDED per-session IC series "
+            "re-evaluated at the registered trial count (repo ledger distinct "
+            "configurations + the look; R-1, v1.17). The recorded result is unchanged."
+        ),
+        "results": results,
+    }
+
+
+def render_recompute_md(doc: Mapping[str, Any]) -> str:
+    lines = [
+        "# R7-CONFIRM-1: deflated Sharpe at the registered N (v1.17, R-1)",
+        "",
+        f"- source: `{doc['source']}` (sha256 `{doc['source_sha256']}`)",
+        f"- git commit: `{doc['git_commit']}`; run: {doc['run_utc']}",
+        f"- deviation note: {doc['deviation_note']}",
+        f"- {doc['note']}",
+        "",
+        "| alpha | N as recorded | DSR | N registered at the look | DSR | "
+        "N repo ledger today | DSR | verdict unchanged |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for r in doc["results"]:
+        b = r["by_trial_count"]
+        lines.append(
+            f"| {r['alpha']} | {b['as_recorded']['n_trials']} | "
+            f"{b['as_recorded']['deflated_sharpe'].get('dsr')} | "
+            f"{b['registered_at_look']['n_trials']} | "
+            f"{b['registered_at_look']['deflated_sharpe'].get('dsr')} | "
+            f"{b['repo_ledger_today']['n_trials']} | "
+            f"{b['repo_ledger_today']['deflated_sharpe'].get('dsr')} | "
+            f"**{r['verdict_unchanged']}** |"
+        )
+    for r in doc["results"]:
+        lines += ["", f"## {r['alpha']}", ""]
+        for label, v in r["by_trial_count"].items():
+            d = v["deflated_sharpe"]
+            lines.append(
+                f"- {label}: N = {v['n_trials']}, SR0 = {d.get('sr0')}, PSR = {d.get('psr')}, "
+                f"DSR = {d.get('dsr')}, gate passed = {v['gate']['passed']} -> {v['verdict']}"
+            )
+            for k, s in v["sensitivity"].items():
+                lines.append(
+                    f"    - sensitivity {k}: DSR {s['dsr']} "
+                    f"(descriptive gate on raw: {s['descriptive_gate_on_raw']['passed']})"
+                )
+    return "\n".join(lines) + "\n"
+
+
+def recompute_dsr_main(root: Path) -> int:
+    doc = recompute_dsr(root)
+    (root / RECOMPUTE_REL).write_text(
+        json.dumps(doc, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8"
+    )
+    (root / RECOMPUTE_MD_REL).write_text(render_recompute_md(doc), encoding="utf-8")
+    print(f"wrote {RECOMPUTE_REL} and {RECOMPUTE_MD_REL} (no look taken; {RESULT_REL} unchanged)")
+    for r in doc["results"]:
+        b = r["by_trial_count"]
+        print(
+            f"  {r['alpha']}: N {b['as_recorded']['n_trials']} -> "
+            f"{b['registered_at_look']['n_trials']} (at the look) / "
+            f"{b['repo_ledger_today']['n_trials']} (today); DSR "
+            f"{b['as_recorded']['deflated_sharpe'].get('dsr')} -> "
+            f"{b['registered_at_look']['deflated_sharpe'].get('dsr')} / "
+            f"{b['repo_ledger_today']['deflated_sharpe'].get('dsr')}; "
+            f"verdict unchanged: {r['verdict_unchanged']}"
+        )
+    return 0 if all(r["verdict_unchanged"] for r in doc["results"]) else 3
 
 
 def record_commands(results: Sequence[Mapping[str, Any]]) -> list[str]:
@@ -700,7 +913,9 @@ def live(
     for look in looks:
         a = look["alpha"]
         if look["ok"]:
-            results.append(analyse(a, look, frames, ds, pre["thresholds"], pre["entries"][a]))
+            results.append(
+                analyse(a, look, frames, ds, pre["thresholds"], pre["entries"][a], root=root)
+            )
         else:
             results.append(
                 {
@@ -746,6 +961,12 @@ def main(argv: list[str] | None = None) -> int:
     mode = ap.add_mutually_exclusive_group(required=True)
     mode.add_argument("--dry-run", action="store_true", help="checks only; no look")
     mode.add_argument("--i-am-the-owner", action="store_true", help="THE confirmatory look")
+    mode.add_argument(
+        "--recompute-dsr",
+        action="store_true",
+        help=f"no look: re-evaluate the recorded {RESULT_REL} DSR at the registered N "
+        f"(repo ledger distinct configurations + the look; R-1) into {RECOMPUTE_REL}",
+    )
     ap.add_argument("--dataset-dir", type=Path, default=DEFAULT_DATASET)
     ap.add_argument("--root", type=Path, default=REPO)
     ap.add_argument("--signed-ok", type=Path, default=None)
@@ -766,6 +987,8 @@ def main(argv: list[str] | None = None) -> int:
     signed_ok = a.signed_ok or root / SIGNED_OK_REL
     try:
         retry = 2 if a.retry2_eq05 else int(a.retry_crashed_look)
+        if a.recompute_dsr:
+            return recompute_dsr_main(root)
         if a.dry_run:
             preflight(root, ds, signed_ok, retry)
             print("\nDRY RUN OK - no IC computed, nothing written. Live (owner only):")
