@@ -24,6 +24,15 @@ that tag.
   pairs every variant with its own plain control on the same windows (day-clustered) and
   reports urgency-regime shares per cell. API_TRADING.md section 2.14, COOKBOOK recipe 101,
   `python/tests/test_v117_signal_aware.py`.
+- v1.17 WS-A item A2b: slim ingest for breadth datasets. `ingest --slim` / `normalize_run(write_normalized_jsonl=False)`
+  writes no `*.normalized.jsonl` twin of the IAP1 file (3x its bytes; the feature build and the MVP read the
+  IAP1; manifest `layout: "slim"`); `process-day` is slim by default (`--no-slim` opts out), deletes `raw/`
+  right after normalisation (new `delete_raw` step, before the feature build) and takes `--peak-gb` to override
+  the disk-guard estimate with a measured value (the symbol-scaled rate estimate overstates a wide universe
+  many times: 830 GB estimated vs ~50 GB expected for 100 names on 2019-01-30). `breadth-universe` records
+  the universe's share of the day's displayed volume for future estimates. A6 (owner-approved 2026-10-15):
+  the regenerable raw and normalized JSONL of the 21 spent real datasets were deleted (151 GB freed; IAP1,
+  Parquet, features and manifests kept).
 
 - v1.17 WS-A item A3 (result): `research/breadth/universe.json` measured on the owner-approved
   2019-01-30 full-market file (368 M messages): 100 names, 29 ETFs, AAPL / QQQ / MSFT at ranks 6 / 12 / 15;

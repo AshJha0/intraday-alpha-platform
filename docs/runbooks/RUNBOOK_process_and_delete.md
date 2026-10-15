@@ -22,7 +22,8 @@ python -m iap.marketdata process-day --manifest research\breadth\candidates.json
 |---|---|---|
 | disk guard | refuses unless free space >= estimated peak + `--min-free-gb` (vendor file if absent + dataset + partition temp + features); never deletes to make room | none (checked every run) |
 | download | only with `--download --i-have-approval`: `tools/r7_download.py` (allow-listed hosts, size then sha256 check); a present file with the right size is used as is | `_DONE_download` |
-| ingest | `iap.marketdata.ingest` with `--partition-instruments N` (the normaliser routes packed records to on-disk partitions of N instruments, sorts each, merges in event-time windows: memory is one partition plus one window, the bytes are identical to the in-memory path) | `_DONE_ingest` |
+| ingest | `iap.marketdata.ingest --slim` (no `*.normalized.jsonl` twin; `--no-slim` writes it) with `--partition-instruments N` (the normaliser routes packed records to on-disk partitions of N instruments, sorts each, merges in event-time windows: memory is one partition plus one window, the bytes are identical to the in-memory path) | `_DONE_ingest` |
+| delete_raw | `raw/` deleted right after normalisation (the IAP1 holds the events); `--keep-raw` keeps it | `_DONE_delete_raw` |
 | features | `python -m iap.features --engine rust --workers 1` into `features/`; log in `features.log` | `_DONE_features` |
 | keep | `KEEP.json` written and re-verified | `_DONE_keep` |
 | delete | `raw/`, `normalized/*.normalized.*` and the vendor file, after `KEEP.json` verifies again; `--keep-raw` / `--keep-gz` keep them | `_DONE_delete`, `_DONE_ALL` |
@@ -54,7 +55,7 @@ For a 5 GB day and 100 names that is roughly 5 + 283 + 567 + 20 GB: far more
 than the free disk, so the first breadth days go through with a SMALLER
 universe or `--keep-raw` off and the download already present, and the
 estimate's rates are re-measured on the first day (`process_report.json`)
-before the next. The guard refuses rather than guesses.
+before the next. The guard refuses rather than guesses; `--peak-gb` overrides the estimate with a measured value (the first day's `process_report.json` gives it).
 
 ## What is never done here
 

@@ -129,6 +129,10 @@ def select_universe(
         "n_symbols_with_directory": len(measured["symbols"]),
         "n_test_securities_excluded": len(excluded),
         "n_etfs_in_universe": sum(1 for r in chosen if r["etp"]),
+        # for the process-day disk estimate: the universe's share of the day's
+        # displayed volume (a proxy for its share of the messages)
+        "displayed_volume_universe": sum(r["displayed_volume"] for r in chosen),
+        "displayed_volume_all": sum(r["displayed_volume"] for r in measured["symbols"].values()),
         "symbols": [r["symbol"] for r in chosen],
         "etfs": [r["symbol"] for r in chosen if r["etp"]],
         "universe": chosen,
