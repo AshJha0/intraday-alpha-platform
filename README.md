@@ -49,60 +49,45 @@ The full list with descriptions is the [Documentation index](#documentation-inde
 
 ## Current status (v1.16.0 released 2026-10-15)
 
-**v1.16, the monetisation release (in progress, not released).** v1.15
-proved the alphas predict on unseen data; v1.16 asks whether any of that
-survives realistic costs, and at what size. So far the answer for a taker is
-no: in-sample, with a stricter cost model, no cell of the study trades and
-no cell of the capacity curve breaks even. Two results are still pending: the
-M5 quoting study v2 (two-sided skewed quoting, running) and AI4 DeepLOB on
-real data (in progress). Item-by-item status:
-[docs/ROADMAP.md](docs/ROADMAP.md) §3.11 and [docs/EPICS.md](docs/EPICS.md)
-(E36); the details are under "## Unreleased" in [CHANGELOG.md](CHANGELOG.md).
+**v1.16.0, the monetisation release, shipped on 2026-10-15.** v1.15 proved
+the alphas predict on unseen data; v1.16 asked whether any of that survives
+realistic costs, and at what size. The answer is no, three ways
+([CHANGELOG.md](CHANGELOG.md) v1.16.0 and
+[docs/release/v1.16.0_RELEASE_NOTES.md](docs/release/v1.16.0_RELEASE_NOTES.md)):
 
-**New in v1.16 so far** (on main unless a PR is named; every switch is
-opt-in and off by default, so no default run, golden or published number moved):
-
-- **Realistic execution, P0-1..P0-5 (Python only).** Impact on the parent
-  order (simulator rule 6b, `ExecConfig.impact_model="parent"`, so splitting
-  a parent cannot lower its cost) with a permanent leg; impact calibrated on
-  the residual mid move after the depth walk (`estimate_calibration(...,
-  impact_fit=True)`, `apply_impact_fit`); net-of-cost pre-registration keys
-  in `configs/prereg/v3.json` (assumed venue latency with a tail, a {0, 1, 5}x
-  latency stress grid, an assumed fee tier with a lower-tier sensitivity,
-  ITCH exec prints, parent square-root impact); router opt-ins in
-  `iap.execution.sor_v2` (all-in price sweep, fill-probability passive
-  routing); exact POV participation with catch-up and Almgren-Chriss `eta`
-  from the residual fit ([API_TRADING.md](API_TRADING.md) §2.13).
-- **In-sample monetisation study (P0-6): no-go.** EQ10 / EQ05 as a taker on
-  the 10 in-sample sessions, 480 cells: zero trades in every cell, because
-  the forecast is several times smaller than the round-trip cost. The owner
-  decided not to buy fresh data, so item 8 (a net-of-cost pre-registration on
-  fresh sessions) is not triggered
+- **Taker: no-go (P0-6, #138).** EQ10 / EQ05 as a taker on the 10 in-sample
+  sessions, 480 cells: zero trades in every cell, because the forecast is
+  several times smaller than the round-trip cost
   ([research/v116/MONETISATION_P0-6.md](research/v116/MONETISATION_P0-6.md)).
-- **Capacity curve (item 7, PR #149, pending merge):** 0 of 45 cells break
-  even; the best (EQ10, AAPL, 1 min, top 0.1% of signals) earns 0.92 bp
-  against 2.4 bp of fixed cost.
-- **Quoting v2:** after the taker no-go, the M5 skewed-quoting study was made
-  runnable (owner-approved values, ticks, a validity gate) and registered;
-  its in-sample run is in progress and has no result yet.
-- **AI4 DeepLOB on real data:** in progress (real-data adapter and streaming
-  training in PR #151; a new pre-registration to be signed by the owner).
-- **Research hygiene:** `research/maker-real` and `research/step2` merged
-  onto main with their blackboards archived unchanged; `beta_stability`
-  moved out of fingerprinted alpha code; a CI warning when a PR touches code
-  an open pre-registration fingerprints; `merge --allow-lot-size-differences
-  / --link`; a memory review of the research pipeline
-  ([docs/research/MEMORY_REVIEW_v116.md](docs/research/MEMORY_REVIEW_v116.md)).
-- **Engineering:** heap-based simulator queues and count-based throughput
-  guards; an allocation-free C++ `depth_into`; a Rust `check_order` bench;
-  report-only multiple-testing columns (Holm, Benjamini-Hochberg,
-  Romano-Wolf; `iap.validation.multiple_testing`); an opt-in MVP end-of-day
-  flatten (`execution.eod_flatten_lead_ns`); `tools/release.py` extracts with
-  Python `tarfile`. Pending in PRs: the forward paper-trade driver (#144), the
-  optimiser's Dykstra projection and estimated Ledoit-Wolf intensity (#147),
-  blocking mypy and agent evals (#143), memory follow-ups (#148) and a
-  registration environment pinned to the CI lock (#152).
+- **Capacity: none (item 7, #149).** 0 of 45 cells break even; the best
+  (EQ10, AAPL, 1 min, top 0.1% of signals) earns 0.92 bp against 2.4 bp of
+  fixed cost ([research/v116/CAPACITY_CURVE.md](research/v116/CAPACITY_CURVE.md)).
+- **Quoting v2: no edge (#157).** Two-sided skewed quoting, registered and
+  signed, run in-sample on 6 test sessions: every cell loses $5-7k per session
+  and adverse selection is about 4x the spread captured. Skewing with EQ01 or
+  EQ05 cuts the loss by about $750-920 per session against the no-skew
+  control, so the signals are useful as an execution input
+  ([research/quoting_real/QUOTING_V2_RESULT.md](research/quoting_real/QUOTING_V2_RESULT.md)).
+- **AI4 DeepLOB: closed.** In-sample failure: net -0.69 bp per trade (gross
+  +0.27 bp against a 0.97 bp cost); the linear and GBM baselines net -0.74 and
+  -0.68 bp. The holdout was not used, by owner decision
+  ([research/r7/AI4_CLOSED_v116.md](research/r7/AI4_CLOSED_v116.md)).
 
+What also shipped: realistic execution (parent-order impact, residual-move
+impact calibration, `configs/prereg/v3.json` realism keys, SOR and algo
+opt-ins; every switch off by default), the forward paper-trade driver
+`python -m iap.paper.daily` (infrastructure; not scheduled), blocking mypy and
+agent evals, heap-based simulator queues, report-only multiple-testing
+columns, a registration environment pinned to the CI lock, and the research
+forks merged onto main with their blackboards archived unchanged. Item-by-item
+status: [docs/ROADMAP.md](docs/ROADMAP.md) §3.11 and
+[docs/EPICS.md](docs/EPICS.md) (E36).
+
+**Next: v1.17 (in progress, not released).** Execution quality and breadth on
+free data: algos and SOR judged on implementation shortfall, built on the
+v1.16 execution work, and more sessions from Nasdaq's free full-market ITCH
+days and IEX HIST (a second, free, daily venue). No v1.17 result is on
+`main` yet; the plan is in [docs/ROADMAP.md](docs/ROADMAP.md).
 **v1.16.0 (2026-10-15): monetisation.** Theme: monetisation. Realistic execution costs shipped
 (parent impact, residual-move calibration, v3 prereg realism, SOR and algo opt-ins). The taker route
 is a no-go: the in-sample study made zero trades in 480 cells, and the capacity curve finds no
@@ -376,13 +361,10 @@ stores: no real dataset has been re-ingested under x-version 2 yet
 ([docs/REAL_DATA.md](docs/REAL_DATA.md) §4). Expect the day-separated HAC
 to report lower t values than 21 and 25 when it is.
 
-**Next: finish v1.16, then v1.17.** v1.16 closes with the quoting v2
-verdict, the AI4 result and the open PRs. The v1.17 direction depends on
-them: if no net-positive rule appears, widen the data (more symbols and
-sessions, a paid-data decision) or pivot to the execution-quality product
-(algos and SOR judged on implementation shortfall); if one does, several
-weeks of forward paper trade with capacity limits and monitoring
-([docs/ROADMAP.md](docs/ROADMAP.md) §3.11-3.12).
+**Next: v1.17.** Execution quality and breadth on free data (Nasdaq ITCH
+full-market days and IEX HIST): algos and SOR judged on implementation
+shortfall, more sessions and symbols without a data purchase; in progress,
+not released ([docs/ROADMAP.md](docs/ROADMAP.md) §3.11-3.12).
 
 ## What this is, and what it is not
 

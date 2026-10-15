@@ -1252,7 +1252,7 @@ issues:
       - "A resumed session produces the same subsequent decisions and audit lines as an uninterrupted one"
     evidence:
       - "java/src/main/java/com/iap/platform/{PaperTrading,SessionStore}.java; java PaperStateRecoveryTest"
-      - "PLATFORM_CONVENTIONS.md §12.3; docs/runbooks/RUNBOOK_paper_trading.md"
+      - "PLATFORM_CONVENTIONS.md §12.3; docs/runbooks/RUNBOOK_shadow_deployment.md"
 
   - key: RP04
     epic: E04
@@ -3708,7 +3708,7 @@ issues:
       - "After a kill at any injected point the restored session keeps the latch, positions and an audit log that is a valid prefix extension"
       - "A torn write to the state directory is detected and refused rather than loaded"
     evidence:
-      - "java/src/main/java/com/iap/platform/PaperTrading.java; docs/runbooks/RUNBOOK_paper_trading.md"
+      - "java/src/main/java/com/iap/platform/PaperTrading.java; docs/runbooks/RUNBOOK_shadow_deployment.md"
 
   - key: FZ05
     epic: E31
