@@ -85,6 +85,16 @@ class VenueSpec:
     #: charge ``per_share_fee_all`` on SELL fills only (FINRA TAF applies to
     #: covered sales); ``False`` charges both sides.
     per_share_fee_sell_only: bool = True
+    #: v1.17 B10 (opt-in): ``"lit"`` (the default: a displayed book replayed
+    #: from the stream, byte-identical to every golden), ``"dark"`` or
+    #: ``"midpoint"`` (no displayed book; fills come only from the
+    #: ``iap.execution.dark`` model and are *modelled, not measured*).
+    venue_type: str = "lit"
+
+    @property
+    def is_lit(self) -> bool:
+        """True for a displayed venue (the only kind the routers quote)."""
+        return self.venue_type == "lit"
 
     def regulatory_fee(self, side: int, qty: float, notional: float) -> float:
         """X-P1-2 regulatory fees of one equity fill (0.0 at the defaults).
@@ -112,6 +122,13 @@ class VenueSpec:
             raise ValueError(f"venue_id must be u16, got {self.venue_id}")
         if self.latency_mean_ns < 0 or self.latency_jitter_ns < 0:
             raise ValueError(f"venue {self.venue_id}: latency mean/jitter must be >= 0")
+        if self.venue_type not in ("lit", "dark", "midpoint"):
+            raise ValueError(
+                f"venue {self.venue_id}: venue_type must be lit, dark or midpoint, "
+                f"got {self.venue_type!r}"
+            )
+        if self.venue_type != "lit" and self.is_fx:
+            raise ValueError(f"venue {self.venue_id}: a dark / midpoint venue must be equity")
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,6 +209,7 @@ FILL_PROVENANCES: tuple[str, ...] = (
     "hidden_print",  #: rule 4 (X-P2-7 opt-in): a non-displayed TRADE print
     "cross",  #: rule 4 last bullet: the display crossed our resting limit
     "reopen_touch",  #: rule 8: uncrossed at the touch when the venue reopened
+    "dark_midpoint",  #: v1.17 B10: a MODELLED midpoint fill on a dark venue (iap.execution.dark)
 )
 
 
@@ -302,6 +320,15 @@ class ChildOrder:
     cancel_rule: str = ""
     cancel_rule_ts: int = 0
     replaces_order_id: int = 0
+    #: v1.17 B10 (set by the replay for a child posted to a dark / midpoint
+    #: venue, outside any golden): the venue's type, the child's outcome
+    #: (``iap.execution.dark.DARK_OUTCOMES``; ``""`` while open), the
+    #: uniform draw it fills against and the last fill probability the
+    #: model gave it. Its fills are modelled, not measured.
+    venue_type: str = ""
+    dark_outcome: str = ""
+    dark_u: float = 0.0
+    dark_p_fill: float = 0.0
 
     @property
     def is_terminal(self) -> bool:

@@ -65,6 +65,7 @@ from typing import TYPE_CHECKING
 from iap.execution.passive import ExecPolicy, PassiveParams
 
 if TYPE_CHECKING:  # pragma: no cover
+    from iap.execution.dark import DarkFirstParams
     from iap.execution.fading import FadeParams, QueueCancelParams
     from iap.execution.optimal import ACParams
     from iap.execution.pacing import PacingParams
@@ -155,6 +156,11 @@ class ParentOrder:
     #: posts). ``None`` = off (the pinned behaviour).
     fade: FadeParams | None = None
     queue_cancel: QueueCancelParams | None = None
+    #: B10 dark-first routing (``iap.execution.dark``, Python only, opt-in):
+    #: a low-urgency parent posts each step to a dark / midpoint venue first
+    #: and sends the unfilled remainder to the lit book. Its dark fills are
+    #: modelled, not measured. ``None`` = off (the pinned behaviour).
+    dark_first: DarkFirstParams | None = None
 
     @property
     def pulls_resting(self) -> bool:

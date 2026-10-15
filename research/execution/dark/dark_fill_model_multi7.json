@@ -1,0 +1,47 @@
+{
+  "label": "modelled, not measured",
+  "model": "logistic midpoint fill probability within horizon (iap.execution.dark)",
+  "proxy": "Nasdaq ITCH non-displayed prints ('P' TRADE messages that are not the print of the EXECUTE immediately before them on the same venue book at the same exchange_ts) whose price lies strictly inside the displayed best bid / ask at the time of the print; the label of a probe (t, q) is 'inside-spread hidden volume in [t, t + horizon) >= q'; the lit-volume feature is the displayed EXECUTE volume in [t - horizon, t); no dark-pool data was used (none is free)",
+  "features": [
+    "intercept",
+    "log1p_lit_volume_100",
+    "spread_ticks",
+    "log1p_qty_100"
+  ],
+  "coef": [
+    -1.7048563424670793,
+    0.9039949143074112,
+    -0.0035550935460008782,
+    -1.4759782193606676
+  ],
+  "horizon_ns": 30000000000,
+  "fitted": true,
+  "source": "multi7: eq_20190130.normalized.iap1, eq_20190327.normalized.iap1, eq_20190730.normalized.iap1, eq_20190830.normalized.iap1, eq_20191030.normalized.iap1, eq_20191230.normalized.iap1, eq_20200130.normalized.iap1",
+  "n_samples": 725200,
+  "n_positive": 134494,
+  "sessions": [
+    "20190130",
+    "20190327",
+    "20190730",
+    "20190830",
+    "20191030",
+    "20191230",
+    "20200130"
+  ],
+  "instruments": [
+    1,
+    2,
+    3
+  ],
+  "probe_sizes": [
+    100,
+    300,
+    1000,
+    3000
+  ],
+  "step_ns": 5000000000,
+  "log_likelihood": -212583.17172936283,
+  "n_hidden_prints": 143399,
+  "n_hidden_inside_spread": 97220,
+  "fingerprint": "db0eda442ac99e7f"
+}
