@@ -1,0 +1,13 @@
+{
+  "x-version": 1,
+  "description": "v1.17 E1: LLM spend policy and per-role model pins (iap.llm.prices.load_llm_config). Caps are enforced by iap.llm.budget.Budget against the shared spend ledger (iap.llm.spend) before every model call. Pins are dated snapshots: `model` is an explicit id listed in configs/reference/llm_prices.json, `pinned` the date the pin was decided; a session records the pin and the price table's `checked` date it ran under. Change a pin in its own PR.",
+  "monthly_cap_usd": 30.0,
+  "per_run_budget_usd": 1.0,
+  "alert_fraction": 0.8,
+  "pins": {
+    "research": {"model": "claude-sonnet-5-5", "pinned": "2026-10-16"},
+    "ops": {"model": "claude-haiku-5-5", "pinned": "2026-10-16"},
+    "docs": {"model": "claude-haiku-5-5", "pinned": "2026-10-16"},
+    "eval": {"model": "claude-haiku-5-5", "pinned": "2026-10-16"}
+  }
+}

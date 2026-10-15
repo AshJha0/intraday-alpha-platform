@@ -17,7 +17,18 @@ that tag.
   symbol's volumes, the source sha256 and the next 50. `research/breadth/candidates.json` lists the
   ten in-sample full-market days (three on disk, seven re-downloads awaiting approval). The test
   ITCH encoder gains the directory `authenticity` field. The 2019-01-30 file is not downloaded yet.
-
+- v1.17 WS-E item E1 (E-7): the LLM spend foundation. Prices are configuration
+  (`configs/reference/llm_prices.json`, `source` + `checked` date; `iap.llm.prices` refuses an
+  unknown model, never guesses). Dated per-role pins in `configs/agents/llm.json` (research
+  `claude-sonnet-5-5`, ops / docs / evals `claude-haiku-5-5`; the most expensive model is no longer
+  the default), recorded in the session summary. `iap.llm.spend`: an append-only, file-locked JSONL
+  ledger outside the repository (`IAP_LLM_SPEND_LEDGER`, else `%LOCALAPPDATA%/iap/llm_spend.jsonl` /
+  `~/.local/state/iap/llm_spend.jsonl`), one row per API call with tokens, USD and month-to-date;
+  corrupt rows skipped and counted. Monthly cap USD 30, per-run budget USD 1 (`Budget.max_usd`
+  default), 80 % alert once a month (WARNING + the watchdog toast route); the call is refused before
+  it is made, in every process, when month-to-date + its maximum cost would pass the cap. `Budget`
+  records to the ledger on every live path; `python -m iap.llm spend` prints the ledger. New
+  ConfigMap items `agents__llm.json` and `reference__llm_prices.json`. GOVERNANCE.md §2c.
 - v1.17 WS0 item 0.1 (R-1): the R7 confirmatory deflated Sharpe was recorded at the holdout
   dataset ledger's own trial count (N = 1 / 2) instead of the registered N (repo ledger distinct
   configurations + the look). `tools/r7_confirm.py` now takes N from the repo ledger

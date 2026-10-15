@@ -4,9 +4,10 @@
 
     python -m iap.llm --workspace WS --agent llm-researcher --keyfile KEYS/agent.key \\
         --env-file ~/.config/iap/anthropic.env --task "Test whether ..." \\
-        [--model claude-opus-5-5] [--effort medium] [--max-usd 2] [--max-tool-calls 40]
+        [--model claude-sonnet-5-5] [--effort medium] [--max-usd 1] [--max-tool-calls 40]
         [--max-tokens 400000] [--max-preregs 3] [--runner planted|power]
         [--dataset synthetic:planted-v1 ...]
+    python -m iap.llm spend [--ledger PATH] [--last 20] [--json]
 
 ``WS`` holds the blackboard, the ledger, the public-key registry and the
 session artefacts (``research/agents/llm_sessions/<id>/``).  Use a scratch
@@ -16,7 +17,10 @@ the workspace and the repository (``python -m iap.agents.cli --root WS
 agent-keygen --agent ID --keyfile PATH``).  The API key comes from
 ``--env-file`` or ``ANTHROPIC_API_KEY`` and is never printed or persisted.
 This command spends money: the session stops at ``--max-usd`` (estimated
-from usage).
+from usage, default the per-run budget in ``configs/agents/llm.json``) and
+every call is recorded in the shared spend ledger (``iap.llm.spend``), which
+refuses a call that would pass the monthly cap.  ``spend`` prints the
+ledger: month-to-date, cap, remaining and the last rows.
 """
 
 from __future__ import annotations
@@ -26,8 +30,9 @@ import json
 import sys
 from pathlib import Path
 
-from iap.llm.budget import DEFAULT_MODEL, PRICES, Budget
+from iap.llm.budget import DEFAULT_MODEL, DEFAULT_PER_RUN_USD, PRICES, Budget
 from iap.llm.runners import PLANTED_DATASET
+from iap.llm.spend import SpendLedger
 
 REPO = Path(__file__).resolve().parents[4]
 
@@ -42,6 +47,12 @@ def _outside(path: Path, *roots: Path) -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
+    args = list(sys.argv[1:] if argv is None else argv)
+    if args[:1] == ["spend"]:
+        from iap.llm.spend import main as spend_main
+
+        return spend_main(args[1:])
+    argv = args
     from iap.llm import agent as ag
     from iap.llm import runners
     from iap.llm.envfile import ApiKeyError, load_api_key
@@ -54,12 +65,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--task", required=True)
     ap.add_argument("--model", default=DEFAULT_MODEL, choices=sorted(PRICES))
     ap.add_argument("--effort", default="medium", choices=("low", "medium", "high", "xhigh"))
-    ap.add_argument("--max-usd", type=float, default=2.0)
+    ap.add_argument("--max-usd", type=float, default=DEFAULT_PER_RUN_USD)
     ap.add_argument("--max-tool-calls", type=int, default=40)
     ap.add_argument("--max-tokens", type=int, default=400_000)
     ap.add_argument("--max-preregs", type=int, default=3)
     ap.add_argument("--runner", choices=("planted", "power"), default="planted")
     ap.add_argument("--dataset", action="append", default=None)
+    ap.add_argument("--run-id", default="", help="recorded in the spend ledger rows")
     a = ap.parse_args(argv)
 
     keyfile = _outside(a.keyfile, a.workspace, REPO)
@@ -84,6 +96,9 @@ def main(argv: list[str] | None = None) -> int:
         max_tokens=a.max_tokens,
         max_usd=a.max_usd,
         max_preregs=a.max_preregs,
+        ledger=SpendLedger.default(),
+        run_id=a.run_id,
+        role="research",
     )
     session = ag.open_session(
         a.workspace, a.agent, keys[a.agent], runner, budget, datasets=datasets, repo=REPO
