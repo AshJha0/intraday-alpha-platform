@@ -19,8 +19,6 @@ that tag.
   `tools/iex_download.py` refuses a manifest without one). The nine overlap days
   (`research/v117/iex_overlap_manifest.json`, approved 2026-10-15) and their results:
   docs/research/IEX_OVERLAP_SET.md. The recent days are listed only (not approved).
-
-
 - v1.17 WS-B item B7 (prerequisite): depth-cap vs book re-run of the multi7 shortfall
   benchmark with `--walk-depth 50` (and a `--max-child-qty 300` variant), summaries
   `research/execution/benchmark/{benchmark,BENCHMARK}_multi7_depth50*` and the comparison
