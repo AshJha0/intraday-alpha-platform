@@ -8,6 +8,14 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-B item B7 (prerequisite): depth-cap vs book re-run of the multi7 shortfall
+  benchmark with `--walk-depth 50` (and a `--max-child-qty 300` variant), summaries
+  `research/execution/benchmark/{benchmark,BENCHMARK}_multi7_depth50*` and the comparison
+  `DEPTH_COMPARISON_multi7.md`: at 0.5 % ADV the depth-10 under-fill was the cap (share
+  60-67 % -> 0 %), at 1 % about half, at 2 % the book; child size is not the lever; all-in
+  rises 2-5 bps at 1-2 % ADV because cancelled quantity is now walked. In-sample only,
+  nothing signed, no defaults changed.
+
 - v1.17 WS-A item A3 (result): `research/breadth/universe.json` measured on the owner-approved
   2019-01-30 full-market file (368 M messages): 100 names, 29 ETFs, AAPL / QQQ / MSFT at ranks 6 / 12 / 15;
   `research/breadth/UNIVERSE_2019-01-30.md`. The first breadth process-day was refused by the disk guard
