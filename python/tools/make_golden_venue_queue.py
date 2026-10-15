@@ -54,6 +54,9 @@ from iap.execution import (  # noqa: E402
 )
 
 GOLDEN = ROOT / "tests" / "golden" / "expected_venue_queue.json"
+#: `order_type` in the golden is the VENUE wire code (`venue::OrderType`,
+#: `iap.risk.OrderType`: LIMIT = 2), not the execution simulator's enum.
+WIRE_LIMIT = 2
 T0 = 1_700_000_000_000_000_000
 MS = 1_000_000
 INSTRUMENT = 1
@@ -68,7 +71,8 @@ DESCRIPTION = (
     "API_TRADING.md section 2) with zero latency. `events` are canonical market events of "
     "instrument 1 on venue 1 (tick 0.01); `actions` happen after the event whose `event_id` is `after_event` "
     "has been processed and before the next one: `submit` places the order (ids are the simulator's own, "
-    "in submission order; `order_type` 2 = LIMIT; `decision_ts` = that event's exchange_ts), "
+    "in submission order; `order_type` is the venue wire code, 2 = LIMIT; `decision_ts` = that "
+    "event's exchange_ts), "
     "`cancel` cancels it. `expected_fills` lists every fill in emission order (`ts` = event "
     "time of a passive fill, the submission time of an aggressive one; `liquidity` taker / "
     "maker); `expected_final` lists every order's remaining quantity, whether it still rests, "
@@ -131,7 +135,7 @@ def submit(after: int, side: int, qty: int, price: int) -> dict[str, Any]:
             "side": side,
             "qty": qty,
             "price_ticks": price,
-            "order_type": int(OrderType.LIMIT),
+            "order_type": WIRE_LIMIT,
         },
     }
 
@@ -257,7 +261,7 @@ def run_vector(vec: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str
                         instrument_id=INSTRUMENT,
                         venue_id=VENUE,
                         side=s["side"],
-                        type=OrderType(s["order_type"]),
+                        type=OrderType.LIMIT,
                         limit_ticks=s["price_ticks"],
                         qty=s["qty"],
                         decision_ts=e.exchange_ts,
