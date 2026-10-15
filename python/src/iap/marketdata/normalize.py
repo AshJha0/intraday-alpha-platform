@@ -44,6 +44,7 @@ Parquet research dataset ``events.parquet`` (pyarrow) and
 from __future__ import annotations
 
 import json
+import os
 import struct
 import zlib
 from array import array
@@ -222,9 +223,16 @@ def normalize_file(
     *,
     partition_instruments: int | None = None,
     sink: _ParquetSink | None = None,
+    write_normalized_jsonl: bool = True,
 ):
     """Normalize one raw JSONL file; returns the kept, event-time-ordered
     events as a numpy structured array of IAP1 records.
+
+    ``write_normalized_jsonl=False`` (v1.17, A2b) skips the
+    ``*.normalized.jsonl`` twin of the IAP1 file (same events, 3x the
+    bytes; the feature build and the MVP read the IAP1 first): the slim
+    layout of a breadth dataset.  The IAP1 file and the Parquet sink are
+    unchanged.
 
     ``partition_instruments`` (v1.17, A2; opt-in) bounds memory for a wide
     universe: the packed records are routed to on-disk partitions of that
@@ -256,7 +264,14 @@ def normalize_file(
         if partition_instruments < 1:
             raise ValueError("partition_instruments must be >= 1")
         return _normalize_partitioned(
-            raw_path, out_dir, stream_qc, per_stream, events, partition_instruments, sink
+            raw_path,
+            out_dir,
+            stream_qc,
+            per_stream,
+            events,
+            partition_instruments,
+            sink,
+            write_normalized_jsonl,
         )
     buf = bytearray()
     epochs = array("q")
@@ -344,7 +359,8 @@ def normalize_file(
     rec["event_id"] = np.arange(1, len(rec) + 1, dtype=np.uint64)
 
     stem = raw_path.stem
-    write_jsonl(out_dir / f"{stem}.normalized.jsonl", iter_record_events(rec))
+    if write_normalized_jsonl:
+        write_jsonl(out_dir / f"{stem}.normalized.jsonl", iter_record_events(rec))
     _write_iap1_records(out_dir / f"{stem}.normalized.iap1", rec)
     return rec
 
@@ -404,6 +420,7 @@ def _normalize_partitioned(
     events: Iterable[MarketEvent] | None,
     partition_instruments: int,
     sink: _ParquetSink | None,
+    write_normalized_jsonl: bool = True,
 ) -> int:
     """The partitioned path of :func:`normalize_file` (module docs, A2)."""
     import shutil
@@ -477,9 +494,10 @@ def _normalize_partitioned(
         next_id = 1
         header = _FRAME.pack(IAP1_MAGIC, IAP1_VERSION, total)
         crc = zlib.crc32(header)
+        jsonl_path = out_dir / f"{stem}.normalized.jsonl"
         with (
             open(out_dir / f"{stem}.normalized.iap1", "wb") as iap1,
-            open(out_dir / f"{stem}.normalized.jsonl", "wb") as jsonl,
+            open(jsonl_path if write_normalized_jsonl else os.devnull, "wb") as jsonl,
         ):
             iap1.write(header)
             while any(pos[k] < len(runs[k]) for k in range(len(runs))):
@@ -521,10 +539,11 @@ def _normalize_partitioned(
                 del order
                 chunk["event_id"] = np.arange(next_id, next_id + len(chunk), dtype=np.uint64)
                 next_id += len(chunk)
-                lines = [encode_jsonl_line(ev) for ev in iter_record_events(chunk)]
-                if lines:
-                    jsonl.write(("\n".join(lines) + "\n").encode("utf-8"))
-                del lines
+                if write_normalized_jsonl:
+                    lines = [encode_jsonl_line(ev) for ev in iter_record_events(chunk)]
+                    if lines:
+                        jsonl.write(("\n".join(lines) + "\n").encode("utf-8"))
+                    del lines
                 body = chunk.tobytes()
                 crc = zlib.crc32(body, crc)
                 iap1.write(body)
@@ -603,6 +622,7 @@ def normalize_run(
     preloaded: Mapping[str, Iterable[MarketEvent]] | None = None,
     *,
     partition_instruments: int | None = None,
+    write_normalized_jsonl: bool = True,
 ) -> dict:
     """Normalize every raw JSONL file in ``raw_dir``; write outputs + QC report.
 
@@ -636,6 +656,7 @@ def normalize_run(
                 preloaded.get(raw_path.name) if preloaded else None,
                 partition_instruments=partition_instruments,
                 sink=sink,
+                write_normalized_jsonl=write_normalized_jsonl,
             )
             if isinstance(kept, int):
                 n_out = kept  # the partitioned path wrote the outputs and the sink
@@ -644,7 +665,9 @@ def normalize_run(
                 n_out = len(kept)
             file_counts[raw_path.name] = {
                 "events_out": n_out,
-                "normalized_jsonl": f"{raw_path.stem}.normalized.jsonl",
+                "normalized_jsonl": (
+                    f"{raw_path.stem}.normalized.jsonl" if write_normalized_jsonl else None
+                ),
                 "normalized_iap1": f"{raw_path.stem}.normalized.iap1",
             }
     finally:

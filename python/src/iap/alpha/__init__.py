@@ -4,6 +4,10 @@ Public surface:
 
 - :class:`~iap.alpha.base.AlphaModel` / :class:`~iap.alpha.base.LinearAlpha`
 - ``ALPHA_CLASSES`` — pinned {alpha_id: class} registry (EQ01..FX12)
+- ``register_ml_alphas()`` — opt-in: adds the ML alphas (``ML01``,
+  :mod:`iap.alpha.gbm`) to ``ALPHA_CLASSES`` for ``build`` / the research
+  runner; ``ALPHA_IDS`` (what ``run_all.py`` and ``fit_all`` iterate) is
+  never extended, so every published report is unchanged
 - ``build_all()`` / ``build(alpha_id)`` — fresh model instances
 - ``fit_all(train)`` / ``save_params`` / ``load_params_file`` — pooled
   fitting and (de)serialization to configs/strategies/alpha_params.json
@@ -99,11 +103,42 @@ ALPHA_CLASSES: dict[str, type] = {
 
 ALPHA_IDS: list[str] = list(ALPHA_CLASSES)
 
+#: Prefix of the opt-in ML alpha ids (v1.17 WS-D, D1).
+ML_ALPHA_PREFIX = "ML"
+
+
+def is_ml_alpha_id(alpha_id: str) -> bool:
+    """True for an opt-in ML alpha id (``ML01``, ...)."""
+    return str(alpha_id).startswith(ML_ALPHA_PREFIX)
+
+
+def register_ml_alphas() -> list[str]:
+    """Opt in to the ML alphas (v1.17 WS-D, D1): adds ``ML01``
+    (:class:`iap.alpha.gbm.GbmAlpha`) to ``ALPHA_CLASSES`` so ``build``,
+    ``pinned_horizon`` and the research runner accept it.  Idempotent;
+    returns the ids registered.  ``ALPHA_IDS`` is left alone, so
+    ``build_all`` / ``fit_all`` / ``run_all.py`` and every published report
+    are unchanged; ``unregister_ml_alphas`` undoes it (tests)."""
+    from iap.alpha.gbm import ml_alpha_classes
+
+    ids = []
+    for aid, cls in ml_alpha_classes().items():
+        ALPHA_CLASSES.setdefault(aid, cls)
+        ids.append(aid)
+    return ids
+
+
+def unregister_ml_alphas() -> None:
+    """Undo :func:`register_ml_alphas`."""
+    for aid in [a for a in ALPHA_CLASSES if is_ml_alpha_id(a)]:
+        del ALPHA_CLASSES[aid]
+
 
 def build(alpha_id: str) -> AlphaModel:
     """A fresh unfitted instance of the given flagship alpha."""
     if alpha_id not in ALPHA_CLASSES:
-        raise ValueError(f"unknown alpha_id {alpha_id!r}")
+        hint = " (opt-in: iap.alpha.register_ml_alphas())" if is_ml_alpha_id(alpha_id) else ""
+        raise ValueError(f"unknown alpha_id {alpha_id!r}{hint}")
     return ALPHA_CLASSES[alpha_id]()
 
 

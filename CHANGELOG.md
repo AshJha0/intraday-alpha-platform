@@ -20,6 +20,34 @@ that tag.
   break-even notional, capacity at horizon, day-clustered SEs) with `research/breadth/book/` outputs for
   the synthetic dataset and the 3-name multi7 smoke test; `docs/PORTFOLIO_BREADTH.md`. No pinned
   number moves.
+- v1.17 WS-D items D1 and D4 (review findings R-6, R-9; all opt-in, no published number moves).
+  D1: `iap.alpha.gbm.GbmAlpha` (alpha id `ML01`) puts gradient-boosted trees behind the `AlphaModel`
+  interface: `hist_gbdt` backend by default (`xgboost` / `lightgbm` when installed, named in the
+  params), one model per horizon (`horizons`, default 1s / 5s / 30s), the curated ML predictor set as
+  `features`, a hypothesis sign check on a held-out slice of the training fold, and `params()` /
+  `load_params()` through a SHA-256-checked pickle sidecar (`save_sidecar`, default
+  `research/models/gbm/`) that reproduces scores exactly. Registered only by
+  `iap.alpha.register_ml_alphas()` (`ALPHA_IDS`, `run_all.py` and every report unchanged); `python -m
+  iap.research run --alpha ML01` opts in by naming it and runs the prereg gate, `validate_alpha` and
+  the ledger like any alpha (synthetic dry run: IC +0.055, gate t +6.0, ITERATE, exploratory). D4 /
+  R-6: `run_model_comparison(gate="clustered", gate_t_threshold=2.0)` gates the model zoo on the
+  fold-mean rank IC vs the mid label AND the day-clustered t of the per-fold-standardised pooled OOS
+  predictions; both the literal and the clustered reading are recorded in `results["gate"]` and on the
+  `model_zoo_gate` ledger look; the default stays `"literal"`. D4 / R-9: `validate_alpha(
+  cpcv_path_ic="demeaned")` (bundle field `cpcv_path_ic`) standardises every (split, group) of a CPCV
+  path before pooling; `path_ics_demeaned` and its summary sit beside the pooled reading in every
+  `cpcv` block, `path_ic_rule` names the headline; a test shows the pooled rule biased by a fit of
+  another scale and the demeaned one not. Docs: RESEARCH_VALIDITY §4d, API_ALPHA §7.3, LEARN §100.
+
+- v1.17 WS-A item A2b: slim ingest for breadth datasets. `ingest --slim` / `normalize_run(write_normalized_jsonl=False)`
+  writes no `*.normalized.jsonl` twin of the IAP1 file (3x its bytes; the feature build and the MVP read the
+  IAP1; manifest `layout: "slim"`); `process-day` is slim by default (`--no-slim` opts out), deletes `raw/`
+  right after normalisation (new `delete_raw` step, before the feature build) and takes `--peak-gb` to override
+  the disk-guard estimate with a measured value (the symbol-scaled rate estimate overstates a wide universe
+  many times: 830 GB estimated vs ~50 GB expected for 100 names on 2019-01-30). `breadth-universe` records
+  the universe's share of the day's displayed volume for future estimates. A6 (owner-approved 2026-10-15):
+  the regenerable raw and normalized JSONL of the 21 spent real datasets were deleted (151 GB freed; IAP1,
+  Parquet, features and manifests kept).
 
 - v1.17 WS-A item A3 (result): `research/breadth/universe.json` measured on the owner-approved
   2019-01-30 full-market file (368 M messages): 100 names, 29 ETFs, AAPL / QQQ / MSFT at ranks 6 / 12 / 15;

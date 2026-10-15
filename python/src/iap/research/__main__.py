@@ -363,6 +363,12 @@ def _runner_gate(args: argparse.Namespace, entry: dict | None):
 
 
 def _run(args: argparse.Namespace) -> int:
+    from iap.alpha import is_ml_alpha_id, register_ml_alphas
+
+    if is_ml_alpha_id(args.alpha):
+        # v1.17 WS-D (D1): the ML alphas are opt-in; naming one IS the opt-in.
+        register_ml_alphas()
+        print(f"ML alpha {args.alpha} registered for this run (iap.alpha.register_ml_alphas)")
     prereg_entry = _check_prereg(args)
     dataset_version, feature_version = _dataset_versions(args)
     runner = ExperimentRunner(
@@ -641,7 +647,11 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True, parser_class=_Parser)
 
     run = sub.add_parser("run", help="run one experiment")
-    run.add_argument("--alpha", required=True, help="flagship alpha id, e.g. EQ03")
+    run.add_argument(
+        "--alpha",
+        required=True,
+        help="flagship alpha id, e.g. EQ03 (or an opt-in ML alpha id such as ML01, iap.alpha.gbm)",
+    )
     run.add_argument(
         "--horizon", default=None, help="label horizon (default: the alpha's pinned horizon)"
     )
