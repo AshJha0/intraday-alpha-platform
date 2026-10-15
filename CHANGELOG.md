@@ -8,6 +8,19 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-C items C1, C2, C7 (opt-in, report-only): `python -m iap.research.breadth_book` — the
+  cross-sectional book backtest through the optimizer (EQ11 or a demeaned beta-gap EQ10 score, linear
+  or decile rank-to-weight map, costs inside the objective, dollar / beta / sector neutrality through the
+  new `iap.portfolio.exposures` builder with `configs/reference/sectors.json`, participation and
+  turnover caps, exact P&L accounting net of the cost model, session-end flatten, one ledger look of kind
+  `breadth_book` per run, `--dataset-dir` for ingested datasets); `ImpactTerm` + `prox_power` in
+  `iap.portfolio.optimizer` (sqrt / power impact from the cost model or a calibration's residual fit, in
+  the proximal step; `solve(impact=None)` unchanged) and `merge_equalities` for the Dykstra path;
+  `iap.research.breadth_report` (breadth, effective bets, fundamental-law yardstick, net Sharpe at size,
+  break-even notional, capacity at horizon, day-clustered SEs) with `research/breadth/book/` outputs for
+  the synthetic dataset and the 3-name multi7 smoke test; `docs/PORTFOLIO_BREADTH.md`. No pinned
+  number moves.
+
 - v1.17 WS-A item A3 (result): `research/breadth/universe.json` measured on the owner-approved
   2019-01-30 full-market file (368 M messages): 100 names, 29 ETFs, AAPL / QQQ / MSFT at ranks 6 / 12 / 15;
   `research/breadth/UNIVERSE_2019-01-30.md`. The first breadth process-day was refused by the disk guard
