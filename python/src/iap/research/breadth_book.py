@@ -907,11 +907,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         report["generated"] = datetime.now(UTC).isoformat()
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / f"book_{tag}.json").write_text(
-        json.dumps(sanitise(report), indent=2, sort_keys=True, allow_nan=False) + "\n",
-        encoding="utf-8",
-    )
-    (out_dir / f"BOOK_{tag}.md").write_text(render_markdown(report), encoding="utf-8")
+    with open(out_dir / f"book_{tag}.json", "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(json.dumps(sanitise(report), indent=2, sort_keys=True, allow_nan=False) + "\n")
+    with open(out_dir / f"BOOK_{tag}.md", "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(render_markdown(report))
     print(f"wrote {out_dir / f'book_{tag}.json'} and BOOK_{tag}.md")
     s = report["book"]
     print(
