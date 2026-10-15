@@ -28,6 +28,15 @@ that tag.
   ARCHITECTURE §2/§8/§9, POLYGLOT, PLATFORM_CONVENTIONS §12, the site, SECURITY, REPO_SETTINGS,
   the Grafana README and the runbooks describe the three-language platform.
 
+- v1.17 WS-A item A3: the breadth universe rule, fixed before any breadth statistic
+  (`research/breadth/UNIVERSE_RULE.md`, `breadth_universe/v1`): the top 100 Nasdaq-listed symbols by
+  displayed continuous-session volume on 2019-01-30 (ITCH `E` + printable `C` shares between system
+  events `Q` and `M`), ETFs kept and flagged, test securities excluded, crosses and hidden prints
+  reported beside the ranking; survivorship explicit. `python -m iap.marketdata breadth-universe`
+  (`iap.marketdata.breadth`) measures it in one streaming pass and writes `universe.json` with every
+  symbol's volumes, the source sha256 and the next 50. `research/breadth/candidates.json` lists the
+  ten in-sample full-market days (three on disk, seven re-downloads awaiting approval). The test
+  ITCH encoder gains the directory `authenticity` field. The 2019-01-30 file is not downloaded yet.
 - v1.17 WS-A item A2: process-and-delete. `python -m iap.marketdata process-day` runs one
   manifest day through disk guard -> (approved download) -> ingest -> Rust features -> `KEEP.json`
   (sha256 of every kept file) -> deletion of raw / normalized / the vendor file, with resumable

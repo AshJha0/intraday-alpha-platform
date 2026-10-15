@@ -83,6 +83,7 @@ class Itch50Encoder:
         market_category: str = "Q",
         round_lot_size: int = 100,
         etp: str = "N",
+        authenticity: str = "P",
     ) -> None:
         tail = struct.pack(
             ">8sccIcc2scccccIc",
@@ -93,7 +94,7 @@ class Itch50Encoder:
             b"N",
             b"C",
             b"Z ",
-            b"P",
+            authenticity.encode(),
             b"N",
             b"N",
             b"1",
