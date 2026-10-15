@@ -81,11 +81,18 @@ comes from the HIST index with the owner's approval sentence:
 python tools\iex_hist.py index --date 2025-11-28 ... --out research\v117\iex_overlap_manifest.json --approval "<sentence>"
 python -m iap.marketdata process-iex-day --manifest research\v117\iex_overlap_manifest.json ^
     --date 2025-11-28 --vendor-dir data\vendor --out-root data\real\iex --symbols AAPL,MSFT,QQQ ^
-    --download --i-have-approval [--feed deep-plus] [--partition-instruments 10] [--min-free-gb 30] [--peak-gb N]
+    --download --i-have-approval [--feed deep-plus] [--round-lots-from data\real\r7_20251128\dataset.json] ^
+    [--partition-instruments 10] [--min-free-gb 30] [--peak-gb N]
 python -m iap.marketdata process-iex-day ... --date D1 --date D2 ... --render-cmd data\real\run_iex_overlap.cmd ^
     --jobs-registry data\real\jobs.json        (one chain, days in order; a failed day is logged and the next runs)
 python tools\iex_hist.py recent --n 5 --out research\v117\iex_recent_manifest.json   (the rolling list; NOT a download)
 ```
+
+**Round lots.** TOPS quotes the best level that holds at least a round lot (measured on
+2025-11-28: AAPL sizes never below 100, MSFT / QQQ never below 40), so the oracle compares
+the book's best round-lot level. `--round-lots-from` takes the paired Nasdaq day's
+`dataset.json` (`lot_size` per symbol); without it the smallest quoted TOPS size per symbol
+is used and `process_report.json` says `round_lots_source: tops_min_quoted_size`.
 
 `tools/iex_download.py` (one feed per call) refuses without `--i-have-approval`
 and without an `approval` sentence in the manifest, so the `recent` manifest

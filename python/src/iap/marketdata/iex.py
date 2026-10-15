@@ -866,7 +866,7 @@ class TopsOracle:
                 status = "no_comparison"
             out[s] = {
                 "status": status,
-                "oracle": "tops_l1_equals_deep_l1",
+                "oracle": "tops_l1_equals_deep_round_lot_l1",
                 "compared": self.compared[s],
                 "mismatched": self.mismatched[s],
                 "bbo_changes_without_tops_quote": self.no_tops_quote[s],
@@ -907,8 +907,13 @@ class IexReader:
         level_feed: bool | None = None,
         tops: TopsQuotes | None = None,
         packets: Iterable[tuple[int, bytes]] | None = None,
+        round_lots: dict[str, int] | None = None,
     ) -> None:
         self.path = Path(path)
+        #: symbol -> round lot (the paired Nasdaq dataset's ``lot_size``, v1.17 A4);
+        #: 100 when unknown.  It sizes a synthesised directory row and is the
+        #: oracle's rule: TOPS quotes the best level holding at least a round lot.
+        self.round_lots = {k: max(1, int(v)) for k, v in (round_lots or {}).items()}
         self.date = date
         self.symbols = tuple(symbols)
         self._index = {s: i for i, s in enumerate(self.symbols)}
@@ -951,6 +956,7 @@ class IexReader:
             "trades_unmatched_to_level": 0,
             "trades_matched_to_level": 0,
             "level_negative_size": 0,
+            "odd_lot_top": 0,
         }
         self.directory_seen: set[str] = set()
         self.oracle = TopsOracle(tops, self.symbols) if tops is not None else None
@@ -1040,7 +1046,7 @@ class IexReader:
     def _ensure_directory(self, inst: int, ts: int, sym: str) -> Iterator[tuple]:
         if sym not in self.directory_seen:
             self.counters["directory_synthesised"] += 1
-            yield self._directory(inst, ts, sym, 100, False, 0)
+            yield self._directory(inst, ts, sym, self.round_lots.get(sym, 100), False, 0)
 
     def _cross_type(self, ts: int) -> str:
         return "O" if ts <= _OPEN_NS + _M else "C" if ts >= _CLOSE_NS else "H"
@@ -1052,15 +1058,31 @@ class IexReader:
             self.counters["odd_lot_trades"] += 1
 
     def _bbo(self, inst: int) -> tuple[int, int, int, int]:
-        """The mapper's book: (bid, bid size, ask, ask size), 0 when empty."""
+        """The mapper's book as TOPS quotes it: per side the best price level
+        whose resting quantity is at least the symbol's round lot, with that
+        level's quantity; (0, 0) when no level qualifies.  Odd-lot levels in
+        front of it are not quoted (measured on 2025-11-28: AAPL's TOPS sizes
+        are never below 100, MSFT's and QQQ's never below 40, their round
+        lots), so a book whose top is an odd lot counts ``odd_lot_top``."""
         book = self.mapper._levels[inst]
-        bid, ask = book.best(0), book.best(1)
-        return (
-            bid or 0,
-            book.totals[0].get(bid, 0) if bid is not None else 0,
-            ask or 0,
-            book.totals[1].get(ask, 0) if ask is not None else 0,
-        )
+        lot = self.round_lots.get(self.symbols[inst], 100)
+        out = []
+        for side in (0, 1):
+            totals = book.totals[side]
+            best = book.best(side)
+            if best is None:
+                out += [0, 0]
+                continue
+            qty = totals[best]
+            if qty < lot:
+                self.counters["odd_lot_top"] += 1
+                best, qty = 0, 0
+                for price in sorted(totals, reverse=side == 0):
+                    if totals[price] >= lot:
+                        best, qty = price, totals[price]
+                        break
+            out += [best, qty]
+        return (out[0], out[1], out[2], out[3])
 
     def _close_ts(self, inst: int, ts: int) -> Iterator[tuple]:
         """Called before the first message of ``inst`` at a new timestamp:
