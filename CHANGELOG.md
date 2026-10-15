@@ -8,6 +8,11 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-A item A3 (result): `research/breadth/universe.json` measured on the owner-approved
+  2019-01-30 full-market file (368 M messages): 100 names, 29 ETFs, AAPL / QQQ / MSFT at ranks 6 / 12 / 15;
+  `research/breadth/UNIVERSE_2019-01-30.md`. The first breadth process-day was refused by the disk guard
+  (22 GB free vs an estimated 40-50 GB peak for 100 names): A6 and a slim ingest mode come next.
+
 - v1.17 WS-F item F9 (+F2 digest pinning): Java retired from the release (DECISION_N7 closed
   2026-10-15). New `iap.metrics` (`python -m iap.metrics serve`): a stdlib Prometheus exposition
   (the retired Java registry's format, log2 histograms), a file-backed exporter over the live risk

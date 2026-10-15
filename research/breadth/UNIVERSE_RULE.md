@@ -27,5 +27,5 @@ nothing downloaded). `universe.json` records the rule version, the source
 file's sha256, every symbol's three volumes, the ETF flags, the next 50 and the
 excluded test securities.
 
-**Status:** rule fixed 2026-10-16; `universe.json` not yet produced (the
-2019-01-30 file is a re-download awaiting approval, 4.76 GB).
+**Status:** rule fixed 2026-10-16; `universe.json` produced 2026-10-15 from the
+approved 2019-01-30 download (`UNIVERSE_2019-01-30.md`).
