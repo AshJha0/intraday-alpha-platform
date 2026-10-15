@@ -35,10 +35,22 @@ order: (a) the schedule state at the event (slices come due / POV volume),
 remainders that took effect are re-posted or crossed, deadlines and the
 BEHIND test are checked — and (c) the new schedule steps are posted. The
 pinned output is ``tests/golden/expected_replay_fills_passive.json``.
+
+Complexity (v1.17 B1, review X-6): the scheduler no longer visits every
+parent on every event. A parent is visited only when the event can change
+it — one of its TWAP/VWAP/IS slices is due (a ``(due_ts, parent index)``
+min-heap over the parents' next slices), the event is a TRADE of a POV
+parent's instrument (parents indexed by instrument), or it is a PASSIVE
+parent with a posted child still working (its state machine is time
+driven). The visits of one event run in parent-list order, each parent
+draining every slice due, exactly the order of the per-event scan, so the
+output is byte-identical (``test_execution_golden``,
+``test_passive_policy``); one pass over the events services every parent.
 """
 
 from __future__ import annotations
 
+import heapq
 import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
@@ -79,6 +91,13 @@ class ParentReport:
     rebates: float = 0.0  #: maker rebates (>= 0)
     impact: float = 0.0  #: linear impact charges (>= 0)
     total_cost: float = 0.0  #: fees - rebates + impact
+    # ---- v1.17 B1 diagnostics (outside ``to_dict``: the golden rows are pinned) ----
+    #: X-5: aggressive children of this parent cancelled for want of depth.
+    depth_exhausted: int = 0
+    #: X-5: qty those children left unfilled (base units).
+    depth_exhausted_qty: int = 0
+    #: X-7: filled qty by ``Fill.provenance`` (insertion order = first fill).
+    provenance_qty: dict[str, int] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         """Row in the key order of ``expected_replay_fills.json`` ``parents``."""
@@ -92,6 +111,14 @@ class ParentReport:
             "rebates": self.rebates,
             "impact": self.impact,
             "total_cost": self.total_cost,
+        }
+
+    def diagnostics(self) -> dict:
+        """v1.17 B1 under-fill and provenance columns (not in any golden)."""
+        return {
+            "depth_exhausted": self.depth_exhausted,
+            "depth_exhausted_qty": self.depth_exhausted_qty,
+            "provenance_qty": dict(self.provenance_qty),
         }
 
 
@@ -145,6 +172,7 @@ class _ParentState:
     behind_qty: int = 0  #: BEHIND tolerance in qty
     working: list[_Working] = field(default_factory=list)
     stats: PassiveStats = field(default_factory=PassiveStats)
+    armed: bool = False  #: X-6: has an entry in the due-slice heap
 
 
 class ExecutionReplay:
@@ -164,6 +192,13 @@ class ExecutionReplay:
         self._fills_booked = 0
         self._sor_no_route = 0
         self._ran = False
+        # X-6 indexes (see the module docstring): parents by parent_id for
+        # fill booking, POV parents by instrument, the due-slice heap and
+        # the PASSIVE parents with a working child.
+        self._by_parent_id: dict[int, list[_ParentState]] = {}
+        self._pov_by_instrument: dict[int, list[int]] = {}
+        self._due: list[tuple[int, int]] = []
+        self._live_passive: set[int] = set()
         for p in parents:
             if p.qty <= 0:
                 raise ValueError("parent qty must be > 0")
@@ -180,7 +215,14 @@ class ExecutionReplay:
                     p.passive, p.urgency, p.algo == AlgoType.IS, p.risk_aversion
                 )
                 ps.behind_qty = max_behind_qty(p.passive, p.qty)
+            idx = len(self._parents)
             self._parents.append(ps)
+            self._by_parent_id.setdefault(p.parent_id, []).append(ps)
+            if p.algo == AlgoType.POV:
+                self._pov_by_instrument.setdefault(p.instrument_id, []).append(idx)
+            elif ps.slice_due:
+                ps.armed = True
+                heapq.heappush(self._due, (ps.slice_due[0], idx))
 
     @property
     def simulator(self) -> ExecutionSimulator:
@@ -268,9 +310,8 @@ class ExecutionReplay:
         while self._fills_booked < len(fills):
             f = fills[self._fills_booked]
             self._fills_booked += 1
-            for ps in self._parents:
-                if ps.order.parent_id == f.parent_id:
-                    ps.filled_qty += f.qty
+            for ps in self._by_parent_id.get(f.parent_id, ()):
+                ps.filled_qty += f.qty
 
     # ------------------------------------------------------ PASSIVE policy
 
@@ -432,23 +473,55 @@ class ExecutionReplay:
             )
             self._issue_slice(ps, q, t, passive)
 
+    def _visits(self, ev: MarketEvent) -> list[int]:
+        """Parent indices this event can change, in parent-list order (X-6)."""
+        t = ev.exchange_ts
+        due = self._due
+        visit: set[int] = set()
+        while due and due[0][0] <= t:
+            idx = heapq.heappop(due)[1]
+            self._parents[idx].armed = False
+            visit.add(idx)
+        if ev.event_type == EventType.TRADE:
+            visit.update(self._pov_by_instrument.get(ev.instrument_id, ()))
+        visit.update(self._live_passive)
+        return sorted(visit)
+
+    def _after_visit(self, idx: int) -> None:
+        """Re-arm the due heap / the live set for a parent just visited."""
+        ps = self._parents[idx]
+        if not ps.armed and ps.order.algo != AlgoType.POV and ps.next_slice < len(ps.slice_due):
+            ps.armed = True
+            heapq.heappush(self._due, (ps.slice_due[ps.next_slice], idx))
+        if ps.order.policy == ExecPolicy.PASSIVE:
+            if any(w.state != _DONE for w in ps.working):
+                self._live_passive.add(idx)
+            else:
+                self._live_passive.discard(idx)
+
     def run(self, events: Iterable[MarketEvent]) -> ExecReplayResult:
         """Replay the stream, working every parent. Callable once."""
         if self._ran:
             raise RuntimeError("ExecutionReplay.run is one-shot")
         self._ran = True
         res = ExecReplayResult()
+        parents = self._parents
         for ev in events:
             self._sim.on_event(ev)
             self._book_new_fills()
-            for ps in self._parents:
-                self._schedule(ps, ev)
+            for idx in self._visits(ev):
+                self._schedule(parents[idx], ev)
+                self._after_visit(idx)
             res.events_processed += 1
         self._sim.cancel_all()
         self._book_new_fills()
 
         res.fills = list(self._sim.fills)
         res.sor_no_route = self._sor_no_route
+        fills_of: dict[int, list[Fill]] = {}
+        for f in res.fills:
+            fills_of.setdefault(f.parent_id, []).append(f)
+        orders = self._sim.orders
         # Reports keyed by parent_id in ascending order (C++ std::map order).
         for ps in sorted(self._parents, key=lambda s: s.order.parent_id):
             p = ps.order
@@ -456,9 +529,7 @@ class ExecutionReplay:
             ins = self._config.instruments.get(p.instrument_id)
             lot = 1.0 if ins is None else ins.qty_unit
             tick = 1.0 if ins is None else ins.tick_size
-            for f in res.fills:
-                if f.parent_id != p.parent_id:
-                    continue
+            for f in fills_of.get(p.parent_id, ()):
                 if f.ts < p.start_ts or f.ts > p.end_ts:
                     raise RuntimeError("fill outside the parent window (time-in-force broken)")
                 r.filled_qty += f.qty
@@ -468,6 +539,12 @@ class ExecutionReplay:
                 else:
                     r.rebates += -f.fee
                 r.impact += f.impact_cost
+                r.provenance_qty[f.provenance] = r.provenance_qty.get(f.provenance, 0) + f.qty
+            for oid in ps.child_ids:
+                o = orders[oid]
+                if o.depth_exhausted:
+                    r.depth_exhausted += 1
+                    r.depth_exhausted_qty += o.remaining
             r.unfilled_qty = p.qty - r.filled_qty
             r.avg_price = r.notional / (float(r.filled_qty) * lot) if r.filled_qty > 0 else 0.0
             r.total_cost = r.fees - r.rebates + r.impact

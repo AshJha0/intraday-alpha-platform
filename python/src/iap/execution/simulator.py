@@ -19,11 +19,17 @@ this module is self-contained:
    applied to the books; orders activate in ``(arrival_ts, order_id)``
    order. Aggressive fills are stamped with ``arrival_ts``.
 3. **Aggressive execution** (MARKET and the marketable part of LIMIT/IOC/
-   FOK) walks the DISPLAYED top-10 opposite depth of the target venue, best
-   first, up to the limit (MARKET: unconstrained), one Fill per level.
+   FOK) walks the DISPLAYED top-N opposite depth of the target venue
+   (``ExecConfig.walk_depth_levels``, pinned 10), best first, up to the
+   limit (MARKET: unconstrained), one Fill per level.
    Simulated fills never mutate the replayed book. Unfilled MARKET/IOC
    remainders are cancelled (``UNFILLED_REMAINDER``); FOK fills fully or
    not at all (checked against displayed depth within the limit first).
+   v1.17 B1 (X-5): a MARKET/IOC/FOK remainder left because the walk ran out
+   of DEPTH (not because it reached the limit) marks the child
+   ``depth_exhausted`` and is counted (``depth_exhausted`` /
+   ``depth_exhausted_qty``), so under-fill on a thin book is visible.
+   Every Fill carries ``provenance`` (X-7): the rule that produced it.
 3b. **Displayed-liquidity consumption.** A per-(instrument, venue, side,
    price) overlay records the displayed size our aggressive fills AND the
    rule-4 / rule-8 crossing check already consumed; walks and crossing
@@ -260,6 +266,9 @@ class ExecutionSimulator:
         self._fills: list[Fill] = []
         self._next_order_id = 1
         self._next_fill_id = 1
+        # v1.17 B1 (X-5): aggressive children cancelled for want of depth.
+        self._depth_exhausted = 0
+        self._depth_exhausted_qty = 0
         self._post_only_rejects = 0  # rule 10 (v1.12 opt-in)
         self._post_only_slides = 0
 
@@ -413,6 +422,18 @@ class ExecutionSimulator:
         return self._amends_applied
 
     @property
+    def depth_exhausted(self) -> int:
+        """v1.17 B1 (X-5): MARKET/IOC/FOK children whose remainder was cancelled
+        because the walk ran out of displayed depth (rule 3; outside the pinned
+        ``ExecCounters``)."""
+        return self._depth_exhausted
+
+    @property
+    def depth_exhausted_qty(self) -> int:
+        """Qty cancelled by those depth-exhausted walks (base units)."""
+        return self._depth_exhausted_qty
+
+    @property
     def hidden_print_trades(self) -> int:
         """Hidden prints tracked against resting orders (``hidden_prints``)."""
         return self._hidden_print_trades
@@ -511,7 +532,13 @@ class ExecutionSimulator:
         return cost
 
     def _emit_fill(
-        self, o: ChildOrder, price_ticks: int, qty: int, ts: int, liq: Liquidity
+        self,
+        o: ChildOrder,
+        price_ticks: int,
+        qty: int,
+        ts: int,
+        liq: Liquidity,
+        provenance: str = "",
     ) -> None:
         impact_cost = 0.0
         if liq == Liquidity.TAKER and self._config.impact_model == "parent":
@@ -538,6 +565,7 @@ class ExecutionSimulator:
                 liquidity=liq,
                 fee=self._fill_fee(o, price_ticks, qty, liq, ts),
                 impact_cost=impact_cost,
+                provenance=provenance,
             )
         )
         self._next_fill_id += 1
@@ -550,10 +578,14 @@ class ExecutionSimulator:
     def _consumed_at(self, instrument_id: int, venue_id: int, side: int, price_ticks: int) -> int:
         return self._consumed.get((instrument_id, venue_id, side, price_ticks), 0)
 
-    def _aggressive_fill(self, o: ChildOrder, book: OrderBook) -> None:
-        """Rule 3 / 3b: walk the displayed opposite depth net of the overlay."""
+    def _aggressive_fill(self, o: ChildOrder, book: OrderBook) -> bool:
+        """Rule 3 / 3b: walk the displayed opposite depth net of the overlay.
+
+        Returns True when the walk stopped at the order's LIMIT (a deeper
+        level was outside it); False when it ran out of depth or filled.
+        """
         opp_side = 1 if o.side == 0 else 0
-        depth = book.depth(opp_side, DEPTH_LEVELS)
+        depth = book.depth(opp_side, self._config.walk_depth_levels)
 
         def within_limit(price: int) -> bool:
             if o.type == OrderType.MARKET:
@@ -570,12 +602,12 @@ class ExecutionSimulator:
                 if within_limit(p):
                     avail += available(p, q)
             if avail < o.remaining:
-                return  # all-or-none: no fills at all
+                return False  # all-or-none: no fills at all
         for p, q in depth:
             if o.remaining == 0:
                 break
             if not within_limit(p):
-                break  # levels are sorted best-first
+                return True  # levels are sorted best-first
             avail = available(p, q)
             if avail < q:
                 self._counters.overlay_thinned_fills += 1
@@ -584,7 +616,8 @@ class ExecutionSimulator:
             take = min(o.remaining, avail)
             key = (o.instrument_id, o.venue_id, opp_side, p)
             self._consumed[key] = self._consumed.get(key, 0) + take
-            self._emit_fill(o, p, take, o.arrival_ts, Liquidity.TAKER)
+            self._emit_fill(o, p, take, o.arrival_ts, Liquidity.TAKER, "aggressive_walk")
+        return False
 
     def _post_only_admit(self, o: ChildOrder, book: OrderBook) -> bool:
         """Rule 10: False (order rejected) or True (rests, possibly slid)."""
@@ -620,10 +653,17 @@ class ExecutionSimulator:
         is_open = self.venue_open(book)
         if o.post_only and is_open and book is not None and not self._post_only_admit(o, book):
             return  # rule 10: rejected rather than crossing
+        limit_bound = False
         if is_open and book is not None:
-            self._aggressive_fill(o, book)
+            limit_bound = self._aggressive_fill(o, book)
         if o.remaining == 0:
             return  # fully filled aggressively
+        if is_open and book is not None and o.type != OrderType.LIMIT and not limit_bound:
+            # X-5: the remainder below is cancelled for want of displayed
+            # depth within the walk, not because of the price.
+            o.depth_exhausted = True
+            self._depth_exhausted += 1
+            self._depth_exhausted_qty += o.remaining
         if o.type == OrderType.LIMIT:
             # Rest passively: queue position = displayed qty at our level.
             o.state = OrderState.ACTIVE
@@ -710,6 +750,7 @@ class ExecutionSimulator:
         qty: int,
         ts: int,
         fill_price: int | None = None,
+        provenance: str = "exec_print",
     ) -> None:
         """Rule 4: one observed trade of ``qty`` at one level, budgeted once.
 
@@ -746,7 +787,7 @@ class ExecutionSimulator:
                     if budget > 0:
                         fill = min(budget, o.remaining)
                         px = o.limit_ticks if fill_price is None else fill_price
-                        self._emit_fill(o, px, fill, ts, Liquidity.MAKER)
+                        self._emit_fill(o, px, fill, ts, Liquidity.MAKER, provenance)
                         budget -= fill
             if o.state == OrderState.FILLED:
                 del self._resting[i]
@@ -813,6 +854,7 @@ class ExecutionSimulator:
                             fill,
                             t,
                             Liquidity.MAKER,
+                            "reopen_touch" if reopened else "cross",
                         )
                         budget[o.side] -= fill
                         if reopened:
@@ -918,7 +960,13 @@ class ExecutionSimulator:
                 # against the resting side opposite the aggressor.
                 self._hidden_print_trades += 1
                 self._track_consumption(
-                    ev.instrument_id, ev.venue_id, 1 - ev.side, ev.price_ticks, ev.qty, t
+                    ev.instrument_id,
+                    ev.venue_id,
+                    1 - ev.side,
+                    ev.price_ticks,
+                    ev.qty,
+                    t,
+                    provenance="hidden_print",
                 )
             elif et == EventType.CANCEL:
                 for oid, before in level_before:
@@ -973,7 +1021,13 @@ class ExecutionSimulator:
                         break
                     consumed = min(incoming, q)
                     self._track_consumption(
-                        ev.instrument_id, ev.venue_id, consumed_side, p, consumed, t
+                        ev.instrument_id,
+                        ev.venue_id,
+                        consumed_side,
+                        p,
+                        consumed,
+                        t,
+                        provenance="marketable_add",
                     )
                     incoming -= consumed
 

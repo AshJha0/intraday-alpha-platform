@@ -832,6 +832,21 @@ crossing it at the end — so that not trading cannot pass for cheap trading.
 It also says which part of the result is the simulator: our resting order
 never changes the replayed book, so nobody reacts to it.
 
+`python -m iap.research.execution_benchmark --data-dir data/real/multi7`
+(v1.17 B1) is the same accounting on real sessions: a grid of algo × policy
+× parent size (% of ADV) × session, one parent per window, costs per cell
+as per-parent means with day-clustered standard errors (one cluster per
+session, Student-t with G − 1 degrees of freedom, cluster bootstrap), every
+cost labelled with `ExecConfig.impact_label()` because the simulator adds
+an impact adder rather than measuring one. Two columns make the simulator's
+silences visible: `depth_exhausted` (an aggressive child cancelled because
+the walk ran out of displayed depth within `ExecConfig.walk_depth_levels`,
+default 10) and the fill-provenance shares (`Fill.provenance`: which rule
+produced the fill — aggressive walk, EXECUTE print, marketable ADD, hidden
+print, cross, reopen touch). Output goes to `research/execution/benchmark/`;
+`prereg_DRAFT.json` there is the unsigned draft of the B7 gate. The
+benchmark refuses a holdout directory.
+
 ```bash
 cd python
 PYTHONPATH=src python3 -m pytest -q tests/test_passive_policy.py tests/test_markout.py
