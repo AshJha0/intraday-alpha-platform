@@ -40,12 +40,13 @@ Contents: [1 What is supported](#1-what-is-supported) ·
 | Nasdaq TotalView-ITCH 5.0 historical file | `iap.marketdata.itch50` | the binary file format: `2-byte big-endian length` + message, plain or gzip (detected by magic). Decoded: `S` system event, `R` stock directory, `H` trading action, `Y` Reg SHO, `L` market participant position, `A` / `F` add order, `E` / `C` executed, `X` cancel, `D` delete, `U` replace, `P` non-cross trade, `Q` cross trade, `B` broken trade. `I` (NOII) is length-checked and counted. Every other type (`V W K J h N O …`) is skipped by its length prefix and counted per type |
 | Databento DBN MBO, dataset `XNAS.ITCH` (v1.15) | `iap.marketdata.dbn_mbo` | a `.dbn` or zstd `.dbn.zst` file (detected by magic) decoded with the official `databento-dbn` codec (optional extra `pip install 'iap[dbn]'`). MBO actions `A C M T F R N` are translated into the ITCH 5.0 messages above and mapped by the unchanged ITCH mapper (§4.4); other record types are counted and skipped |
 | LOBSTER message file (+ orderbook file) | `iap.marketdata.lobster` | CSV without header, event types 1–7, one message file per symbol-day; the orderbook file is optional and, when present, verifies the reconstruction level by level (§6) |
+| IEX HIST captures: DEEP+ (orders), DEEP (price levels), TOPS (BBO oracle) (v1.17) | `iap.marketdata.iex` | the free daily pcap.gz of `https://iextrading.com/trading/market-data/` (T+1, no account): classic pcap (Ethernet / 802.1Q / raw IP, UDP/IPv4), IEX-TP v1 segments, the DEEP+ v1.06 / DEEP v1.08 / TOPS v1.66 messages, translated into the ITCH messages above and mapped by the unchanged ITCH mapper (section 4.5); venue `IEXG` (102) |
 | Corporate actions | `iap.reference.corpactions` | a CSV table you write or export (§5); nothing is downloaded |
 
 One command ingests either source:
 
 ```
-python -m iap.marketdata ingest --format {itch50,dbn-mbo,lobster} --input FILE... \
+python -m iap.marketdata ingest --format {itch50,dbn-mbo,iex-deep-plus,iex-deep,lobster} --input FILE... [--tops TOPS.pcap.gz] \
     --date YYYY-MM-DD --symbols AAPL,MSFT,... --out DATASET_DIR
     [--limit-messages N] [--extended-hours] [--tick-size {auto,0.01,0.0001}]
     [--orderbook FILE...] [--corporate-actions CSV]
@@ -586,6 +587,58 @@ What DBN MBO does not carry, and what replaces it:
 - Records outside the New York calendar day of `--date` are dropped and
   counted (`outside_session_date`). The DBN-specific counters are in the
   manifest under `sessions.<date>.messages.dbn`.
+
+### 4.5 IEX HIST: DEEP+, DEEP and the TOPS oracle (`--format iex-deep-plus` / `iex-deep`, v1.17)
+
+IEX publishes every trading day's feeds as pcap captures the next day, free
+and without an account (`https://iextrading.com/trading/market-data/`;
+nothing in the repository downloads them). `iap.marketdata.iex.IexReader`
+reads the pcap framing, the IEX-TP v1 segments (40-byte little-endian
+header, 2-byte message length blocks; heartbeats and sequence gaps counted)
+and translates each DEEP+ / DEEP message into the ITCH message of section 4.2,
+so the same `Itch50Mapper` and every rule of sections 4.1 / 4.2 apply
+unchanged; the dataset carries venue `IEXG`, id 102. Timestamps are
+nanoseconds since the epoch, converted to the session's New York day
+(outside: counted, dropped); prices are the same 1e-4 fixed point as ITCH.
+`python/tests/test_iex_codec.py` pins the translation against synthetic
+captures (`python/tests/iex_encoder.py`) and the specification's worked
+example bytes; the real-capture conformance pass on the first 2.5 hours of the
+2026-10-13 TOPS file is `research/v117/IEX_HIST_CONFORMANCE_20261013_TOPS.md`
+(7.6 M messages, 0 unknown types, 0 sequence gaps; the files are pcapng, the
+capture clock is TAI, directory rows cover IEX-listed securities only).
+
+| DEEP+ (orders, `0x8005`) | ITCH message | Notes |
+|---|---|---|
+| `S` system event | `S` (`O S R M E C` -> `O S Q M E C`) | IEX's start of regular hours is ITCH's `Q` |
+| `D` security directory | `R` | round lot and the ETP flag (`0x20`); a test security (`0x80`) is skipped; a universe symbol with no row before its first order gets one synthesised (round lot 100), counted |
+| `H` trading status | `H` (`H` halt, `P` pause, `O` order acceptance -> `Q`, `T`) | |
+| `O` operational halt | `h` on the mapped market | `O` halted, `N` released |
+| `a` add order | `A` | side `8` buy / `5` sell |
+| `M` modify | `X` of the size reduction when the priority is maintained, the price unchanged and the size smaller; else `U` (same id, new priority) | counted `modify_in_place` / `modify_replace` |
+| `R` delete | `D` | |
+| `L` order executed | `E`, or `C` printable at the trade price when it differs from the resting order's | the IEX trade id is the match number |
+| `T` trade | `P` non-displayed print, signed by the quote rule; `Q` cross when the single-price-cross flag (`0x08`) is set (type by time) | extended-hours (`0x40`) and odd-lot (`0x20`) flags counted |
+| `B` trade break | `B` | |
+| `C` clear book | `D` for every live order of the symbol | counted |
+| `E I P X A` | none | counted (security event, retail indicator, short-sale test, official price, auction) |
+
+DEEP (price levels, `0x8004`) has no orders, so every level is modelled by
+**synthetic orders** (ids from `iex.LEVEL_ORDER_ID_BASE`, counted): a level
+increase adds one order of the increment at the back; a decrease is consumed
+from the front as `E` when trade reports of the same atomic event (same
+timestamp, level updates with the event flag off closed by one with it on)
+carry that price, and from the back as `X` / `D` otherwise; a trade report
+no level update explains is a `P` print. Queue positions inside a level are
+therefore modelled, not observed (`iex.level_feed` and `queue_positions` in
+the manifest say so); for shortfall and routing the levels are what matter.
+
+**TOPS oracle.** `--tops FILE` reads the day's TOPS capture (`0x8003`) and,
+whenever the mapped book's best bid or offer changes, checks price and
+aggregate size on both sides against the TOPS quote at the same timestamp.
+The result is the session's `book_verification` (`match` / `diverged` with
+the first divergence; `no_comparison` when nothing could be compared), so a
+divergent decode refuses the ingest unless `--allow-book-divergence`: the
+contract LOBSTER's orderbook file gives the ITCH mapper (section 6).
 
 ## 5. Point-in-time reference data
 

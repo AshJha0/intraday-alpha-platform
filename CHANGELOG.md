@@ -84,6 +84,24 @@ that tag.
   docs/index.html gains a "Start here" block and a Showcase nav link; both new pages are read
   by `check_headline_numbers.py`. No number changed.
 
+## Unreleased
+
+- v1.17 WS-A item A1: IEX HIST codec. `iap.marketdata.iex` reads IEX's free daily pcap[.gz]
+  captures (classic pcap, UDP/IPv4, IEX-TP v1 segments) and translates DEEP+ (orders, `0x8005`)
+  and DEEP (price levels, `0x8004`; synthetic orders per level, trades paired to level decrements
+  within the atomic event) into the ITCH message model, so the unchanged `Itch50Mapper`
+  normalises an IEX session (venue `IEXG`, id 102): `python -m iap.marketdata ingest --format
+  {iex-deep-plus,iex-deep}`. `--tops FILE` adds the TOPS BBO oracle (price and size on both sides
+  at every BBO change) as the session's `book_verification`. Synthetic-capture tests
+  (`python/tests/iex_encoder.py`, `test_iex_codec.py`: framing, the specification's worked example
+  bytes, ITCH-equivalence of a DEEP+ session, the level translation, the oracle, ingest end to
+  end). Real-capture conformance pass on the first 250 MB of the 2026-10-13 TOPS file
+  (`tools/iex_hist_conformance.py`, `research/v117/IEX_HIST_CONFORMANCE_20261013_TOPS.md`:
+  7.6 M messages, 0 unknown types, 0 sequence gaps, 0 crossed quotes; the HIST files are
+  pcapng, which the reader now accepts beside classic pcap; the capture clock is TAI; the
+  file was deleted afterwards). The codec itself downloads nothing; docs/REAL_DATA.md
+  section 4.5.
+
 ## v1.16.0 — 2026-10-15
 
 Theme: monetisation. Neither taking (P0-6, item 7), nor making (quoting v2), nor AI4 DeepLOB clears costs; the signals are useful as execution inputs. Notes: docs/release/v1.16.0_RELEASE_NOTES.md.
