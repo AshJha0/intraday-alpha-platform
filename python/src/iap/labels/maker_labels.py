@@ -23,6 +23,16 @@ the displayed size ahead of us, rules 1-9):
   against us: the half-spread was kept at least in part), 0.0 when it
   filled and was run over, or did not fill, NaN when it filled and the
   markout is undefined.
+- ``{side}_run_over`` (v1.17, review R-P2-5) — the FILL-CONDITIONAL twin:
+  1.0 when the order filled and was run over (markout at
+  ``run_over_horizon`` ``< 0``), 0.0 when it filled and was not, NaN when
+  it did not fill or the markout is undefined.  ``not_run_over`` gives
+  "not filled" and "run over" the same value, so a filter trained on it
+  learns to avoid fills; a filter target must read this column instead
+  (:func:`iap.research.maker_real.alpha_side_target_fill_conditional`).
+  The frame's ``attrs["ttl_ns"]`` records the TTL the label orders rested
+  for, so a consumer can check it equals the horizon its cells trade at
+  (the second half of R-P2-5: label TTL != cell TTL).
 
 Also reported: ``{side}_post_ticks`` (the touch at decision time),
 ``{side}_queue_ahead`` (displayed quantity ahead at rest, the simulator's
@@ -69,6 +79,7 @@ def maker_label_columns(horizons: Sequence[str] = tuple(CALIBRATION_HORIZONS_NS)
         ]
         cols += [f"{s}_markout_{h}_bps" for h in horizons]
         cols.append(f"{s}_not_run_over")
+        cols.append(f"{s}_run_over")
     return cols
 
 
@@ -190,4 +201,10 @@ def maker_labels(
         for h in hz:
             out[f"{name}_markout_{h}_bps"] = marks[h]
         out[f"{name}_not_run_over"] = nro
-    return pd.DataFrame(out, columns=maker_label_columns(tuple(hz)))
+        # R-P2-5: conditional on a fill; an unfilled order is NaN, not 0.
+        out[f"{name}_run_over"] = np.where(
+            filled[side], np.where(np.isfinite(ro), (ro < 0).astype(float), np.nan), np.nan
+        )
+    frame = pd.DataFrame(out, columns=maker_label_columns(tuple(hz)))
+    frame.attrs["ttl_ns"] = int(ttl_ns)
+    return frame

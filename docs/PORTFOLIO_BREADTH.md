@@ -155,9 +155,54 @@ itself until the 100-name day has been run (placeholder below).
    public-knowledge GICS-style classification with an `ETF` bucket and two
    `unknown` names; the pre-registration should cite a vendor file.
 
-## What C6 and C8 will add (placeholder for the G5 truth pass)
+## The net-of-cost screen (C6)
 
-- **C6**: the pre-registered net-of-cost screen over all folds.
+Before any confirmatory look at a candidate signal, `iap.research.screen`
+screens every candidate of the DRAFT pre-registration
+`research/preregs/net_of_cost_screen_prereg_DRAFT.json` over ALL in-sample
+folds, net of the modelled round-trip cost of the registered size (100 units)
+on every scored row, in the v1.17 gate form (the net IC, the net HAC t and the
+net day-clustered t of the cost-adjusted label `y - sign(z) * cost`, plus the
+day-clustered mean net return per round trip). Pass / fail per candidate comes
+from the pre-registration's rules; one ledger look per candidate of kind
+`net_of_cost_screen`. The full description is
+[SIGNAL_RESEARCH.md section 8](SIGNAL_RESEARCH.md); the API is
+`API_PORTFOLIO_TCA.md` section 1.10.
+
+How it gates this page:
+
+- `python -m iap.research.breadth_book --screen research/breadth/screen/screen_multi7.json
+  --require-screen` refuses the book unless the score's candidate
+  (`eq11` -> `EQ11/15m/linear_z_v1`, `eq10_beta_gap` -> `EQ10/1s/linear_z_v1`;
+  `--screen-candidate` overrides) PASSED the screen; without `--require-screen`
+  the status is recorded in the report's `screen` block and nothing is refused.
+- The C8 pre-registration (`WriteBroker.preregister(screen=)`) and a
+  confirmatory `python -m iap.research run --require-screen` refuse a
+  candidate that failed or was not screened.
+- The screen never reads the breadth holdout (the 2025/26 days for names
+  outside AAPL / MSFT / QQQ are in no candidates manifest, and a path
+  containing `holdout` is refused) nor a registered holdout (the R7 holdout's
+  `dataset_version` is listed in the pre-registration and refused).
+
+`research/breadth/screen/screen_multi7.json` / `SCREEN_multi7.md` (dataset
+`ee4c2187...`, the seven multi7 sessions; `v2` at revision v1.17; size 100
+shares; 23 looks of kind `net_of_cost_screen`): **0 pass, 22 fail, 1 not
+screened**. Every per-instrument candidate is positive or flat gross and
+negative net: the gross IC runs from -0.0098 (EQ07/10s) to 0.1304
+(EQ01/1s/linear_z_v2), the modelled round trip costs 1.90-2.02 bps per row,
+and the mean net return per round trip is -1.83 to -1.99 bps with net
+day-clustered t between -8.9 and -57.2 over 6 test days (the first session
+is training only) and 1.46-2.31 million pairs. `linear_z_v2` moves no
+verdict. EQ11/15m (cross-sectional) scores no row on three names and is
+recorded as not screened. Read: at one round lot, no registered equity
+alpha clears spread + fee + impact on these seven days at its own horizon;
+the screen passes nothing to C8 from this dataset, so the C8 prereg needs
+either the 100-name breadth day screened first or a different registered
+size, both the owner's call.
+
+## What C8 will add (placeholder for the G5 truth pass)
+
+- **C6** is above: the screen document a C8 prereg cites.
 - **C8**: the breadth-book pre-registration (the owner approves and signs; the
   `linear_z_v2` draft feeds it, see [SIGNAL_RESEARCH.md](SIGNAL_RESEARCH.md)),
   with the 2025/26 days as its holdout.
@@ -165,5 +210,5 @@ itself until the 100-name day has been run (placeholder below).
   `breadth_book --dataset-dir` and its report. Placeholder for the day's
   numbers; none are claimed here.
 
-Tests: `python/tests/test_v117_breadth_book.py`. API: `API_PORTFOLIO_TCA.md`
-sections 1.8 and 1.9.
+Tests: `python/tests/test_v117_breadth_book.py`, `python/tests/test_v117_screen.py`.
+API: `API_PORTFOLIO_TCA.md` sections 1.8 to 1.10.

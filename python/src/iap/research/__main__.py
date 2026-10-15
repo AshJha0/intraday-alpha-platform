@@ -289,6 +289,28 @@ def _check_prereg(args: argparse.Namespace) -> dict | None:
     return entry
 
 
+def _check_screen(args: argparse.Namespace) -> dict | None:
+    """v1.17 C6 (opt-in): under ``--require-screen PATH`` the run's
+    (alpha, horizon) must have PASSED that net-of-cost screen under its
+    model identity; a fail or an unscreened candidate refuses the run
+    before any data is read.  ``None`` without the flag."""
+    screen = getattr(args, "require_screen", None)
+    if screen is None:
+        return None
+    from iap.research.screen import ScreenRefusal, base_alpha_id, model_identity, require_screened
+    from iap.research.specs import pinned_horizon
+
+    horizon = args.horizon or pinned_horizon(args.alpha)
+    try:
+        block = require_screened(
+            screen, base_alpha_id(args.alpha), horizon, model_identity(args.alpha)
+        )
+    except ScreenRefusal as exc:
+        raise ResearchError(str(exc), code="not_screened") from exc
+    print(f"net-of-cost screen: {block['candidate']} passed {block['path']}")
+    return block
+
+
 def _closed_note(entry: dict) -> str:
     """Label for a run of a CLOSED prereg (its outcome is recorded; option A)."""
     closed = entry.get("closed")
@@ -370,6 +392,7 @@ def _run(args: argparse.Namespace) -> int:
         register_ml_alphas()
         print(f"ML alpha {args.alpha} registered for this run (iap.alpha.register_ml_alphas)")
     prereg_entry = _check_prereg(args)
+    _check_screen(args)
     dataset_version, feature_version = _dataset_versions(args)
     runner = ExperimentRunner(
         args.features_dir,
@@ -669,6 +692,13 @@ def _parser() -> argparse.ArgumentParser:
         "--no-prereg",
         action="store_true",
         help="skip the pre-registration check (exploratory run; stated in the output)",
+    )
+    run.add_argument(
+        "--require-screen",
+        type=Path,
+        default=None,
+        help="refuse unless the (alpha, horizon) PASSED this C6 net-of-cost screen "
+        "document (iap.research.screen; v1.17 C6, opt-in)",
     )
     run.add_argument(
         "--prereg-board",
