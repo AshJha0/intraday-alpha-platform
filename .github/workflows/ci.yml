@@ -4,8 +4,8 @@
 # GOVERNANCE.md §1 requires "tests/harness/run_all.sh green (all four
 # languages)" and "YAML must pass the structural validation used in CI";
 # RUNBOOK_backtest.md says "CI treats budget breaks as failures";
-# SECURITY.md routes deployment reports to CODEOWNERS; Dockerfile.java defers
-# its JUnit gate to "the CI harness". Until round 3 none of that existed.
+# SECURITY.md routes deployment reports to CODEOWNERS. Until round 3 none of
+# that existed.
 # This workflow is it (PLATFORM_CONVENTIONS.md §9, §12.7).
 #
 # Jobs:
@@ -41,7 +41,9 @@
 #                                (lockfile vulns + Dockerfile/k8s misconfig).
 #                                Ignores only via .github/audit-ignores.json
 #                                (reason + expiry, tools/audit_ignores.py)
-#   images                       builds the four images; needs every other job;
+#   images                       builds the three images (python, cpp, rust;
+#                                the java image was retired in v1.17, F9);
+#                                needs every other job;
 #                                runs on push to main and on PRs that change
 #                                image inputs
 #   regenerate                   manual only (workflow_dispatch with
@@ -645,10 +647,6 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
-        with:
-          distribution: temurin
-          java-version: "21"
       - name: Tooling
         run: |
           # check_headline_numbers.py imports iap.contracts / iap.lifecycle from
@@ -899,9 +897,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # GOVERNANCE promotion gate 10: an image is only ever built from a tree
       # whose full suite and golden gate are green — hence `needs:` above.
-      - name: build all four images
+      - name: build all three images
         run: |
-          for df in python java cpp rust; do
+          for df in python cpp rust; do
             docker build -f "deployment/docker/Dockerfile.$df" \
               -t "iap/$df:ci-${GITHUB_SHA::12}" .
           done
@@ -915,7 +913,7 @@ jobs:
           tar -xzf /tmp/trivy.tar.gz -C /tmp trivy
           python3 tools/audit_ignores.py --tool trivy > /tmp/.trivyignore
           rc=0
-          for df in python java cpp rust; do   # scan all four, then fail
+          for df in python cpp rust; do   # scan all three, then fail
             /tmp/trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed \
               --exit-code 1 --ignorefile /tmp/.trivyignore "iap/$df:ci-${GITHUB_SHA::12}" || rc=1
           done

@@ -251,12 +251,23 @@ def test_publish_reruns_release_once_when_verify_ci_raced(tmp_path):
     )
     r, fake = _runner(tmp_path, answers, execute=True)
     pages = []
+    k8s = _k8s_fixture(tmp_path, "v1.14.0")
     rel.publish(
-        r, "1.15.0", fetch=lambda url: pages.append(url) or "<h2>v1.15.0</h2>", sleep=lambda s: None
+        r,
+        "1.15.0",
+        fetch=lambda url: pages.append(url) or "<h2>v1.15.0</h2>",
+        sleep=lambda s: None,
+        manifest_fetch=lambda runner, tag: _manifest(tag),
+        pinned_files=[k8s],
     )
     assert ["gh", "run", "rerun", "7", "--failed"] in fake.calls
     assert pages == [rel.SITE_URL]
     assert any(c[:3] == ["gh", "release", "create"] and "--verify-tag" in c for c in fake.calls)
+    # F2: the k8s manifest is pinned to name:tag@digest after release.yml succeeded
+    text = (tmp_path / k8s).read_text()
+    assert f"{rel.IMAGE_PREFIX}python:v1.15.0@{DIGESTS['python']}" in text
+    assert "v1.14.0" not in text
+    assert any("pinned 2 image reference(s) in 1 manifest(s)" in x for x in r.log)
 
 
 def test_publish_does_not_rerun_other_failures(tmp_path):
@@ -266,7 +277,14 @@ def test_publish_does_not_rerun_other_failures(tmp_path):
     )
     r, _ = _runner(tmp_path, answers, execute=True)
     with pytest.raises(rel.ReleaseError, match="failure"):
-        rel.publish(r, "1.15.0", fetch=lambda url: "", sleep=lambda s: None)
+        rel.publish(
+            r,
+            "1.15.0",
+            fetch=lambda url: "",
+            sleep=lambda s: None,
+            manifest_fetch=lambda runner, tag: _manifest(tag),
+            pinned_files=[],
+        )
 
 
 def test_cli_flow_and_default_dry_run(capsys):
@@ -358,3 +376,132 @@ def test_publish_execute_fails_on_empty_section(tmp_path):
     with pytest.raises(rel.ReleaseError, match="missing or empty"):
         rel.publish(r, "1.15.0", fetch=lambda u: "", sleep=lambda s: None)
     assert not any(c[:2] == ["gh", "release"] for c in fake.calls)
+
+
+# ------------------------------------------------------ F2: digest pinning ---
+
+DIGESTS = {
+    "python": "sha256:" + "a" * 64,
+    "cpp": "sha256:" + "b" * 64,
+    "rust": "sha256:" + "c" * 64,
+}
+
+
+def _manifest(tag: str, langs=("python", "cpp", "rust")) -> dict:
+    return {
+        "tag": tag,
+        "commit": "abc123",
+        "built_at": "2026-10-15T00:00:00Z",
+        "images": [
+            {
+                "language": lang,
+                "name": rel.IMAGE_PREFIX + lang,
+                "digest": DIGESTS[lang],
+                "reference": f"{rel.IMAGE_PREFIX}{lang}:{tag}@{DIGESTS[lang]}",
+            }
+            for lang in langs
+        ],
+    }
+
+
+def _k8s_fixture(root: Path, tag: str) -> str:
+    rel_path = "deployment/k8s/platform-metrics.yaml"
+    f = root / rel_path
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(
+        "containers:\n"
+        f"  - name: metrics\n    image: {rel.IMAGE_PREFIX}python:{tag}\n"
+        f"  - name: session\n    image: {rel.IMAGE_PREFIX}python:{tag}\n"
+        "  - name: third-party\n    image: prom/prometheus:v2.53.0@sha256:" + "0" * 64 + "\n"
+    )
+    return rel_path
+
+
+def test_manifest_digests_validates_schema():
+    assert rel.manifest_digests(_manifest("v1.17.0"), "1.17.0") == DIGESTS
+    with pytest.raises(rel.ReleaseError, match="not v1.16.0"):
+        rel.manifest_digests(_manifest("v1.17.0"), "1.16.0")
+    bad = _manifest("v1.17.0")
+    bad["images"][0]["digest"] = "sha256:short"
+    with pytest.raises(rel.ReleaseError, match="not sha256"):
+        rel.manifest_digests(bad)
+    bad = _manifest("v1.17.0")
+    bad["images"][1]["name"] = "ghcr.io/other/cpp"
+    with pytest.raises(rel.ReleaseError, match="image name"):
+        rel.manifest_digests(bad)
+    with pytest.raises(rel.ReleaseError, match="no images"):
+        rel.manifest_digests({"tag": "v1.17.0", "images": []})
+
+
+def test_pin_text_rewrites_tag_and_existing_digest_and_is_idempotent():
+    text = (
+        f"image: {rel.IMAGE_PREFIX}python:v1.14.0\n"
+        f"image: {rel.IMAGE_PREFIX}cpp:v1.14.0@sha256:{'9' * 64}\n"
+        f"image: {rel.IMAGE_PREFIX}rust\n"
+        "image: prom/alertmanager:v0.27.0@sha256:" + "0" * 64 + "\n"
+    )
+    out, n = rel.pin_text(text, "v1.17.0", DIGESTS)
+    assert n == 3
+    assert out == (
+        f"image: {rel.IMAGE_PREFIX}python:v1.17.0@{DIGESTS['python']}\n"
+        f"image: {rel.IMAGE_PREFIX}cpp:v1.17.0@{DIGESTS['cpp']}\n"
+        f"image: {rel.IMAGE_PREFIX}rust:v1.17.0@{DIGESTS['rust']}\n"
+        "image: prom/alertmanager:v0.27.0@sha256:" + "0" * 64 + "\n"
+    )
+    again, n2 = rel.pin_text(out, "v1.17.0", DIGESTS)
+    assert again == out and n2 == 0
+    with pytest.raises(rel.ReleaseError, match="no digest for image.*rust"):
+        rel.pin_text(text, "v1.17.0", {k: v for k, v in DIGESTS.items() if k != "rust"})
+
+
+def test_pin_digests_dry_run_then_execute(tmp_path):
+    k8s = _k8s_fixture(tmp_path, "v1.14.0")
+    before = (tmp_path / k8s).read_text()
+    r, _ = _runner(tmp_path, {})
+    assert rel.pin_digests(r, _manifest("v1.17.0"), "1.17.0", [k8s]) == {k8s: 2}
+    assert (tmp_path / k8s).read_text() == before  # dry run writes nothing
+    assert any("pin 2 image reference(s) to v1.17.0" in x for x in r.log)
+    r, _ = _runner(tmp_path, {}, execute=True)
+    assert rel.pin_digests(r, _manifest("v1.17.0"), "1.17.0", [k8s]) == {k8s: 2}
+    text = (tmp_path / k8s).read_text()
+    assert text.count(f"{rel.IMAGE_PREFIX}python:v1.17.0@{DIGESTS['python']}") == 2
+    assert "prom/prometheus:v2.53.0@sha256:" + "0" * 64 in text  # third-party untouched
+    r, _ = _runner(tmp_path, {}, execute=True)
+    assert rel.pin_digests(r, _manifest("v1.17.0"), "1.17.0", [k8s]) == {k8s: 0}
+    with pytest.raises(rel.ReleaseError, match="not found"):
+        rel.pin_digests(r, _manifest("v1.17.0"), "1.17.0", ["deployment/k8s/missing.yaml"])
+
+
+def test_pin_digests_covers_the_real_manifests():
+    """Every manifest `publish` pins exists and names only images the
+    release manifest will carry (python, cpp, rust)."""
+    digests = rel.manifest_digests(_manifest("v9.9.9"))
+    for rel_path in rel.PINNED_MANIFESTS:
+        text = (REPO_ROOT / rel_path).read_text(encoding="utf-8")
+        out, n = rel.pin_text(text, "v9.9.9", digests)
+        assert n >= 1, rel_path
+        assert rel.IMAGE_PREFIX + "java" not in out
+
+
+def test_cli_pin_digests(tmp_path, capsys):
+    k8s = _k8s_fixture(tmp_path, "v1.14.0")
+    manifest = tmp_path / "release-manifest.json"
+    manifest.write_text(json.dumps(_manifest("v1.17.0")))
+    r = rel.Runner(cwd=tmp_path, exec_fn=FakeExec({}))
+    assert rel.main(["pin-digests", "--manifest", str(manifest), "--file", k8s], runner=r) == 0
+    assert "v1.14.0" in (tmp_path / k8s).read_text()  # dry run
+    r = rel.Runner(cwd=tmp_path, exec_fn=FakeExec({}))
+    assert (
+        rel.main(["--execute", "pin-digests", "--manifest", str(manifest), "--file", k8s], runner=r)
+        == 0
+    )
+    assert DIGESTS["python"] in (tmp_path / k8s).read_text()
+    manifest.write_text(json.dumps({"tag": "nonsense", "images": []}))
+    r = rel.Runner(cwd=tmp_path, exec_fn=FakeExec({}))
+    assert rel.main(["pin-digests", "--manifest", str(manifest), "--file", k8s], runner=r) == 1
+    assert "cannot tell the version" in capsys.readouterr().err
+
+
+def test_flow_mentions_digest_pinning(capsys):
+    assert rel.main(["flow"]) == 0
+    assert "pin-digests" in capsys.readouterr().out

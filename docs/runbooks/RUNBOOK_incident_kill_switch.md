@@ -3,10 +3,11 @@
 **Scope:** engaging, verifying and clearing kill switches (global / strategy /
 instrument / venue — spec §16), and the incident procedure around them.
 **Owner:** risk. **Related alerts:** `KillSwitchEngaged`,
-`LossLimitUtilizationHigh`, `GrossNotionalUtilizationHigh`, `StaleFeed`,
+`LossLimitUtilizationHigh`, `GrossNotionalUtilizationHigh`,
 `SequenceGapDetected`, `PlatformSessionFailed`, `TargetDown`,
-`KillPendingNotRecorded`, `AdminAuthRateLimited`, `AdminAuditSuppressed`,
-and the `Watchdog` heartbeat. Alerts reach a human only through Alertmanager
+and the `Watchdog` heartbeat (`StaleFeed`, `KillPendingNotRecorded`,
+`AdminAuthRateLimited` and `AdminAuditSuppressed` were retired with the Java
+image, v1.17 F9). Alerts reach a human only through Alertmanager
 (`deployment/alertmanager/alertmanager.yml`), and **only once the receiver URLs
 have been supplied** (RUNBOOK_alerting.md §2) — by default compose delivers
 to a local echo sink, not a person. Check that before relying on a page.
@@ -14,87 +15,24 @@ to a local echo sink, not a person. Check that before relying on a page.
 **First principle: the risk engine is fail-closed.** When in doubt, engage.
 An unnecessary halt costs basis points; a missing halt costs the loss limit.
 
-## 0. Prerequisite — the admin token must exist BEFORE the incident
+## 0. The manual halt path since v1.17 (F9): the config path — there is no admin API
 
-The manual halt path is an authenticated HTTP call on the running platform
-(§2 step 1a). It exists **only when a token is configured**; with no token the
-`/admin/*` routes are not registered at all (404) — an unauthenticated kill
-endpoint would be worse than none. Provision it at deploy time, not at 10:14:
-
-```bash
-# k8s (the Deployment reads it as an optional secretKeyRef)
-kubectl -n intraday-alpha create secret generic iap-admin-token \
-  --from-literal=token="$(openssl rand -hex 32)"
-
-# compose: IAP_ADMIN_TOKEN in the environment / a git-ignored .env file
-export IAP_ADMIN_TOKEN='<from your secret store>'
-```
-
-**More than one operator (since v1.3.0).** `IAP_ADMIN_TOKEN` /
-`IAP_ADMIN_TOKEN_FILE` configure one shared token, recorded in the audit as
-operator `admin`. To attribute each call to a person, point
-`IAP_ADMIN_TOKENS_FILE` at a file of `operator_id:sha256hex` lines — the
-file holds the SHA-256 of each operator's token, never a token (blank lines
-and `#` comments are ignored; a malformed line, a duplicate id or an
-unreadable file stops the process at startup):
-
-```bash
-TOKEN="$(openssl rand -hex 32)"                      # give this to the operator
-printf 'alice:%s\n' "$(printf %s "$TOKEN" | sha256sum | cut -d' ' -f1)" >> admin_tokens
-export IAP_ADMIN_TOKENS_FILE="$PWD/admin_tokens"
-```
-
-The bundled k8s manifest and compose file wire only `IAP_ADMIN_TOKEN`;
-mounting a tokens file is an operator change to the deployment.
-
-**Where the call can come from (since v1.3.0).** The listener binds
-`127.0.0.1` unless `IAP_BIND_ADDR` names another address. A process started
-with `archive/java/paper.sh` (archived, frozen at v1.14.0) is therefore reachable from the same host only. The
-container image, compose and the k8s manifest set `IAP_BIND_ADDR=0.0.0.0`;
-in Kubernetes the NetworkPolicy then admits the admin port only from
-Prometheus and from pods labelled `iap.role=operator`, so run the `curl`
-commands of this runbook from such a pod:
-
-```bash
-kubectl -n intraday-alpha run op --rm -it --restart=Never \
-  --image=<an image that has curl> --labels=iap.role=operator -- sh
-```
-
-Compose publishes the port on the host's loopback only.
-
-Verify it is armed before the session (the routes answer 401, not 404):
-
-```bash
-curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:8080/admin/kill
-# 401 = admin API armed, credentials required   |   404 = NO TOKEN CONFIGURED
-```
-
-Do not script this probe in a loop: every unauthenticated call is a failed
-authentication, and after 10 of them inside one 60 s window further failed
-authentications answer `429` until the window rolls. A request carrying a
-valid token is never rate-limited, so the kill itself still goes through.
-
-**Admin authentication abuse.** {#admin-auth-abuse}
-`AdminAuthRateLimited` (critical) fires when `admin_auth_rate_limited_total`
-appears or increases: more than 10 failed authentications arrived inside
-one 60 s window and further failures are answered `429`.
-`AdminAuditSuppressed` (warning) fires when `admin_audit_suppressed_total`
-appears or increases: rejected requests went past the audit cap (the
-rate-limited failures, and any reject beyond 100 audit lines per window)
-and are recorded as one `audit_summary` line per window instead of line by
-line. Neither blocks an operator: a valid token is never rate-limited.
-
-```bash
-grep -c '"code":401' <state-dir>/admin_audit.jsonl        # failed authentications audited
-grep '"action":"audit_summary"' <state-dir>/admin_audit.jsonl | tail -3
-grep -o '"remote":"[^"]*"' <state-dir>/admin_audit.jsonl | sort | uniq -c | sort -rn | head
-```
-
-One remote address with a stale token is a client to fix (a probe left in a
-loop, a rotated token). Several, or an address that should not reach the
-port at all, is a network exposure: check `IAP_BIND_ADDR`, the compose port
-publication and the NetworkPolicies before anything else, and rotate the
-token if it may have been observed.
+The Java platform's authenticated `POST /admin/{kill,clear,override,roll}`
+API was retired with the Java image (DECISION_N7 closed 2026-10-15). The
+deployed Python process (`python -m iap.metrics serve`, compose
+`platform-metrics`, k8s `deployment/k8s/platform-metrics.yaml`) serves
+`/metrics`, `/health`, `/ready` and `/status` only and has **no write
+surface**. The manual halt is therefore the **config path** of §2 step 1:
+set `global.kill_switch_engaged` in `configs/risk/risk.json`, regenerate the
+ConfigMap (k8s) or rely on the read-only bind mount (compose), and restart
+the session container — the MVP loop reads the master switch at start and the
+risk engine then rejects every order pre-trade (fail-closed). Programmatic
+engagement during a running Python session is `iap.risk` API
+(`engage_kill`, §1), exercised by the dry kill-switch drill
+`python -m iap.paper.drill` of the forward paper trade. Everything in this
+runbook that names `/admin/*`, an admin token, `admin_audit.jsonl`, `202`
+"kill latched", `KillPendingNotRecorded` or the admin-auth alerts describes
+the retired Java path and is kept for the record only.
 
 ## 1. How the kill switch works (rust/risk engine, `com.iap.risk` port)
 
@@ -171,53 +109,25 @@ token if it may have been observed.
 1. **Engage** at the narrowest sufficient scope; global if unsure.
    - Automatic latch already engaged? Skip to verification.
 
-   **(a) API path — SECONDS, no restart, no rebuild. Use this first.**
+   **(a) API path — RETIRED (v1.17 F9).** The Java `POST /admin/kill`
+   call no longer exists; there is no Python admin API (§0). Use (b).
+
+   **(b) Config path — THE manual halt (minutes, needs a restart).**
    ```bash
-   TOKEN="$(kubectl -n intraday-alpha get secret iap-admin-token \
-            -o jsonpath='{.data.token}' | base64 -d)"   # or $IAP_ADMIN_TOKEN
-
-   # global halt (everything, every strategy)
-   curl -sS -X POST http://java-platform:8080/admin/kill \
-     -H "Authorization: Bearer $TOKEN" \
-     -d 'scope=global' \
-     --data-urlencode 'reason=INC-2026-09-06 runaway EQ01, approved by <risk owner>'
-   # -> {"action":"kill","message":"applied","ok":true}
-
-   # narrower scopes
-   #   -d 'scope=strategy'   -d 'id=PAPER'
-   #   -d 'scope=instrument' -d 'id=1'
-   #   -d 'scope=venue'      -d 'id=2'
-   ```
-   `reason` is REQUIRED (1..256 chars) and is written verbatim into the risk
-   audit log — put the incident id and the approver in it. Responses:
-
-   | code | meaning | what to do |
-   |---|---|---|
-   | `200` | applied: the risk engine recorded it (the message says what happened to working child orders) | verify (§3) |
-   | `202` | **kill latched, not yet recorded**: the trading thread did not reach the command within the 5 s wait. No new order is sent from this moment; the risk engine records the kill at the next event boundary and a second line in `admin_audit.jsonl` confirms it (`applied after the request returned 202`) | treat as halted; verify (§3) and watch for the second audit line. Do **not** resend in a loop |
-   | `401` / `403` | no token / wrong token | fix the credential; mind the rate limit |
-   | `429` | more than 10 failed authentications in the current 60 s window | a valid token is not affected: retry with the right one |
-   | `400` | bad arguments (scope, id, missing reason, limit) | fix the request |
-   | `404` | the admin API is not configured (§0) | use the config path (b) |
-   | `503` | no session is running, or — for `clear` / `override` / `roll` only — the command was withdrawn on timeout and will not be applied | a kill is never withdrawn while the session runs; for the other verbs, resend |
-
-   **(b) Config path — the deploy-time hard stop (minutes, needs a restart).**
-   Use when the process is not running, is not reachable, or when the halt
-   must survive an image redeploy.
-   ```bash
-   # configs/risk/risk.json: "kill_switch_engaged": true
+   # configs/risk/risk.json: "global": {"kill_switch_engaged": true, ...}
    python3 deployment/k8s/generate_configmaps.py
    kubectl apply -f deployment/k8s/configmap-configs.yaml
-   kubectl -n intraday-alpha rollout restart deployment/java-platform
+   kubectl -n intraday-alpha rollout restart deployment/platform-metrics
    # compose: edit configs/risk/risk.json, then
-   docker compose -f deployment/docker/docker-compose.yml restart java-platform
+   docker compose -f deployment/docker/docker-compose.yml restart mvp-session platform-metrics
    ```
-   This path is real because the process reads `$IAP_CONFIG_DIR` — the mounted
-   ConfigMap (k8s) or the read-only bind mount of `configs/` (compose), not a
-   copy baked into the image (`PLATFORM_CONVENTIONS.md` §12.2). Confirm which
-   configuration the new process loaded:
+   This path is real because both containers read `$IAP_CONFIG_DIR` — the
+   mounted ConfigMap (k8s) or the read-only bind mount of `configs/` (compose),
+   not a copy baked into the image (`PLATFORM_CONVENTIONS.md` §12.2). Confirm
+   the exporter sees the live limits and the restarted session's state:
    ```bash
-   curl -s http://java-platform:8080/status | python3 -m json.tool  # config_sha256
+   curl -s http://platform-metrics:8080/metrics | grep -E '^(risk_limit|risk_kill_switch_engaged|platform_session_state)'
+   curl -s http://platform-metrics:8080/status | python3 -m json.tool  # run_dir, session_state
    ```
    Incident edits to `configs/risk/risk.json` are the ONE allowed
    review-after-the-fact change: commit within the hour with an
@@ -232,10 +142,9 @@ token if it may have been observed.
 **The one check that decides it**: `risk_kill_switch_engaged == 1`.
 
 ```bash
-curl -s http://java-platform:8080/metrics | grep '^risk_kill_switch_engaged'
-# risk_kill_switch_engaged 1        <- HALTED
-curl -s http://java-platform:8080/status | python3 -m json.tool
-# "kill_switch_engaged": true
+curl -s http://platform-metrics:8080/metrics | grep '^risk_kill_switch_engaged'
+# risk_kill_switch_engaged 1        <- HALTED (read from the run's report.json risk.kill_switch_engaged)
+grep -c '"decision":"KILL"\|KILL_SWITCH' /data/mvp/golden/risk_audit.jsonl   # the audit trail
 ```
 
 Then confirm it is having the intended effect:

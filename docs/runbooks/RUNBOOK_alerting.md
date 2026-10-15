@@ -90,12 +90,15 @@ Watchdog within 2 minutes, the pipeline is broken: check
 | SLO | objective (30 days) | source histogram |
 |---|---|---|
 | `order-path-latency` | 99% of orders decision-to-wire < 1,048,575 ns (about 1.05 ms) | `order_path_latency_ns` |
-| `event-path-latency` | 99% of events through `onEvent` < 1,048,575 ns | `book_update_latency_ns` |
 
-The threshold is a log2 bucket bound (`le="1048575"`): the Java histograms
-only have 2^i - 1 ns bounds, so the SLO is exact at the bound, with no
+(v1.17 F9: the `event-path-latency` SLO on `book_update_latency_ns` was
+retired with the Java image; the Python exporter builds `order_path_latency_ns`
+from the MVP run's traces, per parent order `arrival_ts - decision_ts`.)
+
+The threshold is a log2 bucket bound (`le="1048575"`): the histograms only
+have 2^i - 1 ns bounds, so the SLO is exact at the bound, with no
 interpolation. Error ratios are recorded per window as
-`job:{order,event}_path_latency_slo_errors:ratio_rate{5m,30m,1h,2h,6h,1d,3d}`.
+`job:order_path_latency_slo_errors:ratio_rate{5m,30m,1h,2h,6h,1d,3d}`.
 
 | alert | severity | condition (budget 1%) | budget spent |
 |---|---|---|---|
@@ -129,22 +132,22 @@ not match its checkpoint (RUNBOOK_shadow_deployment.md §5).
 What this deployment provides is **restart-and-resume, plus backups**. It is
 not active-active and it has no hot standby:
 
-- `java-platform` is a singleton (replicas 1, `Recreate`, `ReadWriteOnce`
-  claim `iap-java-state`). The RWO attach plus `Recreate` is the fence. No
-  Lease-based leader election exists (it would be a Java change). A second
-  trading loop would duplicate orders once a venue adapter is wired.
+- `platform-metrics` is a singleton (replicas 1, `Recreate`, `ReadWriteOnce`
+  claim `iap-platform-state`; v1.17 F9, was `java-platform` / `iap-java-state`).
+  The RWO attach plus `Recreate` is the fence. No Lease-based leader election
+  exists. A second trading loop would duplicate orders once a venue adapter is
+  wired.
 - On pod or node loss Kubernetes reschedules the single pod, which re-attaches
-  the claim with its checkpoint intact (§12.3). Continuing the interrupted
-  session needs `--resume` in the container arguments (Dockerfile.java;
-  RUNBOOK_shadow_deployment.md §5). `/ready` keeps the pod out of the Service until
-  it is trading. Expect a gap of minutes on node loss (volume detach timeout),
-  not seconds.
+  the claim with the session marker and the MVP artefacts intact (§12.3). The
+  MVP loop is deterministic and finite: the `session` container simply reruns
+  it (there is no `--resume`). Expect a gap of minutes on node loss (volume
+  detach timeout), not seconds.
 - There is no PodDisruptionBudget, on purpose: with one replica it would block
   every node drain.
-- The `state-backup` CronJob archives `/data/state` every 30 minutes to the
-  `iap-java-state-backup` claim and keeps 96 archives (2 days). It mounts the
-  state claim **read-only** and is pinned by a required pod affinity to the
-  node running `java-platform` (RWO is per node). When the trading pod is not
+- The `state-backup` CronJob archives `/data/state` and `/data/mvp` every 30
+  minutes to the `iap-platform-state-backup` claim and keeps 96 archives (2
+  days). It mounts the state claim **read-only** and is pinned by a required
+  pod affinity to the node running `platform-metrics` (RWO is per node). When the pod is not
   running, the job stays Pending until `activeDeadlineSeconds` reaps it, and
   no backup is taken. `check_deployment.py` (`k8s_state_backup`) pins this
   shape.
@@ -159,12 +162,12 @@ kubectl -n intraday-alpha logs job/<latest state-backup job>   # "backup ok: sta
 **Restore** (the state volume is lost or corrupt):
 
 1. Engage the kill switch if the platform is up, then scale to zero:
-   `kubectl -n intraday-alpha scale deploy/java-platform --replicas=0`.
-2. Recreate `iap-java-state` if it is gone (`kubectl apply -f deployment/k8s/pvc.yaml`).
-3. Run a one-off pod that mounts `iap-java-state-backup` read-only and
-   `iap-java-state` read-write, and extract the newest archive:
-   `tar -xzf /backup/state-<ts>.tgz -C /data` (this restores `/data/state`).
-4. Scale back to 1, with `--resume` in the arguments (RUNBOOK_shadow_deployment.md §5).
+   `kubectl -n intraday-alpha scale deploy/platform-metrics --replicas=0`.
+2. Recreate `iap-platform-state` if it is gone (`kubectl apply -f deployment/k8s/pvc.yaml`).
+3. Run a one-off pod that mounts `iap-platform-state-backup` read-only and
+   `iap-platform-state` read-write, and extract the newest archive:
+   `tar -xzf /backup/state-<ts>.tgz -C /data` (this restores `/data/state` and `/data/mvp`).
+4. Scale back to 1; the session container reruns the deterministic MVP loop.
 5. If resume **refuses** (audit or trace line count, or the risk snapshot's
    sha256, does not match the checkpoint), the archive was taken while a
    checkpoint was being written. The refusal is the

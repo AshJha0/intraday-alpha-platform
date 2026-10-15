@@ -73,7 +73,9 @@ cd python && PYTHONPATH=src python3 -m pytest -q tests/test_generator.py tests/t
    after 2 m and `book_stale{instrument="..."}` stays 1 — that instrument is
    silently not trading until you act.
    ```bash
-   curl -s http://java-platform:8080/metrics | grep -E '^(md_sequence_gaps_total|book_stale)'
+   curl -s http://platform-metrics:8080/metrics | grep -E '^md_sequence_gaps_total'
+   # (book_stale and the BookStale alert were retired with the Java image, v1.17 F9:
+   #  the Python exporter reads a finished run's report, not a live book)
    ```
 1. Confirm scope: one stream or all — Grafana "Market Data & Latency" →
    *Stream QC* panel; `qc_report.json` per-stream counters for batch runs.

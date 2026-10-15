@@ -17,7 +17,9 @@ Checks (each one is a named case; exit code 0 iff no case FAILED):
                               the /etc/prometheus paths really resolve
   prometheus_rule_unit_tests  promtool test rules deployment/prometheus/tests/
   alert_metric_provenance     every metric referenced by a rule is exported by
-                              a real producer (PLATFORM_CONVENTIONS.md §12.6)
+                              the Python platform-metrics process
+                              (iap.metrics.LIVE_METRICS; a RETIRED Java-only
+                              name fails: PLATFORM_CONVENTIONS.md §12.6)
   alert_annotation_functions  annotations use only Go text/template +
                               Prometheus functions (no Sprig `default`)
   compose_config              docker compose config -q
@@ -28,10 +30,9 @@ Checks (each one is a named case; exit code 0 iff no case FAILED):
   docker_build_context        tests/harness/check_docker_build.py — a clean
                               checkout of the tracked tree (git ls-files, so
                               staged moves count) + .dockerignore reproduces
-                              the real build context, every stage's COPY and every
-                              build/runtime input resolves in it, and the Java
-                              build stage actually runs (a real `docker build`
-                              when a daemon is reachable)
+                              the real build context and every stage's COPY and
+                              every build/runtime input resolves in it (a real
+                              `docker build` when a daemon is reachable)
   dockerignore_present        the build context excludes host build trees
   k8s_manifests_parse         every manifest is valid YAML with apiVersion/kind
   k8s_dry_run                 kubectl apply --dry-run=client (or kubeconform)
@@ -46,11 +47,12 @@ Checks (each one is a named case; exit code 0 iff no case FAILED):
   alerting_wired              Prometheus -> Alertmanager in config, compose and
                               k8s, plus the always-firing Watchdog rule
   k8s_pod_hardening           automountServiceAccountToken false everywhere,
-                              java root fs read-only with a /tmp emptyDir, its
-                              own state PVC, explicit storageClassName on every
-                              PVC, IAP_BIND_ADDR set
-  k8s_network_policy          default-deny ingress AND egress, DNS egress, the
-                              operator -> java admin ingress rule
+                              platform-metrics root fs read-only with a /tmp
+                              emptyDir, its own state PVC, explicit
+                              storageClassName on every PVC, IAP_BIND_ADDR set
+  k8s_network_policy          default-deny ingress AND egress, DNS egress,
+                              Prometheus -> platform-metrics:8080 only (the
+                              Java admin API and its operator rule are retired)
   compose_exposure            8080/9090 published on 127.0.0.1 only
   image_pinning               every Dockerfile FROM and every third-party
                               compose/k8s image carries a sha256 digest; iap
@@ -70,8 +72,8 @@ Checks (each one is a named case; exit code 0 iff no case FAILED):
   alert_rule_tests            every rule file is loaded by a promtool test and
                               every alert is exercised by name in one (minus a
                               shrinking, explicit legacy allowlist)
-  k8s_state_backup            the state-backup CronJob reads iap-java-state
-                              READ-ONLY, is pinned to the java-platform node
+  k8s_state_backup            the state-backup CronJob reads iap-platform-state
+                              READ-ONLY, is pinned to the platform-metrics node
                               by required pod affinity, never overlaps itself,
                               and writes to its own claim
   release_guard               release.yml verifies the commit with
@@ -122,10 +124,28 @@ def have(tool: str) -> bool:
 
 
 # --------------------------------------------------------------- metrics ---
-# The metrics the deployment actually exports (PLATFORM_CONVENTIONS.md §12.6).
-# Sourced from com.iap.platform.PaperTrading + com.iap.platform.PaperTraces +
-# com.iap.risk.RiskEngine + com.iap.monitoring.GcMetrics; `up` is Prometheus's own.
-EXPORTED_METRICS = {
+# The metrics the deployment actually exports (PLATFORM_CONVENTIONS.md §12.6):
+# the Python platform-metrics process, python/src/iap/metrics/exporter.py
+# (v1.17 F9; the Java producer is retired). The producer contract is read from
+# the module so this list cannot drift from the code; `up` is Prometheus's
+# own. RETIRED names (Java-only, exposed as `<name>_available 0`) are known
+# here so a rule or panel that still reads one fails with a clear message.
+
+
+def _producer_contract() -> tuple[set[str], set[str]]:
+    sys.path.insert(0, str(ROOT / "python" / "src"))
+    try:
+        from iap.metrics.exporter import LIVE_METRICS, RETIRED_METRICS
+    finally:
+        sys.path.pop(0)
+    return set(LIVE_METRICS), set(RETIRED_METRICS)
+
+
+LIVE_METRICS, RETIRED_METRICS = _producer_contract()
+EXPORTED_METRICS = LIVE_METRICS | {"up"} | {f"{n}_available" for n in RETIRED_METRICS}
+# Historical check that the contract covers every name the Java container
+# exposed: the two sets must partition the old list exactly.
+_JAVA_METRICS = {
     # market data
     "md_events_total",
     "md_sequence_gaps_total",
@@ -184,9 +204,11 @@ EXPORTED_METRICS = {
     # rust/telemetry::trace pins) — exported, not yet on a panel (EPICS O06)
     "trace_records_total",
     "trace_tca_skipped_total",
-    # prometheus itself
-    "up",
 }
+assert _JAVA_METRICS == LIVE_METRICS | RETIRED_METRICS, (
+    sorted(_JAVA_METRICS - LIVE_METRICS - RETIRED_METRICS),
+    sorted((LIVE_METRICS | RETIRED_METRICS) - _JAVA_METRICS),
+)
 
 # Go text/template builtins plus Prometheus's own template functions.
 ALLOWED_TEMPLATE_FUNCS = {
@@ -452,6 +474,9 @@ def check_metric_provenance() -> None:
             for suffix in ("_bucket", "_sum", "_count"):
                 if base.endswith(suffix):
                     base = base[: -len(suffix)]
+            if base in RETIRED_METRICS:
+                unknown.setdefault(f"{metric} [RETIRED Java-only]", []).append(name)
+                continue
             if base in EXPORTED_METRICS or metric in recorded:
                 continue
             unknown.setdefault(metric, []).append(name)
@@ -518,39 +543,29 @@ def check_compose_log_limits() -> None:
     )
 
 
+PLATFORM_WORKLOAD = "platform-metrics"
+
+
 def check_config_dir_wiring() -> None:
-    """§12.2 — IAP_CONFIG_DIR is honoured by the code, image and compose."""
+    """§12.2 — IAP_CONFIG_DIR is honoured by the code, compose and k8s: the
+    Python exporter reads the live risk limits from it."""
     problems = []
-    java = (
-        ROOT
-        / "archive"
-        / "java"
-        / "src"
-        / "main"
-        / "java"
-        / "com"
-        / "iap"
-        / "config"
-        / "ConfigService.java"
-    ).read_text()
-    if "IAP_CONFIG_DIR" not in java:
-        problems.append("no Java code reads IAP_CONFIG_DIR")
-    dockerfile = (DEPLOY / "docker" / "Dockerfile.java").read_text()
-    if "IAP_CONFIG_DIR" not in dockerfile:
-        problems.append("Dockerfile.java does not pass IAP_CONFIG_DIR")
+    module = (ROOT / "python" / "src" / "iap" / "metrics" / "__main__.py").read_text()
+    if "IAP_CONFIG_DIR" not in module:
+        problems.append("iap.metrics does not read IAP_CONFIG_DIR")
     doc = compose_doc()
-    jp = doc["services"].get("java-platform", {})
+    jp = doc["services"].get(PLATFORM_WORKLOAD, {})
     env = jp.get("environment") or {}
     if isinstance(env, list):
         env = dict(e.split("=", 1) for e in env if "=" in e)
     if "IAP_CONFIG_DIR" not in env:
-        problems.append("compose java-platform sets no IAP_CONFIG_DIR")
+        problems.append(f"compose {PLATFORM_WORKLOAD} sets no IAP_CONFIG_DIR")
     mounts = [str(v) for v in jp.get("volumes", [])]
     if not any("configs" in m and m.endswith(":ro") for m in mounts):
-        problems.append("compose java-platform does not bind-mount configs:ro")
-    k8s = (DEPLOY / "k8s" / "java-platform.yaml").read_text()
+        problems.append(f"compose {PLATFORM_WORKLOAD} does not bind-mount configs:ro")
+    k8s = (DEPLOY / "k8s" / f"{PLATFORM_WORKLOAD}.yaml").read_text()
     if "IAP_CONFIG_DIR" not in k8s:
-        problems.append("k8s java-platform sets no IAP_CONFIG_DIR")
+        problems.append(f"k8s {PLATFORM_WORKLOAD} sets no IAP_CONFIG_DIR")
     record("compose_and_dockerfile_env", "PASS" if not problems else "FAIL", "; ".join(problems))
 
 
@@ -572,7 +587,7 @@ def check_dockerignore() -> None:
         record("dockerignore_present", "FAIL", "no .dockerignore at the repo root")
         return
     pats = dockerignore_patterns()
-    required = ["cpp/build/", "rust/target/", "archive/java/out/", ".git/"]
+    required = ["cpp/build/", "rust/target/", ".git/"]
     missing = [r for r in required if r not in pats]
     record(
         "dockerignore_present",
@@ -664,9 +679,9 @@ def check_k8s_singleton() -> None:
     problems = []
     found = False
     for _f, doc in k8s_docs():
-        if doc["kind"] == "PodDisruptionBudget" and doc["metadata"]["name"] == "java-platform":
+        if doc["kind"] == "PodDisruptionBudget" and doc["metadata"]["name"] == PLATFORM_WORKLOAD:
             problems.append("a PDB on a single-replica singleton blocks drains")
-        if doc["kind"] != "Deployment" or doc["metadata"]["name"] != "java-platform":
+        if doc["kind"] != "Deployment" or doc["metadata"]["name"] != PLATFORM_WORKLOAD:
             continue
         found = True
         spec = doc["spec"]
@@ -686,7 +701,7 @@ def check_k8s_singleton() -> None:
         if "startupProbe" not in container:
             problems.append("no startupProbe for the decode phase")
     if not found:
-        problems.append("no java-platform Deployment found")
+        problems.append(f"no {PLATFORM_WORKLOAD} Deployment found")
     record("k8s_trading_singleton", "PASS" if not problems else "FAIL", "; ".join(problems))
 
 
@@ -793,10 +808,13 @@ def check_dashboards() -> None:
                         continue
                     if placeholder:
                         continue
+                    why = (
+                        "is RETIRED (Java-only, no Python producer)"
+                        if metric in RETIRED_METRICS
+                        else "which no producer exports"
+                    )
                     problems.append(
-                        f"{f.name}: panel {panel['id']} "
-                        f"({panel.get('title')}) uses {metric}, which no "
-                        f"producer exports"
+                        f"{f.name}: panel {panel['id']} ({panel.get('title')}) uses {metric}, {why}"
                     )
     record("dashboards_valid", "PASS" if not problems else "FAIL", "; ".join(problems[:5]))
 
@@ -879,35 +897,38 @@ def check_k8s_pod_hardening() -> None:
     for pvc, doc in declared.items():
         if not (doc.get("spec") or {}).get("storageClassName"):
             problems.append(f"PVC {pvc} has no explicit storageClassName")
-    java = [p for _, n, p in pods if n == "java-platform"]
-    if not java:
-        problems.append("no java-platform workload")
+    plat = [p for _, n, p in pods if n == PLATFORM_WORKLOAD]
+    if not plat:
+        problems.append(f"no {PLATFORM_WORKLOAD} workload")
     else:
-        pod = java[0]
-        c = pod["containers"][0]
-        if (c.get("securityContext") or {}).get("readOnlyRootFilesystem") is not True:
-            problems.append("java-platform readOnlyRootFilesystem must be true")
-        mounts = {m["mountPath"]: m["name"] for m in c.get("volumeMounts", [])}
+        pod = plat[0]
         vols = {v["name"]: v for v in pod.get("volumes", [])}
-        if "/tmp" not in mounts or "emptyDir" not in vols.get(mounts["/tmp"], {}):
-            problems.append("java-platform needs an emptyDir mounted at /tmp")
-        env = {e["name"]: e.get("value") for e in c.get("env", [])}
-        if "-XX:-UsePerfData" not in (env.get("JAVA_OPTS") or ""):
-            problems.append("java-platform JAVA_OPTS lacks -XX:-UsePerfData")
-        if env.get("IAP_BIND_ADDR") != "0.0.0.0":
-            problems.append("java-platform must set IAP_BIND_ADDR=0.0.0.0")
-        state = (vols.get(mounts.get("/data", ""), {}).get("persistentVolumeClaim") or {}).get(
-            "claimName"
-        )
-        if state != "iap-java-state":
-            problems.append(
-                f"java-platform /data claim is {state!r}, expected its own iap-java-state"
+        for c in pod["containers"]:
+            if (c.get("securityContext") or {}).get("readOnlyRootFilesystem") is not True:
+                problems.append(
+                    f"{PLATFORM_WORKLOAD}/{c['name']} readOnlyRootFilesystem must be true"
+                )
+            mounts = {m["mountPath"]: m["name"] for m in c.get("volumeMounts", [])}
+            if "/tmp" not in mounts or "emptyDir" not in vols.get(mounts["/tmp"], {}):
+                problems.append(
+                    f"{PLATFORM_WORKLOAD}/{c['name']} needs an emptyDir mounted at /tmp"
+                )
+            state = (vols.get(mounts.get("/data", ""), {}).get("persistentVolumeClaim") or {}).get(
+                "claimName"
             )
-    jenv = compose_doc()["services"]["java-platform"].get("environment") or {}
+            if state != STATE_PVC:
+                problems.append(
+                    f"{PLATFORM_WORKLOAD}/{c['name']} /data claim is {state!r}, expected {STATE_PVC}"
+                )
+        c = pod["containers"][0]
+        env = {e["name"]: e.get("value") for e in c.get("env", [])}
+        if env.get("IAP_BIND_ADDR") != "0.0.0.0":
+            problems.append(f"{PLATFORM_WORKLOAD} must set IAP_BIND_ADDR=0.0.0.0")
+    jenv = compose_doc()["services"][PLATFORM_WORKLOAD].get("environment") or {}
     if isinstance(jenv, list):
         jenv = dict(e.split("=", 1) for e in jenv if "=" in e)
     if str(jenv.get("IAP_BIND_ADDR")) != "0.0.0.0":
-        problems.append("compose java-platform must set IAP_BIND_ADDR=0.0.0.0")
+        problems.append(f"compose {PLATFORM_WORKLOAD} must set IAP_BIND_ADDR=0.0.0.0")
     record(
         "k8s_pod_hardening",
         "PASS" if not problems else "FAIL",
@@ -917,7 +938,9 @@ def check_k8s_pod_hardening() -> None:
 
 # PVC -> workloads allowed to mount it in addition to its owner, READ-ONLY and
 # pinned to the owner's node (check_k8s_state_backup enforces both).
-SANCTIONED_READERS = {"iap-java-state": ("state-backup",)}
+STATE_PVC = "iap-platform-state"
+STATE_BACKUP_PVC = "iap-platform-state-backup"
+SANCTIONED_READERS = {STATE_PVC: ("state-backup",)}
 
 
 # ---------------------------------------------------------- v1.12 P4 ops ---
@@ -929,13 +952,9 @@ SEVERITIES = {"page", "critical", "warning", "none"}
 # visible diff to this file.
 LEGACY_UNTESTED_ALERTS = {
     "SignalRateCollapse",
-    "LiveVsBacktestDrift",
-    "AlphaLifecycleRetired",
     "FillRateDrop",
     "PreTradeRejectRatioHigh",
     "GrossNotionalUtilizationHigh",
-    "GcPauseHigh",
-    "SessionRestartsClimbing",
 }
 # A committed receiver URL is only acceptable if it is local: a compose service
 # name or loopback. Anything else is (or will become) a secret.
@@ -1051,29 +1070,29 @@ def check_k8s_state_backup() -> None:
     claims = {
         (v.get("persistentVolumeClaim") or {}).get("claimName"): v for v in pod.get("volumes", [])
     }
-    state = claims.get("iap-java-state")
+    state = claims.get(STATE_PVC)
     if state is None:
-        problems.append("does not mount iap-java-state")
+        problems.append(f"does not mount {STATE_PVC}")
     else:
         if state["persistentVolumeClaim"].get("readOnly") is not True:
-            problems.append("iap-java-state volume must be readOnly")
+            problems.append(f"{STATE_PVC} volume must be readOnly")
         for c in pod.get("containers", []):
             for m in c.get("volumeMounts", []):
                 if m["name"] == state["name"] and m.get("readOnly") is not True:
-                    problems.append("iap-java-state mount must be readOnly")
-    if "iap-java-state-backup" not in claims:
-        problems.append("must write to its own iap-java-state-backup claim")
+                    problems.append(f"{STATE_PVC} mount must be readOnly")
+    if STATE_BACKUP_PVC not in claims:
+        problems.append(f"must write to its own {STATE_BACKUP_PVC} claim")
     terms = ((pod.get("affinity") or {}).get("podAffinity") or {}).get(
         "requiredDuringSchedulingIgnoredDuringExecution"
     ) or []
     if not any(
         t.get("topologyKey") == "kubernetes.io/hostname"
         and (t.get("labelSelector") or {}).get("matchLabels", {}).get("app.kubernetes.io/name")
-        == "java-platform"
+        == PLATFORM_WORKLOAD
         for t in terms
     ):
         problems.append(
-            "needs REQUIRED podAffinity to java-platform on kubernetes.io/hostname "
+            f"needs REQUIRED podAffinity to {PLATFORM_WORKLOAD} on kubernetes.io/hostname "
             "(ReadWriteOnce is per node)"
         )
     record("k8s_state_backup", "PASS" if not problems else "FAIL", "; ".join(problems))
@@ -1105,20 +1124,22 @@ def check_k8s_network_policy() -> None:
                 dns = True
     if not dns:
         problems.append("no DNS (53 UDP+TCP) egress allowance")
-    operator = False
+    scrape = False
     for p in pols:
         sel = (p["spec"].get("podSelector") or {}).get("matchLabels", {})
-        if sel.get("app.kubernetes.io/name") != "java-platform":
+        if sel.get("app.kubernetes.io/name") != PLATFORM_WORKLOAD:
             continue
         for rule in p["spec"].get("ingress") or []:
             froms = [f.get("podSelector", {}).get("matchLabels", {}) for f in rule.get("from", [])]
             ports = [x.get("port") for x in rule.get("ports", [])]
-            if {"iap.role": "operator"} in froms and 8080 in ports:
-                operator = True
-    if not operator:
-        problems.append(
-            "no ingress rule letting iap.role=operator pods reach the java admin port 8080"
-        )
+            if {"app.kubernetes.io/name": "prometheus"} in froms and 8080 in ports:
+                scrape = True
+            if {"iap.role": "operator"} in froms:
+                problems.append(
+                    "an operator -> platform ingress rule survives: the admin API is retired"
+                )
+    if not scrape:
+        problems.append(f"no ingress rule letting prometheus scrape {PLATFORM_WORKLOAD}:8080")
     record(
         "k8s_network_policy",
         "PASS" if not problems else "FAIL",

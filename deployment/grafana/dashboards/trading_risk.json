@@ -1,7 +1,7 @@
 {
   "uid": "iap-trading-risk",
   "title": "Trading & Risk",
-  "description": "Alpha health, execution quality and hard-risk state (spec §25). Metric mapping: deployment/grafana/README.md.",
+  "description": "Alpha health, execution quality and hard-risk state (spec \u00a725). Metric mapping: deployment/grafana/README.md. RETIRED with the Java image (v1.17 F9): the execution-slippage histogram, the live-vs-backtest PSI and the alpha lifecycle gauge panels were removed (no Python producer; exposed as <name>_available 0).",
   "tags": [
     "iap",
     "trading",
@@ -28,7 +28,7 @@
       "id": 101,
       "type": "stat",
       "title": "Kill switch",
-      "description": "Latched by rust/risk on loss-limit breach (fail-closed). risk_kill_switch_engaged is LIVE from both the rust engine and the java platform.",
+      "description": "Latched by rust/risk on loss-limit breach (fail-closed). risk_kill_switch_engaged is LIVE from the platform-metrics exporter (the MVP run's risk engine state).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -51,7 +51,7 @@
                   "color": "green"
                 },
                 "1": {
-                  "text": "ENGAGED — HALTED",
+                  "text": "ENGAGED \u2014 HALTED",
                   "color": "red"
                 }
               }
@@ -101,7 +101,7 @@
       "id": 102,
       "type": "stat",
       "title": "Daily P&L (realized + unrealized)",
-      "description": "risk_daily_pnl — the risk engine's daily P&L in the reporting currency (USD), the same unit as global.max_daily_loss (PLATFORM_CONVENTIONS.md §12.1).",
+      "description": "risk_daily_pnl \u2014 the risk engine's daily P&L in the reporting currency (USD), the same unit as global.max_daily_loss (PLATFORM_CONVENTIONS.md \u00a712.1).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -160,7 +160,7 @@
       "id": 103,
       "type": "stat",
       "title": "Daily loss-limit utilization",
-      "description": "Daily loss against the LIVE limit gauge risk_limit{limit=\"max_daily_loss\"} — never a hand-copied constant, so a GOVERNANCE §3 limit change moves this stat and the LossLimitUtilizationHigh page together.",
+      "description": "Daily loss against the LIVE limit gauge risk_limit{limit=\"max_daily_loss\"} \u2014 never a hand-copied constant, so a GOVERNANCE \u00a73 limit change moves this stat and the LossLimitUtilizationHigh page together.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -223,7 +223,7 @@
       "id": 104,
       "type": "stat",
       "title": "Fill rate (5m)",
-      "description": "exec_fills_total / exec_orders_submitted_total over 5m — the platform's OWN execution counters (§12.6).",
+      "description": "exec_fills_total / exec_orders_submitted_total over 5m \u2014 the platform's OWN execution counters (\u00a712.6).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -405,7 +405,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
+        "w": 12,
         "x": 0,
         "y": 12
       },
@@ -446,78 +446,18 @@
       ]
     },
     {
-      "id": 113,
-      "type": "timeseries",
-      "title": "Execution slippage |fill - mark| (bps)",
-      "description": "exec_slippage_bps, a log2 histogram of |fill price - mark| in basis points x100 (integer-scaled); divided by 100 here. LIVE from the java platform — this panel used to reference two metrics with no producer.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 12
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": true
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "job:exec_slippage_bps_x100:p50 / 100",
-          "legendFormat": "p50 bps",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "job:exec_slippage_bps_x100:p99 / 100",
-          "legendFormat": "p99 bps",
-          "refId": "B"
-        }
-      ]
-    },
-    {
       "id": 114,
       "type": "timeseries",
       "title": "Risk decisions",
-      "description": "risk_decisions_total / risk_rejected_total from rust/risk — live.",
+      "description": "risk_decisions_total / risk_rejected_total from rust/risk \u2014 live.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
+        "w": 12,
+        "x": 12,
         "y": 12
       },
       "fieldConfig": {
@@ -569,7 +509,7 @@
       "id": 115,
       "type": "timeseries",
       "title": "Exposure & limit utilization",
-      "description": "Gross/net notional and their utilization against the LIVE risk_limit gauges (§12.6). One money unit throughout: qty x qty_unit x price_ticks x tick_size, converted to USD (§12.1).",
+      "description": "Gross/net notional and their utilization against the LIVE risk_limit gauges (\u00a712.6). One money unit throughout: qty x qty_unit x price_ticks x tick_size, converted to USD (\u00a712.1).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -647,7 +587,7 @@
       "id": 116,
       "type": "timeseries",
       "title": "Daily P&L and drawdown",
-      "description": "risk_daily_pnl (realized + unrealized, USD) and portfolio_drawdown (peak-to-trough equity), both LIVE from the java platform in the pinned money unit (PLATFORM_CONVENTIONS.md \u00a712.1).",
+      "description": "risk_daily_pnl (realized + unrealized, USD) and portfolio_drawdown (peak-to-trough equity), both LIVE from the Python platform-metrics exporter in the pinned money unit (PLATFORM_CONVENTIONS.md \u00a712.1).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -704,90 +644,18 @@
       ]
     },
     {
-      "id": 117,
-      "type": "timeseries",
-      "title": "Live vs backtest drift (PSI)",
-      "description": "LIVE from java (com.iap.adaptive.DriftMonitor): Population Stability Index of the rolling live signal window vs the research baseline (research/baselines/*.json, API_ADAPTIVE.md), labeled {alpha=...}. Industry rule of thumb: < 0.1 stable, 0.1-0.25 moderate, > 0.25 significant shift - the LiveVsBacktestDrift warning threshold (deployment/prometheus/alerts.yml).",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 28
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "min": 0,
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": true,
-            "thresholdsStyle": {
-              "mode": "line"
-            }
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 0.1
-              },
-              {
-                "color": "red",
-                "value": 0.25
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "alpha_live_vs_backtest_drift",
-          "legendFormat": "PSI {{alpha}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
       "id": 118,
       "type": "timeseries",
-      "title": "Rolling realized IC",
-      "description": "LIVE from java (com.iap.adaptive.RollingIc): Pearson correlation of the live signal vs the subsequent mid return over the alpha's pinned horizon, rolling 256-pair window, event-time and lookahead-free. IC < 0 puts the alpha on WATCH, IC < -0.05 retires it (alpha_lifecycle_state).",
+      "title": "Realized IC per alpha (session)",
+      "description": "alpha_rolling_ic{alpha=...}: the realized IC of each alpha over the newest MVP run (report.json alpha.per_alpha[alpha].realized_ic: Pearson of expected return vs the mid-to-mid label at the MVP horizon, confidence > 0 decisions), served by the Python platform-metrics exporter. The name is kept from the Java rolling-window gauge; the value is per session, not a rolling 256-pair window.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 8,
+        "w": 24,
+        "x": 0,
         "y": 28
       },
       "fieldConfig": {
@@ -824,80 +692,6 @@
           },
           "expr": "alpha_rolling_ic",
           "legendFormat": "IC {{alpha}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 119,
-      "type": "stat",
-      "title": "Alpha lifecycle",
-      "description": "0 ACTIVE / 1 WATCH / 2 RETIRED — IC-gated (NOT PSI-gated) and OBSERVATIONAL: the live loop does not halt allocation on this signal, the AlphaLifecycleRetired alert asks a human to (API_ADAPTIVE.md §6, PLATFORM_CONVENTIONS.md §12.6).",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 28
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "ACTIVE",
-                  "color": "green",
-                  "index": 0
-                },
-                "1": {
-                  "text": "WATCH",
-                  "color": "yellow",
-                  "index": 1
-                },
-                "2": {
-                  "text": "RETIRED",
-                  "color": "red",
-                  "index": 2
-                }
-              }
-            }
-          ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "textMode": "value_and_name",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "alpha_lifecycle_state",
-          "legendFormat": "{{alpha}}",
           "refId": "A"
         }
       ]

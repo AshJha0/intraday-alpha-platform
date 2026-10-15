@@ -84,12 +84,12 @@ cd cpp && bash build.sh && ctest --test-dir build --output-on-failure -R 'Replay
 # Rust — deterministic replay demo over the golden vectors
 cd rust && cargo run --release --bin demo
 
-# Java — replay demo (golden vectors, codec SHA-256s, throughput)
-cd java && bash build.sh && java -cp out/main com.iap.replay.Demo ../tests/golden
+# Java — archived (archive/java/, frozen at v1.14.0, not built; v1.17 retired its image)
+# cd archive/java && bash build.sh && java -cp out/main com.iap.replay.Demo ../../tests/golden
 ```
 
 Containerized equivalents: `docker compose -f
-deployment/docker/docker-compose.yml up cpp-replay rust-replay java-platform`.
+deployment/docker/docker-compose.yml up cpp-replay rust-replay mvp-session platform-metrics`.
 
 The Python reference ports of the same simulator and of the risk engine run
 their goldens in the Python suite (`cd python && PYTHONPATH=src python3 -m
@@ -141,6 +141,9 @@ map-ordering leaks; the determinism tests
 localize the layer.
 
 ### JVM latency issues {#jvm}
+
+(Historical: `GcPauseHigh` and `jvm_gc_pause_ns` were retired with the Java
+image in v1.17, F9; there is no JVM in the deployment.)
 
 `GcPauseHigh` (p99 pause > 10 ms) during Java replay/backtest: check heap
 sizing in `JAVA_OPTS` (compose/k8s set ZGC + 256m–1g), then allocation on hot

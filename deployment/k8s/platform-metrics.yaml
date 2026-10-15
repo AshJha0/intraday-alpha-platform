@@ -1,0 +1,285 @@
+# =============================================================================
+# platform-metrics — the Python /metrics process (v1.17 WS-F item F9; the
+# Java platform image was retired with DECISION_N7,
+# docs/release/DECISION_N7_JAVA_IMAGE.md). Image: the `python` image,
+# deployment/docker/Dockerfile.python.
+#
+# Two containers in ONE pod, mirroring the retired java-platform + sidecar:
+#   metrics   `python -m iap.metrics serve` — GET /metrics (Prometheus text),
+#             /health (liveness), /ready (readiness), /status on :8080. It
+#             reads the live limits from the iap-configs ConfigMap
+#             ($IAP_CONFIG_DIR), the session marker session_exit.json from
+#             /data/state and the newest MVP run under /data/mvp
+#             (python/src/iap/metrics/exporter.py lists every metric and its
+#             source). Long-running; what Prometheus scrapes.
+#   session   `python -m iap.metrics run-session -- python -m iap.mvp run`:
+#             the Python MVP loop over the seeded golden instrument, writing
+#             config.json first and report.json last under /data/mvp/golden,
+#             with the session marker maintained around it (RUNNING ->
+#             FINISHED / FAILED / STOPPED). A session is FINITE (exit 0 when
+#             the stream ends); the kubelet restarts the container (backoff)
+#             and the marker tells "finished" from "crashed" meanwhile — the
+#             same shape the finite Java paper session had.
+#
+# There is NO admin API any more: the kill-switch runbook's manual halt is
+# the config path (configs/risk/risk.json global.kill_switch_engaged, then
+# regenerate the ConfigMap and rollout restart), see
+# docs/runbooks/RUNBOOK_incident_kill_switch.md.
+#
+# SINGLETON (PLATFORM_CONVENTIONS.md §12.7): replicas 1 + strategy Recreate.
+# The state PVC is ReadWriteOnce and the session writes it; a second replica
+# (or a RollingUpdate surge pod) hits Multi-Attach. No PodDisruptionBudget:
+# minAvailable 1 on a single replica blocks every node drain.
+#
+# CONFIG (§12.2): both containers read the iap-configs ConfigMap mounted at
+# /etc/iap/configs (IAP_CONFIG_DIR) — the exporter for the risk limits, the
+# session for mvp.json; mvp.json's `reference` paths resolve against
+# --repo-root /app (the configs baked into the image). STATE (§12.3):
+# /data on the iap-platform-state PVC holds the marker and the MVP artefacts
+# (traces, risk audit, report). The claim is separate from the data-pipeline
+# CronJob's iap-data: a ReadWriteOnce claim shared by two workloads either
+# pins them to one node or fails with Multi-Attach.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: platform-metrics
+  namespace: intraday-alpha
+  labels:
+    app.kubernetes.io/part-of: intraday-alpha-platform
+    app.kubernetes.io/name: platform-metrics
+    app.kubernetes.io/component: strategy-platform
+    app.kubernetes.io/version: "1.17.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: platform-metrics
+  strategy:
+    # One session at a time, never two writers on the RWO claim: Recreate
+    # stops the old pod before the new one starts.
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: intraday-alpha-platform
+        app.kubernetes.io/name: platform-metrics
+        app.kubernetes.io/component: strategy-platform
+        app.kubernetes.io/version: "1.17.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
+    spec:
+      automountServiceAccountToken: false   # no API access needed
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: metrics
+          # Release step: `python tools/release.py publish` pins this by digest
+          # from release-manifest.json (…-python:v1.17.0@sha256:…).
+          image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.17.0
+          imagePullPolicy: IfNotPresent
+          # `command` REPLACES the image ENTRYPOINT (iap.marketdata).
+          command: ["python3", "-m", "iap.metrics", "serve"]
+          args: ["--port", "8080"]
+          ports:
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+          env:
+            # The server binds 127.0.0.1 by default; inside the pod it must
+            # listen on all interfaces so the kubelet probes and Prometheus
+            # (reached only through the NetworkPolicies) can connect.
+            - name: IAP_BIND_ADDR
+              value: 0.0.0.0
+            - name: IAP_CONFIG_DIR
+              value: /etc/iap/configs
+            - name: IAP_STATE_DIR
+              value: /data/state
+            - name: IAP_RUNS_ROOT
+              value: /data/mvp
+          volumeMounts:
+            - name: configs
+              mountPath: /etc/iap/configs
+              readOnly: true
+            - name: data
+              mountPath: /data
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          # Real probes that can fail (PLATFORM_CONVENTIONS.md §12.5): /health
+          # is 503 when the configs cannot be read, /ready until the first
+          # refresh succeeded with no malformed source.
+          startupProbe:
+            httpGet: { path: /health, port: metrics }
+            periodSeconds: 5
+            failureThreshold: 12        # up to a minute for the image to start
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: metrics }
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: { path: /ready, port: metrics }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 2
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true   # writes nothing (reads /data)
+            capabilities:
+              drop: ["ALL"]
+        - name: session
+          image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.17.0
+          imagePullPolicy: IfNotPresent
+          command: ["python3", "-m", "iap.metrics", "run-session"]
+          args:
+            - --state-dir
+            - /data/state
+            - --runs-root
+            - /data/mvp
+            - --
+            - python3
+            - -m
+            - iap.mvp
+            - run
+            - --config
+            - /etc/iap/configs/mvp/mvp.json
+            - --repo-root
+            - /app
+            - --out
+            - /data/mvp/golden
+          env:
+            - name: IAP_CONFIG_DIR
+              value: /etc/iap/configs
+            - name: IAP_STATE_DIR
+              value: /data/state
+          volumeMounts:
+            - name: configs
+              mountPath: /etc/iap/configs
+              readOnly: true
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true   # writes only to /tmp (emptyDir) and /data (PVC)
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: configs
+          configMap:
+            name: iap-configs
+            # Every key is a configs/-relative path with '/' encoded as '__'
+            # (ConfigMap keys may not contain '/'); items[].path projects the
+            # nested domain tree (PLATFORM_CONVENTIONS.md §0) back under
+            # IAP_CONFIG_DIR. Generated from generate_configmaps.py
+            # configmap_items() — check_deployment.py fails if this drifts.
+            items:
+              - key: agents__llm.json
+                path: agents/llm.json
+              - key: execution__execution.json
+                path: execution/execution.json
+              - key: instruments__instruments.json
+                path: instruments/instruments.json
+              - key: marketdata__generator.json
+                path: marketdata/generator.json
+              - key: mvp__generator.json
+                path: mvp/generator.json
+              - key: mvp__generator_tiny.json
+                path: mvp/generator_tiny.json
+              - key: mvp__instruments.json
+                path: mvp/instruments.json
+              - key: mvp__mvp.json
+                path: mvp/mvp.json
+              - key: mvp__mvp_tiny.json
+                path: mvp/mvp_tiny.json
+              - key: mvp__venues.json
+                path: mvp/venues.json
+              - key: paper__paper_trade.json
+                path: paper/paper_trade.json
+              - key: prereg__v2.json
+                path: prereg/v2.json
+              - key: prereg__v3.json
+                path: prereg/v3.json
+              - key: reference__auction_entry_cutoffs.json
+                path: reference/auction_entry_cutoffs.json
+              - key: reference__event_calendar.json
+                path: reference/event_calendar.json
+              - key: reference__fee_tiers.json
+                path: reference/fee_tiers.json
+              - key: reference__llm_prices.json
+                path: reference/llm_prices.json
+              - key: reference__regulatory_fee_schedule.json
+                path: reference/regulatory_fee_schedule.json
+              - key: reference__venue_latency.json
+                path: reference/venue_latency.json
+              - key: risk__risk.json
+                path: risk/risk.json
+              - key: strategies__alpha_params.json
+                path: strategies/alpha_params.json
+              - key: strategies__lifecycle.json
+                path: strategies/lifecycle.json
+              - key: strategies__strategies.json
+                path: strategies/strategies.json
+              - key: templates__regulatory_fees.json
+                path: templates/regulatory_fees.json
+              - key: venues__venues.json
+                path: venues/venues.json
+        - name: data
+          persistentVolumeClaim:
+            claimName: iap-platform-state   # its own claim; NOT the data-pipeline's iap-data
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: platform-metrics
+  namespace: intraday-alpha
+  labels:
+    app.kubernetes.io/part-of: intraday-alpha-platform
+    app.kubernetes.io/name: platform-metrics
+    app.kubernetes.io/component: strategy-platform
+spec:
+  type: ClusterIP
+  # The exporter outlives the finite session and serves the persisted
+  # session state (platform_persisted_session_state) while the session
+  # container is between runs, so "stopped and not resumed" stays scrapeable
+  # even when /ready is 503 (alerts.yml SessionStoppedNotResumed).
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/name: platform-metrics
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: metrics
+      protocol: TCP
+---
+# NOTE: no PodDisruptionBudget. This is a single-replica singleton; a PDB with
+# minAvailable 1 would block every voluntary disruption (node drain, upgrade).
+# Draining this workload is safe: the MVP artefacts and the marker live on the
+# PVC and the next pod re-reads them.

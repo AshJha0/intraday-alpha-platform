@@ -5,11 +5,14 @@
 #   data-generator (python, batch)
 #       -> shared volume /data (raw + normalized + qc_report.json)
 #   cpp-replay, rust-replay (deterministic replay / exec sim)
-#   java-platform (paper-trading vertical, com.iap.platform.PaperTrading;
-#                  monitoring API live on :8080 — /metrics, /health, /ready,
-#                  /status, POST /admin/* when GRAFANA-style secrets provide
-#                  IAP_ADMIN_TOKEN)
-#   prometheus  -> scrapes java-platform (the only metrics producer) and
+#   mvp-session (python: the MVP loop over the golden instrument, finite,
+#                writes /data/mvp/golden with the session marker maintained
+#                by `python -m iap.metrics run-session`)
+#   platform-metrics (python: `python -m iap.metrics serve` — GET /metrics,
+#                /health, /ready, /status on :8080, read from the configs,
+#                the session marker and the newest MVP run; v1.17 F9, it
+#                replaces the retired Java platform image, DECISION_N7)
+#   prometheus  -> scrapes platform-metrics (the only metrics producer) and
 #                  sends alerts to alertmanager (webhook receiver; the
 #                  always-firing Watchdog alert proves the path end to end)
 #   alertmanager -> routes alerts to the webhook whose URL is a secret file
@@ -23,12 +26,15 @@
 #
 # Image pinning: the iap images are built from this repo here (`build:`) and are
 # named after the GHCR images .github/workflows/release.yml publishes
-# (ghcr.io/ashjha0/intraday-alpha-platform-<lang>:<tag>); pulling instead of
-# building uses the same names. The release step pins each of them by digest
-# from release-manifest.json (<name>:<tag>@sha256:...). Third-party images are
-# pinned here by tag AND digest. All images build offline-agnostic — in
-# particular the Java image uses NO Maven (Maven Central unreachable; see
-# docs/BUILD_NOTES.md).
+# (ghcr.io/ashjha0/intraday-alpha-platform-{python,cpp,rust}:<tag>); pulling
+# instead of building uses the same names. The tag names the release that
+# ships this file's services (v1.17.0: `iap.metrics` is not in an older
+# python image), so until that tag is published `docker compose up --build`
+# builds locally. `python tools/release.py publish` pins the KUBERNETES
+# manifests by digest from release-manifest.json (<name>:<tag>@sha256:...);
+# a compose service with `build:` cannot carry a digest (a built image
+# cannot be tagged with one), so compose stays on the tag. Third-party
+# images are pinned here by tag AND digest.
 # =============================================================================
 
 name: intraday-alpha-platform
@@ -62,7 +68,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.python
-    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.14.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.17.0
     container_name: iap-data-generator
     # Deterministic batch job: identical seed => bit-identical /data outputs
     # (configs/marketdata/generator.json pins seed 20260829). Runs to completion; the
@@ -83,7 +89,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.cpp
-    image: ghcr.io/ashjha0/intraday-alpha-platform-cpp:v1.14.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-cpp:v1.17.0
     container_name: iap-cpp-replay
     # Deterministic replay + execution-sim pass over the golden vectors;
     # writes its methodology/results table to the shared volume.
@@ -100,7 +106,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.rust
-    image: ghcr.io/ashjha0/intraday-alpha-platform-rust:v1.14.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-rust:v1.17.0
     container_name: iap-rust-replay
     command: ["/golden"]
     restart: "no"
@@ -111,94 +117,100 @@ services:
       data-generator:
         condition: service_completed_successfully
 
-  # ----------------------------------------------------------- java platform
-  java-platform:
+  # ------------------------------------------------------- python platform
+  # The Python MVP loop over the golden instrument (python -m iap.mvp run),
+  # finite: it exits 0 when the stream ends, so `restart: on-failure`, NOT
+  # `unless-stopped` (the container must not re-run the session forever).
+  # `python -m iap.metrics run-session` maintains the session marker
+  # /data/state/session_exit.json around it (RUNNING -> FINISHED / FAILED /
+  # STOPPED) so platform-metrics can tell "finished" from "crashed" after
+  # the process is gone (PLATFORM_CONVENTIONS.md §12.3). It writes
+  # /data/mvp/golden (config.json first, report.json last).
+  mvp-session:
     build:
       context: ../..
-      dockerfile: deployment/docker/Dockerfile.java
-    image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.14.0
-    container_name: iap-java-platform
-    # The paper-trading vertical (com.iap.platform.PaperTrading) over the
-    # golden equity vector, paced 60x realtime, serving GET /metrics
-    # (Prometheus text), /health, /ready and /status on :8080, plus the
-    # kill-switch admin API when IAP_ADMIN_TOKEN is set (see Dockerfile.java).
-    #
-    # A session is FINITE and ends cleanly (exit 0, status FINISHED,
-    # PLATFORM_CONVENTIONS.md §12.3) — hence `restart: on-failure`, NOT
-    # `unless-stopped`: the container must not re-run the 2-minute session
-    # forever, which used to reset the "daily" counters every two minutes and
-    # make `offset 1h` baselines meaningless. To watch a longer window, lower
-    # --speed or point --events at a longer vector.
+      dockerfile: deployment/docker/Dockerfile.python
+    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.17.0
+    container_name: iap-mvp-session
+    entrypoint: ["python3", "-m", "iap.metrics", "run-session"]
+    command:
+      - --state-dir
+      - /data/state
+      - --runs-root
+      - /data/mvp
+      - "--"
+      - python3
+      - -m
+      - iap.mvp
+      - run
+      - --config
+      - /app/configs/mvp/mvp.json
+      - --repo-root
+      - /app
+      - --out
+      - /data/mvp/golden
     restart: on-failure
     networks: [iap-net]
-    ports:
-      # Loopback only: /metrics, /status and the admin API are not for the LAN.
-      - "127.0.0.1:8080:8080"
     environment:
-      # The server defaults to 127.0.0.1 inside the container; bind all
-      # interfaces so Prometheus (iap-net) and the published loopback port
-      # reach it.
-      IAP_BIND_ADDR: 0.0.0.0
-      # PLATFORM_CONVENTIONS.md §12.2: the entrypoint reads IAP_CONFIG_DIR, so
-      # the bind mount below is what the process actually loads. This makes the
-      # kill-switch runbook's config path real:
-      #   edit configs/risk/risk.json  ->  docker compose restart java-platform
+      # PLATFORM_CONVENTIONS.md §12.2: the bind mount below is what the
+      # process actually loads (mvp.json and, through --repo-root, every
+      # `reference` it names), so an operator edit plus a restart is a real
+      # config change.
       IAP_CONFIG_DIR: /app/configs
       IAP_STATE_DIR: /data/state
-      # Kill-switch admin API (§12.5). Optional: with no token the /admin/*
-      # routes are not registered. Set IAP_ADMIN_TOKEN in the environment or an
-      # .env file (git-ignored, SECURITY.md) to enable the manual halt path.
-      IAP_ADMIN_TOKEN: ${IAP_ADMIN_TOKEN:-}
-    # Immutable root filesystem: the JVM writes only to /tmp (tmpfs) and the
-    # /data volume.
     read_only: true
     tmpfs:
       - /tmp
     volumes:
-      # configs mounted READ-ONLY over the baked-in copy: an operator edit plus
-      # a restart is a real config change (round-3 SEV-1).
       - ../../configs:/app/configs:ro
       - iap-data:/data
     depends_on:
       data-generator:
         condition: service_completed_successfully
     logging:
-      # -Xlog:gc*:stdout grows without bound otherwise (round-3 SEV-3).
       driver: json-file
       options:
         max-size: "50m"
         max-file: "5"
     healthcheck:
-      # Real check against the live /health endpoint (no curl/wget in the
-      # JRE image — bash /dev/tcp, same as the image's own HEALTHCHECK).
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q ok <&3"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+      test: ["NONE"]
 
-  # The last persisted session state, served by a process that outlives the
-  # trading JVM (PLATFORM_CONVENTIONS.md §12.3). java-platform sets
-  # platform_session_state=4 on a clean stop and exits right after the
-  # checkpoint, so Prometheus almost never scrapes the 4; this service reads
-  # the session_exit.json marker the trading thread writes and serves it as
-  # platform_persisted_session_state on :9102 (scraped as job
-  # java-platform-state; alerts.yml SessionStoppedNotResumed). Same image,
-  # different entrypoint, state mounted READ-ONLY, no published port.
-  java-platform-state:
+  # The Python /metrics process (v1.17 F9; python/src/iap/metrics/). Serves
+  # GET /metrics (Prometheus text), /health, /ready and /status on :8080 from
+  # the live risk limits in configs/, the session marker and the newest MVP
+  # run under /data/mvp — every metric and its source is listed in
+  # python/src/iap/metrics/exporter.py; retired Java-only names are exposed
+  # as <name>_available 0. Outlives the finite session (restart:
+  # unless-stopped), state mounted READ-ONLY. There is no admin API.
+  platform-metrics:
     build:
       context: ../..
-      dockerfile: deployment/docker/Dockerfile.java
-    image: ghcr.io/ashjha0/intraday-alpha-platform-java:v1.14.0
-    container_name: iap-java-platform-state
-    entrypoint: ["java", "-Xmx64m", "-XX:-UsePerfData", "-cp", "/app/classes", "com.iap.platform.SessionStateExporter", "--state-dir", "/data/state", "--port", "9102"]
+      dockerfile: deployment/docker/Dockerfile.python
+    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.17.0
+    container_name: iap-platform-metrics
+    entrypoint: ["python3", "-m", "iap.metrics", "serve", "--port", "8080"]
+    command: []
     restart: unless-stopped
     networks: [iap-net]
+    ports:
+      # Loopback only: /metrics and /status are not for the LAN.
+      - "127.0.0.1:8080:8080"
     environment:
+      # The server defaults to 127.0.0.1 inside the container; bind all
+      # interfaces so Prometheus (iap-net) and the published loopback port
+      # reach it.
       IAP_BIND_ADDR: 0.0.0.0
+      # §12.2: the exporter reads the risk limits from IAP_CONFIG_DIR, the
+      # bind mount below — edit configs/risk/risk.json, restart, and
+      # risk_limit{...} moves with it.
+      IAP_CONFIG_DIR: /app/configs
+      IAP_STATE_DIR: /data/state
+      IAP_RUNS_ROOT: /data/mvp
     read_only: true
     tmpfs:
       - /tmp
     volumes:
+      - ../../configs:/app/configs:ro
       - iap-data:/data:ro
     depends_on:
       data-generator:
@@ -209,7 +221,9 @@ services:
         max-size: "10m"
         max-file: "3"
     healthcheck:
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9102 && printf 'GET /health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q ok <&3"]
+      # Real check against the live /health endpoint (stdlib only; the
+      # python image has no curl/wget).
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5).status == 200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -286,7 +300,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.python
-    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.14.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.17.0
     container_name: iap-alert-sink
     restart: unless-stopped
     networks: [iap-net]

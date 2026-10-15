@@ -13,7 +13,7 @@ Outputs (do not hand-edit):
                                 e.g. risk__risk.json, strategies__alpha_params.json.
                                 The Deployment/CronJob mount it with
                                 items[].path so the pod sees the nested tree.
-  configmap-prometheus.yaml  <- deployment/prometheus/{prometheus,recording,alerts}.yml
+  configmap-prometheus.yaml  <- deployment/prometheus/{prometheus,recording,alerts,slo}.yml
   configmap-alertmanager.yaml <- deployment/alertmanager/alertmanager.yml
   configmap-grafana.yaml     <- deployment/grafana/provisioning + dashboards
 
@@ -127,7 +127,7 @@ def main() -> int:
     # 1. Platform configs (mounted at /etc/iap/configs). The tree is nested by
     #    domain (configs/<domain>/<file>.json); a ConfigMap key may not contain
     #    '/', so it is encoded as '__' and decoded back by the manifests'
-    #    items[].path (deployment/k8s/java-platform.yaml,
+    #    items[].path (deployment/k8s/platform-metrics.yaml,
     #    cronjob-data-pipeline.yaml — see configmap_items()).
     cfg_files = {configmap_key(p): p for p in config_files()}
     write(

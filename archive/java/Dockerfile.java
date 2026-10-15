@@ -1,4 +1,13 @@
 # =============================================================================
+# RETIRED (v1.17 WS-F item F9, DECISION_N7 closed 2026-10-15). This Dockerfile
+# built the `java` platform image from the frozen copy in archive/java. It is
+# kept here, unbuilt and unreferenced, as a record: not in release.yml, not in
+# the CI images job, not in docker-compose or the k8s manifests. The Python
+# process `python -m iap.metrics serve` serves /metrics in its place
+# (python/src/iap/metrics/). The COPY paths below assume the repository root
+# as build context and are no longer checked by tests/harness/check_deployment.py.
+# =============================================================================
+# =============================================================================
 # Dockerfile.java — IAP Java platform image (strategy/backtest/monitoring layer)
 #
 # OFFLINE-AGNOSTIC BY DESIGN: there is deliberately NO Maven/Gradle step.

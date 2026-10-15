@@ -632,11 +632,20 @@ never a sum of mixed currencies, never an end-of-day rate applied to a session t
 closed (raise / `FX_RATE_MISSING`) when no rate prevails. FX impact is in base units
 (`qty × qty_unit / adv`) in both the simulator and the research cost model.
 
-## 12. Platform, observability and deployment contracts (Java `com.iap.{platform,monitoring,api,config}`, `deployment/`)
+## 12. Platform, observability and deployment contracts (Python `iap.metrics`, `iap.mvp`; `deployment/`)
 
-Normative implementation: the Java platform vertical (`com.iap.platform.PaperTrading` and the
-`monitoring`/`api`/`config` packages). Only Java has a platform layer; `rust/telemetry` remains the
-reference for the *exposition format* (§12.5) and is unit-tested there. Everything below is pinned:
+Normative implementation since v1.17 (WS-F item F9, DECISION_N7 closed): the Python `/metrics`
+process `python -m iap.metrics serve` (`iap.metrics.{registry,exporter,server}`) over the MVP loop
+(`iap.mvp`), replacing the retired Java platform vertical (`com.iap.platform.PaperTrading` and the
+`monitoring`/`api`/`config` packages, archived and frozen at v1.14.0). Where a subsection below
+describes a Java-only behaviour (the kill-switch admin API of §12.5, the `--resume` checkpoint of
+§12.3, the lock-free JVM registry of §12.4) it is the historical contract the Python process does
+NOT reproduce: `iap.metrics` has no admin API (the manual halt is the config path), the MVP loop is
+deterministic and reruns rather than resumes, and the exporter is single-process and file-backed
+(it re-reads the artefacts on every scrape, so no trading lock exists to block). The metric NAMES of
+§12.6 are kept: every one is LIVE (Python producer) or RETIRED (`<name>_available 0`) per
+`iap.metrics.exporter`. `rust/telemetry` remains the reference for the *exposition format* (§12.5)
+and is unit-tested there. Everything below is pinned:
 a deployment artefact (Dockerfile, compose, k8s, Prometheus rule, dashboard, runbook step) that
 claims a behaviour must be executable exactly as written, and is checked by
 `tests/harness/check_deployment.py` in CI.
@@ -879,8 +888,10 @@ Admin endpoints (`RUNBOOK_incident_kill_switch.md` §2 — the manual ENGAGE pat
 - `platform_session_state` — 0 STARTING, 1 RUNNING, 2 FINISHED, 3 FAILED, 4 STOPPED (a stop was
   requested and the session checkpointed mid-stream; resumable — §12.3, since 2026-10-03).
   A rule or panel that enumerates the states must know the value 4. The trading process exits
-  right after setting 4, so the observable form is `platform_persisted_session_state` (exporter
-  job `java-platform-state`; 1/2/3/4 as above, -1 no marker, -2 unreadable, §12.3), plus
+  right after setting 4, so the observable form is `platform_persisted_session_state` (served
+  by the `platform-metrics` exporter since v1.17, read from the `session_exit.json` marker that
+  `python -m iap.metrics run-session` maintains; 1/2/3/4 as above, -1 no marker, -2 unreadable,
+  §12.3), plus
   `platform_persisted_session_unixtime` and `platform_persisted_session_event_cursor`.
 - Safety counters added 2026-10-03: `risk_routed_venue_mismatch_total`,
   `risk_resume_open_orders_released_total`, `exec_orders_blocked_kill_pending_total`,
@@ -937,9 +948,9 @@ Admin endpoints (`RUNBOOK_incident_kill_switch.md` §2 — the manual ENGAGE pat
   exactly one writer at a time. Probes use `/health` (liveness) and `/ready` (readiness) per §12.5,
   with a `startupProbe` covering the decode phase.
 - **Compose**: every long-running service declares
-  `logging.options.{max-size,max-file}`; `configs/` is bind-mounted read-only into `java-platform`
-  at the path `IAP_CONFIG_DIR` names, so the runbook's "edit risk.json, restart the service" path
-  is real.
+  `logging.options.{max-size,max-file}`; `configs/` is bind-mounted read-only into
+  `platform-metrics` and `mvp-session` (v1.17; was `java-platform`) at the path `IAP_CONFIG_DIR`
+  names, so the runbook's "edit risk.json, restart the service" path is real.
 - **Alert delivery** (2026-10-03): Prometheus sends to Alertmanager (`alertmanager:9093` in
   compose and Kubernetes; `deployment/alertmanager/alertmanager.yml` is the single source, and
   `configmap-alertmanager.yaml` is generated from it). The receiver is a generic webhook whose
@@ -960,15 +971,16 @@ Admin endpoints (`RUNBOOK_incident_kill_switch.md` §2 — the manual ENGAGE pat
     traffic → NaN → no alert.
   - *Tests*: every rule file is loaded by a promtool test file and every alert is exercised by
     name (`alert_rule_tests`), except an explicit legacy allowlist that may only shrink.
-  - *State HA*: restart-and-resume on one RWO claim, never active-active (no Lease-based leader
-    election exists). The `state-backup` CronJob is the one sanctioned second mounter of
-    `iap-java-state`: read-only, `concurrencyPolicy: Forbid`, `activeDeadlineSeconds`, required pod
-    affinity to `java-platform` on `kubernetes.io/hostname` (`k8s_state_backup`).
-- **Network policy** (2026-10-03): default-deny ingress and egress in the namespace, then
-  Prometheus → java-platform:8080 and → alertmanager:9093, Grafana → Prometheus:9090, the ingress
-  controller → Grafana:3000, pods labelled `iap.role=operator` → java-platform:8080 (the admin
-  API, token still required), DNS for every pod, and Alertmanager → tcp/443 on non-private
-  addresses. Enforcement needs a CNI that implements NetworkPolicy.
+  - *State HA*: restart (and, for the retired Java path, resume) on one RWO claim, never
+    active-active (no Lease-based leader election exists). The `state-backup` CronJob is the one
+    sanctioned second mounter of `iap-platform-state` (was `iap-java-state`): read-only,
+    `concurrencyPolicy: Forbid`, `activeDeadlineSeconds`, required pod affinity to
+    `platform-metrics` on `kubernetes.io/hostname` (`k8s_state_backup`).
+- **Network policy** (2026-10-03; v1.17 names): default-deny ingress and egress in the namespace,
+  then Prometheus → platform-metrics:8080 and → alertmanager:9093, Grafana → Prometheus:9090, the
+  ingress controller → Grafana:3000, DNS for every pod, and Alertmanager → tcp/443 on non-private
+  addresses (the `iap.role=operator` → admin-port rule was retired with the Java admin API).
+  Enforcement needs a CNI that implements NetworkPolicy.
 - **CI** (`.github/workflows/ci.yml`) runs the commands of `tests/harness/run_all.sh` as parallel
   jobs (python, cpp and rust since v1.15, plus the `integration` and `replay` rows), `tests/harness/run_golden.sh`,
   and `tests/harness/check_deployment.py` (YAML/compose/promtool/Dockerfile/configmap checks, and

@@ -23,6 +23,29 @@
 # Validated by `promtool check rules` and unit-tested by
 # `promtool test rules deployment/prometheus/tests/*.yml`, both run by
 # tests/harness/check_deployment.py (and CI).
+#
+# RETIRED with the Java platform image (v1.17 WS-F item F9, DECISION_N7).
+# The producer is now the Python platform-metrics process
+# (python/src/iap/metrics/exporter.py). Every rule below reads a metric it
+# exports; the rules whose only inputs were Java-only metrics were removed
+# rather than left evaluating to empty (§12.7 "no aspirational targets").
+# The exporter still exposes each retired name as `<name>_available 0`, so
+# the retirement is visible at the scrape. Removed alerts -> Java metric:
+#   BookStale                  book_stale
+#   StaleFeed                  md_event_time_gap_seconds
+#   LiveVsBacktestDrift        alpha_live_vs_backtest_drift (DriftMonitor PSI)
+#   AlphaLifecycleRetired      alpha_lifecycle_state (LifecycleGauge)
+#   RoutedVenueMismatch        risk_routed_venue_mismatch_total
+#   KillPendingNotRecorded     exec_orders_blocked_kill_pending_total
+#   ResumeReleasedOpenOrders   risk_resume_open_orders_released_total
+#   GcPauseHigh                jvm_gc_pause_ns (there is no JVM)
+#   SessionRestartsClimbing    risk_session_restarts_total (no --resume)
+#   AdminAuthRateLimited       admin_auth_rate_limited_total (no admin API)
+#   AdminAuditSuppressed       admin_audit_suppressed_total (no admin API)
+#   EventPathLatencySLO*Burn   book_update_latency_ns (slo.yml)
+# The recording rules on decode_latency_ns, book_update_latency_ns,
+# exec_slippage_bps and jvm_gc_pause_ns went with them (recording.yml), and
+# so did the Grafana panels built on those names (deployment/grafana/).
 # =============================================================================
 
 groups:
@@ -50,51 +73,12 @@ groups:
           runbook: docs/runbooks/RUNBOOK_data_pipeline.md
           runbook_url: docs/runbooks/RUNBOOK_data_pipeline.md
 
-      # Book stale (the consequence of a gap or a venue drop) is its own
-      # signal: it can persist for a whole session with no further gaps.
-      - alert: BookStale
-        expr: book_stale > 0
-        for: 2m
-        labels:
-          severity: critical
-          domain: market-data
-        annotations:
-          summary: "Book stale for instrument {{ $labels.instrument }} on {{ $labels.service }}"
-          description: >-
-            A venue book has been stale for 2m — no SNAPSHOT recovery after a
-            sequence gap or a venue disconnect. Trading in that instrument is
-            fail-closed (STALE_PRICE / SEQUENCE_GAP rejects). Runbook:
-            docs/runbooks/RUNBOOK_data_pipeline.md#stale-feed
-          runbook: docs/runbooks/RUNBOOK_data_pipeline.md
-          runbook_url: docs/runbooks/RUNBOOK_data_pipeline.md
-
-      # Stale feed, judged on EVENT time: the gap between the last two
-      # consecutive processed events exceeded the configured staleness budget
-      # (configs/risk/risk.json market_data.stale_feed_timeout_ns = 5e9 ns). This
-      # is the same quantity the risk engine uses, so the alert and the
-      # engine agree — and it does NOT page on every historical replay the way
-      # `time() - md_last_event_unixtime` did.
-      - alert: StaleFeed
-        expr: md_event_time_gap_seconds > 5
-        for: 1m
-        labels:
-          severity: page
-          domain: market-data
-        annotations:
-          summary: "Stale market-data feed on {{ $labels.service }} ({{ $value | printf \"%.1f\" }}s event-time gap)"
-          description: >-
-            The gap between consecutive market events exceeded the 5s
-            staleness budget (risk.json stale_feed_timeout_ns). The risk
-            engine rejects orders against stale books (fail-closed); verify
-            feed handlers and venue connectivity. Runbook:
-            docs/runbooks/RUNBOOK_data_pipeline.md#stale-feed
-          runbook: docs/runbooks/RUNBOOK_data_pipeline.md
-          runbook_url: docs/runbooks/RUNBOOK_data_pipeline.md
-
       # Wall-clock liveness of the feed, scoped to a PACED (realtime) session:
       # a wedged decoder thread stops advancing md_last_event_wallclock_unixtime
       # even though event time never moves either. Inhibited for replay
-      # (`asap`) sessions, whose wall-clock pacing is meaningless.
+      # (`asap`) sessions, whose wall-clock pacing is meaningless — the Python
+      # MVP session is always `asap`, so this rule is armed but silent until a
+      # paced Python session exists (kept: its inputs are all exported).
       - alert: FeedWallClockStall
         expr: >
           (time() - md_last_event_wallclock_unixtime) > 60
@@ -139,60 +123,11 @@ groups:
           runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
           runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
 
-      # Live-vs-backtest drift (LIVE from java: com.iap.adaptive.DriftMonitor
-      # via com.iap.platform.PaperTrading, labeled {alpha="..."}). The
-      # statistic is the pinned Population Stability Index of the rolling
-      # live signal window vs the research baseline (API_ADAPTIVE.md /
-      # research/baselines/*.json): 10 baseline-quantile buckets,
-      # sum((live-base)*ln(live/base)), fractions floored at 1e-6.
-      # Threshold 0.25 is the standard industry PSI rule of thumb
-      # (< 0.1 stable, 0.1-0.25 moderate, > 0.25 significant shift) —
-      # see deployment/grafana/README.md.
-      - alert: LiveVsBacktestDrift
-        expr: alpha_live_vs_backtest_drift > 0.25
-        for: 30m
-        labels:
-          severity: warning
-          domain: alpha
-        annotations:
-          summary: "Live signal PSI drift on {{ $labels.alpha }} ({{ $value | printf \"%.2f\" }})"
-          description: >-
-            Live signal distribution for {{ $labels.alpha }} has PSI > 0.25
-            vs its backtest baseline for 30m — a significant shift under the
-            industry rule of thumb. NOTE the lifecycle gauge
-            (alpha_lifecycle_state) is IC-gated, NOT PSI-gated, and is
-            OBSERVATIONAL in the live loop: a RETIRED alpha keeps trading at
-            full size until a human acts (API_ADAPTIVE.md §6,
-            PLATFORM_CONVENTIONS.md §12.6). Persistent drift is a retirement
-            trigger per spec §20 step 13 — raise it with research.
-            Runbook: docs/runbooks/RUNBOOK_shadow_deployment.md#drift
-          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
-          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
-
-      # The lifecycle gauge is observational, so RETIRED must page a human:
-      # nothing in the platform stops the allocation on its own.
-      - alert: AlphaLifecycleRetired
-        expr: alpha_lifecycle_state >= 2
-        for: 15m
-        labels:
-          severity: warning
-          domain: alpha
-        annotations:
-          summary: "Alpha {{ $labels.alpha }} is RETIRED by the lifecycle gauge"
-          description: >-
-            The IC-gated lifecycle state machine has marked {{ $labels.alpha }}
-            RETIRED (rolling IC below watch_ic_gate for retire_breach_evals
-            consecutive evaluations). The live loop does NOT halt allocation
-            on this signal — it is observational — so the position must be
-            reduced by a human decision. Runbook:
-            docs/runbooks/RUNBOOK_shadow_deployment.md#lifecycle
-          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
-          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
-
   - name: iap-execution
     rules:
       # Fill rate over the PLATFORM's own execution counters (exec_*, exported
-      # by com.iap.platform.PaperTrading — PLATFORM_CONVENTIONS.md §12.6).
+      # by the platform-metrics process from the MVP run's report.json —
+      # PLATFORM_CONVENTIONS.md §12.6).
       # The previous version divided venue-simulator counters that no deployed
       # component ever wrote, so it could never fire.
       - alert: FillRateDrop
@@ -292,93 +227,8 @@ groups:
           runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
           runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
 
-      # A child order left for a venue other than the one the pre-trade check
-      # approved (PaperTrading.RiskWiring.onOrderSubmitted). The platform
-      # cancels the child and counts it; the counter is created on the first
-      # occurrence and never decreases, so `> 0` holds for the rest of the
-      # process — a wiring defect stays visible until someone restarts.
-      - alert: RoutedVenueMismatch
-        expr: risk_routed_venue_mismatch_total > 0
-        for: 0m
-        labels:
-          severity: page
-          domain: risk
-        annotations:
-          summary: "{{ $value | printf \"%.0f\" }} child order(s) routed to a venue the risk check did not approve on {{ $labels.service }}"
-          description: >-
-            A child order was submitted to a venue other than the one named
-            in its pre-trade risk request, so a venue kill or disconnect was
-            checked against the wrong venue. The child was cancelled
-            (fail-closed), but this is a routing/risk wiring defect, not a
-            market event: engage the kill switch and investigate. Runbook:
-            docs/runbooks/RUNBOOK_shadow_deployment.md#routed-venue-mismatch
-          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
-          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
-
-      # An admin kill is accepted (latched in AdminService) before the risk
-      # engine records it; the order path withholds every order meanwhile and
-      # counts each one. One or two withheld orders are the normal race. A
-      # counter that keeps climbing for minutes means the kill is still not
-      # in the risk engine — so not in the snapshot a restart would restore.
-      - alert: KillPendingNotRecorded
-        expr: increase(exec_orders_blocked_kill_pending_total[2m]) > 0
-        for: 3m
-        labels:
-          severity: critical
-          domain: risk
-        annotations:
-          summary: "Orders withheld for a pending admin kill for over 3m on {{ $labels.service }}"
-          description: >-
-            Orders have been withheld for more than 3m because an admin kill
-            was accepted (202) but the risk engine has not recorded it. No
-            new order is being sent, but the latch is not yet in the risk
-            snapshot and would not survive a restart. Do NOT restart; verify
-            the halt and the admin audit first. Runbook:
-            docs/runbooks/RUNBOOK_incident_kill_switch.md#kill-pending
-          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
-          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
-
-      # --resume released open orders the restored risk snapshot still
-      # tracked (the simulator that held them is gone). The counter is set
-      # once at resume, so the alert stays up for the life of that process.
-      - alert: ResumeReleasedOpenOrders
-        expr: risk_resume_open_orders_released_total > 0
-        for: 0m
-        labels:
-          severity: warning
-          domain: risk
-        annotations:
-          summary: "Resume released {{ $value | printf \"%.0f\" }} orphaned open order(s) on {{ $labels.service }}"
-          description: >-
-            The session resumed from a checkpoint whose risk snapshot tracked
-            open child orders; they no longer exist in the execution
-            simulator and were released so they do not inflate position
-            projections. Positions and realized P&L are restored, the
-            working orders are not: reconcile before trusting the session.
-            The alert stays up until the process ends. Runbook:
-            docs/runbooks/RUNBOOK_shadow_deployment.md#resume-released-orders
-          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
-          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
-
   - name: iap-infrastructure
     rules:
-      # GC pause: p99 pause above 10ms breaks the order-path latency budget.
-      # NOTE under ZGC the MX bean reports concurrent-cycle time rather than
-      # stop-the-world pause time (deployment/grafana/README.md).
-      - alert: GcPauseHigh
-        expr: job:jvm_gc_pause_ns:p99 > 10e6
-        for: 5m
-        labels:
-          severity: warning
-          domain: infrastructure
-        annotations:
-          summary: "JVM p99 GC pause {{ $value | humanize }}ns on {{ $labels.job }}"
-          description: >-
-            p99 GC pause above 10ms for 5m; check heap sizing / allocation rate
-            on hot paths (spec §23: allocation-conscious Java).
-            Runbook: docs/runbooks/RUNBOOK_backtest.md#jvm
-          runbook: docs/runbooks/RUNBOOK_backtest.md
-          runbook_url: docs/runbooks/RUNBOOK_backtest.md
 
       # The session aborted (config load, decode or accounting failure). The
       # process exits non-zero and `restart: on-failure` retries it.
@@ -391,9 +241,9 @@ groups:
         annotations:
           summary: "Paper-trading session FAILED on {{ $labels.service }}"
           description: >-
-            platform_session_state = 3 (FAILED). /health is 503 with the
-            reason; the container exits non-zero. Check the pod logs and
-            <state-dir>/config_audit.jsonl. Runbook:
+            platform_session_state = 3 (FAILED): the session process exited
+            non-zero (python -m iap.metrics run-session wrote the marker).
+            Check the session container's logs. Runbook:
             docs/runbooks/RUNBOOK_shadow_deployment.md#failed-session
           runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
           runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
@@ -402,13 +252,13 @@ groups:
       # checkpointed mid-stream and exited 0) that nobody resumed. The
       # trading process exits right after the checkpoint, so its own gauge is
       # almost never scraped at 4. The trading thread therefore also persists
-      # how the session ended (session_exit.json) and the java-platform-state
-      # exporter (a sidecar / second compose service, same image) serves it as
+      # how the session ended (session_exit.json) and the platform-metrics
+      # exporter (python -m iap.metrics serve, which outlives it) serves it as
       # platform_persisted_session_state for as long as the state volume
       # exists. The alert fires on a persisted 4 unless a live trading process
       # reports RUNNING again (the resume window before the marker is
       # rewritten). A FINISHED session persists 2 and a crash leaves 1, so
-      # neither fires this; a crash is TargetDown on java-platform
+      # neither fires this; a crash of the exporter is TargetDown on platform-metrics
       # (RUNBOOK_shadow_deployment.md#stopped-session).
       - alert: SessionStoppedNotResumed
         expr: >-
@@ -422,30 +272,12 @@ groups:
           summary: "Paper-trading session STOPPED and not resumed on {{ $labels.service }}"
           description: >-
             The persisted session state is 4 (STOPPED) and no running
-            session has reported for 10m. The session checkpointed
-            mid-stream and exited 0, so nothing restarts it; positions are
-            as the checkpoint left them. Resume it with --resume or record
-            why it stays down. The alert clears when a resumed session
-            starts (the persisted state becomes 1) or finishes (2). Runbook:
+            session has reported for 10m. The session process was
+            interrupted and nothing restarted it. Rerun the session (the
+            MVP loop is deterministic) or record why it stays down. The
+            alert clears when a new session starts (the persisted state
+            becomes 1) or finishes (2). Runbook:
             docs/runbooks/RUNBOOK_shadow_deployment.md#stopped-session
-          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
-          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
-
-      # An unexpected restart re-reads the checkpoint; a burst of restarts is
-      # a crash loop (and each one re-warms the book from the stream).
-      - alert: SessionRestartsClimbing
-        expr: increase(risk_session_restarts_total[15m]) > 2
-        for: 0m
-        labels:
-          severity: warning
-          domain: infrastructure
-        annotations:
-          summary: "{{ $value | printf \"%.0f\" }} session restarts in 15m on {{ $labels.service }}"
-          description: >-
-            The platform resumed from its checkpoint more than twice in 15m.
-            Risk state survives (positions, realized P&L, latches), but the
-            book and feature warm-up restart from the stream each time.
-            Runbook: docs/runbooks/RUNBOOK_shadow_deployment.md#restart-recovery
           runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
           runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
 
@@ -462,56 +294,8 @@ groups:
           summary: "Scrape target {{ $labels.job }}/{{ $labels.instance }} down"
           description: >-
             Prometheus cannot scrape {{ $labels.instance }}. If this is
-            java-platform during a trading session, treat as a platform
+            platform-metrics during a session, treat as a platform
             incident. Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
-          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
-          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
-
-  # The admin (kill-switch) API. Both counters are created on their first
-  # increment, so `increase()` alone misses the first occurrence: the second
-  # arm fires while the series is younger than the window.
-  - name: iap-admin-api
-    rules:
-      - alert: AdminAuthRateLimited
-        expr: >
-          increase(admin_auth_rate_limited_total[10m]) > 0
-          or (admin_auth_rate_limited_total > 0
-              unless admin_auth_rate_limited_total offset 10m)
-        for: 0m
-        labels:
-          severity: critical
-          domain: admin
-        annotations:
-          summary: "Admin API is rate-limiting failed authentications on {{ $labels.service }}"
-          description: >-
-            More than 10 failed authentications reached the admin API within
-            one 60s window, so further failures answer 429. Either a client
-            holds a wrong or rotated token, or the port is being probed. A
-            request with a valid token is never rate-limited, so the kill
-            switch stays usable. Read <state-dir>/admin_audit.jsonl for the
-            remote addresses. Runbook:
-            docs/runbooks/RUNBOOK_incident_kill_switch.md#admin-auth-abuse
-          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
-          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
-
-      - alert: AdminAuditSuppressed
-        expr: >
-          increase(admin_audit_suppressed_total[10m]) > 0
-          or (admin_audit_suppressed_total > 0
-              unless admin_audit_suppressed_total offset 10m)
-        for: 0m
-        labels:
-          severity: warning
-          domain: admin
-        annotations:
-          summary: "Rejected admin requests are no longer individually audited on {{ $labels.service }}"
-          description: >-
-            Rejected admin requests exceeded the per-window audit cap, so
-            the remainder were counted and summarised (one audit_summary
-            line per window) instead of audited one by one. Accepted
-            requests are always audited. Find the source of the rejected
-            traffic in <state-dir>/admin_audit.jsonl. Runbook:
-            docs/runbooks/RUNBOOK_incident_kill_switch.md#admin-auth-abuse
           runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
           runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
 
