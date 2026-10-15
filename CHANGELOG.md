@@ -8,6 +8,15 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS0 item 0.4 (R-4): ML looks reach the multiple-testing ledger. `run_model_comparison(ledger=)`
+  records the model-zoo gate decision (kind `model_zoo_gate`), `run_meta_labeling(ledger=)` the tau
+  decision (`metalabel_tau`), `research/ml_reports/run_ml.py` the primary-model choice
+  (`primary_model_choice`) and `promotion_decision(ledger=)` a shadow promotion (`shadow_promotion`),
+  all dataset-scoped in `research/experiments.json` beside the model ledger's per-fit counter.
+  `ShadowRunner.compare(ts=)` adds a paired day-block bootstrap of the candidate-minus-champion IC
+  (`iap.validation.metrics.paired_day_block_bootstrap`); when it ran, `candidate_better` also needs
+  its 5th percentile above 0. Opt-in (`ledger=None` / no `ts` keeps the v1.16 behaviour); the
+  regenerated ML report records the new looks.
 - v1.17 WS0 item 0.7 (docs): README's current-status section rewritten from the v1.16.0
   notes (the pending-PR list and "in progress" wording were stale; v1.17 is next, in
   progress, not released); docs/index.html maker/quoting/AI4 lines refreshed; GOVERNANCE.md

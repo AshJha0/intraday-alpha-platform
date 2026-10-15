@@ -28,7 +28,7 @@ _HERE = Path(__file__).resolve().parent
 _REPO = _HERE.parents[1]
 sys.path.insert(0, str(_REPO / "python" / "src"))
 
-from iap.experiment.tracker import ExperimentTracker  # noqa: E402
+from iap.experiment.tracker import ExperimentTracker, data_version  # noqa: E402
 from iap.models.dataset import (  # noqa: E402
     FEATURE_SET,
     TARGET_COLUMN,
@@ -40,6 +40,10 @@ from iap.models.metalabel import (  # noqa: E402
 )
 from iap.models.pipeline import run_model_comparison  # noqa: E402
 from iap.models.zoo import TREE_FALLBACK_ACTIVE, model_names  # noqa: E402
+from iap.validation import ExperimentLedger  # noqa: E402
+
+#: v1.17 (R-4): the ML looks go to the multiple-testing ledger too.
+LEDGER_PATH = _REPO / "research" / "experiments.json"
 
 
 def _fmt(x, nd: int = 4) -> str:
@@ -57,16 +61,34 @@ def main() -> None:
     ds = load_dataset()
     print(f"  {len(ds)} rows, {len(ds.feature_names)} features")
 
+    # Dataset-scoped looks (iap.validation.ledger): the gate decision, the
+    # meta-label tau decision and the primary-model choice are each ONE look
+    # in research/experiments.json (v1.17, review R-4), beside the model
+    # ledger's per-fit counter below.
+    ledger = ExperimentLedger(LEDGER_PATH, dataset_version=data_version(_REPO))
+
     print("running gated model comparison ...")
-    results = run_model_comparison(ds, tracker=tracker)
+    results = run_model_comparison(ds, tracker=tracker, ledger=ledger)
     gate = results["gate"]
 
     trained = [n for n in results["models"]]
     best = max(trained, key=lambda n: results["models"][n]["mean_ic"])
     best_pred = results["models"][best]["_pooled_pred"]
 
+    ledger.record(
+        "ML_ZOO",
+        "primary_model_choice",
+        config={
+            "rule": "argmax mean OOS IC over the trained models",
+            "candidates": sorted(trained),
+        },
+        result={"primary_model": best, "mean_ic": float(results["models"][best]["mean_ic"])},
+    )
+
     print(f"running meta-labeling on primary model {best!r} ...")
-    meta = run_meta_labeling(ds, best_pred, tracker=tracker, primary_name=best)
+    meta = run_meta_labeling(ds, best_pred, tracker=tracker, primary_name=best, ledger=ledger)
+    ledger.save()
+    n_ledger_looks = ledger.total_experiments
 
     runtime = time.time() - t0
     n_experiments = tracker.experiment_count
@@ -113,6 +135,9 @@ def main() -> None:
         "(alpha, kind, config) and carries the Bonferroni / expected-"
         "max-|t| yardstick quoted in `research/alpha_reports/"
         "REPORT.md`; neither number is a substitute for the other. "
+        "Since v1.17 this pipeline's three decisions (the model-zoo gate, "
+        "the primary-model choice and the meta-label tau) are each one "
+        f"look in that ledger too ({n_ledger_looks:,} looks after this run). "
         "Multiple-testing note: with this many looks at one dataset, "
         "isolated significance is meaningless — decisions below rest "
         "on signs and stability, not on any single t-stat."
