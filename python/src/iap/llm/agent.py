@@ -48,6 +48,7 @@ from iap.agents.workflow import Workflow, WorkflowError
 from iap.llm import summary_check, verify
 from iap.llm.budget import DEFAULT_MODEL, Budget, BudgetExceeded
 from iap.llm.envfile import redact
+from iap.llm.prices import load_llm_config
 from iap.llm.runners import PLANTED_DATASET, T_THRESHOLD, Runner, verdict
 
 #: the only datasets an agent session may run (A-P0-1: exploratory, never confirmatory)
@@ -483,6 +484,31 @@ class Persister:
         (self.dir / name).write_text(text + "\n", encoding="utf-8")
 
 
+def _is_live_client(client: Any) -> bool:
+    """True for an ``anthropic`` SDK client (anything that spends money)."""
+    return type(client).__module__.split(".")[0] == "anthropic"
+
+
+def _wire_spend(client: Any, session: Session, model: str) -> None:
+    """v1.17 E1: every path that can spend records to the shared ledger and
+    obeys its caps.  A live client on a budget without a ledger gets the
+    operator ledger (``iap.llm.spend.SpendLedger.default()``); the scripted
+    client keeps the budget's own caps only.  The budget records the dated
+    pin the model runs under."""
+    b = session.budget
+    if b.ledger is None and _is_live_client(client):
+        from iap.llm.spend import SpendLedger
+
+        b.ledger = SpendLedger.default()
+    if not b.session_id:
+        b.session_id = session.session_id
+    if b.pin is None:
+        cfg = load_llm_config()
+        pins = [p for p in cfg.pins.values() if p.model == model]
+        pref = [p for p in pins if p.role == b.role]
+        b.pin = (pref or pins or [None])[0]
+
+
 def run_session(
     client: Any,
     session: Session,
@@ -500,6 +526,7 @@ def run_session(
     ``secret`` (the API key) is only used to scrub persisted text."""
     if not _SESSION.match(session.session_id):
         raise ValueError("bad session id")
+    _wire_spend(client, session, model)
     log = Persister(session, secret)
     system = [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}]
     messages: list[dict[str, Any]] = [{"role": "user", "content": task}]
@@ -595,6 +622,7 @@ def run_session(
         "session": session.session_id,
         "agent": session.agent,
         "model": model,
+        "pin": session.budget.pin.as_dict() if session.budget.pin else None,
         "served_models": sorted(served_models),
         "status": status,
         "budget": session.budget.summary(),

@@ -469,6 +469,20 @@ list, disk/time estimates and the files awaiting the owner's approval are in
 writes a resumable batch ingest from that manifest; nothing downloads
 without `tools/r7_download.py --i-have-approval` (COOKBOOK recipe 66).
 
+### 3.5 Process-and-delete: the breadth universe one day at a time (v1.17, A2)
+
+A full-market day's raw and normalized files do not fit beside the next
+one on this machine, so the breadth universe is built with
+`python -m iap.marketdata process-day` (docs/runbooks/RUNBOOK_process_and_delete.md):
+disk guard, optional approved download, ingest with
+`--partition-instruments N` (the normaliser works in on-disk partitions
+of N instruments and merges them in event-time windows into byte-identical
+outputs, section 4), the Rust feature build, `KEEP.json` with the sha256 of
+every kept file, then the deletion of `raw/`, `normalized/*.normalized.*`
+and the vendor file. Every step has a marker and resumes; nothing is
+deleted before the kept files verify. The `plan-ingest` batch of section
+3.4 stays for the three-name datasets.
+
 ## 4. Mapping to canonical events
 
 The canonical contract is the twelve-field `MarketEvent`

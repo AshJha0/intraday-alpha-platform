@@ -28,6 +28,28 @@ that tag.
   ARCHITECTURE §2/§8/§9, POLYGLOT, PLATFORM_CONVENTIONS §12, the site, SECURITY, REPO_SETTINGS,
   the Grafana README and the runbooks describe the three-language platform.
 
+- v1.17 WS-A item A2: process-and-delete. `python -m iap.marketdata process-day` runs one
+  manifest day through disk guard -> (approved download) -> ingest -> Rust features -> `KEEP.json`
+  (sha256 of every kept file) -> deletion of raw / normalized / the vendor file, with resumable
+  step markers, a `.cmd` wrapper and a watchdog registry entry (`--render-cmd --jobs-registry`).
+  The normaliser gains `--partition-instruments N` (`normalize_run(partition_instruments=)`): packed
+  records are routed to on-disk partitions of N instruments, each sorted on its own and merged in
+  event-time windows, so memory is one partition plus one window instead of the day; the outputs
+  are byte-identical (tested on the synthetic pipeline and an ingested ITCH day). The R7 manifest
+  accepts the IEX formats and the IEX HIST hosts. docs/runbooks/RUNBOOK_process_and_delete.md,
+  docs/REAL_DATA.md section 3.5.
+- v1.17 WS-E item E1 (E-7): the LLM spend foundation. Prices are configuration
+  (`configs/reference/llm_prices.json`, `source` + `checked` date; `iap.llm.prices` refuses an
+  unknown model, never guesses). Dated per-role pins in `configs/agents/llm.json` (research
+  `claude-sonnet-5-5`, ops / docs / evals `claude-haiku-5-5`; the most expensive model is no longer
+  the default), recorded in the session summary. `iap.llm.spend`: an append-only, file-locked JSONL
+  ledger outside the repository (`IAP_LLM_SPEND_LEDGER`, else `%LOCALAPPDATA%/iap/llm_spend.jsonl` /
+  `~/.local/state/iap/llm_spend.jsonl`), one row per API call with tokens, USD and month-to-date;
+  corrupt rows skipped and counted. Monthly cap USD 30, per-run budget USD 1 (`Budget.max_usd`
+  default), 80 % alert once a month (WARNING + the watchdog toast route); the call is refused before
+  it is made, in every process, when month-to-date + its maximum cost would pass the cap. `Budget`
+  records to the ledger on every live path; `python -m iap.llm spend` prints the ledger. New
+  ConfigMap items `agents__llm.json` and `reference__llm_prices.json`. GOVERNANCE.md §2c.
 - v1.17 WS0 item 0.1 (R-1): the R7 confirmatory deflated Sharpe was recorded at the holdout
   dataset ledger's own trial count (N = 1 / 2) instead of the registered N (repo ledger distinct
   configurations + the look). `tools/r7_confirm.py` now takes N from the repo ledger
@@ -104,7 +126,6 @@ that tag.
   docs/index.html gains a "Start here" block and a Showcase nav link; both new pages are read
   by `check_headline_numbers.py`. No number changed.
 
-## Unreleased
 
 - v1.17 WS-F item F9 (+F2 digest pinning): Java retired from the release (DECISION_N7 closed
   2026-10-15). New `iap.metrics` (`python -m iap.metrics serve`): a stdlib Prometheus exposition

@@ -1129,8 +1129,8 @@ DIAGRAMS.md 26-29 draw them.
 
 ### 17.1 The LLM research agent (`iap.llm`, AI1-AI2)
 
-A Claude model (default `claude-opus-5-5`; evals default to
-`claude-haiku-5-5`) is given eight tools: list alphas, list features,
+A Claude model (dated pins in `configs/agents/llm.json`: research
+`claude-sonnet-5-5`, ops / docs / evals `claude-haiku-5-5`) is given eight tools: list alphas, list features,
 propose a hypothesis, pre-register it, run a gated study, read a report,
 file a finding, finish. Everything else sits in code around it:
 
@@ -1145,7 +1145,10 @@ file a finding, finish. Everything else sits in code around it:
 - a finding is filed only if every number in it appears in a numeric field
   of an artefact it cites (`iap.llm.verify`);
 - caps on estimated USD (projected one call ahead), tokens, tool calls and
-  pre-registrations stop the session;
+  pre-registrations stop the session; since v1.17 (E1) every call is also
+  recorded in an append-only spend ledger outside the repository
+  (`iap.llm.spend`) and refused before it is made when the month-to-date
+  plus its maximum cost would pass the monthly cap (GOVERNANCE.md §2c);
 - the transcript, tool log and summary are written under
   `research/agents/llm_sessions/<id>/`, with the API key scrubbed.
 
