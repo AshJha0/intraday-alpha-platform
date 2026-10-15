@@ -15,7 +15,15 @@ that probability as a grouped-time (discrete) hazard model:
   displayed queue ahead, ``log1p`` of the queue-depletion rate (per s, e.g.
   :meth:`ExecCalibration.queue_depletion_hazard`), the spread in ticks, the
   queue imbalance (our side's L1 / both sides' L1), and the time of day as
-  ``sin`` / ``cos`` of the fraction of the UTC day;
+  ``sin`` / ``cos`` of the fraction of the day on the model's ``clock``
+  (v1.17 B6, review X-8: ``"utc"`` is the v1.12 default — the UTC day
+  fraction, which is the exchange day shifted by four or five hours
+  depending on DST; an IANA zone such as ``"America/New_York"`` is
+  exchange-local time, so 09:30 is 09:30 in every session; a
+  ``capture_offset_s`` is subtracted first when the stream's clock is not
+  UTC — the IEX HIST capture clock is TAI, :data:`IEX_TAI_OFFSET_S` =
+  37 s ahead of UTC, while Nasdaq ITCH stamps are already local-midnight
+  based). The clock is named in :meth:`FillHazardModel.to_dict`;
 - ``P(fill within t) = 1 - prod_b (1 - h_b) ^ overlap_b(t) / width_b`` (a
   partial bucket contributes geometrically; beyond the last edge the last
   bucket's hazard continues).
@@ -46,6 +54,12 @@ import numpy as np
 import pandas as pd
 
 SCHEMA = "iap.fill_hazard/1"
+#: ``FillHazardModel.clock`` default: the v1.12 UTC day fraction (pinned).
+UTC_CLOCK = "utc"
+#: The IEX HIST capture clock is TAI, 37 s ahead of UTC (since 2017-01-01):
+#: ``capture_offset_s=IEX_TAI_OFFSET_S`` with an exchange-local ``clock``.
+IEX_TAI_OFFSET_S = 37
+_HOUR_NS = 3_600_000_000_000
 FEATURES = ("queue_ahead", "depletion_per_s", "spread_ticks", "imbalance", "tod")
 #: model columns derived from :data:`FEATURES` (tod -> sin, cos)
 COLUMNS = ("log_queue_ahead", "log_depletion", "spread_ticks", "imbalance", "tod_sin", "tod_cos")
@@ -62,9 +76,50 @@ LINKS = ("cloglog", "logit")
 DAY_NS = 86_400_000_000_000
 
 
-def time_of_day(ts_ns: int | np.ndarray) -> np.ndarray:
-    """Fraction of the UTC day of an epoch-ns timestamp."""
-    return (np.asarray(ts_ns, dtype=np.int64) % DAY_NS).astype(float) / DAY_NS
+def check_clock(clock: str) -> str:
+    """``"utc"`` or a loadable IANA zone name; raises ``ValueError`` otherwise."""
+    if clock == UTC_CLOCK:
+        return clock
+    try:
+        from zoneinfo import ZoneInfo
+
+        ZoneInfo(clock)
+    except Exception as exc:  # ZoneInfoNotFoundError, ValueError on ""
+        raise ValueError(f"clock must be 'utc' or an IANA zone name, got {clock!r}") from exc
+    return clock
+
+
+def time_of_day(
+    ts_ns: int | np.ndarray, clock: str = UTC_CLOCK, capture_offset_s: int = 0
+) -> np.ndarray:
+    """Fraction of the day of an epoch-ns timestamp on ``clock`` (X-8).
+
+    ``capture_offset_s`` is subtracted first (a TAI capture clock is 37 s
+    ahead of UTC). ``"utc"`` is the pinned v1.12 rule; an IANA zone applies
+    that zone's UTC offset at the timestamp (cached per UTC hour, so DST is
+    followed per event, as :mod:`iap.execution.volume_curve` does).
+    """
+    ts = np.asarray(ts_ns, dtype=np.int64) - np.int64(capture_offset_s) * 1_000_000_000
+    if clock == UTC_CLOCK:
+        return (ts % DAY_NS).astype(float) / DAY_NS
+    from datetime import UTC, datetime
+    from zoneinfo import ZoneInfo
+
+    zone = ZoneInfo(check_clock(clock))
+    hours = ts // _HOUR_NS
+    offsets = np.zeros(ts.shape, dtype=np.int64)
+    cache: dict[int, int] = {}
+    flat_h = hours.reshape(-1)
+    flat_o = offsets.reshape(-1)
+    for i in range(flat_h.size):  # plain loop: the C++ port keeps the shape
+        h = int(flat_h[i])
+        off = cache.get(h)
+        if off is None:
+            d = datetime.fromtimestamp(h * 3600, tz=UTC).astimezone(zone).utcoffset()
+            off = cache[h] = int(d.total_seconds()) * 1_000_000_000 if d is not None else 0
+        flat_o[i] = off
+    local = ts + flat_o.reshape(ts.shape)
+    return (local % DAY_NS).astype(float) / DAY_NS
 
 
 def hazard_features(
@@ -74,14 +129,20 @@ def hazard_features(
     imbalance: float = 0.0,
     depletion_per_s: float | None = None,
     ts_ns: int = 0,
+    clock: str = UTC_CLOCK,
+    capture_offset_s: int = 0,
 ) -> dict[str, float]:
-    """One feature row (the same construction training and decisions use)."""
+    """One feature row (the same construction training and decisions use).
+
+    ``clock`` / ``capture_offset_s`` must be the model's (X-8):
+    :meth:`FillHazardModel.features` fills them in.
+    """
     return {
         "queue_ahead": float(queue_ahead),
         "depletion_per_s": float(depletion_per_s or 0.0),
         "spread_ticks": float(spread_ticks),
         "imbalance": float(imbalance),
-        "tod": float(time_of_day(ts_ns)),
+        "tod": float(time_of_day(ts_ns, clock, capture_offset_s)),
     }
 
 
@@ -111,6 +172,8 @@ def samples_from_maker_labels(
     sides: Sequence[str] = ("bid", "ask"),
     depletion_per_s: Mapping[str, Sequence[float]] | None = None,
     imbalance: Mapping[str, Sequence[float]] | None = None,
+    clock: str = UTC_CLOCK,
+    capture_offset_s: int = 0,
 ) -> pd.DataFrame:
     """Survival samples from :func:`iap.labels.maker_labels.maker_labels`.
 
@@ -119,6 +182,8 @@ def samples_from_maker_labels(
     :data:`FEATURES`. ``depletion_per_s`` / ``imbalance`` are optional
     per-side arrays row-aligned with ``labels`` (0 when absent — then the
     model learns no dependence on them). Taker-filled rows are dropped.
+    ``clock`` / ``capture_offset_s`` set the ``tod`` clock (X-8) and must
+    match the model the samples are fitted with.
     """
     if ttl_ns <= 0:
         raise ValueError("ttl_ns must be positive")
@@ -143,7 +208,7 @@ def samples_from_maker_labels(
                     "depletion_per_s": dep,
                     "spread_ticks": np.where(np.isfinite(spread), np.maximum(spread, 0), 0),
                     "imbalance": imb,
-                    "tod": time_of_day(ts),
+                    "tod": time_of_day(ts, clock, capture_offset_s),
                 }
             )[keep]
         )
@@ -172,6 +237,8 @@ class FillHazardModel:
         edges_ns: Sequence[int] = DEFAULT_EDGES_NS,
         link: str = "cloglog",
         ridge: float = 1e-3,
+        clock: str = UTC_CLOCK,
+        capture_offset_s: int = 0,
     ) -> None:
         e = [int(x) for x in edges_ns]
         if len(e) < 2 or e[0] != 0 or any(b <= a for a, b in zip(e, e[1:], strict=False)):
@@ -183,6 +250,10 @@ class FillHazardModel:
         self.edges_ns = tuple(e)
         self.link = link
         self.ridge = float(ridge)
+        #: X-8: the clock of the ``tod`` feature (``"utc"`` or an IANA zone).
+        self.clock = check_clock(clock)
+        #: seconds the stream's capture clock runs AHEAD of UTC (IEX: 37).
+        self.capture_offset_s = int(capture_offset_s)
         self.alpha: np.ndarray | None = None  # per bucket
         self.beta: np.ndarray | None = None  # per column, on standardised z
         self.mean = np.zeros(len(COLUMNS))
@@ -261,6 +332,26 @@ class FillHazardModel:
         return self
 
     # ---------------------------------------------------------- prediction
+    def features(
+        self,
+        *,
+        queue_ahead: float,
+        spread_ticks: float,
+        imbalance: float = 0.0,
+        depletion_per_s: float | None = None,
+        ts_ns: int = 0,
+    ) -> dict[str, float]:
+        """One decision-time feature row on THIS model's clock (X-8)."""
+        return hazard_features(
+            queue_ahead=queue_ahead,
+            spread_ticks=spread_ticks,
+            imbalance=imbalance,
+            depletion_per_s=depletion_per_s,
+            ts_ns=ts_ns,
+            clock=self.clock,
+            capture_offset_s=self.capture_offset_s,
+        )
+
     def _check(self) -> None:
         if self.alpha is None or self.beta is None:
             raise RuntimeError("FillHazardModel used before fit() / from_dict()")
@@ -307,6 +398,9 @@ class FillHazardModel:
             "std": [float(x) for x in self.std],
             "n_samples": self.n_samples,
             "n_filled": self.n_filled,
+            # X-8: the clock the tod feature was fitted on, named in the result
+            "clock": self.clock,
+            "capture_offset_s": self.capture_offset_s,
         }
 
     @classmethod
@@ -315,7 +409,13 @@ class FillHazardModel:
             raise ValueError(f"not a {SCHEMA} document: {doc.get('schema')!r}")
         if list(doc.get("columns", [])) != list(COLUMNS):
             raise ValueError("fill hazard document has different feature columns")
-        m = cls(doc["edges_ns"], doc["link"], doc.get("ridge", 1e-3))
+        m = cls(
+            doc["edges_ns"],
+            doc["link"],
+            doc.get("ridge", 1e-3),
+            clock=doc.get("clock", UTC_CLOCK),  # a v1.12 document is UTC
+            capture_offset_s=int(doc.get("capture_offset_s", 0)),
+        )
         m.alpha = np.asarray(doc["alpha"], dtype=float)
         m.beta = np.asarray(doc["beta"], dtype=float)
         m.mean = np.asarray(doc["mean"], dtype=float)
