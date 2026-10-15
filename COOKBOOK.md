@@ -4400,8 +4400,10 @@ What differs between the two outputs:
 A v2 report still carries the old net P&L as
 `net_pnl_1x_cost_label_block`, next to the causal one, so the size of the
 look-ahead is visible without a second run. Ledger entries now carry
-`stats_revision: "v1.14"`, so a rerun under the new rules is a new look and
-never silently replaces an old one.
+`stats_revision` (`"v1.17"` since v1.17; `"v1.14"` entries scope to the
+frozen `v2_v114` / `v3_v114` / `v4_v114` bundles, which reproduce the v1.14
+rules the same way: `--methods v2_v114`), so a rerun under the new rules is a
+new look and never silently replaces an old one.
 
 ## 73. Count adverse selection per touch order, not per message (v1.14)
 

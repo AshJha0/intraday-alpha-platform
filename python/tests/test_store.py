@@ -892,14 +892,15 @@ def test_import_experiments_ledger(store: Store) -> None:
     # The ledger keeps one entry per alpha, dataset AND method bundle at its
     # revision: the entries recorded up to v1.4.0 name no bundle, the v1.5.0
     # run names v2 (scoped as v2_v113 since v1.14.0), the v1.14.0 run names
-    # v2 at stats_revision v1.14.
+    # v2 at stats_revision v1.14 (scoped as v2_v114 since v1.17), the v1.17 run
+    # names v2 at stats_revision v1.17.
     from iap.validation.methods import ledger_bundle
 
     by_bundle: dict = {}
     for r in rows:
         by_bundle.setdefault(json.loads(r["config_json"]).get("methods"), []).append(r)
     assert set(by_bundle) == {None, "v2"}
-    # The entry in force (the one behind the current report) is the v1.14 one.
+    # The entry in force (the one behind the current report) is the v1.17 one.
     in_force = load_ledger_entries(REPO)["EQ03"]["key"]
     (row,) = [r for r in by_bundle["v2"] if r["ledger_key"] == in_force]
     assert ledger_bundle(json.loads(row["config_json"])) == "v2"
@@ -1086,7 +1087,7 @@ def _scope_ledger(dataset: str, start: int) -> tuple[dict, dict[str, dict]]:
     v2 = _ledger_entry(
         "EQ03",
         "promotion_pipeline",
-        {"horizon": "5s", "methods": "v2", "stats_revision": "v1.14"},
+        {"horizon": "5s", "methods": "v2", "stats_revision": "v1.17"},
         84,
         start + 112,
         dataset,
@@ -1096,7 +1097,7 @@ def _scope_ledger(dataset: str, start: int) -> tuple[dict, dict[str, dict]]:
     adaptive = _ledger_entry(
         "EQ03",
         "adaptive_deployment",
-        {"policy": "drift_triggered", "methods": "v2", "stats_revision": "v1.14"},
+        {"policy": "drift_triggered", "methods": "v2", "stats_revision": "v1.17"},
         1,
         start + 113,
         dataset,
@@ -1244,7 +1245,7 @@ def test_scope_helpers_and_bundle_resolution(store: Store) -> None:
             "dataset_version": DATASET_A,
             "experiment_id": "0123456789abcdef",
             "configuration": {"methods": "v2"},
-            "stats_revision": "v1.14",
+            "stats_revision": "v1.17",
         },
     }
     assert ledger_entry_scope(runner) == (DATASET_A, "v2")
@@ -1477,11 +1478,11 @@ def test_cli_selects_the_scope(tmp_path: Path, capsys: pytest.CaptureFixture[str
         if (r["dataset_version"], r["methods"]) == (dataset, "v2")
     )
     everything = lines(["scorecard", "--db", str(db), "--all-scopes"])
-    # four repository scopes (v1.14.0 adds v2_v113) + the ingested dataset's two
+    # five repository scopes (v1.14.0 adds v2_v113, v1.17 v2_v114) + the ingested dataset's two
     # + the unstamped pre-registration scope: EQ10, EQ05 (v1.15 R7) and EQ01
     # (v1.16 item 11: the merged step2 quoting preregs; AUC01 / QNOSKEW are
     # not registry alphas, so they add no scorecard row)
-    assert len(everything) == 24 * 4 + 2 + 3
+    assert len(everything) == 24 * 5 + 2 + 3
     # sql binds :dataset_version / :methods to the selected scope
     query = (
         "SELECT COUNT(*) AS n, SUM(count) AS looks FROM ledger_entries "

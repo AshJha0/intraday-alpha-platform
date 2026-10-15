@@ -22,16 +22,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from iap.validation.metrics import (
-    HORIZONS_NS,
-    auto_hac_lags,
-    day_cluster_tstat,
-    gate_statistics,
-    ic,
-    n_ts_buckets,
-    nw_lags,
-    pooled_slope_hac_tstat,
-)
+from iap.validation.cpcv import CombinatorialPurgedSplitter
 from iap.validation.methods import (
     METHODS,
     METHODS_V2,
@@ -47,11 +38,17 @@ from iap.validation.methods import (
     ledger_config,
     methods,
 )
-from iap.validation.splits import (
-    CombinatorialPurgedSplitter,
-    WalkForwardSplitter,
-    longest_feature_window_ns,
+from iap.validation.metrics import (
+    HORIZONS_NS,
+    auto_hac_lags,
+    day_cluster_tstat,
+    gate_statistics,
+    ic,
+    n_ts_buckets,
+    nw_lags,
+    pooled_slope_hac_tstat,
 )
+from iap.validation.splits import WalkForwardSplitter, longest_feature_window_ns
 from iap.validation.validate import frozen_params_block
 from test_research_validity_v19 import _multi_day_frames, _TwoInstrumentAlpha, _validate
 
@@ -82,7 +79,9 @@ def test_gate_statistics_is_the_pooled_slope_hac_t_and_the_day_cluster_t():
     lags = auto_hac_lags(n_ts_buckets(ts), h)
     assert s["hac_lags"] == lags and s["hac_bandwidth"] == "auto" and s["hac_day_separated"]
     assert s["ic"] == pytest.approx(ic(x, y))
-    assert s["tstat_hac"] == pytest.approx(pooled_slope_hac_tstat(ts, x, y, lags=lags, day_ns=NS_DAY))
+    assert s["tstat_hac"] == pytest.approx(
+        pooled_slope_hac_tstat(ts, x, y, lags=lags, day_ns=NS_DAY)
+    )
     assert s["tstat_day_cluster"] == pytest.approx(day_cluster_tstat(ts, x, y))
     assert s["n_pairs"] == ts.size and s["n_days"] == 4
     # the v1.13 rule, by name: the horizon lags and no day separation
@@ -100,14 +99,14 @@ def test_gate_statistics_is_the_pooled_slope_hac_t_and_the_day_cluster_t():
 
 
 def test_validate_alpha_gate_t_is_gate_statistics_and_reports_the_day_cluster_t():
-    rep = _validate(_multi_day_frames())
+    rep = _validate(_multi_day_frames(), validity_diagnostics=True)
     g = rep["gate_statistics"]
     assert g["rows"] in ("uncrossed", "all")
     assert rep["gate_tstat"] == g["tstat_hac"]
     # the gate t is still the pooled-slope HAC t of the uncrossed rows
     assert rep["gate_tstat"] == rep["nw_tstat_pooled_uncrossed"]
     assert rep["gate_tstat_day_cluster"] == g["tstat_day_cluster"]
-    assert rep["gate_n_days"] == g["n_days"] == 4
+    assert rep["gate_n_days"] == g["n_days"] == 4  # the first day is train only
     assert g["hac_lags"] == rep["nw_lags"] and g["hac_bandwidth"] == rep["nw_lags_rule"]
     # the validity block's day-separated HAC t and day-cluster t are the
     # same numbers (one function, the gate's rows)
@@ -125,7 +124,7 @@ def test_frozen_t_is_computed_by_the_gate_pipeline():
     h = HORIZONS_NS[probe.horizon]
     new = frozen_params_block(_TwoInstrumentAlpha, frames, params, probe.horizon, h)
     assert new["hac_bandwidth"] == "auto" and new["hac_day_separated"] is True
-    assert new["standardisation"] == "instrument" and new["n_days"] == 4
+    assert new["standardisation"] == "instrument" and new["n_days"] == 5
     assert new["frozen_t_day_cluster"] is not None
     old = frozen_params_block(
         _TwoInstrumentAlpha,
@@ -224,9 +223,11 @@ def test_post_block_embargo_reaches_the_splitters_and_the_report():
         a = WalkForwardSplitter(n_folds=2, embargo_ns=NS_S, mode=mode)
         b = WalkForwardSplitter(n_folds=2, embargo_ns=NS_S, mode=mode, feature_window_ns=window)
         ts = frames[1]["exchange_ts"].to_numpy()
-        for fa, fb in zip(a.folds_by_row_mass(ts) if mode == "row_mass" else a.folds_by_day(ts),
-                          b.folds_by_row_mass(ts) if mode == "row_mass" else b.folds_by_day(ts),
-                          strict=True):
+        for fa, fb in zip(
+            a.folds_by_row_mass(ts) if mode == "row_mass" else a.folds_by_day(ts),
+            b.folds_by_row_mass(ts) if mode == "row_mass" else b.folds_by_day(ts),
+            strict=True,
+        ):
             assert np.array_equal(
                 fa.train_mask(ts, NS_S, NS_S, a.post_embargo_ns),
                 fb.train_mask(ts, NS_S, NS_S, b.post_embargo_ns),

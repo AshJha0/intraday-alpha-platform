@@ -437,9 +437,24 @@ stayed, so experiment ids did not move; the v1.13 rules are frozen as
 | R-P2-3 leakage | row shift plus a time-shift detector (`time_shift_ok`; `null` = not applicable) | row shift only | the row-shift test was vacuous whenever a row spans the horizon: every synthetic alpha reported `required_shift_ratio 0.0` |
 | R-P2-4 looks | one per gate decision (2 per experiment or pipeline alpha) | every report statistic | the ledger should price decisions, not columns of a report |
 
-Ledger identities now carry `stats_revision: "v1.14"`
-(`methods.ledger_config`), so a statistic regenerated under the new rules
-is a new look and never silently replaces an old one.
+Ledger identities carry `stats_revision` (`methods.ledger_config`), so a
+statistic regenerated under new rules is a new look and never silently
+replaces an old one.
+
+## 4c. The v1.17 statistics revision
+
+v1.17 (review findings R-2 and R-3) keeps the bundle names and freezes the
+v1.14 rules as `v2_v114`, `v3_v114` and `v4_v114`; ledger identities carry
+`stats_revision: "v1.17"` and entries at `"v1.14"` scope to the `*_v114`
+bundles.
+
+| item | v1.17 default | v1.14 (`*_v114`) | why |
+|---|---|---|---|
+| R-3 post-block embargo | `feature_window_ns="registry"`: after a test block of a two-sided split (`leave_one_day_out`, `cpcv`) the gap is at least the longest feature window (5 m); reported as `methods.post_block_embargo_ns` | the 60 s embargo alone (R-P1-6 implemented in v1.13, passed by no caller) | a train row 60 s after a test block carries features whose look-back reaches into the block |
+| R-2 one gate statistic | `metrics.gate_statistics()` computes the gate IC, the HAC t and the day-cluster t once for the walk-forward gate, `frozen_params_block`, the `validity` block and `tools/r7_confirm.py`; every gate reports `gate_tstat_day_cluster` beside `gate_tstat` | four copies; the frozen t at L = 2, no day separation, no per-instrument scaling | a frozen t and a gate t must be the same statistic on different rows |
+
+The expanding walk-forward is one-sided, so no `v2` gate number moves; the
+`cpcv` block of `v4` does.
 
 What it found. In the synthetic regeneration (#88) FX11 failed the
 time-shift detector: IC 0.108 drops to 0.027 under a 75 s lag, below the
