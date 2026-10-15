@@ -6,8 +6,8 @@ This is a planning aid for the owner before sign-off. It does not change the dra
 
 ## Gate modelled
 
-- HAC t >= 4.441: the Bonferroni threshold of the committed ledger (5,576 looks). The R7 looks themselves will raise it slightly; a threshold fixed in the pre-registration (`threshold_policy="prereg"`) would freeze it.
-- Deflated Sharpe > 0.95: N = 387 (ledger distinct experiments + 1), V = 1/(S-1), normal moments, on the per-session series.
+- HAC t >= 4.442: the Bonferroni threshold of the committed ledger (5,599 looks). The R7 looks themselves will raise it slightly; a threshold fixed in the pre-registration (`threshold_policy="prereg"`) would freeze it.
+- Deflated Sharpe > 0.95: N = 410 (ledger distinct experiments + 1), V = 1/(S-1), normal moments, on the per-session series.
 - Tier 1 = 7 holdout sessions; tier 2 = 47 (7 + 40 approved dates).
 - Power = P(pass | true effect); MDE = smallest effect passed with 80 % probability. `joint <=` is the smaller of the two component powers (an upper bound on passing both).
 
@@ -34,29 +34,29 @@ The tables below are the analysis the decisions were taken on; they still list e
 
 | alpha | effect (IC) | sd/session | S | power HAC | power DSR | joint <= | MDE HAC | MDE DSR | MDE joint |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| EQ01 @1s (in-sample) | +0.1051 | 0.0502 | 7 | 1.00 | 0.23 | 0.23 | 0.0387 | 0.1789 | 0.1789 |
-| EQ01 @1s (in-sample) | +0.1051 | 0.0502 | 47 | 1.00 | 1.00 | 1.00 | 0.0149 | 0.0429 | 0.0429 |
-| EQ01 @1s (v1.8 decayed) | +0.0368 | 0.0502 | 7 | 0.77 | 0.00 | 0.00 | 0.0387 | 0.1789 | 0.1789 |
-| EQ01 @1s (v1.8 decayed) | +0.0368 | 0.0502 | 47 | 1.00 | 0.55 | 0.55 | 0.0149 | 0.0429 | 0.0429 |
-| EQ02 @5s (in-sample) | +0.0419 | 0.0163 | 7 | 1.00 | 0.47 | 0.47 | 0.0126 | 0.0583 | 0.0583 |
+| EQ01 @1s (in-sample) | +0.1051 | 0.0502 | 7 | 1.00 | 0.22 | 0.22 | 0.0387 | 0.1797 | 0.1797 |
+| EQ01 @1s (in-sample) | +0.1051 | 0.0502 | 47 | 1.00 | 1.00 | 1.00 | 0.0149 | 0.0430 | 0.0430 |
+| EQ01 @1s (v1.8 decayed) | +0.0368 | 0.0502 | 7 | 0.77 | 0.00 | 0.00 | 0.0387 | 0.1797 | 0.1797 |
+| EQ01 @1s (v1.8 decayed) | +0.0368 | 0.0502 | 47 | 1.00 | 0.55 | 0.55 | 0.0149 | 0.0430 | 0.0430 |
+| EQ02 @5s (in-sample) | +0.0419 | 0.0163 | 7 | 1.00 | 0.46 | 0.46 | 0.0126 | 0.0585 | 0.0585 |
 | EQ02 @5s (in-sample) | +0.0419 | 0.0163 | 47 | 1.00 | 1.00 | 1.00 | 0.0049 | 0.0140 | 0.0140 |
-| EQ02 @5s (v1.8 decayed) | +0.0161 | 0.0163 | 7 | 0.92 | 0.00 | 0.00 | 0.0126 | 0.0583 | 0.0583 |
+| EQ02 @5s (v1.8 decayed) | +0.0161 | 0.0163 | 7 | 0.92 | 0.00 | 0.00 | 0.0126 | 0.0585 | 0.0585 |
 | EQ02 @5s (v1.8 decayed) | +0.0161 | 0.0163 | 47 | 1.00 | 0.94 | 0.94 | 0.0049 | 0.0140 | 0.0140 |
-| EQ04 @5s (in-sample) | +0.0137 | 0.0089 | 7 | 0.27 | 0.04 | 0.04 | 0.0211 | 0.0317 | 0.0317 |
+| EQ04 @5s (in-sample) | +0.0137 | 0.0089 | 7 | 0.27 | 0.03 | 0.03 | 0.0211 | 0.0318 | 0.0318 |
 | EQ04 @5s (in-sample) | +0.0137 | 0.0089 | 47 | 1.00 | 1.00 | 1.00 | 0.0082 | 0.0076 | 0.0082 |
-| EQ04 @5s (v1.8 decayed) | +0.0276 | 0.0089 | 7 | 0.98 | 0.68 | 0.68 | 0.0211 | 0.0317 | 0.0317 |
+| EQ04 @5s (v1.8 decayed) | +0.0276 | 0.0089 | 7 | 0.98 | 0.68 | 0.68 | 0.0211 | 0.0318 | 0.0318 |
 | EQ04 @5s (v1.8 decayed) | +0.0276 | 0.0089 | 47 | 1.00 | 1.00 | 1.00 | 0.0082 | 0.0076 | 0.0082 |
-| EQ05 @1s (in-sample) | +0.0627 | 0.0176 | 7 | 1.00 | 0.80 | 0.80 | 0.0175 | 0.0629 | 0.0629 |
+| EQ05 @1s (in-sample) | +0.0627 | 0.0176 | 7 | 1.00 | 0.79 | 0.79 | 0.0175 | 0.0632 | 0.0632 |
 | EQ05 @1s (in-sample) | +0.0627 | 0.0176 | 47 | 1.00 | 1.00 | 1.00 | 0.0068 | 0.0151 | 0.0151 |
-| EQ05 @1s (v1.8 decayed) | +0.0331 | 0.0176 | 7 | 1.00 | 0.13 | 0.13 | 0.0175 | 0.0629 | 0.0629 |
+| EQ05 @1s (v1.8 decayed) | +0.0331 | 0.0176 | 7 | 1.00 | 0.13 | 0.13 | 0.0175 | 0.0632 | 0.0632 |
 | EQ05 @1s (v1.8 decayed) | +0.0331 | 0.0176 | 47 | 1.00 | 1.00 | 1.00 | 0.0068 | 0.0151 | 0.0151 |
-| EQ07 @10s (in-sample) | -0.0120 | 0.0159 | 7 | 0.00 | 0.00 | 0.00 | 0.0236 | 0.0566 | 0.0566 |
+| EQ07 @10s (in-sample) | -0.0120 | 0.0159 | 7 | 0.00 | 0.00 | 0.00 | 0.0236 | 0.0569 | 0.0569 |
 | EQ07 @10s (in-sample) | -0.0120 | 0.0159 | 47 | 0.00 | 0.00 | 0.00 | 0.0091 | 0.0136 | 0.0136 |
-| EQ07 @10s (v1.8 decayed) | -0.0206 | 0.0159 | 7 | 0.00 | 0.00 | 0.00 | 0.0236 | 0.0566 | 0.0566 |
+| EQ07 @10s (v1.8 decayed) | -0.0206 | 0.0159 | 7 | 0.00 | 0.00 | 0.00 | 0.0236 | 0.0569 | 0.0569 |
 | EQ07 @10s (v1.8 decayed) | -0.0206 | 0.0159 | 47 | 0.00 | 0.00 | 0.00 | 0.0091 | 0.0136 | 0.0136 |
-| EQ10 @1s (in-sample) | +0.0756 | 0.0209 | 7 | 1.00 | 0.81 | 0.81 | 0.0336 | 0.0746 | 0.0746 |
+| EQ10 @1s (in-sample) | +0.0756 | 0.0209 | 7 | 1.00 | 0.81 | 0.81 | 0.0336 | 0.0749 | 0.0749 |
 | EQ10 @1s (in-sample) | +0.0756 | 0.0209 | 47 | 1.00 | 1.00 | 1.00 | 0.0130 | 0.0179 | 0.0179 |
-| EQ10 @1s (v1.8 decayed) | +0.0966 | 0.0209 | 7 | 1.00 | 0.92 | 0.92 | 0.0336 | 0.0746 | 0.0746 |
+| EQ10 @1s (v1.8 decayed) | +0.0966 | 0.0209 | 7 | 1.00 | 0.92 | 0.92 | 0.0336 | 0.0749 | 0.0749 |
 | EQ10 @1s (v1.8 decayed) | +0.0966 | 0.0209 | 47 | 1.00 | 1.00 | 1.00 | 0.0130 | 0.0179 | 0.0179 |
 
 | alpha | recommendation (in-sample effect) | if decayed to v1.8 |
@@ -74,8 +74,8 @@ No in-sample IC exists for AUC01: the in-sample statistic is the session-cluster
 
 | S | active S | power t-gate | power DSR | joint <= | MDE (bp) | MDE IC (n decisions) |
 |---:|---:|---:|---:|---:|---:|---:|
-| 7 | 3 | 0.00 | 0.00 | 0.00 | 643.8 | 0.77 (21) |
-| 47 | 16 | 0.03 | 0.01 | 0.01 | 51.6 | 0.41 (141) |
+| 7 | 3 | 0.00 | 0.00 | 0.00 | 647.4 | 0.77 (21) |
+| 47 | 16 | 0.03 | 0.01 | 0.01 | 51.8 | 0.41 (141) |
 
 Recommendation: **underpowered even on tier 2**.
 
@@ -90,10 +90,10 @@ Recommendation: **underpowered even on tier 2**.
 | 0.5 | 7 | 0.00 | 0.00 | 0.00 |
 | 0.5 | 47 | 0.16 | 0.09 | 0.09 |
 | 1.0 | 7 | 0.04 | 0.00 | 0.00 |
-| 1.0 | 47 | 0.99 | 0.95 | 0.95 |
+| 1.0 | 47 | 0.99 | 0.94 | 0.94 |
 | 2.0 | 7 | 0.80 | 0.18 | 0.18 |
 | 2.0 | 47 | 1.00 | 1.00 | 1.00 |
 
-MDE (d, 80 %): 3.57 on tier 1, 0.85 on tier 2.
+MDE (d, 80 %): 3.58 on tier 1, 0.86 on tier 2.
 
 Recommendation: **PENDING maker_real summary (rerun with --h1-mean-bps/--h1-sd-bps)**.
