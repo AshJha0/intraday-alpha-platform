@@ -139,7 +139,7 @@ standard research-scaling caveat.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -174,6 +174,37 @@ BLOCK_ROWS_CAUSAL = "causal"
 _ANCHOR_REASON_BITS = LabelReason.NO_ANCHOR | LabelReason.ANCHOR_NOT_TRADABLE
 
 _HORIZON_NAME_BY_NS = {ns: name for name, ns in HORIZONS_NS.items()}
+
+
+@dataclass(frozen=True)
+class SignalRow:
+    """One decision row as a :data:`SizingHook` sees it (v1.17 WS-D, D2/D3).
+
+    ``target_qty`` is the position the policy wants BEFORE the hook (signed,
+    in quantity units); ``scores`` holds every column of the instrument's
+    scores frame at this row other than ``expected_return`` / ``confidence``
+    (a meta-label probability, a conformal width, a sigma, ...), as floats.
+    """
+
+    instrument_id: int
+    row: int
+    ts: int
+    expected_return: float
+    confidence: float
+    mid: float
+    half_spread: float
+    target_qty: float
+    scores: Mapping[str, float]
+
+
+#: Opt-in sizing hook of :class:`Backtester` (v1.17): called once per
+#: decision row with a non-zero target and returns a size multiplier in
+#: ``[0, 1]`` that scales that row's target (0 = decline the trade).  It
+#: runs at the DECISION row, before latency, the row block and the fill cap,
+#: so it can only read decision-time state; anything else it returns
+#: (NaN, < 0, > 1) is a ``ValueError``.  ``None`` (the default) is the
+#: pinned behaviour of every released result.
+SizingHook = Callable[[SignalRow], float]
 
 
 @dataclass(frozen=True)
@@ -329,6 +360,9 @@ class InstrumentResult:
     bar_pnl: np.ndarray = field(repr=False)  # reporting ccy
     quote_currency: str = "USD"
     total_pnl_native: float = 0.0  # quote-currency equity
+    #: per-row multiplier the sizing hook returned (1.0 where it was not
+    #: called); ``None`` when no hook was set (v1.17 WS-D)
+    sizing_multipliers: np.ndarray | None = field(default=None, repr=False)
 
 
 @dataclass
@@ -545,17 +579,26 @@ class Backtester:
         instrument_meta: Mapping[int, dict],
         config: BacktestConfig | None = None,
         reporting_ccy: str = "USD",
+        sizing_hook: SizingHook | None = None,
     ) -> None:
         """``instrument_meta[iid]``: dict with tick_size, lot_size, adv,
         asset_class and, for FX, base_currency / quote_currency (built from
         ReferenceData or configs/instruments/instruments.json; equities default to the
         reporting currency). The quote->reporting conversion table is derived
         from the FX pairs in the meta (a pair quoted ``X/REPORTING`` converts
-        X with its mid, ``REPORTING/X`` converts X with 1 / mid)."""
+        X with its mid, ``REPORTING/X`` converts X with 1 / mid).
+
+        ``sizing_hook`` (v1.17 WS-D, opt-in): a :data:`SizingHook` scaling
+        each non-zero decision target by a multiplier in ``[0, 1]``; see
+        :func:`iap.models.metalabel.meta_probability_hook` and
+        :func:`iap.models.conformal.conformal_sizing_hook`."""
         self.cost_model = cost_model
         self.meta = dict(instrument_meta)
         self.config = config or BacktestConfig()
         self.reporting_ccy = reporting_ccy
+        if sizing_hook is not None and not callable(sizing_hook):
+            raise TypeError("sizing_hook must be callable or None")
+        self.sizing_hook = sizing_hook
         self.fx_conversion: dict[str, tuple] = {}
         for pid, m in sorted(self.meta.items()):
             base = m.get("base_currency")
@@ -575,7 +618,49 @@ class Backtester:
             self.meta,
             self.config.for_horizon(horizon),
             reporting_ccy=self.reporting_ccy,
+            sizing_hook=self.sizing_hook,
         )
+
+    def _apply_sizing_hook(
+        self,
+        iid: int,
+        ts: np.ndarray,
+        er: np.ndarray,
+        conf: np.ndarray,
+        mid: np.ndarray,
+        hs: np.ndarray,
+        target: np.ndarray,
+        scores: pd.DataFrame,
+    ) -> np.ndarray:
+        """Scale ``target`` in place by the hook's multiplier at every row
+        with a finite non-zero target; returns the per-row multipliers."""
+        hook = self.sizing_hook
+        assert hook is not None
+        mult = np.ones(len(target))
+        extra_cols = [c for c in scores.columns if c not in ("expected_return", "confidence")]
+        extras = {c: scores[c].to_numpy(dtype=float) for c in extra_cols}
+        for i in np.flatnonzero(np.isfinite(target) & (target != 0.0)):
+            row = SignalRow(
+                instrument_id=int(iid),
+                row=int(i),
+                ts=int(ts[i]),
+                expected_return=float(er[i]),
+                confidence=float(conf[i]),
+                mid=float(mid[i]),
+                half_spread=float(hs[i]),
+                target_qty=float(target[i]),
+                scores={c: float(v[i]) for c, v in extras.items()},
+            )
+            m = hook(row)
+            try:
+                m = float(m)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"sizing_hook returned a non-number at row {i}: {m!r}") from exc
+            if not (np.isfinite(m) and 0.0 <= m <= 1.0):
+                raise ValueError(f"sizing_hook must return a finite multiplier in [0, 1]; got {m}")
+            mult[i] = m
+            target[i] *= m
+        return mult
 
     def quote_currency(self, iid: int) -> str:
         """Quote currency of an instrument (reporting ccy when unspecified)."""
@@ -662,6 +747,12 @@ class Backtester:
         else:
             target = np.where(conf >= cfg.conf_min, np.sign(er), 0.0) * cfg.max_pos_qty
             target[~np.isfinite(er)] = 0.0
+        sizing_mult: np.ndarray | None = None
+        if self.sizing_hook is not None:
+            # v1.17 WS-D: the hook sizes the DECISION, so it sees decision-time
+            # state only and everything downstream (latency, row block,
+            # flatten, fill cap, costs) applies to the scaled target unchanged.
+            sizing_mult = self._apply_sizing_hook(iid, ts, er, conf, mid, hs, target, scores)
         exec_target = np.full(n, np.nan)
         if cfg.latency_ns is not None:
             # TIME mode: execute at the first row at-or-after t + latency.
@@ -812,6 +903,7 @@ class Backtester:
             bar_pnl=bar_pnl,
             quote_currency=self.quote_currency(iid),
             total_pnl_native=float(equity_native[-1]) if n else 0.0,
+            sizing_multipliers=sizing_mult,
         )
 
     def run(

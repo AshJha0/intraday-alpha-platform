@@ -15,5 +15,7 @@ from iap.backtest.engine import (  # noqa: F401
     Backtester,
     BacktestResult,
     InstrumentResult,
+    SignalRow,
+    SizingHook,
     ensemble_scores,
 )

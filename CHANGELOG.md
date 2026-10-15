@@ -8,6 +8,22 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-D items D2 and D3 (review finding R-5): meta-labelling with a calibrate/select split and
+  conformal sizing, every piece opt-in. `run_meta_labeling(split_mode="calibrate_select")` splits the OOS
+  region 40/20/20/20 train / calibration / select / test so `best_tau` is chosen on rows the calibrator
+  never saw; `primary_selection_window` purges the primary signal's selection fold from the calibration
+  fold and the result records the split, the windows and the purge count (`"legacy"`, the default, is the
+  v1.16 three-way split, unchanged). `Backtester(sizing_hook=)` scales each decision row's target by a
+  multiplier in [0, 1] at the decision row (`SignalRow`, `SizingHook`, `InstrumentResult.sizing_multipliers`);
+  `meta_probability_hook` (gate / linear over a calibrated probability column) and `conformal_sizing_hook`
+  (split-conformal interval width mapped to size, `confidence_from_width`) are the providers.
+  `coverage_by_regime`: empirical coverage per regime vs nominal with the day-clustered t of the shortfall
+  (the v1.17 gate-statistic form), reported, not enforced (`passed: null`). The MVP engine takes the same
+  conformal rule through the optional `portfolio.conformal` block (`ConformalSpec`; absent from every pinned
+  config, golden byte-identical). The ML ledger records `split_mode` / `primary_selection_window` in the
+  `metalabel_tau` look and a `conformal_coverage_gate` look. API_ALPHA.md §9-§10, RESEARCH_VALIDITY.md
+  §4d, MVP.md §11; no registered result changes.
+
 - v1.17 WS-A item A2b: slim ingest for breadth datasets. `ingest --slim` / `normalize_run(write_normalized_jsonl=False)`
   writes no `*.normalized.jsonl` twin of the IAP1 file (3x its bytes; the feature build and the MVP read the
   IAP1; manifest `layout: "slim"`); `process-day` is slim by default (`--no-slim` opts out), deletes `raw/`

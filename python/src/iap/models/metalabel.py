@@ -27,6 +27,23 @@ Pinned methodology:
   semantics; FrozenEstimator on sklearn >= 1.6).
 - Evaluation is economic — P&L per signal with and without the meta-gate —
   in addition to AUC/Brier, per the spec's "not only AUC" requirement.
+
+**v1.17 (WS-D item D2, review finding R-5).**  The three-way split above
+chose ``best_tau`` on the calibration segment, i.e. on the rows the
+calibrator itself was fitted on, so the sweep read an optimistic
+probability.  ``split_mode="calibrate_select"`` (opt-in) splits the OOS
+region four ways, 40 / 20 / 20 / 20 meta-train / calibrate / select / test
+(row mass, purged and embargoed at every boundary): the calibrator is
+fitted on *calibrate*, ``best_tau`` is chosen on *select* and both taus are
+read on *test*.  ``primary_selection_window`` names the fold the primary
+signal was selected on (its ``[start_ts, end_ts]``): calibration rows inside
+it are purged, so the calibration fold never overlaps that fold, and the
+result document records the split (``split_mode``, ``segments``,
+``selection_segment``, ``primary_selection_window``,
+``n_calibration_rows_purged_for_primary_selection``).  The default
+``split_mode="legacy"`` is the three-way split, unchanged, so every stored
+``run_*`` result reproduces.  :func:`meta_probability_hook` turns a
+calibrated probability column into a :data:`iap.backtest.engine.SizingHook`.
 """
 
 from __future__ import annotations
@@ -51,6 +68,14 @@ _EMBARGO_NS = 60_000_000_000
 assert TARGET_HORIZON_NS < _EMBARGO_NS, (
     f"meta-label split requires label horizon < embargo ({TARGET_HORIZON_NS} >= {_EMBARGO_NS})"
 )
+
+#: Split modes of :func:`run_meta_labeling` (module docs): the v1.16 three-way
+#: split and the v1.17 four-way calibrate/select split (R-5).
+SPLIT_MODES = ("legacy", "calibrate_select")
+#: Row-mass boundaries of each split mode (fractions of the meta rows).
+_SPLIT_BOUNDS = {"legacy": (0.50, 0.75), "calibrate_select": (0.40, 0.60, 0.80)}
+#: Multiplier rules of :func:`meta_probability_hook`.
+HOOK_MODES = ("gate", "linear")
 
 #: Pinned meta-classifier hyperparameters (recorded in the run manifest).
 META_HYPERPARAMS: dict[str, Any] = {
@@ -167,8 +192,21 @@ def run_meta_labeling(
     tau: float = 0.5,
     impute_nan: bool = False,
     ledger=None,
+    split_mode: str = "legacy",
+    primary_selection_window: tuple[int, int] | None = None,
+    return_model: bool = False,
 ) -> dict[str, Any]:
     """Train + calibrate + economically evaluate the meta-label gate.
+
+    ``split_mode`` (v1.17 D2, module docs): ``"legacy"`` (default; the
+    v1.16 three-way split, ``best_tau`` chosen on the calibration segment)
+    or ``"calibrate_select"`` (four-way; ``best_tau`` chosen on a select
+    segment disjoint from the calibration segment).
+    ``primary_selection_window`` = ``(start_ts, end_ts)`` of the fold the
+    primary signal was selected on; calibration rows inside it are purged
+    and the count is recorded.  ``return_model=True`` adds the fitted
+    calibrator under ``"calibrator"`` (not JSON; added after the tracker and
+    ledger writes).
 
     ``ledger`` (an :class:`iap.validation.ledger.ExperimentLedger`, v1.17
     review R-4) records the tau decision - the pinned ``tau`` read on the
@@ -205,31 +243,61 @@ def run_meta_labeling(
         primary_pred[idx], direction[idx], ds.meta_context[idx], impute_nan=impute_nan
     )
 
-    # chronological 50/25/25 split with embargo (ts is already sorted
-    # because the dataset is sorted by exchange_ts). PURGING (pinned): rows
-    # on the earlier side of each boundary are kept only when their forward
-    # label window closes at or before the boundary
-    # (ts + TARGET_HORIZON_NS <= boundary) — a row whose label overlaps the
-    # boundary would leak the later segment's outcomes into training.
-    # Boundaries at quantiles of the ROW INDEX, not of the wall span (pinned,
-    # round-4 — the same correction both walk-forward splitters already carry,
+    if split_mode not in SPLIT_MODES:
+        raise ValueError(f"unknown split_mode {split_mode!r}; known: {SPLIT_MODES}")
+    sel_lo = sel_hi = 0
+    if primary_selection_window is not None:
+        sel_lo, sel_hi = (int(v) for v in primary_selection_window)
+        if sel_lo > sel_hi:
+            raise ValueError("primary_selection_window must be (start_ts, end_ts)")
+    # chronological split with embargo (ts is already sorted because the
+    # dataset is sorted by exchange_ts): 50/25/25 train / calibration / test
+    # ("legacy") or 40/20/20/20 train / calibration / select / test
+    # ("calibrate_select", v1.17 R-5).  PURGING (pinned): rows on the
+    # earlier side of each boundary are kept only when their forward label
+    # window closes at or before the boundary (ts + TARGET_HORIZON_NS <=
+    # boundary) — a row whose label overlaps the boundary would leak the
+    # later segment's outcomes into training.  Boundaries at quantiles of
+    # the ROW INDEX, not of the wall span (pinned, round-4 — the same
+    # correction both walk-forward splitters already carry,
     # iap.validation.splits.folds_by_row_mass and iap.models.splits.split).
     # The frames are not uniform in time (an equity session is 6.5 h of each
-    # 24 h day), so wall-span boundaries do not give the documented 50/25/25:
-    # on the dataset this was found on (v1.3.0 and earlier, 206 190 rows) they
-    # gave 50.0 / 6.0 / 43.9 and the calibration window landed almost entirely
-    # in the dormant overnight stretch.
+    # 24 h day), so wall-span boundaries do not give the documented shares:
+    # on the dataset this was found on (v1.3.0 and earlier, 206 190 rows)
+    # they gave 50.0 / 6.0 / 43.9 and the calibration window landed almost
+    # entirely in the dormant overnight stretch.
     n_rows = ts.size
-    b1 = int(ts[min(int(round(0.50 * n_rows)), n_rows - 1)])
-    b2 = int(ts[min(int(round(0.75 * n_rows)), n_rows - 1)])
-    if not (int(ts[0]) < b1 < b2):
+    bounds = [int(ts[min(int(round(f * n_rows)), n_rows - 1)]) for f in _SPLIT_BOUNDS[split_mode]]
+    if not all(a < b for a, b in zip([int(ts[0])] + bounds[:-1], bounds, strict=True)):
         raise ValueError(
             "meta split boundaries are not strictly increasing (too many identical timestamps)"
         )
-    tr = ts + TARGET_HORIZON_NS <= b1
-    ca = (ts > b1 + _EMBARGO_NS) & (ts + TARGET_HORIZON_NS <= b2)
-    te = ts > b2 + _EMBARGO_NS
-    if tr.sum() < 100 or ca.sum() < 50 or te.sum() < 50:
+
+    def _segment(lo: int | None, hi: int | None) -> np.ndarray:
+        m = np.ones(n_rows, dtype=bool)
+        if lo is not None:
+            m &= ts > lo + _EMBARGO_NS
+        if hi is not None:
+            m &= ts + TARGET_HORIZON_NS <= hi
+        return m
+
+    edges: list[int | None] = [None, *bounds, None]
+    segs = [_segment(edges[k], edges[k + 1]) for k in range(len(edges) - 1)]
+    if split_mode == "legacy":
+        tr, ca, te = segs
+        se = ca  # the v1.16 rule: tau selected on the calibration rows
+        selection_segment = "calibration"
+    else:
+        tr, ca, se, te = segs
+        selection_segment = "select"
+    n_purged_sel = 0
+    if primary_selection_window is not None:
+        inside = (ts >= sel_lo) & (ts <= sel_hi)
+        n_purged_sel = int(np.sum(ca & inside))
+        ca = ca & ~inside
+        if split_mode == "legacy":
+            se = ca
+    if tr.sum() < 100 or ca.sum() < 50 or se.sum() < 50 or te.sum() < 50:
         raise ValueError("meta split produced degenerate segments")
 
     base = HistGradientBoostingClassifier(**META_HYPERPARAMS)
@@ -237,24 +305,26 @@ def run_meta_labeling(
     calib = _fit_isotonic_calibrated(base, X_meta[ca], y_meta[ca])
 
     p_test = calib.predict_proba(X_meta[te])[:, 1]
-    p_cal = calib.predict_proba(X_meta[ca])[:, 1]
+    p_sel = calib.predict_proba(X_meta[se])[:, 1]
 
-    # tau sweep on the CALIBRATION segment (never on test).  Grid = pinned
-    # absolute levels + deciles of the calibrated probabilities (the base
-    # rate of profitable trades can sit far below 0.5, so absolute levels
-    # alone can land above the whole probability distribution).
+    # tau sweep on the SELECTION segment (never on test): the calibration
+    # rows under "legacy", the disjoint select rows under "calibrate_select"
+    # (R-5).  Grid = pinned absolute levels + deciles of the calibrated
+    # probabilities (the base rate of profitable trades can sit far below
+    # 0.5, so absolute levels alone can land above the whole probability
+    # distribution).
     fixed = [round(0.30 + 0.05 * i, 2) for i in range(9)]  # 0.30 .. 0.70
-    p_cal_deciles = [float(np.quantile(p_cal, q)) for q in (0.1, 0.25, 0.5, 0.75, 0.9)]
-    taus = sorted(set(round(t, 6) for t in fixed + p_cal_deciles))
-    cal_net = realized_net(direction[idx][ca], ds.y_mid[idx][ca], ds.y[idx][ca])
+    p_sel_deciles = [float(np.quantile(p_sel, q)) for q in (0.1, 0.25, 0.5, 0.75, 0.9)]
+    taus = sorted(set(round(t, 6) for t in fixed + p_sel_deciles))
+    sel_net = realized_net(direction[idx][se], ds.y_mid[idx][se], ds.y[idx][se])
     sweep = []
     for t in taus:
-        take = p_cal >= t
+        take = p_sel >= t
         sweep.append(
             {
                 "tau": t,
                 "n_trades": int(take.sum()),
-                "total_net_bps": float(cal_net[take].sum() * 1e4),
+                "total_net_bps": float(sel_net[take].sum() * 1e4),
             }
         )
     best_tau = max(sweep, key=lambda r: r["total_net_bps"])["tau"]
@@ -295,13 +365,31 @@ def run_meta_labeling(
         "impute_nan": bool(impute_nan),
         "n_missing_meta_values": int(np.sum(~np.isfinite(X_meta))) if not impute_nan else None,
         "n_meta_samples": int(len(idx)),
-        "segments": {"train": int(tr.sum()), "calibration": int(ca.sum()), "test": int(te.sum())},
+        "split_mode": split_mode,
+        "segments": {
+            "train": int(tr.sum()),
+            "calibration": int(ca.sum()),
+            "select": int(se.sum()),
+            "test": int(te.sum()),
+        },
+        "segment_windows": {
+            label: [int(ts[mask].min()), int(ts[mask].max())]
+            for label, mask in (("train", tr), ("calibration", ca), ("select", se), ("test", te))
+        },
+        "selection_segment": selection_segment,
+        "primary_selection_window": (
+            None if primary_selection_window is None else [sel_lo, sel_hi]
+        ),
+        "n_calibration_rows_purged_for_primary_selection": n_purged_sel,
+        "calibration_overlaps_primary_selection": (
+            None if primary_selection_window is None else False
+        ),
         "base_rate_test": float(y_meta[te].mean()),
         "auc_test": auc,
         "brier_test": float(brier_score_loss(y_meta[te], p_test)),
         "tau": tau,
-        "best_tau_from_calibration": best_tau,
-        "tau_sweep_calibration": sweep,
+        "best_tau_from_calibration": best_tau,  # chosen on ``selection_segment``
+        "tau_sweep_calibration": sweep,  # the sweep on ``selection_segment``
         "calibration_method": getattr(calib, "iap_calibration_method", ""),
         "calibration_positives": int(getattr(calib, "iap_calibration_positives", 0)),
         # A gate that declines EVERY test signal is degenerate: say so
@@ -328,12 +416,21 @@ def run_meta_labeling(
                 "n": int(mask.sum()),
                 "window": [int(ts[mask].min()), int(ts[mask].max())],
             }
-            for label, mask in (("train", tr), ("calibration", ca), ("test", te))
+            for label, mask in (
+                ("train", tr),
+                ("calibration", ca),
+                *((("select", se),) if selection_segment == "select" else ()),
+                ("test", te),
+            )
         ]
         tracker.write_manifest(
             run_id,
             model_version="metalabel_isotonic_v1",
-            hyperparams={**META_HYPERPARAMS, "impute_nan": bool(impute_nan)},
+            hyperparams={
+                **META_HYPERPARAMS,
+                "impute_nan": bool(impute_nan),
+                "split_mode": split_mode,
+            },
             train_window={"start_ts": int(ts[tr].min()), "end_ts": int(ts[tr].max())},
             test_window={"start_ts": int(ts[te].min()), "end_ts": int(ts[te].max())},
             features=list(META_FEATURE_NAMES),
@@ -356,10 +453,15 @@ def run_meta_labeling(
                 "tau": float(tau),
                 "tau_grid": "0.30..0.70 step 0.05 + calibration deciles 10/25/50/75/90",
                 "impute_nan": bool(impute_nan),
-                "selection": "best_tau = argmax total_net_bps on the calibration segment",
+                "split_mode": split_mode,
+                "selection": f"best_tau = argmax total_net_bps on the {selection_segment} segment",
+                "primary_selection_window": (
+                    None if primary_selection_window is None else [sel_lo, sel_hi]
+                ),
             },
             result={
                 "best_tau_from_calibration": float(best_tau),
+                "segments": result["segments"],
                 "auc_test": auc,
                 "gate_degenerate": result["gate_degenerate"],
                 "economics_gate_off": econ_off,
@@ -367,4 +469,39 @@ def run_meta_labeling(
                 "economics_gate_best_tau": econ_best,
             },
         )
+    if return_model:
+        result["calibrator"] = calib
     return result
+
+
+def meta_probability_hook(
+    tau: float, column: str = "meta_prob", mode: str = "gate", missing: float = 0.0
+):
+    """A :data:`iap.backtest.engine.SizingHook` over a calibrated meta
+    probability column of the scores frame (v1.17 D2, opt-in).
+
+    ``mode="gate"``: multiplier 1 when ``p >= tau`` else 0 (the meta-gate as
+    a size).  ``mode="linear"``: 0 below ``tau``, ``(p - tau) / (1 - tau)``
+    above it (size grows with the calibrated probability).  A missing or
+    non-finite probability gives ``missing`` (default 0: no trade).  The
+    probabilities are the caller's: score the frame's rows with the
+    calibrator :func:`run_meta_labeling` returns (``return_model=True``) and
+    write them to ``column`` BEFORE the backtest; the hook only reads.
+    """
+    if not 0.0 <= tau < 1.0:
+        raise ValueError("tau must be in [0, 1)")
+    if mode not in HOOK_MODES:
+        raise ValueError(f"unknown mode {mode!r}; known: {HOOK_MODES}")
+    if not 0.0 <= missing <= 1.0:
+        raise ValueError("missing must be in [0, 1]")
+
+    def hook(row) -> float:
+        p = row.scores.get(column)
+        if p is None or not np.isfinite(p):
+            return missing
+        if mode == "gate":
+            return 1.0 if p >= tau else 0.0
+        return float(min(max((p - tau) / (1.0 - tau), 0.0), 1.0))
+
+    hook.__name__ = f"meta_probability_hook[{column},{mode},tau={tau}]"
+    return hook

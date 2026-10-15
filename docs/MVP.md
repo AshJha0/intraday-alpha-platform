@@ -588,3 +588,31 @@ The report gains `counts.eod_flatten` (`decisions`, `parents`, `too_late`,
 lead of a third of the session, the end position goes from -413 to 0
 (CHANGELOG, v1.16 item 17). The config refuses a lead that is not positive.
 Diagram: DIAGRAMS.md §10 (`diagrams/mvp_loop.mmd`, the branch after step 7).
+
+## 11. Conformal sizing (v1.17 WS-D item D3, opt-in)
+
+`portfolio.conformal` is an OPTIONAL key of `mvp.json`
+(`iap.mvp.config.ConformalSpec`): absent — as in `configs/mvp/mvp.json` and
+`mvp_tiny.json` — nothing in this section runs and the golden run is
+byte-identical to v1.16. With the block present the engine keeps an online
+conformal calibrator (`iap.models.conformal.AdaptiveConformal`; `method:
+"split"` is the same rolling window with `gamma` 0) over the residual
+*next sizing-bar log return minus the last expected return of the previous
+bar*. That residual is a scale proxy: the engine does not observe the
+horizon label online, and the width only ever enters as a ratio to
+`ref_width` (the block's value, else the median width of the rolling
+window once `warmup` residuals are in). Every solved portfolio target is
+scaled by `confidence_from_width(width, ref_width)` through
+`conformal_size` (whole lots, never above the solver's target or
+`max_position_qty`, sign preserved); until warm-up the target passes
+unscaled. The trace keeps the solver's target; the parent order carries the
+scaled one. `engine.conformal_sizing` counts `updates`, `decisions_seen`,
+`decisions_scaled`, `qty_removed` and the `min_multiplier`. A config with
+the block hashes to a different `config_version` and `run_id`, so a
+conformal run can never be mistaken for the pinned one.
+
+```json
+"portfolio": { "...": "...", "conformal": { "alpha": 0.1, "method": "adaptive",
+                                             "gamma": 0.005, "window": 500,
+                                             "warmup": 30, "ref_width": null } }
+```

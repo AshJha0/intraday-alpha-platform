@@ -22,6 +22,22 @@ parity-checked against the other engines byte for byte; a conformal multiplier
 there would move the goldens in every language.  This module is a research-side
 post-processor applied to target positions *before* the existing risk caps, so
 the parity path is unchanged.
+
+**v1.17 (WS-D item D3).**  Two wirings, both opt-in and both off in every
+registered configuration:
+
+* :func:`conformal_sizing_hook` -- a :data:`iap.backtest.engine.SizingHook`
+  for the research backtester: the split-conformal interval over the
+  primary signal's residuals is mapped to a size multiplier,
+  ``confidence_from_width(width, ref_width)``.
+* :class:`iap.mvp.sizing.SizingMixin` -- the MVP engine scales the
+  portfolio target by the same rule when ``portfolio.conformal`` is present
+  in ``mvp.json`` (absent = the pinned golden run, byte for byte).
+
+:func:`coverage_by_regime` is the coverage gate: empirical coverage per
+regime label against nominal, with the day-clustered t of the coverage
+shortfall in the v1.17 gate-statistic form.  It is REPORTED, not enforced,
+by default (``enforce=False``: ``passed`` is ``None``).
 """
 
 from __future__ import annotations
@@ -100,8 +116,13 @@ class SplitConformal:
         sigma_cal: Sequence[float] | None = None,
     ) -> SplitConformal:
         resid = np.abs(np.asarray(y_cal, float) - np.asarray(pred_cal, float))
-        scores = resid / self._sigma(sigma_cal, resid)
+        sig = self._sigma(sigma_cal, resid)
+        scores = resid / sig
         self.q = _conformal_quantile(scores, self.alpha)
+        self.n_cal = int(resid.size)
+        #: median interval width over the calibration rows (the default
+        #: ``ref_width`` of :func:`conformal_sizing_hook`); inf when ``q`` is
+        self.cal_median_width = float(np.median(2.0 * self.q * sig)) if resid.size else math.inf
         return self
 
     def interval(
@@ -210,6 +231,179 @@ def conformal_size(
     mag = min(abs(target_qty) * c, max_position)
     lots = math.floor(mag / lot + 1e-12)
     return int(math.copysign(lots * lot, target_qty)) if lots else 0
+
+
+def conformal_sizing_hook(
+    calibrator: SplitConformal,
+    *,
+    ref_width: float | None = None,
+    sigma_column: str | None = None,
+    missing: float = 0.0,
+):
+    """A :data:`iap.backtest.engine.SizingHook` from a fitted
+    :class:`SplitConformal` (v1.17 D3, opt-in).
+
+    The hook reads the row's ``expected_return`` as the point forecast,
+    takes the interval ``calibrator.interval(pred[, sigma])`` -- ``sigma``
+    from the scores-frame column ``sigma_column`` when the calibrator uses
+    the normalised score -- and returns
+    :func:`confidence_from_width` ``(hi - lo, ref_width)``: full size at or
+    below ``ref_width`` (default: the calibrator's median calibration
+    width), shrinking as ``ref_width / width`` above it, 0 for an infinite
+    width.  A missing or non-finite ``sigma`` gives ``missing`` (default 0,
+    no trade).  The residuals the calibrator was fitted on must come from
+    rows disjoint from the rows backtested (the caller's split; see
+    :func:`coverage_by_regime` for the check).
+    """
+    if calibrator.q is None:
+        raise RuntimeError("fit() the calibrator first")
+    if calibrator.score == "normalized" and sigma_column is None:
+        raise ValueError("a normalized-score calibrator needs sigma_column")
+    if not 0.0 <= missing <= 1.0:
+        raise ValueError("missing must be in [0, 1]")
+    ref = calibrator.cal_median_width if ref_width is None else float(ref_width)
+    if not (math.isfinite(ref) and ref > 0.0):
+        raise ValueError(f"ref_width must be finite and > 0 (got {ref}); pass ref_width")
+
+    def hook(row) -> float:
+        sigma = None
+        if sigma_column is not None:
+            sigma = row.scores.get(sigma_column)
+            if sigma is None or not np.isfinite(sigma):
+                return missing
+        lo, hi = calibrator.interval(row.expected_return, sigma)
+        return confidence_from_width(float(hi - lo), ref)
+
+    hook.__name__ = f"conformal_sizing_hook[alpha={calibrator.alpha},ref_width={ref:.3g}]"
+    return hook
+
+
+#: Default day-cluster t at which :func:`coverage_by_regime` flags a regime
+#: as under-covered (one-sided; the gate form of ``iap.validation``).
+COVERAGE_GATE_T = 2.0
+
+
+def _coverage_cell(
+    covered: np.ndarray, ts: np.ndarray, nominal: float, day_ns: int, threshold: float
+) -> dict:
+    """One regime's coverage row in the v1.17 gate-statistic form.
+
+    The statistic is the day-clustered t of the mean coverage shortfall
+    ``e_i = 1{covered_i} - nominal``: ``t = mean(e) / se`` with
+    ``se^2 = G/(G-1) * sum_d s_d^2 / n^2`` over the ``G`` days, ``s_d`` the
+    within-day sum of ``e_i - mean(e)`` (the same cluster rule as
+    :func:`iap.validation.metrics.day_cluster_tstat`).  NaN below two days.
+    """
+    from iap.validation.metrics import day_cluster_inference
+
+    n = int(covered.size)
+    nan = float("nan")
+    if n == 0:
+        return {
+            "n_pairs": 0,
+            "n_days": 0,
+            "coverage": nan,
+            "nominal": nominal,
+            "gap": nan,
+            "tstat_day_cluster": nan,
+            "under_coverage": False,
+        }
+    cov = float(covered.mean())
+    e = covered.astype(float) - nominal
+    _, inv = np.unique(ts // int(day_ns), return_inverse=True)
+    g = int(inv.max()) + 1
+    t = nan
+    if g >= 2:
+        s_d = np.bincount(inv, weights=e - e.mean(), minlength=g)
+        meat = float(np.sum(s_d * s_d)) * g / (g - 1.0)
+        if meat > 0.0:
+            t = float(e.mean() * n / math.sqrt(meat))
+    row = {
+        "n_pairs": n,
+        "n_days": g,
+        "coverage": cov,
+        "nominal": nominal,
+        "gap": cov - nominal,
+        "tstat_day_cluster": t,
+        "under_coverage": bool(np.isfinite(t) and t < -threshold),
+    }
+    row.update({f"inference_{k}": v for k, v in day_cluster_inference(t, g).items()})
+    return row
+
+
+def coverage_by_regime(
+    ts: Sequence[int],
+    y: Sequence[float],
+    lo: Sequence[float],
+    hi: Sequence[float],
+    regime: Sequence[object],
+    alpha: float,
+    *,
+    threshold: float = COVERAGE_GATE_T,
+    enforce: bool = False,
+    day_ns: int = 86_400 * 1_000_000_000,
+    ledger=None,
+    alpha_id: str = "CONFORMAL",
+    config: dict | None = None,
+) -> dict:
+    """Coverage-by-regime gate (v1.17 D3): empirical coverage of the
+    intervals ``[lo, hi]`` per ``regime`` label against the nominal
+    ``1 - alpha``, each with the day-clustered t of the shortfall in the
+    v1.17 gate-statistic form (:func:`_coverage_cell`).
+
+    A regime is ``under_coverage`` when its t is below ``-threshold``.  The
+    gate is REPORTED by default: ``enforced`` is ``False`` and ``passed`` is
+    ``None``; with ``enforce=True`` ``passed`` is ``True`` iff no regime is
+    under-covered.  Nothing in the platform calls it with ``enforce=True``.
+    ``ledger`` (an :class:`iap.validation.ledger.ExperimentLedger`) records
+    the gate read as ONE look of kind ``"conformal_coverage_gate"`` whose
+    identity is ``alpha_id``, ``alpha``, ``threshold``, ``enforce`` and the
+    caller's ``config``; the caller saves the ledger.
+    """
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be in (0, 1)")
+    if threshold < 0.0:
+        raise ValueError("threshold must be >= 0")
+    ts_ = np.asarray(ts, dtype=np.int64)
+    y_, lo_, hi_ = (np.asarray(v, float) for v in (y, lo, hi))
+    reg = np.asarray(list(regime), dtype=object)
+    if not len(ts_) == len(y_) == len(lo_) == len(hi_) == len(reg):
+        raise ValueError("length mismatch")
+    nominal = 1.0 - alpha
+    covered = (lo_ <= y_) & (y_ <= hi_)
+    by_regime = {
+        str(r): _coverage_cell(covered[reg == r], ts_[reg == r], nominal, day_ns, threshold)
+        for r in dict.fromkeys(reg.tolist())
+    }
+    under = sorted(k for k, v in by_regime.items() if v["under_coverage"])
+    out = {
+        "nominal": nominal,
+        "threshold_t": float(threshold),
+        "statistic": "day-cluster t of mean(1{covered} - nominal)",
+        "overall": _coverage_cell(covered, ts_, nominal, day_ns, threshold),
+        "by_regime": by_regime,
+        "under_covered_regimes": under,
+        "enforced": bool(enforce),
+        "passed": (not under) if enforce else None,
+    }
+    if ledger is not None:
+        out["ledger_n"] = ledger.record(
+            alpha_id,
+            "conformal_coverage_gate",
+            config={
+                "alpha": float(alpha),
+                "threshold_t": float(threshold),
+                "enforce": bool(enforce),
+                **(config or {}),
+            },
+            result={
+                "overall": out["overall"],
+                "under_covered_regimes": under,
+                "passed": out["passed"],
+                "regimes": {k: v["coverage"] for k, v in by_regime.items()},
+            },
+        )
+    return out
 
 
 def calibration_report(
