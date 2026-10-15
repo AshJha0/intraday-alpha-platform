@@ -8,11 +8,15 @@ ingested one day at a time and only what research reads is kept:
 and `KEEP.json` (the sha256 of every kept file). `raw/`, `normalized/*.normalized.*`
 and the vendor file are deleted after `KEEP.json` is verified.
 
-```
-python -m iap.marketdata process-day --manifest research\breadth\candidates.json ^
-    --date 2019-01-30 --vendor-dir data\vendor --out-root data\real\breadth ^
-    --symbols-file research\breadth\universe.json [--download --i-have-approval] ^
-    [--partition-instruments 10] [--engine rust] [--workers 1] [--keep-raw] [--keep-gz] ^
+Commands are PowerShell (a backtick continues a line; the square brackets mark
+optional parts: delete the brackets, keep or drop the flag inside).
+
+```powershell
+$env:PYTHONPATH = "python\src"
+python -m iap.marketdata process-day --manifest research\breadth\candidates.json `
+    --date 2019-01-30 --vendor-dir data\vendor --out-root data\real\breadth `
+    --symbols-file research\breadth\universe.json [--download --i-have-approval] `
+    [--partition-instruments 10] [--engine rust] [--workers 1] [--keep-raw] [--keep-gz] `
     [--min-free-gb 10] [--dry-run]
 ```
 
@@ -35,8 +39,8 @@ estimate, the guard reading and what was deleted.
 
 ## Detached run and the watchdog
 
-```
-python -m iap.marketdata process-day ... --render-cmd data\real\run_process_20190130.cmd ^
+```powershell
+python -m iap.marketdata process-day ... --render-cmd data\real\run_process_20190130.cmd `
     --jobs-registry data\real\jobs.json
 ```
 
@@ -77,15 +81,17 @@ divergent book refuses unless `--allow-book-divergence`; the report lands in
 `keep` -> `delete` (normalized, the book capture, the extract). The manifest
 comes from the HIST index with the owner's approval sentence:
 
-```
+```powershell
 python tools\iex_hist.py index --date 2025-11-28 ... --out research\v117\iex_overlap_manifest.json --approval "<sentence>"
-python -m iap.marketdata process-iex-day --manifest research\v117\iex_overlap_manifest.json ^
-    --date 2025-11-28 --vendor-dir data\vendor --out-root data\real\iex --symbols AAPL,MSFT,QQQ ^
-    --download --i-have-approval [--feed deep-plus] [--round-lots-from data\real\r7_20251128\dataset.json] ^
+python -m iap.marketdata process-iex-day --manifest research\v117\iex_overlap_manifest.json `
+    --date 2025-11-28 --vendor-dir data\vendor --out-root data\real\iex --symbols AAPL,MSFT,QQQ `
+    --download --i-have-approval [--feed deep-plus] [--round-lots-from dataeal7_20251128\dataset.json] `
     [--partition-instruments 10] [--min-free-gb 30] [--peak-gb N]
-python -m iap.marketdata process-iex-day ... --date D1 --date D2 ... --render-cmd data\real\run_iex_overlap.cmd ^
-    --jobs-registry data\real\jobs.json        (one chain, days in order; a failed day is logged and the next runs)
-python tools\iex_hist.py recent --n 5 --out research\v117\iex_recent_manifest.json   (the rolling list; NOT a download)
+# one chain, days in order; a failed day is logged and the next runs:
+python -m iap.marketdata process-iex-day ... --date D1 --date D2 ... --render-cmd data\real\run_iex_overlap.cmd `
+    --jobs-registry data\real\jobs.json
+# the rolling list; NOT a download:
+python tools\iex_hist.py recent --n 5 --out research\v117\iex_recent_manifest.json
 ```
 
 **Round lots.** TOPS quotes the best level that holds at least a round lot (measured on

@@ -5,12 +5,24 @@ production-grade replay/execution simulators (C++/Rust/Java) and the
 cross-language parity harness.
 **Owner:** research + per-language owners. **Related alerts:** `GcPauseHigh`.
 
+> **Shells.** Blocks tagged `bash` run in bash (Linux, the containers, Git Bash on Windows).
+> The owner's Windows machine uses PowerShell: each `PYTHONPATH=src python3 ...` has a
+> `powershell` variant below it (`$env:PYTHONPATH = "src"; python ...`; `python3` is `python`;
+> set the variable once per window; `a && b` is `a; if ($?) { b }`). `bash tests/harness/...`
+> and `bash build.sh` need Git Bash or WSL on PATH; `kubectl`, `docker` and `curl` lines
+> are for the cluster/containers and are the same in PowerShell except for the text filters,
+> which are given in PowerShell where the owner would run them locally.
+
 ## 1. Prerequisites
 
 Fresh market data (backtests read `data/normalized/`):
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.marketdata     # see RUNBOOK_data_pipeline.md
+```
+
+```powershell
+Set-Location python; $env:PYTHONPATH = "src"; python -m iap.marketdata
 ```
 
 ## 2. Python research backtester
@@ -22,6 +34,12 @@ costs, exact accounting identity — `python/src/iap/backtest/engine.py`):
 cd python
 PYTHONPATH=src python3 -m pytest -q tests/test_backtester.py          # engine invariants
 PYTHONPATH=src python3 -m pytest -q tests/test_model_economics.py     # cost-adjusted economics
+```
+
+```powershell
+Set-Location python; $env:PYTHONPATH = "src"
+python -m pytest -q tests/test_backtester.py          # engine invariants
+python -m pytest -q tests/test_model_economics.py     # cost-adjusted economics
 ```
 
 Defaults since v1.5.0 (PLATFORM_CONVENTIONS.md §13.6): `BacktestConfig()`
@@ -62,6 +80,11 @@ python3 -m json.tool research/models/ledger.json | head
 python3 -m json.tool research/models/<run_id>/manifest.json
 ```
 
+```powershell
+python -m json.tool research/models/ledger.json | Select-Object -First 10
+python -m json.tool research/models/<run_id>/manifest.json
+```
+
 ### 2.1 Row blocking and methods since v1.14
 
 The research backtester blocks rows causally by default
@@ -88,6 +111,13 @@ cd rust && cargo run --release --bin demo
 # cd archive/java && bash build.sh && java -cp out/main com.iap.replay.Demo ../../tests/golden
 ```
 
+```powershell
+# C++ (build.sh needs Git Bash or WSL; other routes: docs/BUILD_NOTES.md)
+Set-Location cpp; bash build.sh; if ($?) { ctest --test-dir build --output-on-failure -R 'Replay|Exec|Golden' }
+.\build\bench_all
+Set-Location ..\rust; cargo run --release --bin demo
+```
+
 Containerized equivalents: `docker compose -f
 deployment/docker/docker-compose.yml up cpp-replay rust-replay mvp-session platform-metrics`.
 
@@ -95,7 +125,7 @@ The Python reference ports of the same simulator and of the risk engine run
 their goldens in the Python suite (`cd python && PYTHONPATH=src python3 -m
 pytest -q tests/test_execution_golden.py tests/test_risk_golden.py`;
 `API_TRADING.md`), and the whole loop — including both — is one command:
-`PYTHONPATH=src python3 -m iap.mvp run` (docs/MVP.md).
+`PYTHONPATH=src python3 -m iap.mvp run` (docs/MVP.md; PowerShell: `$env:PYTHONPATH = "src"; python -m iap.mvp run`).
 
 Known optimisms of the simulators (documented, not bugs — `docs/SCENARIOS.md`
 TRADING section, paper 05 §5 + erratum): no PEG/MID order types in the
@@ -111,6 +141,11 @@ the parent `end_ts`, FX impact in base units.
 ```bash
 bash tests/harness/run_all.sh        # full builds + tests, parity table
 bash tests/harness/run_golden.sh     # golden groups only, parity table
+```
+
+```powershell
+bash tests/harness/run_all.sh        # Git Bash / WSL on PATH; there is no PowerShell port
+bash tests/harness/run_golden.sh
 ```
 
 Both must show every language passing. Promotion gate 10 (GOVERNANCE.md)
@@ -131,7 +166,7 @@ increase→tail, marketable ADD executes — conventions §4).
 The vectors changed. `git log tests/golden/` — if a regeneration commit
 lacks the mandatory "golden change" note, treat as an incident
 (GOVERNANCE.md §3): revert, then review. Regeneration is only ever done
-deliberately via `cd python && PYTHONPATH=src python3 tools/make_golden.py`.
+deliberately via `cd python && PYTHONPATH=src python3 tools/make_golden.py` (PowerShell: `$env:PYTHONPATH = "src"; python tools/make_golden.py`).
 
 ### Backtest results differ between runs
 

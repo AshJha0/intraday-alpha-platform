@@ -260,12 +260,14 @@ ChildOrder: parent_id, instrument_id, venue_id, side, type, limit_ticks, qty, de
 
 # iap.execution.config
 SorOptions(prefer_rebate=True, max_venue_latency_ns=2**63-1)
-ExecConfig(latency=LatencyConfig(), seed=20260829, impact_coeff_bps_per_pct_adv=2.0, instruments={}, venues={})
+ExecConfig(latency=LatencyConfig(), seed=20260829, impact_coeff_bps_per_pct_adv=2.0, instruments={}, venues={},
+           regulatory_fees=None, impact_model="child", impact_exponent=1.0, permanent_impact_bps_per_pct_adv=0.0,
+           impact_fit_support_pct_adv=None, walk_depth_levels=10, adv_by_session=None)   # fields after venues: §2.13, §2.15
     .venue(vid) / .instrument(iid)                     # ValueError on unknown ids (C++ std::invalid_argument)
 load_venues(path) -> Dict[int, VenueSpec]              # exact port of C++ load_venues
 load_instruments(path) -> Dict[int, InstrumentSpec]    # = Java ConfigService.instruments()
 load_sor_options(path) -> SorOptions                   # strict sor.{prefer_rebate, max_venue_latency_ns}
-load_exec_config(config_dir, latency=LatencyConfig()) -> ExecConfig   # the Java PaperTrading wiring
+load_exec_config(config_dir, latency=LatencyConfig(), *, regulatory_fees=False, adv_table=None) -> ExecConfig   # the Java PaperTrading wiring; adv_table: §2.15
 
 # iap.execution.simulator
 class ExecutionSimulator(config):
@@ -301,6 +303,16 @@ The MVP wraps these as `AlgoScheduler` (`ExecutionAlgorithm`), `SorAdapter`
 (`SmartOrderRouterLike`, every candidate scored into a `VenueDecision`) and
 `SimulatorAdapter` (`ExecutionSimulatorLike`, emitting `ExecutionReport`s)
 in `iap.mvp.adapters`.
+
+**Loop latency (v1.17 F4, Python only).** `iap.mvp.latency.measure_loop_latency(prep,
+work_dir, *, limit=None) -> LoopLatency` times every `MvpEngine.on_event` of
+a prepared symbol (`iap.mvp.real.PreparedSymbol`) with `perf_counter_ns` and
+returns `LoopLatency(events, mean_ns, quantiles_ns, total_s, decisions,
+children_submitted, fills)` (`quantiles_ns` keys `p50`, `p90`, `p99`,
+`p99.9`, `max`; nearest rank; `.to_dict()`); `PERCENTILES = (0.50, 0.90,
+0.99, 0.999)`. It changes nothing in the loop; the budget guard is
+`tests/harness/check_mvp_latency_budget.py` against
+`benchmarks/latency_budget.json`.
 
 ### 2.2 Golden parity
 
@@ -895,8 +907,8 @@ on the dataset (mean / std of `expected_return` over the alpha's scored
 rows of that instrument), so every threshold below is "so many standard
 deviations of this alpha's scores", whatever its `beta`. The sign is the
 alpha's (positive = price expected to rise). `AlphaUrgencySource.
-from_dataset(alpha_id, features_dir, params_path=None, instruments_json=None,
-refit=False)` scores a flagship alpha (`EQ10`, `EQ05`, ...) with the
+from_dataset(alpha_id, features_dir, *, params_path=None,
+instruments_json=None, refit=False, instrument_ids=None)` (a classmethod; everything after `features_dir` is keyword-only, `instrument_ids` limits the instruments scored) scores a flagship alpha (`EQ10`, `EQ05`, ...) with the
 registered parameters of `configs/strategies/alpha_params.json` (its
 `feature_version` must match the registry) over `features_*.parquet`;
 `refit=True` fits in-sample first and labels the source `refit:in-sample`
@@ -985,6 +997,16 @@ and records the choice in its provenance block. Without a table every
 rule is byte-identical to v1.16 (`expected_replay_fills.json` unchanged);
 the C++ rule text keeps the static `adv`.
 
+**Depth walk (`ExecConfig.walk_depth_levels`, default 10).** The number of
+displayed price levels the taker walk (simulator rule 3) reads on the
+opposite side, best first; a positive `int` (anything else raises
+`ValueError`). The default 10 is the pinned value of the goldens and the C++
+rule text; a larger value is an opt-in for deep books
+(`python -m iap.research.execution_benchmark ... --walk-depth 50`, recorded in
+the benchmark's simulator provenance). A MARKET/IOC/FOK remainder left because
+the walk ran out of depth is counted in `ParentReport.depth_exhausted` /
+`depth_exhausted_qty`.
+
 ### 2.16 Quote fading, queue-aware cancels, markout decomposition (v1.17 WS-B items B4 / B5 / B6, Python only)
 
 Every option here is off by default. A `ParentOrder` without `fade` /
@@ -1058,8 +1080,9 @@ emptied through cancels as if it had traded.
 `outcome` ∈ `pulled` / `partial` / `lost_race`); `ParentReport.pulls` /
 `pulled_qty` (by rule), `pulls_lost_race`, `held_unsent_qty` are in
 `diagnostics()` (outside every golden row). **Fades saved vs fills missed:**
-`pull_outcomes(pulls, timeline, tick_size, horizons_ns=..., rules=...)` (=
-`pull_summary(pull_rows(...))`, poolable across sessions) prices every pulled
+`pull_outcomes(pulls, timeline, tick_size, *, horizons_ns=None, qty_unit=1.0,
+rules=None)` (= `pull_summary(pull_rows(..., cluster=""), horizons=None, *,
+lost_race=0, rules=None)`, poolable across sessions) prices every pulled
 quantity after the fact: per horizon `h`, whether the opposite best reached
 the pulled price inside `[effect_ts, effect_ts + h]` (`would_have_filled`:
 the touch-through proxy for "it would have filled") and, when it did, the
@@ -1075,7 +1098,7 @@ order.cancel_rule_ts` of a child with a `cancel_rule` → `faded` (the cancel
 lost the race); a MAKER fill of a child with `replaces_order_id` →
 `cancelled_replaced`; else `passive`. `regime_of(order)` is the B2
 `urgency_regime`, `plain` without one. `fill_rows(fills, orders, timeline,
-tick_size, qty_unit=1, horizons_ns=None, cluster=None, day_ns=1 day)` prices
+tick_size, *, qty_unit=1.0, horizons_ns=None, cluster=None, day_ns=1 day, algo="")` prices
 each fill (`markout_bps[h]`, `price_impact_bps[h]`, the §2.9 definitions,
 `None` where undefined) and tags it with its cluster (the fill's day, or a
 caller label such as the session); `decompose(rows, horizons)` gives `all`,

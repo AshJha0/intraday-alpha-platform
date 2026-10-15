@@ -39,14 +39,14 @@ msg, sig_hex)`, `message(...)`. **`iap.agents.trust`** — the maintainer-signed
 registry: `sign_registry`, `verify_registry`, `read_roots(root, ref)`,
 `load_pubkeys(root)`, `trusted_pubkeys(root, ref)`; `TrustError`.
 
-**`iap.agents.prereg_gate`** — `require(repo_root, alpha_id, horizon, board=,
-*, fingerprinter=, agents=)`: the entry a run needs, or `PreregistrationError`;
+**`iap.agents.prereg_gate`** — `require(repo_root, alpha_id, horizon, board=None,
+fingerprinter=None, agents=None)`: the entry a run needs, or `PreregistrationError`;
 `board_path(repo_root)`, `is_closed(entry)`. **`iap.agents.fingerprint`** —
 `fingerprint(alpha_id)` (scheme 2: code + feature closure hash),
 `module_closure`, `closure_hash`, `check_registration_env` (CI-lock venv for
 registrations), `ci_lock_deps`, `compare_deps`.
 
-**`iap.agents.workflow`** — `Workflow(broker)`: `propose` (one look),
+**`iap.agents.workflow`** — `Workflow(broker, *, ledger=None)`: `propose` (one look),
 `draft_prereg`, `drafts()`, human-only `sign_off` / `record_outcome`
 (`HUMAN_ONLY_OPS`, `require_human`, `AgentAuthorityError`);
 `issue_signoff(approver, secret, draft_hash, reason)`, `hit_rate(entries)`,
@@ -55,7 +55,7 @@ for the human lifecycle edges: `issue`, `verify`, `apply`, `new_secret`;
 `ACTIONS = ("retire", "reset")`.
 
 **`iap.agents.anchor`** — `anchors(repo, board)` and `verify(repo, board,
-anchors_path, ref=)` (chain, git prefixes, anchors). **`iap.agents.reserve`** —
+anchor_file=None, ref=None)` (chain, git prefixes, anchors). **`iap.agents.reserve`** —
 `ReserveEvaluator(secret, broker, runner)` with `evaluate(agent, candidate)`
 (pass/fail only, `MAX_ATTEMPTS = 3`); `iap.agents.reserve_runner.make_runner`.
 

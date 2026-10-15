@@ -64,10 +64,10 @@ space is short. The report directories are small.
 
 ## Run by hand
 
-```
-cd C:\Work\Claude\intraday-alpha-platform\intraday-alpha-platform
-set PYTHONUTF8=1
-set PYTHONPATH=python\src
+```powershell
+Set-Location C:\Work\Claude\intraday-alpha-platform\intraday-alpha-platform
+$env:PYTHONUTF8 = "1"
+$env:PYTHONPATH = "python\src"
 python -m iap.paper.daily --date 2026-10-15 --itch data\real\itch\10152026.NASDAQ_ITCH50.gz
 python -m iap.paper.daily --pending
 python -m iap.paper.daily --date 2026-10-15 --force
@@ -89,11 +89,11 @@ python -m iap.paper.daily --date 2026-10-15 --force
 `tools\run_paper_daily.cmd` runs `--pending` and appends to
 `data\real\paper\paper_daily.log` (`START` / `EXIT <rc>` markers).
 
-```
+```powershell
 schtasks /Create /TN "IAP paper trade daily" /SC DAILY /ST 10:00 /TR "C:\Work\Claude\intraday-alpha-platform\intraday-alpha-platform\tools\run_paper_daily.cmd" /F
 ```
 
-This works in PowerShell and in cmd: the path has no spaces, so it needs no inner quotes (and the cmd-style escape for inner quotes does not work in PowerShell). 10:00 is after the 09:00 Nasdaq watch. Remove with
+This is one line that works in PowerShell and in cmd: the path has no spaces, so it needs no inner quotes (the cmd-style escape for inner quotes does not work in PowerShell). 10:00 is after the 09:00 Nasdaq watch. Remove with
 `schtasks /Delete /TN "IAP paper trade daily" /F`; run once now with
 `schtasks /Run /TN "IAP paper trade daily"`.
 

@@ -56,6 +56,7 @@ that tag.
   a labelled "Dark venue" section and the B8 pairing note. `ParentReport.dark_*` diagnostics.
   API_TRADING §2.17, EXECUTION_QUALITY §7, PLATFORM_CONVENTIONS §11.3 rows (Python reference;
   C++ port = F7, controls = F8); 19 tests in `test_v117_dark_venue.py`.
+- v1.17 WS-G items G3 and G4, docs only (no code, no number moved). **G3**: COOKBOOK 101 -> 140 recipes (102-140: one per v1.17 opt-in on main, from the IEX HIST ingest with the TOPS oracle, process-and-delete and the breadth book to fading, queue cancels, markout decomposition, `linear_z_v2`, regime, GBM, meta-label split, conformal sizing, zoo gates, the agents and spend ledger, docs checks, reproducible build, latency guards, sharenorm, per-session ADV and TRADE_BUST), LEARN 101 -> 140 entries (101-139 new, Further reading is 140) with glossary rows; the API_*.md entries for the v1.17 opt-ins were checked against the signatures (about 25 names/defaults fixed, 5 entries added); the B10, C6, F7 and B9/F8 items are left as placeholders for G5. **G4**: every runbook is PowerShell-safe (cmd syntax converted, PowerShell variants beside the bash blocks) and GOVERNANCE section 0 states the `docs` job is ready to be required (owner action).
 
 - v1.17 WS-F items F4 and F5 (#188). **The committed real slice**
   `benchmarks/slices/itch50_20190130_AAPL` (`tools/extract_real_slice.py`; Nasdaq ITCH 5.0, AAPL,
@@ -257,7 +258,7 @@ that tag.
   cpcv_path_ic="demeaned")` (bundle field `cpcv_path_ic`) standardises every (split, group) of a CPCV
   path before pooling; `path_ics_demeaned` and its summary sit beside the pooled reading in every
   `cpcv` block, `path_ic_rule` names the headline; a test shows the pooled rule biased by a fit of
-  another scale and the demeaned one not. Docs: RESEARCH_VALIDITY §4d, API_ALPHA §7.3, LEARN §100.
+  another scale and the demeaned one not. Docs: RESEARCH_VALIDITY §4d, API_ALPHA §7.4, LEARN §100.
 
 
 - v1.17 WS-A item A2b: slim ingest for breadth datasets. `ingest --slim` / `normalize_run(write_normalized_jsonl=False)`

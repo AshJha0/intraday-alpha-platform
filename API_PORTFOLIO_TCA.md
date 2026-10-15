@@ -138,7 +138,7 @@ when binding (n can be large); aggregate rows always.
 
 ### 1.8 Impact term (v1.17 C2, opt-in; Python only — not part of any parity contract)
 
-`iap.portfolio.optimizer.ImpactTerm(kappa, exponent)` adds a concave
+`iap.portfolio.optimizer.ImpactTerm(kappa, exponent=0.5)` adds a concave
 market-impact cost `sum_i kappa_i |w_i - w_prev_i| ** (1 + k)` to the
 objective (`objective(..., impact=term)`, `solve(..., impact=term)`; the
 default `None` leaves the pinned path byte-identical). The term enters the
@@ -149,7 +149,7 @@ proximal step beside the linear t-cost: soft threshold, then
 | builder | units |
 |---|---|
 | `ImpactTerm.from_cost_model(cost_model, notional, adv_notional)` | the research `CostModel` rule: `sqrt` → `k = 0.5`, `kappa = multiplier * sqrt_impact_coeff_bps * 1e-4 * (notional / adv_notional) ** 0.5`; `linear` → `k = 1` |
-| `ImpactTerm.from_impact_fit(coeff, exponent, notional, adv_notional)` | a calibration `impact.residual` cell (`iap.execution.calibration.apply_impact_fit` units: bps per `(% ADV) ** k`, parent level) |
+| `ImpactTerm.from_impact_fit(coeff_bps_per_pct_adv_pow, exponent, notional, adv_notional)` | a calibration `impact.residual` cell (`iap.execution.calibration.apply_impact_fit` units: bps per `(% ADV) ** k`, parent level) |
 
 Tests: `tests/test_v117_breadth_book.py` — the term lowers turnover at a
 given alpha; the optimum matches a brute-force grid on a 3-asset case for
@@ -175,7 +175,37 @@ affine subspace `w - A^+ A w` in the net row's slot instead of a halfspace
 pair each; the intersection and Dykstra's limit are unchanged, the sweep
 count is not. Default `False`.
 
-### 1.10 Net-of-cost screen (v1.17 C6, opt-in; Python only)
+### 1.10 Cross-sectional book backtest (v1.17 C1 / C7, Python research only)
+
+`python -m iap.research.breadth_book [--dataset-dir DIR | --features-dir DIR]
+[--score eq11|eq10_beta_gap] [--weights linear|deciles] [--rebalance-min 5]
+[--notional 1e6] [--impact cost_model|calibration|none] [--calibration PATH
+--impact-shape sqrt|linear|power] [--no-dollar-neutral] [--no-beta-neutral]
+[--no-sector-neutral] [--sizes 0.25,0.5,1,2,4] [--out research/breadth/book]
+[--tag NAME]` runs the optimizer (§1.3, with the §1.8 impact term and the
+§1.9 exposure rows) at every rebalance of a fixed clock on an ingested
+dataset. `iap.research.breadth_book.run_book(frames, instruments,
+cost_model, cfg, sectors=None, score_fn=None, max_rebalances=None) ->
+BookResult` is the entry point; `BookConfig` holds the knobs (`score`,
+`weights`, `decile_q`, `rebalance_ns`, `max_age_ns`, `exec_delay_ns`,
+`notional`, `alpha_bps`, `risk_aversion`, `w_max`, `gross_cap`,
+`dollar_neutral` / `beta_neutral` / `sector_neutral`, `participation_cap`,
+`turnover_cap`, `impact` in `IMPACT_SOURCES = ("cost_model", "calibration",
+"none")`, `min_names`, `flatten_at_session_end`, `projection="dykstra"`,
+...). `rank_to_weights(scores, method, decile_q=0.1)` maps scores to target
+weights; `score_eq11` / `score_eq10_beta_gap` (`SCORES`) are the two score
+functions; `make_impact_term(cfg, cost_model, adv_notional)`,
+`calibration_impact(path, shape, horizon=None) -> (coeff, exponent)`,
+`load_instruments(path)` and `sectors_for(instruments, taxonomy)` build its
+inputs. Accounting is exact: `net == gross - spread - fee - impact`; a run
+that reads a statistic is ONE ledger look of kind `breadth_book`.
+`iap.research.breadth_report.breadth_report(base, runner, sizes, cost_model,
+instruments)` joins the book with the breadth arithmetic (effective bets,
+`breakeven_notional(sizes, net)`, net Sharpe at size, day-clustered
+`cluster_mean(values, clusters)`); `render_markdown(report)` renders it. Not
+a port contract; no registered result reads it.
+
+### 1.11 Net-of-cost screen (v1.17 C6, opt-in; Python only)
 
 `iap.research.screen` — the pre-registered screen every candidate passes
 through before any confirmatory look (docs/SIGNAL_RESEARCH.md section 8,
@@ -385,6 +415,24 @@ including one before the first quote, one at the session end, one just
 before the halt and one inside the gap; per-fill measures, the report and the
 passive-order statistics; 1e-9, nulls exact). Python generates
 (`python/tools/make_golden_markout.py`), Java consumes (`MarkoutGoldenTest`).
+
+### 2.10 Per-parent shortfall decomposition (v1.17 B1; `iap.tca.shortfall`, Python only)
+
+`parent_costs(parent, fills, timeline, tick, taker_fee) -> dict[str, float]`
+prices one replayed parent: `parent` is an `iap.execution.ParentOrder`
+(`parent_id`, `instrument_id`, `side`, `qty`, `start_ts`, `end_ts` are read),
+`fills` its `iap.execution.types.Fill`s in fill order, `timeline` a
+`MarketTimeline`, `tick` the tick size and `taker_fee` the per-share fee the
+completion leg charges. It is the cost accounting of the execution study and
+of `iap.research.execution_benchmark`, shared. The result carries `notional`,
+`qty`, `filled_qty`, `maker_qty` and the `COST_KEYS = ("shortfall",
+"trading", "opportunity", "spread", "price_vs_mid_residual", "timing",
+"fees_net", "sim_impact", "completion", "all_in")`, in the quote currency,
+positive = worse than the arrival mid: `shortfall` is the Perold total of
+`order_tca` (decision = arrival = the window start), `all_in = shortfall +
+fees_net + sim_impact + completion`; `sim_impact` is the simulator's impact
+ADDER (`ExecConfig.impact_label()` says which rule), not a measured market
+reaction. Not a wire contract and not in any Java service.
 
 ## 3. Training-artifact manifest (for any service persisting fits)
 

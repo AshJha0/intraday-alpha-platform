@@ -12,7 +12,7 @@ Registration scripts call `iap.agents.fingerprint.check_registration_env`. It pr
 warning when the local numpy/pandas/scipy differ from the lock; `--require-ci-env`
 refuses (exit 2) instead:
 
-```
+```powershell
 python tools\quoting_v2_register.py . --dry-run --require-ci-env
 ```
 
@@ -20,10 +20,10 @@ python tools\quoting_v2_register.py . --dry-run --require-ci-env
 
 Same Python as CI's main job (3.11) and the same install command as `.github/workflows/ci.yml`.
 
-```
+```powershell
 py -3.11 -m venv .venv-ci
-.venv-ci\Scripts\python -m pip install --upgrade pip
-.venv-ci\Scripts\python -m pip install --require-hashes -r python\requirements-ci.txt
+.\.venv-ci\Scripts\python -m pip install --upgrade pip
+.\.venv-ci\Scripts\python -m pip install --require-hashes -r python\requirements-ci.txt
 ```
 
 The lock includes `cryptography` (signing). The package itself is not installed: the
@@ -31,12 +31,12 @@ registration scripts put `python/src` on `sys.path`, as CI does with `PYTHONPATH
 
 ## Each registration
 
-```
-set PYTHONUTF8=1
-.venv-ci\Scripts\python tools\<script>_register.py . --dry-run --require-ci-env
-.venv-ci\Scripts\python tools\<script>_register.py . --require-ci-env
+```powershell
+$env:PYTHONUTF8 = "1"
+.\.venv-ci\Scripts\python tools\<script>_register.py . --dry-run --require-ci-env
+.\.venv-ci\Scripts\python tools\<script>_register.py . --require-ci-env
 ```
 
 The first line must print `[ci-env] deps match requirements-ci.txt: OK`. When the lock
-is bumped, rebuild the venv (`rmdir /s /q .venv-ci`, then the steps above) before
+is bumped, rebuild the venv (`Remove-Item -Recurse -Force .venv-ci`, then the steps above) before
 registering. `.venv-ci/` is git-ignored.

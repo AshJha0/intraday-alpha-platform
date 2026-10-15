@@ -1,5 +1,17 @@
 # RUNBOOK — Paper Trading / Shadow Deployment
 
+> **Shells.** These procedures run on the Linux side (the cluster, the containers, WSL or
+> Git Bash): the `bash` blocks are bash. From the owner's Windows PowerShell, translate
+> as follows: `curl` is `curl.exe` (in PowerShell `curl` is an alias of `Invoke-WebRequest`);
+> `export NAME=value` is `$env:NAME = "value"`; `PYTHONPATH=python/src python ...` is
+> `$env:PYTHONPATH = "python/src"; python ...`; `python3` is `python`; `grep X file` is
+> `Select-String -Path file -Pattern X`; `| head -N` is `| Select-Object -First N`;
+> `tail -N file` is `Get-Content file -Tail N`; `cat file` is `Get-Content file`;
+> `ls -l dir` is `Get-ChildItem dir`; `$(...)` command substitution is `$(...)` too but
+> with PowerShell inside (for example `$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())`
+> for `$(date +%s)`); `a && b` is `a; if ($?) { b }`; a trailing `\` continuation is a
+> backtick. `kubectl` and `docker` take the same arguments in both shells.
+
 > Renamed from `RUNBOOK_paper_trading.md` (v1.17 WS0). This is the Java shadow stack
 > on the golden replay vector. The forward paper trade on real sessions
 > (`python -m iap.paper.daily`) is [RUNBOOK_paper_trade.md](RUNBOOK_paper_trade.md).
