@@ -66,8 +66,24 @@ def test_pcap_and_tp_framing_microsecond_nanosecond_vlan_and_heartbeats(tmp_path
     r = IexReader(gz, DATE, ["AAPL"])
     assert [type(m).__name__ for m in r] == ["SystemEvent", "SystemEvent"]
     assert r.counters["segments"] == 3 and r.counters["heartbeats"] == 1 and r.pcap.vlan == 1
-    with pytest.raises(IngestError, match="pcapng"):
-        list(pcap_packets(io.BytesIO(b"\x0a\x0d\x0d\x0a" + b"\x00" * 40)))
+    # pcapng (what IEX HIST files are): microsecond default and if_tsresol 9
+    for nano in (False, True):
+        g = ix.IexPcapWriter(PROTOCOL_DEEP_PLUS, nanosecond=nano, pcapng=True)
+        g.segment([ix.system_event("O", _ep(hms_ns(3)) + 123)], send_time=_ep(hms_ns(3)) + 123)
+        g.heartbeat(_ep(hms_ns(3)) + 456)
+        got = list(pcap_packets(io.BytesIO(g.bytes())))
+        assert len(got) == 2 and got[0][0] == (
+            _ep(hms_ns(3)) + 123 if nano else (_ep(hms_ns(3)) + 123) // 1000 * 1000
+        )
+        assert tp_segment(got[0][1]).messages and not tp_segment(got[1][1]).messages
+    with pytest.raises(IngestError, match="no IEX-TP"):
+        list(
+            IexReader(
+                ix.IexPcapWriter(PROTOCOL_DEEP_PLUS, pcapng=True).write(tmp_path / "e.pcapng"),
+                DATE,
+                ["AAPL"],
+            )
+        )
     with pytest.raises(IngestError, match="not a pcap"):
         list(pcap_packets(io.BytesIO(b"\x00" * 40)))
 
@@ -438,3 +454,15 @@ def test_refusals_limit_and_protocol_checks(tmp_path):
         e = ix.IexPcapWriter(PROTOCOL_DEEP_PLUS)
         e.packet(b"\x00" * 60, _ep(OPEN))
         list(IexReader(e.write(tmp_path / "empty.pcap"), DATE, ["AAPL"]))
+
+
+def test_truncated_gzip_capture_is_counted_not_raised(tmp_path):
+    w = ix.IexPcapWriter(PROTOCOL_DEEP_PLUS)
+    for i in range(200):
+        w.segment([ix.system_event("O", _ep(hms_ns(3)) + i)], send_time=_ep(hms_ns(3)) + i)
+    full = w.write(tmp_path / "full.pcap.gz", compress=True)
+    cut = tmp_path / "cut.pcap.gz"
+    cut.write_bytes(full.read_bytes()[: full.stat().st_size // 2])
+    r = IexReader(cut, DATE, ["AAPL"])
+    n = len(list(r))
+    assert 0 < n < 200 and r.pcap.truncated == 1 and r.counters["segments"] == n

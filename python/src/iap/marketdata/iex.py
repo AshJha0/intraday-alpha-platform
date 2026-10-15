@@ -176,16 +176,150 @@ class PcapStats:
         return {k: getattr(self, k) for k in self.__slots__}
 
 
+def _udp_payload(data: bytes, linktype: int, stats: PcapStats) -> bytes | None:
+    """The UDP payload of one link-layer frame (``None`` when it is not a
+    UDP/IPv4 packet, counted)."""
+    off = 0
+    if linktype == _LINKTYPE_ETHERNET:
+        if len(data) < 14:
+            stats.truncated += 1
+            return None
+        ethertype = struct.unpack(">H", data[12:14])[0]
+        off = 14
+        while ethertype in _ETHERTYPE_VLAN:
+            if len(data) < off + 4:
+                ethertype = 0
+                break
+            stats.vlan += 1
+            ethertype = struct.unpack(">H", data[off + 2 : off + 4])[0]
+            off += 4
+        if ethertype != _ETHERTYPE_IPV4:
+            stats.non_ipv4 += 1
+            return None
+    if len(data) < off + 20 or data[off] >> 4 != 4:
+        stats.non_ipv4 += 1
+        return None
+    ihl = (data[off] & 0x0F) * 4
+    total = struct.unpack(">H", data[off + 2 : off + 4])[0]
+    if data[off + 9] != _IP_PROTO_UDP:
+        stats.non_udp += 1
+        return None
+    udp = off + ihl
+    if len(data) < udp + 8:
+        stats.truncated += 1
+        return None
+    udp_len = struct.unpack(">H", data[udp + 4 : udp + 6])[0]
+    end = min(len(data), off + total, udp + udp_len)
+    return data[udp + 8 : end]
+
+
+def _read(f: BinaryIO, n: int, stats: PcapStats) -> bytes | None:
+    """``n`` bytes, or ``None`` at a clean end; a short read or a truncated
+    gzip member (a partial download) is counted and ends the stream."""
+    try:
+        data = f.read(n)
+    except (EOFError, OSError):
+        stats.truncated += 1
+        return None
+    if not data and n:
+        return None
+    if len(data) < n:
+        stats.truncated += 1
+        return None
+    return data
+
+
+_PCAPNG_SHB, _PCAPNG_IDB, _PCAPNG_SPB, _PCAPNG_EPB = 0x0A0D0D0A, 1, 3, 6
+_PCAPNG_IF_TSRESOL = 9
+
+
+def _pcapng_packets(f: BinaryIO, stats: PcapStats) -> Iterator[tuple[int, bytes]]:
+    """pcapng (RFC draft-ietf-opsawg-pcapng): section header blocks set the
+    byte order, interface description blocks the link type and timestamp
+    resolution (``if_tsresol``), enhanced / simple packet blocks carry the
+    frames; every other block is skipped."""
+    order = "<"
+    interfaces: list[tuple[int, int]] = []  # (linktype, ns per tick)
+    while True:
+        head = _read(f, 8, stats)
+        if head is None:
+            return
+        if head[:4] == _PCAPNG_MAGIC:
+            # a new section: the byte order comes from its magic
+            rest = _read(f, 8, stats)
+            if rest is None:
+                return
+            bom = rest[4:8]
+            order = "<" if bom == b"M<+" else ">" if bom == b"+<M" else order
+            total = struct.unpack(order + "I", head[4:8])[0]
+            if _read(f, total - 16, stats) is None:
+                return
+            interfaces = []
+            continue
+        btype, total = struct.unpack(order + "II", head)
+        if total < 12:
+            stats.truncated += 1
+            return
+        body = _read(f, total - 8, stats)
+        if body is None:
+            return
+        body = body[:-4]  # the trailing block total length
+        if btype == _PCAPNG_IDB:
+            linktype = struct.unpack(order + "H", body[0:2])[0]
+            tick_ns = 1_000  # if_tsresol default: microseconds
+            pos = 8
+            while pos + 4 <= len(body):
+                code, olen = struct.unpack(order + "HH", body[pos : pos + 4])
+                val = body[pos + 4 : pos + 4 + olen]
+                if code == 0:
+                    break
+                if code == _PCAPNG_IF_TSRESOL and olen >= 1:
+                    v = val[0]
+                    tick_ns = (
+                        10 ** (9 - (v & 0x7F))
+                        if not v & 0x80
+                        else 1_000_000_000 // (1 << (v & 0x7F))
+                    )
+                pos += 4 + ((olen + 3) & ~3)
+            interfaces.append((linktype, max(1, tick_ns)))
+        elif btype == _PCAPNG_EPB:
+            if_id, ts_hi, ts_lo, incl, _orig = struct.unpack(order + "IIIII", body[0:20])
+            data = body[20 : 20 + incl]
+            if if_id >= len(interfaces):
+                stats.truncated += 1
+                continue
+            linktype, tick_ns = interfaces[if_id]
+            stats.packets += 1
+            stats.bytes += total
+            payload = _udp_payload(data, linktype, stats)
+            if payload is not None:
+                yield ((ts_hi << 32) | ts_lo) * tick_ns, payload
+        elif btype == _PCAPNG_SPB:
+            if not interfaces:
+                stats.truncated += 1
+                continue
+            (orig,) = struct.unpack(order + "I", body[0:4])
+            data = body[4 : 4 + orig]
+            linktype, _ = interfaces[0]
+            stats.packets += 1
+            stats.bytes += total
+            payload = _udp_payload(data, linktype, stats)
+            if payload is not None:
+                yield 0, payload
+
+
 def pcap_packets(f: BinaryIO, stats: PcapStats | None = None) -> Iterator[tuple[int, bytes]]:
     """``(capture_ts_ns, udp_payload)`` of every UDP/IPv4 packet of a classic
-    pcap stream (Ethernet with optional 802.1Q tags, or raw IP link type).
-    Other packets are counted; a pcapng file is refused."""
+    pcap or a pcapng stream (Ethernet with optional 802.1Q tags, or the raw
+    IP link type; IEX HIST files are pcapng).  Other packets are counted; a
+    truncated stream (a partial download) ends it and is counted."""
     stats = stats if stats is not None else PcapStats()
     head = f.read(24)
     if len(head) < 24:
         raise IngestError("not a pcap file (short global header)")
     if head[:4] == _PCAPNG_MAGIC:
-        raise IngestError("pcapng captures are not supported; convert to classic pcap")
+        yield from _pcapng_packets(_Prefixed(head, f), stats)
+        return
     order_unit = _PCAP_MAGIC.get(head[:4])
     if order_unit is None:
         raise IngestError(f"not a pcap file (magic {head[:4].hex()})")
@@ -195,19 +329,15 @@ def pcap_packets(f: BinaryIO, stats: PcapStats | None = None) -> Iterator[tuple[
         raise IngestError(f"pcap link type {linktype} is not Ethernet (1) or raw IP (101)")
     rec = struct.Struct(order + "IIII")
     while True:
-        h = f.read(16)
-        if not h:
-            return
-        if len(h) < 16:
-            stats.truncated += 1
+        h = _read(f, 16, stats)
+        if h is None:
             return
         sec, frac, incl, orig = rec.unpack(h)
-        data = f.read(incl)
+        data = _read(f, incl, stats)
+        if data is None:
+            return
         stats.packets += 1
         stats.bytes += 16 + len(data)
-        if len(data) < incl:
-            stats.truncated += 1
-            return
         ts = sec * 1_000_000_000 + frac * unit
         off = 0
         if linktype == _LINKTYPE_ETHERNET:
@@ -241,6 +371,22 @@ def pcap_packets(f: BinaryIO, stats: PcapStats | None = None) -> Iterator[tuple[
         udp_len = struct.unpack(">H", data[udp + 4 : udp + 6])[0]
         end = min(len(data), off + total, udp + udp_len)
         yield ts, data[udp + 8 : end]
+
+
+class _Prefixed:
+    """A stream whose first bytes were already read (the magic probe)."""
+
+    def __init__(self, head: bytes, f: BinaryIO) -> None:
+        self._head = head
+        self._f = f
+
+    def read(self, n: int = -1) -> bytes:
+        if self._head:
+            take, self._head = self._head[:n], self._head[n:] if n >= 0 else b""
+            if n < 0 or len(take) == n:
+                return take if n >= 0 else take + self._f.read()
+            return take + self._f.read(n - len(take))
+        return self._f.read(n)
 
 
 class Segment(NamedTuple):

@@ -64,7 +64,12 @@ that tag.
   at every BBO change) as the session's `book_verification`. Synthetic-capture tests
   (`python/tests/iex_encoder.py`, `test_iex_codec.py`: framing, the specification's worked example
   bytes, ITCH-equivalence of a DEEP+ session, the level translation, the oracle, ingest end to
-  end). Nothing downloads; docs/REAL_DATA.md section 4.5.
+  end). Real-capture conformance pass on the first 250 MB of the 2026-10-13 TOPS file
+  (`tools/iex_hist_conformance.py`, `research/v117/IEX_HIST_CONFORMANCE_20261013_TOPS.md`:
+  7.6 M messages, 0 unknown types, 0 sequence gaps, 0 crossed quotes; the HIST files are
+  pcapng, which the reader now accepts beside classic pcap; the capture clock is TAI; the
+  file was deleted afterwards). The codec itself downloads nothing; docs/REAL_DATA.md
+  section 4.5.
 
 ## v1.16.0 — 2026-10-15
 

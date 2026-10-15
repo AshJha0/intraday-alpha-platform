@@ -210,9 +210,12 @@ def udp_frame(payload: bytes, *, vlan: bool = False) -> bytes:
 class IexPcapWriter:
     """Accumulates segments as pcap records; ``write`` emits the file."""
 
-    def __init__(self, protocol: int, *, nanosecond: bool = False, linktype: int = 1) -> None:
+    def __init__(
+        self, protocol: int, *, nanosecond: bool = False, linktype: int = 1, pcapng: bool = False
+    ) -> None:
         self.protocol = protocol
         self.nanosecond = nanosecond
+        self.pcapng = pcapng
         self.linktype = linktype
         self.records: list[bytes] = []
         self.seq = 1
@@ -256,9 +259,41 @@ class IexPcapWriter:
         self.records.append(struct.pack("<IIII", sec, frac, len(frame), len(frame)) + frame)
 
     def bytes(self) -> bytes:
+        if self.pcapng:
+            return self.pcapng_bytes()
         magic = b"\x4d\x3c\xb2\xa1" if self.nanosecond else b"\xd4\xc3\xb2\xa1"
         head = magic + struct.pack("<HHiIII", 2, 4, 0, 0, 65535, self.linktype)
         return head + b"".join(self.records)
+
+    def pcapng_bytes(self) -> bytes:
+        """The same packets as a pcapng file: SHB, one IDB (if_tsresol 9 =
+        nanoseconds, or the microsecond default), enhanced packet blocks."""
+
+        def block(btype: int, body: bytes) -> bytes:
+            pad = body + b"\x00" * (-len(body) % 4)
+            total = 12 + len(pad)
+            return struct.pack("<II", btype, total) + pad + struct.pack("<I", total)
+
+        shb = block(0x0A0D0D0A, struct.pack("<IHHq", 0x1A2B3C4D, 1, 0, -1))
+        opts = struct.pack("<HH", 9, 1) + b"\x09\x00\x00\x00" if self.nanosecond else b""
+        idb = block(
+            1, struct.pack("<HHI", self.linktype, 0, 65535) + opts + struct.pack("<HH", 0, 0)
+        )
+        out = [shb, idb]
+        for rec in self.records:
+            sec, frac, incl, _orig = struct.unpack("<IIII", rec[:16])
+            frame = rec[16:]
+            ticks = sec * (1_000_000_000 if self.nanosecond else 1_000_000) + frac
+            out.append(
+                block(
+                    6,
+                    struct.pack(
+                        "<IIIII", 0, ticks >> 32, ticks & 0xFFFFFFFF, len(frame), len(frame)
+                    )
+                    + frame,
+                )
+            )
+        return b"".join(out)
 
     def write(self, path: str | Path, compress: bool = False) -> Path:
         p = Path(path)

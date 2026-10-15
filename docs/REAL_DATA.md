@@ -602,8 +602,10 @@ nanoseconds since the epoch, converted to the session's New York day
 (outside: counted, dropped); prices are the same 1e-4 fixed point as ITCH.
 `python/tests/test_iex_codec.py` pins the translation against synthetic
 captures (`python/tests/iex_encoder.py`) and the specification's worked
-example bytes; the real-capture conformance slice is an owner download
-(plan A1).
+example bytes; the real-capture conformance pass on the first 2.5 hours of the
+2026-10-13 TOPS file is `research/v117/IEX_HIST_CONFORMANCE_20261013_TOPS.md`
+(7.6 M messages, 0 unknown types, 0 sequence gaps; the files are pcapng, the
+capture clock is TAI, directory rows cover IEX-listed securities only).
 
 | DEEP+ (orders, `0x8005`) | ITCH message | Notes |
 |---|---|---|
