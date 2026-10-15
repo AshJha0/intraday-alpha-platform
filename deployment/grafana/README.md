@@ -179,7 +179,7 @@ The marker is promtool-tested (`deployment/prometheus/tests/alerts_test.yml`)
 and the writer and exporter are covered by `SessionMarkerTest`. The durable
 evidence of a stop is still the process's last stdout line (`status=STOPPED`)
 and the checkpoint in the state directory
-(`docs/runbooks/RUNBOOK_paper_trading.md` §5–§6).
+(`docs/runbooks/RUNBOOK_shadow_deployment.md` §5–§6).
 
 | artefact | today | what it needs |
 |---|---|---|

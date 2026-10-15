@@ -110,9 +110,9 @@ groups:
             A running realtime session has not processed an event in over a
             minute of wall clock — a wedged decode/trading thread or a dead
             upstream. /health returns 503 after 30s of no progress. Runbook:
-            docs/runbooks/RUNBOOK_paper_trading.md#feed-stall
-          runbook: docs/runbooks/RUNBOOK_paper_trading.md
-          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
+            docs/runbooks/RUNBOOK_shadow_deployment.md#feed-stall
+          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
+          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
 
   - name: iap-alpha-health
     rules:
@@ -134,10 +134,10 @@ groups:
             flowing — feature validity flags, warmup state or a wedged engine.
             NOTE: the demo deployment runs a FINITE session, so `offset 1h`
             baselines are only meaningful for a continuously running feed
-            (RUNBOOK_paper_trading.md §1). Runbook:
-            docs/runbooks/RUNBOOK_paper_trading.md#signal-rate
-          runbook: docs/runbooks/RUNBOOK_paper_trading.md
-          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
+            (RUNBOOK_shadow_deployment.md §1). Runbook:
+            docs/runbooks/RUNBOOK_shadow_deployment.md#signal-rate
+          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
+          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
 
       # Live-vs-backtest drift (LIVE from java: com.iap.adaptive.DriftMonitor
       # via com.iap.platform.PaperTrading, labeled {alpha="..."}). The
@@ -165,9 +165,9 @@ groups:
             full size until a human acts (API_ADAPTIVE.md §6,
             PLATFORM_CONVENTIONS.md §12.6). Persistent drift is a retirement
             trigger per spec §20 step 13 — raise it with research.
-            Runbook: docs/runbooks/RUNBOOK_paper_trading.md#drift
-          runbook: docs/runbooks/RUNBOOK_paper_trading.md
-          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
+            Runbook: docs/runbooks/RUNBOOK_shadow_deployment.md#drift
+          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
+          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
 
       # The lifecycle gauge is observational, so RETIRED must page a human:
       # nothing in the platform stops the allocation on its own.
@@ -185,9 +185,9 @@ groups:
             consecutive evaluations). The live loop does NOT halt allocation
             on this signal — it is observational — so the position must be
             reduced by a human decision. Runbook:
-            docs/runbooks/RUNBOOK_paper_trading.md#lifecycle
-          runbook: docs/runbooks/RUNBOOK_paper_trading.md
-          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
+            docs/runbooks/RUNBOOK_shadow_deployment.md#lifecycle
+          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
+          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
 
   - name: iap-execution
     rules:
@@ -209,9 +209,9 @@ groups:
             Fills per submitted child order below half their 1h-ago baseline
             while orders are flowing — queue-position model, venue health or
             adverse regime shift. Runbook:
-            docs/runbooks/RUNBOOK_paper_trading.md#fill-rate
-          runbook: docs/runbooks/RUNBOOK_paper_trading.md
-          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
+            docs/runbooks/RUNBOOK_shadow_deployment.md#fill-rate
+          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
+          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
 
       # Pre-trade rejects are normal in small numbers; a sustained majority
       # means the strategy is fighting a limit (or a stale book).
@@ -227,9 +227,9 @@ groups:
             More than half of all risk decisions are rejects for 10m. Read the
             rule_id distribution in the session's risk_audit.jsonl
             (<state-dir>/risk_audit.jsonl) before changing any limit.
-            Runbook: docs/runbooks/RUNBOOK_paper_trading.md#rejects
-          runbook: docs/runbooks/RUNBOOK_paper_trading.md
-          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
+            Runbook: docs/runbooks/RUNBOOK_shadow_deployment.md#rejects
+          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
+          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
 
   - name: iap-risk
     rules:
@@ -288,9 +288,9 @@ groups:
           description: >-
             Gross exposure has been above 90% of global.max_gross_notional for
             5m; the next sizing decision will be rejected by the pre-trade
-            check. Runbook: docs/runbooks/RUNBOOK_paper_trading.md#exposure
-          runbook: docs/runbooks/RUNBOOK_paper_trading.md
-          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
+            check. Runbook: docs/runbooks/RUNBOOK_shadow_deployment.md#exposure
+          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
+          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
 
       # A child order left for a venue other than the one the pre-trade check
       # approved (PaperTrading.RiskWiring.onOrderSubmitted). The platform
@@ -311,9 +311,9 @@ groups:
             checked against the wrong venue. The child was cancelled
             (fail-closed), but this is a routing/risk wiring defect, not a
             market event: engage the kill switch and investigate. Runbook:
-            docs/runbooks/RUNBOOK_paper_trading.md#routed-venue-mismatch
-          runbook: docs/runbooks/RUNBOOK_paper_trading.md
-          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
+            docs/runbooks/RUNBOOK_shadow_deployment.md#routed-venue-mismatch
+          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
+          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
 
       # An admin kill is accepted (latched in AdminService) before the risk
       # engine records it; the order path withholds every order meanwhile and
@@ -356,9 +356,9 @@ groups:
             projections. Positions and realized P&L are restored, the
             working orders are not: reconcile before trusting the session.
             The alert stays up until the process ends. Runbook:
-            docs/runbooks/RUNBOOK_paper_trading.md#resume-released-orders
-          runbook: docs/runbooks/RUNBOOK_paper_trading.md
-          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
+            docs/runbooks/RUNBOOK_shadow_deployment.md#resume-released-orders
+          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
+          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
 
   - name: iap-infrastructure
     rules:
@@ -394,9 +394,9 @@ groups:
             platform_session_state = 3 (FAILED). /health is 503 with the
             reason; the container exits non-zero. Check the pod logs and
             <state-dir>/config_audit.jsonl. Runbook:
-            docs/runbooks/RUNBOOK_paper_trading.md#failed-session
-          runbook: docs/runbooks/RUNBOOK_paper_trading.md
-          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
+            docs/runbooks/RUNBOOK_shadow_deployment.md#failed-session
+          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
+          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
 
       # A STOPPED session (value 4: a stop was requested, the session
       # checkpointed mid-stream and exited 0) that nobody resumed. The
@@ -409,7 +409,7 @@ groups:
       # reports RUNNING again (the resume window before the marker is
       # rewritten). A FINISHED session persists 2 and a crash leaves 1, so
       # neither fires this; a crash is TargetDown on java-platform
-      # (RUNBOOK_paper_trading.md#stopped-session).
+      # (RUNBOOK_shadow_deployment.md#stopped-session).
       - alert: SessionStoppedNotResumed
         expr: >-
           platform_persisted_session_state == 4
@@ -427,9 +427,9 @@ groups:
             as the checkpoint left them. Resume it with --resume or record
             why it stays down. The alert clears when a resumed session
             starts (the persisted state becomes 1) or finishes (2). Runbook:
-            docs/runbooks/RUNBOOK_paper_trading.md#stopped-session
-          runbook: docs/runbooks/RUNBOOK_paper_trading.md
-          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
+            docs/runbooks/RUNBOOK_shadow_deployment.md#stopped-session
+          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
+          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
 
       # An unexpected restart re-reads the checkpoint; a burst of restarts is
       # a crash loop (and each one re-warms the book from the stream).
@@ -445,9 +445,9 @@ groups:
             The platform resumed from its checkpoint more than twice in 15m.
             Risk state survives (positions, realized P&L, latches), but the
             book and feature warm-up restart from the stream each time.
-            Runbook: docs/runbooks/RUNBOOK_paper_trading.md#restart-recovery
-          runbook: docs/runbooks/RUNBOOK_paper_trading.md
-          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
+            Runbook: docs/runbooks/RUNBOOK_shadow_deployment.md#restart-recovery
+          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
+          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
 
       # A scrape target disappearing is itself an incident. Every job in
       # prometheus.yml is a target that really exists (§12.7), so this can

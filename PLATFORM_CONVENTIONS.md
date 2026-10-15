@@ -746,7 +746,7 @@ may apply `lot_size` a second time and none may omit it. Consequences that are t
   (`risk_resume_open_orders_released_total`), or they would inflate every projection for the
   rest of the session. The market-data book, feature warm-up and the
   execution simulator are deliberately NOT snapshotted: they rebuild from the stream after the
-  cursor (documented in `RUNBOOK_paper_trading.md` §6). Round trip is golden-tested
+  cursor (documented in `RUNBOOK_shadow_deployment.md` §6). Round trip is golden-tested
   (`PaperStateRecoveryTest`): the snapshot restored at cursor *k* is byte-identical to the
   snapshot an uninterrupted run takes at cursor *k*.
 - Unreadable/corrupt state under `--resume` **fails closed**: the process exits non-zero with the
@@ -772,7 +772,7 @@ may apply `lot_size` a second time and none may omit it. Consequences that are t
     decisions/s is ≈ 130 GB/h), so a full-rate day needs its own archival step like the audit —
     archive it with the report's `trace.digest` (= `TraceDigest.ofJsonl(file)`); `--resume`
     refuses a torn trace file (line count ≠ `session_state.json` `trace_lines`);
-  - archival is an operator step, not a process step: `RUNBOOK_paper_trading.md` §7 step 1
+  - archival is an operator step, not a process step: `RUNBOOK_shadow_deployment.md` §7 step 1
     exports the file with its sha256 (recorded in the report as `risk.audit_sha256`) before the
     directory is reused. GOVERNANCE §3 sets the retention period for the archive; the platform's
     contract is only that the file is complete, fsynced and checksummed when the session ends.

@@ -1217,8 +1217,9 @@ places below.
   test files with coverage. `governance` verifies the blackboard
   (`verify-board`), checks every signed agent has a registered key, and
   checks the ledger and blackboard only grow against the base branch.
-  `advisory` adds gitleaks and a non-blocking mypy step (87 errors at the
-  baseline). The required checks are listed in GOVERNANCE.md §0.
+  `advisory` adds gitleaks. mypy is a blocking step of the `python` job
+  (scoped to core/orderbook/execution/backtest/features; 0 errors since
+  v1.16, item 16). The required checks are listed in GOVERNANCE.md §0.
 - **Dependencies.** Python installs come from hashed lock files
   (`requirements-ci.txt`, `requirements-image.txt`) with
   `--require-hashes`; the Rust toolchain is 1.99.0 everywhere.
