@@ -19,9 +19,16 @@
 | native features (48), generated equity day (seed 20261012, 100000 ev) | 895 | 959 | 1087 | 11263 | 201218 | 865.4 | 100000 |
 | alpha score (EQ01+EQ03+EQ06), generated equity day (seed 20261012, 100000 ev) | 103 | 111 | 123 | 215 | 20468 | 102.8 | 100000 |
 | order decision + pre-trade check, generated equity day (seed 20261012, 100000 ev) | 30 | 31 | 41 | 61 | 10510 | 29.8 | 100000 |
+| **tick-to-trade (end to end)**, real ITCH slice AAPL 2019-01-30 09:30 (65132 ev, book to ~2700 levels/side) | 1535 | 1919 | 2943 | 12799 | 1166452 | 1631.1 | 651320 |
+| decode (IAP1 frame + CRC), real ITCH slice AAPL 2019-01-30 09:30 (65132 ev, book to ~2700 levels/side) | 255 | 271 | 335 | 543 | 25578 | 259.9 | 651320 |
+| book update, real ITCH slice AAPL 2019-01-30 09:30 (65132 ev, book to ~2700 levels/side) | 103 | 255 | 383 | 1983 | 602171 | 158.6 | 651320 |
+| native features (48), real ITCH slice AAPL 2019-01-30 09:30 (65132 ev, book to ~2700 levels/side) | 991 | 1215 | 1855 | 11775 | 901699 | 1077.8 | 651320 |
+| alpha score (EQ01+EQ03+EQ06), real ITCH slice AAPL 2019-01-30 09:30 (65132 ev, book to ~2700 levels/side) | 103 | 111 | 143 | 215 | 21470 | 104.4 | 651320 |
+| order decision + pre-trade check, real ITCH slice AAPL 2019-01-30 09:30 (65132 ev, book to ~2700 levels/side) | 30 | 41 | 51 | 71 | 15799 | 30.3 | 651320 |
 
 - golden eq_mbo (2000 ev): 50 timed pass(es); feature vectors 100000, orders 17650, pre-trade rejects 0, book drops 0
 - generated equity day (seed 20261012, 100000 ev): 1 timed pass(es); feature vectors 100000, orders 150, pre-trade rejects 4574, book drops 0
+- real ITCH slice AAPL 2019-01-30 09:30 (65132 ev, book to ~2700 levels/side): 10 timed pass(es); feature vectors 651320, orders 11460, pre-trade rejects 110310, book drops 0 (rows measured in CI run 38805495578, 2026-10-15, AMD EPYC 7763; the golden / generated rows above are the 2026-10-10 baseline of the same runner class, kept as they are)
 
 Guard rows (compared by tests/harness/check_bench_regression.py --rows '^t2t .* p(50|99)$'):
 
@@ -31,3 +38,5 @@ Guard rows (compared by tests/harness/check_bench_regression.py --rows '^t2t .* 
 | t2t golden p99 | 2559 |
 | t2t genday p50 | 1407 |
 | t2t genday p99 | 1727 |
+| t2t realslice p50 | 1535 |
+| t2t realslice p99 | 2943 |

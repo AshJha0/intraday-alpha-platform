@@ -224,7 +224,23 @@ real depth instead of the handful of levels of the synthetic streams), 10
 timed passes; its `t2t realslice p50 / p99` rows are guarded like the other
 two. Provenance: the slice's `SLICE.md` and `docs/governance/REPRODUCIBILITY.md`
 §3.5. Same CI-machine caveat as above: a shared runner, CPU model varying
-between runs.
+between runs. Committed run (CI 38805495578, AMD EPYC 7763, 2026-10-15;
+651,320 samples, book drops 0), nanoseconds:
+
+| path, real slice | p50 | p90 | p99 | p99.9 | max | mean |
+|---|---:|---:|---:|---:|---:|---:|
+| **tick-to-trade** | 1,535 | 1,919 | 2,943 | 12,799 | 1,166,452 | 1,631.1 |
+| decode (frame + CRC) | 255 | 271 | 335 | 543 | 25,578 | 259.9 |
+| book update | 103 | 255 | 383 | 1,983 | 602,171 | 158.6 |
+| native features (48) | 991 | 1,215 | 1,855 | 11,775 | 901,699 | 1,077.8 |
+| alpha score (3 alphas) | 103 | 111 | 143 | 215 | 21,470 | 104.4 |
+| decision + pre-trade check | 30 | 41 | 51 | 71 | 15,799 | 30.3 |
+
+Real depth costs about 20% at the median and 15-75% at the p99 against the
+synthetic streams, nearly all of it in the book update (p90 255 vs 135 ns,
+p99 383 vs 223 ns: a 2,700-level map instead of ten) and in the feature
+engine's own book view; decode, alpha and decision are unchanged, as they
+should be. The 1.2 ms max is one runner preemption in 651,320 samples.
 
 **Python MVP loop budget (v1.17, F4).** `iap.mvp.latency` times every
 `MvpEngine.on_event` of the slice through the whole pinned loop (simulator,

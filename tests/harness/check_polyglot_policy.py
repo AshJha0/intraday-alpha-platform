@@ -170,7 +170,15 @@ def consistency(policy: dict) -> list[str]:
 
 def _git(*args: str) -> str:
     return subprocess.run(
-        ["git", *args], cwd=ROOT, check=True, capture_output=True, text=True, encoding="utf-8"
+        ["git", *args],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        # A binary file in the diff (v1.17 F4: the committed IAP1 slice under
+        # benchmarks/slices) carries no code; its bytes are not a decode error.
+        errors="replace",
     ).stdout
 
 
