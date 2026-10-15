@@ -54,6 +54,20 @@ that tag.
   config, golden byte-identical). The ML ledger records `split_mode` / `primary_selection_window` in the
   `metalabel_tau` look and a `conformal_coverage_gate` look. API_ALPHA.md §9-§10, RESEARCH_VALIDITY.md
   §4e, MVP.md §11; no registered result changes.
+- v1.17 WS-E items E2-E5: the three WS-E agents on one generic, budgeted, ledgered tool loop
+  (`iap.llm.loop`; every call charged to the E1 spend ledger). E2 research assistant
+  (`python -m iap.agents research`, `claude-sonnet-5-5`): in-sample runs through the research CLI
+  into a scratch store (holdout datasets refused by name), pre-registration DRAFTS (`status DRAFT`,
+  unsigned, `research/preregs/drafts/`) and report drafts, every number verified by `iap.llm.verify`
+  against the cited report and refused otherwise (closing text included). E3 morning ops agent
+  (`python -m iap.agents ops`, `claude-haiku-5-5`): threshold rules in code over the paper-trade,
+  drift and cost reports and the spend ledger; the model writes only the narrative, numbers checked
+  against the alerts document or replaced by the code fallback. E4 docs-sync agent
+  (`python -m iap.agents docs-sync`, Haiku): proposes doc edits for a PR as a patch file, never
+  applied; `tests/harness/check_docs.py` (relative links, diagram index, `iap.*` names in API_*.md
+  resolve by import, status-text freshness vs the last tag) in a new advisory `docs` CI job with a
+  lychee step. E5: `docs/AGENTS.md`, `API_AGENTS.md`, `API_LLM.md`, `API_PAPER.md`. agent-evals gains
+  one eval per agent (`iap.agents.wse_evals`; baseline regenerated).
 - v1.17 WS-D items D1 and D4 (review findings R-6, R-9; all opt-in, no published number moves).
   D1: `iap.alpha.gbm.GbmAlpha` (alpha id `ML01`) puts gradient-boosted trees behind the `AlphaModel`
   interface: `hist_gbdt` backend by default (`xgboost` / `lightgbm` when installed, named in the

@@ -1,6 +1,8 @@
-# lychee link-check configuration (v1.17 F1): the ADVISORY step of the
-# `advisory` job in .github/workflows/ci.yml, run over every tracked *.md and
-# docs/*.html.  Local run:  lychee --config lychee.toml './**/*.md' 'docs/*.html'
+# lychee link-check configuration (v1.17 F1 + E4): the ADVISORY link steps of
+# the `advisory` and `docs` jobs in .github/workflows/ci.yml, run over every
+# tracked *.md and docs/*.html; relative links are checked by
+# tests/harness/check_docs.py.
+# Local run:  lychee --config lychee.toml './**/*.md' 'docs/*.html'
 no_progress = true
 max_concurrency = 8
 max_retries = 2
@@ -20,9 +22,14 @@ exclude = [
   "^https?://127\\.0\\.0\\.1",
   "^https?://\\[::1\\]",
   "^https?://0\\.0\\.0\\.0",
+  "^https?://[a-z-]+\\.local(host)?",
+  "^https?://platform-metrics",
   # placeholders in the runbooks and templates
   "^https?://example\\.com",
   "^https?://[^/]*\\.example\\b",
+  # github.com rejects anonymous rate-limited bursts; the repo's own links are
+  # checked by their relative form in check_docs.py
+  "^https?://github\\.com/AshJha0/intraday-alpha-platform/(pull|issues|actions|settings|releases)",
 ]
 exclude_path = [
   # frozen archive and generated research artefacts are not maintained docs
@@ -30,4 +37,9 @@ exclude_path = [
   "research/experiments",
   "research/models",
   "data",
+  "deployment",
+  "python",
+  "cpp",
+  "rust",
+  "benchmarks",
 ]
