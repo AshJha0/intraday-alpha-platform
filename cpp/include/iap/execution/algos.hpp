@@ -144,7 +144,20 @@ struct ParentOrder {
     ExecPolicy policy = ExecPolicy::NATIVE;
     double urgency = 0.5;            // PASSIVE patience, in [0, 1]; 1 = cross at once
     PassiveParams passive;           // PASSIVE parameters
+    // v1.16 P0-5 / v1.17 F7 (rule 4 of the F7 ports, pinned by
+    // tests/golden/expected_f7_pov_exact.json): exact POV participation +
+    // catch-up. Off (default): the pinned floor(participation * V) with ONE
+    // child of at most max_child_qty per TRADE. On: the target counts our
+    // own fills in the total, floor(p / (1 - p) * V) (V = market TRADE
+    // volume, which never contains our simulated fills), so we trade p of
+    // the total, and the WHOLE deficit is covered at once in children of at
+    // most max_child_qty (catch-up after expiries or missed fills). Needs
+    // 0 < participation < 1 (the replay constructor throws otherwise).
+    bool pov_exact = false;
 };
+
+// POV target qty for `market_volume` (iap.execution.replay._pov_target).
+std::int64_t pov_target(const ParentOrder& parent, std::int64_t market_volume);
 
 // Slice weights for TWAP/VWAP/IS (POV is event-driven; throws for POV).
 std::vector<double> slice_weights(const ParentOrder& parent);
