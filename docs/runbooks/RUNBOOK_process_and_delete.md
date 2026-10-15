@@ -81,7 +81,7 @@ comes from the HIST index with the owner's approval sentence:
 python tools\iex_hist.py index --date 2025-11-28 ... --out research\v117\iex_overlap_manifest.json --approval "<sentence>"
 python -m iap.marketdata process-iex-day --manifest research\v117\iex_overlap_manifest.json ^
     --date 2025-11-28 --vendor-dir data\vendor --out-root data\real\iex --symbols AAPL,MSFT,QQQ ^
-    --download --i-have-approval [--feed deep-plus] [--round-lots-from dataeal7_20251128\dataset.json] ^
+    --download --i-have-approval [--feed deep-plus] [--round-lots-from data\real\r7_20251128\dataset.json] ^
     [--partition-instruments 10] [--min-free-gb 30] [--peak-gb N]
 python -m iap.marketdata process-iex-day ... --date D1 --date D2 ... --render-cmd data\real\run_iex_overlap.cmd ^
     --jobs-registry data\real\jobs.json        (one chain, days in order; a failed day is logged and the next runs)
