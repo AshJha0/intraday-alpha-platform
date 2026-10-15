@@ -24,12 +24,16 @@ import json
 import sys
 from pathlib import Path, PureWindowsPath
 
-#: Hosts a manifest URL may name (and the only hosts tools/r7_download.py fetches).
-ALLOWED_HOSTS: frozenset[str] = frozenset({"emi.nasdaq.com"})
+#: Hosts a manifest URL may name (and the only hosts tools/r7_download.py
+#: fetches): Nasdaq's sample directory and, since v1.17 (A1/A2), IEX HIST's
+#: index and the Google Cloud Storage links it hands out.
+ALLOWED_HOSTS: frozenset[str] = frozenset(
+    {"emi.nasdaq.com", "iextrading.com", "www.googleapis.com", "storage.googleapis.com"}
+)
 ROLES = ("insample", "holdout")
 #: Ingest formats a candidate day may name (``format``, default ``itch50``):
 #: the Nasdaq public files are ITCH 5.0, the Databento tier 2 is DBN MBO.
-DAY_FORMATS = ("itch50", "dbn-mbo")
+DAY_FORMATS = ("itch50", "dbn-mbo", "iex-deep-plus", "iex-deep")
 #: Sessions already used by a study (in-sample 2019-20 and the v1.8 holdout).
 #: They are SPENT: none may be a holdout again.
 SPENT_DAYS: frozenset[str] = frozenset(
