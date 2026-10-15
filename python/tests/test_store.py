@@ -710,9 +710,15 @@ def test_ledger_denominator_and_summary_view(built: Store) -> None:
     assert total["n"] == doc["distinct_experiments"] == len(doc["entries"])
     view = built.query("SELECT * FROM v_experiment_ledger_summary ORDER BY kind")
     assert sum(r["total_count"] for r in view) == doc["total_experiments"]
-    # one row per scope AND kind: the pipeline was run in every scope
+    # one row per scope AND kind: the pipeline was run in every scope that
+    # has pipeline looks (a pre-registration is filed before its dataset
+    # exists; a v1.17 `breadth_book` look is a research-only statistic on an
+    # ingested dataset the promotion pipeline never runs on)
+    research_only = {"prereg", "breadth_book"}
     pipeline = [r for r in view if r["kind"] == "promotion_pipeline"]
-    scopes_run = {(r["dataset_version"], r["methods"]) for r in view if r["kind"] != "prereg"}
+    scopes_run = {
+        (r["dataset_version"], r["methods"]) for r in view if r["kind"] not in research_only
+    }
     assert len(pipeline) == len(scopes_run) >= 3
     assert all(r["n_alphas"] == 24 and r["n_promote"] == 0 for r in pipeline)
     (current,) = built.query(
