@@ -741,8 +741,23 @@ def _final_text(ws: Path, sid: str) -> str:
     return out[:600]
 
 
+def run_wse_task(name: str, base: Path) -> dict[str, Any]:
+    """v1.17 WS-E: one eval of the research-assistant / ops / docs-sync
+    agents (:mod:`iap.agents.wse_evals`), scored like the research tasks."""
+    from iap.agents.wse_evals import WSE_TASKS
+
+    checks = WSE_TASKS[name](base / name)
+    return {
+        "task": name,
+        "score": round(sum(checks.values()) / len(checks), 4),
+        "checks": dict(sorted(checks.items())),
+    }
+
+
 def run_all(base: Path) -> dict[str, Any]:
-    rows = [run_task(n, base) for n in TASKS]
+    from iap.agents.wse_evals import WSE_TASKS
+
+    rows = [run_task(n, base) for n in TASKS] + [run_wse_task(n, base) for n in WSE_TASKS]
     return {
         "schema": SCHEMA,
         "model": "stub:reference-policy",

@@ -24,7 +24,8 @@ actors**:
 - `non_fast_forward` (no force-push) and `deletion` (no branch deletion).
 
 Not required today: `python-312` (the Python 3.12 entry), `cpp-sanitizers`,
-`agent-evals`, `images`.
+`agent-evals`, `images`, `docs` (v1.17 E4: the documentation checks; add it to the
+ruleset once it has been green on main).
 
 **Recommended owner actions** (repository settings; code cannot do them):
 
@@ -369,6 +370,33 @@ transcript; a finding can be true to its artefacts and still badly argued.
 The live evals are a sample of four scenarios, not a guarantee. Datasets
 other than the synthetic ones need an explicit `--dataset` allowance and a
 runner that serves them.
+
+### 2d. The WS-E agents: research assistant, morning ops, docs-sync (v1.17 E2-E4)
+
+Three more clients of the 2a-2c controls, on one generic loop (`iap.llm.loop`):
+a fixed tool allowlist with argument schemas, the E1 budget and ledger on
+every call, transcript and tool log persisted with the key scrubbed. Roster,
+models and caps: [docs/AGENTS.md](../AGENTS.md); signatures:
+[API_AGENTS.md §2](../../API_AGENTS.md).
+
+| Control | Enforced by | What it stops |
+|---|---|---|
+| The research assistant runs only ingested in-sample datasets; a name matching `forbidden_datasets` of `configs/paper/paper_trade.json` (the R7 holdout, `holdout2026`) or `*holdout*` is refused | `iap.agents.research_assistant.ResearchAssistant.run_in_sample`, `holdout_patterns` | an agent touching holdout data |
+| Its runs go through the research CLI with `--no-prereg` into a scratch ledger and experiment store under the session; every report says `confirmatory: false` | `research_assistant.cli_runner` | looks pooled into the committed ledger; a run passed off as confirmatory |
+| A pre-registration it writes is a file with `status: DRAFT`, `signed: false`, no signature, under `research/preregs/drafts/`; registering it is a human command (`python -m iap.agents.cli prereg`) | `ResearchAssistant.draft_prereg` | an agent registering, signing or spending a look |
+| Every number in a hypothesis, a report draft or the closing text must appear in the evidence of a cited report of the session (2b rules); a failing draft is refused and recorded, a failing closing text sets `closing_verified: false` and the CLI exits 3 | `iap.llm.verify.verify_finding`, `ResearchAssistant.unverified_numbers` | invented, derived or injected numbers |
+| The morning ops agent decides nothing: every alert, its value and its threshold are computed by code from the paper-trade report, `monitors.json`, `tca_compare.json` and the spend ledger; the model writes only the narrative | `iap.agents.ops_agent.evaluate` (the rules), `run` | a model deciding what is an alert |
+| A narrative with a number that is not in the alerts document is refused; the document then carries the code-written fallback and says `narrative_by: "code (fallback)"` | `ops_agent.unverified_numbers`, `narrative_fallback` | fabricated figures in the morning note |
+| The docs-sync agent proposes edits only to tracked Markdown and `docs/index.html`; an excerpt must occur exactly once; a code file, an identical edit or an overlap is refused | `iap.agents.docs_sync.DocsSync.propose_edit` | an agent editing code or writing an ambiguous patch |
+| Its output is a patch file plus a JSON sidecar with `applied: false`; nothing applies it | `docs_sync.run`, `DocsSync.patch` | silent doc changes |
+| Each agent has one eval in the required `agent-evals` job (`iap.agents.wse_evals`): the control must hold against a misbehaving stub and the ledger must hold one row per call | `iap.agents.eval_harness.run_wse_task`, `research/agents/eval_baseline.json` | a control silently removed |
+| Docs drift is checked in CI: relative links, the diagram index, every `iap.*` name in `API_*.md` resolving by import, status phrases older than the last tag (`docs` job, advisory until added to the ruleset; lychee on external links) | `tests/harness/check_docs.py` | stale or wrong documentation shipping unnoticed |
+
+**Not covered.** The research assistant's in-sample run is a look the
+committed ledger does not see: it is exploratory by construction and can
+inform a human's pre-registration, which is then one ledger look; it must not
+be read as evidence. The ops narrative is checked for numbers, not for
+judgement. The docs-sync patch is reviewed by a human like any diff.
 
 ## 3. Audit-log policy
 
