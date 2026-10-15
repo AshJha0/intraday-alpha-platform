@@ -145,6 +145,7 @@ def process_iex_day(
     min_free_gb: float = 30.0,
     peak_gb: float | None = None,
     allow_book_divergence: bool = False,
+    round_lots: dict[str, int] | None = None,
     slim: bool = True,
     dry_run: bool = False,
     log: Callable[[str], None] | None = None,
@@ -188,6 +189,8 @@ def process_iex_day(
         "n_symbols": len(symbols),
         "symbols": list(symbols),
         "approval": doc.get("approval"),
+        "round_lots": dict(round_lots or {}),
+        "round_lots_source": "nasdaq_dataset" if round_lots else None,
         "steps": [],
         "dry_run": dry_run,
     }
@@ -325,6 +328,16 @@ def process_iex_day(
         from iap.marketdata.ingest import ingest
 
         clock = time.perf_counter()
+        lots = round_lots
+        lots_source = "nasdaq_dataset"
+        if lots is None:
+            # no paired Nasdaq day given: the smallest quoted TOPS size per
+            # symbol is the round lot (TOPS quotes round lots only; measured
+            # 2025-11-28: AAPL 100, MSFT / QQQ 40); recorded as inferred
+            lots = infer_round_lots(extract, symbols)
+            lots_source = "tops_min_quoted_size"
+        report["round_lots"] = dict(lots)
+        report["round_lots_source"] = lots_source
         try:
             manifest = ingest(
                 fmt,
@@ -338,6 +351,7 @@ def process_iex_day(
                 allow_book_divergence=allow_book_divergence,
                 progress=say,
                 slim=slim,
+                round_lots=lots,
             )
         except BookDivergenceError as exc:
             (ds.parent / f"{ds.name}.markers" / "book_divergence.json").write_text(
@@ -526,6 +540,26 @@ def render_iex_jobs_entry(name: str, wrapper: str, log: str) -> dict:
 # ------------------------------------------------------------------- CLI
 
 
+def infer_round_lots(extract: Path, symbols: list[str]) -> dict[str, int]:
+    """symbol -> smallest non-zero quoted size in the day's TOPS extract (100
+    when a symbol has no quote): TOPS quotes the best level holding at least
+    a round lot, so that minimum is the round lot in practice."""
+    quotes = TopsQuotes.load_extract(extract, [])
+    out = {}
+    for s in symbols:
+        sizes = [q[i] for q in quotes.by_symbol.get(s, {}).values() for i in (1, 3) if q[i] > 0]
+        out[s] = min(sizes) if sizes else 100
+    return out
+
+
+def round_lots_from_dataset(path: str | Path) -> dict[str, int]:
+    """``symbol -> lot_size`` of a dataset.json's universe (the paired Nasdaq
+    day: its ITCH directory carries the round lot IEX's directory lacks for
+    non-IEX-listed names)."""
+    doc = json.loads(Path(path).read_text(encoding="utf-8"))
+    return {e["symbol"]: int(e["lot_size"]) for e in doc["universe"]}
+
+
 def _symbols(a) -> list[str]:
     if a.symbols_file:
         doc = json.loads(Path(a.symbols_file).read_text(encoding="utf-8"))
@@ -557,6 +591,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--min-free-gb", type=float, default=30.0)
     p.add_argument("--peak-gb", type=float, default=None, help="override the peak estimate (GB)")
     p.add_argument("--allow-book-divergence", action="store_true")
+    p.add_argument(
+        "--round-lots-from",
+        default=None,
+        help="dataset.json of the paired Nasdaq day: its universe lot_size per symbol",
+    )
     p.add_argument("--no-slim", action="store_true")
     p.add_argument("--dry-run", action="store_true", help="disk guard and the plan only")
     p.add_argument("--render-cmd", default=None, help="write the detached .cmd chain and exit")
@@ -579,6 +618,8 @@ def main(argv: list[str] | None = None) -> int:
                 extra.append("--keep-gz")
             if a.allow_book_divergence:
                 extra.append("--allow-book-divergence")
+            if a.round_lots_from:
+                extra.append(f'--round-lots-from "{Path(a.round_lots_from).resolve()}"')
             extra.append(
                 f"--partition-instruments {a.partition_instruments} --engine {a.engine} "
                 f"--workers {a.workers} --min-free-gb {a.min_free_gb:g}"
@@ -624,6 +665,7 @@ def main(argv: list[str] | None = None) -> int:
             min_free_gb=a.min_free_gb,
             peak_gb=a.peak_gb,
             allow_book_divergence=a.allow_book_divergence,
+            round_lots=round_lots_from_dataset(a.round_lots_from) if a.round_lots_from else None,
             slim=not a.no_slim,
             dry_run=a.dry_run,
         )

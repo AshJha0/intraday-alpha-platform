@@ -8,6 +8,13 @@ that tag.
 
 ## Unreleased
 
+- v1.17 A4 fix: the TOPS oracle compares the book's best **round-lot** level (TOPS quotes the
+  best level holding at least a round lot; on 2025-11-28 the raw-L1 rule diverged 53,506 of
+  431,744 AAPL comparisons, the first on a 1-share bid), `IexReader(round_lots=)` /
+  `ingest(round_lots=)` / `process-iex-day --round-lots-from <paired Nasdaq dataset.json>`
+  (else the smallest quoted TOPS size per symbol, recorded as `round_lots_source`); the
+  synthesised directory row takes the same round lot; `odd_lot_top` counter; oracle label
+  `tops_l1_equals_deep_round_lot_l1`.
 - v1.17 WS-F items F4 and F5 (#188). **The committed real slice**
   `benchmarks/slices/itch50_20190130_AAPL` (`tools/extract_real_slice.py`; Nasdaq ITCH 5.0, AAPL,
   2019-01-30 from the 09:30 open: 1,132 book-reconstruction ADDs + 64,000 real events, 4.69 MB,
