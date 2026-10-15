@@ -3,7 +3,7 @@
     python -m iap.research.execution_benchmark --data-dir data/real/multi7 \\
         [--sessions 20190130,20190327] [--symbols AAPL,MSFT] \\
         [--algos TWAP,VWAP,POV,IS] [--policies native,aggressive,passive] \\
-        [--sizes-pct 0.1,0.5,1,2] [--window-min 15] [--out research/execution/benchmark]
+        [--sizes-pct 0.1,0.5,1,2] [--window-min 30] [--out research/execution/benchmark]
 
 For every (session, symbol) stream of a dataset directory the driver cuts
 back-to-back parent windows (``--window-min`` each, after ``--warmup-min``),
@@ -337,7 +337,7 @@ def run_benchmark(
     algos: tuple[str, ...] = DEFAULT_ALGOS,
     policies: tuple[str, ...] = tuple(POLICIES),
     sizes_pct: tuple[float, ...] = DEFAULT_SIZES_PCT,
-    window_min: float = 15.0,
+    window_min: float = 30.0,
     warmup_min: float = 5.0,
     slices: int = 5,
     participation: float = 0.10,
@@ -662,11 +662,16 @@ def prereg_draft(doc: dict) -> dict[str, object]:
             "mean with day-clustered SE (one cluster per session), Student-t with G - 1 df",
             "direction": "one-sided: signal-aware cheaper (difference < 0)",
             "alpha": 0.05,
-            "minimum_effect_bps": 1.0,
+            "minimum_effect_bps": 2.0,
             "fill_rate_condition": "signal-aware fill rate not lower than plain by more than "
             "0.02 (paired, same clustering)",
             "multiplicity": "Holm over the four algos; a cell passes only if both the cost and "
             "the fill-rate conditions hold",
+            "eligibility": "a cell whose depth_exhausted parent share exceeds 0.25 under either "
+            "arm is reported but not gate-eligible (its cost is the walk cap, not the algo)",
+            "cost_basis": "the signed run uses configs/prereg/v2.json realism opt-ins and "
+            "impact_model=parent with the fitted exponent; the exponent and its fit support "
+            "are recorded here by fingerprint before signing, never read at run time",
             "report_always": [
                 "depth_exhausted parent share and qty share of unfilled",
                 "fill provenance shares",
@@ -702,7 +707,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--algos", default=",".join(DEFAULT_ALGOS))
     ap.add_argument("--policies", default=",".join(POLICIES))
     ap.add_argument("--sizes-pct", default=",".join(f"{x:g}" for x in DEFAULT_SIZES_PCT))
-    ap.add_argument("--window-min", type=float, default=15.0)
+    ap.add_argument("--window-min", type=float, default=30.0)
     ap.add_argument("--warmup-min", type=float, default=5.0)
     ap.add_argument("--slices", type=int, default=5)
     ap.add_argument("--pov-participation", type=float, default=0.10)

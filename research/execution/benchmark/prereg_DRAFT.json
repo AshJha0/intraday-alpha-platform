@@ -1,12 +1,20 @@
 {
   "command": "python -m iap.research.execution_benchmark --data-dir data/real/multi7 --out research/execution/benchmark --write-prereg-draft",
+  "decisions": "owner 2026-10-15: 30-min windows, 2 bp minimum effect, 2 pp fill-rate tolerance, Holm over algos, depth-exhausted eligibility rule, v2 realism + parent impact for the signed run",
   "drafted": "2026-10-15",
+  "fingerprints_to_fill_before_signing": [
+    "configs/prereg/v2.json",
+    "the impact calibration file (exponent, support_pct_adv)",
+    "the IEX/overlap session list and file hashes"
+  ],
   "gate_B7": {
     "alpha": 0.05,
     "comparison": "signal-aware algo (B2 urgency / B3 pacing) vs the plain algo of the same name on the SAME windows, same policy, same size cell",
+    "cost_basis": "the signed run uses configs/prereg/v2.json realism opt-ins and impact_model=parent with the fitted exponent; the exponent and its fit support are recorded here by fingerprint before signing, never read at run time (the driver does not yet apply v2.json realism: B2/B3 add that wiring before signature)",
     "direction": "one-sided: signal-aware cheaper (difference < 0)",
+    "eligibility": "a cell whose depth_exhausted parent share exceeds 0.25 under either arm is reported but not gate-eligible (its cost is the walk cap, not the algo)",
     "fill_rate_condition": "signal-aware fill rate not lower than plain by more than 0.02 (paired, same clustering)",
-    "minimum_effect_bps": 1.0,
+    "minimum_effect_bps": 2.0,
     "multiplicity": "Holm over the four algos; a cell passes only if both the cost and the fill-rate conditions hold",
     "no_look": "the fresh days are not read until this draft is signed and registered (tools/*_register.py, --require-ci-env)",
     "report_always": [
@@ -15,6 +23,7 @@
       "per-symbol cells",
       "low_power flag when sessions < 10"
     ],
+    "sessions_for_signature": "IEX fresh days plus the Nasdaq/IEX overlap days only; the multi7 in-sample sessions are NOT used for the gate and are not padded with IEX days",
     "statistic": "paired per-parent difference signal-aware - plain in all_in bps, mean with day-clustered SE (one cluster per session), Student-t with G - 1 df"
   },
   "grid": {
@@ -41,7 +50,7 @@
     "slices": 5,
     "urgency": 0.5,
     "warmup_min": 5.0,
-    "window_min": 15.0
+    "window_min": 30.0
   },
   "holdout": "data/real/r7_holdout and the 2026 holdout are never read by this benchmark; the signed test runs once on the IEX fresh days and the Nasdaq/IEX overlap days (B7)",
   "id": "B1-IS-BENCHMARK-1",
@@ -68,5 +77,6 @@
     "walk_depth_levels": 10
   },
   "source": "IAP_v1.17_Plan.md section 6, items B1 and B7",
-  "status": "DRAFT - not signed, not on the blackboard, not approved for any fresh-day run"
+  "status": "DRAFT - not signed, not on the blackboard, not approved for any fresh-day run",
+  "walk_depth_split": "ExecConfig.walk_depth_levels governs OUR aggressive children only; the market's marketable-ADD expansion keeps the book's fixed DEPTH_LEVELS (the venue's matching, pinned by the passive goldens)"
 }
