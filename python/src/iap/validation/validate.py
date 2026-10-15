@@ -222,6 +222,20 @@ v1.13.0 rules for the experiments and pre-registrations run under them).**
   the report adds ``net_pnl_1x_cost_label_block``, the last fold's 1x net
   P&L under the v1.13.0 label-valid block, as a diagnostic.
 
+**v1.17 WS-D (review finding R-9; opt-in).**  ``cpcv_path_ic`` names the
+rule the ``cpcv`` block's path statistics (``path_ic_mean`` and the rest)
+read.  ``"pooled"`` (default, the v1.12 rule): each path concatenates the
+standardized signal of its groups, which come from DIFFERENT fits with
+different scales and offsets, and takes the pooled IC of the concatenation
+- a fit whose predictions are ten times larger dominates the path, and an
+offset between fits enters the pooled variance as signal.
+``"demeaned"``: the signal and the label are demeaned and scaled per
+(split, group) before the groups are pooled, so every group enters the
+path IC at unit scale and the path IC is a pair-count-weighted mean of the
+per-group ICs.  Both readings are always in the block (``path_ics`` /
+``path_ics_demeaned`` with their mean, spread, min, max and positive
+share); ``path_ic_rule`` names the one the headline fields read.
+
 **Looks.**  :func:`looks_per_validation` itemises what one call evaluates;
 the ledger debits the gate decisions (``looks_rule="decisions"``) or all
 of it (``"statistics"``).
@@ -342,6 +356,10 @@ DEFAULT_GATE_IC_SOURCE = "pooled"
 #: Book scopes (module docs, R4): default first.
 BOOK_SCOPES = ("consolidated", "single_venue")
 DEFAULT_BOOK_SCOPE = "consolidated"
+
+#: The ``cpcv`` path-IC rules (v1.17 WS-D, R-9): default, then the opt-in.
+CPCV_PATH_IC_RULES = ("pooled", "demeaned")
+DEFAULT_CPCV_PATH_IC = "pooled"
 
 #: Looks the ``cpcv`` block adds: one pooled IC per backtest path at the
 #: default N = 6, k = 2 (5 paths).
@@ -684,6 +702,7 @@ def validate_alpha(
     cpcv: bool = False,
     cpcv_groups: int = DEFAULT_CPCV_GROUPS,
     cpcv_test_groups: int = DEFAULT_CPCV_TEST_GROUPS,
+    cpcv_path_ic: str = DEFAULT_CPCV_PATH_IC,
     deflated_sharpe: bool = False,
     deflated_sharpe_trials: int | None = None,
     deflated_sharpe_trials_basis: str = "distinct_configurations",
@@ -745,6 +764,8 @@ def validate_alpha(
         raise ValueError(f"unknown hypothesis_rule {hypothesis_rule!r}; known: {HYPOTHESIS_RULES}")
     if standardisation not in STANDARDISATIONS:
         raise ValueError(f"unknown standardisation {standardisation!r}; known: {STANDARDISATIONS}")
+    if cpcv_path_ic not in CPCV_PATH_IC_RULES:
+        raise ValueError(f"unknown cpcv_path_ic {cpcv_path_ic!r}; known: {CPCV_PATH_IC_RULES}")
     per_instrument = standardisation == "instrument"
     hac_day_ns = NS_DAY if hac_day_separated else None
     if deflated_sharpe and not fold_diagnostics:
@@ -1122,6 +1143,8 @@ def validate_alpha(
         method_extras["post_block_embargo_ns"] = int(splitter.post_embargo_ns)
     if cpcv:
         method_extras["cpcv"] = True  # N and k are in the cpcv block
+        if cpcv_path_ic != DEFAULT_CPCV_PATH_IC:
+            method_extras["cpcv_path_ic"] = cpcv_path_ic  # v1.17 WS-D (R-9)
         extras["cpcv"] = _cpcv_block(
             model_factory,
             uframes,
@@ -1132,6 +1155,7 @@ def validate_alpha(
             k_test=cpcv_test_groups,
             embargo_ns=embargo_ns,
             feature_window_ns=feature_window_ns,
+            path_ic=cpcv_path_ic,
         )
     if deflated_sharpe:
         method_extras["deflated_sharpe"] = True
@@ -1521,9 +1545,11 @@ def _cpcv_block(
     k_test: int,
     embargo_ns: int,
     feature_window_ns: int | str | None = None,
+    path_ic: str = DEFAULT_CPCV_PATH_IC,
 ) -> dict:
     """The ``cpcv`` report block (module docs): per-split and per-path
-    pooled IC of the standardized signal on all scored rows.
+    pooled IC of the standardized signal on all scored rows; ``path_ic``
+    (v1.17 WS-D, R-9) names the path rule the headline fields read.
 
     Memory (v1.15/v1.16, R7): every split copies its train/test rows, so the
     block first narrows the frames to the columns it reads
@@ -1544,6 +1570,7 @@ def _cpcv_block(
             k_test=k_test,
             embargo_ns=embargo_ns,
             feature_window_ns=feature_window_ns,
+            path_ic=path_ic,
         )
 
 
@@ -1606,7 +1633,10 @@ def _cpcv_block_on(
     k_test: int,
     embargo_ns: int,
     feature_window_ns: int | str | None = None,
+    path_ic: str = DEFAULT_CPCV_PATH_IC,
 ) -> dict:
+    if path_ic not in CPCV_PATH_IC_RULES:
+        raise ValueError(f"unknown cpcv_path_ic {path_ic!r}; known: {CPCV_PATH_IC_RULES}")
     splitter = CombinatorialPurgedSplitter(
         n_groups, k_test, embargo_ns, feature_window_ns=feature_window_ns
     )
@@ -1635,14 +1665,24 @@ def _cpcv_block_on(
             }
         )
     path_ics: list[float | None] = []
+    path_ics_demeaned: list[float | None] = []
     for assignment in splitter.path_assignment():
-        zs, ys = [], []
+        zs, ys, zs_d, ys_d = [], [], [], []
         for g, i in sorted(assignment.items()):
             z, y = per_split[i][g]
             zs.append(z)
             ys.append(y)
+            # v1.17 WS-D (R-9): every (split, group) comes from its own fit,
+            # so the groups are brought to zero mean and unit scale before
+            # they are pooled (``cpcv_path_ic="demeaned"``).
+            z_d, y_d = _standardise_group(z, y)
+            zs_d.append(z_d)
+            ys_d.append(y_d)
         path_ics.append(_fnum(ic(np.concatenate(zs), np.concatenate(ys))))
-    finite = np.array([v for v in path_ics if v is not None], dtype=float)
+        path_ics_demeaned.append(_fnum(ic(np.concatenate(zs_d), np.concatenate(ys_d))))
+    headline = path_ics_demeaned if path_ic == "demeaned" else path_ics
+    finite = np.array([v for v in headline if v is not None], dtype=float)
+    finite_d = np.array([v for v in path_ics_demeaned if v is not None], dtype=float)
     return {
         "grouping": splitter.grouping,
         "n_groups": splitter.n_groups,
@@ -1660,4 +1700,35 @@ def _cpcv_block_on(
         "path_ic_min": _fnum(float(finite.min())) if finite.size else None,
         "path_ic_max": _fnum(float(finite.max())) if finite.size else None,
         "path_frac_positive": _fnum(float(np.mean(finite > 0))) if finite.size else None,
+        # v1.17 WS-D (R-9): the rule the headline fields read, and the
+        # per-group-standardised reading beside the pooled one, always.
+        "path_ic_rule": path_ic,
+        "path_ics_demeaned": path_ics_demeaned,
+        "path_ic_mean_demeaned": _fnum(float(finite_d.mean())) if finite_d.size else None,
+        "path_ic_std_demeaned": (_fnum(float(finite_d.std(ddof=1))) if finite_d.size > 1 else None),
+        "path_ic_min_demeaned": _fnum(float(finite_d.min())) if finite_d.size else None,
+        "path_ic_max_demeaned": _fnum(float(finite_d.max())) if finite_d.size else None,
+        "path_frac_positive_demeaned": (
+            _fnum(float(np.mean(finite_d > 0))) if finite_d.size else None
+        ),
     }
+
+
+def _standardise_group(z: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """``(z, y)`` demeaned and scaled over their finite pairs (v1.17 WS-D,
+    R-9); a group with no spread, or fewer than two pairs, is returned as
+    NaN so it drops out of the pooled IC instead of entering at scale 0."""
+    z = np.asarray(z, dtype=float)
+    y = np.asarray(y, dtype=float)
+    ok = np.isfinite(z) & np.isfinite(y)
+    out_z = np.full(z.shape, np.nan)
+    out_y = np.full(y.shape, np.nan)
+    if ok.sum() < 2:
+        return out_z, out_y
+    sz = float(np.std(z[ok]))
+    sy = float(np.std(y[ok]))
+    if not (sz > 0.0 and sy > 0.0):
+        return out_z, out_y
+    out_z[ok] = (z[ok] - float(np.mean(z[ok]))) / sz
+    out_y[ok] = (y[ok] - float(np.mean(y[ok]))) / sy
+    return out_z, out_y

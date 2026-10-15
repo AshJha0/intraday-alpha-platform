@@ -224,6 +224,9 @@ class ResearchMethods:
     # of two-sided splits (``validate_alpha(feature_window_ns=)``); ``None``
     # is the v1.13-v1.14 rule (the embargo alone).
     feature_window: int | str | None = None
+    # v1.17 WS-D (R-9): the ``cpcv`` path-IC rule (``validate_alpha(
+    # cpcv_path_ic=)``); ``"pooled"`` is the v1.12 rule every bundle keeps.
+    cpcv_path_ic: str = "pooled"
 
     @property
     def row_block(self) -> str:
@@ -292,6 +295,8 @@ class ResearchMethods:
         # set is unchanged for the ``*_v114`` bundles).
         if self.feature_window is not None:
             kw["feature_window_ns"] = self.feature_window
+        if self.cpcv_path_ic != "pooled":
+            kw["cpcv_path_ic"] = self.cpcv_path_ic  # v1.17 WS-D (R-9), opt-in
         return kw
 
     def looks(self, n_folds: int) -> int:

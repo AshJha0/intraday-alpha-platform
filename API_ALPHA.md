@@ -269,6 +269,53 @@ Neither module changes a fit, a score, a gate or a verdict.
   `alpha/base.py` and `alpha/equity.py`; a test keeps `iap.alpha` from
   importing it.
 
+### 7.3 `GbmAlpha` (`ML01`) — v1.17 WS-D (Python research; not a port contract)
+
+`iap.alpha.gbm.GbmAlpha` is gradient-boosted trees behind the `AlphaModel`
+interface. It is not a port target and has no golden case; it exists so a
+GBM is judged by the same chain as the linear alphas. Opt-in:
+`iap.alpha.register_ml_alphas()` adds it to `ALPHA_CLASSES` (never to
+`ALPHA_IDS`); `python -m iap.research run --alpha ML01` registers it by
+naming it.
+
+- Identity: `alpha_id = "ML01"`, `asset_class = "EQUITY"`, `horizon = "5s"`,
+  `features` = the curated ML predictor set (`iap.models.dataset.FEATURE_SET`),
+  `horizons = ("1s", "5s", "30s")`, `backend = "hist_gbdt"` (`"xgboost"` /
+  `"lightgbm"` when installed), `max_iter` (tree-count override, `None` =
+  the zoo's pinned count), `sign_check_frac = 0.2`, `seed = 7`.
+- `fit(train)`: one model per horizon in `fit_horizons` (the instance's
+  `horizon` first, then `horizons`) on the pooled universe rows where the
+  horizon's label is valid; NaN features are legal inputs; a feature with no
+  finite value on the fold is a constant 0 for that fit. Fewer than 32 rows
+  at a horizon: no model for it (the alpha is dead at that horizon). Sign
+  check per horizon: the OOS IC of a fit on the first `1 - sign_check_frac`
+  of the rows (by time, purged by the horizon) on the rest, `None` when
+  either side is too small.
+- `score(data)`: `pred` of the `horizon` model; `z = clip(pred / sigma,
+  ±z_clip)` with `sigma` the fitted model's in-sample prediction standard
+  deviation; `expected_return = z * sigma`, `confidence = min(1, |z| /
+  conf_scale)`; a row whose every feature is NaN, or a dead alpha, scores
+  `(0, 0)`. `z_clip = 4.0`, `conf_scale = 2.0` as for `linear_z_v1`.
+- `params()`: `model = "gbm_v1"`, `backend`, `horizon`, `horizons`,
+  `features`, `hyperparams`, `z_clip`, `conf_scale`, `beta` (1.0; 0.0 when
+  dead, so the validation chain's standardized signal is the clipped
+  prediction), `beta_fit`, `hypothesis_confirmed` (the pinned horizon's sign
+  check > 0), `sign_check`, `sign_check_frac`, `pred_sigma`, `n_train`,
+  `n_train_by_horizon`, `train_window`, `model_sha256` (SHA-256 of the
+  pickled per-horizon models), `sidecar` (path, after `save_sidecar`),
+  `dead`, `fitted`.
+- `save_sidecar(directory=None)`: writes the pickled models to
+  `<directory>/ML01_<sha256[:16]>.pkl` (default `research/models/gbm/`)
+  and sets `sidecar` (repository-relative when under the checkout).
+- `load_params(blob)`: rejects a foreign `alpha_id` / `model`, a horizon or
+  feature list that differs from the instance, unpinned `z_clip` /
+  `conf_scale`, an unknown backend, a live fit without `sidecar` +
+  `model_sha256`, and a sidecar whose digest is not `model_sha256` (checked
+  before unpickling; the unpickler admits only the learner libraries'
+  classes). A dead fit round-trips without a sidecar. Scores after
+  `load_params` equal the fitting instance's scores exactly
+  (`validate_alpha(frozen_params=...)` reads this path).
+
 ## 8. Signal combination — `iap.combine` (Python research; not a port contract)
 
 `CombinedAlpha(member_ids, method="equal_weight", *, asset_class=None,

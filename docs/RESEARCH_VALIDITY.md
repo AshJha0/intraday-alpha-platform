@@ -489,8 +489,48 @@ Nothing here changes a gate, a threshold or a verdict.
 
 API: [API_ALPHA.md](../API_ALPHA.md) §7.2.
 
+## 4d. v1.17 WS-D: the model-zoo gate, the CPCV path IC and GBM as an alpha
+
+Review findings R-6 and R-9 (plan §4) and item D1. Everything here is
+opt-in: the defaults, the regenerated ML report and every published number
+are unchanged until the owner flips a flag.
+
+| item | opt-in | default (unchanged) | why |
+|---|---|---|---|
+| R-6 model-zoo gate | `run_model_comparison(gate="clustered", gate_t_threshold=2.0)`: the best tier-0 model by fold-mean rank IC vs the MID label passes only when that mean is > 0 AND the day-clustered t of its pooled OOS predictions (standardised per fold, each fold being its own fit) is >= the threshold; `results["gate"]["clustered"]` and the `model_zoo_gate` ledger look carry `mean_rank_ic_vs_mid`, `tstat_day_cluster`, `tstat_hac`, `n_days`, `t_threshold`, `passed` | `gate="literal"`: the best linear pooled IC vs mid > 0, one number pooled across fits, no significance; `results["gate"]["literal"]` is recorded beside the clustered reading whichever decides (`gate_rule` names it) | a pooled IC of +0.001 opened the gate; the ML report's `ridge +0.0081` is such a number. With two synthetic sessions the clustered t has one degree of freedom and the clustered gate cannot pass: that is a statement about the data, printed as `n_days`, not a reason to lower the threshold |
+| R-9 CPCV path IC | `validate_alpha(cpcv_path_ic="demeaned")` / bundle field `cpcv_path_ic`: the standardized signal and the label of every (split, group) are demeaned and scaled before the groups of a path are pooled, so the path IC is a pair-count-weighted mean of the per-group ICs | `"pooled"`: each path concatenates the z of its groups as the fits produced them; `path_ics_demeaned` and its mean / spread / min / max / positive share are reported beside `path_ics` in every `cpcv` block, `path_ic_rule` names the headline | the groups of one path come from different fits with different scales and offsets; the pooled IC reads the largest fit and counts an offset between fits as variance (the test fixture: two groups with the same true IC 0.3, one fit ten times larger with an offset: pooled off by more than 0.05, demeaned within 0.01) |
+| D1 GBM as an alpha | `iap.alpha.register_ml_alphas()` adds `ML01` (`iap.alpha.gbm.GbmAlpha`) to `ALPHA_CLASSES`; `python -m iap.research run --alpha ML01` opts in by naming it | `ALPHA_IDS`, `run_all.py`, `fit_all` and every report never see it; no entry in `alpha_params.json` | a GBM used to exist only inside `run_model_comparison`, behind the R-6 gate and outside the walk-forward, the leakage detectors, the prereg gate and (until R-4) the ledger; as an `AlphaModel` it is judged by exactly the chain the linear alphas are |
+
+What D1 chose and why (`iap.alpha.gbm` module docs): the `hist_gbdt`
+backend by default because it is the one every CI environment has
+(`xgboost` / `lightgbm` are selectable and named in the params); one
+model per horizon rather than the horizon as an input, because the targets
+differ in scale by two orders of magnitude and one shared model would make
+every horizon part of every other's identity; the curated ML predictor set
+as `features` so the label guard, the column narrowing and the frozen-params
+hash read one list; the hypothesis sign check as the OOS IC of a fit on the
+first 80 % of the training rows (purged by the horizon) on the last 20 %;
+the fitted models in a pickle sidecar whose SHA-256 is in the params and is
+checked before anything is unpickled.
+
+Synthetic dry run (`--alpha ML01 --horizon 5s --no-prereg --dry-run`,
+scratch ledger, 120 trees): gate IC +0.055, rank IC +0.049, gate t +6.0,
+hit rate 0.542, 4/4 folds positive, leakage passed, hypothesis sign
+confirmed, verdict ITERATE, not gate-eligible (exploratory). The holdout
+traded nothing (cost-aware policy), as the linear alphas do on this data.
+
+Open for the owner: the backend to pre-register (`hist_gbdt` is
+reproducible everywhere; `xgboost` is what the ML report fitted), the
+clustered-t threshold (2.0 is a conventional two-sigma, not a
+multiple-testing number; the ledger's Bonferroni |t| is the alternative),
+and whether `gate="clustered"` / `cpcv_path_ic="demeaned"` become the
+defaults in the release (the ML report and the `v4` cpcv blocks would be
+regenerated under them).
+
 ## 5. Tooling
 
+- `python -m iap.research run --alpha ML01`: the opt-in GBM alpha (§4d);
+  every other flag as for a flagship alpha.
 - `python -m iap.research run --methods {v2,v3,v4,legacy_v1,v2_v113,v3_v113,v4_v113}`: the method
   bundle (default `v2`; `v3` adds the v1.9 validity block of §1a, `v4` adds
   the report-only CPCV / PBO / deflated-Sharpe blocks of §1b); `--normalized-dir` names the events of the recompute
