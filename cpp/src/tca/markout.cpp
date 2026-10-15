@@ -1,5 +1,12 @@
 // Markout primitives: port of iap.tca.fills / iap.tca.markout (header).
 
+// GCC (12/13, -O2 and up) reports maybe-uninitialized false positives on
+// std::optional / std::variant temporaries; no sanitizer build sees an
+// uninitialised read. Silenced for this translation unit.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+
 #include "iap/tca/markout.hpp"
 
 #include <algorithm>

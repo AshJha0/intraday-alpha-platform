@@ -1,5 +1,12 @@
 // Cost-aware router: line-for-line port of iap.execution.sor_v2 (header).
 
+// GCC (12/13, -O2 and up) reports maybe-uninitialized false positives on
+// std::optional / std::variant temporaries; no sanitizer build sees an
+// uninitialised read. Silenced for this translation unit.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+
 #include "iap/sor/sor_v2.hpp"
 
 #include <algorithm>

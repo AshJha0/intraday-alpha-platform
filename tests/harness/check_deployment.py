@@ -509,7 +509,7 @@ def check_docker_build_context() -> None:
     # or input failed without re-running the script (v1.17 F7)
     fails = [ln.strip() for ln in out.splitlines() if ln.strip().startswith("[FAIL")]
     detail = "; ".join([*tail[-1:], *fails]) if (tail or fails) else out
-    record("docker_build_context", "PASS" if rc == 0 else "FAIL", detail[:1200])
+    record("docker_build_context", "PASS" if rc == 0 else "FAIL", detail[:5000])
 
 
 def check_compose_config() -> None:

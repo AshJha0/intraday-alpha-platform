@@ -233,10 +233,19 @@ def check_real_docker_build(force: bool) -> None:
             timeout=3600,
         )
         if proc.returncode != 0:
+            # the compiler / test lines that explain the failure (v1.17 F7),
+            # then the tail of the build output
+            out = proc.stdout + proc.stderr
+            errs = [
+                ln.strip()[:300]
+                for ln in out.splitlines()
+                if ("error" in ln.lower() or "Failed" in ln or "FAILED" in ln)
+                and "Waiting for unfinished" not in ln
+            ][:12]
             record(
                 "docker_build_all_images",
                 False,
-                f"{df}: {(proc.stdout + proc.stderr).strip()[-600:]}",
+                f"{df}: " + " | ".join(errs) + " || tail: " + out.strip()[-400:],
             )
             return
     record("docker_build_all_images", True, "3 images built")
