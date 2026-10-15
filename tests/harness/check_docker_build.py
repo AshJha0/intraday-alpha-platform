@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
-"""tests/harness/check_docker_build.py — prove the four images can be built.
+"""tests/harness/check_docker_build.py — prove the three images can be built.
 
 Round-3 PLATFORM finding SEV-1: "the C++ and Rust images cannot be built from
 this repository" — their build-time test steps read `configs/` and
 `data/reference/`, which the Dockerfiles never copied, and with no
 `.dockerignore` a host `cpp/build/CMakeCache.txt` poisoned the C++ build.
 
-With a Docker daemon this script builds all four images for real. Without one
+With a Docker daemon this script builds all three images for real. Without one
 (the usual case in this environment — `docker info` reports no server) it does
 the next best thing, which is what actually catches the bug class:
 
   1. materialise a CLEAN checkout of the working tree into a temp dir: every
      file `git ls-files` tracks (so staged moves — `git mv` — are honoured
      before they are committed), at its working-tree content, and nothing
-     else — no cpp/build, no rust/target, no archive/java/out, exactly what a fresh
-     checkout plus `.dockerignore` gives Docker as a build context;
+     else — no cpp/build, no rust/target, exactly what a fresh checkout plus
+     `.dockerignore` gives Docker as a build context;
   2. apply the repository's `.dockerignore` to that clone, so the context is
      byte-for-byte what `docker build` would send;
   3. assert every `COPY <src> <dst>` of every stage resolves inside it;
   4. assert the paths each stage's BUILD-TIME and RUN-TIME commands read
      resolve too — `<golden>/../../configs` for the C++ golden tests and
      bench_all, `../../configs` and `../../data/reference` for the Rust
-     workspace tests, `/app/configs` for the Java entrypoint;
-  5. RUN the Java build stage's command (`cd archive/java && bash build.sh`) inside
-     the clone, because that is the image that trades and javac is cheap.
+     workspace tests, `/app/configs` and the MVP config for the Python image's
+     `iap.metrics` / `iap.mvp` entrypoints (v1.17 F9: the Java image is
+     retired; its Dockerfile is kept, unbuilt, under archive/java/).
      The C++/Rust build stages are compiled by tests/harness/run_all.sh in the
      same CI run, so their commands are covered there; this script asserts
      their INPUTS, which is the half that was broken.
@@ -31,7 +31,7 @@ the next best thing, which is what actually catches the bug class:
 Usage:
     python3 tests/harness/check_docker_build.py [--docker] [--keep]
 
-    --docker  force a real `docker build` of all four images (fails if no
+    --docker  force a real `docker build` of all three images (fails if no
               daemon is reachable)
     --keep    leave the temp clone in place for inspection
 """
@@ -182,41 +182,28 @@ def check_build_inputs(ctx: Path) -> None:
         if not (ctx / rel).exists():
             problems.append(f"rust: {rel} absent (cargo test reads it)")
 
-    # Java: the entrypoint reads $IAP_CONFIG_DIR (default /app/configs) and
-    # /golden/events_eq_mbo.jsonl and /app/baselines.
+    # Python: `python -m iap.metrics serve` reads $IAP_CONFIG_DIR/risk/risk.json
+    # and `python -m iap.mvp run` the MVP config plus the references it names
+    # (configs/mvp/*, configs/strategies/alpha_params.json,
+    # research/alpha_registry.json, all COPYed by Dockerfile.python).
     for rel in [
         "configs/risk/risk.json",
+        "configs/mvp/mvp.json",
         "configs/strategies/alpha_params.json",
-        "tests/golden/events_eq_mbo.jsonl",
-        "research/baselines",
+        "research/alpha_registry.json",
+        "python/src/iap/metrics/__main__.py",
     ]:
         if not (ctx / rel).exists():
-            problems.append(f"java: {rel} absent (the entrypoint reads it)")
+            problems.append(f"python: {rel} absent (the entrypoints read it)")
 
     # The context must NOT carry host build state: that is the CMakeCache bug.
-    for rel in ["cpp/build", "rust/target", "archive/java/out"]:
+    for rel in ["cpp/build", "rust/target"]:
         if (ctx / rel).exists():
             problems.append(f"{rel} leaked into the build context (.dockerignore must exclude it)")
     record(
         "build_and_runtime_inputs_present",
         not problems,
-        "; ".join(problems) or "cpp / rust / java inputs resolve",
-    )
-
-
-def check_java_build_stage(ctx: Path) -> None:
-    """Actually run the Java image's build-stage command in the clean checkout."""
-    if not shutil.which("javac"):
-        record("java_build_stage_runs", True, "javac absent — skipped")
-        return
-    proc = run(["bash", "build.sh"], cwd=ctx / "archive" / "java", timeout=900)
-    ok = proc.returncode == 0 and (ctx / "archive" / "java" / "out" / "main").is_dir()
-    record(
-        "java_build_stage_runs",
-        ok,
-        (proc.stdout + proc.stderr).strip()[-400:]
-        if not ok
-        else "javac -Xlint:all -Werror clean in a fresh clone",
+        "; ".join(problems) or "cpp / rust / python inputs resolve",
     )
 
 
@@ -236,7 +223,7 @@ def check_real_docker_build(force: bool) -> None:
                 "the substitute (see this script's docstring)",
             )
         return
-    for df in ["Dockerfile.python", "Dockerfile.java", "Dockerfile.cpp", "Dockerfile.rust"]:
+    for df in ["Dockerfile.python", "Dockerfile.cpp", "Dockerfile.rust"]:
         tag = "iap/check-" + df.split(".")[1].lower() + ":harness"
         proc = run(
             ["docker", "build", "-f", f"deployment/docker/{df}", "-t", tag, "."],
@@ -250,7 +237,7 @@ def check_real_docker_build(force: bool) -> None:
                 f"{df}: {(proc.stdout + proc.stderr).strip()[-600:]}",
             )
             return
-    record("docker_build_all_images", True, "4 images built")
+    record("docker_build_all_images", True, "3 images built")
 
 
 def main() -> int:
@@ -268,7 +255,6 @@ def main() -> int:
         )
         check_copy_sources(ctx)
         check_build_inputs(ctx)
-        check_java_build_stage(ctx)
         check_real_docker_build(force_docker)
     finally:
         if keep:

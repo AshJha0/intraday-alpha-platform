@@ -25,7 +25,22 @@ data:
     #   - staleness is judged on EVENT time (md_event_time_gap_seconds), which is\n#     correct in replay\
     \ and live alike; wall-clock budgets are scoped to\n#     `platform_mode{mode=\"realtime\"}`.\n#\n\
     # Validated by `promtool check rules` and unit-tested by\n# `promtool test rules deployment/prometheus/tests/*.yml`,\
-    \ both run by\n# tests/harness/check_deployment.py (and CI).\n# =============================================================================\n\
+    \ both run by\n# tests/harness/check_deployment.py (and CI).\n#\n# RETIRED with the Java platform\
+    \ image (v1.17 WS-F item F9, DECISION_N7).\n# The producer is now the Python platform-metrics process\n\
+    # (python/src/iap/metrics/exporter.py). Every rule below reads a metric it\n# exports; the rules whose\
+    \ only inputs were Java-only metrics were removed\n# rather than left evaluating to empty (\xA712.7\
+    \ \"no aspirational targets\").\n# The exporter still exposes each retired name as `<name>_available\
+    \ 0`, so\n# the retirement is visible at the scrape. Removed alerts -> Java metric:\n#   BookStale\
+    \                  book_stale\n#   StaleFeed                  md_event_time_gap_seconds\n#   LiveVsBacktestDrift\
+    \        alpha_live_vs_backtest_drift (DriftMonitor PSI)\n#   AlphaLifecycleRetired      alpha_lifecycle_state\
+    \ (LifecycleGauge)\n#   RoutedVenueMismatch        risk_routed_venue_mismatch_total\n#   KillPendingNotRecorded\
+    \     exec_orders_blocked_kill_pending_total\n#   ResumeReleasedOpenOrders   risk_resume_open_orders_released_total\n\
+    #   GcPauseHigh                jvm_gc_pause_ns (there is no JVM)\n#   SessionRestartsClimbing    risk_session_restarts_total\
+    \ (no --resume)\n#   AdminAuthRateLimited       admin_auth_rate_limited_total (no admin API)\n#  \
+    \ AdminAuditSuppressed       admin_audit_suppressed_total (no admin API)\n#   EventPathLatencySLO*Burn\
+    \   book_update_latency_ns (slo.yml)\n# The recording rules on decode_latency_ns, book_update_latency_ns,\n\
+    # exec_slippage_bps and jvm_gc_pause_ns went with them (recording.yml), and\n# so did the Grafana\
+    \ panels built on those names (deployment/grafana/).\n# =============================================================================\n\
     \ngroups:\n  - name: iap-market-data-health\n    rules:\n      # A single sequence gap marks the book\
     \ stale and fail-closes the risk\n      # engine (configs/risk/risk.json market_data.max_sequence_gap_before_halt\
     \ = 1),\n      # so ANY gap is the incident \u2014 a rate threshold would miss the one gap\n     \
@@ -38,38 +53,19 @@ data:
     \ book is marked stale and the risk engine rejects orders\n            against it until a SNAPSHOT\
     \ recovers the stream. Check book_stale\n            for the instrument. Runbook:\n            docs/runbooks/RUNBOOK_data_pipeline.md#sequence-gaps\n\
     \          runbook: docs/runbooks/RUNBOOK_data_pipeline.md\n          runbook_url: docs/runbooks/RUNBOOK_data_pipeline.md\n\
-    \n      # Book stale (the consequence of a gap or a venue drop) is its own\n      # signal: it can\
-    \ persist for a whole session with no further gaps.\n      - alert: BookStale\n        expr: book_stale\
-    \ > 0\n        for: 2m\n        labels:\n          severity: critical\n          domain: market-data\n\
-    \        annotations:\n          summary: \"Book stale for instrument {{ $labels.instrument }} on\
-    \ {{ $labels.service }}\"\n          description: >-\n            A venue book has been stale for\
-    \ 2m \u2014 no SNAPSHOT recovery after a\n            sequence gap or a venue disconnect. Trading\
-    \ in that instrument is\n            fail-closed (STALE_PRICE / SEQUENCE_GAP rejects). Runbook:\n\
-    \            docs/runbooks/RUNBOOK_data_pipeline.md#stale-feed\n          runbook: docs/runbooks/RUNBOOK_data_pipeline.md\n\
-    \          runbook_url: docs/runbooks/RUNBOOK_data_pipeline.md\n\n      # Stale feed, judged on EVENT\
-    \ time: the gap between the last two\n      # consecutive processed events exceeded the configured\
-    \ staleness budget\n      # (configs/risk/risk.json market_data.stale_feed_timeout_ns = 5e9 ns). This\n\
-    \      # is the same quantity the risk engine uses, so the alert and the\n      # engine agree \u2014\
-    \ and it does NOT page on every historical replay the way\n      # `time() - md_last_event_unixtime`\
-    \ did.\n      - alert: StaleFeed\n        expr: md_event_time_gap_seconds > 5\n        for: 1m\n \
-    \       labels:\n          severity: page\n          domain: market-data\n        annotations:\n \
-    \         summary: \"Stale market-data feed on {{ $labels.service }} ({{ $value | printf \\\"%.1f\\\
-    \" }}s event-time gap)\"\n          description: >-\n            The gap between consecutive market\
-    \ events exceeded the 5s\n            staleness budget (risk.json stale_feed_timeout_ns). The risk\n\
-    \            engine rejects orders against stale books (fail-closed); verify\n            feed handlers\
-    \ and venue connectivity. Runbook:\n            docs/runbooks/RUNBOOK_data_pipeline.md#stale-feed\n\
-    \          runbook: docs/runbooks/RUNBOOK_data_pipeline.md\n          runbook_url: docs/runbooks/RUNBOOK_data_pipeline.md\n\
     \n      # Wall-clock liveness of the feed, scoped to a PACED (realtime) session:\n      # a wedged\
     \ decoder thread stops advancing md_last_event_wallclock_unixtime\n      # even though event time\
     \ never moves either. Inhibited for replay\n      # (`asap`) sessions, whose wall-clock pacing is\
-    \ meaningless.\n      - alert: FeedWallClockStall\n        expr: >\n          (time() - md_last_event_wallclock_unixtime)\
-    \ > 60\n          and on (job, instance) platform_mode{mode=\"realtime\"} == 1\n          and on (job,\
-    \ instance) platform_session_state == 1\n        for: 1m\n        labels:\n          severity: page\n\
-    \          domain: market-data\n        annotations:\n          summary: \"No market event processed\
-    \ for {{ $value | humanizeDuration }} on {{ $labels.service }}\"\n          description: >-\n    \
-    \        A running realtime session has not processed an event in over a\n            minute of wall\
-    \ clock \u2014 a wedged decode/trading thread or a dead\n            upstream. /health returns 503\
-    \ after 30s of no progress. Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#feed-stall\n\
+    \ meaningless \u2014 the Python\n      # MVP session is always `asap`, so this rule is armed but silent\
+    \ until a\n      # paced Python session exists (kept: its inputs are all exported).\n      - alert:\
+    \ FeedWallClockStall\n        expr: >\n          (time() - md_last_event_wallclock_unixtime) > 60\n\
+    \          and on (job, instance) platform_mode{mode=\"realtime\"} == 1\n          and on (job, instance)\
+    \ platform_session_state == 1\n        for: 1m\n        labels:\n          severity: page\n      \
+    \    domain: market-data\n        annotations:\n          summary: \"No market event processed for\
+    \ {{ $value | humanizeDuration }} on {{ $labels.service }}\"\n          description: >-\n        \
+    \    A running realtime session has not processed an event in over a\n            minute of wall clock\
+    \ \u2014 a wedged decode/trading thread or a dead\n            upstream. /health returns 503 after\
+    \ 30s of no progress. Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#feed-stall\n\
     \          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
     \n  - name: iap-alpha-health\n    rules:\n      # Signal-rate collapse: alpha engine emitting far\
     \ below its trailing\n      # baseline while market data still flows.\n      - alert: SignalRateCollapse\n\
@@ -82,46 +78,20 @@ data:
     \ `offset 1h`\n            baselines are only meaningful for a continuously running feed\n       \
     \     (RUNBOOK_shadow_deployment.md \xA71). Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#signal-rate\n\
     \          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
-    \n      # Live-vs-backtest drift (LIVE from java: com.iap.adaptive.DriftMonitor\n      # via com.iap.platform.PaperTrading,\
-    \ labeled {alpha=\"...\"}). The\n      # statistic is the pinned Population Stability Index of the\
-    \ rolling\n      # live signal window vs the research baseline (API_ADAPTIVE.md /\n      # research/baselines/*.json):\
-    \ 10 baseline-quantile buckets,\n      # sum((live-base)*ln(live/base)), fractions floored at 1e-6.\n\
-    \      # Threshold 0.25 is the standard industry PSI rule of thumb\n      # (< 0.1 stable, 0.1-0.25\
-    \ moderate, > 0.25 significant shift) \u2014\n      # see deployment/grafana/README.md.\n      - alert:\
-    \ LiveVsBacktestDrift\n        expr: alpha_live_vs_backtest_drift > 0.25\n        for: 30m\n     \
-    \   labels:\n          severity: warning\n          domain: alpha\n        annotations:\n        \
-    \  summary: \"Live signal PSI drift on {{ $labels.alpha }} ({{ $value | printf \\\"%.2f\\\" }})\"\n\
-    \          description: >-\n            Live signal distribution for {{ $labels.alpha }} has PSI >\
-    \ 0.25\n            vs its backtest baseline for 30m \u2014 a significant shift under the\n      \
-    \      industry rule of thumb. NOTE the lifecycle gauge\n            (alpha_lifecycle_state) is IC-gated,\
-    \ NOT PSI-gated, and is\n            OBSERVATIONAL in the live loop: a RETIRED alpha keeps trading\
-    \ at\n            full size until a human acts (API_ADAPTIVE.md \xA76,\n            PLATFORM_CONVENTIONS.md\
-    \ \xA712.6). Persistent drift is a retirement\n            trigger per spec \xA720 step 13 \u2014\
-    \ raise it with research.\n            Runbook: docs/runbooks/RUNBOOK_shadow_deployment.md#drift\n\
-    \          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
-    \n      # The lifecycle gauge is observational, so RETIRED must page a human:\n      # nothing in\
-    \ the platform stops the allocation on its own.\n      - alert: AlphaLifecycleRetired\n        expr:\
-    \ alpha_lifecycle_state >= 2\n        for: 15m\n        labels:\n          severity: warning\n   \
-    \       domain: alpha\n        annotations:\n          summary: \"Alpha {{ $labels.alpha }} is RETIRED\
-    \ by the lifecycle gauge\"\n          description: >-\n            The IC-gated lifecycle state machine\
-    \ has marked {{ $labels.alpha }}\n            RETIRED (rolling IC below watch_ic_gate for retire_breach_evals\n\
-    \            consecutive evaluations). The live loop does NOT halt allocation\n            on this\
-    \ signal \u2014 it is observational \u2014 so the position must be\n            reduced by a human\
-    \ decision. Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#lifecycle\n         \
-    \ runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
     \n  - name: iap-execution\n    rules:\n      # Fill rate over the PLATFORM's own execution counters\
-    \ (exec_*, exported\n      # by com.iap.platform.PaperTrading \u2014 PLATFORM_CONVENTIONS.md \xA7\
-    12.6).\n      # The previous version divided venue-simulator counters that no deployed\n      # component\
-    \ ever wrote, so it could never fire.\n      - alert: FillRateDrop\n        expr: >\n          job:exec_fill_rate:ratio5m\
-    \ < 0.5 * (job:exec_fill_rate:ratio5m offset 1h)\n          and job:exec_orders:rate5m > 0.1\n   \
-    \     for: 10m\n        labels:\n          severity: critical\n          domain: execution\n     \
-    \   annotations:\n          summary: \"Fill rate dropped on {{ $labels.service }} ({{ $value | humanizePercentage\
-    \ }})\"\n          description: >-\n            Fills per submitted child order below half their 1h-ago\
-    \ baseline\n            while orders are flowing \u2014 queue-position model, venue health or\n  \
-    \          adverse regime shift. Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#fill-rate\n\
-    \          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
-    \n      # Pre-trade rejects are normal in small numbers; a sustained majority\n      # means the strategy\
-    \ is fighting a limit (or a stale book).\n      - alert: PreTradeRejectRatioHigh\n        expr: job:risk_rejected:ratio5m\
+    \ (exec_*, exported\n      # by the platform-metrics process from the MVP run's report.json \u2014\
+    \n      # PLATFORM_CONVENTIONS.md \xA712.6).\n      # The previous version divided venue-simulator\
+    \ counters that no deployed\n      # component ever wrote, so it could never fire.\n      - alert:\
+    \ FillRateDrop\n        expr: >\n          job:exec_fill_rate:ratio5m < 0.5 * (job:exec_fill_rate:ratio5m\
+    \ offset 1h)\n          and job:exec_orders:rate5m > 0.1\n        for: 10m\n        labels:\n    \
+    \      severity: critical\n          domain: execution\n        annotations:\n          summary: \"\
+    Fill rate dropped on {{ $labels.service }} ({{ $value | humanizePercentage }})\"\n          description:\
+    \ >-\n            Fills per submitted child order below half their 1h-ago baseline\n            while\
+    \ orders are flowing \u2014 queue-position model, venue health or\n            adverse regime shift.\
+    \ Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#fill-rate\n          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
+    \          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\n      # Pre-trade rejects are\
+    \ normal in small numbers; a sustained majority\n      # means the strategy is fighting a limit (or\
+    \ a stale book).\n      - alert: PreTradeRejectRatioHigh\n        expr: job:risk_rejected:ratio5m\
     \ > 0.5\n        for: 10m\n        labels:\n          severity: warning\n          domain: execution\n\
     \        annotations:\n          summary: \"{{ $value | humanizePercentage }} of pre-trade checks\
     \ rejected on {{ $labels.service }}\"\n          description: >-\n            More than half of all\
@@ -156,121 +126,42 @@ data:
     \ }} of the limit\"\n          description: >-\n            Gross exposure has been above 90% of global.max_gross_notional\
     \ for\n            5m; the next sizing decision will be rejected by the pre-trade\n            check.\
     \ Runbook: docs/runbooks/RUNBOOK_shadow_deployment.md#exposure\n          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
-    \          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\n      # A child order left for\
-    \ a venue other than the one the pre-trade check\n      # approved (PaperTrading.RiskWiring.onOrderSubmitted).\
-    \ The platform\n      # cancels the child and counts it; the counter is created on the first\n   \
-    \   # occurrence and never decreases, so `> 0` holds for the rest of the\n      # process \u2014 a\
-    \ wiring defect stays visible until someone restarts.\n      - alert: RoutedVenueMismatch\n      \
-    \  expr: risk_routed_venue_mismatch_total > 0\n        for: 0m\n        labels:\n          severity:\
-    \ page\n          domain: risk\n        annotations:\n          summary: \"{{ $value | printf \\\"\
-    %.0f\\\" }} child order(s) routed to a venue the risk check did not approve on {{ $labels.service\
-    \ }}\"\n          description: >-\n            A child order was submitted to a venue other than the\
-    \ one named\n            in its pre-trade risk request, so a venue kill or disconnect was\n      \
-    \      checked against the wrong venue. The child was cancelled\n            (fail-closed), but this\
-    \ is a routing/risk wiring defect, not a\n            market event: engage the kill switch and investigate.\
-    \ Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#routed-venue-mismatch\n       \
-    \   runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
-    \n      # An admin kill is accepted (latched in AdminService) before the risk\n      # engine records\
-    \ it; the order path withholds every order meanwhile and\n      # counts each one. One or two withheld\
-    \ orders are the normal race. A\n      # counter that keeps climbing for minutes means the kill is\
-    \ still not\n      # in the risk engine \u2014 so not in the snapshot a restart would restore.\n \
-    \     - alert: KillPendingNotRecorded\n        expr: increase(exec_orders_blocked_kill_pending_total[2m])\
-    \ > 0\n        for: 3m\n        labels:\n          severity: critical\n          domain: risk\n  \
-    \      annotations:\n          summary: \"Orders withheld for a pending admin kill for over 3m on\
-    \ {{ $labels.service }}\"\n          description: >-\n            Orders have been withheld for more\
-    \ than 3m because an admin kill\n            was accepted (202) but the risk engine has not recorded\
-    \ it. No\n            new order is being sent, but the latch is not yet in the risk\n            snapshot\
-    \ and would not survive a restart. Do NOT restart; verify\n            the halt and the admin audit\
-    \ first. Runbook:\n            docs/runbooks/RUNBOOK_incident_kill_switch.md#kill-pending\n      \
-    \    runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md\n\
-    \n      # --resume released open orders the restored risk snapshot still\n      # tracked (the simulator\
-    \ that held them is gone). The counter is set\n      # once at resume, so the alert stays up for the\
-    \ life of that process.\n      - alert: ResumeReleasedOpenOrders\n        expr: risk_resume_open_orders_released_total\
-    \ > 0\n        for: 0m\n        labels:\n          severity: warning\n          domain: risk\n   \
-    \     annotations:\n          summary: \"Resume released {{ $value | printf \\\"%.0f\\\" }} orphaned\
-    \ open order(s) on {{ $labels.service }}\"\n          description: >-\n            The session resumed\
-    \ from a checkpoint whose risk snapshot tracked\n            open child orders; they no longer exist\
-    \ in the execution\n            simulator and were released so they do not inflate position\n    \
-    \        projections. Positions and realized P&L are restored, the\n            working orders are\
-    \ not: reconcile before trusting the session.\n            The alert stays up until the process ends.\
-    \ Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#resume-released-orders\n      \
-    \    runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
-    \n  - name: iap-infrastructure\n    rules:\n      # GC pause: p99 pause above 10ms breaks the order-path\
-    \ latency budget.\n      # NOTE under ZGC the MX bean reports concurrent-cycle time rather than\n\
-    \      # stop-the-world pause time (deployment/grafana/README.md).\n      - alert: GcPauseHigh\n \
-    \       expr: job:jvm_gc_pause_ns:p99 > 10e6\n        for: 5m\n        labels:\n          severity:\
-    \ warning\n          domain: infrastructure\n        annotations:\n          summary: \"JVM p99 GC\
-    \ pause {{ $value | humanize }}ns on {{ $labels.job }}\"\n          description: >-\n            p99\
-    \ GC pause above 10ms for 5m; check heap sizing / allocation rate\n            on hot paths (spec\
-    \ \xA723: allocation-conscious Java).\n            Runbook: docs/runbooks/RUNBOOK_backtest.md#jvm\n\
-    \          runbook: docs/runbooks/RUNBOOK_backtest.md\n          runbook_url: docs/runbooks/RUNBOOK_backtest.md\n\
-    \n      # The session aborted (config load, decode or accounting failure). The\n      # process exits\
-    \ non-zero and `restart: on-failure` retries it.\n      - alert: PlatformSessionFailed\n        expr:\
-    \ platform_session_state == 3\n        for: 0m\n        labels:\n          severity: page\n      \
-    \    domain: infrastructure\n        annotations:\n          summary: \"Paper-trading session FAILED\
-    \ on {{ $labels.service }}\"\n          description: >-\n            platform_session_state = 3 (FAILED).\
-    \ /health is 503 with the\n            reason; the container exits non-zero. Check the pod logs and\n\
-    \            <state-dir>/config_audit.jsonl. Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#failed-session\n\
+    \          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\n  - name: iap-infrastructure\n\
+    \    rules:\n\n      # The session aborted (config load, decode or accounting failure). The\n    \
+    \  # process exits non-zero and `restart: on-failure` retries it.\n      - alert: PlatformSessionFailed\n\
+    \        expr: platform_session_state == 3\n        for: 0m\n        labels:\n          severity:\
+    \ page\n          domain: infrastructure\n        annotations:\n          summary: \"Paper-trading\
+    \ session FAILED on {{ $labels.service }}\"\n          description: >-\n            platform_session_state\
+    \ = 3 (FAILED): the session process exited\n            non-zero (python -m iap.metrics run-session\
+    \ wrote the marker).\n            Check the session container's logs. Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#failed-session\n\
     \          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
     \n      # A STOPPED session (value 4: a stop was requested, the session\n      # checkpointed mid-stream\
     \ and exited 0) that nobody resumed. The\n      # trading process exits right after the checkpoint,\
     \ so its own gauge is\n      # almost never scraped at 4. The trading thread therefore also persists\n\
-    \      # how the session ended (session_exit.json) and the java-platform-state\n      # exporter (a\
-    \ sidecar / second compose service, same image) serves it as\n      # platform_persisted_session_state\
+    \      # how the session ended (session_exit.json) and the platform-metrics\n      # exporter (python\
+    \ -m iap.metrics serve, which outlives it) serves it as\n      # platform_persisted_session_state\
     \ for as long as the state volume\n      # exists. The alert fires on a persisted 4 unless a live\
     \ trading process\n      # reports RUNNING again (the resume window before the marker is\n      #\
     \ rewritten). A FINISHED session persists 2 and a crash leaves 1, so\n      # neither fires this;\
-    \ a crash is TargetDown on java-platform\n      # (RUNBOOK_shadow_deployment.md#stopped-session).\n\
+    \ a crash of the exporter is TargetDown on platform-metrics\n      # (RUNBOOK_shadow_deployment.md#stopped-session).\n\
     \      - alert: SessionStoppedNotResumed\n        expr: >-\n          platform_persisted_session_state\
     \ == 4\n          unless on(service) (platform_session_state == 1)\n        for: 10m\n        labels:\n\
     \          severity: warning\n          domain: infrastructure\n        annotations:\n          summary:\
     \ \"Paper-trading session STOPPED and not resumed on {{ $labels.service }}\"\n          description:\
     \ >-\n            The persisted session state is 4 (STOPPED) and no running\n            session has\
-    \ reported for 10m. The session checkpointed\n            mid-stream and exited 0, so nothing restarts\
-    \ it; positions are\n            as the checkpoint left them. Resume it with --resume or record\n\
-    \            why it stays down. The alert clears when a resumed session\n            starts (the persisted\
-    \ state becomes 1) or finishes (2). Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#stopped-session\n\
-    \          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
-    \n      # An unexpected restart re-reads the checkpoint; a burst of restarts is\n      # a crash loop\
-    \ (and each one re-warms the book from the stream).\n      - alert: SessionRestartsClimbing\n    \
-    \    expr: increase(risk_session_restarts_total[15m]) > 2\n        for: 0m\n        labels:\n    \
-    \      severity: warning\n          domain: infrastructure\n        annotations:\n          summary:\
-    \ \"{{ $value | printf \\\"%.0f\\\" }} session restarts in 15m on {{ $labels.service }}\"\n      \
-    \    description: >-\n            The platform resumed from its checkpoint more than twice in 15m.\n\
-    \            Risk state survives (positions, realized P&L, latches), but the\n            book and\
-    \ feature warm-up restart from the stream each time.\n            Runbook: docs/runbooks/RUNBOOK_shadow_deployment.md#restart-recovery\n\
-    \          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
+    \ reported for 10m. The session process was\n            interrupted and nothing restarted it. Rerun\
+    \ the session (the\n            MVP loop is deterministic) or record why it stays down. The\n    \
+    \        alert clears when a new session starts (the persisted state\n            becomes 1) or finishes\
+    \ (2). Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#stopped-session\n        \
+    \  runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
     \n      # A scrape target disappearing is itself an incident. Every job in\n      # prometheus.yml\
     \ is a target that really exists (\xA712.7), so this can\n      # only fire on a real outage.\n  \
     \    - alert: TargetDown\n        expr: up == 0\n        for: 2m\n        labels:\n          severity:\
     \ critical\n          domain: infrastructure\n        annotations:\n          summary: \"Scrape target\
     \ {{ $labels.job }}/{{ $labels.instance }} down\"\n          description: >-\n            Prometheus\
-    \ cannot scrape {{ $labels.instance }}. If this is\n            java-platform during a trading session,\
+    \ cannot scrape {{ $labels.instance }}. If this is\n            platform-metrics during a session,\
     \ treat as a platform\n            incident. Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n\
     \          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md\n\
-    \n  # The admin (kill-switch) API. Both counters are created on their first\n  # increment, so `increase()`\
-    \ alone misses the first occurrence: the second\n  # arm fires while the series is younger than the\
-    \ window.\n  - name: iap-admin-api\n    rules:\n      - alert: AdminAuthRateLimited\n        expr:\
-    \ >\n          increase(admin_auth_rate_limited_total[10m]) > 0\n          or (admin_auth_rate_limited_total\
-    \ > 0\n              unless admin_auth_rate_limited_total offset 10m)\n        for: 0m\n        labels:\n\
-    \          severity: critical\n          domain: admin\n        annotations:\n          summary: \"\
-    Admin API is rate-limiting failed authentications on {{ $labels.service }}\"\n          description:\
-    \ >-\n            More than 10 failed authentications reached the admin API within\n            one\
-    \ 60s window, so further failures answer 429. Either a client\n            holds a wrong or rotated\
-    \ token, or the port is being probed. A\n            request with a valid token is never rate-limited,\
-    \ so the kill\n            switch stays usable. Read <state-dir>/admin_audit.jsonl for the\n     \
-    \       remote addresses. Runbook:\n            docs/runbooks/RUNBOOK_incident_kill_switch.md#admin-auth-abuse\n\
-    \          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md\n\
-    \n      - alert: AdminAuditSuppressed\n        expr: >\n          increase(admin_audit_suppressed_total[10m])\
-    \ > 0\n          or (admin_audit_suppressed_total > 0\n              unless admin_audit_suppressed_total\
-    \ offset 10m)\n        for: 0m\n        labels:\n          severity: warning\n          domain: admin\n\
-    \        annotations:\n          summary: \"Rejected admin requests are no longer individually audited\
-    \ on {{ $labels.service }}\"\n          description: >-\n            Rejected admin requests exceeded\
-    \ the per-window audit cap, so\n            the remainder were counted and summarised (one audit_summary\n\
-    \            line per window) instead of audited one by one. Accepted\n            requests are always\
-    \ audited. Find the source of the rejected\n            traffic in <state-dir>/admin_audit.jsonl.\
-    \ Runbook:\n            docs/runbooks/RUNBOOK_incident_kill_switch.md#admin-auth-abuse\n         \
-    \ runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md\n\
     \n  # Heartbeat: fires permanently by design. Alertmanager routes it to the\n  # `watchdog` receiver\
     \ (deployment/alertmanager/alertmanager.yml); an external\n  # dead-man's-switch on that receiver\
     \ turns \"this stopped arriving\" into the\n  # page, which proves rule evaluation, Alertmanager and\
@@ -282,46 +173,42 @@ data:
     \    runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md\n          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md\n"
   prometheus.yml: "# =============================================================================\n#\
     \ prometheus.yml \u2014 Intraday Alpha Platform scrape configuration (spec \xA725)\n#\n# ONE source\
-    \ of metrics today: the Java platform (com.iap.monitoring registry\n# served by com.iap.api.MetricsServer)\
-    \ on port 8080, GET /metrics, Prometheus\n# text exposition \u2014 plus Prometheus's own self-scrape.\n\
-    #\n# The `rust-telemetry` file-SD job was REMOVED (round-3 PLATFORM finding\n# SEV-2): no Rust component\
-    \ ever wrote /data/telemetry/rust.prom, so the\n# target was permanently down, `TargetDown` (critical)\
-    \ fired continuously, and\n# every rule/panel built on venue_* was empty. Execution monitoring now\
-    \ comes\n# from the platform's own exec_* counters (PLATFORM_CONVENTIONS.md \xA712.6);\n# deployment/grafana/README.md\
-    \ records what is scraped today. Re-add a job\n# here only together with a producer that actually\
-    \ writes the metrics.\n#\n# Metric-name conventions (see deployment/grafana/README.md for the full\n\
-    # mapping): snake_case, counters end in _total, latency histograms end in _ns\n# (fixed log2 buckets:\
-    \ _bucket{le=\"2^i - 1\"}, powers of two in nanoseconds).\n# =============================================================================\n\
+    \ of metrics: the Python platform-metrics process\n# (`python -m iap.metrics serve`, python/src/iap/metrics/)\
+    \ on port 8080,\n# GET /metrics, Prometheus text exposition \u2014 plus Prometheus's own\n# self-scrape.\
+    \ v1.17 (WS-F item F9, DECISION_N7): it replaces the Java\n# platform's com.iap.api.MetricsServer\
+    \ and the java-platform-state exporter\n# (both served by the retired java image); the persisted session\
+    \ state is\n# served from the same port, so the second job is gone.\n#\n# The `rust-telemetry` file-SD\
+    \ job was REMOVED (round-3 PLATFORM finding\n# SEV-2): no Rust component ever wrote /data/telemetry/rust.prom,\
+    \ so the\n# target was permanently down, `TargetDown` (critical) fired continuously, and\n# every\
+    \ rule/panel built on venue_* was empty. Execution monitoring comes\n# from the platform's own exec_*\
+    \ counters (PLATFORM_CONVENTIONS.md \xA712.6);\n# deployment/grafana/README.md records what is scraped\
+    \ today. Re-add a job\n# here only together with a producer that actually writes the metrics.\n#\n\
+    # Metric-name conventions (see deployment/grafana/README.md for the full\n# mapping): snake_case,\
+    \ counters end in _total, latency histograms end in _ns\n# (fixed log2 buckets: _bucket{le=\"2^i -\
+    \ 1\"}, powers of two in nanoseconds).\n# =============================================================================\n\
     \nglobal:\n  scrape_interval: 15s\n  evaluation_interval: 15s\n  external_labels:\n    platform: intraday-alpha\n\
     \    env: local\n\nrule_files:\n  - /etc/prometheus/recording.yml\n  - /etc/prometheus/alerts.yml\n\
     \  - /etc/prometheus/slo.yml\n\n# Alert delivery: Alertmanager (deployment/alertmanager/). The same\
     \ hostname\n# resolves in docker-compose (service name) and Kubernetes (Service name).\nalerting:\n\
     \  alertmanagers:\n    - static_configs:\n        - targets: [\"alertmanager:9093\"]\n\nscrape_configs:\n\
-    \  # Java platform monitoring API (port 8080, /metrics \u2014 LIVE, served by\n  # com.iap.api.MetricsServer).\n\
-    \  - job_name: java-platform\n    metrics_path: /metrics\n    static_configs:\n      - targets: [\"\
-    java-platform:8080\"]\n        labels:\n          service: java-platform\n          language: java\n\
-    \n  # Last persisted session state (session_exit.json), served by a process\n  # that outlives the\
-    \ trading JVM (com.iap.platform.SessionStateExporter, same\n  # image): compose service / k8s sidecar\
-    \ + Service `java-platform-state`.\n  # This is what makes a clean STOPPED observable after the JVM\
-    \ has exited\n  # (alerts.yml SessionStoppedNotResumed). It carries the same `service`\n  # label\
-    \ as the trading target so the alert can tell \"stopped\" from\n  # \"resumed\".\n  - job_name: java-platform-state\n\
-    \    metrics_path: /metrics\n    static_configs:\n      - targets: [\"java-platform-state:9102\"]\n\
-    \        labels:\n          service: java-platform\n          language: java\n\n  # Prometheus self-scrape\
-    \ (rule/alert health).\n  - job_name: prometheus\n    static_configs:\n      - targets: [\"localhost:9090\"\
-    ]\n        labels:\n          service: prometheus\n"
+    \  # The Python platform-metrics process (port 8080, /metrics \u2014 LIVE, served\n  # by `python\
+    \ -m iap.metrics serve`): the live risk limits, the session\n  # marker (platform_persisted_session_state)\
+    \ and the newest MVP run.\n  - job_name: platform-metrics\n    metrics_path: /metrics\n    static_configs:\n\
+    \      - targets: [\"platform-metrics:8080\"]\n        labels:\n          service: platform-metrics\n\
+    \          language: python\n\n  # Prometheus self-scrape (rule/alert health).\n  - job_name: prometheus\n\
+    \    static_configs:\n      - targets: [\"localhost:9090\"]\n        labels:\n          service: prometheus\n"
   recording.yml: "# =============================================================================\n# recording.yml\
-    \ \u2014 precomputed rates and tail-latency quantiles (spec \xA722/\xA725)\n#\n# Histogram note: the\
-    \ live Java monitoring endpoint (com.iap.api.MetricsServer)\n# exposes fixed log2 histograms \u2014\
-    \ bucket upper bounds are 0, 1, 3, 7, ...,\n# 2^i - 1 nanoseconds. histogram_quantile therefore returns\
-    \ a value within one\n# power of two ABOVE the true order statistic (conservative for latency);\n\
-    # benchmarks/RESULTS.md holds the exact offline numbers.\n# Naming: level:metric:operation per Prometheus\
-    \ recording-rule conventions.\n#\n# Every rule here reads a metric the deployment actually exports\n\
-    # (PLATFORM_CONVENTIONS.md \xA712.6 / \xA712.7 \"no aspirational targets\"). Rules for\n# metrics\
-    \ with no producer \u2014 the rust venue-simulator counters and\n# md_out_of_order_total \u2014 were\
-    \ removed rather than left evaluating to empty\n# (see deployment/grafana/README.md \"what is scraped\
-    \ today\").\n# =============================================================================\n\ngroups:\n\
-    \  - name: iap-event-rates\n    interval: 15s\n    rules:\n      # Market-data event throughput (events/sec).\n\
-    \      - record: job:md_events:rate5m\n        expr: sum by (job, service) (rate(md_events_total[5m]))\n\
+    \ \u2014 precomputed rates and tail-latency quantiles (spec \xA722/\xA725)\n#\n# Naming: level:metric:operation\
+    \ per Prometheus recording-rule conventions.\n#\n# Every rule here reads a metric the deployment actually\
+    \ exports\n# (PLATFORM_CONVENTIONS.md \xA712.6 / \xA712.7 \"no aspirational targets\"): the\n# Python\
+    \ platform-metrics process (python/src/iap/metrics/exporter.py).\n# Rules for metrics with no producer\
+    \ were removed rather than left\n# evaluating to empty: the rust venue-simulator counters and\n# md_out_of_order_total\
+    \ (round 3), and with the Java image (v1.17 F9) the\n# log2-histogram quantiles of decode_latency_ns,\
+    \ book_update_latency_ns,\n# exec_slippage_bps and jvm_gc_pause_ns \u2014 the Python exporter reads\
+    \ the MVP\n# run's report.json, which carries latency percentiles, not the raw samples\n# a histogram\
+    \ needs (deployment/grafana/README.md \"what is scraped today\").\n# =============================================================================\n\
+    \ngroups:\n  - name: iap-event-rates\n    interval: 15s\n    rules:\n      # Market-data event throughput\
+    \ (events/sec).\n      - record: job:md_events:rate5m\n        expr: sum by (job, service) (rate(md_events_total[5m]))\n\
     \n      # Sequence-gap / duplicate rates (per second). NOTE the alert on gaps is\n      # `increase(...)\
     \ > 0`, not a rate: one gap halts trading.\n      - record: job:md_sequence_gaps:rate5m\n        expr:\
     \ sum by (job, service) (rate(md_sequence_gaps_total[5m]))\n      - record: job:md_duplicates:rate5m\n\
@@ -338,93 +225,58 @@ data:
     \ rejection ratio.\n      - record: job:risk_rejected:ratio5m\n        expr: >\n          sum by (job,\
     \ service) (rate(risk_rejected_total[5m]))\n          /\n          clamp_min(sum by (job, service)\
     \ (rate(risk_decisions_total[5m])), 1e-9)\n\n  - name: iap-latency-quantiles\n    interval: 15s\n\
-    \    rules:\n      # p50 / p99 / p999 for each hot-path histogram (nanoseconds).\n      # Market-data\
-    \ decode (LIVE from java: decode_latency_ns).\n      - record: job:decode_latency_ns:p50\n       \
-    \ expr: histogram_quantile(0.50, sum by (job, le) (rate(decode_latency_ns_bucket[5m])))\n      - record:\
-    \ job:decode_latency_ns:p99\n        expr: histogram_quantile(0.99, sum by (job, le) (rate(decode_latency_ns_bucket[5m])))\n\
-    \      - record: job:decode_latency_ns:p999\n        expr: histogram_quantile(0.999, sum by (job,\
-    \ le) (rate(decode_latency_ns_bucket[5m])))\n\n      # Order-book update.\n      - record: job:book_update_latency_ns:p50\n\
-    \        expr: histogram_quantile(0.50, sum by (job, le) (rate(book_update_latency_ns_bucket[5m])))\n\
-    \      - record: job:book_update_latency_ns:p99\n        expr: histogram_quantile(0.99, sum by (job,\
-    \ le) (rate(book_update_latency_ns_bucket[5m])))\n      - record: job:book_update_latency_ns:p999\n\
-    \        expr: histogram_quantile(0.999, sum by (job, le) (rate(book_update_latency_ns_bucket[5m])))\n\
-    \n      # Decision-to-wire order path (includes the pre-trade risk check).\n      - record: job:order_path_latency_ns:p50\n\
-    \        expr: histogram_quantile(0.50, sum by (job, le) (rate(order_path_latency_ns_bucket[5m])))\n\
-    \      - record: job:order_path_latency_ns:p99\n        expr: histogram_quantile(0.99, sum by (job,\
-    \ le) (rate(order_path_latency_ns_bucket[5m])))\n      - record: job:order_path_latency_ns:p999\n\
-    \        expr: histogram_quantile(0.999, sum by (job, le) (rate(order_path_latency_ns_bucket[5m])))\n\
-    \n      # Execution slippage |fill - mark|, basis points x100 (integer-scaled\n      # into the log2\
-    \ histogram; divide by 100 for bps).\n      - record: job:exec_slippage_bps_x100:p50\n        expr:\
-    \ histogram_quantile(0.50, sum by (job, le) (rate(exec_slippage_bps_bucket[5m])))\n      - record:\
-    \ job:exec_slippage_bps_x100:p99\n        expr: histogram_quantile(0.99, sum by (job, le) (rate(exec_slippage_bps_bucket[5m])))\n\
-    \n      # JVM GC pause (LIVE from java: jvm_gc_pause_ns, registered at the\n      # first observed\
-    \ pause).\n      - record: job:jvm_gc_pause_ns:p99\n        expr: histogram_quantile(0.99, sum by\
-    \ (job, le) (rate(jvm_gc_pause_ns_bucket[5m])))\n"
+    \    rules:\n\n      - record: job:order_path_latency_ns:p50\n        expr: histogram_quantile(0.50,\
+    \ sum by (job, le) (rate(order_path_latency_ns_bucket[5m])))\n      - record: job:order_path_latency_ns:p99\n\
+    \        expr: histogram_quantile(0.99, sum by (job, le) (rate(order_path_latency_ns_bucket[5m])))\n\
+    \      - record: job:order_path_latency_ns:p999\n        expr: histogram_quantile(0.999, sum by (job,\
+    \ le) (rate(order_path_latency_ns_bucket[5m])))\n"
   slo.yml: "# =============================================================================\n# slo.yml\
-    \ \u2014 latency SLOs with multi-window, multi-burn-rate alerts (v1.12.0,\n# plan P4; Google SRE Workbook\
-    \ ch. 5 \"Alerting on SLOs\").\n#\n# Source metrics: the log2 histograms com.iap.monitoring.MetricsRegistry\n\
-    # already exports (PLATFORM_CONVENTIONS.md \xA712.6) \u2014 bucket upper bounds are\n# 2^i - 1 ns,\
-    \ so an SLO threshold MUST be one of those bounds. Both SLOs use\n# le=\"1048575\" (2^20 - 1 ns ~=\
-    \ 1.05 ms): the nearest bound above the measured\n# cold p99 of the event path (<= 524,287 ns, benchmarks/RESULTS.md).\n\
-    #\n#   SLO                  objective                               metric\n#   order-path-latency\
-    \   99% of orders decision->wire < 1.05 ms   order_path_latency_ns\n#   event-path-latency   99% of\
-    \ events onEvent        < 1.05 ms   book_update_latency_ns\n#   window: 30 days rolling; error budget\
-    \ 1%.\n#\n# error ratio(W) = 1 - good(W) / total(W)\n#   good  = rate(<metric>_bucket{le=\"1048575\"\
-    }[W])\n#   total = rate(<metric>_count[W])\n# With no traffic the ratio is NaN and nothing fires (a\
-    \ finite paper session\n# that has ended is not an SLO breach; liveness alerts cover a dead feed).\n\
-    #\n# Burn-rate alerts (budget 0.01):\n#   *LatencySLOFastBurn  page     14.4x over 1h AND 5m   (2%\
-    \ of budget / 1h)\n#                                 6x    over 6h AND 30m  (5% of budget / 6h)\n\
-    #   *LatencySLOSlowBurn  warning  3x    over 1d AND 2h   (10% of budget / 1d)\n#                 \
-    \                1x    over 3d AND 6h   (10% of budget / 3d)\n# Alertmanager inhibits the warning\
-    \ while the page for the same `slo` and\n# `service` fires (deployment/alertmanager/alertmanager.yml).\n\
-    #\n# Caveat (documented, not hidden): the histograms are cumulative per JVM; a\n# restart resets them,\
-    \ which rate() handles. Clock-quantisation: a log2 bucket\n# means \"< 1.05 ms\" is exact at the bound\
-    \ \u2014 no interpolation is involved.\n# Unit tests: deployment/prometheus/tests/slo_test.yml (promtool,\
-    \ CI).\n# =============================================================================\n\ngroups:\n\
-    \  - name: iap-slo-order-path-latency-recording\n    interval: 30s\n    rules:\n      - record: job:order_path_latency_slo_errors:ratio_rate5m\n\
-    \        expr: >-\n          1 - (\n            sum by (job, service) (rate(order_path_latency_ns_bucket{le=\"\
-    1048575\"}[5m]))\n            /\n            sum by (job, service) (rate(order_path_latency_ns_count[5m]))\n\
-    \          )\n      - record: job:order_path_latency_slo_errors:ratio_rate30m\n        expr: >-\n\
-    \          1 - (\n            sum by (job, service) (rate(order_path_latency_ns_bucket{le=\"1048575\"\
-    }[30m]))\n            /\n            sum by (job, service) (rate(order_path_latency_ns_count[30m]))\n\
-    \          )\n      - record: job:order_path_latency_slo_errors:ratio_rate1h\n        expr: >-\n \
-    \         1 - (\n            sum by (job, service) (rate(order_path_latency_ns_bucket{le=\"1048575\"\
-    }[1h]))\n            /\n            sum by (job, service) (rate(order_path_latency_ns_count[1h]))\n\
-    \          )\n      - record: job:order_path_latency_slo_errors:ratio_rate2h\n        expr: >-\n \
-    \         1 - (\n            sum by (job, service) (rate(order_path_latency_ns_bucket{le=\"1048575\"\
-    }[2h]))\n            /\n            sum by (job, service) (rate(order_path_latency_ns_count[2h]))\n\
-    \          )\n      - record: job:order_path_latency_slo_errors:ratio_rate6h\n        expr: >-\n \
-    \         1 - (\n            sum by (job, service) (rate(order_path_latency_ns_bucket{le=\"1048575\"\
-    }[6h]))\n            /\n            sum by (job, service) (rate(order_path_latency_ns_count[6h]))\n\
-    \          )\n      - record: job:order_path_latency_slo_errors:ratio_rate1d\n        expr: >-\n \
-    \         1 - (\n            sum by (job, service) (rate(order_path_latency_ns_bucket{le=\"1048575\"\
-    }[1d]))\n            /\n            sum by (job, service) (rate(order_path_latency_ns_count[1d]))\n\
-    \          )\n      - record: job:order_path_latency_slo_errors:ratio_rate3d\n        expr: >-\n \
-    \         1 - (\n            sum by (job, service) (rate(order_path_latency_ns_bucket{le=\"1048575\"\
-    }[3d]))\n            /\n            sum by (job, service) (rate(order_path_latency_ns_count[3d]))\n\
-    \          )\n  - name: iap-slo-event-path-latency-recording\n    interval: 30s\n    rules:\n    \
-    \  - record: job:event_path_latency_slo_errors:ratio_rate5m\n        expr: >-\n          1 - (\n \
-    \           sum by (job, service) (rate(book_update_latency_ns_bucket{le=\"1048575\"}[5m]))\n    \
-    \        /\n            sum by (job, service) (rate(book_update_latency_ns_count[5m]))\n         \
-    \ )\n      - record: job:event_path_latency_slo_errors:ratio_rate30m\n        expr: >-\n         \
-    \ 1 - (\n            sum by (job, service) (rate(book_update_latency_ns_bucket{le=\"1048575\"}[30m]))\n\
-    \            /\n            sum by (job, service) (rate(book_update_latency_ns_count[30m]))\n    \
-    \      )\n      - record: job:event_path_latency_slo_errors:ratio_rate1h\n        expr: >-\n     \
-    \     1 - (\n            sum by (job, service) (rate(book_update_latency_ns_bucket{le=\"1048575\"\
-    }[1h]))\n            /\n            sum by (job, service) (rate(book_update_latency_ns_count[1h]))\n\
-    \          )\n      - record: job:event_path_latency_slo_errors:ratio_rate2h\n        expr: >-\n \
-    \         1 - (\n            sum by (job, service) (rate(book_update_latency_ns_bucket{le=\"1048575\"\
-    }[2h]))\n            /\n            sum by (job, service) (rate(book_update_latency_ns_count[2h]))\n\
-    \          )\n      - record: job:event_path_latency_slo_errors:ratio_rate6h\n        expr: >-\n \
-    \         1 - (\n            sum by (job, service) (rate(book_update_latency_ns_bucket{le=\"1048575\"\
-    }[6h]))\n            /\n            sum by (job, service) (rate(book_update_latency_ns_count[6h]))\n\
-    \          )\n      - record: job:event_path_latency_slo_errors:ratio_rate1d\n        expr: >-\n \
-    \         1 - (\n            sum by (job, service) (rate(book_update_latency_ns_bucket{le=\"1048575\"\
-    }[1d]))\n            /\n            sum by (job, service) (rate(book_update_latency_ns_count[1d]))\n\
-    \          )\n      - record: job:event_path_latency_slo_errors:ratio_rate3d\n        expr: >-\n \
-    \         1 - (\n            sum by (job, service) (rate(book_update_latency_ns_bucket{le=\"1048575\"\
-    }[3d]))\n            /\n            sum by (job, service) (rate(book_update_latency_ns_count[3d]))\n\
-    \          )\n  - name: iap-slo-order-path-latency-alerts\n    rules:\n      - alert: OrderPathLatencySLOFastBurn\n\
+    \ \u2014 latency SLO with multi-window, multi-burn-rate alerts (v1.12.0,\n# plan P4; Google SRE Workbook\
+    \ ch. 5 \"Alerting on SLOs\").\n#\n# Source metric: the log2 histogram the Python platform-metrics\
+    \ process\n# exports (PLATFORM_CONVENTIONS.md \xA712.6; python/src/iap/metrics/exporter.py)\n# \u2014\
+    \ bucket upper bounds are 2^i - 1 ns, so an SLO threshold MUST be one of\n# those bounds. The SLO\
+    \ uses le=\"1048575\" (2^20 - 1 ns ~= 1.05 ms): the\n# nearest bound above the measured cold p99 of\
+    \ the event path\n# (<= 524,287 ns, benchmarks/RESULTS.md).\n#\n#   SLO                  objective\
+    \                                 metric\n#   order-path-latency   99% of parents decision->arrival\
+    \ < 1.05 ms  order_path_latency_ns\n#   window: 30 days rolling; error budget 1%.\n#\n# RETIRED (v1.17\
+    \ F9, with the Java image): the event-path-latency SLO on\n# book_update_latency_ns. The Python exporter\
+    \ reads the MVP run's artefacts;\n# the per-event book-apply latency was a Java in-process histogram\
+    \ and has no\n# Python producer (the name is exposed as book_update_latency_ns_available 0).\n#\n\
+    # error ratio(W) = 1 - good(W) / total(W)\n#   good  = rate(<metric>_bucket{le=\"1048575\"}[W])\n\
+    #   total = rate(<metric>_count[W])\n# With no traffic the ratio is NaN and nothing fires (a finite\
+    \ session that\n# has ended is not an SLO breach; liveness alerts cover a dead feed).\n#\n# Burn-rate\
+    \ alerts (budget 0.01):\n#   *LatencySLOFastBurn  page     14.4x over 1h AND 5m   (2% of budget /\
+    \ 1h)\n#                                 6x    over 6h AND 30m  (5% of budget / 6h)\n#   *LatencySLOSlowBurn\
+    \  warning  3x    over 1d AND 2h   (10% of budget / 1d)\n#                                 1x    over\
+    \ 3d AND 6h   (10% of budget / 3d)\n# Alertmanager inhibits the warning while the page for the same\
+    \ `slo` and\n# `service` fires (deployment/alertmanager/alertmanager.yml).\n#\n# Caveat (documented,\
+    \ not hidden): the histogram is rebuilt from the newest\n# run's traces on every scrape, so it is\
+    \ cumulative per run; a new run\n# resets it, which rate() handles. Clock-quantisation: a log2 bucket\
+    \ means\n# \"< 1.05 ms\" is exact at the bound \u2014 no interpolation is involved.\n# Unit tests:\
+    \ deployment/prometheus/tests/slo_test.yml (promtool, CI).\n# =============================================================================\n\
+    \ngroups:\n  - name: iap-slo-order-path-latency-recording\n    interval: 30s\n    rules:\n      -\
+    \ record: job:order_path_latency_slo_errors:ratio_rate5m\n        expr: >-\n          1 - (\n    \
+    \        sum by (job, service) (rate(order_path_latency_ns_bucket{le=\"1048575\"}[5m]))\n        \
+    \    /\n            sum by (job, service) (rate(order_path_latency_ns_count[5m]))\n          )\n \
+    \     - record: job:order_path_latency_slo_errors:ratio_rate30m\n        expr: >-\n          1 - (\n\
+    \            sum by (job, service) (rate(order_path_latency_ns_bucket{le=\"1048575\"}[30m]))\n   \
+    \         /\n            sum by (job, service) (rate(order_path_latency_ns_count[30m]))\n        \
+    \  )\n      - record: job:order_path_latency_slo_errors:ratio_rate1h\n        expr: >-\n         \
+    \ 1 - (\n            sum by (job, service) (rate(order_path_latency_ns_bucket{le=\"1048575\"}[1h]))\n\
+    \            /\n            sum by (job, service) (rate(order_path_latency_ns_count[1h]))\n      \
+    \    )\n      - record: job:order_path_latency_slo_errors:ratio_rate2h\n        expr: >-\n       \
+    \   1 - (\n            sum by (job, service) (rate(order_path_latency_ns_bucket{le=\"1048575\"}[2h]))\n\
+    \            /\n            sum by (job, service) (rate(order_path_latency_ns_count[2h]))\n      \
+    \    )\n      - record: job:order_path_latency_slo_errors:ratio_rate6h\n        expr: >-\n       \
+    \   1 - (\n            sum by (job, service) (rate(order_path_latency_ns_bucket{le=\"1048575\"}[6h]))\n\
+    \            /\n            sum by (job, service) (rate(order_path_latency_ns_count[6h]))\n      \
+    \    )\n      - record: job:order_path_latency_slo_errors:ratio_rate1d\n        expr: >-\n       \
+    \   1 - (\n            sum by (job, service) (rate(order_path_latency_ns_bucket{le=\"1048575\"}[1d]))\n\
+    \            /\n            sum by (job, service) (rate(order_path_latency_ns_count[1d]))\n      \
+    \    )\n      - record: job:order_path_latency_slo_errors:ratio_rate3d\n        expr: >-\n       \
+    \   1 - (\n            sum by (job, service) (rate(order_path_latency_ns_bucket{le=\"1048575\"}[3d]))\n\
+    \            /\n            sum by (job, service) (rate(order_path_latency_ns_count[3d]))\n      \
+    \    )\n  - name: iap-slo-order-path-latency-alerts\n    rules:\n      - alert: OrderPathLatencySLOFastBurn\n\
     \        expr: >-\n          (\n            job:order_path_latency_slo_errors:ratio_rate1h > (14.4\
     \ * 0.01)\n            and job:order_path_latency_slo_errors:ratio_rate5m > (14.4 * 0.01)\n      \
     \    )\n          or\n          (\n            job:order_path_latency_slo_errors:ratio_rate6h > (6\
@@ -433,8 +285,8 @@ data:
     \      slo: order-path-latency\n        annotations:\n          summary: \"order-path-latency SLO\
     \ fast burn on {{ $labels.service }}\"\n          description: >-\n            The decision-to-wire\
     \ order path (incl. the pre-trade risk check) is burning its 30-day error budget (99% under\n    \
-    \        1.05 ms) at 6x or more: at this rate the budget is gone in days.\n            Check job:order_path_latency_ns:p99,\
-    \ GC pauses (job:jvm_gc_pause_ns:p99) and host\n            contention. Runbook: docs/runbooks/RUNBOOK_alerting.md#latency-slo\n\
+    \        1.05 ms) at 6x or more: at this rate the budget is gone in days.\n            Check job:order_path_latency_ns:p99\
+    \ and the venue latency realism\n            of the run (configs/prereg/v3.json). Runbook: docs/runbooks/RUNBOOK_alerting.md#latency-slo\n\
     \          runbook: docs/runbooks/RUNBOOK_alerting.md\n          runbook_url: docs/runbooks/RUNBOOK_alerting.md#latency-slo\n\
     \n      - alert: OrderPathLatencySLOSlowBurn\n        expr: >-\n          (\n            job:order_path_latency_slo_errors:ratio_rate1d\
     \ > (3 * 0.01)\n            and job:order_path_latency_slo_errors:ratio_rate2h > (3 * 0.01)\n    \
@@ -445,27 +297,5 @@ data:
     \ SLO slow burn on {{ $labels.service }}\"\n          description: >-\n            The decision-to-wire\
     \ order path (incl. the pre-trade risk check) is consuming its 30-day error budget (99% under\n  \
     \          1.05 ms) faster than it accrues. Not urgent; investigate the same\n            day. Runbook:\
-    \ docs/runbooks/RUNBOOK_alerting.md#latency-slo\n          runbook: docs/runbooks/RUNBOOK_alerting.md\n\
-    \          runbook_url: docs/runbooks/RUNBOOK_alerting.md#latency-slo\n  - name: iap-slo-event-path-latency-alerts\n\
-    \    rules:\n      - alert: EventPathLatencySLOFastBurn\n        expr: >-\n          (\n         \
-    \   job:event_path_latency_slo_errors:ratio_rate1h > (14.4 * 0.01)\n            and job:event_path_latency_slo_errors:ratio_rate5m\
-    \ > (14.4 * 0.01)\n          )\n          or\n          (\n            job:event_path_latency_slo_errors:ratio_rate6h\
-    \ > (6 * 0.01)\n            and job:event_path_latency_slo_errors:ratio_rate30m > (6 * 0.01)\n   \
-    \       )\n        for: 2m\n        labels:\n          severity: page\n          domain: latency\n\
-    \          slo: event-path-latency\n        annotations:\n          summary: \"event-path-latency\
-    \ SLO fast burn on {{ $labels.service }}\"\n          description: >-\n            The per-event onEvent\
-    \ path (book + features + alpha + risk) is burning its 30-day error budget (99% under\n          \
-    \  1.05 ms) at 6x or more: at this rate the budget is gone in days.\n            Check job:book_update_latency_ns:p99,\
-    \ GC pauses (job:jvm_gc_pause_ns:p99) and host\n            contention. Runbook: docs/runbooks/RUNBOOK_alerting.md#latency-slo\n\
-    \          runbook: docs/runbooks/RUNBOOK_alerting.md\n          runbook_url: docs/runbooks/RUNBOOK_alerting.md#latency-slo\n\
-    \n      - alert: EventPathLatencySLOSlowBurn\n        expr: >-\n          (\n            job:event_path_latency_slo_errors:ratio_rate1d\
-    \ > (3 * 0.01)\n            and job:event_path_latency_slo_errors:ratio_rate2h > (3 * 0.01)\n    \
-    \      )\n          or\n          (\n            job:event_path_latency_slo_errors:ratio_rate3d >\
-    \ (1 * 0.01)\n            and job:event_path_latency_slo_errors:ratio_rate6h > (1 * 0.01)\n      \
-    \    )\n        for: 30m\n        labels:\n          severity: warning\n          domain: latency\n\
-    \          slo: event-path-latency\n        annotations:\n          summary: \"event-path-latency\
-    \ SLO slow burn on {{ $labels.service }}\"\n          description: >-\n            The per-event onEvent\
-    \ path (book + features + alpha + risk) is consuming its 30-day error budget (99% under\n        \
-    \    1.05 ms) faster than it accrues. Not urgent; investigate the same\n            day. Runbook:\
     \ docs/runbooks/RUNBOOK_alerting.md#latency-slo\n          runbook: docs/runbooks/RUNBOOK_alerting.md\n\
     \          runbook_url: docs/runbooks/RUNBOOK_alerting.md#latency-slo\n"

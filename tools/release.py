@@ -34,9 +34,21 @@ lessons of the v1.14.0 release (2026-10-11):
     3. ``gh release create vX.Y.Z --verify-tag`` with the CHANGELOG section;
     4. watch ``release.yml`` for the tag; when it failed in its verify-ci
        guard (raced the main CI run), ``gh run rerun --failed`` once;
-    5. site check: the GitHub Pages site mentions the full ``vX.Y.Z`` (a
+    5. digest pinning (v1.17 WS-F item F2, finding E-5): download the
+       ``release-manifest.json`` asset of the release and rewrite every
+       ``ghcr.io/ashjha0/intraday-alpha-platform-<lang>`` reference in the
+       Kubernetes manifests (``PINNED_MANIFESTS``) to
+       ``<name>:vX.Y.Z@sha256:<digest>``; the changed files are left in the
+       working tree for a follow-up "release: pin vX.Y.Z image digests" PR
+       (``main`` is protected). Compose keeps the tag: a ``build:`` service
+       cannot carry a digest;
+    6. site check: the GitHub Pages site mentions the full ``vX.Y.Z`` (a
        ``vX.Y`` match is vacuous: the site's roadmap names the next minor
        before it ships).
+
+``pin-digests --manifest FILE [--version X.Y.Z]``  step 5 alone, from a
+    local ``release-manifest.json`` (dry run prints the per-file changes;
+    ``--execute`` writes them).
 
 In dry-run mode a failed ``publish`` precondition (tag exists, no CHANGELOG
 section, main CI not green) is reported as a BLOCKER and the rest of the
@@ -68,6 +80,15 @@ BUNDLE_ARTIFACT = "regenerated-artefacts"
 BUNDLE_FILE = "regenerated.tar.gz"
 CRLF_SKIP_PREFIX = "expected_features"
 SITE_URL = "https://ashjha0.github.io/intraday-alpha-platform/"
+IMAGE_PREFIX = "ghcr.io/ashjha0/intraday-alpha-platform-"
+#: The deployment manifests `publish` pins by digest (repo-relative). Compose
+#: is deliberately absent (its services carry `build:`).
+PINNED_MANIFESTS = (
+    "deployment/k8s/platform-metrics.yaml",
+    "deployment/k8s/cronjob-data-pipeline.yaml",
+    "deployment/k8s/cronjob-state-backup.yaml",
+)
+MANIFEST_ASSET = "release-manifest.json"
 
 #: Mirrors tools/regenerate_dataset_artifacts.py (a test keeps them equal).
 RUNNER_EXPERIMENTS = (
@@ -359,7 +380,11 @@ def publish(
     max_polls: int = 60,
     fetch: Callable[[str], str] | None = None,
     sleep: Callable[[float], None] = time.sleep,
+    manifest_fetch: Callable[[Runner, str], dict] | None = None,
+    pinned_files: Sequence[str] = PINNED_MANIFESTS,
 ) -> None:
+    if manifest_fetch is None:
+        manifest_fetch = download_manifest
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise ReleaseError(f"version must be X.Y.Z, got {version!r}")
     tag = f"v{version}"
@@ -403,7 +428,12 @@ def publish(
         ["gh", "release", "create", tag, "--verify-tag", "--title", tag, "--notes-file", str(notes)]
     )
     if not r.execute:
-        r.note(f"then: watch release.yml for {tag}; rerun once if verify-ci raced; site check")
+        r.note(
+            f"then: watch release.yml for {tag}; rerun once if verify-ci raced; "
+            f"pin {', '.join(PINNED_MANIFESTS)} to the manifest digests "
+            f"(python tools/release.py pin-digests --manifest release-manifest.json "
+            f"--version {version} --execute); site check"
+        )
         if blockers:
             raise ReleaseError("dry run found blockers: " + "; ".join(blockers))
         return
@@ -422,12 +452,117 @@ def publish(
         sleep(poll_s)
     else:
         raise ReleaseError("release.yml did not finish in time")
+    pinned = pin_digests(r, manifest_fetch(r, tag), version, pinned_files)
+    r.note(
+        f"pinned {sum(pinned.values())} image reference(s) in {len(pinned)} manifest(s); "
+        f"commit them as 'release: pin {tag} image digests' (a PR: main is protected)"
+    )
     for _ in range(max_polls):
         if site_mentions(version, fetch):
             r.note(f"site shows {tag}")
             return
         sleep(poll_s)
     raise ReleaseError(f"site {SITE_URL} does not mention {tag}")
+
+
+# ----------------------------------------------------------------- pin-digests
+
+_IMAGE_REF = re.compile(
+    rf"(?P<name>{re.escape(IMAGE_PREFIX)}(?P<lang>[a-z]+))"
+    r"(?::(?P<tag>v\d+\.\d+\.\d+))?(?:@sha256:[0-9a-f]{64})?"
+)
+
+
+def manifest_digests(manifest: dict, version: str | None = None) -> dict[str, str]:
+    """``{language: "sha256:..."}`` of a ``release-manifest.json`` document
+    (release.yml schema: ``images: [{language, name, digest, reference}]``).
+    With ``version`` the manifest's ``tag`` must be ``vVERSION``."""
+    if version is not None and manifest.get("tag") != f"v{version}":
+        raise ReleaseError(f"manifest tag {manifest.get('tag')!r} is not v{version}")
+    out: dict[str, str] = {}
+    for img in manifest.get("images") or []:
+        lang, digest, name = img.get("language"), img.get("digest"), img.get("name")
+        if not (isinstance(lang, str) and isinstance(digest, str) and isinstance(name, str)):
+            raise ReleaseError(f"malformed image entry in manifest: {img!r}")
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+            raise ReleaseError(f"{lang}: digest {digest!r} is not sha256:<64 hex>")
+        if name != IMAGE_PREFIX + lang:
+            raise ReleaseError(f"{lang}: image name {name!r} is not {IMAGE_PREFIX}{lang}")
+        out[lang] = digest
+    if not out:
+        raise ReleaseError("manifest lists no images")
+    return out
+
+
+def pin_text(text: str, tag: str, digests: dict[str, str]) -> tuple[str, int]:
+    """Rewrite every iap image reference in ``text`` to ``name:tag@digest``;
+    returns the new text and the number of references changed. A language
+    the manifest does not list is an error (never leave one image unpinned)."""
+    changed = 0
+    missing: set[str] = set()
+
+    def repl(m: re.Match) -> str:
+        nonlocal changed
+        lang = m.group("lang")
+        if lang not in digests:
+            missing.add(lang)
+            return m.group(0)
+        new = f"{m.group('name')}:{tag}@{digests[lang]}"
+        if new != m.group(0):
+            changed += 1
+        return new
+
+    out = _IMAGE_REF.sub(repl, text)
+    if missing:
+        raise ReleaseError(f"manifest has no digest for image(s): {', '.join(sorted(missing))}")
+    return out, changed
+
+
+def pin_digests(
+    r: Runner, manifest: dict, version: str, files: Sequence[str] = PINNED_MANIFESTS
+) -> dict[str, int]:
+    """Pin ``files`` (repo-relative) to the digests of ``manifest``;
+    ``{file: references changed}``. Dry run reports, ``--execute`` writes."""
+    digests = manifest_digests(manifest, version)
+    tag = f"v{version}"
+    result: dict[str, int] = {}
+    for rel in files:
+        path = r.cwd / rel
+        if not path.is_file():
+            raise ReleaseError(f"{rel} not found")
+        text = path.read_text(encoding="utf-8")
+        new, n = pin_text(text, tag, digests)
+        result[rel] = n
+        if n == 0:
+            r.note(f"{rel}: already pinned to {tag}")
+            continue
+        r.note(f"{rel}: pin {n} image reference(s) to {tag}@sha256:...")
+        if r.execute:
+            path.write_text(new, encoding="utf-8", newline="\n")
+    return result
+
+
+def download_manifest(r: Runner, tag: str) -> dict:
+    """The ``release-manifest.json`` asset of release ``tag`` (a read-only
+    download into a scratch dir)."""
+    work = Path(tempfile.mkdtemp(prefix="iap-manifest-"))
+    r.query(
+        [
+            "gh",
+            "release",
+            "download",
+            tag,
+            "--pattern",
+            MANIFEST_ASSET,
+            "--dir",
+            str(work),
+            "--clobber",
+        ]
+    )
+    path = work / MANIFEST_ASSET
+    if not path.is_file():
+        raise ReleaseError(f"release {tag} has no {MANIFEST_ASSET} asset")
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 # -------------------------------------------------------------------------- CLI
@@ -444,8 +579,12 @@ release flow (tools/release.py, dry-run by default; --execute to act):
  4. owner merges the release PR (merge commit)
  5. python tools/release.py publish --version X.Y.Z
       main ci + codeql green -> annotated tag from CHANGELOG -> gh release --verify-tag
-      -> release.yml (rerun if verify-ci raced) -> site shows vX.Y.Z
+      -> release.yml (rerun if verify-ci raced) -> k8s manifests pinned to
+      name:vX.Y.Z@sha256:<digest> from release-manifest.json -> site shows vX.Y.Z
       (needs a '## vX.Y.Z' CHANGELOG heading: rename 'Unreleased' first)
+ 6. open the 'release: pin vX.Y.Z image digests' PR with the rewritten
+      deployment/k8s manifests (python tools/release.py pin-digests ... --execute
+      re-runs that step from a local release-manifest.json)
 """
 
 
@@ -463,6 +602,10 @@ def main(argv: Sequence[str] | None = None, runner: Runner | None = None) -> int
     a.add_argument("--download-dir", type=Path)
     pub = sub.add_parser("publish")
     pub.add_argument("--version", required=True)
+    pin = sub.add_parser("pin-digests")
+    pin.add_argument("--manifest", type=Path, required=True, help="a release-manifest.json")
+    pin.add_argument("--version", default=None, help="X.Y.Z the manifest must carry")
+    pin.add_argument("--file", action="append", help="override the manifests to pin")
     sub.add_parser("flow")
     args = ap.parse_args(argv)
     r = runner or Runner(execute=args.execute)
@@ -477,6 +620,12 @@ def main(argv: Sequence[str] | None = None, runner: Runner | None = None) -> int
             )
         elif args.cmd == "apply-bundle":
             apply_bundle(r, args.run_id, args.download_dir)
+        elif args.cmd == "pin-digests":
+            manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+            version = args.version or str(manifest.get("tag", "")).lstrip("v")
+            if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+                raise ReleaseError(f"cannot tell the version from {args.manifest} (--version)")
+            pin_digests(r, manifest, version, args.file or PINNED_MANIFESTS)
         else:
             publish(r, args.version)
     except ReleaseError as e:

@@ -8,6 +8,26 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-F item F9 (+F2 digest pinning): Java retired from the release (DECISION_N7 closed
+  2026-10-15). New `iap.metrics` (`python -m iap.metrics serve`): a stdlib Prometheus exposition
+  (the retired Java registry's format, log2 histograms), a file-backed exporter over the live risk
+  limits, the `session_exit.json` marker (`python -m iap.metrics run-session -- CMD`) and the newest
+  MVP run's `report.json` / `traces.jsonl`, and `/metrics`, `/health`, `/ready`, `/status` on :8080;
+  30 metric families kept live, 16 Java-only names exposed as `<name>_available 0` (`python -m
+  iap.metrics names`). Deployment: compose `platform-metrics` + `mvp-session` and k8s
+  `deployment/k8s/platform-metrics.yaml` replace `java-platform` / `java-platform-state`; claims
+  `iap-platform-state*`; Prometheus job `platform-metrics`; the alerts, recording rules, event-path
+  SLO and dashboard panels built only on Java metrics removed (listed in `alerts.yml`); no admin API
+  (the kill-switch runbook's manual halt is the config path). `java` dropped from `release.yml`
+  (three images, manifest schema `images` length 3), the CI `images` job and `check_docker_build.py`;
+  `Dockerfile.java` moved under `archive/java/` (unbuilt); `archive/java/README.md`: frozen at
+  v1.14.0, not built, not a port target, the risk engine kept only as the byte-identical mirror of
+  the Rust risk engine. F2: `tools/release.py publish` pins the k8s manifests to
+  `name:vX.Y.Z@sha256:<digest>` from `release-manifest.json` (`pin-digests`, dry-run default,
+  tests on a fixture manifest); manifests moved from `:v1.14.0` to `:v1.17.0`. Docs: README,
+  ARCHITECTURE §2/§8/§9, POLYGLOT, PLATFORM_CONVENTIONS §12, the site, SECURITY, REPO_SETTINGS,
+  the Grafana README and the runbooks describe the three-language platform.
+
 - v1.17 WS-B item B1: implementation-shortfall benchmark `python -m iap.research.execution_benchmark`
   (algo × policy × parent size in % of ADV × session on a dataset directory, per-parent costs from
   the execution study's decomposition — now `iap.tca.shortfall.parent_costs`, shared — with
@@ -126,6 +146,26 @@ that tag.
   docs/index.html gains a "Start here" block and a Showcase nav link; both new pages are read
   by `check_headline_numbers.py`. No number changed.
 
+
+- v1.17 WS-F item F9 (+F2 digest pinning): Java retired from the release (DECISION_N7 closed
+  2026-10-15). New `iap.metrics` (`python -m iap.metrics serve`): a stdlib Prometheus exposition
+  (the retired Java registry's format, log2 histograms), a file-backed exporter over the live risk
+  limits, the `session_exit.json` marker (`python -m iap.metrics run-session -- CMD`) and the newest
+  MVP run's `report.json` / `traces.jsonl`, and `/metrics`, `/health`, `/ready`, `/status` on :8080;
+  30 metric families kept live, 16 Java-only names exposed as `<name>_available 0` (`python -m
+  iap.metrics names`). Deployment: compose `platform-metrics` + `mvp-session` and k8s
+  `deployment/k8s/platform-metrics.yaml` replace `java-platform` / `java-platform-state`; claims
+  `iap-platform-state*`; Prometheus job `platform-metrics`; the alerts, recording rules, event-path
+  SLO and dashboard panels built only on Java metrics removed (listed in `alerts.yml`); no admin API
+  (the kill-switch runbook's manual halt is the config path). `java` dropped from `release.yml`
+  (three images, manifest schema `images` length 3), the CI `images` job and `check_docker_build.py`;
+  `Dockerfile.java` moved under `archive/java/` (unbuilt); `archive/java/README.md`: frozen at
+  v1.14.0, not built, not a port target, the risk engine kept only as the byte-identical mirror of
+  the Rust risk engine. F2: `tools/release.py publish` pins the k8s manifests to
+  `name:vX.Y.Z@sha256:<digest>` from `release-manifest.json` (`pin-digests`, dry-run default,
+  tests on a fixture manifest); manifests moved from `:v1.14.0` to `:v1.17.0`. Docs: README,
+  ARCHITECTURE §2/§8/§9, POLYGLOT, PLATFORM_CONVENTIONS §12, the site, SECURITY, REPO_SETTINGS,
+  the Grafana README and the runbooks describe the three-language platform.
 
 - v1.17 WS-A item A1: IEX HIST codec. `iap.marketdata.iex` reads IEX's free daily pcap[.gz]
   captures (classic pcap, UDP/IPv4, IEX-TP v1 segments) and translates DEEP+ (orders, `0x8005`)

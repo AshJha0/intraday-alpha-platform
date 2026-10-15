@@ -1,10 +1,13 @@
 # =============================================================================
-# release — on a v* tag: build the four images, push them to GHCR, record the
-# image digests in release-manifest.json, attest build provenance for each
-# image, and attach the manifest to the GitHub release.
+# release — on a v* tag: build the three images, push them to GHCR, record
+# the image digests in release-manifest.json, attest build provenance for
+# each image, and attach the manifest to the GitHub release.
 #
-#   images:  ghcr.io/ashjha0/intraday-alpha-platform-{python,java,cpp,rust}:<tag>
-#   manifest: release-manifest.json  (tag, commit, per-image reference+digest)
+#   images:  ghcr.io/ashjha0/intraday-alpha-platform-{python,cpp,rust}:<tag>
+#   manifest: release-manifest.json  (tag, commit, per-image reference+digest;
+#             schema: {tag, commit, built_at, images: [{language, name,
+#             digest, reference}]} with exactly three images since v1.17 —
+#             the java image was retired, WS-F item F9 / DECISION_N7)
 #
 # The release is created if it does not exist yet (generated notes); an
 # existing release keeps its notes, only the manifest asset is added/replaced.
@@ -16,11 +19,14 @@
 # 40 minutes for a run that is still in progress, and fails after a 2-minute
 # grace when no run exists. It prints what it saw on every attempt.
 #
-# Digest pinning (the release step for deployment/): after the workflow
-# finishes, replace the version tags in deployment/docker/docker-compose.yml
-# and deployment/k8s/{java-platform,cronjob-data-pipeline}.yaml with
-# <name>:<tag>@<digest> using release-manifest.json, and verify provenance:
-#   gh attestation verify oci://ghcr.io/ashjha0/intraday-alpha-platform-java@<digest> \
+# Digest pinning (v1.17 F2, the release step for deployment/): after the
+# workflow finishes, `python tools/release.py publish --version X.Y.Z`
+# downloads release-manifest.json from the release and rewrites the
+# Kubernetes manifests (deployment/k8s/{platform-metrics,cronjob-data-pipeline,
+# cronjob-state-backup}.yaml) to <name>:<tag>@<digest> (`pin-digests` runs
+# that step alone, dry-run by default); compose keeps the tag because a
+# `build:` service cannot carry a digest. Verify provenance with:
+#   gh attestation verify oci://ghcr.io/ashjha0/intraday-alpha-platform-python@<digest> \
 #     --repo AshJha0/intraday-alpha-platform
 #
 # Dry run (workflow_dispatch): runs ONLY the verify-ci guard, against the
@@ -89,7 +95,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        lang: [python, java, cpp, rust]
+        lang: [python, cpp, rust]
     env:
       IMAGE: ghcr.io/ashjha0/intraday-alpha-platform-${{ matrix.lang }}
     steps:
@@ -148,11 +154,10 @@ jobs:
             --arg commit "$GITHUB_SHA" \
             --arg built "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --arg python "$(cat digests/python.txt)" \
-            --arg java "$(cat digests/java.txt)" \
             --arg cpp "$(cat digests/cpp.txt)" \
             --arg rust "$(cat digests/rust.txt)" \
             '{tag: $tag, commit: $commit, built_at: $built,
-              images: ({python: $python, java: $java, cpp: $cpp, rust: $rust}
+              images: ({python: $python, cpp: $cpp, rust: $rust}
                 | to_entries
                 | map({language: .key,
                        name: ("ghcr.io/ashjha0/intraday-alpha-platform-" + .key),
@@ -160,7 +165,7 @@ jobs:
                        reference: ("ghcr.io/ashjha0/intraday-alpha-platform-" + .key + ":" + $tag + "@" + .value)}))}' \
             > release-manifest.json
           cat release-manifest.json
-          jq -e '.images | length == 4 and all(.digest | test("^sha256:[0-9a-f]{64}$"))' release-manifest.json
+          jq -e '.images | length == 3 and all(.digest | test("^sha256:[0-9a-f]{64}$"))' release-manifest.json
       - name: create the release if absent, attach the manifest
         env:
           GH_TOKEN: ${{ github.token }}

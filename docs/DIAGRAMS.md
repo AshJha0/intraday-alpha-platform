@@ -995,19 +995,17 @@ Source: [`diagrams/deployment_topology.mmd`](diagrams/deployment_topology.mmd).
 flowchart LR
     %% deployment/k8s as of v1.3.0: workloads, the flows the NetworkPolicies allow, alert delivery.
     subgraph NS["namespace intraday-alpha — default-deny ingress AND egress"]
-        JP["java-platform (singleton, Recreate)<br/>:8080 /metrics /health /ready /status /admin/*<br/>IAP_BIND_ADDR=0.0.0.0 · read-only root fs<br/>egress: DNS only"]
-        PVC[("iap-java-state PVC<br/>risk snapshot, session state,<br/>audit and trace JSONL")]
+        JP["platform-metrics (singleton, Recreate; v1.17: Python, was java-platform)<br/>:8080 /metrics /health /ready /status · no admin API<br/>+ mvp-session container (python -m iap.mvp run)<br/>IAP_BIND_ADDR=0.0.0.0 · read-only root fs · egress: DNS only"]
+        PVC[("iap-platform-state PVC<br/>session marker, MVP run artefacts<br/>(traces, risk audit, report)")]
         PROM["prometheus :9090<br/>alerts.yml · recording.yml"]
         AM["alertmanager :9093<br/>groups by alertname, service<br/>Watchdog to its own receiver"]
         GRAF["grafana :3000<br/>two provisioned dashboards"]
         CRON["data-pipeline CronJob<br/>iap-data PVC · egress: DNS only"]
-        OPP["operator pod<br/>label iap.role=operator"]
     end
     JP --- PVC
     PROM -->|"scrape :8080"| JP
     PROM -->|"alerts :9093"| AM
     GRAF -->|"queries :9090"| PROM
-    OPP -->|"POST /admin/* with a token, :8080"| JP
     ING["ingress controller namespace"] -->|":3000"| GRAF
     AM -->|"HTTPS :443, non-private addresses only"| WH["webhook receiver<br/>URL from the iap-alertmanager-webhook Secret<br/>(page_url / ticket_url; compose: local alert-sink)"]
     KUBELET["kubelet probes<br/>startup + liveness /health · readiness /ready"] --> JP
@@ -1016,7 +1014,7 @@ flowchart LR
     CM -.-> AM
     CM -.-> GRAF
     CNI["enforcement needs a CNI that implements NetworkPolicy;<br/>one that does not ignores every policy silently"] -.-> NS
-    COMPOSE["docker-compose equivalent: the same services on one bridge network,<br/>java-platform, prometheus and alertmanager published on 127.0.0.1 only"] -.-> NS
+    COMPOSE["docker-compose equivalent: the same services on one bridge network,<br/>platform-metrics, prometheus and alertmanager published on 127.0.0.1 only"] -.-> NS
 ```
 
 ## 19. Agent layer as planned at v1.3.0 (most of it built since v1.7.0)

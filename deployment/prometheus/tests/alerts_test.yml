@@ -45,13 +45,13 @@ tests:
     name: StaleFeed does not fire on a replayed session with 10-day-old data
     input_series:
       # event time ~ 2026-08-22, i.e. ~10 days behind wall clock
-      - series: 'md_last_event_unixtime{job="java-platform",service="java-platform"}'
+      - series: 'md_last_event_unixtime{job="platform-metrics",service="platform-metrics"}'
         values: '1787583604+15x40'
-      - series: 'md_event_time_gap_seconds{job="java-platform",service="java-platform"}'
+      - series: 'md_event_time_gap_seconds{job="platform-metrics",service="platform-metrics"}'
         values: '0.3+0x40'
-      - series: 'platform_mode{job="java-platform",service="java-platform",mode="asap"}'
+      - series: 'platform_mode{job="platform-metrics",service="platform-metrics",mode="asap"}'
         values: '1+0x40'
-      - series: 'platform_session_state{job="java-platform",service="java-platform"}'
+      - series: 'platform_session_state{job="platform-metrics",service="platform-metrics"}'
         values: '1+0x40'
     alert_rule_test:
       - eval_time: 10m
@@ -62,49 +62,17 @@ tests:
         exp_alerts: []
 
   # ---------------------------------------------------------------------------
-  # Test 14 (positive) — a real 6-second event-time gap fires StaleFeed.
-  # ---------------------------------------------------------------------------
-  - interval: 15s
-    name: StaleFeed fires on a 6s event-time gap
-    input_series:
-      - series: 'md_event_time_gap_seconds{job="java-platform",service="java-platform"}'
-        values: '6+0x20'
-    alert_rule_test:
-      - eval_time: 30s
-        alertname: StaleFeed
-        exp_alerts: []          # `for: 1m` not yet satisfied
-      - eval_time: 5m
-        alertname: StaleFeed
-        exp_alerts:
-          - exp_labels:
-              alertname: StaleFeed
-              severity: page
-              domain: market-data
-              job: java-platform
-              service: java-platform
-            exp_annotations:
-              summary: "Stale market-data feed on java-platform (6.0s event-time gap)"
-              runbook: docs/runbooks/RUNBOOK_data_pipeline.md
-              runbook_url: docs/runbooks/RUNBOOK_data_pipeline.md
-              description: >-
-                The gap between consecutive market events exceeded the 5s
-                staleness budget (risk.json stale_feed_timeout_ns). The risk
-                engine rejects orders against stale books (fail-closed); verify
-                feed handlers and venue connectivity. Runbook:
-                docs/runbooks/RUNBOOK_data_pipeline.md#stale-feed
-
-  # ---------------------------------------------------------------------------
   # A wedged realtime session (no event processed for minutes of wall clock)
   # fires FeedWallClockStall; the same series in `asap` mode does not.
   # ---------------------------------------------------------------------------
   - interval: 15s
     name: FeedWallClockStall is scoped to realtime sessions
     input_series:
-      - series: 'md_last_event_wallclock_unixtime{job="java-platform",service="java-platform"}'
+      - series: 'md_last_event_wallclock_unixtime{job="platform-metrics",service="platform-metrics"}'
         values: '0+0x40'        # frozen: never advances
-      - series: 'platform_mode{job="java-platform",service="java-platform",mode="realtime"}'
+      - series: 'platform_mode{job="platform-metrics",service="platform-metrics",mode="realtime"}'
         values: '1+0x40'
-      - series: 'platform_session_state{job="java-platform",service="java-platform"}'
+      - series: 'platform_session_state{job="platform-metrics",service="platform-metrics"}'
         values: '1+0x40'
     alert_rule_test:
       - eval_time: 5m
@@ -114,10 +82,10 @@ tests:
               alertname: FeedWallClockStall
               severity: page
               domain: market-data
-              job: java-platform
-              service: java-platform
+              job: platform-metrics
+              service: platform-metrics
             exp_annotations:
-              summary: "No market event processed for 5m 0s on java-platform"
+              summary: "No market event processed for 5m 0s on platform-metrics"
               runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
               runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
               description: >-
@@ -134,9 +102,9 @@ tests:
   - interval: 15s
     name: LossLimitUtilizationHigh fires at 76 percent of the live limit
     input_series:
-      - series: 'risk_daily_pnl{job="java-platform",service="java-platform"}'
+      - series: 'risk_daily_pnl{job="platform-metrics",service="platform-metrics"}'
         values: '-190000+0x20'
-      - series: 'risk_limit{job="java-platform",service="java-platform",limit="max_daily_loss"}'
+      - series: 'risk_limit{job="platform-metrics",service="platform-metrics",limit="max_daily_loss"}'
         values: '250000+0x20'
     alert_rule_test:
       - eval_time: 5m
@@ -146,8 +114,8 @@ tests:
               alertname: LossLimitUtilizationHigh
               severity: page
               domain: risk
-              job: java-platform
-              service: java-platform
+              job: platform-metrics
+              service: platform-metrics
             exp_annotations:
               summary: "Daily loss limit utilization 76%"
               runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
@@ -161,9 +129,9 @@ tests:
   - interval: 15s
     name: LossLimitUtilizationHigh follows an approved limit override
     input_series:
-      - series: 'risk_daily_pnl{job="java-platform",service="java-platform"}'
+      - series: 'risk_daily_pnl{job="platform-metrics",service="platform-metrics"}'
         values: '-190000+0x20'
-      - series: 'risk_limit{job="java-platform",service="java-platform",limit="max_daily_loss"}'
+      - series: 'risk_limit{job="platform-metrics",service="platform-metrics",limit="max_daily_loss"}'
         values: '500000+0x20'
     alert_rule_test:
       - eval_time: 5m
@@ -177,9 +145,7 @@ tests:
   - interval: 15s
     name: One sequence gap fires SequenceGapDetected
     input_series:
-      - series: 'md_sequence_gaps_total{job="java-platform",service="java-platform"}'
-        values: '0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1'
-      - series: 'book_stale{job="java-platform",service="java-platform",instrument="1"}'
+      - series: 'md_sequence_gaps_total{job="platform-metrics",service="platform-metrics"}'
         values: '0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1'
     alert_rule_test:
       - eval_time: 2m
@@ -189,10 +155,10 @@ tests:
               alertname: SequenceGapDetected
               severity: critical
               domain: market-data
-              job: java-platform
-              service: java-platform
+              job: platform-metrics
+              service: platform-metrics
             exp_annotations:
-              summary: "Sequence gap on java-platform (1 in 5m)"
+              summary: "Sequence gap on platform-metrics (1 in 5m)"
               runbook: docs/runbooks/RUNBOOK_data_pipeline.md
               runbook_url: docs/runbooks/RUNBOOK_data_pipeline.md
               description: >-
@@ -201,26 +167,6 @@ tests:
                 against it until a SNAPSHOT recovers the stream. Check book_stale
                 for the instrument. Runbook:
                 docs/runbooks/RUNBOOK_data_pipeline.md#sequence-gaps
-      - eval_time: 3m
-        alertname: BookStale
-        exp_alerts:
-          - exp_labels:
-              alertname: BookStale
-              severity: critical
-              domain: market-data
-              job: java-platform
-              service: java-platform
-              instrument: "1"
-            exp_annotations:
-              summary: "Book stale for instrument 1 on java-platform"
-              runbook: docs/runbooks/RUNBOOK_data_pipeline.md
-              runbook_url: docs/runbooks/RUNBOOK_data_pipeline.md
-              description: >-
-                A venue book has been stale for 2m — no SNAPSHOT recovery after a
-                sequence gap or a venue disconnect. Trading in that instrument is
-                fail-closed (STALE_PRICE / SEQUENCE_GAP rejects). Runbook:
-                docs/runbooks/RUNBOOK_data_pipeline.md#stale-feed
-
   # ---------------------------------------------------------------------------
   # The kill-switch page renders (this is the rule whose `default` template
   # function made Prometheus refuse the ENTIRE alerts.yml at load time).
@@ -228,7 +174,7 @@ tests:
   - interval: 15s
     name: KillSwitchEngaged renders its annotations
     input_series:
-      - series: 'risk_kill_switch_engaged{job="java-platform",service="java-platform"}'
+      - series: 'risk_kill_switch_engaged{job="platform-metrics",service="platform-metrics"}'
         values: '0 0 1 1 1 1'
     alert_rule_test:
       - eval_time: 1m
@@ -238,10 +184,10 @@ tests:
               alertname: KillSwitchEngaged
               severity: page
               domain: risk
-              job: java-platform
-              service: java-platform
+              job: platform-metrics
+              service: platform-metrics
             exp_annotations:
-              summary: "Global kill switch engaged on java-platform"
+              summary: "Global kill switch engaged on platform-metrics"
               runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
               runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
               description: >-
@@ -258,7 +204,7 @@ tests:
   - interval: 15s
     name: PlatformSessionFailed pages on state 3
     input_series:
-      - series: 'platform_session_state{job="java-platform",service="java-platform"}'
+      - series: 'platform_session_state{job="platform-metrics",service="platform-metrics"}'
         values: '1 1 3 3 3 3'
     alert_rule_test:
       - eval_time: 30s
@@ -268,23 +214,23 @@ tests:
               alertname: PlatformSessionFailed
               severity: page
               domain: infrastructure
-              job: java-platform
-              service: java-platform
+              job: platform-metrics
+              service: platform-metrics
             exp_annotations:
-              summary: "Paper-trading session FAILED on java-platform"
+              summary: "Paper-trading session FAILED on platform-metrics"
               runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
               runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
               description: >-
-                platform_session_state = 3 (FAILED). /health is 503 with the
-                reason; the container exits non-zero. Check the pod logs and
-                <state-dir>/config_audit.jsonl. Runbook:
+                platform_session_state = 3 (FAILED): the session process exited
+                non-zero (python -m iap.metrics run-session wrote the marker).
+                Check the session container's logs. Runbook:
                 docs/runbooks/RUNBOOK_shadow_deployment.md#failed-session
 
   # ---------------------------------------------------------------------------
   # v1.3.0 safety rules. platform_session_state 4 (STOPPED): the trading
   # process exits right after setting it, so its own series goes stale and is
   # almost never scraped at 4. The rule therefore reads the PERSISTED state
-  # (platform_persisted_session_state, served by the java-platform-state
+  # (platform_persisted_session_state, served by the platform-metrics
   # exporter from session_exit.json) and is suppressed while a live trading
   # process reports RUNNING.
   # ---------------------------------------------------------------------------
@@ -292,10 +238,10 @@ tests:
     name: SessionStoppedNotResumed fires 10m after a persisted STOPPED that nobody resumed
     input_series:
       # the trading process was scraped RUNNING, then went away (no 4 scraped)
-      - series: 'platform_session_state{job="java-platform",service="java-platform"}'
+      - series: 'platform_session_state{job="platform-metrics",service="platform-metrics"}'
         values: '1 1 1 stale'
       # the exporter keeps serving the persisted 4 from the stop on
-      - series: 'platform_persisted_session_state{job="java-platform-state",service="java-platform"}'
+      - series: 'platform_persisted_session_state{job="platform-metrics",service="platform-metrics"}'
         values: '1 1 1 4+0x80'
     alert_rule_test:
       - eval_time: 5m
@@ -308,19 +254,19 @@ tests:
               alertname: SessionStoppedNotResumed
               severity: warning
               domain: infrastructure
-              job: java-platform-state
-              service: java-platform
+              job: platform-metrics
+              service: platform-metrics
             exp_annotations:
-              summary: "Paper-trading session STOPPED and not resumed on java-platform"
+              summary: "Paper-trading session STOPPED and not resumed on platform-metrics"
               runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
               runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
               description: >-
                 The persisted session state is 4 (STOPPED) and no running
-                session has reported for 10m. The session checkpointed
-                mid-stream and exited 0, so nothing restarts it; positions are
-                as the checkpoint left them. Resume it with --resume or record
-                why it stays down. The alert clears when a resumed session
-                starts (the persisted state becomes 1) or finishes (2). Runbook:
+                session has reported for 10m. The session process was
+                interrupted and nothing restarted it. Rerun the session (the
+                MVP loop is deterministic) or record why it stays down. The
+                alert clears when a new session starts (the persisted state
+                becomes 1) or finishes (2). Runbook:
                 docs/runbooks/RUNBOOK_shadow_deployment.md#stopped-session
       - eval_time: 12m
         alertname: PlatformSessionFailed
@@ -331,9 +277,9 @@ tests:
     input_series:
       # stopped at 45s, resumed at 14m45s: the trading process reports
       # RUNNING again and the persisted marker becomes 1
-      - series: 'platform_session_state{job="java-platform",service="java-platform"}'
+      - series: 'platform_session_state{job="platform-metrics",service="platform-metrics"}'
         values: '1 1 1 stale _x55 1+0x60'
-      - series: 'platform_persisted_session_state{job="java-platform-state",service="java-platform"}'
+      - series: 'platform_persisted_session_state{job="platform-metrics",service="platform-metrics"}'
         values: '1 1 1 4+0x55 1+0x60'
     alert_rule_test:
       - eval_time: 13m
@@ -343,19 +289,19 @@ tests:
               alertname: SessionStoppedNotResumed
               severity: warning
               domain: infrastructure
-              job: java-platform-state
-              service: java-platform
+              job: platform-metrics
+              service: platform-metrics
             exp_annotations:
-              summary: "Paper-trading session STOPPED and not resumed on java-platform"
+              summary: "Paper-trading session STOPPED and not resumed on platform-metrics"
               runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
               runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
               description: >-
                 The persisted session state is 4 (STOPPED) and no running
-                session has reported for 10m. The session checkpointed
-                mid-stream and exited 0, so nothing restarts it; positions are
-                as the checkpoint left them. Resume it with --resume or record
-                why it stays down. The alert clears when a resumed session
-                starts (the persisted state becomes 1) or finishes (2). Runbook:
+                session has reported for 10m. The session process was
+                interrupted and nothing restarted it. Rerun the session (the
+                MVP loop is deterministic) or record why it stays down. The
+                alert clears when a new session starts (the persisted state
+                becomes 1) or finishes (2). Runbook:
                 docs/runbooks/RUNBOOK_shadow_deployment.md#stopped-session
       - eval_time: 20m
         alertname: SessionStoppedNotResumed
@@ -364,9 +310,9 @@ tests:
   - interval: 15s
     name: SessionStoppedNotResumed is suppressed while a live process reports RUNNING over a not-yet-rewritten marker
     input_series:
-      - series: 'platform_session_state{job="java-platform",service="java-platform"}'
+      - series: 'platform_session_state{job="platform-metrics",service="platform-metrics"}'
         values: '1+0x80'
-      - series: 'platform_persisted_session_state{job="java-platform-state",service="java-platform"}'
+      - series: 'platform_persisted_session_state{job="platform-metrics",service="platform-metrics"}'
         values: '4+0x80'
     alert_rule_test:
       - eval_time: 12m
@@ -377,18 +323,18 @@ tests:
     name: SessionStoppedNotResumed stays silent after a FINISHED session and after a crash
     input_series:
       # FINISHED persists 2; the trading target is gone
-      - series: 'platform_persisted_session_state{job="java-platform-state",service="finished"}'
+      - series: 'platform_persisted_session_state{job="platform-metrics",service="finished"}'
         values: '1 1 2+0x80'
       # a crash leaves the RUNNING marker (1) behind
-      - series: 'platform_persisted_session_state{job="java-platform-state",service="crashed"}'
+      - series: 'platform_persisted_session_state{job="platform-metrics",service="crashed"}'
         values: '1 1 1+0x80'
       # no session has ever run here (-1) / unreadable marker (-2)
-      - series: 'platform_persisted_session_state{job="java-platform-state",service="fresh"}'
+      - series: 'platform_persisted_session_state{job="platform-metrics",service="fresh"}'
         values: '-1+0x80'
-      - series: 'platform_persisted_session_state{job="java-platform-state",service="garbled"}'
+      - series: 'platform_persisted_session_state{job="platform-metrics",service="garbled"}'
         values: '-2+0x80'
       # the crashed trading target is down: TargetDown, not this alert
-      - series: 'up{job="java-platform",service="crashed"}'
+      - series: 'up{job="platform-metrics",service="crashed"}'
         values: '1 1 0+0x80'
     alert_rule_test:
       - eval_time: 12m
@@ -401,179 +347,13 @@ tests:
               alertname: TargetDown
               severity: critical
               domain: infrastructure
-              job: java-platform
+              job: platform-metrics
               service: crashed
             exp_annotations:
-              summary: "Scrape target java-platform/ down"
+              summary: "Scrape target platform-metrics/ down"
               runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
               runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
               description: >-
                 Prometheus cannot scrape . If this is
-                java-platform during a trading session, treat as a platform
+                platform-metrics during a session, treat as a platform
                 incident. Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
-
-  - interval: 15s
-    name: RoutedVenueMismatch pages on the first mismatched child
-    input_series:
-      - series: 'risk_routed_venue_mismatch_total{job="java-platform",service="java-platform"}'
-        values: '_ _ 1+0x10'
-    alert_rule_test:
-      - eval_time: 15s
-        alertname: RoutedVenueMismatch
-        exp_alerts: []
-      - eval_time: 1m
-        alertname: RoutedVenueMismatch
-        exp_alerts:
-          - exp_labels:
-              alertname: RoutedVenueMismatch
-              severity: page
-              domain: risk
-              job: java-platform
-              service: java-platform
-            exp_annotations:
-              summary: "1 child order(s) routed to a venue the risk check did not approve on java-platform"
-              runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
-              runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
-              description: >-
-                A child order was submitted to a venue other than the one named
-                in its pre-trade risk request, so a venue kill or disconnect was
-                checked against the wrong venue. The child was cancelled
-                (fail-closed), but this is a routing/risk wiring defect, not a
-                market event: engage the kill switch and investigate. Runbook:
-                docs/runbooks/RUNBOOK_shadow_deployment.md#routed-venue-mismatch
-
-  - interval: 15s
-    name: KillPendingNotRecorded fires only when orders keep being withheld
-    input_series:
-      # the normal race: two orders withheld, then the kill is recorded
-      - series: 'exec_orders_blocked_kill_pending_total{job="java-platform",service="race"}'
-        values: '_ _ 1 2+0x40'
-      # stuck: the counter climbs on every scrape
-      - series: 'exec_orders_blocked_kill_pending_total{job="java-platform",service="stuck"}'
-        values: '_ _ 1+1x40'
-    alert_rule_test:
-      - eval_time: 2m
-        alertname: KillPendingNotRecorded
-        exp_alerts: []          # `for: 3m` not yet satisfied
-      - eval_time: 6m
-        alertname: KillPendingNotRecorded
-        exp_alerts:
-          - exp_labels:
-              alertname: KillPendingNotRecorded
-              severity: critical
-              domain: risk
-              job: java-platform
-              service: stuck
-            exp_annotations:
-              summary: "Orders withheld for a pending admin kill for over 3m on stuck"
-              runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
-              runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
-              description: >-
-                Orders have been withheld for more than 3m because an admin kill
-                was accepted (202) but the risk engine has not recorded it. No
-                new order is being sent, but the latch is not yet in the risk
-                snapshot and would not survive a restart. Do NOT restart; verify
-                the halt and the admin audit first. Runbook:
-                docs/runbooks/RUNBOOK_incident_kill_switch.md#kill-pending
-
-  - interval: 15s
-    name: ResumeReleasedOpenOrders warns when a resume released orphaned orders
-    input_series:
-      - series: 'risk_resume_open_orders_released_total{job="java-platform",service="java-platform"}'
-        values: '2+0x10'
-      - series: 'risk_resume_open_orders_released_total{job="java-platform",service="clean-resume"}'
-        values: '0+0x10'
-    alert_rule_test:
-      - eval_time: 1m
-        alertname: ResumeReleasedOpenOrders
-        exp_alerts:
-          - exp_labels:
-              alertname: ResumeReleasedOpenOrders
-              severity: warning
-              domain: risk
-              job: java-platform
-              service: java-platform
-            exp_annotations:
-              summary: "Resume released 2 orphaned open order(s) on java-platform"
-              runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
-              runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
-              description: >-
-                The session resumed from a checkpoint whose risk snapshot tracked
-                open child orders; they no longer exist in the execution
-                simulator and were released so they do not inflate position
-                projections. Positions and realized P&L are restored, the
-                working orders are not: reconcile before trusting the session.
-                The alert stays up until the process ends. Runbook:
-                docs/runbooks/RUNBOOK_shadow_deployment.md#resume-released-orders
-
-  # ---------------------------------------------------------------------------
-  # The admin counters do not exist until their first increment, which
-  # `increase()` cannot see: the first-appearance arm must fire on it, and
-  # the increase arm on a later burst.
-  # ---------------------------------------------------------------------------
-  - interval: 15s
-    name: AdminAuthRateLimited fires on the first appearance of the counter
-    input_series:
-      - series: 'admin_auth_rate_limited_total{job="java-platform",service="java-platform"}'
-        values: '_ _ _ _ 3+0x100'
-    alert_rule_test:
-      - eval_time: 30s
-        alertname: AdminAuthRateLimited
-        exp_alerts: []
-      - eval_time: 2m
-        alertname: AdminAuthRateLimited
-        exp_alerts:
-          - exp_labels:
-              alertname: AdminAuthRateLimited
-              severity: critical
-              domain: admin
-              job: java-platform
-              service: java-platform
-            exp_annotations:
-              summary: "Admin API is rate-limiting failed authentications on java-platform"
-              runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
-              runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
-              description: >-
-                More than 10 failed authentications reached the admin API within
-                one 60s window, so further failures answer 429. Either a client
-                holds a wrong or rotated token, or the port is being probed. A
-                request with a valid token is never rate-limited, so the kill
-                switch stays usable. Read <state-dir>/admin_audit.jsonl for the
-                remote addresses. Runbook:
-                docs/runbooks/RUNBOOK_incident_kill_switch.md#admin-auth-abuse
-      - eval_time: 20m
-        alertname: AdminAuthRateLimited
-        exp_alerts: []          # no new 429 for over 10m
-
-  - interval: 15s
-    name: AdminAuditSuppressed fires on a later burst and clears afterwards
-    input_series:
-      - series: 'admin_audit_suppressed_total{job="java-platform",service="java-platform"}'
-        values: '5+0x60 9+0x100'
-    alert_rule_test:
-      - eval_time: 14m
-        alertname: AdminAuditSuppressed
-        exp_alerts: []          # series older than 10m, no increase
-      - eval_time: 17m
-        alertname: AdminAuditSuppressed
-        exp_alerts:
-          - exp_labels:
-              alertname: AdminAuditSuppressed
-              severity: warning
-              domain: admin
-              job: java-platform
-              service: java-platform
-            exp_annotations:
-              summary: "Rejected admin requests are no longer individually audited on java-platform"
-              runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
-              runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
-              description: >-
-                Rejected admin requests exceeded the per-window audit cap, so
-                the remainder were counted and summarised (one audit_summary
-                line per window) instead of audited one by one. Accepted
-                requests are always audited. Find the source of the rejected
-                traffic in <state-dir>/admin_audit.jsonl. Runbook:
-                docs/runbooks/RUNBOOK_incident_kill_switch.md#admin-auth-abuse
-      - eval_time: 30m
-        alertname: AdminAuditSuppressed
-        exp_alerts: []

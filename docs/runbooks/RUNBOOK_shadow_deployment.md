@@ -20,7 +20,16 @@ until `ALERT_PAGE_URL_FILE` / `ALERT_TICKET_URL_FILE` name real receivers; on
 Kubernetes the Secret `iap-alertmanager-webhook` must carry both `page_url`
 and `ticket_url` (RUNBOOK_alerting.md §2).
 
-> **Status:** the paper-trading loop is LIVE — `com.iap.platform.PaperTrading`
+> **v1.17 (WS-F item F9): this runbook describes the RETIRED Java shadow
+> deployment** (`java-platform`, `java-platform-state`, the admin API,
+> `--resume`, `Dockerfile.java`). The deployed stack is now the Python
+> `platform-metrics` + `mvp-session` pair (`deployment/docker/docker-compose.yml`,
+> `deployment/k8s/platform-metrics.yaml`; `deployment/grafana/README.md` for
+> the metric contract). The procedure below is kept for the record until the
+> Python paper path (`python -m iap.paper.daily`, RUNBOOK_paper_trade.md) has
+> its own shadow runbook.
+>
+> **Status (historical):** the paper-trading loop was LIVE — `com.iap.platform.PaperTrading`
 > (started by `archive/java/paper.sh` (archived, frozen at v1.14.0) locally, or as the `java-platform` compose
 > service) runs the full vertical over deterministic replay sessions and
 > serves `/metrics`, `/health`, `/ready`, `/status` and the kill-switch admin
@@ -465,4 +474,4 @@ before the final checkpoint — the same bounded loss.
 Because STOPPED exits 0, compose (`restart: on-failure`) does not restart
 the container. To continue the session, start it again with `--resume`
 added to the command — the image's default entrypoint does not pass it
-(`deployment/docker/Dockerfile.java`).
+(`archive/java/Dockerfile.java`, retired).
