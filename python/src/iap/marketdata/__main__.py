@@ -56,6 +56,10 @@ def main(argv=None) -> int:
         from iap.marketdata.r7plan import main as r7_main
 
         return r7_main(args_in)
+    if args_in[:1] == ["breadth-universe"]:
+        from iap.marketdata.breadth import main as breadth_main
+
+        return breadth_main(args_in[1:])
     if args_in[:1] == ["process-day"]:
         from iap.marketdata.process_delete import main as process_main
 

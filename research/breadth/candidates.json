@@ -1,0 +1,90 @@
+{
+  "schema": "iap.r7_candidates/v1",
+  "status": "DRAFT - the breadth in-sample days (plan A3); each download needs the owner's approval",
+  "checked": "2026-10-16",
+  "source": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/",
+  "note": "Sizes from research/r7/nasdaq_listing_known.json (the public listing). No publisher checksum: the sha256 is recorded after download. 2019-10-18, 2021-07-13 and 2021-08-13 are on disk (data/real/itch/r7); the seven 2019-20 days are re-downloads (deleted after their first ingest). The breadth universe (research/breadth/universe.json) is selected on 2019-01-30 and fixed; the 2025/26 days are the breadth holdout for names outside AAPL/MSFT/QQQ (plan C8) and are NOT in this manifest.",
+  "symbols": "see research/breadth/universe.json",
+  "days": [
+    {
+      "date": "2019-01-30",
+      "file": "01302019.NASDAQ_ITCH50.gz",
+      "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/01302019.NASDAQ_ITCH50.gz",
+      "bytes": 4764426091,
+      "sha256": null,
+      "role": "insample"
+    },
+    {
+      "date": "2019-03-27",
+      "file": "03272019.NASDAQ_ITCH50.gz",
+      "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/03272019.NASDAQ_ITCH50.gz",
+      "bytes": 5510131732,
+      "sha256": null,
+      "role": "insample"
+    },
+    {
+      "date": "2019-07-30",
+      "file": "07302019.NASDAQ_ITCH50.gz",
+      "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/07302019.NASDAQ_ITCH50.gz",
+      "bytes": 3662140094,
+      "sha256": null,
+      "role": "insample"
+    },
+    {
+      "date": "2019-08-30",
+      "file": "08302019.NASDAQ_ITCH50.gz",
+      "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/08302019.NASDAQ_ITCH50.gz",
+      "bytes": 4075649457,
+      "sha256": null,
+      "role": "insample"
+    },
+    {
+      "date": "2019-10-18",
+      "file": "S101819-v50.txt.gz",
+      "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S101819-v50.txt.gz",
+      "bytes": 3951201663,
+      "sha256": null,
+      "role": "insample"
+    },
+    {
+      "date": "2019-10-30",
+      "file": "10302019.NASDAQ_ITCH50.gz",
+      "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/10302019.NASDAQ_ITCH50.gz",
+      "bytes": 3872931242,
+      "sha256": null,
+      "role": "insample"
+    },
+    {
+      "date": "2019-12-30",
+      "file": "12302019.NASDAQ_ITCH50.gz",
+      "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/12302019.NASDAQ_ITCH50.gz",
+      "bytes": 3524013057,
+      "sha256": null,
+      "role": "insample"
+    },
+    {
+      "date": "2020-01-30",
+      "file": "01302020.NASDAQ_ITCH50.gz",
+      "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/01302020.NASDAQ_ITCH50.gz",
+      "bytes": 5597158940,
+      "sha256": null,
+      "role": "insample"
+    },
+    {
+      "date": "2021-07-13",
+      "file": "S071321-v50.txt.gz",
+      "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S071321-v50.txt.gz",
+      "bytes": 5996745270,
+      "sha256": null,
+      "role": "insample"
+    },
+    {
+      "date": "2021-08-13",
+      "file": "S081321-v50.txt.gz",
+      "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S081321-v50.txt.gz",
+      "bytes": 4889328604,
+      "sha256": null,
+      "role": "insample"
+    }
+  ]
+}
