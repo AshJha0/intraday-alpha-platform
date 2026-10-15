@@ -8,6 +8,23 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-B items B2 + B3: signal-aware urgency and pacing, both opt-in and byte-identical off.
+  `iap.execution.signal` (`SignalSource`, `ArraySignalSource`, `AlphaUrgencySource.from_dataset`:
+  a flagship alpha's registered parameters scored on a dataset's feature frames, causal readings
+  in signal units = the z-score of the alpha's own scores); `ParentOrder(urgency_policy="alpha",
+  alpha_urgency=AlphaUrgencyPolicy(threshold_z, passive_urgency, max_age_ns, latency_ns))`
+  re-evaluates agree -> post / adverse -> cross / neutral -> the base style at EVERY child
+  decision through the parent's life, each child recording `urgency_regime`, `signal_z` and
+  `pacing_scale`; `iap.execution.pacing` (`PacingParams`) with `pov_signal_pacing`
+  (per-TRADE participation scaled by the signal), `slice_signal_tilt` (remaining quantity
+  re-apportioned at each slice, never negative) and `ac_signal_drift` (Almgren-Chriss re-solved
+  per slice with the signal as the drift; `ac_holdings` / `ac_trajectory` gain `drift=0.0`,
+  `ac_drift_from_signal`). The B1 benchmark driver takes `--signal EQ10|EQ05|synthetic` and
+  `base+variant` policies (`native+urgency`, `native+pacing`, `native+ac`, `native+ac_drift`),
+  pairs every variant with its own plain control on the same windows (day-clustered) and
+  reports urgency-regime shares per cell. API_TRADING.md section 2.14, COOKBOOK recipe 101,
+  `python/tests/test_v117_signal_aware.py`.
+
 - v1.17 WS-A item A3 (result): `research/breadth/universe.json` measured on the owner-approved
   2019-01-30 full-market file (368 M messages): 100 names, 29 ETFs, AAPL / QQQ / MSFT at ranks 6 / 12 / 15;
   `research/breadth/UNIVERSE_2019-01-30.md`. The first breadth process-day was refused by the disk guard

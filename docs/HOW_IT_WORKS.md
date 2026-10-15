@@ -845,7 +845,13 @@ default 10) and the fill-provenance shares (`Fill.provenance`: which rule
 produced the fill — aggressive walk, EXECUTE print, marketable ADD, hidden
 print, cross, reopen touch). Output goes to `research/execution/benchmark/`;
 `prereg_DRAFT.json` there is the unsigned draft of the B7 gate. The
-benchmark refuses a holdout directory.
+benchmark refuses a holdout directory. With `--signal EQ10` and `base+variant`
+policies (`native+urgency`, `native+pacing`, `native+ac_drift`; v1.17 B2 / B3,
+API_TRADING.md §2.14) the same parents are also worked with a real alpha
+signal re-read at every child decision — agree posts, adverse crosses,
+participation and slice weights tilt, the Almgren-Chriss drift follows the
+signal — and every variant is paired with its own plain control on the same
+windows, with the urgency-regime shares reported per cell.
 
 ```bash
 cd python

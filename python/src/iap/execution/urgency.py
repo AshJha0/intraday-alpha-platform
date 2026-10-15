@@ -73,3 +73,58 @@ def apply_alpha_urgency(
             risk_aversion=parent.risk_aversion * p.accelerate,
         )
     return parent
+
+
+# ---------------------------------------------------------------------------
+# v1.17 WS-B item B2: the parent-level policy re-evaluated through the life
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class AlphaUrgencyPolicy:
+    """``ParentOrder(urgency_policy="alpha", alpha_urgency=...)`` (v1.17 B2).
+
+    Thresholds are in **signal units** (``iap.execution.signal``: the
+    z-score of the alpha's own score distribution). At EVERY child decision
+    of the parent's life the replay reads the signal source causally and
+    classifies the alignment ``-z`` (buy) / ``+z`` (sell):
+
+    - ``alignment >= threshold_z`` (*agree*: waiting is expected to pay):
+      the child is POSTED passively with patience ``passive_urgency``
+      (the PASSIVE state machine of ``iap.execution.passive``);
+    - ``alignment <= -threshold_z`` (*adverse*: the price is expected to
+      run away): the child crosses (MARKET);
+    - inside the band (*neutral*), with no reading (*no_signal*) or a
+      reading older than ``max_age_ns`` (*stale*): the parent's plain
+      child style (its base ``policy``).
+
+    Each child records the regime and the ``z`` it was decided on
+    (``ChildOrder.urgency_regime`` / ``signal_z``: provenance).
+    """
+
+    threshold_z: float = 1.0  #: |z| at which the signal counts
+    passive_urgency: float = 0.1  #: PASSIVE patience when the signal agrees
+    max_age_ns: int = 10_000_000_000  #: readings older than this are stale (0 = never)
+    latency_ns: int = 0  #: read the signal as of ``t - latency_ns``
+
+    def __post_init__(self) -> None:
+        if self.threshold_z < 0 or self.max_age_ns < 0 or self.latency_ns < 0:
+            raise ValueError("need threshold_z >= 0, max_age_ns >= 0, latency_ns >= 0")
+        if not 0.0 <= self.passive_urgency <= 1.0:
+            raise ValueError("passive_urgency must be in [0, 1]")
+
+
+def regime_from_z(side: int, z: float, threshold_z: float) -> str:
+    """``"agree"`` / ``"adverse"`` / ``"neutral"`` from a z-score reading."""
+    a = alignment(side, z)
+    if threshold_z == 0.0:
+        if a > 0.0:
+            return "agree"
+        if a < 0.0:
+            return "adverse"
+        return "neutral"
+    if a >= threshold_z:
+        return "agree"
+    if a <= -threshold_z:
+        return "adverse"
+    return "neutral"
