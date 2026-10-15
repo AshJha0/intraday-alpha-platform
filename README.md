@@ -47,7 +47,7 @@ loop end to end.
 
 The full list with descriptions is the [Documentation index](#documentation-index).
 
-## Current status (v1.16 in progress; v1.15.0 released 2026-10-13)
+## Current status (v1.16.0 released 2026-10-15)
 
 **v1.16, the monetisation release (in progress, not released).** v1.15
 proved the alphas predict on unseen data; v1.16 asks whether any of that
@@ -103,14 +103,12 @@ opt-in and off by default, so no default run, golden or published number moved):
   blocking mypy and agent evals (#143), memory follow-ups (#148) and a
   registration environment pinned to the CI lock (#152).
 
-<!-- DRAFT v1.16 release-prep: replace at release -->
-**v1.16 (in progress, results pending).** Theme: monetisation. Realistic execution costs shipped
+**v1.16.0 (2026-10-15): monetisation.** Theme: monetisation. Realistic execution costs shipped
 (parent impact, residual-move calibration, v3 prereg realism, SOR and algo opt-ins). The taker route
 is a no-go: the in-sample study made zero trades in 480 cells, and the capacity curve finds no
 break-even size (0 of 45 cells): the edge is ~0.1-0.9 bp against a 0.8-2.4 bp round-trip cost.
-Two-sided quoting v2: RESULT PENDING. AI4 DeepLOB: RESULT PENDING. Draft notes:
-[docs/release/v1.16.0_RELEASE_NOTES_DRAFT.md](docs/release/v1.16.0_RELEASE_NOTES_DRAFT.md).
-<!-- /DRAFT -->
+Quoting v2: no edge (every cell loses $5-7k per session; skewing with EQ01/EQ05 cuts the loss by about $750-920 per session). AI4 DeepLOB: closed after an in-sample failure (net -0.69 bp per trade; holdout not used). Release notes:
+[docs/release/v1.16.0_RELEASE_NOTES.md](docs/release/v1.16.0_RELEASE_NOTES.md).
 
 **v1.15.0 (2026-10-13).** The R7 confirmatory pre-registration
 R7-CONFIRM-1 is **signed** (`research/r7/r7_confirm_prereg.json`: H4 tier 1,

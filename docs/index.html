@@ -121,16 +121,13 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     <tr><td>What does the full loop do?</td><td>Loses 82.84 USD on its golden session.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/MVP.md">MVP</a></td></tr>
   </table></div>
 
-  <!-- DRAFT v1.16 release-prep: replace at release -->
-  <div class="honest new">
-    <strong>v1.16 (in progress, results pending): monetisation.</strong>
+    <div class="honest new">
+    <strong>v1.16.0 (2026-10-15): monetisation.</strong>
     Realistic execution costs shipped first. The taker route does not pay: the in-sample study made
     zero trades in 480 cells, and no instrument has a break-even size (0 of 45 cells). The edge is
-    about 0.1&ndash;0.9 bp, against 0.8&ndash;2.4 bp to cross the spread. Two-sided quoting v2: RESULT
-    PENDING. AI4 DeepLOB: RESULT PENDING.
+    about 0.1&ndash;0.9 bp, against 0.8&ndash;2.4 bp to cross the spread. Two-sided quoting v2: no edge (every cell loses $5&ndash;7k per session; skewing with EQ01/EQ05 cuts the loss by about $750&ndash;920 per session). AI4 DeepLOB: closed after an in-sample failure (&minus;0.69 bp per trade net; holdout not used).
   </div>
-  <!-- /DRAFT -->
-  <div class="honest">
+    <div class="honest">
     <strong>v1.15.0 (2026-10-13): the confirmatory release.</strong>
     The pre-registered confirmatory round R7-CONFIRM-1, owner-signed before any data was read, ran
     once on 7 unseen Nasdaq sessions (2025-11 to 2026-06), six years after the in-sample data.

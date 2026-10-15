@@ -6,7 +6,11 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
-## Unreleased
+## v1.16.0 — 2026-10-15
+
+Theme: monetisation. Neither taking (P0-6, item 7), nor making (quoting v2), nor AI4 DeepLOB clears costs; the signals are useful as execution inputs. Notes: docs/release/v1.16.0_RELEASE_NOTES.md.
+
+- v1.16 item 10 CLOSED: AI4 DeepLOB in-sample failure (validation net -0.69 bp per trade, gross +0.27 vs cost 0.97 bp; baselines -0.74 / -0.68 bp; accept rule fails on all 3 symbols); no holdout look, by owner decision 2026-10-15. `research/r7/AI4_CLOSED_v116.md`, `research/v116/ai4_insample_summary.json`.
 
 - v1.16 (opt-in): registration-time CI-environment check. `iap.agents.fingerprint`
   gains `ci_lock_deps()` (numpy/pandas/scipy pins parsed from `python/requirements-ci.txt`),

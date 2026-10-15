@@ -491,11 +491,9 @@ change: still 0 alphas promoted, no strategy that trades at 1x costs.
 
 ## 3.10 v1.15.0 (2026-10-13): the confirmatory release
 
-<!-- DRAFT v1.16 release-prep: replace at release -->
-**v1.16 (in progress, results pending).** P0 execution items 1-5 done. P0-6 taker study: no-go
+**v1.16.0 (2026-10-15): monetisation.** P0 execution items 1-5 done. P0-6 taker study: no-go
 (0 trades in 480 cells). Item 7: no taker capacity (0/45 cells). Item 8 (paid data): closed by
-owner decision 2026-10-14. Quoting v2: RESULT PENDING. AI4 DeepLOB: RESULT PENDING.
-<!-- /DRAFT -->
+owner decision 2026-10-14. Quoting v2: no edge (every cell loses $5-7k per session; skewing with EQ01/EQ05 cuts the loss by about $750-920 per session). AI4 DeepLOB: closed after an in-sample failure (net -0.69 bp per trade; holdout not used).
 
 | Item | State |
 |---|---|

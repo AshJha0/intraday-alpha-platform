@@ -1,0 +1,223 @@
+{
+ "status": "IN-SAMPLE MODEL SELECTION (not a confirmatory look; no ledger entry)",
+ "cache": "C:\\Work\\Claude\\intraday-alpha-platform\\intraday-alpha-platform\\data\\real\\ai4_cache",
+ "train_units": [
+  "ds3_20190130_AAPL.meta.npz",
+  "ds3_20190130_MSFT.meta.npz",
+  "ds3_20190130_QQQ.meta.npz",
+  "ds3_20190327_AAPL.meta.npz",
+  "ds3_20190327_MSFT.meta.npz",
+  "ds3_20190327_QQQ.meta.npz",
+  "ds3_20190730_AAPL.meta.npz",
+  "ds3_20190730_MSFT.meta.npz",
+  "ds3_20190730_QQQ.meta.npz",
+  "ds3_20190830_AAPL.meta.npz",
+  "ds3_20190830_MSFT.meta.npz",
+  "ds3_20190830_QQQ.meta.npz",
+  "ds3_20191030_AAPL.meta.npz",
+  "ds3_20191030_MSFT.meta.npz",
+  "ds3_20191030_QQQ.meta.npz",
+  "ds3_20191230_AAPL.meta.npz",
+  "ds3_20191230_MSFT.meta.npz",
+  "ds3_20191230_QQQ.meta.npz",
+  "ds3_20200130_AAPL.meta.npz",
+  "ds3_20200130_MSFT.meta.npz",
+  "ds3_20200130_QQQ.meta.npz",
+  "r7_20191018_AAPL.meta.npz",
+  "r7_20191018_MSFT.meta.npz",
+  "r7_20191018_QQQ.meta.npz"
+ ],
+ "val_units": [
+  "r7_20210713_AAPL.meta.npz",
+  "r7_20210713_MSFT.meta.npz",
+  "r7_20210713_QQQ.meta.npz",
+  "r7_20210813_AAPL.meta.npz",
+  "r7_20210813_MSFT.meta.npz",
+  "r7_20210813_QQQ.meta.npz"
+ ],
+ "params": {
+  "window": 100,
+  "horizon": 50,
+  "threshold": 2e-05,
+  "stride": 50,
+  "max_train": 300000,
+  "baseline_train": 30000,
+  "epochs": 3,
+  "batch": 256,
+  "lr": 0.001,
+  "min_confidence": 0.6,
+  "min_trades": 30,
+  "taker_fee_per_share": 0.003,
+  "seed": 20261014
+ },
+ "results": {
+  "by_symbol": {
+   "deeplob": {
+    "AAPL": {
+     "n_trades": 4617,
+     "n_signals": 4617,
+     "mean_net_bp": -0.9321523500927976,
+     "std_net_bp": 0.4385867816577923,
+     "lower95_bp": -0.9427693755348473,
+     "gross_bp": 0.382630839478658,
+     "cost_bp": 1.3147831895714555,
+     "accuracy": 0.6387382771071416
+    },
+    "MSFT": {
+     "n_trades": 837,
+     "n_signals": 837,
+     "mean_net_bp": -0.5000773831699211,
+     "std_net_bp": 0.3469375028359085,
+     "lower95_bp": -0.5198023270391512,
+     "gross_bp": 0.24518384607181484,
+     "cost_bp": 0.745261229241736,
+     "accuracy": 0.6490119991193307
+    },
+    "QQQ": {
+     "n_trades": 3438,
+     "n_signals": 3438,
+     "mean_net_bp": -0.4223816005539841,
+     "std_net_bp": 0.2162296439372529,
+     "lower95_bp": -0.4284474210439442,
+     "gross_bp": 0.13558850809035594,
+     "cost_bp": 0.55797010864434,
+     "accuracy": 0.8289519734278941
+    }
+   },
+   "linear": {
+    "AAPL": {
+     "n_trades": 7526,
+     "n_signals": 7526,
+     "mean_net_bp": -1.2111427110003241,
+     "std_net_bp": 0.7443159323445311,
+     "lower95_bp": -1.2252551625885513,
+     "gross_bp": 0.1819074141910022,
+     "cost_bp": 1.3930501251913265,
+     "accuracy": 0.5805259959245445
+    },
+    "MSFT": {
+     "n_trades": 14895,
+     "n_signals": 14895,
+     "mean_net_bp": -0.887401226083505,
+     "std_net_bp": 0.5993767024746426,
+     "lower95_bp": -0.8954792821128444,
+     "gross_bp": 0.08509403261804714,
+     "cost_bp": 0.9724952587015523,
+     "accuracy": 0.5351992514310876
+    },
+    "QQQ": {
+     "n_trades": 24157,
+     "n_signals": 24157,
+     "mean_net_bp": -0.5087236222996494,
+     "std_net_bp": 0.24020295855900428,
+     "lower95_bp": -0.5112656724219594,
+     "gross_bp": 0.050904147995440074,
+     "cost_bp": 0.5596277702950896,
+     "accuracy": 0.6906964612347049
+    }
+   },
+   "gbm": {
+    "AAPL": {
+     "n_trades": 356,
+     "n_signals": 356,
+     "mean_net_bp": -0.851733017662466,
+     "std_net_bp": 0.51218274183273,
+     "lower95_bp": -0.8963836073113484,
+     "gross_bp": 0.4113778483996962,
+     "cost_bp": 1.2631108660621622,
+     "accuracy": 0.6155486969267252
+    },
+    "MSFT": {
+     "n_trades": 13,
+     "n_signals": 13,
+     "mean_net_bp": -0.5588147750594461,
+     "std_net_bp": 0.4525161473795861,
+     "lower95_bp": -0.7652527839532828,
+     "gross_bp": 0.10860748060200678,
+     "cost_bp": 0.6674222556614529,
+     "accuracy": 0.661341369440775
+    },
+    "QQQ": {
+     "n_trades": 231,
+     "n_signals": 231,
+     "mean_net_bp": -0.4183121528799724,
+     "std_net_bp": 0.2133699793249427,
+     "lower95_bp": -0.4414037824466504,
+     "gross_bp": 0.1068593984867381,
+     "cost_bp": 0.5251715513667105,
+     "accuracy": 0.876192740215403
+    }
+   }
+  },
+  "pooled": {
+   "deeplob": {
+    "n_trades": 8892,
+    "n_signals": 8892,
+    "mean_net_bp": -0.6943837283846455,
+    "std_net_bp": 0.43678417467354064,
+    "lower95_bp": -0.7020026661245665,
+    "gross_bp": 0.2741766482062209,
+    "cost_bp": 0.9685603765908665,
+    "accuracy": 0.7346782414471505,
+    "macro_f1": 0.4583608355367395
+   },
+   "linear": {
+    "n_trades": 46578,
+    "n_signals": 46578,
+    "mean_net_bp": -0.7433152528961071,
+    "std_net_bp": 0.5521355882881479,
+    "lower95_bp": -0.7475233192504824,
+    "gross_bp": 0.0830049018457886,
+    "cost_bp": 0.8263201547418958,
+    "accuracy": 0.6239960263094674,
+    "macro_f1": 0.39761284668551927
+   },
+   "gbm": {
+    "n_trades": 600,
+    "n_signals": 600,
+    "mean_net_bp": -0.6785194227981406,
+    "std_net_bp": 0.470434391331161,
+    "lower95_bp": -0.7101095005726472,
+    "gross_bp": 0.2875782205475908,
+    "cost_bp": 0.9660976433457313,
+    "accuracy": 0.7544947504431444,
+    "macro_f1": 0.385766837151049
+   }
+  }
+ },
+ "acceptance_in_sample": {
+  "AAPL": {
+   "candidate": "deeplob",
+   "accepted": false,
+   "checks": {
+    "mean_net_positive": false,
+    "lower95_positive": false,
+    "enough_trades": true,
+    "beats_baselines": false
+   },
+   "best_baseline_mean_net_bp": -0.851733017662466
+  },
+  "MSFT": {
+   "candidate": "deeplob",
+   "accepted": false,
+   "checks": {
+    "mean_net_positive": false,
+    "lower95_positive": false,
+    "enough_trades": true,
+    "beats_baselines": true
+   },
+   "best_baseline_mean_net_bp": -0.5588147750594461
+  },
+  "QQQ": {
+   "candidate": "deeplob",
+   "accepted": false,
+   "checks": {
+    "mean_net_positive": false,
+    "lower95_positive": false,
+    "enough_trades": true,
+    "beats_baselines": false
+   },
+   "best_baseline_mean_net_bp": -0.4183121528799724
+  }
+ }
+}
