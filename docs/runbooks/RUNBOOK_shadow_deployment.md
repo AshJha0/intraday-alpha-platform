@@ -1,5 +1,9 @@
 # RUNBOOK — Paper Trading / Shadow Deployment
 
+> Renamed from `RUNBOOK_paper_trading.md` (v1.17 WS0). This is the Java shadow stack
+> on the golden replay vector. The forward paper trade on real sessions
+> (`python -m iap.paper.daily`) is [RUNBOOK_paper_trade.md](RUNBOOK_paper_trade.md).
+
 **Scope:** promotion gate 11 (spec §20): running strategies against live-shaped
 event flow with the real risk engine, real execution simulator and full
 observability — no capital at risk.

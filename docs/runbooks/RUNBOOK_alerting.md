@@ -124,7 +124,7 @@ it, not venue round-trip. A JVM restart resets the cumulative histograms;
 Since v1.14 a backup of a state directory includes a hash-chained
 `risk_audit.jsonl` whose head is recorded in `session_state.json`. Back up
 both together; restoring one without the other leaves a chain that does
-not match its checkpoint (RUNBOOK_paper_trading.md §5).
+not match its checkpoint (RUNBOOK_shadow_deployment.md §5).
 
 What this deployment provides is **restart-and-resume, plus backups**. It is
 not active-active and it has no hot standby:
@@ -136,7 +136,7 @@ not active-active and it has no hot standby:
 - On pod or node loss Kubernetes reschedules the single pod, which re-attaches
   the claim with its checkpoint intact (§12.3). Continuing the interrupted
   session needs `--resume` in the container arguments (Dockerfile.java;
-  RUNBOOK_paper_trading.md §5). `/ready` keeps the pod out of the Service until
+  RUNBOOK_shadow_deployment.md §5). `/ready` keeps the pod out of the Service until
   it is trading. Expect a gap of minutes on node loss (volume detach timeout),
   not seconds.
 - There is no PodDisruptionBudget, on purpose: with one replica it would block
@@ -164,7 +164,7 @@ kubectl -n intraday-alpha logs job/<latest state-backup job>   # "backup ok: sta
 3. Run a one-off pod that mounts `iap-java-state-backup` read-only and
    `iap-java-state` read-write, and extract the newest archive:
    `tar -xzf /backup/state-<ts>.tgz -C /data` (this restores `/data/state`).
-4. Scale back to 1, with `--resume` in the arguments (RUNBOOK_paper_trading.md §5).
+4. Scale back to 1, with `--resume` in the arguments (RUNBOOK_shadow_deployment.md §5).
 5. If resume **refuses** (audit or trace line count, or the risk snapshot's
    sha256, does not match the checkpoint), the archive was taken while a
    checkpoint was being written. The refusal is the
