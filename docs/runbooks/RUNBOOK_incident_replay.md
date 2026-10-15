@@ -29,7 +29,7 @@ are below.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run                 # -> ../data/mvp/<run_id>/
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=231 children=347 fills=163 pnl=-82.837333 USD digest=3f2b117ecea95922... out=.../data/mvp/58a10f2194a3c81c
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=231 children=347 fills=163 pnl=-82.837333 USD digest=77c5c4f705e33ecb... out=.../data/mvp/58a10f2194a3c81c
 ```
 
 **Java paper vertical** (`archive/java/paper.sh` (archived, frozen at v1.14.0), state directory `--state-dir` /
