@@ -1,0 +1,8583 @@
+{
+ "x-version": 1,
+ "description": "F7 rule 2 golden: iap.execution.sor_v2.CostAwareRouter passive routing with fill probability (API_TRADING.md section 2.9 / 2.13 P0-4): passive_costs / route_passive with the model's p_fill_touch or with hazard_fill_prob(rate, horizon_s) where rate(vid, side, q) reads the per-venue calibration document (`calibration_docs`, keyed by venue id; `source` exec = queue_exec_depletion_hazard (X-4), pooled = queue_depletion_hazard, cancel = queue_cancel_depletion_hazard; a venue without a document or an empty cell is None and skipped); aggressive_costs / route_aggressive; allocate_passive. Costs are keyed by venue id as strings; route 0 = NO_ROUTE; {error} = ValueError. Books and ledger fills as in expected_f7_sor_sweep.json.",
+ "generator": "PYTHONPATH=src python tools/make_golden_f7.py --only r02_sor_passive --force",
+ "parity": "canonical JSON bytes of `expected` (sorted keys, no whitespace, Python float repr) must equal the C++ port's canonical bytes; `expected_tol` (when present) is compared to `tolerance`",
+ "inputs": {
+  "calibration_docs": {
+   "1": {
+    "queue_edges": [
+     0,
+     500,
+     2000
+    ],
+    "queue_depletion": {
+     "bid": {
+      "0": {
+       "hazard_per_s": 2.0,
+       "exec_hazard_per_s": 1.2,
+       "cancel_hazard_per_s": 0.8
+      },
+      "1-500": {
+       "hazard_per_s": 0.9,
+       "exec_hazard_per_s": 0.5,
+       "cancel_hazard_per_s": 0.4
+      },
+      "501-2000": {
+       "hazard_per_s": 0.3,
+       "exec_hazard_per_s": 0.12,
+       "cancel_hazard_per_s": 0.18
+      },
+      ">2000": {
+       "hazard_per_s": 0.05,
+       "exec_hazard_per_s": 0.02,
+       "cancel_hazard_per_s": 0.03
+      }
+     },
+     "ask": {
+      "0": {
+       "hazard_per_s": 1.8,
+       "exec_hazard_per_s": 1.0,
+       "cancel_hazard_per_s": 0.8
+      },
+      "1-500": {
+       "hazard_per_s": 0.8,
+       "exec_hazard_per_s": 0.45,
+       "cancel_hazard_per_s": 0.35
+      },
+      "501-2000": {
+       "hazard_per_s": 0.25
+      },
+      ">2000": {}
+     }
+    }
+   },
+   "2": {
+    "queue_edges": [
+     0,
+     500,
+     2000
+    ],
+    "queue_depletion": {
+     "bid": {
+      "0": {
+       "hazard_per_s": 1.0,
+       "exec_hazard_per_s": 0.7,
+       "cancel_hazard_per_s": 0.3
+      },
+      "1-500": {
+       "hazard_per_s": 0.4,
+       "exec_hazard_per_s": 0.3,
+       "cancel_hazard_per_s": 0.1
+      }
+     },
+     "ask": {
+      "0": {
+       "hazard_per_s": 1.1,
+       "exec_hazard_per_s": 0.6,
+       "cancel_hazard_per_s": 0.5
+      },
+      "1-500": {
+       "hazard_per_s": 0.5,
+       "exec_hazard_per_s": 0.2,
+       "cancel_hazard_per_s": 0.3
+      },
+      "501-2000": {
+       "hazard_per_s": 0.2,
+       "exec_hazard_per_s": 0.1,
+       "cancel_hazard_per_s": 0.1
+      },
+      ">2000": {
+       "hazard_per_s": 0.01,
+       "exec_hazard_per_s": 0.0,
+       "cancel_hazard_per_s": 0.01
+      }
+     }
+    }
+   },
+   "3": {
+    "queue_edges": [
+     0,
+     500,
+     2000
+    ],
+    "queue_depletion": {
+     "bid": {},
+     "ask": {
+      "0": {
+       "hazard_per_s": 3.0,
+       "exec_hazard_per_s": 2.5,
+       "cancel_hazard_per_s": 0.5
+      }
+     }
+    }
+   },
+   "101": {
+    "queue_edges": [
+     0,
+     300,
+     1000,
+     5000
+    ],
+    "queue_depletion": {
+     "bid": {
+      "0": {
+       "hazard_per_s": 4.0,
+       "exec_hazard_per_s": 3.1,
+       "cancel_hazard_per_s": 0.9
+      },
+      "1-300": {
+       "hazard_per_s": 2.2,
+       "exec_hazard_per_s": 1.4,
+       "cancel_hazard_per_s": 0.8
+      },
+      "301-1000": {
+       "hazard_per_s": 0.9,
+       "exec_hazard_per_s": 0.55,
+       "cancel_hazard_per_s": 0.35
+      },
+      "1001-5000": {
+       "hazard_per_s": 0.3,
+       "exec_hazard_per_s": 0.16,
+       "cancel_hazard_per_s": 0.14
+      },
+      ">5000": {
+       "hazard_per_s": 0.08,
+       "exec_hazard_per_s": 0.03,
+       "cancel_hazard_per_s": 0.05
+      }
+     },
+     "ask": {
+      "0": {
+       "hazard_per_s": 3.8,
+       "exec_hazard_per_s": 2.9,
+       "cancel_hazard_per_s": 0.9
+      },
+      "1-300": {
+       "hazard_per_s": 2.0,
+       "exec_hazard_per_s": 1.3,
+       "cancel_hazard_per_s": 0.7
+      },
+      "301-1000": {
+       "hazard_per_s": 0.85,
+       "exec_hazard_per_s": 0.5,
+       "cancel_hazard_per_s": 0.35
+      },
+      "1001-5000": {
+       "hazard_per_s": 0.28,
+       "exec_hazard_per_s": 0.15,
+       "cancel_hazard_per_s": 0.13
+      },
+      ">5000": {
+       "hazard_per_s": 0.07,
+       "cancel_hazard_per_s": 0.05
+      }
+     }
+    }
+   }
+  },
+  "fixed": [
+   {
+    "label": "three venues",
+    "venues": [
+     {
+      "spec": {
+       "venue_id": 1,
+       "name": "V1",
+       "is_fx": false,
+       "taker_fee_per_share": 0.003,
+       "maker_rebate_per_share": 0.002,
+       "commission_per_million": 0.0,
+       "latency_mean_ns": 100000,
+       "latency_jitter_ns": 0
+      },
+      "p_fill_touch": 0.6,
+      "toxicity_bps": {
+       "100ms": 0.1,
+       "1s": 0.4
+      },
+      "latency_ns": null,
+      "tiers": []
+     },
+     {
+      "spec": {
+       "venue_id": 2,
+       "name": "V2",
+       "is_fx": false,
+       "taker_fee_per_share": 0.001,
+       "maker_rebate_per_share": 0.0025,
+       "commission_per_million": 0.0,
+       "latency_mean_ns": 300000,
+       "latency_jitter_ns": 10000
+      },
+      "p_fill_touch": 0.35,
+      "toxicity_bps": {
+       "1s": -0.2
+      },
+      "latency_ns": 250000,
+      "tiers": []
+     },
+     {
+      "spec": {
+       "venue_id": 3,
+       "name": "V3",
+       "is_fx": false,
+       "taker_fee_per_share": 0.003,
+       "maker_rebate_per_share": 0.0015,
+       "commission_per_million": 0.0,
+       "latency_mean_ns": 150000,
+       "latency_jitter_ns": 0
+      },
+      "p_fill_touch": 0.5,
+      "toxicity_bps": {
+       "1s": 1.6
+      },
+      "latency_ns": null,
+      "tiers": [
+       [
+        0,
+        0.003,
+        0.0015
+       ],
+       [
+        5000,
+        0.002,
+        0.002
+       ],
+       [
+        20000,
+        0.0012,
+        0.0028
+       ]
+      ]
+     }
+    ],
+    "sor_options": {
+     "prefer_rebate": true,
+     "max_venue_latency_ns": 9223372036854775807
+    },
+    "ledger_fills": [
+     [
+      3,
+      4000,
+      1787578200000000000,
+      false
+     ],
+     [
+      3,
+      1500,
+      1787578201000000000,
+      true
+     ],
+     [
+      3,
+      30000,
+      1784122200000000000,
+      false
+     ],
+     [
+      1,
+      2000,
+      1787578200000000000,
+      false
+     ]
+    ],
+    "events": [
+     [
+      1,
+      7,
+      1,
+      1787578200000000001,
+      1787578200000000001,
+      1,
+      1,
+      1,
+      10001,
+      300,
+      11,
+      0
+     ],
+     [
+      2,
+      7,
+      1,
+      1787578200000000002,
+      1787578200000000002,
+      2,
+      1,
+      1,
+      10002,
+      500,
+      12,
+      0
+     ],
+     [
+      3,
+      7,
+      1,
+      1787578200000000003,
+      1787578200000000003,
+      3,
+      1,
+      1,
+      10003,
+      1000,
+      13,
+      0
+     ],
+     [
+      4,
+      7,
+      1,
+      1787578200000000004,
+      1787578200000000004,
+      4,
+      1,
+      1,
+      10005,
+      200,
+      14,
+      0
+     ],
+     [
+      5,
+      7,
+      1,
+      1787578200000000005,
+      1787578200000000005,
+      5,
+      1,
+      0,
+      9999,
+      400,
+      15,
+      0
+     ],
+     [
+      6,
+      7,
+      1,
+      1787578200000000006,
+      1787578200000000006,
+      6,
+      1,
+      0,
+      9998,
+      600,
+      16,
+      0
+     ],
+     [
+      7,
+      7,
+      1,
+      1787578200000000007,
+      1787578200000000007,
+      7,
+      1,
+      0,
+      9996,
+      900,
+      17,
+      0
+     ],
+     [
+      8,
+      7,
+      2,
+      1787578200000000001,
+      1787578200000000001,
+      1,
+      1,
+      1,
+      10002,
+      200,
+      21,
+      0
+     ],
+     [
+      9,
+      7,
+      2,
+      1787578200000000002,
+      1787578200000000002,
+      2,
+      1,
+      1,
+      10002,
+      150,
+      22,
+      0
+     ],
+     [
+      10,
+      7,
+      2,
+      1787578200000000003,
+      1787578200000000003,
+      3,
+      1,
+      1,
+      10003,
+      400,
+      23,
+      0
+     ],
+     [
+      11,
+      7,
+      2,
+      1787578200000000004,
+      1787578200000000004,
+      4,
+      1,
+      0,
+      9999,
+      100,
+      24,
+      0
+     ],
+     [
+      12,
+      7,
+      2,
+      1787578200000000005,
+      1787578200000000005,
+      5,
+      1,
+      0,
+      9997,
+      700,
+      25,
+      0
+     ],
+     [
+      13,
+      7,
+      3,
+      1787578200000000001,
+      1787578200000000001,
+      1,
+      1,
+      1,
+      10001,
+      50,
+      31,
+      0
+     ],
+     [
+      14,
+      7,
+      3,
+      1787578200000000002,
+      1787578200000000002,
+      2,
+      1,
+      1,
+      10004,
+      2000,
+      32,
+      0
+     ],
+     [
+      15,
+      7,
+      3,
+      1787578200000000003,
+      1787578200000000003,
+      3,
+      1,
+      0,
+      10000,
+      250,
+      33,
+      0
+     ],
+     [
+      16,
+      7,
+      3,
+      1787578200000000004,
+      1787578200000000004,
+      4,
+      1,
+      0,
+      9999,
+      800,
+      34,
+      0
+     ],
+     [
+      17,
+      7,
+      3,
+      1787578200000000005,
+      1787578200000000005,
+      5,
+      1,
+      0,
+      9998,
+      100,
+      35,
+      0
+     ]
+    ],
+    "queries": [
+     {
+      "kind": "passive",
+      "side": 0,
+      "ts": 1787578210000000000,
+      "qty": 0,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": null,
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 1.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "passive",
+      "side": 1,
+      "ts": 1787578210000000000,
+      "qty": 0,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": null,
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 1.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "passive",
+      "side": 0,
+      "ts": 1787578210000000000,
+      "qty": 0,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": null,
+      "options": {
+       "tox_horizon": "100ms",
+       "latency_penalty_bps_per_ms": 0.5,
+       "miss_cost_bps": 1.25,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 1.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "passive",
+      "side": 1,
+      "ts": 1787578210000000000,
+      "qty": 0,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": null,
+      "options": {
+       "tox_horizon": "100ms",
+       "latency_penalty_bps_per_ms": 0.5,
+       "miss_cost_bps": 1.25,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 1.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "passive",
+      "side": 0,
+      "ts": 1787578210000000000,
+      "qty": 0,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": {
+       "source": "exec",
+       "horizon_s": 1.0
+      },
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 1.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "passive",
+      "side": 1,
+      "ts": 1787578210000000000,
+      "qty": 0,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": {
+       "source": "exec",
+       "horizon_s": 1.0
+      },
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 1.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "passive",
+      "side": 0,
+      "ts": 1787578210000000000,
+      "qty": 0,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": {
+       "source": "pooled",
+       "horizon_s": 0.5
+      },
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 1.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "passive",
+      "side": 1,
+      "ts": 1787578210000000000,
+      "qty": 0,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": {
+       "source": "cancel",
+       "horizon_s": 2.0
+      },
+      "options": {
+       "tox_horizon": "100ms",
+       "latency_penalty_bps_per_ms": 0.5,
+       "miss_cost_bps": 1.25,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 1.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "passive",
+      "side": 0,
+      "ts": 1787578210000000000,
+      "qty": 0,
+      "tick": 0.01,
+      "candidates": [
+       2,
+       3
+      ],
+      "fill_prob": {
+       "source": "exec",
+       "horizon_s": 1.0
+      },
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 1.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "aggressive",
+      "side": 0,
+      "ts": 1787578210000000000,
+      "qty": 0,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": null,
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 1.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "aggressive",
+      "side": 1,
+      "ts": 1787578210000000000,
+      "qty": 0,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": null,
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 1.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "aggressive",
+      "side": 0,
+      "ts": 1787578210000000000,
+      "qty": 0,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": null,
+      "options": {
+       "tox_horizon": "100ms",
+       "latency_penalty_bps_per_ms": 0.5,
+       "miss_cost_bps": 1.25,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 1.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "aggressive",
+      "side": 1,
+      "ts": 1787578210000000000,
+      "qty": 0,
+      "tick": 0.01,
+      "candidates": [
+       1,
+       2
+      ],
+      "fill_prob": null,
+      "options": {
+       "tox_horizon": "100ms",
+       "latency_penalty_bps_per_ms": 0.5,
+       "miss_cost_bps": 1.25,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 1.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "allocate",
+      "side": 0,
+      "ts": 1787578210000000000,
+      "qty": 1050,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": null,
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": 1.0,
+       "tox_scale_bps": 0.5,
+       "lot": 100
+      }
+     },
+     {
+      "kind": "allocate",
+      "side": 1,
+      "ts": 1787578210000000000,
+      "qty": 1050,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": null,
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": 1.0,
+       "tox_scale_bps": 0.5,
+       "lot": 100
+      }
+     },
+     {
+      "kind": "allocate",
+      "side": 0,
+      "ts": 1787578210000000000,
+      "qty": 1001,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": null,
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 2.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "allocate",
+      "side": 1,
+      "ts": 1787578210000000000,
+      "qty": 7,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": null,
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 2.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "allocate",
+      "side": 0,
+      "ts": 1787578210000000000,
+      "qty": 0,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": null,
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": 1.0,
+       "tox_scale_bps": 0.5,
+       "lot": 100
+      }
+     }
+    ]
+   },
+   {
+    "label": "venue 3 halted, no ledger fills",
+    "venues": [
+     {
+      "spec": {
+       "venue_id": 1,
+       "name": "V1",
+       "is_fx": false,
+       "taker_fee_per_share": 0.003,
+       "maker_rebate_per_share": 0.002,
+       "commission_per_million": 0.0,
+       "latency_mean_ns": 100000,
+       "latency_jitter_ns": 0
+      },
+      "p_fill_touch": 0.6,
+      "toxicity_bps": {
+       "100ms": 0.1,
+       "1s": 0.4
+      },
+      "latency_ns": null,
+      "tiers": []
+     },
+     {
+      "spec": {
+       "venue_id": 2,
+       "name": "V2",
+       "is_fx": false,
+       "taker_fee_per_share": 0.001,
+       "maker_rebate_per_share": 0.0025,
+       "commission_per_million": 0.0,
+       "latency_mean_ns": 300000,
+       "latency_jitter_ns": 10000
+      },
+      "p_fill_touch": 0.35,
+      "toxicity_bps": {
+       "1s": -0.2
+      },
+      "latency_ns": 250000,
+      "tiers": []
+     },
+     {
+      "spec": {
+       "venue_id": 3,
+       "name": "V3",
+       "is_fx": false,
+       "taker_fee_per_share": 0.003,
+       "maker_rebate_per_share": 0.0015,
+       "commission_per_million": 0.0,
+       "latency_mean_ns": 150000,
+       "latency_jitter_ns": 0
+      },
+      "p_fill_touch": 0.5,
+      "toxicity_bps": {
+       "1s": 1.6
+      },
+      "latency_ns": null,
+      "tiers": [
+       [
+        0,
+        0.003,
+        0.0015
+       ],
+       [
+        5000,
+        0.002,
+        0.002
+       ],
+       [
+        20000,
+        0.0012,
+        0.0028
+       ]
+      ]
+     }
+    ],
+    "sor_options": {
+     "prefer_rebate": true,
+     "max_venue_latency_ns": 9223372036854775807
+    },
+    "ledger_fills": [],
+    "events": [
+     [
+      1,
+      7,
+      1,
+      1787578200000000001,
+      1787578200000000001,
+      1,
+      1,
+      1,
+      10001,
+      300,
+      11,
+      0
+     ],
+     [
+      2,
+      7,
+      1,
+      1787578200000000002,
+      1787578200000000002,
+      2,
+      1,
+      1,
+      10002,
+      500,
+      12,
+      0
+     ],
+     [
+      3,
+      7,
+      1,
+      1787578200000000003,
+      1787578200000000003,
+      3,
+      1,
+      1,
+      10003,
+      1000,
+      13,
+      0
+     ],
+     [
+      4,
+      7,
+      1,
+      1787578200000000004,
+      1787578200000000004,
+      4,
+      1,
+      1,
+      10005,
+      200,
+      14,
+      0
+     ],
+     [
+      5,
+      7,
+      1,
+      1787578200000000005,
+      1787578200000000005,
+      5,
+      1,
+      0,
+      9999,
+      400,
+      15,
+      0
+     ],
+     [
+      6,
+      7,
+      1,
+      1787578200000000006,
+      1787578200000000006,
+      6,
+      1,
+      0,
+      9998,
+      600,
+      16,
+      0
+     ],
+     [
+      7,
+      7,
+      1,
+      1787578200000000007,
+      1787578200000000007,
+      7,
+      1,
+      0,
+      9996,
+      900,
+      17,
+      0
+     ],
+     [
+      8,
+      7,
+      2,
+      1787578200000000001,
+      1787578200000000001,
+      1,
+      1,
+      1,
+      10002,
+      200,
+      21,
+      0
+     ],
+     [
+      9,
+      7,
+      2,
+      1787578200000000002,
+      1787578200000000002,
+      2,
+      1,
+      1,
+      10002,
+      150,
+      22,
+      0
+     ],
+     [
+      10,
+      7,
+      2,
+      1787578200000000003,
+      1787578200000000003,
+      3,
+      1,
+      1,
+      10003,
+      400,
+      23,
+      0
+     ],
+     [
+      11,
+      7,
+      2,
+      1787578200000000004,
+      1787578200000000004,
+      4,
+      1,
+      0,
+      9999,
+      100,
+      24,
+      0
+     ],
+     [
+      12,
+      7,
+      2,
+      1787578200000000005,
+      1787578200000000005,
+      5,
+      1,
+      0,
+      9997,
+      700,
+      25,
+      0
+     ],
+     [
+      13,
+      7,
+      3,
+      1787578200000000001,
+      1787578200000000001,
+      1,
+      1,
+      1,
+      10001,
+      50,
+      31,
+      0
+     ],
+     [
+      14,
+      7,
+      3,
+      1787578200000000002,
+      1787578200000000002,
+      2,
+      1,
+      1,
+      10004,
+      2000,
+      32,
+      0
+     ],
+     [
+      15,
+      7,
+      3,
+      1787578200000000003,
+      1787578200000000003,
+      3,
+      1,
+      0,
+      10000,
+      250,
+      33,
+      0
+     ],
+     [
+      16,
+      7,
+      3,
+      1787578200000000004,
+      1787578200000000004,
+      4,
+      1,
+      0,
+      9999,
+      800,
+      34,
+      0
+     ],
+     [
+      17,
+      7,
+      3,
+      1787578200000000005,
+      1787578200000000005,
+      5,
+      1,
+      0,
+      9998,
+      100,
+      35,
+      0
+     ],
+     [
+      18,
+      7,
+      3,
+      1787578200000000006,
+      1787578200000000006,
+      6,
+      8,
+      0,
+      0,
+      2,
+      0,
+      0
+     ]
+    ],
+    "queries": [
+     {
+      "kind": "passive",
+      "side": 0,
+      "ts": 1787578210000000000,
+      "qty": 0,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": null,
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 1.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "aggressive",
+      "side": 1,
+      "ts": 1787578210000000000,
+      "qty": 0,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": null,
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 1.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "allocate",
+      "side": 0,
+      "ts": 1787578210000000000,
+      "qty": 500,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": null,
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": 1.0,
+       "tox_scale_bps": 0.5,
+       "lot": 100
+      }
+     }
+    ]
+   },
+   {
+    "label": "venue 2 stale, latency cap 120us",
+    "venues": [
+     {
+      "spec": {
+       "venue_id": 1,
+       "name": "V1",
+       "is_fx": false,
+       "taker_fee_per_share": 0.003,
+       "maker_rebate_per_share": 0.002,
+       "commission_per_million": 0.0,
+       "latency_mean_ns": 100000,
+       "latency_jitter_ns": 0
+      },
+      "p_fill_touch": 0.6,
+      "toxicity_bps": {
+       "100ms": 0.1,
+       "1s": 0.4
+      },
+      "latency_ns": null,
+      "tiers": []
+     },
+     {
+      "spec": {
+       "venue_id": 2,
+       "name": "V2",
+       "is_fx": false,
+       "taker_fee_per_share": 0.001,
+       "maker_rebate_per_share": 0.0025,
+       "commission_per_million": 0.0,
+       "latency_mean_ns": 300000,
+       "latency_jitter_ns": 10000
+      },
+      "p_fill_touch": 0.35,
+      "toxicity_bps": {
+       "1s": -0.2
+      },
+      "latency_ns": 250000,
+      "tiers": []
+     },
+     {
+      "spec": {
+       "venue_id": 3,
+       "name": "V3",
+       "is_fx": false,
+       "taker_fee_per_share": 0.003,
+       "maker_rebate_per_share": 0.0015,
+       "commission_per_million": 0.0,
+       "latency_mean_ns": 150000,
+       "latency_jitter_ns": 0
+      },
+      "p_fill_touch": 0.5,
+      "toxicity_bps": {
+       "1s": 1.6
+      },
+      "latency_ns": null,
+      "tiers": [
+       [
+        0,
+        0.003,
+        0.0015
+       ],
+       [
+        5000,
+        0.002,
+        0.002
+       ],
+       [
+        20000,
+        0.0012,
+        0.0028
+       ]
+      ]
+     }
+    ],
+    "sor_options": {
+     "prefer_rebate": true,
+     "max_venue_latency_ns": 120000
+    },
+    "ledger_fills": [
+     [
+      3,
+      4000,
+      1787578200000000000,
+      false
+     ],
+     [
+      3,
+      1500,
+      1787578201000000000,
+      true
+     ],
+     [
+      3,
+      30000,
+      1784122200000000000,
+      false
+     ],
+     [
+      1,
+      2000,
+      1787578200000000000,
+      false
+     ]
+    ],
+    "events": [
+     [
+      1,
+      7,
+      1,
+      1787578200000000001,
+      1787578200000000001,
+      1,
+      1,
+      1,
+      10001,
+      300,
+      11,
+      0
+     ],
+     [
+      2,
+      7,
+      1,
+      1787578200000000002,
+      1787578200000000002,
+      2,
+      1,
+      1,
+      10002,
+      500,
+      12,
+      0
+     ],
+     [
+      3,
+      7,
+      1,
+      1787578200000000003,
+      1787578200000000003,
+      3,
+      1,
+      1,
+      10003,
+      1000,
+      13,
+      0
+     ],
+     [
+      4,
+      7,
+      1,
+      1787578200000000004,
+      1787578200000000004,
+      4,
+      1,
+      1,
+      10005,
+      200,
+      14,
+      0
+     ],
+     [
+      5,
+      7,
+      1,
+      1787578200000000005,
+      1787578200000000005,
+      5,
+      1,
+      0,
+      9999,
+      400,
+      15,
+      0
+     ],
+     [
+      6,
+      7,
+      1,
+      1787578200000000006,
+      1787578200000000006,
+      6,
+      1,
+      0,
+      9998,
+      600,
+      16,
+      0
+     ],
+     [
+      7,
+      7,
+      1,
+      1787578200000000007,
+      1787578200000000007,
+      7,
+      1,
+      0,
+      9996,
+      900,
+      17,
+      0
+     ],
+     [
+      8,
+      7,
+      2,
+      1787578200000000001,
+      1787578200000000001,
+      2,
+      1,
+      1,
+      10002,
+      200,
+      21,
+      0
+     ],
+     [
+      9,
+      7,
+      2,
+      1787578200000000002,
+      1787578200000000002,
+      3,
+      1,
+      1,
+      10002,
+      150,
+      22,
+      0
+     ],
+     [
+      10,
+      7,
+      2,
+      1787578200000000003,
+      1787578200000000003,
+      4,
+      1,
+      1,
+      10003,
+      400,
+      23,
+      0
+     ],
+     [
+      11,
+      7,
+      2,
+      1787578200000000004,
+      1787578200000000004,
+      5,
+      1,
+      0,
+      9999,
+      100,
+      24,
+      0
+     ],
+     [
+      12,
+      7,
+      2,
+      1787578200000000005,
+      1787578200000000005,
+      6,
+      1,
+      0,
+      9997,
+      700,
+      25,
+      0
+     ],
+     [
+      13,
+      7,
+      3,
+      1787578200000000001,
+      1787578200000000001,
+      1,
+      1,
+      1,
+      10001,
+      50,
+      31,
+      0
+     ],
+     [
+      14,
+      7,
+      3,
+      1787578200000000002,
+      1787578200000000002,
+      2,
+      1,
+      1,
+      10004,
+      2000,
+      32,
+      0
+     ],
+     [
+      15,
+      7,
+      3,
+      1787578200000000003,
+      1787578200000000003,
+      3,
+      1,
+      0,
+      10000,
+      250,
+      33,
+      0
+     ],
+     [
+      16,
+      7,
+      3,
+      1787578200000000004,
+      1787578200000000004,
+      4,
+      1,
+      0,
+      9999,
+      800,
+      34,
+      0
+     ],
+     [
+      17,
+      7,
+      3,
+      1787578200000000005,
+      1787578200000000005,
+      5,
+      1,
+      0,
+      9998,
+      100,
+      35,
+      0
+     ]
+    ],
+    "queries": [
+     {
+      "kind": "passive",
+      "side": 0,
+      "ts": 1787578210000000000,
+      "qty": 0,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": {
+       "source": "exec",
+       "horizon_s": 1.0
+      },
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 1.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "aggressive",
+      "side": 0,
+      "ts": 1787578210000000000,
+      "qty": 0,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": null,
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 1.0,
+       "lot": 1
+      }
+     },
+     {
+      "kind": "allocate",
+      "side": 1,
+      "ts": 1787578210000000000,
+      "qty": 333,
+      "tick": 0.01,
+      "candidates": null,
+      "fill_prob": null,
+      "options": {
+       "tox_horizon": "1s",
+       "latency_penalty_bps_per_ms": 0.0,
+       "miss_cost_bps": null,
+       "stagger": "sync_arrival",
+       "sweep_rank": "price",
+       "sweep_levels": 10,
+       "max_toxicity_bps": null,
+       "tox_scale_bps": 2.0,
+       "lot": 1
+      }
+     }
+    ]
+   }
+  ],
+  "slice": {
+   "path": "benchmarks/slices/itch50_20190130_AAPL/normalized/eq_20190130.normalized.iap1",
+   "instrument_id": 1,
+   "venue_id": 101,
+   "tick_size": 0.01,
+   "adv": 14451444.0,
+   "prefix_events": 1132,
+   "sample_every": 500,
+   "rule": "a sample is taken after applying the k-th event (1-based) whenever k > prefix_events and k % sample_every == 0",
+   "venues": [
+    {
+     "spec": {
+      "venue_id": 101,
+      "name": "XNAS",
+      "is_fx": false,
+      "taker_fee_per_share": 0.003,
+      "maker_rebate_per_share": 0.002,
+      "commission_per_million": 0.0,
+      "latency_mean_ns": 0,
+      "latency_jitter_ns": 0
+     },
+     "p_fill_touch": 0.45,
+     "toxicity_bps": {
+      "1s": 0.8
+     },
+     "latency_ns": null,
+     "tiers": []
+    }
+   ],
+   "sor_options": {
+    "prefer_rebate": true,
+    "max_venue_latency_ns": 9223372036854775807
+   },
+   "queries": "at every sample, in order: passive buy / sell (model p_fill), passive buy with latency penalty 0.5 bps/ms + miss 1.25 bps + 100ms toxicity and the exec hazard fill_prob at 1 s, passive sell with the exec hazard at 5 s, aggressive buy, aggressive sell (penalty options), allocate buy 1050 (lot 100, tox cap 1.0, scale 0.5), allocate sell 777 (lot 1, scale 2.0); ts = the sampled event's exchange_ts; the hazard tables are `calibration_docs[\"101\"]`"
+  }
+ },
+ "expected": {
+  "fixed": [
+   [
+    {
+     "costs": {
+      "1": -0.49996300184990755,
+      "2": -0.2274921253937302,
+      "3": 0.8
+     },
+     "route": 1
+    },
+    {
+     "costs": {
+      "1": 0.1000069996500175,
+      "2": -0.2274921253937302,
+      "3": 0.8
+     },
+     "route": 2
+    },
+    {
+     "costs": {
+      "1": -0.45994900254987237,
+      "2": 0.2000306234688266,
+      "3": 0.27501749912504375
+     },
+     "route": 1
+    },
+    {
+     "costs": {
+      "1": 0.1400209989500525,
+      "2": 0.2000306234688266,
+      "3": 0.27501749912504375
+     },
+     "route": 1
+    },
+    {
+     "costs": {
+      "1": -0.08692646486468425,
+      "2": 0.013165034737022463
+     },
+     "route": 1
+    },
+    {
+     "costs": {
+      "1": 0.3376185181328343,
+      "2": 0.21962370177909368
+     },
+     "route": 2
+    },
+    {
+     "costs": {
+      "1": -0.024735212558857855,
+      "2": 0.21962370177909368
+     },
+     "route": 1
+    },
+    {
+     "costs": {
+      "1": 0.3187004306475432,
+      "2": -0.10352561470992938
+     },
+     "route": 2
+    },
+    {
+     "costs": {
+      "2": -0.023874024344109457
+     },
+     "route": 2
+    },
+    {
+     "costs": {
+      "1": 0.7999600019999,
+      "2": 1.5999200039997998,
+      "3": 0.6999650017499125
+     },
+     "route": 3
+    },
+    {
+     "costs": {
+      "1": 1.799910004499775,
+      "2": 1.5999200039997998,
+      "3": 0.6999650017499125
+     },
+     "route": 3
+    },
+    {
+     "costs": {
+      "1": 0.8499600019999001,
+      "2": 1.7249200039997998,
+      "3": 0.7749650017499125
+     },
+     "route": 3
+    },
+    {
+     "costs": {
+      "1": 1.849910004499775,
+      "2": 1.7249200039997998
+     },
+     "route": 2
+    },
+    {
+     "allocation": {
+      "1": 500,
+      "2": 550
+     }
+    },
+    {
+     "allocation": {
+      "1": 500,
+      "2": 550
+     }
+    },
+    {
+     "allocation": {
+      "1": 444,
+      "2": 311,
+      "3": 246
+     }
+    },
+    {
+     "allocation": {
+      "1": 3,
+      "2": 2,
+      "3": 2
+     }
+    },
+    {
+     "error": "allocation qty must be > 0"
+    }
+   ],
+   [
+    {
+     "costs": {
+      "1": -0.49996300184990755,
+      "2": -0.2274921253937302
+     },
+     "route": 1
+    },
+    {
+     "costs": {
+      "1": 1.799910004499775,
+      "2": 1.5999200039997998
+     },
+     "route": 2
+    },
+    {
+     "allocation": {
+      "1": 200,
+      "2": 300
+     }
+    }
+   ],
+   [
+    {
+     "costs": {
+      "1": -0.026276431395094335
+     },
+     "route": 1
+    },
+    {
+     "costs": {
+      "1": 0.7999600019999
+     },
+     "route": 1
+    },
+    {
+     "allocation": {
+      "1": 333
+     }
+    }
+   ]
+  ],
+  "slice": [
+   {
+    "k": 1500,
+    "ts": 1548858600604827158,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5591116556899985
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5591116556899985
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.8206021471183298
+      },
+      "route": 101
+     },
+     {
+      "costs": {},
+      "route": 0
+     },
+     {
+      "costs": {
+       "101": 1.7154234951753715
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7154234951753715
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 2000,
+    "ts": 1548858601107785941,
+    "results": [
+     {
+      "costs": {
+       "101": 0.46719754977029104
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.46719754977029104
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.41021622006999364
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.06603069304527746
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.7963246554364471
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.7963246554364471
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 2500,
+    "ts": 1548858601577929406,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5590141146933654
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5590141146933654
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.9373912203555383
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.6425594030622227
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7145831419736077
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7145831419736077
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 3000,
+    "ts": 1548858602371140523,
+    "results": [
+     {
+      "costs": {
+       "101": 0.589737180665319
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.589737180665319
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.1687431446942989
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.155639831085832
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.021687189854806
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.021687189854806
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 3500,
+    "ts": 1548858603210882454,
+    "results": [
+     {
+      "costs": {
+       "101": 0.651285950818667
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.651285950818667
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.6322043693326675
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.7689471352752077
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6369043968847734
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6369043968847734
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 4000,
+    "ts": 1548858604518931603,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6513395485770362
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6513395485770362
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6842940110225872
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.7694196103213171
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.63738959764475
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.63738959764475
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 4500,
+    "ts": 1548858606884070771,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5903298323198823
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5903298323198823
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.172553325437748
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.1606816809322
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.0269025244149623
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.0269025244149623
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 5000,
+    "ts": 1548858608835474571,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5597234598248579
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5597234598248579
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.8198506412369673
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.8553622747457622
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.720694423106468
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.720694423106468
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 5500,
+    "ts": 1548858610964579824,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6826896954423922
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6826896954423922
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.868215437701499
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -2.0812650321046897
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.9503057869018714
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.9503057869018714
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 6000,
+    "ts": 1548858613692344666,
+    "results": [
+     {
+      "costs": {
+       "101": 0.4981766819172783
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.4981766819172783
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.478307767682854
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.24197283323148358
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.1054134553382258
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.1054134553382258
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 6500,
+    "ts": 1548858616752352013,
+    "results": [
+     {
+      "costs": {
+       "101": 0.8361027153212928
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.8361027153212928
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -3.0241667816932365
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -2.957624946898546
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 4.484580415284434
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 4.484580415284434
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 7000,
+    "ts": 1548858618775859142,
+    "results": [
+     {
+      "costs": {
+       "101": 0.7133460333067043
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.7133460333067043
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -2.0992359971891634
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -2.3869791223208514
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 3.2569286548270138
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 3.2569286548270138
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 7500,
+    "ts": 1548858621473484301,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5904147465437789
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5904147465437789
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.1730992423153017
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.1614040694776666
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.0276497695852536
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.0276497695852536
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 8000,
+    "ts": 1548858623571826760,
+    "results": [
+     {
+      "costs": {
+       "101": 0.7133677482792526
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.7133677482792526
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -2.0993839496352136
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -2.3871749050378486
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 3.2571288102261553
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 3.2571288102261553
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 8500,
+    "ts": 1548858624133916154,
+    "results": [
+     {
+      "costs": {
+       "101": 0.4983551114527287
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.4983551114527287
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.2789518610674314
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.2433167945977815
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.1068408916218293
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.1068408916218293
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 9000,
+    "ts": 1548858624649936996,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6212731687824671
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6212731687824671
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.24108839656528824
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.161811920652882
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.336089509113823
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.336089509113823
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 9500,
+    "ts": 1548858625104943689,
+    "results": [
+     {
+      "costs": {
+       "101": 0.7134546348659949
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.7134546348659949
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.6310754527985921
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.9323187946017633
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 3.2579296778952544
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 3.2579296778952544
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 10000,
+    "ts": 1548858625954828478,
+    "results": [
+     {
+      "costs": {
+       "101": 0.652020164760851
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.652020164760851
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.3711592244226186
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4187956957495182
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6435509652034916
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6435509652034916
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 10500,
+    "ts": 1548858626497412120,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5598339840747686
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5598339840747686
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.018856576485808407
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.8562776641582824
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.721646632028776
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.721646632028776
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 11000,
+    "ts": 1548858626816341652,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5291579012117857
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5291579012117857
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.7113064058427931
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5503043836552992
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4147751737712986
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4147751737712986
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 11500,
+    "ts": 1548858627059369029,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5292099433915827
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5292099433915827
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.8650298074147941
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5507194407659011
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4152104356386905
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4152104356386905
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 12000,
+    "ts": 1548858627466623061,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5292099433915827
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5292099433915827
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.8650298074147941
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5507194407659011
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4152104356386905
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4152104356386905
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 12500,
+    "ts": 1548858627703063740,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6214821423078106
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6214821423078106
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4068251541132333
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.163328509140457
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.337957978281601
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.337957978281601
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 13000,
+    "ts": 1548858628032181682,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6214821423078106
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6214821423078106
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4068251541132333
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.163328509140457
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.337957978281601
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.337957978281601
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 13500,
+    "ts": 1548858628179031414,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6214821423078106
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6214821423078106
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.24185805132112737
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.163328509140457
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.337957978281601
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.337957978281601
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 14000,
+    "ts": 1548858628429247601,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6214821423078106
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6214821423078106
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.24185805132112737
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.163328509140457
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.337957978281601
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.337957978281601
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 14500,
+    "ts": 1548858628652798365,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5907266350827541
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5907266350827541
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.11174241571905896
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.9062558958686986
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.0303943887282347
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.0303943887282347
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 15000,
+    "ts": 1548858628894428523,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5292099433915827
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5292099433915827
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.7116200757328897
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.392063215606266
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4152104356386905
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4152104356386905
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 15500,
+    "ts": 1548858628994161193,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5907124400147657
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5907124400147657
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.11169117112211702
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.1639366293202031
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.0302694721299375
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.0302694721299375
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 16000,
+    "ts": 1548858629085644342,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6214821423078106
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6214821423078106
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.24185805132112737
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4706980637810398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.337957978281601
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.337957978281601
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 16500,
+    "ts": 1548858629172230951,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6214821423078106
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6214821423078106
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.24185805132112737
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4706980637810398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.337957978281601
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.337957978281601
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 17000,
+    "ts": 1548858629273005665,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5292099433915827
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5292099433915827
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.14851287387707934
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5507194407659011
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4152104356386905
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4152104356386905
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 17500,
+    "ts": 1548858629365220278,
+    "results": [
+     {
+      "costs": {
+       "101": 0.4984487585761314
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.4984487585761314
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.47985653100461
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.24402216053173714
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.1075900686090514
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.1075900686090514
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 18000,
+    "ts": 1548858629549644695,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5599692355022304
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5599692355022304
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.9433693602830595
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.6491674651772648
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.722811875096139
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.722811875096139
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 18500,
+    "ts": 1548858629656693048,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5599692355022304
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5599692355022304
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.9433693602830595
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.6491674651772648
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.722811875096139
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.722811875096139
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 19000,
+    "ts": 1548858629800194469,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5599692355022304
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5599692355022304
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.9433693602830595
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.6491674651772648
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.722811875096139
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.722811875096139
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 19500,
+    "ts": 1548858629889360777,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6214821423078106
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6214821423078106
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4068251541132333
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4706980637810398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.337957978281601
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.337957978281601
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 20000,
+    "ts": 1548858629951723513,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6214821423078106
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6214821423078106
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4068251541132333
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4706980637810398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.337957978281601
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.337957978281601
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 20500,
+    "ts": 1548858630037818948,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6522357573520365
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6522357573520365
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.6385316660249132
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.7773198713615745
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6455026455026456
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6455026455026456
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 21000,
+    "ts": 1548858630161214972,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6522357573520365
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6522357573520365
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.6385316660249132
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.7773198713615745
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6455026455026456
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6455026455026456
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 21500,
+    "ts": 1548858630242142883,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6521998031496063
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6521998031496063
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.6382921510309478
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4201202083583093
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6451771653543306
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6451771653543306
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 22000,
+    "ts": 1548858630318547756,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6521998031496063
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6521998031496063
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.6382921510309478
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4201202083583093
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6451771653543306
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6451771653543306
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 22500,
+    "ts": 1548858630358432472,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6214499707791211
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6214499707791211
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.406614139827725
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.32536974298611854
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.3376703269662578
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.3376703269662578
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 23000,
+    "ts": 1548858630401886815,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6214499707791211
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6214499707791211
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.406614139827725
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.32536974298611854
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.3376703269662578
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.3376703269662578
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 23500,
+    "ts": 1548858630438384332,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6214499707791211
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6214499707791211
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.406614139827725
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.32536974298611854
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.3376703269662578
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.3376703269662578
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 24000,
+    "ts": 1548858630474845785,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5598954393086694
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5598954393086694
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.9429074669108999
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.8567866517379495
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7221760925054586
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7221760925054586
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 24500,
+    "ts": 1548858630539794915,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5598708526798069
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5598708526798069
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.8196695921216479
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.3593879238694746
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7219642692414132
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7219642692414132
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 25000,
+    "ts": 1548858630595421487,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5598708526798069
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5598708526798069
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.8196695921216479
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.3593879238694746
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7219642692414132
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7219642692414132
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 25500,
+    "ts": 1548858630663861548,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5598708526798069
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5598708526798069
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.8196695921216479
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.3593879238694746
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7219642692414132
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7219642692414132
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 26000,
+    "ts": 1548858630694829670,
+    "results": [
+     {
+      "costs": {
+       "101": 0.590584762958864
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.590584762958864
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.11123025333899705
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.905247110345136
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.0291459140380006
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.0291459140380006
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 26500,
+    "ts": 1548858630757577099,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5598216975621754
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5598216975621754
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.942445914325144
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.6481467148562997
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7215407789972026
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7215407789972026
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 27000,
+    "ts": 1548858630806048677,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5598216975621754
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5598216975621754
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.942445914325144
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.35940334858807965
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7215407789972026
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7215407789972026
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 27500,
+    "ts": 1548858630832473198,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6828285933897001
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6828285933897001
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5014635540646456
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.29142712739343835
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951575710991545
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951575710991545
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 28000,
+    "ts": 1548858630863722909,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6828285933897001
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6828285933897001
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5014635540646456
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.29142712739343835
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951575710991545
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951575710991545
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 28500,
+    "ts": 1548858630889627026,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5905564094681833
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5905564094681833
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.174009998815297
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.9050455020928834
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.028896403320012
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.028896403320012
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 29000,
+    "ts": 1548858630931108968,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6520560747663552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6520560747663552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.37129355133941633
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4190604679699872
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6438760452533203
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6438760452533203
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 29500,
+    "ts": 1548858630977759365,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6520560747663552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6520560747663552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.37129355133941633
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4190604679699872
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6438760452533203
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6438760452533203
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 30000,
+    "ts": 1548858631025900241,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6520560747663552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6520560747663552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.37129355133941633
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4190604679699872
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6438760452533203
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6438760452533203
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 30500,
+    "ts": 1548858631051032566,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6520560747663552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6520560747663552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.37129355133941633
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4190604679699872
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6438760452533203
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6438760452533203
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 31000,
+    "ts": 1548858631072134173,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6520560747663552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6520560747663552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.37129355133941633
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4190604679699872
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6438760452533203
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6438760452533203
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 31500,
+    "ts": 1548858631097575135,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6827888960619756
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6827888960619756
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5013132081189305
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.6759434534614852
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951212763995204
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951212763995204
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 32000,
+    "ts": 1548858631118259922,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6827888960619756
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6827888960619756
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5013132081189305
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.6759434534614852
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951212763995204
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951212763995204
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 32500,
+    "ts": 1548858631137719247,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6827888960619756
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6827888960619756
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5013132081189305
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.6759434534614852
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951212763995204
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951212763995204
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 33000,
+    "ts": 1548858631153119344,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6827888960619756
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6827888960619756
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5013132081189305
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.6759434534614852
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951212763995204
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951212763995204
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 33500,
+    "ts": 1548858631171837097,
+    "results": [
+     {
+      "costs": {
+       "101": 0.652038118659699
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.652038118659699
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.37122638375169326
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.3084367290943848
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6437134952351675
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6437134952351675
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 34000,
+    "ts": 1548858631196729455,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6827888960619756
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6827888960619756
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5013132081189305
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.29144319670149144
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951212763995204
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951212763995204
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 34500,
+    "ts": 1548858631228053432,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6827888960619756
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6827888960619756
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5013132081189305
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.29144319670149144
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951212763995204
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951212763995204
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 35000,
+    "ts": 1548858631246813689,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6827888960619756
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6827888960619756
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5013132081189305
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.29144319670149144
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951212763995204
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951212763995204
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 35500,
+    "ts": 1548858631268465832,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6520560747663552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6520560747663552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.37129355133941633
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.30842974003703627
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6438760452533203
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6438760452533203
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 36000,
+    "ts": 1548858631291899317,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6520560747663552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6520560747663552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.37129355133941633
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.30842974003703627
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6438760452533203
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6438760452533203
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 36500,
+    "ts": 1548858631310401388,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6520560747663552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6520560747663552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.37129355133941633
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.30842974003703627
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6438760452533203
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6438760452533203
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 37000,
+    "ts": 1548858631331002383,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6520560747663552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6520560747663552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.37129355133941633
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.30842974003703627
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6438760452533203
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.6438760452533203
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 37500,
+    "ts": 1548858631347662030,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6521099563372489
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6521099563372489
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.3714951036697124
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4194577484205873
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.644363815263514
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.644363815263514
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 38000,
+    "ts": 1548858631360440547,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6521099563372489
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6521099563372489
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.3714951036697124
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4194577484205873
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.644363815263514
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.644363815263514
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 38500,
+    "ts": 1548858631370932508,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6521099563372489
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6521099563372489
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.3714951036697124
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4194577484205873
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.644363815263514
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.644363815263514
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 39000,
+    "ts": 1548858631391463668,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6521099563372489
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6521099563372489
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.3714951036697124
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4194577484205873
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.644363815263514
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.644363815263514
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 39500,
+    "ts": 1548858631414510466,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6521099563372489
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6521099563372489
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.3714951036697124
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4194577484205873
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.644363815263514
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.644363815263514
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 40000,
+    "ts": 1548858631433447421,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5598339840747686
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5598339840747686
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.9425228161063874
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.8562776641582824
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.721646632028776
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.721646632028776
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 40500,
+    "ts": 1548858631455886665,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6828484457153398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6828484457153398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5015387409057758
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -2.082681906208924
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951757217968822
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951757217968822
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 41000,
+    "ts": 1548858631470346467,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6828484457153398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6828484457153398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5015387409057758
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -2.082681906208924
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951757217968822
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951757217968822
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 41500,
+    "ts": 1548858631483220454,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6828484457153398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6828484457153398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5015387409057758
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -2.082681906208924
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951757217968822
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951757217968822
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 42000,
+    "ts": 1548858631497678227,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6828484457153398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6828484457153398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5015387409057758
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -2.082681906208924
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951757217968822
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951757217968822
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 42500,
+    "ts": 1548858631529192011,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6828484457153398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6828484457153398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5015387409057758
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -2.082681906208924
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951757217968822
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951757217968822
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 43000,
+    "ts": 1548858631562433083,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6828484457153398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6828484457153398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5015387409057758
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -2.082681906208924
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951757217968822
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951757217968822
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 43500,
+    "ts": 1548858631574802481,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6828484457153398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6828484457153398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5015387409057758
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -2.082681906208924
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951757217968822
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951757217968822
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 44000,
+    "ts": 1548858631616892031,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6828484457153398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6828484457153398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5015387409057758
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -2.082681906208924
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951757217968822
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951757217968822
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 44500,
+    "ts": 1548858631627017518,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6828484457153398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6828484457153398
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5015387409057758
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.6763881127096294
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951757217968822
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.951757217968822
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 45000,
+    "ts": 1548858631644519280,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5905564094681833
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5905564094681833
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.174009998815297
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.3424157604611049
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.028896403320012
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.028896403320012
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 45500,
+    "ts": 1548858631671743897,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5905564094681833
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5905564094681833
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.174009998815297
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.3424157604611049
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.028896403320012
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.028896403320012
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 46000,
+    "ts": 1548858631693407263,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5290539128296552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5290539128296552
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.7106796445402974
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.39102455277657355
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4139054527571155
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4139054527571155
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 46500,
+    "ts": 1548858632864928506,
+    "results": [
+     {
+      "costs": {
+       "101": 0.43686867755127146
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.43686867755127146
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.016067127324552677
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.3697194629490133
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.49195953632813705
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.49195953632813705
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 47000,
+    "ts": 1548858636558377492,
+    "results": [
+     {
+      "costs": {
+       "101": 0.4984487585761314
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.4984487585761314
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.47985653100461
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.24402216053173714
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.1075900686090514
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.1075900686090514
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 47500,
+    "ts": 1548858639978082468,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6215143217549151
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6215143217549151
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4070362203359255
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.3253459329957
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.3382457003968864
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.3382457003968864
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 48000,
+    "ts": 1548858642719906329,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5598585616333058
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5598585616333058
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.9426766480432975
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.6484017612018317
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7218583771484794
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7218583771484794
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 48500,
+    "ts": 1548858645059981997,
+    "results": [
+     {
+      "costs": {
+       "101": 0.436878132783911
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.436878132783911
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5390567345253735
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.36966668423064
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.49202004981703
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.49202004981703
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 49000,
+    "ts": 1548858648827044422,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5906131234241437
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5906131234241437
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.1113326354208265
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.1630917158987801
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.029395486132464
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.029395486132464
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 49500,
+    "ts": 1548858650525800023,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5597357342592878
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5597357342592878
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.9419078665216369
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.8554639346740658
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7208001720800172
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7208001720800172
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 50000,
+    "ts": 1548858652373020323,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5289500522209254
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5289500522209254
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.7100536533567456
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5486467051736368
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.413036800393193
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.413036800393193
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 50500,
+    "ts": 1548858653541780001,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6212892318096588
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6212892318096588
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4055598467873913
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4690237258418974
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.336233131474594
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.336233131474594
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 51000,
+    "ts": 1548858658461347428,
+    "results": [
+     {
+      "costs": {
+       "101": 0.4982955837610253
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.4982955837610253
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.47898460198117543
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.1339814103846313
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.106364670088202
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.106364670088202
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 51500,
+    "ts": 1548858661628957200,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5906131234241437
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5906131234241437
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.7742136976442542
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.1630917158987801
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.029395486132464
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.029395486132464
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 52000,
+    "ts": 1548858665377409782,
+    "results": [
+     {
+      "costs": {
+       "101": 0.4984487585761314
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.4984487585761314
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.27865252934906753
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.24402216053173714
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.1075900686090514
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.1075900686090514
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 52500,
+    "ts": 1548858666838909113,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5293141238763699
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5293141238763699
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.7122479948811842
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.3927567233126489
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4160817633296392
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4160817633296392
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 53000,
+    "ts": 1548858669884977573,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5601786209232854
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5601786209232854
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.9446799121360097
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.8591320325213454
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7246158110313818
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7246158110313818
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 53500,
+    "ts": 1548858674456888005,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5601539645881448
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5601539645881448
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.9445255871331384
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.6504455247304086
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7244033872209392
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7244033872209392
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 54000,
+    "ts": 1548858676402660636,
+    "results": [
+     {
+      "costs": {
+       "101": 0.6217236813745111
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.6217236813745111
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4084094180776145
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.165081436298361
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.340117621701512
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.340117621701512
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 54500,
+    "ts": 1548858679100071570,
+    "results": [
+     {
+      "costs": {
+       "101": 0.4678117299162149
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.4678117299162149
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.4084345353120942
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.06183236322326948
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.8008871365204534
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.8008871365204534
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 55000,
+    "ts": 1548858680484228471,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5295960530373112
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5295960530373112
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.7139472451676363
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5537988189656067
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4184397163120566
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4184397163120566
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 55500,
+    "ts": 1548858682004264504,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5297007096575133
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5297007096575133
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.7145780340908665
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5546334971930743
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4193150262264733
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4193150262264733
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 56000,
+    "ts": 1548858682332232266,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5298054955233098
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5298054955233098
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.1464972863390357
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.3960276816360472
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4201914171040444
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4201914171040444
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 56500,
+    "ts": 1548858684434928936,
+    "results": [
+     {
+      "costs": {
+       "101": 0.4988417512572893
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.4988417512572893
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.4820935940913925
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.24698224771338262
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.1107340100583136
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.1107340100583136
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 57000,
+    "ts": 1548858687550926165,
+    "results": [
+     {
+      "costs": {
+       "101": 0.4988417512572893
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.4988417512572893
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.4820935940913925
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.24698224771338262
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.1107340100583136
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.1107340100583136
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 57500,
+    "ts": 1548858688615219542,
+    "results": [
+     {
+      "costs": {
+       "101": 0.4987475719174915
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.4987475719174915
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.48155748964288625
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.13681929838812967
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.1099805753399314
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.1099805753399314
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 58000,
+    "ts": 1548858690549105917,
+    "results": [
+     {
+      "costs": {
+       "101": 0.745576359542244
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.745576359542244
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.7664502834207801
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -2.7069928431405303
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 3.578148616552022
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 3.578148616552022
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 58500,
+    "ts": 1548858693199827359,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5604749714708694
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5604749714708694
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.9465347822473205
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.652666430610285
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7271689849797984
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7271689849797984
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 59000,
+    "ts": 1548858697156293157,
+    "results": [
+     {
+      "costs": {
+       "101": 0.4988246182322999
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.4988246182322999
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.48199606642839476
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.24685319887841628
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.1105969458583989
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.1105969458583989
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 59500,
+    "ts": 1548858699066177624,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5605491962605289
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5605491962605289
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.016342912617590244
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.8622012299194516
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.72780846009071
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.72780846009071
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 60000,
+    "ts": 1548858701856692449,
+    "results": [
+     {
+      "costs": {
+       "101": 0.467958050586058
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.467958050586058
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.24948583903972377
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.06083216411905647
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.8019740900678594
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.8019740900678594
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 60500,
+    "ts": 1548858704614114033,
+    "results": [
+     {
+      "costs": {
+       "101": 0.43710100231303006
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.43710100231303006
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5385287385446695
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.36842263571699274
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.49344641480339246
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.49344641480339246
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 61000,
+    "ts": 1548858707171202420,
+    "results": [
+     {
+      "costs": {
+       "101": 0.4371581124039382
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.4371581124039382
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.0012932217645976
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.36810384954649533
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.4938119193852042
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.4938119193852042
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 61500,
+    "ts": 1548858709423769855,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5607102053419795
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5607102053419795
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.01577703480041237
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.654293910628967
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7291956152539756
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7291956152539756
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 62000,
+    "ts": 1548858711103409623,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5299209095402869
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5299209095402869
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.1461066789649007
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5563896789567058
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.421156697973307
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.421156697973307
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 62500,
+    "ts": 1548858713672634357,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5298264682270116
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5298264682270116
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.7153360091954313
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.5556364718704082
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4203668251713704
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.4203668251713704
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 63000,
+    "ts": 1548858716013727594,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5606854178887896
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5606854178887896
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.9478519749227325
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.6541224171081136
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7289820618111087
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 1.7289820618111087
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 63500,
+    "ts": 1548858717490247684,
+    "results": [
+     {
+      "costs": {
+       "101": 0.4372010005249668
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.4372010005249668
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.017469216893623407
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.3678644498249197
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.49408640335978754
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.49408640335978754
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 64000,
+    "ts": 1548858719108058833,
+    "results": [
+     {
+      "costs": {
+       "101": 0.622386170705356
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.622386170705356
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.24518761067291728
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.4785444436233546
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.346041055718475
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.346041055718475
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 64500,
+    "ts": 1548858720896850690,
+    "results": [
+     {
+      "costs": {
+       "101": 0.591395779340985
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.591395779340985
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.11415804541785257
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.9110138639766567
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.0362828582006665
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.0362828582006665
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   },
+   {
+    "k": 65000,
+    "ts": 1548858723206419389,
+    "results": [
+     {
+      "costs": {
+       "101": 0.5913815018202012
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 0.5913815018202012
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -1.1793145499238955
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": -0.91091234328405
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.03615721601777
+      },
+      "route": 101
+     },
+     {
+      "costs": {
+       "101": 2.03615721601777
+      },
+      "route": 101
+     },
+     {
+      "allocation": {
+       "101": 1050
+      }
+     },
+     {
+      "allocation": {
+       "101": 777
+      }
+     }
+    ]
+   }
+  ]
+ }
+}

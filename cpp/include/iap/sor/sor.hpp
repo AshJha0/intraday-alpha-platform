@@ -91,10 +91,13 @@ public:
 
     const SorOptions& options() const { return options_; }
 
-private:
-    // The venue book when the venue is eligible, else nullptr.
+    // The venue book when the venue is eligible, else nullptr (the pinned
+    // eligibility rule; public since v1.17 F7 so the cost-aware router of
+    // sor_v2.hpp gates on exactly this rule, as the Python one does).
     const OrderBook* eligible(const ConsolidatedBook& book,
                               std::uint16_t vid) const;
+
+private:
     // Shared body of score_*: fills the rows, then ranks the eligible ones
     // with the comparator of the corresponding route_* rule.
     void score(const ConsolidatedBook& book, std::uint8_t side,

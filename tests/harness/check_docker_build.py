@@ -171,6 +171,8 @@ def check_build_inputs(ctx: Path) -> None:
         "tests/golden/events_eq_mbo.jsonl",
         "configs/strategies/alpha_params.json",
         "configs/venues/venues.json",
+        # v1.17 F7: test_f7_*.cpp replay the committed real slice
+        "benchmarks/slices/itch50_20190130_AAPL/normalized/eq_20190130.normalized.iap1",
     ]:
         if not (ctx / rel).exists():
             problems.append(f"cpp: {rel} absent (ctest / bench_all read it)")

@@ -69,6 +69,10 @@ ExecutionReplay::ExecutionReplay(const ExecConfig& config,
         if (p.end_ts <= p.start_ts) {
             throw std::invalid_argument("parent window must have end_ts > start_ts");
         }
+        if (p.algo == AlgoType::POV && p.pov_exact &&
+            !(p.participation > 0.0 && p.participation < 1.0)) {
+            throw std::invalid_argument("pov_exact needs 0 < participation < 1");
+        }
         ParentState ps;
         ps.order = p;
         if (p.algo != AlgoType::POV) {
@@ -331,14 +335,18 @@ void ExecutionReplay::schedule_passive(ParentState& ps, const MarketEvent& ev) {
             t >= p.start_ts && t < p.end_ts;
         if (in_window) {
             ps.pov_volume += ev.qty;
-            const auto target = static_cast<std::int64_t>(
-                std::floor(p.participation * static_cast<double>(ps.pov_volume)));
-            ps.scheduled_qty = std::min(target, p.qty);
+            ps.scheduled_qty = std::min(pov_target(p, ps.pov_volume), p.qty);
         }
         work_passive(ps, t);
         if (in_window) {
-            const std::int64_t deficit = ps.scheduled_qty - committed_qty(ps);
-            if (deficit > 0) post(ps, std::min(deficit, p.max_child_qty), t, 0);
+            // pov_exact: the whole deficit at once (rule 4 of the F7 ports);
+            // pinned: one child per TRADE.
+            std::int64_t deficit = ps.scheduled_qty - committed_qty(ps);
+            while (deficit > 0) {
+                const std::int64_t q = std::min(deficit, p.max_child_qty);
+                post(ps, q, t, 0);
+                deficit = p.pov_exact ? deficit - q : 0;
+            }
         }
         return;
     }
@@ -375,12 +383,13 @@ void ExecutionReplay::schedule(ParentState& ps, const MarketEvent& ev) {
             return;
         }
         ps.pov_volume += ev.qty;
-        const auto target = static_cast<std::int64_t>(
-            std::floor(p.participation * static_cast<double>(ps.pov_volume)));
         // Deficit against FILLED + in-flight qty, never sent qty (pinned).
-        std::int64_t deficit = std::min(target, p.qty) - committed_qty(ps);
-        if (deficit > 0) {
-            issue_child(ps, std::min(deficit, p.max_child_qty), t, false);
+        std::int64_t deficit =
+            std::min(pov_target(p, ps.pov_volume), p.qty) - committed_qty(ps);
+        while (deficit > 0) {
+            const std::int64_t q = std::min(deficit, p.max_child_qty);
+            issue_child(ps, q, t, false);
+            deficit = p.pov_exact ? deficit - q : 0;
         }
         return;
     }
