@@ -330,7 +330,7 @@ Auditable events and where they are recorded:
   bytes it read (`PLATFORM_CONVENTIONS.md` §12.3, tested by
   `PaperStateRecoveryTest.auditLogIsPersistedAndMatchesTheEngine`). In the
   deployments `<state-dir>` is `$IAP_STATE_DIR` on the shared volume/PVC
-  (`/data/state`, its own `iap-java-state` PVC in Kubernetes). Intended
+  (`/data/state`, its own `iap-platform-state` PVC in Kubernetes; was `iap-java-state`). Intended
   retention: immutable, per session, shipped off-host daily. **The shipping is
   not implemented** (section 0): today the files exist only on the state
   volume, so a lost volume loses the audit trail.

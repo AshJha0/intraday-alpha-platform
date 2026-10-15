@@ -4,6 +4,20 @@
 > v1.14.0 ([archive/java/README.md](../archive/java/README.md)). Its rows below
 > are historical: the Java paths left `tests/harness/polyglot_policy.json`,
 > and parity is now tested across three engines (python, cpp, rust).
+>
+> **v1.17 (WS-F item F9, DECISION_N7 closed 2026-10-15): Java is retired from
+> the release.** The `java` image is gone from `release.yml`, the CI images
+> job, compose and k8s; the Python process `python -m iap.metrics serve`
+> replaces its `/metrics` container. Parity policy (owner, 2026-10-15): Python
+> is the reference for everything; C++ ports every execution, SOR and
+> dark-venue rule (F7); Rust ports only what Rust owns, the pre-trade risk
+> controls and the venue simulator (F8); **Java is not a port target** — its
+> risk engine (`archive/java/.../risk/`) survives only as the byte-identical
+> mirror of the Rust risk engine checked by `tests/golden/expected_risk_*.json`,
+> and that mirror is the one edit the archive accepts. Every "Java platform /
+> `java` image / `java-platform.yaml`" consumer named in the tables below no
+> longer exists; the platform is three languages: Python reference, C++
+> latency path, Rust risk and infrastructure.
 
 IAP_Next_Releases_Plan item **E3** (v1.11.0). The platform implements several
 components in more than one language: the order book in four, features and
@@ -192,8 +206,9 @@ with no consumer in `deployment/`, CI, the MVP, documented commands or the
 golden harness. Every duplicated copy fails that test:
 
 - every FROZEN copy is either built into an image (`Dockerfile.rust` builds
-  the whole workspace and runs the replay demo; `Dockerfile.java` compiles
-  `com.iap.*` for the platform) or imported by the Java platform;
+  the whole workspace and runs the replay demo; until v1.17 `Dockerfile.java`
+  compiled `com.iap.*` for the platform image) or imported by the Java
+  platform (archived, frozen at v1.14.0; its image retired in v1.17, F9);
 - the two RETIRE candidates (Rust `alpha`, Rust `lifecycle`) have no runtime
   consumer, but each is the only Rust proof of a golden contract
   (`golden_alpha.rs`, `golden_lifecycle.rs` — the registry byte-parity check)

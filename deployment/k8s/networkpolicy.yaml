@@ -2,21 +2,21 @@
 # Network policy: default-deny ingress in the namespace, then narrowly allow
 # exactly the flows the architecture needs (spec §26 — restrict ingress;
 # control plane separate from data plane):
-#   prometheus  -> java-platform:8080   (metrics scrape)
-#   grafana     -> prometheus:9090      (queries)
-#   ingress-gw  -> grafana:3000         (human dashboards only)
-#   prometheus  -> alertmanager:9093    (alert delivery)
-#   operator    -> java-platform:8080   (kill-switch admin API; only pods
-#                                        labelled iap.role=operator)
-# Nothing else in-cluster may reach the trading pods.
+#   prometheus  -> platform-metrics:8080 (metrics scrape)
+#   grafana     -> prometheus:9090       (queries)
+#   ingress-gw  -> grafana:3000          (human dashboards only)
+#   prometheus  -> alertmanager:9093     (alert delivery)
+# Nothing else in-cluster may reach the platform pod. (v1.17 F9: the Java
+# kill-switch admin API and its operator -> :8080 rule are retired; the
+# manual halt is the config path, RUNBOOK_incident_kill_switch.md.)
 #
 # EGRESS is default-deny too (default-deny-egress), with explicit allowances:
 #   all pods        -> kube-dns:53 (UDP+TCP)
-#   prometheus      -> java-platform:8080, alertmanager:9093
+#   prometheus      -> platform-metrics:8080, alertmanager:9093
 #   grafana         -> prometheus:9090
 #   alertmanager    -> tcp/443 to non-private addresses (the webhook receiver;
 #                      narrow the CIDR to your receiver's range if it is fixed)
-#   java-platform, data-pipeline: DNS only — they need no outbound network.
+#   platform-metrics, data-pipeline: DNS only — they need no outbound network.
 # Enforcement requires a CNI that implements NetworkPolicy (Calico, Cilium,
 # ...); on one that does not, these objects are accepted and silently ignored.
 # =============================================================================
@@ -36,7 +36,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-prometheus-scrape-java
+  name: allow-prometheus-scrape-platform
   namespace: intraday-alpha
   labels:
     app.kubernetes.io/part-of: intraday-alpha-platform
@@ -44,7 +44,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: java-platform
+      app.kubernetes.io/name: platform-metrics
   policyTypes:
     - Ingress
   ingress:
@@ -55,8 +55,6 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
-        - protocol: TCP
-          port: 9102   # session-state sidecar (last persisted session state)
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -106,35 +104,6 @@ spec:
       ports:
         - protocol: TCP
           port: 3000
----
-# Operators reach the kill-switch admin API (POST /admin/*, bearer token) on
-# the java admin port from pods that carry the label iap.role=operator, e.g.
-#   kubectl -n intraday-alpha run op --rm -it --image=... \
-#     --labels=iap.role=operator -- curl ...
-# The routes only exist when IAP_ADMIN_TOKEN is configured, and the token is
-# still required.
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-operator-to-java-admin
-  namespace: intraday-alpha
-  labels:
-    app.kubernetes.io/part-of: intraday-alpha-platform
-    app.kubernetes.io/component: security
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/name: java-platform
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              iap.role: operator
-      ports:
-        - protocol: TCP
-          port: 8080
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -218,12 +187,10 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: java-platform
+              app.kubernetes.io/name: platform-metrics
       ports:
         - protocol: TCP
           port: 8080
-        - protocol: TCP
-          port: 9102
     - to:
         - podSelector:
             matchLabels:

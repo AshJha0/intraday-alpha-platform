@@ -1,7 +1,7 @@
 {
   "uid": "iap-md-latency",
   "title": "Market Data & Latency",
-  "description": "Feed health, stream QC and hot-path tail latency (spec §22/§25). Metric mapping: deployment/grafana/README.md.",
+  "description": "Feed health, stream QC and hot-path tail latency (spec \u00a722/\u00a725). Metric mapping: deployment/grafana/README.md. RETIRED with the Java image (v1.17 F9): panels on decode_latency_ns, book_update_latency_ns, jvm_gc_pause_ns, md_event_time_gap_seconds, book_stale and risk_session_restarts_total were removed (no Python producer; each name is exposed as <name>_available 0 by the platform-metrics exporter).",
   "tags": [
     "iap",
     "market-data",
@@ -28,7 +28,7 @@
       "id": 1,
       "type": "stat",
       "title": "Feed status (events in last 1m)",
-      "description": "Normalized market events/sec from the java platform. A 5s event-time gap trips the StaleFeed page (risk.json stale_feed_timeout_ns).",
+      "description": "Normalized market events/sec from the Python platform-metrics exporter. A 5s event-time gap trips the StaleFeed page (risk.json stale_feed_timeout_ns).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -150,14 +150,14 @@
       "id": 3,
       "type": "stat",
       "title": "Session state",
-      "description": "platform_session_state: 0 STARTING, 1 RUNNING, 2 FINISHED, 3 FAILED, 4 STOPPED (PLATFORM_CONVENTIONS.md §12.6). A paper session is finite: FINISHED is the normal terminal state; STOPPED is an operator or signal stop that checkpointed and can be resumed. While no trading process is running the panel falls back to the last persisted state (platform_persisted_session_state, served by the java-platform-state exporter), so a clean stop, a finished session or a failed one stays visible; a crashed session shows no data (see the TargetDown alert).",
+      "description": "platform_session_state: 0 STARTING, 1 RUNNING, 2 FINISHED, 3 FAILED, 4 STOPPED (PLATFORM_CONVENTIONS.md \u00a712.6). A paper session is finite: FINISHED is the normal terminal state; STOPPED is an operator or signal stop that checkpointed and can be resumed. While no trading process is running the panel falls back to the last persisted state (platform_persisted_session_state, served by the platform-metrics exporter), so a clean stop, a finished session or a failed one stays visible; a crashed session shows no data (see the TargetDown alert).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "h": 4,
-        "w": 6,
+        "w": 12,
         "x": 12,
         "y": 0
       },
@@ -244,69 +244,10 @@
       ]
     },
     {
-      "id": 4,
-      "type": "stat",
-      "title": "Event-time gap (last event)",
-      "description": "md_event_time_gap_seconds — the gap between the last two consecutive processed events. This is the staleness signal StaleFeed alerts on; it is correct in replay AND live (PLATFORM_CONVENTIONS.md §12.6).",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 0
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 5
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "max(md_event_time_gap_seconds)",
-          "legendFormat": "gap s",
-          "refId": "A"
-        }
-      ]
-    },
-    {
       "id": 10,
       "type": "timeseries",
       "title": "Market-data events/sec",
-      "description": "Normalized event throughput per service (spec §25 market-data health).",
+      "description": "Normalized event throughput per service (spec \u00a725 market-data health).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -357,7 +298,7 @@
       "id": 11,
       "type": "timeseries",
       "title": "Stream QC: sequence gaps / duplicates (per sec)",
-      "description": "Gap and duplicate counters, LIVE from the java platform and updated on EVERY event (max_sequence_gap_before_halt = 1, so a single gap must be visible on the next scrape). The SequenceGapDetected alert uses increase(...) > 0, not a rate.",
+      "description": "Gap and duplicate counters, LIVE from the Python platform-metrics exporter and updated on EVERY event (max_sequence_gap_before_halt = 1, so a single gap must be visible on the next scrape). The SequenceGapDetected alert uses increase(...) > 0, not a rate.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -414,156 +355,18 @@
       ]
     },
     {
-      "id": 12,
-      "type": "timeseries",
-      "title": "Decode latency (p50/p99/p999)",
-      "description": "Log2 buckets: quantiles are upper bounds within one power of two (telemetry crate doc).",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 12
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ns",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": true
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "job:decode_latency_ns:p50",
-          "legendFormat": "p50",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "job:decode_latency_ns:p99",
-          "legendFormat": "p99",
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "job:decode_latency_ns:p999",
-          "legendFormat": "p999",
-          "refId": "C"
-        }
-      ]
-    },
-    {
-      "id": 13,
-      "type": "timeseries",
-      "title": "Book update latency (p50/p99/p999)",
-      "description": "",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 12
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ns",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": true
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "job:book_update_latency_ns:p50",
-          "legendFormat": "p50",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "job:book_update_latency_ns:p99",
-          "legendFormat": "p99",
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "job:book_update_latency_ns:p999",
-          "legendFormat": "p999",
-          "refId": "C"
-        }
-      ]
-    },
-    {
       "id": 14,
       "type": "timeseries",
       "title": "Order path latency decision-to-wire (p50/p99/p999)",
-      "description": "",
+      "description": "order_path_latency_ns: per parent order, arrival_ts - decision_ts (decision -> pre-trade risk -> venue arrival) from the MVP run's traces.jsonl, built into a log2 histogram by the Python platform-metrics exporter; histogram_quantile reports the bucket's inclusive upper bound (within one power of two above the exact value).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
+        "w": 24,
+        "x": 0,
         "y": 12
       },
       "fieldConfig": {
@@ -617,117 +420,6 @@
           "expr": "job:order_path_latency_ns:p999",
           "legendFormat": "p999",
           "refId": "C"
-        }
-      ]
-    },
-    {
-      "id": 15,
-      "type": "timeseries",
-      "title": "Book stale & session restarts",
-      "description": "book_stale{instrument} is 1 while any venue book of the instrument is stale (fail-closed trading); risk_session_restarts_total counts --resume restarts, each of which re-warms the book from the stream (PLATFORM_CONVENTIONS.md §12.3).",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 20
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": true
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "book_stale",
-          "legendFormat": "stale instrument {{instrument}}",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "risk_session_restarts_total",
-          "legendFormat": "restarts {{service}}",
-          "refId": "B"
-        }
-      ]
-    },
-    {
-      "id": 16,
-      "type": "timeseries",
-      "title": "JVM GC pause p99",
-      "description": "GcPauseHigh alert at 10ms sustained 5m (spec §23).",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 20
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ns",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 8,
-            "showPoints": "never",
-            "spanNulls": true
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "job:jvm_gc_pause_ns:p99",
-          "legendFormat": "gc p99 {{job}}",
-          "refId": "A"
         }
       ]
     }

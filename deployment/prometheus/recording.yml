@@ -1,18 +1,18 @@
 # =============================================================================
 # recording.yml — precomputed rates and tail-latency quantiles (spec §22/§25)
 #
-# Histogram note: the live Java monitoring endpoint (com.iap.api.MetricsServer)
-# exposes fixed log2 histograms — bucket upper bounds are 0, 1, 3, 7, ...,
-# 2^i - 1 nanoseconds. histogram_quantile therefore returns a value within one
-# power of two ABOVE the true order statistic (conservative for latency);
-# benchmarks/RESULTS.md holds the exact offline numbers.
 # Naming: level:metric:operation per Prometheus recording-rule conventions.
 #
 # Every rule here reads a metric the deployment actually exports
-# (PLATFORM_CONVENTIONS.md §12.6 / §12.7 "no aspirational targets"). Rules for
-# metrics with no producer — the rust venue-simulator counters and
-# md_out_of_order_total — were removed rather than left evaluating to empty
-# (see deployment/grafana/README.md "what is scraped today").
+# (PLATFORM_CONVENTIONS.md §12.6 / §12.7 "no aspirational targets"): the
+# Python platform-metrics process (python/src/iap/metrics/exporter.py).
+# Rules for metrics with no producer were removed rather than left
+# evaluating to empty: the rust venue-simulator counters and
+# md_out_of_order_total (round 3), and with the Java image (v1.17 F9) the
+# log2-histogram quantiles of decode_latency_ns, book_update_latency_ns,
+# exec_slippage_bps and jvm_gc_pause_ns — the Python exporter reads the MVP
+# run's report.json, which carries latency percentiles, not the raw samples
+# a histogram needs (deployment/grafana/README.md "what is scraped today").
 # =============================================================================
 
 groups:
@@ -61,39 +61,10 @@ groups:
   - name: iap-latency-quantiles
     interval: 15s
     rules:
-      # p50 / p99 / p999 for each hot-path histogram (nanoseconds).
-      # Market-data decode (LIVE from java: decode_latency_ns).
-      - record: job:decode_latency_ns:p50
-        expr: histogram_quantile(0.50, sum by (job, le) (rate(decode_latency_ns_bucket[5m])))
-      - record: job:decode_latency_ns:p99
-        expr: histogram_quantile(0.99, sum by (job, le) (rate(decode_latency_ns_bucket[5m])))
-      - record: job:decode_latency_ns:p999
-        expr: histogram_quantile(0.999, sum by (job, le) (rate(decode_latency_ns_bucket[5m])))
 
-      # Order-book update.
-      - record: job:book_update_latency_ns:p50
-        expr: histogram_quantile(0.50, sum by (job, le) (rate(book_update_latency_ns_bucket[5m])))
-      - record: job:book_update_latency_ns:p99
-        expr: histogram_quantile(0.99, sum by (job, le) (rate(book_update_latency_ns_bucket[5m])))
-      - record: job:book_update_latency_ns:p999
-        expr: histogram_quantile(0.999, sum by (job, le) (rate(book_update_latency_ns_bucket[5m])))
-
-      # Decision-to-wire order path (includes the pre-trade risk check).
       - record: job:order_path_latency_ns:p50
         expr: histogram_quantile(0.50, sum by (job, le) (rate(order_path_latency_ns_bucket[5m])))
       - record: job:order_path_latency_ns:p99
         expr: histogram_quantile(0.99, sum by (job, le) (rate(order_path_latency_ns_bucket[5m])))
       - record: job:order_path_latency_ns:p999
         expr: histogram_quantile(0.999, sum by (job, le) (rate(order_path_latency_ns_bucket[5m])))
-
-      # Execution slippage |fill - mark|, basis points x100 (integer-scaled
-      # into the log2 histogram; divide by 100 for bps).
-      - record: job:exec_slippage_bps_x100:p50
-        expr: histogram_quantile(0.50, sum by (job, le) (rate(exec_slippage_bps_bucket[5m])))
-      - record: job:exec_slippage_bps_x100:p99
-        expr: histogram_quantile(0.99, sum by (job, le) (rate(exec_slippage_bps_bucket[5m])))
-
-      # JVM GC pause (LIVE from java: jvm_gc_pause_ns, registered at the
-      # first observed pause).
-      - record: job:jvm_gc_pause_ns:p99
-        expr: histogram_quantile(0.99, sum by (job, le) (rate(jvm_gc_pause_ns_bucket[5m])))

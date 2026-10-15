@@ -53,10 +53,11 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
 <header>
   <div class="wrap">
     <h1>intraday-alpha-platform</h1>
-    <p>An event-driven trading research platform for equities and FX, written in four
+    <p>An event-driven trading research platform for equities and FX, written in three
        languages on purpose: Python for research and the reference implementation, C++ for
-       the latency-critical path, Rust for the hard risk engine and infrastructure, Java for
-       the strategy and platform layer. Market data → order books → 205-feature factory →
+       the latency-critical path, Rust for the hard risk engine and infrastructure (the Java
+       strategy layer is archived, frozen at v1.14.0 and retired from the release in v1.17).
+       Market data → order books → 205-feature factory →
        24 alphas → validation → ML → portfolio → fail-closed risk → execution/SOR →
        deterministic replay → TCA → decision trace → 7-state promotion lifecycle. Cross-language
        golden tests hold it together, and one command (<code>python -m iap.mvp run</code>) runs
@@ -102,19 +103,21 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
   <div class="grid">
     <div class="card"><h3>It is</h3>
       <p>A research platform built to make self-deception hard: one seeded
-         generator, integer prices and timestamps, byte-identical goldens across four languages,
+         generator, integer prices and timestamps, byte-identical goldens across three languages,
          a ledger that counts every statistic ever computed and raises the significance bar with
          it, and pre-registration checked by code and anchored in git. The loop from market data
-         to TCA runs end to end, and a Java paper-trading vertical covers the universe.</p></div>
+         to TCA runs end to end in Python (<code>python -m iap.mvp</code>), and the Python
+         <code>iap.metrics</code> process is what the deployment scrapes.</p></div>
     <div class="card"><h3>It is not</h3>
       <p>A profitable strategy: no alpha has been promoted. Not connected to a venue: there is no
          live order gateway, so the risk checks guard a simulator. Not a large-sample study: the
          real data is nine Nasdaq sessions on AAPL, MSFT and QQQ, enough to show a signal exists and
-         too little to size it. Not four production services: much of the Java tree is a frozen copy
-         kept for parity.</p></div>
-    <div class="card"><h3>Why four languages</h3>
+         too little to size it. Not four production services: the Java tree is an archived copy
+         frozen at v1.14.0, not built and not a port target; only its risk engine is kept as the
+         byte-identical mirror of the Rust one.</p></div>
+    <div class="card"><h3>Why three languages</h3>
       <p>Each one owns what it is good at, and the duplication is the test. Python defines the
-         semantics; C++, Rust and Java must reproduce them from the same golden files. Parity has
+         semantics; C++ and Rust must reproduce them from the same golden files. Parity has
          caught real bugs (a Rust feature engine reading a half-built book) and missed others
          (three risk engines agreeing on a wrong answer). Both stories are in
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">LEARN.md</a> §21 and §36.</p></div>
@@ -610,9 +613,12 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
          SQLite → report, deterministic twice over. The golden run loses 82.84 USD, the realized-IC
          gap is attributed to the data rather than a leak, and the document says so.</p></div>
     <div class="card"><h3>Observability &amp; deployment</h3>
-      <p>Prometheus metrics (rust telemetry + 19 live Java metrics with /metrics, /health),
-         recording + alert rules, two Grafana dashboards, structured JSONL logs,
-         Dockerfiles + docker-compose + Kubernetes manifests, runbooks, governance and
+      <p>Prometheus metrics from the Python <code>iap.metrics</code> process (/metrics, /health,
+         /ready, /status; 30 live metric families read from the MVP run's artefacts and the live
+         risk limits, every retired Java-only name exposed as <code>_available 0</code>),
+         recording + alert rules with promtool unit tests, two Grafana dashboards, structured
+         JSONL logs, three Dockerfiles (python, cpp, rust) + docker-compose + Kubernetes
+         manifests pinned by digest at release, runbooks, governance and
          reproducibility docs, and a paper-trading mode. Alertmanager routes the alerts
          by severity (page / ticket / watchdog); real delivery needs operator-supplied
          <code>page_url</code> and <code>ticket_url</code> Secret files, and compose echoes to a

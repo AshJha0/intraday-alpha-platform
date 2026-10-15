@@ -140,23 +140,25 @@ JSON
 
 1. Merge to `main` with `ci` green.
 2. `git tag -s vX.Y.Z && git push origin vX.Y.Z`. `release.yml` verifies the
-   commit has a green `ci` run, builds the four images, pushes
-   `ghcr.io/ashjha0/intraday-alpha-platform-{python,java,cpp,rust}:vX.Y.Z`,
+   commit has a green `ci` run, builds the three images, pushes
+   `ghcr.io/ashjha0/intraday-alpha-platform-{python,cpp,rust}:vX.Y.Z`
+   (the `java` image was retired in v1.17, F9),
    attests build provenance for each, writes `release-manifest.json` (image
    digests) and attaches it to the GitHub release (creating the release with
    generated notes if it does not exist; existing notes are left alone).
-3. **Manual:** pin the deployment manifests by digest from
-   `release-manifest.json` (`<name>:vX.Y.Z@sha256:...` in
-   `deployment/docker/docker-compose.yml`,
-   `deployment/k8s/java-platform.yaml`, `deployment/k8s/cronjob-data-pipeline.yaml`)
-   and bump the version tag in the same files. The repository references
+3. **Scripted (v1.17 F2):** `python tools/release.py publish --version X.Y.Z`
+   downloads `release-manifest.json` from the release and rewrites the
+   Kubernetes manifests (`deployment/k8s/{platform-metrics,cronjob-data-pipeline,cronjob-state-backup}.yaml`)
+   to `<name>:vX.Y.Z@sha256:...` (`pin-digests` alone, dry-run by default);
+   open the "release: pin vX.Y.Z image digests" PR with the result. Compose
+   keeps the tag (a `build:` service cannot carry a digest). The repository references
    `v1.5.0` by tag only: those images exist once the `v1.5.0` tag has been
    pushed and `release.yml` has run for it (it ran for the first time for
    `v1.3.0`; no image was ever published for `v1.2.0`, which was tagged
    before the release workflow existed), and the digests are pinned from
    that run's `release-manifest.json` afterwards.
 4. Verify provenance before deploying:
-   `gh attestation verify oci://ghcr.io/ashjha0/intraday-alpha-platform-java@sha256:<digest> --repo AshJha0/intraday-alpha-platform`.
+   `gh attestation verify oci://ghcr.io/ashjha0/intraday-alpha-platform-python@sha256:<digest> --repo AshJha0/intraday-alpha-platform`.
 5. Make the GHCR packages public (or grant the cluster a pull secret):
    packages are created private by default.
 
@@ -172,7 +174,7 @@ against a given commit:
 
 | Setting | Why it is outside the tree | What exists today |
 |---|---|---|
-| Off-host shipping of the audit JSONL (`risk_audit.jsonl`, `admin_audit.jsonl`, `config_audit.jsonl`, `decision_traces.jsonl`) | needs a log sink and credentials | **Nothing ships them.** The files are written to the state volume (`/data/state`, PVC `iap-java-state`). GOVERNANCE.md section 3 requires daily off-host shipping; that is not implemented. |
+| Off-host shipping of the audit JSONL (`risk_audit.jsonl`, `admin_audit.jsonl`, `config_audit.jsonl`, `decision_traces.jsonl`) | needs a log sink and credentials | **Nothing ships them.** The files are written to the state volume (`/data/state`, PVC `iap-platform-state`). GOVERNANCE.md section 3 requires daily off-host shipping; that is not implemented. |
 | Alert delivery | receiver URLs are secrets | Alertmanager routes `page` and `ticket` alerts (v1.12.0); compose defaults to a local echo sink. Supply real URLs: compose `ALERT_PAGE_URL_FILE` / `ALERT_TICKET_URL_FILE`; k8s Secret `iap-alertmanager-webhook` with keys `page_url` and `ticket_url` (docs/runbooks/RUNBOOK_alerting.md §2). Point the `watchdog` receiver at a dead-man's-switch service to alarm when the heartbeat stops. |
 | StorageClass | cluster specific | `storageClassName: standard` in `deployment/k8s/pvc.yaml` is a placeholder: replace it with a class that exists (`kubectl get storageclass`). |
 | NetworkPolicy enforcement | needs a CNI that implements it | Policies are in `deployment/k8s/networkpolicy.yaml`; a CNI without NetworkPolicy support ignores them. |

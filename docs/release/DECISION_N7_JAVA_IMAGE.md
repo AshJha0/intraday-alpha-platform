@@ -1,9 +1,50 @@
-# Decision N-7: the Java deployment image (closed in v1.16)
+# Decision N-7: the Java deployment image (CLOSED 2026-10-15 — image retired)
 
-**Status: PROPOSED for owner acceptance (v1.16 plan item 16).** This closes the
-open decision N-7 ("retire the Java deployment image: compose, k8s, network
-policy, state backup"), raised in the v1.15 plan and deferred on 2026-10-11
-("kept for v1.15; `release.yml` keeps building it from `archive/java`").
+**Status: CLOSED 2026-10-15 by owner decision (v1.17 WS-F item F9, widening
+F2).** The retirement trigger below was met by the same change set: the
+Python process `python -m iap.metrics serve` (`python/src/iap/metrics/`)
+serves `/metrics`, `/health`, `/ready` and `/status`; Prometheus, the alert
+rules, the promtool tests and the dashboards were moved to it; and the
+kill-switch runbook points at the config path (there is no Python admin API,
+see "What was done"). The `java` image is gone from `release.yml`, the CI
+`images` job and the release manifest (three images: python, cpp, rust);
+`Dockerfile.java` lives, unbuilt, under `archive/java/`; the compose services
+`java-platform` and `java-platform-state`, the k8s `java-platform.yaml`, the
+`iap-java-state*` claims and the operator network-policy rule are replaced by
+`platform-metrics` / `mvp-session`, `deployment/k8s/platform-metrics.yaml`,
+`iap-platform-state*` and a Prometheus-only ingress rule. `archive/java`
+stays read-only (frozen at v1.14.0, not built, not a port target); its risk
+engine is the byte-identical mirror of the Rust risk engine checked by
+`tests/golden/expected_risk_*.json`, the one edit the archive accepts.
+
+## What was done (v1.17, F9)
+
+- **Metric names.** Every name the Java container exposed is accounted for
+  in `iap.metrics.exporter`: 30 LIVE families with a Python producer (the
+  MVP run's `report.json` / `traces.jsonl`, the session marker, the risk
+  limits in `configs/risk/risk.json`) and 16 RETIRED Java-only families
+  exposed as `<name>_available 0` (`python -m iap.metrics names`;
+  `deployment/grafana/README.md`). The alerts, recording rules, SLO and
+  dashboard panels that read only retired names were removed and are listed
+  in the header of `deployment/prometheus/alerts.yml`.
+- **Admin API.** Not replaced. The Java `POST /admin/*` kill path had no
+  Python counterpart to point the runbook at, so the manual halt is the
+  config path (`configs/risk/risk.json` `global.kill_switch_engaged`, then
+  regenerate the ConfigMap and restart), and `KillPendingNotRecorded`,
+  `AdminAuthRateLimited`, `AdminAuditSuppressed` are retired.
+- **Digest pinning (F2).** `python tools/release.py publish` now rewrites the
+  Kubernetes manifests to `<name>:vX.Y.Z@sha256:<digest>` from the release's
+  `release-manifest.json` (`pin-digests` alone, dry-run by default); compose
+  keeps the tag because a `build:` service cannot carry a digest.
+
+The text below is the v1.16 decision as it stood, kept for the record.
+
+---
+
+This closed the open decision N-7 ("retire the Java deployment image:
+compose, k8s, network policy, state backup"), raised in the v1.15 plan and
+deferred on 2026-10-11 ("kept for v1.15; `release.yml` keeps building it from
+`archive/java`").
 
 ## Decision
 

@@ -13,8 +13,8 @@ auditable:
 | Python | `python/pyproject.toml` 1.1.0: numpy, pandas, scipy, scikit-learn, `pyarrow` (Parquet), `jsonschema` + `referencing` (offline contract validation), each with lower and upper bounds; extras `ml` (xgboost, lightgbm), `dev` (pytest, pytest-cov, pytest-xdist, pyyaml) | Bounds in `python/pyproject.toml`; exact versions and sha256 hashes (direct and transitive) in `python/requirements-ci.txt` and `python/requirements-image.txt`; CI installs with `pip install --require-hashes -r python/requirements-ci.txt` and `Dockerfile.python` installs from `requirements-image.txt` the same way, so a pin or a hash that does not match fails the install. `Dockerfile.python` installs the package with its declared dependencies and not the `dev` extra. No network or LLM client anywhere on the trading path (`PLATFORM_CONVENTIONS.md` §13.7). |
 | C++ | g++/CMake toolchain, GoogleTest, Eigen (system packages) | Debian package versions recorded at image build; no FetchContent/network downloads in CMake (`cpp/CMakeLists.txt` resolves system packages only). |
 | Rust | `serde`, `serde_json` (+ `crossbeam` only where justified) — PLATFORM_CONVENTIONS.md §10 | `rust/Cargo.toml` workspace dependencies; **`Cargo.lock` is the pin** — commit it, and never publish a release image built without a lockfile. Every cargo invocation in CI, `run_all.sh` and `Dockerfile.rust` passes `--locked`, and the toolchain is pinned in `rust/rust-toolchain.toml` (both enforced by `check_deployment.py`). The release profile keeps `overflow-checks = true`. |
-| Java | **none at runtime**; JUnit4 + hamcrest, test scope only | Local jar at `/usr/share/java/junit4.jar` (or vendored `archive/java/lib/`). Maven/Gradle are deliberately absent (Maven Central unreachable — `docs/BUILD_NOTES.md` is the normative pom-equivalent list). Any new Java dependency must be vendored into `archive/java/lib/` and recorded there. The `iap/java` image build does NOT run the JUnit suite (its base image has no JUnit jars and the build may not reach a registry): since v1.15 no CI job runs it either: the image builds from the frozen copy in `archive/java/` (tested green at v1.14.0). |
-| Images | base images in `deployment/docker/*`, `docker-compose.yml`, `deployment/k8s/*` | Third-party and base images are pinned by tag **and** sha256 digest in the repo (enforced by `check_deployment.py`; Dependabot's docker ecosystem proposes bumps). The platform's own images are named `ghcr.io/ashjha0/intraday-alpha-platform-<lang>:<tag>`; **digest-pinning them is a manual release step** from `release-manifest.json` (`REPO_SETTINGS.md` section 5). |
+| Java (archived) | **none at runtime**; JUnit4 + hamcrest, test scope only | `archive/java/` is frozen at v1.14.0, not built by CI and, since v1.17 (F9), not built into any image either: there is no `java` image to scan or attest. The local JDK build (`bash build.sh`, JUnit4 jar at `/usr/share/java`) exists only for a reviewer replaying the risk goldens against the Java risk mirror. |
+| Images | base images in `deployment/docker/*`, `docker-compose.yml`, `deployment/k8s/*` | Third-party and base images are pinned by tag **and** sha256 digest in the repo (enforced by `check_deployment.py`; Dependabot's docker ecosystem proposes bumps). The platform's own images are named `ghcr.io/ashjha0/intraday-alpha-platform-<lang>:<tag>` (python, cpp, rust); **`python tools/release.py publish` pins the Kubernetes manifests by digest** from `release-manifest.json` (v1.17 F2; `REPO_SETTINGS.md` section 5). |
 | GitHub Actions | `.github/workflows/*.yml` | Every `uses:` is a full commit SHA with the version as a trailing comment, runners are `ubuntu-24.04`, workflows declare least-privilege `permissions:` (enforced by `check_deployment.py`; Dependabot updates the SHAs). |
 
 Adding a dependency in any language is a reviewed change (see GOVERNANCE.md)
@@ -83,22 +83,24 @@ secrets.**
   Kubernetes enforces `runAsNonRoot`, `seccompProfile: RuntimeDefault`,
   dropped capabilities, no service-account token mounts
   (`automountServiceAccountToken: false`), a read-only root filesystem on the
-  java platform (writable `/tmp` emptyDir and its own state PVC only), and the
+  platform-metrics pod (writable `/tmp` emptyDir and its own state PVC only), and the
   namespace carries `pod-security.kubernetes.io/enforce: restricted`.
 - Ingress and egress are default-deny; only the flows in
-  `deployment/k8s/networkpolicy.yaml` are open (prometheus→java:8080,
+  `deployment/k8s/networkpolicy.yaml` are open (prometheus→platform-metrics:8080,
   prometheus→alertmanager:9093, grafana→prometheus:9090, ingress→grafana:3000,
-  `iap.role=operator` pods→java:8080 for the admin API, DNS for every pod,
-  alertmanager→tcp/443 for the webhook). NetworkPolicies take effect only on a
-  CNI that implements them.
-- docker-compose publishes 8080, 9090 and 9093 on `127.0.0.1` only; the java
-  server's bind address is `IAP_BIND_ADDR` (0.0.0.0 inside the containers).
+  DNS for every pod, alertmanager→tcp/443 for the webhook; the operator→admin
+  rule went with the Java admin API in v1.17). NetworkPolicies take effect only
+  on a CNI that implements them.
+- docker-compose publishes 8080, 9090 and 9093 on `127.0.0.1` only; the
+  metrics server's bind address is `IAP_BIND_ADDR` (0.0.0.0 inside the containers).
 - Raw market data is immutable (spec §1): pipeline outputs are written once
   per dated run; nothing rewrites `data/raw/` in place.
-- **Monitoring API exposure** (`com.iap.api.MetricsServer`, port 8080):
+- **Monitoring API exposure** (`python -m iap.metrics serve`, port 8080):
   `/metrics`, `/health`, `/ready` and `/status` are **unauthenticated** and
-  must stay behind the NetworkPolicy (only `prometheus → java-platform:8080`
-  is open) — they expose position, P&L and limit data. The write surface is
+  must stay behind the NetworkPolicy (only `prometheus → platform-metrics:8080`
+  is open) — they expose position, P&L and limit data. Since v1.17 the process
+  has NO write surface (the Java `POST /admin/*` API is retired with its
+  image; the paragraph below describes it for the record). The write surface was
   authenticated: `POST /admin/{kill,clear,override,roll}` requires a bearer
   token from `$IAP_ADMIN_TOKEN` or `$IAP_ADMIN_TOKEN_FILE` (a Kubernetes
   Secret), compared in constant time; **with no token configured the routes

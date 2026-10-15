@@ -9,22 +9,25 @@ to the institutional specification in [docs/SPECIFICATION.md](docs/SPECIFICATION
 - **Python** — quant research and ML environment, the *reference
   implementation* every port must match, and the executable MVP that runs
   the whole loop (`python -m iap.mvp`);
-- **Java** — institutional strategy/platform layer (portfolio, TCA, risk
-  orchestration, backtest, paper trading, monitoring/API); archived since
-  v1.15 in [archive/java/](archive/java/README.md), frozen at v1.14.0 and no
-  longer built or tested in CI (the `java` platform image still builds from
-  the frozen copy);
 - **C++** — latency-critical HFT path (codec, book, features, alpha,
   execution simulator, SOR, replay);
 - **Rust** — safety-critical infrastructure (hard risk engine, event bus,
   venue protocol simulation, telemetry, replay components).
+
+Three languages. The Java strategy/platform layer (portfolio, TCA, risk
+orchestration, backtest, paper trading, monitoring/API) is archived in
+[archive/java/](archive/java/README.md), frozen at v1.14.0, not built, not a
+port target (v1.15 archived it; v1.17 retired its deployment image, DECISION_N7).
+Its risk engine is kept only as the byte-identical mirror of the Rust risk
+engine checked by the risk goldens. The `/metrics` process is Python
+(`python -m iap.metrics serve`, [deployment/](deployment/grafana/README.md)).
 
 The connecting principle (spec §1): alpha, execution, portfolio construction
 and risk are separate concerns joined by explicit, versioned contracts, and
 **no strategy is production-ready because of backtest Sharpe alone**.
 
 The engineering principle, stated once and enforced everywhere: **Python
-defines the semantics, C++/Rust/Java implement them, golden tests prove
+defines the semantics, C++ and Rust implement them, golden tests prove
 equivalence.** Two subsystems qualify it honestly — the rule text of the
 hard risk engine is owned by Rust and of the execution simulator by C++
 (PLATFORM_CONVENTIONS.md §11) — and since 2026-09-19 both also have a Python
@@ -221,9 +224,10 @@ PYTHONPATH=python/src python3 research/ml_reports/run_ml.py      # gated ML + me
 PYTHONPATH=python/src python3 research/adaptive_reports/run_adaptive.py  # adaptive policy study
 cd python && PYTHONPATH=src python3 -m iap.tca && cd ..          # TCA report
 
-# 7. Paper trading: the Java platform vertical (archive/java/paper.sh) is archived and
-#    frozen at v1.14.0 (archive/java/README.md says how to restore it); the deployed
-#    `java` image still builds from it. The MVP (step 4) is the maintained loop.
+# 7. Paper trading: the Java platform vertical (archive/java/paper.sh) is archived,
+#    frozen at v1.14.0 and retired from the deployment in v1.17 (archive/java/README.md);
+#    the MVP (step 4) is the maintained loop and `python -m iap.metrics serve` the
+#    /metrics process the deployment scrapes.
 
 # 8. Validate the deployment the way CI does, and the build plan
 python3 tests/harness/check_deployment.py

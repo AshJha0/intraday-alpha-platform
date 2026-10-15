@@ -6,7 +6,7 @@ contracts and `tests/golden/`). Two packages run the other way — `risk/` and
 `execution/` are Python ports of the Rust and C++ references, proven by the
 same goldens (`/API_TRADING.md`). Everything deterministic is seeded via
 SplitMix64 only; no wall clock and no network or LLM client on any trading
-path (`PLATFORM_CONVENTIONS.md` §13.7). All 26 packages are listed below.
+path (`PLATFORM_CONVENTIONS.md` §13.7). All 27 packages are listed below.
 
 ```
 iap/
@@ -445,6 +445,16 @@ iap/
                    import_all — each returns ImportReport(inserted, warnings).
     __main__.py    `python -m iap.store build [--db data/store/iap.sqlite] |
                    explain <parent_order_id> | sql "<query>"`.
+  metrics/         The Python /metrics process (v1.17 F9, `python -m iap.metrics
+                   serve`; replaces the retired Java platform image, DECISION_N7):
+                   registry.py (stdlib Prometheus text exposition, the retired
+                   Java registry's format, log2 histograms), exporter.py (the
+                   file-backed PlatformExporter over configs/risk/risk.json, the
+                   session_exit.json marker and the newest MVP run's report.json /
+                   traces.jsonl; LIVE_METRICS / RETIRED_METRICS are the producer
+                   contract check_deployment.py reads), server.py (/metrics,
+                   /health, /ready, /status; no admin API), __main__.py (serve,
+                   run-session, names).
   mvp/             The executable MVP (`python -m iap.mvp`, docs/MVP.md): one
                    complete, deterministic, fully traced trading loop on one
                    synthetic equity - seeded feed -> books -> features -> EQ01/

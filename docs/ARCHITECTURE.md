@@ -49,7 +49,7 @@ the optional extras).
 The spec's responsibility matrix, mapped to what actually lives in this
 repository:
 
-| subsystem | Python (`python/src/iap`) | C++ (`cpp/`) | Rust (`rust/`) | Java (`java/` `com.iap.*`) |
+| subsystem | Python (`python/src/iap`) | C++ (`cpp/`) | Rust (`rust/`) | Java (`archive/java/`, frozen at v1.14.0, not built — historical column) |
 |---|---|---|---|---|
 | Events / codec (JSONL + IAP1) | `core` (reference) | `marketdata` | `marketdata` crate | `core`, `codec` |
 | Synthetic generator + normalize/QC | `marketdata` (sole owner) | — | — | — |
@@ -383,31 +383,40 @@ not the benchmark table — is what keeps them interchangeable.
 ## 8. Observability wiring
 
 Spec §25, realized as a Prometheus/Grafana stack with the **metric-name
-contract set by the Rust telemetry crate** and binding on Java
+contract set by the Rust telemetry crate** and binding on every producer
 (`deployment/grafana/README.md`): snake_case, counters end `_total`, latency
 histograms end `_ns` with fixed log2 buckets, gauges are bare nouns.
 
-- **Producer**: exactly one — Java's `com.iap.monitoring` registry (lock-free
-  counters, gauges, histograms, GC metrics; `PLATFORM_CONVENTIONS.md` §12.4)
-  served by `com.iap.api.MetricsServer` on
-  `GET /metrics | /health | /ready | /status` plus
-  `POST /admin/{kill,clear,override,roll}` (port from
-  `configs/execution/execution.json` `monitoring.port`, default 8080). `rust/telemetry`
+- **Producer**: exactly one — since v1.17 (WS-F item F9, DECISION_N7 closed)
+  the Python process `python -m iap.metrics serve` (`iap.metrics`: a stdlib
+  registry rendering the same exposition the retired Java
+  `com.iap.monitoring` did, a file-backed exporter and an HTTP server on
+  `GET /metrics | /health | /ready | /status`, port 8080). It reads the live
+  risk limits from `configs/risk/risk.json`, the session marker
+  `session_exit.json` that `python -m iap.metrics run-session` maintains
+  around the MVP loop, and the newest MVP run's `report.json` and
+  `traces.jsonl`; every name the Java container exposed is either LIVE (a
+  Python producer) or RETIRED (exposed as `<name>_available 0`), the two
+  lists in `iap/metrics/exporter.py` being the contract
+  `check_deployment.py` reads. There is no admin API. `rust/telemetry`
   remains the reference for the exposition FORMAT and is unit-tested there,
   but no deployed Rust binary writes metrics anywhere Prometheus can read —
   so round 3 removed the `rust-telemetry` scrape job, the exporter sidecar and
   every rule and panel built on `venue_*` rather than leave a permanently-down
   target and an always-firing `TargetDown` (§12.7 "no aspirational targets").
-- **Scrape**: `deployment/prometheus/prometheus.yml` — jobs `java-platform`
+- **Scrape**: `deployment/prometheus/prometheus.yml` — jobs `platform-metrics`
   (:8080) and Prometheus's self-scrape, plus recording rules and alerts
-  (`recording.yml`, `alerts.yml`: SequenceGapDetected, BookStale, StaleFeed,
-  FeedWallClockStall, SignalRateCollapse, LiveVsBacktestDrift,
-  AlphaLifecycleRetired, FillRateDrop, PreTradeRejectRatioHigh,
+  (`recording.yml`, `alerts.yml`: SequenceGapDetected, FeedWallClockStall,
+  SignalRateCollapse, FillRateDrop, PreTradeRejectRatioHigh,
   LossLimitUtilizationHigh, KillSwitchEngaged, GrossNotionalUtilizationHigh,
-  RoutedVenueMismatch, KillPendingNotRecorded, ResumeReleasedOpenOrders,
-  GcPauseHigh, PlatformSessionFailed, SessionStoppedNotResumed,
-  SessionRestartsClimbing, TargetDown, AdminAuthRateLimited,
-  AdminAuditSuppressed, and the always-firing `Watchdog` heartbeat — each with a runbook anchor in
+  PlatformSessionFailed, SessionStoppedNotResumed, TargetDown and the
+  always-firing `Watchdog` heartbeat; `slo.yml`: the order-path burn-rate
+  pair. The Java-only alerts — BookStale, StaleFeed, LiveVsBacktestDrift,
+  AlphaLifecycleRetired, RoutedVenueMismatch, KillPendingNotRecorded,
+  ResumeReleasedOpenOrders, GcPauseHigh, SessionRestartsClimbing,
+  AdminAuthRateLimited, AdminAuditSuppressed, the event-path SLO — were
+  retired with their metrics in v1.17 and are listed in the header of
+  `alerts.yml`) — each with a runbook anchor in
   `docs/runbooks/`). Since v1.3.0 Prometheus delivers to Alertmanager
   (`deployment/alertmanager/`), which routes by severity (page vs ticket,
   with inhibition) to webhooks whose URLs are operator-supplied secrets;
@@ -502,20 +511,22 @@ in [/API_ADAPTIVE.md](../API_ADAPTIVE.md):
 
 `deployment/docker/docker-compose.yml` composes the full stack:
 `data-generator` (Python image; runs the seeded pipeline into a shared
-volume — data is never baked into images) → `cpp-replay` + `rust-replay` and
-`java-platform` (the paper-trading vertical: `com.iap.platform.PaperTrading`
-paced in realtime over the golden vector, serving `/metrics`, `/health`,
-`/ready`, `/status` and the kill-switch admin API on :8080, with a real HTTP
-healthcheck against `/health`) → `prometheus` → `grafana` (:3000, admin
+volume — data is never baked into images) → `cpp-replay` + `rust-replay`,
+`mvp-session` (Python image: the MVP loop over the golden instrument, finite,
+wrapped by `python -m iap.metrics run-session` so the session marker survives
+the process) and `platform-metrics` (Python image: `python -m iap.metrics
+serve`, `/metrics`, `/health`, `/ready`, `/status` on :8080 from the configs,
+the marker and the newest run, with a real HTTP healthcheck against
+`/health`; three images since v1.17, the `java` image is retired) → `prometheus` → `grafana` (:3000, admin
 password from the environment, never committed). `deployment/k8s/` carries the
 equivalent manifests (namespace, ConfigMaps generated from `configs/` by
 `generate_configmaps.py`, PVCs, network policies, CronJob for the data pipeline,
 Deployments for the platform, Prometheus, Alertmanager and Grafana). Since
 v1.3.0 the namespace is default-deny for ingress **and** egress, with the
 allowed flows listed explicitly (Prometheus → platform and Alertmanager,
-Grafana → Prometheus, the ingress controller → Grafana, pods labelled
-`iap.role=operator` → the admin port, DNS, Alertmanager → HTTPS on
-non-private addresses); the platform has its own state PVC and a read-only
+Grafana → Prometheus, the ingress controller → Grafana, DNS, Alertmanager →
+HTTPS on non-private addresses; the operator → admin-port rule went with the
+Java admin API in v1.17); the platform has its own state PVC and a read-only
 root filesystem; compose publishes the platform, Prometheus and Alertmanager
 ports on the host's loopback only. The platform's listener itself binds
 `127.0.0.1` unless `IAP_BIND_ADDR` says otherwise — the containers set it to
@@ -1266,7 +1277,9 @@ goldens, stores and reports.
   read hit rates and fees; sign-off, confirmatory runs, outcomes and
   promotion have no tool.
 - **Java archived** to `archive/java/`; parity is three languages (python,
-  cpp, rust).
+  cpp, rust). v1.17 (F9) retired its deployment image too: the Python
+  `iap.metrics` process serves `/metrics`; the Java risk engine survives only
+  as the byte-identical mirror of the Rust one checked by the risk goldens.
 
 ## 21. v1.16: cost realism and the monetisation question
 
