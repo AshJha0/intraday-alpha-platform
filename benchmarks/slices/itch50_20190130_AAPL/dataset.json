@@ -1,0 +1,112 @@
+{
+  "dataset_version": "ce37133c2b41dfaf038df9bfc51126404674603cdf387b8d44f4cbd976b47848",
+  "kind": "real",
+  "normalized": {
+    "files": {
+      "eq_20190130.normalized.iap1": "ce37133c2b41dfaf038df9bfc51126404674603cdf387b8d44f4cbd976b47848"
+    },
+    "qc_totals": {
+      "events_in": 65132,
+      "events_out": 65132
+    }
+  },
+  "sessions": {
+    "2019-01-30": {
+      "format": "itch50",
+      "per_symbol": {
+        "AAPL": {
+          "asset_class": "EQUITY",
+          "crosses": [
+            {
+              "cross_type": "O",
+              "exchange_ts": 1548858600300423116,
+              "match_number": 104177,
+              "price_e4": 1632200,
+              "shares": 770817
+            },
+            {
+              "cross_type": "C",
+              "exchange_ts": 1548882000563528211,
+              "match_number": 9669041,
+              "price_e4": 1652500,
+              "shares": 2340937
+            }
+          ],
+          "displayed_orders_below_one_dollar": 246,
+          "events": 1835366,
+          "lot_size": 100,
+          "off_tick_orders_rejected": 10,
+          "ref_price_e4": 1632200,
+          "ref_price_source": "opening_cross",
+          "volume": 14451444
+        }
+      },
+      "slice": {
+        "bytes": 4689536,
+        "command": "python tools/extract_real_slice.py --dataset C:/Work/Claude/intraday-alpha-platform/intraday-alpha-platform/data/real/ds3_20190130 --date 2019-01-30 --symbol AAPL --start 09:30:00 --events 64000 --out benchmarks/slices/itch50_20190130_AAPL",
+        "day": "2019-01-30",
+        "events": 65132,
+        "extractor": "tools/extract_real_slice.py",
+        "extractor_version": 1,
+        "instrument_id": 1,
+        "levels_at_end": {
+          "ask": 2651,
+          "bid": 2702
+        },
+        "levels_at_t0": {
+          "ask": 225,
+          "bid": 257
+        },
+        "prefix_events": 1132,
+        "prefix_rule": "one ADD per order resting at T0; qty = remaining at T0; exchange_ts/receive_ts of the original ADD; sorted by (exchange_ts, order_id)",
+        "renumbered": [
+          "event_id",
+          "sequence"
+        ],
+        "resting_orders_at_end": 39774,
+        "resting_orders_at_t0": 1132,
+        "source_dataset": "ds3_20190130",
+        "source_dataset_version": "06419d749910a8f0a6d089d5ed13a40500481d581a93f276bb62c339940c7293",
+        "source_format": "itch50",
+        "source_inputs": [
+          {
+            "bytes": 4764426091,
+            "file": "01302019.NASDAQ_ITCH50.gz",
+            "sha256": "8c97b5b13bc451c012c2466fb7e258da134dab29aa47b67fe7b0088c78e870be"
+          }
+        ],
+        "source_normalized_file": "eq_20190130.normalized.iap1",
+        "source_normalized_sha256": "f5cae034f6be46682c9f3e874b877bfb4d0d84b535b90060584053ddced4435e",
+        "symbol": "AAPL",
+        "symbol_events_before_window": 30199,
+        "venue": "XNAS",
+        "venue_id": 101,
+        "window_events": 64000,
+        "window_first_ts": 1548858600000036157,
+        "window_last_ts": 1548858723554188841,
+        "window_original_sequence_range": [
+          30200,
+          94199
+        ],
+        "window_start_local": "2019-01-30T09:30:00-05:00",
+        "window_start_ts": 1548858600000000000
+      }
+    }
+  },
+  "source": {
+    "format": "itch50",
+    "venue": "XNAS",
+    "venue_id": 101
+  },
+  "universe": [
+    {
+      "asset_class": "EQUITY",
+      "instrument_id": 1,
+      "lot_size": 100,
+      "symbol": "AAPL",
+      "tick_size": 0.01,
+      "tick_size_e4": 100
+    }
+  ],
+  "x-version": 2
+}

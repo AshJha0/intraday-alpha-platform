@@ -1,0 +1,22 @@
+{
+  "x-version": 1,
+  "description": "Source venue of an ingested real dataset. Fees are indicative list prices (edit to your own tier); latency is zero because the feed carries exchange timestamps only (receive_ts == exchange_ts).",
+  "venues": [
+    {
+      "venue": "XNAS",
+      "venue_id": 101,
+      "asset_class": "EQUITY",
+      "taker_fee_per_share": 0.003,
+      "maker_rebate_per_share": 0.002,
+      "latency": {
+        "mean_ns": 0,
+        "jitter_ns": 0
+      },
+      "supports": [
+        "MBO",
+        "AUCTION",
+        "HALT"
+      ]
+    }
+  ]
+}

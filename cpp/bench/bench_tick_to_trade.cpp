@@ -37,10 +37,20 @@
 // recording, no new dependency. A percentile is reported as the UPPER bound
 // of the bucket that holds it (conservative); max is exact.
 //
-// Workloads (both pinned): the golden tests/golden/events_eq_mbo.jsonl (2000
-// events) and a generated equity day: 100,000 MBO events from SplitMix64 seed
+// Workloads (all pinned): the golden tests/golden/events_eq_mbo.jsonl (2000
+// events), a generated equity day: 100,000 MBO events from SplitMix64 seed
 // 20261012 (one instrument, one venue; adds / cancels / executes / trades
-// around a random-walk mid), built in-process so CI needs no data/ files.
+// around a random-walk mid), built in-process so CI needs no data/ files,
+// and (v1.17, F4) the committed REAL slice
+// benchmarks/slices/itch50_20190130_AAPL (Nasdaq ITCH 5.0, AAPL, 2019-01-30
+// from the 09:30 open: 1,132 book-reconstruction ADDs then 64,000 real
+// events; the book grows to ~40,000 resting orders over ~2,700 price levels
+// per side, so the level map, the free lists and the feature engine's book
+// view are exercised at real depth, not at the handful of levels of the
+// synthetic streams; provenance in its SLICE.md / dataset.json). The slice
+// is read as one IAP1 file and re-framed per event like the other two; when
+// the file is missing (a build outside the repository) the workload is
+// skipped with a note.
 //
 // Usage: bench_tick_to_trade [output.md]
 
@@ -51,6 +61,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <fstream>
+#include <iterator>
 #include <map>
 #include <sstream>
 #include <string>
@@ -202,6 +213,16 @@ std::vector<iap::MarketEvent> generate_equity_day(std::uint64_t seed,
     return out;
 }
 
+// ------------------------------------------------------- real slice
+// The committed real-session slice (see the header). Empty when absent.
+std::vector<iap::MarketEvent> read_real_slice(const std::string& path) {
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return {};
+    std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(f)),
+                                    std::istreambuf_iterator<char>());
+    return iap::decode_iap1(bytes);  // magic, size and CRC verified
+}
+
 // ------------------------------------------------------- the pipeline
 constexpr int kStages = 5;
 const char* const kStageNames[kStages] = {"decode (IAP1 frame + CRC)",
@@ -240,7 +261,16 @@ void run_pass(const std::vector<std::uint8_t>& frames, std::size_t n_events,
               Hists* h) {
     constexpr std::size_t kFrame =
         iap::IAP1_HEADER_SIZE + iap::IAP1_RECORD_SIZE + iap::IAP1_TRAILER_SIZE;
-    iap::OrderBook book(1, 1);
+    // The book is keyed by the stream's own (instrument, venue): the real
+    // slice is instrument 1 on venue 101, the synthetic streams 1 on 1.
+    std::uint32_t iid = 1;
+    std::uint16_t vid = 1;
+    if (n_events > 0) {
+        const auto first = iap::decode_iap1(frames.data(), kFrame);
+        iid = first.front().instrument_id;
+        vid = first.front().venue_id;
+    }
+    iap::OrderBook book(iid, vid);
     iap::FeatureEngine fe(ticks, 0);
     iap::FeatureVector vec;
     Decider d;
@@ -357,7 +387,20 @@ int main(int argc, char** argv) {
                          iap::read_jsonl(dir + "/events_eq_mbo.jsonl"), 50});
     workloads.push_back({"generated equity day (seed 20261012, 100000 ev)",
                          generate_equity_day(20261012ULL, 100000), 1});
-    const char* const short_names[2] = {"golden", "genday"};
+    const std::string slice_path =
+        iap::repo_root() +
+        "/benchmarks/slices/itch50_20190130_AAPL/normalized/"
+        "eq_20190130.normalized.iap1";
+    auto slice = read_real_slice(slice_path);
+    const bool have_slice = !slice.empty();
+    if (have_slice) {
+        // 10 timed passes: 651,320 samples, so the p99 of a real stream is
+        // read from thousands of events, not from the single-pass tail.
+        workloads.push_back({"real ITCH slice AAPL 2019-01-30 09:30 (65132 ev, "
+                             "book to ~2700 levels/side)",
+                             std::move(slice), 10});
+    }
+    const char* const short_names[3] = {"golden", "genday", "realslice"};
 
     // Timer overhead: back-to-back clock reads.
     LogHistogram timer;
@@ -389,6 +432,15 @@ int main(int argc, char** argv) {
                   static_cast<unsigned long long>(timer.quantile(0.50)),
                   static_cast<unsigned long long>(timer.quantile(0.99)));
     md << buf;
+    md << "- Real slice: "
+       << (have_slice
+               ? "benchmarks/slices/itch50_20190130_AAPL (Nasdaq ITCH 5.0, "
+                 "AAPL 2019-01-30 from the 09:30 open; 1,132 book-"
+                 "reconstruction ADDs + 64,000 real events; provenance in its "
+                 "SLICE.md). Same per-event framing as the synthetic streams."
+               : "NOT FOUND (workload skipped; build outside the repository?)")
+       << "
+";
 
     std::ostringstream wide, guard;
     wide << "\n| path, workload | p50 ns | p90 ns | p99 ns | p99.9 ns | "

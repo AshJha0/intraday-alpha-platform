@@ -1,0 +1,29 @@
+{
+  "description": "Point-in-time security master: one record per (symbol, effective_date); read through SecurityMaster.as_of (latest record on or before the date).",
+  "records": [
+    {
+      "asset_class": "EQUITY",
+      "authenticity": "P",
+      "effective_date": "2019-01-30",
+      "etp_flag": "N",
+      "etp_leverage_factor": 0,
+      "financial_status": "N",
+      "instrument_id": 1,
+      "inverse_indicator": "N",
+      "ipo_flag": "N",
+      "issue_classification": "C",
+      "issue_subtype": "Z",
+      "locate": 14,
+      "luld_tier": "1",
+      "market_category": "Q",
+      "round_lot_size": 100,
+      "round_lots_only": "N",
+      "short_sale_threshold": "N",
+      "source": "itch50",
+      "symbol": "AAPL",
+      "tick_size": 0.01,
+      "venue": "XNAS"
+    }
+  ],
+  "x-version": 1
+}

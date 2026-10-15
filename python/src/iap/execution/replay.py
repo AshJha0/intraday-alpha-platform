@@ -187,12 +187,16 @@ class _ParentState:
     filled_qty: int = 0  #: fills booked so far
     pov_volume: int = 0  #: window TRADE volume (POV)
     child_ids: list[int] = field(default_factory=list)
+    #: F4 (X-6 follow-up): children not yet seen terminal by ``_committed_qty``
+    #: (a terminal child never becomes open again, so pruning is exact).
+    open_child_ids: list[int] = field(default_factory=list)
     # ---- PASSIVE policy state ----
     scheduled_qty: int = 0  #: qty the schedule has called for so far
     current_step_qty: int = 0  #: q_cur: the most recent slice (0 for POV)
     patience_ns: int = 0
     behind_qty: int = 0  #: BEHIND tolerance in qty
     working: list[_Working] = field(default_factory=list)
+    working_open: int = 0  #: F4: entries of ``working`` not yet ``_DONE``
     stats: PassiveStats = field(default_factory=PassiveStats)
     armed: bool = False  #: X-6: has an entry in the due-slice heap
     # ---- v1.17 B2 / B3 signal-aware state (unused for a plain parent) ----
@@ -363,7 +367,9 @@ class ExecutionReplay:
             decision_ts=decision_ts,
             expire_ts=p.end_ts,  # pinned: no child outlives the window
         )
-        ps.child_ids.append(self._sim.submit(child))
+        oid = self._sim.submit(child)
+        ps.child_ids.append(oid)
+        ps.open_child_ids.append(oid)
         return True
 
     def _issue_slice(
@@ -381,10 +387,19 @@ class ExecutionReplay:
         """Filled + still open/in-flight qty of the parent's children."""
         open_qty = 0
         orders = self._sim.orders
-        for oid in ps.child_ids:
+        # F4: only the children not yet seen terminal are scanned; the ones
+        # found terminal here are dropped (a terminal child stays terminal),
+        # so the scan is O(open children), not O(all children of the parent).
+        still_open: list[int] = []
+        for oid in ps.open_child_ids:
             o = orders[oid]
             if o.state in (OrderState.PENDING, OrderState.ACTIVE):
                 open_qty += o.remaining
+                still_open.append(oid)
+            elif not o.is_terminal:
+                still_open.append(oid)
+        if len(still_open) != len(ps.open_child_ids):
+            ps.open_child_ids = still_open
         return ps.filled_qty + open_qty
 
     def _book_new_fills(self) -> None:
@@ -420,6 +435,7 @@ class ExecutionReplay:
             return
         ps.stats.posts += 1
         ps.working.append(_Working(oid, min(t + rest, cap), reprices, patience=rest))
+        ps.working_open += 1
 
     def _post_step(self, ps: _ParentState, step_qty: int, t: int) -> None:
         """POST a schedule step, split at ``max_child_qty`` (pinned)."""
@@ -444,6 +460,7 @@ class ExecutionReplay:
             if w.state == _REST:
                 if o.is_terminal:
                     w.state = _DONE
+                    ps.working_open -= 1
                 elif t >= p.end_ts:
                     continue  # expires with the window (rule 7)
                 elif behind:
@@ -477,6 +494,7 @@ class ExecutionReplay:
                 continue
             state = w.state
             w.state = _DONE
+            ps.working_open -= 1
             if (
                 o.state != OrderState.CANCELLED
                 or o.cancel_reason != CancelReason.USER
@@ -500,6 +518,13 @@ class ExecutionReplay:
                 self._tag_children(
                     ps, first, o.urgency_regime, o.signal_z, o.pacing_scale, count_qty=False
                 )
+        # F4: drop the ``_DONE`` entries once they outnumber the live ones
+        # (amortised O(1) per visit; the relative order of the live entries,
+        # and so the evaluation order above, is unchanged). Without this a
+        # POV parent with thousands of posted children rescanned every one
+        # of them on every event of its instrument (X-6 follow-up).
+        if len(ps.working) > 2 * ps.working_open + 32:
+            ps.working = [w for w in ps.working if w.state != _DONE]
 
     def _schedule_passive(self, ps: _ParentState, ev: MarketEvent) -> None:
         p = ps.order
@@ -749,7 +774,7 @@ class ExecutionReplay:
             ps.armed = True
             heapq.heappush(self._due, (ps.slice_due[ps.next_slice], idx))
         if ps.order.policy == ExecPolicy.PASSIVE or ps.signal:
-            if any(w.state != _DONE for w in ps.working):
+            if ps.working_open > 0:
                 self._live_passive.add(idx)
             else:
                 self._live_passive.discard(idx)

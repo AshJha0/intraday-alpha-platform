@@ -195,6 +195,32 @@ jobs:
         run: >
           python -m pytest -q -n auto --dist loadfile --durations=25
           -m "not slow"
+      # v1.17 (F4 / F5): the Python MVP loop latency budget and the peak-RSS
+      # guards on the committed real slice (benchmarks/slices/
+      # itch50_20190130_AAPL). Serial, after pytest, on the pinned 3.11 only:
+      # the budgets (benchmarks/latency_budget.json, memory_budget.json) are
+      # measured CI figures times a margin, so the guards are coarse (an
+      # algorithmic regression or a path holding the day in memory, not
+      # drift); the tables go to the job summary and the JSON to artifacts.
+      - name: MVP loop latency budget (real slice, coarse)
+        if: matrix.python-version == '3.11'
+        env:
+          PYTHONPATH: python/src
+        run: |
+          python3 tests/harness/check_mvp_latency_budget.py             --json "$RUNNER_TEMP/mvp_latency_ci.json"
+      - name: peak RSS guard (ingest + features on the real slice)
+        if: matrix.python-version == '3.11'
+        run: |
+          python3 tests/harness/check_slice_memory.py             --json "$RUNNER_TEMP/slice_memory_ci.json"
+      - name: upload slice guard output
+        if: always() && matrix.python-version == '3.11'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: slice-guards
+          path: |
+            ${{ runner.temp }}/mvp_latency_ci.json
+            ${{ runner.temp }}/slice_memory_ci.json
+          if-no-files-found: ignore
       # E-P1-5: mypy on core/orderbook/execution/backtest/features and, since
       # v1.17 (F3), agents/llm/mvp/paper (config: python/pyproject.toml
       # [tool.mypy]); the error count goes to the job summary.  BLOCKING since
