@@ -273,8 +273,8 @@ from iap.validation.metrics import (
     capacity_proxy_usd,
     day_block_bootstrap_tstat,
     day_cluster_inference,
-    day_cluster_tstat,
     decay_curve,
+    gate_statistics,
     hit_rate,
     ic,
     instrument_ics,
@@ -694,9 +694,20 @@ def validate_alpha(
     hypothesis_rule: str = DEFAULT_HYPOTHESIS_RULE,
     standardisation: str = DEFAULT_STANDARDISATION,
     leakage_time_shift: bool = True,
+    feature_window_ns: int | str | None = None,
 ) -> dict:
     """Full validation of one alpha.  ``model_factory()`` returns a fresh
     unfitted model (a fresh instance per fold — no state bleeds across).
+
+    ``feature_window_ns`` (v1.17, R-3 / R-P1-6) is the post-block embargo
+    of every two-sided split (``split_mode="leave_one_day_out"`` and the
+    ``cpcv`` block): ``"registry"`` reads the longest feature look-back
+    window from the feature registry, an int is a window in ns, ``None``
+    keeps ``embargo_ns`` (the rule up to v1.16, now the ``*_v114``
+    bundles; :func:`iap.validation.splits.post_block_embargo_ns`).  The
+    expanding walk-forward is one-sided, so the default ``v2`` numbers do
+    not move; the report states the resolved gap
+    (``methods.post_block_embargo_ns``).
 
     The keyword arguments from ``tstat_threshold`` on are the method choices
     of the module docs; every default is the v1.5.0 rule and every legacy
@@ -749,7 +760,12 @@ def validate_alpha(
     horizon_ns = HORIZONS_NS[horizon]
     universe = probe.universe(list(frames))
     uframes = {i: frames[i] for i in universe}
-    splitter = WalkForwardSplitter(n_folds=n_folds, embargo_ns=embargo_ns, mode=split_mode)
+    splitter = WalkForwardSplitter(
+        n_folds=n_folds,
+        embargo_ns=embargo_ns,
+        mode=split_mode,
+        feature_window_ns=feature_window_ns,
+    )
     asset_class = "FX" if probe.asset_class == "FX" else "EQUITY"
     bt = backtester.for_horizon(horizon)
 
@@ -1007,8 +1023,34 @@ def validate_alpha(
         )
     else:
         gate_ic = gate_ic_pooled
+    # v1.17 (R-2): the gate statistic is computed ONCE, by
+    # metrics.gate_statistics, on the rows the gate reads (the uncrossed
+    # rows when they yield a t, else every row); the same function serves
+    # frozen_params_block, the validity block and tools/r7_confirm.py, so
+    # the day-cluster t sits beside the HAC t in every gate (R-P1-3).
+    gate_stats = gate_statistics(
+        ts[unc],
+        x[unc],
+        y[unc],
+        horizon_ns=horizon_ns,
+        hac_bandwidth=hac_bandwidth,
+        day_separated=hac_day_separated,
+        lags=lags,
+    )
+    gate_stat_rows = "uncrossed"
+    if not np.isfinite(gate_stats["tstat_hac"]):
+        gate_stats = gate_statistics(
+            ts,
+            x,
+            y,
+            horizon_ns=horizon_ns,
+            hac_bandwidth=hac_bandwidth,
+            day_separated=hac_day_separated,
+            lags=lags,
+        )
+        gate_stat_rows = "all"
     if significance == "pooled_slope":
-        gate_t = nw_t_pooled_uncrossed if np.isfinite(nw_t_pooled_uncrossed) else nw_t_pooled
+        gate_t = float(gate_stats["tstat_hac"])
     else:
         gate_t = nw_t_uncrossed if np.isfinite(nw_t_uncrossed) else nw_t
     promote_gates = {
@@ -1074,6 +1116,10 @@ def validate_alpha(
         method_extras["validity_diagnostics"] = True
     if single_venue:
         method_extras["book_scope"] = book_scope
+    if feature_window_ns is not None:
+        # v1.17 (R-3): the post-block embargo rule and the gap it resolved to.
+        method_extras["feature_window"] = feature_window_ns
+        method_extras["post_block_embargo_ns"] = int(splitter.post_embargo_ns)
     if cpcv:
         method_extras["cpcv"] = True  # N and k are in the cpcv block
         extras["cpcv"] = _cpcv_block(
@@ -1085,6 +1131,7 @@ def validate_alpha(
             n_groups=cpcv_groups,
             k_test=cpcv_test_groups,
             embargo_ns=embargo_ns,
+            feature_window_ns=feature_window_ns,
         )
     if deflated_sharpe:
         method_extras["deflated_sharpe"] = True
@@ -1096,7 +1143,16 @@ def validate_alpha(
         )
     if frozen_params is not None:
         frozen = frozen_params_block(
-            model_factory, uframes, frozen_params, horizon, horizon_ns, ic_rows, single_venue
+            model_factory,
+            uframes,
+            frozen_params,
+            horizon,
+            horizon_ns,
+            ic_rows,
+            single_venue,
+            hac_bandwidth=hac_bandwidth,
+            hac_day_separated=hac_day_separated,
+            standardisation=standardisation,
         )
         extras["frozen"] = frozen
         extras["frozen_ic"] = frozen["frozen_ic"]
@@ -1189,6 +1245,14 @@ def validate_alpha(
         "nw_tstat_uncrossed": _fnum(nw_t_uncrossed),
         "nw_tstat_pooled": _fnum(nw_t_pooled),
         "nw_tstat_pooled_uncrossed": _fnum(nw_t_pooled_uncrossed),
+        # v1.17 (R-2 / R-P1-3): the gate's statistics from one function, the
+        # day-cluster t beside the HAC t the verdict read (report-only).
+        "gate_tstat_day_cluster": _fnum(float(gate_stats["tstat_day_cluster"])),
+        "gate_n_days": int(gate_stats["n_days"]),
+        "gate_statistics": {
+            "rows": gate_stat_rows,
+            **{k: (_fnum(v) if isinstance(v, float) else v) for k, v in gate_stats.items()},
+        },
         "nw_lags": int(lags),
         "nw_lags_rule": hac_bandwidth,
         "n_ic_buckets": int(bics.size),
@@ -1292,10 +1356,20 @@ def frozen_params_block(
     horizon_ns: int,
     ic_rows: str = DEFAULT_IC_ROWS,
     single_venue: bool = False,
+    *,
+    hac_bandwidth: str = DEFAULT_HAC_BANDWIDTH,
+    hac_day_separated: bool = True,
+    standardisation: str = DEFAULT_STANDARDISATION,
 ) -> dict:
     """Score ``frames`` with ``params`` loaded into a fresh model, NO refit
-    (v1.13, R-P1-2).  The IC and pooled-slope HAC t are computed on the
-    standardized signal over the same (uncrossed) rows the gate reads."""
+    (v1.13, R-P1-2).  The IC, the pooled-slope HAC t and the day-cluster t
+    are computed by :func:`iap.validation.metrics.gate_statistics` on the
+    standardized signal over the same (uncrossed) rows the gate reads,
+    under the SAME statistics as the walk-forward gate (v1.17, R-2 /
+    R-P1-2: the HAC bandwidth rule, the day separation and the
+    per-instrument scaling of ``validate_alpha``; until v1.16 this block
+    kept the v1.13 ``L = 2`` rule with no day separation and no scaling,
+    so a frozen t and a gate t were different statistics)."""
 
     model = model_factory()
     model.load_params(dict(params))
@@ -1305,16 +1379,29 @@ def frozen_params_block(
         crossed = np.zeros_like(crossed)
     beta = float(model.params().get("beta", 0.0) or 0.0)
     z = er / beta if beta != 0.0 else er
+    if standardisation == "instrument":
+        z, y = _standardise_by_instrument(_pooled_instrument_ids(scores, frames), z, y)
     unc = ~crossed
-    lags = nw_lags(horizon_ns)
-    f_ic = ic(z[unc], y[unc])
-    f_t = pooled_slope_hac_tstat(ts[unc], z[unc], y[unc], lags=lags)
+    stats = gate_statistics(
+        ts[unc],
+        z[unc],
+        y[unc],
+        horizon_ns=horizon_ns,
+        hac_bandwidth=hac_bandwidth,
+        day_separated=hac_day_separated,
+    )
     return {
         "mode": "frozen_params",
         "refit": False,
-        "frozen_ic": _fnum(f_ic),
-        "frozen_t": _fnum(f_t),
-        "n_pairs": int(np.sum(np.isfinite(z[unc]) & np.isfinite(y[unc]))),
+        "frozen_ic": _fnum(stats["ic"]),
+        "frozen_t": _fnum(stats["tstat_hac"]),
+        "frozen_t_day_cluster": _fnum(stats["tstat_day_cluster"]),
+        "hac_lags": int(stats["hac_lags"]),
+        "hac_bandwidth": hac_bandwidth,
+        "hac_day_separated": bool(hac_day_separated),
+        "standardisation": standardisation,
+        "n_pairs": int(stats["n_pairs"]),
+        "n_days": int(stats["n_days"]),
         "beta": _fnum(beta),
         "params_sha256": hashlib.sha256(
             json.dumps(dict(params), sort_keys=True, default=str).encode()
@@ -1359,7 +1446,10 @@ def _validity_block(
         )
     keep = ~event_day_mask(ts)
     boot = day_block_bootstrap_tstat(ts, x, y, seed=seed, n_boot=min(int(n_boot), 2000))
-    t_cluster = day_cluster_tstat(ts, x, y)
+    # v1.17 (R-2): the day-separated HAC t and the day-cluster t of this
+    # block are the gate's statistics on the gate's rows (one function).
+    gate_stats = gate_statistics(ts, x, y, lags=lags, day_separated=True)
+    t_cluster = float(gate_stats["tstat_day_cluster"])
     bic_dm, _ = bucket_ics_demeaned(ts, instrument_ids, x, y)
     extra: dict[str, object] = {}
     if few_sessions_rule and len(day_rows) < FEW_SESSIONS:
@@ -1394,9 +1484,7 @@ def _validity_block(
                 pooled_slope_hac_tstat(ts[keep], x[keep], y[keep], lags=lags, day_ns=NS_DAY)
             ),
         },
-        "tstat_pooled_slope_day_separated": _fnum(
-            pooled_slope_hac_tstat(ts, x, y, lags=lags, day_ns=NS_DAY)
-        ),
+        "tstat_pooled_slope_day_separated": _fnum(float(gate_stats["tstat_hac"])),
         "tstat_day_cluster": _fnum(t_cluster),
         # report-only: Student-t (G - 1 df) beside the normal reading
         "tstat_day_cluster_inference": {
@@ -1432,6 +1520,7 @@ def _cpcv_block(
     n_groups: int,
     k_test: int,
     embargo_ns: int,
+    feature_window_ns: int | str | None = None,
 ) -> dict:
     """The ``cpcv`` report block (module docs): per-split and per-path
     pooled IC of the standardized signal on all scored rows.
@@ -1454,6 +1543,7 @@ def _cpcv_block(
             n_groups=n_groups,
             k_test=k_test,
             embargo_ns=embargo_ns,
+            feature_window_ns=feature_window_ns,
         )
 
 
@@ -1515,8 +1605,11 @@ def _cpcv_block_on(
     n_groups: int,
     k_test: int,
     embargo_ns: int,
+    feature_window_ns: int | str | None = None,
 ) -> dict:
-    splitter = CombinatorialPurgedSplitter(n_groups, k_test, embargo_ns)
+    splitter = CombinatorialPurgedSplitter(
+        n_groups, k_test, embargo_ns, feature_window_ns=feature_window_ns
+    )
     # per split, the (z, y) rows of each of its test groups - all a path reads
     per_split: dict[int, dict[int, tuple[np.ndarray, np.ndarray]]] = {}
     split_rows = []
@@ -1556,6 +1649,10 @@ def _cpcv_block_on(
         "k_test": splitter.k_test,
         "n_splits": splitter.n_splits,
         "n_paths": splitter.n_paths,
+        "embargo_ns": int(splitter.embargo_ns),
+        # v1.17 (R-3): the gap after each test group (>= the longest feature
+        # window under feature_window_ns="registry"; = embargo_ns before).
+        "post_block_embargo_ns": int(splitter.post_embargo_ns),
         "splits": split_rows,
         "path_ics": path_ics,
         "path_ic_mean": _fnum(float(finite.mean())) if finite.size else None,

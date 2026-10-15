@@ -8,6 +8,28 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS0 item 0.1 (R-1): the R7 confirmatory deflated Sharpe was recorded at the holdout
+  dataset ledger's own trial count (N = 1 / 2) instead of the registered N (repo ledger distinct
+  configurations + the look). `tools/r7_confirm.py` now takes N from the repo ledger
+  (`registered_trials`) and gains `--recompute-dsr` (no look: the recorded per-session IC series
+  re-deflated at N = 297 at the look and N = 308 today; EQ10 0.99995 -> 0.99886, EQ05
+  0.9999998 -> 0.99996, both verdicts unchanged). `research/r7/R7_DEVIATION_dsr_trials.md`,
+  `research/r7/r7_confirm_result_dsr_recompute.{json,md}`; `docs/research/R7_RESULTS.md` states N.
+- v1.17 WS0 item 0.2 (R-2, R-P1-2, R-P1-3): one `iap.validation.metrics.gate_statistics()`
+  (pooled IC, pooled-slope HAC t at the bundle's bandwidth and day separation, day-cluster t,
+  n_pairs, n_days) behind the walk-forward gate, `frozen_params_block` (which kept the v1.13
+  L = 2 rule, no day separation and no per-instrument scaling until now), the `validity` block
+  and `tools/r7_confirm.py::pooled_stats`. Reports gain `gate_tstat_day_cluster`, `gate_n_days`
+  and a `gate_statistics` block; the frozen block gains `frozen_t_day_cluster` and states its
+  statistics. Gate t values are unchanged.
+- v1.17 WS0 item 0.3 (R-3, R-P1-6): statistics revision v1.17. `v2` / `v3` / `v4` pass
+  `feature_window_ns="registry"` to `validate_alpha`: the post-block embargo of every two-sided
+  split (`leave_one_day_out`, the `cpcv` block) is at least the longest feature window (5 m), not
+  the 60 s embargo alone; reports state `methods.post_block_embargo_ns` and the cpcv block its
+  `embargo_ns` / `post_block_embargo_ns`. The walk-forward is one-sided, so no `v2` number moves.
+  The v1.14.0 rules are frozen as `v2_v114` / `v3_v114` / `v4_v114`; ledger identities carry
+  `stats_revision: "v1.17"` and entries at `"v1.14"` scope to the `*_v114` bundles (an unknown
+  revision raises). Regenerated research outputs follow (CI regenerate).
 - v1.17 WS0 item 0.5 (X-1): VWAP slices follow the forecast volume curve over the PARENT window
   (`curve_slice_weights(curve, n, start_frac, end_frac)`, `volume_curve.curve_window`,
   `ParentOrder.curve_window`); the whole-session resampling and the pinned `1 + x^2` curve are

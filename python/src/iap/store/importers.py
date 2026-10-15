@@ -444,6 +444,9 @@ _REPORT_V19_METHOD_FIELDS = {
     "hypothesis_rule": "last_fold",
     "standardisation": "pooled",
     "leakage_time_shift": False,
+    # v1.17 statistics revision: a report written before it states no
+    # post-block embargo rule (the embargo alone; the ``*_v114`` bundles).
+    "feature_window": None,
 }
 
 

@@ -1437,7 +1437,9 @@ def test_pipeline_entry_selection_prefers_the_default_method_bundle():
     def entry(alpha_id, key, methods=None):
         config = {} if methods is None else {"methods": methods}
         if methods == "v2":
-            config["stats_revision"] = "v1.14"  # the current revision of v2
+            from iap.validation.methods import STATS_REVISION
+
+            config["stats_revision"] = STATS_REVISION  # the current revision of v2
         return {
             "alpha_id": alpha_id,
             "kind": "promotion_pipeline",

@@ -13,6 +13,12 @@ Every number below is copied from `research/r7/r7_confirm_result.json` /
   2026-10-12T19:55:25Z (owner-run, `tools/r7_confirm.py --i-am-the-owner`)
 - Gate (prereg): HAC t >= ledger threshold in force and deflated Sharpe > 0.95,
   both on the per-session IC series; net-of-cost P&L descriptive only.
+- DSR trial count: the DSR column below was recorded at the holdout dataset's
+  own ledger count (N = 1 for EQ10, 2 for EQ05), not the registered N = 297
+  (the repo ledger's 296 configurations at the look plus the look itself).
+  Recomputed at N = 297 without a new look: EQ10 0.99886, EQ05 0.99996, both
+  verdicts unchanged (`research/r7/R7_DEVIATION_dsr_trials.md`,
+  `research/r7/r7_confirm_result_dsr_recompute.md`; v1.17 WS0 item 0.1).
 - Threshold: **4.432** = max(run's ledger threshold, repo-ledger Bonferroni
   |t|), from `research/experiments.json` (5,361 experiments over 296
   configurations; `tests/harness/check_headline_numbers.py`).
@@ -90,6 +96,11 @@ input drift, but the report does not establish cause. The round-lot change
   experiment or ledger entry. Fixed (sliced windows, column-narrowed train
   frames, output identical), one EQ05-only retry. Record:
   `research/r7/r7_confirm_result_crash2.json`.
+- **DSR trial count** (`research/r7/R7_DEVIATION_dsr_trials.md`, recorded
+  2026-10-15 after the looks, v1.17): the recorded DSR used the dataset
+  ledger's N (1 / 2) instead of the registered N = 297; recomputed from the
+  recorded per-session IC series at N = 297 and N = 308 (no new look):
+  EQ10 0.99886, EQ05 0.99996, gate passed, verdicts unchanged.
 - Registered code hash restored before the look (#117): the report-only
   `beta_stability` addition to `alpha/base.py` was reverted so
   `prereg_gate.require` passed.

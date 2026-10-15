@@ -274,7 +274,7 @@ possible.
 Run id `58a10f2194a3c81c`, 15,805 events, 800 decisions, 231 parent orders,
 496 children generated / 347 submitted, 163 fills, fill rate 15.4 %
 (v1.14.0). Trace digest
-`77c5c4f705e33ecb262eb00ea5f00d22775cd61afac1fe74ea36f83151a85a61`
+`d4659d8c1bb40b5be02a907baf2dc5aeda57f3814fa9592082b99f4b04645073`
 (`config_version` `62d78a3b…`).
 Wall time: about 2.2× the v1.3.0 session on the same machine (27 s → 59 s on
 the laptop this was measured on; 0.8 s of that is feed generation and
@@ -495,7 +495,7 @@ python -m iap.mvp.real --dataset data/real/<dataset> --date 2019-01-30 \
 `iap.mvp.real` feeds the normalized stream of a dataset directory written by
 `iap.marketdata.ingest` (docs/REAL_DATA.md) through the same `MvpEngine` and
 `run_session` as the synthetic run. The loop is unchanged; only the feed and
-the reference data differ, so the synthetic golden (digest `77c5c4f7`) does not
+the reference data differ, so the synthetic golden (digest `d4659d8c`) does not
 move. The MVP trades one instrument, so each symbol gets its own engine and
 its own `<out>/<SYMBOL>/` directory.
 
@@ -525,7 +525,7 @@ its own `<out>/<SYMBOL>/` directory.
 - **Pre-registration.** `--config` is pinned by hash and its opt-ins that
   the MVP loop exercises are applied through `MvpEngine(realism=...)` (an
   opt-in keyword; the synthetic run, the golden and the C++/Rust parity path
-  never set it, so the golden digest `77c5c4f7` is unchanged):
+  never set it, so the golden digest `d4659d8c` is unchanged):
   `regulatory_fees` (SEC Section 31 + FINRA TAF on sell fills, dated by fill
   time, `ExecConfig.regulatory_fees`), `hidden_print_fills`
   (`ExecutionSimulator(hidden_prints=True)`) and `feed_latency_ns` (added to
@@ -566,7 +566,7 @@ parametric tail), `fee_tier` (from the assumed table
 
 `execution.eod_flatten_lead_ns` in `configs/mvp/mvp.json` (absent by default)
 turns it on. The pinned golden run does not set it, so the golden numbers in
-§7 and the digest `77c5c4f7` are unchanged, and the report carries no
+§7 and the digest `d4659d8c` are unchanged, and the report carries no
 `counts.eod_flatten` block
 (`python/tests/test_v116_mvp_eod_flatten.py::test_default_is_off_and_unreported`).
 

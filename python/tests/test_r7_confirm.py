@@ -357,7 +357,8 @@ def test_live_runs_each_look_once_and_writes_result(tmp_path, no_board, monkeypa
     run = FakeRun(ds, {"EQ10": 0, "EQ05": 1})
     seen = []
 
-    def fake_analyse(alpha, look, frames, ds_, thr, entry):
+    def fake_analyse(alpha, look, frames, ds_, thr, entry, root=None):
+        assert root is not None  # v1.17 R-1: the DSR N comes from the repo ledger
         seen.append(alpha)
         return {
             "alpha": f"{alpha}@1s",
@@ -422,7 +423,7 @@ def test_crash_retry_needs_the_note_and_runs_once(tmp_path, no_board, monkeypatc
     monkeypatch.setattr(
         rc,
         "analyse",
-        lambda a, look, *x: {
+        lambda a, look, *x, root=None: {
             "alpha": f"{a}@1s",
             "prereg_id": x[-1]["body"]["prereg_id"],
             "experiment_id": look["experiment_id"],
@@ -460,7 +461,7 @@ def _after_first_retry(tmp_path, monkeypatch):
     monkeypatch.setattr(
         rc,
         "analyse",
-        lambda a, look, *x: {
+        lambda a, look, *x, root=None: {
             "alpha": f"{a}@1s",
             "prereg_id": x[-1]["body"]["prereg_id"],
             "experiment_id": look["experiment_id"],

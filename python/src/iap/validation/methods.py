@@ -1,7 +1,24 @@
 """The research method bundles: ``"v2"`` (the default), ``"legacy_v1"`` and
 the opt-in ``"v3"`` (v1.9 research-validity rules) and ``"v4"`` (v1.12
-overfitting statistics), each at the v1.14.0 statistics revision, plus the
-frozen v1.13.0 revisions ``"v2_v113"``, ``"v3_v113"`` and ``"v4_v113"``.
+overfitting statistics), each at the v1.17 statistics revision, plus the
+frozen v1.14.0 revisions ``"v2_v114"``, ``"v3_v114"`` and ``"v4_v114"`` and
+the frozen v1.13.0 revisions ``"v2_v113"``, ``"v3_v113"`` and ``"v4_v113"``.
+
+**Statistics revision v1.17 (the 2026-10-15 review, R-2 / R-3).**  ``v2``,
+``v3`` and ``v4`` now pass ``feature_window_ns="registry"`` to
+``validate_alpha``: the embargo AFTER a test block on every two-sided split
+(``leave_one_day_out`` folds and the ``cpcv`` block) is at least the longest
+feature look-back window in the registry (5 m today), not the 60 s
+``embargo_ns`` alone (R-P1-6 was implemented in v1.13 and passed by no
+caller).  The expanding walk-forward is one-sided, so a ``v2`` verdict and
+every published ``v2`` number are unchanged; the ``cpcv`` block of ``v4``
+moves, and reports state ``methods.post_block_embargo_ns``.  In the same
+revision the gate statistic is computed by one function
+(:func:`iap.validation.metrics.gate_statistics`) for the walk-forward gate,
+``frozen_params_block``, the ``validity`` block and ``tools/r7_confirm.py``,
+with the day-cluster t beside the HAC t in every gate.  The v1.14.0 rules
+are frozen as ``*_v114`` and the ledger identity carries
+``stats_revision: "v1.17"``, exactly as v1.14.0 did with ``*_v113``.
 
 Every method choice of the validation chain is an argument somewhere — a
 ``BacktestConfig`` field, a ``CostModel`` field, a ``validate_alpha`` keyword
@@ -138,8 +155,12 @@ __all__ = [
     "METHODS_V2_V113",
     "METHODS_V3_V113",
     "METHODS_V4_V113",
+    "METHODS_V2_V114",
+    "METHODS_V3_V114",
+    "METHODS_V4_V114",
     "STATS_REVISION",
     "V113_REVISION",
+    "V114_REVISION",
     "ResearchMethods",
     "ledger_bundle",
     "ledger_config",
@@ -154,10 +175,16 @@ METHODS_V4 = "v4"
 METHODS_V2_V113 = "v2_v113"
 METHODS_V3_V113 = "v3_v113"
 METHODS_V4_V113 = "v4_v113"
+#: The frozen v1.14.0 revisions of ``v2`` / ``v3`` / ``v4`` (module docs, v1.17).
+METHODS_V2_V114 = "v2_v114"
+METHODS_V3_V114 = "v3_v114"
+METHODS_V4_V114 = "v4_v114"
 #: The bundle a pipeline uses when it names none.
 DEFAULT_METHODS = METHODS_V2
 #: The statistics revision of the current ``v2`` / ``v3`` / ``v4``.
-STATS_REVISION = "v1.14"
+STATS_REVISION = "v1.17"
+#: The revision of the ``*_v114`` bundles (v1.14.0 to v1.16.0).
+V114_REVISION = "v1.14"
 #: The revision of ``legacy_v1`` and the ``*_v113`` bundles.
 V113_REVISION = "v1.13"
 
@@ -193,6 +220,10 @@ class ResearchMethods:
     leakage_time_shift: bool = False
     looks_rule: str = V113_LOOKS_RULE
     revision: str = V113_REVISION
+    # v1.17 statistics revision (module docs): the post-block embargo rule
+    # of two-sided splits (``validate_alpha(feature_window_ns=)``); ``None``
+    # is the v1.13-v1.14 rule (the embargo alone).
+    feature_window: int | str | None = None
 
     @property
     def row_block(self) -> str:
@@ -257,6 +288,10 @@ class ResearchMethods:
         ):
             if getattr(self, key) != default:
                 kw[key] = getattr(self, key)
+        # v1.17 statistics revision: named only when set (the v1.14 keyword
+        # set is unchanged for the ``*_v114`` bundles).
+        if self.feature_window is not None:
+            kw["feature_window_ns"] = self.feature_window
         return kw
 
     def looks(self, n_folds: int) -> int:
@@ -341,7 +376,7 @@ _V114 = {
     "standardisation": DEFAULT_STANDARDISATION,
     "leakage_time_shift": True,
     "looks_rule": DEFAULT_LOOKS_RULE,
-    "revision": STATS_REVISION,
+    "revision": V114_REVISION,
 }
 # ``v2`` gains the validity block (R-P1-3: required whenever the data span
 # two or more session days; it debits no look under the decisions rule).
@@ -349,11 +384,28 @@ METHODS[METHODS_V2] = replace(METHODS[METHODS_V2], validity_diagnostics=True, **
 METHODS[METHODS_V3] = replace(METHODS[METHODS_V3], **_V114)
 METHODS[METHODS_V4] = replace(METHODS[METHODS_V4], **_V114)
 
+#: The v1.14.0 revisions, frozen under their own names (module docs, v1.17).
+METHODS[METHODS_V2_V114] = replace(METHODS[METHODS_V2], name=METHODS_V2_V114)
+METHODS[METHODS_V3_V114] = replace(METHODS[METHODS_V3], name=METHODS_V3_V114)
+METHODS[METHODS_V4_V114] = replace(METHODS[METHODS_V4], name=METHODS_V4_V114)
+
+#: The v1.17 statistics revision (R-3 / R-P1-6; module docs).
+_V117 = {"feature_window": "registry", "revision": STATS_REVISION}
+METHODS[METHODS_V2] = replace(METHODS[METHODS_V2], **_V117)
+METHODS[METHODS_V3] = replace(METHODS[METHODS_V3], **_V117)
+METHODS[METHODS_V4] = replace(METHODS[METHODS_V4], **_V117)
+
 #: Bundle name -> its v1.13.0 revision (itself when it has no other).
 V113_OF = {
     METHODS_V2: METHODS_V2_V113,
     METHODS_V3: METHODS_V3_V113,
     METHODS_V4: METHODS_V4_V113,
+}
+#: Bundle name -> its v1.14.0 revision (v1.17).
+V114_OF = {
+    METHODS_V2: METHODS_V2_V114,
+    METHODS_V3: METHODS_V3_V114,
+    METHODS_V4: METHODS_V4_V114,
 }
 
 
@@ -382,7 +434,9 @@ def ledger_bundle(config: Mapping[str, Any] | None) -> str:
     ``configuration["methods"]``; ``legacy_v1`` when neither names one),
     mapped to its frozen ``*_v113`` name when the entry carries no
     ``stats_revision`` - an entry recorded under ``v2`` before v1.14.0 was
-    computed at the v1.13.0 revision (module docs)."""
+    computed at the v1.13.0 revision (module docs) - and to its frozen
+    ``*_v114`` name when it carries ``"v1.14"`` (v1.17).  An entry naming a
+    revision this code does not know is an error, never a silent match."""
     cfg = dict(config or {})
     name = cfg.get("methods")
     if name is None:
@@ -390,6 +444,15 @@ def ledger_bundle(config: Mapping[str, Any] | None) -> str:
     if name is None:
         return METHODS_LEGACY
     name = str(name)
-    if name in V113_OF and cfg.get("stats_revision") != METHODS[name].revision:
-        return V113_OF[name]
+    if name in V113_OF:
+        revision = cfg.get("stats_revision")
+        if revision is None:
+            return V113_OF[name]
+        if revision == V114_REVISION:
+            return V114_OF[name]
+        if revision != METHODS[name].revision:
+            raise ValueError(
+                f"ledger entry under {name!r} carries stats_revision {revision!r}; "
+                f"known: None (v1.13), {V114_REVISION!r}, {METHODS[name].revision!r}"
+            )
     return name

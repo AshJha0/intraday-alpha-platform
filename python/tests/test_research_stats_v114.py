@@ -346,6 +346,7 @@ def test_v113_bundles_are_the_old_rules_under_new_names():
             "looks_rule",
             "revision",
             "validity_diagnostics",
+            "feature_window",  # v1.17 statistics revision (test_research_stats_v117)
         }
         assert all(getattr(a, k) == getattr(b, k) for k in keep)
     assert methods(METHODS_V2_V113).validity_diagnostics is False
@@ -354,14 +355,18 @@ def test_v113_bundles_are_the_old_rules_under_new_names():
 
 def test_ledger_identity_carries_the_revision_and_old_entries_scope_to_v113():
     base = {"n_folds": 4, "methods": "v2"}
-    assert ledger_config(base, methods(METHODS_V2)) == {**base, "stats_revision": "v1.14"}
+    # the current revision (v1.17 since test_research_stats_v117; "v1.14"
+    # entries scope to the frozen ``*_v114`` bundles)
+    assert ledger_config(base, methods(METHODS_V2)) == {**base, "stats_revision": STATS_REVISION}
     assert ledger_config(base, methods(METHODS_V2_V113)) == base
     assert ledger_config({"x": 1}, methods("legacy_v1")) == {"x": 1}
     assert ledger_bundle(None) == "legacy_v1"
     assert ledger_bundle({"methods": "legacy_v1"}) == "legacy_v1"
     assert ledger_bundle(base) == METHODS_V2_V113
-    assert ledger_bundle({**base, "stats_revision": "v1.14"}) == METHODS_V2
+    assert ledger_bundle({**base, "stats_revision": "v1.14"}) == "v2_v114"
+    assert ledger_bundle({**base, "stats_revision": STATS_REVISION}) == METHODS_V2
     runner_entry = {"configuration": {"methods": "v3"}, "experiment_id": "x"}
     assert ledger_bundle(runner_entry) == METHODS_V3_V113
-    assert ledger_bundle({**runner_entry, "stats_revision": "v1.14"}) == METHODS_V3
+    assert ledger_bundle({**runner_entry, "stats_revision": "v1.14"}) == "v3_v114"
+    assert ledger_bundle({**runner_entry, "stats_revision": STATS_REVISION}) == METHODS_V3
     assert ledger_bundle({"methods": "v4_v113"}) == METHODS_V4_V113

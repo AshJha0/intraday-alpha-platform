@@ -16,7 +16,7 @@ PROMOTE here would be a reason to look for leakage before anything else.
 - **Outer validation:** `validate_alpha`, 4 expanding walk-forward folds purged at the combination horizon, 60 s embargo, method bundle `v2` — the chain of the alpha reports.
 - **Weights:** fitted inside each fold's training window on the members' out-of-sample predictions from 3 inner walk-forward folds (same splitter); standardisation, weights, ridge penalty and scale never see a test row.
 - **Methods:** `equal_weight`, `ic_weighted`, `ridge`, `shrinkage_mv`; default `equal_weight` (the baseline). `ridge` and `shrinkage_mv` account for member correlation explicitly; `equal_weight` and `ic_weighted` do not, and nothing is orthogonalised.
-- **Looks:** each experiment debits `looks_per_validation(4) + K` (83 + members); this report declared 104 looks over 8 experiments on a ledger of 5,214 and was judged at 5,318 looks: PROMOTE needs gate t >= 4.430.
+- **Looks:** each experiment debits `looks_per_validation(4) + K` (83 + members); this report declared 104 looks over 8 experiments on a ledger of 5,430 and was judged at 5,534 looks: PROMOTE needs gate t >= 4.439.
 
 ## COMB_EQ — EQUITY, horizon 5s
 

@@ -452,6 +452,7 @@ def test_v2_defaults_are_unchanged_and_v3_is_opt_in(frames, v2_report):
         "capacity",
         "fold_diagnostics",
         "validity_diagnostics",  # v1.14.0 (R-P1-3): v2 always carries it
+        "feature_window_ns",  # v1.17 (R-3): post-block embargo = longest feature window
     }
     v3 = methods(METHODS_V3)
     assert v3.validate_kwargs()["gate_ic_source"] == "instrument_mean"

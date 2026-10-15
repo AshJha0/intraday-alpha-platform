@@ -51,7 +51,7 @@ from iap.research.runner import (
 from iap.validation import validate_alpha
 from iap.validation.leakage import RecomputeSources
 from iap.validation.ledger import ExperimentLedger
-from iap.validation.methods import METHODS_LEGACY, METHODS_V2, methods
+from iap.validation.methods import METHODS_LEGACY, METHODS_V2, STATS_REVISION, methods
 from iap.validation.metrics import HORIZONS_NS
 from iap.validation.splits import Fold
 
@@ -632,8 +632,8 @@ def test_ledger_increments_by_exactly_the_looks_and_deduplicates(frames, tmp_pat
         LOOKS_PER_EXPERIMENT,
         1,
     )
-    # the spec plus its statistics revision (v1.14.0): same id, new look
-    assert entry["config"] == {**a.to_dict(), "stats_revision": "v1.14"}
+    # the spec plus its statistics revision (v1.14.0, v1.17 since): same id, new look
+    assert entry["config"] == {**a.to_dict(), "stats_revision": STATS_REVISION}
     assert entry["result"]["experiment_id"] == a.experiment_id
     # a different spec is one more batch of looks
     rb = runner.run(b)

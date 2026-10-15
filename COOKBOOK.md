@@ -1213,7 +1213,7 @@ synthetic equity `SYN.EQ.AAPL` and writes every artefact under
 ```bash
 cd python
 PYTHONPATH=src python3 -m iap.mvp run                       # configs/mvp/mvp.json, seed 12345
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=231 children=347 fills=163 pnl=-82.837333 USD digest=77c5c4f705e33ecb... out=.../data/mvp/58a10f2194a3c81c
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=231 children=347 fills=163 pnl=-82.837333 USD digest=d4659d8c1bb40b5b... out=.../data/mvp/58a10f2194a3c81c
 PYTHONPATH=src python3 -m iap.mvp run --seed 7 --out /tmp/mvp7          # another seed, explicit directory
 PYTHONPATH=src python3 -m iap.mvp verify                                  # run twice from scratch, compare digest/report/stream
 cat ../data/mvp/58a10f2194a3c81c/report.md                                # the honest numbers (cost-negative)
@@ -1243,7 +1243,7 @@ with it the trace digest (`f51890da…` in v1.4.0, `2affe409…` in v1.5.0,
 `20d4ff76…` in v1.13.0), because every trace carries `config_version`. In v1.14.0 the
 counts and P&L moved slightly (231 parents, 347 children submitted, 163
 fills, −82.84 USD; it was 235 / 348 / 169 / −81.53) and the digest became
-`77c5c4f7…` with `config_version` `62d78a3b…`: `alpha_params.json` and the
+`d4659d8c…` with `config_version` `62d78a3b…`: `alpha_params.json` and the
 risk configuration are hashed, and both changed in the v1.14 regeneration. The summary line was re-run for this
 page with `--out` pointing at a scratch directory; `replay` (recipe 23)
 and `explain` (recipe 24) were re-run against that directory.
@@ -4400,8 +4400,10 @@ What differs between the two outputs:
 A v2 report still carries the old net P&L as
 `net_pnl_1x_cost_label_block`, next to the causal one, so the size of the
 look-ahead is visible without a second run. Ledger entries now carry
-`stats_revision: "v1.14"`, so a rerun under the new rules is a new look and
-never silently replaces an old one.
+`stats_revision` (`"v1.17"` since v1.17; `"v1.14"` entries scope to the
+frozen `v2_v114` / `v3_v114` / `v4_v114` bundles, which reproduce the v1.14
+rules the same way: `--methods v2_v114`), so a rerun under the new rules is a
+new look and never silently replaces an old one.
 
 ## 73. Count adverse selection per touch order, not per message (v1.14)
 

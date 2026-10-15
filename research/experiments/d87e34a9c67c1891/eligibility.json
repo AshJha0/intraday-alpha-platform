@@ -6,7 +6,7 @@
   "reasons": [
     "not pre-registered (--no-prereg): exploratory, not gate evidence"
   ],
-  "significance_threshold": 4.426226879160989,
-  "threshold_looks": 5214,
+  "significance_threshold": 4.4349795483589505,
+  "threshold_looks": 5430,
   "x-version": 2
 }

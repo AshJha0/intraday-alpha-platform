@@ -100,12 +100,12 @@ reported as stale rather than failing).
 | what | number | artefact |
 |---|---|---|
 | Cross-language parity (CI counts) | tests python 2411 / cpp 302 / rust 366; golden 193 / 72 / 72; integration 35, replay 6 | `tests/harness/run_all.sh` table in README.md |
-| MVP golden run (`python -m iap.mvp run`, seed 12345) | 15,805 events · 800 decisions · 231 parent orders · 163 fills · P&L −82.84 USD · digest `77c5c4f7…` | `tests/golden/expected_mvp.json` |
+| MVP golden run (`python -m iap.mvp run`, seed 12345) | 15,805 events · 800 decisions · 231 parent orders · 163 fills · P&L −82.84 USD · digest `d4659d8c…` | `tests/golden/expected_mvp.json` |
 | Registered features | 205 in 10 families | `data/reference/feature_registry.json` |
 | Flagship alphas | 24 (EQ01-EQ12, FX01-FX12); verdicts 0 PROMOTE / 12 ITERATE / 12 REJECT | `research/alpha_reports/REPORT.md` |
 | Promotion lifecycle | 7 states · 17 pinned edges · 20 gates; 23 alphas at CANDIDATE, 0 beyond | `research/alpha_registry.json`, `tests/golden/expected_lifecycle.json` |
 | Contracts | 17 JSON Schemas · 22 typed Python contracts · 18 runtime-checkable Protocols | `schemas/`, `python/src/iap/contracts/` |
-| Experiments ledger | 5,372 recorded looks over 307 distinct configurations; Bonferroni per-test \|t\| ≥ 4.432 | `research/experiments.json` |
+| Experiments ledger | 5,574 recorded looks over 384 distinct configurations; Bonferroni per-test \|t\| ≥ 4.432 | `research/experiments.json` |
 | C++ tick-to-trade (CI runner) | p50 1,279 ns · p99 2,559 ns · p99.9 11,263 ns, in-process, decoded frame to order intent | `benchmarks/results_tick_to_trade.md` |
 | Rust feature engine from Python | about 790,000 events/s against about 5,250 through the Python reference on the 45 native slots: 150x, not a pipeline speed-up | `rust-pyo3` CI job summary, API_FEATURES.md §7.1 |
 <!-- source: README.md "Headline numbers" table and "Cross-language parity" table (every row); the same figures appear in docs/index.html "Measured, not claimed" -->
@@ -138,7 +138,7 @@ flowchart TD
     FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
-    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,372 looks / 307 configs, two datasets, three method revisions)<br/>REPORT.md, ML_REPORT.md, model manifests"]
+    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,574 looks / 384 configs, two datasets, three method revisions)<br/>REPORT.md, ML_REPORT.md, model manifests"]
     RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 23 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```
