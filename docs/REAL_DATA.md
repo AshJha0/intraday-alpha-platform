@@ -664,6 +664,12 @@ the manifest say so); for shortfall and routing the levels are what matter.
 **TOPS oracle.** `--tops FILE` reads the day's TOPS capture (`0x8003`) and,
 whenever the mapped book's best bid or offer changes, checks price and
 aggregate size on both sides against the TOPS quote at the same timestamp.
+The book's quote is its best level holding at least the symbol's **round
+lot** (A4, measured on 2025-11-28: TOPS never quotes a size below 100 for
+AAPL or below 40 for MSFT / QQQ, their round lots); an odd lot in front is
+not quoted and is counted (`odd_lot_top`). The round lots come from the
+paired Nasdaq day's `dataset.json` (`round_lots=` / `--round-lots-from`) or,
+failing that, from the smallest quoted TOPS size per symbol (recorded).
 The result is the session's `book_verification` (`match` / `diverged` with
 the first divergence; `no_comparison` when nothing could be compared), so a
 divergent decode refuses the ingest unless `--allow-book-divergence`: the

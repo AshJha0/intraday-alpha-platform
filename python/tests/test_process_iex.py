@@ -234,6 +234,9 @@ def test_process_iex_day_runs_the_chain_and_keeps_features_and_hashes(tmp_path):
     assert (ds.parent / "iex_20251128.markers" / "_DONE_ALL").is_file()
     report = json.loads((ds / "process_report.json").read_text())
     assert report["approval"] == APPROVAL and report["free_gb_min_seen"] > 0
+    # no paired Nasdaq day given: the round lots are the smallest quoted TOPS sizes
+    assert report["round_lots"] == {"AAPL": 100, "QQQ": 200}
+    assert report["round_lots_source"] == "tops_min_quoted_size"
     assert all("free_gb_after" in s for s in report["steps"])
     # a second run is a no-op
     rep2 = pix.process_iex_day(
@@ -384,6 +387,33 @@ def test_render_wrapper_chains_the_days_and_registers_the_job(tmp_path):
     text = cmd.read_bytes().decode("ascii")
     assert text.count("--date 2025-") == 2 and "--date 2025-12-08" in text
     assert "--feed deep-plus" in text and "--i-have-approval" in text and "--peak-gb 40" in text
+    assert "--round-lots-from" not in text
+    nas = tmp_path / "dataset.json"
+    nas.write_text(
+        json.dumps(
+            {"universe": [{"symbol": "AAPL", "lot_size": 100}, {"symbol": "QQQ", "lot_size": 40}]}
+        )
+    )
+    assert pix.round_lots_from_dataset(nas) == {"AAPL": 100, "QQQ": 40}
+    rc = pix.main(
+        [
+            "--manifest",
+            "m.json",
+            "--date",
+            DATE,
+            "--vendor-dir",
+            "v",
+            "--out-root",
+            "o",
+            "--symbols",
+            "AAPL,QQQ",
+            "--round-lots-from",
+            str(nas),
+            "--render-cmd",
+            str(cmd),
+        ]
+    )
+    assert rc == 0 and "--round-lots-from" in cmd.read_bytes().decode("ascii")
     assert "EXIT_2025-11-28" in text and text.rstrip().endswith("exit /b %FAILED%")
     assert "\r\n" in text
     job = json.loads(reg.read_text())["jobs"][0]
