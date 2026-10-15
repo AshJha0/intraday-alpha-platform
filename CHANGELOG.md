@@ -23,8 +23,19 @@ that tag.
   on the slice (`benchmarks/memory_budget.json`: CI-measured 194 MB / 173 MB, limits 2x); the
   remaining v1.16 memory-review items are closed or stated in `MEMORY_REVIEW_v116.md` (F5 status).
 
+- v1.17 WS-A item A4: the IEX overlap set. `python -m iap.marketdata process-iex-day` runs one
+  IEX HIST day (TOPS download -> universe quote extract (`TopsQuotes.save` / `*.tops.json.gz`,
+  read back by `--tops`) -> TOPS deleted -> DEEP+ download -> `ingest --format iex-deep-plus`
+  with the extract as the `book_verification` oracle -> features -> `KEEP.json` -> delete), one
+  vendor file on disk at a time, resumable markers, a `--render-cmd` chain over several dates
+  and a watchdog entry. `tools/iex_hist.py index` writes the manifest from the HIST index with
+  the owner's approval sentence; `recent --n 5` is the rolling "recent IEX days" rule (latest N
+  HIST days with TOPS and DEEP+; a list, not a download: no approval sentence, and
+  `tools/iex_download.py` refuses a manifest without one). The nine overlap days
+  (`research/v117/iex_overlap_manifest.json`, approved 2026-10-15) and their results:
+  docs/research/IEX_OVERLAP_SET.md. The recent days are listed only (not approved). `test_iex_codec.py` and `test_process_iex.py`
+  carry the `slow` marker so the python-slow coverage floor counts the IEX codec and chain.
 - v1.17 WS-G item G2: four topical documents, docs only, no code and no number moved. `docs/EXECUTION_QUALITY.md` (the shortfall benchmark, the multi7 and depth-50 results with their artefact paths, signal-aware urgency and pacing, the realism layer), `docs/PORTFOLIO_BREADTH.md` extended (universe rule, the measured 2019-01-30 universe, the breadth holdout rule, committed book results), `docs/SIGNAL_RESEARCH.md` (statistics revision, `linear_z_v2`, long horizons, regime model and gate, GBM, meta-labelling split, conformal sizing, zoo gates, each with its opt-in), `docs/DATA_SOURCES.md` (free Nasdaq days, IEX HIST, process-and-delete, the download approval rule); `iap.paper` in ARCHITECTURE section 9.2 and API_TRADING section 4; linked from the README docs table, ARCHITECTURE, DIAGRAMS and the site nav. B4-B10, C6/C8, the A4 overlap table and the first completed 100-name day are marked placeholders for the G5 truth pass.
-
 - v1.17 WS-B item B7 (prerequisite): depth-cap vs book re-run of the multi7 shortfall
   benchmark with `--walk-depth 50` (and a `--max-child-qty 300` variant), summaries
   `research/execution/benchmark/{benchmark,BENCHMARK}_multi7_depth50*` and the comparison

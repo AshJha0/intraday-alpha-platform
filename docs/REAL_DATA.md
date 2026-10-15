@@ -483,6 +483,21 @@ and the vendor file. Every step has a marker and resumes; nothing is
 deleted before the kept files verify. The `plan-ingest` batch of section
 3.4 stays for the three-name datasets.
 
+### 3.6 The IEX overlap set and the rolling IEX days (v1.17, A4)
+
+The nine Nasdaq 2025/26 sessions on disk (2025-11-28, 2025-12-08..12,
+2026-05-15, 2026-05-18, 2026-06-12) are also on IEX HIST, free. `python -m
+iap.marketdata process-iex-day` (RUNBOOK_process_and_delete.md, IEX section)
+builds the same day's IEX dataset for the same three names, venue `IEXG`:
+the TOPS capture is read once for the universe's quotes (the oracle), deleted,
+then the DEEP+ capture is ingested with that oracle as `book_verification`,
+features are built and everything but features, manifests and hashes is
+deleted, one vendor file on disk at a time. `tools/iex_hist.py index` writes
+the manifest from the HIST index with the owner's approval sentence;
+`tools/iex_hist.py recent --n 5` writes the rolling list (the latest five HIST
+days with TOPS and DEEP+) without one, so it is a list until approved. The
+per-day results are in docs/research/IEX_OVERLAP_SET.md.
+
 ## 4. Mapping to canonical events
 
 The canonical contract is the twelve-field `MarketEvent`

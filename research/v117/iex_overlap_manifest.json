@@ -1,0 +1,243 @@
+{
+  "schema": "iap.iex_hist.manifest/v1",
+  "source": "https://iextrading.com/api/1.0/hist?date={yyyymmdd}",
+  "fetched_utc": "2026-10-15T20:32:01+00:00",
+  "approval": "Owner, 2026-10-15: \"A4 (IEX overlap days, needs your download approvals), = approved\" (the nine Nasdaq/IEX overlap days; TOPS and DEEP+ captures; nothing else)",
+  "note": "overlap set: every file is listed; download only with the approval sentence",
+  "days": [
+    {
+      "date": "2025-11-28",
+      "feeds": {
+        "DEEP": {
+          "file": "20251128_IEXTP1_DEEP1.0.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20251128%2F20251128_IEXTP1_DEEP1.0.pcap.gz?generation=1764376255080294&alt=media",
+          "bytes": 4596311004,
+          "version": "1.0",
+          "protocol": "IEXTP1"
+        },
+        "DEEP+": {
+          "file": "20251128_IEXTP1_DPLS1.0.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20251128%2F20251128_IEXTP1_DPLS1.0.pcap.gz?generation=1764377118697783&alt=media",
+          "bytes": 4313169306,
+          "version": "1.0",
+          "protocol": "IEXTP1"
+        },
+        "TOPS": {
+          "file": "20251128_IEXTP1_TOPS1.6.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20251128%2F20251128_IEXTP1_TOPS1.6.pcap.gz?generation=1764378057615623&alt=media",
+          "bytes": 4371690941,
+          "version": "1.6",
+          "protocol": "IEXTP1"
+        }
+      }
+    },
+    {
+      "date": "2025-12-08",
+      "feeds": {
+        "DEEP": {
+          "file": "20251208_IEXTP1_DEEP1.0.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20251208%2F20251208_IEXTP1_DEEP1.0.pcap.gz?generation=1765245137607207&alt=media",
+          "bytes": 9431563473,
+          "version": "1.0",
+          "protocol": "IEXTP1"
+        },
+        "DEEP+": {
+          "file": "20251208_IEXTP1_DPLS1.0.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20251208%2F20251208_IEXTP1_DPLS1.0.pcap.gz?generation=1765246823900953&alt=media",
+          "bytes": 8992353997,
+          "version": "1.0",
+          "protocol": "IEXTP1"
+        },
+        "TOPS": {
+          "file": "20251208_IEXTP1_TOPS1.6.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20251208%2F20251208_IEXTP1_TOPS1.6.pcap.gz?generation=1765248736272853&alt=media",
+          "bytes": 9300813282,
+          "version": "1.6",
+          "protocol": "IEXTP1"
+        }
+      }
+    },
+    {
+      "date": "2025-12-09",
+      "feeds": {
+        "DEEP": {
+          "file": "20251209_IEXTP1_DEEP1.0.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20251209%2F20251209_IEXTP1_DEEP1.0.pcap.gz?generation=1765332130167866&alt=media",
+          "bytes": 8887507277,
+          "version": "1.0",
+          "protocol": "IEXTP1"
+        },
+        "DEEP+": {
+          "file": "20251209_IEXTP1_DPLS1.0.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20251209%2F20251209_IEXTP1_DPLS1.0.pcap.gz?generation=1765333727594063&alt=media",
+          "bytes": 8430281480,
+          "version": "1.0",
+          "protocol": "IEXTP1"
+        },
+        "TOPS": {
+          "file": "20251209_IEXTP1_TOPS1.6.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20251209%2F20251209_IEXTP1_TOPS1.6.pcap.gz?generation=1765335487320171&alt=media",
+          "bytes": 8608566865,
+          "version": "1.6",
+          "protocol": "IEXTP1"
+        }
+      }
+    },
+    {
+      "date": "2025-12-10",
+      "feeds": {
+        "DEEP": {
+          "file": "20251210_IEXTP1_DEEP1.0.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20251210%2F20251210_IEXTP1_DEEP1.0.pcap.gz?generation=1765420995634009&alt=media",
+          "bytes": 11738717867,
+          "version": "1.0",
+          "protocol": "IEXTP1"
+        },
+        "DEEP+": {
+          "file": "20251210_IEXTP1_DPLS1.0.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20251210%2F20251210_IEXTP1_DPLS1.0.pcap.gz?generation=1765423146626904&alt=media",
+          "bytes": 11453956522,
+          "version": "1.0",
+          "protocol": "IEXTP1"
+        },
+        "TOPS": {
+          "file": "20251210_IEXTP1_TOPS1.6.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20251210%2F20251210_IEXTP1_TOPS1.6.pcap.gz?generation=1765425670154317&alt=media",
+          "bytes": 12292715623,
+          "version": "1.6",
+          "protocol": "IEXTP1"
+        }
+      }
+    },
+    {
+      "date": "2025-12-11",
+      "feeds": {
+        "DEEP": {
+          "file": "20251211_IEXTP1_DEEP1.0.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20251211%2F20251211_IEXTP1_DEEP1.0.pcap.gz?generation=1765506469836664&alt=media",
+          "bytes": 10997284110,
+          "version": "1.0",
+          "protocol": "IEXTP1"
+        },
+        "DEEP+": {
+          "file": "20251211_IEXTP1_DPLS1.0.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20251211%2F20251211_IEXTP1_DPLS1.0.pcap.gz?generation=1765508459486326&alt=media",
+          "bytes": 10547151935,
+          "version": "1.0",
+          "protocol": "IEXTP1"
+        },
+        "TOPS": {
+          "file": "20251211_IEXTP1_TOPS1.6.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20251211%2F20251211_IEXTP1_TOPS1.6.pcap.gz?generation=1765510770148819&alt=media",
+          "bytes": 11153308818,
+          "version": "1.6",
+          "protocol": "IEXTP1"
+        }
+      }
+    },
+    {
+      "date": "2025-12-12",
+      "feeds": {
+        "DEEP": {
+          "file": "20251212_IEXTP1_DEEP1.0.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20251212%2F20251212_IEXTP1_DEEP1.0.pcap.gz?generation=1765604536312530&alt=media",
+          "bytes": 12977428400,
+          "version": "1.0",
+          "protocol": "IEXTP1"
+        },
+        "DEEP+": {
+          "file": "20251212_IEXTP1_DPLS1.0.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20251212%2F20251212_IEXTP1_DPLS1.0.pcap.gz?generation=1765606885733348&alt=media",
+          "bytes": 12711108353,
+          "version": "1.0",
+          "protocol": "IEXTP1"
+        },
+        "TOPS": {
+          "file": "20251212_IEXTP1_TOPS1.6.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20251212%2F20251212_IEXTP1_TOPS1.6.pcap.gz?generation=1765609626473231&alt=media",
+          "bytes": 13669964431,
+          "version": "1.6",
+          "protocol": "IEXTP1"
+        }
+      }
+    },
+    {
+      "date": "2026-05-15",
+      "feeds": {
+        "DEEP": {
+          "file": "20260515_IEXTP1_DEEP1.0.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20260515%2F20260515_IEXTP1_DEEP1.0.pcap.gz?generation=1778897374405624&alt=media",
+          "bytes": 12600742072,
+          "version": "1.0",
+          "protocol": "IEXTP1"
+        },
+        "DEEP+": {
+          "file": "20260515_IEXTP1_DPLS1.0.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20260515%2F20260515_IEXTP1_DPLS1.0.pcap.gz?generation=1778899540728644&alt=media",
+          "bytes": 11905260029,
+          "version": "1.0",
+          "protocol": "IEXTP1"
+        },
+        "TOPS": {
+          "file": "20260515_IEXTP1_TOPS1.6.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20260515%2F20260515_IEXTP1_TOPS1.6.pcap.gz?generation=1778902103025146&alt=media",
+          "bytes": 12154370088,
+          "version": "1.6",
+          "protocol": "IEXTP1"
+        }
+      }
+    },
+    {
+      "date": "2026-05-18",
+      "feeds": {
+        "DEEP": {
+          "file": "20260518_IEXTP1_DEEP1.0.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20260518%2F20260518_IEXTP1_DEEP1.0.pcap.gz?generation=1779165194810800&alt=media",
+          "bytes": 14902406145,
+          "version": "1.0",
+          "protocol": "IEXTP1"
+        },
+        "DEEP+": {
+          "file": "20260518_IEXTP1_DPLS1.0.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20260518%2F20260518_IEXTP1_DPLS1.0.pcap.gz?generation=1779167879902655&alt=media",
+          "bytes": 14210389328,
+          "version": "1.0",
+          "protocol": "IEXTP1"
+        },
+        "TOPS": {
+          "file": "20260518_IEXTP1_TOPS1.6.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20260518%2F20260518_IEXTP1_TOPS1.6.pcap.gz?generation=1779171038693591&alt=media",
+          "bytes": 14869297887,
+          "version": "1.6",
+          "protocol": "IEXTP1"
+        }
+      }
+    },
+    {
+      "date": "2026-06-12",
+      "feeds": {
+        "DEEP": {
+          "file": "20260612_IEXTP1_DEEP1.0.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20260612%2F20260612_IEXTP1_DEEP1.0.pcap.gz?generation=1781321615910075&alt=media",
+          "bytes": 15326140201,
+          "version": "1.0",
+          "protocol": "IEXTP1"
+        },
+        "DEEP+": {
+          "file": "20260612_IEXTP1_DPLS1.0.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20260612%2F20260612_IEXTP1_DPLS1.0.pcap.gz?generation=1781324341456770&alt=media",
+          "bytes": 14691476825,
+          "version": "1.0",
+          "protocol": "IEXTP1"
+        },
+        "TOPS": {
+          "file": "20260612_IEXTP1_TOPS1.6.pcap.gz",
+          "url": "https://www.googleapis.com/download/storage/v1/b/iex/o/data%2Ffeeds%2F20260612%2F20260612_IEXTP1_TOPS1.6.pcap.gz?generation=1781327520889883&alt=media",
+          "bytes": 15619609934,
+          "version": "1.6",
+          "protocol": "IEXTP1"
+        }
+      }
+    }
+  ]
+}

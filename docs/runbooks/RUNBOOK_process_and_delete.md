@@ -62,3 +62,32 @@ before the next. The guard refuses rather than guesses; `--peak-gb` overrides th
 Nothing is downloaded without the approval flag; nothing outside the day's
 dataset directory and its vendor file is deleted; the holdout sessions
 (`data/real/r7_holdout`, the 2026 holdout) are not inputs of this chain.
+
+## IEX HIST days: `process-iex-day` (v1.17, A4)
+
+An IEX day is two captures (TOPS = the BBO oracle, DEEP+ = the displayed
+orders; `--feed deep` takes the DEEP price-level feed instead) and the owner's
+rule is one vendor file on disk at a time, so the chain is: disk guard
+(the larger capture + dataset + partition temp + features + `--min-free-gb`,
+default 30) -> `download_tops` -> `tops_extract` (the universe's quotes to
+`<out-root>\iex_<yyyymmdd>.markers\<yyyymmdd>.tops.json.gz`) -> `delete_tops`
+-> `download_book` -> `ingest --format iex-deep-plus --tops <extract>` (a
+divergent book refuses unless `--allow-book-divergence`; the report lands in
+`book_divergence.json` beside the markers) -> `delete_raw` -> `features` ->
+`keep` -> `delete` (normalized, the book capture, the extract). The manifest
+comes from the HIST index with the owner's approval sentence:
+
+```
+python tools\iex_hist.py index --date 2025-11-28 ... --out research\v117\iex_overlap_manifest.json --approval "<sentence>"
+python -m iap.marketdata process-iex-day --manifest research\v117\iex_overlap_manifest.json ^
+    --date 2025-11-28 --vendor-dir data\vendor --out-root data\real\iex --symbols AAPL,MSFT,QQQ ^
+    --download --i-have-approval [--feed deep-plus] [--partition-instruments 10] [--min-free-gb 30] [--peak-gb N]
+python -m iap.marketdata process-iex-day ... --date D1 --date D2 ... --render-cmd data\real\run_iex_overlap.cmd ^
+    --jobs-registry data\real\jobs.json        (one chain, days in order; a failed day is logged and the next runs)
+python tools\iex_hist.py recent --n 5 --out research\v117\iex_recent_manifest.json   (the rolling list; NOT a download)
+```
+
+`tools/iex_download.py` (one feed per call) refuses without `--i-have-approval`
+and without an `approval` sentence in the manifest, so the `recent` manifest
+cannot be downloaded until the owner approves it. Results:
+docs/research/IEX_OVERLAP_SET.md.
