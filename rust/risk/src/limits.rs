@@ -5,7 +5,12 @@
 //!
 //! x-version 4 adds OPTIONAL keys (absent or null = that control is off; a
 //! present key is parsed strictly): `market_data.max_mid_jump_ratio`, the
-//! SEC 15c3-5 `pre_trade` set and the `overrides` bounds.
+//! SEC 15c3-5 `pre_trade` set and the `overrides` bounds. v1.17 (F8) adds,
+//! still optional and parsed last: `pre_trade.venue_types` (the lit / dark /
+//! midpoint type of each venue id), `pre_trade.allowed_venue_types`
+//! (check 31), `pre_trade.max_dark_participation_bps` +
+//! `dark_participation_floor_qty` (check 32) and
+//! `pre_trade.max_dark_fill_notional` (check 33).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -20,6 +25,47 @@ pub struct FxConversion {
     pub instrument_id: u32,
     /// `true`: rate = 1 / mid (pair quoted REPORTING/CCY); `false`: rate = mid.
     pub invert: bool,
+}
+
+/// The type of a venue as the pre-trade controls see it (v1.17 F8, the
+/// `VenueSpec.venue_type` vocabulary of the B10 dark-venue model). Every
+/// venue is `Lit` unless `pre_trade.venue_types` says otherwise. The
+/// declaration order is the pinned order of the type names in reasons.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum VenueType {
+    /// A displayed (lit) book.
+    Lit,
+    /// A non-displayed pool.
+    Dark,
+    /// A midpoint-matching venue.
+    Midpoint,
+}
+
+impl VenueType {
+    /// The pinned name (`risk.json` value and reason text).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            VenueType::Lit => "lit",
+            VenueType::Dark => "dark",
+            VenueType::Midpoint => "midpoint",
+        }
+    }
+
+    /// Parse the pinned name; `None` for anything else.
+    pub fn parse(s: &str) -> Option<VenueType> {
+        match s {
+            "lit" => Some(VenueType::Lit),
+            "dark" => Some(VenueType::Dark),
+            "midpoint" => Some(VenueType::Midpoint),
+            _ => None,
+        }
+    }
+
+    /// True for every non-displayed type (dark and midpoint): the venues
+    /// the dark-first controls (checks 32 and 33) count.
+    pub const fn is_dark(self) -> bool {
+        !matches!(self, VenueType::Lit)
+    }
 }
 
 /// The complete pinned limit set.
@@ -97,6 +143,21 @@ pub struct RiskLimits {
     /// `overrides.min_approvers`: distinct comma-separated approvers an
     /// override needs (G-P2-3).
     pub min_approvers: Option<i64>,
+    /// `pre_trade.venue_types` (v1.17 F8): venue id -> type; an unmapped
+    /// venue is `Lit`. Absent / null = empty.
+    pub venue_types: BTreeMap<u16, VenueType>,
+    /// `pre_trade.allowed_venue_types` (check 31): the venue types an order
+    /// may be routed to; `None` = off.
+    pub allowed_venue_types: Option<BTreeSet<VenueType>>,
+    /// `pre_trade.max_dark_participation_bps` (check 32): cap of the
+    /// firm's session quantity routed to dark / midpoint venues, in bps of
+    /// the instrument's session market volume.
+    pub max_dark_participation_bps: Option<f64>,
+    /// `pre_trade.dark_participation_floor_qty` (required with the bps).
+    pub dark_participation_floor_qty: Option<i64>,
+    /// `pre_trade.max_dark_fill_notional` (check 33): cap of the firm's
+    /// session notional FILLED on dark / midpoint venues plus the order.
+    pub max_dark_fill_notional: Option<f64>,
 }
 
 fn need_f64(doc: &serde_json::Value, section: &str, key: &str) -> Result<f64, IapError> {
@@ -211,6 +272,60 @@ fn parse_restricted(doc: &serde_json::Value) -> Result<BTreeSet<u32>, IapError> 
     Ok(out)
 }
 
+/// `pre_trade.venue_types`: absent / null = empty; else an object whose
+/// keys are decimal u16 venue ids and whose values are `lit` / `dark` /
+/// `midpoint`.
+fn parse_venue_types(doc: &serde_json::Value) -> Result<BTreeMap<u16, VenueType>, IapError> {
+    let v = &doc["pre_trade"]["venue_types"];
+    if v.is_null() {
+        return Ok(BTreeMap::new());
+    }
+    let obj = v.as_object().ok_or_else(|| {
+        IapError::InvalidArgument("risk.json: pre_trade.venue_types must be an object".to_string())
+    })?;
+    let mut out = BTreeMap::new();
+    for (k, t) in obj {
+        let vid = k.parse::<u16>().map_err(|_| {
+            IapError::InvalidArgument(format!(
+                "risk.json: pre_trade.venue_types key {k} is not a u16 venue id"
+            ))
+        })?;
+        let ty = t.as_str().and_then(VenueType::parse).ok_or_else(|| {
+            IapError::InvalidArgument(format!(
+                "risk.json: pre_trade.venue_types.{k} must be one of lit, dark, midpoint"
+            ))
+        })?;
+        out.insert(vid, ty);
+    }
+    Ok(out)
+}
+
+/// `pre_trade.allowed_venue_types`: absent / null = off; else a non-empty
+/// array of `lit` / `dark` / `midpoint`.
+fn parse_allowed_venue_types(
+    doc: &serde_json::Value,
+) -> Result<Option<BTreeSet<VenueType>>, IapError> {
+    let v = &doc["pre_trade"]["allowed_venue_types"];
+    if v.is_null() {
+        return Ok(None);
+    }
+    let bad = || {
+        IapError::InvalidArgument(
+            "risk.json: pre_trade.allowed_venue_types must be a non-empty array of lit, dark, midpoint"
+                .to_string(),
+        )
+    };
+    let arr = v.as_array().ok_or_else(bad)?;
+    if arr.is_empty() {
+        return Err(bad());
+    }
+    let mut out = BTreeSet::new();
+    for item in arr {
+        out.insert(item.as_str().and_then(VenueType::parse).ok_or_else(bad)?);
+    }
+    Ok(Some(out))
+}
+
 fn need_bool(doc: &serde_json::Value, section: &str, key: &str) -> Result<bool, IapError> {
     doc[section][key].as_bool().ok_or_else(|| {
         IapError::InvalidArgument(format!("risk.json: missing/non-bool {section}.{key}"))
@@ -279,6 +394,11 @@ impl RiskLimits {
             max_tracked_keys: None,
             max_loss_override_multiple: None,
             min_approvers: None,
+            venue_types: BTreeMap::new(),
+            allowed_venue_types: None,
+            max_dark_participation_bps: None,
+            dark_participation_floor_qty: None,
+            max_dark_fill_notional: None,
         };
         // x-version 4 keys, parsed in this order (the first error names its key)
         let jump = opt_pos_f64(doc, "market_data", "max_mid_jump_ratio")?;
@@ -315,6 +435,17 @@ impl RiskLimits {
         let max_loss_override_multiple =
             opt_pos_f64(doc, "overrides", "max_loss_override_multiple")?;
         let min_approvers = opt_pos_i64(doc, "overrides", "min_approvers")?;
+        // v1.17 F8 keys, parsed after every x-version 4 key, in this order
+        let venue_types = parse_venue_types(doc)?;
+        let allowed_venue_types = parse_allowed_venue_types(doc)?;
+        let max_dark_participation_bps =
+            opt_pos_f64(doc, "pre_trade", "max_dark_participation_bps")?;
+        let dark_participation_floor_qty = if max_dark_participation_bps.is_some() {
+            Some(need_pos_i64(doc, "pre_trade", "dark_participation_floor_qty")?)
+        } else {
+            None
+        };
+        let max_dark_fill_notional = opt_pos_f64(doc, "pre_trade", "max_dark_fill_notional")?;
         Ok(RiskLimits {
             max_mid_jump_ratio: jump,
             restricted_instruments: restricted,
@@ -330,8 +461,19 @@ impl RiskLimits {
             max_tracked_keys,
             max_loss_override_multiple,
             min_approvers,
+            venue_types,
+            allowed_venue_types,
+            max_dark_participation_bps,
+            dark_participation_floor_qty,
+            max_dark_fill_notional,
             ..base
         })
+    }
+
+    /// The type of `venue_id` as the pre-trade controls see it: the
+    /// `pre_trade.venue_types` entry, else `Lit`.
+    pub fn venue_type(&self, venue_id: u16) -> VenueType {
+        self.venue_types.get(&venue_id).copied().unwrap_or(VenueType::Lit)
     }
 
     /// Load and strictly parse a risk.json file.
@@ -364,6 +506,46 @@ mod tests {
         assert_eq!(limits.fx_conversion["JPY"].instrument_id, 103);
         assert!(limits.fx_conversion["JPY"].invert);
         assert!(!limits.fx_conversion["EUR"].invert);
+    }
+
+    #[test]
+    fn f8_controls_are_off_by_default_and_parse_strictly() {
+        let limits = RiskLimits::from_json(&repo_risk_json()).unwrap();
+        assert!(limits.venue_types.is_empty());
+        assert!(limits.allowed_venue_types.is_none());
+        assert!(limits.max_dark_participation_bps.is_none());
+        assert!(limits.dark_participation_floor_qty.is_none());
+        assert!(limits.max_dark_fill_notional.is_none());
+        assert_eq!(limits.venue_type(7), VenueType::Lit);
+        let mut doc = repo_risk_json();
+        doc["pre_trade"]["venue_types"] =
+            serde_json::json!({"1": "lit", "2": "dark", "3": "midpoint"});
+        doc["pre_trade"]["allowed_venue_types"] = serde_json::json!(["dark", "lit"]);
+        doc["pre_trade"]["max_dark_participation_bps"] = serde_json::json!(500.0);
+        doc["pre_trade"]["dark_participation_floor_qty"] = serde_json::json!(100);
+        doc["pre_trade"]["max_dark_fill_notional"] = serde_json::json!(250000.0);
+        let limits = RiskLimits::from_json(&doc).unwrap();
+        assert_eq!(limits.venue_type(2), VenueType::Dark);
+        assert_eq!(limits.venue_type(3), VenueType::Midpoint);
+        assert_eq!(limits.venue_type(9), VenueType::Lit);
+        assert!(limits.allowed_venue_types.as_ref().unwrap().contains(&VenueType::Dark));
+        assert_eq!(limits.dark_participation_floor_qty, Some(100));
+        // strictness: bad key, bad type name, empty allow list, missing floor
+        let mut bad = doc.clone();
+        bad["pre_trade"]["venue_types"] = serde_json::json!({"x": "lit"});
+        assert!(RiskLimits::from_json(&bad).is_err());
+        let mut bad = doc.clone();
+        bad["pre_trade"]["venue_types"] = serde_json::json!({"1": "grey"});
+        assert!(RiskLimits::from_json(&bad).is_err());
+        let mut bad = doc.clone();
+        bad["pre_trade"]["allowed_venue_types"] = serde_json::json!([]);
+        assert!(RiskLimits::from_json(&bad).is_err());
+        let mut bad = doc.clone();
+        bad["pre_trade"]
+            .as_object_mut()
+            .unwrap()
+            .remove("dark_participation_floor_qty");
+        assert!(RiskLimits::from_json(&bad).is_err());
     }
 
     #[test]

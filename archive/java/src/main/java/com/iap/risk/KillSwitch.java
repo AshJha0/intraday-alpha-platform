@@ -187,6 +187,8 @@ final class KillSwitch {
         e.lossOverrideStrategy.clear();
         e.marketVolume.clear();
         e.executed.clear();
+        e.darkExecuted.clear();
+        e.darkFilled.clear();
         e.refreshPnlGauges();
         e.emit(new RiskEvent(ts, Scope.GLOBAL, "", Rules.SESSION_ROLLED,
                 Severity.INFO.code(), Decision.ALLOW.code(), reason));

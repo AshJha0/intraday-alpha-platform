@@ -67,7 +67,7 @@ public final class RiskEngine {
     static final double NS_PER_SEC = 1e9;
     /** Snapshot schema version (2: open-order strategy, the 15c3-5 buckets
      *  and the session volume counters). */
-    public static final long SNAPSHOT_VERSION = 2;
+    public static final long SNAPSHOT_VERSION = 3;
 
     // Package-private (not private): LimitsEvaluator, KillSwitch and
     // RiskAudit in this same package continue RiskEngine's implementation
@@ -87,6 +87,7 @@ public final class RiskEngine {
         long priceTicks; // 0 = unpriced
         long qty;
         String strategyId = ""; // owning strategy (checks 24-26)
+        int venueId; // target venue (checks 32-33 read its type; v1.17 F8)
     }
 
     /**
@@ -181,6 +182,10 @@ public final class RiskEngine {
     final TreeMap<Long, Long> marketVolume = new TreeMap<>();
     /** The firm's session executed quantity per instrument (check 27). */
     final TreeMap<Long, Long> executed = new TreeMap<>();
+    /** v1.17 F8: dark / midpoint fills per instrument (check 32). */
+    final TreeMap<Long, Long> darkExecuted = new TreeMap<>();
+    /** v1.17 F8: dark / midpoint filled notional per quote currency (check 33). */
+    final TreeMap<String, Double> darkFilled = new TreeMap<>(CODE_POINT_ORDER);
     /** Audit chain: seq of the last record and SHA-256 of its line. */
     long auditSeq;
     String auditHead = RiskEvent.GENESIS_SHA256;
@@ -704,6 +709,19 @@ public final class RiskEngine {
                 .merge(ins.quoteCcy(), realizedPnl, Double::sum);
         executed.put(fill.instrumentId(),
                 satAdd(executed.getOrDefault(fill.instrumentId(), 0L), fill.qty()));
+        // v1.17 F8: a fill of an open order routed to a dark / midpoint venue
+        // counts towards the dark participation (check 32) and the dark-fill
+        // notional (check 33, quote currency, converted at check time).
+        boolean dark = false;
+        if (fill.orderId() != 0 && limits != null) {
+            OpenOrder r0 = open.get(fill.orderId());
+            dark = r0 != null && !limits.venueType(r0.venueId).equals("lit");
+        }
+        if (dark) {
+            darkExecuted.put(fill.instrumentId(),
+                    satAdd(darkExecuted.getOrDefault(fill.instrumentId(), 0L), fill.qty()));
+            darkFilled.merge(ins.quoteCcy(), (double) fill.qty() * unit * price, Double::sum);
+        }
         // open order reduction
         if (fill.orderId() != 0) {
             OpenOrder r = open.get(fill.orderId());
@@ -1005,6 +1023,7 @@ public final class RiskEngine {
             r.priceTicks = trackedPrice(order);
             r.qty = order.qty();
             r.strategyId = order.strategyId();
+            r.venueId = order.venueId();
             open.put(order.orderId(), r);
         }
         return outcome;

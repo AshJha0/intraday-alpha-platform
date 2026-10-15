@@ -83,7 +83,25 @@ final class RiskAudit {
         }
         sb.append("},\"cancel_buckets\":{");
         rateMap(sb, e.cancelBuckets);
-        sb.append("},\"executed\":{");
+        sb.append("},\"dark_executed\":{");
+        first = true;
+        for (Map.Entry<Long, Long> xe : e.darkExecuted.entrySet()) {
+            sb.append(first ? "" : ",").append('"').append(xe.getKey())
+                    .append("\":").append(xe.getValue());
+            first = false;
+        }
+        sb.append("},\"dark_filled\":[");
+        first = true;
+        for (Map.Entry<String, Double> de : e.darkFilled.entrySet()) {
+            sb.append(first ? "" : ",");
+            first = false;
+            sb.append("{\"ccy\":");
+            jsonStr(sb, de.getKey());
+            sb.append(",\"notional\":");
+            jsonDouble(sb, de.getValue());
+            sb.append('}');
+        }
+        sb.append("],\"executed\":{");
         first = true;
         for (Map.Entry<Long, Long> xe : e.executed.entrySet()) {
             sb.append(first ? "" : ",").append('"').append(xe.getKey())
@@ -174,6 +192,7 @@ final class RiskAudit {
                     .append(",\"side\":").append(o.side)
                     .append(",\"strategy_id\":");
             jsonStr(sb, o.strategyId);
+            sb.append(",\"venue_id\":").append(o.venueId);
             sb.append('}');
             first = false;
         }
@@ -355,6 +374,11 @@ final class RiskAudit {
             r.priceTicks = snapLong(o.get("price_ticks"), "open.price_ticks");
             r.qty = snapLong(o.get("qty"), "open.qty");
             r.strategyId = snapStr(o.get("strategy_id"), "open.strategy_id");
+            long vid = snapLong(o.get("venue_id"), "open.venue_id");
+            if (vid < 0 || vid > 0xFFFF) {
+                throw bad("open.venue_id");
+            }
+            r.venueId = (int) vid;
             long id;
             try {
                 id = Long.parseUnsignedLong(e.getKey());
@@ -418,6 +442,19 @@ final class RiskAudit {
                 : snapObj(snap.get("executed"), "executed").entrySet()) {
             eng.executed.put(parseU32(e.getKey(), "executed"),
                     snapLong(e.getValue(), "executed"));
+        }
+        for (Map.Entry<String, Object> e
+                : snapObj(snap.get("dark_executed"), "dark_executed").entrySet()) {
+            eng.darkExecuted.put(parseU32(e.getKey(), "dark_executed"),
+                    snapLong(e.getValue(), "dark_executed"));
+        }
+        for (Object item : snapArr(snap.get("dark_filled"), "dark_filled")) {
+            Map<String, Object> d = snapObj(item, "dark_filled");
+            double notional = snapDouble(d.get("notional"), "dark_filled.notional");
+            if (!Double.isFinite(notional)) {
+                throw bad("dark_filled.notional");
+            }
+            eng.darkFilled.put(snapStr(d.get("ccy"), "dark_filled.ccy"), notional);
         }
         if (chainHead != null) {
             eng.auditSeq = chainSeq;

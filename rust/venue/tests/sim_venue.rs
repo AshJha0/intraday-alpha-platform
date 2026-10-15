@@ -31,6 +31,18 @@ fn add(seq: u64, side: u8, price: i64, qty: i64, order_id: u64) -> MarketEvent {
     }
 }
 
+fn cancel(seq: u64, side: u8, price: i64, order_id: u64) -> MarketEvent {
+    let mut e = add(seq, side, price, 0, order_id);
+    e.event_type = EventType::Cancel.as_u8();
+    e
+}
+
+fn execute(seq: u64, side: u8, price: i64, qty: i64, order_id: u64) -> MarketEvent {
+    let mut e = add(seq, side, price, qty, order_id);
+    e.event_type = EventType::Execute.as_u8();
+    e
+}
+
 /// Venue with a book: bids 2450x300, 2449x500; asks 2452x200, 2453x400.
 fn venue_with_book() -> SimulatedVenue {
     let mut v = SimulatedVenue::new(cfg()).unwrap();
@@ -77,7 +89,12 @@ fn market_order_walks_depth_and_cancels_remainder() {
     assert_eq!((reps[2].filled_qty, reps[2].fill_price_ticks), (300, 2453));
     // taker fees are charged per share
     assert!((reps[1].fees - 0.003 * 200.0).abs() < 1e-12);
-    // buy 10_000: exhausts the ask side (600), remainder canceled
+    // rule 3b (v1.17 B9): the display our walk consumed is not available
+    // again until it changes — a second buy on the same venue finds nothing
+    let reps = v.submit(&order(2, 0, 100, 0, OrderType::Market)).unwrap();
+    assert_eq!(statuses(&reps), vec![ExecStatus::New.as_u8(), ExecStatus::Canceled.as_u8()]);
+    // buy 10_000 on a fresh venue: exhausts the ask side (600), remainder canceled
+    let mut v = venue_with_book();
     let reps = v.submit(&order(2, 0, 10_000, 0, OrderType::Market)).unwrap();
     assert_eq!(*statuses(&reps).last().unwrap(), ExecStatus::Canceled.as_u8());
     let filled: i64 = reps.iter().map(|r| r.filled_qty).sum();
@@ -95,23 +112,66 @@ fn limit_order_fills_marketable_part_and_rests() {
     );
     assert_eq!(reps[1].filled_qty, 200);
     assert_eq!(v.resting_count(), 1);
-    // a market sell arriving as new best bid does not fill it, but the ask
-    // dropping to 2452... simulate the ask side crossing our resting buy:
-    // new best ask at 2451 with size 40 -> resting buy fills 40 @ its own
-    // limit price 2452? No: fills at the RESTING price only when crossed.
+    // rule 4 (v1.17 B9): nothing is displayed on our side at 2452, so the
+    // queue ahead of us is empty ...
+    assert_eq!(v.queue_position(1).unwrap().ahead_qty, 0);
+    assert_eq!(v.queue_position(1).unwrap().remaining, 100);
+    // ... but the display still shows the 200 @ 2452 our own walk consumed,
+    // so a crossing ask is NOT a fill while that exemption lasts
     let fills = v.on_market_event(&add(5, 1, 2451, 40, 15)).unwrap();
+    assert!(fills.is_empty());
+    // the consumed display goes and the best ask (2451) still crosses us:
+    // the exemption ends only once the display shows an UNCROSSED best
+    assert!(v.on_market_event(&cancel(6, 1, 2452, 13)).unwrap().is_empty());
+    assert!(v.on_market_event(&cancel(7, 1, 2451, 15)).unwrap().is_empty());
+    // a new crossing ask at 2451 with size 40 -> resting buy fills 40 at its
+    // own limit price 2452 (no price improvement), bounded by the display
+    let fills = v.on_market_event(&add(8, 1, 2451, 40, 16)).unwrap();
     assert_eq!(fills.len(), 1);
     assert_eq!(fills[0].status, ExecStatus::Partial.as_u8());
     assert_eq!(fills[0].filled_qty, 40);
     assert_eq!(fills[0].fill_price_ticks, 2452);
     // maker fill earns the rebate (negative fees)
     assert!((fills[0].fees + 0.002 * 40.0).abs() < 1e-12);
-    // more size at the crossing price completes it
-    let fills = v.on_market_event(&add(6, 1, 2451, 500, 16)).unwrap();
+    // an unrelated event leaves the display unchanged: the same 40 is never
+    // consumed twice (rule 3b overlay)
+    assert!(v.on_market_event(&add(9, 0, 2440, 10, 17)).unwrap().is_empty());
+    // more size at the crossing price completes it (pool = 500 new shares)
+    let fills = v.on_market_event(&add(10, 1, 2451, 500, 18)).unwrap();
     assert_eq!(fills.len(), 1);
     assert_eq!(fills[0].status, ExecStatus::Filled.as_u8());
     assert_eq!(fills[0].filled_qty, 60);
     assert_eq!(v.resting_count(), 0);
+    assert!(v.queue_position(1).is_none());
+}
+
+/// Rule 4: a resting order pays down the displayed queue ahead of it from
+/// executions at its level and fills only once that queue is gone; a cancel
+/// of an order that joined after it moves nothing.
+#[test]
+fn resting_order_pays_down_its_queue_before_filling() {
+    let mut v = venue_with_book();
+    // buy 50 @ 2450 behind the displayed 300 (orders 11 and 12)
+    let reps = v.submit(&order(1, 0, 50, 2450, OrderType::Limit)).unwrap();
+    assert_eq!(statuses(&reps), vec![ExecStatus::New.as_u8()]);
+    assert_eq!(v.queue_position(1).unwrap().ahead_qty, 300);
+    // an order joining our level after us is behind us
+    assert!(v.on_market_event(&add(5, 0, 2450, 100, 15)).unwrap().is_empty());
+    assert!(v.on_market_event(&cancel(6, 0, 2450, 15)).unwrap().is_empty());
+    assert_eq!(v.queue_position(1).unwrap().ahead_qty, 300);
+    // an execution of 100 at our level pays our queue down, no fill
+    assert!(v.on_market_event(&execute(7, 0, 2450, 100, 11)).unwrap().is_empty());
+    assert_eq!(v.queue_position(1).unwrap().ahead_qty, 200);
+    // a cancel of the order ahead of us credits the displayed size removed
+    assert!(v.on_market_event(&cancel(8, 0, 2450, 12)).unwrap().is_empty());
+    assert_eq!(v.queue_position(1).unwrap().ahead_qty, 0);
+    // the next execution at (or through) our level is ours
+    assert!(v.on_market_event(&add(9, 0, 2450, 80, 16)).unwrap().is_empty());
+    let fills = v.on_market_event(&execute(10, 0, 2450, 80, 16)).unwrap();
+    assert_eq!(fills.len(), 1);
+    assert_eq!((fills[0].filled_qty, fills[0].fill_price_ticks), (50, 2450));
+    assert_eq!(fills[0].status, ExecStatus::Filled.as_u8());
+    assert!(v.queue_position(1).is_none());
 }
 
 #[test]

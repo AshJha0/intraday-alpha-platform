@@ -178,9 +178,20 @@ class Rules:
     VENUE_MESSAGE_RATE = "VENUE_MESSAGE_RATE"
     #: A bounded per-key state map is full (``pre_trade.max_tracked_keys``).
     STATE_CAPACITY = "STATE_CAPACITY"
+    # ---- v1.17 F8: the pre-trade controls of the dark-venue model (checks
+    # ---- 31-33, run after check 28 and before check 29)
+    #: The order's venue type is not in ``pre_trade.allowed_venue_types``.
+    VENUE_TYPE_RESTRICTED = "VENUE_TYPE_RESTRICTED"
+    #: The firm's projected session quantity routed to dark / midpoint venues
+    #: would exceed the dark participation cap.
+    DARK_PARTICIPATION = "DARK_PARTICIPATION"
+    #: The firm's session dark-fill notional plus the order would exceed
+    #: ``pre_trade.max_dark_fill_notional``.
+    DARK_FILL_NOTIONAL = "DARK_FILL_NOTIONAL"
 
     #: The pre-trade rule ids in pinned check order (index = check number;
-    #: 23-29 are the 15c3-5 set, 30 the state-capacity reject of check 7).
+    #: 23-29 are the 15c3-5 set, 30 the state-capacity reject of check 7,
+    #: 31-33 the v1.17 F8 dark-venue controls, evaluated between 28 and 29).
     CHECK_ORDER = (
         CONFIG_MISSING,
         KILL_GLOBAL,
