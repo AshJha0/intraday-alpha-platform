@@ -1109,11 +1109,15 @@ def ingest(
     defer_normalize: bool = False,
     progress: Callable[[str], None] | None = None,
     tops: str | Path | None = None,
+    partition_instruments: int | None = None,
 ) -> dict:
     """Ingest one session into ``out_dir``; returns the manifest document.
 
     ``tops`` (the IEX formats only, v1.17 A1) is the day's TOPS capture: the
-    best bid / offer oracle recorded as the session's ``book_verification``."""
+    best bid / offer oracle recorded as the session's ``book_verification``.
+    ``partition_instruments`` (v1.17 A2) normalises in on-disk partitions
+    of that many instruments (memory-bounded, same bytes; the in-memory
+    record buffer is then not kept)."""
     if source_format not in FORMATS:
         raise IngestError(f"unknown format {source_format!r}; known: {list(FORMATS)}")
     if tick_size not in TICK_CHOICES:
@@ -1227,7 +1231,9 @@ def ingest(
         ticks = _decide_ticks(universe, stats, TICK_CHOICES[tick_size], previous_ticks)
         check = _BookCheck(len(universe)) if book_check else None
         clock = time.perf_counter()
-        fresh: bytearray | None = None if defer_normalize else bytearray()
+        fresh: bytearray | None = (
+            None if defer_normalize or partition_instruments is not None else bytearray()
+        )
         with _Stage(progress, "raw_and_book_check", raw_dir / f"{stem}.jsonl.partial"):
             raw_info = _raw_pass(spool, raw_dir / f"{stem}.jsonl", ticks, venue_id, check, fresh)
         if raw_info.pop("kept", True) is False:
@@ -1334,7 +1340,9 @@ def ingest(
     with _Stage(progress, "normalize", normalized_dir):
         preloaded = {} if fresh is None else {raw_file.name: iter_record_events(fresh)}
         fresh = None  # the generator holds the buffer; it is freed once consumed
-        qc = normalize_run(raw_dir, normalized_dir, preloaded)
+        qc = normalize_run(
+            raw_dir, normalized_dir, preloaded, partition_instruments=partition_instruments
+        )
         del preloaded
     stage["normalize"] = time.perf_counter() - clock
     qc["raw_dir"] = "raw"
@@ -1543,6 +1551,13 @@ def _parser() -> argparse.ArgumentParser:
         "capture (pcap or pcap.gz); lobster: one message file per symbol",
     )
     p.add_argument(
+        "--partition-instruments",
+        type=int,
+        default=None,
+        help="normalise in on-disk partitions of N instruments (memory-bounded for a wide "
+        "universe; identical bytes); default: the whole day in memory",
+    )
+    p.add_argument(
         "--tops",
         default=None,
         help="IEX formats: the day's TOPS capture (pcap or pcap.gz), the best bid / offer "
@@ -1632,6 +1647,7 @@ def main(argv: list[str] | None = None) -> int:
             defer_normalize=args.defer_normalize,
             progress=None if args.quiet else lambda line: print(line, file=sys.stderr, flush=True),
             tops=args.tops,
+            partition_instruments=args.partition_instruments,
         )
     except BookDivergenceError as exc:
         print(f"error: {exc}", file=sys.stderr)

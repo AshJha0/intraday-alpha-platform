@@ -51,7 +51,14 @@ from collections import deque
 from collections.abc import Iterable, Iterator, Mapping
 from pathlib import Path
 
-from iap.core.codec import IAP1_MAGIC, IAP1_RECORD_SIZE, IAP1_VERSION, iter_jsonl, write_jsonl
+from iap.core.codec import (
+    IAP1_MAGIC,
+    IAP1_RECORD_SIZE,
+    IAP1_VERSION,
+    encode_jsonl_line,
+    iter_jsonl,
+    write_jsonl,
+)
 from iap.core.events import FIELDS, MarketEvent, validation_error
 
 #: Per-stream duplicate-detection window (sequences remembered), pinned.
@@ -212,9 +219,23 @@ def normalize_file(
     stream_qc: dict[str, _StreamQC],
     per_stream: dict[str, dict[str, int]],
     events: Iterable[MarketEvent] | None = None,
+    *,
+    partition_instruments: int | None = None,
+    sink: _ParquetSink | None = None,
 ):
     """Normalize one raw JSONL file; returns the kept, event-time-ordered
     events as a numpy structured array of IAP1 records.
+
+    ``partition_instruments`` (v1.17, A2; opt-in) bounds memory for a wide
+    universe: the packed records are routed to on-disk partitions of that
+    many instruments each, every partition is sorted on its own, and the
+    partitions are merged in event-time windows into the SAME output bytes
+    (:func:`_normalize_partitioned`; the sort key puts venue and instrument
+    right after ``exchange_ts``, so a per-instrument partition is a slice of
+    the global order).  Memory is then one partition plus one window, not
+    the day.  The outputs are written by this function and the row count is
+    returned instead of the records; ``sink`` receives one row group per
+    merge window.
 
     ``events``, when given, are the events of ``raw_path`` already in hand
     (the caller has just written that file): they are used instead of
@@ -231,6 +252,12 @@ def normalize_file(
     """
     import numpy as np
 
+    if partition_instruments is not None:
+        if partition_instruments < 1:
+            raise ValueError("partition_instruments must be >= 1")
+        return _normalize_partitioned(
+            raw_path, out_dir, stream_qc, per_stream, events, partition_instruments, sink
+        )
     buf = bytearray()
     epochs = array("q")
     for ev in iter_jsonl(raw_path) if events is None else events:
@@ -322,6 +349,204 @@ def normalize_file(
     return rec
 
 
+def _qc_steps(ev: MarketEvent, stream_qc, per_stream) -> int | None:
+    """Steps 1-3 of :func:`normalize_file` for one event; the stream epoch
+    of a kept event, ``None`` for a dropped one (counted).  One copy of the
+    rules for both the in-memory and the partitioned path."""
+    key = f"{ev.venue_id}:{ev.instrument_id}"
+    counters = per_stream.get(key)
+    if counters is None:
+        counters = per_stream[key] = _new_counter()
+    counters["events_in"] += 1
+    if ev.receive_ts < ev.exchange_ts:
+        ev.receive_ts = ev.exchange_ts
+        counters["ts_clamped"] += 1
+    if validation_error(ev) is not None:
+        counters["invalid"] += 1
+        return None
+    qc = stream_qc.get(key)
+    if qc is None:
+        qc = stream_qc[key] = _StreamQC()
+    if not qc.started:
+        qc.started = True
+        qc.max_seq = ev.sequence
+        qc.max_exchange_ts = ev.exchange_ts
+    elif ev.sequence < qc.max_seq and ev.exchange_ts > qc.max_exchange_ts:
+        counters["sequence_resets"] += 1
+        qc.reset()
+        qc.max_seq = ev.sequence
+    elif ev.sequence in qc.recent_set:
+        counters["duplicates"] += 1
+        return None
+    elif ev.sequence < qc.max_seq:
+        counters["out_of_order"] += 1
+    elif ev.sequence > qc.max_seq + 1:
+        counters["gaps"] += 1
+        counters["gap_missing_events"] += ev.sequence - qc.max_seq - 1
+    qc.remember(ev.sequence)
+    if ev.sequence > qc.max_seq:
+        qc.max_seq = ev.sequence
+    if ev.exchange_ts > qc.max_exchange_ts:
+        qc.max_exchange_ts = ev.exchange_ts
+    return qc.epoch
+
+
+#: Rows a merge window holds at most per partition (the memory bound of the
+#: partitioned path together with one partition's sort).
+_MERGE_WINDOW_ROWS = 1 << 20
+
+
+def _normalize_partitioned(
+    raw_path: Path,
+    out_dir: Path,
+    stream_qc: dict[str, _StreamQC],
+    per_stream: dict[str, dict[str, int]],
+    events: Iterable[MarketEvent] | None,
+    partition_instruments: int,
+    sink: _ParquetSink | None,
+) -> int:
+    """The partitioned path of :func:`normalize_file` (module docs, A2)."""
+    import shutil
+    import tempfile
+
+    import numpy as np
+
+    stem = raw_path.stem
+    tmp = Path(tempfile.mkdtemp(prefix=f".norm_{stem}_", dir=out_dir))
+    part_of: dict[int, int] = {}
+    files: list = []
+    epoch_struct = struct.Struct("<q")
+    try:
+        # steps 1-3, routed to per-partition record files (72 B record + 8 B epoch)
+        for ev in iter_jsonl(raw_path) if events is None else events:
+            epoch = _qc_steps(ev, stream_qc, per_stream)
+            if epoch is None:
+                continue
+            part = part_of.get(ev.instrument_id)
+            if part is None:
+                part = part_of[ev.instrument_id] = len(part_of) // partition_instruments
+                while len(files) <= part:
+                    files.append(open(tmp / f"part_{len(files):04d}.bin", "wb"))
+            files[part].write(pack_record(ev))
+            files[part].write(epoch_struct.pack(epoch))
+        for f in files:
+            f.close()
+        dtype_part = np.dtype(_IAP1_RECORD + [("epoch", "<i8")])
+        dtype_rec = np.dtype(_IAP1_RECORD)
+        sorted_paths: list[Path] = []
+        total = 0
+        # steps 4-5 per partition: drop ts regressions, sort, write a sorted run
+        for k in range(len(files)):
+            raw = np.fromfile(tmp / f"part_{k:04d}.bin", dtype=dtype_part)
+            (tmp / f"part_{k:04d}.bin").unlink()
+            epoch = raw["epoch"].copy()
+            keep = _ts_regression_keep(raw, epoch, per_stream)
+            if not keep.all():
+                raw, epoch = raw[keep], epoch[keep]
+            del keep
+            if len(raw):
+                streams = raw["venue_id"].astype(np.int64) << 32 | raw["instrument_id"].astype(
+                    np.int64
+                )
+                values, counts = np.unique(streams, return_counts=True)
+                for v, c in zip(values.tolist(), counts.tolist(), strict=True):
+                    per_stream[f"{v >> 32}:{v & 0xFFFFFFFF}"]["events_out"] += c
+                del streams
+            order = np.lexsort(
+                (
+                    raw["event_id"],
+                    raw["sequence"],
+                    epoch,
+                    raw["instrument_id"],
+                    raw["venue_id"],
+                    raw["exchange_ts"],
+                )
+            )
+            rec = np.empty(len(raw), dtype=dtype_rec)
+            for name in dtype_rec.names:
+                rec[name] = raw[name][order]
+            del raw, epoch, order
+            p = tmp / f"sorted_{k:04d}.bin"
+            rec.tofile(p)
+            sorted_paths.append(p)
+            total += len(rec)
+            del rec
+        # merge the sorted runs in event-time windows into the final outputs
+        runs = [np.memmap(p, dtype=dtype_rec, mode="r") for p in sorted_paths]
+        pos = [0] * len(runs)
+        next_id = 1
+        header = _FRAME.pack(IAP1_MAGIC, IAP1_VERSION, total)
+        crc = zlib.crc32(header)
+        with (
+            open(out_dir / f"{stem}.normalized.iap1", "wb") as iap1,
+            open(out_dir / f"{stem}.normalized.jsonl", "wb") as jsonl,
+        ):
+            iap1.write(header)
+            while any(pos[k] < len(runs[k]) for k in range(len(runs))):
+                # the window ends at the earliest "chunk-ahead" timestamp of any
+                # run, so each run contributes at most a chunk of rows
+                bound = None
+                for k, run in enumerate(runs):
+                    if pos[k] < len(run):
+                        t = int(run["exchange_ts"][min(pos[k] + _MERGE_WINDOW_ROWS, len(run) - 1)])
+                        bound = t if bound is None else min(bound, t)
+                assert bound is not None
+                parts = []
+                advanced = False
+                for k, run in enumerate(runs):
+                    if pos[k] >= len(run):
+                        continue
+                    hi = int(np.searchsorted(run["exchange_ts"][pos[k] :], bound, side="left"))
+                    if hi:
+                        parts.append(np.asarray(run[pos[k] : pos[k] + hi]))
+                        pos[k] += hi
+                        advanced = True
+                if not advanced:
+                    # every remaining row of the front shares ``bound``: take
+                    # that timestamp from every run at once
+                    for k, run in enumerate(runs):
+                        if pos[k] >= len(run):
+                            continue
+                        hi = int(np.searchsorted(run["exchange_ts"][pos[k] :], bound, side="right"))
+                        if hi:
+                            parts.append(np.asarray(run[pos[k] : pos[k] + hi]))
+                            pos[k] += hi
+                chunk = np.concatenate(parts) if len(parts) > 1 else parts[0].copy()
+                del parts
+                # stable: rows of one run (same venue, instrument) keep their order
+                order = np.lexsort(
+                    (chunk["instrument_id"], chunk["venue_id"], chunk["exchange_ts"])
+                )
+                chunk = chunk[order]
+                del order
+                chunk["event_id"] = np.arange(next_id, next_id + len(chunk), dtype=np.uint64)
+                next_id += len(chunk)
+                lines = [encode_jsonl_line(ev) for ev in iter_record_events(chunk)]
+                if lines:
+                    jsonl.write(("\n".join(lines) + "\n").encode("utf-8"))
+                del lines
+                body = chunk.tobytes()
+                crc = zlib.crc32(body, crc)
+                iap1.write(body)
+                if sink is not None:
+                    sink.write(stem, chunk)
+                del chunk, body
+            iap1.write(_FRAME.pack(crc & 0xFFFFFFFF, 0, total))
+        # release the memory maps before the temp directory is removed
+        # (Windows refuses to delete a mapped file)
+        for run in runs:
+            mm = getattr(run, "_mmap", None)
+            if mm is not None:
+                mm.close()
+        runs.clear()
+        return total
+    finally:
+        for f in files:
+            if not f.closed:
+                f.close()
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 _SCHEMA_TYPES = {
     "event_id": "uint64",
     "instrument_id": "uint32",
@@ -373,12 +598,19 @@ class _ParquetSink:
 
 
 def normalize_run(
-    raw_dir, normalized_dir, preloaded: Mapping[str, Iterable[MarketEvent]] | None = None
+    raw_dir,
+    normalized_dir,
+    preloaded: Mapping[str, Iterable[MarketEvent]] | None = None,
+    *,
+    partition_instruments: int | None = None,
 ) -> dict:
     """Normalize every raw JSONL file in ``raw_dir``; write outputs + QC report.
 
     ``preloaded`` maps a raw file NAME to the events of that file already in
     memory; such a file is not decoded again (see :func:`normalize_file`).
+    ``partition_instruments`` (v1.17, A2) selects the memory-bounded
+    partitioned path; the outputs are byte-identical (tested), the Parquet
+    file then holds one row group per merge window instead of per file.
 
     Returns the QC report dict (also written to
     ``normalized_dir/qc_report.json``).
@@ -402,10 +634,16 @@ def normalize_run(
                 stream_qc,
                 per_stream,
                 preloaded.get(raw_path.name) if preloaded else None,
+                partition_instruments=partition_instruments,
+                sink=sink,
             )
-            sink.write(raw_path.stem, kept)
+            if isinstance(kept, int):
+                n_out = kept  # the partitioned path wrote the outputs and the sink
+            else:
+                sink.write(raw_path.stem, kept)
+                n_out = len(kept)
             file_counts[raw_path.name] = {
-                "events_out": len(kept),
+                "events_out": n_out,
                 "normalized_jsonl": f"{raw_path.stem}.normalized.jsonl",
                 "normalized_iap1": f"{raw_path.stem}.normalized.iap1",
             }
