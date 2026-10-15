@@ -73,14 +73,14 @@ from iap.llm.spend import SpendLedger, SpendPolicy, SpendRow, MonthlyCapExceeded
   growing-context projection (`add_pending_tool_tokens`).
 - `pin_for(role)` → `ModelPin(role, model, pinned, prices_checked)`;
   `PINNED_MODELS` maps role → id; `PRICES` is a live read-only view of the
-  price file (`--model` choices). `usage_cost(model, usage)` and
-  `max_call_cost(model, prompt_tokens, max_tokens, *, cache_write=False)`
+  price file (`--model` choices). `usage_cost(model, usage, table=None)` and
+  `max_call_cost(model, prompt_tokens, max_tokens, *, table=None, cache_write=False)`
   refuse an unknown model (`UnknownModelError`).
 - `SpendLedger(path=None, *, policy=None, notifier=None, clock=time.time,
   allow_in_repo=False)` / `SpendLedger.default()`: `rows()`, `month_to_date()`,
-  `last(n)`, `check_call(model, prompt_tokens, max_tokens)` (raises
-  `MonthlyCapExceeded` before the call), `record(*, model, usage, session, run,
-  role, pin)` (locked append + fsync, the 80 % alert once a month), `status()`.
+  `last(n=20)`, `check_call(model, prompt_tokens, max_tokens)` (raises
+  `MonthlyCapExceeded` before the call), `record(*, model, usage, session="", run="",
+  role="", pin=None, table=None)` (locked append + fsync, the 80 % alert once a month), `status()`.
   A path under the repository is refused.
 
 ## 4. `iap.llm.verify` and `iap.llm.summary_check` — the LLM never computes
@@ -99,7 +99,7 @@ from iap.llm.summary_check import check_summary, action_claims, clauses
   and `t_threshold`; `leaves(obj)` every number outside free-text fields.
   Used by the AI1 `file_finding`, the E2 drafts and closing text, and (through
   `numbers_in_text` + `matches`) the E3 narrative.
-- `check_summary(text, tool_log, root, session_id)` (A-P1-4): the closing
+- `check_summary(text, log, root, session_id)` (A-P1-4): the closing
   summary's action claims (`action_claims`, `clauses`) must be backed by the
   tool log.
 

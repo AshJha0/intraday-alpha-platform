@@ -6,9 +6,9 @@ repo's *real, verified numbers* as worked examples. Everything cited here can
 be reproduced from the committed code and seeds — that reproducibility is
 itself one of the lessons.
 
-Sections §45-§99 (added for v1.16) and §100 (v1.17) are shorter concept entries: each
+Sections §45-§99 (added for v1.16) and §100-§139 (v1.17) are shorter concept entries: each
 teaches one idea behind the platform, says where it lives in the code, and
-ends with questions. If a v1.12-v1.16 term is unfamiliar, start there.
+ends with questions. If a v1.12-v1.17 term is unfamiliar, start there.
 
 Reading order matters less than you'd think; each section stands alone but
 cross-references the others. If you only have an hour, read §6 (honest alpha
@@ -35,11 +35,17 @@ Three reading paths, depending on why you are here:
   out knowing why a t of 21 can be overstated, what a look costs, and why
   nothing here is promoted. Then §65-§87 (IC, HAC, multiple testing,
   pre-registration, holdouts, CPCV, leakage) and §78 on the R7 result.
+  The v1.17 additions are §109-§115 (breadth, the registered N, the
+  statistics revision), §130-§136 (clustered SEs, conformal sizing,
+  meta-labelling, regimes, long horizons, `linear_z_v2`, ML looks).
 - *You build trading systems.* §3, §9, §10, §12, §16, §21, §22, §25, §30,
   §36, then §44. Run recipes 2, 9, 10, 14, 22, 69 and 70. The theme is
   fail-closed design and proving the implementations agree. Then §45-§64
   (queues, costs, impact, execution schedules, maker and quoting economics)
   and §88-§99 (data, models, paper trading, controls, agents).
+  For v1.17, §101-§108 (execution quality), §121-§127 (agents, spend,
+  CI gates, budgets) and §128-§129, §137-§139 (data features, opt-in
+  discipline, releases).
 - *You are reviewing the platform.* §20, §27, §44, then
   [docs/ROADMAP.md](docs/ROADMAP.md) §3.8-3.10 and CHANGELOG.md. These say
   what is wrong or unfinished, in the platform's own words.
@@ -160,7 +166,46 @@ Contents:
 98. [Pre-trade controls and a tamper-evident audit](#98-pre-trade-controls-and-a-tamper-evident-audit)
 99. [Agents that propose and humans that decide](#99-agents-that-propose-and-humans-that-decide)
 100. [A tree model on the same bench, and two gates that read one number](#100-a-tree-model-on-the-same-bench-and-two-gates-that-read-one-number)
-101. [Further reading](#101-further-reading)
+101. [Implementation shortfall, and the benchmark that measures it](#101-implementation-shortfall-and-the-benchmark-that-measures-it)
+102. [Fill types, and a markout that knows how the fill happened](#102-fill-types-and-a-markout-that-knows-how-the-fill-happened)
+103. [Queue-aware cancels: when waiting is the expensive choice](#103-queue-aware-cancels-when-waiting-is-the-expensive-choice)
+104. [Quote fading, and pricing the fades it saved against the fills it missed](#104-quote-fading-and-pricing-the-fades-it-saved-against-the-fills-it-missed)
+105. [Signal-aware urgency: let the alpha choose passive or aggressive](#105-signal-aware-urgency-let-the-alpha-choose-passive-or-aggressive)
+106. [Pacing, and Almgren-Chriss with a drift](#106-pacing-and-almgren-chriss-with-a-drift)
+107. [The depth cap versus the book](#107-the-depth-cap-versus-the-book)
+108. [A dark midpoint, as an idea only](#108-a-dark-midpoint-as-an-idea-only)
+109. [Breadth and the fundamental law](#109-breadth-and-the-fundamental-law)
+110. [The cross-sectional book](#110-the-cross-sectional-book)
+111. [Break-even notional: how big can the book be?](#111-break-even-notional-how-big-can-the-book-be)
+112. [A universe rule, written before any statistic](#112-a-universe-rule-written-before-any-statistic)
+113. [A Sharpe deflated at the number of trials you registered](#113-a-sharpe-deflated-at-the-number-of-trials-you-registered)
+114. [The statistics revision](#114-the-statistics-revision)
+115. [One gate statistic](#115-one-gate-statistic)
+116. [Why TOPS equals the top of DEEP: an oracle for the book](#116-why-tops-equals-the-top-of-deep-an-oracle-for-the-book)
+117. [Capture clocks: pcapng and TAI](#117-capture-clocks-pcapng-and-tai)
+118. [Process-and-delete: the data lifecycle on a small disk](#118-process-and-delete-the-data-lifecycle-on-a-small-disk)
+119. [The approval rule for downloads](#119-the-approval-rule-for-downloads)
+120. [Spend governance: a budget the model cannot raise](#120-spend-governance-a-budget-the-model-cannot-raise)
+121. [A number must come from a tool result, not from the model](#121-a-number-must-come-from-a-tool-result-not-from-the-model)
+122. [The three v1.17 agents, and what each is allowed to write](#122-the-three-v117-agents-and-what-each-is-allowed-to-write)
+123. [Documentation checks as a CI gate](#123-documentation-checks-as-a-ci-gate)
+124. [Reproducible builds and SBOMs](#124-reproducible-builds-and-sboms)
+125. [Ratchets: coverage floors and a growing mypy scope](#125-ratchets-coverage-floors-and-a-growing-mypy-scope)
+126. [Latency budgets: a limit is a measurement times a margin](#126-latency-budgets-a-limit-is-a-measurement-times-a-margin)
+127. [A real slice committed to the repository](#127-a-real-slice-committed-to-the-repository)
+128. [Share-normalised features and the per-session ADV](#128-share-normalised-features-and-the-per-session-adv)
+129. [TRADE_BUST: a correction that must not move registered vectors](#129-trade_bust-a-correction-that-must-not-move-registered-vectors)
+130. [Day-clustered standard errors, in the v1.17 gate form](#130-day-clustered-standard-errors-in-the-v117-gate-form)
+131. [Conformal sizing: width as confidence](#131-conformal-sizing-width-as-confidence)
+132. [Meta-labelling: choose the threshold on rows nobody fitted](#132-meta-labelling-choose-the-threshold-on-rows-nobody-fitted)
+133. [Regime conditioning: one beta, or one per regime?](#133-regime-conditioning-one-beta-or-one-per-regime)
+134. [Long horizons: features and labels, truncated at the close](#134-long-horizons-features-and-labels-truncated-at-the-close)
+135. [linear_z_v2: standardise each instrument against itself](#135-linear_z_v2-standardise-each-instrument-against-itself)
+136. [ML looks are looks](#136-ml-looks-are-looks)
+137. [Opt-in, and byte-identical when off](#137-opt-in-and-byte-identical-when-off)
+138. [One entry point for realism, and a label for what a cost is](#138-one-entry-point-for-realism-and-a-label-for-what-a-cost-is)
+139. [Release, regenerate, and retiring a language](#139-release-regenerate-and-retiring-a-language)
+140. [Further reading](#140-further-reading)
 - [Glossary](#glossary)
 
 ---
@@ -6721,7 +6766,1380 @@ the better number, and the name of the one that decided.
    contract that people and three ports read. The digest makes the two
    inseparable without making the file unreadable.)*
 
-## 101. Further reading
+## 101. Implementation shortfall, and the benchmark that measures it
+
+**The question.** You must buy 1 % of a day's volume. Which algorithm and
+which child policy cost least against the price you saw when you decided?
+
+**The idea (Perold).** Implementation shortfall is the gap between the paper
+portfolio (every share at the arrival price, no cost) and the real one. It
+splits into spread, fees, impact, and the opportunity cost of what never
+filled. The last term is the one a fill-rate table hides: an algorithm that
+fills 60 % cheaply has not beaten one that fills 100 % dearly until the
+unfilled 40 % is priced at where the market went. `iap.tca.shortfall.
+parent_costs` does that split per parent order, in bps of arrival notional.
+
+**The benchmark (v1.17 B1).** `python -m iap.research.execution_benchmark`
+replays a grid (algo TWAP / VWAP / POV / IS × policy `native` / `aggressive`
+/ `passive` × 0.1 / 0.5 / 1 / 2 % of ADV × session) through the execution
+simulator on recorded books. The committed run is
+`research/execution/benchmark/BENCHMARK_multi7.md`: AAPL, MSFT and QQQ over
+seven sessions, 44,718,339 events, 252 parents per policy, 30-minute
+windows, five slices, seed 20260829. Every cost carries
+`ExecConfig.impact_label()` ("replay + linear child adder (rule 6)"), so a
+reader cannot mistake a simulated impact for a measured one.
+
+**What it found, and did not.** The largest paired difference is aggressive
+minus native TWAP at 1 % ADV, -4.10 ± 2.19 bp (95 % CI -9.47 to 1.27, fill
+rate difference -0.19). The interval holds zero, and per-cell n is 9-21
+parents on 3-7 sessions: low-power. The honest reading in
+`docs/EXECUTION_QUALITY.md` is that the benchmark is a machine for the signed
+run, not a finding about the policies. The gate it prepares
+(`prereg_DRAFT.json`) is unsigned; the owner signs it.
+
+**What it is not.** Not a market-impact measurement, not evidence that any
+policy wins, and not a promotion gate.
+
+**Check yourself.**
+
+1. Why does a cell with a fill rate of 0.83 need the completion term before
+   its cost can be compared? *(The unfilled 17 % is a cost or a saving
+   depending on where the price went; ignoring it rewards under-filling.)*
+2. Why are costs labelled with `impact_label()`? *(The simulator's impact is
+   a modelled adder, and the label is the cheapest guard against quoting it
+   as a market reaction.)*
+
+## 102. Fill types, and a markout that knows how the fill happened
+
+**The question.** §30 measured adverse selection per fill. Why does the
+v1.17 markout split fills again by how they came about?
+
+**The idea.** A passive fill is not one thing. A first post that rested and
+filled is the clean case. A fill of a child that re-posted after a cancel
+is a different bet (you paid latency and lost your place). A fill that
+landed after a cancel had already been sent lost a race. A taker fill never
+risked selection at all. Pooling them hides the mix.
+`iap.tca.markout_decomposition.fill_type` assigns one of `passive`,
+`aggressive`, `faded`, `cancelled_replaced` from new provenance on
+`ChildOrder` (`cancel_rule`, `cancel_rule_ts`, `replaces_order_id`), and
+`regime_of` adds the B2 urgency regime (`agree`, `adverse`, `neutral`,
+`no_signal`, `stale`, or `plain`).
+
+**The statistic.** Per cell and horizon: the mean markout and the mean price
+impact (`s * (m_h - m_fill)`, whose negative is the adverse selection of a
+passive fill), each with a day-clustered standard error (§130). `decompose`
+aggregates rows; `fill_rows` prices one timeline. With one day the SE is
+`None`, not zero.
+
+**Where it stands.** The machinery and its tests are committed
+(`python/tests/test_v117_fading_cancels_markout.py`). The changelog says the
+benchmark policies that exercise it were not run on multi7 in that PR, and
+`docs/EXECUTION_QUALITY.md` section 6.1 reserves the results for the truth
+pass. This entry therefore quotes no markout number.
+
+**What it is not.** Not a claim that faded fills are worse than passive
+ones; that is the question the decomposition exists to ask.
+
+**Check yourself.**
+
+1. Why is `faded` a maker fill after a cancel was sent, not a fill after a
+   cancel was acknowledged? *(Rule 7: the cancel travels the latency path
+   and can lose the race; the fill that lands first is the one the fade
+   tried and failed to avoid.)*
+2. Why can a pooled passive markout look better than any of its parts?
+   *(Mix: clean first-post fills dilute the replaced and raced ones.)*
+
+## 103. Queue-aware cancels: when waiting is the expensive choice
+
+**The question.** §45 says the back of the queue fills last and worst. If a
+resting order is hopelessly far back, why keep it?
+
+**The idea.** A resting child can be judged on two numbers it already has:
+the displayed size ahead of it (`ahead_qty`, the simulator's deterministic
+queue position) and, with a fitted `FillHazardModel`, the probability of
+filling within a horizon given spread, imbalance and depletion. B5
+(`iap.execution.fading.QueueCancelParams`, `ParentOrder.queue_cancel`)
+cancels when `ahead_qty > max_ahead_qty` or `p_fill_within < min_p_fill`,
+then crosses (default) or re-posts. The cancel goes through simulator rule 7
+and may lose the race.
+
+**The calibration trap it exposed (review X-4).** A level shrinks for two
+reasons: trades hit it, or orders ahead of you cancel. Only the first fills
+anyone. The pooled `queue_depletion` hazard mixed them and so overstated
+fill probability. `estimate_calibration(depletion_split=True)` now fits both
+rates (`ExecCalibration.queue_exec_depletion_hazard`,
+`queue_cancel_depletion_hazard`), and `sor_v2.hazard_fill_prob` documents the
+execution rate as its input.
+
+**What it is not.** Not a result that cancelling beats waiting: the
+benchmark variants `passive+qcancel` exist (flags `--qcancel-max-ahead`,
+`--qcancel-min-pfill`) but no committed run is quoted here. Off by default,
+byte-identical off.
+
+**Check yourself.**
+
+1. Why must the hazard's depletion feature be the execution rate? *(A level
+   emptied by cancels ahead of you did not fill you; using it as a fill
+   signal inflates the probability.)*
+2. Why does a queue cancel cross by default? *(The queue was the problem; the
+   remainder still has to trade, so it takes liquidity.)*
+
+## 104. Quote fading, and pricing the fades it saved against the fills it missed
+
+**The question.** Pull a resting quote when the market is about to run
+through it, and you avoid an adverse fill, but you also forgo fills that
+would have been good. Does fading pay?
+
+**The rule (B4).** `FadeParams` on `ParentOrder.fade` pulls a resting child
+when the signal turns adverse by `threshold_z` (the same alignment test as
+B2) or when the opposite side's share of the two L1 sizes reaches
+`pressure_threshold` (`book_pressure`). The remainder is held off the book
+until the condition clears (`hold`), re-posted, or crossed, at most
+`max_fades` times. Every pull is a `PullRecord`
+(`ExecReplayResult.pulls`, `ParentReport.diagnostics()`).
+
+**The counterfactual.** `pull_outcomes`, `pull_rows` and `pull_summary` price
+each pulled quantity afterwards: did the market trade through the pulled
+price inside the horizon (the touch-through proxy for "it would have
+filled"), and if so was that fill's markout adverse (a fade *saved*
+`|markout|`) or favourable (a fade *missed* it)? The net is the answer,
+not the count of fades.
+
+**Why it is labelled.** Our resting order never moved the replayed book, and
+touch-through is a proxy for a fill. The docstring says so; the report keeps
+`fades_saved_vs_fills_missed` as its own field, per policy.
+
+**What it is not.** Not a measured benefit. No committed run reports it
+(`docs/EXECUTION_QUALITY.md` section 6.1), and the C++ port is pending (F7).
+
+**Check yourself.**
+
+1. Why can a fade lose money even when most pulls are correct? *(Saved
+   adverse fills are small per fill; one missed favourable run can outweigh
+   many; only the netted counterfactual compares them.)*
+2. Why does the pull use rule 7 instead of removing the order instantly?
+   *(A real cancel takes time and can lose to a fill; modelling it as free
+   would flatter the fade.)*
+
+## 105. Signal-aware urgency: let the alpha choose passive or aggressive
+
+**The question.** A buy is waiting to be worked. If the alpha says price is
+about to rise, patience costs; if it says price is about to fall, patience
+pays. Can the child style follow the signal?
+
+**The rule (B2).** `iap.execution.signal` supplies causal readings in signal
+units: `AlphaUrgencySource.from_dataset` scores a flagship alpha's
+registered parameters on a dataset's feature frames and reports the z-score
+of the alpha's own scores. `ParentOrder(urgency_policy="alpha",
+alpha_urgency=AlphaUrgencyPolicy(threshold_z, passive_urgency, max_age_ns,
+latency_ns))` re-evaluates at every child decision: agree -> post, adverse
+-> cross, neutral -> the base style. A reading is the latest at or before
+the decision and no older than `max_age_ns`, so there is no look-ahead.
+Each child records `urgency_regime`, `signal_z` and `pacing_scale`.
+
+**Design point.** The policy is re-evaluated through the parent's life, not
+once at arrival, so a signal that flips mid-order changes the style.
+
+**Evidence.** `python/tests/test_v117_signal_aware.py` pins the causality.
+No committed signal-aware benchmark result exists (`docs/EXECUTION_QUALITY.md`
+section 4). The v1.16 in-sample study found EQ10 and EQ05 never clear taker
+costs, and urgency does not change that: it moves the price a cost is paid
+at, not whether the alpha is worth trading.
+
+**What it is not.** Not a source of alpha and not enabled by default;
+`--signal EQ10|EQ05|synthetic` on the benchmark opts in.
+
+**Check yourself.**
+
+1. Why measure the signal in z-units of the alpha's own scores? *(Alphas
+   differ in scale; one threshold must mean the same strength for each.)*
+2. Why compare each `native+urgency` variant with its own plain control on
+   the same windows? *(Windows differ in difficulty; only a paired
+   difference removes that.)*
+
+## 106. Pacing, and Almgren-Chriss with a drift
+
+**The question.** §52 solved the trade-off between impact and risk assuming
+price has no drift. What changes when a signal says it does?
+
+**The mechanics.** With zero drift the Almgren-Chriss trajectory depends on
+risk aversion and impact only. A signal adds a term: when the price is
+expected to run away from the order, trade sooner; when waiting is
+expected to pay, hold more for later.
+`ac_holdings` and `ac_trajectory` gain `drift=0.0` (so the old result is
+the default), and `ac_drift_from_signal` converts a signal reading into the
+drift. `PacingParams` in `iap.execution.pacing` carries three opt-ins
+(`pov_signal_pacing`, `slice_signal_tilt`, `ac_signal_drift`): scale the
+per-trade POV participation by the signal, re-apportion the remaining
+quantity at each slice (never negative), or re-solve the Almgren-Chriss
+trajectory per slice with the signal as drift.
+
+**Why re-solve per slice.** The signal changes; a trajectory fixed at
+arrival uses a stale forecast. The cost is that the schedule is no longer
+the closed form, so the benchmark compares each variant with its plain
+control (`native+pacing`, `native+ac`, `native+ac_drift`).
+
+**What it is not.** Not tested on real data in a committed result; the
+tests show causality and that the remaining quantity stays non-negative.
+It scales an order's pace, never the order's size.
+
+**Check yourself.**
+
+1. Why must the tilt never make the remaining quantity negative? *(An
+   over-tilted early slice would sell past the parent; the parent is a hard
+   cap.)*
+2. Why keep `drift=0.0` as the default argument? *(Existing callers and
+   goldens must reproduce byte for byte; drift is opt-in.)*
+
+## 107. The depth cap versus the book
+
+**The question.** In the first multi7 run, 60-100 % of aggressive parents at
+0.5 % ADV or more hit `depth_exhausted`. Was the market that thin, or was
+the simulator's ten-level walk the limit?
+
+**The method.** Same dataset, windows and seed, with only
+`ExecConfig.walk_depth_levels` changed (default 10 -> 50 via
+`--walk-depth 50`), plus a variant with a 300-share child cap. Nothing else
+differs, which is what makes it a measurement of the cap.
+
+**The answer** (`research/execution/benchmark/DEPTH_COMPARISON_multi7.md`).
+At 0.5 % ADV it was the cap: the exhausted share went from 60-67 % to 0 %
+(11 % for VWAP). At 1 % about half cap and half book. At 2 % it is the book:
+a parent that size exhausts 50 displayed levels inside 30 minutes. Child
+size is not the lever: capping at 300 shares leaves aggressive cells
+unchanged and hurts native TWAP and VWAP.
+
+**The twist.** Costs rose by 2-5 bp at 1-2 % ADV (aggressive TWAP at 1 %:
+-6.9 to +0.7 bp). At depth 10 the cancelled quantity was priced by the
+completion term, small or favourable on these sessions; at depth 50 the same
+shares were walked and paid the real spread. The first run understated
+cost where under-fill was largest. A cap you do not examine can hide the
+very cost you are measuring.
+
+**What it is not.** In-sample, three names, seven sessions; nothing signed.
+
+**Check yourself.**
+
+1. How does the comparison separate "cap" from "book"? *(If raising the cap
+   to 50 levels removes the exhaustion, it was the cap; if the share stays
+   high with 50 levels available, the displayed book ran out.)*
+2. Why did a deeper walk make cost look worse? *(Quantity formerly
+   cancelled and priced by a benign completion term is now filled at the
+   walked prices.)*
+
+## 108. A dark midpoint, as an idea only
+
+**The question.** Some venues fill at the midpoint of the lit quote with no
+displayed queue. Should a router send a patient order there?
+
+**The idea.** A midpoint fill saves half the spread against a marketable
+order and, unlike a displayed bid, carries no visible queue to wait in. The
+cost is uncertainty: the fill probability depends on contra flow you cannot
+see, and a midpoint fill can be adversely selected if the mid is stale. A
+study would need a model of the dark fill probability and a markout of
+dark fills, compared with the passive and aggressive fill types (§102).
+
+**Where it stands.** This is an idea. The dark-midpoint model (plan item
+B10) is not on `main`: no code, no number and no result for it exists in
+this repository, and `docs/EXECUTION_QUALITY.md` section 6.3 reserves the
+heading as a placeholder for the truth pass. This entry makes no claim
+about a model, a venue or a benefit.
+
+**What it is not.** Not implemented, not tested, not a result.
+
+**Check yourself.**
+
+1. What would make a midpoint fill adversely selected? *(A stale quote:
+   the mid is about to move and the contra order knows it.)*
+2. What evidence would have to exist before the router used it? *(A
+   committed fill-probability model and a markout of dark fills, signed
+   through the pre-registration process like any other gate.)*
+
+## 109. Breadth and the fundamental law
+
+**The question.** A signal with a rank IC of 0.06 looks too weak to matter.
+Why do funds trade it anyway, and why can this repository not yet say that
+it would work?
+
+**The idea (Grinold and Kahn).** The fundamental law says the information
+ratio of a strategy is roughly the skill per bet times the square root of the
+number of independent bets: `IC × sqrt(BR)`. A small IC across many
+independent names beats a larger IC on one. `iap.research.breadth_report`
+reports the yardstick beside the book's measured breadth, and the word
+*independent* is the catch: names that move together are not separate bets.
+It computes effective bets from the correlation of the names' returns
+(`iap.combine.weights.effective_bets`).
+
+**The platform's real numbers.** `research/breadth/book/BOOK_multi7.md`
+(AAPL, MSFT, QQQ, seven sessions, 905 rebalances): mean rank IC 0.0626
+(day-clustered t 2.73, df 6) but effective bets 1.46 of 3 names. Three
+correlated names are barely more than one bet. The synthetic book
+(`BOOK_synthetic.md`, 11 names) has effective bets 10.33 of 11 and a rank IC
+of -0.0745, because the generator has no cross-sectional edge.
+
+**What it is not.** The law is a yardstick, not a forecast, and the
+platform's 100-name book has not been run in a committed result
+(`docs/PORTFOLIO_BREADTH.md`, placeholder). "A breadth of 3 is not breadth."
+
+**Check yourself.**
+
+1. Why does effective bets, not the name count, enter the law? *(Correlated
+   names carry overlapping information; independent bets are what multiply.)*
+2. A positive IC with t 2.73 and a net-negative book: contradiction?
+   *(No. The IC measures ranking; the book also pays spread, fee and
+   impact, §110-§111.)*
+
+## 110. The cross-sectional book
+
+**The question.** A time-series alpha asks "will this name rise?". A
+cross-sectional book asks "which names will beat the others?". How does one
+become a portfolio?
+
+**The pipeline** (`python -m iap.research.breadth_book`, `run_book`). On a
+rebalance clock (default five minutes) each name contributes its latest
+fresh feature value; a score (`eq11`, or `eq10_beta_gap`, demeaned and
+studentised) is ranked into target weights (`linear` or `deciles`); the
+optimizer then trades them off against costs *inside* the objective: a
+one-leg linear cost (half spread plus fee), an impact term (`ImpactTerm`,
+sqrt rule or a calibration's residual fit), under dollar, beta and sector
+neutrality (`iap.portfolio.exposures`, `configs/reference/sectors.json`) and
+participation and turnover caps. A stale name is frozen, not traded; the
+book is flattened at the last live rebalance of each session.
+
+**Accounting.** P&L marks at the mid a stated delay after the decision and
+charges spread, fee and impact per name by the same rule the optimizer saw,
+so `net = gross - spread - fee - impact` to the last float; a test
+reconstructs the gross P&L from positions and marks. One ledger look of
+kind `breadth_book` is spent per run.
+
+**What the committed runs say.** `BOOK_multi7.md`: gross P&L 1,042.67
+against spread 3,651.02, fee 1,246.04 and impact 5,698.64, net -9,553.03.
+A negative result for EQ11 as a three-name book after costs.
+
+**What it is not.** Not a statement about EQ11 or about a 100-name book;
+fractional shares, no queue, no venue; the sector file is public-knowledge
+classification, not a vendor taxonomy.
+
+**Check yourself.**
+
+1. Why put costs inside the optimizer rather than subtract them afterwards?
+   *(Otherwise the optimizer trades names whose edge is below their cost.)*
+2. Why freeze a stale name instead of trading it on an old price? *(A trade
+   on a stale mark books a gain or loss that no real fill would give.)*
+
+## 111. Break-even notional: how big can the book be?
+
+**The question.** A book that loses money at one size might still break
+even at a smaller one. How is "how big" measured?
+
+**The idea.** Impact cost per dollar rises with size (§48), so net P&L
+per dollar falls as the notional rises. `iap.research.breadth_report`
+re-runs the book at several multiples of a base notional (the impact term
+and costs scale with the size) and reports net bps at each, plus the
+break-even notional: the first zero crossing of net P&L across sizes. A
+second figure, `capacity_breakeven` in `iap.validation.metrics`, is a
+single-name proxy at the rebalance horizon using the book's realised
+round-trip edge at universe medians.
+
+**The committed result.** On the three-name multi7 book the net is
+negative at every size from 0.25x to 4x the base notional (net -77.63 to
+-99.08 bp in the sweep); the break-even notional is below the smallest size
+tried and the single-name capacity proxy is zero shares
+(`docs/PORTFOLIO_BREADTH.md`, `research/breadth/book/BOOK_multi7.md`).
+
+**Why two numbers.** The size sweep is a book-level answer; the capacity
+proxy is single-name. The doc states they are different objects and the
+proxy is "not the capacity of the book".
+
+**What it is not.** Not a capacity claim for any portfolio. A break-even
+below the smallest size means the sweep never found positive net P&L, not
+that a smaller size would.
+
+**Check yourself.**
+
+1. Why re-run the book at each size instead of scaling the P&L? *(Impact and
+   participation caps are nonlinear, so the optimizer's decisions change
+   with size.)*
+2. Why is "zero shares" a legitimate capacity? *(If the realised edge is
+   below the cost at any size, nothing can be traded profitably.)*
+
+## 112. A universe rule, written before any statistic
+
+**The question.** Which 100 stocks make a breadth test, and who decides?
+
+**The rule** (`research/breadth/UNIVERSE_RULE.md`, `breadth_universe/v1`):
+the top 100 Nasdaq-listed symbols by *displayed continuous-session volume*
+on 2019-01-30, measured by one streaming pass over the full-market file
+(`python -m iap.marketdata breadth-universe`, `iap.marketdata.breadth`).
+ETFs are kept and flagged; test securities are excluded; crosses and
+non-displayed prints are reported beside the ranking and do not rank.
+
+**Why fix it first.** If you choose names after seeing returns, breadth is
+chosen, not measured. The rule is written, versioned and hashed to its
+source (`universe.json` records the source file's sha256 and the next 50
+names).
+
+**The measured outcome** (`research/breadth/UNIVERSE_2019-01-30.md`):
+368,366,634 messages read, 8,713 symbols with a directory row, 27 test
+securities excluded, 100 names of which 29 are ETFs; AAPL, QQQ and MSFT
+rank 6, 12 and 15. The rule ranks share volume, not notional, so
+low-priced names rank high (HMNY at rank 2); that is the rule as registered,
+and a notional rule would be a new version and a new look.
+
+**Survivorship is explicit.** A symbol that later delists stays in the list
+and is reported as missing, not repaired. The 2025/26 days are the holdout
+for every name outside AAPL, MSFT and QQQ, and a `--dataset-dir` containing
+`holdout` is refused by the book driver.
+
+**What it is not.** Not an index, not liquid-by-notional, not survivorship-free.
+
+**Check yourself.**
+
+1. Why rank by displayed volume rather than total? *(Crosses and hidden
+   prints are not tradable by a displayed-order strategy.)*
+2. Why does a notional ranking count as a new look? *(It is a different
+   selection; a second selection of names is a second chance to find a good
+   one.)*
+
+## 113. A Sharpe deflated at the number of trials you registered
+
+**The question.** §40 explained why a Sharpe must be deflated. What N goes
+into the deflation?
+
+**The bug that taught it (review R-1).** The R7 confirmatory deflated Sharpe
+was recorded at N = 1 (EQ10) and N = 2 (EQ05): the trial count of the
+*holdout dataset's own* ledger. That counts only what was tried on that data,
+not how many configurations the research had tried before arriving there.
+The right N is the repository ledger's distinct configurations plus the look.
+`tools/r7_confirm.py` now takes it from `registered_trials`, and
+`--recompute-dsr` re-deflates the recorded per-session IC series without
+taking a new look.
+
+**What changed.** At N = 297 (the look) and 308 (today), EQ10 at 1 s moved
+from 0.99995 to 0.99886 and EQ05 from 0.9999998 to 0.99996
+(`research/r7/r7_confirm_result_dsr_recompute.{json,md}`; the note
+`research/r7/R7_DEVIATION_dsr_trials.md`). The gate is DSR > 0.95; both
+verdicts are unchanged. A descriptive variant without two sessions moves EQ05
+from 0.988 to 0.956 at N = 297, still above 0.95 (`docs/SIGNAL_RESEARCH.md`).
+
+**What it teaches.** The correction was small because the evidence was
+strong, but the recording was wrong, and it was found by review and
+recorded as a deviation, not quietly fixed. Nothing in
+`r7_confirm_result.json` was rewritten.
+
+**What it is not.** Not a new look, and not a statement that the alphas are
+tradable (§78).
+
+**Check yourself.**
+
+1. Why is a dataset-local trial count too small? *(The selection that led to
+   this candidate happened across the whole research history.)*
+2. Why record a deviation instead of overwriting the result? *(The record
+   of what was reported at the time is itself evidence.)*
+
+## 114. The statistics revision
+
+**The question.** If the rules for computing a statistic change, what
+happens to the ledger of statistics computed under the old rules?
+
+**The mechanism.** `iap.validation.methods.STATS_REVISION` is `"v1.17"`; it
+is written into every new ledger identity as `stats_revision`. The v1.14
+rules are frozen as `v2_v114`, `v3_v114`, `v4_v114`, and an entry at `"v1.14"`
+scopes to those bundles; an unknown revision raises. A rerun under new rules
+is therefore a new look with its own identity, not a silent overwrite of the
+old one. This is the same idea as §76 (deviations recorded) applied to the
+code itself.
+
+**The v1.17 change (R-3).** `v2`, `v3` and `v4` pass
+`feature_window_ns="registry"`: after a test block of a two-sided split
+(`leave_one_day_out`, the `cpcv` block) the embargo is at least the longest
+feature window (5 m), not the 60 s embargo alone, because a feature at the
+start of the next training row still reads 5 minutes of the test block. The
+reports state `methods.post_block_embargo_ns`. The walk-forward is
+one-sided, so no `v2` gate number moves; a regenerated `v4` cpcv block is a
+new look.
+
+**What it is not.** Not a change to any registered pre-registration; each
+stays at the bundle it names.
+
+**Check yourself.**
+
+1. Why can a feature window larger than the embargo leak? *(The first
+   training row after a test block still includes test-block data in its
+   rolling window.)*
+2. Why version the revision in the ledger identity? *(So a number computed
+   under old rules is never mistaken for, or merged with, one computed
+   under new rules.)*
+
+## 115. One gate statistic
+
+**The question.** If the walk-forward gate, the frozen-parameter block, the
+validity block and the R7 confirmation each compute "the t-statistic", can
+they disagree?
+
+**They did (review R-2).** `frozen_params_block` kept the v1.13 L = 2 HAC
+rule, no day separation and no per-instrument scaling, while the gate used
+the bundle's bandwidth. The same number was computed in four places by four
+rules. v1.17 puts one function behind all of them:
+`iap.validation.metrics.gate_statistics()` returns the pooled IC, the
+pooled-slope HAC t at the bundle's bandwidth and day separation, the
+day-cluster t, `n_pairs` and `n_days`. The walk-forward gate, the frozen
+block, the `validity` block and `tools/r7_confirm.py::pooled_stats` read it.
+
+**What follows.** Reports gain `gate_tstat_day_cluster`, `gate_n_days` and a
+`gate_statistics` block; the frozen block gains `frozen_t_day_cluster` and
+states which statistics it used. Gate t values are unchanged (CHANGELOG): the fix
+is to agreement, and agreement is the point. The same shape is reused wherever a
+new gate needs a number (B6's `cluster_mean`, `coverage_by_regime`, the
+regime gate), so a day-clustered reading means the same thing everywhere.
+
+**What it is not.** Not a new test; a refactor that makes four readings one.
+
+**Check yourself.**
+
+1. Why is a duplicated statistic dangerous even if each copy is right?
+   *(They drift apart; a gate and its report can quote different t values.)*
+2. Why did the gate t values not move? *(The gate already used the bundle's
+   rule; the divergent copies were the frozen block and the validity block.)*
+
+## 116. Why TOPS equals the top of DEEP: an oracle for the book
+
+**The question.** You rebuild an order book from a vendor's feed. How do you
+know the rebuild is right?
+
+**The idea.** For LOBSTER there is a published book to compare with. IEX
+gives one differently. TOPS publishes IEX's best bid and offer; DEEP and
+DEEP+ publish the book that produces them. A book reconstructed from DEEP
+must therefore reproduce TOPS's price and size on both sides at every change.
+`ingest --format iex-deep-plus --tops FILE` runs that comparison as the
+session's `book_verification`. The oracle is independent because the vendor
+computed the answer separately from the data being tested.
+
+**Why it matters (§36).** Parity proves agreement, not correctness; an oracle
+is the external check. The TOPS reader is `iap.marketdata.iex.TopsQuotes`;
+`process-iex-day` extracts a universe quote file once from the TOPS capture,
+deletes the capture, then verifies the DEEP+ book against the extract.
+
+**What is checked and what is not** (`docs/DATA_SOURCES.md`). The codec is
+tested on synthetic captures. A conformance pass on the first 250 MB of the
+2026-10-13 TOPS file found 7,619,846 messages, 0 unknown types, 0 sequence
+gaps and 0 crossed quotes
+(`research/v117/IEX_HIST_CONFORMANCE_20261013_TOPS.md`). A DEEP+ book is
+**unverified against real IEX data** until a day is ingested with both feeds.
+
+**What it is not.** Not proof of a correct book on real data yet.
+
+**Check yourself.**
+
+1. Why is DEEP+ ingested with TOPS and not checked against itself? *(A
+   self-check shares the reconstruction's own mistakes; the oracle does not.)*
+2. Why did the conformance pass need no DEEP file? *(It tested the framing
+   and TOPS message types only; the oracle comparison needs both feeds.)*
+
+## 117. Capture clocks: pcapng and TAI
+
+**The question.** A packet capture stamps each packet. Is that the time the
+exchange says it happened?
+
+**What the real files showed.** The IEX HIST files are **pcapng** (section
+header, interface block, enhanced packet blocks), not the classic pcap the
+vendor page describes; `iap.marketdata.iex` reads both. And the capture
+host stamps in **TAI**, not UTC: capture stamp minus the IEX-TP send time was
+37.00-38.14 s on the checked slice, and TAI - UTC was 37 s
+(`docs/DATA_SOURCES.md`).
+
+**The design response.** `exchange_ts` comes from the messages' own UTC
+nanosecond timestamps, so the offset never touches the data, and
+`receive_ts` is not derived from the capture stamp. Where a clock does enter
+a model, it is named: `FillHazardModel(clock="America/New_York",
+capture_offset_s=IEX_TAI_OFFSET_S)` fits the time-of-day feature on the
+exchange clock, and `to_dict` records the clock (`"utc"` default, so
+v1.12 documents load unchanged). Review finding X-8 asked for exactly this.
+
+**The general lesson.** Time-of-day features are a silent source of error:
+a 37-second offset would not break a test yet would misplace any feature
+keyed to the clock, and a Nasdaq feed is local while the IEX capture clock
+is TAI.
+
+**What it is not.** Not a claim that the unchecked parts of the capture are
+clean; the check covered the first 250 MB of one TOPS file.
+
+**Check yourself.**
+
+1. Why take `exchange_ts` from the message, not the capture stamp? *(The
+   capture stamp is the recorder's clock and carries its offset and jitter;
+   the message stamp is the exchange's own.)*
+2. Why does the clock name go in `to_dict`? *(A model fitted on one clock and
+   loaded on another is wrong without any error; the name makes the
+   mismatch detectable.)*
+
+## 118. Process-and-delete: the data lifecycle on a small disk
+
+**The question.** One full-market day is 4-18 GB compressed and several
+times that after normalising. The machine has 16 GB of memory and little
+disk. How do you work with ten of them?
+
+**The design** (`python -m iap.marketdata process-day`, A2/A2b, runbook
+`docs/runbooks/RUNBOOK_process_and_delete.md`). One manifest day goes through
+a disk guard, an approved download, `ingest --slim`, deletion of raw, the
+Rust feature build, `KEEP.json` (sha256 of every kept file), then deletion
+of the intermediate files and the vendor file. Each step leaves a marker and
+resumes. **Nothing is deleted before the kept files verify.** The normaliser
+accepts `--partition-instruments N` so memory is one partition plus one
+event-time window, and the output is byte-identical (tested).
+
+**Honest sizing** (`docs/DATA_SOURCES.md`). The normalized JSONL twin was
+3x the bytes of the IAP1 file, so `--slim` omits it; the symbol-scaled
+estimate overstated a 100-name day many times (830 GB estimated against
+about 50 GB expected), so `--peak-gb` takes a measured value. The disk guard
+never deletes to make room: it refuses, and the first 100-name day was
+refused on those terms.
+
+**What is kept.** Features, manifests, the IAP1 file, Parquet and `KEEP.json`;
+what is deleted is regenerable.
+
+**What it is not.** Not a backup; no wall-clock figure for a completed 100-name
+day is committed yet.
+
+**Check yourself.**
+
+1. Why check the kept files' hashes before deleting? *(Deletion is
+   irreversible; a corrupt kept file would leave nothing to regenerate from.)*
+2. Why must the guard refuse rather than clean up? *(Deleting something to
+   make room is a decision about data it was not asked to judge.)*
+
+## 119. The approval rule for downloads
+
+**The question.** An agent or script can download in the background. What
+stops it from spending bandwidth, disk and legal goodwill without asking?
+
+**The rule** (`docs/DATA_SOURCES.md` section 3): nothing is downloaded by
+default. The IEX codec reads files; it fetches none. `process-day` downloads
+only with `--download --i-have-approval`, through `tools/r7_download.py`,
+which accepts only the hosts in `iap.marketdata.r7plan.ALLOWED_HOSTS`,
+checks the size and records the sha256. Each day is an owner decision
+recorded with its date: the 2019-01-30 full-market file for the universe
+measurement, the first 250 MB of a TOPS file for the conformance pass, and
+the A4 overlap days (`research/v117/iex_overlap_manifest.json`, the
+approval sentence recorded verbatim).
+
+**Listing is not downloading.** `tools/iex_hist.py recent --n 5` lists the
+latest HIST days; no approval sentence, no download, and
+`tools/iex_download.py` refuses a manifest without one.
+
+**Boundaries.** The holdout sessions are never inputs of the chain, and
+nothing outside a day's dataset directory and its vendor file is deleted.
+
+**Why it matters.** Approval is a control like the pre-registration: a human
+decision made before the action, written down, checked by code that refuses
+without it.
+
+**What it is not.** Not an access-control system; it constrains this
+repository's tools, not the machine.
+
+**Check yourself.**
+
+1. Why an allow-list of hosts as well as a flag? *(The flag records
+   consent; the allow-list limits where consent can be spent.)*
+2. Why keep the approval sentence verbatim? *(Later readers can see what
+   was approved, not a paraphrase of it.)*
+
+## 120. Spend governance: a budget the model cannot raise
+
+**The question.** An LLM agent pays per token. What keeps a loop from
+spending a month's allowance in an afternoon?
+
+**The ledger** (E1, `iap.llm.spend.SpendLedger`). An append-only,
+file-locked JSONL outside the repository (`IAP_LLM_SPEND_LEDGER`, else a
+per-user state directory), one row per API call with tokens, USD and
+month-to-date. Prices are configuration (`configs/reference/llm_prices.json`
+with `source` and `checked` date); `iap.llm.prices` refuses an unknown model
+and never guesses. A monthly cap of USD 30, a per-run budget of USD 1
+(`Budget.max_usd`), and an 80 % alert once a month. The call is refused
+*before* it is made, in every process, when month-to-date plus its maximum
+cost would pass the cap.
+
+**Model pins.** Dated per-role pins in `configs/agents/llm.json` (research
+`claude-sonnet-5-5`; ops, docs and evals `claude-haiku-5-5`), recorded in
+the session summary. The most expensive model is no longer the default.
+
+**Evidence.** `docs/AGENTS.md` records per-session costs (~USD 0.1-0.2 for
+a research session, ~USD 0.01 for a morning ops run). The first live
+evaluation (§99) used 0.76 USD of a 20 USD cap.
+
+**What it is not.** Not a guarantee against a key used elsewhere; it governs
+this repository's calls, and a corrupt row is skipped and counted, not
+trusted.
+
+**Check yourself.**
+
+1. Why refuse before the call instead of alerting after? *(After is too
+   late: the money is spent.)*
+2. Why is the ledger outside the repository? *(An agent that can edit the
+   repository must not be able to edit its own budget.)*
+
+## 121. A number must come from a tool result, not from the model
+
+**The question.** §37 said an LLM must never compute a number. What
+mechanism makes that more than a request?
+
+**The check.** `iap.llm.verify.verify_finding` accepts a finding, a
+pre-registration draft, a report draft or a closing text only if every
+number in it appears in the evidence of a cited artefact. The match is
+exact-decimal; a labelled statistic must match its field; number words are
+refused (a model cannot dodge the digit check by writing "ninety-five").
+`iap.llm.summary_check` (§99) applies the same rule to the closing summary.
+The morning ops narrative is checked against the alerts document, and a
+narrative that fails is replaced by a fallback written by code
+(`docs/AGENTS.md`, section 4).
+
+**Where the rule lives.** In the output path, not the prompt. The model may
+read, look up and draft; it gets a citation for a number the code computed.
+A verification failure of the closing text makes `python -m iap.agents
+research` exit 3: the drafts it wrote stand, the text does not.
+
+**Why free text is wrapped.** Tool results go through
+`iap.agents.untrusted`, which marks free text as data. Even so the controls
+that matter are structural (§99): the verifier and the missing tools hold
+whether or not the model obeys.
+
+**What it is not.** Not a guarantee the model *understood* a number; it
+guarantees the digits are the code's. A true number can still be cited for
+the wrong claim, which is why a human reads every draft.
+
+**Check yourself.**
+
+1. Why refuse number words? *(They bypass a digit comparison and carry the
+   same claim.)*
+2. Why a code-written fallback rather than a retry? *(A retry re-asks the
+   component that failed; the fallback is deterministic and cannot invent.)*
+
+## 122. The three v1.17 agents, and what each is allowed to write
+
+**The question.** §99 described an agent that proposes. v1.17 adds three
+more LLM-backed agents. What separates them?
+
+**The roster** (`docs/AGENTS.md`). The research assistant (E2, `python -m
+iap.agents research`, `claude-sonnet-5-5`) runs *in-sample* studies into a
+scratch store and drafts pre-registrations (`status DRAFT`, unsigned, in
+`research/preregs/drafts/`). The morning ops agent (E3, `python -m iap.agents
+ops`, `claude-haiku-5-5`) writes the narrative of an alerts document whose
+thresholds are rules in code over the paper-trade, drift and cost reports
+and the spend ledger. The docs-sync agent (E4, `python -m iap.agents
+docs-sync`, Haiku) proposes edits for a pull request as a patch file that is
+never applied. All run on `iap.llm.loop`, one budgeted, ledgered tool loop.
+
+**What distinguishes them is the write set.** The ops agent decides no alert;
+code does, and the model writes words. The docs agent edits no non-doc file
+and applies nothing. The research assistant refuses every dataset in
+`forbidden_datasets` and any name matching `*holdout*`, and every report says
+`confirmatory: false`. None can sign, register, approve or promote: no tool
+exists.
+
+**Evals.** `iap.agents.wse_evals` adds one eval per agent to `agent-evals`
+(run with the scripted client, no key), asserting for instance that the
+research assistant refuses a holdout run and a fabricated number and that
+the spend ledger holds one row per model call.
+
+**What it is not.** Not autonomous research. Each agent produces a draft or a
+patch or a document that a human reads.
+
+**Check yourself.**
+
+1. Why does a smaller model run the ops and docs agents? *(Their tasks are
+   narrow, checked by code and cheap; the research task is the one that
+   needs the larger model.)*
+2. Why is a patch file safer than an edit? *(It has to be applied by a
+   person, which is a review step the agent cannot skip.)*
+
+## 123. Documentation checks as a CI gate
+
+**The question.** Documentation rots. What keeps a repository with dozens of
+documents from linking to files that no longer exist?
+
+**The check.** `tests/harness/check_docs.py` verifies relative links, the
+diagram index, that every `iap.*` name in `API_*.md` resolves by import, and
+the freshness of status text against the last tag. It runs in the `docs` CI
+job (advisory, with a lychee external-link step configured in
+`lychee.toml`, which excludes the GitHub API and loopback and private
+hosts). The docs-sync agent (§122) proposes fixes in the same spirit.
+
+**The API-name check is the useful one.** A link checker finds a moved file;
+an import check finds an API document that names a function that was renamed.
+That is the failure readers actually hit. It is also why this document names
+only identifiers that exist: LEARN is held to the same check.
+
+**Advisory by design.** The job is not a required check, so an external
+site's outage cannot block a merge; the repository's required checks are
+listed in `docs/governance/GOVERNANCE.md`.
+
+**What it is not.** Not a proof that prose is true. A document can link
+correctly and still be wrong, which is what the headline-number checks and
+the truth pass (§139) are for.
+
+**Check yourself.**
+
+1. Why check names by import instead of by text search? *(A name can appear
+   in text after it stopped existing; an import fails.)*
+2. Why keep external links advisory? *(They fail for reasons the repository
+   does not control.)*
+
+## 124. Reproducible builds and SBOMs
+
+**The question.** If you ship a wheel and images, how does a user know the
+artefact came from the source they can read?
+
+**Reproducibility** (F1, the `reproducible-build` CI job). The wheel is built
+twice under `SOURCE_DATE_EPOCH` set to the commit date, and the two sha256
+values must match. The python image is built twice with BuildKit
+`rewrite-timestamp`, report-only. Same source, same bytes: any difference is
+an unpinned input.
+
+**SBOMs.** Every release attaches CycloneDX software bills of materials: one
+per image (syft, from the pushed image by digest, attested and pushed to GHCR
+beside the provenance) and one per hashed Python lock file (`cyclonedx-bom`,
+attested with the lock as subject), all uploaded as release assets
+(`sbom-image-{python,cpp,rust}.cdx.json`; `.github/workflows/release.yml`).
+
+**Digest pinning (F2).** `tools/release.py pin-digests` rewrites the k8s
+manifests to `name:vX.Y.Z@sha256:<digest>` from `release-manifest.json`
+(dry-run by default), so a tag cannot silently change what a deployment runs.
+
+**What it is not.** The SBOM lists components; it does not say they are free
+of vulnerabilities. And `reproducible-build` is not yet a required check: the
+owner must add it to the ruleset (`docs/governance/GOVERNANCE.md`, section 0).
+
+**Check yourself.**
+
+1. What does a mismatched hash on two builds of one commit tell you? *(An
+   input is not pinned: a timestamp, an unpinned dependency, a path.)*
+2. Why pin by digest and not by tag? *(A tag can be re-pointed; a digest
+   names the content.)*
+
+## 125. Ratchets: coverage floors and a growing mypy scope
+
+**The question.** How do you stop quality from slipping without demanding a
+perfect score today?
+
+**The idea.** A ratchet fixes a floor at the measured level and only moves it
+with evidence. The `python-slow` coverage floor is `--cov-fail-under=54`
+(`.github/workflows/ci.yml`). It began at 55 when measured at 55.90 % on the
+wave-2 integration PR, then moved to 54 when main measured 54.76 % after
+later merges: the changelog records both measurements and the reason, that
+the 55.90 % predated modules only the fast job covers. A floor taken from a
+measurement is honest; one typed in is a wish.
+
+**The type ratchet** (F3). The mypy scope (`python/pyproject.toml`
+`[tool.mypy]`) grew from core, orderbook, execution, backtest and features to
+also `agents`, `llm`, `mvp` and `paper`. 258 errors went to 0 with type-only
+changes, using `dataclass_transform` on `@contract` (which alone removed
+191 errors) and one `type: ignore[attr-defined]`, named and explained. Type
+fixes must not change behaviour, and the goldens prove they did not.
+
+**What it is not.** Coverage is not correctness, and mypy at zero errors is a
+bound on a class of mistakes, not a proof. A floor can also be lowered, so
+the changelog entry is part of the control.
+
+**Check yourself.**
+
+1. Why take a floor from a CI run rather than the laptop? *(The floor guards
+   the CI job; a different environment measures different code paths.)*
+2. Why is lowering a floor allowed here? *(Because the entry says why; the
+   control is the recorded reason, not the number.)*
+
+## 126. Latency budgets: a limit is a measurement times a margin
+
+**The question.** "Fast enough" needs a number. Whose, measured how?
+
+**The method** (F4/F5). `iap.mvp.latency.measure_loop_latency` times the
+Python MVP loop per event on a committed real slice (§127).
+`benchmarks/latency_budget.json` stores the measurement with its provenance
+(run id, CPU model, Python version, runner) and the limit:
+`limit = measured x margin`, rounded up, with margin 4. The CI-measured p50
+is 116,659 ns and p99 1,794,957 ns over 65,132 events; the limits are p50
+500,000 ns and p99 8,000,000 ns. `tests/harness/check_mvp_latency_budget.py`
+is blocking in the `python` job. Only p50 and p99 are guarded, never p99.9
+or the max, because a shared runner produces outlier spikes unrelated to the
+code. The same file records a local laptop at p50 255 µs, p99 3.8 ms.
+
+**Why 4x.** A shared runner's noise is large; a tight bound would fail on
+weather. The budget catches an order-of-magnitude regression (a quadratic
+loop), not drift. Memory (§127) uses 2x and the same rule.
+
+**Why a real slice.** Synthetic data has a book that is shallow and regular.
+A budget measured on it would pass code that is slow on a real book's depth
+and message mix.
+
+**What it is not.** Not a claim about production latency: the budget is for
+the Python reference loop in CI, and tick-to-trade for the C++ and Rust
+engines is §41.
+
+**Check yourself.**
+
+1. Why not guard the max? *(One preempted run sets it; the guard would
+   fail for reasons that say nothing about the code.)*
+2. What does the margin trade? *(False alarms against sensitivity: 4x
+   catches large regressions and ignores noise.)*
+
+## 127. A real slice committed to the repository
+
+**The question.** Real data is too large to commit. How do tests and
+budgets still touch it?
+
+**The slice** (`benchmarks/slices/itch50_20190130_AAPL`,
+`tools/extract_real_slice.py`). Nasdaq ITCH 5.0 AAPL, 2019-01-30 from the
+09:30 open: 1,132 book-reconstruction adds plus 64,000 real events, 4.69 MB,
+with the book reaching about 2,700 price levels per side. It is a
+self-contained ingested dataset, with provenance in `SLICE.md` and
+`dataset.json` (`docs/governance/REPRODUCIBILITY.md` section 3.5).
+
+**What it buys.** `bench_tick_to_trade` replays it as a third workload (the
+`t2t realslice p50/p99` guard rows). `check_slice_memory.py` guards peak RSS
+of the normaliser and the feature build against `benchmarks/memory_budget.json`
+(CI-measured 194 MB and 173 MB, limits 2x). And it exposed a defect: with 12
+parents on the slice, the passive working list made `ExecutionReplay` cost
+239 µs per event; open-count tracking and amortised compaction brought it to
+59 µs per event, with the goldens unchanged.
+
+**Why it is valuable.** Quadratic behaviour hides on a small synthetic book
+and shows on a real one. A committed slice makes that a CI-visible fact.
+
+**What it is not.** One name, one day, one open: a performance workload, not
+research data.
+
+**Check yourself.**
+
+1. What did the slice reveal that synthetic data did not? *(A list that grew
+   with the book depth: cost per event scaled with it.)*
+2. Why must outputs stay unchanged after the speedup? *(A performance
+   fix that changes results is a behaviour change; the goldens prove it is not.)*
+
+## 128. Share-normalised features and the per-session ADV
+
+**The question.** Volume 10,000 shares means different things for QQQ and a
+small stock. How do you compare?
+
+**The family** (A5, D-P1-5). `iap.features.feature_v2` adds `sharenorm`: 14
+`_v2` features dividing volumes and depths by the instrument's session ADV
+(`iap.reference.session_adv.SessionAdvTable`, the dataset's
+`adv_by_session`) and by the running session volume. Examples:
+`session_volume_adv_v2`, `traded_volume_adv_w<w>_v2`, `depth_l10_adv_v2`.
+Windows are 1, 5 and 15 minutes.
+
+**The as-of rule.** The ADV for a session is the mean of the dataset's
+*earlier* sessions (the first session uses its own volume), keyed by the
+session date in the calendar's zone. A table that used the same day's volume
+would put the day's total in every early feature: a look-ahead through the
+normaliser.
+
+**Execution uses it too (X-9).** `ExecConfig.adv_by_session` /
+`load_exec_config(adv_table=)` make the impact rules divide by the ADV of the
+fill's session; the default is the static ADV, byte-identical, and
+`expected_replay_fills.json` is unchanged.
+
+**What it is not.** Python reference only, pending the C++ and Rust ports
+(F7/F8, `PLATFORM_CONVENTIONS.md` section 11.7); the registered feature vectors,
+their goldens and the pre-registration fingerprints are untouched.
+
+**Check yourself.**
+
+1. Why is "ADV known" a validity condition for each feature? *(Without an
+   ADV the ratio is undefined, and a missing value is better than a wrong one.)*
+2. Why two normalisers, ADV and running session volume? *(ADV compares
+   across names; session volume compares within a day to how active it is.)*
+
+## 129. TRADE_BUST: a correction that must not move registered vectors
+
+**The question.** An exchange breaks a trade after the fact. A feed has
+already shown it. What happens to your features?
+
+**The event.** `TRADE_BUST = 10` (`schemas/FORMAT.md` section 4) is the
+canonical kind for ITCH `B` broken trades and IEX trade breaks. The mapper
+emits it, the normaliser carries it into the IAP1 file, the JSONL twin and
+Parquet.
+
+**The invariant.** Every book (Python, Rust, C++) applies it as a no-op, and
+the feature engines skip it before the book, so the registered feature
+vectors are byte-identical with or without busts. Only the opt-in
+`sharenorm` volumes react: from the bust's time forward the print is removed
+from every window it is still in and from the session volume; emissions
+before the bust stay what they were, because the print was on the tape then.
+A bust naming a print the extension never recorded is counted
+(`busts_unmatched`) and changes nothing.
+
+**Why a no-op.** Registered features and goldens are fingerprinted; changing
+them would change every pre-registration. A correction that matters can go
+only where it is opt-in.
+
+**Test discipline.** The anomaly fixture's two deliberately unknown events
+moved to code 250 so the new meaning of code 10 did not collide with them;
+expected states and checkpoints are unchanged.
+
+**What it is not.** Not a claim that busts do not matter; only that the
+registered path does not read them.
+
+**Check yourself.**
+
+1. Why leave earlier emissions unchanged after a bust? *(That is what a
+   trader had at the time; restating history is a look-ahead.)*
+2. Why count unmatched busts? *(A silent skip hides a mapping bug.)*
+
+## 130. Day-clustered standard errors, in the v1.17 gate form
+
+**The question.** §32 and §67 argued for day-clustered t statistics. How do
+v1.17's new reports use them?
+
+**The form.** One function shape everywhere: the cluster-robust (CR1)
+sandwich with one cluster per trading day,
+`G/(G-1) * sum_g (sum_{i in g} (x_i - mean))^2 / N^2`, and Student-t
+inference with `G - 1` degrees of freedom through
+`iap.validation.metrics.day_cluster_inference`. It appears in
+`iap.tca.markout_decomposition.cluster_mean` (B6), in the execution
+benchmark's cell statistics and paired differences (B1), in
+`gate_statistics` (§115), in `coverage_by_regime` (§131), and in the breadth
+report (mean rank IC with t 2.73, df 6 on seven sessions).
+
+**Why the pattern.** Fills, parents and rebalances inside a day share a
+market and a volatility regime; treating them as independent understates the
+standard error, sometimes badly. Counting days gives the honest sample size.
+
+**The edge cases.** With one cluster the SE is `None`, not zero. With
+fewer than two clusters `t`, `df` and the interval are `None`. Cells with
+fewer than 10 sessions are marked low-power in the benchmark.
+
+**What it is not.** Not a cure for few clusters: with 7 days, df is 6 and
+the critical value is large, which is correct. It prevents false precision;
+it does not create power.
+
+**Check yourself.**
+
+1. Why Student-t with `G - 1` df and not the normal? *(With few clusters the
+   SE itself is estimated from few numbers; the t has heavier tails.)*
+2. Why report `None` rather than a point estimate of the SE for one day?
+   *(One day has no dispersion across days; any number would be invented.)*
+
+## 131. Conformal sizing: width as confidence
+
+**The question.** §95 introduced conformal intervals. v1.17 wires them into
+position size. What does "size by interval width" mean and what is checked?
+
+**The rule** (D3). `iap.models.conformal.conformal_sizing_hook` is a
+`SizingHook` for `Backtester(sizing_hook=)`: the split-conformal interval over
+the primary signal's residuals gives a width, and
+`confidence_from_width(width, ref_width)` maps it to a multiplier in [0, 1]
+applied at the decision row (`SignalRow`,
+`InstrumentResult.sizing_multipliers`). A narrow interval means the model has
+been accurate lately and size stays near full; a wide one scales down. The MVP
+engine takes the same rule through an optional `portfolio.conformal` block
+(`ConformalSpec`), absent from every pinned config, so the golden run is
+byte-identical.
+
+**The check.** `coverage_by_regime` reports the empirical coverage per regime
+against nominal with the day-clustered t of the shortfall (§130). It is
+reported, not enforced (`passed: None`). Intraday residuals are not
+exchangeable (volatility clusters, open and close differ), which is why the
+module also provides `AdaptiveConformal` (Gibbs and Candes).
+
+**What it is not.** Not a source of edge: it changes size, not direction, and
+a finite-sample coverage guarantee holds only if calibration and test scores
+are exchangeable, which a coverage report tests rather than assumes.
+
+**Check yourself.**
+
+1. Why per-regime coverage? *(Pooled coverage can be nominal while one regime
+   is badly under-covered.)*
+2. Why is the conformal rule absent from the pinned MVP config? *(Turning it
+   on changes sizes and so the goldens in every language.)*
+
+## 132. Meta-labelling: choose the threshold on rows nobody fitted
+
+**The question.** §7 gated a primary signal with a calibrated probability and
+a threshold `best_tau`. Where does the threshold come from?
+
+**The flaw (review R-5).** In the three-way split, `best_tau` was chosen on
+the *calibration* segment, the same rows the calibrator was fitted on. The
+probability it swept was therefore optimistic, and the threshold tuned to that
+optimism. Picking a parameter on the data used to fit a component upstream of
+it is a leak even if each step looks careful.
+
+**The fix** (D2). `run_meta_labeling(split_mode="calibrate_select")` splits
+the out-of-sample region 40/20/20/20 into meta-train, calibration, select and
+test. The calibrator is fitted on *calibrate*, `best_tau` is chosen on
+*select*, and both taus are read on *test*. Boundaries are purged and
+embargoed. `primary_selection_window` purges the primary signal's own
+selection fold from the calibration fold, and the result records the split,
+the windows and the purge count. `"legacy"` is the default and reproduces
+every stored result.
+
+**The ledger.** The `metalabel_tau` look records `split_mode` and
+`primary_selection_window`, so the number states which procedure produced it.
+
+**What it is not.** Not evidence that meta-labelling adds value; it makes
+the threshold honest. Whether a gate helps is a separate question for the test
+segment.
+
+**Check yourself.**
+
+1. Why can the calibrator not also choose the threshold? *(It has seen those
+   rows; the calibrated probability is too good on them, so the best threshold
+   on them is biased.)*
+2. Why purge the primary's selection fold from calibration? *(The primary was
+   chosen on those rows; calibrating on them stacks a second dependence.)*
+
+## 133. Regime conditioning: one beta, or one per regime?
+
+**The question.** A signal may work in quiet markets and not in volatile
+ones. Can a model say so, and can a gate check it?
+
+**The model** (C5). `iap.alpha.regime_conditioned.RegimeConditionedAlpha`
+(id `<member>_rc`) wraps a registered linear alpha and conditions its scaling
+on the row's regime flags (default `vol_regime_flag_v1`). In `per_regime` mode
+`er = beta_r * z` with `beta_r` the OLS slope over that regime's training rows
+(`min_obs` pairs, else the pooled slope); an unknown regime (NaN flag) scores
+at the pooled slope. The wrapper inherits the member's standardisation and leaves its class,
+fit and params untouched. Until v1.17 the research reports split the IC by
+regime (`iap.validation.stress.regime_split`) but no model read the flags.
+
+**The gate** (`iap.validation.regime_gate`). `regime_gate_statistics` computes
+the same `gate_statistics` block (§115) per regime; a regime with fewer than
+`min_pairs` finite pairs is reported but not judged. `regime_gate` decides.
+Nothing calls it by default, and `validate_alpha` does not.
+
+**The multiple-testing cost.** Splitting by regime multiplies the number of
+looks. A regime that "works" among several is exactly the pattern §24 warns
+about, so a regime-conditioned result needs its looks counted.
+
+**What it is not.** Not a result: no study has run (`docs/research/
+V117_WSC_MODELS.md`).
+
+**Check yourself.**
+
+1. Why fall back to the pooled slope for a thin regime? *(A slope from a few
+   rows is noise; the pooled slope is the stable estimate.)*
+2. Why report a thin regime but not judge it? *(Hiding it hides a gap in
+   coverage; judging it overstates what the data supports.)*
+
+## 134. Long horizons: features and labels, truncated at the close
+
+**The question.** The registered labels use a fixed set of horizons
+(`HORIZONS_NS`). Can the platform study 15 m, 30 m and
+1 h targets without touching them?
+
+**The pair** (C4). `iap.features.feature_v2.FeatureV2Extension` adds the
+`longwin` family: 12 features at 15 m, 30 m and 1 h on a running engine, with
+its own registry hash. Windows reset per session-local day and on recovery,
+because a window must never span a session. `iap.labels.labels_v2.
+compute_labels_v2` produces 15 m, 30 m and 1 h labels **truncated at the
+session close and flagged** (`AFTER_CLOSE`). Goldens
+`tests/golden/expected_features_v2.json` and `expected_labels_v2.json` are new;
+no earlier golden moved.
+
+**Why truncation, not extrapolation.** An hour-ahead label at 15:30 has no
+mid an hour later in the same session. Reading the next day's open would turn
+an overnight gap into a signal. The label is cut at the close and flagged, so
+a study can drop or weight it.
+
+**Why a new module.** The registered families, `WINDOW_NS`, the registry hash
+(`585dd7b9...`) and the fingerprinted alpha modules are unchanged; adding new
+horizons by edit would invalidate pre-registrations.
+
+**What it is not.** Opt-in: the store CLI does not write them yet, and no
+study has run.
+
+**Check yourself.**
+
+1. Why does a long window need a per-day reset? *(A window spanning the
+   close would mix last evening's market with this morning's.)*
+2. Why does a flagged, truncated label beat a missing one? *(It keeps the
+   rows but lets the analysis choose how to treat them.)*
+
+## 135. linear_z_v2: standardise each instrument against itself
+
+**The question.** Which instrument's volatility sets "a strong signal"?
+
+**The problem (R-7).** `linear_z_v1` pools `mu` and `sigma` of the raw signal
+across the universe. On a real multi-name dataset the most active name sets
+both: QQQ sets every z and the confidence eligibility of the others. A quiet
+name never reaches `|z| >= conf_min` and a loud one is always "confident".
+
+**The fix** (C3). `iap.alpha.linear_v2` (model `linear_z_v2`, twins
+`EQ01_z2 ... FX12_z2`) standardises each instrument against its own causal
+history: a rolling mean and standard deviation over a declared window
+(default 30 m, 32 observations minimum), reading only rows at or before `t`.
+A truncation probe test shows a row's z is bit-identical whether or not later
+rows exist. The slope `beta` is pooled across the universe, because once every
+instrument is on its own scale the slope is what is comparable.
+
+**The combiner (R-8).** `ridge` and `shrinkage_mv` now solve on
+pairwise-complete moments (a no-opinion row no longer enters `Z'Z/n` as 0), the
+ridge search re-standardises inside each forward-chained split, and a new
+`decay_aware` method weights by IC times a survival ratio at the combination
+horizon. A new combination run writes `stacking: "v1.17"` into its ledger
+identity; older identities reproduce byte for byte.
+
+**What it is not.** A draft, not a result:
+`research/preregs/linear_z_v2_prereg_DRAFT.json` is unsigned and no
+`linear_z_v2` study has run. `COMBINATION.json` is still the pre-v1.17 run.
+
+**Check yourself.**
+
+1. Why a window and not the whole sample? *(A whole-sample mean uses the
+   future; a causal window uses only what was known.)*
+2. Why does a no-opinion row entering as 0 bias the moments? *(It adds a
+   fake observation of zero, pulling covariances toward it.)*
+
+## 136. ML looks are looks
+
+**The question.** §100 put a GBM on the alpha bench. But the ML pipeline
+itself makes choices: which model, which gate, which threshold. Do those
+count?
+
+**The finding (R-4).** The multiple-testing ledger counted alpha looks, but
+the ML report's decisions were free: the model-zoo gate pass, the `best_tau`
+choice, the primary-model choice and a shadow promotion. Each is a selection
+among alternatives with a data-dependent outcome. v1.17 records them, opt-in:
+`run_model_comparison(ledger=)` writes kind `model_zoo_gate`,
+`run_meta_labeling(ledger=)` writes `metalabel_tau`,
+`research/ml_reports/run_ml.py` writes `primary_model_choice` and
+`promotion_decision(ledger=)` writes `shadow_promotion`, all dataset-scoped in
+`research/experiments.json` beside the model ledger's per-fit counter.
+
+**The shadow comparison.** `ShadowRunner.compare(ts=)` adds a paired
+day-block bootstrap of the candidate-minus-champion IC
+(`iap.validation.metrics.paired_day_block_bootstrap`). When it ran,
+`candidate_better` also needs its 5th percentile above 0, not just a higher
+mean.
+
+**Why it matters.** The ledger threshold (§68) rises with the count of
+looks. A model-selection step that is not counted lets the bar stand where it
+was while the candidate set grows.
+
+**What it is not.** Opt-in (`ledger=None` or no `ts` keeps the v1.16
+behaviour); the regenerated ML report is what records the new looks.
+
+**Check yourself.**
+
+1. Why must a gate decision be a look? *(Its outcome depends on the data, and
+   the result you carry forward depends on the outcome.)*
+2. Why a 5th-percentile condition? *(A higher mean on a few days can be
+   chance; a bootstrap lower bound above 0 asks for more.)*
+
+## 137. Opt-in, and byte-identical when off
+
+**The question.** v1.17 added dozens of mechanisms. How do you add them
+without changing what was already established?
+
+**The discipline.** Each piece is switched on explicitly and, off, reproduces
+the old output byte for byte. Examples named in the changelog: B2 to B6 leave
+every execution golden and the X4 fingerprint unchanged; `drift=0.0` in
+`ac_holdings` is the v1.10 trajectory; `split_mode="legacy"` and
+`gate="literal"` remain the defaults; `ledger=None` keeps the v1.16 ML
+behaviour; a `portfolio.conformal` block absent from every pinned config keeps
+the MVP golden; `TRADE_BUST` is a no-op in the registered path.
+
+**What it protects.** Goldens (§12), pre-registration fingerprints (§74) and
+published numbers. A default that moves is a retroactive change to a result
+someone cited. When a change must alter a default, it is its own decision
+(§114, the `stats_revision` tag).
+
+**The tests.** Typical ones assert a golden unchanged or that an off option
+reproduces a stored result. Each also shows the on-path does something: tests
+show every v3 key changes at least one simulator fill or config.
+
+**The cost.** More code paths, more flags (the benchmark driver has a dozen).
+The cost is paid so that "no registered result changes" can be a sentence
+rather than a hope.
+
+**What it is not.** Not a reason for a feature never to become a default; the
+owner can flip one deliberately and regenerate (§139).
+
+**Check yourself.**
+
+1. Why test that the on-path changes something? *(A flag that does nothing
+   passes the byte-identical-off test trivially.)*
+2. Why keep legacy names for old rules? *(So an old number can be
+   reproduced and compared with a new one.)*
+
+## 138. One entry point for realism, and a label for what a cost is
+
+**The question.** The simulator has more than a dozen realism options
+(§58-§61). How do you know a prereg key actually reached the simulator?
+
+**The finding (X-2).** Some keys were silently shadowed: a calibration's
+per-venue latency was read in place of the prereg venue latency.
+`iap.execution.realism.apply(prereg, exec_config, calibration=, impact=,
+maker_config=, quoting_config=)` is now the one entry point; it returns an
+`AppliedRealism` with configs, grids, keyword arguments and an `applied`
+statement per prereg key, and puts the prereg latency table on every venue of
+the calibration. The MVP loop uses it (`MvpEngine.realism_applied`). Tests
+show every v3 key changes at least one fill or config.
+
+**A semantic fix.** The prereg `venue_latency.mean_ns` is now the *mean* of
+the simulator's `base + U[0, jitter]` draw (`simulator_latency_base_ns`); it
+had been the minimum. Ingested real datasets receive the assumed latency of
+`configs/reference/venue_latency.json` instead of 0 / 0.
+
+**What a cost is called (X-3).** The residual impact fit records its support
+(`support_pct_adv`, the %ADV range of its sweeps). A parent beyond it is
+flagged (`impact_beyond_support`) and `ExecConfig.impact_label()` names the
+cost "replay + fitted adder (rule 6b, ...)", not a measurement. VWAP slices
+also follow the forecast volume curve over the parent window (X-1,
+`curve_slice_weights(curve, n, start_frac, end_frac)`), with the
+whole-session resampling still the default.
+
+**What it is not.** Not more realism: it is evidence that the realism asked
+for is the realism applied.
+
+**Check yourself.**
+
+1. Why must the mean of a draw be what the prereg states? *(A prereg
+   "mean 1 ms" that the simulator reads as the minimum is a different
+   experiment.)*
+2. Why label a cost outside the fit's support? *(A fit extrapolated beyond
+   its data is an assumption, and the label says so.)*
+
+## 139. Release, regenerate, and retiring a language
+
+**The question.** What does it take to turn a pile of merged work into a
+release you can trust, and what do you remove?
+
+**Retire.** Java left the release in v1.17 (decision N7, closed 2026-10-15):
+`archive/java/` holds the code frozen at v1.14.0, unbuilt, and its risk engine
+is kept only as the byte-identical mirror of the Rust one. Its operational
+role passed to `iap.metrics` (`python -m iap.metrics serve`): a stdlib
+Prometheus exposition on :8080 with `/metrics`, `/health`, `/ready` and
+`/status`, 30 metric families kept live and 16 Java-only names exposed as
+`<name>_available 0` (`python -m iap.metrics names`). The alerts and panels
+built only on Java metrics were removed and listed. Three images, not four.
+
+**Pin.** `tools/release.py publish` pins the k8s manifests by digest (§124).
+It also blocks on an `## Unreleased (vX.Y)` heading not yet renamed.
+
+**Regenerate.** Research outputs depend on rules: the statistics revision
+(§114) means `v2`/`v3`/`v4` reports must be regenerated, and they are
+regenerated by a CI job under rules the owner flips deliberately, not by a
+laptop. The changelog marks which outputs follow it ("CI regenerate").
+
+**The truth pass.** `docs/EXECUTION_QUALITY.md`, `docs/PORTFOLIO_BREADTH.md`
+and `docs/SIGNAL_RESEARCH.md` reserve headings as placeholders for a final
+pass that replaces each with what is true at the tag. A document written
+before its results exist says so, and the pass replaces it.
+
+**What it is not.** Not done: the v1.17 headings above are written before the
+tag, and the standing conclusions (no promoted alpha, no tradable edge) are
+unchanged.
+
+**Check yourself.**
+
+1. Why keep a retired port's risk engine? *(It is a byte-identical mirror of
+   the Rust one, a second implementation for checking.)*
+2. Why regenerate in CI and not locally? *(A number that every reader can
+   reproduce from the repository's own pipeline is the only kind that
+   counts.)*
+
+<!-- G5 placeholders: B10 dark model; C6 screen; F7 C++ ports; B9/F8 Rust -->
+
+## 140. Further reading
 
 Inside this repository, in suggested order:
 
@@ -6799,7 +8217,9 @@ elsewhere, the entry gives the local one.
 | CANDIDATE | the second lifecycle state: the alpha passed the research checks it can pass on bundled data. Not promoted |
 | coalescing | treating all events of one instrument with the same `exchange_ts` as one state change (v1.14) |
 | decision trace | one `DecisionTrace` record per trading decision, from signal to TCA, written as canonical JSONL with a stream digest |
+| effective bets | the number of independent bets a book makes, computed from the correlation of its names' returns (`iap.combine.weights.effective_bets`). The multi7 book has 1.46 of 3 (§109) |
 | embargo | rows removed after a test fold so that labels overlapping the fold cannot leak into training |
+| fade (quote fade) | pulling a resting child when the signal turns adverse or the opposite side's L1 share is heavy (`iap.execution.fading.FadeParams`, v1.17). Priced by the fades-saved-vs-fills-missed counterfactual (§104) |
 | fail-closed | on missing, NaN or out-of-range input, the risk engine rejects rather than allows |
 | FROZEN copy | a duplicated implementation kept for parity and changed only with a `POLYGLOT-OVERRIDE` line ([docs/POLYGLOT.md](docs/POLYGLOT.md)) |
 | gate | a pass/fail check in the promotion report (significance, stability, cost, leakage, ...). An alpha is promoted only if every gate passes |
@@ -6809,6 +8229,7 @@ elsewhere, the entry gives the local one.
 | IC | information coefficient: the rank correlation between a signal and the next-horizon return |
 | ledger (look ledger) | `research/experiments.json`: every statistic the research has computed, counted as looks. A hash chain since v1.14 |
 | look | one statistic computed and seen. Since v1.14 one look per gate decision |
+| implementation shortfall | the gap between a paper portfolio at the arrival price and the real one: spread, fees, impact and the cost of what did not fill (§101) |
 | markout | the mid some time after a fill, relative to the fill, as a measure of execution quality |
 | OFI | order-flow imbalance: signed changes in best bid and ask size (Cont, Kukanov and Stoikov) |
 | PBO | probability of backtest overfitting, from combinatorially symmetric cross-validation |
@@ -6816,7 +8237,10 @@ elsewhere, the entry gives the local one.
 | PROMOTE | the verdict that an alpha passed every gate. No alpha has received it |
 | queue position (`ahead_qty`) | the displayed size ahead of a resting simulated order at its price level; cancels and, since v1.14, size-reducing MODIFYs ahead of it reduce it |
 | row block | which feature rows the backtest is not allowed to trade on. Since v1.14 `causal`: decided from decision-time state only |
-| stats revision | the tag (`v1.14`) on a ledger identity, so that a rerun under new rules is a new look |
+| sharenorm | the v1.17 feature family dividing volumes and depths by the session ADV (as of the session, from earlier sessions) or the running session volume (§128) |
+| stats revision | the tag on a ledger identity (`v1.14`, now `v1.17`; `iap.validation.methods.STATS_REVISION`), so that a rerun under new rules is a new look |
 | time-shift leakage test | v1.14 check: pair each label with the score from a quarter-horizon earlier. A causal signal keeps most of its IC; one that collapses is suspected of look-ahead and flagged for review. Too few pairs reports `null`, never a pass. In the #88 regeneration FX11 failed it (IC 0.108 to 0.027); the review has not found a leak |
+| TOPS | IEX's top-of-book feed; the oracle a DEEP+ book reconstruction must reproduce (§116) |
 | touch order | a resting simulated order at the best price, the unit of a v1.14 per-order markout |
+| TRADE_BUST | canonical event kind 10, a broken trade; a no-op for every book and registered feature, removed from the opt-in `sharenorm` volumes (§129) |
 | trust root | a maintainer key in `research/agents/trust_roots.json`, read from `main`, that must sign the agent key registry |

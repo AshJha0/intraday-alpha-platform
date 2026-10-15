@@ -38,25 +38,27 @@ restart budget. Transitions are appended to `watchdog_log`.
 
 ## Running
 
-```
+```powershell
 python tools\jobs\watchdog.py --registry data\real\jobs.json --once --dry-run   # look only
 python tools\jobs\watchdog.py --registry data\real\jobs.json --once
 python tools\jobs\watchdog.py --registry data\real\jobs.json --loop --interval 600
-tools\jobs\run_watchdog.cmd [registry]                                         # one tick
+.\tools\jobs\run_watchdog.cmd [registry]                                       # one tick
 ```
 
 ## Enabling it with Task Scheduler (owner does this; nothing registers it automatically)
 
 Every 10 minutes, as the logged-in user (needed for toasts), only while logged on:
 
+```powershell
+schtasks /Create /TN "IAP Job Watchdog" /SC MINUTE /MO 10 /IT /TR "C:\Work\Claude\intraday-alpha-platform\intraday-alpha-platform\tools\jobs\run_watchdog.cmd"
 ```
-schtasks /Create /TN "IAP Job Watchdog" /SC MINUTE /MO 10 /IT ^
-  /TR "\"C:\Work\Claude\intraday-alpha-platform\intraday-alpha-platform\tools\jobs\run_watchdog.cmd\""
-```
+
+(One line, no inner quotes: the path has no spaces. The cmd-style `^` continuation and the
+`\"` escapes do not work in PowerShell.)
 
 Check / run now / disable / remove:
 
-```
+```powershell
 schtasks /Query /TN "IAP Job Watchdog" /V /FO LIST
 schtasks /Run /TN "IAP Job Watchdog"
 schtasks /Change /TN "IAP Job Watchdog" /DISABLE

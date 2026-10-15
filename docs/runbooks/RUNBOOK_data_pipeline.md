@@ -7,6 +7,14 @@ qc_report.json}`.
 **Owner:** market-data. **Related alerts:** `SequenceGapDetected`, `BookStale`, `StaleFeed`,
 `FeedWallClockStall`, `TargetDown`.
 
+> **Shells.** Blocks tagged `bash` run in bash (Linux, the containers, Git Bash on Windows).
+> The owner's Windows machine uses PowerShell: each `PYTHONPATH=src python3 ...` has a
+> `powershell` variant below it (`$env:PYTHONPATH = "src"; python ...`; `python3` is `python`;
+> set the variable once per window; `a && b` is `a; if ($?) { b }`). `bash tests/harness/...`
+> and `bash build.sh` need Git Bash or WSL on PATH; `kubectl`, `docker` and `curl` lines
+> are for the cluster/containers and are the same in PowerShell except for the text filters,
+> which are given in PowerShell where the owner would run them locally.
+
 ## 1. Normal operation
 
 Local / on-demand run (deterministic — same seed ⇒ bit-identical files):
@@ -19,6 +27,13 @@ PYTHONPATH=src python3 -m iap.marketdata --seed 42  # explicit seed override
 PYTHONPATH=src python3 -m iap.marketdata --configs-dir ../configs --out ../data
 ```
 
+```powershell
+Set-Location python; $env:PYTHONPATH = "src"
+python -m iap.marketdata                  # uses configs/marketdata/generator.json (seed 20260829)
+python -m iap.marketdata --seed 42
+python -m iap.marketdata --configs-dir ../configs --out ../data
+```
+
 Container / scheduled:
 
 ```bash
@@ -29,6 +44,7 @@ docker compose -f deployment/docker/docker-compose.yml up data-generator
 kubectl -n intraday-alpha get cronjob data-pipeline
 kubectl -n intraday-alpha create job --from=cronjob/data-pipeline data-pipeline-manual-$(date +%s)   # ad-hoc run
 kubectl -n intraday-alpha logs job/<job-name>
+# PowerShell: the ad-hoc job name is "data-pipeline-manual-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
 ```
 
 ## 2. Verify a run succeeded
@@ -36,6 +52,11 @@ kubectl -n intraday-alpha logs job/<job-name>
 ```bash
 ls data/raw data/normalized
 python3 -m json.tool data/normalized/qc_report.json | head -40
+```
+
+```powershell
+Get-ChildItem data/raw, data/normalized
+python -m json.tool data/normalized/qc_report.json | Select-Object -First 40
 ```
 
 Expect in `qc_report.json`: per-stream event counts, and gap/duplicate/
@@ -54,10 +75,19 @@ cd python && PYTHONPATH=src python3 -c "from iap.experiment.tracker import data_
 # 116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573   (committed config, v1.4.0)
 ```
 
+```powershell
+Set-Location python; $env:PYTHONPATH = "src"
+python -c "from iap.experiment.tracker import data_version; print(data_version())"
+```
+
 Cross-check determinism after any pipeline code change:
 
 ```bash
 cd python && PYTHONPATH=src python3 -m pytest -q tests/test_generator.py tests/test_normalize.py
+```
+
+```powershell
+Set-Location python; $env:PYTHONPATH = "src"; python -m pytest -q tests/test_generator.py tests/test_normalize.py
 ```
 
 ## 3. Failure modes
