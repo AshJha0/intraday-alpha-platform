@@ -31,6 +31,7 @@ from iap.features.engine import FeatureVector
 
 if TYPE_CHECKING:
     from iap.mvp.adapters import SimulatorAdapter
+    from iap.mvp.config import MvpConfig
     from iap.mvp.orders import _LiveParent
 
 BAR_NS = 60_000_000_000
@@ -43,6 +44,7 @@ class SizingMixin:
     if TYPE_CHECKING:
         # The engine attributes this mixin touches, declared for the type
         # checker only (F3); MvpEngine.__init__ assigns them.
+        cfg: MvpConfig
         sim: SimulatorAdapter
         _mid_index: int
         _current_bar: int | None
@@ -105,7 +107,7 @@ class SizingMixin:
             return
         self._conformal.update(bar_return, self._conformal_pending)
         self._conformal_pending = None
-        self.conformal_sizing["updates"] = int(self.conformal_sizing["updates"]) + 1
+        self.conformal_sizing["updates"] = int(self.conformal_sizing["updates"] or 0) + 1
 
     def _conformal_scale(self, target_qty: int, expected_return: float) -> int:
         """The portfolio target scaled by the conformal confidence (identity
@@ -115,7 +117,9 @@ class SizingMixin:
         spec = self.cfg.portfolio.conformal
         assert spec is not None
         self._conformal_observe(expected_return)
-        self.conformal_sizing["decisions_seen"] = int(self.conformal_sizing["decisions_seen"]) + 1
+        self.conformal_sizing["decisions_seen"] = (
+            int(self.conformal_sizing["decisions_seen"] or 0) + 1
+        )
         scores = self._conformal._scores
         if len(scores) < spec.warmup or target_qty == 0:
             return target_qty
@@ -132,11 +136,11 @@ class SizingMixin:
         sized = conformal_size(target_qty, conf, self.cfg.portfolio.max_position_qty)
         if sized != target_qty:
             self.conformal_sizing["decisions_scaled"] = (
-                int(self.conformal_sizing["decisions_scaled"]) + 1
+                int(self.conformal_sizing["decisions_scaled"] or 0) + 1
             )
-            self.conformal_sizing["qty_removed"] = int(self.conformal_sizing["qty_removed"]) + abs(
-                target_qty - sized
-            )
+            self.conformal_sizing["qty_removed"] = int(
+                self.conformal_sizing["qty_removed"] or 0
+            ) + abs(target_qty - sized)
         prev = self.conformal_sizing["min_multiplier"]
         self.conformal_sizing["min_multiplier"] = conf if prev is None else min(float(prev), conf)
         return sized
