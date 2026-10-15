@@ -317,6 +317,10 @@ figure in this README from the artefact that produces it.
 | [deployment/grafana/README.md](deployment/grafana/README.md) | dashboards and observability stack (incl. the trace metrics) |
 | [python/src/iap/README.md](python/src/iap/README.md) | the Python package map, module by module |
 | [docs/SHOWCASE.md](docs/SHOWCASE.md) | the three-minute read for a newcomer: what is proven, what is not, the re-derived numbers, one diagram, a ten-minute quick start |
+| [docs/EXECUTION_QUALITY.md](docs/EXECUTION_QUALITY.md) | v1.17 execution quality: the implementation-shortfall benchmark and its depth-cap finding, signal-aware urgency and pacing, the realism layer |
+| [docs/PORTFOLIO_BREADTH.md](docs/PORTFOLIO_BREADTH.md) | v1.17 breadth: the universe rule, the cross-sectional book through the optimiser, the breadth report and the breadth holdout rule |
+| [docs/SIGNAL_RESEARCH.md](docs/SIGNAL_RESEARCH.md) | v1.17 signal research: the statistics revision, `linear_z_v2`, long horizons, regime model and gate, GBM, meta-labelling split, conformal sizing, zoo gates |
+| [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) | free Nasdaq sample days and IEX HIST (TOPS / DEEP), process-and-delete, the download approval rule |
 | [docs/README_HISTORY.md](docs/README_HISTORY.md) | the sections moved out of this README: release-by-release status, the reviews that moved the numbers, the repository map, what the parity counts contain, [real-world usage notes](docs/README_HISTORY.md#real-world-usage-notes) (scope, units and out-of-scope items for a live deployment) and the [references](docs/README_HISTORY.md#references) (the literature and standards the platform implements) |
 
 ## License

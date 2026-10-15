@@ -994,3 +994,25 @@ the C++ rule text keeps the static `adv`.
 | SOR eligibility + tie-break ladder; algo slicing, child split, `expire_ts`, POV deficit | §11.3 | `iap.execution.sor`, `iap.execution.algos`, `iap.execution.replay` |
 | paper / backtest wiring (incl. the per-instrument gap gate: `on_feed_recovered` only when no venue of the instrument is stale) | §11.4 (Java `BacktestEngine`, `PaperTrading.RiskWiring`) | `iap.mvp.engine.MvpEngine` (docs/MVP.md §4, row by row) |
 | scenarios and the tests per language | docs/SCENARIOS.md, TRADING section | `py` cells now filled for risk and execution |
+
+## 4. `iap.paper` — the forward paper trade driven from these ports (v1.16, Python only)
+
+`iap.paper` composes the pieces of sections 1 and 2 into a daily job; it adds
+no rule of its own. `iap.paper.daily.run_day` runs a real session through the
+MVP loop (`iap.mvp.real.run_symbol`, which uses `iap.risk` per child and
+`iap.execution` for routing and fills) with the prereg realism applied by
+`iap.execution.realism.apply` (section 2.11-2.13) and the opt-in end-of-day
+flatten. The checks around it:
+
+| module | what it reads from this page's ports | output |
+|---|---|---|
+| `iap.paper.tca_compare` | per-parent simulator fills (section 2) against the research cost model's expectation, components `is`, `spread`, `fee`, `impact` | `tca_compare.json`, an alert when the absolute IS gap passes the threshold |
+| `iap.paper.monitors` | none (feature drift and realised IC from the feature store) | `monitors.json` |
+| `iap.paper.drill` | the kill switch latch of the risk engine (section 1): `kill_drill` replays a prepared symbol, latches the switch mid-session and reports working children cancelled and submissions after the kill | `drill.json` |
+
+The signatures, the CLI, the config and the report keys are in
+[API_PAPER.md](API_PAPER.md); the architecture note is
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) section 9.2; the operator steps
+are [docs/runbooks/RUNBOOK_paper_trade.md](docs/runbooks/RUNBOOK_paper_trade.md).
+The v1.17 execution studies built on these ports are in
+[docs/EXECUTION_QUALITY.md](docs/EXECUTION_QUALITY.md).
