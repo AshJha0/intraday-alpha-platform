@@ -1,0 +1,78 @@
+{
+  "by_type": {
+    "A": 339,
+    "D": 3,
+    "H": 13282,
+    "I": 28606,
+    "O": 13274,
+    "P": 13889,
+    "Q": 7425025,
+    "S": 3,
+    "T": 125422,
+    "X": 3
+  },
+  "capture_clock_note": "capture_minus_send_ns is the capture host clock minus the IEX-TP send time; about 37 s on 2026-10-13 = TAI - UTC, so the capture stamps are TAI; the reader uses the messages' own UTC timestamps",
+  "capture_minus_send_ns": {
+    "max": 38139917428,
+    "min": 37000011465
+  },
+  "date": "2026-10-13",
+  "directory_rows": 3,
+  "file": "20261013_IEXTP1_TOPS1.6.partial.pcap.gz",
+  "first_message_ts": 25652180602707,
+  "first_system_event": "O",
+  "heartbeats": 2694,
+  "last_message_ts": 34494275673020,
+  "messages": 7619846,
+  "ok": true,
+  "outside_session_date": 0,
+  "pcap": {
+    "bytes": 1174638984,
+    "non_ipv4": 0,
+    "non_udp": 0,
+    "packets": 7253833,
+    "truncated": 1,
+    "vlan": 0
+  },
+  "protocols": {
+    "TOPS": 7253833
+  },
+  "quotes": 7425025,
+  "quotes_before_directory": 107226,
+  "quotes_crossed": 0,
+  "quotes_negative_size": 0,
+  "quotes_one_sided": 437045,
+  "run_utc": "2026-10-15T08:36:26+00:00",
+  "segments": 7253833,
+  "sequence_gaps": 0,
+  "sessions": [
+    1359151104
+  ],
+  "symbols_checked": [
+    "AAPL",
+    "MSFT",
+    "QQQ"
+  ],
+  "symbols_checked_seen": [],
+  "symbols_seen": 13274,
+  "system_events": [
+    {
+      "code": "O",
+      "ts_ns_since_midnight": 25652180602707
+    },
+    {
+      "code": "S",
+      "ts_ns_since_midnight": 28800000602106
+    },
+    {
+      "code": "R",
+      "ts_ns_since_midnight": 34200000155231
+    }
+  ],
+  "tp_versions": {
+    "1": 7253833
+  },
+  "trades": 125422,
+  "unknown_types": {},
+  "violations": []
+}
