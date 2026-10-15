@@ -74,6 +74,7 @@ from iap.combine.weights import (
     METHODS,
     MIN_OBS,
     RIDGE_PENALTIES,
+    STACKING_REVISION,
     correlation_matrix,
     effective_bets,
 )
@@ -105,6 +106,7 @@ __all__ = [
     "ASSET_CLASSES",
     "COMBINATION_X_VERSION",
     "CORRELATION_X_VERSION",
+    "DEFAULT_STACKING_METHOD",
     "LEDGER_KIND",
     "combination_looks",
     "correlation_document",
@@ -117,6 +119,10 @@ __all__ = [
 
 COMBINATION_X_VERSION = 1
 CORRELATION_X_VERSION = 1
+#: The method a report presents as the default under the v1.17 stacking
+#: revision (plan item C3: decay-aware stacking); ``DEFAULT_METHOD``
+#: (``equal_weight``) stays the default of an identity without a revision.
+DEFAULT_STACKING_METHOD = "decay_aware"
 LEDGER_KIND = "combination"
 ASSET_CLASSES = ("EQUITY", "FX")
 #: Pinned protocol: the alpha reports' (``research/alpha_reports/run_all.py``).
@@ -159,10 +165,18 @@ def experiment_identity(
     n_folds: int = N_FOLDS,
     inner_folds: int = INNER_FOLDS,
     embargo_s: int = EMBARGO_S,
+    stacking: str | None = None,
 ) -> dict[str, Any]:
     """The ledger configuration of one combination experiment — what was
-    looked at: the member list and the method are part of it."""
-    return {
+    looked at: the member list and the method are part of it.
+
+    ``stacking`` (v1.17, C3) names the stacking revision
+    (:data:`iap.combine.weights.STACKING_REVISION`): with it the identity
+    carries a ``stacking`` key and is a NEW experiment; ``None`` (the
+    default of this function) reproduces every identity written before
+    v1.17 byte for byte, so the ledger's existing entries are untouched.
+    :func:`run_combination` passes the revision for every new run."""
+    out = {
         "asset_class": asset_class,
         "members": sorted(members),
         "method": method,
@@ -173,6 +187,9 @@ def experiment_identity(
         "ridge_penalties": list(RIDGE_PENALTIES),
         "methods": bundle,
     }
+    if stacking is not None:
+        out["stacking"] = str(stacking)
+    return out
 
 
 def _load_meta(configs_dir: Path) -> dict[int, dict]:
@@ -558,6 +575,7 @@ def run_combination(
     feature_version: str | None = None,
     gate: Callable[[str, str], None] | None = None,
     config_version: str | None = None,
+    stacking: str | None = STACKING_REVISION,
 ) -> dict[str, Any]:
     """Evaluate the combinations (module docs) and return the report
     document together with the full validation reports
@@ -569,7 +587,13 @@ def run_combination(
     is skipped with a progress line; ``ValueError`` if none has rows.  ``gate``
     is called with ``(combination_id, horizon)`` for every class that will
     run, before anything is evaluated or any look is debited (the
-    pre-registration check; it raises to refuse)."""
+    pre-registration check; it raises to refuse).
+
+    ``stacking`` (v1.17, C3) is written into every experiment identity
+    (:func:`experiment_identity`), so a run under the v1.17 stacking
+    revision is a new experiment and the report's ``default_method`` is
+    :data:`DEFAULT_STACKING_METHOD`; ``stacking=None`` reproduces the
+    pre-v1.17 identities and presents ``equal_weight``."""
     repo = Path(repo)
     features_dir = Path(features_dir) if features_dir else repo / "data" / "features"
     configs_dir = Path(configs_dir) if configs_dir else repo / "configs"
@@ -608,7 +632,9 @@ def run_combination(
         ids = sorted(members[ac]) if members and ac in members else default_members(ac)
         probe = CombinedAlpha(ids, asset_class=ac, horizon=horizon)
         for name in method_names:
-            config = experiment_identity(ac, ids, name, probe.horizon, bundle.name)
+            config = experiment_identity(
+                ac, ids, name, probe.horizon, bundle.name, stacking=stacking
+            )
             plan.append(
                 {
                     "asset_class": ac,
@@ -795,7 +821,8 @@ def run_combination(
         "dataset_version": dataset_version,
         "feature_version": feature_version,
         "methods_bundle": bundle.name,
-        "default_method": DEFAULT_METHOD,
+        "default_method": DEFAULT_STACKING_METHOD if stacking else DEFAULT_METHOD,
+        "stacking_revision": stacking,
         "protocol": {
             "n_folds": N_FOLDS,
             "inner_folds": INNER_FOLDS,

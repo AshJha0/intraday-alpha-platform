@@ -143,7 +143,7 @@ def _stack(seed: int = 3, n: int = 900):
 
 
 def test_methods_and_default_are_pinned():
-    assert METHODS == ("equal_weight", "ic_weighted", "ridge", "shrinkage_mv")
+    assert METHODS == ("equal_weight", "ic_weighted", "ridge", "shrinkage_mv", "decay_aware")
     assert DEFAULT_METHOD == "equal_weight"
     assert RIDGE_PENALTIES == (0.01, 0.1, 1.0, 10.0, 100.0)
     assert INNER_FOLDS == 3
