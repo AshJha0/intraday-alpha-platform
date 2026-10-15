@@ -1,8 +1,8 @@
 {
-  "bonferroni_p_threshold": 8.97021887334051e-06,
-  "bonferroni_t_threshold": 4.440614916255818,
-  "chain_head": "202f6bc39f7fb525480ef8a594641cdcdb35a370c00f5ca53b628a8d6d7e0064",
-  "chain_length": 384,
+  "bonferroni_p_threshold": 8.96700143472023e-06,
+  "bonferroni_t_threshold": 4.440692110389091,
+  "chain_head": "b2d9f258b8308a29296d4e766659107d9850ebc676b70c9989d2348a8f507fc7",
+  "chain_length": 386,
   "datasets": [
     {
       "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
@@ -11,17 +11,22 @@
     },
     {
       "dataset_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
-      "entries": 300,
-      "looks": 4492
+      "entries": 301,
+      "looks": 4493
     },
     {
       "dataset_version": null,
       "entries": 14,
       "looks": 14
+    },
+    {
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "entries": 1,
+      "looks": 1
     }
   ],
   "description": "Multiple-testing ledger (spec \u00a713). Deterministic: no wall-clock; identical rerun => identical file. Experiments are de-duplicated by (alpha_id, kind, canonical config, dataset_version): re-running the same script on the same dataset does not inflate the Bonferroni denominator; the same configuration on a new dataset is a new look, and the looks of earlier datasets are kept (`datasets`). An entry judged under the ledger t-stat policy carries `gate_looks`, the look count its threshold was derived from.",
-  "distinct_experiments": 384,
+  "distinct_experiments": 386,
   "entries": [
     {
       "alpha_id": "ALL",
@@ -9603,10 +9608,122 @@
         "net_pnl": 0.0,
         "refits": 5
       }
+    },
+    {
+      "alpha_id": "EQ11",
+      "config": {
+        "book": {
+          "alpha_bps": 5.0,
+          "beta_neutral": true,
+          "cov_init": 20,
+          "cov_lam": 0.94,
+          "cov_shrinkage": null,
+          "decile_q": 0.1,
+          "dollar_neutral": true,
+          "dykstra_max_iter": 30,
+          "dykstra_tol": 1e-09,
+          "exec_delay_ns": 1000000000,
+          "feas_tol": 1e-06,
+          "flatten_at_session_end": true,
+          "gross_cap": 1.0,
+          "impact": "cost_model",
+          "impact_coeff": null,
+          "impact_exponent": null,
+          "max_age_ns": 60000000000,
+          "min_names": 4,
+          "neutral_bound": 0.0,
+          "notional": 1000000.0,
+          "participation_cap": 0.01,
+          "projection": "dykstra",
+          "rebalance_ns": 300000000000,
+          "risk_aversion": 1000.0,
+          "score": "eq11",
+          "sector_neutral": true,
+          "solver_iters": 20,
+          "turnover_cap": 0.5,
+          "w_max": 0.1,
+          "weights": "linear"
+        },
+        "sizes": [
+          0.25,
+          0.5,
+          1.0,
+          2.0,
+          4.0
+        ],
+        "tag": "synthetic"
+      },
+      "count": 1,
+      "dataset_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",
+      "key": "e601d09f2ba13875f45e53e7d3acca9788f9b8d4e8a7fcb8dfa31b54fb6f8723",
+      "kind": "breadth_book",
+      "n": 5575,
+      "reruns": 1,
+      "result": {
+        "gross_pnl": -1799.790902896185,
+        "net_pnl": -12092.739531265543,
+        "net_sharpe_daily": -124.93849212766101
+      }
+    },
+    {
+      "alpha_id": "EQ11",
+      "config": {
+        "book": {
+          "alpha_bps": 5.0,
+          "beta_neutral": true,
+          "cov_init": 20,
+          "cov_lam": 0.94,
+          "cov_shrinkage": null,
+          "decile_q": 0.1,
+          "dollar_neutral": true,
+          "dykstra_max_iter": 30,
+          "dykstra_tol": 1e-09,
+          "exec_delay_ns": 1000000000,
+          "feas_tol": 1e-06,
+          "flatten_at_session_end": true,
+          "gross_cap": 1.0,
+          "impact": "cost_model",
+          "impact_coeff": null,
+          "impact_exponent": null,
+          "max_age_ns": 60000000000,
+          "min_names": 3,
+          "neutral_bound": 0.0,
+          "notional": 1000000.0,
+          "participation_cap": 0.01,
+          "projection": "dykstra",
+          "rebalance_ns": 300000000000,
+          "risk_aversion": 1000.0,
+          "score": "eq11",
+          "sector_neutral": false,
+          "solver_iters": 20,
+          "turnover_cap": 0.5,
+          "w_max": 0.1,
+          "weights": "linear"
+        },
+        "sizes": [
+          0.25,
+          0.5,
+          1.0,
+          2.0,
+          4.0
+        ],
+        "tag": "multi7"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "e53593daaa1649b6d768a0b6a51dee8a401bc07c37ea4ef918b3482c473dd5ee",
+      "kind": "breadth_book",
+      "n": 5576,
+      "reruns": 1,
+      "result": {
+        "gross_pnl": 1042.6733163663205,
+        "net_pnl": -9553.027442587627,
+        "net_sharpe_daily": -30.09570712864743
+      }
     }
   ],
-  "expected_max_null_t": 4.1535209661302765,
+  "expected_max_null_t": 4.153607336386135,
   "pinned_alpha": 0.05,
-  "total_experiments": 5574,
+  "total_experiments": 5576,
   "x-version": 4
 }
