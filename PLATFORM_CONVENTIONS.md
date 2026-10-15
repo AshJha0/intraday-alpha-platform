@@ -404,6 +404,23 @@ implements it (`docs/SCENARIOS.md`, TRADING section).
   | venue-type restriction | `allowed_venue_types` | 31 `VENUE_TYPE_RESTRICTED` | off |
   | dark participation cap (dark-first router rule) | `max_dark_participation_bps` + `dark_participation_floor_qty` | 32 `DARK_PARTICIPATION` | off |
   | dark-fill notional limit | `max_dark_fill_notional` | 33 `DARK_FILL_NOTIONAL` | off |
+
+  **Two forms, by design.** The B10 hand-over (`docs/research/B10_F8_HANDOVER.md`) defines the
+  same three controls as a STATELESS function the execution replay evaluates before a dark post,
+  from inputs the risk engine never sees: the trailing displayed lit EXECUTE volume over
+  `participation_window_ns`, the PARENT's cumulative dark-filled notional and the child notional
+  at the midpoint (`iap.execution.dark.dark_pretrade_check`, `DarkControls{max_participation,
+  participation_window_ns, allowed_venue_types, max_dark_notional}`, codes `venue_type` /
+  `participation` / `notional`, first failure wins; a rejected post goes to the lit book). The
+  Rust risk crate carries that pure function too (`risk::dark_pretrade_check`,
+  `rust/risk/src/dark.rs`), pinned by `tests/golden/expected_dark_controls.json` (the hand-over's
+  ten rows, which the Python `DARK_CONTROL_GOLDENS` must equal). The engine checks 31-33 above
+  guard the GATEWAY path: every order of the session, on the engine's own fail-closed state
+  (session market volume, the firm's dark fills across parents), with no caller input to trust.
+  The stateless check guards the REPLAY path: one parent's next dark step, windowed and
+  parent-scoped. Only `allowed_venue_types` is shared by name; the participation and notional
+  keys differ on purpose because a bps-of-session-volume cap and a fraction-of-trailing-volume
+  cap, or a firm session notional and a parent notional, are different quantities.
 - **Reference-price sanity gate (v1.14, G-P2-6)**. `on_market` drops (and counts) an update for
   a new instrument once `max_tracked_keys` markets exist, a regression (as before), a crossed
   two-sided book (`bid > ask`, `risk_market_crossed_dropped_total`; a locked book is accepted),
