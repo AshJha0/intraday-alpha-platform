@@ -183,7 +183,9 @@ def test_eval_harness_is_deterministic_and_meets_baseline(tmp_path):
     b = eval_harness.run_all(tmp_path / "b")
     assert a == b
     baseline = json.loads((REPO / eval_harness.BASELINE_RELPATH).read_text(encoding="utf-8"))
-    assert set(baseline["tasks"]) == set(eval_harness.TASKS)
+    from iap.agents.wse_evals import WSE_TASKS
+
+    assert set(baseline["tasks"]) == set(eval_harness.TASKS) | set(WSE_TASKS)
     assert eval_harness.regressions(a, baseline) == []
 
 

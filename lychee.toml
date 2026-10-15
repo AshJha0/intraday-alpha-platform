@@ -1,0 +1,20 @@
+# lychee configuration (v1.17 E4): the advisory external-link step of the
+# `docs` CI job. Relative links are checked by tests/harness/check_docs.py.
+no_progress = true
+max_concurrency = 8
+timeout = 20
+max_retries = 2
+accept = ["200..=204", "429"]
+exclude_path = ["research", "archive", "data", "deployment", "python", "cpp", "rust", "benchmarks"]
+exclude = [
+  "^https?://localhost",
+  "^https?://127\.0\.0\.1",
+  "^https?://\[::1\]",
+  "^https?://[a-z-]+\.local(host)?",
+  "^https?://example\.com",
+  "^https?://platform-metrics",
+  "^mailto:",
+  # github.com rejects anonymous rate-limited bursts; the repo's own links are
+  # checked by their relative form in check_docs.py
+  "^https?://github\.com/AshJha0/intraday-alpha-platform/(pull|issues|actions|settings|releases)",
+]

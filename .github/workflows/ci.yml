@@ -53,6 +53,10 @@
 #                                from it — and uploads the changed files, so
 #                                the artefacts are produced in the environment
 #                                that verifies them
+#   docs                         v1.17 (E4), advisory until added to the
+#                                ruleset: tests/harness/check_docs.py (links,
+#                                diagram index, API names, status freshness)
+#                                plus lychee on external links
 #   risk-fuzz                    manual only (workflow_dispatch with
 #                                risk_fuzz=true): the large differential-fuzz
 #                                run of the Rust and Python risk engines
@@ -787,6 +791,57 @@ jobs:
         run: |
           echo "### agent eval harness" >> "$GITHUB_STEP_SUMMARY"
           tail -n 20 /tmp/agent-evals.txt >> "$GITHUB_STEP_SUMMARY" || true
+
+  # v1.17 (E4): documentation checks, tests/harness/check_docs.py - relative
+  # links resolve, every docs/diagrams/*.mmd is embedded and DIAGRAMS.md is
+  # numbered consecutively, every `iap.*` name in API_*.md resolves by import,
+  # and "in progress" / "pending PR" / "not yet released" phrases older than
+  # the last release tag are reported as STALE (exit 2: reported in the job
+  # summary, not failing, until the v1.17.0 truth pass (G5) clears them; a
+  # structural failure, exit 1, fails the job).  lychee checks external links
+  # as an advisory step.  ADVISORY until the owner adds `docs` to the
+  # protect-main ruleset (docs/governance/REPO_SETTINGS.md).
+  docs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # status freshness blames each flagged line against the last tag
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install the research stack
+        run: |
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r python/requirements-ci.txt
+      - name: docs checks (links, diagram index, API names, status freshness)
+        env:
+          PYTHONPATH: python/src
+          PYTHONUTF8: "1"
+        run: |
+          set +e
+          python tests/harness/check_docs.py | tee /tmp/check_docs.txt
+          rc=${PIPESTATUS[0]}
+          set -e
+          {
+            echo "### docs checks (exit $rc; 2 = stale status text only)"
+            echo '```'
+            tail -n 40 /tmp/check_docs.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$rc" = "1" ]; then exit 1; fi
+      # External links: lychee, pinned by SHA-256 like the other release
+      # tarballs; advisory because the network and third-party sites are not
+      # this repository's to keep up.
+      - name: lychee external links (advisory)
+        continue-on-error: true
+        run: |
+          curl -fsSL -o /tmp/lychee.tar.gz             https://github.com/lycheeverse/lychee/releases/download/lychee-v0.24.2/lychee-x86_64-unknown-linux-gnu.tar.gz
+          echo "1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a  /tmp/lychee.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/lychee.tar.gz -C /tmp
+          /tmp/lychee-x86_64-unknown-linux-gnu/lychee --config lychee.toml --no-progress             'README.md' '*.md' 'docs/**/*.md' 'docs/index.html' | tee /tmp/lychee.txt
+          { echo "### lychee (advisory)"; echo '```'; tail -n 30 /tmp/lychee.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
   regenerate:
     if: github.event_name == 'workflow_dispatch' && inputs.regenerate

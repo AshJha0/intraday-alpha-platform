@@ -8,6 +8,21 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-E items E2-E5: the three WS-E agents on one generic, budgeted, ledgered tool loop
+  (`iap.llm.loop`; every call charged to the E1 spend ledger). E2 research assistant
+  (`python -m iap.agents research`, `claude-sonnet-5-5`): in-sample runs through the research CLI
+  into a scratch store (holdout datasets refused by name), pre-registration DRAFTS (`status DRAFT`,
+  unsigned, `research/preregs/drafts/`) and report drafts, every number verified by `iap.llm.verify`
+  against the cited report and refused otherwise (closing text included). E3 morning ops agent
+  (`python -m iap.agents ops`, `claude-haiku-5-5`): threshold rules in code over the paper-trade,
+  drift and cost reports and the spend ledger; the model writes only the narrative, numbers checked
+  against the alerts document or replaced by the code fallback. E4 docs-sync agent
+  (`python -m iap.agents docs-sync`, Haiku): proposes doc edits for a PR as a patch file, never
+  applied; `tests/harness/check_docs.py` (relative links, diagram index, `iap.*` names in API_*.md
+  resolve by import, status-text freshness vs the last tag) in a new advisory `docs` CI job with a
+  lychee step. E5: `docs/AGENTS.md`, `API_AGENTS.md`, `API_LLM.md`, `API_PAPER.md`. agent-evals gains
+  one eval per agent (`iap.agents.wse_evals`; baseline regenerated).
+
 - v1.17 WS-A item A2b: slim ingest for breadth datasets. `ingest --slim` / `normalize_run(write_normalized_jsonl=False)`
   writes no `*.normalized.jsonl` twin of the IAP1 file (3x its bytes; the feature build and the MVP read the
   IAP1; manifest `layout: "slim"`); `process-day` is slim by default (`--no-slim` opts out), deletes `raw/`
