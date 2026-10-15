@@ -124,6 +124,8 @@ spec:
                     path: reference/event_calendar.json
                   - key: reference__fee_tiers.json
                     path: reference/fee_tiers.json
+                  - key: reference__venue_latency.json
+                    path: reference/venue_latency.json
                   - key: reference__regulatory_fee_schedule.json
                     path: reference/regulatory_fee_schedule.json
                   - key: risk__risk.json

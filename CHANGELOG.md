@@ -6,6 +6,29 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## Unreleased
+
+- v1.17 WS0 item 0.5 (X-1): VWAP slices follow the forecast volume curve over the PARENT window
+  (`curve_slice_weights(curve, n, start_frac, end_frac)`, `volume_curve.curve_window`,
+  `ParentOrder.curve_window`); the whole-session resampling and the pinned `1 + x^2` curve are
+  unchanged by default.
+- v1.17 WS0 item 0.5 (X-2): `iap.execution.realism.apply(prereg, exec_config, calibration=,
+  impact=, maker_config=, quoting_config=)` is the one entry point for every realism opt-in; it
+  returns an `AppliedRealism` (configs, grids, keyword arguments and an `applied` statement per v3
+  key) and puts the prereg latency table on every venue of a calibration, which the simulator
+  would otherwise read in place of the prereg venue latency. The MVP loop uses it
+  (`MvpEngine.realism_applied`). The prereg `venue_latency.mean_ns` is now the MEAN of the
+  simulator's `base + U[0, jitter]` draw (`simulator_latency_base_ns`; it was the minimum), and
+  `iap.marketdata.ingest` writes the assumed latency of the new
+  `configs/reference/venue_latency.json` into a real dataset's venues.json instead of 0 / 0.
+  Tests show every v3 key changes at least one simulator fill or config.
+- v1.17 WS0 item 0.6 (X-3): the residual impact fit records its support
+  (`impact.residual.by_horizon[h].support_pct_adv`: min / p05 / p50 / p95 / max % ADV of the
+  sweeps); `apply_impact_fit` carries it as `ExecConfig.impact_fit_support_pct_adv`, the simulator
+  flags parents whose participation leaves it (`ExecutionSimulator.impact_beyond_support`) and
+  `ExecConfig.impact_label()` names a cost "replay + fitted adder (rule 6b, ...)" rather than a
+  measurement.
+
 ## v1.16.0 — 2026-10-15
 
 Theme: monetisation. Neither taking (P0-6, item 7), nor making (quoting v2), nor AI4 DeepLOB clears costs; the signals are useful as execution inputs. Notes: docs/release/v1.16.0_RELEASE_NOTES.md.

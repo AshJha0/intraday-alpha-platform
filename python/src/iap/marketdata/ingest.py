@@ -844,6 +844,18 @@ def _instrument_rows(manifest: dict) -> list[dict]:
 
 def _write_configs(out: Path, manifest: dict, configs_dir: Path) -> None:
     venue = manifest["source"]["venue"]
+    # v1.17 (X-2): assumed order-entry latency from the reference table
+    # (0 / 0 before, which every simulator run then took as instant).
+    lat_doc = json.loads(
+        (configs_dir / "reference" / "venue_latency.json").read_text(encoding="utf-8")
+    )
+    lat_row = dict(lat_doc.get("venues", {}).get(venue) or lat_doc["default"])
+    from iap.execution.realism import simulator_latency_base_ns
+
+    venue_latency = {
+        "mean_ns": simulator_latency_base_ns(int(lat_row["mean_ns"]), int(lat_row["jitter_ns"])),
+        "jitter_ns": int(lat_row["jitter_ns"]),
+    }
     session = {
         "timezone": ITCH_TIMEZONE,
         "open": "09:30:00",
@@ -880,8 +892,10 @@ def _write_configs(out: Path, manifest: dict, configs_dir: Path) -> None:
             "x-version": 1,
             "description": (
                 "Source venue of an ingested real dataset. Fees are indicative list prices "
-                "(edit to your own tier); latency is zero because the feed carries exchange "
-                "timestamps only (receive_ts == exchange_ts)."
+                "(edit to your own tier); latency is the ASSUMED order-entry leg of "
+                "configs/reference/venue_latency.json (simulator base + U[0, jitter]; the "
+                f"assumed mean is {lat_row['mean_ns']} ns), not a measurement: the feed "
+                "carries exchange timestamps only (receive_ts == exchange_ts)."
             ),
             "venues": [
                 {
@@ -890,7 +904,7 @@ def _write_configs(out: Path, manifest: dict, configs_dir: Path) -> None:
                     "asset_class": "EQUITY",
                     "taker_fee_per_share": 0.003,
                     "maker_rebate_per_share": 0.002,
-                    "latency": {"mean_ns": 0, "jitter_ns": 0},
+                    "latency": venue_latency,
                     "supports": ["MBO", "AUCTION", "HALT"],
                 }
             ],

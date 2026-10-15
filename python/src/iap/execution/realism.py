@@ -44,6 +44,23 @@ prereg key                 where it lands                               default
 The fee-tier table (``configs/reference/fee_tiers.json``) holds ASSUMED
 per-share schedules for sensitivity, not a quoted exchange price list.
 
+**v1.17 (review X-2): one entry point, and mean means mean.**  A loop that
+runs under a prereg calls :func:`apply` once and reads everything it needs
+from the :class:`AppliedRealism` it returns - the exec config, the
+calibration (with the prereg latency table on every venue, so a venue
+latency a calibration would otherwise override is never silently lost),
+the simulator / calibration / maker / quoting keyword arguments, the
+stress and fee-tier grids - together with ``applied``, which states per
+key whether it was applied, not set, or not applied and why.  Until v1.16
+each key had its own applier, two had no caller at all (``latency_stress``,
+``fee_tier_sensitivity``) and the MVP left the impact rule out without
+saying so in one place.  The simulator draws a venue's latency as
+``latency_mean_ns + U[0, latency_jitter_ns]``, so the prereg ``mean_ns``
+was in fact the MINIMUM; :meth:`RealismOptIns.exec_config` and
+:meth:`latency_tail` now place the prereg mean at ``mean_ns`` (the
+simulator base is ``mean_ns - jitter_ns / 2``), which moves every v3 run's
+latency draws down by half the jitter.
+
 ``modify_queue_credit`` (v1.14 X-P1-1, a shrinking MODIFY ahead of a resting
 child credits its queue position) has no switch: it shipped on in the C++,
 Rust and Python simulators with byte-identical goldens. The prereg records it
@@ -61,7 +78,35 @@ from typing import Any
 
 from iap.execution.regulatory import prereg_wants_regulatory_fees
 
-__all__ = ["FEE_TIERS_PATH", "RealismOptIns", "load_fee_tiers", "load_prereg"]
+__all__ = [
+    "FEE_TIERS_PATH",
+    "V116_KEYS",
+    "AppliedRealism",
+    "RealismOptIns",
+    "apply",
+    "load_fee_tiers",
+    "load_prereg",
+    "simulator_latency_base_ns",
+]
+
+#: The v1.16 P0-3 keys :func:`apply` reports on (``applied``).
+V116_KEYS = (
+    "venue_latency",
+    "latency_stress",
+    "fee_tier",
+    "fee_tier_sensitivity",
+    "exec_prints",
+    "impact_model",
+    "impact_shape",
+)
+
+
+def simulator_latency_base_ns(mean_ns: int, jitter_ns: int) -> int:
+    """The ``latency_mean_ns`` the simulator needs so that ``base + U[0,
+    jitter]`` has mean ``mean_ns`` (v1.17, X-2): ``mean_ns - jitter_ns / 2``,
+    never below 0."""
+    return max(0, int(round(int(mean_ns) - int(jitter_ns) / 2.0)))
+
 
 _ROUTES = ("book", "sim")
 _UNITS = ("message", "touch_order")
@@ -179,7 +224,7 @@ class RealismOptIns:
 
         vl = self.venue_latency
         return parametric_latency(
-            vl["mean_ns"],
+            simulator_latency_base_ns(vl["mean_ns"], vl["jitter_ns"]),
             vl["jitter_ns"],
             float(vl.get("tail_prob", 0.01)),
             float(vl.get("tail_mult", 10.0)),
@@ -195,7 +240,13 @@ class RealismOptIns:
         vl = self.venue_latency
         venues = {}
         for vid, v in cfg.venues.items():
-            mean = vl["mean_ns"] if vl is not None else v.latency_mean_ns
+            # The prereg mean_ns is the MEAN of the simulator's base + U[0,
+            # jitter] draw (v1.17, X-2); a config value is already a base.
+            mean = (
+                simulator_latency_base_ns(vl["mean_ns"], vl["jitter_ns"])
+                if vl is not None
+                else v.latency_mean_ns
+            )
             jit = vl["jitter_ns"] if vl is not None else v.latency_jitter_ns
             venues[vid] = replace(
                 v, latency_mean_ns=int(round(mean * mult)), latency_jitter_ns=int(round(jit * mult))
@@ -288,3 +339,121 @@ class RealismOptIns:
 def load_prereg(path) -> RealismOptIns:
     """The opt-ins of a prereg file (``configs/prereg/v2.json``)."""
     return RealismOptIns.from_prereg(json.loads(Path(path).read_text(encoding="utf-8")))
+
+
+@dataclass(frozen=True)
+class AppliedRealism:
+    """What :func:`apply` produced for one loop (module docs, v1.17)."""
+
+    prereg: RealismOptIns
+    exec_config: Any
+    calibration: Any
+    simulator_kwargs: dict[str, Any]
+    calibration_kwargs: dict[str, Any]
+    exec_config_kwargs: dict[str, Any]
+    maker_config: Any
+    quoting_config: Any
+    #: ``{multiplier: ExecConfig}`` (``latency_stress``; ``{1: exec_config}`` without a grid)
+    stressed: dict[float, Any]
+    #: ``{tier: ExecConfig}`` (``fee_tier`` + ``fee_tier_sensitivity``; empty without a tier)
+    fee_tiers: dict[str, Any]
+    #: per v1.16 key: ``"applied"``, ``"not set"`` or ``"not applied: <why>"``
+    applied: dict[str, str]
+
+    def not_applied(self) -> dict[str, str]:
+        """The keys that are set but were not applied, with the reason."""
+        return {k: v for k, v in self.applied.items() if v.startswith("not applied")}
+
+
+def apply(
+    prereg: RealismOptIns,
+    exec_config,
+    *,
+    calibration=None,
+    impact: bool = True,
+    maker_config=None,
+    quoting_config=None,
+) -> AppliedRealism:
+    """Apply every opt-in of ``prereg`` to one loop's inputs at once (module
+    docs, v1.17 X-2).
+
+    ``exec_config`` gets the venue latency (as a mean), the fee tier and -
+    with ``impact`` and a ``calibration`` carrying a residual fit - the
+    parent impact rule.  ``calibration``, when given and the prereg sets
+    ``venue_latency``, gets the prereg's parametric latency table on EVERY
+    venue of ``exec_config`` (the simulator reads the calibration's table
+    before the venue config, so without this the prereg latency would be
+    silently replaced by whatever the calibration measured).  ``applied``
+    says what happened to each key; a caller that cannot apply a key passes
+    ``impact=False`` and records the reason it finds there."""
+    applied: dict[str, str] = {}
+    cfg = exec_config
+    if prereg.venue_latency is not None:
+        cfg = prereg._with_latency(cfg)
+        applied["venue_latency"] = "applied"
+    else:
+        applied["venue_latency"] = "not set"
+    if prereg.fee_tier is not None:
+        cfg = prereg._with_fees(cfg, prereg.fee_tier)
+        applied["fee_tier"] = "applied"
+    else:
+        applied["fee_tier"] = "not set"
+    if prereg.impact_model == "parent":
+        if not impact:
+            applied["impact_model"] = applied["impact_shape"] = (
+                "not applied: the caller runs no execution calibration (rule 6 stays)"
+            )
+        elif calibration is None:
+            raise ValueError("prereg impact_model 'parent' needs a calibration with impact_fit")
+        else:
+            from iap.execution.calibration import apply_impact_fit
+
+            assert prereg.impact_shape is not None
+            cfg = apply_impact_fit(cfg, calibration, prereg.impact_shape)
+            applied["impact_model"] = applied["impact_shape"] = "applied"
+    else:
+        applied["impact_model"] = applied["impact_shape"] = "not set"
+    cal = calibration
+    if cal is not None and prereg.venue_latency is not None:
+        from iap.execution.calibration import ExecCalibration, LatencyTable
+
+        table = prereg.latency_tail()
+        assert table is not None
+        lat = {
+            int(vid): LatencyTable(
+                tuple(table["probs"]), tuple(int(q) for q in table["quantiles_ns"])
+            )
+            for vid in cfg.venues
+        }
+        doc = dict(cal.doc)
+        doc["latency"] = {str(vid): dict(table) for vid in lat}
+        cal = ExecCalibration(
+            doc=doc, latency=lat, impact_coeff_bps_per_pct_adv=cal.impact_coeff_bps_per_pct_adv
+        )
+        applied["venue_latency"] = "applied (config and calibration latency table)"
+    stressed = {m: prereg._with_latency(cfg, m) for m in (prereg.latency_stress or (1,))}
+    applied["latency_stress"] = (
+        f"applied: {len(stressed)} configs" if prereg.latency_stress else "not set"
+    )
+    tiers = (
+        {t: prereg._with_fees(cfg, t) for t in (prereg.fee_tier, *prereg.fee_tier_sensitivity)}
+        if prereg.fee_tier is not None
+        else {}
+    )
+    applied["fee_tier_sensitivity"] = (
+        f"applied: {len(tiers)} configs" if prereg.fee_tier_sensitivity else "not set"
+    )
+    applied["exec_prints"] = "applied" if prereg.exec_prints else "not set"
+    return AppliedRealism(
+        prereg=prereg,
+        exec_config=cfg,
+        calibration=cal,
+        simulator_kwargs=prereg.simulator_kwargs(),
+        calibration_kwargs=prereg.calibration_kwargs(),
+        exec_config_kwargs=prereg.exec_config_kwargs(),
+        maker_config=None if maker_config is None else prereg.maker_config(maker_config),
+        quoting_config=None if quoting_config is None else prereg.quoting_config(quoting_config),
+        stressed=stressed,
+        fee_tiers=tiers,
+        applied=applied,
+    )

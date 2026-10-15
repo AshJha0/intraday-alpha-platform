@@ -36,7 +36,7 @@ def test_residual_block_shape():
     assert res["adv"] == "tape" and res["n_sweeps"] > 0
     cell = res["by_horizon"][res["horizon"]]
     assert cell["n"] >= 20
-    assert set(cell) == {"n", "linear", "sqrt", "power"}
+    assert set(cell) == {"n", "linear", "sqrt", "power", "support_pct_adv"}  # v1.17 X-3
     assert cell["linear"]["se"] >= 0 and cell["sqrt"]["se"] >= 0
     ExecCalibration.from_dict(doc)  # still a valid v1 document
 
