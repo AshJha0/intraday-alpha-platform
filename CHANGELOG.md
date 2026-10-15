@@ -8,6 +8,11 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-A item A3 (result): `research/breadth/universe.json` measured on the owner-approved
+  2019-01-30 full-market file (368 M messages): 100 names, 29 ETFs, AAPL / QQQ / MSFT at ranks 6 / 12 / 15;
+  `research/breadth/UNIVERSE_2019-01-30.md`. The first breadth process-day was refused by the disk guard
+  (22 GB free vs an estimated 40-50 GB peak for 100 names): A6 and a slim ingest mode come next.
+
 - v1.17 WS-A item A3: the breadth universe rule, fixed before any breadth statistic
   (`research/breadth/UNIVERSE_RULE.md`, `breadth_universe/v1`): the top 100 Nasdaq-listed symbols by
   displayed continuous-session volume on 2019-01-30 (ITCH `E` + printable `C` shares between system
