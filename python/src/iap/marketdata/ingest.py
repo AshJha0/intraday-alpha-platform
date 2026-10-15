@@ -1110,6 +1110,7 @@ def ingest(
     progress: Callable[[str], None] | None = None,
     tops: str | Path | None = None,
     partition_instruments: int | None = None,
+    slim: bool = False,
 ) -> dict:
     """Ingest one session into ``out_dir``; returns the manifest document.
 
@@ -1117,7 +1118,9 @@ def ingest(
     best bid / offer oracle recorded as the session's ``book_verification``.
     ``partition_instruments`` (v1.17 A2) normalises in on-disk partitions
     of that many instruments (memory-bounded, same bytes; the in-memory
-    record buffer is then not kept)."""
+    record buffer is then not kept).  ``slim`` (v1.17 A2b) writes no
+    ``*.normalized.jsonl`` twin (the IAP1 file carries the events); the
+    manifest records ``layout: "slim"``."""
     if source_format not in FORMATS:
         raise IngestError(f"unknown format {source_format!r}; known: {list(FORMATS)}")
     if tick_size not in TICK_CHOICES:
@@ -1341,7 +1344,11 @@ def ingest(
         preloaded = {} if fresh is None else {raw_file.name: iter_record_events(fresh)}
         fresh = None  # the generator holds the buffer; it is freed once consumed
         qc = normalize_run(
-            raw_dir, normalized_dir, preloaded, partition_instruments=partition_instruments
+            raw_dir,
+            normalized_dir,
+            preloaded,
+            partition_instruments=partition_instruments,
+            write_normalized_jsonl=not slim,
         )
         del preloaded
     stage["normalize"] = time.perf_counter() - clock
@@ -1355,6 +1362,8 @@ def ingest(
         "qc_totals": qc["totals"],
     }
     manifest["dataset_version"] = real_dataset_version(normalized_dir)
+    if slim:
+        manifest["layout"] = "slim"
     _write_json(manifest_path, manifest)
     return manifest
 
@@ -1558,6 +1567,12 @@ def _parser() -> argparse.ArgumentParser:
         "universe; identical bytes); default: the whole day in memory",
     )
     p.add_argument(
+        "--slim",
+        action="store_true",
+        help="write no *.normalized.jsonl twin of the IAP1 file (breadth datasets; the "
+        "feature build and the MVP read the IAP1)",
+    )
+    p.add_argument(
         "--tops",
         default=None,
         help="IEX formats: the day's TOPS capture (pcap or pcap.gz), the best bid / offer "
@@ -1648,6 +1663,7 @@ def main(argv: list[str] | None = None) -> int:
             progress=None if args.quiet else lambda line: print(line, file=sys.stderr, flush=True),
             tops=args.tops,
             partition_instruments=args.partition_instruments,
+            slim=args.slim,
         )
     except BookDivergenceError as exc:
         print(f"error: {exc}", file=sys.stderr)

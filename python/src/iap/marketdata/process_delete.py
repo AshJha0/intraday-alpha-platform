@@ -191,6 +191,8 @@ def process_day(
     keep_raw: bool = False,
     keep_gz: bool = False,
     min_free_gb: float = 10.0,
+    peak_gb: float | None = None,
+    slim: bool = True,
     dry_run: bool = False,
     tops: Path | None = None,
     log: Callable[[str], None] | None = None,
@@ -243,6 +245,16 @@ def process_day(
 
     # -- disk guard (before anything is written) ----------------------
     est = estimate_peak_gb(int(day["bytes"]), len(symbols), vendor_present=vendor_file.is_file())
+    if peak_gb is not None:
+        # the measured-day override (A2b): the rate estimate scales the
+        # three-name day linearly by symbol count, which overstates a wide
+        # universe many times (2019-01-30: 830 GB estimated, ~50 GB measured)
+        est = {
+            **est,
+            "peak_gb_estimated": est["peak_gb"],
+            "peak_gb": float(peak_gb),
+            "override": True,
+        }
     guard = disk_guard(Path(out_root), est["peak_gb"], min_free_gb)
     report["estimate"] = est
     report["disk"] = guard
@@ -303,6 +315,7 @@ def process_day(
             partition_instruments=partition_instruments,
             tops=tops,
             progress=say,
+            slim=slim,
         )
         return {
             "dataset_version": manifest.get("dataset_version"),
@@ -311,6 +324,23 @@ def process_day(
         }
 
     step("ingest", do_ingest)
+
+    # -- raw gone before the feature build (A2b): the normalised IAP1 holds
+    # the events; raw JSONL is only the normaliser's input ---------------
+    def do_delete_raw() -> dict:
+        if keep_raw:
+            return {"kept_raw": True}
+        freed = 0
+        base = ds / "raw"
+        if base.is_dir():
+            for p in base.rglob("*"):
+                if p.is_file():
+                    freed += p.stat().st_size
+                    p.unlink()
+            shutil.rmtree(base, ignore_errors=True)
+        return {"freed_gb": round(freed / GB, 2)}
+
+    step("delete_raw", do_delete_raw)
 
     # -- features -------------------------------------------------------
     def do_features() -> dict:
@@ -492,6 +522,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--keep-raw", action="store_true")
     p.add_argument("--keep-gz", action="store_true")
     p.add_argument("--min-free-gb", type=float, default=10.0)
+    p.add_argument(
+        "--peak-gb",
+        type=float,
+        default=None,
+        help="override the disk-guard peak estimate with a measured value (GB)",
+    )
+    p.add_argument("--no-slim", action="store_true", help="also write the *.normalized.jsonl twin")
     p.add_argument("--tops", default=None, help="IEX formats: the day's TOPS capture (oracle)")
     p.add_argument("--dry-run", action="store_true", help="disk guard and the plan only")
     p.add_argument(
@@ -518,8 +555,13 @@ def main(argv: list[str] | None = None) -> int:
             if a.tops:
                 extra.append(f'--tops "{a.tops}"')
             extra.append(
-                f"--partition-instruments {a.partition_instruments} --engine {a.engine} --workers {a.workers} --min-free-gb {a.min_free_gb:g}"
+                f"--partition-instruments {a.partition_instruments} --engine {a.engine} "
+                f"--workers {a.workers} --min-free-gb {a.min_free_gb:g}"
             )
+            if a.peak_gb is not None:
+                extra.append(f"--peak-gb {a.peak_gb:g}")
+            if a.no_slim:
+                extra.append("--no-slim")
             text = render_wrapper(
                 python_dir=a.python_dir,
                 manifest=str(Path(a.manifest).resolve()),
@@ -553,6 +595,8 @@ def main(argv: list[str] | None = None) -> int:
             keep_raw=a.keep_raw,
             keep_gz=a.keep_gz,
             min_free_gb=a.min_free_gb,
+            peak_gb=a.peak_gb,
+            slim=not a.no_slim,
             dry_run=a.dry_run,
             tops=Path(a.tops) if a.tops else None,
         )
