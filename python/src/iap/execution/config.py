@@ -79,6 +79,10 @@ class ExecConfig:
     #: extrapolated adder and flagged by the simulator
     #: (``ExecutionSimulator.impact_beyond_support``).  ``None`` = unknown.
     impact_fit_support_pct_adv: tuple[float, float] | None = None
+    #: v1.17 B1 (X-5): how many displayed opposite levels an aggressive
+    #: child walks (simulator rule 3). 10 is the pinned value every golden
+    #: was generated with; deeper walks change fills on thin books.
+    walk_depth_levels: int = 10
 
     def impact_label(self) -> str:
         """How a cost under this config should be labelled (v1.17, X-3):
@@ -101,6 +105,10 @@ class ExecConfig:
             raise ValueError(f"impact_exponent must be in (0, 1], got {self.impact_exponent!r}")
         if self.permanent_impact_bps_per_pct_adv < 0.0:
             raise ValueError("permanent_impact_bps_per_pct_adv must be >= 0")
+        if not isinstance(self.walk_depth_levels, int) or self.walk_depth_levels <= 0:
+            raise ValueError(
+                f"walk_depth_levels must be a positive int, got {self.walk_depth_levels!r}"
+            )
         if self.impact_model == "child" and (
             self.impact_exponent != 1.0 or self.permanent_impact_bps_per_pct_adv
         ):

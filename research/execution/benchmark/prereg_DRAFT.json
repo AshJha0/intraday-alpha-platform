@@ -1,0 +1,72 @@
+{
+  "command": "python -m iap.research.execution_benchmark --data-dir data/real/multi7 --out research/execution/benchmark --write-prereg-draft",
+  "drafted": "2026-10-15",
+  "gate_B7": {
+    "alpha": 0.05,
+    "comparison": "signal-aware algo (B2 urgency / B3 pacing) vs the plain algo of the same name on the SAME windows, same policy, same size cell",
+    "direction": "one-sided: signal-aware cheaper (difference < 0)",
+    "fill_rate_condition": "signal-aware fill rate not lower than plain by more than 0.02 (paired, same clustering)",
+    "minimum_effect_bps": 1.0,
+    "multiplicity": "Holm over the four algos; a cell passes only if both the cost and the fill-rate conditions hold",
+    "no_look": "the fresh days are not read until this draft is signed and registered (tools/*_register.py, --require-ci-env)",
+    "report_always": [
+      "depth_exhausted parent share and qty share of unfilled",
+      "fill provenance shares",
+      "per-symbol cells",
+      "low_power flag when sessions < 10"
+    ],
+    "statistic": "paired per-parent difference signal-aware - plain in all_in bps, mean with day-clustered SE (one cluster per session), Student-t with G - 1 df"
+  },
+  "grid": {
+    "algos": [
+      "TWAP",
+      "VWAP",
+      "POV",
+      "IS"
+    ],
+    "max_child_qty": 1000,
+    "policies": [
+      "native",
+      "aggressive",
+      "passive"
+    ],
+    "pov_participation": 0.1,
+    "seed": 20260829,
+    "sizes_pct_adv": [
+      0.1,
+      0.5,
+      1.0,
+      2.0
+    ],
+    "slices": 5,
+    "urgency": 0.5,
+    "warmup_min": 5.0,
+    "window_min": 15.0
+  },
+  "holdout": "data/real/r7_holdout and the 2026 holdout are never read by this benchmark; the signed test runs once on the IEX fresh days and the Nasdaq/IEX overlap days (B7)",
+  "id": "B1-IS-BENCHMARK-1",
+  "in_sample_dataset": "data/real/multi7 (AAPL, MSFT, QQQ; git-ignored)",
+  "in_sample_sessions": [
+    "2019-01-30",
+    "2019-03-27",
+    "2019-07-30",
+    "2019-08-30",
+    "2019-10-30",
+    "2019-12-30",
+    "2020-01-30"
+  ],
+  "on_blackboard": false,
+  "primary_metric": "all_in bps per parent (shortfall + fees_net + sim_impact + completion), labelled replay + linear child adder (rule 6)",
+  "schema": "iap.execution_benchmark_prereg/v1",
+  "signature": null,
+  "signed": false,
+  "simulator": {
+    "cost_label": "replay + linear child adder (rule 6)",
+    "impact_exponent": 1.0,
+    "impact_model": "child",
+    "note": "costs are replay + adder: simulated fills never move the replayed book; the signed run uses configs/prereg/v2.json realism opt-ins and impact_model=parent with the fitted exponent (label recorded at run time)",
+    "walk_depth_levels": 10
+  },
+  "source": "IAP_v1.17_Plan.md section 6, items B1 and B7",
+  "status": "DRAFT - not signed, not on the blackboard, not approved for any fresh-day run"
+}

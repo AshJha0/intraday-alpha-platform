@@ -77,8 +77,7 @@ from iap.execution import (  # noqa: E402
     load_exec_config,
     load_sor_options,
 )
-from iap.tca.fills import MAKER, TAKER, stamp_fill  # noqa: E402
-from iap.tca.fills import ParentOrder as TcaParent  # noqa: E402
+from iap.tca.fills import MAKER, TAKER  # noqa: E402
 from iap.tca.markout import (  # noqa: E402
     DEFAULT_HORIZONS_NS,
     MarkoutFill,
@@ -87,7 +86,7 @@ from iap.tca.markout import (  # noqa: E402
     fill_measures,
     passive_order_stats,
 )
-from iap.tca.tca import order_tca  # noqa: E402
+from iap.tca.shortfall import COST_KEYS, parent_costs  # noqa: E402, F401 (shared since v1.17 B1)
 
 OUT_DIR = REPO / "research" / "execution"
 SEC = 1_000_000_000
@@ -118,19 +117,6 @@ MVP_PASSIVE = {
     "improve_min_spread_ticks": 3,
     "end_margin_ns": 100_000_000,
 }
-
-COST_KEYS = (
-    "shortfall",
-    "trading",
-    "opportunity",
-    "spread",
-    "price_vs_mid_residual",
-    "timing",
-    "fees_net",
-    "sim_impact",
-    "completion",
-    "all_in",
-)
 
 
 def make_parents(events, instrument_id: int, rng: SplitMix64) -> list[ParentOrder]:
@@ -170,50 +156,6 @@ def _mean_se(values: list[float]) -> dict[str, float | int | None]:
     var = sum((v - mean) ** 2 for v in values) / (n - 1)
     se = math.sqrt(var / n)
     return {"n": n, "mean": mean, "se": se, "t": mean / se if se > 0 else None}
-
-
-def parent_costs(parent, fills, timeline, tick, taker_fee) -> dict[str, float]:
-    """Cost decomposition of one parent (module docstring), currency."""
-    order = TcaParent(
-        order_id=parent.parent_id,
-        instrument_id=parent.instrument_id,
-        side=parent.side,
-        qty_target=parent.qty,
-        decision_ts=parent.start_ts,
-        arrival_ts=parent.start_ts,
-        end_ts=parent.end_ts,
-    )
-    fees_net = sim_impact = 0.0
-    maker_qty = 0
-    for f in fills:
-        liq = MAKER if f.liquidity == Liquidity.MAKER else TAKER
-        order.fills.append(stamp_fill(timeline, f.ts, f.price_ticks * tick, f.qty, f.side, liq))
-        fees_net += f.fee
-        sim_impact += f.impact_cost
-        if f.liquidity == Liquidity.MAKER:
-            maker_qty += f.qty
-    rec = order_tca(order, timeline)
-    perold = rec["perold"]
-    unfilled = parent.qty - order.qty_filled
-    i_end = timeline.prevailing(parent.end_ts)
-    completion = unfilled * (timeline.half_spread(i_end) + taker_fee)
-    shortfall = float(perold["total_is"])
-    return {
-        "notional": parent.qty * float(rec["decision_mid"]),
-        "qty": parent.qty,
-        "filled_qty": order.qty_filled,
-        "maker_qty": maker_qty,
-        "shortfall": shortfall,
-        "trading": float(perold["trading_cost"]),
-        "opportunity": float(perold["opportunity_cost"]),
-        "spread": float(rec["spread_cost"]),
-        "price_vs_mid_residual": float(rec["impact_cost"]),
-        "timing": float(rec["timing_cost"]),
-        "fees_net": fees_net,
-        "sim_impact": sim_impact,
-        "completion": completion,
-        "all_in": shortfall + fees_net + sim_impact + completion,
-    }
 
 
 def summarise(rows: list[dict[str, float]]) -> dict[str, object]:

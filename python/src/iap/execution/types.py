@@ -184,6 +184,17 @@ class ExecCounters:
         }
 
 
+#: v1.17 B1 (X-7): ``Fill.provenance`` values, by simulator rule.
+FILL_PROVENANCES: tuple[str, ...] = (
+    "aggressive_walk",  #: rule 3: our aggressive child walked displayed depth
+    "exec_print",  #: rule 4: an EXECUTE on the book reached our resting child
+    "marketable_add",  #: rule 4: a crossing ADD matched internally against our level
+    "hidden_print",  #: rule 4 (X-P2-7 opt-in): a non-displayed TRADE print
+    "cross",  #: rule 4 last bullet: the display crossed our resting limit
+    "reopen_touch",  #: rule 8: uncrossed at the touch when the venue reopened
+)
+
+
 @dataclass(frozen=True, slots=True)
 class Fill:
     """One simulated fill.
@@ -206,6 +217,11 @@ class Fill:
     liquidity: Liquidity
     fee: float
     impact_cost: float
+    #: v1.17 B1 (X-7): which simulator rule produced the fill, one of
+    #: :data:`FILL_PROVENANCES` (``""`` only for a Fill built by hand).
+    #: Last, with a default, and outside ``to_dict`` so every pinned golden
+    #: row and every positional constructor stays byte-identical.
+    provenance: str = ""
 
     def to_dict(self) -> dict:
         """Row in the key order of ``tests/golden/expected_replay_fills.json``."""
@@ -264,6 +280,12 @@ class ChildOrder:
     #: behaviour), ``"reject"`` = cancelled on arrival when it would cross,
     #: ``"slide"`` = repriced one tick inside the opposite touch instead.
     post_only: str = ""
+    #: v1.17 B1 (X-5): set by the simulator when an aggressive (MARKET /
+    #: IOC / FOK) child walked the configured depth without reaching its
+    #: limit and still had a remainder, which was cancelled
+    #: (``UNFILLED_REMAINDER``): the under-fill was the book's depth, not
+    #: the price. Never set for a LIMIT (its remainder rests).
+    depth_exhausted: bool = False
 
     @property
     def is_terminal(self) -> bool:
