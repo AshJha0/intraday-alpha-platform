@@ -3120,8 +3120,11 @@ PYTHONPATH=python/src python -m iap.llm --workspace $WS --agent llm-researcher \
 The session prints its status, budget and findings and leaves
 `transcript.jsonl`, `tool_log.jsonl`, `session.json` and the run reports in
 `$WS/research/agents/llm_sessions/<id>/`; the board in `$WS` verifies with
-`python -m iap.agents.cli --root $WS verify-board`. The default model is
-`claude-opus-5-5`; `--runner power --dataset synthetic:seed=7` uses the full
+`python -m iap.agents.cli --root $WS verify-board`. The default model is the
+research pin in `configs/agents/llm.json` (`claude-sonnet-5-5`); every call is
+recorded in the spend ledger outside the repository and refused before it is
+made once the month would pass the USD 30 cap (`python -m iap.llm spend` prints
+month-to-date, cap and the last rows; GOVERNANCE.md §2c); `--runner power --dataset synthetic:seed=7` uses the full
 synthetic pipeline (minutes per run) instead of the planted in-memory set.
 
 The live evals, for the release owner (four sessions on

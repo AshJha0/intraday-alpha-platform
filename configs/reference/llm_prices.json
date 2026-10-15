@@ -1,0 +1,13 @@
+{
+  "x-version": 1,
+  "description": "v1.17 E1: USD per million tokens for every model iap.llm may request (iap.llm.prices). Anthropic first-party API list prices; cache writes are billed at input x cache_write_multiplier. An unknown model has no price and is refused, never guessed. Re-check the source and bump `checked` in its own PR when prices move.",
+  "source": "https://www.anthropic.com/pricing (Anthropic first-party API list prices)",
+  "checked": "2026-10-06",
+  "unit": "USD per million tokens",
+  "cache_write_multiplier": 1.25,
+  "models": {
+    "claude-haiku-5-5": {"input": 0.10, "output": 0.50, "cache_read": 0.01, "cache_write": 0.125},
+    "claude-opus-5-5": {"input": 4.00, "output": 20.00, "cache_read": 0.20, "cache_write": 5.00},
+    "claude-sonnet-5-5": {"input": 2.00, "output": 10.00, "cache_read": 0.20, "cache_write": 2.50}
+  }
+}

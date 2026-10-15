@@ -287,6 +287,7 @@ The model is a client of the 2a controls, not an exception to them.
 | Every number in a finding must appear in the evidence of a cited artefact (`metrics`/`result(s)`/`stats` subtrees and `t_threshold`, not metadata) under exact-decimal matching (integers exactly; decimals by rounding at the precision shown); a labelled statistic (`IC`, `t`, `Sharpe`, `hit rate`) must match a field of that statistic; number words are refused (v1.13); free-text fields are not evidence; at least one cited report must be from the session | `iap.llm.verify.verify_finding` | invented, derived or injected numbers; hallucinated citations |
 | Tool output free text wrapped and flagged as untrusted; the system prompt says it is data | `iap.agents.untrusted` | prompt injection (advisory; the structural controls above are the real ones) |
 | Caps on estimated USD (projected one call ahead), tokens, tool calls; session stops at the first | `iap.llm.budget.Budget` | runaway spend |
+| Monthly cap on the shared spend ledger, checked before every call in every process; 80 % alert; prices and pins from configuration (§2c) | `iap.llm.spend.SpendLedger`, `iap.llm.prices` | spend across sessions passing the owner's cap; a silent model or price change |
 | Transcript, tool log and summary persisted; the API key is scrubbed from anything written | `run_session`, `envfile.redact` | unaudited sessions, key leaks |
 
 **API key.** `ANTHROPIC_API_KEY` from the environment or `--env-file`
@@ -294,6 +295,60 @@ The model is a client of the 2a controls, not an exception to them.
 committed; `.env`, `*.env` and `.iap_keys/` are git-ignored. The SDK is the
 optional `[llm]` extra; tests and CI use a scripted client and make no
 network call.
+
+### 2c. LLM spend (v1.17 E1)
+
+Every model call the platform makes is paid for from the owner's API key, so
+the spend controls are shared state outside any one process, and nothing
+about money is decided by the model.
+
+**Prices are configuration.** `configs/reference/llm_prices.json` lists USD
+per million tokens (input, output, cache read, cache write) for every model
+`iap.llm` may request, with the `source` and the `checked` date they were read
+on. `iap.llm.prices` loads it and **refuses an unknown model** (`UnknownModelError`);
+a price is never guessed in code. Moving a price or adding a model is a
+reviewed change to that file.
+
+**Dated pins.** `configs/agents/llm.json` pins one explicit model id per role
+(research `claude-sonnet-5-5`; ops, docs and evals `claude-haiku-5-5`), each a
+dated snapshot `{"model", "pinned", "prices_checked"}` recorded in the session
+summary (`pin`) and in every ledger row, so a run states which model and which
+price table it ran under. The most expensive model is no longer anyone's
+default (review finding E-7).
+
+**The ledger.** `iap.llm.spend.SpendLedger` is an append-only JSONL file
+**outside the repository**: `IAP_LLM_SPEND_LEDGER`, else
+`%LOCALAPPDATA%\iap\llm_spend.jsonl` on Windows and
+`~/.local/state/iap/llm_spend.jsonl` elsewhere; a path under the repository is
+refused. One row per API call: UTC time, session id, run id, agent role, model,
+pin, tokens in / out / cache read / cache write, USD and the month-to-date after
+the row. Appends take the `iap.experiment.locking.FileLock` on the file, re-read
+the month inside the lock and `fsync` one line. A corrupt line (torn tail from a
+killed process, not JSON, wrong schema, malformed `usd`) is skipped and counted
+(`corrupt_rows`), never repaired and never fatal; a torn tail is terminated
+before the next append so it cannot swallow a good row.
+
+**The caps** (`configs/agents/llm.json`): a **monthly cap** of USD 30, a
+**per-run budget** of USD 1 (`Budget.max_usd`, `--max-usd`) and an **80 %
+alert**. `Budget.check_model_call` reads the ledger on *every* call and refuses
+the call **before it is made** when the month-to-date plus the next call's
+maximum cost (`prompt tokens x input price + max_tokens x output price`) would
+exceed the cap, in every process at once. When a recorded call takes the
+month-to-date past the alert fraction, the alert fires once per month across
+processes (an `O_EXCL` marker next to the ledger): a logged WARNING and, on
+Windows, the toast route of `tools/jobs/watchdog.py` (`notify`, reused). A
+real `anthropic` client on a budget without a ledger gets the operator ledger
+attached by `run_session`; the scripted test client never touches it, and no
+test writes the operator's ledger.
+
+**Prompt caching.** The stable prefix (tool specs and the system prompt) carries
+`cache_control` so repeated turns are billed at the cache-read price; the
+cache read and write token counts are recorded in the ledger and costed from the
+file's columns.
+
+**Reading it.** `python -m iap.llm spend [--last N] [--json]` prints the ledger
+path, month-to-date, cap, remaining, the per-run budget, whether the alert fired
+and the last rows.
 
 **Evals (AI2).** `python -m iap.llm.evals` (mocked) must pass in CI: the
 scripted model p-hacks, follows the injection and fabricates citations, and
