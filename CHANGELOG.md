@@ -8,6 +8,27 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-F item F7, part 1: hand-written C++ parity ports of the execution rules already on
+  main (no translation tools), one commit per rule, next to `SmartOrderRouter` and the execution
+  simulator in `cpp/`: `sor/sor_v2.hpp` (`CostAwareRouter::plan_sweep` all-in / price ranking,
+  passive routing with fill probability, `aggressive_costs`, `allocate_passive`, `VenueModel`
+  / `FeeLedger`), simulator rule 6b (`ExecConfig::impact_model = PARENT`,
+  `ExecutionSimulator::parent_impact`), `ParentOrder::pov_exact` (`pov_target`, the deficit
+  loops), `execution/optimal.hpp` (the Almgren-Chriss eta path with the B3 drift),
+  `execution/signal.hpp` (signal units, `ArraySignalSource`, `regime_from_z`, `read_signal`),
+  `execution/pacing.hpp` (B3), `execution/fading.hpp` (B4 / B5 rules, `PullRecord`, the B4
+  counterfactual), `execution/fill_hazard.hpp` (hazard prediction on the UTC clock),
+  `execution/queue_depletion.hpp` (the X-4 split read), `tca/markout.hpp` +
+  `tca/markout_decomposition.hpp` (B6 with the CR1 day-clustered SE). Every port reproduces a
+  golden the Python reference generates (`python/tools/make_golden_f7.py` ->
+  `tests/golden/expected_f7_*.json`: fixed vectors + the sampled real slice) byte for byte as
+  canonical JSON (`cpp/tests/test_f7_*.cpp`; `python/tests/test_f7_golden.py` pins the bytes);
+  the only tolerance is the two SciPy Student-t readings of B6 (`expected_tol`, 1e-9).
+  PLATFORM_CONVENTIONS §11.3 carries the owning-language table; `bench_exec_rules`
+  (`benchmarks/results_exec_rules.md`, CI artifact `bench-exec-rules`) the per-event latency
+  rows. Not in part 1: the replay-scheduler wiring of B2-B5 (Python `iap.execution.replay`),
+  the X-8 IANA-zone clock, the A5 per-session ADV in rule 6b, and the B10 dark-venue model
+  (F7 part 2). Python rule code untouched.
 - v1.17 WS-F items F4 and F5 (#188). **The committed real slice**
   `benchmarks/slices/itch50_20190130_AAPL` (`tools/extract_real_slice.py`; Nasdaq ITCH 5.0, AAPL,
   2019-01-30 from the 09:30 open: 1,132 book-reconstruction ADDs + 64,000 real events, 4.69 MB,
