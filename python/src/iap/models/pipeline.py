@@ -178,11 +178,20 @@ def run_model_comparison(
     tracker: ExperimentTracker | None = None,
     n_folds: int = 4,
     embargo_ns: int = 60_000_000_000,
+    ledger=None,
 ) -> dict[str, Any]:
     """Full gated comparison. Returns per-model metrics + gate record.
 
     When ``tracker`` is given, each trained model becomes a tracked run with
     manifest.json / metrics.json / model.pkl per spec §14/§26.
+
+    ``ledger`` (an :class:`iap.validation.ledger.ExperimentLedger`, v1.17
+    review R-4) records the gate decision as ONE look of kind
+    ``"model_zoo_gate"`` (identity: the target, the predictor set, the fold
+    protocol and the tier-0 model names; result: the gate record and every
+    model's pooled ICs) so the model-zoo look enters the multiple-testing
+    denominator the alpha reports quote.  The caller saves the ledger; the
+    running total is returned as ``results["gate"]["ledger_n"]``.
     """
     splitter = WalkForwardSplitter(
         n_folds=n_folds, embargo_ns=embargo_ns, label_horizon_ns=TARGET_HORIZON_NS
@@ -265,4 +274,31 @@ def run_model_comparison(
             _track(res)
             results["models"][name] = res
     results["gate"]["skipped_models"] = skipped
+    if ledger is not None:
+        results["gate"]["ledger_n"] = ledger.record(
+            "ML_ZOO",
+            "model_zoo_gate",
+            config={
+                "target": TARGET_COLUMN,
+                "features": list(ds.feature_names),
+                "n_folds": int(n_folds),
+                "embargo_ns": int(embargo_ns),
+                "tier0_models": sorted(model_names(0)),
+                "rule": results["gate"]["rule"],
+            },
+            result={
+                "passed": bool(gate_passed),
+                "best_linear_model": best_linear,
+                "best_linear_pooled_ic_vs_mid": float(tier0_ics[best_linear]),
+                "models": {
+                    n: {
+                        "mean_ic": float(r["mean_ic"]),
+                        "pooled_ic": float(r["pooled_ic"]),
+                        "pooled_ic_vs_mid": float(r["pooled_ic_vs_mid"]),
+                    }
+                    for n, r in results["models"].items()
+                },
+                "skipped_models": skipped,
+            },
+        )
     return results

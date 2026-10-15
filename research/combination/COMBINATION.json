@@ -261,7 +261,7 @@
           },
           "trade_count_1x_cost": 0,
           "trade_count_all_folds": 0,
-          "tstat_threshold": 4.430487477733682,
+          "tstat_threshold": 4.43906492880506,
           "verdict": "ITERATE",
           "weight_stability": {
             "mean": {
@@ -460,7 +460,7 @@
           },
           "trade_count_1x_cost": 0,
           "trade_count_all_folds": 3,
-          "tstat_threshold": 4.430487477733682,
+          "tstat_threshold": 4.43906492880506,
           "verdict": "ITERATE",
           "weight_stability": {
             "mean": {
@@ -715,7 +715,7 @@
           },
           "trade_count_1x_cost": 0,
           "trade_count_all_folds": 7,
-          "tstat_threshold": 4.430487477733682,
+          "tstat_threshold": 4.43906492880506,
           "verdict": "ITERATE",
           "weight_stability": {
             "mean": {
@@ -1010,7 +1010,7 @@
           },
           "trade_count_1x_cost": 0,
           "trade_count_all_folds": 6,
-          "tstat_threshold": 4.430487477733682,
+          "tstat_threshold": 4.43906492880506,
           "verdict": "ITERATE",
           "weight_stability": {
             "mean": {
@@ -2040,7 +2040,7 @@
           },
           "trade_count_1x_cost": 0,
           "trade_count_all_folds": 2,
-          "tstat_threshold": 4.430487477733682,
+          "tstat_threshold": 4.43906492880506,
           "verdict": "ITERATE",
           "weight_stability": {
             "mean": {
@@ -2239,7 +2239,7 @@
           },
           "trade_count_1x_cost": 1019,
           "trade_count_all_folds": 4217,
-          "tstat_threshold": 4.430487477733682,
+          "tstat_threshold": 4.43906492880506,
           "verdict": "ITERATE",
           "weight_stability": {
             "mean": {
@@ -2494,7 +2494,7 @@
           },
           "trade_count_1x_cost": 1508,
           "trade_count_all_folds": 6523,
-          "tstat_threshold": 4.430487477733682,
+          "tstat_threshold": 4.43906492880506,
           "verdict": "ITERATE",
           "weight_stability": {
             "mean": {
@@ -2789,7 +2789,7 @@
           },
           "trade_count_1x_cost": 1519,
           "trade_count_all_folds": 6518,
-          "tstat_threshold": 4.430487477733682,
+          "tstat_threshold": 4.43906492880506,
           "verdict": "ITERATE",
           "weight_stability": {
             "mean": {
@@ -3563,13 +3563,13 @@
   "looks": {
     "declared_by_this_report": 104,
     "experiments": 8,
-    "gate_looks": 5318,
-    "ledger_before": 5214,
+    "gate_looks": 5534,
+    "ledger_before": 5430,
     "per_experiment": {
       "COMB_EQ": 13,
       "COMB_FX": 13
     },
-    "tstat_threshold": 4.430487477733682
+    "tstat_threshold": 4.43906492880506
   },
   "methods_bundle": "v2",
   "protocol": {

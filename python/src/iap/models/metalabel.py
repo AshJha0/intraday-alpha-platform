@@ -166,8 +166,16 @@ def run_meta_labeling(
     primary_name: str = "primary",
     tau: float = 0.5,
     impute_nan: bool = False,
+    ledger=None,
 ) -> dict[str, Any]:
     """Train + calibrate + economically evaluate the meta-label gate.
+
+    ``ledger`` (an :class:`iap.validation.ledger.ExperimentLedger`, v1.17
+    review R-4) records the tau decision - the pinned ``tau`` read on the
+    test segment and ``best_tau`` chosen on the calibration segment and
+    read on the test segment - as ONE look of kind ``"metalabel_tau"``
+    (identity: the primary model, ``tau``, the sweep grid rule and the
+    imputation); the caller saves the ledger.
 
     ``primary_pred`` is the pooled OOS prediction vector (NaN where a sample
     was never out-of-sample).  ``tau`` is the pinned probability threshold of
@@ -339,4 +347,24 @@ def run_meta_labeling(
         tracker.write_metrics(run_id, result)
         tracker.save_model(run_id, calib)
         result["run_id"] = run_id
+    if ledger is not None:
+        result["ledger_n"] = ledger.record(
+            f"META_{primary_name}",
+            "metalabel_tau",
+            config={
+                "primary_model": primary_name,
+                "tau": float(tau),
+                "tau_grid": "0.30..0.70 step 0.05 + calibration deciles 10/25/50/75/90",
+                "impute_nan": bool(impute_nan),
+                "selection": "best_tau = argmax total_net_bps on the calibration segment",
+            },
+            result={
+                "best_tau_from_calibration": float(best_tau),
+                "auc_test": auc,
+                "gate_degenerate": result["gate_degenerate"],
+                "economics_gate_off": econ_off,
+                "economics_gate_tau": econ_tau,
+                "economics_gate_best_tau": econ_best,
+            },
+        )
     return result

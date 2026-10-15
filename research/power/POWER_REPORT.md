@@ -12,7 +12,7 @@ How often does the validation chain (`iap.validation.validate_alpha`, the pinned
 - Sessions: each run is generated at 4 sessions and evaluated on its first 1, 2, 4 (the first n sessions of a run are exactly the n-session run of the same seed).
 - Scenarios: `stable` = the effect holds for the whole sample; `break` = it is reversed from the middle of the sample on (levels 1, 4 sessions).
 - Detectors: `lead_lag:EQ10@1s` (declared horizon); `lead_lag:EQ10@5s` (matched horizon); `order_flow:EQ04@5s` (declared horizon); `order_flow:EQ04@10s` (matched horizon). The matched horizon is the shortest pinned label horizon that covers the planted mechanism — a rule on the planted block, not on the results.
-- Thresholds on the pooled-slope HAC t (gate IC > 0 required): `fixed` 3; `gate` 4.426, the PROMOTE threshold in force (Bonferroni at the 5,204 looks the committed promotion reports were judged at); `study` 4.164, Bonferroni over this study's own 1,600 tests. Verdicts are computed at 4.426, the largest of the three.
+- Thresholds on the pooled-slope HAC t (gate IC > 0 required): `fixed` 3; `gate` 4.435, the PROMOTE threshold in force (Bonferroni at the 5,420 looks the committed promotion reports were judged at); `study` 4.164, Bonferroni over this study's own 1,600 tests. Verdicts are computed at 4.435, the largest of the three.
 
 ## Detection of the reference effect, by number of sessions
 
@@ -119,26 +119,26 @@ Fit of `t ~ N((kappa0 + kappa * level) * sqrt(sessions), sd)` to the chain's t o
 
 | detector | kappa0 | kappa | sd | null mean t | null sd t | threshold | MDE at 4 sessions | sessions for reference | modelled power at 4 |
 |---|---:|---:|---:|---:|---:|---|---:|---:|---:|
-| lead_lag:EQ10@1s | -0.208 | +1.165 | 1.08 | -0.37 | 1.10 | gate 4.426 | 2.47 | 31.1 | 0.01 |
+| lead_lag:EQ10@1s | -0.208 | +1.165 | 1.08 | -0.37 | 1.10 | gate 4.435 | 2.47 | 31.2 | 0.01 |
 | lead_lag:EQ10@1s | -0.208 | +1.165 | 1.08 | -0.37 | 1.10 | fixed 3.000 | 1.86 | 16.7 | 0.16 |
-| lead_lag:EQ10@5s | +0.012 | +1.964 | 1.07 | -0.11 | 0.95 | gate 4.426 | 1.35 | 7.3 | 0.33 |
+| lead_lag:EQ10@5s | +0.012 | +1.964 | 1.07 | -0.11 | 0.95 | gate 4.435 | 1.35 | 7.3 | 0.33 |
 | lead_lag:EQ10@5s | +0.012 | +1.964 | 1.07 | -0.11 | 0.95 | fixed 3.000 | 0.99 | 3.9 | 0.81 |
-| order_flow:EQ04@5s | -0.780 | +3.129 | 1.02 | -1.08 | 1.07 | gate 4.426 | 1.09 | 5.1 | 0.61 |
+| order_flow:EQ04@5s | -0.780 | +3.129 | 1.02 | -1.08 | 1.07 | gate 4.435 | 1.09 | 5.1 | 0.60 |
 | order_flow:EQ04@5s | -0.780 | +3.129 | 1.02 | -1.08 | 1.07 | fixed 3.000 | 0.87 | 2.7 | 0.95 |
-| order_flow:EQ04@10s | -0.765 | +4.398 | 1.01 | -1.16 | 1.09 | gate 4.426 | 0.77 | 2.1 | 1.00 |
+| order_flow:EQ04@10s | -0.765 | +4.398 | 1.01 | -1.16 | 1.09 | gate 4.435 | 0.77 | 2.1 | 1.00 |
 | order_flow:EQ04@10s | -0.765 | +4.398 | 1.01 | -1.16 | 1.09 | fixed 3.000 | 0.61 | 1.1 | 1.00 |
 
 Break test (`E[z] = kappa * level * sqrt(sessions)`, fitted on the `break` runs):
 
 | detector | kappa | sd | threshold | sessions for reference |
 |---|---:|---:|---|---:|
-| lead_lag:EQ10@1s | +0.895 | 1.00 | gate 4.426 | 34.6 |
+| lead_lag:EQ10@1s | +0.895 | 1.00 | gate 4.435 | 34.7 |
 | lead_lag:EQ10@1s | +0.895 | 1.00 | fixed 3.000 | 18.4 |
-| lead_lag:EQ10@5s | +1.864 | 0.86 | gate 4.426 | 7.6 |
+| lead_lag:EQ10@5s | +1.864 | 0.86 | gate 4.435 | 7.7 |
 | lead_lag:EQ10@5s | +1.864 | 0.86 | fixed 3.000 | 4.0 |
-| order_flow:EQ04@5s | +3.032 | 1.03 | gate 4.426 | 3.0 |
+| order_flow:EQ04@5s | +3.032 | 1.03 | gate 4.435 | 3.1 |
 | order_flow:EQ04@5s | +3.032 | 1.03 | fixed 3.000 | 1.6 |
-| order_flow:EQ04@10s | +4.209 | 0.95 | gate 4.426 | 1.5 |
+| order_flow:EQ04@10s | +4.209 | 0.95 | gate 4.435 | 1.5 |
 | order_flow:EQ04@10s | +4.209 | 0.95 | fixed 3.000 | 0.8 |
 
 ## What the platform can and cannot detect

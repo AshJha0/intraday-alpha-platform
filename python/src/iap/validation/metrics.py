@@ -803,6 +803,72 @@ def day_block_bootstrap_tstat(
     }
 
 
+def paired_day_block_bootstrap(
+    ts: np.ndarray,
+    scores_a: np.ndarray,
+    scores_b: np.ndarray,
+    labels: np.ndarray,
+    seed: int = 0,
+    n_boot: int = 2000,
+    day_ns: int = 86_400 * NS_S,
+    min_days: int = 2,
+) -> dict[str, float | bool]:
+    """Paired day-block bootstrap of ``IC(b) - IC(a)`` (v1.17, R-4).
+
+    Both scores are correlated with the same labels on the same rows; whole
+    days are resampled with replacement ONCE per draw and both ICs are
+    recomputed from that draw's per-day sufficient statistics, so the
+    difference is paired (the day-to-day variation common to both models
+    cancels).  Returns ``{"ic_a", "ic_b", "delta", "se", "tstat", "p05",
+    "p95", "n_days", "low_power"}`` (NaN where undefined; ``low_power`` below
+    :data:`BOOTSTRAP_LOW_POWER_DAYS` days).  Rows where either score or the
+    label is not finite are dropped for both.  Deterministic for a seed.
+    """
+    ts = np.asarray(ts, dtype=np.int64)
+    a = np.asarray(scores_a, dtype=float)
+    b = np.asarray(scores_b, dtype=float)
+    y = np.asarray(labels, dtype=float)
+    if not (ts.shape == a.shape == b.shape == y.shape):
+        raise ValueError("ts/score/label length mismatch")
+    ok = np.isfinite(a) & np.isfinite(b) & np.isfinite(y)
+    nan = float("nan")
+    days, n, sa, sy, saa, syy, say = _day_moments(ts[ok], a[ok], y[ok], day_ns)
+    _, _, sb, _, sbb, _, sby = _day_moments(ts[ok], b[ok], y[ok], day_ns)
+    g = int(days.size)
+    ic_a = _corr_from_moments(n.sum(), sa.sum(), sy.sum(), saa.sum(), syy.sum(), say.sum())
+    ic_b = _corr_from_moments(n.sum(), sb.sum(), sy.sum(), sbb.sum(), syy.sum(), sby.sum())
+    out: dict[str, float | bool] = {
+        "ic_a": ic_a,
+        "ic_b": ic_b,
+        "delta": ic_b - ic_a if np.isfinite(ic_a) and np.isfinite(ic_b) else nan,
+        "se": nan,
+        "tstat": nan,
+        "p05": nan,
+        "p95": nan,
+        "n_days": g,
+        "low_power": g < BOOTSTRAP_LOW_POWER_DAYS,
+    }
+    if g < max(2, min_days) or not np.isfinite(out["delta"]):
+        return out
+    rng = np.random.default_rng(int(seed))
+    draws = rng.integers(0, g, size=(int(n_boot), g))
+    counts = np.stack([np.bincount(row, minlength=g) for row in draws]).astype(float)
+    ma = counts @ np.stack([n, sa, sy, saa, syy, say], axis=1)
+    mb = counts @ np.stack([n, sb, sy, sbb, syy, sby], axis=1)
+    boot = np.array(
+        [_corr_from_moments(*rb) - _corr_from_moments(*ra) for ra, rb in zip(ma, mb, strict=True)]
+    )
+    boot = boot[np.isfinite(boot)]
+    if boot.size < 2:
+        return out
+    se = float(boot.std(ddof=1))
+    out["se"] = se
+    out["tstat"] = float(out["delta"] / se) if se > EPS else nan
+    out["p05"] = float(np.quantile(boot, 0.05))
+    out["p95"] = float(np.quantile(boot, 0.95))
+    return out
+
+
 def decay_curve(
     scores: np.ndarray,
     frame,
