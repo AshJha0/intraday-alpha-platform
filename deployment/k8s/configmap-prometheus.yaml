@@ -69,8 +69,8 @@ data:
     \ for {{ $value | humanizeDuration }} on {{ $labels.service }}\"\n          description: >-\n    \
     \        A running realtime session has not processed an event in over a\n            minute of wall\
     \ clock \u2014 a wedged decode/trading thread or a dead\n            upstream. /health returns 503\
-    \ after 30s of no progress. Runbook:\n            docs/runbooks/RUNBOOK_paper_trading.md#feed-stall\n\
-    \          runbook: docs/runbooks/RUNBOOK_paper_trading.md\n          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md\n\
+    \ after 30s of no progress. Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#feed-stall\n\
+    \          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
     \n  - name: iap-alpha-health\n    rules:\n      # Signal-rate collapse: alpha engine emitting far\
     \ below its trailing\n      # baseline while market data still flows.\n      - alert: SignalRateCollapse\n\
     \        expr: >\n          job:alpha_signals:rate5m\n            < 0.2 * (job:alpha_signals:rate5m\
@@ -80,8 +80,8 @@ data:
     \ 20% of its rate 1h ago while market data is\n            flowing \u2014 feature validity flags,\
     \ warmup state or a wedged engine.\n            NOTE: the demo deployment runs a FINITE session, so\
     \ `offset 1h`\n            baselines are only meaningful for a continuously running feed\n       \
-    \     (RUNBOOK_paper_trading.md \xA71). Runbook:\n            docs/runbooks/RUNBOOK_paper_trading.md#signal-rate\n\
-    \          runbook: docs/runbooks/RUNBOOK_paper_trading.md\n          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md\n\
+    \     (RUNBOOK_shadow_deployment.md \xA71). Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#signal-rate\n\
+    \          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
     \n      # Live-vs-backtest drift (LIVE from java: com.iap.adaptive.DriftMonitor\n      # via com.iap.platform.PaperTrading,\
     \ labeled {alpha=\"...\"}). The\n      # statistic is the pinned Population Stability Index of the\
     \ rolling\n      # live signal window vs the research baseline (API_ADAPTIVE.md /\n      # research/baselines/*.json):\
@@ -97,8 +97,8 @@ data:
     \ NOT PSI-gated, and is\n            OBSERVATIONAL in the live loop: a RETIRED alpha keeps trading\
     \ at\n            full size until a human acts (API_ADAPTIVE.md \xA76,\n            PLATFORM_CONVENTIONS.md\
     \ \xA712.6). Persistent drift is a retirement\n            trigger per spec \xA720 step 13 \u2014\
-    \ raise it with research.\n            Runbook: docs/runbooks/RUNBOOK_paper_trading.md#drift\n   \
-    \       runbook: docs/runbooks/RUNBOOK_paper_trading.md\n          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md\n\
+    \ raise it with research.\n            Runbook: docs/runbooks/RUNBOOK_shadow_deployment.md#drift\n\
+    \          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
     \n      # The lifecycle gauge is observational, so RETIRED must page a human:\n      # nothing in\
     \ the platform stops the allocation on its own.\n      - alert: AlphaLifecycleRetired\n        expr:\
     \ alpha_lifecycle_state >= 2\n        for: 15m\n        labels:\n          severity: warning\n   \
@@ -107,8 +107,8 @@ data:
     \ has marked {{ $labels.alpha }}\n            RETIRED (rolling IC below watch_ic_gate for retire_breach_evals\n\
     \            consecutive evaluations). The live loop does NOT halt allocation\n            on this\
     \ signal \u2014 it is observational \u2014 so the position must be\n            reduced by a human\
-    \ decision. Runbook:\n            docs/runbooks/RUNBOOK_paper_trading.md#lifecycle\n          runbook:\
-    \ docs/runbooks/RUNBOOK_paper_trading.md\n          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md\n\
+    \ decision. Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#lifecycle\n         \
+    \ runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
     \n  - name: iap-execution\n    rules:\n      # Fill rate over the PLATFORM's own execution counters\
     \ (exec_*, exported\n      # by com.iap.platform.PaperTrading \u2014 PLATFORM_CONVENTIONS.md \xA7\
     12.6).\n      # The previous version divided venue-simulator counters that no deployed\n      # component\
@@ -118,8 +118,8 @@ data:
     \   annotations:\n          summary: \"Fill rate dropped on {{ $labels.service }} ({{ $value | humanizePercentage\
     \ }})\"\n          description: >-\n            Fills per submitted child order below half their 1h-ago\
     \ baseline\n            while orders are flowing \u2014 queue-position model, venue health or\n  \
-    \          adverse regime shift. Runbook:\n            docs/runbooks/RUNBOOK_paper_trading.md#fill-rate\n\
-    \          runbook: docs/runbooks/RUNBOOK_paper_trading.md\n          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md\n\
+    \          adverse regime shift. Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#fill-rate\n\
+    \          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
     \n      # Pre-trade rejects are normal in small numbers; a sustained majority\n      # means the strategy\
     \ is fighting a limit (or a stale book).\n      - alert: PreTradeRejectRatioHigh\n        expr: job:risk_rejected:ratio5m\
     \ > 0.5\n        for: 10m\n        labels:\n          severity: warning\n          domain: execution\n\
@@ -127,8 +127,8 @@ data:
     \ rejected on {{ $labels.service }}\"\n          description: >-\n            More than half of all\
     \ risk decisions are rejects for 10m. Read the\n            rule_id distribution in the session's\
     \ risk_audit.jsonl\n            (<state-dir>/risk_audit.jsonl) before changing any limit.\n      \
-    \      Runbook: docs/runbooks/RUNBOOK_paper_trading.md#rejects\n          runbook: docs/runbooks/RUNBOOK_paper_trading.md\n\
-    \          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md\n\n  - name: iap-risk\n    rules:\n\
+    \      Runbook: docs/runbooks/RUNBOOK_shadow_deployment.md#rejects\n          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
+    \          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\n  - name: iap-risk\n    rules:\n\
     \      # Loss-limit utilization against the LIVE limit gauge (\xA712.6), so a\n      # GOVERNANCE\
     \ \xA73 limit change cannot leave this alert reading the old\n      # number. risk_daily_pnl is realized\
     \ + unrealized in the reporting\n      # currency, the same unit the limit is expressed in (\xA712.1).\n\
@@ -155,9 +155,9 @@ data:
     \     domain: risk\n        annotations:\n          summary: \"Gross notional at {{ $value | humanizePercentage\
     \ }} of the limit\"\n          description: >-\n            Gross exposure has been above 90% of global.max_gross_notional\
     \ for\n            5m; the next sizing decision will be rejected by the pre-trade\n            check.\
-    \ Runbook: docs/runbooks/RUNBOOK_paper_trading.md#exposure\n          runbook: docs/runbooks/RUNBOOK_paper_trading.md\n\
-    \          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md\n\n      # A child order left for a\
-    \ venue other than the one the pre-trade check\n      # approved (PaperTrading.RiskWiring.onOrderSubmitted).\
+    \ Runbook: docs/runbooks/RUNBOOK_shadow_deployment.md#exposure\n          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
+    \          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\n      # A child order left for\
+    \ a venue other than the one the pre-trade check\n      # approved (PaperTrading.RiskWiring.onOrderSubmitted).\
     \ The platform\n      # cancels the child and counts it; the counter is created on the first\n   \
     \   # occurrence and never decreases, so `> 0` holds for the rest of the\n      # process \u2014 a\
     \ wiring defect stays visible until someone restarts.\n      - alert: RoutedVenueMismatch\n      \
@@ -168,8 +168,8 @@ data:
     \ one named\n            in its pre-trade risk request, so a venue kill or disconnect was\n      \
     \      checked against the wrong venue. The child was cancelled\n            (fail-closed), but this\
     \ is a routing/risk wiring defect, not a\n            market event: engage the kill switch and investigate.\
-    \ Runbook:\n            docs/runbooks/RUNBOOK_paper_trading.md#routed-venue-mismatch\n          runbook:\
-    \ docs/runbooks/RUNBOOK_paper_trading.md\n          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md\n\
+    \ Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#routed-venue-mismatch\n       \
+    \   runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
     \n      # An admin kill is accepted (latched in AdminService) before the risk\n      # engine records\
     \ it; the order path withholds every order meanwhile and\n      # counts each one. One or two withheld\
     \ orders are the normal race. A\n      # counter that keeps climbing for minutes means the kill is\
@@ -193,8 +193,8 @@ data:
     \ in the execution\n            simulator and were released so they do not inflate position\n    \
     \        projections. Positions and realized P&L are restored, the\n            working orders are\
     \ not: reconcile before trusting the session.\n            The alert stays up until the process ends.\
-    \ Runbook:\n            docs/runbooks/RUNBOOK_paper_trading.md#resume-released-orders\n          runbook:\
-    \ docs/runbooks/RUNBOOK_paper_trading.md\n          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md\n\
+    \ Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#resume-released-orders\n      \
+    \    runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
     \n  - name: iap-infrastructure\n    rules:\n      # GC pause: p99 pause above 10ms breaks the order-path\
     \ latency budget.\n      # NOTE under ZGC the MX bean reports concurrent-cycle time rather than\n\
     \      # stop-the-world pause time (deployment/grafana/README.md).\n      - alert: GcPauseHigh\n \
@@ -210,8 +210,8 @@ data:
     \    domain: infrastructure\n        annotations:\n          summary: \"Paper-trading session FAILED\
     \ on {{ $labels.service }}\"\n          description: >-\n            platform_session_state = 3 (FAILED).\
     \ /health is 503 with the\n            reason; the container exits non-zero. Check the pod logs and\n\
-    \            <state-dir>/config_audit.jsonl. Runbook:\n            docs/runbooks/RUNBOOK_paper_trading.md#failed-session\n\
-    \          runbook: docs/runbooks/RUNBOOK_paper_trading.md\n          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md\n\
+    \            <state-dir>/config_audit.jsonl. Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#failed-session\n\
+    \          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
     \n      # A STOPPED session (value 4: a stop was requested, the session\n      # checkpointed mid-stream\
     \ and exited 0) that nobody resumed. The\n      # trading process exits right after the checkpoint,\
     \ so its own gauge is\n      # almost never scraped at 4. The trading thread therefore also persists\n\
@@ -220,8 +220,8 @@ data:
     \ for as long as the state volume\n      # exists. The alert fires on a persisted 4 unless a live\
     \ trading process\n      # reports RUNNING again (the resume window before the marker is\n      #\
     \ rewritten). A FINISHED session persists 2 and a crash leaves 1, so\n      # neither fires this;\
-    \ a crash is TargetDown on java-platform\n      # (RUNBOOK_paper_trading.md#stopped-session).\n  \
-    \    - alert: SessionStoppedNotResumed\n        expr: >-\n          platform_persisted_session_state\
+    \ a crash is TargetDown on java-platform\n      # (RUNBOOK_shadow_deployment.md#stopped-session).\n\
+    \      - alert: SessionStoppedNotResumed\n        expr: >-\n          platform_persisted_session_state\
     \ == 4\n          unless on(service) (platform_session_state == 1)\n        for: 10m\n        labels:\n\
     \          severity: warning\n          domain: infrastructure\n        annotations:\n          summary:\
     \ \"Paper-trading session STOPPED and not resumed on {{ $labels.service }}\"\n          description:\
@@ -229,8 +229,8 @@ data:
     \ reported for 10m. The session checkpointed\n            mid-stream and exited 0, so nothing restarts\
     \ it; positions are\n            as the checkpoint left them. Resume it with --resume or record\n\
     \            why it stays down. The alert clears when a resumed session\n            starts (the persisted\
-    \ state becomes 1) or finishes (2). Runbook:\n            docs/runbooks/RUNBOOK_paper_trading.md#stopped-session\n\
-    \          runbook: docs/runbooks/RUNBOOK_paper_trading.md\n          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md\n\
+    \ state becomes 1) or finishes (2). Runbook:\n            docs/runbooks/RUNBOOK_shadow_deployment.md#stopped-session\n\
+    \          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
     \n      # An unexpected restart re-reads the checkpoint; a burst of restarts is\n      # a crash loop\
     \ (and each one re-warms the book from the stream).\n      - alert: SessionRestartsClimbing\n    \
     \    expr: increase(risk_session_restarts_total[15m]) > 2\n        for: 0m\n        labels:\n    \
@@ -238,8 +238,8 @@ data:
     \ \"{{ $value | printf \\\"%.0f\\\" }} session restarts in 15m on {{ $labels.service }}\"\n      \
     \    description: >-\n            The platform resumed from its checkpoint more than twice in 15m.\n\
     \            Risk state survives (positions, realized P&L, latches), but the\n            book and\
-    \ feature warm-up restart from the stream each time.\n            Runbook: docs/runbooks/RUNBOOK_paper_trading.md#restart-recovery\n\
-    \          runbook: docs/runbooks/RUNBOOK_paper_trading.md\n          runbook_url: docs/runbooks/RUNBOOK_paper_trading.md\n\
+    \ feature warm-up restart from the stream each time.\n            Runbook: docs/runbooks/RUNBOOK_shadow_deployment.md#restart-recovery\n\
+    \          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md\n          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md\n\
     \n      # A scrape target disappearing is itself an incident. Every job in\n      # prometheus.yml\
     \ is a target that really exists (\xA712.7), so this can\n      # only fire on a real outage.\n  \
     \    - alert: TargetDown\n        expr: up == 0\n        for: 2m\n        labels:\n          severity:\

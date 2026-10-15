@@ -118,13 +118,13 @@ tests:
               service: java-platform
             exp_annotations:
               summary: "No market event processed for 5m 0s on java-platform"
-              runbook: docs/runbooks/RUNBOOK_paper_trading.md
-              runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
+              runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
+              runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
               description: >-
                 A running realtime session has not processed an event in over a
                 minute of wall clock — a wedged decode/trading thread or a dead
                 upstream. /health returns 503 after 30s of no progress. Runbook:
-                docs/runbooks/RUNBOOK_paper_trading.md#feed-stall
+                docs/runbooks/RUNBOOK_shadow_deployment.md#feed-stall
 
   # ---------------------------------------------------------------------------
   # Test 15 — loss-limit utilization is computed against the EXPORTED limit
@@ -272,13 +272,13 @@ tests:
               service: java-platform
             exp_annotations:
               summary: "Paper-trading session FAILED on java-platform"
-              runbook: docs/runbooks/RUNBOOK_paper_trading.md
-              runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
+              runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
+              runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
               description: >-
                 platform_session_state = 3 (FAILED). /health is 503 with the
                 reason; the container exits non-zero. Check the pod logs and
                 <state-dir>/config_audit.jsonl. Runbook:
-                docs/runbooks/RUNBOOK_paper_trading.md#failed-session
+                docs/runbooks/RUNBOOK_shadow_deployment.md#failed-session
 
   # ---------------------------------------------------------------------------
   # v1.3.0 safety rules. platform_session_state 4 (STOPPED): the trading
@@ -312,8 +312,8 @@ tests:
               service: java-platform
             exp_annotations:
               summary: "Paper-trading session STOPPED and not resumed on java-platform"
-              runbook: docs/runbooks/RUNBOOK_paper_trading.md
-              runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
+              runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
+              runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
               description: >-
                 The persisted session state is 4 (STOPPED) and no running
                 session has reported for 10m. The session checkpointed
@@ -321,7 +321,7 @@ tests:
                 as the checkpoint left them. Resume it with --resume or record
                 why it stays down. The alert clears when a resumed session
                 starts (the persisted state becomes 1) or finishes (2). Runbook:
-                docs/runbooks/RUNBOOK_paper_trading.md#stopped-session
+                docs/runbooks/RUNBOOK_shadow_deployment.md#stopped-session
       - eval_time: 12m
         alertname: PlatformSessionFailed
         exp_alerts: []          # a stop is not a failure
@@ -347,8 +347,8 @@ tests:
               service: java-platform
             exp_annotations:
               summary: "Paper-trading session STOPPED and not resumed on java-platform"
-              runbook: docs/runbooks/RUNBOOK_paper_trading.md
-              runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
+              runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
+              runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
               description: >-
                 The persisted session state is 4 (STOPPED) and no running
                 session has reported for 10m. The session checkpointed
@@ -356,7 +356,7 @@ tests:
                 as the checkpoint left them. Resume it with --resume or record
                 why it stays down. The alert clears when a resumed session
                 starts (the persisted state becomes 1) or finishes (2). Runbook:
-                docs/runbooks/RUNBOOK_paper_trading.md#stopped-session
+                docs/runbooks/RUNBOOK_shadow_deployment.md#stopped-session
       - eval_time: 20m
         alertname: SessionStoppedNotResumed
         exp_alerts: []
@@ -432,15 +432,15 @@ tests:
               service: java-platform
             exp_annotations:
               summary: "1 child order(s) routed to a venue the risk check did not approve on java-platform"
-              runbook: docs/runbooks/RUNBOOK_paper_trading.md
-              runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
+              runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
+              runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
               description: >-
                 A child order was submitted to a venue other than the one named
                 in its pre-trade risk request, so a venue kill or disconnect was
                 checked against the wrong venue. The child was cancelled
                 (fail-closed), but this is a routing/risk wiring defect, not a
                 market event: engage the kill switch and investigate. Runbook:
-                docs/runbooks/RUNBOOK_paper_trading.md#routed-venue-mismatch
+                docs/runbooks/RUNBOOK_shadow_deployment.md#routed-venue-mismatch
 
   - interval: 15s
     name: KillPendingNotRecorded fires only when orders keep being withheld
@@ -495,8 +495,8 @@ tests:
               service: java-platform
             exp_annotations:
               summary: "Resume released 2 orphaned open order(s) on java-platform"
-              runbook: docs/runbooks/RUNBOOK_paper_trading.md
-              runbook_url: docs/runbooks/RUNBOOK_paper_trading.md
+              runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
+              runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
               description: >-
                 The session resumed from a checkpoint whose risk snapshot tracked
                 open child orders; they no longer exist in the execution
@@ -504,7 +504,7 @@ tests:
                 projections. Positions and realized P&L are restored, the
                 working orders are not: reconcile before trusting the session.
                 The alert stays up until the process ends. Runbook:
-                docs/runbooks/RUNBOOK_paper_trading.md#resume-released-orders
+                docs/runbooks/RUNBOOK_shadow_deployment.md#resume-released-orders
 
   # ---------------------------------------------------------------------------
   # The admin counters do not exist until their first increment, which

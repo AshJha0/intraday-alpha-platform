@@ -8,7 +8,7 @@ Binding for every change to this repository.
 Controls in this document are of two kinds. Be clear which is which before
 relying on one.
 
-**Live branch ruleset (read from the GitHub API, 2026-10-11 09:06).** One
+**Live branch ruleset (read from the GitHub API, 2026-10-15).** One
 active ruleset, `protect-main`, targets the default branch with **no bypass
 actors**:
 
@@ -16,13 +16,15 @@ actors**:
   repository has one maintainer, and GitHub does not let an author approve
   their own pull request);
 - `required_status_checks`, **strict** (a branch must be up to date with
-  `main` before merging): `python`, `integration`, `cpp`, `rust`, `java`,
+  `main` before merging), 13 checks: `python`, `integration`, `cpp`, `rust`,
   `golden`, `deployment`, `CodeQL`, `governance`, `advisory`, `rust-pyo3`,
-  `python-slow`;
+  `python-slow`, `supply-chain` and `analyze (rust)` (the CodeQL matrix
+  entry; `java` is no longer a required check: the Java tree was archived
+  in v1.15 and the ruleset read on 2026-10-15 does not list it);
 - `non_fast_forward` (no force-push) and `deletion` (no branch deletion).
 
 Not required today: `python-312` (the Python 3.12 entry), `cpp-sanitizers`,
-`images`.
+`agent-evals`, `images`.
 
 **Recommended owner actions** (repository settings; code cannot do them):
 
@@ -32,11 +34,11 @@ Not required today: `python-312` (the Python 3.12 entry), `cpp-sanitizers`,
 3. restrict merge methods to merge commits for research branches, or at
    least never rebase them (section 2c).
 
-| Control | Status (2026-10-11) | Enforced by |
+| Control | Status (2026-10-15) | Enforced by |
 |---|---|---|
-| CI green on every push and pull request (python, cpp and rust, golden gate, deployment validation; Java archived in v1.15) | **Enforced as a merge gate for the twelve required checks** | `protect-main` ruleset; other jobs run but do not block |
+| CI green on every push and pull request (python, cpp and rust, golden gate, deployment validation; Java archived in v1.15) | **Enforced as a merge gate for the thirteen required checks** | `protect-main` ruleset; other jobs run but do not block |
 | Pull requests only, no direct push to `main` | **Enforced** | `protect-main` (`pull_request` rule, no bypass actors) |
-| Required status checks before merge | **Enforced, strict**: python, integration, cpp, rust, java, golden, deployment, CodeQL, governance, advisory, rust-pyo3, python-slow | `protect-main` |
+| Required status checks before merge | **Enforced, strict**: python, integration, cpp, rust, golden, deployment, CodeQL, governance, advisory, rust-pyo3, python-slow, supply-chain, analyze (rust) | `protect-main` |
 | "1 to 2 reviewers" by change class (section 1) | **Not enforced: the ruleset requires 0 approvals**; not satisfiable by one maintainer | Needs a second maintainer; GitHub does not let an author approve their own pull request |
 | Reviewer ownership by path | Enforced as a file, applied only once the ruleset requires code-owner review | `CODEOWNERS` (every path owned by `@AshJha0`) |
 | Force-push and branch-deletion protection | **Enforced** | `protect-main` (`non_fast_forward`, `deletion`) |

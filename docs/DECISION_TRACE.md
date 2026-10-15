@@ -192,7 +192,7 @@ refuses a torn trace file (line count ≠ `trace_lines`, both named).
 
 Capture → replay → reproduce → debug → fix → regression test, with exact
 commands, is `docs/runbooks/RUNBOOK_incident_replay.md` (MVP: docs/MVP.md
-§6; Java: the state directory of `RUNBOOK_paper_trading.md` §4–§5). The
+§6; Java: the state directory of `RUNBOOK_shadow_deployment.md` §4–§5). The
 short form: the JSONL file and its digest are the evidence; `replay` must
 reproduce the digest from the captured stream; `explain` and
 `v_order_chain` locate the decision; the engine is a plain object you can
@@ -226,5 +226,5 @@ well as outputs.
 | canonical JSON, trace id, digest, no-LLM-on-the-path rule | [../PLATFORM_CONVENTIONS.md](../PLATFORM_CONVENTIONS.md) §13 |
 | the store tables and views | [DATA_MODEL.md](DATA_MODEL.md) |
 | the diagram | [DIAGRAMS.md](DIAGRAMS.md) §9, `diagrams/decision_trace_chain.mmd` |
-| Java state directory, retention, archival | `RUNBOOK_paper_trading.md` §4–§5; PLATFORM_CONVENTIONS.md §12.3 |
+| Java state directory, retention, archival | `RUNBOOK_shadow_deployment.md` §4–§5; PLATFORM_CONVENTIONS.md §12.3 |
 | the observability story (metrics + audit + trace) | [ARCHITECTURE.md](ARCHITECTURE.md) §8 |

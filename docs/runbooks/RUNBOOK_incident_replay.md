@@ -33,7 +33,7 @@ cd python && PYTHONPATH=src python3 -m iap.mvp run                 # -> ../data/
 ```
 
 **Java paper vertical** (`archive/java/paper.sh` (archived, frozen at v1.14.0), state directory `--state-dir` /
-`$IAP_STATE_DIR`, `/data/state` in the deployments; `RUNBOOK_paper_trading.md`
+`$IAP_STATE_DIR`, `/data/state` in the deployments; `RUNBOOK_shadow_deployment.md`
 §4–§5, PLATFORM_CONVENTIONS.md §12.3):
 
 | file | what |
@@ -130,7 +130,7 @@ debugger with the same decisions (API_TRADING.md §1.2).
 
 A session that ended `STOPPED` (a requested stop, `platform_session_state`
 4) has no session report: its evidence is the state directory. Resume it to
-completion first (`RUNBOOK_paper_trading.md` §5) if the incident needs the
+completion first (`RUNBOOK_shadow_deployment.md` §5) if the incident needs the
 report's digests, or work from `decision_traces.jsonl` and
 `risk_audit.jsonl` directly — both are complete up to the checkpoint.
 
