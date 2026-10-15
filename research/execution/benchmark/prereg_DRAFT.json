@@ -2,6 +2,7 @@
   "command": "python -m iap.research.execution_benchmark --data-dir data/real/multi7 --out research/execution/benchmark --write-prereg-draft",
   "decisions": "owner 2026-10-15: 30-min windows, 2 bp minimum effect, 2 pp fill-rate tolerance, Holm over algos, depth-exhausted eligibility rule, v2 realism + parent impact for the signed run",
   "drafted": "2026-10-15",
+  "expected_effect": "to be filled from the multi7 in-sample run (B2/B3 session, 2026-10-15): paired signal-aware minus plain all_in bps per cell with day-clustered CIs; see research/execution/benchmark/BENCHMARK_multi7_signal.md",
   "fingerprints_to_fill_before_signing": [
     "configs/prereg/v2.json",
     "the impact calibration file (exponent, support_pct_adv)",
@@ -67,6 +68,16 @@
   "on_blackboard": false,
   "primary_metric": "all_in bps per parent (shortfall + fees_net + sim_impact + completion), labelled replay + linear child adder (rule 6)",
   "schema": "iap.execution_benchmark_prereg/v1",
+  "signal_arm": {
+    "ac_drift": "IS cells only: native+ac_drift vs native+ac (plain Almgren-Chriss, sigma = price * 0.015 per sqrt(day), eta from the simulator slope, lambda 1e-6)",
+    "alpha": "OPEN (owner): EQ10 (registered beta < 0, synthetic fit; real in-sample IC > 0) or EQ05; the arm must be fixed here before signing",
+    "driver": "python -m iap.research.execution_benchmark --data-dir <gate dataset> --walk-depth 50 --window-min 30 --signal <alpha> --policies native,native+urgency,native+pacing,native+ac,native+ac_drift",
+    "pacing": "pov_signal_pacing (POV) / slice_signal_tilt (TWAP, VWAP, IS) with PacingParams(gain=0.5, min_scale=0.25, max_scale=3.0, max_participation=0.5); policies native+pacing vs native",
+    "source": "AlphaUrgencySource.from_dataset(<alpha>, <dataset>/features, params=configs/strategies/alpha_params.json) unless the owner chooses --signal-refit (labelled refit:in-sample, in-sample only)",
+    "thresholds_status": "OPEN (owner): threshold_z and gain are the driver defaults, not tuned; any tuning happens in-sample and is recorded here before signing",
+    "units": "z-score of the alpha's expected_return per instrument on the gate dataset (iap.execution.signal)",
+    "urgency": "ParentOrder(urgency_policy='alpha', alpha_urgency=AlphaUrgencyPolicy(threshold_z=1.0, passive_urgency=0.1, max_age_ns=10 s)) on the native child style; policies native+urgency vs native"
+  },
   "signature": null,
   "signed": false,
   "simulator": {

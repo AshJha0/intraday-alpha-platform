@@ -23,6 +23,22 @@ that tag.
   the concrete alpha classes, not the `AlphaModel` ABC). `reproducible-build` is not a required
   check until the owner adds it to the ruleset (GOVERNANCE.md section 0).
 
+- v1.17 WS-B items B2 + B3: signal-aware urgency and pacing, both opt-in and byte-identical off.
+  `iap.execution.signal` (`SignalSource`, `ArraySignalSource`, `AlphaUrgencySource.from_dataset`:
+  a flagship alpha's registered parameters scored on a dataset's feature frames, causal readings
+  in signal units = the z-score of the alpha's own scores); `ParentOrder(urgency_policy="alpha",
+  alpha_urgency=AlphaUrgencyPolicy(threshold_z, passive_urgency, max_age_ns, latency_ns))`
+  re-evaluates agree -> post / adverse -> cross / neutral -> the base style at EVERY child
+  decision through the parent's life, each child recording `urgency_regime`, `signal_z` and
+  `pacing_scale`; `iap.execution.pacing` (`PacingParams`) with `pov_signal_pacing`
+  (per-TRADE participation scaled by the signal), `slice_signal_tilt` (remaining quantity
+  re-apportioned at each slice, never negative) and `ac_signal_drift` (Almgren-Chriss re-solved
+  per slice with the signal as the drift; `ac_holdings` / `ac_trajectory` gain `drift=0.0`,
+  `ac_drift_from_signal`). The B1 benchmark driver takes `--signal EQ10|EQ05|synthetic` and
+  `base+variant` policies (`native+urgency`, `native+pacing`, `native+ac`, `native+ac_drift`),
+  pairs every variant with its own plain control on the same windows (day-clustered) and
+  reports urgency-regime shares per cell. API_TRADING.md section 2.14, COOKBOOK recipe 101,
+  `python/tests/test_v117_signal_aware.py`.
 - v1.17 WS-D items D1 and D4 (review findings R-6, R-9; all opt-in, no published number moves).
   D1: `iap.alpha.gbm.GbmAlpha` (alpha id `ML01`) puts gradient-boosted trees behind the `AlphaModel`
   interface: `hist_gbdt` backend by default (`xgboost` / `lightgbm` when installed, named in the

@@ -286,6 +286,13 @@ class ChildOrder:
     #: (``UNFILLED_REMAINDER``): the under-fill was the book's depth, not
     #: the price. Never set for a LIMIT (its remainder rests).
     depth_exhausted: bool = False
+    #: v1.17 B2 / B3 provenance (set by the replay for a signal-aware parent,
+    #: outside any golden): why this child got its urgency
+    #: (``iap.execution.signal.URGENCY_REGIMES``), the signal it was decided
+    #: on, and the pacing scale applied to its quantity.
+    urgency_regime: str = ""
+    signal_z: float = 0.0
+    pacing_scale: float = 1.0
 
     @property
     def is_terminal(self) -> bool:
