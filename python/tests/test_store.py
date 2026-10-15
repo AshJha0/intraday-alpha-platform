@@ -908,8 +908,10 @@ def test_import_experiments_ledger(store: Store) -> None:
     # against the constant rather than a literal so the two cannot drift.
     assert row["count"] == LOOKS_PER_EXPERIMENT and row["verdict"] == "ITERATE"
     for r in by_bundle["v2"]:
-        current = ledger_bundle(json.loads(r["config_json"])) == "v2"
-        assert r["count"] == (LOOKS_PER_EXPERIMENT if current else 84)
+        # v1.13 (v2_v113) debited every statistic (84); v1.14 and v1.17 (v2_v114,
+        # v2) one look per gate decision
+        bundle = ledger_bundle(json.loads(r["config_json"]))
+        assert r["count"] == (84 if bundle == "v2_v113" else LOOKS_PER_EXPERIMENT), bundle
     # `looks` is no longer part of the experiment identity — it is the size
     # of the recording (`count`), not what was looked at.
     config = json.loads(row["config_json"])
