@@ -336,6 +336,7 @@ class _IexSource(_ItchSource):
         extended_hours: bool,
         source_format: str,
         tops: Path | None,
+        round_lots: dict[str, int] | None = None,
     ) -> None:
         if len(inputs) != 1:
             raise IngestError(
@@ -358,6 +359,7 @@ class _IexSource(_ItchSource):
             mapper=self.mapper,
             level_feed=source_format == "iex-deep",
             tops=quotes,
+            round_lots=round_lots,
         )
 
     def finish(self) -> None:
@@ -1111,6 +1113,7 @@ def ingest(
     tops: str | Path | None = None,
     partition_instruments: int | None = None,
     slim: bool = False,
+    round_lots: dict[str, int] | None = None,
 ) -> dict:
     """Ingest one session into ``out_dir``; returns the manifest document.
 
@@ -1120,7 +1123,10 @@ def ingest(
     of that many instruments (memory-bounded, same bytes; the in-memory
     record buffer is then not kept).  ``slim`` (v1.17 A2b) writes no
     ``*.normalized.jsonl`` twin (the IAP1 file carries the events); the
-    manifest records ``layout: "slim"``."""
+    manifest records ``layout: "slim"``.  ``round_lots`` (the IEX formats,
+    v1.17 A4) is symbol -> round lot, normally the paired Nasdaq dataset's
+    ``lot_size``: it sizes a synthesised directory row and is the TOPS
+    oracle's rule (the quote is the best level holding a round lot)."""
     if source_format not in FORMATS:
         raise IngestError(f"unknown format {source_format!r}; known: {list(FORMATS)}")
     if tick_size not in TICK_CHOICES:
@@ -1206,6 +1212,7 @@ def ingest(
             extended_hours,
             source_format,
             None if tops is None else Path(tops),
+            round_lots,
         )
     else:
         source = _LobsterSource(paths, date, universe, limit_messages, book_paths, input_symbols)
