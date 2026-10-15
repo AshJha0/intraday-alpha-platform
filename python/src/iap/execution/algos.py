@@ -107,6 +107,11 @@ class ParentOrder:
     #: Forecast VWAP volume curve (``iap.execution.volume_curve``, v1.10,
     #: opt-in); ``None`` keeps the pinned ``1 + x^2`` curve.
     volume_curve: tuple[float, ...] | None = None
+    #: The part of the curve's session this parent covers, as fractions
+    #: (``iap.execution.volume_curve.curve_window``; v1.17, review X-1):
+    #: the VWAP slices then follow the curve over the parent window instead
+    #: of the whole session.  ``None`` (the v1.10 rule) is the whole span.
+    curve_window: tuple[float, float] | None = None
     #: POV exact participation + catch-up (v1.16 P0-5, opt-in; Python only).
     #: Off: the pinned ``floor(participation * V)`` with one child of at most
     #: ``max_child_qty`` per TRADE. On: the target counts our own fills in
@@ -129,7 +134,8 @@ def slice_weights(parent: ParentOrder) -> list[float]:
     if parent.algo == AlgoType.VWAP and parent.volume_curve is not None:
         from iap.execution.volume_curve import curve_slice_weights
 
-        return curve_slice_weights(parent.volume_curve, n)
+        lo, hi = parent.curve_window or (0.0, 1.0)
+        return curve_slice_weights(parent.volume_curve, n, lo, hi)
     if parent.algo == AlgoType.IS and parent.is_model == ISModel.ALMGREN_CHRISS:
         from iap.execution.optimal import ac_trajectory
 
