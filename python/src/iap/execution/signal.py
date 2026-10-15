@@ -186,6 +186,7 @@ class AlphaUrgencySource(ArraySignalSource):
         self.horizon = alpha.horizon
         self.params_label = params_label
         self.beta = float(getattr(alpha, "beta", float("nan")))
+        self.features_dir: str | None = None
 
     @classmethod
     def from_dataset(
@@ -262,7 +263,7 @@ class AlphaUrgencySource(ArraySignalSource):
                 "beta": self.beta,
                 "units": "z-score of the alpha's expected_return per instrument on this dataset",
                 "scale": {str(k): v for k, v in sorted(self.scale.items())},
-                "features_dir": getattr(self, "features_dir", None),
+                "features_dir": self.features_dir,
             }
         )
         return d
