@@ -8,6 +8,18 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-A item A4: the IEX overlap set. `python -m iap.marketdata process-iex-day` runs one
+  IEX HIST day (TOPS download -> universe quote extract (`TopsQuotes.save` / `*.tops.json.gz`,
+  read back by `--tops`) -> TOPS deleted -> DEEP+ download -> `ingest --format iex-deep-plus`
+  with the extract as the `book_verification` oracle -> features -> `KEEP.json` -> delete), one
+  vendor file on disk at a time, resumable markers, a `--render-cmd` chain over several dates
+  and a watchdog entry. `tools/iex_hist.py index` writes the manifest from the HIST index with
+  the owner's approval sentence; `recent --n 5` is the rolling "recent IEX days" rule (latest N
+  HIST days with TOPS and DEEP+; a list, not a download: no approval sentence, and
+  `tools/iex_download.py` refuses a manifest without one). The nine overlap days
+  (`research/v117/iex_overlap_manifest.json`, approved 2026-10-15) and their results:
+  docs/research/IEX_OVERLAP_SET.md. The recent days are listed only (not approved).
+
 - v1.17 WS-F items F1 and F3. **F1**: `reproducible-build` CI job (the wheel built twice under
   `SOURCE_DATE_EPOCH` = commit date, sha256 must match; the python image built twice with BuildKit
   `rewrite-timestamp`, report-only); CycloneDX SBOMs on every release (syft per image, attested and
