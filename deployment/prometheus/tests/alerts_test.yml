@@ -221,9 +221,9 @@ tests:
               runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
               runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
               description: >-
-                platform_session_state = 3 (FAILED). /health is 503 with the
-                reason; the container exits non-zero. Check the pod logs and
-                <state-dir>/config_audit.jsonl. Runbook:
+                platform_session_state = 3 (FAILED): the session process exited
+                non-zero (python -m iap.metrics run-session wrote the marker).
+                Check the session container's logs. Runbook:
                 docs/runbooks/RUNBOOK_shadow_deployment.md#failed-session
 
   # ---------------------------------------------------------------------------
@@ -262,11 +262,11 @@ tests:
               runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
               description: >-
                 The persisted session state is 4 (STOPPED) and no running
-                session has reported for 10m. The session checkpointed
-                mid-stream and exited 0, so nothing restarts it; positions are
-                as the checkpoint left them. Resume it with --resume or record
-                why it stays down. The alert clears when a resumed session
-                starts (the persisted state becomes 1) or finishes (2). Runbook:
+                session has reported for 10m. The session process was
+                interrupted and nothing restarted it. Rerun the session (the
+                MVP loop is deterministic) or record why it stays down. The
+                alert clears when a new session starts (the persisted state
+                becomes 1) or finishes (2). Runbook:
                 docs/runbooks/RUNBOOK_shadow_deployment.md#stopped-session
       - eval_time: 12m
         alertname: PlatformSessionFailed
@@ -297,11 +297,11 @@ tests:
               runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
               description: >-
                 The persisted session state is 4 (STOPPED) and no running
-                session has reported for 10m. The session checkpointed
-                mid-stream and exited 0, so nothing restarts it; positions are
-                as the checkpoint left them. Resume it with --resume or record
-                why it stays down. The alert clears when a resumed session
-                starts (the persisted state becomes 1) or finishes (2). Runbook:
+                session has reported for 10m. The session process was
+                interrupted and nothing restarted it. Rerun the session (the
+                MVP loop is deterministic) or record why it stays down. The
+                alert clears when a new session starts (the persisted state
+                becomes 1) or finishes (2). Runbook:
                 docs/runbooks/RUNBOOK_shadow_deployment.md#stopped-session
       - eval_time: 20m
         alertname: SessionStoppedNotResumed
