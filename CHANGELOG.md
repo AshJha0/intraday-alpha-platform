@@ -8,6 +8,13 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-B item B7 (prerequisite): depth-cap vs book re-run of the multi7 shortfall
+  benchmark with `--walk-depth 50` (and a `--max-child-qty 300` variant), summaries
+  `research/execution/benchmark/{benchmark,BENCHMARK}_multi7_depth50*` and the comparison
+  `DEPTH_COMPARISON_multi7.md`: at 0.5 % ADV the depth-10 under-fill was the cap (share
+  60-67 % -> 0 %), at 1 % about half, at 2 % the book; child size is not the lever; all-in
+  rises 2-5 bps at 1-2 % ADV because cancelled quantity is now walked. In-sample only,
+  nothing signed, no defaults changed.
 - v1.17 WS-F items F1 and F3. **F1**: `reproducible-build` CI job (the wheel built twice under
   `SOURCE_DATE_EPOCH` = commit date, sha256 must match; the python image built twice with BuildKit
   `rewrite-timestamp`, report-only); CycloneDX SBOMs on every release (syft per image, attested and
