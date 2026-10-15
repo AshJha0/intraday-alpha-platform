@@ -28,6 +28,17 @@ that tag.
   ARCHITECTURE §2/§8/§9, POLYGLOT, PLATFORM_CONVENTIONS §12, the site, SECURITY, REPO_SETTINGS,
   the Grafana README and the runbooks describe the three-language platform.
 
+- v1.17 WS-B item B1: implementation-shortfall benchmark `python -m iap.research.execution_benchmark`
+  (algo × policy × parent size in % of ADV × session on a dataset directory, per-parent costs from
+  the execution study's decomposition — now `iap.tca.shortfall.parent_costs`, shared — with
+  day-clustered SEs / Student-t CIs / cluster bootstrap per cell, paired policy comparisons,
+  `ExecConfig.impact_label()` on every cost, JSON + Markdown under `research/execution/benchmark/`,
+  unsigned `prereg_DRAFT.json` of the B7 gate). Review fixes carried: X-6 `ExecutionReplay` visits
+  only the parents an event can change (due-slice heap, POV parents by instrument, live PASSIVE
+  set; goldens byte-identical); X-5 `ExecConfig.walk_depth_levels` (default 10, unchanged) and
+  `depth_exhausted` on `ChildOrder` / the simulator / `ParentReport.diagnostics()`; X-7
+  `Fill.provenance` (outside `to_dict`, goldens unchanged). No golden moved.
+
 - v1.17 WS-A item A3: the breadth universe rule, fixed before any breadth statistic
   (`research/breadth/UNIVERSE_RULE.md`, `breadth_universe/v1`): the top 100 Nasdaq-listed symbols by
   displayed continuous-session volume on 2019-01-30 (ITCH `E` + printable `C` shares between system
