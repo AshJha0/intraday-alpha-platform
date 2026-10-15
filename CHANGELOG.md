@@ -8,6 +8,16 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-A item A3: the breadth universe rule, fixed before any breadth statistic
+  (`research/breadth/UNIVERSE_RULE.md`, `breadth_universe/v1`): the top 100 Nasdaq-listed symbols by
+  displayed continuous-session volume on 2019-01-30 (ITCH `E` + printable `C` shares between system
+  events `Q` and `M`), ETFs kept and flagged, test securities excluded, crosses and hidden prints
+  reported beside the ranking; survivorship explicit. `python -m iap.marketdata breadth-universe`
+  (`iap.marketdata.breadth`) measures it in one streaming pass and writes `universe.json` with every
+  symbol's volumes, the source sha256 and the next 50. `research/breadth/candidates.json` lists the
+  ten in-sample full-market days (three on disk, seven re-downloads awaiting approval). The test
+  ITCH encoder gains the directory `authenticity` field. The 2019-01-30 file is not downloaded yet.
+
 - v1.17 WS0 item 0.1 (R-1): the R7 confirmatory deflated Sharpe was recorded at the holdout
   dataset ledger's own trial count (N = 1 / 2) instead of the registered N (repo ledger distinct
   configurations + the look). `tools/r7_confirm.py` now takes N from the repo ledger

@@ -56,6 +56,10 @@ def main(argv=None) -> int:
         from iap.marketdata.r7plan import main as r7_main
 
         return r7_main(args_in)
+    if args_in[:1] == ["breadth-universe"]:
+        from iap.marketdata.breadth import main as breadth_main
+
+        return breadth_main(args_in[1:])
     parser = argparse.ArgumentParser(
         prog="python3 -m iap.marketdata",
         description="Generate synthetic raw market data and normalize it.",
