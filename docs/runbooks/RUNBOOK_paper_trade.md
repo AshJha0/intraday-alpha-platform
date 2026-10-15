@@ -90,10 +90,10 @@ python -m iap.paper.daily --date 2026-10-15 --force
 `data\real\paper\paper_daily.log` (`START` / `EXIT <rc>` markers).
 
 ```
-schtasks /Create /TN "IAP paper trade daily" /SC DAILY /ST 10:00 /TR "\"C:\Work\Claude\intraday-alpha-platform\intraday-alpha-platform\tools\run_paper_daily.cmd\"" /F
+schtasks /Create /TN "IAP paper trade daily" /SC DAILY /ST 10:00 /TR "C:\Work\Claude\intraday-alpha-platform\intraday-alpha-platform\tools\run_paper_daily.cmd" /F
 ```
 
-10:00 is after the 09:00 Nasdaq watch. Remove with
+This works in PowerShell and in cmd: the path has no spaces, so it needs no inner quotes (and the cmd-style escape for inner quotes does not work in PowerShell). 10:00 is after the 09:00 Nasdaq watch. Remove with
 `schtasks /Delete /TN "IAP paper trade daily" /F`; run once now with
 `schtasks /Run /TN "IAP paper trade daily"`.
 

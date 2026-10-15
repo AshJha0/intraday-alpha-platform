@@ -47,7 +47,7 @@ loop end to end.
 
 The full list with descriptions is the [Documentation index](#documentation-index).
 
-## Current status (v1.16 in progress; v1.15.0 released 2026-10-13)
+## Current status (v1.16.0 released 2026-10-15)
 
 **v1.16, the monetisation release (in progress, not released).** v1.15
 proved the alphas predict on unseen data; v1.16 asks whether any of that
@@ -102,6 +102,13 @@ opt-in and off by default, so no default run, golden or published number moved):
   optimiser's Dykstra projection and estimated Ledoit-Wolf intensity (#147),
   blocking mypy and agent evals (#143), memory follow-ups (#148) and a
   registration environment pinned to the CI lock (#152).
+
+**v1.16.0 (2026-10-15): monetisation.** Theme: monetisation. Realistic execution costs shipped
+(parent impact, residual-move calibration, v3 prereg realism, SOR and algo opt-ins). The taker route
+is a no-go: the in-sample study made zero trades in 480 cells, and the capacity curve finds no
+break-even size (0 of 45 cells): the edge is ~0.1-0.9 bp against a 0.8-2.4 bp round-trip cost.
+Quoting v2: no edge (every cell loses $5-7k per session; skewing with EQ01/EQ05 cuts the loss by about $750-920 per session). AI4 DeepLOB: closed after an in-sample failure (net -0.69 bp per trade; holdout not used). Release notes:
+[docs/release/v1.16.0_RELEASE_NOTES.md](docs/release/v1.16.0_RELEASE_NOTES.md).
 
 **v1.15.0 (2026-10-13).** The R7 confirmatory pre-registration
 R7-CONFIRM-1 is **signed** (`research/r7/r7_confirm_prereg.json`: H4 tier 1,
@@ -420,10 +427,10 @@ the full design, data flow, and diagrams.
 | Flagship alphas | **24** (EQ01–EQ12, FX01–FX12), each with an enforced `Economic rationale:` docstring | `python/src/iap/alpha/`, `research/alpha_reports/` |
 | Promotion verdicts | **0 PROMOTE / 12 ITERATE / 12 REJECT** (gated on the pooled *uncrossed* IC and its HAC t against the ledger threshold, 4.426 at the run's look count; the v1.14.0 methods: causal row block, automatic day-separated HAC, time-shift leakage; FX11 fails leakage) | `research/alpha_reports/REPORT.md` |
 | Lifecycle registry | **23 alphas at CANDIDATE, 0 beyond** (FX11 held in RESEARCH by the v1.14 time-shift leakage gate) — every candidate fails `net_pnl_after_costs` at 1× costs, its bootstrap bound `net_pnl_bootstrap_ci` and `capacity`; the cross-alpha correlation gate passes vacuously (7 states, 17 pinned edges, 20 gates) | `research/alpha_registry.json`, `research/lifecycle_transitions.jsonl`, `tests/golden/expected_lifecycle.json` |
-| Experiments ledger | 5,361 recorded looks over **296 distinct configurations** (de-duplicated by alpha × kind × config × dataset × statistics revision: 70 configurations holding 1,068 of the looks on the v1.3.0 dataset are kept as history, 223 holding 4,290 of them are on the current one, 77 of them added by the v1.14 regeneration); expected max \|t\| under the global null ≈ 4.144, Bonferroni per-test \|t\| ≥ 4.432; a hash chain since v1.14 | `research/experiments.json` |
+| Experiments ledger | 5,372 recorded looks over **307 distinct configurations** (de-duplicated by alpha × kind × config × dataset × statistics revision: 70 configurations holding 1,068 of the looks on the v1.3.0 dataset are kept as history, 223 holding 4,290 of them are on the current one, 77 of them added by the v1.14 regeneration); expected max \|t\| under the global null ≈ 4.144, Bonferroni per-test \|t\| ≥ 4.432; a hash chain since v1.14 | `research/experiments.json` |
 | Contracts | **17** JSON Schemas (all `x-version` 1 except `risk_event`, 2 since v1.14) mirrored by **22** typed Python contracts and **18** runtime-checkable Protocols; one pinned instance each | `schemas/`, `python/src/iap/contracts/`, `tests/golden/expected_contracts_examples.json` |
 | Python reference ports proven by the ports' own goldens | risk: `expected_risk_decisions.json` exact, audit JSONL + snapshot **byte-identical**; execution: `expected_replay_fills.json` **bit-identical** | `python/tests/test_risk_golden.py`, `python/tests/test_execution_golden.py` |
-| MVP golden run (`python -m iap.mvp run`, seed 12345) | **15,805** events · **800** decisions · **231** parent orders · **163** fills · P&L **−82.84 USD** (cost-negative: +0.0245 bps alpha vs −0.4367 bps execution cost) · trace digest `3f2b117e…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
+| MVP golden run (`python -m iap.mvp run`, seed 12345) | **15,805** events · **800** decisions · **231** parent orders · **163** fills · P&L **−82.84 USD** (cost-negative: +0.0245 bps alpha vs −0.4367 bps execution cost) · trace digest `77c5c4f7…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
 | Adaptive deployment study | 4 refit policies × 10 alphas; 88 drift-triggered refits; FX01 retired under every policy; 19 of 40 deployments make no trade, none ends above zero | `research/adaptive_reports/ADAPTIVE_REPORT.md` |
 | Bundled dataset | 2 synthetic sessions, 19 instruments, 308,975 normalized events (`data_version` `116b7787…`; equity flow runs to the close since v1.4.0) | `data/normalized/qc_report.json` |
 | Feature emission | 213,021 vectors at 100 ms cadence | `data/features/features_summary.json` |

@@ -835,7 +835,7 @@ the canonical config, so the same 24 pipelines run under the new default
 rules are new looks at the same sample, added beside the v1.4.0 ones
 (ledger `x-version` 3). At v1.5.0 the ledger held 216 distinct
 configurations and a look count of 5,156, broken down below. At v1.14.0 it holds
-**296 distinct configurations / 5,361 looks**: v1.14.0 regenerated every statistic under its revised methods, and each one is a new look (`stats_revision`), adding 202 to the count over 77 configurations (the
+**307 distinct configurations / 5,361 looks**: v1.14.0 regenerated every statistic under its revised methods, and each one is a new look (`stats_revision`), adding 202 to the count over 77 configurations (the
 breakdown below is the v1.5.0 one, and every entry in it is still there):
 
 - on the v1.3.0 dataset (`203c8f54…`), 70 entries carrying 1,068 of the
@@ -2034,7 +2034,7 @@ reproduces them with string concatenation and one hash (pinned:
 digest is sha256 over every canonical line + newline in emission order;
 same seed ⇒ same digest; one changed field or one swapped line changes it.
 Known answers are pinned for one trace, the same trace twice, and the empty
-stream; the MVP golden pins a whole session's digest (`3f2b117e…`, 800
+stream; the MVP golden pins a whole session's digest (`77c5c4f7…`, 800
 traces).
 
 ### 18.3 Four languages, one line
@@ -2121,7 +2121,7 @@ index that lied about what its sources contain would be worse than none.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=231 children=347 fills=163 pnl=-82.837333 USD digest=3f2b117ecea95922...
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=231 children=347 fills=163 pnl=-82.837333 USD digest=77c5c4f705e33ecb...
 ```
 
 Seven seconds later `data/mvp/58a10f2194a3c81c/` holds the captured stream,
@@ -2153,7 +2153,7 @@ and the `config_version` it covers (`f293e7e7…` → `439bbad5…`), because
 names its impact model, and `alpha_params.json`, whose header names the
 regeneration commit. A digest that changes when a hashed configuration
 document changes, with every count and every dollar the same, is the
-digest doing its job. In v1.14.0 the digest moved again (`3f2b117e…`) and
+digest doing its job. In v1.14.0 the digest moved again (`77c5c4f7…`) and
 this time a few counts moved too, because the refitted `alpha_params.json`
 changes the expected returns the loop trades on: 231 parents and 163 fills
 (was 235 and 169), −82.84 USD (was −81.53).
@@ -3193,7 +3193,7 @@ Dependabot bump is being asked to do.
 3. **Random splits on overlapping labels.** Walk-forward only, purge at the
    label horizon, 60 s embargo (§6.2).
 4. **Uncounted multiple testing.** A ledger de-duplicated by (alpha, kind,
-   config, dataset) — 296 distinct configurations, 5,361 looks at v1.14.0 — with a printed
+   config, dataset) — 307 distinct configurations, 5,361 looks at v1.14.0 — with a printed
    expected-max-|t| yardstick of 4.144; FX08's t = 3.84 is called what it is.
    Regenerating the dataset did not reset the count, and neither did
    changing the default methods: the looks already taken are kept and the
