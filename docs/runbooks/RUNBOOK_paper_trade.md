@@ -9,7 +9,7 @@ new real Nasdaq session through the MVP loop and writes a dated report.
 > research cost model, drift / alpha-decay monitors and a kill-switch drill
 > every day, so a future rule that does clear costs lands on a tested path.
 >
-> Not to be confused with RUNBOOK_paper_trading.md (the Java shadow stack on the
+> Not to be confused with RUNBOOK_shadow_deployment.md (the Java shadow stack on the
 > golden replay vector).
 
 ## What one run does

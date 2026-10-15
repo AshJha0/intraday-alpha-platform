@@ -6,6 +6,24 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## Unreleased
+
+- v1.17 WS0 item 0.7 (docs): README's current-status section rewritten from the v1.16.0
+  notes (the pending-PR list and "in progress" wording were stale; v1.17 is next, in
+  progress, not released); docs/index.html maker/quoting/AI4 lines refreshed; GOVERNANCE.md
+  §0 lists the 13 required checks read from the ruleset (`java` gone, `supply-chain` and
+  `analyze (rust)` added); SECURITY.md says Python installs are hash-pinned
+  (`--require-hashes`) and the `governance` CI job now installs that way too;
+  ARCHITECTURE.md's mypy line (blocking, 0 errors); `docs/runbooks/RUNBOOK_paper_trading.md`
+  renamed to `RUNBOOK_shadow_deployment.md` (it is the Java shadow stack, not the
+  `iap.paper` driver), references updated.
+- v1.17 WS0 item 0.9: `tools/r7_watch_nasdaq.py` also reads the IEX HIST index for the last
+  7 UTC days (one JSON GET per day, never a download) and reports DEEP / TOPS days with sizes
+  (`iex`, `iex_new` in the report and toast; exit code unchanged, Nasdaq only; `--no-iex`,
+  `--iex-days`); RUNBOOK_r7_nasdaq_watch.md registers the task with
+  `Register-ScheduledTask` (S4U, battery allowed, start when available) because the
+  `schtasks` task never ran (0x800710E0). Not registered: the owner runs it.
+
 ## v1.16.0 — 2026-10-15
 
 Theme: monetisation. Neither taking (P0-6, item 7), nor making (quoting v2), nor AI4 DeepLOB clears costs; the signals are useful as execution inputs. Notes: docs/release/v1.16.0_RELEASE_NOTES.md.

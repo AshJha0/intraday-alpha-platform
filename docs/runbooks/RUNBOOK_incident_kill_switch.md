@@ -288,7 +288,7 @@ Then confirm it is having the intended effect:
 - Diagnose with the halt in place — never "clear to see if it happens again".
 - Typical triggers and their runbooks: loss limit (this doc), stale
   feed/sequence gaps (`RUNBOOK_data_pipeline.md`), signal/fill anomalies
-  (`RUNBOOK_paper_trading.md`).
+  (`RUNBOOK_shadow_deployment.md`).
 - Positions: the halt stops NEW orders. Risk owner decides explicitly whether
   existing exposure is flattened (manual, risk-approved orders outside the
   killed strategy scope) or carried.

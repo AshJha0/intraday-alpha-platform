@@ -785,7 +785,7 @@ The port comes from `configs/execution/execution.json` `monitoring.port` (defaul
 8080 — the Grafana/Prometheus contract; `deployment/prometheus/` scrapes it
 in the docker-compose stack). The session report lands in
 `archive/java/out/paper_session_report.json`. Full ops procedure:
-`docs/runbooks/RUNBOOK_paper_trading.md`. Note the honest P&L: paper
+`docs/runbooks/RUNBOOK_shadow_deployment.md`. Note the honest P&L: paper
 trading the golden vector *loses* money — consistent with the promotion
 report, not an embarrassment to be tuned away.
 
