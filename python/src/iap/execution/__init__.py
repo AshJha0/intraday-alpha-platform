@@ -26,6 +26,14 @@ from iap.execution.config import (
     load_sor_options,
     load_venues,
 )
+from iap.execution.fading import (
+    FadeParams,
+    PullRecord,
+    QueueCancelParams,
+    pull_outcomes,
+    pull_rows,
+    pull_summary,
+)
 from iap.execution.fill_hazard import FillHazardModel
 from iap.execution.markout_feedback import FeedbackConfig, MarkoutFeedback
 from iap.execution.pacing import PacingParams
@@ -75,7 +83,13 @@ __all__ = [
     "ExecReplayResult",
     "ExecutionReplay",
     "ExecutionSimulator",
+    "FadeParams",
     "Fill",
+    "PullRecord",
+    "QueueCancelParams",
+    "pull_outcomes",
+    "pull_rows",
+    "pull_summary",
     "INSTRUMENTS_FILE",
     "InstrumentSpec",
     "LatencyConfig",

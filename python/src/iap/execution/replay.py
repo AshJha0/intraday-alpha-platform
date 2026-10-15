@@ -46,6 +46,17 @@ driven). The visits of one event run in parent-list order, each parent
 draining every slice due, exactly the order of the per-event scan, so the
 output is byte-identical (``test_execution_golden``,
 ``test_passive_policy``); one pass over the events services every parent.
+
+Quote fading and queue-aware cancels (v1.17 B4 / B5, ``ParentOrder.fade`` /
+``ParentOrder.queue_cancel``, :mod:`iap.execution.fading`): a resting child
+of the PASSIVE state machine is also tested, after the BEHIND test and
+before its deadline, by the fade rule (adverse signal or opposite-side book
+pressure) and then the queue rule (queue ahead or hazard fill probability);
+a hit sends an ordinary cancel (rule 7: it can lose the race) and records a
+:class:`~iap.execution.fading.PullRecord`. Once the cancel resolves the
+remainder is held off the book until the fade condition clears (``hold``),
+re-posted, or crossed, per the rule's ``action``. Off by default: the
+pinned outputs above are unchanged.
 """
 
 from __future__ import annotations
@@ -66,6 +77,14 @@ from iap.execution.algos import (
     slice_weights,
 )
 from iap.execution.config import ExecConfig, SorOptions
+from iap.execution.fading import (
+    FadeParams,
+    PullRecord,
+    QueueCancelParams,
+    book_pressure,
+    fade_rule,
+    queue_cancel_rule,
+)
 from iap.execution.optimal import ac_drift_from_signal, ac_trajectory
 from iap.execution.pacing import PacingParams, apportion, pacing_scale, tilted_slice_qty
 from iap.execution.passive import (
@@ -87,6 +106,10 @@ _CANCEL_REPRICE = 1
 _CANCEL_CROSS_TIMEOUT = 2
 _CANCEL_CROSS_BEHIND = 3
 _DONE = 4
+#: v1.17 B4 / B5: a pull cancel is in flight; the remainder is held off the book.
+_CANCEL_FADE = 5
+_CANCEL_QUEUE = 6
+_HELD = 7
 
 
 @dataclass(slots=True)
@@ -115,6 +138,13 @@ class ParentReport:
     #: parent); empty for a parent without signal opt-ins.
     urgency_children: dict[str, int] = field(default_factory=dict)
     urgency_qty: dict[str, int] = field(default_factory=dict)
+    #: v1.17 B4 / B5: pulls by ``cancel_rule`` (children whose cancel was
+    #: sent), the qty they took off the book, and the pulls that lost the
+    #: race to a fill; ``held_unsent_qty`` is held qty the window closed on.
+    pulls: dict[str, int] = field(default_factory=dict)
+    pulled_qty: dict[str, int] = field(default_factory=dict)
+    pulls_lost_race: int = 0
+    held_unsent_qty: int = 0
 
     def to_dict(self) -> dict:
         """Row in the key order of ``expected_replay_fills.json`` ``parents``."""
@@ -138,6 +168,10 @@ class ParentReport:
             "provenance_qty": dict(self.provenance_qty),
             "urgency_children": dict(self.urgency_children),
             "urgency_qty": dict(self.urgency_qty),
+            "pulls": dict(self.pulls),
+            "pulled_qty": dict(self.pulled_qty),
+            "pulls_lost_race": self.pulls_lost_race,
+            "held_unsent_qty": self.held_unsent_qty,
         }
 
 
@@ -163,6 +197,8 @@ class ExecReplayResult:
     passive: dict[int, PassiveStats] = field(default_factory=dict)
     #: every submitted child in its final state, by parent_id, submission order.
     children: dict[int, list[ChildOrder]] = field(default_factory=dict)
+    #: v1.17 B4 / B5: every pull of a resting child, in decision order.
+    pulls: list[PullRecord] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -176,6 +212,10 @@ class _Working:
     #: rest time of this child (the parent's ``patience_ns`` unless a B2
     #: *agree* decision posted it with the policy's ``passive_urgency``).
     patience: int = 0
+    # ---- v1.17 B4 / B5 ----
+    fades: int = 0  #: fades along this chain of posts
+    held_qty: int = 0  #: qty held off the book (state ``_HELD``)
+    pull: int = -1  #: index into ``ExecutionReplay._pulls`` of the open pull
 
 
 @dataclass(slots=True)
@@ -206,6 +246,16 @@ class _ParentState:
     last_z: float = 0.0  #: signal of the latest pacing decision
     urgency_children: dict[str, int] = field(default_factory=dict)
     urgency_qty: dict[str, int] = field(default_factory=dict)
+    # ---- v1.17 B4 / B5 pull rules (None = off) ----
+    fade: FadeParams | None = None
+    qcancel: QueueCancelParams | None = None
+    held_qty: int = 0  #: qty of this parent held off the book right now
+    last_fade_z: float = 0.0  #: scratch: inputs of the latest rule evaluation
+    last_fade_pressure: float = 0.0
+    last_p_fill: float = -1.0
+    pulls: dict[str, int] = field(default_factory=dict)
+    pulled_qty: dict[str, int] = field(default_factory=dict)
+    pulls_lost_race: int = 0
 
 
 class ExecutionReplay:
@@ -232,6 +282,7 @@ class ExecutionReplay:
         self._pov_by_instrument: dict[int, list[int]] = {}
         self._due: list[tuple[int, int]] = []
         self._live_passive: set[int] = set()
+        self._pulls: list[PullRecord] = []
         for p in parents:
             if p.qty <= 0:
                 raise ValueError("parent qty must be > 0")
@@ -250,6 +301,8 @@ class ExecutionReplay:
                 ps.behind_qty = max_behind_qty(p.passive, p.qty)
             if p.signal_aware:
                 self._init_signal_state(ps)
+            if p.pulls_resting:
+                self._init_pull_state(ps)
             idx = len(self._parents)
             self._parents.append(ps)
             self._by_parent_id.setdefault(p.parent_id, []).append(ps)
@@ -294,6 +347,21 @@ class ExecutionReplay:
         )
         if p.policy != ExecPolicy.PASSIVE:
             ps.behind_qty = max_behind_qty(p.passive, p.qty)
+
+    @staticmethod
+    def _init_pull_state(ps: _ParentState) -> None:
+        """Validate the B4 / B5 opt-ins: they act on children the PASSIVE
+        state machine posts, so the parent must post through it."""
+        p = ps.order
+        if p.policy != ExecPolicy.PASSIVE and p.urgency_policy != "alpha":
+            raise ValueError(
+                f"parent {p.parent_id}: fade / queue_cancel need policy=PASSIVE or "
+                "urgency_policy='alpha' (they act on posted children)"
+            )
+        if p.fade is not None and p.fade.threshold_z > 0.0 and p.signal_source is None:
+            raise ValueError(f"parent {p.parent_id}: fade.threshold_z > 0 needs a signal_source")
+        ps.fade = p.fade
+        ps.qcancel = p.queue_cancel
 
     def _reading(
         self, ps: _ParentState, t: int, max_age_ns: int, latency_ns: int
@@ -378,14 +446,15 @@ class ExecutionReplay:
             left -= q
 
     def _committed_qty(self, ps: _ParentState) -> int:
-        """Filled + still open/in-flight qty of the parent's children."""
+        """Filled + still open/in-flight qty of the parent's children (plus
+        qty a B4 fade is holding off the book: it is still the parent's)."""
         open_qty = 0
         orders = self._sim.orders
         for oid in ps.child_ids:
             o = orders[oid]
             if o.state in (OrderState.PENDING, OrderState.ACTIVE):
                 open_qty += o.remaining
-        return ps.filled_qty + open_qty
+        return ps.filled_qty + open_qty + ps.held_qty
 
     def _book_new_fills(self) -> None:
         fills = self._sim.fills
@@ -398,12 +467,19 @@ class ExecutionReplay:
     # ------------------------------------------------------ PASSIVE policy
 
     def _post(
-        self, ps: _ParentState, qty: int, t: int, reprices: int, patience: int | None = None
+        self,
+        ps: _ParentState,
+        qty: int,
+        t: int,
+        reprices: int,
+        patience: int | None = None,
+        fades: int = 0,
     ) -> None:
         """POST one child of ``qty`` (or CROSS it when it cannot rest).
 
         ``patience`` defaults to the parent's ``patience_ns`` (the pinned
         PASSIVE rule); a B2 *agree* decision passes its own rest time.
+        ``fades`` carries the B4 fade count along a chain of re-posts.
         """
         p = ps.order
         rest = ps.patience_ns if patience is None else patience
@@ -419,7 +495,7 @@ class ExecutionReplay:
             ps.stats.crosses_immediate += 1  # no same-side quote: MARKET fallback
             return
         ps.stats.posts += 1
-        ps.working.append(_Working(oid, min(t + rest, cap), reprices, patience=rest))
+        ps.working.append(_Working(oid, min(t + rest, cap), reprices, patience=rest, fades=fades))
 
     def _post_step(self, ps: _ParentState, step_qty: int, t: int) -> None:
         """POST a schedule step, split at ``max_child_qty`` (pinned)."""
@@ -441,6 +517,9 @@ class ExecutionReplay:
             if w.state == _DONE:
                 continue
             o = orders[w.order_id]
+            if w.state == _HELD:
+                self._work_held(ps, w, o, t)
+                continue
             if w.state == _REST:
                 if o.is_terminal:
                     w.state = _DONE
@@ -449,6 +528,10 @@ class ExecutionReplay:
                 elif behind:
                     self._sim.cancel(o.order_id, t)
                     w.state = _CANCEL_CROSS_BEHIND
+                elif ps.fade is not None and self._pull(ps, w, o, t, self._fade_rule(ps, w, o, t)):
+                    w.state = _CANCEL_FADE
+                elif ps.qcancel is not None and self._pull(ps, w, o, t, self._queue_rule(ps, o, t)):
+                    w.state = _CANCEL_QUEUE
                 elif t >= w.deadline:
                     if w.reprices >= p.passive.max_reprices:
                         self._sim.cancel(o.order_id, t)
@@ -477,6 +560,8 @@ class ExecutionReplay:
                 continue
             state = w.state
             w.state = _DONE
+            if state in (_CANCEL_FADE, _CANCEL_QUEUE):
+                self._resolve_pull(ps, w, o, t)
             if (
                 o.state != OrderState.CANCELLED
                 or o.cancel_reason != CancelReason.USER
@@ -487,19 +572,166 @@ class ExecutionReplay:
             first = len(ps.child_ids)
             if state == _CANCEL_REPRICE:
                 ps.stats.reprices += 1
-                self._post(ps, o.remaining, t, w.reprices + 1, patience=w.patience)
+                self._post(ps, o.remaining, t, w.reprices + 1, patience=w.patience, fades=w.fades)
+            elif state == _CANCEL_FADE:
+                assert ps.fade is not None
+                if ps.fade.action == "hold":
+                    w.state = _HELD
+                    w.held_qty = o.remaining
+                    ps.held_qty += o.remaining
+                    continue
+                if ps.fade.action == "repost":
+                    self._post(ps, o.remaining, t, w.reprices, patience=w.patience, fades=w.fades)
+                else:
+                    self._issue_child(ps, o.remaining, t, False)
+            elif state == _CANCEL_QUEUE:
+                assert ps.qcancel is not None
+                if ps.qcancel.action == "repost":
+                    self._post(ps, o.remaining, t, w.reprices, patience=w.patience, fades=w.fades)
+                else:
+                    self._issue_child(ps, o.remaining, t, False)
             else:
                 if state == _CANCEL_CROSS_BEHIND:
                     ps.stats.crosses_behind += 1
                 else:
                     ps.stats.crosses_timeout += 1
                 self._issue_child(ps, o.remaining, t, False)
+            self._mark_replacements(ps, first, o.order_id)
             if ps.signal:
                 # A re-send inherits the provenance of the decision it came from;
                 # its qty was attributed at that decision (not counted twice).
                 self._tag_children(
                     ps, first, o.urgency_regime, o.signal_z, o.pacing_scale, count_qty=False
                 )
+
+    # ------------------------------------------- v1.17 B4 / B5 pull rules
+
+    def _mark_replacements(self, ps: _ParentState, first: int, order_id: int) -> None:
+        """The children issued since ``first`` re-send ``order_id``'s remainder."""
+        for oid in ps.child_ids[first:]:
+            self._sim.orders[oid].replaces_order_id = order_id
+
+    def _touch_sizes(self, ps: _ParentState, venue_id: int) -> tuple[int, int] | None:
+        """``(own L1 qty, opposite L1 qty)`` on ``venue_id``; None when not two-sided."""
+        vb = self._sim.venue_book(ps.order.instrument_id, venue_id)
+        if vb is None:
+            return None
+        bb, ba = vb.best_bid(), vb.best_ask()
+        if bb is None or ba is None:
+            return None
+        return (bb[1], ba[1]) if ps.order.side == 0 else (ba[1], bb[1])
+
+    def _fade_rule(self, ps: _ParentState, w: _Working, o: ChildOrder, t: int) -> str:
+        """B4: the fade rule for resting child ``o`` at ``t`` (``""`` = keep)."""
+        fp = ps.fade
+        assert fp is not None
+        if w.fades >= fp.max_fades:
+            return ""
+        z: float | None = None
+        if fp.threshold_z > 0.0:
+            r, _status = self._reading(ps, t, fp.max_age_ns, fp.latency_ns)
+            z = None if r is None else r.z
+        pressure: float | None = None
+        if fp.pressure_threshold > 0.0:
+            sizes = self._touch_sizes(ps, o.venue_id)
+            if sizes is not None:
+                pressure = book_pressure(sizes[0], sizes[1])
+        ps.last_fade_z = 0.0 if z is None else z
+        ps.last_fade_pressure = 0.0 if pressure is None else pressure
+        return fade_rule(ps.order.side, z, fp.threshold_z, pressure, fp.pressure_threshold)
+
+    def _queue_rule(self, ps: _ParentState, o: ChildOrder, t: int) -> str:
+        """B5: the queue rule for resting child ``o`` at ``t`` (``""`` = keep)."""
+        qp = ps.qcancel
+        assert qp is not None
+        ps.last_p_fill = -1.0
+        if o.state != OrderState.ACTIVE or t - o.arrival_ts < qp.min_rest_ns:
+            return ""
+        p_fill: float | None = None
+        if qp.min_p_fill > 0.0 and qp.hazard is not None:
+            vb = self._sim.venue_book(ps.order.instrument_id, o.venue_id)
+            bb = None if vb is None else vb.best_bid()
+            ba = None if vb is None else vb.best_ask()
+            spread = float(ba[0] - bb[0]) if bb is not None and ba is not None else 0.0
+            sizes = self._touch_sizes(ps, o.venue_id)
+            imb = 0.5 if sizes is None else 1.0 - book_pressure(sizes[0], sizes[1])
+            dep = None if qp.depletion_per_s is None else qp.depletion_per_s(o.side, o.ahead_qty)
+            x = qp.hazard.features(
+                queue_ahead=o.ahead_qty,
+                spread_ticks=spread,
+                imbalance=imb,
+                depletion_per_s=dep,
+                ts_ns=t,
+            )
+            p_fill = float(qp.hazard.p_fill_within(x, qp.horizon_ns))
+            ps.last_p_fill = p_fill
+        return queue_cancel_rule(o.ahead_qty, qp.max_ahead_qty, p_fill, qp.min_p_fill)
+
+    def _pull(self, ps: _ParentState, w: _Working, o: ChildOrder, t: int, rule: str) -> bool:
+        """Send the cancel of ``o`` under ``rule`` and open its record."""
+        if not rule:
+            return False
+        self._sim.cancel(o.order_id, t)
+        o.cancel_rule = rule
+        o.cancel_rule_ts = t
+        if rule.startswith("fade:"):
+            w.fades += 1
+        ps.pulls[rule] = ps.pulls.get(rule, 0) + 1
+        w.pull = len(self._pulls)
+        self._pulls.append(
+            PullRecord(
+                parent_id=ps.order.parent_id,
+                order_id=o.order_id,
+                side=o.side,
+                price_ticks=o.limit_ticks,
+                qty_at_decision=o.remaining,
+                decision_ts=t,
+                rule=rule,
+                ahead_qty=o.ahead_qty,
+                signal_z=ps.last_fade_z,
+                pressure=ps.last_fade_pressure,
+                p_fill=ps.last_p_fill,
+            )
+        )
+        return True
+
+    def _resolve_pull(self, ps: _ParentState, w: _Working, o: ChildOrder, t: int) -> None:
+        """Close the pull record once the cancel has resolved (rule 7)."""
+        rec = self._pulls[w.pull]
+        # when the cancel reached the venue (rule 7), not the visit that saw it
+        rec.effect_ts = o.cancel_arrival_ts if o.cancel_arrival_ts else t
+        pulled = o.remaining if o.state == OrderState.CANCELLED else 0
+        rec.pulled_qty = pulled
+        rec.filled_in_flight = rec.qty_at_decision - pulled
+        if pulled <= 0:
+            rec.outcome = "lost_race"
+            ps.pulls_lost_race += 1
+        elif rec.filled_in_flight > 0:
+            rec.outcome = "partial"
+        else:
+            rec.outcome = "pulled"
+        ps.pulled_qty[rec.rule] = ps.pulled_qty.get(rec.rule, 0) + pulled
+
+    def _work_held(self, ps: _ParentState, w: _Working, o: ChildOrder, t: int) -> None:
+        """B4 ``hold``: re-post the held qty when the fade clears, or cross it
+        at the PASSIVE end margin; qty still held at the window end is unsent."""
+        p = ps.order
+        if t >= p.end_ts:
+            return
+        cap = p.end_ts - p.passive.end_margin_ns
+        if t < cap and self._fade_rule(ps, w, o, t):
+            return  # still adverse: stay off the book
+        q = w.held_qty
+        w.held_qty = 0
+        ps.held_qty -= q
+        w.state = _DONE
+        first = len(ps.child_ids)
+        self._post(ps, q, t, w.reprices, patience=w.patience, fades=w.fades)
+        self._mark_replacements(ps, first, o.order_id)
+        if ps.signal:
+            self._tag_children(
+                ps, first, o.urgency_regime, o.signal_z, o.pacing_scale, count_qty=False
+            )
 
     def _schedule_passive(self, ps: _ParentState, ev: MarketEvent) -> None:
         p = ps.order
@@ -773,6 +1005,7 @@ class ExecutionReplay:
 
         res.fills = list(self._sim.fills)
         res.sor_no_route = self._sor_no_route
+        res.pulls = list(self._pulls)
         fills_of: dict[int, list[Fill]] = {}
         for f in res.fills:
             fills_of.setdefault(f.parent_id, []).append(f)
@@ -806,6 +1039,11 @@ class ExecutionReplay:
             if ps.signal:
                 r.urgency_children = dict(ps.urgency_children)
                 r.urgency_qty = dict(ps.urgency_qty)
+            if ps.fade is not None or ps.qcancel is not None:
+                r.pulls = dict(ps.pulls)
+                r.pulled_qty = dict(ps.pulled_qty)
+                r.pulls_lost_race = ps.pulls_lost_race
+                r.held_unsent_qty = ps.held_qty
             res.parents[r.parent_id] = r
             if p.policy == ExecPolicy.PASSIVE or ps.signal:
                 res.passive[p.parent_id] = ps.stats

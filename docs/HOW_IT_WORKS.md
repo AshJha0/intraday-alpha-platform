@@ -853,9 +853,35 @@ participation and slice weights tilt, the Almgren-Chriss drift follows the
 signal — and every variant is paired with its own plain control on the same
 windows, with the urgency-regime shares reported per cell.
 
+Two more things a posted order can do, both opt-in (v1.17 B4 / B5,
+API_TRADING.md §2.15): **fade** — pull the resting child when the signal
+turns adverse by a threshold in signal units or the opposite side of the
+book gets heavy (`FadeParams`), holding the quantity off the book until the
+condition clears, and **cancel a hopeless queue** — when more than a cap
+sits ahead of the child, or the fill-hazard model of §3.9 puts its chance of
+filling inside the horizon below a floor (`QueueCancelParams`), then cross.
+Both go through the simulator's ordinary cancel, which travels the latency
+path and can lose the race to a fill. The benchmark's `passive+fade` /
+`passive+qcancel` variants report, beside the paired cost difference,
+**fades saved vs fills missed**: for every pulled quantity, whether the
+market traded through the pulled price inside the horizon and what the
+fill we forwent would have been worth — a counterfactual on a book our
+order never moved, labelled as such. Its **markout decomposition** (B6)
+splits every fill by type — passive, aggressive, faded (the cancel lost the
+race), cancelled-replaced — and by the B2 regime it was decided in, with
+standard errors clustered by session like every v1.17 gate; the hazard's
+time-of-day feature can be fitted on the exchange clock (`clock=
+"America/New_York"`, with the IEX capture clock's 37 s TAI offset
+removed) instead of the UTC day, and the result names the clock. The
+owner's multi7 command for the new variants:
+
+```bash
+python -m iap.research.execution_benchmark --data-dir data/real/multi7 --out research/execution/benchmark --tag multi7_pulls --policies passive,passive+fade,passive+qcancel,passive+fade_qcancel --baseline-policy passive --signal EQ10 --fade-threshold-z 1.0 --fade-pressure 0.8 --qcancel-max-ahead 5000 --markout-horizons 1s,5s,30s
+```
+
 ```bash
 cd python
-PYTHONPATH=src python3 -m pytest -q tests/test_passive_policy.py tests/test_markout.py
+PYTHONPATH=src python3 -m pytest -q tests/test_passive_policy.py tests/test_markout.py tests/test_v117_fading_cancels_markout.py
 ```
 
 ### 3.6 The maker path: calibrate, post or quote, decompose (v1.9, v1.10)

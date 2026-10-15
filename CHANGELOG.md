@@ -8,6 +8,38 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-B items B4, B5 and B6, every piece opt-in and byte-identical off (every execution
+  golden, the B1/B2/B3 driver tests and the X4 fingerprint unchanged). **B4 quote fading**
+  (`iap.execution.fading.FadeParams`, `ParentOrder.fade`): a child posted through the PASSIVE
+  state machine is pulled when the signal turns adverse by `threshold_z` (signal units) or the
+  opposite side's share of the two L1 sizes reaches `pressure_threshold`; the cancel goes
+  through simulator rule 7 (one latency draw, can lose the race), the remainder is held off the
+  book until the rule clears (`hold`), re-posted or crossed; every pull is a `PullRecord`
+  (`ExecReplayResult.pulls`, `ParentReport.diagnostics()`), and `pull_outcomes` /
+  `pull_rows` + `pull_summary` price the **fades saved vs fills missed** counterfactual
+  (touch-through proxy, labelled). **B5 queue-aware cancels** (`QueueCancelParams`,
+  `ParentOrder.queue_cancel`): cancel on `ahead_qty > max_ahead_qty` or
+  `FillHazardModel.p_fill_within < min_p_fill`, then cross or re-post; review X-4:
+  `estimate_calibration(depletion_split=True)` splits every `queue_depletion` cell into
+  execution vs cancel depletions with both rates (`ExecCalibration.queue_exec_depletion_hazard`
+  / `queue_cancel_depletion_hazard`; the pooled rate overstated the fill probability of
+  `sor_v2.hazard_fill_prob`, which now documents the execution rate as its input). **B6
+  markout decomposition** (`iap.tca.markout_decomposition`): `fill_type` (passive /
+  aggressive / faded / cancelled_replaced from the new `ChildOrder.cancel_rule`,
+  `cancel_rule_ts`, `replaces_order_id`), by B2 regime, `cluster_mean` = the v1.17
+  gate-statistic form (CR1 SE, one cluster per day, Student-t `G - 1`); review X-8:
+  `FillHazardModel(clock="America/New_York", capture_offset_s=IEX_TAI_OFFSET_S)` fits the
+  time-of-day feature on the exchange clock (the IEX capture clock is TAI + 37 s; Nasdaq is
+  local) and `to_dict` names the clock (`"utc"` default, v1.12 documents load unchanged). The
+  benchmark driver gains `passive+fade`, `passive+qcancel`, `passive+fade_qcancel` with
+  `--fade-threshold-z`, `--fade-pressure`, `--fade-action`, `--fade-max`,
+  `--qcancel-max-ahead`, `--qcancel-min-pfill`, `--qcancel-horizon-s`, `--qcancel-hazard`,
+  `--qcancel-calibration`, `--qcancel-action`, `--markout-horizons`, and reports
+  `fades_saved_vs_fills_missed` and `markout_decomposition` per policy (not run on multi7 in
+  this PR; the command is in HOW_IT_WORKS §3.5). PLATFORM_CONVENTIONS §11.3 lists the owning
+  language of each new rule (Python reference, C++ pending F7). Tests:
+  `python/tests/test_v117_fading_cancels_markout.py`.
+
 - v1.17 WS-F items F1 and F3. **F1**: `reproducible-build` CI job (the wheel built twice under
   `SOURCE_DATE_EPOCH` = commit date, sha256 must match; the python image built twice with BuildKit
   `rewrite-timestamp`, report-only); CycloneDX SBOMs on every release (syft per image, attested and
