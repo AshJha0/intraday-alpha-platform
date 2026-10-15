@@ -278,7 +278,17 @@ ingested dataset's `instruments.json` rows carry `ref_price_by_session` /
 `adv_by_session` (point-in-time values per session, also on its
 security-master records); `import_reference` keeps loading the scalar
 `ref_price` / `adv` into `instruments`, and per-session consumers (the
-backtester, the capacity proxy) read the file, never the store. Ledger
+backtester, the capacity proxy and, since v1.17 A5, the execution
+simulator through an **ADV table** — `iap.reference.session_adv.SessionAdvTable`,
+built from that `instruments.json` or from a plain
+`{"adv_by_session": {"<instrument_id>": {"YYYY-MM-DD": adv}}, "adv": {...},
+"timezone": "America/New_York"}` file, `load_exec_config(adv_table=)` /
+`--adv-table`) read the file, never the store. The normalised files a
+dataset holds (`normalized/*.iap1`, the JSONL twin, `events.parquet`)
+carry the canonical `event_type` codes of `schemas/FORMAT.md`; since v1.17
+A5 that includes `TRADE_BUST = 10` (an ITCH `B` / IEX trade break naming
+the broken print by `trade_id`), which the store does not index either —
+the store holds no events. Ledger
 entries of `--dataset-dir` runs carry `config_version` (sha256 over the
 dataset's `configs/` + `reference/` trees): it stays in the entry JSON and
 is not a `ledger_entries` column (it is provenance, not part of the key).

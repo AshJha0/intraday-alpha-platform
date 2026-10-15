@@ -198,7 +198,9 @@ def _eq_scripted(script: _Script, venue_index: int) -> None:
     script.emit(EventType.QUOTE, side=BID, price=bb, qty=0, order_id=st.new_order_id())
     script.emit(EventType.STATUS, qty=9)
     script.emit(0, side=BID, price=bb, qty=lot, order_id=st.new_order_id())  # unknown type
-    script.emit(10, side=BID, price=bb, qty=lot, order_id=st.new_order_id())  # unknown type
+    # unknown type (250: 10 became TRADE_BUST in v1.17 A5; the vector and
+    # every expected state are unchanged, an unknown code drops the same way)
+    script.emit(250, side=BID, price=bb, qty=lot, order_id=st.new_order_id())
     script.emit(EventType.ADD, side=9, price=bb, qty=lot, order_id=st.new_order_id())
 
     # --- MODIFY price mismatch, duplicate ADD id, unknown ids

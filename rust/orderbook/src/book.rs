@@ -423,7 +423,7 @@ impl OrderBook {
             }
             EventType::Trade => ev.qty > 0 && ev.price_ticks > 0,
             EventType::Status => SessionStatus::from_i64(ev.qty).is_some(),
-            EventType::Heartbeat => true,
+            EventType::Heartbeat | EventType::TradeBust => true,
         }
     }
 
@@ -485,7 +485,11 @@ impl OrderBook {
         if self.stale
             && !matches!(
                 et,
-                EventType::Snapshot | EventType::Status | EventType::Trade | EventType::Heartbeat
+                EventType::Snapshot
+                    | EventType::Status
+                    | EventType::Trade
+                    | EventType::Heartbeat
+                    | EventType::TradeBust
             )
         {
             self.counters.dropped_while_stale += 1;
@@ -520,7 +524,8 @@ impl OrderBook {
                 self.status = ev.qty;
                 true
             }
-            EventType::Heartbeat => true,
+            // v1.17 (A5): a tape correction, never book state (no-op, also while stale)
+            EventType::Heartbeat | EventType::TradeBust => true,
         };
         if applied {
             self.counters.events_applied += 1;

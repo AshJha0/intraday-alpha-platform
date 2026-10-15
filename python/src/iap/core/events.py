@@ -41,6 +41,12 @@ class EventType(IntEnum):
     SNAPSHOT = 7
     STATUS = 8
     HEARTBEAT = 9
+    #: v1.17 (A5, X-11): an earlier tape print (``trade_id``) was broken
+    #: (ITCH ``B``, IEX trade break).  A correction of the tape, not a book
+    #: event: every book applies it as a no-op (also while stale), the
+    #: registered feature engine skips it, the v2 share-normalised volume
+    #: features remove the print from the bust time forward.
+    TRADE_BUST = 10
 
 
 class SessionStatus(IntEnum):
@@ -152,6 +158,11 @@ def validation_error(ev: MarketEvent) -> str | None:
     elif et == EventType.STATUS:
         if ev.qty not in SessionStatus._value2member_map_:
             return f"STATUS qty must be a SessionStatus code: {ev.qty}"
+    elif et == EventType.TRADE_BUST:
+        if ev.trade_id == 0:
+            return "trade_id required for TRADE_BUST"
+        if ev.qty != 0 or ev.price_ticks != 0 or ev.order_id != 0:
+            return "TRADE_BUST carries only trade_id: qty, price_ticks and order_id must be 0"
     # HEARTBEAT: no payload constraints.
     return None
 

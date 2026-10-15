@@ -27,7 +27,7 @@ std::string validation_error(const MarketEvent& ev) {
         return "receive_ts " + std::to_string(ev.receive_ts) +
                " < exchange_ts " + std::to_string(ev.exchange_ts);
     }
-    if (ev.event_type < 1 || ev.event_type > 9) {
+    if (ev.event_type < 1 || ev.event_type > 10) {
         return "unknown event_type: " + std::to_string(ev.event_type);
     }
     if (ev.side != 0 && ev.side != 1) {
@@ -74,6 +74,13 @@ std::string validation_error(const MarketEvent& ev) {
         if (ev.qty < 1 || ev.qty > 4) {
             return "STATUS qty must be a SessionStatus code: " +
                    std::to_string(ev.qty);
+        }
+    }
+    if (et == static_cast<std::uint8_t>(EventType::TRADE_BUST)) {
+        if (ev.trade_id == 0) return "trade_id required for TRADE_BUST";
+        if (ev.qty != 0 || ev.price_ticks != 0 || ev.order_id != 0) {
+            return "TRADE_BUST carries only trade_id: qty, price_ticks and "
+                   "order_id must be 0";
         }
     }
     // HEARTBEAT: no payload constraints.

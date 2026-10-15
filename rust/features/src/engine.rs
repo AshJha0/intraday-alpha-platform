@@ -149,6 +149,9 @@ struct InstState {
     stale_seen: bool,
     /// an applied book-touching event is waiting for the group close
     pending_refresh: bool,
+    /// the last event left its same-timestamp group open (a TRADE_BUST
+    /// closing the group closes it in the event's place, v1.17 A5)
+    group_open: bool,
     /// venues whose depth cache the closing refresh re-reads (sorted)
     pending_venues: Vec<u16>,
     /// monotone count of merged-view refreshes (label sampling hook)
@@ -208,6 +211,7 @@ impl InstState {
             stale_touched: false,
             stale_seen: false,
             pending_refresh: false,
+            group_open: false,
             pending_venues: Vec::new(),
             refresh_seq: 0,
             last_ts: 0,
@@ -355,6 +359,9 @@ pub struct FeatureEngine {
     pub events_dropped: u64,
     /// Events dropped for an exchange_ts regression (fail closed).
     pub ts_regressions_dropped: u64,
+    /// v1.17 (A5, X-11): TRADE_BUST events skipped before the book (the
+    /// registered features never see a bust, `iap.features.engine`).
+    pub trade_busts_skipped: u64,
     /// Applied events whose qty exceeded [`FEATURE_MAX_QTY`] (not folded).
     pub oversized_qty_dropped: u64,
     /// Refreshes whose merged depth exceeded [`FEATURE_MAX_QTY`].
@@ -386,6 +393,7 @@ impl FeatureEngine {
             events_processed: 0,
             events_dropped: 0,
             ts_regressions_dropped: 0,
+            trade_busts_skipped: 0,
             oversized_qty_dropped: 0,
             oversized_depth_skipped: 0,
             vectors_emitted: 0,
@@ -406,6 +414,19 @@ impl FeatureEngine {
         ev: &MarketEvent,
         group_end: bool,
     ) -> Result<Option<FeatureVector>, IapError> {
+        if ev.event_type == EventType::TradeBust.as_u8() {
+            // v1.17 (A5): neither the book nor a window sees a bust; it only
+            // closes a same-timestamp group it happens to end.
+            self.trade_busts_skipped += 1;
+            let open = match self.states.get(&ev.instrument_id) {
+                Some(st) => st.group_open && ev.exchange_ts >= st.last_ts,
+                None => false,
+            };
+            if group_end && open {
+                return Ok(self.close_group(ev.instrument_id, ev.exchange_ts, true));
+            }
+            return Ok(None);
+        }
         let tick = *self.ticks.get(&ev.instrument_id).ok_or_else(|| {
             IapError::InvalidArgument(format!(
                 "no tick_size configured for instrument {}",
@@ -499,9 +520,13 @@ impl FeatureEngine {
     /// `group_end == false` the group stays open and nothing is emitted.
     fn close_group(&mut self, instrument_id: u32, t: i64, group_end: bool) -> Option<FeatureVector> {
         if !group_end {
+            if let Some(st) = self.states.get_mut(&instrument_id) {
+                st.group_open = true;
+            }
             return None;
         }
         let st = self.states.get_mut(&instrument_id)?;
+        st.group_open = false;
         let stale_changed = st.stale_touched;
         let just_recovered = (!st.stale_venues.is_empty() || st.stale_seen)
             && st.stale_running.is_empty();

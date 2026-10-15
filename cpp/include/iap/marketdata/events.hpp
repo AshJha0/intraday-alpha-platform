@@ -28,6 +28,9 @@ enum class EventType : std::uint8_t {
     SNAPSHOT = 7,
     STATUS = 8,
     HEARTBEAT = 9,
+    // v1.17 (A5, X-11): an earlier tape print (trade_id) was broken (ITCH
+    // B, IEX trade break). A tape correction, not book state.
+    TRADE_BUST = 10,
 };
 
 enum class SessionStatus : std::uint8_t {

@@ -397,7 +397,9 @@ class ExtendedFeatureEngine(FeatureEngine):
         self._dropped_before = 0
 
     def apply(self, ev: MarketEvent, group_end: bool = True) -> FeatureVector | None:
-        self._cur = ev
+        # v1.17 (A5): a TRADE_BUST is not an event of the extended state or
+        # the event / volume clock either (the base engine skips it).
+        self._cur = None if ev.event_type == EventType.TRADE_BUST else ev
         self._dropped_before = self.events_dropped
         return super().apply(ev, group_end)
 

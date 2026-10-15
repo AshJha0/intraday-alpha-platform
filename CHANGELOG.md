@@ -8,6 +8,24 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-A item A5 (review rows D-P1-5, X-9, X-11), additive and opt-in; the registered
+  feature code, its goldens and the pre-registration fingerprints are untouched. **D-P1-5**:
+  the v2 spec gains a second family, `sharenorm` (14 `_v2` features, `iap.features.feature_v2`,
+  API_FEATURES §9.1): volumes and depths over the session ADV (`iap.reference.session_adv.
+  SessionAdvTable`, the dataset's `adv_by_session`) and over the running session volume;
+  `FeatureV2Extension(families=, adv=)`; v2 golden regenerated at x-version 2 (26 columns).
+  Python-reference only, pending F7 / F8 (conventions §11.7). **X-9**: `ExecConfig.adv_by_session`
+  / `load_exec_config(adv_table=)` / benchmark `--adv-table` make rules 6 / 6b and the X-3
+  support check divide by the ADV of the fill's session (API_TRADING §2.15); default static,
+  byte-identical, `expected_replay_fills.json` unchanged. **X-11**: new canonical event kind
+  `TRADE_BUST = 10` (`schemas/FORMAT.md` §4, API_CORE §4) for ITCH `B` broken trades and IEX
+  trade breaks: the mapper emits it, the normaliser carries it into the IAP1 file, the JSONL
+  twin and Parquet, every book (Python, Rust, C++) applies it as a no-op, the feature engines
+  (Python, Rust, C++) skip it before the book so registered vectors are byte-identical with or
+  without busts, and the `sharenorm` volumes remove the print from the bust time forward. The
+  anomaly fixture's two deliberately unknown events use code 250 instead of 10 (expected states
+  and feature checkpoints unchanged); the mapping counter `invalid_broken_trades` is new.
+
 - v1.17 WS-F items F1 and F3. **F1**: `reproducible-build` CI job (the wheel built twice under
   `SOURCE_DATE_EPOCH` = commit date, sha256 must match; the python image built twice with BuildKit
   `rewrite-timestamp`, report-only); CycloneDX SBOMs on every release (syft per image, attested and
