@@ -34,6 +34,9 @@ pub enum EventType {
     Snapshot = 7,
     Status = 8,
     Heartbeat = 9,
+    /// v1.17 (A5, X-11): an earlier tape print (`trade_id`) was broken
+    /// (ITCH `B`, IEX trade break). A tape correction, not book state.
+    TradeBust = 10,
 }
 
 impl EventType {
@@ -54,6 +57,7 @@ impl EventType {
             7 => Some(EventType::Snapshot),
             8 => Some(EventType::Status),
             9 => Some(EventType::Heartbeat),
+            10 => Some(EventType::TradeBust),
             _ => None,
         }
     }
@@ -187,6 +191,17 @@ pub fn validation_error(ev: &MarketEvent) -> Option<String> {
                 return Some(format!("STATUS qty must be a SessionStatus code: {}", ev.qty));
             }
         }
+        EventType::TradeBust => {
+            if ev.trade_id == 0 {
+                return Some("trade_id required for TRADE_BUST".to_string());
+            }
+            if ev.qty != 0 || ev.price_ticks != 0 || ev.order_id != 0 {
+                return Some(
+                    "TRADE_BUST carries only trade_id: qty, price_ticks and order_id must be 0"
+                        .to_string(),
+                );
+            }
+        }
         EventType::Heartbeat => {} // no payload constraints
     }
     None
@@ -242,7 +257,7 @@ mod tests {
         let mut ev = valid_add();
         ev.event_type = 0;
         assert!(validation_error(&ev).is_some());
-        ev.event_type = 10;
+        ev.event_type = 250;
         assert!(validation_error(&ev).is_some());
     }
 

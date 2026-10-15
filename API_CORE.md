@@ -19,8 +19,9 @@ event_id u64 | instrument_id u32 | venue_id u16 | exchange_ts i64 | receive_ts i
 ```
 
 - Enums (u8): side {BID=0, ASK=1}; event_type {ADD=1, MODIFY=2, CANCEL=3,
-  EXECUTE=4, TRADE=5, QUOTE=6, SNAPSHOT=7, STATUS=8, HEARTBEAT=9};
-  STATUS payload in `qty`: {TRADING=1, HALT=2, AUCTION=3, CLOSE=4}.
+  EXECUTE=4, TRADE=5, QUOTE=6, SNAPSHOT=7, STATUS=8, HEARTBEAT=9,
+  TRADE_BUST=10 (v1.17 A5)}; STATUS payload in `qty`: {TRADING=1, HALT=2,
+  AUCTION=3, CLOSE=4}.
 - Invariants: receive_ts >= exchange_ts; sequence is per (venue_id,
   instrument_id) stream; event_id is globally monotone 1..N per file; unused
   fields are 0. Validation rules: `iap/core/events.py::validation_error`
@@ -100,6 +101,7 @@ in the synthetic range below as "not known to be ahead" (API_TRADING.md
 | SNAPSHOT | burst per §1: the first record of a burst clears both sides; each record inserts one order; `trade_id == 0` ends the burst and clears `stale` unless the burst is broken (gap inside it). Countdown validation: while a burst is active a record with `trade_id >= previous` starts a NEW burst (previous one interrupted; `snapshot_restarts`), a record that skips ahead (`trade_id < previous - 1`) marks the burst broken. `order_id == 0` records get `synthetic_order_id(side, ordinal)` (ordinal per side, restarting at 0 for every burst); a repeated id inside a burst is malformed (drop + count `unknown_order_events`; the countdown still advances). |
 | STATUS | store qty as session status; a code outside {1..4} is malformed (drop + count). Never touches sequencing. |
 | HEARTBEAT | timestamps/sequence only. |
+| TRADE_BUST | timestamps/sequence only (v1.17 A5): a tape correction naming an earlier print by `trade_id`; applied as a no-op also while stale; `trade_flow` is not reversed (the book keeps no per-print quantity). The validator requires `trade_id != 0` and zero `side`/`price_ticks`/`qty`/`order_id`; the book itself checks no payload (as for HEARTBEAT). |
 
 **Malformed-event policy** (checked after the sequence number is consumed;
 never raised mid-stream): unknown `event_type` → `unknown_type_dropped`;

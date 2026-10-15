@@ -689,6 +689,7 @@ _CANCEL = int(EventType.CANCEL)
 _EXECUTE = int(EventType.EXECUTE)
 _TRADE = int(EventType.TRADE)
 _STATUS = int(EventType.STATUS)
+_TRADE_BUST = int(EventType.TRADE_BUST)
 _BID = int(Side.BID)
 _ASK = int(Side.ASK)
 
@@ -709,6 +710,7 @@ MAPPING_COUNTERS = (
     "hidden_trades_signed_by_tick_rule",
     "cross_trades",
     "broken_trades",
+    "invalid_broken_trades",
     "synthetic_trade_ids",
     "outside_session_dropped",
     "reg_sho_messages",
@@ -924,6 +926,22 @@ class Itch50Mapper:
             if kind is BrokenTrade:
                 counters["broken_trades"] += 1
                 self.broken.append(m.match_number)
+                # v1.17 (A5, X-11): the break is an event of the stream, a
+                # TRADE_BUST naming the print's trade_id (the match number,
+                # as the print carried it), at the break's own time.  A break
+                # outside the session is dropped with the session's events;
+                # a zero match number names no print.
+                if m.match_number <= 0:
+                    counters["invalid_broken_trades"] += 1
+                elif self._dropping():
+                    counters["outside_session_dropped"] += 1
+                else:
+                    ts = self._ts(m.ts)
+                    if self._emitted_status[inst] is None:
+                        ev = self._sync_status(inst, ts)
+                        if ev is not None:
+                            yield ev
+                    yield (inst, ts, _TRADE_BUST, 0, 0, 0, 0, m.match_number)
                 continue
             if kind is OperationalHalt:
                 counters["operational_halt_messages"] += 1

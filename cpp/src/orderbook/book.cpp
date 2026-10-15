@@ -118,6 +118,7 @@ bool OrderBook::payload_ok(const MarketEvent& ev) {
         case EventType::STATUS:
             return ev.qty >= 1 && ev.qty <= 4;
         case EventType::HEARTBEAT:
+        case EventType::TRADE_BUST:
             return true;
     }
     return true;
@@ -158,7 +159,7 @@ ApplyStatus OrderBook::apply_sequenced(const MarketEvent& ev, bool from_buffer) 
 
     // Malformed-event classes: dropped + counted (never thrown), after the
     // sequence number above is consumed (pinned).
-    if (ev.event_type < 1 || ev.event_type > 9) {
+    if (ev.event_type < 1 || ev.event_type > 10) {
         ++counters_.unknown_type_dropped;
         return ApplyStatus::DROPPED;
     }
@@ -173,7 +174,8 @@ ApplyStatus OrderBook::apply_sequenced(const MarketEvent& ev, bool from_buffer) 
         return ApplyStatus::DROPPED;
     }
     if (stale_ && et != EventType::SNAPSHOT && et != EventType::STATUS &&
-        et != EventType::TRADE && et != EventType::HEARTBEAT) {
+        et != EventType::TRADE && et != EventType::HEARTBEAT &&
+        et != EventType::TRADE_BUST) {
         ++counters_.dropped_while_stale;
         return ApplyStatus::DROPPED;
     }
@@ -215,6 +217,7 @@ ApplyStatus OrderBook::apply_sequenced(const MarketEvent& ev, bool from_buffer) 
             status_ = ev.qty;
             break;
         case EventType::HEARTBEAT:
+        case EventType::TRADE_BUST:  // v1.17 (A5): a tape correction, no-op
             break;
     }
     if (!applied) return ApplyStatus::DROPPED;

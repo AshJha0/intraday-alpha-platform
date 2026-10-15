@@ -960,6 +960,31 @@ the thresholds (1 z, gain 0.5) and the alpha (the registered EQ10 `beta`
 was fitted on synthetic data and is negative, while its in-sample real IC
 is positive: `--signal-refit` shows the other sign).
 
+### 2.15 Per-session ADV in the simulator (v1.17 A5, review X-9, Python only)
+
+Until v1.17 the simulator divided by the one dataset-level `adv` of
+`InstrumentSpec` for every fill of a multi-session replay (the backtester
+had read the per-session values since v1.14, D-P2-8). `ExecConfig.adv_by_session`
+(default `None`) is an `iap.reference.session_adv.SessionAdvTable`: per
+(instrument, session) ADV keyed `YYYY-MM-DD` in the table's zone
+(`America/New_York` unless the table says otherwise), built from an
+ingested dataset's `instruments.json` (`adv_by_session`,
+`SessionAdvTable.from_instruments_json`) or a plain table file
+(`{"adv_by_session": {"<instrument_id>": {"<date>": adv}}, "adv": {...},
+"timezone": ...}`, `from_json`; `from_path` picks by shape).
+`ExecConfig.session_adv(instrument_id, exchange_ts)` is the ADV the
+simulator divides by: the fill session's value, the static `adv` when the
+table lacks that session or instrument. It enters rule 6 (child impact),
+rule 6b (`pct` of the parent adder, so a parent spanning sessions is
+charged each fill at its own session's scale) and the X-3 support check
+(`impact_fit_support_pct_adv`). Fills, fees and queue positions do not
+read ADV and are unchanged. Loading: `load_exec_config(config_dir,
+adv_table=True)` reads the directory's own `instruments.json`; a path reads
+that file; the execution benchmark takes `--adv-table static|instruments|<path>`
+and records the choice in its provenance block. Without a table every
+rule is byte-identical to v1.16 (`expected_replay_fills.json` unchanged);
+the C++ rule text keeps the static `adv`.
+
 ## 3. Where the rules live
 
 | rule set | normative text | Python port entry |

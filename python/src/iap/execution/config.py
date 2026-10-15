@@ -26,6 +26,7 @@ from pathlib import Path
 
 from iap.execution.regulatory import RegulatoryFeeSchedule, load_default_schedule
 from iap.execution.types import InstrumentSpec, LatencyConfig, VenueSpec
+from iap.reference.session_adv import SessionAdvTable
 
 PathLike = str | Path
 
@@ -83,6 +84,25 @@ class ExecConfig:
     #: child walks (simulator rule 3). 10 is the pinned value every golden
     #: was generated with; deeper walks change fills on thin books.
     walk_depth_levels: int = 10
+    #: v1.17 A5 (review X-9): ADV per (instrument, session) for the impact
+    #: adders (rules 6 / 6b) and the X-3 support check: the ADV of the
+    #: session the FILL falls in replaces ``InstrumentSpec.adv`` wherever
+    #: the simulator divides by ADV.  ``None`` (the default) keeps the one
+    #: dataset-level ADV, byte-identical to every golden; a table without
+    #: per-session rows for an instrument falls back to its static ADV.
+    #: Loaded by ``load_exec_config(adv_table=...)`` / ``--adv-table``.
+    adv_by_session: SessionAdvTable | None = None
+
+    def session_adv(self, instrument_id: int, exchange_ts: int) -> float:
+        """The ADV the simulator divides by for ``instrument_id`` at
+        ``exchange_ts``: the session's value from ``adv_by_session`` when
+        the table has it, else the instrument's static ``adv``."""
+        static = self.instrument(instrument_id).adv
+        table = self.adv_by_session
+        if table is None:
+            return static
+        v = table.adv(instrument_id, exchange_ts, static)
+        return static if v is None else v
 
     def impact_label(self) -> str:
         """How a cost under this config should be labelled (v1.17, X-3):
@@ -300,6 +320,7 @@ def load_exec_config(
     latency: LatencyConfig = LatencyConfig(),  # noqa: B008 (frozen dataclass default, one shared immutable instance is intended)
     *,
     regulatory_fees: bool = False,
+    adv_table: PathLike | bool | None = None,
 ) -> ExecConfig:
     """Build the ``ExecConfig`` the platform runs with from a config directory.
 
@@ -309,8 +330,19 @@ def load_exec_config(
     ``regulatory_fees=True`` (v1.15 X-P1-1; what ``configs/prereg/v2.json``
     asks for) also loads the dated Section 31 + TAF schedule
     ``reference/regulatory_fee_schedule.json``; the default stays off.
+
+    ``adv_table`` (v1.17 A5, X-9): ``True`` reads the per-session ADV of
+    the directory's own ``instruments/instruments.json`` (an ingested
+    dataset's ``adv_by_session``); a path reads that file (an
+    ``instruments.json`` or a plain ADV table, ``iap.reference.session_adv``);
+    ``None`` / ``False`` (the default) keeps the static ADV.
     """
     base = Path(config_dir)
+    table: SessionAdvTable | None = None
+    if adv_table is True:
+        table = SessionAdvTable.from_instruments_json(base / INSTRUMENTS_FILE)
+    elif adv_table not in (None, False):
+        table = SessionAdvTable.from_path(adv_table)  # type: ignore[arg-type]
     exec_path = base / EXECUTION_FILE
     root = _read_json(exec_path)
     defaults = root.get("defaults")
@@ -328,4 +360,5 @@ def load_exec_config(
         instruments=load_instruments(base / INSTRUMENTS_FILE),
         venues=load_venues(base / VENUES_FILE),
         regulatory_fees=load_default_schedule(base) if regulatory_fees else None,
+        adv_by_session=table,
     )

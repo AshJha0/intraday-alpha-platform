@@ -87,7 +87,7 @@ intraday-alpha-platform/
   QUOTE/SNAPSHOT records (`0xFFFF000000000000 | side<<40 | ordinal`); feeds must not carry explicit
   ids there on ADD/QUOTE/SNAPSHOT.
 - **Enums (u8)**: side {BID=0, ASK=1}; event_type {ADD=1, MODIFY=2, CANCEL=3, EXECUTE=4, TRADE=5,
-  QUOTE=6, SNAPSHOT=7, STATUS=8, HEARTBEAT=9}; status payload uses qty field: {TRADING=1, HALT=2,
+  QUOTE=6, SNAPSHOT=7, STATUS=8, HEARTBEAT=9, TRADE_BUST=10 (v1.17 A5, §11.7)}; status payload uses qty field: {TRADING=1, HALT=2,
   AUCTION=3, CLOSE=4}.
 - **Integer arithmetic is checked everywhere on feed-controlled values**: level totals, trade_flow,
   sequence comparisons. An operation that would leave i64/u64 is a malformed event: dropped + counted
@@ -552,7 +552,9 @@ overlay and never re-used on the same display — a level refresh caps the overl
 `min(consumed, new displayed)`; (4) deterministic queue position (only book-APPLIED events are tracked;
 a cancel, or a MODIFY size decrease (X-P1-1, v1.14), advances us only when that order is known to be ahead; trade-through, marketable-ADD expansion, crossing with the double-count exemption); (5) fees;
 (6) linear impact identical to the research cost model, `impact_bps = coeff × (qty × qty_unit /
-adv × 100)`; (7) cancels travel the same latency path, take effect at `max(cancel arrival, order
+adv × 100)` — `adv` is the instrument's static ADV, or, with an ADV table (v1.17 A5, review X-9,
+Python only, off by default), the ADV of the session the FILL falls in (`ExecConfig.adv_by_session`,
+`load_exec_config(adv_table=)`, `--adv-table`; also rule 6b and the X-3 support check); (7) cancels travel the same latency path, take effect at `max(cancel arrival, order
 arrival)`, `expire_ts` (time-in-force) expires pending or resting orders before activation,
 `cancel_all` is the end-of-stream sweep; (8) venue trading-state gate — no fill of any kind
 while the venue book is missing, stale or not TRADING (MARKET/IOC/FOK → `VENUE_NOT_TRADING`,
@@ -621,6 +623,19 @@ against the state before the event that filled them, TAKER fills against the sta
 otherwise `null` and excluded from `n_defined` (§2.5); order windows are validated
 (`decision ≤ arrival ≤ end ≤ last_ts`, fills inside) (§2.3). PGD returns `feasible=false`
 (`status INFEASIBLE`) with `w_prev` instead of NaN weights (§1.3).
+
+### 11.7 v1.17 A5: `TRADE_BUST` and the share-normalised v2 family (status)
+
+| item | rule | Python | Rust | C++ | pinned by |
+|---|---|---|---|---|---|
+| `TRADE_BUST` (event type 10, review X-11) | canonical event (§1, `schemas/FORMAT.md` §4): `trade_id` names the print, other payload 0; every book applies it as a no-op, also while stale; the ITCH mapper emits one per `B` (the IEX trade break maps the same way); the normaliser carries it into the IAP1 file, the JSONL twin and the Parquet sink; an older reader drops it as an unknown type | reference | port (`marketdata::EventType::TradeBust`, `orderbook`) | port (`EventType::TRADE_BUST`, `orderbook`) | `test_trade_bust.py`, `test_itch50_mapping.py`; the port unit tests (`unknown_event_type_rejected` now uses 250) |
+| feature engines and busts | the registered engine never sees a bust: it reaches neither the book nor a rolling window, emits nothing of its own, and only closes a same-timestamp group it happens to end (exactly as that group's last real event would have); a stream with its busts removed yields byte-identical vectors (`trade_busts_skipped` counts them) | reference | port (`features::FeatureEngine`) | port (`FeatureEngine`) | `test_trade_bust.py::test_registered_engine_never_sees_a_bust`; the feature goldens (no bust in any fixture) |
+| v2 `sharenorm` family (review D-P1-5) | 14 opt-in `_v2` features (API_FEATURES §9.1): volumes and depths over the session ADV (`iap.reference.session_adv.SessionAdvTable`, the dataset's `adv_by_session`) and the running session volume; a bust removes its print from the bust time forward | **reference only** (`iap.features.feature_v2`) | none — pending F7 / F8 (§6 does not require a port for an opt-in family outside the registry) | none — pending F7 / F8 | `tests/golden/expected_features_v2.json` (x-version 2), `test_feature_v2.py` |
+| per-session ADV in the simulator (review X-9) | §11.2 rule (6) / 6b and the X-3 support check divide by the fill session's ADV when `ExecConfig.adv_by_session` is set; default static, byte-identical (`expected_replay_fills.json` unchanged) | **reference only** (`iap.execution`) | — | none (the C++ rule text keeps the static `adv`; the option is Python-only, documented in API_TRADING §2.15) | `test_exec_session_adv.py`, `test_execution_golden.py` |
+
+The unknown-type anomaly fixture `tests/golden/events_eq_anomalies.jsonl` uses code 250 for its
+two deliberately unknown events (it used 10 until v1.17); every expected state and feature
+checkpoint is unchanged, an unknown code drops the same way.
 
 ### 11.6 Currency
 

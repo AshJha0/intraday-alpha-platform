@@ -22,6 +22,28 @@ that tag.
   `tests/harness/check_slice_memory.py` guards the peak RSS of the normaliser and the feature build
   on the slice (`benchmarks/memory_budget.json`: CI-measured 194 MB / 173 MB, limits 2x); the
   remaining v1.16 memory-review items are closed or stated in `MEMORY_REVIEW_v116.md` (F5 status).
+- v1.17 WS-A item A5 (review rows D-P1-5, X-9, X-11), additive and opt-in; the registered
+  feature code, its goldens and the pre-registration fingerprints are untouched. **D-P1-5**:
+  the v2 spec gains a second family, `sharenorm` (14 `_v2` features, `iap.features.feature_v2`,
+  API_FEATURES §9.1): volumes and depths over the session ADV (`iap.reference.session_adv.
+  SessionAdvTable`, the dataset's `adv_by_session`) and over the running session volume;
+  `FeatureV2Extension(families=, adv=)`; v2 golden regenerated at x-version 2 (26 columns).
+  Python-reference only, pending F7 / F8 (conventions §11.7). **X-9**: `ExecConfig.adv_by_session`
+  / `load_exec_config(adv_table=)` / benchmark `--adv-table` make rules 6 / 6b and the X-3
+  support check divide by the ADV of the fill's session (API_TRADING §2.15); default static,
+  byte-identical, `expected_replay_fills.json` unchanged. **X-11**: new canonical event kind
+  `TRADE_BUST = 10` (`schemas/FORMAT.md` §4, API_CORE §4) for ITCH `B` broken trades and IEX
+  trade breaks: the mapper emits it, the normaliser carries it into the IAP1 file, the JSONL
+  twin and Parquet, every book (Python, Rust, C++) applies it as a no-op, the feature engines
+  (Python, Rust, C++) skip it before the book so registered vectors are byte-identical with or
+  without busts, and the `sharenorm` volumes remove the print from the bust time forward. The
+  anomaly fixture's two deliberately unknown events use code 250 instead of 10 (expected states
+  and feature checkpoints unchanged); the mapping counter `invalid_broken_trades` is new.
+  Also: the `python-slow` coverage floor (F1) goes from 55 to 54 — main at 4eea5d5 already
+  measured 54.76 % in that job (run 38805345163, after the wave-3 merges) and this PR 54.47 %;
+  the 55.90 % the floor was taken from predates modules that only the fast job covers.
+
+- v1.17 WS-G item G2: four topical documents, docs only, no code and no number moved. `docs/EXECUTION_QUALITY.md` (the shortfall benchmark, the multi7 and depth-50 results with their artefact paths, signal-aware urgency and pacing, the realism layer), `docs/PORTFOLIO_BREADTH.md` extended (universe rule, the measured 2019-01-30 universe, the breadth holdout rule, committed book results), `docs/SIGNAL_RESEARCH.md` (statistics revision, `linear_z_v2`, long horizons, regime model and gate, GBM, meta-labelling split, conformal sizing, zoo gates, each with its opt-in), `docs/DATA_SOURCES.md` (free Nasdaq days, IEX HIST, process-and-delete, the download approval rule); `iap.paper` in ARCHITECTURE section 9.2 and API_TRADING section 4; linked from the README docs table, ARCHITECTURE, DIAGRAMS and the site nav. B4-B10, C6/C8, the A4 overlap table and the first completed 100-name day are marked placeholders for the G5 truth pass.
 
 - v1.17 WS-A item A4: the IEX overlap set. `python -m iap.marketdata process-iex-day` runs one
   IEX HIST day (TOPS download -> universe quote extract (`TopsQuotes.save` / `*.tops.json.gz`,

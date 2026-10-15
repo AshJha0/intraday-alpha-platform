@@ -457,6 +457,7 @@ def run_benchmark(
     impact_model: str = "child",
     impact_exponent: float = 1.0,
     walk_depth_levels: int = 10,
+    adv_table: Path | bool | None = None,
     baseline_policy: str = "native",
     max_events: int = 0,
     allow_holdout: bool = False,
@@ -506,7 +507,7 @@ def run_benchmark(
     )
     pacing_params = PacingParams(gain=signal_gain, max_age_ns=int(signal_max_age_s * SEC))
     algo_types = tuple(AlgoType[a] for a in algos)
-    cfg = load_exec_config(config_dir)
+    cfg = load_exec_config(config_dir, adv_table=adv_table)
     cfg = replace(
         cfg,
         seed=seed,
@@ -708,6 +709,11 @@ def run_benchmark(
         },
         "simulator": {
             "impact_model": impact_model,
+            "adv_table": (
+                "static"
+                if cfg.adv_by_session is None
+                else ("instruments.json" if adv_table is True else str(adv_table))
+            ),
             "impact_exponent": cfg.impact_exponent,
             "walk_depth_levels": walk_depth_levels,
             "cost_label": cfg.impact_label(),
@@ -937,6 +943,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--impact-model", choices=("child", "parent"), default="child")
     ap.add_argument("--impact-exponent", type=float, default=1.0)
     ap.add_argument("--walk-depth", type=int, default=10)
+    ap.add_argument(
+        "--adv-table",
+        default="static",
+        help="v1.17 A5 (X-9): per-session ADV for the impact adders: 'static' (default, the "
+        "dataset-level adv), 'instruments' (the config dir's instruments.json adv_by_session) "
+        "or a path (an instruments.json or a plain ADV table, iap.reference.session_adv)",
+    )
     ap.add_argument("--baseline-policy", default="native")
     ap.add_argument("--max-events", type=int, default=0, help="per session (smoke runs / tests)")
     ap.add_argument("--allow-holdout", action="store_true")
@@ -985,6 +998,11 @@ def main(argv: list[str] | None = None) -> int:
         impact_model=args.impact_model,
         impact_exponent=args.impact_exponent,
         walk_depth_levels=args.walk_depth,
+        adv_table=(
+            None
+            if args.adv_table == "static"
+            else (True if args.adv_table == "instruments" else Path(args.adv_table))
+        ),
         baseline_policy=args.baseline_policy,
         max_events=args.max_events,
         allow_holdout=args.allow_holdout,
