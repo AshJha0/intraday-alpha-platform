@@ -58,10 +58,10 @@ from iap.marketdata.itch50 import (
     ITCH_TIMEZONE,
     PRICE_SCALE,
     Itch50Mapper,
-    session_midnight_ns,
     Itch50Reader,
     LevelBook,
     ProtoEvent,
+    session_midnight_ns,
 )
 from iap.marketdata.lobster import LobsterConverter, sibling_orderbook, symbol_from_filename
 from iap.marketdata.normalize import RECORD_STRUCT, iter_record_events, normalize_run

@@ -7,6 +7,7 @@ from __future__ import annotations
 import io
 import json
 
+import iex_encoder as ix
 import pytest
 from conftest import CONFIGS_DIR
 from iap.core.events import EventType
@@ -29,8 +30,6 @@ from iap.marketdata.iex import (
 from iap.marketdata.ingest import ingest
 from iap.marketdata.itch50 import Itch50Mapper, Itch50Reader, session_midnight_ns
 from itch50_encoder import Itch50Encoder, hms_ns
-
-import iex_encoder as ix
 
 DATE = "2025-01-15"
 MID = session_midnight_ns(DATE)
@@ -179,7 +178,9 @@ def test_equivalent_itch_and_deep_plus_sequences_map_to_identical_events(tmp_pat
     assert p_iex == p_itch and len(p_iex) > 10
     assert m_iex.counters == m_itch.counters
     assert reader.protocol == PROTOCOL_DEEP_PLUS and reader.level_feed is False
-    assert reader.filtered == 2 and reader.counters["test_securities_skipped"] == 0  # MSFT, ZTST: outside the universe
+    assert (
+        reader.filtered == 2 and reader.counters["test_securities_skipped"] == 0
+    )  # MSFT, ZTST: outside the universe
     assert reader.counters["modify_in_place"] == 1 and reader.counters["modify_replace"] == 1
     assert reader.counters["executed_at_other_price"] == 1
     assert reader.counters["hidden_trades"] == 1 and reader.counters["outside_session_date"] == 0
