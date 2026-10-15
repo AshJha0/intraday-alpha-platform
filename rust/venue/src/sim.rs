@@ -737,6 +737,7 @@ impl SimulatedVenue {
                 (Vec::new(), order.qty, Some(price))
             }
             OrderType::Mid => {
+                let book = &self.books[&iid];
                 let (bid, _) = book.best_bid().expect("checked");
                 let (ask, _) = book.best_ask().expect("checked");
                 let mid = (bid + ask).div_euclid(2);
