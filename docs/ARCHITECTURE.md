@@ -19,7 +19,14 @@ each sits, what is opt-in, and what is Python-only. Sections 16 and 17
 were added with v1.11.0: the polyglot policy (which language copy is
 canonical, which is frozen) and the v1.11 subsystems (the LLM research
 agent, the model registry, the Rust feature engine as a Python wheel, and
-the optional extras).
+the optional extras). Section 9.2 documents the forward paper
+trade (`iap.paper`). The v1.17 topical pages are
+[EXECUTION_QUALITY.md](EXECUTION_QUALITY.md) (the shortfall benchmark,
+signal-aware urgency and pacing, the realism layer),
+[PORTFOLIO_BREADTH.md](PORTFOLIO_BREADTH.md) (the breadth universe and the
+cross-sectional book), [SIGNAL_RESEARCH.md](SIGNAL_RESEARCH.md) (the statistics
+revision and the new models and gates) and [DATA_SOURCES.md](DATA_SOURCES.md)
+(free Nasdaq and IEX data, process-and-delete).
 
 ## 1. Design principles (spec §1, condensed)
 
@@ -676,6 +683,34 @@ commit, checkpoint P&L), `PaperTradingMetrics` (risk-limit gauges,
 problem and its hash), `PaperTradingReports` (`/status` and the session
 report JSON) and `PaperTradingCli` (the command line). The golden MVP run,
 its digest and the paper-trading outputs are unchanged.
+
+### 9.2 The forward paper trade (`iap.paper`, v1.16 infrastructure)
+
+`python -m iap.paper.daily` runs one real session a day through the MVP loop
+and reports whether the live-shaped run still looks like the backtest. It is
+infrastructure, not a money claim: the daily P&L is reported and never
+promoted (the v1.16 in-sample study found EQ10 and EQ05 never clear taker
+costs). It is a Python-only package of four modules, composed from parts that
+already exist, and it is distinct from the Java `PaperTrading` shadow stack
+described above (the shadow stack's runbook is
+[RUNBOOK_shadow_deployment.md](runbooks/RUNBOOK_shadow_deployment.md); this one
+is [RUNBOOK_paper_trade.md](runbooks/RUNBOOK_paper_trade.md)).
+
+| module | role |
+|---|---|
+| `iap.paper.daily` | the driver: `run_day` locates or ingests the day's dataset (a dataset matching the config's `forbidden_datasets`, i.e. the holdout, is refused), runs the registered rule per symbol through `iap.mvp.real.run_symbol` with the prereg realism (`iap.execution.realism.apply`) and the opt-in end-of-day flatten, then calls the three checks below and writes `report.json` last with `status: complete`; a rerun of a complete date is a no-op unless `--force`; exit code 10 (`EXIT_ALERTS`) when any alert fired |
+| `iap.paper.tca_compare` | live-shaped versus backtest cost: per-parent simulated cost components (`is`, `spread`, `fee`, `impact`) against the research cost model's expectation, with an alert when the implementation-shortfall gap passes the configured threshold |
+| `iap.paper.monitors` | feature drift of the day's store against the in-sample reference stores (PSI, KS, mean shift, std ratio) and realised IC against the confirmed holdout IC (sign flip, day ratio, rolling ratio); pure functions whose alerts never change a pre-registration, gate or result |
+| `iap.paper.drill` | a dry kill-switch drill: replay a prepared symbol into a null trace sink, latch the kill switch mid-session, report whether working children were cancelled and nothing was submitted afterwards; nothing is sent anywhere |
+
+Configuration is `configs/paper/paper_trade.json`; output is
+`OUT_ROOT/<date>/{mvp/<SYMBOL>/, tca_compare.json, monitors.json, drill.json,
+report.json, report.md}`. The morning ops agent (`python -m iap.agents ops`,
+[AGENTS.md](AGENTS.md)) reads that output: thresholds are rules in code, the
+model writes only the narrative, and every number in it is checked against the
+alerts document. The package is inside the blocking mypy scope. Signatures:
+[../API_PAPER.md](../API_PAPER.md); cross-reference from
+[../API_TRADING.md](../API_TRADING.md) section 4.
 
 ## 10. Known deviations from the spec blueprint (documented, not hidden)
 

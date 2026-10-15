@@ -8,6 +8,8 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-G item G2: four topical documents, docs only, no code and no number moved. `docs/EXECUTION_QUALITY.md` (the shortfall benchmark, the multi7 and depth-50 results with their artefact paths, signal-aware urgency and pacing, the realism layer), `docs/PORTFOLIO_BREADTH.md` extended (universe rule, the measured 2019-01-30 universe, the breadth holdout rule, committed book results), `docs/SIGNAL_RESEARCH.md` (statistics revision, `linear_z_v2`, long horizons, regime model and gate, GBM, meta-labelling split, conformal sizing, zoo gates, each with its opt-in), `docs/DATA_SOURCES.md` (free Nasdaq days, IEX HIST, process-and-delete, the download approval rule); `iap.paper` in ARCHITECTURE section 9.2 and API_TRADING section 4; linked from the README docs table, ARCHITECTURE, DIAGRAMS and the site nav. B4-B10, C6/C8, the A4 overlap table and the first completed 100-name day are marked placeholders for the G5 truth pass.
+
 - v1.17 WS-F items F1 and F3. **F1**: `reproducible-build` CI job (the wheel built twice under
   `SOURCE_DATE_EPOCH` = commit date, sha256 must match; the python image built twice with BuildKit
   `rewrite-timestamp`, report-only); CycloneDX SBOMs on every release (syft per image, attested and
