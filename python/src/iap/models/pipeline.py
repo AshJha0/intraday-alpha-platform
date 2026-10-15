@@ -10,6 +10,20 @@ Flow (pinned):
 3. If the gate passes, Tier 1 (trees) and Tier 2 (MLP) run on the same
    folds; otherwise they are skipped and the skip is recorded.
 
+**v1.17 WS-D (review finding R-6; opt-in).**  The literal rule reads ONE
+number pooled across fits with no significance: a pooled IC of +0.001
+passes it.  ``gate="clustered"`` reads instead the fold-mean rank IC
+against the mid-to-mid label (``mean_rank_ic_vs_mid``) and the
+day-clustered t of the pooled OOS predictions
+(:func:`iap.validation.metrics.gate_statistics` on the predictions
+standardised per fold - each fold is its own fit - against the mid label),
+and passes only when the mean rank IC is > 0 AND that t clears
+``gate_t_threshold`` (default :data:`DEFAULT_GATE_T_THRESHOLD` = 2.0).
+Both readings are always computed and recorded (``results["gate"]
+["literal"]`` / ``["clustered"]`` and the ledger look); ``gate_rule``
+names the one that decided.  The default stays ``"literal"`` so the
+regenerated ML report is unchanged until the owner flips it.
+
 Every trained model writes a tracker run: manifest + metrics + pickled model
 (the model saved is the fit from the FINAL fold — the largest purged train
 window).  Predictions are also returned pooled across folds for the
@@ -39,9 +53,17 @@ from iap.models.zoo import (
     model_names,
 )
 from iap.validation.metrics import _ranks as _avg_ranks
+from iap.validation.metrics import gate_statistics
 
 #: Column of Dataset.meta_context holding half_spread_cost_bps_v1.
 _HALF_SPREAD_COL = 4
+
+#: The model-zoo gate rules (v1.17 WS-D, R-6): the literal v1 rule
+#: (default) and the clustered rule.
+GATE_RULES = ("literal", "clustered")
+DEFAULT_GATE_RULE = "literal"
+#: Day-clustered t the clustered gate requires of the best linear model.
+DEFAULT_GATE_T_THRESHOLD = 2.0
 
 
 def _asset_classes(ds, idx: np.ndarray) -> list:
@@ -91,6 +113,15 @@ def ic_tstat(fold_ics: list[float]) -> float:
     return float(arr.mean() / (sd / math.sqrt(len(arr))))
 
 
+def _standardise(pred: np.ndarray) -> np.ndarray:
+    """``pred`` at zero mean and unit scale (NaN when it has no spread)."""
+    pred = np.asarray(pred, dtype=np.float64)
+    sd = float(np.std(pred)) if pred.size else 0.0
+    if not sd > 0.0:
+        return np.full(pred.shape, np.nan)
+    return (pred - float(np.mean(pred))) / sd
+
+
 def _cost_estimate(ds: Dataset, idx: np.ndarray) -> np.ndarray:
     """Observable round-trip cost estimate (return units) at decision time.
 
@@ -111,6 +142,7 @@ def _evaluate_model(
     """Train/evaluate one model across all folds; returns metrics + preds."""
     per_fold: list[dict[str, float]] = []
     pooled_pred = np.full(len(ds), np.nan)
+    pooled_pred_std = np.full(len(ds), np.nan)
     final_model: Any = None
     for fold in folds:
         scaler = TrainScaler().fit(ds.X[fold.train_idx])
@@ -121,6 +153,9 @@ def _evaluate_model(
         model.fit(X_tr, y_tr)
         pred = np.asarray(model.predict(X_te), dtype=np.float64)
         pooled_pred[fold.test_idx] = pred
+        # v1.17 WS-D (R-6): each fold is its own fit, so the pooled series
+        # the clustered t reads is standardised per fold (R-9's lesson).
+        pooled_pred_std[fold.test_idx] = _standardise(pred)
         y_te = ds.y[fold.test_idx]
         ic_f = information_coefficient(pred, y_te)
         per_fold.append(
@@ -134,6 +169,8 @@ def _evaluate_model(
                 "test_asset_classes": _asset_classes(ds, fold.test_idx),
                 "ic": ic_f,
                 "rank_ic": rank_ic(pred, y_te),
+                # v1.17 WS-D (R-6): the clustered gate's per-fold input
+                "rank_ic_vs_mid": rank_ic(pred, ds.y_mid[fold.test_idx]),
                 "degenerate": bool(not np.isfinite(ic_f)),
             }
         )
@@ -148,6 +185,10 @@ def _evaluate_model(
     )
     fold_ics = [f["ic"] for f in per_fold if np.isfinite(f["ic"])]
     rank_ics = [f["rank_ic"] for f in per_fold if np.isfinite(f["rank_ic"])]
+    rank_ics_mid = [f["rank_ic_vs_mid"] for f in per_fold if np.isfinite(f["rank_ic_vs_mid"])]
+    clustered = gate_statistics(
+        ds.ts[idx], pooled_pred_std[idx], ds.y_mid[idx], horizon_ns=TARGET_HORIZON_NS
+    )
     return {
         "model": name,
         "per_fold": per_fold,
@@ -166,6 +207,11 @@ def _evaluate_model(
         # measure — the cost-adjusted target contains an observable spread
         # component that inflates raw IC.
         "pooled_ic_vs_mid": information_coefficient(pooled_pred[idx], ds.y_mid[idx]),
+        # v1.17 WS-D (R-6): the clustered gate's readings, for every model.
+        "mean_rank_ic_vs_mid": float(np.mean(rank_ics_mid)) if rank_ics_mid else float("nan"),
+        "tstat_day_cluster_vs_mid": float(clustered["tstat_day_cluster"]),
+        "tstat_hac_vs_mid": float(clustered["tstat_hac"]),
+        "n_days": int(clustered["n_days"]),
         "economics": econ,
         "economics_label_exact": econ_exact,
         "_pooled_pred": pooled_pred,
@@ -179,8 +225,15 @@ def run_model_comparison(
     n_folds: int = 4,
     embargo_ns: int = 60_000_000_000,
     ledger=None,
+    gate: str = DEFAULT_GATE_RULE,
+    gate_t_threshold: float = DEFAULT_GATE_T_THRESHOLD,
 ) -> dict[str, Any]:
     """Full gated comparison. Returns per-model metrics + gate record.
+
+    ``gate`` (v1.17 WS-D, R-6) names the rule that decides: ``"literal"``
+    (default, the pooled mid IC > 0) or ``"clustered"`` (fold-mean rank IC
+    vs mid > 0 AND day-clustered t >= ``gate_t_threshold``); both readings
+    are recorded whichever decides (module docs).
 
     When ``tracker`` is given, each trained model becomes a tracked run with
     manifest.json / metrics.json / model.pkl per spec §14/§26.
@@ -193,6 +246,10 @@ def run_model_comparison(
     denominator the alpha reports quote.  The caller saves the ledger; the
     running total is returned as ``results["gate"]["ledger_n"]``.
     """
+    if gate not in GATE_RULES:
+        raise ValueError(f"unknown gate {gate!r}; known: {GATE_RULES}")
+    if not np.isfinite(gate_t_threshold) or gate_t_threshold <= 0.0:
+        raise ValueError("gate_t_threshold must be a positive number")
     splitter = WalkForwardSplitter(
         n_folds=n_folds, embargo_ns=embargo_ns, label_horizon_ns=TARGET_HORIZON_NS
     )
@@ -249,18 +306,57 @@ def run_model_comparison(
     best_linear = max(
         tier0_ics, key=lambda n: tier0_ics[n] if np.isfinite(tier0_ics[n]) else -np.inf
     )
-    gate_passed = bool(np.isfinite(tier0_ics[best_linear]) and tier0_ics[best_linear] > 0.0)
+    literal_passed = bool(np.isfinite(tier0_ics[best_linear]) and tier0_ics[best_linear] > 0.0)
+    # v1.17 WS-D (R-6): the clustered reading - the best tier-0 model by
+    # fold-mean rank IC vs mid, with the day-clustered t of its pooled
+    # (per-fold standardised) OOS predictions against the mid label.
+    tier0_rank = {n: results["models"][n]["mean_rank_ic_vs_mid"] for n in model_names(0)}
+    best_clustered = max(
+        tier0_rank, key=lambda n: tier0_rank[n] if np.isfinite(tier0_rank[n]) else -np.inf
+    )
+    t_cluster = float(results["models"][best_clustered]["tstat_day_cluster_vs_mid"])
+    clustered_passed = bool(
+        np.isfinite(tier0_rank[best_clustered])
+        and tier0_rank[best_clustered] > 0.0
+        and np.isfinite(t_cluster)
+        and t_cluster >= float(gate_t_threshold)
+    )
+    gate_passed = clustered_passed if gate == "clustered" else literal_passed
+    literal_rule = (
+        "advanced models run only if the best linear pooled OOS IC "
+        "vs the MID-TO-MID label is > 0 (the cost-adjusted target "
+        "embeds the observable half-spread)"
+    )
+    clustered_rule = (
+        "advanced models run only if the best linear fold-mean rank IC vs the "
+        "MID-TO-MID label is > 0 AND the day-clustered t of its pooled "
+        f"(per-fold standardised) OOS predictions is >= {float(gate_t_threshold):g}"
+    )
     results["gate"] = {
-        "rule": (
-            "advanced models run only if the best linear pooled OOS IC "
-            "vs the MID-TO-MID label is > 0 (the cost-adjusted target "
-            "embeds the observable half-spread)"
-        ),
-        "best_linear_model": best_linear,
+        "rule": clustered_rule if gate == "clustered" else literal_rule,
+        "gate_rule": gate,
+        "best_linear_model": best_clustered if gate == "clustered" else best_linear,
         "best_linear_pooled_ic_vs_mid": tier0_ics[best_linear],
         "best_linear_mean_oos_ic": results["models"][best_linear]["mean_ic"],
         "passed": bool(gate_passed),
         "tree_fallback_active": TREE_FALLBACK_ACTIVE,
+        # both readings, whichever decided (v1.17 WS-D, R-6)
+        "literal": {
+            "rule": literal_rule,
+            "best_linear_model": best_linear,
+            "pooled_ic_vs_mid": float(tier0_ics[best_linear]),
+            "passed": literal_passed,
+        },
+        "clustered": {
+            "rule": clustered_rule,
+            "best_linear_model": best_clustered,
+            "mean_rank_ic_vs_mid": float(tier0_rank[best_clustered]),
+            "tstat_day_cluster": t_cluster,
+            "tstat_hac": float(results["models"][best_clustered]["tstat_hac_vs_mid"]),
+            "n_days": int(results["models"][best_clustered]["n_days"]),
+            "t_threshold": float(gate_t_threshold),
+            "passed": clustered_passed,
+        },
     }
 
     # ---- Tier 1 + 2: only behind the gate
@@ -288,13 +384,19 @@ def run_model_comparison(
             },
             result={
                 "passed": bool(gate_passed),
-                "best_linear_model": best_linear,
+                "gate_rule": gate,
+                "best_linear_model": results["gate"]["best_linear_model"],
                 "best_linear_pooled_ic_vs_mid": float(tier0_ics[best_linear]),
+                # v1.17 WS-D (R-6): both readings on the look
+                "literal": dict(results["gate"]["literal"]),
+                "clustered": dict(results["gate"]["clustered"]),
                 "models": {
                     n: {
                         "mean_ic": float(r["mean_ic"]),
                         "pooled_ic": float(r["pooled_ic"]),
                         "pooled_ic_vs_mid": float(r["pooled_ic_vs_mid"]),
+                        "mean_rank_ic_vs_mid": float(r["mean_rank_ic_vs_mid"]),
+                        "tstat_day_cluster_vs_mid": float(r["tstat_day_cluster_vs_mid"]),
                     }
                     for n, r in results["models"].items()
                 },
