@@ -23,6 +23,15 @@ that tag.
   `--iex-days`); RUNBOOK_r7_nasdaq_watch.md registers the task with
   `Register-ScheduledTask` (S4U, battery allowed, start when available) because the
   `schtasks` task never ran (0x800710E0). Not registered: the owner runs it.
+- v1.17 WS-G item G1 (showcase): new `docs/SHOWCASE.md`, a three-minute read for a newcomer
+  (what is proven and what is not, every number cited to its source document, the pipeline
+  diagram copied from `docs/diagrams/pipeline.mmd`, a ten-minute quick start); README.md cut
+  from 1,227 to about 330 lines, with the release-by-release status, the review narratives,
+  the repository map, the parity-count notes, the real-world usage notes and the references
+  moved verbatim to the new `docs/README_HISTORY.md` (links that pointed at those README
+  sections updated: docs/index.html, docs/ROADMAP.md, docs/EPICS.md, tools/github/issues.yaml);
+  docs/index.html gains a "Start here" block and a Showcase nav link; both new pages are read
+  by `check_headline_numbers.py`. No number changed.
 
 ## v1.16.0 — 2026-10-15
 

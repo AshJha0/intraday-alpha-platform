@@ -537,7 +537,7 @@ epics:
       here and what is not is explicit. The container/k8s stack that exists is
       recorded here too.
     scope:
-      - "README.md §Real-world usage notes; deployment/"
+      - "docs/README_HISTORY.md §Real-world usage notes; deployment/"
     acceptance:
       - "Every out-of-scope item has an issue stating what would prove it done"
       - "The existing deployment stack passes tests/harness/check_deployment.py"
@@ -1074,7 +1074,7 @@ issues:
       - "Clustering is visible in inter-arrival statistics and documented as a simplification"
     evidence:
       - "python/src/iap/marketdata/generator.py (_eq_add, _eq_slot, _eq_session_stream, _snapshot_burst)"
-      - "README.md References [3] Hawkes (1971); tests/golden/events_eq_mbo.jsonl"
+      - "docs/README_HISTORY.md References [3] Hawkes (1971); tests/golden/events_eq_mbo.jsonl"
 
   - key: M03
     epic: E03
@@ -1801,7 +1801,7 @@ issues:
       - "DSR with skew/kurtosis reported next to the existing yardstick in every report"
       - "README references updated from 'style' to the implemented method"
     evidence:
-      - "python/src/iap/validation/ledger.py; README.md References [10], [13]"
+      - "python/src/iap/validation/ledger.py; docs/README_HISTORY.md References [10], [13]"
 
   # ---------------------------------------------------------------- E09 ----
   - key: P01
@@ -2172,7 +2172,7 @@ issues:
     acceptance:
       - "New AlgoType variant behind config; TCA_REPORT compares both schedules on the same seed"
     evidence:
-      - "cpp/include/iap/execution/algos.hpp; README.md References [6]"
+      - "cpp/include/iap/execution/algos.hpp; docs/README_HISTORY.md References [6]"
 
   # ---------------------------------------------------------------- E12 ----
   - key: H01

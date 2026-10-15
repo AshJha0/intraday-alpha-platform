@@ -160,7 +160,7 @@ A seeded generator that produces realistic multi-venue equity MBO and FX quote/t
 | key | title | status | est. (d) | milestone | evidence |
 |---|---|---|---:|---|---|
 | M01 | Regime-switching efficient price with vol regimes and spread dynamics | done | 2 | Week 1 | `python/src/iap/marketdata/generator.py (_EffPrice, new_session, mid_at)`<br>`configs/marketdata/generator.json; python/tests/test_generator.py` |
-| M02 | Equity MBO streams: Hawkes-style clustered flow, FIFO queue dynamics, trades, quotes, depth | done | 3 | Week 1 | `python/src/iap/marketdata/generator.py (_eq_add, _eq_slot, _eq_session_stream, _snapshot_burst)`<br>`README.md References [3] Hawkes (1971); tests/golden/events_eq_mbo.jsonl` |
+| M02 | Equity MBO streams: Hawkes-style clustered flow, FIFO queue dynamics, trades, quotes, depth | done | 3 | Week 1 | `python/src/iap/marketdata/generator.py (_eq_add, _eq_slot, _eq_session_stream, _snapshot_burst)`<br>`docs/README_HISTORY.md References [3] Hawkes (1971); tests/golden/events_eq_mbo.jsonl` |
 | M03 | Multi-venue books with AR(1) venue noise and latency profiles (XV1/XV2, LP1/LP2/PRI) | done | 2 | Week 1 | `python/src/iap/marketdata/generator.py (_fx_pair_session, _emit); configs/venues/venues.json`<br>`tests/golden/events_fx_quote.jsonl` |
 | M04 | Auctions and halts: open/close auctions, HALT status, reopen auction | done | 1 | Week 1 | `python/src/iap/marketdata/generator.py (_reopen_auction); configs/instruments/instruments.json (sessions)`<br>`docs/SCENARIOS.md (halts, auctions); tests/golden/expected_anomaly_states.json` |
 | M05 | Feed anomaly injection and the pinned anomaly golden vectors | done | 2 | Week 1 | `python/src/iap/marketdata/golden_anomalies.py; python/src/iap/marketdata/generator.py (_inject_file_anomalies)`<br>`tests/golden/events_eq_anomalies.jsonl; tests/golden/events_fx_anomalies.jsonl; tests/golden/expected_anomaly_states.json`<br>`python/tests/test_golden_anomalies.py; java AnomalyGoldenTest` |
@@ -303,7 +303,7 @@ Honest research machinery: walk-forward with purging and embargo, automatic leak
 | V06 | Cost, latency and regime stress tests | done | 1 | Week 3 | `python/src/iap/validation/stress.py; research/alpha_reports/*.json (stress)` |
 | V07 | Research backtester with the pinned cost model and ensemble scoring | done | 3 | Week 3 | `python/src/iap/backtest/{engine,costs}.py; python/tests/test_backtester.py; tests/golden/expected_backtest.json`<br>`java/src/main/java/com/iap/backtest/{BacktestEngine,ResearchBacktester,CostModel}.java; java BacktestTest, BacktestGoldenTest (legacy and v1.5.0 default rules)` |
 | V08 | ExperimentRunner: spec -> deterministic id -> result document -> ledger entry | done | 3 | Week 3 | `python/src/iap/research/{specs,runner,registry,golden,__main__}.py (ExperimentRunner satisfies iap.contracts.protocols.ExperimentRunner)`<br>`research/experiments/README.md; research/experiments/{217fa0cb1d89a9c8,4a2900e4a6705542,c73bb6294d226163,d0dd1ab0711d33a1,d7b554d0a3fa3b26}/{spec,result}.json`<br>`python/tests/test_research_runner.py; python/tests/test_research_golden.py; tests/golden/expected_experiment_golden_frame.json (python/tools/make_golden_research.py)` |
-| V09 | Full deflated Sharpe ratio (skew/kurtosis) and Harvey-Liu-Zhu adjusted p-values | backlog | 2 | Backlog | `python/src/iap/validation/ledger.py; README.md References [10], [13]` |
+| V09 | Full deflated Sharpe ratio (skew/kurtosis) and Harvey-Liu-Zhu adjusted p-values | backlog | 2 | Backlog | `python/src/iap/validation/ledger.py; docs/README_HISTORY.md References [10], [13]` |
 
 ## Week 4
 
@@ -387,7 +387,7 @@ Parent-order algorithms (TWAP/VWAP/POV/IS) sliced into children with time-in-for
 | X07 | Python execution port (iap.execution): simulator, algos and SOR against the same goldens | done | 5 | Week 5 | `python/src/iap/execution/{types,config,simulator,algos,sor,replay}.py`<br>`python/tests/test_execution_golden.py (expected_replay_fills.json bit-identical); python/tests/test_execution_rules.py; python/tests/test_exec_algos.py; python/tests/test_sor.py`<br>`API_TRADING.md` |
 | X10 | Execution policies: NATIVE / AGGRESSIVE / PASSIVE (post, rest, reprice, cross) in C++, Java and Python | done | 4 | Week 5 | `cpp/include/iap/execution/algos.hpp; cpp/src/replay/exec_replay.cpp; cpp/tests/test_replay_fills_passive.cpp`<br>`java/src/main/java/com/iap/execution/PassivePolicy.java; java/src/test/java/com/iap/ReplayFillsPassiveGoldenTest.java; java/src/test/java/com/iap/PassivePolicyTest.java`<br>`python/src/iap/execution/passive.py; python/tests/test_passive_policy.py; tests/golden/expected_replay_fills_passive.json`<br>`research/execution/run_execution_study.py; research/execution/EXECUTION_REPORT.md` |
 | X08 | PEG and MID order types in the execution simulator | backlog | 3 | Backlog | `schemas/order/order_request.schema.json (order_type enum); cpp/include/iap/execution/execution.hpp (rule 9 note)` |
-| X09 | Closed-form Almgren-Chriss IS trajectory as an alternative to the front-loaded exponential | backlog | 2 | Backlog | `cpp/include/iap/execution/algos.hpp; README.md References [6]` |
+| X09 | Closed-form Almgren-Chriss IS trajectory as an alternative to the front-loaded exponential | backlog | 2 | Backlog | `cpp/include/iap/execution/algos.hpp; docs/README_HISTORY.md References [6]` |
 
 ### E12 — Performance architecture
 
@@ -655,7 +655,7 @@ Production engineering — real feeds, HA, kernel bypass, regulatory controls. D
 
 Name what a live deployment would need beyond this repository — real feed handlers, HA, kernel bypass, regulatory controls, real reference data, hardened endpoints — so the boundary between what is validated here and what is not is explicit. The container/k8s stack that exists is recorded here too.
 
-**Scope:** README.md §Real-world usage notes; deployment/.
+**Scope:** docs/README_HISTORY.md §Real-world usage notes; deployment/.
 
 **Acceptance criteria:**
 
