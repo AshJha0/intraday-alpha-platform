@@ -19,8 +19,8 @@ actors**:
   `main` before merging), 13 checks: `python`, `integration`, `cpp`, `rust`,
   `golden`, `deployment`, `CodeQL`, `governance`, `advisory`, `rust-pyo3`,
   `python-slow`, `supply-chain` and `analyze (rust)` (the CodeQL matrix
-  entry; `java` was retired from the ruleset when the Java tree was
-  archived in v1.15);
+  entry; `java` is no longer a required check: the Java tree was archived
+  in v1.15 and the ruleset read on 2026-10-15 does not list it);
 - `non_fast_forward` (no force-push) and `deletion` (no branch deletion).
 
 Not required today: `python-312` (the Python 3.12 entry), `cpp-sanitizers`,
