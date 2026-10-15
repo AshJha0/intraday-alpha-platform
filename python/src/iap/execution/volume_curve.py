@@ -148,24 +148,66 @@ def load_volume_curve(path: str | Path, instrument_id: int) -> tuple[float, ...]
     return tuple(cell["curve"] if cell else u_shape(int(doc["n_bins"])))
 
 
-def curve_slice_weights(curve: Sequence[float], n: int) -> list[float]:
+def curve_slice_weights(
+    curve: Sequence[float], n: int, start_frac: float = 0.0, end_frac: float = 1.0
+) -> list[float]:
     """Resample a piecewise-constant curve on ``len(curve)`` equal bins to
-    ``n`` equal slices (each slice gets the curve mass it overlaps)."""
+    ``n`` equal slices (each slice gets the curve mass it overlaps).
+
+    ``start_frac`` / ``end_frac`` (v1.17, review X-1) are the part of the
+    curve's span the parent window covers, as fractions of the session the
+    curve was estimated on (:func:`curve_window`): the ``n`` slices divide
+    ``[start_frac, end_frac]``, not the whole session, so a parent worked
+    from 10:00 to 11:00 follows the curve's 10-11 shape instead of the
+    whole day's U.  The defaults (the whole span) are the v1.10 rule, so the
+    pinned ``1 + x^2`` resampling is unchanged.  A window with no curve
+    mass raises."""
     m = len(curve)
     if m == 0 or n <= 0:
         raise ValueError("need a non-empty curve and n > 0")
     if any(c < 0 for c in curve) or sum(curve) <= 0:
         raise ValueError("curve must be non-negative with positive mass")
+    if not (0.0 <= start_frac < end_frac <= 1.0):
+        raise ValueError("need 0 <= start_frac < end_frac <= 1")
+    span = (end_frac - start_frac) * m
     out = []
     for i in range(n):
-        lo, hi = i * m / n, (i + 1) * m / n
+        lo = start_frac * m + i * span / n
+        hi = start_frac * m + (i + 1) * span / n
         tot = 0.0
         b = int(lo)
         while b < m and b < hi:
             tot += curve[b] * (min(hi, b + 1) - max(lo, b))
             b += 1
         out.append(tot)
+    if sum(out) <= 0:
+        raise ValueError("the parent window covers no mass of the volume curve")
     return out
+
+
+def curve_window(
+    start_ts: int, end_ts: int, session_ns: Sequence[int] = DEFAULT_SESSION
+) -> tuple[float, float]:
+    """The fraction of the curve's session ``[start, end)`` (offsets from
+    the start of the UTC day, as the curve document's ``session_ns``) that
+    the parent window ``[start_ts, end_ts)`` covers, clamped to ``[0, 1]``
+    (v1.17, X-1).  The window must lie within one UTC day and overlap the
+    session.  Pass the result to :func:`curve_slice_weights` or set it as
+    ``ParentOrder.curve_window``."""
+    if end_ts <= start_ts:
+        raise ValueError("parent window must have end_ts > start_ts")
+    s0, s1 = int(session_ns[0]), int(session_ns[1])
+    if s1 <= s0:
+        raise ValueError("session_ns must have end > start")
+    day = (int(start_ts) // DAY_NS) * DAY_NS
+    if (int(end_ts) - 1) // DAY_NS != int(start_ts) // DAY_NS:
+        raise ValueError("parent window must lie within one UTC day")
+    a = (int(start_ts) - day - s0) / (s1 - s0)
+    b = (int(end_ts) - day - s0) / (s1 - s0)
+    a, b = max(0.0, min(1.0, a)), max(0.0, min(1.0, b))
+    if not a < b:
+        raise ValueError("parent window does not overlap the volume curve's session")
+    return a, b
 
 
 def _read_events(path: str) -> list[MarketEvent]:

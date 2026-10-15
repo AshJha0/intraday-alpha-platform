@@ -739,6 +739,19 @@ def _residual_impact(
     for h in hz:
         x, y = xs[h], ys[h]
         cell: dict = {"n": len(y), "linear": None, "sqrt": None, "power": None}
+        # v1.17 (X-3): the participation range the fit is supported on, so a
+        # consumer can tell an interpolation from a 100-1000x extrapolation.
+        if x:
+            sx = sorted(x)
+            cell["support_pct_adv"] = {
+                "min": sx[0],
+                "p05": _quantile(sx, 0.05),
+                "p50": _quantile(sx, 0.50),
+                "p95": _quantile(sx, 0.95),
+                "max": sx[-1],
+            }
+        else:
+            cell["support_pct_adv"] = None
         if len(y) >= MIN_SAMPLES:
             lin = _through_origin(x, y)
             sq = _through_origin([math.sqrt(v) for v in x], y)
@@ -793,11 +806,14 @@ def apply_impact_fit(
             raise ValueError("power fit has too few positive bins")
     if coeff <= 0:
         raise ValueError(f"fitted {shape} impact coefficient {coeff!r} is not positive")
+    sup = (res["by_horizon"].get(h) or {}).get("support_pct_adv")
+    support = (float(sup["min"]), float(sup["max"])) if sup else None
     return replace(
         config,
         impact_model="parent",
         impact_coeff_bps_per_pct_adv=float(coeff),
         impact_exponent=float(k),
+        impact_fit_support_pct_adv=support,
     )
 
 
