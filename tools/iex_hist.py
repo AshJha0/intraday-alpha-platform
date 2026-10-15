@@ -175,7 +175,8 @@ def main(argv: list[str] | None = None, fetch=fetch_index) -> int:
         }
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+    out.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8", newline="
+")
     for d in doc["days"]:
         sizes = ", ".join(f"{f} {e['bytes'] / 1e9:.2f} GB" for f, e in sorted(d["feeds"].items()))
         print(f"{d['date']}: {sizes or d.get('note') or d.get('error')}")
