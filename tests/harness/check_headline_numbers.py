@@ -51,6 +51,9 @@ DOCS = {
     "LEARN.md": ROOT / "LEARN.md",
     "COOKBOOK.md": ROOT / "COOKBOOK.md",
     "docs/index.html": ROOT / "docs" / "index.html",
+    # added 2026-10-15 (v1.17 G1): the three-minute showcase quotes the same figures.
+    "docs/SHOWCASE.md": ROOT / "docs" / "SHOWCASE.md",
+    "docs/README_HISTORY.md": ROOT / "docs" / "README_HISTORY.md",
     "docs/DIAGRAMS.md": ROOT / "docs" / "DIAGRAMS.md",
     "docs/BUILD_NOTES.md": ROOT / "docs" / "BUILD_NOTES.md",
     # added round 3: all three quote counts that the harness produces, and all
