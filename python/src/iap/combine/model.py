@@ -53,6 +53,15 @@ A row on which no member with a non-zero weight has an opinion scores
 ``(0.0, 0.0)``; a combination with no weights, no variance or ``beta == 0``
 is dead and scores ``(0.0, 0.0)`` everywhere.
 
+**Own-horizon labels (v1.17, ``decay_aware``).**  The stack also carries,
+per member, the label at the member's OWN horizon on the inner-test rows
+(:meth:`CombinedAlpha.stack` returns them as a fifth element): the
+``decay_aware`` method reads them for the survival ratio.  A member whose
+horizon is longer than the combination's has that label masked on the
+last ``member horizon - combination horizon`` of the training window —
+the same rule as the member purge — so no label reaching past the purged
+window enters the weights.
+
 **Hypothesis.**  ``hypothesis_confirmed`` is ``beta > 0`` AND the weights
 are net long the members' stated hypotheses (``sum(w) > 0``): the blend
 forecasts in the direction its members were built to forecast.  Under
@@ -142,6 +151,20 @@ def _label(df: pd.DataFrame, horizon: str) -> np.ndarray:
     """The label a fit may read: ``label_mid_<h>`` on valid rows, else NaN."""
     y = df[f"label_mid_{horizon}"].to_numpy(dtype=float).copy()
     y[~df[f"label_valid_{horizon}"].to_numpy(dtype=bool)] = np.nan
+    return y
+
+
+def _own_label(df: pd.DataFrame, member_horizon: str, horizon: str, end: int) -> np.ndarray:
+    """``_label`` at the member's own horizon, NaN where the frame lacks it
+    or the label would reach past a window purged at ``horizon`` (module
+    docs, "Own-horizon labels")."""
+    if f"label_mid_{member_horizon}" not in df.columns:
+        return np.full(len(df), np.nan)
+    y = _label(df, member_horizon)
+    extra = HORIZONS_NS[member_horizon] - HORIZONS_NS[horizon]
+    if extra > 0:
+        ts = df["exchange_ts"].to_numpy(dtype=np.int64)
+        y[ts > end - extra] = np.nan
     return y
 
 
@@ -248,22 +271,32 @@ class CombinedAlpha(AlphaModel):
 
     def stack(
         self, train: Mapping[int, pd.DataFrame]
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """The members' out-of-sample predictions inside ``train`` (module
-        docs, steps 1-2): ``(z, y, inner fold id, exchange_ts)``, one row per
-        inner-test row.  Empty when the window is too short to split."""
+        docs, steps 1-2): ``(z, y, inner fold id, exchange_ts, own)``, one
+        row per inner-test row; ``own`` is ``rows x K`` of each member's
+        own-horizon label (module docs, "Own-horizon labels").  Empty when
+        the window is too short to split."""
         universe = self.universe(list(train))
         frames = {i: train[i] for i in universe}
         k = len(self.member_ids)
-        empty = (np.empty((0, k)), np.empty(0), np.empty(0, np.int64), np.empty(0, np.int64))
-        if not any(len(df) for df in frames.values()):
+        empty = (
+            np.empty((0, k)),
+            np.empty(0),
+            np.empty(0, np.int64),
+            np.empty(0, np.int64),
+            np.empty((0, k)),
+        )
+        nonempty = [df for df in frames.values() if len(df)]
+        if not nonempty:
             return empty
+        end = max(int(df["exchange_ts"].iloc[-1]) for df in nonempty)
         splitter = WalkForwardSplitter(n_folds=self.inner_folds, embargo_ns=self.embargo_ns)
         try:
             folds = list(splitter.split_frames(frames, HORIZONS_NS[self.horizon]))
         except ValueError:
             return empty  # too few rows for the inner split: no stack
-        zs, ys, fs, ts = [], [], [], []
+        zs, ys, fs, ts, own = [], [], [], [], []
         for fold, inner_train, inner_test in folds:
             members = self._fit_members(inner_train)
             signals = self._signals(members, inner_test, universe)
@@ -273,7 +306,21 @@ class CombinedAlpha(AlphaModel):
                 ys.append(_label(df, self.horizon))
                 fs.append(np.full(len(df), fold.index, dtype=np.int64))
                 ts.append(df["exchange_ts"].to_numpy(dtype=np.int64))
-        return np.vstack(zs), np.concatenate(ys), np.concatenate(fs), np.concatenate(ts)
+                own.append(
+                    np.column_stack(
+                        [
+                            _own_label(df, self.member_horizons[aid], self.horizon, end)
+                            for aid in self.member_ids
+                        ]
+                    )
+                )
+        return (
+            np.vstack(zs),
+            np.concatenate(ys),
+            np.concatenate(fs),
+            np.concatenate(ts),
+            np.vstack(own),
+        )
 
     # -- AlphaModel -------------------------------------------------------
 
@@ -293,7 +340,7 @@ class CombinedAlpha(AlphaModel):
             if spans
             else None
         )
-        z, y, folds, ts = self.stack(frames)
+        z, y, folds, ts, own = self.stack(frames)
         self.n_stack_rows = int(z.shape[0])
         self.n_train = int(np.sum(np.isfinite(y)))
         self.detail = {"n_stack_rows": self.n_stack_rows}
@@ -302,7 +349,13 @@ class CombinedAlpha(AlphaModel):
         if z.shape[0] < MIN_OBS:
             return
         fit, std = fit_weights(
-            self.method, z, y, folds, ts, HORIZONS_NS[self.horizon] + self.embargo_ns
+            self.method,
+            z,
+            y,
+            folds,
+            ts,
+            HORIZONS_NS[self.horizon] + self.embargo_ns,
+            own_labels={j: own[:, j] for j in range(own.shape[1])},
         )
         self.detail.update(fit.detail)
         self.weights = fit.weights

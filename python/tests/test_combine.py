@@ -143,7 +143,7 @@ def _stack(seed: int = 3, n: int = 900):
 
 
 def test_methods_and_default_are_pinned():
-    assert METHODS == ("equal_weight", "ic_weighted", "ridge", "shrinkage_mv")
+    assert METHODS == ("equal_weight", "ic_weighted", "ridge", "shrinkage_mv", "decay_aware")
     assert DEFAULT_METHOD == "equal_weight"
     assert RIDGE_PENALTIES == (0.01, 0.1, 1.0, 10.0, 100.0)
     assert INNER_FOLDS == 3
@@ -621,7 +621,8 @@ def test_committed_report_evaluates_eight_experiments_and_promotes_none(committe
     )
     for ac, block in committed["combinations"].items():
         assert block["members"] == combine_report.default_members(ac)
-        assert sorted(block["methods"]) == sorted(METHODS)
+        # the committed report is the pre-v1.17 run: the four original methods
+        assert sorted(block["methods"]) == sorted(set(METHODS) - {"decay_aware"})
         assert all(block["weights_ignore_test_rows"].values()), ac
         for name, m in block["methods"].items():
             # honest result: nothing is promotable, and the reason is costs
@@ -659,7 +660,8 @@ def test_committed_ledger_holds_the_eight_combination_entries(committed):
     assert len(entries) == 8 and {e["alpha_id"] for e in entries} == {"COMB_EQ", "COMB_FX"}
     assert {e["count"] for e in entries} == {13}
     assert {e["gate_looks"] for e in entries} == {committed["looks"]["gate_looks"]}
-    assert {e["config"]["method"] for e in entries} == set(METHODS)
+    assert {e["config"]["method"] for e in entries} == set(METHODS) - {"decay_aware"}
+    assert all("stacking" not in e["config"] for e in entries)  # pre-v1.17 identities
     assert all(len(e["config"]["members"]) == 12 for e in entries)
     ids = {
         m["experiment_id"]

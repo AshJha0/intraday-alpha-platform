@@ -1,0 +1,40 @@
+{
+  "schema": "iap.prereg_draft/v1",
+  "status": "DRAFT - not signed, not on the blackboard, not approved for any run",
+  "signed": false,
+  "signature": null,
+  "on_blackboard": false,
+  "plan_item": "C3 (IAP_v1.17_Plan.md), review finding R-7",
+  "drafted": "2026-10-15",
+  "drafted_by": "Claude (session v117-c3c5); every number below is to be computed by code, none is filled in here",
+  "model": "linear_z_v2",
+  "model_code": "iap.alpha.linear_v2 (LinearAlphaV2; the registered linear_z_v1 classes in iap.alpha.base / equity / fx are untouched)",
+  "hypothesis": "On the multi7 in-sample sessions, the per-instrument causally standardised twins (EQ05_z2, EQ10_z2) have a fold-mean gate IC at least as high as their linear_z_v1 originals (EQ05, EQ10) at the same horizons, and the share of rows with confidence >= conf_min is no longer set by one instrument: the per-instrument confident-row shares differ by less than 0.10 between the most and the least active name.",
+  "candidates": ["EQ05_z2", "EQ10_z2"],
+  "baselines": ["EQ05", "EQ10"],
+  "std_window": "30m",
+  "min_obs": 32,
+  "horizons": {"EQ05_z2": "1s", "EQ10_z2": "1s"},
+  "symbols": ["AAPL", "MSFT", "QQQ"],
+  "dataset": "data/real/multi7 (in-sample days of research/r7/r7_candidates.json); no holdout day is read by this draft",
+  "protocol": {
+    "methods_bundle": "v2 at statistics revision v1.17 (iap.validation.methods)",
+    "gate": "iap.validation.metrics.gate_statistics on the uncrossed rows, per-instrument scaling, HAC auto bandwidth, day-separated; the day-cluster t reported beside it",
+    "folds": 4,
+    "embargo_s": 60,
+    "looks": "one validation per candidate and per baseline (4 x looks_per_validation(4)); the baselines' existing reports are reused where their experiment ids match, else re-run and debited"
+  },
+  "acceptance": {
+    "rules": [
+      "fold_mean_gate_ic(candidate) >= fold_mean_gate_ic(baseline) for both pairs",
+      "max over instruments of confident_row_share - min over instruments < 0.10 for each candidate",
+      "hypothesis_confirmed (beta > 0 in >= 70 % of folds) for each candidate"
+    ],
+    "unit": "per candidate; the hypothesis holds only if every candidate passes"
+  },
+  "what_this_does_not_claim": "no promotion, no holdout read, no change to any registered alpha's fingerprint; a pass makes linear_z_v2 the standardisation for the C8 breadth book pre-registration, which is its own document",
+  "open_for_owner": [
+    "approve the candidate pair and the 30m window before any run",
+    "sign-off and blackboard registration (WriteBroker.preregister) before the first look"
+  ]
+}
