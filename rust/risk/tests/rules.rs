@@ -860,7 +860,7 @@ fn risk_snapshot_restore_roundtrip() {
     let mut unbroken = engine();
     let first = script(&mut unbroken, 0, 30);
     let snap = unbroken.snapshot();
-    assert_eq!(snap["x-version"].as_u64(), Some(2));
+    assert_eq!(snap["x-version"].as_u64(), Some(3));
     let limits = RiskLimits::from_json(&config()).unwrap();
     let mut restored = RiskEngine::restore(limits, unbroken_refs(), &snap, T0 + 5 * NS).unwrap();
     assert_eq!(restored.audit().len(), 1);
