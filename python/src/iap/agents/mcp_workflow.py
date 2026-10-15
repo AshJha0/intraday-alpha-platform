@@ -106,7 +106,7 @@ class WorkflowTools:
     ) -> dict[str, Any]:
         if self._my_looks() >= self.look_cap:
             raise ToolError(f"look budget: {self.look_cap} proposals for {self.agent} reached")
-        args = {
+        args: dict[str, Any] = {
             "alpha_id": alpha_id,
             "horizon": horizon,
             "expected_sign": expected_sign,

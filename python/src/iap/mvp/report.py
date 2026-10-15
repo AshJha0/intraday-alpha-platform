@@ -16,7 +16,7 @@ import math
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from iap.contracts.types import Algo
+from iap.contracts.types import Algo, Attribution, TCAResult
 from iap.contracts.versions import canonical_json
 from iap.lifecycle.registry import AlphaRegistry
 from iap.mvp.engine import IcResult, MvpEngine, OrderOutcome
@@ -117,11 +117,23 @@ def research_ic_of(registry: AlphaRegistry, alpha_id: str) -> float | None:
     return ev.gates["oos_ic"].value
 
 
+def _tca(o: OrderOutcome) -> TCAResult:
+    """``o.tca`` of an outcome already filtered on ``o.tca is not None`` (type narrowing)."""
+    assert o.tca is not None
+    return o.tca
+
+
+def _attribution(o: OrderOutcome) -> Attribution:
+    """``o.attribution`` of an outcome already filtered on it being present (type narrowing)."""
+    assert o.attribution is not None
+    return o.attribution
+
+
 def _execution_block(outcomes: Sequence[OrderOutcome]) -> dict[str, Any]:
     with_tca = [o for o in outcomes if o.tca is not None]
-    qty = [float(o.tca.qty) for o in with_tca]
-    filled = [float(o.tca.filled_qty) for o in with_tca]
-    is_bps = [o.tca.implementation_shortfall_bps for o in with_tca]
+    qty = [float(_tca(o).qty) for o in with_tca]
+    filled = [float(_tca(o).filled_qty) for o in with_tca]
+    is_bps = [_tca(o).implementation_shortfall_bps for o in with_tca]
 
     def qw(attr: str) -> float | None:
         return _weighted([getattr(o.tca, attr) for o in with_tca], qty)
@@ -134,24 +146,24 @@ def _execution_block(outcomes: Sequence[OrderOutcome]) -> dict[str, Any]:
         group = [o for o in with_tca if o.parent.algo is algo]
         if not group:
             continue
-        g_qty = [float(o.tca.qty) for o in group]
+        g_qty = [float(_tca(o).qty) for o in group]
         per_algo[algo.value] = {
             "n_orders": len(group),
             "qty": int(sum(g_qty)),
-            "filled_qty": int(sum(o.tca.filled_qty for o in group)),
-            "fill_rate": sum(o.tca.filled_qty for o in group) / sum(g_qty),
+            "filled_qty": int(sum(_tca(o).filled_qty for o in group)),
+            "fill_rate": sum(_tca(o).filled_qty for o in group) / sum(g_qty),
             "implementation_shortfall_bps_qty_weighted": _weighted(
-                [o.tca.implementation_shortfall_bps for o in group], g_qty
+                [_tca(o).implementation_shortfall_bps for o in group], g_qty
             ),
             "slippage_bps_filled_weighted": _weighted(
-                [o.tca.slippage_bps for o in group], [float(o.tca.filled_qty) for o in group]
+                [_tca(o).slippage_bps for o in group], [float(_tca(o).filled_qty) for o in group]
             ),
         }
     latencies = [lat for o in outcomes for lat in o.latencies_ns]
     total_qty = sum(o.parent.qty for o in outcomes)
-    total_filled = sum(o.tca.filled_qty for o in with_tca)
+    total_filled = sum(_tca(o).filled_qty for o in with_tca)
     residuals = [
-        o.realized_bps - o.attribution.total_bps for o in with_tca if o.attribution is not None
+        o.realized_bps - _attribution(o).total_bps for o in with_tca if o.attribution is not None
     ]
     return {
         "n_parent_orders": len(outcomes),
@@ -171,7 +183,7 @@ def _execution_block(outcomes: Sequence[OrderOutcome]) -> dict[str, Any]:
         "fees_bps_qty_weighted": qw("fees_bps"),
         "timing_cost_bps_qty_weighted": qw("timing_cost_bps"),
         "slippage_bps_filled_weighted": fw("slippage_bps"),
-        "participation_rate_mean": _mean([o.tca.participation_rate for o in with_tca]),
+        "participation_rate_mean": _mean([_tca(o).participation_rate for o in with_tca]),
         "latency_decision_to_arrival_ns": _latency_block(latencies),
         "per_algo": per_algo,
         "attribution_residual_bps_mean": _mean(residuals),
@@ -196,13 +208,13 @@ def build_report(
     outcomes = engine.outcomes
     with_tca = [o for o in outcomes if o.tca is not None and o.attribution is not None]
     notional = [o.filled_notional for o in with_tca]
-    alpha_contribution = _weighted([o.attribution.alpha_bps for o in with_tca], notional)
+    alpha_contribution = _weighted([_attribution(o).alpha_bps for o in with_tca], notional)
     cost_bps = _weighted(
         [
-            o.attribution.spread_bps
-            + o.attribution.impact_bps
-            + o.attribution.fees_bps
-            + o.attribution.timing_bps
+            _attribution(o).spread_bps
+            + _attribution(o).impact_bps
+            + _attribution(o).fees_bps
+            + _attribution(o).timing_bps
             for o in with_tca
         ],
         notional,

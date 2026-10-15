@@ -8,6 +8,21 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-F items F1 and F3. **F1**: `reproducible-build` CI job (the wheel built twice under
+  `SOURCE_DATE_EPOCH` = commit date, sha256 must match; the python image built twice with BuildKit
+  `rewrite-timestamp`, report-only); CycloneDX SBOMs on every release (syft per image, attested and
+  pushed to GHCR next to the provenance; `cyclonedx-bom` per hashed Python lock file, attested with
+  the lock as subject; all uploaded as release assets); coverage floor `--cov-fail-under=58` in
+  `python-slow` (58% measured on main 2026-10-15, run 38763455187, rounded down); advisory lychee
+  link check (`lychee.toml`, excludes the GitHub API, loopback and private hosts). **F3**: the mypy
+  scope grew from core/orderbook/execution/backtest/features to also `agents`, `llm`, `mvp` and
+  `paper`: 258 errors to 0 with type-only changes (`dataclass_transform` on `@contract`, which
+  alone removed the 191 "unexpected keyword argument" / `replace` errors in `mvp`; `TYPE_CHECKING`
+  attribute declarations on the three MVP engine mixins; annotations, two casts, three narrowing
+  asserts/helpers) and one `type: ignore[attr-defined]` (`paper/monitors.py`: `signals()` lives on
+  the concrete alpha classes, not the `AlphaModel` ABC). `reproducible-build` is not a required
+  check until the owner adds it to the ruleset (GOVERNANCE.md section 0).
+
 - v1.17 WS-A item A2b: slim ingest for breadth datasets. `ingest --slim` / `normalize_run(write_normalized_jsonl=False)`
   writes no `*.normalized.jsonl` twin of the IAP1 file (3x its bytes; the feature build and the MVP read the
   IAP1; manifest `layout: "slim"`); `process-day` is slim by default (`--no-slim` opts out), deletes `raw/`

@@ -35,6 +35,7 @@ from typing import (
     ClassVar,
     Optional,
     TypeVar,
+    dataclass_transform,
 )
 
 from iap.contracts import versions as V
@@ -399,10 +400,18 @@ def _no_defaults(cls: type) -> None:
             raise TypeError(f"{cls.__name__}.{f.name}: contract fields have no defaults")
 
 
+_ContractT = TypeVar("_ContractT")
+
+
+# F3 (v1.17): dataclass_transform tells type checkers that every @contract class
+# is a frozen dataclass whose annotated fields are its __init__ parameters, so
+# constructing a contract in typed code (iap.mvp) is checked instead of being an
+# "unexpected keyword argument" error. No runtime effect.
+@dataclass_transform(frozen_default=True, field_specifiers=(field,))
 def contract(x_version: int, schema: str):
     """Class decorator: frozen slotted dataclass + version/schema pins."""
 
-    def wrap(cls: type) -> type:
+    def wrap(cls: type[_ContractT]) -> type[_ContractT]:
         cls.x_version = x_version  # type: ignore[attr-defined]
         cls.SCHEMA = schema  # type: ignore[attr-defined]
         out = dataclass(frozen=True, slots=True, eq=True, repr=True)(cls)

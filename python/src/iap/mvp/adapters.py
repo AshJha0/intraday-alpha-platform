@@ -26,6 +26,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 from iap.contracts.ids import NO_ROUTE
 from iap.contracts.types import (
@@ -659,7 +660,7 @@ class TcaAdapter:
             venue_fills.setdefault(rep.venue_id, []).append(
                 (rep.fill_price_ticks * tick, rep.filled_qty)
             )
-        rec = order_tca(order, tl)
+        rec: dict[str, Any] = order_tca(order, tl)
         perold = rec["perold"]
         m_d = float(rec["decision_mid"])
         m_a = float(rec["arrival_mid"])

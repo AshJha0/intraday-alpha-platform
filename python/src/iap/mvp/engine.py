@@ -348,7 +348,7 @@ class MvpEngine(RiskWiringMixin, SizingMixin, EngineMetricsMixin):
         #: the research label series: one sample per feature-engine book refresh
         self.mid_series = MidSeries()
         self._last_refresh_seq = 0
-        self._labels: dict[str, tuple[int, LabelResult]] = {}
+        self._labels: dict[str, tuple[tuple[int, int, int], LabelResult]] = {}
         self.first_ts: int | None = None
         self.last_ts: int | None = None
         self._finished = False

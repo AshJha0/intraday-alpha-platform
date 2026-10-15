@@ -1,0 +1,33 @@
+# lychee link-check configuration (v1.17 F1): the ADVISORY step of the
+# `advisory` job in .github/workflows/ci.yml, run over every tracked *.md and
+# docs/*.html.  Local run:  lychee --config lychee.toml './**/*.md' 'docs/*.html'
+no_progress = true
+max_concurrency = 8
+max_retries = 2
+timeout = 20
+# 429 (rate limited) is not a dead link
+accept = ["200..=206", "429"]
+# mailto: links are not checked
+exclude_mail = true
+# localhost / 127.0.0.1 / [::1] and private or internal hosts (the runbooks
+# name prometheus:9090, grafana:3000 and friends)
+exclude_loopback = true
+exclude_private = true
+exclude = [
+  # the GitHub API (rate limited, answers 4xx without a token)
+  "^https://api\\.github\\.com",
+  "^https?://localhost",
+  "^https?://127\\.0\\.0\\.1",
+  "^https?://\\[::1\\]",
+  "^https?://0\\.0\\.0\\.0",
+  # placeholders in the runbooks and templates
+  "^https?://example\\.com",
+  "^https?://[^/]*\\.example\\b",
+]
+exclude_path = [
+  # frozen archive and generated research artefacts are not maintained docs
+  "archive",
+  "research/experiments",
+  "research/models",
+  "data",
+]

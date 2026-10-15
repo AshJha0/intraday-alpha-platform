@@ -6,11 +6,16 @@ variance and the signed in-flight quantity.  Split out of
 from __future__ import annotations
 
 import math
+from typing import TYPE_CHECKING
 
 from iap.contracts.types import (
     Side,
 )
 from iap.features.engine import FeatureVector
+
+if TYPE_CHECKING:
+    from iap.mvp.adapters import SimulatorAdapter
+    from iap.mvp.orders import _LiveParent
 
 BAR_NS = 60_000_000_000
 
@@ -18,6 +23,17 @@ BAR_NS = 60_000_000_000
 class SizingMixin:
     """Mixin of :class:`~iap.mvp.engine.MvpEngine` (module docstring); it
     reads and writes the engine's own attributes."""
+
+    if TYPE_CHECKING:
+        # The engine attributes this mixin touches, declared for the type
+        # checker only (F3); MvpEngine.__init__ assigns them.
+        sim: SimulatorAdapter
+        _mid_index: int
+        _current_bar: int | None
+        _bar_mid: float | None
+        _last_bar_mid: float | None
+        bar_returns: list[float]
+        _live: _LiveParent | None
 
     def _roll_bar(self, vec: FeatureVector) -> None:
         """Java ``PaperTrading`` sizing bar roll: last mid per 1-minute bucket."""
