@@ -16,6 +16,15 @@ backtest's per-quote markout).
 candidate must beat the champion **and** the alpha's evidence must pass
 every gate of the lifecycle PROMOTION edge into ``to_state``
 (:mod:`iap.lifecycle.gates`).
+
+v1.17 (review R-4): a shadow promotion is a LOOK.  ``compare(..., ts=)``
+adds a paired day-block bootstrap of the candidate-minus-champion IC
+(:func:`iap.validation.metrics.paired_day_block_bootstrap`, on the rank
+scores the Spearman IC reads); when it is available the candidate must
+also beat the champion at the bootstrap's 5th percentile (``p05 > 0``), and
+``promotion_decision(..., ledger=)`` records the decision in the
+experiments ledger (kind ``"shadow_promotion"``) so it enters the
+multiple-testing denominator like every other look.
 """
 
 from __future__ import annotations
@@ -76,7 +85,9 @@ class ShadowRunner:
         parts = getattr(self, name)
         return np.concatenate(parts) if parts else np.empty(0)
 
-    def compare(self, y, pnl=None) -> ShadowComparison:
+    def compare(self, y, pnl=None, ts=None, seed: int = 0, n_boot: int = 2000) -> ShadowComparison:
+        """``ts`` (one event-time stamp per recorded row) turns on the
+        paired day-block bootstrap of the IC delta (module docs, v1.17)."""
         y = np.asarray(y, dtype=float).ravel()
         sc, sk = self._cat("champion_scores"), self._cat("candidate_scores")
         ac = self._cat("champion_allow").astype(bool)
@@ -96,6 +107,21 @@ class ShadowRunner:
             return out
 
         champion, candidate = side(sc, ac), side(sk, ak)
+        ic_delta_bootstrap = None
+        if ts is not None:
+            from iap.validation.metrics import paired_day_block_bootstrap
+
+            ts_arr = np.asarray(ts, dtype=np.int64).ravel()
+            if ts_arr.size != sc.size:
+                raise ValueError(f"ts has {ts_arr.size} rows, shadow record has {sc.size}")
+            # Spearman = Pearson on ranks: rank scores and labels once on the
+            # rows where both scores and the label are finite, so the
+            # bootstrap re-correlates the quantity the IC reads (exactly the
+            # Spearman IC of each side when neither side has gaps).
+            m = np.isfinite(sc) & np.isfinite(sk) & np.isfinite(y)
+            ic_delta_bootstrap = paired_day_block_bootstrap(
+                ts_arr[m], _ranked(sc[m]), _ranked(sk[m]), _ranked(y[m]), seed=seed, n_boot=n_boot
+            )
         pnl_delta = None
         if pnl is not None:
             p = np.nan_to_num(np.asarray(pnl, dtype=float).ravel())
@@ -111,7 +137,17 @@ class ShadowRunner:
             pnl_delta=pnl_delta,
             agreement=float((ac == ak).mean()) if sc.size else None,
             candidate_errors=len(self.candidate_errors),
+            ic_delta_bootstrap=ic_delta_bootstrap,
         )
+
+
+def _ranked(s: np.ndarray) -> np.ndarray:
+    """Ranks of the finite entries (NaN stays NaN), as the Spearman IC ranks."""
+    out = np.full(s.shape, np.nan)
+    m = np.isfinite(s)
+    if m.any():
+        out[m] = np.argsort(np.argsort(s[m], kind="stable"), kind="stable").astype(float)
+    return out
 
 
 @dataclass(frozen=True)
@@ -124,16 +160,26 @@ class ShadowComparison:
     pnl_delta: float | None
     agreement: float | None
     candidate_errors: int
+    #: v1.17: paired day-block bootstrap of IC(candidate) - IC(champion)
+    #: (``compare(ts=)``); ``None`` when no timestamps were given.
+    ic_delta_bootstrap: dict | None = None
 
     def candidate_better(self) -> bool:
-        """Candidate IC >= champion IC, no candidate errors, and (when P&L
-        was supplied) a positive P&L delta."""
+        """Candidate IC >= champion IC, no candidate errors, (when P&L was
+        supplied) a positive P&L delta and (when the paired day-block
+        bootstrap ran) an IC delta whose 5th percentile is above 0."""
         ic_c, ic_k = self.champion.get("ic"), self.candidate.get("ic")
         if self.candidate_errors or ic_k is None:
             return False
         if ic_c is not None and ic_k < ic_c:
             return False
-        return self.pnl_delta is None or self.pnl_delta > 0.0
+        if self.pnl_delta is not None and not self.pnl_delta > 0.0:
+            return False
+        b = self.ic_delta_bootstrap
+        if b is not None:
+            p05 = b.get("p05")
+            return p05 is not None and np.isfinite(p05) and float(p05) > 0.0
+        return True
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -145,9 +191,16 @@ def promotion_decision(
     config=None,
     to_state: str = "ACTIVE",
     alpha_id: str = "",
+    ledger=None,
 ) -> dict:
     """Promote only if the candidate beats the champion in shadow AND every
-    gate of the lifecycle PROMOTION edge into ``to_state`` passes."""
+    gate of the lifecycle PROMOTION edge into ``to_state`` passes.
+
+    ``ledger`` (an :class:`iap.validation.ledger.ExperimentLedger`, v1.17
+    R-4) records the decision as one look of kind ``"shadow_promotion"``
+    under ``alpha_id`` (the champion / candidate ids and the edge are its
+    identity); the caller saves the ledger.  ``ledger_n`` in the result is
+    the running total after the record."""
     from iap.lifecycle.config import load_policy_config
     from iap.lifecycle.gates import build_gates
     from iap.lifecycle.machine import transition_table
@@ -165,7 +218,7 @@ def promotion_decision(
         results[g] = {"passed": bool(r.passed), "value": r.value, "threshold": r.threshold}
     gates_ok = all(v["passed"] for v in results.values())
     better = comparison.candidate_better()
-    return {
+    out = {
         "promote": bool(gates_ok and better),
         "candidate_better": better,
         "gates_passed": gates_ok,
@@ -173,3 +226,25 @@ def promotion_decision(
         "gates": results,
         "comparison": comparison.to_dict(),
     }
+    if ledger is not None:
+        out["ledger_n"] = ledger.record(
+            alpha_id or "shadow",
+            "shadow_promotion",
+            config={
+                "champion_id": comparison.champion_id,
+                "candidate_id": comparison.candidate_id,
+                "edge": out["edge"],
+                "rule": "candidate_better (IC, P&L delta, paired day-block bootstrap p05 > 0)"
+                " and every PROMOTION gate",
+            },
+            result={
+                "promote": out["promote"],
+                "candidate_better": better,
+                "gates_passed": gates_ok,
+                "ic_champion": comparison.champion.get("ic"),
+                "ic_candidate": comparison.candidate.get("ic"),
+                "pnl_delta": comparison.pnl_delta,
+                "ic_delta_bootstrap": comparison.ic_delta_bootstrap,
+            },
+        )
+    return out

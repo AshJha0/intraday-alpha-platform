@@ -72,6 +72,23 @@ class ExecConfig:
     #: Parent-mode permanent impact, bps per % of ADV of the instrument's
     #: cumulative signed taker flow (0 = none).
     permanent_impact_bps_per_pct_adv: float = 0.0
+    #: v1.17 (review X-3): the participation range (% of ADV, min and max
+    #: over the sweeps) the parent impact fit was estimated on
+    #: (``calibration.impact.residual.by_horizon[h].support_pct_adv``).  A
+    #: parent whose cumulative taker quantity leaves it is charged the
+    #: extrapolated adder and flagged by the simulator
+    #: (``ExecutionSimulator.impact_beyond_support``).  ``None`` = unknown.
+    impact_fit_support_pct_adv: tuple[float, float] | None = None
+
+    def impact_label(self) -> str:
+        """How a cost under this config should be labelled (v1.17, X-3):
+        the simulator replays the book and ADDS a fitted adder; it does not
+        measure impact."""
+        if self.impact_model != "parent":
+            return "replay + linear child adder (rule 6)"
+        sup = self.impact_fit_support_pct_adv
+        rng = f", fit support {sup[0]:.3g}-{sup[1]:.3g} % ADV" if sup else ", fit support unknown"
+        return f"replay + fitted adder (rule 6b, exponent {self.impact_exponent:g}{rng})"
 
     def __post_init__(self) -> None:
         if not isinstance(self.seed, int) or self.seed < 0:
@@ -90,6 +107,14 @@ class ExecConfig:
             raise ValueError(
                 "impact_exponent / permanent_impact_bps_per_pct_adv need impact_model='parent'"
             )
+        sup = self.impact_fit_support_pct_adv
+        if sup is not None:
+            if self.impact_model != "parent":
+                raise ValueError("impact_fit_support_pct_adv needs impact_model='parent'")
+            lo, hi = float(sup[0]), float(sup[1])
+            if not (0.0 <= lo <= hi):
+                raise ValueError("impact_fit_support_pct_adv must be (lo, hi) with 0 <= lo <= hi")
+            object.__setattr__(self, "impact_fit_support_pct_adv", (lo, hi))
         # Freeze the maps in ascending key order (deterministic iteration).
         object.__setattr__(self, "instruments", dict(sorted(self.instruments.items())))
         object.__setattr__(self, "venues", dict(sorted(self.venues.items())))

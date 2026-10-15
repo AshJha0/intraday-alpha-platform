@@ -209,6 +209,11 @@ class ExecutionSimulator:
         #: cumulative signed taker qty per instrument.
         self._parent_qty: dict[tuple[int, int], int] = {}
         self._signed_flow: dict[int, int] = {}
+        #: v1.17 (X-3): ``(instrument_id, parent_id)`` of every parent whose
+        #: cumulative taker participation left the impact fit's support
+        #: (``ExecConfig.impact_fit_support_pct_adv``): their adder is an
+        #: extrapolation.  Empty without a support range.
+        self.impact_beyond_support: set[tuple[int, int]] = set()
         if calibration is not None:
             feed = [v for v in calibration.feed_derived_latency_venues() if v in config.venues]
             if feed:
@@ -488,6 +493,9 @@ class ExecutionSimulator:
         q0 = self._parent_qty.get(key, 0)
         q1 = q0 + qty
         self._parent_qty[key] = q1
+        sup = cfg.impact_fit_support_pct_adv
+        if sup is not None and q1 * pct > sup[1]:
+            self.impact_beyond_support.add(key)
 
         def total_bps_qty(q: int) -> float:
             return cfg.impact_coeff_bps_per_pct_adv * (q * pct) ** cfg.impact_exponent * q
