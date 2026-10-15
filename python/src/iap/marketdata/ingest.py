@@ -51,10 +51,14 @@ from iap.core.codec import sha256_file
 from iap.core.events import EventType, MarketEvent, SessionStatus
 from iap.marketdata.dbn_mbo import DbnMboReader
 from iap.marketdata.feederrors import BookDivergenceError, IngestError
+from iap.marketdata.iex import VENUE as IEX_VENUE
+from iap.marketdata.iex import VENUE_ID as IEX_VENUE_ID
+from iap.marketdata.iex import IexReader, TopsQuotes
 from iap.marketdata.itch50 import (
     ITCH_TIMEZONE,
     PRICE_SCALE,
     Itch50Mapper,
+    session_midnight_ns,
     Itch50Reader,
     LevelBook,
     ProtoEvent,
@@ -77,11 +81,20 @@ MANIFEST_VERSION = 2
 #: (recorded in the manifest; bumped with every rule change).
 INGEST_RULES_VERSION = 2
 MANIFEST_NAME = "dataset.json"
-FORMATS = ("itch50", "lobster", "dbn-mbo")
+FORMATS = ("itch50", "lobster", "dbn-mbo", "iex-deep-plus", "iex-deep")
+#: The IEX HIST formats (v1.17, A1): DEEP+ (orders) and DEEP (price levels).
+IEX_FORMATS = ("iex-deep-plus", "iex-deep")
 
-#: Venue of each supported source (both are Nasdaq order-by-order data).
-#: Ids from 101 up are real venues; every synthetic venue id is below 100.
-SOURCE_VENUE = {"itch50": ("XNAS", 101), "lobster": ("XNAS", 101), "dbn-mbo": ("XNAS", 101)}
+#: Venue of each supported source (the first three are Nasdaq order-by-order
+#: data; the IEX formats are IEX's own feeds, v1.17 A1).  Ids from 101 up are
+#: real venues; every synthetic venue id is below 100.
+SOURCE_VENUE = {
+    "itch50": ("XNAS", 101),
+    "lobster": ("XNAS", 101),
+    "dbn-mbo": ("XNAS", 101),
+    "iex-deep-plus": (IEX_VENUE, IEX_VENUE_ID),
+    "iex-deep": (IEX_VENUE, IEX_VENUE_ID),
+}
 
 #: Domain separation of real dataset versions: no synthetic dataset
 #: (``iap.experiment.tracker.data_version``) hashes this prefix.
@@ -307,6 +320,61 @@ class _DbnMboSource(_ItchSource):
         doc = super().messages()
         doc["dbn"] = {"dataset": self.reader.dataset, **self.reader.counters}
         return doc
+
+
+class _IexSource(_ItchSource):
+    """One IEX HIST capture (DEEP+ or DEEP, pcap[.gz]) -> ITCH messages ->
+    the ITCH mapper; with ``tops`` the day's TOPS capture is the BBO oracle
+    (v1.17, A1; :mod:`iap.marketdata.iex`)."""
+
+    def __init__(
+        self,
+        inputs: list[Path],
+        date: str,
+        symbols: tuple[str, ...],
+        limit_messages: int | None,
+        extended_hours: bool,
+        source_format: str,
+        tops: Path | None,
+    ) -> None:
+        if len(inputs) != 1:
+            raise IngestError(
+                f"--format {source_format} takes exactly one --input file per session date"
+            )
+        self.format = source_format
+        self.inputs = inputs
+        self.symbols = symbols
+        self.mapper = Itch50Mapper(date, symbols, extended_hours=extended_hours)
+        quotes = None
+        if tops is not None:
+            if not tops.is_file():
+                raise IngestError(f"--tops file not found: {tops}")
+            quotes = TopsQuotes.load(tops, symbols, session_midnight_ns(date))
+        self.reader = IexReader(  # type: ignore[assignment]
+            inputs[0],
+            date,
+            symbols,
+            limit_messages=limit_messages,
+            mapper=self.mapper,
+            level_feed=source_format == "iex-deep",
+            tops=quotes,
+        )
+
+    def finish(self) -> None:
+        missing = [s for s in self.symbols if s not in self.mapper.directory]
+        if missing:
+            raise IngestError(
+                f"{self.inputs[0].name}: no message for {missing} on the session date"
+            )
+
+    def messages(self) -> dict:
+        doc = super().messages()
+        doc["iex"] = self.reader.summary()
+        return doc
+
+    def verification(self) -> dict | None:
+        oracle = self.reader.oracle
+        return None if oracle is None else oracle.report()
 
 
 class _LobsterSource:
@@ -1026,8 +1094,12 @@ def ingest(
     timings: dict[str, float] | None = None,
     defer_normalize: bool = False,
     progress: Callable[[str], None] | None = None,
+    tops: str | Path | None = None,
 ) -> dict:
-    """Ingest one session into ``out_dir``; returns the manifest document."""
+    """Ingest one session into ``out_dir``; returns the manifest document.
+
+    ``tops`` (the IEX formats only, v1.17 A1) is the day's TOPS capture: the
+    best bid / offer oracle recorded as the session's ``book_verification``."""
     if source_format not in FORMATS:
         raise IngestError(f"unknown format {source_format!r}; known: {list(FORMATS)}")
     if tick_size not in TICK_CHOICES:
@@ -1093,12 +1165,26 @@ def ingest(
         }
     previous_ticks = {e["symbol"]: e["tick_size_e4"] for e in manifest["universe"]}
 
+    if tops is not None and source_format not in IEX_FORMATS:
+        raise IngestError("--tops applies to the IEX formats only")
     if source_format in ("itch50", "dbn-mbo"):
         if book_paths is not None:
             raise IngestError("--orderbook applies to --format lobster only")
         kind = _ItchSource if source_format == "itch50" else _DbnMboSource
         source: _ItchSource | _LobsterSource = kind(
             paths, date, universe, limit_messages, extended_hours
+        )
+    elif source_format in IEX_FORMATS:
+        if book_paths is not None:
+            raise IngestError("--orderbook applies to --format lobster only")
+        source = _IexSource(
+            paths,
+            date,
+            universe,
+            limit_messages,
+            extended_hours,
+            source_format,
+            None if tops is None else Path(tops),
         )
     else:
         source = _LobsterSource(paths, date, universe, limit_messages, book_paths, input_symbols)
@@ -1439,7 +1525,15 @@ def _parser() -> argparse.ArgumentParser:
         required=True,
         nargs="+",
         help="itch50: the day's file (.gz or plain); dbn-mbo: the day's Databento XNAS.ITCH MBO "
-        "file (.dbn or .dbn.zst); lobster: one message file per symbol",
+        "file (.dbn or .dbn.zst); iex-deep-plus / iex-deep: the day's IEX HIST DEEP+ / DEEP "
+        "capture (pcap or pcap.gz); lobster: one message file per symbol",
+    )
+    p.add_argument(
+        "--tops",
+        default=None,
+        help="IEX formats: the day's TOPS capture (pcap or pcap.gz), the best bid / offer "
+        "oracle recorded as book_verification (a divergence refuses the ingest unless "
+        "--allow-book-divergence)",
     )
     p.add_argument("--date", required=True, help="session date, YYYY-MM-DD")
     p.add_argument(
@@ -1523,6 +1617,7 @@ def main(argv: list[str] | None = None) -> int:
             timings=stages,
             defer_normalize=args.defer_normalize,
             progress=None if args.quiet else lambda line: print(line, file=sys.stderr, flush=True),
+            tops=args.tops,
         )
     except BookDivergenceError as exc:
         print(f"error: {exc}", file=sys.stderr)
