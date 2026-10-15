@@ -103,6 +103,15 @@ opt-in and off by default, so no default run, golden or published number moved):
   blocking mypy and agent evals (#143), memory follow-ups (#148) and a
   registration environment pinned to the CI lock (#152).
 
+<!-- DRAFT v1.16 release-prep: replace at release -->
+**v1.16 (in progress, results pending).** Theme: monetisation. Realistic execution costs shipped
+(parent impact, residual-move calibration, v3 prereg realism, SOR and algo opt-ins). The taker route
+is a no-go: the in-sample study made zero trades in 480 cells, and the capacity curve finds no
+break-even size (0 of 45 cells): the edge is ~0.1-0.9 bp against a 0.8-2.4 bp round-trip cost.
+Two-sided quoting v2: RESULT PENDING. AI4 DeepLOB: RESULT PENDING. Draft notes:
+[docs/release/v1.16.0_RELEASE_NOTES_DRAFT.md](docs/release/v1.16.0_RELEASE_NOTES_DRAFT.md).
+<!-- /DRAFT -->
+
 **v1.15.0 (2026-10-13).** The R7 confirmatory pre-registration
 R7-CONFIRM-1 is **signed** (`research/r7/r7_confirm_prereg.json`: H4 tier 1,
 EQ10 @1s and EQ05 @1s, one look) has run on the 7 unseen holdout sessions:

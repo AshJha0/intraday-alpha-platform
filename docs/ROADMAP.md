@@ -491,6 +491,12 @@ change: still 0 alphas promoted, no strategy that trades at 1x costs.
 
 ## 3.10 v1.15.0 (2026-10-13): the confirmatory release
 
+<!-- DRAFT v1.16 release-prep: replace at release -->
+**v1.16 (in progress, results pending).** P0 execution items 1-5 done. P0-6 taker study: no-go
+(0 trades in 480 cells). Item 7: no taker capacity (0/45 cells). Item 8 (paid data): closed by
+owner decision 2026-10-14. Quoting v2: RESULT PENDING. AI4 DeepLOB: RESULT PENDING.
+<!-- /DRAFT -->
+
 | Item | State |
 |---|---|
 | R7 confirmatory round (R7-CONFIRM-1, 7 unseen holdout sessions) | done: EQ10@1s and EQ05@1s both confirmed; net P&L at 1x cost 0 (docs/research/R7_RESULTS.md) |
