@@ -353,6 +353,21 @@ signal.
 | `ic_weighted` | `max(IC_k, 0) / (1 − IC_k²)` | yes | no |
 | `ridge` | `(Z'Z/n + λI)⁻¹ Z'y/n`, `λ ∈ {0.01, 0.1, 1, 10, 100}` by forward-chained CV over the inner folds (purged, embargoed; larger `λ` on a tie; the largest when no split is possible) | yes | yes |
 | `shrinkage_mv` | `S*⁻¹ cov(z, y)`, `S*` the Ledoit–Wolf shrinkage of the signal covariance towards `mu·I` | yes | yes |
+| `decay_aware` (v1.17) | `ic_weighted` × the survival ratio `clip(IC_k(h_c) / IC_k(h_k), 0, 1)` of each member's IC at the combination horizon over its IC at its own horizon (1 when they coincide, 0 when the own-horizon IC is not positive) | yes (both horizons) | no |
+
+**Stacking revision v1.17 (review R-8; `WeightFit.detail["stacking_revision"]`).**
+`ridge` and `shrinkage_mv` solve on **pairwise-complete** moments — `G_jk` is
+the mean of `z_j z_k` over the rows where both members have an opinion,
+`g_j` the mean of `z_j y` where member `j` has one — so a member silent on
+part of the stack is no longer read as "zero signal" there; and the ridge
+penalty search re-standardises the stack inside every forward-chained split
+with that split's training-row moments. `experiment_identity(...,
+stacking="v1.17")` adds a `stacking` key to the ledger configuration (a new
+experiment); without it the identities written before v1.17 are reproduced
+byte for byte. `run_combination` passes the revision for every new run and
+presents `decay_aware` as the report's `default_method`
+(`DEFAULT_STACKING_METHOD`); `CombinedAlpha`'s own default stays
+`equal_weight`.
 
 Nothing is orthogonalised: under `equal_weight` and `ic_weighted` a block of
 near-duplicate members is over-weighted by them, which
@@ -406,3 +421,86 @@ a research run.
 
 Kept out of `iap.mvp.sizing` because that path is parity-checked against the
 C++/Rust engines; a multiplier there would move every engine's goldens.
+
+## 10. v1.17 WS-C models — `linear_z_v2`, regime conditioning, regime gate (Python research; opt-in; not a port contract)
+
+Nothing in this section changes a registered alpha, the default feature
+registry, `alpha_params.json`, a golden or a port: every object here is a
+NEW identity built beside the registered ones, and the fingerprinted
+modules (`iap/alpha/base.py`, `equity.py`, `fx.py`, the feature families)
+are untouched. See docs/research/V117_WSC_MODELS.md for the opt-in map.
+
+### 10.1 `linear_z_v2` — per-instrument causal standardisation (`iap.alpha.linear_v2`, C3 / R-7)
+
+`linear_z_v1` pools `mu` / `sigma` across the universe, so the loudest name
+sets every z and the `conf_min` eligibility of the others. `linear_z_v2`
+standardises each instrument against itself, causally:
+
+```
+mu_i(t), sigma_i(t) = mean, std of raw_i over the instrument's rows with ts in (t − W, t]
+z    = clip((raw_i(t) − mu_i(t)) / (sigma_i(t) + 1e-12), −4, +4)
+er   = beta · z          beta = OLS slope of the pinned-horizon mid label on z, pooled over the universe
+conf = min(1, |z| / 2)   rows with < min_obs (32) finite raw values in the window, no spread, or NaN raw → (0.0, 0.0)
+```
+
+`W` is the class's `std_window` (`"5m" | "15m" | "30m" (default) | "1h" |
+`"2h"`), half-open in event time like every feature window; `z` at row `t`
+is bit-identical whatever rows follow it. The params carry `model:
+"linear_z_v2"`, `std_window`, `std_window_ns`, `min_obs`, `mu = 0`, `sigma
+= 1`; a dead alpha is `beta == 0`. `load_params` rejects a `linear_z_v1`
+blob and a different `std_window`; every `linear_z_v1` loader (Python and
+the ports) rejects `linear_z_v2`.
+
+Identities: `linear_z_v2(cls, std_window, min_obs)` builds the twin of a
+registered per-instrument class; `V2_ALPHA_CLASSES` / `V2_ALPHA_IDS` hold
+the 21 twins `EQ01_z2 … EQ12_z2, FX01_z2 … FX12_z2` (EQ11, FX05, FX06 are
+cross-sectional and have none); `build_v2("EQ02")` or `build_v2("EQ02_z2")`.
+A non-default window is in the id (`EQ02_z2_1h`). The first study is
+pre-registered as a DRAFT only: `research/preregs/linear_z_v2_prereg_DRAFT.json`
+(unsigned, not on the blackboard).
+
+### 10.2 Regime-conditioned model (`iap.alpha.regime_conditioned`, C5)
+
+`RegimeConditionedAlpha(member_id, mode="per_regime" | "interaction",
+regime_features=("vol_regime_flag_v1",), *, member_factory=iap.alpha.build,
+min_obs=32)` wraps a registered per-instrument `LinearAlpha` (a `linear_z_v2`
+twin works through `member_factory`) and conditions its scaling on the
+row's regime; id `<member>_rc`, model `regime_conditioned_v1`, horizon and
+asset class the member's, `features` = the member's ∪ the regime flags (so
+the masking leakage guard covers them).
+
+- regime label `r` = the declared flags read as bits in declared order
+  (`regime_labels(df, features)`), `−1` where a flag is NaN or missing;
+- `z` = the member's own clipped standardised signal (`expected_return /
+  beta_member` where its confidence > 0), fitted by the member on the same
+  training rows — the wrapper inherits the member's standardisation;
+- `per_regime`: `er = beta_r · z`, `beta_r` the OLS slope on the training
+  rows of regime `r` (≥ `min_obs` pairs, else the pooled slope `beta_0`);
+  unknown regime → `beta_0`;
+- `interaction`: `er = (beta_0 + Σ_f gamma_f · flag_f) · z`, one OLS on
+  `z` and `z · flag_f` over the known-regime rows (a flag that never varies
+  keeps the pooled slope only);
+- `conf = min(1, |z| / conf_scale)`; `beta` in the params is `beta_0`,
+  `hypothesis_confirmed = beta_0 > 0`; `beta_by_regime`, `gamma`,
+  `n_by_regime`, `member_params` are serialised; dead when `beta_0 == 0` or
+  the member is dead. `regime_conditioned(member_id, mode, features)` is a
+  `model_factory` for `validate_alpha`.
+
+### 10.3 Regime as a gate input (`iap.validation.regime_gate`, C5)
+
+`regime_gate_statistics(ts, scores, labels, regime, *, horizon_ns,
+regime_features, min_pairs=256, hac_bandwidth="auto", day_separated=True)`
+returns `{"pooled": gate_statistics(known rows), "by_regime": {str(r):
+gate_statistics(rows of r) + regime, flags, judged}, "n_unknown",
+"regime_features", "min_pairs"}` — the SAME statistic every gate reads
+(§7.1, `gate_statistics`: pooled IC, pooled-slope HAC t, day-cluster t,
+`n_pairs`, `n_days`), computed per regime; a regime with fewer than
+`min_pairs` finite pairs is reported but not judged. `regime_rows(frames,
+scores, horizon, features)` pools `(ts, z, label, regime)` from scored
+frames. `regime_gate(stats, *, min_ic=0.0, min_t=0.0, min_regimes=1,
+max_ic_ratio=0.0)` → `{"passed", "worst_regime", "worst_ic", "judged",
+"failed", "thresholds"}`: PASS when every judged regime has `ic > min_ic`
+and `tstat_hac >= min_t`, at least `min_regimes` were judged, and (with
+`max_ic_ratio > 0`) the worst judged regime's IC is at least that fraction
+of the pooled IC. No pipeline calls it by default: `validate_alpha`, the
+lifecycle gates and every published verdict are unchanged.
