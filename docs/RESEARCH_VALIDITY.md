@@ -469,6 +469,34 @@ estimator gives a reliable day-level t. The `few_sessions` reading says so
 instead of printing a t. The time-shift detector flags; it cannot prove a
 leak, and a slow-moving causal signal can fail it.
 
+## 4e. v1.17 WS-D: meta-label calibrate/select split, sizing hook, conformal sizing (opt-in)
+
+Review finding R-5: `run_meta_labeling` chose `best_tau` on the calibration
+segment, the rows its own calibrator was fitted on. `split_mode=
+"calibrate_select"` (opt-in; API_ALPHA.md §10) adds a *select* segment
+between calibration and test (40/20/20/20 of the meta rows by row mass,
+purged at the label horizon and embargoed 60 s at every boundary): the
+calibrator never sees the rows the tau is chosen on, and neither sees the
+test rows. `primary_selection_window` purges from the calibration fold the
+rows of the fold the primary signal was selected on and the result document
+records the purge count and the four windows. `split_mode="legacy"` (the
+default) is the v1.16 rule, so every stored `run_*` and the ML ledger look
+identities reproduce; the new mode is a different look identity.
+
+Sizing is a hook, not a rule change: `Backtester(sizing_hook=...)` scales a
+decision row's target by a multiplier in `[0, 1]` at the decision row, so
+latency, the row block, the session flatten, the fill cap and costs are
+unchanged. `meta_probability_hook` (the calibrated meta probability as a
+gate or a linear size) and `conformal_sizing_hook` (split-conformal interval
+width over the primary signal's residuals mapped to size) are the two
+providers. `coverage_by_regime` reports empirical coverage per regime
+against nominal with the day-clustered t of the shortfall (the v1.17 gate
+statistic form) and flags `under_coverage` at t < −2; it is reported, not
+enforced (`passed: null`), and nothing in the platform enforces it. The MVP
+engine takes the same conformal rule through the optional
+`portfolio.conformal` block (docs/MVP.md §11); the pinned configs do not
+carry it. No gate, threshold, verdict or registered number moves.
+
 ## 4c. v1.16 report-only additions
 
 Nothing here changes a gate, a threshold or a verdict.

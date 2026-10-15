@@ -334,6 +334,7 @@ class MvpEngine(RiskWiringMixin, SizingMixin, EngineMetricsMixin):
         self._bar_mid: float | None = None
         self._last_bar_mid: float | None = None
         self.bar_returns: list[float] = []
+        self._init_conformal()  # v1.17 D3 opt-in; a no-op without portfolio.conformal
         self._decisions: list[_Decision] = []
         self._live: _LiveParent | None = None
         #: v1.16 end-of-day flatten counters (reported only when enabled)
@@ -514,7 +515,11 @@ class MvpEngine(RiskWiringMixin, SizingMixin, EngineMetricsMixin):
             list(member_signals.values()) + [signal], state, self.constraints
         )
         builder.set_portfolio(target)
-        delta = target.targets[0].target_qty - (self.account.position + self._inflight_signed())
+        # v1.17 D3 (opt-in): the conformal multiplier scales the solved
+        # target; identity when portfolio.conformal is absent.  The trace
+        # keeps the solver's target; the parent carries the scaled one.
+        target_qty = self._conformal_scale(target.targets[0].target_qty, signal.expected_return)
+        delta = target_qty - (self.account.position + self._inflight_signed())
         if delta == 0:
             self.counters.decisions_flat += 1
             decision.ready = True

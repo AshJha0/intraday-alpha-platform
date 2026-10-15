@@ -8,6 +8,7 @@ that tag.
 
 ## Unreleased
 
+<<<<<<< HEAD
 - v1.17 WS-F items F1 and F3. **F1**: `reproducible-build` CI job (the wheel built twice under
   `SOURCE_DATE_EPOCH` = commit date, sha256 must match; the python image built twice with BuildKit
   `rewrite-timestamp`, report-only); CycloneDX SBOMs on every release (syft per image, attested and
@@ -39,6 +40,23 @@ that tag.
   pairs every variant with its own plain control on the same windows (day-clustered) and
   reports urgency-regime shares per cell. API_TRADING.md section 2.14, COOKBOOK recipe 101,
   `python/tests/test_v117_signal_aware.py`.
+=======
+- v1.17 WS-D items D2 and D3 (review finding R-5): meta-labelling with a calibrate/select split and
+  conformal sizing, every piece opt-in. `run_meta_labeling(split_mode="calibrate_select")` splits the OOS
+  region 40/20/20/20 train / calibration / select / test so `best_tau` is chosen on rows the calibrator
+  never saw; `primary_selection_window` purges the primary signal's selection fold from the calibration
+  fold and the result records the split, the windows and the purge count (`"legacy"`, the default, is the
+  v1.16 three-way split, unchanged). `Backtester(sizing_hook=)` scales each decision row's target by a
+  multiplier in [0, 1] at the decision row (`SignalRow`, `SizingHook`, `InstrumentResult.sizing_multipliers`);
+  `meta_probability_hook` (gate / linear over a calibrated probability column) and `conformal_sizing_hook`
+  (split-conformal interval width mapped to size, `confidence_from_width`) are the providers.
+  `coverage_by_regime`: empirical coverage per regime vs nominal with the day-clustered t of the shortfall
+  (the v1.17 gate-statistic form), reported, not enforced (`passed: null`). The MVP engine takes the same
+  conformal rule through the optional `portfolio.conformal` block (`ConformalSpec`; absent from every pinned
+  config, golden byte-identical). The ML ledger records `split_mode` / `primary_selection_window` in the
+  `metalabel_tau` look and a `conformal_coverage_gate` look. API_ALPHA.md §9-§10, RESEARCH_VALIDITY.md
+  §4e, MVP.md §11; no registered result changes.
+>>>>>>> origin/feat/v117-d2d3-metalabel-conformal
 - v1.17 WS-D items D1 and D4 (review findings R-6, R-9; all opt-in, no published number moves).
   D1: `iap.alpha.gbm.GbmAlpha` (alpha id `ML01`) puts gradient-boosted trees behind the `AlphaModel`
   interface: `hist_gbdt` backend by default (`xgboost` / `lightgbm` when installed, named in the
