@@ -439,8 +439,7 @@ int main(int argc, char** argv) {
                  "reconstruction ADDs + 64,000 real events; provenance in its "
                  "SLICE.md). Same per-event framing as the synthetic streams."
                : "NOT FOUND (workload skipped; build outside the repository?)")
-       << "
-";
+       << "\n";
 
     std::ostringstream wide, guard;
     wide << "\n| path, workload | p50 ns | p90 ns | p99 ns | p99.9 ns | "

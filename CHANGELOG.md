@@ -8,6 +8,21 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-F items F4 and F5 (#188). **The committed real slice**
+  `benchmarks/slices/itch50_20190130_AAPL` (`tools/extract_real_slice.py`; Nasdaq ITCH 5.0, AAPL,
+  2019-01-30 from the 09:30 open: 1,132 book-reconstruction ADDs + 64,000 real events, 4.69 MB,
+  book to ~2,700 price levels per side; a self-contained ingested dataset with its provenance in
+  `SLICE.md` / `dataset.json`, REPRODUCIBILITY.md §3.5). **F4**: `bench_tick_to_trade` replays the
+  slice as a third workload (`t2t realslice p50/p99` guard rows in `results_tick_to_trade.md`); the
+  Python MVP loop latency budget (`iap.mvp.latency`, `tests/harness/check_mvp_latency_budget.py`,
+  `benchmarks/latency_budget.json`: CI-measured p50 117 µs / p99 1.79 ms per event, limits 4x,
+  blocking in the `python` job); `ExecutionReplay` X-6 follow-up (open count + amortised compaction
+  of the PASSIVE working list, `_committed_qty` over the not-yet-terminal children only; outputs
+  unchanged, goldens pass; 12 parents on the slice 239 -> 59 µs/event). **F5**:
+  `tests/harness/check_slice_memory.py` guards the peak RSS of the normaliser and the feature build
+  on the slice (`benchmarks/memory_budget.json`: CI-measured 194 MB / 173 MB, limits 2x); the
+  remaining v1.16 memory-review items are closed or stated in `MEMORY_REVIEW_v116.md` (F5 status).
+
 - v1.17 WS-F items F1 and F3. **F1**: `reproducible-build` CI job (the wheel built twice under
   `SOURCE_DATE_EPOCH` = commit date, sha256 must match; the python image built twice with BuildKit
   `rewrite-timestamp`, report-only); CycloneDX SBOMs on every release (syft per image, attested and

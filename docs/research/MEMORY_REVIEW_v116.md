@@ -33,3 +33,15 @@ case, 2 instruments x 5 days x 4 000 rows (20 000 rows each), 229 columns:
 | `validate_alpha` v4 (walk-forward + CPCV) | 71 MiB | 48 MiB |
 | `power_real.shift_labels` | 135 MiB | 5 MiB |
 | `leakage._obfuscate_labels` | 135 MiB | 4 MiB |
+
+## v1.17 F5 status (2026-10-15)
+
+What was still open after the v1.16 follow-ups, and what v1.17 did with it:
+
+| # | Item | v1.17 status |
+|---|---|---|
+| 7 | float32 z / y in the CPCV `per_split` arrays | **Not adopted, by design**: it moves the stored ICs / t-stats in the last digits, so committed numbers would change (owner rule: nothing changes a registered result). Closed as "no". |
+| - | `tools/r7_confirm.py` `load_frames` at full width | **Left as is**: R7 is closed and its registered runs used this path; narrowing it would make the registered command not the one that ran. |
+| - | `maker_real` / `auction_real` / `quoting_real` per-session concatenation (~2.6 GB peaks) | **Open, low**: one unit at a time, fits 16 GB; no study is scheduled on them in v1.17 (the WS-B benchmark uses `ExecutionReplay` per session). Revisit if a study pools more sessions. |
+| §2.3 | ingest of 50-100 names in one dataset (4-12 GB resident plus sort copies) | **Fixed by A2** (`--partition-instruments`, per-instrument partitions merged in event-time windows, byte-identical outputs). |
+| new | a guard, so the v1.16 failure mode cannot come back unnoticed | **Added (F5)**: `tests/harness/check_slice_memory.py` measures the peak RSS of the normaliser and of the feature build on the committed real slice (`benchmarks/slices/itch50_20190130_AAPL`, REPRODUCIBILITY.md §3.5) in CI against `benchmarks/memory_budget.json` (a measured CI figure x margin with its run id); the guard catches a path that holds the day in memory again, not drift. |
