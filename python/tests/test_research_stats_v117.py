@@ -256,7 +256,9 @@ def test_dsr_recompute_uses_the_repo_ledger_count_at_the_look(tmp_path):
     ledger.record("EQ01", "k", {"i": 9}, count=3)  # total 8, 6 distinct
     ledger.save()
     assert rc.trials_at_total(ledger, 5) == 5 and rc.trials_at_total(ledger, 8) == 6
-    series = {d: v for d, v in zip("abcdefg", [0.06, 0.07, 0.06, 0.07, 0.08, 0.10, 0.06], strict=True)}
+    series = {
+        d: v for d, v in zip("abcdefg", [0.06, 0.07, 0.06, 0.07, 0.08, 0.10, 0.06], strict=True)
+    }
     recorded = {
         "schema": "iap.r7_confirm_result/v1",
         "results": [
