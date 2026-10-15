@@ -248,10 +248,15 @@ class MvpEngine(RiskWiringMixin, SizingMixin, EngineMetricsMixin):
                         else load_default_schedule(REPO_ROOT / "configs")
                     ),
                 )
-            # v1.16 P0-3: prereg venue latency + fee tier (the impact rule
-            # needs a calibration the MVP does not run: not applied).
-            self.exec_config = realism.exec_config(self.exec_config, impact=False)
-            sim_kwargs = realism.simulator_kwargs()
+            # v1.16 P0-3 / v1.17 X-2: one entry point. The impact rule needs a
+            # calibration the MVP does not run (recorded as not applied in
+            # ``self.realism_applied``).
+            from iap.execution.realism import apply as apply_realism
+
+            applied = apply_realism(realism, self.exec_config, impact=False)
+            self.exec_config = applied.exec_config
+            sim_kwargs = applied.simulator_kwargs
+            self.realism_applied = applied.applied
         self.sim = SimulatorAdapter(ExecutionSimulator(self.exec_config, **sim_kwargs))
         self.book: ConsolidatedBook = self.sim.simulator.instrument_book(self.iid)
         sor_file = load_sor_options(cfg.reference_path("execution"))

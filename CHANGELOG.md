@@ -30,6 +30,26 @@ that tag.
   The v1.14.0 rules are frozen as `v2_v114` / `v3_v114` / `v4_v114`; ledger identities carry
   `stats_revision: "v1.17"` and entries at `"v1.14"` scope to the `*_v114` bundles (an unknown
   revision raises). Regenerated research outputs follow (CI regenerate).
+- v1.17 WS0 item 0.5 (X-1): VWAP slices follow the forecast volume curve over the PARENT window
+  (`curve_slice_weights(curve, n, start_frac, end_frac)`, `volume_curve.curve_window`,
+  `ParentOrder.curve_window`); the whole-session resampling and the pinned `1 + x^2` curve are
+  unchanged by default.
+- v1.17 WS0 item 0.5 (X-2): `iap.execution.realism.apply(prereg, exec_config, calibration=,
+  impact=, maker_config=, quoting_config=)` is the one entry point for every realism opt-in; it
+  returns an `AppliedRealism` (configs, grids, keyword arguments and an `applied` statement per v3
+  key) and puts the prereg latency table on every venue of a calibration, which the simulator
+  would otherwise read in place of the prereg venue latency. The MVP loop uses it
+  (`MvpEngine.realism_applied`). The prereg `venue_latency.mean_ns` is now the MEAN of the
+  simulator's `base + U[0, jitter]` draw (`simulator_latency_base_ns`; it was the minimum), and
+  `iap.marketdata.ingest` writes the assumed latency of the new
+  `configs/reference/venue_latency.json` into a real dataset's venues.json instead of 0 / 0.
+  Tests show every v3 key changes at least one simulator fill or config.
+- v1.17 WS0 item 0.6 (X-3): the residual impact fit records its support
+  (`impact.residual.by_horizon[h].support_pct_adv`: min / p05 / p50 / p95 / max % ADV of the
+  sweeps); `apply_impact_fit` carries it as `ExecConfig.impact_fit_support_pct_adv`, the simulator
+  flags parents whose participation leaves it (`ExecutionSimulator.impact_beyond_support`) and
+  `ExecConfig.impact_label()` names a cost "replay + fitted adder (rule 6b, ...)" rather than a
+  measurement.
 - v1.17 WS0 item 0.4 (R-4): ML looks reach the multiple-testing ledger. `run_model_comparison(ledger=)`
   records the model-zoo gate decision (kind `model_zoo_gate`), `run_meta_labeling(ledger=)` the tau
   decision (`metalabel_tau`), `research/ml_reports/run_ml.py` the primary-model choice

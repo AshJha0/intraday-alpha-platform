@@ -1060,6 +1060,21 @@ data:
         }
       ]
     }
+  reference__venue_latency.json: |
+    {
+      "x-version": 1,
+      "description": "v1.17 (review X-2): ASSUMED order-entry latency per source venue, written into an ingested real dataset's configs/venues/venues.json by iap.marketdata.ingest (real feeds carry exchange timestamps only, so nothing here is measured). mean_ns is the MEAN of the simulator's base + U[0, jitter_ns] draw (iap.execution.realism.simulator_latency_base_ns converts). The values equal configs/prereg/v3.json venue_latency; a pre-registration's venue_latency overrides them.",
+      "default": {
+        "mean_ns": 250000,
+        "jitter_ns": 100000
+      },
+      "venues": {
+        "NASDAQ": {
+          "mean_ns": 250000,
+          "jitter_ns": 100000
+        }
+      }
+    }
   risk__risk.json: |
     {
       "x-version": 4,

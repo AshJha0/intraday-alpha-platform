@@ -61,12 +61,14 @@ def test_venue_latency_fee_tier_and_stress_grid():
     )
     cfg = r.exec_config(exec_config())
     for v in cfg.venues.values():
-        assert (v.latency_mean_ns, v.latency_jitter_ns) == (200_000, 40_000)
+        # v1.17 (X-2): mean_ns is the MEAN of base + U[0, jitter]; the base is
+        # mean - jitter / 2
+        assert (v.latency_mean_ns, v.latency_jitter_ns) == (180_000, 40_000)
         assert v.maker_rebate_per_share == 0.002
     grid = r.stressed_exec_configs(exec_config())
     assert sorted(grid) == [0, 1, 5]
     assert all(v.latency_mean_ns == 0 for v in grid[0].venues.values())
-    assert all(v.latency_mean_ns == 1_000_000 for v in grid[5].venues.values())
+    assert all(v.latency_mean_ns == 900_000 for v in grid[5].venues.values())
     assert grid[1] == cfg
     tiers = r.fee_tier_configs(exec_config())
     assert [v.maker_rebate_per_share for v in tiers["base"].venues.values()] == [0.001] * len(

@@ -241,4 +241,6 @@ def test_v3_prereg_records_the_net_of_cost_keys(dataset: Path, tmp_path: Path) -
         p["not_applied"]
     )
     v = run.result.engine.exec_config.venues
-    assert all(s.latency_mean_ns == 250_000 for s in v.values() if not s.is_fx)
+    # v1.17 (X-2): the prereg mean 250 us is the MEAN of base + U[0, 100 us]
+    assert all(s.latency_mean_ns == 200_000 for s in v.values() if not s.is_fx)
+    assert run.result.engine.realism_applied["venue_latency"] == "applied"
