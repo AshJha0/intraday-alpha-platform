@@ -16,11 +16,13 @@ Blocks the Python derives from SciPy (Student-t readings of B6) are kept
 apart under ``expected_tol`` and compared to a tolerance (the generator
 says so in each file's description).
 
-The committed bytes are the ones the CI runner's Linux Python (glibc libm,
-numpy / OpenBLAS Haswell) writes, taken from the `f7-goldens-linux` artifact
+The committed bytes are the ones the CI runner's Linux CPython 3.11 (glibc
+libm, numpy / OpenBLAS Haswell) writes, taken from the `f7-goldens-linux` artifact
 of the python job: a Windows regeneration differs in the last bit of a few
-libm results (pow, exp, acosh) and in the seeded hazard fit, which is why
-`--check` on a laptop may report differences that CI does not.
+libm results (pow, exp, acosh) and in the seeded hazard fit, and CPython 3.12
+computes `x ** 2` as `x * x` (not `pow(x, 2.0)`), which is why `--check`
+on a laptop or under 3.12 may report last-bit differences that the 3.11 job
+does not (the C++ ports call `std::pow(x, 2.0)`, the 3.11 arithmetic).
 
 Two kinds of vectors per rule: fixed vectors (small synthetic books and
 scalar cases) and a sampled slice of the committed real session

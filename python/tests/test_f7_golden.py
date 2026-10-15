@@ -9,6 +9,12 @@ generator) cannot drift from what the C++ port is held to: regenerate with
 
 Named with ``golden`` so the cross-language golden group (``pytest -k
 golden``, tests/harness/run_all.sh) runs it.
+
+The reference bytes are those of CPython 3.11 on Linux (the ``python`` job and
+the Python image): CPython 3.12 computes ``x ** 2`` as ``x * x`` instead of
+``pow(x, 2.0)`` (the ``zscore`` variance, ``sigma ** 2`` of the Almgren-Chriss
+path), which moves the last bit of a few doubles, so the byte check runs on
+3.11 only; the C++ ports call ``std::pow(x, 2.0)`` and match the 3.11 bytes.
 """
 
 from __future__ import annotations
@@ -26,6 +32,10 @@ from f7_golden import GOLDEN_DIR, dumps  # noqa: E402
 from make_golden_f7 import MODULES, first_diff  # noqa: E402
 
 
+@pytest.mark.skipif(
+    sys.version_info >= (3, 12),
+    reason="the reference bytes are CPython 3.11's (3.12 computes x ** 2 as x * x)",
+)
 @pytest.mark.parametrize("name", MODULES)
 def test_f7_golden_is_pinned_to_the_reference(name: str) -> None:
     mod = importlib.import_module(f"f7_golden.{name}")

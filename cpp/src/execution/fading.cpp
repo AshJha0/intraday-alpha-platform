@@ -1,5 +1,12 @@
 // B4 / B5 rules and the B4 counterfactual: port of iap.execution.fading.
 
+// GCC (12/13, -O2 and up) reports maybe-uninitialized false positives on
+// std::variant temporaries moved into contracts::Value trees; no sanitizer
+// build sees an uninitialised read. Report-plane code, silenced here.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+
 #include "iap/execution/fading.hpp"
 
 #include <algorithm>

@@ -1,5 +1,12 @@
 // B6 markout decomposition: port of iap.tca.markout_decomposition (header).
 
+// GCC (12/13, -O2 and up) reports maybe-uninitialized false positives on
+// std::variant temporaries moved into contracts::Value trees; no sanitizer
+// build sees an uninitialised read. Report-plane code, silenced here.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+
 #include "iap/tca/markout_decomposition.hpp"
 
 #include <cmath>

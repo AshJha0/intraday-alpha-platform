@@ -505,7 +505,11 @@ def check_docker_build_context() -> None:
     script = ROOT / "tests" / "harness" / "check_docker_build.py"
     rc, out = run([sys.executable, str(script)])
     tail = [ln for ln in out.splitlines() if ln.startswith("docker build checks")]
-    record("docker_build_context", "PASS" if rc == 0 else "FAIL", (tail[-1] if tail else out)[:300])
+    # the failing inner check(s) and their detail, so a CI log says WHICH image
+    # or input failed without re-running the script (v1.17 F7)
+    fails = [ln.strip() for ln in out.splitlines() if ln.strip().startswith("[FAIL")]
+    detail = "; ".join([*tail[-1:], *fails]) if (tail or fails) else out
+    record("docker_build_context", "PASS" if rc == 0 else "FAIL", detail[:1200])
 
 
 def check_compose_config() -> None:
