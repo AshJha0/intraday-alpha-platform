@@ -409,7 +409,7 @@ implements it (`docs/SCENARIOS.md`, TRADING section).
   same three controls as a STATELESS function the execution replay evaluates before a dark post,
   from inputs the risk engine never sees: the trailing displayed lit EXECUTE volume over
   `participation_window_ns`, the PARENT's cumulative dark-filled notional and the child notional
-  at the midpoint (`iap.execution.dark.dark_pretrade_check`, `DarkControls{max_participation,
+  at the midpoint (`dark_pretrade_check` in `python/src/iap/execution/dark.py` (B10 branch), `DarkControls{max_participation,
   participation_window_ns, allowed_venue_types, max_dark_notional}`, codes `venue_type` /
   `participation` / `notional`, first failure wins; a rejected post goes to the lit book). The
   Rust risk crate carries that pure function too (`risk::dark_pretrade_check`,
