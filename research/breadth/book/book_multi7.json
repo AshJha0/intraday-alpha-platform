@@ -1,0 +1,283 @@
+{
+  "at_size": [
+    {
+      "fee_cost": 344.4717972751447,
+      "gross_pnl": 252.94768841831706,
+      "impact_cost": 824.0950282402712,
+      "mean_turnover": 0.09025985682001841,
+      "n_infeasible": 0,
+      "net_pnl": -1940.8106798919043,
+      "net_return_bps": -77.63242719567617,
+      "notional": 250000.0,
+      "sharpe": {
+        "gross_daily_annualised": 4.129859954299311,
+        "n_days": 7,
+        "net_daily_annualised": -27.44229287432489,
+        "net_per_rebalance": -0.22646435007511923,
+        "net_per_rebalance_annualised": -40.876658356990795,
+        "rebalances_per_day": 129.28571428571428
+      },
+      "size": 0.25,
+      "spread_cost": 1025.1915427948054
+    },
+    {
+      "fee_cost": 662.7350197426873,
+      "gross_pnl": 519.5006614431217,
+      "impact_cost": 2200.7010396547284,
+      "mean_turnover": 0.08690558920460342,
+      "n_infeasible": 0,
+      "net_pnl": -4303.345124465822,
+      "net_return_bps": -86.06690248931643,
+      "notional": 500000.0,
+      "sharpe": {
+        "gross_daily_annualised": 4.424544578828574,
+        "n_days": 7,
+        "net_daily_annualised": -29.04262123038117,
+        "net_per_rebalance": -0.256190886332884,
+        "net_per_rebalance_annualised": -46.242277565233906,
+        "rebalances_per_day": 129.28571428571428
+      },
+      "size": 0.5,
+      "spread_cost": 1959.409726511528
+    },
+    {
+      "fee_cost": 1246.0363568301432,
+      "gross_pnl": 1042.6733163663205,
+      "impact_cost": 5698.642823271092,
+      "mean_turnover": 0.08175337409967035,
+      "n_infeasible": 0,
+      "net_pnl": -9553.027442587627,
+      "net_return_bps": -95.53027442587627,
+      "notional": 1000000.0,
+      "sharpe": {
+        "gross_daily_annualised": 4.746087678430682,
+        "n_days": 7,
+        "net_daily_annualised": -30.09570712864743,
+        "net_per_rebalance": -0.29119755394329405,
+        "net_per_rebalance_annualised": -52.56095682602181,
+        "rebalances_per_day": 129.28571428571428
+      },
+      "size": 1.0,
+      "spread_cost": 3651.0215788527125
+    },
+    {
+      "fee_cost": 2208.2148602796333,
+      "gross_pnl": 2236.106523864606,
+      "impact_cost": 13368.179012989596,
+      "mean_turnover": 0.07249941986911972,
+      "n_infeasible": 0,
+      "net_pnl": -19815.67522759797,
+      "net_return_bps": -99.07837613798985,
+      "notional": 2000000.0,
+      "sharpe": {
+        "gross_daily_annualised": 5.708063172304644,
+        "n_days": 7,
+        "net_daily_annualised": -31.497576332369967,
+        "net_per_rebalance": -0.32008149556459975,
+        "net_per_rebalance_annualised": -57.77448828589946,
+        "rebalances_per_day": 129.28571428571428
+      },
+      "size": 2.0,
+      "spread_cost": 6475.387878193347
+    },
+    {
+      "fee_cost": 3657.3508951480253,
+      "gross_pnl": 4406.284764855015,
+      "impact_cost": 28421.987461641264,
+      "mean_turnover": 0.06025187810605854,
+      "n_infeasible": 0,
+      "net_pnl": -38465.38065871454,
+      "net_return_bps": -96.16345164678634,
+      "notional": 4000000.0,
+      "sharpe": {
+        "gross_daily_annualised": 6.560167544424991,
+        "n_days": 7,
+        "net_daily_annualised": -33.28978736201878,
+        "net_per_rebalance": -0.3396403191800891,
+        "net_per_rebalance_annualised": -61.304842403577595,
+        "rebalances_per_day": 129.28571428571428
+      },
+      "size": 4.0,
+      "spread_cost": 10792.327066780264
+    }
+  ],
+  "book": {
+    "daily_gross_pnl": {
+      "17926": 403.326979891979,
+      "17982": 282.07563862009727,
+      "18107": -93.29757347847416,
+      "18138": 841.7908148987976,
+      "18199": -738.199364232596,
+      "18260": 373.38128145083294,
+      "18291": -26.404460784316328
+    },
+    "daily_net_pnl": {
+      "17926": -1162.996800538343,
+      "17982": -210.22687946370507,
+      "18107": -1109.5640251335917,
+      "18138": -2193.6532827058227,
+      "18199": -2133.942076894719,
+      "18260": -928.8939708051137,
+      "18291": -1813.750407046333
+    },
+    "fee_cost": 1246.0363568301432,
+    "gross_pnl": 1042.6733163663205,
+    "impact_cost": 5698.642823271092,
+    "max_abs_beta_exposure": 1.1987038847518703e-05,
+    "max_abs_net_exposure": 1.028445712059333e-09,
+    "max_abs_sector_exposure": 0.0,
+    "mean_gross_exposure": 0.06858593200949832,
+    "mean_names_scored": 2.9900552486187846,
+    "mean_rank_ic": 0.06260946005731396,
+    "mean_turnover": 0.08175337409967035,
+    "n_days": 7,
+    "n_frozen_name_steps": 0,
+    "n_infeasible": 0,
+    "n_names": 3,
+    "n_rebalances": 905,
+    "n_traded": 849,
+    "net_pnl": -9553.027442587627,
+    "spread_cost": 3651.0215788527125,
+    "total_costs": 10595.700758953948,
+    "traded_notional": 73986803.56020167
+  },
+  "breadth": {
+    "arithmetic": {
+      "bets_per_year": 47466.01292068283,
+      "ir_implied": 13.640532824911693,
+      "mean_rank_ic": 0.06260946005731396,
+      "n_effective_names": 1.456906473931333,
+      "note": "IR_implied = IC * sqrt(BR): no costs, no constraints; a yardstick only",
+      "rank_ic_day_clustered": {
+        "df": 6,
+        "mean": 0.06260946005731396,
+        "n": 896,
+        "n_clusters": 7,
+        "p_student_t": 0.03414880879732727,
+        "se": 0.02292697392929904,
+        "t": 2.7308209208239003
+      }
+    },
+    "effective_bets": {
+      "eigenvalues": [
+        2.4334641041641163,
+        0.501492275474231,
+        0.06504362036165111
+      ],
+      "mean_abs_offdiag": 0.7104077510307166,
+      "mean_offdiag": 0.7104077510307166,
+      "n_effective": 1.456906473931333,
+      "n_members": 3
+    },
+    "mean_names_scored": 2.9900552486187846,
+    "n_names": 3,
+    "rebalances_per_day": 129.28571428571428
+  },
+  "breakeven": {
+    "at": 0.25,
+    "notional": null,
+    "size": null,
+    "status": "below"
+  },
+  "capacity": {
+    "breakeven": {
+      "notional": 0.0,
+      "participation": 0.0,
+      "units": 0.0
+    },
+    "edge_return_round_trip": 2.8185386209255998e-05,
+    "half_spread_return": 4.934692949509496e-05,
+    "horizon_ns": 300000000000,
+    "median_adv_shares": 8058372.0,
+    "median_mid": 193.815,
+    "note": "single-name size at which the book's realised round-trip edge equals its own cost; a proxy"
+  },
+  "config": {
+    "alpha_bps": 5.0,
+    "beta_neutral": true,
+    "cov_init": 20,
+    "cov_lam": 0.94,
+    "cov_shrinkage": null,
+    "decile_q": 0.1,
+    "dollar_neutral": true,
+    "dykstra_max_iter": 30,
+    "dykstra_tol": 1e-09,
+    "exec_delay_ns": 1000000000,
+    "feas_tol": 1e-06,
+    "flatten_at_session_end": true,
+    "gross_cap": 1.0,
+    "impact": "cost_model",
+    "impact_coeff": null,
+    "impact_exponent": null,
+    "max_age_ns": 60000000000,
+    "min_names": 3,
+    "neutral_bound": 0.0,
+    "notional": 1000000.0,
+    "participation_cap": 0.01,
+    "projection": "dykstra",
+    "rebalance_ns": 300000000000,
+    "risk_aversion": 1000.0,
+    "score": "eq11",
+    "sector_neutral": false,
+    "solver_iters": 20,
+    "turnover_cap": 0.5,
+    "w_max": 0.1,
+    "weights": "linear"
+  },
+  "dataset": {
+    "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+    "features_dir": "C:\\Work\\Claude\\intraday-alpha-platform\\intraday-alpha-platform\\data\\real\\multi7\\features",
+    "instruments": "C:\\Work\\Claude\\intraday-alpha-platform\\intraday-alpha-platform\\data\\real\\multi7\\configs\\instruments\\instruments.json",
+    "smoke_test": true
+  },
+  "identity": {
+    "net_minus_gross_plus_costs": 0.0
+  },
+  "instruments": {
+    "1": "AAPL",
+    "2": "MSFT",
+    "3": "QQQ"
+  },
+  "ledger": {
+    "kind": "breadth_book",
+    "path": "research/experiments.json",
+    "total_experiments": 5576
+  },
+  "net_pnl_day_clustered": {
+    "df": 6,
+    "mean": -10.55583142827362,
+    "n": 905,
+    "n_clusters": 7,
+    "p_student_t": 0.001942985494615406,
+    "se": 2.0154159857913982,
+    "t": -5.237544756363851
+  },
+  "neutrality": {
+    "beta": true,
+    "bound": 0.0,
+    "dollar": true,
+    "exposure_rows": [
+      "beta"
+    ],
+    "max_abs_beta": 1.1987038847518703e-05,
+    "max_abs_net": 1.028445712059333e-09,
+    "max_abs_sector": 0.0,
+    "missing_beta": [
+      1,
+      2
+    ],
+    "sector": false,
+    "sector_of": {}
+  },
+  "sectors": null,
+  "sharpe": {
+    "gross_daily_annualised": 4.746087678430682,
+    "n_days": 7,
+    "net_daily_annualised": -30.09570712864743,
+    "net_per_rebalance": -0.29119755394329405,
+    "net_per_rebalance_annualised": -52.56095682602181,
+    "rebalances_per_day": 129.28571428571428
+  },
+  "tag": "multi7",
+  "x-version": 1
+}
