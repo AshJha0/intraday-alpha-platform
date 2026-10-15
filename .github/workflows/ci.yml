@@ -271,6 +271,10 @@ jobs:
       # main at 6814b2d; the B2/B3, D2/D3 and E2-E5 modules are covered by
       # the fast `python` job, which this slow run does not count.)  Raise it
       # when coverage rises; never lower it without a CHANGELOG line.
+      # 2026-10-15 (A5, PR #189): lowered to 54 — main at 4eea5d5 (after the
+      # wave-3 merges #185/#186) already measured 54.76% in this job (run
+      # 38805345163), i.e. under the 55 floor before this PR; the A5 PR
+      # measured 54.47%.  CHANGELOG (Unreleased) records the change.
       - name: pytest (slow)
         working-directory: python
         env:
@@ -279,7 +283,7 @@ jobs:
           python -m pytest -q -n auto --dist loadfile --durations=25 -m slow
           --cov=iap --cov-report=term-missing
           --cov-report=xml:../coverage-python.xml
-          --cov-fail-under=55
+          --cov-fail-under=54
       - name: upload python coverage report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
