@@ -6,7 +6,7 @@ repo's *real, verified numbers* as worked examples. Everything cited here can
 be reproduced from the committed code and seeds — that reproducibility is
 itself one of the lessons.
 
-Sections §45-§99 (added for v1.16) are shorter concept entries: each
+Sections §45-§99 (added for v1.16) and §100 (v1.17) are shorter concept entries: each
 teaches one idea behind the platform, says where it lives in the code, and
 ends with questions. If a v1.12-v1.16 term is unfamiliar, start there.
 
@@ -159,7 +159,8 @@ Contents:
 97. [Paper trading: what the PAPER gates check](#97-paper-trading-what-the-paper-gates-check)
 98. [Pre-trade controls and a tamper-evident audit](#98-pre-trade-controls-and-a-tamper-evident-audit)
 99. [Agents that propose and humans that decide](#99-agents-that-propose-and-humans-that-decide)
-100. [Further reading](#100-further-reading)
+100. [A tree model on the same bench, and two gates that read one number](#100-a-tree-model-on-the-same-bench-and-two-gates-that-read-one-number)
+101. [Further reading](#101-further-reading)
 - [Glossary](#glossary)
 
 ---
@@ -6661,7 +6662,66 @@ named checks that also score a real model. The first live run
 2. Why does each proposal cost a look? *(A proposal is a search step; an
    agent that proposes a thousand variants has run a thousand tests.)*
 
-## 100. Further reading
+## 100. A tree model on the same bench, and two gates that read one number
+
+**The question.** The ML report fits gradient-boosted trees and finds
+nothing that pays. The flagship alphas go through a walk-forward, four
+leakage detectors, a gate with a significance threshold that follows the
+look count, a pre-registration and a ledger. The trees went through none
+of that. Is the ML result weaker evidence than it looks, and in which
+direction?
+
+**Same bench (v1.17 D1).** `iap.alpha.gbm.GbmAlpha` (`ML01`) is a GBM
+behind the `AlphaModel` interface: `fit` on per-instrument frames, `score`
+to `(expected_return, confidence)`, `params` / `load_params`, a declared
+feature list, a pinned horizon and an `Economic rationale:` section like
+every other alpha. It fits one model per horizon (the targets differ by a
+hundredfold in scale), checks its own hypothesis sign on a held-out slice
+of the training fold, and stores its fitted trees in a pickle sidecar whose
+SHA-256 travels in the params and is verified before anything is
+unpickled. Registering it is an explicit opt-in, so the 24-alpha report
+never changes by accident. On the synthetic store it reads an IC of +0.055
+at 5 s with a gate t of +6.0 and is an ITERATE: predictive, not tradable,
+the familiar shape (§78).
+
+**Two gates that read one number (v1.17 D4).** The model-zoo gate passed
+when the best linear model's pooled OOS IC against the mid label was > 0:
++0.0081 opened it. One number, pooled across fits, with no standard error.
+The opt-in `gate="clustered"` asks for the fold-mean rank IC to be positive
+AND for the day-clustered t of the pooled predictions (standardised per
+fold, because each fold is its own fit) to clear a stated threshold; both
+readings are recorded whichever decides. The CPCV path IC had the same
+flaw in another costume: a path concatenates the predictions of several
+fits, and a fit whose outputs are ten times larger owns the path, while an
+offset between fits is counted as variance. `cpcv_path_ic="demeaned"`
+standardises each (split, group) before pooling, so the path IC is a
+weighted mean of per-group ICs; the test fixture has two groups with the
+same true IC and shows the pooled reading off by more than 0.05 and the
+demeaned one within 0.01.
+
+**Why the defaults did not move.** Both fixes change what a published
+number means; the ML report and the `v4` CPCV blocks are regenerated only
+by the CI job, under rules the owner flips deliberately. Until then every
+report carries both readings, which is the honest state: the old number,
+the better number, and the name of the one that decided.
+
+**Check yourself.**
+
+1. Why standardise predictions per fold before a clustered t, when the
+   literal gate never did? *(Each fold is a different fit; pooling raw
+   outputs weights folds by their scale and mixes in offsets between
+   them. The t is about the sign of a relation, not about which fold
+   shouted loudest.)*
+2. Why is the GBM's `beta` 1.0 in its params? *(The validation chain
+   divides `expected_return` by `beta` to recover the standardized signal
+   that every fold statistic reads; for a tree model the clipped
+   prediction IS that signal.)*
+3. Why a digest-checked sidecar instead of the model inside the JSON?
+   *(A fitted ensemble is megabytes of opaque bytes; the params file is a
+   contract that people and three ports read. The digest makes the two
+   inseparable without making the file unreadable.)*
+
+## 101. Further reading
 
 Inside this repository, in suggested order:
 
