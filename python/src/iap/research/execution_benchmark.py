@@ -77,6 +77,26 @@ and favourable fills missed; labelled a proxy) and the **markout
 decomposition** by fill type (passive / aggressive / faded /
 cancelled-replaced) and B2 regime with day-clustered standard errors
 (v1.17 B6, :mod:`iap.tca.markout_decomposition`), at ``--markout-horizons``.
+
+**Dark venue (v1.17 B10).** ``--venues <venues.json>`` replaces the config
+directory's venue table (so a dataset's single lit venue can be joined by
+a ``"venue_type": "dark"`` entry); the ``dark`` variant on any base
+(``native+dark``, ``passive+dark``, ...) works the same parents with
+``ParentOrder.dark_first`` (:mod:`iap.execution.dark`): every step of a
+low-urgency parent (``urgency <= --dark-max-urgency``; for
+``urgency_policy="alpha"`` parents the B2 regimes in ``--dark-regimes``)
+is posted to the dark venue first under the pre-trade controls
+(``--dark-max-participation`` of the trailing displayed volume,
+``--dark-max-notional`` per parent, venue-type restriction) and the
+unfilled remainder goes to the lit book after ``--dark-horizon-s``. Dark
+fills come from ``--dark-model`` (a ``DarkFillModel`` document fitted on
+the hidden-print proxy by ``python -m iap.execution.dark``; without it the
+documented prior, labelled as such) and are **modelled, not measured**: the
+report says so wherever it quotes them. Each dark policy pairs with its
+base on the same windows; fill type ``dark`` appears in the markout
+decomposition (its negated price impact is the adverse selection of the
+dark fills). B8 pairs the same variant router-vs-pinned on the Nasdaq /
+IEX overlap days (``--venues`` with both lit venues plus the dark one).
 """
 
 from __future__ import annotations
@@ -109,6 +129,14 @@ from iap.execution import (
     load_sor_options,
 )
 from iap.execution.calibration import load_calibration
+from iap.execution.config import load_venues
+from iap.execution.dark import (
+    DARK_CONTROL_CODES,
+    MODELLED_LABEL,
+    DarkControls,
+    DarkFillModel,
+    DarkFirstParams,
+)
 from iap.execution.fading import CANCEL_RULES, pull_rows, pull_summary
 from iap.execution.optimal import ac_params_from_calibration
 from iap.execution.signal import URGENCY_REGIMES, AlphaUrgencySource
@@ -137,7 +165,9 @@ VARIANTS: dict[str, str | None] = {
     "fade": None,  #: B4: quote fading on posted children (passive base only)
     "qcancel": None,  #: B5: queue-aware cancels on posted children (passive base only)
     "fade_qcancel": None,  #: B4 + B5 together (passive base only)
+    "dark": None,  #: B10: dark-first posting on any base (needs a dark venue)
 }
+DARK_VARIANT = "dark"
 #: the variants that pull resting children: they need the ``passive`` base
 PULL_VARIANTS: tuple[str, ...] = ("fade", "qcancel", "fade_qcancel")
 DEFAULT_MARKOUT_HORIZONS: tuple[str, ...] = ("1s", "5s", "30s")
@@ -281,6 +311,7 @@ def signal_variant(
     ac_params,
     fade: FadeParams | None = None,
     queue_cancel: QueueCancelParams | None = None,
+    dark: DarkFirstParams | None = None,
 ) -> ParentOrder | None:
     """``p`` worked under policy ``name``; ``None`` when the variant does not
     apply to this parent's algo (AC variants are IS-only)."""
@@ -288,6 +319,10 @@ def signal_variant(
     p = replace(p, policy=POLICIES[base])
     if variant is None:
         return p
+    if variant == DARK_VARIANT:
+        if dark is None:
+            raise SystemExit("the dark variant needs a dark venue (--venues) and --dark-model")
+        return replace(p, dark_first=dark)
     if variant in PULL_VARIANTS:
         if variant in ("fade", "fade_qcancel"):
             if fade is None:
@@ -552,8 +587,21 @@ def run_benchmark(
     qcancel_calibration: Path | None = None,
     qcancel_action: str = "cross",
     markout_horizons: tuple[str, ...] = DEFAULT_MARKOUT_HORIZONS,
+    venues: Path | None = None,
+    dark_venue_id: int = 0,
+    dark_model: Path | None = None,
+    dark_horizon_s: float = 30.0,
+    dark_max_urgency: float = 0.5,
+    dark_regimes: tuple[str, ...] = ("agree",),
+    dark_max_participation: float = 0.1,
+    dark_participation_window_s: float = 30.0,
+    dark_max_notional: float = 0.0,
 ) -> dict[str, object]:
     """Run the grid; returns the JSON document (see the module docstring).
+
+    ``venues`` replaces the venue table; the ``dark_*`` knobs build the B10
+    :class:`DarkFirstParams` of the ``dark`` variant (``dark_model`` = a
+    fitted ``DarkFillModel`` JSON, else the documented prior).
 
     ``fade_*`` / ``qcancel_*`` build the B4 :class:`FadeParams` and B5
     :class:`QueueCancelParams` of the ``fade`` / ``qcancel`` variants (a zero
@@ -587,7 +635,7 @@ def run_benchmark(
     if baseline_policy not in policies:
         raise SystemExit(f"baseline policy {baseline_policy!r} is not in --policies")
     if signal == "none" and any(
-        parse_policy(pol)[1] not in (None, *PULL_VARIANTS) for pol in policies
+        parse_policy(pol)[1] not in (None, DARK_VARIANT, *PULL_VARIANTS) for pol in policies
     ):
         raise SystemExit("signal-aware policies need --signal (an alpha id or 'synthetic')")
     pull_variants_used = {parse_policy(pol)[1] for pol in policies} & set(PULL_VARIANTS)
@@ -665,8 +713,71 @@ def run_benchmark(
         impact_exponent=impact_exponent if impact_model == "parent" else 1.0,
         walk_depth_levels=walk_depth_levels,
     )
+    if venues is not None:
+        cfg = replace(cfg, venues=load_venues(venues))
     sor = load_sor_options(config_dir / "execution" / "execution.json")
-    taker_fee = cfg.venue(sorted(cfg.venues)[0]).taker_fee_per_share
+    lit_venues = sorted(v for v, s in cfg.venues.items() if s.is_lit)
+    if not lit_venues:
+        raise SystemExit("the venue table has no lit venue")
+    taker_fee = cfg.venue(lit_venues[0]).taker_fee_per_share
+    # v1.17 B10: the dark-first arm (modelled, not measured)
+    dark_used = any(parse_policy(pol)[1] == DARK_VARIANT for pol in policies)
+    dark_params: DarkFirstParams | None = None
+    dark_doc: dict[str, object] = {"used": False, "label": MODELLED_LABEL}
+    if dark_used:
+        dark_vid = dark_venue_id
+        if dark_vid == 0:
+            for v, s in cfg.venues.items():
+                if not s.is_lit:
+                    dark_vid = v
+                    break
+        if dark_vid == 0 or cfg.venues[dark_vid].is_lit:
+            raise SystemExit(
+                "the dark variant needs a venue with venue_type dark / midpoint (--venues)"
+            )
+        if dark_model is not None:
+            model = DarkFillModel.load(dark_model)
+        else:
+            model = DarkFillModel.prior(int(dark_horizon_s * SEC))
+        controls = DarkControls(
+            max_participation=dark_max_participation,
+            participation_window_ns=int(dark_participation_window_s * SEC),
+            max_dark_notional=dark_max_notional,
+        )
+        dark_params = DarkFirstParams(
+            model=model,
+            venue_id=dark_vid,
+            controls=controls,
+            max_urgency=dark_max_urgency,
+            regimes=tuple(dark_regimes),
+            horizon_ns=int(dark_horizon_s * SEC),
+        )
+        dark_doc = {
+            "used": True,
+            "label": MODELLED_LABEL,
+            "venue_id": dark_vid,
+            "venue": cfg.venues[dark_vid].name,
+            "venue_type": cfg.venues[dark_vid].venue_type,
+            "fee_per_share": cfg.venues[dark_vid].taker_fee_per_share,
+            "model": None if dark_model is None else str(dark_model),
+            "model_doc": model.to_dict(),
+            "horizon_s": dark_horizon_s,
+            "max_urgency": dark_max_urgency,
+            "regimes": list(dark_regimes),
+            "controls": controls.to_dict(),
+            "control_codes": list(DARK_CONTROL_CODES),
+            "fill_rule": (
+                "fills at the first event inside the horizon where p_fill(lit volume since the "
+                "post, spread at the post, qty + own dark queue) >= u (one seeded uniform per "
+                "child); price = displayed midpoint rounded against us; unfilled remainder to "
+                "the lit book in the base child style"
+            ),
+            "b8_pairing": (
+                "B8 runs the same base+dark variant with --venues naming both lit venues "
+                "(Nasdaq + IEX) and the dark one on the overlap days, paired router-vs-pinned "
+                "on the same windows"
+            ),
+        }
     names = _symbols(config_dir)
     want_symbols = set(symbols)
     files = [
@@ -680,6 +791,7 @@ def run_benchmark(
     warmup_ns = int(warmup_min * 60 * SEC)
     rng = SplitMix64(seed)
     rows: dict[str, list[dict]] = {p: [] for p in policies}
+    dark_totals: dict[str, dict[str, object]] = {}
     pull_rows_of: dict[str, list[dict]] = {p: [] for p in policies}
     pull_lost: dict[str, int] = {p: 0 for p in policies}
     mk_rows_of: dict[str, list[dict]] = {p: [] for p in policies}
@@ -782,6 +894,7 @@ def run_benchmark(
                         ac_params=acp,
                         fade=fade_params,
                         queue_cancel=qcancel_params,
+                        dark=dark_params,
                     )
                     if q is not None:
                         worked.append(q)
@@ -848,9 +961,42 @@ def run_benchmark(
                             "pulled_qty": rep.pulled_qty,
                             "pulls_lost_race": rep.pulls_lost_race,
                             "held_unsent_qty": rep.held_unsent_qty,
+                            "dark_children": rep.dark_children,
+                            "dark_posted_qty": rep.dark_posted_qty,
+                            "dark_filled_qty": rep.dark_filled_qty,
+                            "dark_expired_qty": rep.dark_expired_qty,
+                            "dark_unsent_qty": rep.dark_unsent_qty,
+                            "dark_rejected": rep.dark_rejected,
                         }
                     )
                     rows[pol].append(row)
+                    if rep.dark_children or rep.dark_rejected:
+                        tot = dark_totals.setdefault(
+                            pol,
+                            {
+                                "label": MODELLED_LABEL,
+                                "parents": 0,
+                                "dark_children": 0,
+                                "dark_posted_qty": 0,
+                                "dark_filled_qty": 0,
+                                "dark_expired_qty": 0,
+                                "dark_unsent_qty": 0,
+                                "dark_rejected": {},
+                            },
+                        )
+                        tot["parents"] += 1  # type: ignore[operator]
+                        for k in (
+                            "dark_children",
+                            "dark_posted_qty",
+                            "dark_filled_qty",
+                            "dark_expired_qty",
+                            "dark_unsent_qty",
+                        ):
+                            tot[k] += getattr(rep, k)  # type: ignore[operator]
+                        rej = tot["dark_rejected"]
+                        assert isinstance(rej, dict)
+                        for k, n in rep.dark_rejected.items():
+                            rej[k] = rej.get(k, 0) + n
     cells: dict[str, object] = {}
     by_symbol: dict[str, object] = {}
     for pol in policies:
@@ -954,6 +1100,8 @@ def run_benchmark(
         "markout_horizons": list(mk_horizons),
         "fades_saved_vs_fills_missed": fades,
         "markout_decomposition": markouts,
+        # v1.17 B10 (modelled, not measured)
+        "dark": {**dark_doc, "totals": dark_totals},
     }
     if timestamp:
         doc["generated"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -1089,6 +1237,36 @@ def render(doc: dict) -> str:
                 mk = " | ".join(_stat(hs[h]["markout"]) for h in doc["markout_horizons"])
                 pi = " | ".join(_stat(hs[h]["price_impact"]) for h in doc["markout_horizons"])
                 lines.append(f"| {pol} | {name} | {c['n_fills']} | {c['qty']} | {mk} | {pi} |")
+    dk = doc.get("dark", {})
+    if dk.get("used"):
+        lines += [
+            "",
+            f"## Dark venue (v1.17 B10; **{dk['label']}**)",
+            "",
+            f"Venue `{dk['venue']}` (id {dk['venue_id']}, type {dk['venue_type']}, fee "
+            f"{dk['fee_per_share']} / share); model "
+            + (
+                f"`{dk['model']}` (fitted on {', '.join(dk['model_doc']['sessions'])}; "
+                f"{dk['model_doc']['n_samples']} proxy samples)"
+                if dk["model_doc"]["fitted"]
+                else "the documented PRIOR (not fitted)"
+            )
+            + f"; horizon {dk['horizon_s']:g} s; controls {dk['controls']}. "
+            + dk["fill_rule"]
+            + ".",
+            "",
+            "| policy | parents | dark children | posted | filled dark | expired to lit | "
+            "unsent | rejected |",
+            "|---|---|---|---|---|---|---|---|",
+        ]
+        for pol, t in dk["totals"].items():
+            rej = ", ".join(f"{k} {n}" for k, n in sorted(t["dark_rejected"].items())) or "-"
+            lines.append(
+                f"| {pol} | {t['parents']} | {t['dark_children']} | {t['dark_posted_qty']} | "
+                f"{t['dark_filled_qty']} | {t['dark_expired_qty']} | {t['dark_unsent_qty']} | "
+                f"{rej} |"
+            )
+        lines += ["", dk["b8_pairing"] + "."]
     lines += [
         "",
         "## Reading it",
@@ -1116,6 +1294,10 @@ def render(doc: dict) -> str:
         "= a taker fill, faded = a maker fill that landed after a pull cancel was sent, "
         "cancelled_replaced = a maker fill of a child re-sent after a cancel; regimes are the "
         "B2 urgency regimes (plain without a signal). SEs cluster by session.",
+        "- dark (B10): fill type `dark` and every dark row above are MODELLED, NOT MEASURED — "
+        "a logistic fill probability fitted on Nasdaq inside-spread hidden prints as the proxy "
+        "(no dark-pool data exists); the negated price impact of the `dark` type is the adverse "
+        "selection of those modelled fills.",
         "",
     ]
     return "\n".join(lines)
@@ -1298,6 +1480,16 @@ def main(argv: list[str] | None = None) -> int:
         default=",".join(DEFAULT_MARKOUT_HORIZONS),
         help="B6 decomposition horizons (keys of iap.tca.markout.DEFAULT_HORIZONS_NS)",
     )
+    dg = ap.add_argument_group("dark venue (v1.17 B10; modelled, not measured)")
+    dg.add_argument("--venues", type=Path, default=None, help="venues.json replacing the config's")
+    dg.add_argument("--dark-venue-id", type=int, default=0, help="0 = first non-lit venue")
+    dg.add_argument("--dark-model", type=Path, default=None, help="DarkFillModel JSON (else prior)")
+    dg.add_argument("--dark-horizon-s", type=float, default=30.0)
+    dg.add_argument("--dark-max-urgency", type=float, default=0.5)
+    dg.add_argument("--dark-regimes", default="agree", help="B2 regimes that post dark first")
+    dg.add_argument("--dark-max-participation", type=float, default=0.1)
+    dg.add_argument("--dark-participation-window-s", type=float, default=30.0)
+    dg.add_argument("--dark-max-notional", type=float, default=0.0, help="0 = off")
     args = ap.parse_args(argv)
     doc = run_benchmark(
         args.data_dir,
@@ -1347,6 +1539,15 @@ def main(argv: list[str] | None = None) -> int:
         qcancel_calibration=args.qcancel_calibration,
         qcancel_action=args.qcancel_action,
         markout_horizons=_csv(args.markout_horizons),
+        venues=args.venues,
+        dark_venue_id=args.dark_venue_id,
+        dark_model=args.dark_model,
+        dark_horizon_s=args.dark_horizon_s,
+        dark_max_urgency=args.dark_max_urgency,
+        dark_regimes=_csv(args.dark_regimes),
+        dark_max_participation=args.dark_max_participation,
+        dark_participation_window_s=args.dark_participation_window_s,
+        dark_max_notional=args.dark_max_notional,
     )
     tag = args.tag or Path(args.data_dir).name
     args.out.mkdir(parents=True, exist_ok=True)

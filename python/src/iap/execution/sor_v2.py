@@ -159,8 +159,8 @@ class CostAwareRouter:
     def _touches(self, book: ConsolidatedBook, side_of_book: int, candidates):
         out = []
         for vid in self._candidates(candidates):
-            if vid not in self.models:
-                continue
+            if vid not in self.models or not self.models[vid].spec.is_lit:
+                continue  # v1.17 B10: a dark venue has no displayed quote to rank
             vb = self._gate._eligible(book, vid)
             if vb is None:
                 continue

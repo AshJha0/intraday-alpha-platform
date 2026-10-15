@@ -8,6 +8,26 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-B item B10, the dark / midpoint venue model (**modelled, not measured**; opt-in,
+  Python only). `VenueSpec.venue_type` ∈ lit / dark / midpoint (default lit: every golden
+  byte-identical; a non-lit venue is never a router candidate); `iap.execution.dark`: the
+  logistic midpoint fill model `DarkFillModel` fitted on Nasdaq inside-spread hidden prints as
+  the proxy (`hidden_print_samples`, `fit_logistic`, `calibrate_dark_model`, CLI `python -m
+  iap.execution.dark`; the committed seven-session fit
+  `research/execution/dark/dark_fill_model_multi7.json` carries the label and the proxy
+  definition), the dark-first rule `ParentOrder.dark_first = DarkFirstParams(...)` (low-urgency
+  parents post each step dark first, fill at the first event where the model's probability on
+  the displayed volume since the post reaches a seeded draw, at the midpoint rounded against
+  us; the unfilled remainder goes lit after the horizon), and the three pre-trade controls
+  `DarkControls` / `dark_pretrade_check` (venue type, participation cap, dark notional limit;
+  Rust-owned per F8, mirrored here with `DARK_CONTROL_GOLDENS`;
+  `docs/research/B10_F8_HANDOVER.md`). B6 fill type `dark` (`Fill.provenance
+  "dark_midpoint"`) with its day-clustered markout / adverse selection; the B1 benchmark takes
+  `--venues` and the `dark` variant on any base (`--dark-model`, `--dark-*` controls), reports
+  a labelled "Dark venue" section and the B8 pairing note. `ParentReport.dark_*` diagnostics.
+  API_TRADING §2.17, EXECUTION_QUALITY §7, PLATFORM_CONVENTIONS §11.3 rows (Python reference;
+  C++ port = F7, controls = F8); 19 tests in `test_v117_dark_venue.py`.
+
 - v1.17 WS-F items F4 and F5 (#188). **The committed real slice**
   `benchmarks/slices/itch50_20190130_AAPL` (`tools/extract_real_slice.py`; Nasdaq ITCH 5.0, AAPL,
   2019-01-30 from the 09:30 open: 1,132 book-reconstruction ADDs + 64,000 real events, 4.69 MB,

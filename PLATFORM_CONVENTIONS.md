@@ -603,6 +603,24 @@ never updated afterwards — a read-only diagnostic for the markout analysis (no
   | B6 cell statistic: equal-weight mean, CR1 standard error with one cluster per day, Student-t `G - 1` | `iap.tca.markout_decomposition.cluster_mean` | pending F7 |
   | B4 counterfactual: touch-through proxy (`would_have_filled`) and `saved` / `missed` split of the forgone fill's markout | `iap.execution.fading.pull_rows` / `pull_summary` | pending F7 |
   | X-8 hazard clock: `time_of_day(ts - capture_offset_s, clock)`, `"utc"` or an IANA zone (UTC offset per hour); IEX capture = TAI + 37 s | `iap.execution.fill_hazard.time_of_day` | pending F7 |
+  | B10 dark fill model: `p = sigmoid(b0 + b1 log1p(V/100) + b2 spread + b3 log1p((q + ahead)/100))`; a dark child fills at the first event where `p(displayed EXECUTE volume since the post) >= u` (one SplitMix64 uniform per child, seed `cfg.seed ^ 0xB10`), at the displayed midpoint rounded against us; expiry at `min(post + horizon, end - margin)` re-sends lit (modelled, not measured) | `iap.execution.dark.DarkFillModel.p_fill` / `midpoint_ticks`, `iap.execution.replay._dark_try` / `_work_dark` | pending F7 |
+  | B10 dark-first eligibility: alpha-urgency parent ⇒ decision regime in `regimes`; else `urgency <= max_urgency`; every step at the `max_child_qty` split | `iap.execution.replay._dark_eligible` | pending F7 |
+  | B10 proxy sampler and fit: inside-spread hidden prints per probe window, prior-window displayed volume, Newton logistic | `iap.execution.dark.hidden_print_samples` / `fit_logistic` | pending F7 (calibration only; the fitted document is the input the port reads) |
+  | B6 fill type `dark`: `Fill.provenance == "dark_midpoint"` before the liquidity split | `iap.tca.markout_decomposition.fill_type` | pending F7 |
+
+- **Pre-trade controls of the dark-first rule (v1.17 B10 → F8, Rust-owned).** `venue_type`
+  restriction, participation cap and dark-fill notional limit are risk controls, so per item F8
+  the Rust risk engine owns them (three risk goldens regenerated, Java mirror byte-identical);
+  `iap.execution.dark.dark_pretrade_check` / `DarkControls` is the Python mirror of that
+  interface and `DARK_CONTROL_GOLDENS` the vectors Rust must reproduce. Until F8 lands the
+  Python mirror is the only implementation; the hand-over is
+  `docs/research/B10_F8_HANDOVER.md`.
+
+  | control (F8) | semantics | Python mirror | Rust |
+  |---|---|---|---|
+  | `venue_type` | the venue's type must be in `allowed_venue_types` (default dark, midpoint) | `dark_pretrade_check` | pending F8 |
+  | `participation` | `qty <= max_participation * trailing displayed EXECUTE volume over participation_window_ns` (0 = off; zero volume rejects) | `dark_pretrade_check` | pending F8 |
+  | `notional` | `dark_notional_so_far + child_notional <= max_dark_notional` (0 = off) | `dark_pretrade_check` | pending F8 |
 
 ### 11.4 Backtest / paper-trading wiring (Java `BacktestEngine`, `PaperTrading.RiskWiring`)
 

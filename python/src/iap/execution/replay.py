@@ -67,6 +67,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 
 from iap.core.events import EventType, MarketEvent
+from iap.core.rng import SplitMix64
 from iap.execution.algos import (
     URGENCY_POLICIES,
     AlgoType,
@@ -77,6 +78,7 @@ from iap.execution.algos import (
     slice_weights,
 )
 from iap.execution.config import ExecConfig, SorOptions
+from iap.execution.dark import DARK_ID_BASE, DarkFirstParams, dark_pretrade_check, midpoint_ticks
 from iap.execution.fading import (
     FadeParams,
     PullRecord,
@@ -97,7 +99,7 @@ from iap.execution.passive import (
 from iap.execution.signal import SignalReading
 from iap.execution.simulator import ExecutionSimulator
 from iap.execution.sor import NO_ROUTE, SmartOrderRouter
-from iap.execution.types import CancelReason, ChildOrder, Fill, OrderState, OrderType
+from iap.execution.types import CancelReason, ChildOrder, Fill, Liquidity, OrderState, OrderType
 from iap.execution.urgency import AlphaUrgencyPolicy, regime_from_z
 
 #: States of a posted child in the PASSIVE state machine.
@@ -145,6 +147,18 @@ class ParentReport:
     pulled_qty: dict[str, int] = field(default_factory=dict)
     pulls_lost_race: int = 0
     held_unsent_qty: int = 0
+    #: v1.17 B10: dark-first accounting (``iap.execution.dark``; every dark
+    #: fill is MODELLED, not measured): children posted dark and their qty,
+    #: qty filled dark / expired back to the lit book / expired at the
+    #: window end (never re-sent), the dark-filled notional, and the posts
+    #: the pre-trade controls rejected, by ``DARK_CONTROL_CODES`` entry.
+    dark_children: int = 0
+    dark_posted_qty: int = 0
+    dark_filled_qty: int = 0
+    dark_expired_qty: int = 0
+    dark_unsent_qty: int = 0
+    dark_notional: float = 0.0
+    dark_rejected: dict[str, int] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         """Row in the key order of ``expected_replay_fills.json`` ``parents``."""
@@ -172,6 +186,14 @@ class ParentReport:
             "pulled_qty": dict(self.pulled_qty),
             "pulls_lost_race": self.pulls_lost_race,
             "held_unsent_qty": self.held_unsent_qty,
+            "dark_children": self.dark_children,
+            "dark_posted_qty": self.dark_posted_qty,
+            "dark_filled_qty": self.dark_filled_qty,
+            "dark_expired_qty": self.dark_expired_qty,
+            "dark_unsent_qty": self.dark_unsent_qty,
+            "dark_notional": self.dark_notional,
+            "dark_rejected": dict(self.dark_rejected),
+            "dark_fills_label": "modelled, not measured" if self.dark_children else "",
         }
 
 
@@ -260,6 +282,33 @@ class _ParentState:
     pulls: dict[str, int] = field(default_factory=dict)
     pulled_qty: dict[str, int] = field(default_factory=dict)
     pulls_lost_race: int = 0
+    # ---- v1.17 B10 dark-first (None = off) ----
+    dark: DarkFirstParams | None = None
+    dark_venue_id: int = 0
+    dark_open: list[_DarkChild] = field(default_factory=list)
+    dark_open_qty: int = 0
+    dark_children: int = 0
+    dark_posted_qty: int = 0
+    dark_filled_qty: int = 0
+    dark_expired_qty: int = 0
+    dark_unsent_qty: int = 0
+    dark_notional: float = 0.0
+    dark_rejected: dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class _DarkChild:
+    """One open child on a dark / midpoint venue (``iap.execution.dark``)."""
+
+    order_id: int
+    qty: int
+    u: float  #: the uniform draw the fill probability is tested against
+    post_ts: int
+    deadline: int
+    lit_volume_at_post: int  #: the instrument's displayed EXECUTE volume so far
+    spread_ticks: int
+    queue_ahead: int  #: our own earlier dark qty open at the post
+    regime: str
 
 
 class ExecutionReplay:
@@ -274,7 +323,20 @@ class ExecutionReplay:
         self._config = config
         self._sim = ExecutionSimulator(config)
         self._sor = SmartOrderRouter(config.venues, sor_options)
-        self._sor_candidates: list[int] = sorted(config.venues)
+        # v1.17 B10: a dark / midpoint venue has no displayed book and is
+        # never a candidate of the pinned router (no config has one unless
+        # a caller opted in, so the candidate list of every golden is unchanged).
+        self._sor_candidates: list[int] = sorted(v for v, s in config.venues.items() if s.is_lit)
+        self._dark_orders: dict[int, ChildOrder] = {}
+        self._dark_fills: list[Fill] = []
+        self._dark_rng = SplitMix64(config.seed ^ 0xB10)
+        self._next_dark_id = DARK_ID_BASE
+        self._live_dark: set[int] = set()
+        #: per instrument with a dark-first parent: cumulative displayed
+        #: EXECUTE volume, and the trailing (ts, qty) list of the controls' window
+        self._lit_volume: dict[int, int] = {}
+        self._lit_trail: dict[int, list[tuple[int, int]]] = {}
+        self._lit_trail_head: dict[int, int] = {}
         self._parents: list[_ParentState] = []
         self._fills_booked = 0
         self._sor_no_route = 0
@@ -307,6 +369,8 @@ class ExecutionReplay:
                 self._init_signal_state(ps)
             if p.pulls_resting:
                 self._init_pull_state(ps)
+            if p.dark_first is not None:
+                self._init_dark_state(ps)
             idx = len(self._parents)
             self._parents.append(ps)
             self._by_parent_id.setdefault(p.parent_id, []).append(ps)
@@ -366,6 +430,219 @@ class ExecutionReplay:
             raise ValueError(f"parent {p.parent_id}: fade.threshold_z > 0 needs a signal_source")
         ps.fade = p.fade
         ps.qcancel = p.queue_cancel
+
+    def _order(self, oid: int) -> ChildOrder:
+        """A child by id: the simulator's, or a dark child of this replay."""
+        o = self._dark_orders.get(oid)
+        return self._sim.orders[oid] if o is None else o
+
+    # ------------------------------------------------- v1.17 B10 dark-first
+
+    def _init_dark_state(self, ps: _ParentState) -> None:
+        p = ps.order
+        d = p.dark_first
+        assert d is not None
+        vid = d.venue_id
+        if vid == 0:
+            for v, s in self._config.venues.items():
+                if not s.is_lit:
+                    vid = v
+                    break
+            if vid == 0:
+                raise ValueError(
+                    f"parent {p.parent_id}: dark_first needs a dark / midpoint venue in the config"
+                )
+        spec = self._config.venues.get(vid)
+        if spec is None or spec.is_lit:
+            raise ValueError(f"parent {p.parent_id}: venue {vid} is not a dark / midpoint venue")
+        ps.dark = d
+        ps.dark_venue_id = vid
+        self._lit_volume.setdefault(p.instrument_id, 0)
+        self._lit_trail.setdefault(p.instrument_id, [])
+        self._lit_trail_head.setdefault(p.instrument_id, 0)
+
+    def _track_lit_volume(self, ev: MarketEvent) -> None:
+        """Displayed EXECUTE volume of the instruments with dark-first parents."""
+        iid = ev.instrument_id
+        if iid not in self._lit_volume or ev.event_type != EventType.EXECUTE or ev.qty <= 0:
+            return
+        spec = self._config.venues.get(ev.venue_id)
+        if spec is not None and not spec.is_lit:
+            return
+        self._lit_volume[iid] += ev.qty
+        self._lit_trail[iid].append((ev.exchange_ts, ev.qty))
+
+    def _trailing_lit_volume(self, iid: int, t: int, window_ns: int) -> int:
+        trail = self._lit_trail[iid]
+        head = self._lit_trail_head[iid]
+        while head < len(trail) and trail[head][0] < t - window_ns:
+            head += 1
+        if head > 4096 and head * 2 > len(trail):
+            del trail[:head]
+            head = 0
+        self._lit_trail_head[iid] = head
+        total = 0
+        for i in range(head, len(trail)):
+            total += trail[i][1]
+        return total
+
+    def _dark_eligible(self, ps: _ParentState, regime: str) -> bool:
+        """Low urgency: the B2 regime for an alpha-urgency parent, else
+        ``ParentOrder.urgency <= max_urgency``."""
+        d = ps.dark
+        if d is None:
+            return False
+        p = ps.order
+        if p.urgency_policy == "alpha":
+            return regime in d.regimes
+        return p.urgency <= d.max_urgency
+
+    def _dark_try(self, ps: _ParentState, qty: int, t: int, regime: str = "") -> bool:
+        """Post ``qty`` to the dark venue when the rule and the controls allow;
+        False (nothing posted) sends the caller down the lit path."""
+        if qty <= 0 or not self._dark_eligible(ps, regime):
+            return False
+        d = ps.dark
+        assert d is not None
+        p = ps.order
+        cap = p.end_ts - p.passive.end_margin_ns
+        if t >= cap:
+            return False  # no time left to rest dark: lit at once
+        book = self._sim.instrument_book(p.instrument_id)
+        bb, ba = book.best_bid(), book.best_ask()
+        if bb is None or ba is None or ba[0] <= bb[0]:
+            return False  # no displayed midpoint to peg to
+        ins = self._config.instruments.get(p.instrument_id)
+        lot = 1.0 if ins is None else ins.qty_unit
+        tick = 1.0 if ins is None else ins.tick_size
+        mid = midpoint_ticks(bb[0], ba[0], p.side)
+        code = dark_pretrade_check(
+            d.controls,
+            self._config.venues[ps.dark_venue_id].venue_type,
+            qty,
+            self._trailing_lit_volume(p.instrument_id, t, d.controls.participation_window_ns),
+            ps.dark_notional,
+            float(qty) * lot * float(mid) * tick,
+        )
+        if code:
+            ps.dark_rejected[code] = ps.dark_rejected.get(code, 0) + 1
+            return False
+        oid = self._next_dark_id
+        self._next_dark_id += 1
+        spec = self._config.venues[ps.dark_venue_id]
+        child = ChildOrder(
+            parent_id=p.parent_id,
+            instrument_id=p.instrument_id,
+            venue_id=ps.dark_venue_id,
+            side=p.side,
+            type=OrderType.LIMIT,
+            limit_ticks=0,  # midpoint peg: no limit of our own
+            qty=qty,
+            decision_ts=t,
+            expire_ts=p.end_ts,
+            order_id=oid,
+            arrival_ts=t,
+            state=OrderState.ACTIVE,
+            remaining=qty,
+            resting=True,
+            urgency_regime=regime,
+            venue_type=spec.venue_type,
+            dark_u=self._dark_rng.uniform(),
+        )
+        self._dark_orders[oid] = child
+        ps.child_ids.append(oid)
+        ps.dark_open.append(
+            _DarkChild(
+                oid,
+                qty,
+                child.dark_u,
+                t,
+                min(t + d.rest_ns, cap),
+                self._lit_volume[p.instrument_id],
+                ba[0] - bb[0],
+                ps.dark_open_qty,
+                regime,
+            )
+        )
+        ps.dark_open_qty += qty
+        ps.dark_children += 1
+        ps.dark_posted_qty += qty
+        return True
+
+    def _dark_fill(self, ps: _ParentState, dc: _DarkChild, o: ChildOrder, t: int, px: int) -> None:
+        p = ps.order
+        ins = self._config.instruments.get(p.instrument_id)
+        lot = 1.0 if ins is None else ins.qty_unit
+        tick = 1.0 if ins is None else ins.tick_size
+        spec = self._config.venues[ps.dark_venue_id]
+        fill = Fill(
+            fill_id=DARK_ID_BASE + len(self._dark_fills),
+            order_id=o.order_id,
+            parent_id=p.parent_id,
+            instrument_id=p.instrument_id,
+            venue_id=ps.dark_venue_id,
+            side=p.side,
+            price_ticks=px,
+            qty=dc.qty,
+            ts=t,
+            liquidity=Liquidity.MAKER,
+            fee=spec.taker_fee_per_share * float(dc.qty),
+            impact_cost=0.0,
+            provenance="dark_midpoint",
+        )
+        self._dark_fills.append(fill)
+        o.state = OrderState.FILLED
+        o.remaining = 0
+        o.dark_outcome = "filled"
+        ps.filled_qty += dc.qty
+        ps.dark_filled_qty += dc.qty
+        ps.dark_notional += float(dc.qty) * lot * float(px) * tick
+
+    def _work_dark(self, ps: _ParentState, ev: MarketEvent) -> None:
+        """Advance every open dark child of the parent (posting order): fill
+        at the first event where the model's probability reaches the draw,
+        expire at the deadline and send the remainder to the lit book."""
+        d = ps.dark
+        assert d is not None
+        p = ps.order
+        if ev.instrument_id != p.instrument_id:
+            return
+        t = ev.exchange_ts
+        book = self._sim.instrument_book(p.instrument_id)
+        bb, ba = book.best_bid(), book.best_ask()
+        two_sided = bb is not None and ba is not None and ba[0] > bb[0]
+        lit_now = self._lit_volume[p.instrument_id]
+        expired: list[int] = []
+        keep: list[_DarkChild] = []
+        for dc in ps.dark_open:
+            o = self._dark_orders[dc.order_id]
+            if t >= dc.deadline:
+                o.state = OrderState.CANCELLED
+                o.cancel_reason = CancelReason.EXPIRED
+                o.dark_outcome = "expired"
+                ps.dark_open_qty -= dc.qty
+                ps.dark_expired_qty += dc.qty
+                expired.append(dc.qty)
+                continue
+            pf = d.model.p_fill(
+                lit_now - dc.lit_volume_at_post, dc.spread_ticks, dc.qty, dc.queue_ahead
+            )
+            o.dark_p_fill = pf
+            if two_sided and pf >= dc.u:
+                assert bb is not None and ba is not None
+                ps.dark_open_qty -= dc.qty
+                self._dark_fill(ps, dc, o, t, midpoint_ticks(bb[0], ba[0], p.side))
+                continue
+            keep.append(dc)
+        ps.dark_open = keep
+        for q in expired:
+            if t >= p.end_ts:
+                ps.dark_unsent_qty += q  # the window closed on it
+                continue
+            if ps.signal:
+                self._signal_child(ps, q, t, allow_dark=False)
+            else:
+                self._plain_child(ps, q, t)
 
     def _reading(
         self, ps: _ParentState, t: int, max_age_ns: int, latency_ns: int
@@ -448,7 +725,8 @@ class ExecutionReplay:
         left = slice_qty
         while left > 0:
             q = min(left, cap)
-            self._issue_child(ps, q, decision_ts, passive)
+            if not self._dark_try(ps, q, decision_ts):
+                self._issue_child(ps, q, decision_ts, passive)
             left -= q
 
     def _committed_qty(self, ps: _ParentState) -> int:
@@ -469,7 +747,7 @@ class ExecutionReplay:
                 still_open.append(oid)
         if len(still_open) != len(ps.open_child_ids):
             ps.open_child_ids = still_open
-        return ps.filled_qty + open_qty + ps.held_qty
+        return ps.filled_qty + open_qty + ps.held_qty + ps.dark_open_qty
 
     def _book_new_fills(self) -> None:
         fills = self._sim.fills
@@ -519,7 +797,8 @@ class ExecutionReplay:
         left = step_qty
         while left > 0:
             q = min(left, cap)
-            self._post(ps, q, t, 0)
+            if not self._dark_try(ps, q, t):
+                self._post(ps, q, t, 0)
             left -= q
 
     def _work_passive(self, ps: _ParentState, t: int) -> None:
@@ -635,7 +914,7 @@ class ExecutionReplay:
     def _mark_replacements(self, ps: _ParentState, first: int, order_id: int) -> None:
         """The children issued since ``first`` re-send ``order_id``'s remainder."""
         for oid in ps.child_ids[first:]:
-            self._sim.orders[oid].replaces_order_id = order_id
+            self._order(oid).replaces_order_id = order_id
 
     def _touch_sizes(self, ps: _ParentState, venue_id: int) -> tuple[int, int] | None:
         """``(own L1 qty, opposite L1 qty)`` on ``venue_id``; None when not two-sided."""
@@ -778,7 +1057,8 @@ class ExecutionReplay:
                 deficit = ps.scheduled_qty - self._committed_qty(ps)
                 while deficit > 0:
                     q = min(deficit, p.max_child_qty)
-                    self._post(ps, q, t, 0)
+                    if not self._dark_try(ps, q, t):
+                        self._post(ps, q, t, 0)
                     deficit = deficit - q if p.pov_exact else 0
             return
         while ps.next_slice < len(ps.slice_due) and t >= ps.slice_due[ps.next_slice]:
@@ -806,7 +1086,7 @@ class ExecutionReplay:
     ) -> None:
         """Provenance of the children issued since ``first`` (B2 / B3)."""
         for oid in ps.child_ids[first:]:
-            o = self._sim.orders[oid]
+            o = self._order(oid)
             o.urgency_regime = regime
             o.signal_z = z
             o.pacing_scale = ps.last_scale if scale is None else scale
@@ -824,8 +1104,9 @@ class ExecutionReplay:
         else:
             self._issue_child(ps, qty, t, p.algo in (AlgoType.TWAP, AlgoType.VWAP))
 
-    def _signal_child(self, ps: _ParentState, qty: int, t: int) -> None:
-        """One child of at most ``max_child_qty``, its style decided NOW (B2)."""
+    def _signal_child(self, ps: _ParentState, qty: int, t: int, allow_dark: bool = True) -> None:
+        """One child of at most ``max_child_qty``, its style decided NOW (B2).
+        ``allow_dark`` False is the lit remainder of an expired dark child."""
         p = ps.order
         first = len(ps.child_ids)
         if p.urgency_policy == "alpha":
@@ -834,7 +1115,9 @@ class ExecutionReplay:
             r, status = self._reading(ps, t, urg.max_age_ns, urg.latency_ns)
             z = 0.0 if r is None else r.z
             regime = status if r is None else regime_from_z(p.side, z, urg.threshold_z)
-            if regime == "adverse":
+            if allow_dark and self._dark_try(ps, qty, t, regime):
+                pass
+            elif regime == "adverse":
                 self._issue_child(ps, qty, t, False)
             elif regime == "agree":
                 self._post(ps, qty, t, 0, patience=ps.patience_agree_ns)
@@ -842,7 +1125,8 @@ class ExecutionReplay:
                 self._plain_child(ps, qty, t)
         else:
             regime, z = "plain", ps.last_z
-            self._plain_child(ps, qty, t)
+            if not (allow_dark and self._dark_try(ps, qty, t, regime)):
+                self._plain_child(ps, qty, t)
         self._tag_children(ps, first, regime, z)
 
     def _signal_step(self, ps: _ParentState, step_qty: int, t: int) -> None:
@@ -952,6 +1236,8 @@ class ExecutionReplay:
     def _schedule(self, ps: _ParentState, ev: MarketEvent) -> None:
         p = ps.order
         t = ev.exchange_ts
+        if ps.dark_open:
+            self._work_dark(ps, ev)
         if ps.signal:
             self._schedule_signal(ps, ev)
             return
@@ -971,7 +1257,8 @@ class ExecutionReplay:
             deficit = min(_pov_target(p, ps.pov_volume), p.qty) - self._committed_qty(ps)
             while deficit > 0:
                 q = min(deficit, p.max_child_qty)
-                self._issue_child(ps, q, t, False)
+                if not self._dark_try(ps, q, t):
+                    self._issue_child(ps, q, t, False)
                 deficit = deficit - q if p.pov_exact else 0
             return
         # TWAP / VWAP / IS: issue every slice that has come due (inside the
@@ -999,6 +1286,10 @@ class ExecutionReplay:
         if ev.event_type == EventType.TRADE:
             visit.update(self._pov_by_instrument.get(ev.instrument_id, ()))
         visit.update(self._live_passive)
+        if self._live_dark:
+            for idx in self._live_dark:
+                if self._parents[idx].order.instrument_id == ev.instrument_id:
+                    visit.add(idx)
         return sorted(visit)
 
     def _after_visit(self, idx: int) -> None:
@@ -1012,6 +1303,11 @@ class ExecutionReplay:
                 self._live_passive.add(idx)
             else:
                 self._live_passive.discard(idx)
+        if ps.dark is not None:
+            if ps.dark_open:
+                self._live_dark.add(idx)
+            else:
+                self._live_dark.discard(idx)
 
     def run(self, events: Iterable[MarketEvent]) -> ExecReplayResult:
         """Replay the stream, working every parent. Callable once."""
@@ -1023,20 +1319,35 @@ class ExecutionReplay:
         for ev in events:
             self._sim.on_event(ev)
             self._book_new_fills()
+            if self._lit_volume:
+                self._track_lit_volume(ev)
             for idx in self._visits(ev):
                 self._schedule(parents[idx], ev)
                 self._after_visit(idx)
             res.events_processed += 1
         self._sim.cancel_all()
         self._book_new_fills()
+        for ps in self._parents:
+            # B10: open dark children at the end of the stream expire unsent
+            for dc in ps.dark_open:
+                o = self._dark_orders[dc.order_id]
+                o.state = OrderState.CANCELLED
+                o.cancel_reason = CancelReason.END_OF_STREAM
+                o.dark_outcome = "expired"
+                ps.dark_open_qty -= dc.qty
+                ps.dark_expired_qty += dc.qty
+                ps.dark_unsent_qty += dc.qty
+            ps.dark_open = []
 
         res.fills = list(self._sim.fills)
+        if self._dark_fills:
+            # modelled dark fills merged by time; the lit order is unchanged
+            res.fills = sorted(res.fills + self._dark_fills, key=lambda f: (f.ts, f.fill_id))
         res.sor_no_route = self._sor_no_route
         res.pulls = list(self._pulls)
         fills_of: dict[int, list[Fill]] = {}
         for f in res.fills:
             fills_of.setdefault(f.parent_id, []).append(f)
-        orders = self._sim.orders
         # Reports keyed by parent_id in ascending order (C++ std::map order).
         for ps in sorted(self._parents, key=lambda s: s.order.parent_id):
             p = ps.order
@@ -1056,7 +1367,7 @@ class ExecutionReplay:
                 r.impact += f.impact_cost
                 r.provenance_qty[f.provenance] = r.provenance_qty.get(f.provenance, 0) + f.qty
             for oid in ps.child_ids:
-                o = orders[oid]
+                o = self._order(oid)
                 if o.depth_exhausted:
                     r.depth_exhausted += 1
                     r.depth_exhausted_qty += o.remaining
@@ -1071,8 +1382,16 @@ class ExecutionReplay:
                 r.pulled_qty = dict(ps.pulled_qty)
                 r.pulls_lost_race = ps.pulls_lost_race
                 r.held_unsent_qty = ps.held_qty
+            if ps.dark is not None:
+                r.dark_children = ps.dark_children
+                r.dark_posted_qty = ps.dark_posted_qty
+                r.dark_filled_qty = ps.dark_filled_qty
+                r.dark_expired_qty = ps.dark_expired_qty
+                r.dark_unsent_qty = ps.dark_unsent_qty
+                r.dark_notional = ps.dark_notional
+                r.dark_rejected = dict(ps.dark_rejected)
             res.parents[r.parent_id] = r
             if p.policy == ExecPolicy.PASSIVE or ps.signal:
                 res.passive[p.parent_id] = ps.stats
-            res.children[p.parent_id] = [self._sim.orders[oid] for oid in ps.child_ids]
+            res.children[p.parent_id] = [self._order(oid) for oid in ps.child_ids]
         return res

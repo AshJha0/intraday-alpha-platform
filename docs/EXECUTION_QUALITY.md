@@ -173,4 +173,63 @@ verdict, or the statement that the gate was not signed. The draft is in
 
 ### 6.3 B8-B10
 
-Placeholder for the G5 truth pass.
+Placeholder for the G5 truth pass (B8 / B9). B10 is below.
+
+## 7. The dark-venue model (B10) — modelled, not measured
+
+No free dark-pool data exists, so the platform cannot replay a dark fill the
+way it replays a lit one. B10 adds a dark / midpoint venue type
+(`VenueSpec.venue_type`), a fill model, a dark-first router rule and three
+pre-trade controls (API_TRADING.md §2.17), and labels every number that comes
+out of them **modelled, not measured**. The label is in the calibration
+document, in the replay diagnostics and in the benchmark report, and a
+document without it is refused.
+
+**The proxy.** The only free observation of non-displayed trading is the
+Nasdaq `P` message: a non-displayed print on the lit exchange. The proxy
+takes those prints when they land *strictly inside* the displayed spread (a
+midpoint-style execution) and asks, every 5 s of a session and for probe
+sizes 100 / 300 / 1,000 / 3,000 shares, whether the next 30 s of such prints
+reached the probe size, given the displayed EXECUTE volume of the previous
+30 s (causal), the displayed spread and the size. A logistic fit of that
+label is the fill model; the dark child in the replay fills at the first
+event where the model's probability, evaluated on the displayed volume that
+has actually traded since the post, reaches the child's seeded uniform draw.
+What the proxy is NOT: it is not a dark pool, its prints are not midpoint
+pegs, and the hidden liquidity on Nasdaq is not the liquidity in any dark
+pool. The model is a stand-in with a documented shape, nothing more.
+
+**The fit.** `python -m iap.execution.dark --data-dir data/real/multi7
+--out research/execution/dark/dark_fill_model_multi7.json` streams the seven
+multi7 sessions (AAPL, MSFT, QQQ) in 19 minutes, single process, under
+150 MB; the committed document records the coefficients, the sample counts,
+the hidden-print counts and the proxy definition verbatim. The seven-session
+fit (fingerprint `db0eda442ac99e7f`) is `coef = [-1.705, 0.904, -0.004,
+-1.476]` on 725,200 probe samples (134,494 positive; 143,399 hidden prints,
+97,220 of them inside the spread): more displayed volume raises the fill
+probability, a larger order lowers it sharply, and the spread barely matters
+on these three names (their spread is one tick most of the session). At the
+model's own scale, p = 0.36 for 100 shares after 1,000 displayed shares and
+0.92 after 30,000; for 1,000 shares the same volumes give 0.04 and
+0.48. The single session 2019-07-30 alone gave `[-1.97, 0.91, -0.01,
+-1.71]` (103,608 samples), the same shape.
+
+**The rule and the controls.** A low-urgency parent (B2 regime `agree`, or
+`urgency <= 0.5` without a signal) posts each step dark first and sends the
+unfilled remainder to the lit book after the horizon. Three pre-trade
+controls gate every dark post — venue-type restriction, a participation cap
+against the trailing displayed volume, a dark-fill notional limit per
+parent — and are Rust-owned per plan item F8 (`docs/research/B10_F8_HANDOVER.md`
+lists them with the golden vectors the Rust engine must reproduce); the
+Python engine mirrors the interface.
+
+**What the benchmark reports.** With `--venues` naming a dark venue and the
+`dark` variant (`native+dark`, `passive+dark`), the B1 report pairs each
+dark policy with its base on the same windows, shows the dark totals
+(posted / filled dark / expired to lit / rejected by control) and the markout
+decomposition's `dark` fill type, whose negated price impact is the adverse
+selection of the modelled dark fills. B8 pairs the same variant
+router-vs-pinned on the Nasdaq / IEX overlap days with both lit venues in
+`--venues`. The multi7 dark benchmark was not run in the B10 PR; the command
+is in API_TRADING.md §2.17. Whatever it produces, the dark rows are a model's
+output: they say what the proxy implies, never what a dark pool did.

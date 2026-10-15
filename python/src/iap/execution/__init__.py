@@ -26,6 +26,15 @@ from iap.execution.config import (
     load_sor_options,
     load_venues,
 )
+from iap.execution.dark import (
+    DARK_CONTROL_CODES,
+    DARK_CONTROL_GOLDENS,
+    VENUE_TYPES,
+    DarkControls,
+    DarkFillModel,
+    DarkFirstParams,
+    dark_pretrade_check,
+)
 from iap.execution.fading import (
     FadeParams,
     PullRecord,
@@ -84,6 +93,13 @@ __all__ = [
     "ExecutionReplay",
     "ExecutionSimulator",
     "FadeParams",
+    "DARK_CONTROL_CODES",
+    "DARK_CONTROL_GOLDENS",
+    "VENUE_TYPES",
+    "DarkControls",
+    "DarkFillModel",
+    "DarkFirstParams",
+    "dark_pretrade_check",
     "Fill",
     "PullRecord",
     "QueueCancelParams",
