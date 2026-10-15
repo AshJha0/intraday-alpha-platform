@@ -144,7 +144,14 @@ def test_process_day_keeps_features_and_hashes_then_deletes(tmp_path):
         run=_features_fake(None),
     )
     ds = out_root / "ds_20191230"
-    assert [s["step"] for s in rep["steps"]] == ["download", "ingest", "features", "keep", "delete"]
+    assert [s["step"] for s in rep["steps"]] == [
+        "download",
+        "ingest",
+        "delete_raw",
+        "features",
+        "keep",
+        "delete",
+    ]
     assert rep["steps"][0]["status"] == "ok" and rep["steps"][0]["download"] == "present"
     keep = json.loads((ds / pdm.KEEP_NAME).read_text())
     assert "dataset.json" in keep["files"] and "features/features_1.parquet" in keep["files"]
@@ -274,7 +281,9 @@ def test_process_day_keep_flags_dry_run_and_refusals(tmp_path):
             min_free_gb=0.0,
             run=boom,
         )
-    assert src.exists() and (out3 / "ds_20191230" / "raw").is_dir()
+    # raw is gone by design (deleted right after normalisation, A2b); the vendor
+    # file, the normalized data and the features are untouched, nothing is "kept"
+    assert src.exists() and (out3 / "ds_20191230" / "normalized").is_dir()
     assert not (out3 / "ds_20191230" / pdm.KEEP_NAME).exists()
 
 
@@ -395,3 +404,78 @@ def test_gz_sanity(tmp_path):
     with gzip.open(p, "rb") as f:
         assert f.read(2)
     assert sys.version_info >= (3, 11)
+
+
+def test_slim_normalisation_drops_only_the_jsonl_twin(refdata, tmp_path):
+    MarketDataGenerator(refdata, CFG).generate_run(tmp_path / "raw")
+    full = normalize_run(tmp_path / "raw", tmp_path / "full")
+    slim = normalize_run(tmp_path / "raw", tmp_path / "slim", write_normalized_jsonl=False)
+    slim_p = normalize_run(
+        tmp_path / "raw", tmp_path / "slim_p", partition_instruments=2, write_normalized_jsonl=False
+    )
+    for d in (tmp_path / "slim", tmp_path / "slim_p"):
+        assert not list(d.glob("*.normalized.jsonl"))
+        for f in (tmp_path / "full").glob("*.normalized.iap1"):
+            assert (d / f.name).read_bytes() == f.read_bytes()
+    assert full["totals"] == slim["totals"] == slim_p["totals"]
+    assert all(v["normalized_jsonl"] is None for v in slim["files"].values())
+
+
+def test_process_day_slim_deletes_raw_before_features_and_honours_peak_override(tmp_path):
+    enc, _ = build_session(11, symbols=("AAPL", "MSFT"), n_actions=600)
+    vendor = tmp_path / "vendor"
+    vendor.mkdir()
+    src = enc.write(vendor / "12302019.NASDAQ_ITCH50.gz", compress=True)
+    man = _manifest(tmp_path, src)
+    out_root = tmp_path / "slim"
+    seen = {}
+
+    def run(cmd, **kw):
+        out = Path(cmd[cmd.index("--out-dir") + 1])
+        ds = out.parent
+        seen["raw_present"] = (ds / "raw").exists()
+        seen["jsonl"] = sorted(p.name for p in (ds / "normalized").glob("*.normalized.jsonl"))
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "features_1.parquet").write_bytes(b"PAR1fake")
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    rep = pdm.process_day(
+        man,
+        DATE,
+        vendor,
+        out_root,
+        ["AAPL", "MSFT"],
+        configs_dir=CONFIGS_DIR,
+        partition_instruments=1,
+        min_free_gb=0.0,
+        peak_gb=0.001,
+        run=run,
+    )
+    assert [s["step"] for s in rep["steps"]] == [
+        "download",
+        "ingest",
+        "delete_raw",
+        "features",
+        "keep",
+        "delete",
+    ]
+    assert seen == {"raw_present": False, "jsonl": []}
+    assert rep["estimate"]["override"] is True and rep["estimate"]["peak_gb"] == 0.001
+    assert rep["estimate"]["peak_gb_estimated"] > 0.001
+    ds = out_root / "ds_20191230"
+    manifest = json.loads((ds / "dataset.json").read_text())
+    assert (
+        manifest["layout"] == "slim" and list((ds / "normalized").glob("*.normalized.iap1")) == []
+    )
+    assert (ds / "normalized" / "qc_report.json").is_file()
+    text = pdm.render_wrapper(
+        python_dir="p",
+        manifest="m",
+        date=DATE,
+        vendor_dir="v",
+        out_root="r",
+        symbols_file="u",
+        log="l",
+        extra_args="--peak-gb 50",
+    )
+    assert "--peak-gb 50" in text
