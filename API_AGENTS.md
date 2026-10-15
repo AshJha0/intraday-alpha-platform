@@ -24,7 +24,11 @@ hash every signature and citation uses; `GENESIS`, `KINDS`.
 **`iap.agents.broker`** — `WriteBroker(root, agents, *, pubkeys=, trusted=,
 fingerprinter=)`: the only writer. `post_task`, `claim`, `file_finding`,
 `release`, `preregister(agent, alpha_id, horizon, hypothesis, expected_sign,
-*, auth, ledger=, dataset_version=, supersede=)`; `request_context()` gives the
+*, auth, ledger=, dataset_version=, supersede=, screen=)` (`screen`, v1.17 C6,
+opt-in: a net-of-cost screen document or its path; the (alpha, horizon) must have
+PASSED it under its model identity, else `BrokerError`; the screen's path, sha256
+and status are recorded on the entry — `API_PORTFOLIO_TCA.md` section 1.10);
+`request_context()` gives the
 board head and id a signed request binds to (`ed25519-v2`);
 `iap.agents.broker.sign(private_key, agent, op, args, **context)` builds the
 `auth` document; `board_id(root, board)`. Errors: `BrokerError`.

@@ -15,6 +15,28 @@ that tag.
   (else the smallest quoted TOPS size per symbol, recorded as `round_lots_source`); the
   synthesised directory row takes the same round lot; `odd_lot_top` counter; oracle label
   `tops_l1_equals_deep_round_lot_l1`.
+- v1.17 WS-C item C6 (review row R-P2-5 folded in), additive and opt-in. **The
+  pre-registered net-of-cost screen** `iap.research.screen`
+  (`python -m iap.research.screen --dataset-dir DIR`): every candidate of
+  `research/preregs/net_of_cost_screen_prereg_DRAFT.json` (DRAFT, unsigned; alpha id x
+  horizon x model identity) is screened ONCE over ALL in-sample walk-forward folds of the
+  methods bundle, net of the modelled round-trip cost at the registered size (100 units:
+  spread + fee of both legs + 2 x sqrt impact at `size / adv`), in the v1.17 gate form
+  (`gate_statistics` on the cost-adjusted label `y - sign(z) * cost`, day-clustered t
+  beside the HAC t) plus the day-clustered mean net return per round trip; pass / fail per
+  candidate from the pre-registration's rules, one ledger look per candidate of kind
+  `net_of_cost_screen`, holdout paths and the registered holdout dataset versions refused.
+  Consumers, all opt-in with defaults unchanged: `breadth_book --screen PATH
+  --require-screen` (C7), `python -m iap.research run --require-screen PATH` and
+  `WriteBroker.preregister(screen=)` (C8) refuse a confirmatory run on a candidate that
+  failed or was not screened. **R-P2-5**: `maker_labels` adds the fill-conditional
+  `{side}_run_over` label and `attrs["ttl_ns"]`; `maker_real` gains
+  `alpha_side_target_fill_conditional` and the prereg opt-ins `filter_target:
+  fill_conditional` / `label_ttl: cell` (label orders rest for the cell's horizon); the
+  screen's `maker_fill_conditional` target refuses a label TTL that is not the cell horizon.
+  Multi7 screen document under `research/breadth/screen/` (see docs/SIGNAL_RESEARCH.md
+  section 8). Docs: SIGNAL_RESEARCH.md section 8, PORTFOLIO_BREADTH.md, API_PORTFOLIO_TCA.md
+  section 1.10, API_AGENTS.md. Tests: `tests/test_v117_screen.py`.
 - v1.17 WS-F items F4 and F5 (#188). **The committed real slice**
   `benchmarks/slices/itch50_20190130_AAPL` (`tools/extract_real_slice.py`; Nasdaq ITCH 5.0, AAPL,
   2019-01-30 from the 09:30 open: 1,132 book-reconstruction ADDs + 64,000 real events, 4.69 MB,

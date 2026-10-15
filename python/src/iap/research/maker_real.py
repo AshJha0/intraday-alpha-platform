@@ -145,6 +145,27 @@ def alpha_side_target(z: np.ndarray, bid: np.ndarray, ask: np.ndarray) -> np.nda
     return out
 
 
+def alpha_side_target_fill_conditional(
+    z: np.ndarray, bid_run_over: np.ndarray, ask_run_over: np.ndarray
+) -> np.ndarray:
+    """R-P2-5 (v1.17 C6): the fill-conditional filter target - 1.0 when the
+    label order of the side the alpha points to filled and was NOT run
+    over, 0.0 when it filled and was, NaN when it did not fill (an unfilled
+    order is neither a loss nor a win) or z is 0 / not finite.  Reads the
+    ``{side}_run_over`` labels (:mod:`iap.labels.maker_labels`)."""
+    z = np.asarray(z, dtype=float)
+    out = np.full(z.shape, np.nan)
+    pos, neg = z > 0, z < 0
+    out[pos] = 1.0 - np.asarray(bid_run_over, dtype=float)[pos]
+    out[neg] = 1.0 - np.asarray(ask_run_over, dtype=float)[neg]
+    return out
+
+
+#: R-P2-5 (v1.17 C6) opt-ins of the study, read from the prereg document.
+FILTER_TARGETS = ("not_run_over", "fill_conditional")
+LABEL_TTLS = ("1s", "cell")
+
+
 def cluster_stats(day_means: Sequence[float], n_tests: int = 1) -> dict[str, Any]:
     """Session-clustered mean, se, 95 % CI and the Bonferroni CI over ``n_tests``."""
     from scipy import stats
@@ -272,6 +293,14 @@ class Study:
         configure_universe(self.data / "multi7" / "configs" / "instruments" / "instruments.json")
         self.exec_config = load_exec_config(self.data / "multi7" / "configs")
         self._alpha_cache: dict[tuple[str, int], Any] = {}
+        # v1.17 C6 (R-P2-5), both opt-in through the prereg document; the
+        # registered maker_real prereg names neither, so its run is unchanged.
+        self.filter_target = str(self.prereg.get("filter_target", "not_run_over"))
+        self.label_ttl = str(self.prereg.get("label_ttl", "1s"))
+        if self.filter_target not in FILTER_TARGETS:
+            raise ValueError(f"filter_target must be one of {FILTER_TARGETS}")
+        if self.label_ttl not in LABEL_TTLS:
+            raise ValueError(f"label_ttl must be one of {LABEL_TTLS}")
 
     # -- per-unit pieces -------------------------------------------------
 
@@ -319,30 +348,50 @@ class Study:
         path = self.out / "calib" / f"{unit_name(self.sessions[day - 1], symbol)}.json"
         return load_calibration(path) if path.is_file() else None
 
+    def label_path(self, day: int, symbol: str, horizon: str | None = None) -> Path:
+        """The label file of a unit: one per unit under ``label_ttl="1s"``,
+        one per cell horizon (``_ttl<h>``) under ``label_ttl="cell"``."""
+        name = unit_name(self.sessions[day], symbol)
+        if self.label_ttl == "cell":
+            if horizon is None:
+                raise ValueError("label_ttl='cell' needs the cell horizon")
+            name = f"{name}_ttl{horizon}"
+        return self.out / "labels" / f"{name}.parquet"
+
+    def label_ttls(self) -> list[tuple[str | None, int]]:
+        """``(horizon, ttl_ns)`` of every label set a unit needs."""
+        if self.label_ttl == "cell":
+            hs = sorted({c["horizon"] for c in self.prereg["cells"]}, key=lambda h: HORIZON_NS[h])
+            return [(h, HORIZON_NS[h]) for h in hs]
+        return [(None, SEC)]
+
     def labels(self, day: int, symbol: str, events: list, cal_doc: dict, feats: pd.DataFrame):
         from iap.execution.calibration import ExecCalibration
         from iap.labels.maker_labels import maker_labels
 
-        path = self.out / "labels" / f"{unit_name(self.sessions[day], symbol)}.parquet"
-        if path.is_file():
-            return
-        if feats.empty:
-            pd.DataFrame().to_parquet(path)
-            return
-        sec = feats["exchange_ts"].to_numpy() // SEC
-        grid = feats.loc[np.r_[True, sec[1:] != sec[:-1]]].reset_index(drop=True)
-        lab = maker_labels(
-            events,
-            grid["exchange_ts"].to_numpy(dtype=np.int64),
-            instrument_id=self.symbols[symbol],
-            exec_config=self.exec_config,
-            ttl_ns=SEC,
-            qty=100,
-            calibration=ExecCalibration.from_dict(cal_doc),
-        )
-        keep = ["bid_not_run_over", "ask_not_run_over", "bid_filled", "ask_filled"]
-        out = pd.concat([grid.reset_index(drop=True), lab[keep].reset_index(drop=True)], axis=1)
-        out.to_parquet(path)
+        for horizon, ttl_ns in self.label_ttls():
+            path = self.label_path(day, symbol, horizon)
+            if path.is_file():
+                continue
+            if feats.empty:
+                pd.DataFrame().to_parquet(path)
+                continue
+            sec = feats["exchange_ts"].to_numpy() // SEC
+            grid = feats.loc[np.r_[True, sec[1:] != sec[:-1]]].reset_index(drop=True)
+            lab = maker_labels(
+                events,
+                grid["exchange_ts"].to_numpy(dtype=np.int64),
+                instrument_id=self.symbols[symbol],
+                exec_config=self.exec_config,
+                ttl_ns=ttl_ns,
+                qty=100,
+                calibration=ExecCalibration.from_dict(cal_doc),
+            )
+            keep = ["bid_not_run_over", "ask_not_run_over", "bid_filled", "ask_filled"]
+            keep += [c for c in ("bid_run_over", "ask_run_over") if c in lab.columns]
+            out = pd.concat([grid.reset_index(drop=True), lab[keep].reset_index(drop=True)], axis=1)
+            out["ttl_ns"] = int(ttl_ns)  # R-P2-5: the TTL travels with the labels
+            out.to_parquet(path)
 
     def alpha(self, alpha_id: str, horizon: str, day: int):
         """The alpha fitted on sessions strictly before ``day`` (all symbols)."""
@@ -370,7 +419,12 @@ class Study:
         z = (sig - model.mu) / (model.sigma + 1e-12)
         return np.where(np.isfinite(z), z, 0.0)
 
-    def maker_filter(self, model, day: int):
+    def maker_filter(self, model, day: int, horizon: str | None = None):
+        """The meta_gbm filter fitted on the labels of the sessions before
+        ``day``.  ``horizon`` is the cell's horizon: under
+        ``label_ttl="cell"`` the labels that rested exactly that long are
+        read (R-P2-5), and under ``filter_target="fill_conditional"`` the
+        target is :func:`alpha_side_target_fill_conditional`."""
         from iap.backtest.maker import MakerFilter
 
         xs, ys = [], []
@@ -378,14 +432,25 @@ class Study:
             for sym, iid in self.symbols.items():
                 if iid not in model.universe([iid]):
                     continue
-                p = self.out / "labels" / f"{unit_name(self.sessions[d], sym)}.parquet"
+                p = self.label_path(d, sym, horizon)
                 if not p.is_file():
                     continue
                 lab = pd.read_parquet(p)
                 if lab.empty:
                     continue
+                if horizon is not None and "ttl_ns" in lab.columns:
+                    ttl = int(lab["ttl_ns"].iloc[0])
+                    if self.label_ttl == "cell" and ttl != HORIZON_NS[horizon]:
+                        raise ValueError(
+                            f"{p.name}: label TTL {ttl} != cell horizon {HORIZON_NS[horizon]}"
+                        )
                 z = self.z_of(model, lab, iid)
-                y = alpha_side_target(z, lab["bid_not_run_over"], lab["ask_not_run_over"])
+                if self.filter_target == "fill_conditional":
+                    y = alpha_side_target_fill_conditional(
+                        z, lab["bid_run_over"], lab["ask_run_over"]
+                    )
+                else:
+                    y = alpha_side_target(z, lab["bid_not_run_over"], lab["ask_not_run_over"])
                 xs.append(self.filter_X(lab, z))
                 ys.append(y)
         if not xs:
@@ -451,7 +516,7 @@ class Study:
             mask = sc["exchange_ts"].to_numpy() >= start
         sc = sc[mask].reset_index(drop=True)
         fx = feats[mask].reset_index(drop=True)
-        filt, filt_note = self.maker_filter(model, day)
+        filt, filt_note = self.maker_filter(model, day, hz)
         allow_f = filt.allow(self.filter_X(fx, sc["z"].to_numpy())) if filt else None
         h_ns = HORIZON_NS[hz]
         cell_out: dict[str, Any] = {

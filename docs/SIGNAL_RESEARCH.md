@@ -125,7 +125,81 @@ its own identity; every pre-registration stays at the bundle it names.
 - No registered result changes; whether either becomes a default is the owner's
   call, and the ML report and `v4` cpcv blocks would be regenerated if it does.
 
-## 8. Placeholder for the G5 truth pass
+## 8. The net-of-cost screen before any confirmatory look (C6, review finding R-P2-5)
+
+- **What:** `iap.research.screen` (`python -m iap.research.screen --dataset-dir
+  DIR`) screens every candidate of a pre-registration document — alpha id x
+  horizon x model identity — ONCE over ALL in-sample walk-forward folds of the
+  methods bundle, **net of the modelled cost at the registered size**. The
+  model is fitted per fold and scored on the fold's test rows exactly as the
+  walk-forward gate does; the pooled signal `z` and label `y` of every fold are
+  then read three ways: `gross` = `gate_statistics(ts, z, y)` (section 1);
+  `net` = the same gate statistic on the cost-adjusted label `y - sign(z) *
+  cost`, where `cost` is the round trip of the registered size on that row
+  (spread + fee of both legs, `CostModel.round_trip_cost_return`, plus two legs
+  of the cost model's sqrt impact at `size / adv`); `net_return` = the mean of
+  `sign(z) * y - cost` per scored row with a day-clustered t (`n_days - 1`
+  degrees of freedom). The net gate t and the net day-clustered t are the
+  v1.17 gate statistic of the cost-adjusted label, not a new statistic.
+- **Pre-registration:** `research/preregs/net_of_cost_screen_prereg_DRAFT.json`
+  (DRAFT, unsigned, not on the blackboard): the hypothesis, the size (100
+  units, one round lot), the six `>=` rules (net IC > 0, net day-clustered t
+  >= 2, net-return t >= 2, mean net return > 0, at least 4 days and 1 000
+  pairs), the fold set (`v2`: row-mass walk-forward, 4 folds, 60 s embargo),
+  the candidate rule (every registered EQUITY alpha at its pinned horizon
+  under `linear_z_v1` and, where a `_z2` twin exists, `linear_z_v2`: 23
+  candidates), the holdout exclusions (the breadth holdout — the 2025/26
+  Nasdaq days for names outside AAPL / MSFT / QQQ — and the R7 holdout's
+  `dataset_version`, which the screen refuses), and the ordering statement:
+  no confirmatory look at any candidate before the screen has run. The code
+  evaluates the rules and records each rule's value and outcome; it signs
+  nothing.
+- **Looks:** one ledger look per candidate, kind `net_of_cost_screen`,
+  dataset-scoped; the identity is the candidate, the pre-registration's
+  sha256, the size, the rules and the bundle at its statistics revision, so a
+  re-run adds no look and a changed threshold is a new one.
+- **Consumers (opt-in, defaults unchanged):** `python -m iap.research.breadth_book
+  --screen PATH --require-screen` (C7) refuses the book unless its score's
+  candidate passed; `python -m iap.research run --require-screen PATH` refuses
+  a confirmatory run (`ResearchError` code `not_screened`) before any data is
+  read; `WriteBroker.preregister(..., screen=PATH)` (C8) refuses to register a
+  candidate that failed or was not screened and records the screen's path and
+  sha256 on the entry. A `not_screened` candidate is refused like a fail.
+- **R-P2-5 (the maker-filter target), fixed as stated:** the maker study's
+  filter target `{side}_not_run_over` gave "not filled" and "run over" the same
+  value (0.0), so the filter learned to avoid fills, and the label orders
+  rested for 1 s while the cells trade at the alpha's horizon.
+  `iap.labels.maker_labels` now also emits `{side}_run_over` — conditional on
+  a fill: 1.0 run over, 0.0 kept, NaN not filled — and stamps the frame with
+  `attrs["ttl_ns"]`; `maker_real.alpha_side_target_fill_conditional` is the
+  fixed target and the study's prereg may opt in with `filter_target:
+  fill_conditional` and `label_ttl: cell` (one label set per cell horizon,
+  resting exactly as long as the cell trades). The screen's
+  `maker_fill_conditional` target reads the fixed label and refuses a label
+  TTL that is not the cell horizon. The registered v1.15 maker study is
+  unchanged: its prereg names neither option.
+
+**The multi7 screen (in-sample, a filter, not evidence).**
+`research/breadth/screen/screen_multi7.json` / `SCREEN_multi7.md` (dataset
+`ee4c2187...`, the seven multi7 sessions; `v2` at revision v1.17; size 100
+shares; 23 looks of kind `net_of_cost_screen`): **0 pass, 22 fail, 1 not
+screened**. Every per-instrument candidate is positive or flat gross and
+negative net: the gross IC runs from -0.0098 (EQ07/10s) to 0.1304
+(EQ01/1s/linear_z_v2), the modelled round trip costs 1.90-2.02 bps per row,
+and the mean net return per round trip is -1.83 to -1.99 bps with net
+day-clustered t between -8.9 and -57.2 over 6 test days (the first session
+is training only) and 1.46-2.31 million pairs. `linear_z_v2` moves no
+verdict. EQ11/15m (cross-sectional) scores no row on three names and is
+recorded as not screened. Read: at one round lot, no registered equity
+alpha clears spread + fee + impact on these seven days at its own horizon;
+the screen passes nothing to C8 from this dataset, so the C8 prereg needs
+either the 100-name breadth day screened first or a different registered
+size, both the owner's call.
+
+No registered result changes. The screen reads no holdout; the C8
+pre-registration is the owner's document.
+
+## 9. Placeholder for the G5 truth pass
 
 Placeholder: which of the opt-ins above the owner turned on for the v1.17.0 tag,
 the first `linear_z_v2` study (if run), and the C6 net-of-cost screen. This page

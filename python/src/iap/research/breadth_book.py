@@ -91,6 +91,9 @@ SCORES = ("eq11", "eq10_beta_gap")
 WEIGHT_MAPS = ("linear", "deciles")
 IMPACT_SOURCES = ("cost_model", "calibration", "none")
 LEDGER_KIND = "breadth_book"
+#: The (alpha id, pinned horizon) each built-in score is the C6 screen
+#: candidate of (``--require-screen``); ``--screen-candidate`` overrides.
+SCORE_CANDIDATE = {"eq11": ("EQ11", "15m"), "eq10_beta_gap": ("EQ10", "1s")}
 #: A beta is a slow window feature: the last finite value within this age is used.
 BETA_MAX_AGE_NS = 30 * 60 * NS_S
 #: Columns the book reads from the feature store.
@@ -760,6 +763,46 @@ def _relative(path: Path) -> str:
         return str(path)
 
 
+def screen_check(
+    screen: Path | None, require: bool, candidate: str | None, score: str
+) -> dict | None:
+    """The C6 screen block of a book report (``None`` without ``--screen``).
+
+    With ``require``, the candidate (``ALPHA/HORIZON[/MODEL]``, default the
+    score's :data:`SCORE_CANDIDATE` under ``linear_z_v1``) must have PASSED
+    the screen; a fail or an unscreened candidate returns a block whose
+    ``refused`` text the caller prints before reading any data.  Without
+    ``require`` the status is recorded and nothing is refused (default
+    behaviour unchanged)."""
+    from iap.research.screen import ScreenRefusal, load_screen, require_screened, screen_status
+
+    if screen is None:
+        if require:
+            return {"refused": "--require-screen needs --screen PATH (v1.17 C6)"}
+        return None
+    if candidate is None:
+        alpha_id, horizon = SCORE_CANDIDATE[score]
+        model = "linear_z_v1"
+    else:
+        parts = candidate.split("/")
+        if len(parts) not in (2, 3):
+            return {"refused": f"--screen-candidate {candidate!r}: want ALPHA/HORIZON[/MODEL]"}
+        alpha_id, horizon = parts[0], parts[1]
+        model = parts[2] if len(parts) == 3 else "linear_z_v1"
+    if require:
+        try:
+            return {**require_screened(screen, alpha_id, horizon, model), "required": True}
+        except ScreenRefusal as exc:
+            return {"refused": str(exc)}
+    doc = load_screen(screen)
+    return {
+        "path": _relative(screen),
+        "candidate": f"{alpha_id}/{horizon}/{model}",
+        "status": screen_status(doc, alpha_id, horizon, model),
+        "required": False,
+    }
+
+
 def _parse_sizes(text: str) -> tuple[float, ...]:
     out = tuple(float(x) for x in text.split(",") if x.strip())
     if not out or any(not (math.isfinite(x) and x > 0) for x in out):
@@ -809,6 +852,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--no-ledger", action="store_true", help="tests only: record no look")
     ap.add_argument("--allow-holdout", action="store_true")
     ap.add_argument("--no-timestamp", action="store_true")
+    ap.add_argument(
+        "--screen",
+        type=Path,
+        default=None,
+        help="a C6 net-of-cost screen document (iap.research.screen); recorded in the report",
+    )
+    ap.add_argument(
+        "--require-screen",
+        action="store_true",
+        help="refuse the book unless its score's candidate PASSED --screen (v1.17 C6)",
+    )
+    ap.add_argument(
+        "--screen-candidate",
+        default=None,
+        help="ALPHA/HORIZON[/MODEL] the book is a confirmatory run of (default: the score's)",
+    )
     args = ap.parse_args(argv)
 
     if args.dataset_dir is not None and "holdout" in str(args.dataset_dir).lower():
@@ -819,6 +878,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
+    screen_block = screen_check(args.screen, args.require_screen, args.screen_candidate, args.score)
+    if screen_block is not None and screen_block.get("refused"):
+        print(screen_block["refused"], file=sys.stderr)
+        return 2
     fdir, inst_path, exe_path, version = resolve_dataset(
         args.dataset_dir, args.features_dir, args.config_dir
     )
@@ -884,6 +947,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if taxonomy_doc
         else None
     )
+    report["screen"] = screen_block
     report["ledger"] = None
     if not args.no_ledger:
         ledger = ExperimentLedger(args.ledger, dataset_version=version)
