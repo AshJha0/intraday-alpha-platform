@@ -6,7 +6,7 @@ siblings via ``queue_bucket``), plus ``hazard_fill_prob``."""
 
 from __future__ import annotations
 
-import sys
+import json
 from pathlib import Path
 
 from iap.execution.calibration import SCHEMA as CAL_SCHEMA
@@ -63,12 +63,17 @@ P_FILL_T_NS = [100_000_000, 250_000_000, 999_999_999, SEC, 1_500_000_000, 5 * SE
 
 
 def fitted_model() -> FillHazardModel:
-    """A model fitted on the planted survival samples of the X4 tests (seeded)."""
-    tests = Path(__file__).resolve().parents[2] / "tests"
-    sys.path.insert(0, str(tests))
-    from test_fill_hazard_x4 import planted_samples
-
-    return FillHazardModel().fit(planted_samples(n=6000, seed=11))
+    """The fitted hazard document the golden loads: ``hazard_model_fixture.json``,
+    a FillHazardModel fitted ONCE on the planted survival samples of the X4
+    tests (``test_fill_hazard_x4.planted_samples(n=6000, seed=11)``) by the
+    CI runner's Linux Python and pinned as bytes. The fit's Newton steps go
+    through BLAS / LAPACK (``D.T @ ...``, ``(D * w).T @ D``,
+    ``np.linalg.solve``), whose blocked, multithreaded reductions can move a
+    beta's last bit between runners or thread counts, so the golden does not
+    refit: it consumes a fixed document (the fit is research plane; the port
+    only predicts)."""
+    doc = json.loads((Path(__file__).resolve().parent / "hazard_model_fixture.json").read_text())
+    return FillHazardModel.from_dict(doc)
 
 
 def _cal(doc: dict) -> ExecCalibration:
