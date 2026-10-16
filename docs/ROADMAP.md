@@ -491,7 +491,7 @@ change: still 0 alphas promoted, no strategy that trades at 1x costs.
 
 ## 3.10 v1.15.0 (2026-10-13): the confirmatory release
 
-**v1.17.0 (2026-10-16): execution quality and breadth.** Shipped: WS0, A1-A5, B1-B6, B8-B10 (B8 results in v1.17.1), C1-C8 (C6 screen 0 of 22 pass; C8 registered under option (a), no confirmatory look), D1-D4, E1-E5, F1-F9, G1-G4. B7 fresh test and B8 real-book results: v1.17.1. Notes: docs/release/v1.17.0_RELEASE_NOTES.md.
+**v1.17.0 (2026-10-16): execution quality and breadth.** Shipped: WS0, A1-A5, B1-B6, B8-B10 (B8 results in v1.17.1), C1-C8 (C6 screen 0 of 22 pass; C8 registered under option (a), no confirmatory look), D1-D4, E1-E5, F1-F9, G1-G4. B8 real-book results: v1.17.1; B7 closed 2026-10-16 on its in-sample result, no fresh test (research/preregs/B7_CLOSED_v117.md). Notes: docs/release/v1.17.0_RELEASE_NOTES.md.
 
 **v1.16.0 (2026-10-15): monetisation.** P0 execution items 1-5 done. P0-6 taker study: no-go
 (0 trades in 480 cells). Item 7: no taker capacity (0/45 cells). Item 8 (paid data): closed by
@@ -548,7 +548,8 @@ and stated as such:
 | B1 depth-50 re-run | done, in-sample: at 0.5 % ADV the depth-10 under-fill was the walk cap; at 2 % ADV the displayed book itself runs out; costs rise 2-5 bps at 1-2 % ADV (research/execution/benchmark/DEPTH_COMPARISON_multi7.md) |
 | B10 dark / midpoint venue | done, opt-in: **modelled, not measured** (no free dark-pool data) |
 | A4 IEX HIST second venue | code done; 9 overlap days approved; day 1 (2025-11-28) processed with 0 TOPS-oracle mismatches on AAPL / MSFT / QQQ (docs/research/IEX_OVERLAP_SET.md) |
-| B7 signal-aware execution fresh test, B8 two-venue router on real books | code and run commands shipped; no real-data result yet (v1.17.1) |
+| B7 signal-aware execution fresh test | **closed 2026-10-16 on its in-sample result** (multi7, EQ10 registered, depth 50): no cell cheaper by the 2 bp minimum, urgency dearer on TWAP/VWAP at 1-2 % ADV, AC drift inert; not registered, not signed, the overlap days unread (research/preregs/B7_CLOSED_v117.md) |
+| B8 two-venue router on real books | code and run commands shipped; first real results in research/execution/b8/ (negative, provisional); more in v1.17.1 |
 | F7 / F8 / B9 C++ and Rust parity of the new execution rules | done, byte parity against Python goldens; not ported: the B2-regime arm of dark eligibility, the B10 proxy sampler / fit, the exchange-local hazard clock (PLATFORM_CONVENTIONS §11.3) |
 | E1-E4 budgeted LLM agents | done (docs/AGENTS.md); the LLM never computes a number, signs, registers or merges |
 | release manifest / SBOMs / digest-pinned k8s manifests | **not produced** for v1.17.0 (the release `manifest` job failed); fix in PR #211, ships in v1.17.1 |
@@ -560,8 +561,9 @@ quoting edge, AI4 closed.
 
 v1.17.1 (next):
 
-- B7 (signal-aware execution, fresh test) and B8 (two-venue router on real
-  Nasdaq + IEX books) real-data results;
+- B8 (two-venue router on real Nasdaq + IEX books) real-data results (B7 was
+  closed on 2026-10-16 on its in-sample result; a new pre-registration would be
+  needed to reopen it);
 - the remaining 8 of the 9 approved IEX overlap days (docs/research/IEX_OVERLAP_SET.md);
 - the release manifest / Python lock-file SBOM / k8s digest-pinning fix (#211).
 

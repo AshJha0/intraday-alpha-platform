@@ -8,6 +8,28 @@ that tag.
 
 ## Unreleased
 
+- v1.17.1 B7 CLOSED (owner decision 2026-10-16, `research/preregs/B7_CLOSED_v117.md`): the
+  signal-aware execution gate is not signed, not registered and not run on the fresh days; the
+  nine Nasdaq / IEX overlap days stay unread by B7 and available to B8. Basis: the multi7
+  in-sample run (no cell cheaper by the 2 bp minimum; urgency dearer on TWAP / VWAP at 1-2 % ADV;
+  the registered EQ10 sign opposite its real IC; AC drift inert; `no_signal` 21-33 % on QQQ).
+  `prereg_DRAFT.json` carries status CLOSED as the record and `tools/b7_shortfall_register.py`
+  refuses it; the runbook section is marked superseded; README, the site, ROADMAP,
+  EXECUTION_QUALITY §6.2 and SHOWCASE no longer announce a B7 fresh test for v1.17.1 (the tagged
+  v1.17.0 notes get a dated one-line update only).
+
+- v1.17.1 B7 preparation: `tools/b7_shortfall_register.py` (owner-only registration of the
+  shortfall gate through `WriteBroker.preregister`, `--dry-run` / `--require-ci-env`, refuses until
+  the draft is complete: filled `expected_effect`, decided alpha and thresholds, walk depth 50, the
+  fresh-day list with both dataset hashes, the v2 fingerprint), the B7 section of
+  RUNBOOK_prereg_environment.md, `python/tests/test_b7_register.py`; `prereg_DRAFT.json` records
+  walk depth 50 and the nine overlap days (IEX hashes filled as the days are ingested), and the
+  in-sample `expected_effect` from the multi7 signal-aware run (EQ10 registered, depth 50, 30-min
+  windows; `BENCHMARK_multi7_signal.md` + `_PROVENANCE.md`): NEGATIVE in-sample — no cell cheaper
+  by the 2 bp minimum; urgency makes TWAP/VWAP dearer at 1-2 % ADV (+1.7 / +2.0 ± 0.5 bps) while
+  filling 6-10 pp more, IS -0.2 to -0.6 bps (n.s.), pacing within ±1 bp, the AC drift arm inert at
+  the registered beta (0.00 vs plain AC). Unsigned; the alpha and thresholds stay the owner's call.
+
 - v1.17 B8 first real-book run (2 overlap days, AAPL + MSFT; `research/execution/b8/REPORT_overlap2.md`):
   NEGATIVE: `sor` +5.1 ± 1.3 bps all-in and -8 pp fill vs pinned Nasdaq, pinned IEX +11.6 ± 0.6 bps;
   2 clusters, provisional. Two-venue reads now stream with the `--symbols` filter; the `two_venue`

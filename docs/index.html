@@ -149,13 +149,16 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
           gate and refused every candidate; the holdout is unread
           (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/preregs/breadth_book_prereg.json">breadth_book_prereg.json</a>).</li>
       <li><strong>Dark venue (B10): modelled, not measured</strong> &mdash; there is no free dark-pool data.</li>
-      <li><strong>B7 (signal-aware execution) and B8 (two-venue router) real-data results ship in v1.17.1.</strong></li>
+      <li><strong>B7 (signal-aware execution): closed 2026-10-16 on its in-sample result, no fresh test</strong>
+          &mdash; no cell cheaper by the 2 bp minimum, the urgency arm dearer on TWAP/VWAP at 1&ndash;2 % ADV
+          (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/preregs/B7_CLOSED_v117.md">B7_CLOSED_v117.md</a>).
+          B8 (two-venue router) real-data results ship in v1.17.1.</li>
       <li><strong>Known gap:</strong> v1.17.0 has no release manifest, no lock-file SBOMs and no digest-pinned k8s
           manifests (images were built, pushed and attested). Fixed by PR #211, ships with v1.17.1.</li>
     </ul>
     Also shipped: a real second venue (IEX HIST), an implementation-shortfall benchmark, quote fading,
     queue-aware cancels, budgeted LLM agents, and C++/Rust parity for the new rules.
-    Next: v1.17.1 (B7/B8 real-data results, the remaining 8 IEX overlap days, the #211 manifest fix).
+    Next: v1.17.1 (B8 real-data results, the remaining 8 IEX overlap days, the #211 manifest fix; B7 closed 2026-10-16).
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/v1.17.0_RELEASE_NOTES.md">Release notes</a>,
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/CHANGELOG.md">CHANGELOG</a>,
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/SHOWCASE.md">Showcase</a>.

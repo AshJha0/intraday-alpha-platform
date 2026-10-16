@@ -78,3 +78,41 @@ The tool exits with an error, and writes nothing, in any of these cases:
 - the draft's decision is not option (a)
 - the screen's sha256 differs from the pinned value
 - the output file already exists
+
+## B7 shortfall gate: signal-aware vs plain execution (SUPERSEDED 2026-10-16)
+
+> **Superseded.** B7 was closed on its in-sample result on 2026-10-16
+> (`research/preregs/B7_CLOSED_v117.md`): the draft carries status CLOSED, nothing was
+> registered or signed, the nine overlap days were not read. `tools/b7_shortfall_register.py`
+> refuses the CLOSED draft. The steps below are kept as the procedure a NEW B7 draft would
+> follow; they do not apply to the closed one.
+
+The draft is `research/execution/benchmark/prereg_DRAFT.json` (the B1 grid, the owner's
+2026-10-15 decisions, the B2/B3 signal arm, walk depth 50, the fresh-test day list and the
+in-sample `expected_effect` from `BENCHMARK_multi7_signal.md`). Before registering, fill the
+two OPEN fields in the draft by hand and commit them: `signal_arm.alpha_id` (EQ10 or EQ05) and
+`signal_arm.thresholds` (threshold_z, passive_urgency, gain); drop any `fresh_test.sessions`
+row whose IEX day is not ingested (its `iex_dataset_version` still says "to be filled"). The
+tool refuses, and writes nothing, while any of those is open, while
+`simulator.walk_depth_levels` is not 50, or when the `configs/prereg/v2.json` fingerprint
+differs from the file on disk.
+
+Run these from the repository root in PowerShell, with the one-time `.venv-ci` built as above:
+
+```powershell
+git pull
+$env:PYTHONUTF8 = "1"
+.\.venv-ci\Scripts\python tools\b7_shortfall_register.py . --dry-run --require-ci-env
+.\.venv-ci\Scripts\python tools\b7_shortfall_register.py . --require-ci-env
+git add research\preregs\b7_shortfall_prereg.json research\experiments.json research\agents\blackboard.jsonl
+git commit -m "B7: register the shortfall gate (signal-aware vs plain)"
+```
+
+A good dry run prints `[ci-env] deps match requirements-ci.txt: OK`, then
+`draft complete: N fresh day(s), walk depth 50, v2 fingerprint ok`, then the
+`[dry-run] would call WriteBroker.preregister(EQ10/shortfall:b7-signal-aware, sign -1)` line.
+A good registration prints `maintainer key matches trust root ashjha0`, then
+`B7-SHORTFALL-GATE: registered EQ10/shortfall:b7-signal-aware as <id>` and the
+`wrote research/preregs/b7_shortfall_prereg.json (sha256 ...)` line. The registration debits one
+ledger look; no market data is read and the fresh days stay unread until the signed run, which
+is the `fresh_test.command` of the draft, run once.

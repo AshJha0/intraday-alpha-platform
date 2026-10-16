@@ -167,11 +167,22 @@ Nothing is claimed here.
 
 The two-venue router's evaluation and its first real results are section 8 (B8).
 
-### 6.2 B7 (the signed gate run)
+### 6.2 B7: closed on its in-sample result (2026-10-16)
 
-Placeholder for the G5 truth pass: the signed `prereg.json`, the run and its
-verdict, or the statement that the gate was not signed. The draft is in
-`research/execution/benchmark/prereg_DRAFT.json`.
+The gate was **not signed and not run**. The in-sample run of the signal-aware
+arms on multi7 (EQ10 registered parameters, walk depth 50, 30-minute windows,
+7 sessions, 252 parents per policy; `research/execution/benchmark/
+BENCHMARK_multi7_signal.md` and `_PROVENANCE.md`) found no cell cheaper than
+its plain control by the 2 bp minimum effect: the urgency arm is dearer on
+TWAP / VWAP at 1-2 % ADV (+1.7 and +2.0 ± 0.5 bps, filling 6-10 pp more),
+IS 0.2-0.6 bps cheaper but not significant, pacing within ±1 bp, and the
+Almgren-Chriss drift arm identical to plain AC (inert at the registered
+beta). The owner closed B7 on that result: no fresh test, no registration,
+no ledger look; the nine overlap days were not read for B7 and stay
+available to B8. `prereg_DRAFT.json` carries status CLOSED as the record;
+`tools/b7_shortfall_register.py` refuses it. What is not concluded (one
+dataset, one alpha, untuned thresholds, no refit or EQ05 arm) is listed in
+`research/preregs/B7_CLOSED_v117.md`; a new pre-registration can reopen it.
 
 ### 6.3 B8-B10
 
