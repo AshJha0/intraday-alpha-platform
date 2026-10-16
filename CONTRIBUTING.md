@@ -232,8 +232,9 @@ Research truth is the product (spec §32). Two rules are mechanical:
    the SHA-256 of the canonical spec and writes
    `research/experiments/<id>/{spec,result}.json`) *before* its result is
    read, and every report prints the denominator and the expected max |t|
-   under the global null (5,361 looks / 293 configurations, max |t| ≈ 4.144
-   at v1.14.0: the 1068 made on the v1.3.0 dataset, the 852 made on
+   under the global null (as of v1.17.0, `research/experiments.json`: 5,732 recorded
+   looks over 422 distinct configurations, expected max |t| 4.160; the history of
+   the count: the 1068 made on the v1.3.0 dataset, the 852 made on
    the current one under the rules up to v1.4.0, the 3,236 made on it
    under the v1.5.0 default methods, 760 of them by the signal-combination
    report, and the 202 of the v1.14 statistics revision). An experiment runs under the default

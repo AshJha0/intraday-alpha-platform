@@ -1,9 +1,23 @@
 # B8: two-venue SOR on real books (Nasdaq + IEX) — run book
 
-Status (2026-10-16): **code and synthetic tests only; no real result yet.** No
-Nasdaq / IEX overlap day has been ingested with its normalized events kept, so
-nothing under this directory is a measurement. The reports land here when the
-commands below run.
+Status (2026-10-16): **two real runs, both on the overlap days 2025-11-28 and
+2025-12-08 (AAPL, MSFT; 2 day clusters, provisional).**
+
+- `REPORT_overlap2.md`: the first run was negative. `sor` cost +5.1 ± 1.3 bps
+  vs pinned Nasdaq.
+- `REPORT_sweep.md`: the cause, and a re-run with the opt-in `sor_sweep`
+  route. IEX children filled far beyond their touch because:
+  - our own consumption overlay kept IEX's slowly-updating near levels used;
+  - MARKET children had no price limit on a sparse book;
+  - the router picked IEX on its lower fee at an equal displayed touch.
+
+  `sor_sweep` (plan_sweep across both books' net displayed depth, IOC per
+  venue) pooled at +3.8 ± 2.1 bps; AAPL −0.8, MSFT +8.5. No policy beats
+  pinned Nasdaq with confidence.
+
+The four-policy run is `run_b8_sweep.cmd` (`--policies
+pin_nasdaq,pin_iex,sor,sor_sweep`). The diagnosis is `diagnose_depth_walk.py`
+(`run_b8_diag.cmd`).
 
 ## Prerequisite: both venues' NORMALIZED events
 

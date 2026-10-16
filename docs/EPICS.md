@@ -17,8 +17,8 @@ planned paths of the current release, **backlog** says what would prove it done.
 |---|---:|---:|
 | epics | 36 | |
 | issues | 215 | 679 |
-| issues `done` | 153 | 392 |
-| issues `in-progress` | 4 | 6.5 |
+| issues `done` | 157 | 398.5 |
+| issues `in-progress` | 0 | 0 |
 | issues `backlog` | 58 | 280.5 |
 
 ### By milestone
@@ -39,7 +39,7 @@ planned paths of the current release, **backlog** says what would prove it done.
 | v1.13 | 1 | 4 | 4 | 0 | 0 |
 | v1.14 | 1 | 5 | 5 | 0 | 0 |
 | v1.15 | 1 | 20 | 17 | 0 | 3 |
-| v1.16 | 1 | 18 | 13 | 4 | 1 |
+| v1.16 | 1 | 18 | 17 | 0 | 1 |
 
 Issues are listed under their epic; an issue's own milestone can differ from
 the epic's (a backlog item under a finished epic sits in **Backlog**).
@@ -81,7 +81,7 @@ the epic's (a backlog item under a finished epic sits in **Backlog**).
 - [E33 — v1.13 - review-driven hardening](#e33--v113---review-driven-hardening) · v1.13 · done · 4 issues
 - [E34 — v1.14 - real-data mapping, 15c3-5 risk, execution realism, trust roots](#e34--v114---real-data-mapping-15c3-5-risk-execution-realism-trust-roots) · v1.14 · done · 5 issues
 - [E35 — v1.15 - research evidence, models, fees, governance enforcement, release automation](#e35--v115---research-evidence-models-fees-governance-enforcement-release-automation) · v1.15 · partial · 20 issues
-- [E36 — v1.16 - monetisation: realistic execution, cost-aware study, capacity, AI4](#e36--v116---monetisation-realistic-execution-cost-aware-study-capacity-ai4) · v1.16 · in-progress · 18 issues
+- [E36 — v1.16 - monetisation: realistic execution, cost-aware study, capacity, AI4](#e36--v116---monetisation-realistic-execution-cost-aware-study-capacity-ai4) · v1.16 · partial · 18 issues
 
 ## Phase 0
 
@@ -337,7 +337,7 @@ Deterministic mean-variance construction with transaction costs solved by pinned
 
 A deterministic pre-trade and post-fill risk engine with a pinned check order, kill switches at four scopes, latching loss limits with a pinned re-arm precedence, currency-aware notional, snapshot/restore, and a byte-identical audit log. The engine depends on nothing but its config and the event stream — never on a network call, a wall clock or an LLM.
 
-**Scope:** rust/risk (reference), java com.iap.risk (byte-identical port), python/src/iap/risk (port in progress); configs/risk/risk.json (x-version 3), schemas/risk/risk_event.schema.json.
+**Scope:** rust/risk (reference), java com.iap.risk (byte-identical port), python/src/iap/risk (port); configs/risk/risk.json (x-version 3), schemas/risk/risk_event.schema.json.
 
 **Acceptance criteria:**
 
@@ -364,7 +364,7 @@ Execution algorithms (TWAP/VWAP/POV/IS), smart order routing with venue scoring,
 
 **Status:** partial · **Milestone:** Week 5 · **Issues:** 10 (done 8, in-progress 0, backlog 2) · **Estimate:** 32 days · **Labels:** `type:epic`, `area:execution`, `phase:w5`, `priority:p0`, `status:partial`
 
-Parent-order algorithms (TWAP/VWAP/POV/IS) sliced into children with time-in-force, a deterministic smart order router with a pinned venue scoring ladder, and an event-driven execution simulator with seeded latency, queue position, partial fills, cancels and a venue trading-state gate — C++ is the reference, Java the port, Python the port in progress.
+Parent-order algorithms (TWAP/VWAP/POV/IS) sliced into children with time-in-force, a deterministic smart order router with a pinned venue scoring ladder, and an event-driven execution simulator with seeded latency, queue position, partial fills, cancels and a venue trading-state gate — C++ is the reference, Java the port, Python a port.
 
 **Scope:** cpp/include/iap/execution/{execution,algos}.hpp, cpp/include/iap/sor/sor.hpp (+ src); java com.iap.{execution,sor}; python/src/iap/execution; rust/venue (venue protocol codec + simulated venue).
 
@@ -979,11 +979,11 @@ Release v1.15 per IAP_v1.15_Plan.md: run the R7 confirmatory round on unseen ses
 
 ## v1.16
 
-In progress (IAP_v1.16_Plan.md), the monetisation release: realistic execution P0-1..P0-5, in-sample monetisation study (no-go) and capacity curve, quoting v2, forward paper-trade infrastructure, AI4 on real data, research hygiene and engineering.
+Released as v1.16.0 on 2026-10-15 (IAP_v1.16_Plan.md), the monetisation release: realistic execution P0-1..P0-5, in-sample monetisation study (no-go) and capacity curve, quoting v2, forward paper-trade infrastructure, AI4 on real data, research hygiene and engineering.
 
 ### E36 — v1.16 - monetisation: realistic execution, cost-aware study, capacity, AI4
 
-**Status:** in-progress · **Milestone:** v1.16 · **Issues:** 18 (done 13, in-progress 4, backlog 1) · **Estimate:** 28 days · **Labels:** `type:epic`, `area:execution`, `phase:phase2`, `priority:p0`, `status:in-progress`
+**Status:** partial · **Milestone:** v1.16 · **Issues:** 18 (done 17, in-progress 0, backlog 1) · **Estimate:** 28 days · **Labels:** `type:epic`, `area:execution`, `phase:phase2`, `priority:p0`, `status:partial`
 
 Release v1.16 per IAP_v1.16_Plan.md (18 items, owner-approved 2026-10-14): make the cost model credible, then ask whether the confirmed EQ10/EQ05 edge survives realistic costs and at what size. Item keys are the plan's item numbers.
 
@@ -1003,16 +1003,16 @@ Release v1.16 per IAP_v1.16_Plan.md (18 items, owner-approved 2026-10-14): make 
 | V116-4 | v1.16 item 4: SOR opt-ins on the cost-aware router | done | 2 | v1.16 | `python/src/iap/execution/sor_v2.py; python/tests/test_v116_sor.py` |
 | V116-5 | v1.16 item 5: algos: POV exact participation, AC eta from the residual fit | done | 2 | v1.16 | `python/src/iap/execution/algos.py; python/tests/test_v116_algos.py` |
 | V116-6 | v1.16 item 6: in-sample monetisation study (taker) | done | 3 | v1.16 | `research/v116/MONETISATION_P0-6.md; research/v116/monetisation_summary.json` |
-| V116-7 | v1.16 item 7: taker capacity curve and break-even participation | done | 1 | v1.16 | `research/v116/MONETISATION_P0-6.md`<br>`PR #149: tools/v116_capacity_curve.py (pending merge)` |
+| V116-7 | v1.16 item 7: taker capacity curve and break-even participation | done | 1 | v1.16 | `research/v116/MONETISATION_P0-6.md`<br>`tools/v116_capacity_curve.py; research/v116/CAPACITY_CURVE.md` |
 | V116-8 | v1.16 item 8: net-of-cost prereg on fresh sessions | backlog | 2 | v1.16 | `planned: none (not triggered in v1.16)` |
-| V116-9 | v1.16 item 9: forward paper-trade daily driver (infrastructure) | in-progress | 2 | v1.16 | `planned: PR #144 (forward paper-trade driver)` |
-| V116-10 | v1.16 item 10: AI4 DeepLOB on real data | in-progress | 3 | v1.16 | `planned: PR #151 (iap.models.lob_real, iap.models.lob_train)` |
+| V116-9 | v1.16 item 9: forward paper-trade daily driver (infrastructure) | done | 2 | v1.16 | `python/src/iap/paper/daily.py; python/tests/test_paper_daily.py` |
+| V116-10 | v1.16 item 10: AI4 DeepLOB on real data | done | 3 | v1.16 | `research/r7/AI4_CLOSED_v116.md (closed: in-sample failure, no holdout look)` |
 | V116-11 | v1.16 item 11: merge research/maker-real and research/step2 | done | 1 | v1.16 | `research/agents/forks/; python/tests/test_v116_fork_archive.py` |
 | V116-12 | v1.16 item 12: R7 follow-ups | done | 1.5 | v1.16 | `python/src/iap/validation/beta_stability.py; tools/prereg_touch_check.py; docs/research/MEMORY_REVIEW_v116.md` |
 | V116-13 | v1.16 item 13: engineering performance items | done | 2 | v1.16 | `rust/risk/benches/check_order.rs; python/tools/bench_exec_simulator.py` |
-| V116-14 | v1.16 item 14: optimiser: Dykstra projection, estimated Ledoit-Wolf intensity | in-progress | 1 | v1.16 | `planned: PR #147` |
+| V116-14 | v1.16 item 14: optimiser: Dykstra projection, estimated Ledoit-Wolf intensity | done | 1 | v1.16 | `python/src/iap/portfolio/optimizer.py; python/tests/test_v116_dykstra_lw.py` |
 | V116-15 | v1.16 item 15: multiple testing report columns | done | 1 | v1.16 | `python/src/iap/validation/multiple_testing.py; python/tests/test_v116_multiple_testing.py` |
-| V116-16 | v1.16 item 16: blocking mypy and agent-evals; Java image decision (N-7) | in-progress | 0.5 | v1.16 | `planned: PR #143` |
+| V116-16 | v1.16 item 16: blocking mypy and agent-evals; Java image decision (N-7) | done | 0.5 | v1.16 | `.github/workflows/ci.yml (mypy step, blocking)` |
 | V116-17 | v1.16 item 17: MVP end-of-day flatten | done | 0.5 | v1.16 | `python/src/iap/mvp/engine.py; python/tests/test_v116_mvp_eod_flatten.py` |
 | V116-18 | v1.16 item 18: release.py tarfile extract; process-and-delete pipeline | done | 1 | v1.16 | `tools/release.py; python/tests/test_release_tool.py` |
 

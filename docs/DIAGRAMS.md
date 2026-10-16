@@ -35,7 +35,7 @@ flowchart TD
     FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
-    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,574 looks / 307 configs, two datasets, three method revisions)<br/>REPORT.md, ML_REPORT.md, model manifests"]
+    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,732 looks / 422 configs as of v1.17.0, research/experiments.json)<br/>REPORT.md, ML_REPORT.md, model manifests"]
     RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 23 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```
@@ -925,7 +925,7 @@ nothing and commits nothing.
 v1.5.0 replaced the release guard: `verify-ci` is now
 `tests/harness/verify_ci_green.py`, which retries an API error instead of
 reading it as "no successful run" (the v1.4.0 release failed on that once
-although CI was green), polls a run in progress and stops on a failed or
+although CI was green), polls an unfinished run and stops on a failed or
 missing run.
 One box says what is not true yet: branch protection is not configured
 (`docs/governance/REPO_SETTINGS.md`, LEARN.md §26).
@@ -970,7 +970,7 @@ flowchart LR
     DB["dependabot.yml<br/>weekly: github-actions, pip, cargo, docker"] -.->|"bump PRs through the same gate"| PR
     TAG["git tag v*"] --> VER
     subgraph REL["release.yml — the guard failed the v1.4.0 release once on an API error and now retries"]
-        VER["verify-ci (tests/harness/verify_ci_green.py)<br/>the tagged commit has a green ci run<br/>API errors retried, a run in progress polled,<br/>a failed or missing run stops the release"]
+        VER["verify-ci (tests/harness/verify_ci_green.py)<br/>the tagged commit has a green ci run<br/>API errors retried, an unfinished run polled,<br/>a failed or missing run stops the release"]
         BLD["images<br/>build and push to GHCR, one per language"]
         ATT["attest build provenance<br/>per image digest"]
         MAN["manifest<br/>release-manifest.json attached to the release"]

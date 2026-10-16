@@ -165,7 +165,7 @@ Placeholder for the G5 truth pass: quote fading, queue cancels, the markout
 decomposition, the dark midpoint model and the two-venue router as released.
 Nothing is claimed here.
 
-The two-venue router's evaluation design is section 8 (B8); it has no result yet.
+The two-venue router's evaluation and its first real results are section 8 (B8).
 
 ### 6.2 B7 (the signed gate run)
 
@@ -236,7 +236,7 @@ router-vs-pinned on the Nasdaq / IEX overlap days with both lit venues in
 is in API_TRADING.md §2.17. Whatever it produces, the dark rows are a model's
 output: they say what the proxy implies, never what a dark pool did.
 
-## 8. Two venues on real books (B8) — designed, not yet run
+## 8. Two venues on real books (B8)
 
 Until v1.17 every multi-venue routing statement in this repository rested on
 synthetic venues: the real data was Nasdaq only, so the cost-aware router had
@@ -277,3 +277,44 @@ is done leave-one-day-out, the fees are list prices, and venue latency is zero
 because both feeds carry exchange timestamps only. With two to nine days the
 standard errors rest on very few clusters; treat any router gain under a
 couple of bps as unresolved.
+
+**First real results (v1.17.1, 2 overlap days, AAPL + MSFT, 2 day
+clusters).** These are provisional: every SE rests on two clusters.
+
+- `research/execution/b8/REPORT_overlap2.md`: the cost-aware router
+  (`sor`) cost +5.1 ± 1.3 bps all-in vs pinned Nasdaq and filled 8 pp less.
+  Pinned IEX cost +11.6 ± 0.6 bps. Our IEX fills marked out at −23 to −28
+  bps at 1 s.
+- `research/execution/b8/REPORT_sweep.md`: the cause, found by recording
+  every child. IEX children were small (median 19 shares against a
+  100-share touch, AAPL), but they filled beyond the touch they saw, for
+  three reasons:
+  - **Our own consumption overlay.** The overlay debits the displayed size
+    our fills took, until the level changes. IEX's book updates about five
+    times less often than Nasdaq's, so its touch was often still "used" by
+    our earlier fills: 57 % of pinned-IEX children for AAPL, 82 % for MSFT.
+  - **MARKET children with no limit.** They skipped the used levels and
+    filled at stray resting orders, up to dollars away. A 23-share sell
+    filled at $175 against a $277 mid. A real IEX order would not trade
+    through the NBBO, so the replay overstates pinned-IEX cost.
+  - **The router chose IEX on fee at an equal displayed touch.** This was
+    89 % of `sor`'s IEX children for AAPL and 77 % for MSFT.
+
+The opt-in `sor_sweep` route splits a marketable child with
+`plan_sweep`: all-in rank over both books' displayed depth, net of our
+overlay, one IOC LIMIT per venue capped at the planned qty. On the same
+parents it removes the marketable loss on POV and AAPL IS, and the IEX 1 s
+markout improves from −13.7 to −0.6 bps (AAPL). Pooled it is still
++3.8 ± 2.1 bps vs pinned Nasdaq (p 0.32): AAPL −0.8, MSFT +8.5. The MSFT
+gap comes from its IS 0.1 % cells, which complete more qty at far levels.
+Passive TWAP / VWAP routing, and with it the −7 to −8 pp fill gap, is
+unchanged. No two-venue policy beats pinned Nasdaq with any confidence.
+
+Next steps:
+
+- a price collar on the sweep;
+- an order-protection rule in the replay;
+- net-of-overlay touches in the single-venue router;
+- leave-one-day-out calibration;
+- QQQ, which did not fit in memory beside the ingest;
+- the remaining overlap days.

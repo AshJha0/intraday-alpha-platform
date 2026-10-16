@@ -298,3 +298,13 @@ state change and sample once, after its last event.
 Why it matters: on the synthetic equity golden vector 409 of 2,000 feature
 rows were samples of a book in the middle of a group, a state the market
 never showed (COOKBOOK recipe 71).
+
+## 10. IEX HIST ingest (v1.17 A4, opt-in; Python only)
+
+The second venue (docs/DATA_SOURCES.md, docs/research/IEX_OVERLAP_SET.md).
+
+| name | what |
+|---|---|
+| `iap.marketdata.iex.IexReader(path, date, symbols, *, limit_messages=None, mapper=None, level_feed=None, tops=None, packets=None, round_lots=None)` | reads an IEX DEEP+ / DEEP capture into canonical events; `tops` (a `TopsQuotes` extract) is the `book_verification` oracle, compared at the cumulative round lot; `round_lots` maps symbol to round lot (default: the smallest quoted TOPS size per symbol, recorded as `round_lots_source`) |
+| `iap.marketdata.ingest.ingest(..., round_lots=)` | the same round-lot table passed through `ingest --format iex-deep-plus` |
+| `python -m iap.marketdata process-iex-day` | one IEX HIST day end to end (TOPS extract, DEEP+ ingest with the oracle, features, `KEEP.json`, delete); flags include `--round-lots-from <paired Nasdaq dataset.json>`, `--keep-normalized` (default) / `--delete-normalized`, `--dry-run`, `--render-cmd`; downloads need `--download --i-have-approval` and a manifest carrying the owner's approval sentence |

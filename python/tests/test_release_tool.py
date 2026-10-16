@@ -291,6 +291,7 @@ def test_cli_flow_and_default_dry_run(capsys):
     assert rel.main(["flow"]) == 0
     out = capsys.readouterr().out
     assert "regenerate_allow_rerun=true" in out and "python tarfile" in out
+    assert "check_docs.py --release" in out  # v1.17 G5: the truth-pass step
     r = rel.Runner(exec_fn=FakeExec(_publish_answers()))
     assert rel.main(["publish", "--version", "1.15.0"], runner=r) == 0
     assert r.execute is False

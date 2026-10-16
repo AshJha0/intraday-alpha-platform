@@ -148,6 +148,7 @@ from iap.research.two_venue import (
     instrument_map,
     load_calibrations,
     merge_events,
+    read_events,
     remap_instruments,
     router_from_calibrations,
     symbols_of,
@@ -792,6 +793,7 @@ def run_benchmark(
     cal_docs = None if venue_calibration is None else load_calibrations(venue_calibration)
     router = None
     router_fp = None
+    sweep_router = None
     if "sor" in routes_used:
         router, router_fp = router_from_calibrations(
             cfg.venues,
@@ -800,6 +802,19 @@ def run_benchmark(
             fill_horizon_s=router_fill_horizon_s,
             sor_options=sor,
         )
+    if "sor_sweep" in routes_used:
+        # v1.17.1: the same router with an all-in sweep over the walk depth
+        sweep_router, sweep_fp = router_from_calibrations(
+            cfg.venues,
+            cal_docs,
+            tox_horizon=router_tox_horizon,
+            fill_horizon_s=router_fill_horizon_s,
+            sor_options=sor,
+            sweep_rank="all_in",
+            sweep_levels=walk_depth_levels,
+        )
+        if router is None:
+            router, router_fp = sweep_router, sweep_fp
     lit_venues = sorted(v for v, s in cfg.venues.items() if s.is_lit)
     if not lit_venues:
         raise SystemExit("the venue table has no lit venue")
@@ -926,6 +941,7 @@ def run_benchmark(
     pull_lost: dict[str, int] = {p: 0 for p in policies}
     mk_rows_of: dict[str, list[dict]] = {p: [] for p in policies}
     venue_rows_of: dict[str, dict[str, list[dict]]] = {}
+    sweep_unsent: dict[str, int] = {}
     session_labels: list[str] = []
     n_events = 0
     source = None
@@ -963,13 +979,26 @@ def run_benchmark(
     for s_index, path in enumerate(files):
         label = _session_label(path)
         session_labels.append(label)
-        events = _read_events(path)
+        if keep_ids is not None and label in second_of:
+            # two-venue mode with --symbols: stream the files, keep the symbols
+            pm = primary_map_of.get(label)
+            raw = keep_ids if pm is None else {k for k, v in pm.items() if v in keep_ids}
+            events = read_events(path, raw)
+        else:
+            events = _read_events(path)
         if max_events > 0:
             events = events[:max_events]
         if label in primary_map_of:
             events = remap_instruments(events, primary_map_of[label])
         if label in second_of:
-            other = _read_events(second_of[label])
+            xm = id_map_of[label]
+            if keep_ids is not None:
+                xkeep = {k for k, v in (xm or {}).items() if v in keep_ids}
+                if xm is None:
+                    xkeep = set(keep_ids)
+                other = read_events(second_of[label], xkeep)
+            else:
+                other = _read_events(second_of[label])
             if max_events > 0:
                 other = other[:max_events]
             cnt: dict[str, int] = {}
@@ -1055,6 +1084,16 @@ def run_benchmark(
                     res = ExecutionReplay(
                         cfg, worked, sor, router=router, router_fill_prob=router_fp
                     ).run(evs)
+                elif route == "sor_sweep":
+                    res = ExecutionReplay(
+                        cfg,
+                        worked,
+                        sor,
+                        router=sweep_router,
+                        router_fill_prob=router_fp,
+                        router_sweep=True,
+                    ).run(evs)
+                    sweep_unsent[pol] = sweep_unsent.get(pol, 0) + res.sweep_unsent_qty
                 else:
                     res = ExecutionReplay(cfg, worked, sor).run(evs)
                 fills_of: dict[int, list] = {p.parent_id: [] for p in worked}
@@ -1284,7 +1323,12 @@ def run_benchmark(
             },
             router_tox_horizon=router_tox_horizon,
             router_fill_horizon_s=router_fill_horizon_s,
+            baseline_policy=baseline_policy,
+            seed=seed,
         )
+        if sweep_unsent:
+            # v1.17.1 sor_sweep: child qty beyond both books' displayed depth (not sent)
+            doc["two_venue"]["sweep_unsent_qty"] = dict(sorted(sweep_unsent.items()))
     if timestamp:
         doc["generated"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     return doc
@@ -1295,6 +1339,7 @@ def two_venue_block(
     venue_rows_of: dict[str, dict[str, list[dict]]],
     policies: tuple[str, ...],
     horizons: list[str],
+    seed: int = 0,
     **meta: object,
 ) -> dict[str, object]:
     """v1.17 B8: per policy, the venue split (fill qty share per venue) and
@@ -1329,10 +1374,38 @@ def two_venue_block(
                         cl.append(str(fr["cluster"]))
                 cell[h] = cluster_mean_stats(vals, cl)
             vmk[pol][vn] = cell  # type: ignore[index]
+    baseline = str(meta.get("baseline_policy", ""))
+    pooled: dict[str, object] = {}
+    pairs: dict[str, list[dict[str, object]]] = {}
+    if baseline in rows:
+        keyed = {(r["session"], r["symbol"], r["window"]): r for r in rows[baseline]}
+        for pol in policies:
+            if pol == baseline:
+                continue
+            pooled[f"{pol}-{baseline}"] = _paired_summary(rows[baseline], rows[pol], seed)
+            out_rows = []
+            for r in rows[pol]:
+                b = keyed.get((r["session"], r["symbol"], r["window"]))
+                if b is None:
+                    continue
+                out_rows.append(
+                    {
+                        "session": r["session"],
+                        "symbol": r["symbol"],
+                        "window": r["window"],
+                        "algo": r["algo"],
+                        "size_pct_adv": r["size_pct_adv"],
+                        "fill_rate_diff": r["filled_qty"] / r["qty"] - b["filled_qty"] / b["qty"],
+                        "costs_bps_diff": {k: _bps(r, k) - _bps(b, k) for k in REPORT_COSTS},
+                    }
+                )
+            pairs[f"{pol}-{baseline}"] = out_rows
     return {
         "item": "v1.17 B8",
         "alignment": ALIGNMENT_RULE,
         **meta,
+        "paired_pooled": pooled,
+        "paired_rows": pairs,
         "venue_split": split,
         "venue_markouts_bps": vmk,
     }
@@ -1392,6 +1465,20 @@ def _two_venue_lines(doc: dict) -> list[str]:
                 or "-"
             )
         out.append(f"| {pol} | {sp['filled_qty']} | {share or '-'} | " + " | ".join(cols) + " |")
+    if tv.get("paired_pooled"):
+        out += [
+            "",
+            "Pooled over every cell (same parents, `other - baseline`, bps; ± day-clustered SE):",
+            "",
+            "| pair | n | all-in | shortfall | spread | fees net | fill rate diff |",
+            "|---|---:|---|---|---|---|---|",
+        ]
+        for k, v in tv["paired_pooled"].items():
+            c = v["costs_bps"]
+            out.append(
+                f"| {k} | {v['n_pairs']} | {_stat(c['all_in'])} | {_stat(c['shortfall'])} | "
+                f"{_stat(c['spread'])} | {_stat(c['fees_net'])} | {_stat(v['fill_rate_diff'])} |"
+            )
     out += [
         "",
         "Shortfall, fill rate and the paired router-vs-pinned differences are in the cells and "
