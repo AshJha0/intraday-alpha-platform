@@ -1298,6 +1298,8 @@ def run_benchmark(
             },
             router_tox_horizon=router_tox_horizon,
             router_fill_horizon_s=router_fill_horizon_s,
+            baseline_policy=baseline_policy,
+            seed=seed,
         )
     if timestamp:
         doc["generated"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -1309,6 +1311,7 @@ def two_venue_block(
     venue_rows_of: dict[str, dict[str, list[dict]]],
     policies: tuple[str, ...],
     horizons: list[str],
+    seed: int = 0,
     **meta: object,
 ) -> dict[str, object]:
     """v1.17 B8: per policy, the venue split (fill qty share per venue) and
@@ -1343,10 +1346,38 @@ def two_venue_block(
                         cl.append(str(fr["cluster"]))
                 cell[h] = cluster_mean_stats(vals, cl)
             vmk[pol][vn] = cell  # type: ignore[index]
+    baseline = str(meta.get("baseline_policy", ""))
+    pooled: dict[str, object] = {}
+    pairs: dict[str, list[dict[str, object]]] = {}
+    if baseline in rows:
+        keyed = {(r["session"], r["symbol"], r["window"]): r for r in rows[baseline]}
+        for pol in policies:
+            if pol == baseline:
+                continue
+            pooled[f"{pol}-{baseline}"] = _paired_summary(rows[baseline], rows[pol], seed)
+            out_rows = []
+            for r in rows[pol]:
+                b = keyed.get((r["session"], r["symbol"], r["window"]))
+                if b is None:
+                    continue
+                out_rows.append(
+                    {
+                        "session": r["session"],
+                        "symbol": r["symbol"],
+                        "window": r["window"],
+                        "algo": r["algo"],
+                        "size_pct_adv": r["size_pct_adv"],
+                        "fill_rate_diff": r["filled_qty"] / r["qty"] - b["filled_qty"] / b["qty"],
+                        "costs_bps_diff": {k: _bps(r, k) - _bps(b, k) for k in REPORT_COSTS},
+                    }
+                )
+            pairs[f"{pol}-{baseline}"] = out_rows
     return {
         "item": "v1.17 B8",
         "alignment": ALIGNMENT_RULE,
         **meta,
+        "paired_pooled": pooled,
+        "paired_rows": pairs,
         "venue_split": split,
         "venue_markouts_bps": vmk,
     }
@@ -1406,6 +1437,20 @@ def _two_venue_lines(doc: dict) -> list[str]:
                 or "-"
             )
         out.append(f"| {pol} | {sp['filled_qty']} | {share or '-'} | " + " | ".join(cols) + " |")
+    if tv.get("paired_pooled"):
+        out += [
+            "",
+            "Pooled over every cell (same parents, `other - baseline`, bps; ± day-clustered SE):",
+            "",
+            "| pair | n | all-in | shortfall | spread | fees net | fill rate diff |",
+            "|---|---:|---|---|---|---|---|",
+        ]
+        for k, v in tv["paired_pooled"].items():
+            c = v["costs_bps"]
+            out.append(
+                f"| {k} | {v['n_pairs']} | {_stat(c['all_in'])} | {_stat(c['shortfall'])} | "
+                f"{_stat(c['spread'])} | {_stat(c['fees_net'])} | {_stat(v['fill_rate_diff'])} |"
+            )
     out += [
         "",
         "Shortfall, fill rate and the paired router-vs-pinned differences are in the cells and "
