@@ -148,6 +148,7 @@ from iap.research.two_venue import (
     instrument_map,
     load_calibrations,
     merge_events,
+    read_events,
     remap_instruments,
     router_from_calibrations,
     symbols_of,
@@ -963,13 +964,26 @@ def run_benchmark(
     for s_index, path in enumerate(files):
         label = _session_label(path)
         session_labels.append(label)
-        events = _read_events(path)
+        if keep_ids is not None and label in second_of:
+            # two-venue mode with --symbols: stream the files, keep the symbols
+            pm = primary_map_of.get(label)
+            raw = keep_ids if pm is None else {k for k, v in pm.items() if v in keep_ids}
+            events = read_events(path, raw)
+        else:
+            events = _read_events(path)
         if max_events > 0:
             events = events[:max_events]
         if label in primary_map_of:
             events = remap_instruments(events, primary_map_of[label])
         if label in second_of:
-            other = _read_events(second_of[label])
+            xm = id_map_of[label]
+            if keep_ids is not None:
+                xkeep = {k for k, v in (xm or {}).items() if v in keep_ids}
+                if xm is None:
+                    xkeep = set(keep_ids)
+                other = read_events(second_of[label], xkeep)
+            else:
+                other = _read_events(second_of[label])
             if max_events > 0:
                 other = other[:max_events]
             cnt: dict[str, int] = {}
