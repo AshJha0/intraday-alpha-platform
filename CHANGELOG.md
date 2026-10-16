@@ -8,6 +8,15 @@ that tag.
 
 ## Unreleased
 
+- v1.17 fix: `FillHazardModel.bucket_hazards` / `p_fill_within` evaluate each
+  row with scalar `math` calls (`log1p`, `sin`, `cos`, `exp`, `expm1`) and
+  left-to-right sums, line for line the C++ port's order, instead of BLAS `@`
+  and numpy's vectorised ufuncs. Those pick CPU-specific kernels (FMA, lane
+  splits, SIMD dispatch), so the last bit of the hazard moved between CI
+  runners and the F7 queue-cancel golden failed at random (seen on #195); now
+  Python is the same on every runner and agrees with C++ for any model. The
+  fit stays vectorised. Opt-in users only (B5 queue-aware cancels, the maker
+  backtester's `fill_hazard`); values move in the last bit at most.
 - v1.17 WS-F item F7, part 1: hand-written C++ parity ports of the execution rules already on
   main (no translation tools), one commit per rule, next to `SmartOrderRouter` and the execution
   simulator in `cpp/`: `sor/sor_v2.hpp` (`CostAwareRouter::plan_sweep` all-in / price ranking,
