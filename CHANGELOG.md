@@ -34,6 +34,16 @@ that tag.
   `tests/golden/expected_venue_queue.json` (`python/tools/make_golden_venue_queue.py`;
   `rust/venue/tests/golden_venue_queue.rs` joins the golden group; API_TRADING §2.18). No
   execution, SOR or dark-venue logic moved to Rust (C++ owns that path, F7).
+- v1.17 C8 (DRAFT, unsigned): the breadth-book pre-registration is drafted in
+  `research/preregs/breadth_book_prereg_DRAFT.json` with a Markdown rendering. Its holdout is
+  nine 2025/26 Nasdaq days for the breadth names outside AAPL/MSFT/QQQ, taken from manifests
+  only. The DSR is computed at the registered N (410 at draft), and the C6 screen
+  dependency is 0 pass / 22 fail / 1 not screened. Three owner options are stated: (a) screen as a hard gate, (b) an EQ10/1s/linear_z_v2 override, (c) defer to v1.18.
+  `test_v117_breadth_prereg_draft.py` dry-runs the screen gate. Option (a) has been chosen.
+  `tools/breadth_book_register.py` (`--dry-run`, `--require-ci-env`) is the owner-run
+  registration: the screen gate refuses, and it writes a signed record of the refusal. The owner commands are in
+  `docs/runbooks/RUNBOOK_prereg_environment.md`.
+
 - v1.17 WS-F item F7, part 1: hand-written C++ parity ports of the execution rules already on
   main (no translation tools), one commit per rule, next to `SmartOrderRouter` and the execution
   simulator in `cpp/`: `sor/sor_v2.hpp` (`CostAwareRouter::plan_sweep` all-in / price ranking,
