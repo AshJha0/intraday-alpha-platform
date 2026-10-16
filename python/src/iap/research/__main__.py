@@ -923,6 +923,12 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"error: {exc}", file=sys.stderr)
         return 1
+    finally:
+        # ``--dataset-dir`` points the process-global alpha universe at the
+        # dataset; in-process callers must get the pinned default back.
+        from iap.alpha import configure_universe
+
+        configure_universe(None)
 
 
 if __name__ == "__main__":
