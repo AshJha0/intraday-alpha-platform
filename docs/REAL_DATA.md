@@ -339,6 +339,11 @@ its sweep, passive split, toxicity and tier logic is exercised only on
 synthetic multi-venue books. It is capability for multi-venue data later
 (e.g. a consolidated or second-venue feed), not a measured result.
 
+> **Superseded (v1.17 B8, pending data).** This rests on synthetic venues. The
+> real two-venue evaluation (Nasdaq + IEX books merged on the overlap days, per-venue
+> calibration, router vs pinned) replaces it: `research/execution/b8/README.md`,
+> docs/EXECUTION_QUALITY.md section 8. No real result exists yet; kept as history.
+
 ### 3.3 Auction imbalance (NOII) study (v1.10, plan item A1): in-sample result, holdout running
 
 **Status (v1.12.0, 2026-10-10).** The in-sample run of `AUC01` is

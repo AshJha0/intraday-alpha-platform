@@ -99,6 +99,7 @@ from iap.execution.passive import (
 from iap.execution.signal import SignalReading
 from iap.execution.simulator import ExecutionSimulator
 from iap.execution.sor import NO_ROUTE, SmartOrderRouter
+from iap.execution.sor_v2 import CostAwareRouter, FillProb
 from iap.execution.types import CancelReason, ChildOrder, Fill, Liquidity, OrderState, OrderType
 from iap.execution.urgency import AlphaUrgencyPolicy, regime_from_z
 
@@ -319,10 +320,17 @@ class ExecutionReplay:
         config: ExecConfig,
         parents: Sequence[ParentOrder],
         sor_options: SorOptions = SorOptions(),  # noqa: B008 (frozen dataclass default, one shared immutable instance is intended)
+        *,
+        router: CostAwareRouter | None = None,
+        router_fill_prob: FillProb | None = None,
     ) -> None:
         self._config = config
         self._sim = ExecutionSimulator(config)
         self._sor = SmartOrderRouter(config.venues, sor_options)
+        # v1.17 B8 (opt-in): unpinned children (venue_id 0) route through the
+        # cost-aware router (sor_v2) instead of the pinned one; None = unchanged.
+        self._router = router
+        self._router_fill_prob = router_fill_prob
         # v1.17 B10: a dark / midpoint venue has no displayed book and is
         # never a candidate of the pinned router (no config has one unless
         # a caller opted in, so the candidate list of every golden is unchanged).
@@ -678,6 +686,16 @@ class ExecutionReplay:
         book = self._sim.instrument_book(p.instrument_id)
         if p.venue_id != 0:
             venue_id = p.venue_id
+        elif self._router is not None:
+            tick = self._config.instrument(p.instrument_id).tick_size
+            if passive:
+                venue_id = self._router.route_passive(
+                    book, p.side, decision_ts, tick, self._sor_candidates, self._router_fill_prob
+                )
+            else:
+                venue_id = self._router.route_aggressive(
+                    book, p.side, decision_ts, tick, self._sor_candidates
+                )
         elif passive:
             venue_id = self._sor.route_passive(book, p.side, self._sor_candidates)
         else:

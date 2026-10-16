@@ -1312,6 +1312,65 @@ duplicate and a cancel) is generated from THIS simulator by
 resting order's `remaining` / `ahead_qty`. PLATFORM_CONVENTIONS.md §11.2 lists what is not ported
 (latency legs, impact, PEG / MID, hidden prints, the policy layer).
 
+### 2.19 Two-venue SOR on real books (v1.17 WS-B item B8, Python only)
+
+Everything is opt-in; no golden, registered result or default path changes.
+
+**Merged replay — `iap.research.two_venue`.** `merge_events(primary, second, *, id_map=None,
+iex_clock="exchange", keep=None, counters=None)` merges a Nasdaq ITCH stream and the IEX stream
+of the same day into one consolidated stream: order `(exchange_ts, venue_id)`, each stream's own
+order kept inside a tie (stable two-way merge, nothing re-sorted), `event_id` renumbered 1..N,
+the IEX instrument ids re-keyed onto the Nasdaq ids by symbol (`instrument_map`, `symbols_of`;
+unmapped events dropped and counted). The input events are consumed (updated in place).
+**Alignment rule:** both clocks are ns since the session's New York midnight on the exchange
+(UTC) clock. ITCH is used as stamped; an ingested IEX dataset already is (the reader takes
+`exchange_ts` from the messages' own UTC send times), so `iex_clock="exchange"` (default) shifts
+nothing; `iex_clock="capture"` is for a stream stamped by the TAI capture clock and subtracts
+`IEX_TAI_OFFSET_S` = 37 s (`iap.execution.fill_hazard`) from `exchange_ts` and `receive_ts`.
+`load_merged_session(nasdaq_dir, iex_dir, label, ...)` reads both datasets'
+`normalized/eq_*.normalized.{iap1,jsonl}` (refused, with the reason, when either is missing:
+the A4 process-and-delete chain deletes the IEX normalized events unless told not to).
+
+**Per-venue calibration.** `calibrate_day(events, tick_sizes, *, label)` runs
+`estimate_calibration(..., depletion_split=True)` on each venue's own events (fill probability:
+the queue-depletion hazard with the X-4 split, `exec_hazard_per_s` = the fill rate) and prices
+every displayed execution as a maker fill against the consolidated mid
+(`maker_markout_rows`, `iap.tca.markout.fill_measures`). `combine_days(days, venues)` pools the
+days (exposure seconds and depletions summed per side and queue bucket; markouts by horizon with
+`cluster_mean`, one cluster per day) into one document per venue (schema `two_venue.SCHEMA`):
+`fill_probability` (`exec_hazard_per_s`, `p_fill_touch = 1 - exp(-rate * horizon)`, the
+`queue_depletion` table) and `toxicity` (`markout_bps[h]` CR1 statistics, `toxicity_bps[h] =
+-mean`). `save_calibrations` / `load_calibrations` write and read
+`venue_calibration_<VENUE>.json`; `router_from_calibrations(venues, docs)` returns the
+`sor_v2.CostAwareRouter` (one `VenueModel` per lit venue) and the queue-aware `fill_prob`
+(`hazard_fill_prob` over each venue's execution hazard; `None` without documents). CLI:
+
+```
+python -m iap.research.two_venue calibrate --nasdaq-dir D1 --iex-dir X1 [--nasdaq-dir D2 --iex-dir X2 ...]
+    [--iex-clock exchange|capture] [--symbols AAPL,...] [--venues venues.json]
+    [--horizons 1s,5s,30s] [--fill-horizon-s 1] [--max-events N] [--out research/execution/b8]
+```
+
+**Router hook.** `ExecutionReplay(config, parents, sor_options, *, router=None,
+router_fill_prob=None)`: with a `CostAwareRouter`, an unpinned child (`venue_id == 0`) routes
+through `router.route_aggressive` / `route_passive` (with `router_fill_prob`) over the lit
+candidates instead of the pinned `SmartOrderRouter`; a pinned parent stays pinned; `None` (the
+default) is byte-identical to before.
+
+**Benchmark policies.** `iap.research.execution_benchmark` gains route policies: `sor` (the
+`sor_v2` router), `pin_nasdaq` (every child to XNAS), `pin_iex` (every child to IEXG), and
+`style@route` for another child style (`passive@sor`, `aggressive@pin_iex`, variants as before:
+`sor+dark`). Arguments: `--second-data-dir` (the IEX dataset of the same day; the run merges
+each session present in both and lists the others as `unmatched`; the venue table is the union
+of both datasets' unless `--venues`), `--pair-dir NASDAQ_DIR IEX_DIR` (repeat per further day;
+re-keyed onto the first dataset's instrument ids by symbol, its configs serve every day),
+`--iex-clock`, `--venue-calibration DIR`, `--router-tox-horizon` (1s), `--router-fill-horizon-s`
+(1.0). Every route works the same parents and windows, so `paired_vs_baseline` is the paired
+router-vs-pinned difference (shortfall, all-in, fill rate) with day-clustered SEs; the document
+adds `two_venue` (alignment rule, routes, merge counts, router models, `venue_split` per policy
+and `venue_markouts_bps[policy][venue][h]`, day-clustered) and the Markdown a "Two venues"
+section. The run book (commands, memory, decisions) is `research/execution/b8/README.md`.
+
 ## 3. Where the rules live
 
 | rule set | normative text | Python port entry |

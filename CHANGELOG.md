@@ -8,6 +8,19 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-B item B8: two-venue SOR on real books, ready for the Nasdaq / IEX overlap days
+  (Python only, opt-in). `iap.research.two_venue`: `merge_events` (one consolidated stream,
+  `(exchange_ts, venue_id)` order, IEX ids re-keyed by symbol, clock rule stated and tested:
+  ingested IEX is already on the exchange clock, a TAI capture stream shifts by
+  `IEX_TAI_OFFSET_S`), per-venue calibration (X-4 execution hazard as the fill probability,
+  maker markouts by horizon against the consolidated mid, day-clustered) saved as
+  `venue_calibration_<VENUE>.json`, `router_from_calibrations`; CLI
+  `python -m iap.research.two_venue calibrate`. `ExecutionReplay(router=, router_fill_prob=)`
+  routes unpinned children through `sor_v2` (default None: unchanged). The B1 benchmark gains
+  the route policies `sor` / `pin_nasdaq` / `pin_iex` / `style@route`, `--second-data-dir`,
+  `--pair-dir`, `--iex-clock`, `--venue-calibration` and a `two_venue` block (venue split,
+  per-venue markouts). Synthetic-peer routing statements are marked superseded (pending data);
+  run book `research/execution/b8/README.md`; no real result yet; C++ port pending (F7).
 - v1.17 A4: `process-iex-day --keep-normalized` (default; `--delete-normalized` opts out) keeps
   the IEX day's `normalized/*.iap1` and Parquet after the feature build and hashes them into
   `KEEP.json` (the owner's A6 rule: IAP1 + Parquet + features + manifests stay, raw and the
