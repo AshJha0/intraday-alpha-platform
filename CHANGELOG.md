@@ -8,6 +8,10 @@ that tag.
 
 ## Unreleased
 
+- v1.17 B8 first real-book run (2 overlap days, AAPL + MSFT; `research/execution/b8/REPORT_overlap2.md`):
+  NEGATIVE: `sor` +5.1 ± 1.3 bps all-in and -8 pp fill vs pinned Nasdaq, pinned IEX +11.6 ± 0.6 bps;
+  2 clusters, provisional. Two-venue reads now stream with the `--symbols` filter; the `two_venue`
+  block gains `paired_pooled` / `paired_rows`.
 ## v1.17.0 — 2026-10-16
 
 Theme: execution quality and breadth. The platform gains a real second venue (IEX HIST, free), an implementation-shortfall benchmark with signal-aware urgency, pacing, quote fading, queue-aware cancels, markout decomposition and a modelled dark venue, a cross-sectional breadth book with a pre-registered net-of-cost screen, the v1.17 statistics revision, budgeted LLM agents, and C++/Rust parity for the new execution rules. Headline results are negative and stated as such: the net-of-cost screen passes 0 of 22 candidates on multi7, so the breadth book is registered with the screen as a hard gate and makes no confirmatory look. B7 (signal-aware execution fresh test) and B8 (two-venue router on real books) ship as code and run commands; their real-data results land in v1.17.1 as the IEX overlap days are ingested. Notes: docs/release/v1.17.0_RELEASE_NOTES.md.
