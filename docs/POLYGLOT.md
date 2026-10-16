@@ -24,7 +24,7 @@ components in more than one language: the order book in four, features and
 the alpha scoring in four, risk in three, the lifecycle in three (four counting
 `iap.adaptive.lifecycle`, which `iap.lifecycle` wraps). Every copy is pinned by
 a golden fixture, so the copies agree *today*; the risk is that each new
-feature has to be written N times, and a copy that is not updated drifts.
+feature must be written N times, and a copy that is not updated drifts.
 
 This document is the policy that bounds that risk. It decides, for every
 duplicated copy:

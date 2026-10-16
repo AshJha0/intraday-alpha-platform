@@ -36,7 +36,7 @@ flowchart LR
     DB["dependabot.yml<br/>weekly: github-actions, pip, cargo, docker"] -.->|"bump PRs through the same gate"| PR
     TAG["git tag v*"] --> VER
     subgraph REL["release.yml — the guard failed the v1.4.0 release once on an API error and now retries"]
-        VER["verify-ci (tests/harness/verify_ci_green.py)<br/>the tagged commit has a green ci run<br/>API errors retried, a run in progress polled,<br/>a failed or missing run stops the release"]
+        VER["verify-ci (tests/harness/verify_ci_green.py)<br/>the tagged commit has a green ci run<br/>API errors retried, an unfinished run polled,<br/>a failed or missing run stops the release"]
         BLD["images<br/>build and push to GHCR, one per language"]
         ATT["attest build provenance<br/>per image digest"]
         MAN["manifest<br/>release-manifest.json attached to the release"]

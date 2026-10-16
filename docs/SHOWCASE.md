@@ -83,12 +83,24 @@ negative ones first, is written down with the artefact that produced it.
   one fails the net-P&L-after-costs gate.
   <!-- source: README.md "Headline numbers" (Promotion verdicts, Lifecycle registry rows) and docs/index.html "Results so far" -->
 
-**In progress (v1.17, not released).** Execution quality and breadth on
-free data: algorithms and the SOR judged on implementation shortfall, built
-on the v1.16 execution work, and more sessions from Nasdaq's free
-full-market ITCH days and IEX HIST (a second, free, daily venue). No v1.17
-result is on `main` yet.
-<!-- source: README.md "Current status", "Next: v1.17"; docs/release/v1.16.0_RELEASE_NOTES.md "v1.17 direction" -->
+**Released: v1.17.0 (2026-10-16), execution quality and breadth.**
+- **Breadth screen: 0 pass / 22 fail / 1 not screened** of 23 candidates;
+  net IC negative in every screened row (round trip about 1.90-2.02 bps).
+  <!-- source: research/breadth/screen/SCREEN_multi7.md -->
+- **Breadth book (C8): registered under option (a), no confirmatory look**;
+  the screen refused every candidate and the holdout is unread.
+  <!-- source: research/preregs/breadth_book_prereg.json -->
+- **Dark venue (B10): modelled, not measured** (no free dark-pool data).
+- **IEX second venue:** day 1 (2025-11-28) processed, TOPS oracle 0
+  mismatches for AAPL, MSFT and QQQ; 8 overlap days remain.
+  <!-- source: docs/research/IEX_OVERLAP_SET.md -->
+- **Known gap:** v1.17.0 ships no release manifest, no lock-file SBOMs and
+  no digest-pinned k8s manifests; fixed by PR #211, ships with v1.17.1.
+<!-- source: CHANGELOG.md "## v1.17.0"; docs/release/v1.17.0_RELEASE_NOTES.md -->
+
+**Next: v1.17.1.** B7 (signal-aware execution) and B8 (two-venue router)
+real-data results, the remaining 8 IEX overlap days, and the #211
+manifest/SBOM/digest-pinning fix.
 
 ## Numbers a CI check re-derives
 
@@ -105,7 +117,7 @@ reported as stale rather than failing).
 | Flagship alphas | 24 (EQ01-EQ12, FX01-FX12); verdicts 0 PROMOTE / 12 ITERATE / 12 REJECT | `research/alpha_reports/REPORT.md` |
 | Promotion lifecycle | 7 states · 17 pinned edges · 20 gates; 23 alphas at CANDIDATE, 0 beyond | `research/alpha_registry.json`, `tests/golden/expected_lifecycle.json` |
 | Contracts | 17 JSON Schemas · 22 typed Python contracts · 18 runtime-checkable Protocols | `schemas/`, `python/src/iap/contracts/` |
-| Experiments ledger | 5,574 recorded looks over 384 distinct configurations; Bonferroni per-test \|t\| ≥ 4.432 | `research/experiments.json` |
+| Experiments ledger | 5,732 recorded looks over 422 distinct configurations (as of v1.17.0); expected max \|t\| 4.160; Bonferroni per-test \|t\| ≥ 4.447 | `research/experiments.json` |
 | C++ tick-to-trade (CI runner) | p50 1,279 ns · p99 2,559 ns · p99.9 11,263 ns, in-process, decoded frame to order intent | `benchmarks/results_tick_to_trade.md` |
 | Rust feature engine from Python | about 790,000 events/s against about 5,250 through the Python reference on the 45 native slots: 150x, not a pipeline speed-up | `rust-pyo3` CI job summary, API_FEATURES.md §7.1 |
 <!-- source: README.md "Headline numbers" table and "Cross-language parity" table (every row); the same figures appear in docs/index.html "Measured, not claimed" -->
@@ -138,7 +150,7 @@ flowchart TD
     FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
-    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,574 looks / 384 configs, two datasets, three method revisions)<br/>REPORT.md, ML_REPORT.md, model manifests"]
+    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,732 looks / 422 configs as of v1.17.0, research/experiments.json)<br/>REPORT.md, ML_REPORT.md, model manifests"]
     RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 23 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```

@@ -1,8 +1,8 @@
 # ROADMAP — the six-week build plan against what exists
 
 The plan behind `tools/github/issues.yaml` (rendered as
-[EPICS.md](EPICS.md): 36 epics, 215 issues — 153 done, 4 in progress, 58
-backlog as of 2026-10-14, v1.16 in progress), mapped phase by phase to the code, the tests and
+[EPICS.md](EPICS.md): 36 epics, 215 issues — 157 done, 0 in-progress, 58
+backlog as of 2026-10-16, after the v1.16.0 and v1.17.0 releases), mapped phase by phase to the code, the tests and
 the artefacts that prove each step, and stated the same way the research
 is: what is done cites evidence; what is not done says what would prove it.
 Every count in this file is re-derived by `tests/harness/check_headline_numbers.py`
@@ -16,7 +16,7 @@ the YAML, every `done` evidence path on disk).
 | **Phase 0** — architecture and contracts | E01 contracts (canonical types, 17 schemas with `x-version`, JSONL + IAP1, determinism rules, `iap.contracts` types + Protocols), E02 repository engineering (CI, governance, CODEOWNERS, issue tooling) | done (2 of 9 issues sit in Backlog: C07 schema validation of every golden/config in CI, R04 the CI half of the pyproject install) | `schemas/` (17 files), `PLATFORM_CONVENTIONS.md` §1–§3, §13; `python/src/iap/contracts/`, `tests/golden/expected_contracts_examples.json`, `expected_canonical_json.json`; `.github/workflows/ci.yml`, `tools/github/`, `tests/integration/test_github_issue_plan.py`; [../API_CONTRACTS.md](../API_CONTRACTS.md) |
 | **Week 1** — market data + deterministic replay | E03 seeded generator + normalisation/QC, E04 replay as a flagship feature | done (RP05 incident capture bundle: backlog; M08 equity flow that reaches the close in the bundled dataset: done in v1.4.0 — the default `equities.flow.calibration = "session"` carries each equity stream to the close, `"legacy_budget"` reproduces the v1.3.0 dataset, §3.2) | `python/src/iap/marketdata/`, `data/normalized/qc_report.json` (308,975 events), `tests/replay/test_generator_determinism.py` (pins the raw-file hashes of the current and the v1.3.0 dataset), four replay engines + `expected_checkpoint_eq_1000.json`; `docs/runbooks/RUNBOOK_incident_replay.md` (the MVP capture → replay flow exists; a Java-side capture bundle tool does not) |
 | **Week 2** — order book + feature engine | E05 integer-tick L1/L2/MBO book (four languages, anomaly goldens), E06 205-feature registry / native 40 | done (F06 further native ports: backlog, on demand) | `expected_book_states.json`, `expected_anomaly_states.json`, `expected_features.json`; `data/reference/feature_registry.json` (205) |
-| **Week 3** — alphas + research framework | E07 24 flagship alphas, E08 validation (purged/embargoed walk-forward, leakage, NW t, ledger, hypothesis sign, costs, capacity) + `ExperimentRunner` | done (A07 EQ03 cost-aware iteration and A08 porting the other 18 alphas: backlog — the 6 golden alphas are ported, the rest wait for a CANDIDATE that clears the cost gate; V09 full deflated Sharpe: backlog) | `research/alpha_reports/REPORT.md` (0 PROMOTE / 11 ITERATE / 13 REJECT under the v1.5.0 default methods), `research/experiments.json` (5,361 looks / 293 configurations, two datasets, three method revisions, hash-chained), `python/src/iap/research/`, `research/experiments/<id>/` (15 runs: 5 on the v1.3.0 dataset, 5 on the current one under the rules up to v1.4.0, 5 under the default methods), `tests/golden/expected_experiment_golden_frame.json` |
+| **Week 3** — alphas + research framework | E07 24 flagship alphas, E08 validation (purged/embargoed walk-forward, leakage, NW t, ledger, hypothesis sign, costs, capacity) + `ExperimentRunner` | done (A07 EQ03 cost-aware iteration and A08 porting the other 18 alphas: backlog — the 6 golden alphas are ported, the rest wait for a CANDIDATE that clears the cost gate; V09 full deflated Sharpe: backlog) | `research/alpha_reports/REPORT.md` (0 PROMOTE / 11 ITERATE / 13 REJECT under the v1.5.0 default methods), `research/experiments.json` (5,732 looks / 422 configurations as of v1.17.0, per-dataset breakdown in its `datasets` block, hash-chained), `python/src/iap/research/`, `research/experiments/<id>/` (15 runs: 5 on the v1.3.0 dataset, 5 on the current one under the rules up to v1.4.0, 5 under the default methods), `tests/golden/expected_experiment_golden_frame.json` |
 | **Week 4** — portfolio + hard risk | E09 PGD optimizer under 7 constraint families, E10 fail-closed risk engine (Rust reference, Java port, **Python reference port `iap.risk`**) | done; v1.3.0 closed four fail-open defects in all three engines (future-stamped marks, NaN, i64 overflow, venue-0 orders — §3) | `expected_portfolio.json`; `expected_risk_{decisions,snapshot}.json` + `expected_risk_audit.jsonl` matched by Rust, Java and Python; the edge golden `expected_risk_edge_decisions.json` + `expected_risk_edge_audit.jsonl` (v1.3.0); [../API_TRADING.md](../API_TRADING.md) §1 |
 | **Week 5** — execution + performance | E11 TWAP/VWAP/POV/IS, SOR, event-driven simulator (C++ reference, Java port, **Python reference port `iap.execution`**), E12 performance architecture | done (X08 PEG/MID order types, X09 closed-form Almgren–Chriss, H05 Rust/Java benchmark harnesses with percentiles: backlog); v1.3.0 corrected the simulator's crossing pool, applied-only queue tracking, execute cap and cancel rule in all three languages (§3) | `expected_replay_fills.json` matched by C++, Java and Python (reproduced unchanged by the v1.3.0 rules); `benchmarks/results_cpp.md` (generated); [../API_TRADING.md](../API_TRADING.md) §2 |
 | **Week 6** — TCA, parity, lifecycle, trace, store, MVP, testing | E13 TCA, E14 cross-language parity, E15 7-state lifecycle, E16 decision trace, E17 SQL data model + store, E18 end-to-end MVP, E19 six-level testing | done (T05 venue/algo TCA attribution, L04 RETIRED as a live allocation gate, L05 ledger-id CI check, O06 trace on the Java dashboards, D03 Postgres backend, Q04 more integration verticals: backlog) | `expected_tca.json`; the parity table (README, `run_all.sh`: python 2411 / cpp 302 / rust 376; 193/72/75 golden; Java archived in v1.15); `expected_lifecycle.json` + `research/alpha_registry.json` (23 CANDIDATE / 0 beyond); `expected_canonical_json.json`, Java `decision_traces.jsonl`; `schemas/sql/iap_v1.sql` + `iap.store`; `expected_mvp.json` (15,805 events, 800 decisions, 231 parents, 163 fills, −82.84 USD, digest `a7f1ee60…`); `tests/README.md` |
@@ -70,9 +70,9 @@ takes 306-359 s in CI under coverage and xdist for the 1988 tests of the merged 
 (it is 1.5.0 since v1.5.0)
 (docs/governance/REPO_SETTINGS.md, CHANGELOG.md "Known limitations").
 
-## 3.1 In progress
+## 3.1 Open work as of 2026-10-04 (history)
 
-(Dated 2026-10-04; what is running now is in §3.6.) Nothing, as of 2026-10-04. The next work is chosen from the backlog above.
+(Dated 2026-10-04; the current state is §3.11-§3.13.) Nothing was running on 2026-10-04. The next work is chosen from the backlog above.
 The research-side candidates with the highest information value are still
 A07 (can a cost-aware horizon / threshold make EQ03 net-positive? — the
 cost-aware position policy, opt-in in v1.3.0 and the default since v1.5.0,
@@ -218,7 +218,7 @@ default, golden, published number and cross-language contract is unchanged):
   `BrokenProcessPool` under the spawn start method (Windows, macOS); the
   worker is now submitted by its importable module name.
 
-**In progress (not part of the release):** the first real-data maker study,
+**Running at the time (not part of the release; it finished with no maker edge, v1.16 item 11):** the first real-data maker study,
 pre-registered on branch `research/maker-real` (`research/maker_real/prereg.json`):
 EQ01, EQ02, EQ05 and EQ10 on the seven 2019-20 sessions, taker and passive
 exits, gated / gated with a meta-label filter / ungated (diagnostic only),
@@ -371,7 +371,7 @@ on `research/step2` that are not on `main` yet.
 | P1-P3 | not started |
 | real batch re-run under `v3` / `v4` | not done |
 
-## 3.8 v1.13.0 (2026-10-11): the quality review, hardening done, correctness in progress
+## 3.8 v1.13.0 (2026-10-11): the quality review, hardening done, correctness carried to v1.14.0
 
 On 2026-10-11 five independent read-only reviews (research validity,
 execution realism, data, risk/governance/AI/security, engineering) reviewed
@@ -507,7 +507,7 @@ owner decision 2026-10-14. Quoting v2: no edge (every cell loses $5-7k per sessi
 | A3 futures lead-lag | on hold (data cost) |
 | P1-P3 live gateway | not started |
 
-## 3.11 v1.16 (in progress): monetisation
+## 3.11 v1.16.0 (released 2026-10-15): monetisation
 
 The question: does the confirmed EQ10/EQ05 edge survive realistic costs, and
 at what size? Plan: `IAP_v1.16_Plan.md` (18 items, owner-approved
@@ -518,34 +518,56 @@ a PR is named.
 |---|---|
 | 1-5 realistic execution (parent impact, residual impact fit, v3 prereg realism keys, SOR and algo opt-ins) | done, all opt-in (#126-#130, #135; API_TRADING.md §2.13) |
 | 6 in-sample monetisation study (taker, 10 sessions, 480 cells) | done: zero trades in every cell; **no-go** on buying data (research/v116/MONETISATION_P0-6.md) |
-| 7 capacity curve | done: 0 of 45 cells break even (best 0.92 bp against 2.4 bp); tool and results in PR #149 |
+| 7 capacity curve | done: 0 of 45 cells break even (best 0.92 bp against 2.4 bp); research/v116/CAPACITY_CURVE.md |
 | 8 net-of-cost prereg on fresh data | not triggered (no net-positive in-sample cell) |
-| M5 quoting study v2 (two-sided skewed quoting, after the taker no-go) | registered (#134); in-sample run in progress, no result yet |
-| 9 forward paper-trade driver (infrastructure) | in PR #144 |
-| 10 AI4 DeepLOB on real data | in progress: adapter and training in PR #151; new prereg to be signed by the owner; no result yet |
+| M5 quoting study v2 (two-sided skewed quoting, after the taker no-go) | done: no quoting edge, every cell loses $5.0-6.9k per session (CHANGELOG v1.16.0; research/quoting_real/QUOTING_V2_RESULT.md) |
+| 9 forward paper-trade driver (infrastructure) | done: `python -m iap.paper.daily` (not registered as a daily task) |
+| 10 AI4 DeepLOB on real data | closed 2026-10-15: in-sample failure (validation net -0.69 bp per trade), no holdout look (research/r7/AI4_CLOSED_v116.md) |
 | 11 research branches merged onto main | done (#131, #132) |
-| 12 R7 follow-ups | done (#140); memory follow-ups in PR #148 |
+| 12 R7 follow-ups | done (#140); memory follow-ups done (docs/research/MEMORY_REVIEW_v116.md) |
 | 13 engineering performance | done (#145, #146) |
-| 14 optimiser (Dykstra, estimated Ledoit-Wolf) | in PR #147 |
+| 14 optimiser (Dykstra, estimated Ledoit-Wolf) | done, opt-in |
 | 15 multiple-testing report columns | done (#142) |
-| 16 blocking mypy and agent-evals | in PR #143 |
+| 16 blocking mypy and agent-evals | done: mypy blocking |
 | 17 MVP end-of-day flatten | done (#139) |
 | 18 release.py tar fix; process-and-delete pipeline | tar fix done (#141); the pipeline is not needed (item 8 not triggered) |
-| registration environment pinned to the CI lock | in PR #152 |
+| registration environment pinned to the CI lock | done (`--require-ci-env`; RUNBOOK_prereg_environment.md) |
 
-## 3.12 v1.17 direction (depends on v1.16)
+## 3.12 v1.17.0 (released 2026-10-16): execution quality and breadth
 
-From the plan's v1.17 sketch. The taker study was a no-go, so unless the
-quoting study or AI4 finds a net-positive rule:
+Plan `IAP_v1.17_Plan.md`; what shipped is CHANGELOG.md "## v1.17.0" and
+docs/release/v1.17.0_RELEASE_NOTES.md. v1.16 showed that neither taking,
+quoting v2 nor AI4 clears costs, so v1.17 took the execution-quality and
+breadth branch of the old v1.17 sketch. The headline results are negative
+and stated as such:
 
-- widen the data (more symbols and sessions; a paid-data decision), or
-- pivot to the execution-quality product: algos and SOR judged on
-  implementation shortfall.
+| Item | State (2026-10-16) |
+|---|---|
+| C6 pre-registered net-of-cost screen on multi7 | done: **0 pass / 22 fail / 1 not screened** of 23 candidates; net IC negative in every screened row (research/breadth/screen/SCREEN_multi7.md) |
+| C8 breadth book | registered by the owner under option (a): the screen is a hard gate and refused every candidate, so **no confirmatory look**; holdout unread (research/preregs/breadth_book_prereg.json) |
+| B1 depth-50 re-run | done, in-sample: at 0.5 % ADV the depth-10 under-fill was the walk cap; at 2 % ADV the displayed book itself runs out; costs rise 2-5 bps at 1-2 % ADV (research/execution/benchmark/DEPTH_COMPARISON_multi7.md) |
+| B10 dark / midpoint venue | done, opt-in: **modelled, not measured** (no free dark-pool data) |
+| A4 IEX HIST second venue | code done; 9 overlap days approved; day 1 (2025-11-28) processed with 0 TOPS-oracle mismatches on AAPL / MSFT / QQQ (docs/research/IEX_OVERLAP_SET.md) |
+| B7 signal-aware execution fresh test, B8 two-venue router on real books | code and run commands shipped; no real-data result yet (v1.17.1) |
+| F7 / F8 / B9 C++ and Rust parity of the new execution rules | done, byte parity against Python goldens; not ported: the B2-regime arm of dark eligibility, the B10 proxy sampler / fit, the exchange-local hazard clock (PLATFORM_CONVENTIONS §11.3) |
+| E1-E4 budgeted LLM agents | done (docs/AGENTS.md); the LLM never computes a number, signs, registers or merges |
+| release manifest / SBOMs / digest-pinned k8s manifests | **not produced** for v1.17.0 (the release `manifest` job failed); fix in PR #211, ships in v1.17.1 |
 
-If a net-positive rule does appear: several weeks of forward paper trade,
-capacity limits in the portfolio layer, a monitoring runbook (drift, decay,
-cost creep) and an agent daily report. Either way: retire what v1.16 drops,
-a reproducible-build check, and a docs and site refresh.
+Still standing from v1.16: taker no-go, no capacity (0 of 45 cells), no
+quoting edge, AI4 closed.
+
+## 3.13 Next: v1.17.1, then v1.18
+
+v1.17.1 (next):
+
+- B7 (signal-aware execution, fresh test) and B8 (two-venue router on real
+  Nasdaq + IEX books) real-data results;
+- the remaining 8 of the 9 approved IEX overlap days (docs/research/IEX_OVERLAP_SET.md);
+- the release manifest / Python lock-file SBOM / k8s digest-pinning fix (#211).
+
+v1.18: the C++ ports v1.17 left out (B2-regime arm of the dark eligibility,
+the B10 proxy sampler / fit, the exchange-local hazard clock;
+PLATFORM_CONVENTIONS §11.3).
 
 Every result still goes through the same gate and ledger; a deep model gets
 no exemption for being deep.

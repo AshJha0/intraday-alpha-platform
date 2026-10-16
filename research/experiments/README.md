@@ -235,8 +235,9 @@ are read from the documents, which have not changed since v1.3.0.)
   (24 × 84), the five `v2` runs (5 × 84) and the adaptive study (40), for
   4,396; the signal-combination report (`research/combination/`) added eight
   experiments at 95 looks each, for
-  **5,574 looks over 384 distinct configurations** (Bonferroni |t| ≥ 4.432,
-  expected max |t| ≈ 4.144). Entries are never de-duplicated across kinds or
+  5,574 at v1.14.0. Later releases added the v1.15-v1.17 studies; as of v1.17.0
+  the ledger holds **5,732 looks over 422 distinct configurations** (Bonferroni
+  |t| ≥ 4.447, expected max |t| 4.160; `research/experiments.json`). Entries are never de-duplicated across kinds or
   datasets — the denominator only grows.
 
 `seed` is recorded and hashed but consumed by nothing: the whole chain

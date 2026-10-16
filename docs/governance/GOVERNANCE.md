@@ -8,36 +8,35 @@ Binding for every change to this repository.
 Controls in this document are of two kinds. Be clear which is which before
 relying on one.
 
-**Live branch ruleset (read from the GitHub API, 2026-10-15).** One
-active ruleset, `protect-main`, targets the default branch with **no bypass
-actors**:
+**Live branch ruleset (read from the GitHub API, 2026-10-16).** One
+active ruleset, `protect-main` (id 24455225), targets the default branch with
+**no bypass actors**:
 
-- `pull_request`: a pull request is required; **0 approving reviews** (the
-  repository has one maintainer, and GitHub does not let an author approve
-  their own pull request);
+- `pull_request`: a pull request is required; **0 approving reviews** and no
+  code-owner review (the repository has one maintainer, and GitHub does not
+  let an author approve their own pull request);
 - `required_status_checks`, **strict** (a branch must be up to date with
-  `main` before merging), 13 checks: `python`, `integration`, `cpp`, `rust`,
+  `main` before merging), 16 checks: `python`, `integration`, `cpp`, `rust`,
   `golden`, `deployment`, `CodeQL`, `governance`, `advisory`, `rust-pyo3`,
-  `python-slow`, `supply-chain` and `analyze (rust)` (the CodeQL matrix
-  entry; `java` is no longer a required check: the Java tree was archived
-  in v1.15 and the ruleset read on 2026-10-15 does not list it);
+  `python-slow`, `supply-chain`, `analyze (rust)` (the CodeQL matrix entry),
+  `python-312`, `cpp-sanitizers` and `agent-evals` (the last three since
+  2026-10-15, owner item 0.8; `java` is not required: the Java tree was
+  archived in v1.15);
 - `non_fast_forward` (no force-push) and `deletion` (no branch deletion).
 
-Since 2026-10-15 (owner item 0.8) `python-312`, `cpp-sanitizers` and
-`agent-evals` are required as well (16 required checks). Not required today:
-`images`, `docs` (v1.17 E4: the documentation checks; add it to the ruleset
-once it has been green on main) and `reproducible-build` (v1.17 F1: the wheel
-built twice must match; the python image is report-only). The lychee link
-check is an advisory step (`continue-on-error`), so a dead link annotates the
-run and does not block a merge. No required check was renamed in v1.17:
-`python` still carries the blocking mypy step, whose scope grew to `agents`,
-`llm`, `mvp` and `paper` (F3).
+Not required (2026-10-16): `docs` (v1.17 E4: the documentation checks),
+`reproducible-build` (v1.17 F1: the wheel built twice must match; the python
+image is report-only) and `images`. The lychee link check is an advisory step
+(`continue-on-error`), so a dead link annotates the run and does not block a
+merge. No required check was renamed in v1.17: `python` still carries the
+blocking mypy step, whose scope grew to `agents`, `llm`, `mvp` and `paper` (F3).
 
-**Ready to be required (owner action, v1.17 G4):** the `docs` job (E4) has been green on
-main in the CI runs 38803067354 (62b9f0e) and 38805345163 (4eea5d5); it is ready to be added
-to the ruleset as a required check (Settings > Rules > the main ruleset > Require status
-checks > `docs`). `reproducible-build` was green in the same two runs and can be added with
-it. Until the owner does, both stay advisory.
+**Ready to be required (owner action, v1.17 G4; status 2026-10-16):** the `docs` job (E4)
+has been green on main in the CI runs 38803067354 (62b9f0e) and 38805345163 (4eea5d5).
+The owner can make it a required check (Settings > Rules > `protect-main` > Require status
+checks > `docs`); as of the 2026-10-16 ruleset read it is not required. `reproducible-build`
+was green in the same two runs and can be required with it. Until the owner does, both stay
+advisory.
 
 **Recommended owner actions** (repository settings; code cannot do them):
 
@@ -47,11 +46,11 @@ it. Until the owner does, both stay advisory.
 3. restrict merge methods to merge commits for research branches, or at
    least never rebase them (section 2c).
 
-| Control | Status (2026-10-15) | Enforced by |
+| Control | Status (2026-10-16) | Enforced by |
 |---|---|---|
-| CI green on every push and pull request (python, cpp and rust, golden gate, deployment validation; Java archived in v1.15) | **Enforced as a merge gate for the thirteen required checks** | `protect-main` ruleset; other jobs run but do not block |
+| CI green on every push and pull request (python, cpp and rust, golden gate, deployment validation; Java archived in v1.15) | **Enforced as a merge gate for the sixteen required checks** | `protect-main` ruleset; other jobs run but do not block |
 | Pull requests only, no direct push to `main` | **Enforced** | `protect-main` (`pull_request` rule, no bypass actors) |
-| Required status checks before merge | **Enforced, strict**: python, integration, cpp, rust, golden, deployment, CodeQL, governance, advisory, rust-pyo3, python-slow, supply-chain, analyze (rust) | `protect-main` |
+| Required status checks before merge | **Enforced, strict**: python, integration, cpp, rust, golden, deployment, CodeQL, governance, advisory, rust-pyo3, python-slow, supply-chain, analyze (rust), python-312, cpp-sanitizers, agent-evals | `protect-main` |
 | "1 to 2 reviewers" by change class (section 1) | **Not enforced: the ruleset requires 0 approvals**; not satisfiable by one maintainer | Needs a second maintainer; GitHub does not let an author approve their own pull request |
 | Reviewer ownership by path | Enforced as a file, applied only once the ruleset requires code-owner review | `CODEOWNERS` (every path owned by `@AshJha0`) |
 | Force-push and branch-deletion protection | **Enforced** | `protect-main` (`non_fast_forward`, `deletion`) |

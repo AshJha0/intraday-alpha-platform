@@ -821,20 +821,16 @@ def check_parity_table_vs_tree(tests: dict[str, int], golden: dict[str, int]) ->
     )
 
 
-def check_research(docs: dict[str, str]) -> None:
-    print("research ledger numbers (move on every research rerun):")
-    ledger = ROOT / "research" / "experiments.json"
-    if not ledger.exists():
-        report(
-            "experiment_ledger", True, "research/experiments.json absent — skipped", RESEARCH_STALE
-        )
-        return
-    doc = json.loads(ledger.read_text(encoding="utf-8"))
+def ledger_mismatches(docs: dict[str, str], doc: dict) -> list[str]:
+    """Every ledger count quoted in ``docs`` that differs from the ledger ``doc``.
+
+    Shared with tests/harness/check_docs.py (``release_truth``), which fails a
+    tagged release on any of these.
+    """
     total = doc["total_experiments"]
     distinct = doc["distinct_experiments"]
     max_t = doc["expected_max_null_t"]
     bonf = doc["bonferroni_t_threshold"]
-
     stale = []
     for name, text in docs.items():
         # "865 recorded looks", "865-look", "865 looks over": three digits and
@@ -864,6 +860,24 @@ def check_research(docs: dict[str, str]) -> None:
         for m in re.finditer(r"Bonferroni[^\n\d]{0,40}\\?\|t\\?\|[^\n\d]{0,10}([\d.]+)", text):
             if abs(float(m.group(1)) - bonf) > 0.005:
                 stale.append(f"{name}: Bonferroni {m.group(1)}, ledger says {bonf:.3f}")
+    return stale
+
+
+def check_research(docs: dict[str, str]) -> None:
+    print("research ledger numbers (move on every research rerun):")
+    ledger = ROOT / "research" / "experiments.json"
+    if not ledger.exists():
+        report(
+            "experiment_ledger", True, "research/experiments.json absent — skipped", RESEARCH_STALE
+        )
+        return
+    doc = json.loads(ledger.read_text(encoding="utf-8"))
+    total = doc["total_experiments"]
+    distinct = doc["distinct_experiments"]
+    max_t = doc["expected_max_null_t"]
+    bonf = doc["bonferroni_t_threshold"]
+
+    stale = ledger_mismatches(docs, doc)
     report(
         "experiment_ledger",
         not stale,
