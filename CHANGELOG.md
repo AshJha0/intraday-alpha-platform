@@ -30,7 +30,21 @@ that tag.
   tagged HEAD, run in CI on release and truth-pass branches) fails on undated status phrases,
   pending-PR lists and ledger drift; `tools/release.py flow` gains the step.
 - v1.17.1 fix: release.yml passes each Python lock file to `cyclonedx-py requirements` positionally (`-i` is `--index-url` in cyclonedx-bom 7.x). The v1.17.0 release workflow's manifest job failed on it, so v1.17.0 shipped its three images (pushed and attested) without `release-manifest.json` and the two lock-file SBOMs.
-
+- v1.17.1 B8 follow-up (`research/execution/b8/REPORT_sweep.md`).
+  - **Diagnosis, confirmed and refined.** IEX children filled far beyond the
+    touch they saw, for three reasons:
+    - the consumption overlay kept IEX's slowly-updating touch "used" by our
+      earlier fills (57 % / 82 % of pinned-IEX children, AAPL / MSFT);
+    - MARKET children had no limit and reached stray far levels;
+    - `sor` picked IEX on fee at an equal displayed touch (89 % / 77 %).
+  - **New opt-in route `sor_sweep`.** `ExecutionReplay(router_sweep=True)`
+    runs `CostAwareRouter.plan_sweep(available=...)`: all-in rank over both
+    books' depth net of our overlay, one IOC LIMIT per venue capped at the
+    planned qty, and `sweep_unsent_qty`. Also `router_from_calibrations(sweep_rank=, sweep_levels=)`.
+    Defaults leave every replay unchanged.
+  - **Re-run on the same parents.** `sor_sweep` is +3.8 ± 2.1 bps pooled vs
+    pinned Nasdaq (AAPL −0.8, MSFT +8.5); `sor` is +5.1 ± 1.3. 2 clusters,
+    provisional. QQQ was not run (memory).
 ## v1.17.0 — 2026-10-16
 
 Theme: execution quality and breadth. The platform gains a real second venue (IEX HIST, free), an implementation-shortfall benchmark with signal-aware urgency, pacing, quote fading, queue-aware cancels, markout decomposition and a modelled dark venue, a cross-sectional breadth book with a pre-registered net-of-cost screen, the v1.17 statistics revision, budgeted LLM agents, and C++/Rust parity for the new execution rules. Headline results are negative and stated as such: the net-of-cost screen passes 0 of 22 candidates on multi7, so the breadth book is registered with the screen as a hard gate and makes no confirmatory look. B7 (signal-aware execution fresh test) and B8 (two-venue router on real books) ship as code and run commands; their real-data results land in v1.17.1 as the IEX overlap days are ingested. Notes: docs/release/v1.17.0_RELEASE_NOTES.md.

@@ -69,6 +69,8 @@ SWEEP_RANKS = ("price", "all_in")
 
 #: ``(venue_id, side, queue_qty_ahead) -> fill probability or None``.
 FillProb = Callable[[int, int, int], "float | None"]
+#: ``(venue_id, side_of_book, price_ticks, displayed_qty) -> qty a sweep may take``.
+Available = Callable[[int, int, int, int], int]
 
 
 def hazard_fill_prob(
@@ -266,8 +268,15 @@ class CostAwareRouter:
         limit_ticks: int | None = None,
         candidates=None,
         tick: float | None = None,
+        available: Available | None = None,
     ) -> list[SweepChild]:
-        """Children across displayed depth, best price first (module docstring)."""
+        """Children across displayed depth, best price first (module docstring).
+
+        ``available(venue_id, side_of_book, price_ticks, displayed)`` (v1.17.1,
+        opt-in) is the qty the sweep may take at a level, e.g. the displayed
+        size net of what our own earlier fills already consumed there; a level
+        with 0 is skipped. ``None`` = the displayed size (unchanged).
+        """
         if qty <= 0:
             raise ValueError("sweep qty must be > 0")
         all_in = self.options.sweep_rank == "all_in"
@@ -281,6 +290,10 @@ class CostAwareRouter:
                     px > limit_ticks if side == 0 else px < limit_ticks
                 ):
                     break
+                if available is not None:
+                    q = available(vid, 1 - side, px, q)
+                    if q <= 0:
+                        continue
                 key_px = px if side == 0 else -px
                 if all_in:
                     # cost per share for a buy, minus proceeds for a sell
