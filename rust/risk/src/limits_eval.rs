@@ -50,9 +50,11 @@ impl RiskEngine {
             | rules::STRATEGY_POSITION
             | rules::CANCEL_RATE
             | rules::STATE_CAPACITY => (Scope::Strategy, order.strategy_id.clone()),
-            rules::KILL_VENUE | rules::VENUE_DISCONNECTED | rules::VENUE_MESSAGE_RATE => {
-                (Scope::Venue, order.venue_id.to_string())
-            }
+            rules::KILL_VENUE
+            | rules::VENUE_DISCONNECTED
+            | rules::VENUE_MESSAGE_RATE
+            | rules::VENUE_TYPE_RESTRICTED => (Scope::Venue, order.venue_id.to_string()),
+            rules::DARK_FILL_NOTIONAL => (Scope::Global, String::new()),
             _ => (Scope::Instrument, order.instrument_id.to_string()),
         }
     }
@@ -791,6 +793,100 @@ impl RiskEngine {
                             "strategy {sid} exceeded {} cancels/s (burst {})",
                             fmt_fixed(rate, 2),
                             fmt_fixed(burst, 2)
+                        ),
+                    );
+                }
+            }
+        }
+        // 31-33 (v1.17 F8): the pre-trade controls of the dark-venue model.
+        // A venue is `lit` unless `pre_trade.venue_types` maps it; the dark
+        // checks (32, 33) apply to an order routed to a dark / midpoint
+        // venue only. They run before 29 so that only an order about to be
+        // ALLOWed spends the venue message token.
+        let venue_type = limits.venue_type(order.venue_id);
+        // 31. venue-type restriction
+        if let Some(allowed) = &limits.allowed_venue_types {
+            if !allowed.contains(&venue_type) {
+                let names: Vec<&str> = allowed.iter().map(|t| t.as_str()).collect();
+                return Self::reject(
+                    rules::VENUE_TYPE_RESTRICTED,
+                    Warn,
+                    format!(
+                        "venue {} is {}, allowed venue types: {}",
+                        order.venue_id,
+                        venue_type.as_str(),
+                        names.join(", ")
+                    ),
+                );
+            }
+        }
+        if venue_type.is_dark() {
+            // 32. dark participation: the firm's session quantity routed to
+            // dark / midpoint venues in the instrument (dark fills + every
+            // open dark order + this order) against the dark cap
+            if let (Some(bps), Some(floor)) = (
+                limits.max_dark_participation_bps,
+                limits.dark_participation_floor_qty,
+            ) {
+                let mut open_qty = 0.0f64;
+                for r in self.open.values() {
+                    if r.instrument_id == order.instrument_id
+                        && limits.venue_type(r.venue_id).is_dark()
+                    {
+                        open_qty += r.qty as f64;
+                    }
+                }
+                let executed = self
+                    .dark_executed
+                    .get(&order.instrument_id)
+                    .copied()
+                    .unwrap_or(0);
+                let projected_qty = executed as f64 + open_qty + order.qty as f64;
+                let volume = self
+                    .market_volume
+                    .get(&order.instrument_id)
+                    .copied()
+                    .unwrap_or(0);
+                let cap = (floor as f64).max(volume as f64 * bps / 1e4);
+                if !(projected_qty <= cap) {
+                    return Self::reject(
+                        rules::DARK_PARTICIPATION,
+                        Warn,
+                        format!(
+                            "projected dark session qty {} exceeds dark participation cap {} ({}bps of market volume {volume}, floor {floor})",
+                            fmt_fixed(projected_qty, 0),
+                            fmt_fixed(cap, 0),
+                            fmt_fixed(bps, 1)
+                        ),
+                    );
+                }
+            }
+            // 33. dark-fill notional: the firm's session notional filled on
+            // dark / midpoint venues (every currency converted at the
+            // current rate; a missing rate is fail-closed) plus this order
+            if let Some(max) = limits.max_dark_fill_notional {
+                let mut total = 0.0f64;
+                for (ccy, notional) in &self.dark_filled {
+                    let Some((rate, _)) = self.fx_rate(ccy) else {
+                        return Self::reject(
+                            rules::FX_RATE_MISSING,
+                            Warn,
+                            format!(
+                                "dark fill notional in {ccy} has no conversion rate (fail-closed)"
+                            ),
+                        );
+                    };
+                    total += notional * rate;
+                }
+                total += order_notional;
+                if !(total <= max) {
+                    return Self::reject(
+                        rules::DARK_FILL_NOTIONAL,
+                        Warn,
+                        format!(
+                            "projected dark fill notional {} exceeds max_dark_fill_notional {}",
+                            fmt_fixed(total, 2),
+                            fmt_fixed(max, 2)
                         ),
                     );
                 }

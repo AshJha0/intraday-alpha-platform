@@ -126,4 +126,4 @@ reason branches: 63 of 64 reached
   LOSS_LIMIT_OVERRIDE: daily loss limit -> 002_kills (16)
   SESSION_ROLLED -> 000_baseline (37)
   BOOTSTRAP_COMPLETE: drop-copy fills -> 009_bootstrap (3)
-  STATE_RESTORED: restored snapshot v2 -> 000_baseline (16)
+  STATE_RESTORED: restored snapshot v3 -> 000_baseline (16)

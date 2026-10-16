@@ -860,7 +860,7 @@ fn risk_snapshot_restore_roundtrip() {
     let mut unbroken = engine();
     let first = script(&mut unbroken, 0, 30);
     let snap = unbroken.snapshot();
-    assert_eq!(snap["x-version"].as_u64(), Some(2));
+    assert_eq!(snap["x-version"].as_u64(), Some(3));
     let limits = RiskLimits::from_json(&config()).unwrap();
     let mut restored = RiskEngine::restore(limits, unbroken_refs(), &snap, T0 + 5 * NS).unwrap();
     assert_eq!(restored.audit().len(), 1);
@@ -1550,4 +1550,149 @@ fn cancel_requests_spend_strategy_and_venue_budgets() {
     assert_eq!(eng.check_order(&at(3, 2449, "S3", T0)).rule_id, rules::VENUE_MESSAGE_RATE);
     assert!(eng.check_order(&at(4, 2448, "S1", T0 + NS)).allowed());
     assert_eq!(eng.metrics.counter_value("risk_cancel_requests_total"), 1);
+}
+
+// ------------------------------------------------ v1.17 F8: checks 31-33
+
+/// Repo config plus venue 2 dark, venue 3 midpoint (1 stays lit).
+fn f8_config() -> serde_json::Value {
+    let mut doc = config();
+    doc["pre_trade"]["venue_types"] = serde_json::json!({"2": "dark", "3": "midpoint"});
+    doc
+}
+
+/// An order to `venue_id`, stamped 100 ms apart per order id so neither the
+/// per-strategy throttle (burst 4) nor the stale gate decides these tests.
+fn at_venue(id: u64, side: u8, qty: i64, price: i64, venue_id: u16) -> OrderRequest {
+    let mut o = order(id, side, qty, price);
+    o.venue_id = venue_id;
+    o.timestamp = T0 + id as i64 * NS / 10; // 100 ms: past the burst, inside the stale timeout
+    o
+}
+
+fn f8_fill(order_id: u64, qty: i64, price: i64) -> Fill {
+    Fill {
+        ts: T0,
+        strategy_id: "S1".to_string(),
+        instrument_id: 1,
+        order_id,
+        side: 0,
+        qty,
+        price_ticks: price,
+    }
+}
+
+/// Every F8 control is off in the repo config: an order to any venue id
+/// passes, nothing is counted as dark, and the snapshot carries the new
+/// fields empty (the only change to every pre-F8 golden row).
+#[test]
+fn f8_controls_are_off_by_default() {
+    let mut eng = engine();
+    assert!(eng.check_order(&at_venue(1, 0, 100, 2450, 7)).allowed());
+    assert_eq!(eng.snapshot()["open"]["1"]["venue_id"], serde_json::json!(7));
+    assert!(eng.on_fill(&f8_fill(1, 100, 2450)));
+    let snap = eng.snapshot();
+    assert_eq!(snap["x-version"], serde_json::json!(3));
+    assert_eq!(snap["dark_executed"], serde_json::json!({}));
+    assert_eq!(snap["dark_filled"], serde_json::json!([]));
+}
+
+#[test]
+fn venue_type_restriction_check_31() {
+    let mut doc = f8_config();
+    doc["pre_trade"]["allowed_venue_types"] = serde_json::json!(["lit"]);
+    let mut eng = RiskEngine::from_config_ticks(&doc, ticks());
+    eng.on_market(1, 2450, 2452, T0);
+    assert!(eng.check_order(&at_venue(1, 0, 100, 2450, 1)).allowed());
+    let d = eng.check_order(&at_venue(2, 0, 100, 2450, 2));
+    assert_eq!(d.rule_id, rules::VENUE_TYPE_RESTRICTED);
+    assert_eq!(d.reason, "venue 2 is dark, allowed venue types: lit");
+    let last = eng.audit().last().unwrap();
+    assert_eq!((last.scope, last.scope_id.as_str()), (Scope::Venue, "2"));
+    let d = eng.check_order(&at_venue(3, 0, 100, 2450, 3));
+    assert_eq!(d.reason, "venue 3 is midpoint, allowed venue types: lit");
+    // the allow list is rendered in the pinned type order, not input order
+    doc["pre_trade"]["allowed_venue_types"] = serde_json::json!(["midpoint", "dark"]);
+    let mut eng = RiskEngine::from_config_ticks(&doc, ticks());
+    eng.on_market(1, 2450, 2452, T0);
+    let d = eng.check_order(&at_venue(4, 0, 100, 2450, 1));
+    assert_eq!(d.reason, "venue 1 is lit, allowed venue types: dark, midpoint");
+    assert!(eng.check_order(&at_venue(5, 0, 100, 2450, 2)).allowed());
+    // an unmapped venue (SOR included) is lit
+    let d = eng.check_order(&at_venue(6, 0, 100, 2450, 0));
+    assert_eq!(d.reason, "venue 0 is lit, allowed venue types: dark, midpoint");
+}
+
+#[test]
+fn dark_participation_check_32() {
+    let mut doc = f8_config();
+    doc["pre_trade"]["max_dark_participation_bps"] = serde_json::json!(1000.0);
+    doc["pre_trade"]["dark_participation_floor_qty"] = serde_json::json!(100);
+    let mut eng = RiskEngine::from_config_ticks(&doc, ticks());
+    eng.on_market(1, 2450, 2452, T0);
+    eng.on_market_trade(1, 2000, T0); // cap = max(100, 200) = 200
+    assert!(eng.check_order(&at_venue(1, 0, 100, 2450, 2)).allowed());
+    let d = eng.check_order(&at_venue(2, 0, 150, 2450, 3));
+    assert_eq!(d.rule_id, rules::DARK_PARTICIPATION);
+    assert_eq!(
+        d.reason,
+        "projected dark session qty 250 exceeds dark participation cap 200 (1000.0bps of market volume 2000, floor 100)"
+    );
+    let last = eng.audit().last().unwrap();
+    assert_eq!((last.scope, last.scope_id.as_str()), (Scope::Instrument, "1"));
+    assert!(eng.check_order(&at_venue(3, 0, 150, 2450, 1)).allowed()); // lit: not counted
+    assert!(eng.on_fill(&f8_fill(1, 100, 2450)));
+    assert_eq!(eng.snapshot()["dark_executed"], serde_json::json!({"1": 100}));
+    assert!(eng.check_order(&at_venue(4, 0, 100, 2450, 2)).allowed()); // 100 + 0 + 100
+    assert_eq!(
+        eng.check_order(&at_venue(5, 0, 1, 2450, 2)).rule_id,
+        rules::DARK_PARTICIPATION
+    );
+    eng.roll_session(T0 + NS, "eod");
+    assert_eq!(eng.snapshot()["dark_executed"], serde_json::json!({}));
+}
+
+#[test]
+fn dark_fill_notional_check_33_and_snapshot_roundtrip() {
+    let mut doc = f8_config();
+    doc["pre_trade"]["max_dark_fill_notional"] = serde_json::json!(5000.0);
+    let mut eng = RiskEngine::from_config_ticks(&doc, ticks());
+    eng.on_market(1, 2450, 2452, T0);
+    assert!(eng.check_order(&at_venue(1, 0, 100, 2450, 2)).allowed());
+    assert!(eng.on_fill(&f8_fill(1, 100, 2450)));
+    assert_eq!(
+        eng.snapshot()["dark_filled"],
+        serde_json::json!([{"ccy": "USD", "notional": 2450.0}])
+    );
+    assert!(eng.check_order(&at_venue(2, 0, 100, 2451, 3)).allowed());
+    assert!(eng.on_fill(&f8_fill(2, 100, 2451)));
+    let d = eng.check_order(&at_venue(3, 0, 100, 2450, 2));
+    assert_eq!(d.rule_id, rules::DARK_FILL_NOTIONAL);
+    assert_eq!(
+        d.reason,
+        "projected dark fill notional 7351.00 exceeds max_dark_fill_notional 5000.00"
+    );
+    let last = eng.audit().last().unwrap();
+    assert_eq!((last.scope, last.scope_id.as_str()), (Scope::Global, ""));
+    assert!(eng.check_order(&at_venue(4, 0, 100, 2450, 1)).allowed()); // lit
+    // a fill of an order no longer open is not counted (no venue known)
+    eng.on_order_done(4);
+    assert!(eng.on_fill(&f8_fill(4, 100, 2450)));
+    assert_eq!(
+        eng.snapshot()["dark_filled"],
+        serde_json::json!([{"ccy": "USD", "notional": 4901.0}])
+    );
+    let limits = RiskLimits::from_json(&doc).unwrap();
+    let mut restored = RiskEngine::restore(limits.clone(), unbroken_refs(), &eng.snapshot(), T0).unwrap();
+    assert_eq!(restored.snapshot(), eng.snapshot());
+    assert_eq!(
+        restored.check_order(&at_venue(5, 0, 100, 2450, 2)).rule_id,
+        rules::DARK_FILL_NOTIONAL
+    );
+    eng.roll_session(T0 + NS, "eod");
+    assert!(eng.check_order(&at_venue(6, 0, 100, 2450, 2)).allowed());
+    // a strict restore refuses an open order without a venue
+    let mut bad = eng.snapshot();
+    bad["open"]["6"].as_object_mut().unwrap().remove("venue_id");
+    assert!(RiskEngine::restore(limits, unbroken_refs(), &bad, T0).is_err());
 }

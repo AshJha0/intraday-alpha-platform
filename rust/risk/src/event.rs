@@ -279,6 +279,15 @@ pub mod rules {
     /// Check 7: a bounded per-key state map is full
     /// (`pre_trade.max_tracked_keys`).
     pub const STATE_CAPACITY: &str = "STATE_CAPACITY";
+    /// Check 31 (v1.17 F8): the order's venue type is not in
+    /// `pre_trade.allowed_venue_types`.
+    pub const VENUE_TYPE_RESTRICTED: &str = "VENUE_TYPE_RESTRICTED";
+    /// Check 32 (v1.17 F8): the firm's projected session quantity routed to
+    /// dark / midpoint venues would exceed the dark participation cap.
+    pub const DARK_PARTICIPATION: &str = "DARK_PARTICIPATION";
+    /// Check 33 (v1.17 F8): the firm's session dark-fill notional plus the
+    /// order would exceed `pre_trade.max_dark_fill_notional`.
+    pub const DARK_FILL_NOTIONAL: &str = "DARK_FILL_NOTIONAL";
 }
 
 /// Fixed-decimal formatting for audit reasons, PINNED for cross-language

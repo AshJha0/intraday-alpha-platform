@@ -20,9 +20,16 @@ and is emitted as the decision's ``rule_id`` (deterministic, replayable):
 22. ``STRATEGY_LOSS``, then the SEC 15c3-5 set (each off unless its
 ``pre_trade`` key is configured): 23. ``RESTRICTED_INSTRUMENT``
 24. ``MAX_OPEN_ORDERS``  25. ``MAX_OPEN_NOTIONAL``  26. ``STRATEGY_POSITION``
-27. ``PARTICIPATION``  28. ``CANCEL_RATE``  29. ``VENUE_MESSAGE_RATE``
-— else ``ALLOW``. Check 7 also rejects ``STATE_CAPACITY`` when a bounded
-state map is full (``pre_trade.max_tracked_keys``).
+27. ``PARTICIPATION``  28. ``CANCEL_RATE``  31. ``VENUE_TYPE_RESTRICTED``
+32. ``DARK_PARTICIPATION``  33. ``DARK_FILL_NOTIONAL``
+29. ``VENUE_MESSAGE_RATE`` — else ``ALLOW``. Check 7 also rejects
+``STATE_CAPACITY`` (rule index 30) when a bounded state map is full
+(``pre_trade.max_tracked_keys``). Checks 31-33 (v1.17 F8: the venue-type
+restriction, the dark participation cap of the dark-first router rule and
+the dark-fill notional limit) run after check 28 and before check 29, which
+stays last because it spends the venue message token; each is off unless
+its ``pre_trade`` key is configured, and a venue is ``lit`` unless
+``pre_trade.venue_types`` maps it.
 
 Audit chain (G-P0-1): every record carries ``seq`` and ``prev_sha256``
 (:mod:`iap.risk.events`); the head is part of the snapshot, so a restored
@@ -122,7 +129,7 @@ from iap.risk.events import (
     fmt_fixed,
     line_sha256,
 )
-from iap.risk.limits import RiskLimits
+from iap.risk.limits import VENUE_TYPES, RiskLimits
 from iap.risk.orders import Fill, OrderRequest, OrderType, order_validation_error
 from iap.risk.refdata import InstrumentRef, equity_refs
 from iap.risk.serialize import to_canonical_json
@@ -134,8 +141,9 @@ TAPE_EVENT_TYPE = 5
 
 _NS_PER_SEC = 1e9
 #: Snapshot schema version (2: audit chain head, open-order strategy, the
-#: 15c3-5 buckets and the session volume counters).
-SNAPSHOT_VERSION = 2
+#: 15c3-5 buckets and the session volume counters; 3: v1.17 F8 —
+#: ``open.*.venue_id``, ``dark_executed``, ``dark_filled``).
+SNAPSHOT_VERSION = 3
 
 _I64_MAX = (1 << 63) - 1
 _I64_MIN = -(1 << 63)
@@ -272,10 +280,16 @@ class _MarketState:
 
 
 class _OpenOrder:
-    __slots__ = ("instrument_id", "side", "price_ticks", "qty", "strategy_id")
+    __slots__ = ("instrument_id", "side", "price_ticks", "qty", "strategy_id", "venue_id")
 
     def __init__(
-        self, instrument_id: int, side: int, price_ticks: int, qty: int, strategy_id: str
+        self,
+        instrument_id: int,
+        side: int,
+        price_ticks: int,
+        qty: int,
+        strategy_id: str,
+        venue_id: int,
     ) -> None:
         self.instrument_id = instrument_id
         self.side = side
@@ -285,6 +299,8 @@ class _OpenOrder:
         self.qty = qty
         #: Owning strategy (checks 24-26).
         self.strategy_id = strategy_id
+        #: Target venue (checks 32-33 read its type; v1.17 F8).
+        self.venue_id = venue_id
 
 
 class _Rate:
@@ -334,6 +350,7 @@ _GLOBAL_SCOPE_RULES = frozenset(
         Rules.DAILY_LOSS,
         Rules.CONFIG_MISSING,
         Rules.NOT_BOOTSTRAPPED,
+        Rules.DARK_FILL_NOTIONAL,
     }
 )
 _STRATEGY_SCOPE_RULES = frozenset(
@@ -352,7 +369,12 @@ _STRATEGY_SCOPE_RULES = frozenset(
     }
 )
 _VENUE_SCOPE_RULES = frozenset(
-    {Rules.KILL_VENUE, Rules.VENUE_DISCONNECTED, Rules.VENUE_MESSAGE_RATE}
+    {
+        Rules.KILL_VENUE,
+        Rules.VENUE_DISCONNECTED,
+        Rules.VENUE_MESSAGE_RATE,
+        Rules.VENUE_TYPE_RESTRICTED,
+    }
 )
 
 
@@ -404,6 +426,11 @@ class RiskEngine:
         #: session executed quantity (fills) per instrument (check 27).
         self._market_volume: dict[int, int] = {}
         self._executed: dict[int, int] = {}
+        #: The firm's session quantity filled on dark / midpoint venues per
+        #: instrument (check 32) and the notional so filled per quote
+        #: currency (check 33, converted at check time); v1.17 F8.
+        self._dark_executed: dict[int, int] = {}
+        self._dark_filled: dict[str, float] = {}
         #: Audit chain: seq of the last record and SHA-256 of its line.
         self._audit_seq: int = 0
         self._audit_head: str = GENESIS_SHA256
@@ -846,6 +873,8 @@ class RiskEngine:
         self._loss_override_strategy.clear()
         self._market_volume.clear()
         self._executed.clear()
+        self._dark_executed.clear()
+        self._dark_filled.clear()
         self._refresh_pnl_gauges()
         self._emit(
             RiskEvent(
@@ -993,6 +1022,23 @@ class RiskEngine:
         self._executed[fill.instrument_id] = min(
             self._executed.get(fill.instrument_id, 0) + fill.qty, _I64_MAX
         )
+        # v1.17 F8: a fill of an open order routed to a dark / midpoint venue
+        # counts towards the dark participation (check 32) and the dark-fill
+        # notional (check 33, in the quote currency, converted at check
+        # time). A fill whose order is no longer open (or an external
+        # adjustment, order_id 0) has no venue and is not counted.
+        limits = self._limits
+        dark = False
+        if fill.order_id != 0 and limits is not None:
+            r0 = self._open.get(fill.order_id)
+            dark = r0 is not None and limits.venue_type(r0.venue_id) != "lit"
+        if dark:
+            self._dark_executed[fill.instrument_id] = min(
+                self._dark_executed.get(fill.instrument_id, 0) + fill.qty, _I64_MAX
+            )
+            self._dark_filled[ccy] = (
+                self._dark_filled.get(ccy, 0.0) + float(fill.qty) * unit * price
+            )
         # open order reduction
         if fill.order_id != 0:
             r = self._open.get(fill.order_id)
@@ -1272,6 +1318,7 @@ class RiskEngine:
                 self._tracked_price(order),
                 order.qty,
                 order.strategy_id,
+                order.venue_id,
             )
         return outcome
 
@@ -1846,6 +1893,77 @@ class RiskEngine:
                         f"strategy {sid} exceeded {fmt_fixed(limits.max_cancels_per_sec, 2)} "
                         f"cancels/s (burst {fmt_fixed(limits.cancel_burst, 2)})",
                     )
+        # 31-33 (v1.17 F8): the pre-trade controls of the dark-venue model.
+        # A venue is "lit" unless pre_trade.venue_types maps it; the dark
+        # checks (32, 33) apply to an order routed to a dark / midpoint
+        # venue only. They run before 29 so that only an order about to be
+        # ALLOWed spends the venue message token.
+        venue_type = limits.venue_type(order.venue_id)
+        # 31. venue-type restriction
+        if limits.allowed_venue_types is not None and venue_type not in limits.allowed_venue_types:
+            names = ", ".join(t for t in VENUE_TYPES if t in limits.allowed_venue_types)
+            return reject(
+                Rules.VENUE_TYPE_RESTRICTED,
+                warn,
+                f"venue {order.venue_id} is {venue_type}, allowed venue types: {names}",
+            )
+        if venue_type != "lit":
+            # 32. dark participation: the firm's session quantity routed to
+            # dark / midpoint venues in the instrument (dark fills + every
+            # open dark order + this order) against the dark cap
+            if (
+                limits.max_dark_participation_bps is not None
+                and limits.dark_participation_floor_qty is not None
+            ):
+                open_qty = 0.0
+                for oid in sorted(self._open):
+                    r = self._open[oid]
+                    if (
+                        r.instrument_id == order.instrument_id
+                        and limits.venue_type(r.venue_id) != "lit"
+                    ):
+                        open_qty += float(r.qty)
+                projected_qty = (
+                    float(self._dark_executed.get(order.instrument_id, 0))
+                    + open_qty
+                    + float(order.qty)
+                )
+                volume = self._market_volume.get(order.instrument_id, 0)
+                cap = max(
+                    float(limits.dark_participation_floor_qty),
+                    float(volume) * limits.max_dark_participation_bps / 1e4,
+                )
+                if not (projected_qty <= cap):
+                    return reject(
+                        Rules.DARK_PARTICIPATION,
+                        warn,
+                        f"projected dark session qty {fmt_fixed(projected_qty, 0)} exceeds dark "
+                        f"participation cap {fmt_fixed(cap, 0)} "
+                        f"({fmt_fixed(limits.max_dark_participation_bps, 1)}bps of market "
+                        f"volume {volume}, floor {limits.dark_participation_floor_qty})",
+                    )
+            # 33. dark-fill notional: the firm's session notional filled on
+            # dark / midpoint venues (every currency converted at the
+            # current rate; a missing rate is fail-closed) plus this order
+            if limits.max_dark_fill_notional is not None:
+                total = 0.0
+                for ccy in sorted(self._dark_filled):
+                    rate = self._fx_rate(ccy)
+                    if rate is None:
+                        return reject(
+                            Rules.FX_RATE_MISSING,
+                            warn,
+                            f"dark fill notional in {ccy} has no conversion rate (fail-closed)",
+                        )
+                    total += self._dark_filled[ccy] * rate[0]
+                total += order_notional
+                if not (total <= limits.max_dark_fill_notional):
+                    return reject(
+                        Rules.DARK_FILL_NOTIONAL,
+                        warn,
+                        f"projected dark fill notional {fmt_fixed(total, 2)} exceeds "
+                        f"max_dark_fill_notional {fmt_fixed(limits.max_dark_fill_notional, 2)}",
+                    )
         # 29. per-venue message rate (venue 0 = SOR: the child orders are
         # throttled where they are sent); the token is spent here, last
         if (
@@ -1913,6 +2031,7 @@ class RiskEngine:
                     "price_ticks": o.price_ticks,
                     "qty": o.qty,
                     "strategy_id": o.strategy_id,
+                    "venue_id": o.venue_id,
                 }
                 for k, o in sorted(self._open.items())
             },
@@ -1944,6 +2063,11 @@ class RiskEngine:
             },
             "market_volume": {str(k): v for k, v in sorted(self._market_volume.items())},
             "executed": {str(k): v for k, v in sorted(self._executed.items())},
+            "dark_executed": {str(k): v for k, v in sorted(self._dark_executed.items())},
+            "dark_filled": [
+                {"ccy": ccy, "notional": notional}
+                for ccy, notional in sorted(self._dark_filled.items())
+            ],
         }
 
     def snapshot_json(self, pretty: bool = True) -> str:
@@ -2021,12 +2145,16 @@ class RiskEngine:
             iid = r.u64("instrument_id", "open.instrument_id")
             if iid > _U32_MAX:
                 raise _bad("open.instrument_id")
+            vid = r.u64("venue_id", "open.venue_id")
+            if vid > _U16_MAX:
+                raise _bad("open.venue_id")
             eng._open[oid] = _OpenOrder(
                 iid,
                 side,
                 r.i64("price_ticks", "open.price_ticks"),
                 r.i64("qty", "open.qty"),
                 r.str("strategy_id", "open.strategy_id"),
+                vid,
             )
         for k, v in get.obj("positions").items():
             iid = _key(k, _U32_MAX, "positions")
@@ -2066,6 +2194,15 @@ class RiskEngine:
             eng._market_volume[_key(k, _U32_MAX, "market_volume")] = _as_i64(v, "market_volume")
         for k, v in get.obj("executed").items():
             eng._executed[_key(k, _U32_MAX, "executed")] = _as_i64(v, "executed")
+        for k, v in get.obj("dark_executed").items():
+            eng._dark_executed[_key(k, _U32_MAX, "dark_executed")] = _as_i64(v, "dark_executed")
+        for entry in get.arr("dark_filled"):
+            r = _SnapReader(entry)
+            ccy = r.str("ccy", "dark_filled.ccy")
+            notional = r.f64("notional", "dark_filled.notional")
+            if not math.isfinite(notional):
+                raise _bad("dark_filled.notional")
+            eng._dark_filled[ccy] = notional
         if chain is not None:
             seq, head = chain
             _require("chain seq", seq, 0, _U64_MAX)

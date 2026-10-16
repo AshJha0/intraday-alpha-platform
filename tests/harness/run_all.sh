@@ -22,7 +22,7 @@
 #                                        CanonicalJsonGolden, TraceGolden, ReplayTraceGolden)
 #   rust    cargo test -p <crate> --test <golden target> for each golden
 #           integration-test file (golden_marketdata, golden_book,
-#           golden_features, golden_alpha, golden_risk, golden_risk_fuzz,
+#           golden_features, golden_alpha, golden_risk, golden_risk_fuzz, golden_venue_queue,
 #           golden_replay, golden_canonical_json, golden_trace, golden_lifecycle)
 #   (java: archived in v1.15 under archive/java/, frozen at v1.14.0 — not run)
 #   The risk differential-fuzz corpus (tests/golden/risk_fuzz) is replayed by
@@ -48,7 +48,7 @@ GOLDEN_ONLY=0
 [ "${1:-}" = "--golden-only" ] && GOLDEN_ONLY=1
 
 # Rust golden integration-test targets: "<crate>:<test file>" pairs.
-RUST_GOLDEN_TARGETS="marketdata:golden_marketdata orderbook:golden_book features:golden_features alpha:golden_alpha risk:golden_risk risk:golden_risk_fuzz replay:golden_replay contracts:golden_canonical_json contracts:golden_trace lifecycle:golden_lifecycle"
+RUST_GOLDEN_TARGETS="marketdata:golden_marketdata orderbook:golden_book features:golden_features alpha:golden_alpha risk:golden_risk risk:golden_risk_fuzz risk:golden_dark_controls venue:golden_venue_queue replay:golden_replay contracts:golden_canonical_json contracts:golden_trace lifecycle:golden_lifecycle"
 
 # Per-language results. TESTS/GOLDEN hold a NUMBER when the suite ran and the
 # count could be parsed, and "-" when it did not run or could not be parsed —

@@ -32,7 +32,8 @@ final class LimitsEvaluator {
                     Rules.MAX_OPEN_NOTIONAL, Rules.STRATEGY_POSITION,
                     Rules.CANCEL_RATE, Rules.STATE_CAPACITY -> Scope.STRATEGY;
             case Rules.KILL_VENUE, Rules.VENUE_DISCONNECTED,
-                    Rules.VENUE_MESSAGE_RATE -> Scope.VENUE;
+                    Rules.VENUE_MESSAGE_RATE, Rules.VENUE_TYPE_RESTRICTED -> Scope.VENUE;
+            case Rules.DARK_FILL_NOTIONAL -> Scope.GLOBAL;
             default -> Scope.INSTRUMENT;
         };
     }
@@ -643,6 +644,70 @@ final class LimitsEvaluator {
                             + " exceeded " + RiskEngine.fmtFixed(limits.maxCancelsPerSec(), 2)
                             + " cancels/s (burst " + RiskEngine.fmtFixed(limits.cancelBurst(), 2)
                             + ")");
+                }
+            }
+        }
+        // 31-33 (v1.17 F8): the pre-trade controls of the dark-venue model;
+        // they run before 29 so that only an order about to be ALLOWed
+        // spends the venue message token.
+        String venueType = limits.venueType(order.venueId());
+        // 31. venue-type restriction
+        if (limits.allowedVenueTypes() != null
+                && !limits.allowedVenueTypes().contains(venueType)) {
+            StringBuilder names = new StringBuilder();
+            for (String t : RiskLimits.VENUE_TYPES) {
+                if (limits.allowedVenueTypes().contains(t)) {
+                    names.append(names.length() == 0 ? "" : ", ").append(t);
+                }
+            }
+            return reject(Rules.VENUE_TYPE_RESTRICTED, Severity.WARN, "venue "
+                    + order.venueId() + " is " + venueType + ", allowed venue types: " + names);
+        }
+        if (!venueType.equals("lit")) {
+            // 32. dark participation: dark fills + every open dark order + this order
+            if (limits.maxDarkParticipationBps() != null
+                    && limits.darkParticipationFloorQty() != null) {
+                double openQty = 0.0;
+                for (RiskEngine.OpenOrder r : e.open.values()) {
+                    if (r.instrumentId == order.instrumentId()
+                            && !limits.venueType(r.venueId).equals("lit")) {
+                        openQty += (double) r.qty;
+                    }
+                }
+                double projectedQty =
+                        (double) e.darkExecuted.getOrDefault(order.instrumentId(), 0L)
+                        + openQty + (double) order.qty();
+                long volume = e.marketVolume.getOrDefault(order.instrumentId(), 0L);
+                double bps = limits.maxDarkParticipationBps();
+                long floor = limits.darkParticipationFloorQty();
+                double cap = Math.max((double) floor, (double) volume * bps / 1e4);
+                if (!(projectedQty <= cap)) {
+                    return reject(Rules.DARK_PARTICIPATION, Severity.WARN,
+                            "projected dark session qty " + RiskEngine.fmtFixed(projectedQty, 0)
+                            + " exceeds dark participation cap " + RiskEngine.fmtFixed(cap, 0)
+                            + " (" + RiskEngine.fmtFixed(bps, 1) + "bps of market volume "
+                            + volume + ", floor " + floor + ")");
+                }
+            }
+            // 33. dark-fill notional (every currency converted at the current
+            // rate; a missing rate is fail-closed) plus this order
+            if (limits.maxDarkFillNotional() != null) {
+                double total = 0.0;
+                for (Map.Entry<String, Double> d : e.darkFilled.entrySet()) {
+                    double[] rate = e.fxRate(d.getKey());
+                    if (rate == null) {
+                        return reject(Rules.FX_RATE_MISSING, Severity.WARN,
+                                "dark fill notional in " + d.getKey()
+                                + " has no conversion rate (fail-closed)");
+                    }
+                    total += d.getValue() * rate[0];
+                }
+                total += orderNotional;
+                if (!(total <= limits.maxDarkFillNotional())) {
+                    return reject(Rules.DARK_FILL_NOTIONAL, Severity.WARN,
+                            "projected dark fill notional " + RiskEngine.fmtFixed(total, 2)
+                            + " exceeds max_dark_fill_notional "
+                            + RiskEngine.fmtFixed(limits.maxDarkFillNotional(), 2));
                 }
             }
         }

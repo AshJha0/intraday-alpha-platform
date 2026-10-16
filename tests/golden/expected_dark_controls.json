@@ -1,0 +1,121 @@
+{
+  "x-version": 1,
+  "description": "B10 -> F8 golden vectors of the stateless dark-first pre-trade check (docs/research/B10_F8_HANDOVER.md section 2): `controls` holds the non-default DarkControls keys (defaults: max_participation 0, participation_window_ns 30 s, allowed_venue_types [dark, midpoint], max_dark_notional 0); evaluation order venue_type, participation, notional, first failure wins; `expected` is the failing code or \"\". Rust: rust/risk/src/dark.rs (rust/risk/tests/golden_dark_controls.rs); Python: iap.execution.dark.dark_pretrade_check, whose DARK_CONTROL_GOLDENS must equal these rows.",
+  "codes": [
+    "venue_type",
+    "participation",
+    "notional"
+  ],
+  "rows": [
+    {
+      "controls": {},
+      "venue_type": "dark",
+      "qty": 100,
+      "trailing_lit_volume": 0,
+      "dark_notional_so_far": 0.0,
+      "child_notional": 0.0,
+      "expected": ""
+    },
+    {
+      "controls": {},
+      "venue_type": "lit",
+      "qty": 100,
+      "trailing_lit_volume": 0,
+      "dark_notional_so_far": 0.0,
+      "child_notional": 0.0,
+      "expected": "venue_type"
+    },
+    {
+      "controls": {
+        "allowed_venue_types": [
+          "midpoint"
+        ]
+      },
+      "venue_type": "dark",
+      "qty": 100,
+      "trailing_lit_volume": 0,
+      "dark_notional_so_far": 0.0,
+      "child_notional": 0.0,
+      "expected": "venue_type"
+    },
+    {
+      "controls": {
+        "max_participation": 0.1
+      },
+      "venue_type": "dark",
+      "qty": 100,
+      "trailing_lit_volume": 1000,
+      "dark_notional_so_far": 0.0,
+      "child_notional": 0.0,
+      "expected": ""
+    },
+    {
+      "controls": {
+        "max_participation": 0.1
+      },
+      "venue_type": "dark",
+      "qty": 101,
+      "trailing_lit_volume": 1000,
+      "dark_notional_so_far": 0.0,
+      "child_notional": 0.0,
+      "expected": "participation"
+    },
+    {
+      "controls": {
+        "max_participation": 0.1
+      },
+      "venue_type": "midpoint",
+      "qty": 1,
+      "trailing_lit_volume": 0,
+      "dark_notional_so_far": 0.0,
+      "child_notional": 0.0,
+      "expected": "participation"
+    },
+    {
+      "controls": {
+        "max_dark_notional": 10000.0
+      },
+      "venue_type": "dark",
+      "qty": 100,
+      "trailing_lit_volume": 0,
+      "dark_notional_so_far": 9000.0,
+      "child_notional": 1000.0,
+      "expected": ""
+    },
+    {
+      "controls": {
+        "max_dark_notional": 10000.0
+      },
+      "venue_type": "dark",
+      "qty": 100,
+      "trailing_lit_volume": 0,
+      "dark_notional_so_far": 9000.0,
+      "child_notional": 1000.01,
+      "expected": "notional"
+    },
+    {
+      "controls": {
+        "max_participation": 0.1,
+        "max_dark_notional": 10000.0
+      },
+      "venue_type": "dark",
+      "qty": 500,
+      "trailing_lit_volume": 1000,
+      "dark_notional_so_far": 9999.0,
+      "child_notional": 5.0,
+      "expected": "participation"
+    },
+    {
+      "controls": {
+        "max_participation": 0.5,
+        "max_dark_notional": 10000.0
+      },
+      "venue_type": "lit",
+      "qty": 500,
+      "trailing_lit_volume": 1000,
+      "dark_notional_so_far": 9999.0,
+      "child_notional": 5.0,
+      "expected": "venue_type"
+    }
+  ]
+}

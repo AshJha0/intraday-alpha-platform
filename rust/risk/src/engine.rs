@@ -14,11 +14,17 @@
 //! 19. `GROSS_NOTIONAL`  20. `NET_NOTIONAL`  21. `DAILY_LOSS`
 //! 22. `STRATEGY_LOSS`  23. `RESTRICTED_INSTRUMENT`  24. `MAX_OPEN_ORDERS`
 //! 25. `MAX_OPEN_NOTIONAL`  26. `STRATEGY_POSITION`  27. `PARTICIPATION`
-//! 28. `CANCEL_RATE`  29. `VENUE_MESSAGE_RATE` — else `ALLOW`.
+//! 28. `CANCEL_RATE`  31. `VENUE_TYPE_RESTRICTED`  32. `DARK_PARTICIPATION`
+//! 33. `DARK_FILL_NOTIONAL`  29. `VENUE_MESSAGE_RATE` — else `ALLOW`.
 //!
 //! Checks 23-29 are the SEC 15c3-5 set, each off unless its `pre_trade` key
-//! is configured. Check 7 also rejects `STATE_CAPACITY` when a bounded
-//! state map is full (`pre_trade.max_tracked_keys`).
+//! is configured. Check 7 also rejects `STATE_CAPACITY` (rule index 30) when
+//! a bounded state map is full (`pre_trade.max_tracked_keys`). Checks 31-33
+//! (v1.17 F8: the venue-type restriction, the dark participation cap of the
+//! dark-first router rule and the dark-fill notional limit) run after check
+//! 28 and before check 29, which stays last because it spends the venue
+//! message token; each is off unless its `pre_trade` key is configured, and
+//! a venue is `lit` unless `pre_trade.venue_types` maps it.
 //!
 //! Audit chain (G-P0-1): every record carries `seq` and `prev_sha256`
 //! ([`crate::event`]); [`RiskEngine::audit_chain_head`] is the value to
@@ -127,8 +133,9 @@ use crate::limits::RiskLimits;
 
 pub(crate) const NS_PER_SEC: f64 = 1e9;
 /// Snapshot schema version (2: open-order strategy, the 15c3-5 buckets and
-/// the session volume counters).
-pub const SNAPSHOT_VERSION: u64 = 2;
+/// the session volume counters; 3: v1.17 F8 — `open.*.venue_id`,
+/// `dark_executed`, `dark_filled`).
+pub const SNAPSHOT_VERSION: u64 = 3;
 
 /// `EventType::TRADE`: the only event type that is market volume (X-P1-3).
 pub const TAPE_EVENT_TYPE: u8 = 5;
@@ -251,6 +258,8 @@ pub(crate) struct OpenOrder {
     pub(crate) qty: i64,
     /// Owning strategy (checks 24-26).
     pub(crate) strategy_id: String,
+    /// Target venue (checks 32-33 read its type; v1.17 F8).
+    pub(crate) venue_id: u16,
 }
 
 /// A 15c3-5 message bucket (checks 28/29): an event-time token bucket whose
@@ -329,6 +338,12 @@ pub struct RiskEngine {
     pub(crate) market_volume: BTreeMap<u32, i64>,
     /// The firm's session executed quantity per instrument (check 27).
     pub(crate) executed: BTreeMap<u32, i64>,
+    /// The firm's session quantity filled on dark / midpoint venues per
+    /// instrument (check 32; v1.17 F8).
+    pub(crate) dark_executed: BTreeMap<u32, i64>,
+    /// The firm's session notional filled on dark / midpoint venues per
+    /// quote currency (check 33; converted at check time).
+    pub(crate) dark_filled: BTreeMap<String, f64>,
     /// Audit chain: seq of the last record and SHA-256 of its line.
     pub(crate) audit_seq: u64,
     pub(crate) audit_head: String,
@@ -380,6 +395,8 @@ impl RiskEngine {
             cancel_buckets: BTreeMap::new(),
             market_volume: BTreeMap::new(),
             executed: BTreeMap::new(),
+            dark_executed: BTreeMap::new(),
+            dark_filled: BTreeMap::new(),
             audit_seq: 0,
             audit_head: GENESIS_SHA256.to_string(),
             audit: Vec::new(),
@@ -437,6 +454,11 @@ impl RiskEngine {
                 max_tracked_keys: None,
                 max_loss_override_multiple: None,
                 min_approvers: None,
+                venue_types: BTreeMap::new(),
+                allowed_venue_types: None,
+                max_dark_participation_bps: None,
+                dark_participation_floor_qty: None,
+                max_dark_fill_notional: None,
             },
             BTreeMap::new(),
         );
@@ -798,10 +820,27 @@ impl RiskEngine {
         *self.positions.entry(fill.instrument_id).or_insert(0) += signed;
         *self
             .realized
-            .entry((fill.strategy_id.clone(), ccy))
+            .entry((fill.strategy_id.clone(), ccy.clone()))
             .or_insert(0.0) += realized;
         let done = self.executed.entry(fill.instrument_id).or_insert(0);
         *done = done.saturating_add(fill.qty);
+        // v1.17 F8: a fill of an open order routed to a dark / midpoint venue
+        // counts towards the dark participation (check 32) and the dark-fill
+        // notional (check 33, in the quote currency, converted at check
+        // time). A fill whose order is no longer open (or an external
+        // adjustment, order_id 0) has no venue and is not counted.
+        let dark = fill.order_id != 0
+            && self
+                .open
+                .get(&fill.order_id)
+                .zip(self.limits.as_ref())
+                .is_some_and(|(r, l)| l.venue_type(r.venue_id).is_dark());
+        if dark {
+            let dq = self.dark_executed.entry(fill.instrument_id).or_insert(0);
+            *dq = dq.saturating_add(fill.qty);
+            *self.dark_filled.entry(ccy.clone()).or_insert(0.0) +=
+                fill.qty as f64 * unit * price;
+        }
         // open order reduction
         if fill.order_id != 0 {
             let remove = match self.open.get_mut(&fill.order_id) {
@@ -1076,6 +1115,7 @@ impl RiskEngine {
                     price_ticks,
                     qty: order.qty,
                     strategy_id: order.strategy_id.clone(),
+                    venue_id: order.venue_id,
                 },
             );
         }

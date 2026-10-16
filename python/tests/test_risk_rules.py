@@ -498,6 +498,7 @@ def test_u64_order_ids_print_unsigned_and_sort_unsigned(config_doc):
             "price_ticks": 2450,
             "qty": 10,
             "strategy_id": "S1",
+            "venue_id": 1,
         }
     }
 
@@ -1520,12 +1521,12 @@ def test_risk_snapshot_restore_roundtrip(config_doc):
     unbroken = engine(config_doc)
     first = script(unbroken, 0, 30)
     snap = unbroken.snapshot()
-    assert snap["x-version"] == 2
+    assert snap["x-version"] == 3
     limits = RiskLimits.from_json(config_doc)
     restored = RiskEngine.restore(limits, equity_refs(ticks()), snap, T0 + 5 * NS)
     assert restored.audit_len() == 1
     assert restored.audit()[0].rule_id == Rules.STATE_RESTORED
-    assert restored.audit()[0].reason.startswith("restored snapshot v2: ")
+    assert restored.audit()[0].reason.startswith("restored snapshot v3: ")
     a = script(unbroken, 30, 20)
     b = script(restored, 30, 20)
     assert a == b
@@ -1631,7 +1632,7 @@ def test_restore_is_strict_field_by_field(config_doc):
     assert restored.metrics.gauge_value("risk_daily_pnl") == eng.metrics.gauge_value(
         "risk_daily_pnl"
     )
-    assert restored.audit()[0].reason == "restored snapshot v2: 1 positions, 1 open orders"
+    assert restored.audit()[0].reason == "restored snapshot v3: 1 positions, 1 open orders"
     # a restored snapshot with a latched global switch stays latched
     eng.engage_kill(Scope.GLOBAL, "", T0, "x")
     latched = RiskEngine.restore(limits, refs, eng.snapshot(), T0)
@@ -1995,6 +1996,8 @@ def test_snapshot_is_json_shaped_and_independent_of_the_engine(config_doc):
         "cancel_buckets",
         "market_volume",
         "executed",
+        "dark_executed",
+        "dark_filled",
     }
     assert not math.isnan(eng.metrics.gauge_value("risk_daily_pnl"))
 
@@ -2076,6 +2079,7 @@ def test_restore_tolerates_unknown_instruments_fail_closed(config_doc):
         "price_ticks": 0,
         "qty": 10,
         "strategy_id": "S9",
+        "venue_id": 1,
     }
     limits = RiskLimits.from_json(config_doc)
     restored = RiskEngine.restore(limits, equity_refs(ticks()), snap, T0)
@@ -2563,3 +2567,202 @@ def test_cancel_requests_spend_strategy_and_venue_budgets(config_doc):
     # one second refills the cancel bucket to its burst
     expect(eng, order(4, 0, 10, 2448, timestamp=T0 + NS), Rules.ALLOW)
     assert eng.metrics.counter_value("risk_cancel_requests_total") == 1
+
+
+# ------------------------------------------------ v1.17 F8: checks 31-33
+
+#: 100 ms between F8 test orders: past the throttle burst, inside the stale timeout.
+_F8_STEP = 100_000_000
+
+
+def _f8_config(config_doc: dict) -> dict:
+    """Repo config plus venue 2 dark, venue 3 midpoint (1 stays lit)."""
+    doc = config(config_doc)
+    doc["pre_trade"]["venue_types"] = {"2": "dark", "3": "midpoint"}
+    return doc
+
+
+def test_f8_controls_are_off_by_default(config_doc):
+    """Every F8 control is off in the repo config: an order to any venue id
+    passes, nothing is counted as dark, and the snapshot carries the new
+    fields empty (the only change to every pre-F8 golden row)."""
+    limits = RiskLimits.from_json(config_doc)
+    assert limits.venue_types == {}
+    assert limits.allowed_venue_types is None
+    assert limits.max_dark_participation_bps is None
+    assert limits.max_dark_fill_notional is None
+    assert limits.venue_type(0) == "lit" and limits.venue_type(65535) == "lit"
+    eng = engine(config_doc)
+    expect(eng, order(1, 0, 100, 2450, venue_id=7, timestamp=T0 + 1 * _F8_STEP), Rules.ALLOW)
+    eng.on_fill(fill("S1", 1, 0, 100, 2450, order_id=1))
+    snap = eng.snapshot()
+    assert snap["x-version"] == 3
+    assert snap["dark_executed"] == {} and snap["dark_filled"] == []
+    assert snap["open"] == {}
+
+
+def test_f8_limits_parse_strictly(config_doc):
+    doc = _f8_config(config_doc)
+    doc["pre_trade"]["allowed_venue_types"] = ["dark", "lit"]
+    doc["pre_trade"]["max_dark_participation_bps"] = 500.0
+    doc["pre_trade"]["dark_participation_floor_qty"] = 100
+    doc["pre_trade"]["max_dark_fill_notional"] = 250000.0
+    limits = RiskLimits.from_json(doc)
+    assert limits.venue_types == {2: "dark", 3: "midpoint"}
+    assert limits.venue_type(2) == "dark" and limits.venue_type(9) == "lit"
+    assert limits.allowed_venue_types == frozenset({"dark", "lit"})
+    assert limits.dark_participation_floor_qty == 100
+    for mutate, msg in [
+        (
+            lambda d: d["pre_trade"].__setitem__("venue_types", {"x": "lit"}),
+            "pre_trade.venue_types key x is not a u16 venue id",
+        ),
+        (
+            lambda d: d["pre_trade"].__setitem__("venue_types", {"70000": "lit"}),
+            "pre_trade.venue_types key 70000 is not a u16 venue id",
+        ),
+        (
+            lambda d: d["pre_trade"].__setitem__("venue_types", {"1": "grey"}),
+            "pre_trade.venue_types.1 must be one of lit, dark, midpoint",
+        ),
+        (
+            lambda d: d["pre_trade"].__setitem__("venue_types", [1]),
+            "pre_trade.venue_types must be an object",
+        ),
+        (
+            lambda d: d["pre_trade"].__setitem__("allowed_venue_types", []),
+            "pre_trade.allowed_venue_types must be a non-empty array",
+        ),
+        (
+            lambda d: d["pre_trade"].__setitem__("allowed_venue_types", ["grey"]),
+            "pre_trade.allowed_venue_types must be a non-empty array",
+        ),
+        (
+            lambda d: d["pre_trade"].pop("dark_participation_floor_qty"),
+            "missing/non-integer pre_trade.dark_participation_floor_qty",
+        ),
+        (
+            lambda d: d["pre_trade"].__setitem__("max_dark_fill_notional", -1.0),
+            "pre_trade.max_dark_fill_notional must be > 0",
+        ),
+    ]:
+        bad = copy.deepcopy(doc)
+        mutate(bad)
+        with pytest.raises(ValueError, match=re.escape(msg)):
+            RiskLimits.from_json(bad)
+
+
+def test_venue_type_restriction_check_31(config_doc):
+    doc = _f8_config(config_doc)
+    doc["pre_trade"]["allowed_venue_types"] = ["lit"]
+    eng = engine(doc)
+    expect(eng, order(1, 0, 100, 2450, venue_id=1, timestamp=T0 + 1 * _F8_STEP), Rules.ALLOW)
+    d = eng.check_order(order(2, 0, 100, 2450, venue_id=2, timestamp=T0 + 2 * _F8_STEP))
+    assert d.rule_id == Rules.VENUE_TYPE_RESTRICTED
+    assert d.reason == "venue 2 is dark, allowed venue types: lit"
+    assert eng.audit()[-1].scope == Scope.VENUE and eng.audit()[-1].scope_id == "2"
+    d = eng.check_order(order(3, 0, 100, 2450, venue_id=3, timestamp=T0 + 3 * _F8_STEP))
+    assert d.reason == "venue 3 is midpoint, allowed venue types: lit"
+    # the allow list is rendered in the pinned type order, not input order
+    doc["pre_trade"]["allowed_venue_types"] = ["midpoint", "dark"]
+    eng = engine(doc)
+    d = eng.check_order(order(4, 0, 100, 2450, venue_id=1, timestamp=T0 + 4 * _F8_STEP))
+    assert d.reason == "venue 1 is lit, allowed venue types: dark, midpoint"
+    expect(eng, order(5, 0, 100, 2450, venue_id=2, timestamp=T0 + 5 * _F8_STEP), Rules.ALLOW)
+    # an unmapped venue (SOR included) is lit
+    d = eng.check_order(order(6, 0, 100, 2450, venue_id=0, timestamp=T0 + 6 * _F8_STEP))
+    assert d.reason == "venue 0 is lit, allowed venue types: dark, midpoint"
+
+
+def test_dark_participation_check_32(config_doc):
+    doc = _f8_config(config_doc)
+    doc["pre_trade"]["max_dark_participation_bps"] = 1000.0  # 10 %
+    doc["pre_trade"]["dark_participation_floor_qty"] = 100
+    eng = engine(doc)
+    eng.on_market_trade(1, 2000, T0)  # cap = max(100, 200) = 200
+    expect(
+        eng, order(1, 0, 100, 2450, venue_id=2, timestamp=T0 + 1 * _F8_STEP), Rules.ALLOW
+    )  # dark open 100
+    d = eng.check_order(
+        order(2, 0, 150, 2450, venue_id=3, timestamp=T0 + 2 * _F8_STEP)
+    )  # 100 + 150 > 200
+    assert d.rule_id == Rules.DARK_PARTICIPATION
+    assert d.reason == (
+        "projected dark session qty 250 exceeds dark participation cap 200 "
+        "(1000.0bps of market volume 2000, floor 100)"
+    )
+    assert eng.audit()[-1].scope == Scope.INSTRUMENT and eng.audit()[-1].scope_id == "1"
+    expect(
+        eng, order(3, 0, 150, 2450, venue_id=1, timestamp=T0 + 3 * _F8_STEP), Rules.ALLOW
+    )  # lit: not counted
+    eng.on_fill(fill("S1", 1, 0, 100, 2450, order_id=1))  # dark fill closes order 1
+    assert eng.snapshot()["dark_executed"] == {"1": 100}
+    expect(
+        eng, order(4, 0, 100, 2450, venue_id=2, timestamp=T0 + 4 * _F8_STEP), Rules.ALLOW
+    )  # 100 + 0 + 100 = 200
+    d = eng.check_order(
+        order(5, 0, 1, 2450, venue_id=2, timestamp=T0 + 5 * _F8_STEP)
+    )  # 100 + 100 + 1
+    assert d.rule_id == Rules.DARK_PARTICIPATION
+    # a session roll zeroes the dark counters like the lit ones
+    eng.roll_session(T0 + SEC, "eod")
+    assert eng.snapshot()["dark_executed"] == {}
+
+
+def test_dark_fill_notional_check_33_and_snapshot_roundtrip(config_doc):
+    doc = _f8_config(config_doc)
+    doc["pre_trade"]["max_dark_fill_notional"] = 5000.0
+    eng = engine(doc)
+    expect(
+        eng, order(1, 0, 100, 2450, venue_id=2, timestamp=T0 + 1 * _F8_STEP), Rules.ALLOW
+    )  # 2450 USD
+    eng.on_fill(fill("S1", 1, 0, 100, 2450, order_id=1))
+    assert eng.snapshot()["dark_filled"] == [{"ccy": "USD", "notional": 2450.0}]
+    expect(
+        eng, order(2, 0, 100, 2451, venue_id=3, timestamp=T0 + 2 * _F8_STEP), Rules.ALLOW
+    )  # 2450 + 2451 <= 5000
+    eng.on_fill(fill("S1", 1, 0, 100, 2451, order_id=2))
+    d = eng.check_order(
+        order(3, 0, 100, 2450, venue_id=2, timestamp=T0 + 3 * _F8_STEP)
+    )  # 4901 + 2450 > 5000
+    assert d.rule_id == Rules.DARK_FILL_NOTIONAL
+    assert d.reason == "projected dark fill notional 7351.00 exceeds max_dark_fill_notional 5000.00"
+    assert eng.audit()[-1].scope == Scope.GLOBAL and eng.audit()[-1].scope_id == ""
+    expect(
+        eng, order(4, 0, 100, 2450, venue_id=1, timestamp=T0 + 4 * _F8_STEP), Rules.ALLOW
+    )  # lit: not limited
+    # a fill of an order no longer open is not counted (no venue known)
+    eng.on_order_done(4)
+    eng.on_fill(fill("S1", 1, 0, 100, 2450, order_id=4))
+    assert eng.snapshot()["dark_filled"] == [{"ccy": "USD", "notional": 4901.0}]
+    # snapshot / restore keeps the dark state and the next decision
+    limits = RiskLimits.from_json(doc)
+    restored = RiskEngine.restore(limits, equity_refs(ticks()), eng.snapshot(), T0)
+    assert restored.snapshot() == eng.snapshot()
+    d = restored.check_order(order(5, 0, 100, 2450, venue_id=2, timestamp=T0 + 5 * _F8_STEP))
+    assert d.rule_id == Rules.DARK_FILL_NOTIONAL
+    # a session roll clears the dark-fill notional
+    eng.roll_session(T0 + SEC, "eod")
+    expect(eng, order(6, 0, 100, 2450, venue_id=2, timestamp=T0 + 6 * _F8_STEP), Rules.ALLOW)
+    # a strict restore refuses an open order without a venue
+    bad = eng.snapshot()
+    del bad["open"]["6"]["venue_id"]
+    with pytest.raises(ValueError, match="bad open.venue_id"):
+        RiskEngine.restore(limits, equity_refs(ticks()), bad, T0)
+
+
+def test_dark_fill_notional_missing_rate_is_fail_closed(config_doc):
+    """A dark-fill total in a currency whose conversion rate is missing is
+    undeterminable: FX_RATE_MISSING at check 33, never a guess."""
+    doc = _f8_config(config_doc)
+    doc["pre_trade"]["max_dark_fill_notional"] = 1e12
+    del doc["currency"]["conversion"]["JPY"]
+    eng = engine(doc)
+    snap = eng.snapshot()
+    snap["dark_filled"] = [{"ccy": "JPY", "notional": 1000.0}]
+    limits = RiskLimits.from_json(doc)
+    restored = RiskEngine.restore(limits, equity_refs(ticks()), snap, T0)
+    expect(restored, order(1, 0, 100, 2450, venue_id=1, timestamp=T0 + _F8_STEP), Rules.ALLOW)
+    d = restored.check_order(order(2, 0, 100, 2450, venue_id=2, timestamp=T0 + 2 * _F8_STEP))
+    assert d.rule_id == Rules.FX_RATE_MISSING
+    assert d.reason == "dark fill notional in JPY has no conversion rate (fail-closed)"

@@ -7,6 +7,12 @@ identical; any missing or invalid limit raises ``ValueError`` with the Rust
 message text (``"risk.json: ..."``), and the engine built from a failed
 parse is fail-closed (rejects every order with ``CONFIG_MISSING``).
 
+v1.17 (F8) adds, still optional and parsed last: ``pre_trade.venue_types``
+(the lit / dark / midpoint type of each venue id), ``pre_trade.
+allowed_venue_types`` (check 31), ``pre_trade.max_dark_participation_bps``
++ ``dark_participation_floor_qty`` (check 32) and
+``pre_trade.max_dark_fill_notional`` (check 33).
+
 Type strictness follows ``serde_json``'s accessors: a number is read by
 ``as_f64`` (int or float, finite), an integer by ``as_i64`` / ``as_u64``
 (a JSON float such as ``50000.0`` is NOT an integer), a bool by ``as_bool``
@@ -18,16 +24,22 @@ from __future__ import annotations
 import json
 import math
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from iap.risk.serialize import rust_display_f64
 
-__all__ = ["FxConversion", "RiskLimits", "RISK_CONFIG_VERSION"]
+__all__ = ["FxConversion", "RiskLimits", "RISK_CONFIG_VERSION", "VENUE_TYPES"]
 
 #: The ``x-version`` of ``configs/risk/risk.json`` this parser reads.
 RISK_CONFIG_VERSION = 4
+
+#: The venue types the pre-trade controls know (v1.17 F8; the Rust
+#: ``VenueType`` enum), in the pinned order type names appear in reasons.
+#: Every venue is ``"lit"`` unless ``pre_trade.venue_types`` says otherwise;
+#: ``"dark"`` and ``"midpoint"`` are the non-displayed types checks 32-33 count.
+VENUE_TYPES = ("lit", "dark", "midpoint")
 
 _U32_MAX = (1 << 32) - 1
 _I64_MAX = (1 << 63) - 1
@@ -122,6 +134,22 @@ class RiskLimits:
     #: ``overrides.min_approvers``: distinct comma-separated approvers an
     #: override needs (G-P2-3).
     min_approvers: int | None = None
+    #: ``pre_trade.venue_types`` (v1.17 F8): venue id -> type; an unmapped
+    #: venue is ``"lit"``. Absent / null = empty. Sorted mapping.
+    venue_types: Mapping[int, str] = field(default_factory=dict)
+    #: ``pre_trade.allowed_venue_types`` (check 31); ``None`` = off.
+    allowed_venue_types: frozenset[str] | None = None
+    #: ``pre_trade.max_dark_participation_bps`` (check 32).
+    max_dark_participation_bps: float | None = None
+    #: ``pre_trade.dark_participation_floor_qty`` (required with the bps).
+    dark_participation_floor_qty: int | None = None
+    #: ``pre_trade.max_dark_fill_notional`` (check 33).
+    max_dark_fill_notional: float | None = None
+
+    def venue_type(self, venue_id: int) -> str:
+        """The type of ``venue_id`` as the pre-trade controls see it: the
+        ``pre_trade.venue_types`` entry, else ``"lit"``."""
+        return self.venue_types.get(venue_id, "lit")
 
     @classmethod
     def from_json(cls, doc: Any) -> RiskLimits:
@@ -180,6 +208,16 @@ class RiskLimits:
         max_keys = _opt(doc, "pre_trade", "max_tracked_keys", _need_pos_i64)
         override_mult = _opt(doc, "overrides", "max_loss_override_multiple", _need_pos_f64)
         min_approvers = _opt(doc, "overrides", "min_approvers", _need_pos_i64)
+        # v1.17 F8 keys, parsed after every x-version 4 key, in this order
+        venue_types = _parse_venue_types(doc)
+        allowed_venue_types = _parse_allowed_venue_types(doc)
+        dark_bps = _opt(doc, "pre_trade", "max_dark_participation_bps", _need_pos_f64)
+        dark_floor = (
+            _need_pos_i64(doc, "pre_trade", "dark_participation_floor_qty")
+            if dark_bps is not None
+            else None
+        )
+        max_dark_notional = _opt(doc, "pre_trade", "max_dark_fill_notional", _need_pos_f64)
         return cls(
             kill_switch_engaged=kill,
             max_gross_notional=max_gross,
@@ -213,6 +251,11 @@ class RiskLimits:
             max_tracked_keys=max_keys,
             max_loss_override_multiple=override_mult,
             min_approvers=min_approvers,
+            venue_types=venue_types,
+            allowed_venue_types=allowed_venue_types,
+            max_dark_participation_bps=dark_bps,
+            dark_participation_floor_qty=dark_floor,
+            max_dark_fill_notional=max_dark_notional,
         )
 
     @classmethod
@@ -316,6 +359,58 @@ def _parse_restricted(doc: Any) -> frozenset[int]:
                 "risk.json: pre_trade.restricted_instruments entries must be u32 instrument ids"
             )
         out.add(iid)
+    return frozenset(out)
+
+
+def _parse_venue_types(doc: Any) -> dict[int, str]:
+    """``pre_trade.venue_types``: absent / null = empty; else an object whose
+    keys are decimal u16 venue ids and whose values are ``lit`` / ``dark`` /
+    ``midpoint`` (sorted by venue id, as the Rust ``BTreeMap``)."""
+    v = _lookup(doc, "pre_trade", "venue_types")
+    if v is None:
+        return {}
+    if not isinstance(v, dict):
+        raise ValueError("risk.json: pre_trade.venue_types must be an object")
+    out: dict[int, str] = {}
+    for k, t in v.items():
+        vid = _parse_u16_key(k)
+        if vid is None:
+            raise ValueError(f"risk.json: pre_trade.venue_types key {k} is not a u16 venue id")
+        if not isinstance(t, str) or t not in VENUE_TYPES:
+            raise ValueError(
+                f"risk.json: pre_trade.venue_types.{k} must be one of lit, dark, midpoint"
+            )
+        out[vid] = t
+    return dict(sorted(out.items()))
+
+
+def _parse_u16_key(k: Any) -> int | None:
+    """Rust ``str::parse::<u16>``: an optional ``+``, decimal digits, in range."""
+    if not isinstance(k, str) or not k:
+        return None
+    digits = k[1:] if k[0] == "+" else k
+    if not digits or not digits.isascii() or not digits.isdigit():
+        return None
+    value = int(digits)
+    return value if value <= 0xFFFF else None
+
+
+def _parse_allowed_venue_types(doc: Any) -> frozenset[str] | None:
+    """``pre_trade.allowed_venue_types``: absent / null = off; else a
+    non-empty array of ``lit`` / ``dark`` / ``midpoint``."""
+    v = _lookup(doc, "pre_trade", "allowed_venue_types")
+    if v is None:
+        return None
+    msg = (
+        "risk.json: pre_trade.allowed_venue_types must be a non-empty array of lit, dark, midpoint"
+    )
+    if not isinstance(v, list) or not v:
+        raise ValueError(msg)
+    out = set()
+    for item in v:
+        if not isinstance(item, str) or item not in VENUE_TYPES:
+            raise ValueError(msg)
+        out.add(item)
     return frozenset(out)
 
 
