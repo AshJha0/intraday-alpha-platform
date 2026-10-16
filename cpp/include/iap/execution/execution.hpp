@@ -207,11 +207,21 @@ enum class CancelReason : std::uint8_t {
     END_OF_STREAM = 5,       // cancel_all()
 };
 
+// VenueSpec::venue_type (v1.17 B10): LIT (the default) is a displayed book
+// replayed from the stream; DARK and MIDPOINT have no displayed book and
+// fill only through the dark model (execution/dark.hpp), MODELLED, not
+// measured. Equity only.
+enum class VenueType : std::uint8_t { LIT = 0, DARK = 1, MIDPOINT = 2 };
+const char* venue_type_name(VenueType t);
+std::optional<VenueType> venue_type_from_name(const std::string& s);
+
 // One venue's execution profile (configs/venues/venues.json).
 struct VenueSpec {
     std::uint16_t venue_id = 0;
     std::string name;
     bool is_fx = false;
+    VenueType venue_type = VenueType::LIT;  // venues.json key "venue_type"
+    bool is_lit() const { return venue_type == VenueType::LIT; }
     double taker_fee_per_share = 0.0;
     double maker_rebate_per_share = 0.0;
     double commission_per_million = 0.0;
@@ -273,6 +283,11 @@ struct Fill {
     Liquidity liquidity = Liquidity::TAKER;
     double fee = 0.0;          // > 0 cost, < 0 rebate
     double impact_cost = 0.0;  // linear impact charge (taker fills only)
+    // v1.17 B10 (F7 part 2): set only on a MODELLED dark fill of the replay
+    // (Python Fill.provenance == "dark_midpoint"); the lit provenances of
+    // review X-7 are Python-only and stay NONE here. Outside every pinned
+    // golden row.
+    bool dark_midpoint = false;
 };
 
 struct ChildOrder {
@@ -314,6 +329,14 @@ struct ChildOrder {
     std::uint8_t cancel_rule = 0;     // CancelRule (0 = none)
     std::int64_t cancel_rule_ts = 0;
     std::uint64_t replaces_order_id = 0;
+    // v1.17 B10 (F7 part 2): a child posted to a dark / midpoint venue by
+    // the replay (never submitted to the simulator): its venue's type, its
+    // outcome (DarkOutcome), the uniform draw its fill probability is tested
+    // against and the last probability evaluated.
+    std::uint8_t venue_type = 0;    // VenueType; 0 (LIT) for a simulator child
+    std::uint8_t dark_outcome = 0;  // DarkOutcome
+    double dark_u = 0.0;
+    double dark_p_fill = 0.0;
 };
 
 // ChildOrder::urgency_regime values (iap.execution.signal.URGENCY_REGIMES;

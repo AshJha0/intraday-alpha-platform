@@ -56,10 +56,12 @@ ExecutionReplay::ExecutionReplay(const ExecConfig& config,
     : config_(config),
       sim_(config),
       sor_(config.venues, sor_options),
-      sor_options_(sor_options) {
+      sor_options_(sor_options),
+      dark_rng_(config.seed ^ 0xB10) {
     for (const auto& [vid, spec] : config.venues) {
-        (void)spec;
-        sor_candidates_.push_back(vid);
+        // v1.17 B10: a dark / midpoint venue has no displayed book and is
+        // never a candidate of the pinned router.
+        if (spec.is_lit()) sor_candidates_.push_back(vid);
     }
     for (const auto& p : parents) {
         if (p.qty <= 0) throw std::invalid_argument("parent qty must be > 0");
@@ -84,6 +86,34 @@ ExecutionReplay::ExecutionReplay(const ExecConfig& config,
             ps.patience_ns = patience_ns(p.passive, p.urgency,
                                          p.algo == AlgoType::IS, p.risk_aversion);
             ps.behind_qty = max_behind_qty(p.passive, p.qty);
+        }
+        if (p.dark_first.has_value()) {
+            // B10: ExecutionReplay._init_dark_state
+            p.dark_first->validate();
+            std::uint16_t vid = p.dark_first->venue_id;
+            if (vid == 0) {
+                for (const auto& [v, s] : config.venues) {
+                    if (!s.is_lit()) {
+                        vid = v;
+                        break;
+                    }
+                }
+                if (vid == 0) {
+                    throw std::invalid_argument(
+                        "parent " + std::to_string(p.parent_id) +
+                        ": dark_first needs a dark / midpoint venue in the config");
+                }
+            }
+            auto sit = config.venues.find(vid);
+            if (sit == config.venues.end() || sit->second.is_lit()) {
+                throw std::invalid_argument("parent " + std::to_string(p.parent_id) +
+                                            ": venue " + std::to_string(vid) +
+                                            " is not a dark / midpoint venue");
+            }
+            ps.dark_venue_id = vid;
+            lit_volume_.emplace(p.instrument_id, 0);
+            lit_trail_.emplace(p.instrument_id, std::vector<std::pair<std::int64_t, std::int64_t>>{});
+            lit_trail_head_.emplace(p.instrument_id, 0);
         }
         parents_.push_back(std::move(ps));
     }
@@ -190,7 +220,7 @@ void ExecutionReplay::issue_slice(ParentState& ps, std::int64_t slice_qty,
     std::int64_t left = slice_qty;
     while (left > 0) {
         const std::int64_t q = std::min(left, cap);
-        issue_child(ps, q, decision_ts, passive);
+        if (!dark_try(ps, q, decision_ts)) issue_child(ps, q, decision_ts, passive);
         left -= q;
     }
 }
@@ -199,12 +229,195 @@ std::int64_t ExecutionReplay::committed_qty(const ParentState& ps) const {
     std::int64_t open = 0;
     const auto& orders = sim_.orders();
     for (std::uint64_t id : ps.child_ids) {
+        if (id >= kDarkIdBase) continue;  // dark children: counted as dark_open_qty
         const ChildOrder& o = orders.at(id);
         if (o.state == OrderState::PENDING || o.state == OrderState::ACTIVE) {
             open += o.remaining;
         }
     }
-    return ps.filled_qty + open;
+    return ps.filled_qty + open + ps.dark_open_qty;
+}
+
+// --------------------------------------------------- v1.17 B10 dark-first
+
+const ChildOrder& ExecutionReplay::order(std::uint64_t oid) const {
+    auto it = dark_orders_.find(oid);
+    return it == dark_orders_.end() ? sim_.orders().at(oid) : it->second;
+}
+
+void ExecutionReplay::track_lit_volume(const MarketEvent& ev) {
+    auto it = lit_volume_.find(ev.instrument_id);
+    if (it == lit_volume_.end() ||
+        static_cast<EventType>(ev.event_type) != EventType::EXECUTE || ev.qty <= 0) {
+        return;
+    }
+    auto vit = config_.venues.find(ev.venue_id);
+    if (vit != config_.venues.end() && !vit->second.is_lit()) return;
+    it->second += ev.qty;
+    lit_trail_[ev.instrument_id].emplace_back(ev.exchange_ts, ev.qty);
+}
+
+std::int64_t ExecutionReplay::trailing_lit_volume(std::uint32_t iid, std::int64_t t,
+                                                  std::int64_t window_ns) {
+    auto& trail = lit_trail_[iid];
+    std::size_t head = lit_trail_head_[iid];
+    while (head < trail.size() && trail[head].first < t - window_ns) ++head;
+    if (head > 4096 && head * 2 > trail.size()) {
+        trail.erase(trail.begin(), trail.begin() + static_cast<std::ptrdiff_t>(head));
+        head = 0;
+    }
+    lit_trail_head_[iid] = head;
+    std::int64_t total = 0;
+    for (std::size_t i = head; i < trail.size(); ++i) total += trail[i].second;
+    return total;
+}
+
+bool ExecutionReplay::dark_try(ParentState& ps, std::int64_t qty, std::int64_t t) {
+    const ParentOrder& p = ps.order;
+    // eligibility: a plain parent is low-urgency when urgency <= max_urgency
+    // (the B2 regime rule of an alpha-urgency parent is not wired in C++)
+    if (qty <= 0 || !p.dark_first.has_value() || !(p.urgency <= p.dark_first->max_urgency)) {
+        return false;
+    }
+    const DarkFirstParams& d = *p.dark_first;
+    const std::int64_t cap = p.end_ts - p.passive.end_margin_ns;
+    if (t >= cap) return false;  // no time left to rest dark: lit at once
+    const ConsolidatedBook& book = sim_.instrument_book(p.instrument_id);
+    const auto bb = consolidated_touch_price(book, Side::BID);
+    const auto ba = consolidated_touch_price(book, Side::ASK);
+    if (!bb.has_value() || !ba.has_value() || *ba <= *bb) return false;  // no midpoint to peg to
+    const auto iit = config_.instruments.find(p.instrument_id);
+    const double lot = iit == config_.instruments.end() ? 1.0 : iit->second.qty_unit;
+    const double tick = iit == config_.instruments.end() ? 1.0 : iit->second.tick_size;
+    const std::int64_t mid = midpoint_ticks(*bb, *ba, p.side);
+    const VenueSpec& spec = config_.venues.at(ps.dark_venue_id);
+    const DarkControlCode code = dark_pretrade_check(
+        d.controls, spec.venue_type, qty,
+        trailing_lit_volume(p.instrument_id, t, d.controls.participation_window_ns),
+        ps.dark_notional,
+        static_cast<double>(qty) * lot * static_cast<double>(mid) * tick);
+    if (code != DarkControlCode::NONE) {
+        ps.dark_rejected[dark_control_code_name(code)] += 1;
+        return false;
+    }
+    const std::uint64_t oid = next_dark_id_++;
+    ChildOrder child;
+    child.parent_id = p.parent_id;
+    child.instrument_id = p.instrument_id;
+    child.venue_id = ps.dark_venue_id;
+    child.side = p.side;
+    child.type = OrderType::LIMIT;
+    child.limit_ticks = 0;  // midpoint peg: no limit of our own
+    child.qty = qty;
+    child.decision_ts = t;
+    child.expire_ts = p.end_ts;
+    child.order_id = oid;
+    child.arrival_ts = t;
+    child.state = OrderState::ACTIVE;
+    child.remaining = qty;
+    child.resting = true;
+    child.venue_type = static_cast<std::uint8_t>(spec.venue_type);
+    child.dark_u = dark_rng_.uniform();
+    dark_orders_[oid] = child;
+    ps.child_ids.push_back(oid);
+    ParentState::DarkChild dc;
+    dc.order_id = oid;
+    dc.qty = qty;
+    dc.u = child.dark_u;
+    dc.post_ts = t;
+    dc.deadline = std::min(t + d.rest_ns(), cap);
+    dc.lit_volume_at_post = lit_volume_[p.instrument_id];
+    dc.spread_ticks = *ba - *bb;
+    dc.queue_ahead = ps.dark_open_qty;
+    ps.dark_open.push_back(dc);
+    ps.dark_open_qty += qty;
+    ps.dark_children += 1;
+    ps.dark_posted_qty += qty;
+    return true;
+}
+
+void ExecutionReplay::dark_fill(ParentState& ps, const ParentState::DarkChild& dc,
+                                ChildOrder& o, std::int64_t t, std::int64_t px) {
+    const ParentOrder& p = ps.order;
+    const auto iit = config_.instruments.find(p.instrument_id);
+    const double lot = iit == config_.instruments.end() ? 1.0 : iit->second.qty_unit;
+    const double tick = iit == config_.instruments.end() ? 1.0 : iit->second.tick_size;
+    const VenueSpec& spec = config_.venues.at(ps.dark_venue_id);
+    Fill f;
+    f.fill_id = kDarkIdBase + dark_fills_.size();
+    f.order_id = o.order_id;
+    f.parent_id = p.parent_id;
+    f.instrument_id = p.instrument_id;
+    f.venue_id = ps.dark_venue_id;
+    f.side = p.side;
+    f.price_ticks = px;
+    f.qty = dc.qty;
+    f.ts = t;
+    f.liquidity = Liquidity::MAKER;
+    f.fee = spec.taker_fee_per_share * static_cast<double>(dc.qty);
+    f.impact_cost = 0.0;
+    f.dark_midpoint = true;
+    dark_fills_.push_back(f);
+    o.state = OrderState::FILLED;
+    o.remaining = 0;
+    o.dark_outcome = static_cast<std::uint8_t>(DarkOutcome::FILLED);
+    ps.filled_qty += dc.qty;
+    ps.dark_filled_qty += dc.qty;
+    ps.dark_notional += static_cast<double>(dc.qty) * lot * static_cast<double>(px) * tick;
+}
+
+void ExecutionReplay::plain_child(ParentState& ps, std::int64_t qty, std::int64_t t) {
+    const ParentOrder& p = ps.order;
+    if (p.policy == ExecPolicy::PASSIVE) {
+        post(ps, qty, t, 0);
+    } else if (p.policy == ExecPolicy::AGGRESSIVE) {
+        issue_child(ps, qty, t, false);
+    } else {
+        issue_child(ps, qty, t, p.algo == AlgoType::TWAP || p.algo == AlgoType::VWAP);
+    }
+}
+
+void ExecutionReplay::work_dark(ParentState& ps, const MarketEvent& ev) {
+    const ParentOrder& p = ps.order;
+    const DarkFirstParams& d = *p.dark_first;
+    if (ev.instrument_id != p.instrument_id) return;
+    const std::int64_t t = ev.exchange_ts;
+    const ConsolidatedBook& book = sim_.instrument_book(p.instrument_id);
+    const auto bb = consolidated_touch_price(book, Side::BID);
+    const auto ba = consolidated_touch_price(book, Side::ASK);
+    const bool two_sided = bb.has_value() && ba.has_value() && *ba > *bb;
+    const std::int64_t lit_now = lit_volume_[p.instrument_id];
+    std::vector<std::int64_t> expired;
+    std::vector<ParentState::DarkChild> keep;
+    for (const ParentState::DarkChild& dc : ps.dark_open) {
+        ChildOrder& o = dark_orders_.at(dc.order_id);
+        if (t >= dc.deadline) {
+            o.state = OrderState::CANCELLED;
+            o.cancel_reason = CancelReason::EXPIRED;
+            o.dark_outcome = static_cast<std::uint8_t>(DarkOutcome::EXPIRED);
+            ps.dark_open_qty -= dc.qty;
+            ps.dark_expired_qty += dc.qty;
+            expired.push_back(dc.qty);
+            continue;
+        }
+        const double pf = d.model.p_fill(lit_now - dc.lit_volume_at_post, dc.spread_ticks,
+                                         dc.qty, dc.queue_ahead);
+        o.dark_p_fill = pf;
+        if (two_sided && pf >= dc.u) {
+            ps.dark_open_qty -= dc.qty;
+            dark_fill(ps, dc, o, t, midpoint_ticks(*bb, *ba, p.side));
+            continue;
+        }
+        keep.push_back(dc);
+    }
+    ps.dark_open = std::move(keep);
+    for (const std::int64_t q : expired) {
+        if (t >= p.end_ts) {
+            ps.dark_unsent_qty += q;  // the window closed on it
+            continue;
+        }
+        plain_child(ps, q, t);
+    }
 }
 
 void ExecutionReplay::book_new_fills() {
@@ -246,7 +459,7 @@ void ExecutionReplay::post_step(ParentState& ps, std::int64_t step_qty,
     std::int64_t left = step_qty;
     while (left > 0) {
         const std::int64_t q = std::min(left, cap);
-        post(ps, q, t, 0);
+        if (!dark_try(ps, q, t)) post(ps, q, t, 0);
         left -= q;
     }
 }
@@ -344,7 +557,7 @@ void ExecutionReplay::schedule_passive(ParentState& ps, const MarketEvent& ev) {
             std::int64_t deficit = ps.scheduled_qty - committed_qty(ps);
             while (deficit > 0) {
                 const std::int64_t q = std::min(deficit, p.max_child_qty);
-                post(ps, q, t, 0);
+                if (!dark_try(ps, q, t)) post(ps, q, t, 0);
                 deficit = p.pov_exact ? deficit - q : 0;
             }
         }
@@ -372,6 +585,7 @@ void ExecutionReplay::schedule(ParentState& ps, const MarketEvent& ev) {
         ps.trigger_ts = t;
         ps.trigger_seq = ev.sequence;
     }
+    if (!ps.dark_open.empty()) work_dark(ps, ev);  // B10, before the schedule
     if (p.policy == ExecPolicy::PASSIVE) {
         schedule_passive(ps, ev);
         return;
@@ -388,7 +602,7 @@ void ExecutionReplay::schedule(ParentState& ps, const MarketEvent& ev) {
             std::min(pov_target(p, ps.pov_volume), p.qty) - committed_qty(ps);
         while (deficit > 0) {
             const std::int64_t q = std::min(deficit, p.max_child_qty);
-            issue_child(ps, q, t, false);
+            if (!dark_try(ps, q, t)) issue_child(ps, q, t, false);
             deficit = p.pov_exact ? deficit - q : 0;
         }
         return;
@@ -425,13 +639,34 @@ ExecReplayResult ExecutionReplay::run(const std::vector<MarketEvent>& events) {
     for (const auto& ev : events) {
         sim_.on_event(ev);
         book_new_fills();
+        if (!lit_volume_.empty()) track_lit_volume(ev);
         for (auto& ps : parents_) schedule(ps, ev);
         ++res.events_processed;
     }
     sim_.cancel_all();
     book_new_fills();
+    for (auto& ps : parents_) {
+        // B10: open dark children at the end of the stream expire unsent
+        for (const auto& dc : ps.dark_open) {
+            ChildOrder& o = dark_orders_.at(dc.order_id);
+            o.state = OrderState::CANCELLED;
+            o.cancel_reason = CancelReason::END_OF_STREAM;
+            o.dark_outcome = static_cast<std::uint8_t>(DarkOutcome::EXPIRED);
+            ps.dark_open_qty -= dc.qty;
+            ps.dark_expired_qty += dc.qty;
+            ps.dark_unsent_qty += dc.qty;
+        }
+        ps.dark_open.clear();
+    }
 
     res.fills = sim_.fills();
+    if (!dark_fills_.empty()) {
+        // modelled dark fills merged by time; the lit order is unchanged
+        res.fills.insert(res.fills.end(), dark_fills_.begin(), dark_fills_.end());
+        std::stable_sort(res.fills.begin(), res.fills.end(), [](const Fill& a, const Fill& b) {
+            return a.ts != b.ts ? a.ts < b.ts : a.fill_id < b.fill_id;
+        });
+    }
     res.sor_no_route = sor_no_route_;
     for (const auto& ps : parents_) {
         ParentReport r;
@@ -463,10 +698,21 @@ ExecReplayResult ExecutionReplay::run(const std::vector<MarketEvent>& events) {
                           ? r.notional / (static_cast<double>(r.filled_qty) * lot)
                           : 0.0;
         r.total_cost = r.fees - r.rebates + r.impact;
+        if (ps.order.dark_first.has_value()) {
+            r.dark_children = ps.dark_children;
+            r.dark_posted_qty = ps.dark_posted_qty;
+            r.dark_filled_qty = ps.dark_filled_qty;
+            r.dark_expired_qty = ps.dark_expired_qty;
+            r.dark_unsent_qty = ps.dark_unsent_qty;
+            r.dark_notional = ps.dark_notional;
+            r.dark_rejected = ps.dark_rejected;
+        }
         res.parents[r.parent_id] = r;
         if (ps.order.policy == ExecPolicy::PASSIVE) {
             res.passive[r.parent_id] = ps.stats;
         }
+        std::vector<ChildOrder>& kids = res.children[ps.order.parent_id];
+        for (const std::uint64_t oid : ps.child_ids) kids.push_back(order(oid));
     }
     if (trace_sink_ != nullptr) {
         for (const auto& ps : parents_) trace_sink_->emit(build_trace(ps, res));
@@ -600,6 +846,7 @@ contracts::DecisionTrace ExecutionReplay::build_trace(
     const auto& orders = sim_.orders();
     t.stages.child_orders.reserve(ps.child_ids.size());
     for (std::size_t i = 0; i < ps.child_ids.size(); ++i) {
+        if (ps.child_ids[i] >= kDarkIdBase) continue;  // B10: never in the simulator
         const ChildOrder& o = orders.at(ps.child_ids[i]);
         contracts::ChildOrder c;
         c.child_order_id = o.order_id;
@@ -621,7 +868,7 @@ contracts::DecisionTrace ExecutionReplay::build_trace(
     for (const auto& f : res.fills) {
         if (f.parent_id != p.parent_id) continue;
         const std::int64_t done = cum_filled[f.order_id] += f.qty;
-        const ChildOrder& o = orders.at(f.order_id);
+        const ChildOrder& o = order(f.order_id);
         contracts::ExecutionReport er;
         er.order_id = f.order_id;
         er.execution_id = f.fill_id;

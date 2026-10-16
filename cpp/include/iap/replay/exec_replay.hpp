@@ -82,7 +82,9 @@
 #include "iap/contracts/canonical_json.hpp"
 #include "iap/contracts/trace.hpp"
 #include "iap/execution/algos.hpp"
+#include "iap/execution/dark.hpp"
 #include "iap/execution/execution.hpp"
+#include "iap/marketdata/rng.hpp"
 #include "iap/sor/sor.hpp"
 
 namespace iap {
@@ -98,6 +100,18 @@ struct ParentReport {
     double rebates = 0.0;       // maker rebates (>= 0)
     double impact = 0.0;        // linear impact charges (>= 0)
     double total_cost = 0.0;    // fees - rebates + impact
+    // v1.17 B10 (F7 part 2) dark-first accounting (every dark fill is
+    // MODELLED, not measured): children posted dark and their qty, qty
+    // filled dark / expired back to the lit book / expired at the window
+    // end (never re-sent), the dark-filled notional, the posts the
+    // pre-trade check rejected by code. All 0 / empty without dark_first.
+    std::int64_t dark_children = 0;
+    std::int64_t dark_posted_qty = 0;
+    std::int64_t dark_filled_qty = 0;
+    std::int64_t dark_expired_qty = 0;
+    std::int64_t dark_unsent_qty = 0;
+    double dark_notional = 0.0;
+    std::map<std::string, std::int64_t> dark_rejected;
 };
 
 struct ExecReplayResult {
@@ -107,6 +121,11 @@ struct ExecReplayResult {
     std::uint64_t sor_no_route = 0;  // children not submitted: no eligible venue
     // PASSIVE transition counters, one row per PASSIVE parent.
     std::map<std::uint64_t, PassiveStats> passive;
+    // Every submitted child in its final state, by parent_id, submission
+    // order (the simulator's children and, v1.17 B10, the replay's dark
+    // children, which never enter the simulator). Copies, built after the
+    // stream; the Python res.children layout.
+    std::map<std::uint64_t, std::vector<ChildOrder>> children;
 };
 
 // Identity and versions stamped on every emitted trace (header comment).
@@ -178,7 +197,46 @@ private:
         std::int64_t behind_qty = 0;        // BEHIND tolerance in qty
         std::vector<Working> working;
         PassiveStats stats;
+        // v1.17 B10 dark-first state (nullopt = off).
+        struct DarkChild {
+            std::uint64_t order_id = 0;
+            std::int64_t qty = 0;
+            double u = 0.0;                   // the draw the probability is tested against
+            std::int64_t post_ts = 0;
+            std::int64_t deadline = 0;
+            std::int64_t lit_volume_at_post = 0;
+            std::int64_t spread_ticks = 0;
+            std::int64_t queue_ahead = 0;     // our own earlier dark qty open at the post
+        };
+        std::uint16_t dark_venue_id = 0;      // 0 = no dark-first
+        std::vector<DarkChild> dark_open;
+        std::int64_t dark_open_qty = 0;
+        std::int64_t dark_children = 0;
+        std::int64_t dark_posted_qty = 0;
+        std::int64_t dark_filled_qty = 0;
+        std::int64_t dark_expired_qty = 0;
+        std::int64_t dark_unsent_qty = 0;
+        double dark_notional = 0.0;
+        std::map<std::string, std::int64_t> dark_rejected;
     };
+
+    // v1.17 B10 dark-first rule (exec_replay.cpp, the Python
+    // ExecutionReplay._dark_try / _work_dark): post `qty` dark when the
+    // parent is low-urgency, the window and the displayed midpoint allow
+    // and the stateless pre-trade check passes (false = the lit path);
+    // advance the open dark children of a parent at an event of its
+    // instrument (fill at the first event where p_fill >= u, expire at the
+    // deadline and send the remainder lit in the base child style).
+    bool dark_try(ParentState& ps, std::int64_t qty, std::int64_t t);
+    void work_dark(ParentState& ps, const MarketEvent& ev);
+    void dark_fill(ParentState& ps, const ParentState::DarkChild& dc, ChildOrder& o,
+                   std::int64_t t, std::int64_t px);
+    // One child in the parent's base policy style (the lit remainder).
+    void plain_child(ParentState& ps, std::int64_t qty, std::int64_t t);
+    void track_lit_volume(const MarketEvent& ev);
+    std::int64_t trailing_lit_volume(std::uint32_t iid, std::int64_t t, std::int64_t window_ns);
+    // A child by id: the simulator's, or a dark child of this replay.
+    const ChildOrder& order(std::uint64_t oid) const;
 
     void schedule(ParentState& ps, const MarketEvent& ev);
     // Issue one child of at most max_child_qty; returns false when unroutable.
@@ -209,10 +267,21 @@ private:
     ExecConfig config_;
     ExecutionSimulator sim_;
     SmartOrderRouter sor_;
-    std::vector<std::uint16_t> sor_candidates_;
+    std::vector<std::uint16_t> sor_candidates_;  // lit venues only (B10)
     std::vector<ParentState> parents_;
     std::size_t fills_booked_ = 0;
     std::uint64_t sor_no_route_ = 0;
+    // v1.17 B10: the replay's dark children and fills (ids from
+    // kDarkIdBase), their uniform stream (seed ^ 0xB10: no lit draw moves),
+    // and per instrument with a dark-first parent the cumulative displayed
+    // EXECUTE volume and the trailing (ts, qty) list of the controls' window.
+    std::map<std::uint64_t, ChildOrder> dark_orders_;
+    std::vector<Fill> dark_fills_;
+    SplitMix64 dark_rng_;
+    std::uint64_t next_dark_id_ = kDarkIdBase;
+    std::map<std::uint32_t, std::int64_t> lit_volume_;
+    std::map<std::uint32_t, std::vector<std::pair<std::int64_t, std::int64_t>>> lit_trail_;
+    std::map<std::uint32_t, std::size_t> lit_trail_head_;
     bool ran_ = false;
     SorOptions sor_options_;
     contracts::TraceSink* trace_sink_ = nullptr;
