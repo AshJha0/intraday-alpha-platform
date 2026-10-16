@@ -34,12 +34,13 @@ def draft() -> dict:
     return json.loads(DRAFT.read_text(encoding="utf-8"))
 
 
-def test_draft_is_unsigned_and_undecided(draft: dict) -> None:
+def test_draft_is_unsigned_with_option_a_chosen(draft: dict) -> None:
     assert draft["schema"] == json.loads(C6_DRAFT.read_text(encoding="utf-8"))["schema"]
     assert draft["status"].startswith("DRAFT")
     assert draft["signed"] is False and draft["signature"] is None
     assert draft["on_blackboard"] is False
-    assert draft["decision_required"]["chosen"] is None
+    # the owner chose option (a) on 2026-10-16; signing is still the owner's
+    assert draft["decision_required"]["chosen"]["option"] == "a"
     assert set(draft["decision_required"]["options"]) == {"a", "b", "c"}
 
 

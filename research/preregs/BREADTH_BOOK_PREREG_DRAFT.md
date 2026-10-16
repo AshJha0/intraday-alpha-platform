@@ -4,14 +4,18 @@ Rendering of `research/preregs/breadth_book_prereg_DRAFT.json`. Status: **DRAFT.
 not on the blackboard, not approved for any run.** Claude drafted it; the owner signs and registers
 it from `.venv-ci` with `--require-ci-env`.
 
-## Decision needed before signing
+## Decision: option (a), chosen by the owner on 2026-10-16
+
+The owner chose **option (a)** (owner's words: "go with your recommendation"; the recommendation was (a)): the book is registered with the C6 screen as a hard gate. The confirmatory run refuses every candidate, the expected outcome is no confirmatory look (a documented negative result), the holdout stays unread, and no breadth holdout dataset is built or downloaded under this registration. The draft is still unsigned: signing it is the owner's confirmation. Options (b) and (c) below are kept as the record of what was considered.
+
+### Options considered
 
 The C6 net-of-cost screen this pre-registration depends on, `research/breadth/screen/SCREEN_multi7.md`
 (data `research/breadth/screen/screen_multi7.json`, sha256 `b860740c…91ac`), reads:
 
 > **0 pass, 22 fail, 1 not screened** of 23 candidates.
 
-No candidate passed, so the draft does not pick an option. The owner chooses one:
+No candidate passed, so the draft offered three options:
 
 | option | what it means | expected outcome |
 |---|---|---|

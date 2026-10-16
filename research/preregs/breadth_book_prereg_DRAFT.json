@@ -36,12 +36,18 @@
         "ledger": "nothing charged"
       }
     },
-    "chosen": null
+    "chosen": {
+      "option": "a",
+      "owner_words": "go with your recommendation",
+      "recommendation": "option (a): register the breadth book with the C6 screen as a hard gate",
+      "date": "2026-10-16",
+      "given_to": "the coordinating Claude session, in the owner's chat"
+    }
   },
   "hypothesis": "On the breadth holdout (the 2025/26 Nasdaq days, names of the fixed breadth universe outside AAPL / MSFT / QQQ), the cross-sectional book driven by the registered score, through the cost-aware optimizer at the registered notional, earns a mean daily net P&L (gross minus spread, fee and impact) whose day-clustered t is at least 2.0 with a positive mean per-rebalance rank IC; and its deflated Sharpe at the registered N is at least 0.95. Anything less is a negative result, recorded as such.",
   "book": {
     "driver": "python -m iap.research.breadth_book (iap.research.breadth_book.run_book; BookConfig defaults of the C7 report research/breadth/book/book_multi7.json)",
-    "score": "eq11 under option (a); eq10_beta_gap under option (b); open under option (c)",
+    "score": "eq11 (option a, chosen 2026-10-16)",
     "weights": "linear (centred rank, gross 1)",
     "decile_q": 0.1,
     "alpha_bps": 5.0,
@@ -107,8 +113,7 @@
   "ordering": "sign -> register (owner, .venv-ci, --require-ci-env) -> build the holdout breadth dataset -> append its dataset_version -> one confirmatory run -> outcome on the board. No step before signature reads the holdout.",
   "what_this_does_not_claim": "no edge, no promotion, no holdout read, no change to any registered alpha's fingerprint; the in-sample book is net negative on multi7 and the screen passed nothing",
   "open_for_owner": [
-    "choose option (a), (b) or (c) in decision_required",
-    "under (b): confirm the candidate EQ10/1s/linear_z_v2 and record the override reason",
+    "option (a) chosen 2026-10-16: confirm by signing; no breadth holdout dataset is built or downloaded under this registration",
     "approve the book configuration (rebalance clock, linear weights, alpha_bps, risk aversion, notional) - the C7 open questions",
     "replace configs/reference/sectors.json with a vendor taxonomy or accept it",
     "approve the acceptance thresholds and the registered N rule",
