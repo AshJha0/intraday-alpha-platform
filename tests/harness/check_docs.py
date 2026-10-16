@@ -18,14 +18,21 @@ Four named checks over the tracked Markdown (and ``docs/index.html``):
                       style phrase whose line (git blame) is OLDER than the
                       last release tag is STALE: it was written before a
                       release shipped and never updated
+  release_truth       (v1.17 G5) on a tagged release (HEAD carries a tag, or
+                      ``--release``): EVERY undated status phrase above, and
+                      every pending-PR list, FAILS whatever its age, and so
+                      does every ledger count (looks, distinct configurations,
+                      expected max |t|, Bonferroni |t|) that differs from the
+                      committed research/experiments.json; on any other
+                      commit the same findings are reported as STALE
 
 Exit codes, as check_headline_numbers.py: 0 all good · 1 a structural
 check failed (links, diagrams, API names) · 2 only status text is stale
-(``--strict`` makes that 1 too).  ``--json`` prints the findings as one
+(``--strict`` makes that 1 too); a ``release_truth`` failure exits 1.  ``--json`` prints the findings as one
 JSON document (what the docs-sync agent reads).
 
 Usage:
-    python tests/harness/check_docs.py [--strict] [--json] [--verbose]
+    python tests/harness/check_docs.py [--strict] [--release] [--json] [--verbose]
 """
 
 from __future__ import annotations
@@ -45,7 +52,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python" / "src"))
 
 STALE_PHRASES = re.compile(
-    r"\b(in progress|pending PR|pending pull request|not (?:yet )?released|work in progress|"
+    r"\b(in progress|pending PRs?|pending pull requests?|not (?:yet )?released|work in progress|"
     r"coming soon|to be (?:done|written|added)|not yet (?:merged|implemented|shipped))\b",
     re.I,
 )
@@ -273,23 +280,74 @@ def check_status_freshness(f: Findings) -> None:
         )
 
 
+#: a list of open pull requests presented as pending work ("pending: #12, #13")
+PENDING_PR_LIST = re.compile(
+    r"\b(?:pending|open|awaiting merge)\b[^\n]{0,20}#\d+[^\n]{0,12}#\d+", re.I
+)
+
+
+def tag_at_head() -> str | None:
+    """The release tag on HEAD itself, or None (``git describe --exact-match``)."""
+    return _git("describe", "--tags", "--exact-match", "HEAD").strip() or None
+
+
+def check_release_truth(f: Findings, release: bool) -> None:
+    status = "FAIL" if release else "STALE"
+    n = 0
+    for doc in tracked_docs():
+        if "CHANGELOG" in doc.name or "README_HISTORY" in doc.name or doc.parent.name == "release":
+            continue
+        rel = doc.relative_to(ROOT).as_posix()
+        for i, line in enumerate(doc.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+            if DATED.search(line):
+                continue
+            m = STALE_PHRASES.search(line) or PENDING_PR_LIST.search(line)
+            if m:
+                n += 1
+                f.add(
+                    "release_truth", status, f"{rel}:{i}", f"'{m.group(0)}': {line.strip()[:100]}"
+                )
+    ledger = ROOT / "research" / "experiments.json"
+    if ledger.exists():
+        sys.path.insert(0, str(ROOT / "tests" / "harness"))
+        import check_headline_numbers as chn  # noqa: PLC0415 (a sibling harness)
+
+        doc = json.loads(ledger.read_text(encoding="utf-8"))
+        for row in chn.ledger_mismatches(chn.texts(), doc):
+            n += 1
+            f.add("release_truth", status, row.split(":", 1)[0], row)
+    if not n:
+        f.add(
+            "release_truth",
+            "PASS",
+            "",
+            "no undated status phrase, no pending-PR list, every ledger count = research/experiments.json",
+        )
+
+
 # ---------------------------------------------------------------------------
-def run_all() -> Findings:
+def run_all(release: bool = False) -> Findings:
     f = Findings()
     check_internal_links(f)
     check_diagram_index(f)
     check_api_names(f)
     check_status_freshness(f)
+    check_release_truth(f, release)
     return f
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--strict", action="store_true", help="stale status text fails too")
+    ap.add_argument(
+        "--release",
+        action="store_true",
+        help="treat this commit as a tagged release (automatic when HEAD carries a tag)",
+    )
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--verbose", action="store_true")
     a = ap.parse_args(argv)
-    f = run_all()
+    f = run_all(release=a.release or tag_at_head() is not None)
     fails = [r for r in f.rows if r["status"] == "FAIL"]
     stale = [r for r in f.rows if r["status"] == "STALE"]
     if a.json:

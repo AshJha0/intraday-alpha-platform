@@ -1173,8 +1173,8 @@ was judged at, not a re-judgement: `legacy_v1` rows read the fixed 3.0,
 `v2` rows `max(3.0, Bonferroni |t| at gate_looks)`, where `gate_looks`
 counts every look the ledger held at the time, across datasets;
 `scope_bonferroni_t` is what the scope alone would demand. The ledger total
-(a total of 5,156 over 216 entries in the output above, captured at v1.5.0; 5,358
-over 293 at v1.14.0, which adds a fourth scope for the v1.14 statistics
+(a total of 5,156 over 216 entries in the output above, captured at v1.5.0; 5,732
+over 422 as of v1.17.0, source `research/experiments.json`; v1.14.0 added a fourth scope for the v1.14 statistics
 revision) is the sum of the three scopes: 1,068 on the
 v1.3.0 dataset, 852 on the current dataset under the old rules, and 3,236
 under the default rules (24 × 84 for the promotion report, 5 × 84 for the
@@ -2909,7 +2909,7 @@ nonce). What the new entry holds:
                   "deps": {"numpy": "...", "pandas": "...", "scipy": "..."}}}
 ```
 
-`ledger_total` is 5157: the 5,156 committed when this output was captured (v1.5.0; 5,358 at v1.14.0) plus this one. Now edit
+`ledger_total` is 5157: the 5,156 committed when this output was captured (v1.5.0; 5,732 as of v1.17.0) plus this one. Now edit
 the hypothesis text of that last entry and verify again:
 
 ```bash
@@ -7000,7 +7000,7 @@ an in-repo path (`ValueError`) unless `allow_in_repo=True`, which is for tests.
 reviewer does. `tests/harness/check_docs.py` runs four structural checks: relative
 links (including anchors) in the Markdown files, the diagram index, every `iap.*`
 name in `API_*.md` resolving by import, and status-text freshness against the last
-tag (words such as "in progress" written before the last release). Failures exit
+tag (present-tense status words, such as a claim that work is still under way, written before the last release). Failures exit
 non-zero; stale status rows are listed but only fail with `--strict`.
 
 ```bash

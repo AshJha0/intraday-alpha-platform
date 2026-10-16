@@ -884,7 +884,7 @@ jobs:
   # numbered consecutively, every `iap.*` name in API_*.md resolves by import,
   # and "in progress" / "pending PR" / "not yet released" phrases older than
   # the last release tag are reported as STALE (exit 2: reported in the job
-  # summary, not failing, until the v1.17.0 truth pass (G5) clears them; a
+  # summary, not failing; the G5 truth pass cleared them for v1.17.0; a
   # structural failure, exit 1, fails the job).  lychee checks external links
   # as an advisory step.  ADVISORY until the owner adds `docs` to the
   # protect-main ruleset (docs/governance/REPO_SETTINGS.md).
@@ -918,6 +918,17 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           if [ "$rc" = "1" ]; then exit 1; fi
+      # v1.17 G5: the release truth check. On a tagged commit, a release/*
+      # branch or a docs/*-status-truth branch, every undated "in progress" /
+      # "not released" / pending-PR phrase and every ledger count other than
+      # research/experiments.json's fails (check_docs.py --release; the same
+      # mode runs by itself when HEAD carries a tag).
+      - name: release truth (tagged release, release and truth-pass branches)
+        if: startsWith(github.head_ref, 'release/') || endsWith(github.head_ref, '-status-truth')
+        env:
+          PYTHONPATH: python/src
+          PYTHONUTF8: "1"
+        run: python tests/harness/check_docs.py --release
       # External links: lychee, pinned by SHA-256 like the other release
       # tarballs; advisory because the network and third-party sites are not
       # this repository's to keep up.

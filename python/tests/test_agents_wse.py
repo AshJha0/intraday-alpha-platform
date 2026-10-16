@@ -372,6 +372,30 @@ def test_check_docs_json_and_api_names(tmp_path):
     assert f.failed("diagram_index") == []
 
 
+def test_check_docs_release_truth_pending_prs_and_ledger():
+    """v1.17 G5: the release mode fails on pending-PR lists and ledger drift."""
+    script = REPO_ROOT / "tests" / "harness" / "check_docs.py"
+    sys.path.insert(0, str(script.parent))
+    try:
+        import check_docs
+        import check_headline_numbers as chn
+    finally:
+        sys.path.pop(0)
+    assert check_docs.PENDING_PR_LIST.search("pending: #12, #13")
+    assert not check_docs.PENDING_PR_LIST.search("merged in #12 and #13")
+    assert check_docs.STALE_PHRASES.search("the pending PRs")
+    ledger = {
+        "total_experiments": 5732,
+        "distinct_experiments": 422,
+        "expected_max_null_t": 4.160,
+        "bonferroni_t_threshold": 4.447,
+    }
+    good = {"a.md": "5,732 looks over 422 distinct configurations, Bonferroni |t| >= 4.447"}
+    bad = {"b.md": "a 5,574-look ledger, 384 distinct configurations, expected max |t| 4.144"}
+    assert chn.ledger_mismatches(good, ledger) == []
+    assert len(chn.ledger_mismatches(bad, ledger)) == 3
+
+
 # -- the evals -----------------------------------------------------------------
 @pytest.mark.parametrize("name", sorted(WSE_TASKS))
 def test_wse_eval_scores_one(name, tmp_path):

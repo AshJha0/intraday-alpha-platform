@@ -8,6 +8,15 @@ that tag.
 
 ## Unreleased
 
+- v1.17 G5, the post-release docs truth pass: README "Current status" and "Next" (v1.17.1), the
+  site (docs/index.html: v1.17.0 block and history, four result cards), SHOWCASE, ROADMAP, EPICS,
+  LEARN, COOKBOOK, HOW_IT_WORKS, API references, runbooks (prereg environment: Python 3.11 or
+  3.12) and GOVERNANCE section 0 (16 required checks, live ruleset read 2026-10-16) state the
+  v1.17.0 release, its negative results and the known manifest / SBOM / digest-pinning gap (#211);
+  every ledger count is the committed research/experiments.json (5,732 looks, 422 distinct
+  configurations, as of v1.17.0). New: `check_docs.py --release` (`release_truth`, automatic on a
+  tagged HEAD, run in CI on release and truth-pass branches) fails on undated status phrases,
+  pending-PR lists and ledger drift; `tools/release.py flow` gains the step.
 - v1.17.1 fix: release.yml passes each Python lock file to `cyclonedx-py requirements` positionally (`-i` is `--index-url` in cyclonedx-bom 7.x). The v1.17.0 release workflow's manifest job failed on it, so v1.17.0 shipped its three images (pushed and attested) without `release-manifest.json` and the two lock-file SBOMs.
 
 ## v1.17.0 — 2026-10-16

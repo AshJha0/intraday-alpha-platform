@@ -60,67 +60,63 @@ the repository map, the real-world usage notes and the references) is in
 
 The full list with descriptions is the [Documentation index](#documentation-index).
 
-## Current status (v1.17.0 released 2026-10-16)
+## Current status (v1.17.0, released 2026-10-16)
 
-**v1.17.0, the execution-quality and breadth release, shipped on 2026-10-16.** It adds a real second
-venue (IEX HIST), an implementation-shortfall benchmark with signal-aware execution, quote fading,
-queue-aware cancels and a modelled dark venue, a cross-sectional breadth book, the v1.17 statistics
-revision, budgeted LLM agents and C++/Rust parity for the new rules. The net-of-cost screen passes
-0 of 22 candidates on multi7, so the breadth book is registered with the screen as a hard gate and
-makes no confirmatory look. B7 and B8 real-data results follow in v1.17.1
+**v1.17.0, the execution-quality and breadth release, shipped on 2026-10-16.** v1.16 showed that
+neither taking nor making pays on these alphas; v1.17 worked on the two things that could still
+change that (how well an order is executed, and how many independent bets a book can hold) and
+added a real second venue. **The headline results are negative**
 ([CHANGELOG.md](CHANGELOG.md) v1.17.0 and
-[docs/release/v1.17.0_RELEASE_NOTES.md](docs/release/v1.17.0_RELEASE_NOTES.md)). The v1.16.0 summary
-below is kept until the post-release docs pass.
+[docs/release/v1.17.0_RELEASE_NOTES.md](docs/release/v1.17.0_RELEASE_NOTES.md)):
 
-### v1.16.0 (2026-10-15)
+- **Breadth: the net-of-cost screen passes 0 of 22.** The pre-registered C6 screen on multi7
+  (7 in-sample sessions): 0 pass, 22 fail, 1 not screened (EQ11 at 15 m had no scored row).
+  Gross ICs reach 0.13, but the modelled round trip (about 1.90-2.02 bps) is larger than every
+  edge, and every screened candidate's net IC is negative
+  ([research/breadth/screen/SCREEN_multi7.md](research/breadth/screen/SCREEN_multi7.md)).
+- **The breadth book makes no confirmatory look.** The owner registered C8 under option (a):
+  the screen is a hard gate, it refused every candidate, and the holdout stays unread
+  (`research/preregs/breadth_book_prereg.json`, signed).
+- **Execution quality: the depth cap, then the book.** The implementation-shortfall benchmark
+  (B1) re-run with a 50-level walk on multi7: at 0.5 % ADV the old 10-level walk cap, not the
+  book, caused the "depth exhausted" readings (60-67 % of parents to 0 %, 11 % for VWAP); at
+  2 % ADV the displayed book itself runs out (67-89 % still exhausted); the 10-level runs
+  understated cost by 2-5 bps at 1-2 % ADV. In-sample only
+  ([research/execution/benchmark/DEPTH_COMPARISON_multi7.md](research/execution/benchmark/DEPTH_COMPARISON_multi7.md)).
+  Signal-aware urgency and pacing (B2 / B3), quote fading (B4), queue-aware cancels (B5) and
+  markout decomposition (B6) ship opt-in; the dark venue (B10) is **modelled, not measured**
+  (no free dark-pool data exists).
+- **IEX, a free second venue.** The IEX HIST codec (A1) rebuilds the DEEP+ book and checks it
+  against TOPS. Day 1 of the nine Nasdaq / IEX overlap days, 2025-11-28: 148,115,121 messages,
+  1,969,356 events, TOPS oracle 0 mismatches on AAPL / MSFT / QQQ (435,973 / 72,883 / 998,642
+  comparisons) ([docs/research/IEX_OVERLAP_SET.md](docs/research/IEX_OVERLAP_SET.md)).
+- **Agents within a budget.** A spend ledger with a monthly cap of USD 30 (E1), a research
+  assistant on `claude-sonnet-5-5` (E2), a morning ops agent and a docs-sync agent on
+  `claude-haiku-5-5` (E3 / E4); the LLM never computes a number, signs, registers or merges
+  ([docs/AGENTS.md](docs/AGENTS.md)).
+- **Engineering.** C++ tick-to-trade on a real ITCH slice (AAPL, 2019-01-30): p50 1,535 ns,
+  p99 2,943 ns ([benchmarks/results_tick_to_trade.md](benchmarks/results_tick_to_trade.md));
+  hand-written C++ ports of the new execution rules with byte-for-byte goldens (F7), the
+  dark-first pre-trade controls in Rust (F8), Java retired from the release (F9).
 
-**v1.16.0, the monetisation release, shipped on 2026-10-15.** v1.15 proved
-the alphas predict on unseen data; v1.16 asked whether any of that survives
-realistic costs, and at what size. The answer is no, three ways
-([CHANGELOG.md](CHANGELOG.md) v1.16.0 and
-[docs/release/v1.16.0_RELEASE_NOTES.md](docs/release/v1.16.0_RELEASE_NOTES.md)):
+**Known gap in v1.17.0:** no `release-manifest.json`, no Python lock-file SBOMs, and the
+Kubernetes manifests are not digest-pinned (the release workflow's manifest job failed on a
+command-line flag; the images were built, pushed and attested). Fixed by #211; ships with v1.17.1.
 
-- **Taker: no-go (P0-6, #138).** EQ10 / EQ05 as a taker on the 10 in-sample
-  sessions, 480 cells: zero trades in every cell, because the forecast is
-  several times smaller than the round-trip cost
-  ([research/v116/MONETISATION_P0-6.md](research/v116/MONETISATION_P0-6.md)).
-- **Capacity: none (item 7, #149).** 0 of 45 cells break even; the best
-  (EQ10, AAPL, 1 min, top 0.1% of signals) earns 0.92 bp against 2.4 bp of
-  fixed cost ([research/v116/CAPACITY_CURVE.md](research/v116/CAPACITY_CURVE.md)).
-- **Quoting v2: no edge (#157).** Two-sided skewed quoting, registered and
-  signed, run in-sample on 6 test sessions: every cell loses $5-7k per session
-  and adverse selection is about 4x the spread captured. Skewing with EQ01 or
-  EQ05 cuts the loss by about $750-920 per session against the no-skew
-  control, so the signals are useful as an execution input
-  ([research/quoting_real/QUOTING_V2_RESULT.md](research/quoting_real/QUOTING_V2_RESULT.md)).
-- **AI4 DeepLOB: closed.** In-sample failure: net -0.69 bp per trade (gross
-  +0.27 bp against a 0.97 bp cost); the linear and GBM baselines net -0.74 and
-  -0.68 bp. The holdout was not used, by owner decision
-  ([research/r7/AI4_CLOSED_v116.md](research/r7/AI4_CLOSED_v116.md)).
-
-**v1.15.0 (2026-10-13).** The owner-signed confirmatory pre-registration
-R7-CONFIRM-1 (EQ10 @1s and EQ05 @1s, one look) ran on the 7 unseen holdout
-sessions: **both confirmed** (EQ10@1s IC +0.0838, HAC t 13.66; EQ05@1s IC
-+0.0409, HAC t 13.20; threshold 4.432; 7/7 sessions positive). Net P&L at 1x
-cost is 0: predictive, not tradable
-([docs/research/R7_RESULTS.md](docs/research/R7_RESULTS.md)). The full MVP
-loop on a real ITCH day (2019-10-18, AAPL/MSFT/QQQ): gross +$801, net −$9,226
-at ~70 k parent orders
-([docs/research/MVP_REAL_20191018.md](docs/research/MVP_REAL_20191018.md)).
-
-**Bundled synthetic data:** 24 alphas, 0 PROMOTE, 23 held at CANDIDATE; the
-executable loop loses 82.84 USD on its golden session (the table below).
-**Real data (owner-supplied, not bundled):** signals that are statistically
-strong and cost-negative as takers, a 2026 holdout confirmed 4 of 4
-pre-registered signals with no trade at 1x costs, no maker edge, and an
-auction study that is underpowered rather than negative
+**Standing results.** Bundled synthetic data: 24 alphas, 0 PROMOTE, 23 held at CANDIDATE; the
+executable loop loses 82.84 USD on its golden session (the table below). Real data
+(owner-supplied, not bundled): R7-CONFIRM-1 confirmed EQ10@1s and EQ05@1s on 7 unseen sessions
+in v1.15 (predictive, not tradable at 1x cost;
+[docs/research/R7_RESULTS.md](docs/research/R7_RESULTS.md)); v1.16 found no taker, capacity,
+quoting or DeepLOB edge; v1.17 adds the screen and breadth results above
 ([docs/REAL_DATA.md](docs/REAL_DATA.md) §3, [LEARN.md](LEARN.md) §31-§44).
 
-**Next: v1.17 (in progress, not released).** Execution quality and breadth on
-free data: algos and SOR judged on implementation shortfall, built on the
-v1.16 execution work, and more sessions from Nasdaq's free full-market ITCH
-days and IEX HIST (a second, free, daily venue). No v1.17 result is on
-`main` yet; the plan is in [docs/ROADMAP.md](docs/ROADMAP.md) §3.11-3.12.
+**Next: v1.17.1.** The B7 (fresh test of signal-aware execution) and B8 (two-venue router on
+real Nasdaq + IEX books) real-data results, from the eight remaining IEX overlap days; the
+release manifest, lock-file SBOMs and digest pinning (#211). Beyond that (v1.18): the C++
+ports not done in v1.17 (the B2-regime arm of dark eligibility, the B10 proxy sampler and fit,
+the exchange-local hazard clock; PLATFORM_CONVENTIONS.md §11.3). Plan:
+[docs/ROADMAP.md](docs/ROADMAP.md).
 
 What each release from v1.9 to v1.16 added, and the 2026-10-11 quality
 review, are recorded in full in
@@ -170,7 +166,7 @@ the full design, data flow, and diagrams.
 | Flagship alphas | **24** (EQ01–EQ12, FX01–FX12), each with an enforced `Economic rationale:` docstring | `python/src/iap/alpha/`, `research/alpha_reports/` |
 | Promotion verdicts | **0 PROMOTE / 12 ITERATE / 12 REJECT** (gated on the pooled *uncrossed* IC and its HAC t against the ledger threshold, 4.426 at the run's look count; the v1.14.0 methods: causal row block, automatic day-separated HAC, time-shift leakage; FX11 fails leakage) | `research/alpha_reports/REPORT.md` |
 | Lifecycle registry | **23 alphas at CANDIDATE, 0 beyond** (FX11 held in RESEARCH by the v1.14 time-shift leakage gate) — every candidate fails `net_pnl_after_costs` at 1× costs, its bootstrap bound `net_pnl_bootstrap_ci` and `capacity`; the cross-alpha correlation gate passes vacuously (7 states, 17 pinned edges, 20 gates) | `research/alpha_registry.json`, `research/lifecycle_transitions.jsonl`, `tests/golden/expected_lifecycle.json` |
-| Experiments ledger | 5,574 recorded looks over **384 distinct configurations** (de-duplicated by alpha × kind × config × dataset × statistics revision: 70 configurations holding 1,068 of the looks on the v1.3.0 dataset are kept as history, 223 holding 4,290 of them are on the current one, 77 of them added by the v1.14 regeneration); expected max \|t\| under the global null ≈ 4.154, Bonferroni per-test \|t\| ≥ 4.441; a hash chain since v1.14 | `research/experiments.json` |
+| Experiments ledger (as of v1.17.0) | 5,732 recorded looks over **422 distinct configurations** (de-duplicated by alpha × kind × config × dataset × statistics revision; the ledger's `datasets` block: 70 configurations holding 1,068 of the looks on the v1.3.0 dataset kept as history, 314 holding 4,626 on the bundled synthetic one, 24 holding 24 on the real multi7 dataset, 14 holding 14 with no dataset); expected max \|t\| 4.160 under the global null, Bonferroni per-test \|t\| ≥ 4.447; a hash chain since v1.14 | `research/experiments.json` |
 | Contracts | **17** JSON Schemas (all `x-version` 1 except `risk_event`, 2 since v1.14) mirrored by **22** typed Python contracts and **18** runtime-checkable Protocols; one pinned instance each | `schemas/`, `python/src/iap/contracts/`, `tests/golden/expected_contracts_examples.json` |
 | Python reference ports proven by the ports' own goldens | risk: `expected_risk_decisions.json` exact, audit JSONL + snapshot **byte-identical**; execution: `expected_replay_fills.json` **bit-identical** | `python/tests/test_risk_golden.py`, `python/tests/test_execution_golden.py` |
 | MVP golden run (`python -m iap.mvp run`, seed 12345) | **15,805** events · **800** decisions · **231** parent orders · **163** fills · P&L **−82.84 USD** (cost-negative: +0.0245 bps alpha vs −0.4367 bps execution cost) · trace digest `a7f1ee60…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |

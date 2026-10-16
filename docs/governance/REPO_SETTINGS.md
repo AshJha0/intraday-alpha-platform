@@ -165,8 +165,8 @@ JSON
 `release.yml` can only be exercised in full by pushing a tag, so a release is
 its own test. Its `verify-ci` guard failed the v1.4.0 release once on an API
 error although CI was green; since v1.5.0 the guard is
-`tests/harness/verify_ci_green.py`, which retries an API error, polls a run
-in progress and fails on a failed or missing run, and it can be run alone
+`tests/harness/verify_ci_green.py`, which retries an API error, polls a run that has not
+finished yet and fails on a failed or missing run, and it can be run alone
 against a given commit:
 `gh workflow run release.yml --ref <branch> -f dry_run=true -f sha=<40 hex>`.
 

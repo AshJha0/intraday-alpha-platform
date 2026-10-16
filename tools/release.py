@@ -585,6 +585,12 @@ release flow (tools/release.py, dry-run by default; --execute to act):
  6. open the 'release: pin vX.Y.Z image digests' PR with the rewritten
       deployment/k8s manifests (python tools/release.py pin-digests ... --execute
       re-runs that step from a local release-manifest.json)
+ 7. post-release docs truth pass (one PR 'docs: vX.Y.Z status truth pass', before
+      the release is announced): README status + Next, docs/index.html, SHOWCASE,
+      ROADMAP / EPICS, runbooks, GOVERNANCE section 0 from the live ruleset; then
+      python tests/harness/check_docs.py --release   must exit 0: no undated
+      "in progress" / "not released" / pending-PR phrase, every ledger count
+      = research/experiments.json (automatic on a tagged HEAD)
 """
 
 
