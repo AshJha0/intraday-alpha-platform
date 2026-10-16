@@ -51,6 +51,8 @@ disk = free GB at the lowest point of the day, then at its end.
 | day | TOPS / DEEP+ GB | download | TOPS extract | ingest | messages | events | oracle AAPL / MSFT / QQQ | kept GB | disk min / end | dataset_version |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 2025-11-28 | 4.37 / 4.31 | ~1.5 min + ~2 min | 41 min | 16:52 (parse 927 s, normalise 53 s) | 148,115,121 | 1,969,356 | 435,973/0 / 72,883/0 / 998,642/0 | 0.325 (normalized 0.192) | 135.9 / 140.4 | `f977bb3a39d1` |
+| 2025-12-08 | 9.30 / 8.99 | ~4 min + ~2 min | 1:49 h | 1:23:12 (parse under load) | 317,211,767 | 5,590,941 | 832,770/0 / 152,908/0 / 3,496,249/0 | 0.671 (normalized 0.547) | 136.4 / 146.4 | `6c94942ab59d` |
+| 2025-12-09 | 8.61 / 8.43 | 5:02 min (28.5 MB/s) + 20:20 min (6.9 MB/s) | 1:21 h | 1:45:41 (parse 6,157 s) | 295,426,880 | 4,829,986 | 711,762/0 / 101,120/0 / 3,045,150/0 | 0.706 (normalized 0.472) | 137.1 / 166.2 | `9517c4efa19b` |
 
 Notes per day:
 
@@ -64,3 +66,20 @@ Notes per day:
   431,744), the best-round-lot-level oracle diverged (56,540 of 434,022), the cumulative round-lot
   oracle (PR #201) matched every comparison. Events per symbol: AAPL 605,896, MSFT 94,667,
   QQQ 1,268,793.
+- **2025-12-08** (done 2026-10-16 12:06). Round lots 100 / 40 / 40 from `r7_20251208/dataset.json`;
+  251,467,861 segments, 0 sequence gaps, 0 outside the session date, 3 directory rows synthesised;
+  `odd_lot_top` 560,974; ingest 4,992 s while the chain's day 3 extract / download and the breadth
+  feature build ran beside it; features 495 s; DEEP+ sha256
+  `e4a7f8cbe152947c12fa88a68148fcdca9b206e5bfc992d90973a3673f15d6ab`. The TOPS download and extract
+  times are from the chain's first pass (2026-10-15 23:15 to 2026-10-16 ~08:40, interrupted by the
+  overnight shutdown and resumed from markers); the first ingest attempt (best-round-lot-level rule)
+  was stopped before its verdict, the rerun under the cumulative rule matched every comparison.
+  Events per symbol: AAPL 1,095,441, MSFT 190,368, QQQ 4,305,132.
+- **2025-12-09** (done 2026-10-16 13:27, chain day, 3 h 50 min end to end). Round lots 100 / 40 / 40
+  inferred from the TOPS extract (`round_lots_source: tops_min_quoted_size`; the chain's wrapper
+  predates `--round-lots-from`), equal to the Nasdaq directory's; 3,871,924 TOPS quotes extracted;
+  238,222,190 segments, 0 sequence gaps, 0 outside the session date, 3 directory rows synthesised;
+  `odd_lot_top` 417,487; the ingest overlapped the day-2 rerun for its first half; features
+  1,079 s; TOPS sha256 `7024b40097bd7d24388c174dacd0cd548633e788c6671caffdb305caaa666757`, DEEP+
+  sha256 `2bd48f7924ff8e605f0c2c5f4896d06e4c4ba65c23922f4b38e1861f3eeb06e6`. Events per symbol:
+  AAPL 921,688, MSFT 119,742, QQQ 3,788,556.
