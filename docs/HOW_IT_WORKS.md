@@ -277,17 +277,18 @@ buckets gain (FX08 2.18 → 3.84). The threshold the t is compared with is
 Try enough things and something will look significant. So every look at
 the data is recorded in a ledger (`research/experiments.json`), identified
 by alpha, kind, configuration and — since v1.4.0 — dataset, so that
-re-running a script does not inflate the count. Today (v1.14.0) it holds
-5,358 looks over 293 entries: 1,068 were taken on the v1.3.0 dataset, 852
-on the v1.4.0 dataset under the old rules, 2,476 were added when v1.5.0
-re-ran everything under the new ones, 202 when v1.14.0 re-ran it under the
-revised statistics, and 760 by the signal-combination
-experiments of the same release (§2.13). A statistic computed on a different
+re-running a script does not inflate the count. As of v1.17.0 it holds
+5,732 looks over 422 entries (`research/experiments.json`, its `datasets`
+block): 1,068 on the v1.3.0 dataset, 4,626 on the regenerated synthetic
+dataset (the v1.4.0 legacy rules, the v1.5.0 re-run, the v1.14.0 statistics
+revision and the signal-combination experiments of §2.13), 24 on the
+seven-session real dataset (the v1.17 net-of-cost screen) and 14 with no
+dataset. A statistic computed on a different
 dataset, or under a different method bundle, is a different look, and the
 denominator only grows: regenerating the data or changing the rules does
 not reset it. From that count come two yardsticks: the largest t expected
-from pure noise over that many trials (about 4.10) and the Bonferroni
-threshold (about 4.39).
+from pure noise over that many trials (4.160 as of v1.17.0) and the Bonferroni
+threshold (4.447).
 
 Up to v1.4.0 the PROMOTE gate asked for t ≥ 3.0 whatever the count, and
 the report printed the yardsticks beside it. Since v1.5.0 the gate follows
@@ -1569,8 +1570,8 @@ reason for each:
   trading path in any case.
 - **Agent debate.** Several agents arguing about 24 alphas on the same two
   sessions add no data. Evidence comes from sessions, and the ledger
-  already holds 5,358 looks at them (1,068 on the v1.3.0 dataset, the rest
-  on the regenerated one). Debate multiplies looks; it does not add a
+  already holds 5,732 looks as of v1.17.0 (`research/experiments.json`),
+  1,068 on the v1.3.0 dataset and 4,626 on the regenerated one. Debate multiplies looks; it does not add a
   holdout. Pre-registration and a hidden reserve seed (built since v1.7)
   are what would score who was right, and they score one registered
   hypothesis at a time, which is what the v1.11 agent is limited to.

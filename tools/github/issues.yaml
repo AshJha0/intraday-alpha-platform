@@ -110,7 +110,7 @@ milestones:
   - title: "v1.15"
     description: "Released 2026-10-13 (IAP_v1.15_Plan.md): R7 confirmatory round, v2 realism config, models (DeepLOB, conformal sizing), regulatory fees, governance enforcement, narrower agent job, Java archive, release automation."
   - title: "v1.16"
-    description: "In progress (IAP_v1.16_Plan.md), the monetisation release: realistic execution P0-1..P0-5, in-sample monetisation study (no-go) and capacity curve, quoting v2, forward paper-trade infrastructure, AI4 on real data, research hygiene and engineering."
+    description: "Released as v1.16.0 on 2026-10-15 (IAP_v1.16_Plan.md), the monetisation release: realistic execution P0-1..P0-5, in-sample monetisation study (no-go) and capacity curve, quoting v2, forward paper-trade infrastructure, AI4 on real data, research hygiene and engineering."
 
 # ----------------------------------------------------------------------------
 epics:
@@ -304,7 +304,7 @@ epics:
       byte-identical audit log. The engine depends on nothing but its config
       and the event stream — never on a network call, a wall clock or an LLM.
     scope:
-      - "rust/risk (reference), java com.iap.risk (byte-identical port), python/src/iap/risk (port in progress)"
+      - "rust/risk (reference), java com.iap.risk (byte-identical port), python/src/iap/risk (port)"
       - "configs/risk/risk.json (x-version 3), schemas/risk/risk_event.schema.json"
     acceptance:
       - "Missing or invalid config rejects everything with CONFIG_MISSING; unbootstrapped engines reject with NOT_BOOTSTRAPPED"
@@ -323,7 +323,7 @@ epics:
       time-in-force, a deterministic smart order router with a pinned venue
       scoring ladder, and an event-driven execution simulator with seeded
       latency, queue position, partial fills, cancels and a venue trading-state
-      gate — C++ is the reference, Java the port, Python the port in progress.
+      gate — C++ is the reference, Java the port, Python a port.
     scope:
       - "cpp/include/iap/execution/{execution,algos}.hpp, cpp/include/iap/sor/sor.hpp (+ src); java com.iap.{execution,sor}; python/src/iap/execution"
       - "rust/venue (venue protocol codec + simulated venue)"
@@ -4306,12 +4306,12 @@ issues:
     status: done
     estimate_days: 1
     context: >
-      0 of 45 cells break even (best EQ10 AAPL 1m top 0.1%: 0.92 bp against 2.4 bp fixed cost). The tool and results are in PR #149, pending merge.
+      0 of 45 cells break even (best EQ10 AAPL 1m top 0.1%: 0.92 bp against 2.4 bp fixed cost). Tool and results merged in v1.16.0 (research/v116/CAPACITY_CURVE.md).
     acceptance:
       - "Capacity per instrument reported"
     evidence:
       - "research/v116/MONETISATION_P0-6.md"
-      - "PR #149: tools/v116_capacity_curve.py (pending merge)"
+      - "tools/v116_capacity_curve.py; research/v116/CAPACITY_CURVE.md"
 
   - key: V116-8
     epic: E36
@@ -4332,28 +4332,28 @@ issues:
     title: "v1.16 item 9: forward paper-trade daily driver (infrastructure)"
     labels: [type:feature, area:mvp, lang:python, priority:p1]
     milestone: "v1.16"
-    status: in-progress
+    status: done
     estimate_days: 2
     context: >
-      Daily driver and live-vs-backtest TCA as infrastructure, in PR #144. The owner registers the daily task.
+      Daily driver and live-vs-backtest TCA as infrastructure, shipped in v1.16.0. The owner registers the daily task.
     acceptance:
       - "Daily run produces a TCA report"
     evidence:
-      - "planned: PR #144 (forward paper-trade driver)"
+      - "python/src/iap/paper/daily.py; python/tests/test_paper_daily.py"
 
   - key: V116-10
     epic: E36
     title: "v1.16 item 10: AI4 DeepLOB on real data"
     labels: [type:research, area:ml, lang:python, priority:p1]
     milestone: "v1.16"
-    status: in-progress
+    status: done
     estimate_days: 3
     context: >
-      Parts 1-2 (streaming real-data LOB adapter, streaming training and evaluation) in PR #151; a new prereg superseding AI4-DEEPLOB-1 needs the owner's signature; no development on R7 holdout sessions.
+      Parts 1-2 (streaming real-data LOB adapter, streaming training and evaluation) shipped in v1.16.0; CLOSED 2026-10-15 after an in-sample failure (validation net -0.69 bp per trade), no holdout look, by owner decision.
     acceptance:
       - "One holdout test against baselines after costs"
     evidence:
-      - "planned: PR #151 (iap.models.lob_real, iap.models.lob_train)"
+      - "research/r7/AI4_CLOSED_v116.md (closed: in-sample failure, no holdout look)"
 
   - key: V116-11
     epic: E36
@@ -4402,14 +4402,14 @@ issues:
     title: "v1.16 item 14: optimiser: Dykstra projection, estimated Ledoit-Wolf intensity"
     labels: [type:feature, area:portfolio, lang:python, priority:p2]
     milestone: "v1.16"
-    status: in-progress
+    status: done
     estimate_days: 1
     context: >
-      Opt-in; in PR #147.
+      Opt-in; shipped in v1.16.0.
     acceptance:
       - "Defaults unchanged"
     evidence:
-      - "planned: PR #147"
+      - "python/src/iap/portfolio/optimizer.py; python/tests/test_v116_dykstra_lw.py"
 
   - key: V116-15
     epic: E36
@@ -4430,14 +4430,14 @@ issues:
     title: "v1.16 item 16: blocking mypy and agent-evals; Java image decision (N-7)"
     labels: [type:feature, area:testing, priority:p2]
     milestone: "v1.16"
-    status: in-progress
+    status: done
     estimate_days: 0.5
     context: >
-      In PR #143.
+      Shipped in v1.16.0: mypy is blocking.
     acceptance:
       - "CI jobs blocking"
     evidence:
-      - "planned: PR #143"
+      - ".github/workflows/ci.yml (mypy step, blocking)"
 
   - key: V116-17
     epic: E36

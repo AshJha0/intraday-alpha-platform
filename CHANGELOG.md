@@ -12,6 +12,17 @@ that tag.
   NEGATIVE: `sor` +5.1 ± 1.3 bps all-in and -8 pp fill vs pinned Nasdaq, pinned IEX +11.6 ± 0.6 bps;
   2 clusters, provisional. Two-venue reads now stream with the `--symbols` filter; the `two_venue`
   block gains `paired_pooled` / `paired_rows`.
+- v1.17 G5, the post-release docs truth pass: README "Current status" and "Next" (v1.17.1), the
+  site (docs/index.html: v1.17.0 block and history, four result cards), SHOWCASE, ROADMAP, EPICS,
+  LEARN, COOKBOOK, HOW_IT_WORKS, API references, runbooks (prereg environment: Python 3.11 or
+  3.12) and GOVERNANCE section 0 (16 required checks, live ruleset read 2026-10-16) state the
+  v1.17.0 release, its negative results and the known manifest / SBOM / digest-pinning gap (#211);
+  every ledger count is the committed research/experiments.json (5,732 looks, 422 distinct
+  configurations, as of v1.17.0). New: `check_docs.py --release` (`release_truth`, automatic on a
+  tagged HEAD, run in CI on release and truth-pass branches) fails on undated status phrases,
+  pending-PR lists and ledger drift; `tools/release.py flow` gains the step.
+- v1.17.1 fix: release.yml passes each Python lock file to `cyclonedx-py requirements` positionally (`-i` is `--index-url` in cyclonedx-bom 7.x). The v1.17.0 release workflow's manifest job failed on it, so v1.17.0 shipped its three images (pushed and attested) without `release-manifest.json` and the two lock-file SBOMs.
+
 ## v1.17.0 — 2026-10-16
 
 Theme: execution quality and breadth. The platform gains a real second venue (IEX HIST, free), an implementation-shortfall benchmark with signal-aware urgency, pacing, quote fading, queue-aware cancels, markout decomposition and a modelled dark venue, a cross-sectional breadth book with a pre-registered net-of-cost screen, the v1.17 statistics revision, budgeted LLM agents, and C++/Rust parity for the new execution rules. Headline results are negative and stated as such: the net-of-cost screen passes 0 of 22 candidates on multi7, so the breadth book is registered with the screen as a hard gate and makes no confirmatory look. B7 (signal-aware execution fresh test) and B8 (two-venue router on real books) ship as code and run commands; their real-data results land in v1.17.1 as the IEX overlap days are ingested. Notes: docs/release/v1.17.0_RELEASE_NOTES.md.

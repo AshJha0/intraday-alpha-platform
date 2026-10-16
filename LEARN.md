@@ -880,8 +880,8 @@ did the same thing along a different axis: the method bundle is part of
 the canonical config, so the same 24 pipelines run under the new default
 rules are new looks at the same sample, added beside the v1.4.0 ones
 (ledger `x-version` 3). At v1.5.0 the ledger held 216 distinct
-configurations and a look count of 5,156, broken down below. At v1.14.0 it holds
-**307 distinct configurations / 5,361 looks**: v1.14.0 regenerated every statistic under its revised methods, and each one is a new look (`stats_revision`), adding 202 to the count over 77 configurations (the
+configurations and a look count of 5,156, broken down below. As of v1.17.0 it holds
+**422 distinct configurations / 5,732 looks** (`research/experiments.json`). v1.14.0 regenerated every statistic under its revised methods, and each one is a new look (`stats_revision`), adding 202 to the count over 77 configurations (the
 breakdown below is the v1.5.0 one, and every entry in it is still there):
 
 - on the v1.3.0 dataset (`203c8f54…`), 70 entries carrying 1,068 of the
@@ -905,8 +905,8 @@ evaluations at four folds (itemised in
 and every one of them is a look.
 
 That translates into a selection yardstick: Bonferroni per-test threshold
-|t| ≥ **4.432**, and an expected **max |t| ≈ 4.144 under the global null**
-at v1.14.0 (4.424 and 4.135 at v1.5.0's count of 5,156, 4.206 and 3.888 at the v1.4.0 count of 1920, 4.071 and 3.735 before the
+|t| ≥ **4.447**, and an expected **max |t| ≈ 4.160 under the global null**
+as of v1.17.0, source `research/experiments.json` (4.432 and 4.144 at v1.14.0, 4.424 and 4.135 at v1.5.0's count of 5,156, 4.206 and 3.888 at the v1.4.0 count of 1920, 4.071 and 3.735 before the
 dataset regeneration: looking again raised the bar each time). Up to
 v1.4.0 this yardstick was printed beside a fixed gate of t ≥ 3.0 and read
 by nothing. Since v1.5.0 the Bonferroni figure *is* the PROMOTE
@@ -918,7 +918,7 @@ on each entry as `gate_looks`. The committed report was judged at **3,936
 looks** (the 1,920 already recorded plus its own 2,016), which gives the
 threshold of **4.365** and a yardstick of 4.07; the runner and adaptive
 runs that followed brought the ledger to 4,396, and the combination
-experiments of §29 to 5,156, and the v1.14.0 regeneration to 5,361. The
+experiments of §29 to 5,156, and the v1.14.0 regeneration further; it stands at 5,732 as of v1.17.0. The
 threshold is not
 retroactive — later looks tighten later runs and do not re-judge a
 recorded one.
@@ -3241,8 +3241,8 @@ Dependabot bump is being asked to do.
 3. **Random splits on overlapping labels.** Walk-forward only, purge at the
    label horizon, 60 s embargo (§6.2).
 4. **Uncounted multiple testing.** A ledger de-duplicated by (alpha, kind,
-   config, dataset) — 307 distinct configurations, 5,361 looks at v1.14.0 — with a printed
-   expected-max-|t| yardstick of 4.144; FX08's t = 3.84 is called what it is.
+   config, dataset) — 422 distinct configurations, 5,732 looks as of v1.17.0
+   (`research/experiments.json`) — with a printed expected-max-|t| yardstick of 4.160; FX08's t = 3.84 is called what it is.
    Regenerating the dataset did not reset the count, and neither did
    changing the default methods: the looks already taken are kept and the
    new ones added (§6.6). Since v1.5.0 the count is not only printed: the
@@ -3800,7 +3800,7 @@ Better, and still a loss.
 adverse selection of the trades you take. Any gate that conditions on an
 average will be wrong in the direction that hurts, because the trades that
 survive to be measured are selected by the market. This is why the
-maker study on real data (in progress, pre-registered, in-sample) reports
+maker study on real data (pre-registered, in-sample; it finished in v1.16 with no maker edge) reports
 adverse selection per trip, not per calibration.
 
 **Check yourself.**
@@ -4193,7 +4193,7 @@ asked for fewer copies. v1.11 deleted none. Why is that the right outcome?
 
 **The real risk of duplication.** Copies that agree today are not the
 problem; the golden tests guarantee that. The problem is the next feature:
-it has to be written N times, and a copy that is not updated drifts, or
+it must be written N times, and a copy that is not updated drifts, or
 blocks the release until someone who knows that language ports it. The
 cost grows with every feature added to every copy.
 
@@ -5542,13 +5542,13 @@ gate decision ever recorded. The threshold is
 |t| >= Φ^{-1}(1 - α / (2N)),      α = 0.05 (PINNED_ALPHA)
 ```
 
-(`ExperimentLedger.bonferroni_t_threshold`). At the 5,361 looks of the R7
-run, `α / (2N) = 4.66e-6` and `|t| = 4.432`. The threshold grows slowly,
+(`ExperimentLedger.bonferroni_t_threshold`). As of v1.17.0 the ledger holds
+5,732 looks (`research/experiments.json`) and the threshold is `|t| = 4.447`. The threshold grows slowly,
 like `sqrt(2 ln N)`: doubling the looks adds about 0.15.
 
 **The yardstick beside it.** `expected_max_null_t` is `sqrt(2 ln N)`, the
 approximate largest `|t|` that `N` independent null tests would produce:
-4.144 at 5,358 looks. A best result near that number is what pure search
+4.160 at 5,732 looks, as of v1.17.0 (`research/experiments.json`). A best result near that number is what pure search
 would have found.
 
 **Why conservative is the point.** Bonferroni is valid under any
@@ -6518,9 +6518,10 @@ then deferred without being run. What was wrong with the pipeline?
 inputs the registration pins. Doing so under the same registration would
 be a deviation of substance, chosen after review. So a new registration
 will supersede it, the spent look stays counted, and the holdout sessions
-are off limits for AI4 development until then (§73). The rebuild is v1.16
-work in progress and is not on main as of this writing; the code in §93 is
-the v1.15 pipeline the review criticised.
+are off limits for AI4 development until then (§73). The rebuild was done in v1.16 and
+AI4 was closed on 2026-10-15 after an in-sample failure with no holdout look
+(research/r7/AI4_CLOSED_v116.md); the code in §93 is the v1.15 pipeline the
+review criticised.
 
 **Check yourself.**
 

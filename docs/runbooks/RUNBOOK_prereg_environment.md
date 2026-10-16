@@ -18,10 +18,11 @@ python tools\quoting_v2_register.py . --dry-run --require-ci-env
 
 ## One-time: build the CI venv (owner, from the repo root, Windows)
 
-Same Python as CI's main job (3.11) and the same install command as `.github/workflows/ci.yml`.
+Python 3.11 or 3.12 (CI tests both; the CI-env check compares the numpy/pandas/scipy
+versions only, not the interpreter) and the same install command as `.github/workflows/ci.yml`.
 
 ```powershell
-py -3.11 -m venv .venv-ci
+py -3.12 -m venv .venv-ci    # or: py -3.11 -m venv .venv-ci
 .\.venv-ci\Scripts\python -m pip install --upgrade pip
 .\.venv-ci\Scripts\python -m pip install --require-hashes -r python\requirements-ci.txt
 ```

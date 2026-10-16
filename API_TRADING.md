@@ -263,7 +263,7 @@ Checks 31-33 run after check 28 and before check 29 (the venue token is still sp
 The B10 hand-over (`docs/research/B10_F8_HANDOVER.md`) also defines a STATELESS form of the
 three controls that the execution replay evaluates itself before a dark post, from inputs the
 risk engine does not track (the trailing displayed lit volume, the parent's cumulative dark
-notional, the child notional at the midpoint): `dark_pretrade_check` in `python/src/iap/execution/dark.py` (B10 branch)
+notional, the child notional at the midpoint): `dark_pretrade_check` in `python/src/iap/execution/dark.py`
 (`DarkControls`: `max_participation`, `participation_window_ns`, `allowed_venue_types`,
 `max_dark_notional`; codes `venue_type` / `participation` / `notional`, first failure wins). The
 Rust crate carries the same pure function (`risk::dark_pretrade_check`, `rust/risk/src/dark.rs`),
