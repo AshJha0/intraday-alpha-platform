@@ -37,15 +37,16 @@ std::string day_label(std::int64_t ts, std::int64_t day_ns) {
 }  // namespace
 
 const std::vector<std::string>& fill_types() {
-    // v1.17 B10 added "dark" (Fill.provenance == "dark_midpoint" in the Python
-    // reference); the classification itself is ported in F7 part 2, so no C++
-    // fill is typed "dark" yet, but the reported list matches the reference.
+    // v1.17 B10 "dark": a modelled dark fill (Fill::dark_midpoint, F7 part 2).
     static const std::vector<std::string> t = {"passive", "aggressive", "faded",
                                                "cancelled_replaced", "dark"};
     return t;
 }
 
 std::string fill_type(const Fill& fill, const ChildOrder& order) {
+    // v1.17 B10 (F7 part 2): a MODELLED dark fill, tested before the
+    // liquidity split (Python: Fill.provenance == "dark_midpoint").
+    if (fill.dark_midpoint) return "dark";
     if (fill.liquidity == Liquidity::TAKER) return "aggressive";
     if (order.cancel_rule != 0 && fill.ts >= order.cancel_rule_ts) return "faded";
     if (order.replaces_order_id != 0) return "cancelled_replaced";

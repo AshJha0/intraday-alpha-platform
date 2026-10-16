@@ -29,6 +29,18 @@ std::map<std::uint16_t, VenueSpec> load_venues(const std::string& path) {
         }
         spec.latency_mean_ns = v["latency"]["mean_ns"].i64();
         spec.latency_jitter_ns = v["latency"]["jitter_ns"].i64();
+        if (v.has("venue_type")) {
+            const auto vt = venue_type_from_name(v["venue_type"].s());
+            if (!vt.has_value()) {
+                throw std::runtime_error("venue " + std::to_string(spec.venue_id) +
+                                         ": venue_type must be lit, dark or midpoint");
+            }
+            spec.venue_type = *vt;
+            if (spec.venue_type != VenueType::LIT && spec.is_fx) {
+                throw std::runtime_error("venue " + std::to_string(spec.venue_id) +
+                                         ": a dark / midpoint venue must be equity");
+            }
+        }
         out[spec.venue_id] = spec;
     }
     if (out.empty()) throw std::runtime_error("no venues in " + path);
@@ -301,6 +313,22 @@ double ExecutionSimulator::parent_impact(const ChildOrder& o,
         cost += perm * 1e-4 * unit_price;
     }
     return cost;
+}
+
+const char* venue_type_name(VenueType t) {
+    switch (t) {
+        case VenueType::LIT: return "lit";
+        case VenueType::DARK: return "dark";
+        case VenueType::MIDPOINT: return "midpoint";
+    }
+    return "lit";
+}
+
+std::optional<VenueType> venue_type_from_name(const std::string& s) {
+    if (s == "lit") return VenueType::LIT;
+    if (s == "dark") return VenueType::DARK;
+    if (s == "midpoint") return VenueType::MIDPOINT;
+    return std::nullopt;
 }
 
 const char* urgency_regime_name(UrgencyRegime r) {

@@ -100,6 +100,7 @@
 #include <optional>
 #include <vector>
 
+#include "iap/execution/dark.hpp"
 #include "iap/execution/execution.hpp"
 
 namespace iap {
@@ -154,6 +155,12 @@ struct ParentOrder {
     // most max_child_qty (catch-up after expiries or missed fills). Needs
     // 0 < participation < 1 (the replay constructor throws otherwise).
     bool pov_exact = false;
+    // v1.17 B10 / F7 part 2: dark-first routing (execution/dark.hpp, the
+    // rule in exec_replay.hpp). nullopt = off (the pinned behaviour). A
+    // parent with it posts each step to the dark / midpoint venue first and
+    // sends the unfilled remainder to the lit book; its dark fills are
+    // MODELLED, not measured.
+    std::optional<DarkFirstParams> dark_first;
 };
 
 // POV target qty for `market_volume` (iap.execution.replay._pov_target).

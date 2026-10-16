@@ -168,7 +168,10 @@ std::vector<CostAwareRouter::Touch> CostAwareRouter::touches(
     const std::vector<std::uint16_t>* candidates) const {
     std::vector<Touch> out;
     for (const std::uint16_t vid : candidate_ids(candidates)) {
-        if (models_->find(vid) == models_->end()) continue;
+        auto mit = models_->find(vid);
+        if (mit == models_->end() || !mit->second.spec.is_lit()) {
+            continue;  // v1.17 B10: a dark venue has no displayed quote to rank
+        }
         const OrderBook* vb = gate_.eligible(book, vid);
         if (vb == nullptr) continue;
         const std::optional<LevelEntry> q =

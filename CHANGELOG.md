@@ -8,6 +8,25 @@ that tag.
 
 ## Unreleased
 
+- v1.17 WS-F item F7, part 2: C++ port of the B10 dark / midpoint venue model and the
+  dark-first replay rule, next to the simulator and router in `cpp/`: `VenueSpec::venue_type`
+  (`venues.json` `"venue_type"`), `execution/dark.hpp` (`sigmoid`, `dark_features`,
+  `DarkFillModel` read from the committed multi7 fit with the modelled label, `midpoint_ticks`,
+  `DarkFirstParams`, the stateless `dark_pretrade_check` as the replay-path mirror of the
+  Rust-owned F8 controls), `ExecutionReplay::dark_try` / `work_dark` (the seeded draw from
+  `seed ^ 0xB10`, the lit-tape-driven midpoint fill, expiry to the lit book in the base child
+  style, the dark accounting of `ParentReport`, `ExecReplayResult::children`, lit-only SOR
+  candidates), `Fill::dark_midpoint` and the `dark` fill type of the B6 decomposition;
+  `sor_v2` skips non-lit venues. Golden `tests/golden/expected_f7_dark_venue.json`
+  (`make_golden_f7.py --only r11_dark_venue`: scalar rules, six golden-stream and two
+  real-slice replay scenarios across the multi7 / prior / sure / never / mixed models and the
+  control variants), byte parity in `cpp/tests/test_f7_dark_venue.cpp`. Every dark fill is
+  MODELLED, not measured. Also `expected_f7_hazard_grid.json` (`r12_hazard_grid`,
+  `test_f7_hazard_grid.cpp`): the hazard evaluation over 11 models x a feature grid, the
+  wave-5 fit that diverged by 1 ulp before #200 included. Not ported (stated in
+  PLATFORM_CONVENTIONS section 11.3): the B2-regime arm of the dark eligibility (the signal
+  replay wiring), the proxy sampler / fit (calibration), the X-8 zone clock.
+  `bench_exec_rules` gains the B10 per-event row.
 - v1.17 fix: intermittent `test_legacy_methods` failures under xdist —
   `iap.research.screen.main` and `iap.research` `main` (`--dataset-dir`) left
   the process-global alpha universe (`configure_universe`) pointed at the

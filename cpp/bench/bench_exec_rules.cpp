@@ -47,6 +47,7 @@
 #include <string>
 #include <vector>
 
+#include "iap/execution/dark.hpp"
 #include "iap/execution/fading.hpp"
 #include "iap/execution/fill_hazard.hpp"
 #include "iap/execution/pacing.hpp"
@@ -120,7 +121,7 @@ private:
     double sum_ = 0.0;
 };
 
-constexpr int kRules = 8;
+constexpr int kRules = 9;
 const char* const kRuleNames[kRules] = {
     "sor_v2 plan_sweep (all-in, buy 5000)",
     "sor_v2 route_passive (hazard fill prob)",
@@ -130,6 +131,7 @@ const char* const kRuleNames[kRules] = {
     "B3 pov_pacing_step",
     "B4 book_pressure + fade_rule",
     "B5 hazard p_fill + queue_cancel_rule",
+    "B10 dark p_fill + midpoint + pretrade check",
 };
 
 struct Workload {
@@ -274,6 +276,10 @@ void run_workload(const Workload& w, Result* out, bool timed) {
     const double exponent = 0.5;
     std::int64_t parent_q = 0;
     std::int64_t volume = 0;
+    const iap::DarkFillModel dark_model = iap::DarkFillModel::prior();
+    iap::DarkControls dark_controls;
+    dark_controls.max_participation = 0.1;
+    dark_controls.max_dark_notional = 1e7;
     double target_f = 0.0;
 
     iap::ConsolidatedBook book(w.instrument);
@@ -331,6 +337,15 @@ void run_workload(const Workload& w, Result* out, bool timed) {
                                        dep.exec_hazard(0, bb->second), t);
             const double p = hz.p_fill_within(x, 1'000'000'000);
             g_sink = g_sink + static_cast<double>(iap::queue_cancel_rule(bb->second, 5000, p, 0.2));
+        });
+        time(8, [&] {
+            // the per-event work of one open dark child (work_dark) plus the
+            // stateless pre-trade check of a post (dark_try)
+            const double pf = dark_model.p_fill(volume % 50'000, ba->first - bb->first, 300, 600);
+            const std::int64_t mid = iap::midpoint_ticks(bb->first, ba->first, 0);
+            const auto code = iap::dark_pretrade_check(dark_controls, iap::VenueType::DARK, 300,
+                                                       volume % 50'000, 1e5, 300.0 * mid * w.tick);
+            g_sink = g_sink + pf + static_cast<double>(mid) + static_cast<double>(code);
         });
     }
 }
