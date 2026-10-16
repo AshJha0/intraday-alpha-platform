@@ -5,6 +5,14 @@ expected, an order rejected for a rule nobody predicted, a P&L figure that
 disagrees with the dashboard, a postmortem (`RUNBOOK_incident_kill_switch.md`
 §6) — and the answer must be reproducible, not recollected.
 
+> **Shells.** Blocks tagged `bash` run in bash (Linux, the containers, Git Bash on Windows).
+> The owner's Windows machine uses PowerShell: each `PYTHONPATH=src python3 ...` has a
+> `powershell` variant below it (`$env:PYTHONPATH = "src"; python ...`; `python3` is `python`;
+> set the variable once per window; `a && b` is `a; if ($?) { b }`). `bash tests/harness/...`
+> and `bash build.sh` need Git Bash or WSL on PATH; `kubectl`, `docker` and `curl` lines
+> are for the cluster/containers and are the same in PowerShell except for the text filters,
+> which are given in PowerShell where the owner would run them locally.
+
 **What makes it possible** (PLATFORM_CONVENTIONS.md §3, §13; docs/MVP.md §5):
 everything downstream of the captured market-data stream is a pure function
 of that stream plus the configuration in force. Every run keeps both, every
@@ -32,6 +40,10 @@ cd python && PYTHONPATH=src python3 -m iap.mvp run                 # -> ../data/
 # mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=231 children=347 fills=163 pnl=-82.837333 USD digest=d4659d8c1bb40b5b... out=.../data/mvp/58a10f2194a3c81c
 ```
 
+```powershell
+Set-Location python; $env:PYTHONPATH = "src"; python -m iap.mvp run     # -> ..\data\mvp\<run_id>\
+```
+
 **Java paper vertical** (`archive/java/paper.sh` (archived, frozen at v1.14.0), state directory `--state-dir` /
 `$IAP_STATE_DIR`, `/data/state` in the deployments; `RUNBOOK_shadow_deployment.md`
 §4–§5, PLATFORM_CONVENTIONS.md §12.3):
@@ -56,6 +68,11 @@ risk_audit.jsonl` must match the report before the directory is reused.
 cd python
 PYTHONPATH=src python3 -m iap.mvp replay --run ../data/mvp/<run_id>          # -> <run_id>/replay/
 # replay OK: ../data/mvp/<run_id> reproduces its trace digest and report
+```
+
+```powershell
+Set-Location python; $env:PYTHONPATH = "src"
+python -m iap.mvp replay --run ../data/mvp/<run_id>
 ```
 
 `replay` re-runs the loop over `events.jsonl`, compares the trace digest,
@@ -117,6 +134,14 @@ grep -c '"decision":2' ../data/mvp/<run_id>/risk_audit.jsonl              # REJE
 
 # the exact trace line (the pinned renderer shows 0.1 bp; the line holds the exact values)
 grep '"parent_order_id":17,' ../data/mvp/<run_id>/traces.jsonl | python3 -m json.tool | less
+```
+
+```powershell
+# from python\ with $env:PYTHONPATH = "src"
+python -m iap.mvp explain --run ../data/mvp/<run_id> 17
+python -m iap.store sql --db ../data/mvp/<run_id>/iap.sqlite "SELECT trace_id, order_id, rule_id, rule_index, reason FROM risk_decisions WHERE decision <> 1 ORDER BY timestamp_ns"
+(Select-String -Path ../data/mvp/<run_id>/risk_audit.jsonl -Pattern '"decision":2' -SimpleMatch).Count   # REJECTs in the audit
+Select-String -Path ../data/mvp/<run_id>/traces.jsonl -Pattern '"parent_order_id":17,' -SimpleMatch | ForEach-Object { $_.Line } | python -m json.tool
 ```
 
 For a Java session: the line whose `stages.parent_orders[0].parent_order_id`
@@ -196,6 +221,13 @@ A captured stream + its expected digest is a test, exactly like
 cd python && PYTHONPATH=src python3 tools/make_golden_mvp.py --force        # deliberate, versioned change only
 PYTHONPATH=src python3 -m pytest -q tests/test_mvp_golden.py               # reproduces it from scratch AND from the capture
 python3 -m pytest -q tests/replay/test_mvp_replay_determinism.py           # repo root: run twice, replay, identical bytes
+```
+
+```powershell
+Set-Location python; $env:PYTHONPATH = "src"
+python tools/make_golden_mvp.py --force         # deliberate, versioned change only
+python -m pytest -q tests/test_mvp_golden.py
+Set-Location ..; python -m pytest -q tests/replay/test_mvp_replay_determinism.py
 ```
 
 For a smaller pin, `configs/mvp/mvp_tiny.json` + `generator_tiny.json` are

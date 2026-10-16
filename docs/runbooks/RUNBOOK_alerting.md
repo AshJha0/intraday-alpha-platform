@@ -1,5 +1,17 @@
 # RUNBOOK — alert delivery, latency SLOs and trading-state backups (v1.12.0)
 
+> **Shells.** These procedures run on the Linux side (the cluster, the containers, WSL or
+> Git Bash): the `bash` blocks are bash. From the owner's Windows PowerShell, translate
+> as follows: `curl` is `curl.exe` (in PowerShell `curl` is an alias of `Invoke-WebRequest`);
+> `export NAME=value` is `$env:NAME = "value"`; `PYTHONPATH=python/src python ...` is
+> `$env:PYTHONPATH = "python/src"; python ...`; `python3` is `python`; `grep X file` is
+> `Select-String -Path file -Pattern X`; `| head -N` is `| Select-Object -First N`;
+> `tail -N file` is `Get-Content file -Tail N`; `cat file` is `Get-Content file`;
+> `ls -l dir` is `Get-ChildItem dir`; `$(...)` command substitution is `$(...)` too but
+> with PowerShell inside (for example `$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())`
+> for `$(date +%s)`); `a && b` is `a; if ($?) { b }`; a trailing `\` continuation is a
+> backtick. `kubectl` and `docker` take the same arguments in both shells.
+
 Owner: platform on-call. Scope: `deployment/alertmanager/`,
 `deployment/prometheus/slo.yml`, `deployment/k8s/cronjob-state-backup.yaml`.
 Contracts: PLATFORM_CONVENTIONS.md §12.7 ("Alerting, SLOs and state backup").
@@ -72,6 +84,12 @@ To deliver for real, keep the files **outside the repo**:
 ```bash
 export ALERT_PAGE_URL_FILE=$HOME/.iap/page_url
 export ALERT_TICKET_URL_FILE=$HOME/.iap/ticket_url
+docker compose -f deployment/docker/docker-compose.yml up -d alertmanager
+```
+
+```powershell
+$env:ALERT_PAGE_URL_FILE = "$HOME\.iap\page_url"
+$env:ALERT_TICKET_URL_FILE = "$HOME\.iap\ticket_url"
 docker compose -f deployment/docker/docker-compose.yml up -d alertmanager
 ```
 

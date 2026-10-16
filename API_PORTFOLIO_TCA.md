@@ -138,7 +138,7 @@ when binding (n can be large); aggregate rows always.
 
 ### 1.8 Impact term (v1.17 C2, opt-in; Python only — not part of any parity contract)
 
-`iap.portfolio.optimizer.ImpactTerm(kappa, exponent)` adds a concave
+`iap.portfolio.optimizer.ImpactTerm(kappa, exponent=0.5)` adds a concave
 market-impact cost `sum_i kappa_i |w_i - w_prev_i| ** (1 + k)` to the
 objective (`objective(..., impact=term)`, `solve(..., impact=term)`; the
 default `None` leaves the pinned path byte-identical). The term enters the
@@ -149,7 +149,7 @@ proximal step beside the linear t-cost: soft threshold, then
 | builder | units |
 |---|---|
 | `ImpactTerm.from_cost_model(cost_model, notional, adv_notional)` | the research `CostModel` rule: `sqrt` → `k = 0.5`, `kappa = multiplier * sqrt_impact_coeff_bps * 1e-4 * (notional / adv_notional) ** 0.5`; `linear` → `k = 1` |
-| `ImpactTerm.from_impact_fit(coeff, exponent, notional, adv_notional)` | a calibration `impact.residual` cell (`iap.execution.calibration.apply_impact_fit` units: bps per `(% ADV) ** k`, parent level) |
+| `ImpactTerm.from_impact_fit(coeff_bps_per_pct_adv_pow, exponent, notional, adv_notional)` | a calibration `impact.residual` cell (`iap.execution.calibration.apply_impact_fit` units: bps per `(% ADV) ** k`, parent level) |
 
 Tests: `tests/test_v117_breadth_book.py` — the term lowers turnover at a
 given alpha; the optimum matches a brute-force grid on a 3-asset case for
@@ -174,6 +174,74 @@ members (smaller sectors and unnamed instruments fall into
 affine subspace `w - A^+ A w` in the net row's slot instead of a halfspace
 pair each; the intersection and Dykstra's limit are unchanged, the sweep
 count is not. Default `False`.
+
+### 1.10 Cross-sectional book backtest (v1.17 C1 / C7, Python research only)
+
+`python -m iap.research.breadth_book [--dataset-dir DIR | --features-dir DIR]
+[--score eq11|eq10_beta_gap] [--weights linear|deciles] [--rebalance-min 5]
+[--notional 1e6] [--impact cost_model|calibration|none] [--calibration PATH
+--impact-shape sqrt|linear|power] [--no-dollar-neutral] [--no-beta-neutral]
+[--no-sector-neutral] [--sizes 0.25,0.5,1,2,4] [--out research/breadth/book]
+[--tag NAME]` runs the optimizer (§1.3, with the §1.8 impact term and the
+§1.9 exposure rows) at every rebalance of a fixed clock on an ingested
+dataset. `iap.research.breadth_book.run_book(frames, instruments,
+cost_model, cfg, sectors=None, score_fn=None, max_rebalances=None) ->
+BookResult` is the entry point; `BookConfig` holds the knobs (`score`,
+`weights`, `decile_q`, `rebalance_ns`, `max_age_ns`, `exec_delay_ns`,
+`notional`, `alpha_bps`, `risk_aversion`, `w_max`, `gross_cap`,
+`dollar_neutral` / `beta_neutral` / `sector_neutral`, `participation_cap`,
+`turnover_cap`, `impact` in `IMPACT_SOURCES = ("cost_model", "calibration",
+"none")`, `min_names`, `flatten_at_session_end`, `projection="dykstra"`,
+...). `rank_to_weights(scores, method, decile_q=0.1)` maps scores to target
+weights; `score_eq11` / `score_eq10_beta_gap` (`SCORES`) are the two score
+functions; `make_impact_term(cfg, cost_model, adv_notional)`,
+`calibration_impact(path, shape, horizon=None) -> (coeff, exponent)`,
+`load_instruments(path)` and `sectors_for(instruments, taxonomy)` build its
+inputs. Accounting is exact: `net == gross - spread - fee - impact`; a run
+that reads a statistic is ONE ledger look of kind `breadth_book`.
+`iap.research.breadth_report.breadth_report(base, runner, sizes, cost_model,
+instruments)` joins the book with the breadth arithmetic (effective bets,
+`breakeven_notional(sizes, net)`, net Sharpe at size, day-clustered
+`cluster_mean(values, clusters)`); `render_markdown(report)` renders it. Not
+a port contract; no registered result reads it.
+
+### 1.11 Net-of-cost screen (v1.17 C6, opt-in; Python only)
+
+`iap.research.screen` — the pre-registered screen every candidate passes
+through before any confirmatory look (docs/SIGNAL_RESEARCH.md section 8,
+docs/PORTFOLIO_BREADTH.md "The net-of-cost screen").
+
+| name | what |
+|---|---|
+| `Candidate(alpha_id, horizon, model="linear_z_v1", target="mid")` | one screened identity; `id` = `alpha/horizon/model`; `target` in `("mid", "maker_fill_conditional")` |
+| `InstrumentCost(adv, asset_class="EQUITY", lot_size=1)` | what a row's cost needs; `instruments_from_config(path)` builds them from an `instruments.json` (`adv`, else the mean of `adv_by_session`) |
+| `ScreenSpec` / `load_prereg(path)` | the pre-registration's parameters (candidates, `size.qty`, `acceptance.rules`, folds, embargo, `ic_rows`, `cost_multiplier`, `holdout_exclusions.dataset_versions`, the file's sha256 and `signed`); schema `iap.prereg_draft/v1`, `kind` `net_of_cost_screen`; a document claiming `signed` without a signature is refused |
+| `row_costs(mid, half_spread, cost_model, instrument, size_qty, *, cross_spread=True)` | round-trip cost as a return: `CostModel.round_trip_cost_return` (fee only when `cross_spread=False`) + 2 × impact at participation `size_qty × unit / adv` × multiplier × sensitivity |
+| `net_of_cost_statistics(ts, z, y, cost, *, horizon_ns, hac_bandwidth, day_separated, instrument_ids=None)` | `gross` = `gate_statistics(ts, z, y)`; `net` = the same on `y − sign(z) × cost` (plus `inference_day_cluster`); `net_return` = `day_cluster_mean` of `sign(z) × y − cost`; `cost` = the mean priced round trip; `instrument_ids` switches on the gate's per-instrument scaling for the IC blocks |
+| `day_cluster_mean(ts, values, min_days=2)` | mean, day-mean series, se and t with one cluster per UTC day (`n_days − 1` df, `day_cluster_inference` beside it) |
+| `maker_fill_target(z, labels, horizon, horizon_ns)` | R-P2-5: the fill-conditional maker target in the label's orientation (NaN where the label order did not fill); refuses a label frame whose `attrs["ttl_ns"]` / `ttl_ns` column is not the cell horizon |
+| `screen_candidate(candidate, model_factory, frames, instruments, cost_model, spec, bundle, *, maker_labels=None)` | one candidate over ALL folds of the bundle's `WalkForwardSplitter`: per-fold fit, pooled test rows, the statistics, every rule's outcome, `status` in `pass / fail` |
+| `run_screen(spec, frames, instruments, cost_model, *, bundle=None, factories=None, ledger=None, maker_labels=None, dataset=None)` | the document (schema `iap.net_of_cost_screen/v1`): `spec`, `methods`, `cost_model`, `instruments`, `candidates`, `summary`, `ledger`; one look per candidate of kind `net_of_cost_screen` when a ledger is given; a candidate that cannot be built is `not_screened` (still a look) |
+| `default_factories()` / `model_identity(alpha_id)` / `base_alpha_id(alpha_id)` | `linear_z_v1` → `iap.alpha.build`, `linear_z_v2` → `iap.alpha.linear_v2.build_v2`; a `_z2` id maps to `linear_z_v2` at its base id |
+| `load_screen(path)` / `screen_status(doc, alpha_id, horizon, model)` / `require_screened(screen, alpha_id, horizon, model)` | `pass` / `fail` / `not_screened`; `require_screened` raises `ScreenRefusal` unless `pass` and returns a provenance block (path, sha256, candidate, status, prereg sha256) |
+| `assert_not_holdout(dataset_dir, dataset_version, spec)` | refuses a path containing `holdout` or a dataset version in the pre-registration's exclusions |
+| `render_markdown(doc)` / `sanitise(obj)` / `main(argv)` | the `SCREEN_<tag>.md` table; JSON-safe copy; the CLI (`--dataset-dir`, `--prereg`, `--methods`, `--out`, `--tag`, `--ledger` / `--no-ledger`, `--no-timestamp`, `--allow-holdout`, `--max-rows`) |
+
+Consumers (all opt-in, defaults unchanged): `python -m iap.research.breadth_book
+--screen PATH [--require-screen] [--screen-candidate ALPHA/HORIZON[/MODEL]]`
+(`breadth_book.screen_check`; the report's `screen` block; the score's
+candidate is `SCORE_CANDIDATE[score]`), `python -m iap.research run
+--require-screen PATH` (`ResearchError` code `not_screened`, before any data is
+read) and `WriteBroker.preregister(..., screen=)` (`API_AGENTS.md`).
+
+R-P2-5 in the maker study: `iap.labels.maker_labels` adds `{side}_run_over`
+(1.0 filled and run over, 0.0 filled and kept, NaN not filled) and
+`attrs["ttl_ns"]`; `iap.research.maker_real.alpha_side_target_fill_conditional`
+is the fixed filter target; the study reads `filter_target`
+(`not_run_over` | `fill_conditional`) and `label_ttl` (`1s` | `cell`) from its
+prereg document (both default to the registered v1.15 behaviour).
+
+Tests: `tests/test_v117_screen.py`.
 
 ## 2. TCA (spec §19)
 
@@ -347,6 +415,24 @@ including one before the first quote, one at the session end, one just
 before the halt and one inside the gap; per-fill measures, the report and the
 passive-order statistics; 1e-9, nulls exact). Python generates
 (`python/tools/make_golden_markout.py`), Java consumes (`MarkoutGoldenTest`).
+
+### 2.10 Per-parent shortfall decomposition (v1.17 B1; `iap.tca.shortfall`, Python only)
+
+`parent_costs(parent, fills, timeline, tick, taker_fee) -> dict[str, float]`
+prices one replayed parent: `parent` is an `iap.execution.ParentOrder`
+(`parent_id`, `instrument_id`, `side`, `qty`, `start_ts`, `end_ts` are read),
+`fills` its `iap.execution.types.Fill`s in fill order, `timeline` a
+`MarketTimeline`, `tick` the tick size and `taker_fee` the per-share fee the
+completion leg charges. It is the cost accounting of the execution study and
+of `iap.research.execution_benchmark`, shared. The result carries `notional`,
+`qty`, `filled_qty`, `maker_qty` and the `COST_KEYS = ("shortfall",
+"trading", "opportunity", "spread", "price_vs_mid_residual", "timing",
+"fees_net", "sim_impact", "completion", "all_in")`, in the quote currency,
+positive = worse than the arrival mid: `shortfall` is the Perold total of
+`order_tca` (decision = arrival = the window start), `all_in = shortfall +
+fees_net + sim_impact + completion`; `sim_impact` is the simulator's impact
+ADDER (`ExecConfig.impact_label()` says which rule), not a measured market
+reaction. Not a wire contract and not in any Java service.
 
 ## 3. Training-artifact manifest (for any service persisting fits)
 

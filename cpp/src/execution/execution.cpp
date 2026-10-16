@@ -3,6 +3,7 @@
 #include "iap/execution/execution.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 
 #include "iap/util/json.hpp"
@@ -36,6 +37,19 @@ std::map<std::uint16_t, VenueSpec> load_venues(const std::string& path) {
 
 ExecutionSimulator::ExecutionSimulator(const ExecConfig& config)
     : config_(config), rng_(config.seed) {
+    // Rule 6b configuration (the Python ExecConfig.__post_init__ checks).
+    if (!(config.impact_exponent > 0.0 && config.impact_exponent <= 1.0)) {
+        throw std::invalid_argument("impact_exponent must be in (0, 1]");
+    }
+    if (config.permanent_impact_bps_per_pct_adv < 0.0) {
+        throw std::invalid_argument("permanent_impact_bps_per_pct_adv must be >= 0");
+    }
+    if (config.impact_model == ImpactModel::CHILD &&
+        (config.impact_exponent != 1.0 ||
+         config.permanent_impact_bps_per_pct_adv != 0.0)) {
+        throw std::invalid_argument(
+            "impact_exponent / permanent_impact_bps_per_pct_adv need impact_model=PARENT");
+    }
     fills_.reserve(256);
     pending_.reserve(64);
     resting_.reserve(64);
@@ -224,7 +238,9 @@ void ExecutionSimulator::emit_fill(ChildOrder& o, std::int64_t price_ticks,
     f.ts = ts;
     f.liquidity = liq;
     f.fee = fill_fee(o, price_ticks, qty, liq, ts);
-    if (liq == Liquidity::TAKER) {
+    if (liq == Liquidity::TAKER && config_.impact_model == ImpactModel::PARENT) {
+        f.impact_cost = parent_impact(o, price_ticks, qty);
+    } else if (liq == Liquidity::TAKER) {
         // Pinned rule 6: linear impact from the child's total size in base
         // units (qty * qty_unit) — the linear rule of the research cost
         // model (whose default is the square root since v1.5.0).
@@ -246,6 +262,85 @@ void ExecutionSimulator::emit_fill(ChildOrder& o, std::int64_t price_ticks,
         cancels_.erase(std::remove(cancels_.begin(), cancels_.end(), o.order_id),
                        cancels_.end());
     }
+}
+
+double ExecutionSimulator::parent_impact(const ChildOrder& o,
+                                         std::int64_t price_ticks,
+                                         std::int64_t qty) {
+    // Rule 6b (header): the Python evaluation order, operation for operation
+    // (iap.execution.simulator._parent_impact).
+    const ExecConfig& cfg = config_;
+    const InstrumentSpec& ins = instrument(o.instrument_id);
+    const double unit_price =
+        ins.qty_unit * static_cast<double>(price_ticks) * ins.tick_size;
+    const double pct = ins.qty_unit / ins.adv * 100.0;  // % of ADV per share
+    const std::pair<std::uint32_t, std::int64_t> key =
+        o.parent_id != 0
+            ? std::pair<std::uint32_t, std::int64_t>{
+                  o.instrument_id, static_cast<std::int64_t>(o.parent_id)}
+            : std::pair<std::uint32_t, std::int64_t>{
+                  o.instrument_id, -static_cast<std::int64_t>(o.order_id)};
+    auto it = parent_qty_.find(key);
+    const std::int64_t q0 = it == parent_qty_.end() ? 0 : it->second;
+    const std::int64_t q1 = q0 + qty;
+    parent_qty_[key] = q1;
+    auto total_bps_qty = [&](std::int64_t q) {
+        return cfg.impact_coeff_bps_per_pct_adv *
+               std::pow(static_cast<double>(q) * pct, cfg.impact_exponent) *
+               static_cast<double>(q);
+    };
+    double cost = (total_bps_qty(q1) - total_bps_qty(q0)) * 1e-4 * unit_price;
+    if (cfg.permanent_impact_bps_per_pct_adv != 0.0) {
+        const std::int64_t sign = o.side == 0 ? 1 : -1;
+        auto sit = signed_flow_.find(o.instrument_id);
+        const std::int64_t s0 = sit == signed_flow_.end() ? 0 : sit->second;
+        const std::int64_t s1 = s0 + sign * qty;
+        signed_flow_[o.instrument_id] = s1;
+        const double perm = cfg.permanent_impact_bps_per_pct_adv * pct *
+                            static_cast<double>(s1 * s1 - s0 * s0) / 2.0;
+        cost += perm * 1e-4 * unit_price;
+    }
+    return cost;
+}
+
+const char* urgency_regime_name(UrgencyRegime r) {
+    switch (r) {
+        case UrgencyRegime::NONE: return "";
+        case UrgencyRegime::AGREE: return "agree";
+        case UrgencyRegime::ADVERSE: return "adverse";
+        case UrgencyRegime::NEUTRAL: return "neutral";
+        case UrgencyRegime::NO_SIGNAL: return "no_signal";
+        case UrgencyRegime::STALE: return "stale";
+        case UrgencyRegime::PLAIN: return "plain";
+    }
+    return "";
+}
+
+const char* cancel_rule_name(CancelRule r) {
+    switch (r) {
+        case CancelRule::NONE: return "";
+        case CancelRule::FADE_SIGNAL: return "fade:signal";
+        case CancelRule::FADE_PRESSURE: return "fade:pressure";
+        case CancelRule::QUEUE_AHEAD: return "queue:ahead";
+        case CancelRule::QUEUE_P_FILL: return "queue:p_fill";
+    }
+    return "";
+}
+
+std::optional<UrgencyRegime> urgency_regime_from_name(const std::string& s) {
+    for (int i = 0; i <= static_cast<int>(UrgencyRegime::PLAIN); ++i) {
+        const auto r = static_cast<UrgencyRegime>(i);
+        if (s == urgency_regime_name(r)) return r;
+    }
+    return std::nullopt;
+}
+
+std::optional<CancelRule> cancel_rule_from_name(const std::string& s) {
+    for (int i = 0; i <= static_cast<int>(CancelRule::QUEUE_P_FILL); ++i) {
+        const auto r = static_cast<CancelRule>(i);
+        if (s == cancel_rule_name(r)) return r;
+    }
+    return std::nullopt;
 }
 
 std::int64_t ExecutionSimulator::consumed_at(std::uint32_t instrument_id,

@@ -714,7 +714,7 @@ def test_ledger_denominator_and_summary_view(built: Store) -> None:
     # has pipeline looks (a pre-registration is filed before its dataset
     # exists; a v1.17 `breadth_book` look is a research-only statistic on an
     # ingested dataset the promotion pipeline never runs on)
-    research_only = {"prereg", "breadth_book"}
+    research_only = {"prereg", "breadth_book", "net_of_cost_screen"}
     pipeline = [r for r in view if r["kind"] == "promotion_pipeline"]
     scopes_run = {
         (r["dataset_version"], r["methods"]) for r in view if r["kind"] not in research_only
@@ -1491,8 +1491,10 @@ def test_cli_selects_the_scope(tmp_path: Path, capsys: pytest.CaptureFixture[str
     # (v1.16 item 11: the merged step2 quoting preregs; AUC01 / QNOSKEW are
     # not registry alphas, so they add no scorecard row) + the v1.17 C1
     # `breadth_book` look of EQ11 on the multi7 dataset (a research-only
-    # scope the promotion pipeline never ran on: one row, EQ11)
-    assert len(everything) == 24 * 5 + 2 + 3 + 1
+    # scope the promotion pipeline never ran on: one row, EQ11) + the v1.17 C6
+    # `net_of_cost_screen` looks on multi7 under `v2` (one more research-only
+    # scope: the 12 EQUITY alphas of the screen's candidate list)
+    assert len(everything) == 24 * 5 + 2 + 3 + 1 + 12
     # sql binds :dataset_version / :methods to the selected scope
     query = (
         "SELECT COUNT(*) AS n, SUM(count) AS looks FROM ledger_entries "

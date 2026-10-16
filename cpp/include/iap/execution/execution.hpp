@@ -123,6 +123,23 @@
 //    impact_bps = impact_coeff_bps_per_pct_adv *
 //    (child_order_qty * qty_unit / adv * 100); each taker fill is charged
 //    impact_bps * 1e-4 * its own notional. Passive fills carry zero impact.
+// 6b. Parent impact (v1.16 opt-in, ExecConfig::impact_model = PARENT; v1.17
+//    F7 part 1 C++ port of iap.execution.simulator._parent_impact, pinned
+//    by tests/golden/expected_f7_impact_parent.json). With pct = qty_unit /
+//    adv * 100 (% of ADV per share) and
+//      f(q) = impact_coeff_bps_per_pct_adv * (q * pct) ** impact_exponent * q
+//    each taker fill of q shares moving the parent's cumulative taker qty
+//    from Q to Q + q is charged (f(Q + q) - f(Q)) * 1e-4 * qty_unit * price,
+//    so splitting a parent into children cannot lower its cost (equal at
+//    constant price). The parent key is (instrument, parent_id), or
+//    (instrument, -order_id) for a parent_id == 0 child (its own parent).
+//    Permanent leg (permanent_impact_bps_per_pct_adv > 0): with S the
+//    instrument's cumulative signed taker qty (buys +), a fill moving it to
+//    S' adds permanent * pct * (S'^2 - S^2) / 2 * 1e-4 * qty_unit * price
+//    (m(S) = permanent * S integrated over dS; trading against one's own
+//    earlier flow is credited). The static InstrumentSpec::adv is the ADV
+//    (the Python per-session table, A5, is not ported: the golden uses the
+//    static value). impact_model = CHILD (the default) is rule 6 unchanged.
 // 7. Cancels have latency: cancel(order_id, cancel_ts) arrives at
 //      cancel_ts + decision_ns + risk_ns + wire_ns + venue mean + jitter
 //    (one jitter draw, rule 1) and takes effect at max(cancel arrival,
@@ -223,6 +240,9 @@ struct LatencyConfig {
     std::int64_t wire_ns = 100'000;
 };
 
+// Simulator impact rules (ExecConfig::impact_model; Python "child" / "parent").
+enum class ImpactModel : std::uint8_t { CHILD = 0, PARENT = 1 };
+
 struct ExecConfig {
     LatencyConfig latency;
     std::uint64_t seed = 20260829;
@@ -231,6 +251,13 @@ struct ExecConfig {
     std::map<std::uint16_t, VenueSpec> venues;
     // v1.15 X-P1-1: dated Section 31 + TAF schedule; empty = off (v1).
     std::optional<RegulatoryFeeSchedule> regulatory_fees;
+    // v1.16 P0-1 / v1.17 F7 (rule 6b): CHILD (default, rule 6, every golden)
+    // or PARENT (the parent adder with impact_exponent in (0, 1] and the
+    // permanent leg; both ignored under CHILD, as in Python where they are
+    // rejected). Validated by the simulator constructor.
+    ImpactModel impact_model = ImpactModel::CHILD;
+    double impact_exponent = 1.0;
+    double permanent_impact_bps_per_pct_adv = 0.0;
 };
 
 struct Fill {
@@ -274,7 +301,35 @@ struct ChildOrder {
     bool cross_exempt = false;   // see the crossing-rule exemption above
     CancelReason cancel_reason = CancelReason::NONE;
     std::int64_t cancel_arrival_ts = 0;  // 0 = no cancel in flight
+    // ---- v1.17 provenance (set by the replay scheduler, outside every
+    // golden row; the B6 markout decomposition reads them, tca/
+    // markout_decomposition.hpp). B2 / B3: why this child got its urgency
+    // (UrgencyRegime), the signal it was decided on, the pacing scale of
+    // its quantity. B4 / B5: the rule that pulled this resting child, when
+    // it decided, and the order this child re-sent the remainder of (a
+    // reprice, a cross or a pull re-send; 0 = a fresh step).
+    std::uint8_t urgency_regime = 0;  // UrgencyRegime (0 = none / "plain")
+    double signal_z = 0.0;
+    double pacing_scale = 1.0;
+    std::uint8_t cancel_rule = 0;     // CancelRule (0 = none)
+    std::int64_t cancel_rule_ts = 0;
+    std::uint64_t replaces_order_id = 0;
 };
+
+// ChildOrder::urgency_regime values (iap.execution.signal.URGENCY_REGIMES;
+// "" / "plain" = no signal opt-in).
+enum class UrgencyRegime : std::uint8_t {
+    NONE = 0, AGREE = 1, ADVERSE = 2, NEUTRAL = 3, NO_SIGNAL = 4, STALE = 5, PLAIN = 6,
+};
+// ChildOrder::cancel_rule values (iap.execution.fading.CANCEL_RULES).
+enum class CancelRule : std::uint8_t {
+    NONE = 0, FADE_SIGNAL = 1, FADE_PRESSURE = 2, QUEUE_AHEAD = 3, QUEUE_P_FILL = 4,
+};
+// The Python string of each value ("" for NONE).
+const char* urgency_regime_name(UrgencyRegime r);
+const char* cancel_rule_name(CancelRule r);
+std::optional<UrgencyRegime> urgency_regime_from_name(const std::string& s);
+std::optional<CancelRule> cancel_rule_from_name(const std::string& s);
 
 // Named counters (conventions section 8: every drop is counted).
 struct ExecCounters {
@@ -340,6 +395,10 @@ private:
                              std::int64_t price_ticks) const;
     void emit_fill(ChildOrder& o, std::int64_t price_ticks, std::int64_t qty,
                    std::int64_t ts, Liquidity liq);
+    // Rule 6b: the incremental parent temporary + instrument permanent
+    // impact of one taker fill (updates the cumulative state).
+    double parent_impact(const ChildOrder& o, std::int64_t price_ticks,
+                         std::int64_t qty);
     double fill_fee(const ChildOrder& o, std::int64_t price_ticks,
                     std::int64_t qty, Liquidity liq, std::int64_t ts) const;
 
@@ -358,6 +417,10 @@ private:
     std::map<std::uint64_t, std::set<std::uint64_t>> behind_;
     ExecCounters counters_;
     std::vector<Fill> fills_;
+    // Rule 6b state: cumulative taker qty per (instrument, parent key) and
+    // cumulative signed taker qty per instrument.
+    std::map<std::pair<std::uint32_t, std::int64_t>, std::int64_t> parent_qty_;
+    std::map<std::uint32_t, std::int64_t> signed_flow_;
     std::uint64_t next_order_id_ = 1;
     std::uint64_t next_fill_id_ = 1;
 };

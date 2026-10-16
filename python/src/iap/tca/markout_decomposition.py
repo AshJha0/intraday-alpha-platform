@@ -18,7 +18,11 @@ replay):
 - ``cancelled_replaced`` — a MAKER fill of a child that re-sent the
   remainder of a cancelled one (``replaces_order_id != 0``: a reprice, a
   re-post after a pull, a held quantity put back);
-- ``passive`` — every other MAKER fill (a first post that rested and filled).
+- ``passive`` — every other MAKER fill (a first post that rested and filled);
+- ``dark`` (v1.17 B10) — a fill on a dark / midpoint venue
+  (``Fill.provenance == "dark_midpoint"``, tested first): MODELLED, not
+  measured (:mod:`iap.execution.dark`); its ``price_impact`` row, negated,
+  is the adverse selection of the dark fill the B10 report quotes.
 
 **Regime** (:func:`regime_of`): the child's B2 ``urgency_regime`` (``agree``
 / ``adverse`` / ``neutral`` / ``no_signal`` / ``stale``), ``plain`` for a
@@ -52,13 +56,15 @@ from iap.execution.types import ChildOrder, Fill, Liquidity
 from iap.tca.fills import MAKER, TAKER, MarketTimeline
 from iap.tca.markout import DEFAULT_HORIZONS_NS, MarkoutFill, fill_measures
 
-FILL_TYPES: tuple[str, ...] = ("passive", "aggressive", "faded", "cancelled_replaced")
+FILL_TYPES: tuple[str, ...] = ("passive", "aggressive", "faded", "cancelled_replaced", "dark")
 DAY_NS = 86_400_000_000_000
 _MEASURES = ("markout", "price_impact")
 
 
 def fill_type(fill: Fill, order: ChildOrder) -> str:
     """One of :data:`FILL_TYPES` for ``fill`` of ``order`` (module docstring)."""
+    if fill.provenance == "dark_midpoint":
+        return "dark"
     if fill.liquidity == Liquidity.TAKER:
         return "aggressive"
     if order.cancel_rule and fill.ts >= order.cancel_rule_ts:

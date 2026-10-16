@@ -278,8 +278,16 @@ class WriteBroker:
         ledger: Path | None = None,
         dataset_version: str | None = None,
         supersede: bool = False,
+        screen: Path | Mapping | None = None,
     ) -> str:
         """Commit a hypothesis before any run.  One per (alpha, horizon).
+
+        ``screen`` (v1.17 C6, opt-in): a net-of-cost screen document (or
+        its path); the (alpha, horizon) must have PASSED it under its
+        model identity, else the registration is refused
+        (:func:`iap.research.screen.require_screened`); the screen's path,
+        sha256 and status are recorded on the entry.  ``None`` leaves the
+        v1.16 behaviour unchanged.
 
         Debits one look on ``ledger`` (default ``<root>/research/experiments.json``;
         ``dataset_version`` scopes it as a dataset ledger is) and records the
@@ -299,6 +307,21 @@ class WriteBroker:
         if not hypothesis.strip():
             raise BrokerError("empty hypothesis")
         pid = digest({"alpha": alpha_id, "horizon": horizon})[:16]
+        screen_block = None
+        if screen is not None:
+            from iap.research.screen import (
+                ScreenRefusal,
+                base_alpha_id,
+                model_identity,
+                require_screened,
+            )
+
+            try:
+                screen_block = require_screened(
+                    screen, base_alpha_id(alpha_id), horizon, model_identity(alpha_id)
+                )
+            except ScreenRefusal as exc:
+                raise BrokerError(str(exc)) from exc
         code = self.fingerprinter(alpha_id)
         prior = self.state()["preregs"].get(pid)
         if prior is not None:
@@ -309,6 +332,8 @@ class WriteBroker:
                     f"{alpha_id}/{horizon}: code fingerprint unchanged; nothing to supersede"
                 )
         body: dict[str, Any] = {**args, "prereg_id": pid, "format": PREREG_FORMAT}
+        if screen_block is not None:
+            body["screen"] = screen_block
         if code is not None:
             body["code"] = code
         if prior is not None:
