@@ -12,6 +12,7 @@
 // units, so the diagnostic is silenced here for every F7 test.
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#pragma GCC diagnostic ignored "-Warray-bounds"  // GCC 12: initializer-list Array{...} false positive
 #endif
 
 #include <gtest/gtest.h>

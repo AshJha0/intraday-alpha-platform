@@ -5,6 +5,7 @@
 // uninitialised read. Silenced for this translation unit.
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#pragma GCC diagnostic ignored "-Warray-bounds"  // GCC 12: initializer-list Array{...} false positive
 #endif
 
 #include "iap/execution/optimal.hpp"
