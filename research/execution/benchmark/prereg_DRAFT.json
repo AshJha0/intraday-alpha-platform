@@ -1,13 +1,85 @@
 {
-  "command": "python -m iap.research.execution_benchmark --data-dir data/real/multi7 --out research/execution/benchmark --write-prereg-draft",
+  "command": "python -m iap.research.execution_benchmark --data-dir data/real/multi7 --out research/execution/benchmark --tag multi7_signal --walk-depth 50 --window-min 30 --signal EQ10 --policies native,native+urgency,native+pacing,native+ac,native+ac_drift",
   "decisions": "owner 2026-10-15: 30-min windows, 2 bp minimum effect, 2 pp fill-rate tolerance, Holm over algos, depth-exhausted eligibility rule, v2 realism + parent impact for the signed run",
   "drafted": "2026-10-15",
   "expected_effect": "to be filled from the multi7 in-sample run (B2/B3 session, 2026-10-15): paired signal-aware minus plain all_in bps per cell with day-clustered CIs; see research/execution/benchmark/BENCHMARK_multi7_signal.md",
+  "fingerprints": {
+    "configs/prereg/v2.json": "db79bef71fe82399dd228e10c5ee79c0c91d59cb357b43ed944fe9392d647d60"
+  },
   "fingerprints_to_fill_before_signing": [
     "configs/prereg/v2.json",
     "the impact calibration file (exponent, support_pct_adv)",
     "the IEX/overlap session list and file hashes"
   ],
+  "fresh_test": {
+    "command": "python -m iap.research.execution_benchmark --data-dir <each fresh dataset> --config-dir <its configs> --walk-depth 50 --window-min 30 --signal EQ10 --policies native,native+urgency,native+pacing,native+ac,native+ac_drift --allow-holdout --tag b7_<day> (then one pooled day-clustered table over the days)",
+    "note": "plan row B7: the IEX overlap days (data/real/iex/iex_<day>, venue IEXG, docs/research/IEX_OVERLAP_SET.md) plus the Nasdaq overlap days (the same nine 2025/26 sessions). The run happens once, after signature, on every day listed with both dataset_version hashes filled; a day whose IEX dataset is not ingested at signing time is dropped from the list before signing, never padded. None of these days has been read by the benchmark.",
+    "sessions": [
+      {
+        "day": "2025-11-28",
+        "iex_dataset": "iex/iex_20251128",
+        "iex_dataset_version": "f977bb3a39d16557c79ae6fbc9303a69317fdcc19d0e7f4162d1a06a9120ec79",
+        "nasdaq_dataset": "r7_20251128",
+        "nasdaq_dataset_version": "535f4868b0a5f6d14305018142221bea100b615dcc3a212de4eb7a715aecd8fb"
+      },
+      {
+        "day": "2025-12-08",
+        "iex_dataset": "iex/iex_20251208",
+        "iex_dataset_version": "6c94942ab59df29f8b93cc20e6526e6794affd0b9f2851eeb00cb1c2fef1a1e6",
+        "nasdaq_dataset": "r7_20251208",
+        "nasdaq_dataset_version": "284629a29df4e6419fb527990abf34e3a8dd25f42902e56604df840860ce8ecc"
+      },
+      {
+        "day": "2025-12-09",
+        "iex_dataset": "iex/iex_20251209",
+        "iex_dataset_version": "to be filled when the IEX day is ingested (dataset.json dataset_version)",
+        "nasdaq_dataset": "r7_20251209",
+        "nasdaq_dataset_version": "24d5d38b9e50ed676d0cceca46cd9cad89be186a6f3517e5a06903b17fb28a1b"
+      },
+      {
+        "day": "2025-12-10",
+        "iex_dataset": "iex/iex_20251210",
+        "iex_dataset_version": "to be filled when the IEX day is ingested (dataset.json dataset_version)",
+        "nasdaq_dataset": "r7_20251210",
+        "nasdaq_dataset_version": "dea2a6b03ae35df24e5c8751bea8ddcc0f9ca8b93e02c9e2fdb656b6ab62fd80"
+      },
+      {
+        "day": "2025-12-11",
+        "iex_dataset": "iex/iex_20251211",
+        "iex_dataset_version": "to be filled when the IEX day is ingested (dataset.json dataset_version)",
+        "nasdaq_dataset": "r7_20251211",
+        "nasdaq_dataset_version": "62632989c86d77a14b061ddd8fd175dd71c4c03a96992cc02715d684451dd73c"
+      },
+      {
+        "day": "2025-12-12",
+        "iex_dataset": "iex/iex_20251212",
+        "iex_dataset_version": "to be filled when the IEX day is ingested (dataset.json dataset_version)",
+        "nasdaq_dataset": "r7_20251212",
+        "nasdaq_dataset_version": "081ff2cdd7844587613518df6d0ed8a64eea9513ef5b2ed3f5a2f8901829d861"
+      },
+      {
+        "day": "2026-05-15",
+        "iex_dataset": "iex/iex_20260515",
+        "iex_dataset_version": "to be filled when the IEX day is ingested (dataset.json dataset_version)",
+        "nasdaq_dataset": "holdout2026",
+        "nasdaq_dataset_version": "d7f7ffd14fbc363550a5bc9afd886e36df0d851511f840615f1f089b22f5f237"
+      },
+      {
+        "day": "2026-05-18",
+        "iex_dataset": "iex/iex_20260518",
+        "iex_dataset_version": "to be filled when the IEX day is ingested (dataset.json dataset_version)",
+        "nasdaq_dataset": "holdout2026",
+        "nasdaq_dataset_version": "d7f7ffd14fbc363550a5bc9afd886e36df0d851511f840615f1f089b22f5f237"
+      },
+      {
+        "day": "2026-06-12",
+        "iex_dataset": "iex/iex_20260612",
+        "iex_dataset_version": "to be filled when the IEX day is ingested (dataset.json dataset_version)",
+        "nasdaq_dataset": "r7_20260612",
+        "nasdaq_dataset_version": "6a495deeb3fc02a6ef5447a6a82e3a04d0491926bf09b4133398a3c4261ddce9"
+      }
+    ]
+  },
   "gate_B7": {
     "alpha": 0.05,
     "comparison": "signal-aware algo (B2 urgency / B3 pacing) vs the plain algo of the same name on the SAME windows, same policy, same size cell",
@@ -67,13 +139,16 @@
   ],
   "on_blackboard": false,
   "primary_metric": "all_in bps per parent (shortfall + fees_net + sim_impact + completion), labelled replay + linear child adder (rule 6)",
+  "registration_tool": "tools/b7_shortfall_register.py <root> --dry-run --require-ci-env (owner only; refuses until every field above is filled)",
   "schema": "iap.execution_benchmark_prereg/v1",
   "signal_arm": {
     "ac_drift": "IS cells only: native+ac_drift vs native+ac (plain Almgren-Chriss, sigma = price * 0.015 per sqrt(day), eta from the simulator slope, lambda 1e-6)",
     "alpha": "OPEN (owner): EQ10 (registered beta < 0, synthetic fit; real in-sample IC > 0) or EQ05; the arm must be fixed here before signing",
+    "alpha_id": "OPEN (owner): EQ10 or EQ05 - the in-sample run used EQ10 registered",
     "driver": "python -m iap.research.execution_benchmark --data-dir <gate dataset> --walk-depth 50 --window-min 30 --signal <alpha> --policies native,native+urgency,native+pacing,native+ac,native+ac_drift",
     "pacing": "pov_signal_pacing (POV) / slice_signal_tilt (TWAP, VWAP, IS) with PacingParams(gain=0.5, min_scale=0.25, max_scale=3.0, max_participation=0.5); policies native+pacing vs native",
     "source": "AlphaUrgencySource.from_dataset(<alpha>, <dataset>/features, params=configs/strategies/alpha_params.json) unless the owner chooses --signal-refit (labelled refit:in-sample, in-sample only)",
+    "thresholds": "OPEN (owner): the in-sample run used threshold_z 1.0, passive_urgency 0.1, gain 0.5 (clip 0.25-3), max_age 10 s",
     "thresholds_status": "OPEN (owner): threshold_z and gain are the driver defaults, not tuned; any tuning happens in-sample and is recorded here before signing",
     "units": "z-score of the alpha's expected_return per instrument on the gate dataset (iap.execution.signal)",
     "urgency": "ParentOrder(urgency_policy='alpha', alpha_urgency=AlphaUrgencyPolicy(threshold_z=1.0, passive_urgency=0.1, max_age_ns=10 s)) on the native child style; policies native+urgency vs native"
@@ -84,10 +159,10 @@
     "cost_label": "replay + linear child adder (rule 6)",
     "impact_exponent": 1.0,
     "impact_model": "child",
-    "note": "costs are replay + adder: simulated fills never move the replayed book; the signed run uses configs/prereg/v2.json realism opt-ins and impact_model=parent with the fitted exponent (label recorded at run time)",
-    "walk_depth_levels": 10
+    "note": "costs are replay + adder: simulated fills never move the replayed book; the signed run uses configs/prereg/v2.json realism opt-ins and impact_model=parent with the fitted exponent (label recorded at run time); walk depth 50 (the depth-50 comparison, research/execution/benchmark/DEPTH_COMPARISON_multi7.md)",
+    "walk_depth_levels": 50
   },
   "source": "IAP_v1.17_Plan.md section 6, items B1 and B7",
-  "status": "DRAFT - not signed, not on the blackboard, not approved for any fresh-day run",
+  "status": "DRAFT - not signed, not on the blackboard, not approved for any fresh-day run (v1.17.1 B7 scope)",
   "walk_depth_split": "ExecConfig.walk_depth_levels governs OUR aggressive children only; the market's marketable-ADD expansion keeps the book's fixed DEPTH_LEVELS (the venue's matching, pinned by the passive goldens)"
 }

@@ -8,6 +8,14 @@ that tag.
 
 ## Unreleased
 
+- v1.17.1 B7 preparation: `tools/b7_shortfall_register.py` (owner-only registration of the
+  shortfall gate through `WriteBroker.preregister`, `--dry-run` / `--require-ci-env`, refuses until
+  the draft is complete: filled `expected_effect`, decided alpha and thresholds, walk depth 50, the
+  fresh-day list with both dataset hashes, the v2 fingerprint), the B7 section of
+  RUNBOOK_prereg_environment.md, `python/tests/test_b7_register.py`; `prereg_DRAFT.json` records
+  walk depth 50 and the nine overlap days (IEX hashes filled as the days are ingested). The multi7
+  in-sample signal-aware run (EQ10, depth 50) and its `expected_effect` follow in this branch.
+
 - v1.17 B8 first real-book run (2 overlap days, AAPL + MSFT; `research/execution/b8/REPORT_overlap2.md`):
   NEGATIVE: `sor` +5.1 ± 1.3 bps all-in and -8 pp fill vs pinned Nasdaq, pinned IEX +11.6 ± 0.6 bps;
   2 clusters, provisional. Two-venue reads now stream with the `--symbols` filter; the `two_venue`
