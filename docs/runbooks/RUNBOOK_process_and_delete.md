@@ -78,8 +78,12 @@ default 30) -> `download_tops` -> `tops_extract` (the universe's quotes to
 -> `download_book` -> `ingest --format iex-deep-plus --tops <extract>` (a
 divergent book refuses unless `--allow-book-divergence`; the report lands in
 `book_divergence.json` beside the markers) -> `delete_raw` -> `features` ->
-`keep` -> `delete` (normalized, the book capture, the extract). The manifest
-comes from the HIST index with the owner's approval sentence:
+`keep` -> `delete` (the book capture, the extract, `normalized/*.normalized.jsonl`;
+with `--keep-normalized`, the default and the owner's A6 rule, the IAP1 event
+files and the Parquet stay and are hashed into `KEEP.json` so the two-venue
+router (B8) can replay both venues; `--delete-normalized` is the A2 behaviour;
+`process_report.json` records `kept_normalized_gb` and `kept_dataset_gb`). The
+manifest comes from the HIST index with the owner's approval sentence:
 
 ```powershell
 python tools\iex_hist.py index --date 2025-11-28 ... --out research\v117\iex_overlap_manifest.json --approval "<sentence>"

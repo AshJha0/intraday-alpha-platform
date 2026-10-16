@@ -17,8 +17,11 @@ one vendor file is ever on disk (the owner's rule), so the chain is::
       -> ingest          (iap.marketdata.ingest --format iex-deep-plus --tops <extract>,
                           --partition-instruments N, slim; a divergent book refuses
                           the ingest unless --allow-book-divergence)
-      -> delete_raw -> features -> keep (KEEP.json) -> delete (normalized + the
-         book capture + the extract) -> _DONE marker
+      -> delete_raw -> features -> keep (KEEP.json) -> delete (the book capture,
+         the extract and normalized/*.normalized.jsonl; with --keep-normalized,
+         the default, the IAP1 event files and the Parquet STAY and are hashed
+         into KEEP.json: the two-venue work replays them; --delete-normalized
+         is the A2 behaviour) -> _DONE marker
 
 Every step has a marker beside the dataset directory and is skipped when
 present (a crashed day resumes); ``process_report.json`` records the sizes,
@@ -142,6 +145,7 @@ def process_iex_day(
     engine: str = "rust",
     workers: int = 1,
     keep_gz: bool = False,
+    keep_normalized: bool = True,
     min_free_gb: float = 30.0,
     peak_gb: float | None = None,
     allow_book_divergence: bool = False,
@@ -191,6 +195,7 @@ def process_iex_day(
         "approval": doc.get("approval"),
         "round_lots": dict(round_lots or {}),
         "round_lots_source": "nasdaq_dataset" if round_lots else None,
+        "keep_normalized": keep_normalized,
         "steps": [],
         "dry_run": dry_run,
     }
@@ -424,6 +429,13 @@ def process_iex_day(
 
     def do_keep() -> dict:
         doc = keep_manifest(ds)
+        if keep_normalized:
+            # the owner's A6 rule: IAP1 + Parquet stay (the two-venue work, B8,
+            # replays them); raw and the *.normalized.jsonl twin go
+            for q in sorted(_kept_normalized(ds)):
+                doc["files"][q.relative_to(ds).as_posix()] = _sha256(q)
+            doc["kept_normalized"] = True
+            doc["deleted"] = ["raw", "normalized/*.normalized.jsonl"]
         (ds / KEEP_NAME).write_text(
             json.dumps(doc, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
@@ -440,12 +452,13 @@ def process_iex_day(
             raise IngestError(f"refusing to delete: {KEEP_NAME} no longer matches {bad}")
         freed = 0
         deleted: list[str] = []
+        kept = set(_kept_normalized(ds)) if keep_normalized else set()
         for d in ("raw", "normalized"):
             base = ds / d
             if not base.is_dir():
                 continue
             for p in base.rglob("*"):
-                if p.is_file() and p.name != "qc_report.json":
+                if p.is_file() and p.name != "qc_report.json" and p not in kept:
                     freed += _unlink(p)
                     deleted.append(p.relative_to(ds).as_posix())
             if d == "raw":
@@ -462,6 +475,11 @@ def process_iex_day(
             "deleted": deleted if len(deleted) <= 50 else deleted[:50] + ["..."],
             "freed_gb": round(freed / GB, 2),
             "kept_gz": keep_gz,
+            "kept_normalized": keep_normalized,
+            "kept_normalized_gb": round(sum(q.stat().st_size for q in kept) / GB, 3),
+            "kept_dataset_gb": round(
+                sum(q.stat().st_size for q in ds.rglob("*") if q.is_file()) / GB, 3
+            ),
         }
 
     step("delete", do_delete)
@@ -540,6 +558,15 @@ def render_iex_jobs_entry(name: str, wrapper: str, log: str) -> dict:
 # ------------------------------------------------------------------- CLI
 
 
+def _kept_normalized(ds: Path) -> list[Path]:
+    """The normalized files ``--keep-normalized`` keeps: the IAP1 event files
+    and the Parquet; never the ``*.normalized.jsonl`` twin."""
+    base = ds / "normalized"
+    if not base.is_dir():
+        return []
+    return [q for q in base.rglob("*") if q.is_file() and q.suffix in (".iap1", ".parquet")]
+
+
 def infer_round_lots(extract: Path, symbols: list[str]) -> dict[str, int]:
     """symbol -> smallest non-zero quoted size in the day's TOPS extract (100
     when a symbol has no quote): TOPS quotes the best level holding at least
@@ -588,6 +615,20 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--engine", choices=("python", "rust"), default="rust")
     p.add_argument("--workers", type=int, default=1)
     p.add_argument("--keep-gz", action="store_true")
+    p.add_argument(
+        "--keep-normalized",
+        dest="keep_normalized",
+        action="store_true",
+        default=True,
+        help="keep normalized/*.iap1 and the Parquet (default; the A6 rule); raw and the "
+        "*.normalized.jsonl twin are deleted either way",
+    )
+    p.add_argument(
+        "--delete-normalized",
+        dest="keep_normalized",
+        action="store_false",
+        help="delete every normalized/*.normalized.* file after the features (the A2 default)",
+    )
     p.add_argument("--min-free-gb", type=float, default=30.0)
     p.add_argument("--peak-gb", type=float, default=None, help="override the peak estimate (GB)")
     p.add_argument("--allow-book-divergence", action="store_true")
@@ -616,6 +657,8 @@ def main(argv: list[str] | None = None) -> int:
                 extra.append("--i-have-approval")
             if a.keep_gz:
                 extra.append("--keep-gz")
+            if not a.keep_normalized:
+                extra.append("--delete-normalized")
             if a.allow_book_divergence:
                 extra.append("--allow-book-divergence")
             if a.round_lots_from:
@@ -662,6 +705,7 @@ def main(argv: list[str] | None = None) -> int:
             engine=a.engine,
             workers=a.workers,
             keep_gz=a.keep_gz,
+            keep_normalized=a.keep_normalized,
             min_free_gb=a.min_free_gb,
             peak_gb=a.peak_gb,
             allow_book_divergence=a.allow_book_divergence,
