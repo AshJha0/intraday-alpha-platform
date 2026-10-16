@@ -944,6 +944,18 @@ def assert_not_holdout(dataset_dir: Path | None, dataset_version: str, spec: Scr
 
 def main(argv: Sequence[str] | None = None) -> int:
     from iap.alpha import configure_universe
+
+    # ``_main`` points the process-global alpha universe at the dataset's
+    # instruments.json; restore the pinned default so in-process callers
+    # (tests, notebooks) do not inherit it.
+    try:
+        return _main(argv)
+    finally:
+        configure_universe(None)
+
+
+def _main(argv: Sequence[str] | None) -> int:
+    from iap.alpha import configure_universe
     from iap.alpha.data import load_features
     from iap.research.breadth_book import resolve_dataset
 

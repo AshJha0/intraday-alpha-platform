@@ -452,6 +452,11 @@ def test_cli_end_to_end_on_synthetic_features(tmp_path):
     argv = ["--prereg", str(p), "--out", str(tmp_path / "out"), "--tag", "t"]
     argv += ["--ledger", str(led), "--no-timestamp"]
     assert sc.main(["--dataset-dir", str(tmp_path / "ds"), *argv]) == 0
+    # the dataset's universe must not leak into the process (it emptied FX01's
+    # universe for test_legacy_methods in the same xdist worker)
+    from iap.alpha import universe_ids
+
+    assert universe_ids("fx") and universe_ids("equity") != (1, 2)
     doc = json.loads((tmp_path / "out" / "screen_t.json").read_text(encoding="utf-8"))
     assert doc["summary"]["n_candidates"] == 2
     assert doc["summary"]["n_not_screened"] == 0
