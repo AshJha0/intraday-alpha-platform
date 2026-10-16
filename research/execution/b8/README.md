@@ -11,8 +11,11 @@ The replay needs `normalized/eq_YYYYMMDD.normalized.iap1` of BOTH datasets for
 each day: the Nasdaq one (`data/real/r7_YYYYMMDD`, kept) and the IEX one
 (`data/real/iex/iex_YYYYMMDD`). The A4 process-and-delete chain
 (`process-iex-day`) deletes the IEX normalized events after the features step,
-so an IEX day processed that way **cannot** be used by B8. Keep the IEX
-`normalized/` for the overlap days (owner decision, see the PR).
+unless it runs with `--keep-normalized` (decided 2026-10-16: the A4 chain keeps
+`normalized/*.iap1` and Parquet for every IEX overlap day; vendor files, raw and
+JSONL are still deleted). B8 reads `data/real/iex/iex_YYYYMMDD/normalized/*.iap1`
+beside `data/real/r7_YYYYMMDD/normalized/*.iap1` (the `.iap1` codec is preferred
+where both exist).
 `python -m iap.research.two_venue` refuses a dataset without them and says why.
 
 ## The commands (run once >= 2 overlap days are ingested)
