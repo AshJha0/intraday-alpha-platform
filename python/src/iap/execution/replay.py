@@ -336,7 +336,7 @@ class ExecutionReplay:
         self._router_fill_prob = router_fill_prob
         # v1.17.1 B8 (opt-in, needs ``router``): a marketable unpinned child is
         # split by ``router.plan_sweep`` across every lit venue's displayed
-        # depth, one IOC LIMIT per venue capped at the qty planned there (its
+        # depth net of our own consumption overlay, one IOC LIMIT per venue capped at the qty planned there (its
         # limit = the deepest planned level); qty beyond the displayed depth
         # of all venues is not sent (``sweep_unsent_qty``). False = unchanged.
         if router_sweep and router is None:
@@ -756,8 +756,21 @@ class ExecutionReplay:
         assert self._router is not None
         book = self._sim.instrument_book(p.instrument_id)
         tick = self._config.instrument(p.instrument_id).tick_size
+        iid = p.instrument_id
+        sim = self._sim
+
+        def available(vid: int, side: int, px: int, displayed: int) -> int:
+            # displayed net of our own consumption overlay (simulator rule 3b)
+            return max(displayed - sim._consumed_at(iid, vid, side, px), 0)
+
         plan = self._router.plan_sweep(
-            book, p.side, child_qty, decision_ts, candidates=self._sor_candidates, tick=tick
+            book,
+            p.side,
+            child_qty,
+            decision_ts,
+            candidates=self._sor_candidates,
+            tick=tick,
+            available=available,
         )
         if not plan:
             self._sor_no_route += 1

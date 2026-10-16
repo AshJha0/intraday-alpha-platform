@@ -21,6 +21,7 @@ is unchanged (the recorder only reads).
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import statistics
 from collections import defaultdict
@@ -34,6 +35,8 @@ LEVELS = 10
 _children: list[dict] = []
 _fills: dict[int, list] = defaultdict(list)
 _label: dict[int, str] = {}
+#: one id per replay run (``id(self)`` is reused once a replay is collected)
+_rep_ids = itertools.count(1)
 
 _orig_issue = replay_mod.ExecutionReplay._issue_child
 _orig_run = replay_mod.ExecutionReplay.run
@@ -51,8 +54,12 @@ def _issue(self, ps, child_qty, decision_ts, passive, post=False):
     p = ps.order
     book = self._sim.instrument_book(p.instrument_id)
     opp = 1 - p.side
+    # (price, displayed, displayed net of our consumption overlay) per level
     depth = {
-        self._config.venues[v].name: (vb.depth(opp, LEVELS) if vb is not None else [])
+        self._config.venues[v].name: [
+            (px, q, max(q - self._sim._consumed_at(p.instrument_id, v, opp, px), 0))
+            for px, q in (vb.depth(opp, LEVELS) if vb is not None else [])
+        ]
         for v in self._sor_candidates
         for vb in [book.books.get(v)]
     }
@@ -74,7 +81,7 @@ def _issue(self, ps, child_qty, decision_ts, passive, post=False):
     o = self._sim.orders[ps.child_ids[-1]]
     _children.append(
         {
-            "rep": id(self),
+            "rep": self._diag_rep,
             "order_id": o.order_id,
             "side": p.side,
             "qty": o.qty,
@@ -93,10 +100,10 @@ def _issue(self, ps, child_qty, decision_ts, passive, post=False):
 
 
 def _run(self, events):
+    rep = self._diag_rep = next(_rep_ids)
     res = _orig_run(self, events)
-    _label[id(self)] = _policy_of(self)
-    for f in res.fills:
-        _fills[id(self)].append(f)
+    _label[rep] = _policy_of(self)
+    _fills[rep].extend(res.fills)
     return res
 
 
@@ -112,7 +119,7 @@ def _summ(xs: list[float]) -> dict:
     }
 
 
-def analyse() -> dict:
+def analyse(dump: int = 0) -> dict:
     by_rep_order = {(r, f.order_id): [] for r, fs in _fills.items() for f in fs}
     for r, fs in _fills.items():
         for f in fs:
@@ -129,8 +136,11 @@ def analyse() -> dict:
             "qty": c["qty"],
             "touch_size": touch[1] if touch else 0,
             "size_over_touch": c["qty"] / touch[1] if touch and touch[1] > 0 else float("inf"),
-            "depth10": sum(q for _, q in own),
-            "exceeds_depth10": c["qty"] > sum(q for _, q in own),
+            "depth10": sum(q for _, q, _ in own),
+            "exceeds_depth10": c["qty"] > sum(q for _, q, _ in own),
+            "touch_avail": touch[2] if touch else 0,
+            "touch_consumed": bool(touch and touch[2] < touch[1]),
+            "qty_gt_touch_avail": bool(touch and c["qty"] > touch[2]),
             "levels_walked": len({f.price_ticks for f in fs}),
             "filled": sum(f.qty for f in fs),
         }
@@ -139,6 +149,9 @@ def analyse() -> dict:
             row["touch_bps"] = 1e4 * s * (touch[0] - c["mid"]) / c["mid"]
             row["walk_bps"] = 1e4 * s * (vwap - touch[0]) / c["mid"]
             row["total_bps"] = row["touch_bps"] + row["walk_bps"]
+            first = min(fs, key=lambda f: f.fill_id).price_ticks
+            # decision levels strictly better than our first fill: skipped
+            row["levels_skipped"] = sum(1 for px, _, _ in own if s * (first - px) > 0)
         # touch comparison against the other venue(s)
         for name, d in other.items():
             if touch and d:
@@ -154,10 +167,17 @@ def analyse() -> dict:
             row["behind_nbbo_ticks"] = s * (c["nbb_same"] - c["limit"])
             row["limit_vs_mid_bps"] = 1e4 * s * (c["limit"] - c["mid"]) / c["mid"]
         row["n_fills"] = len(fs)
+        if fs:
+            # ms from decision to the first fill (venue latency, or a resting wait)
+            row["first_fill_ms"] = (min(f.ts for f in fs) - c["ts"]) / 1e6
         row["maker_qty"] = sum(f.qty for f in fs if f.liquidity.name == "MAKER")
         if fs:
             vw = sum(f.price_ticks * f.qty for f in fs) / row["filled"]
             row["fill_vs_decision_mid_bps"] = 1e4 * s * (vw - c["mid"]) / c["mid"]
+        row["fills"] = [(f.price_ticks, f.qty, f.ts - c["ts"]) for f in fs]
+        row["decision_depth"] = own
+        row["mid"] = c["mid"]
+        row["side"] = c["side"]
         groups[(pol, c["venue"], c["type"])].append(row)
     out = {}
     for (pol, ven, typ), rows in sorted(groups.items()):
@@ -180,9 +200,21 @@ def analyse() -> dict:
                 [r["limit_vs_mid_bps"] for r in rows if "limit_vs_mid_bps" in r]
             ),
             "children": len(rows),
+            "first_fill_ms": _summ([r["first_fill_ms"] for r in rows if "first_fill_ms" in r]),
             "child_qty": _summ([r["qty"] for r in rows]),
             "touch_size": _summ([r["touch_size"] for r in rows]),
             "share_qty_gt_touch": sum(r["qty"] > r["touch_size"] for r in rows) / len(rows),
+            "share_touch_consumed": sum(r["touch_consumed"] for r in rows) / len(rows),
+            "share_qty_gt_touch_avail": sum(r["qty_gt_touch_avail"] for r in rows) / len(rows),
+            "levels_skipped": _summ([r["levels_skipped"] for r in rows if "levels_skipped" in r]),
+            "share_skipped_ge1": (
+                sum(r.get("levels_skipped", 0) >= 1 for r in withcost) / max(1, len(withcost))
+            ),
+            "walk_bps_qty_weighted_skipped": (
+                sum(r["walk_bps"] * r["filled"] for r in withcost if r["levels_skipped"])
+                / max(1, sum(r["filled"] for r in withcost if r["levels_skipped"]))
+            ),
+            "filled_qty_skipped": sum(r["filled"] for r in withcost if r["levels_skipped"]),
             "share_qty_gt_depth10": sum(r["exceeds_depth10"] for r in rows) / len(rows),
             "levels_walked": _summ([r["levels_walked"] for r in rows]),
             "share_walked_ge2": sum(r["levels_walked"] >= 2 for r in rows) / len(rows),
@@ -199,6 +231,16 @@ def analyse() -> dict:
             ),
             "touch_vs_other": dict(tvo),
         }
+        if dump:
+            worst = sorted(withcost, key=lambda r: -r["walk_bps"] * r["filled"])[:dump]
+            out[f"{pol}/{ven}/{typ}"]["worst"] = [
+                {
+                    k: r[k]
+                    for k in ("side", "qty", "mid", "decision_depth", "fills", "walk_bps")
+                    if k in r
+                }
+                for r in worst
+            ]
     return out
 
 
@@ -208,6 +250,7 @@ def main() -> int:
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--policies", default="pin_nasdaq,pin_iex,sor")
     ap.add_argument("--data-root", type=Path, required=True)
+    ap.add_argument("--dump", type=int, default=0, help="keep the N worst-walk children per group")
     ap.add_argument("--calibration", type=Path, default=Path("research/execution/b8/calibration"))
     ap.add_argument(
         "--venues", type=Path, default=Path("research/execution/b8/venues_xnas_iexg.json")
@@ -227,7 +270,7 @@ def main() -> int:
         symbols=(a.symbol,),
         timestamp=False,
     )
-    doc = {"symbol": a.symbol, "levels_recorded": LEVELS, "groups": analyse()}
+    doc = {"symbol": a.symbol, "levels_recorded": LEVELS, "groups": analyse(a.dump)}
     a.out.mkdir(parents=True, exist_ok=True)
     p = a.out / f"depth_walk_{a.symbol}.json"
     p.write_text(json.dumps(doc, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
