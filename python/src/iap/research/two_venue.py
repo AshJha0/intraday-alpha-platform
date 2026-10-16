@@ -445,7 +445,8 @@ def save_calibrations(docs: Mapping[int, Mapping[str, object]], out_dir: Path) -
     paths = []
     for _vid, doc in sorted(docs.items()):
         p = out_dir / f"venue_calibration_{doc['venue']}.json"
-        p.write_text(json.dumps(doc, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        p.write_text(json.dumps(doc, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="
+")
         paths.append(p)
     return paths
 
