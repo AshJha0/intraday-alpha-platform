@@ -36,7 +36,7 @@
 namespace iap {
 
 constexpr std::int64_t kDayNs = 86'400'000'000'000;
-const std::vector<std::string>& fill_types();  // passive, aggressive, faded, cancelled_replaced
+const std::vector<std::string>& fill_types();  // passive, aggressive, faded, cancelled_replaced, dark
 
 std::string fill_type(const Fill& fill, const ChildOrder& order);
 std::string regime_of(const ChildOrder& order);

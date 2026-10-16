@@ -37,8 +37,11 @@ std::string day_label(std::int64_t ts, std::int64_t day_ns) {
 }  // namespace
 
 const std::vector<std::string>& fill_types() {
+    // v1.17 B10 added "dark" (Fill.provenance == "dark_midpoint" in the Python
+    // reference); the classification itself is ported in F7 part 2, so no C++
+    // fill is typed "dark" yet, but the reported list matches the reference.
     static const std::vector<std::string> t = {"passive", "aggressive", "faded",
-                                               "cancelled_replaced"};
+                                               "cancelled_replaced", "dark"};
     return t;
 }
 

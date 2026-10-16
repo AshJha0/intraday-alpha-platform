@@ -5991,7 +5991,8 @@
      "passive",
      "aggressive",
      "faded",
-     "cancelled_replaced"
+     "cancelled_replaced",
+     "dark"
     ],
     "all": {
      "n_fills": 40,
@@ -8592,7 +8593,8 @@
      "passive",
      "aggressive",
      "faded",
-     "cancelled_replaced"
+     "cancelled_replaced",
+     "dark"
     ],
     "all": {
      "n_fills": 40,
@@ -12121,7 +12123,8 @@
      "passive",
      "aggressive",
      "faded",
-     "cancelled_replaced"
+     "cancelled_replaced",
+     "dark"
     ],
     "all": {
      "n_fills": 40,
@@ -14722,7 +14725,8 @@
      "passive",
      "aggressive",
      "faded",
-     "cancelled_replaced"
+     "cancelled_replaced",
+     "dark"
     ],
     "all": {
      "n_fills": 40,
@@ -20275,7 +20279,8 @@
      "passive",
      "aggressive",
      "faded",
-     "cancelled_replaced"
+     "cancelled_replaced",
+     "dark"
     ],
     "all": {
      "n_fills": 128,
