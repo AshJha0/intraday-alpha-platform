@@ -26,7 +26,7 @@
   "feature_version": "585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac",
   "kind": "signal",
   "max": 14.34288361670007,
-  "mean": -0.21837427581430188,
+  "mean": -0.21837427581430197,
   "min": -13.999953349437872,
   "n": 2790,
   "n_buckets": 10,
