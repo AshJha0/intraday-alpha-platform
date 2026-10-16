@@ -8,6 +8,8 @@ that tag.
 
 ## Unreleased
 
+- v1.17.1 fix: release.yml passes each Python lock file to `cyclonedx-py requirements` positionally (`-i` is `--index-url` in cyclonedx-bom 7.x). The v1.17.0 release workflow's manifest job failed on it, so v1.17.0 shipped its three images (pushed and attested) without `release-manifest.json` and the two lock-file SBOMs.
+
 ## v1.17.0 — 2026-10-16
 
 Theme: execution quality and breadth. The platform gains a real second venue (IEX HIST, free), an implementation-shortfall benchmark with signal-aware urgency, pacing, quote fading, queue-aware cancels, markout decomposition and a modelled dark venue, a cross-sectional breadth book with a pre-registered net-of-cost screen, the v1.17 statistics revision, budgeted LLM agents, and C++/Rust parity for the new execution rules. Headline results are negative and stated as such: the net-of-cost screen passes 0 of 22 candidates on multi7, so the breadth book is registered with the screen as a hard gate and makes no confirmatory look. B7 (signal-aware execution fresh test) and B8 (two-venue router on real books) ship as code and run commands; their real-data results land in v1.17.1 as the IEX overlap days are ingested. Notes: docs/release/v1.17.0_RELEASE_NOTES.md.
