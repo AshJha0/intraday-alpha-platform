@@ -60,7 +60,19 @@ the repository map, the real-world usage notes and the references) is in
 
 The full list with descriptions is the [Documentation index](#documentation-index).
 
-## Current status (v1.16.0 released 2026-10-15; v1.17 in progress)
+## Current status (v1.17.0 released 2026-10-16)
+
+**v1.17.0, the execution-quality and breadth release, shipped on 2026-10-16.** It adds a real second
+venue (IEX HIST), an implementation-shortfall benchmark with signal-aware execution, quote fading,
+queue-aware cancels and a modelled dark venue, a cross-sectional breadth book, the v1.17 statistics
+revision, budgeted LLM agents and C++/Rust parity for the new rules. The net-of-cost screen passes
+0 of 22 candidates on multi7, so the breadth book is registered with the screen as a hard gate and
+makes no confirmatory look. B7 and B8 real-data results follow in v1.17.1
+([CHANGELOG.md](CHANGELOG.md) v1.17.0 and
+[docs/release/v1.17.0_RELEASE_NOTES.md](docs/release/v1.17.0_RELEASE_NOTES.md)). The v1.16.0 summary
+below is kept until the post-release docs pass.
+
+### v1.16.0 (2026-10-15)
 
 **v1.16.0, the monetisation release, shipped on 2026-10-15.** v1.15 proved
 the alphas predict on unseen data; v1.16 asked whether any of that survives

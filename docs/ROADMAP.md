@@ -491,6 +491,8 @@ change: still 0 alphas promoted, no strategy that trades at 1x costs.
 
 ## 3.10 v1.15.0 (2026-10-13): the confirmatory release
 
+**v1.17.0 (2026-10-16): execution quality and breadth.** Shipped: WS0, A1-A5, B1-B6, B8-B10 (B8 results in v1.17.1), C1-C8 (C6 screen 0 of 22 pass; C8 registered under option (a), no confirmatory look), D1-D4, E1-E5, F1-F9, G1-G4. B7 fresh test and B8 real-book results: v1.17.1. Notes: docs/release/v1.17.0_RELEASE_NOTES.md.
+
 **v1.16.0 (2026-10-15): monetisation.** P0 execution items 1-5 done. P0-6 taker study: no-go
 (0 trades in 480 cells). Item 7: no taker capacity (0/45 cells). Item 8 (paid data): closed by
 owner decision 2026-10-14. Quoting v2: no edge (every cell loses $5-7k per session; skewing with EQ01/EQ05 cuts the loss by about $750-920 per session). AI4 DeepLOB: closed after an in-sample failure (net -0.69 bp per trade; holdout not used).
