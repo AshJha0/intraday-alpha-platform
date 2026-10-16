@@ -141,6 +141,17 @@ from iap.execution.fading import CANCEL_RULES, pull_rows, pull_summary
 from iap.execution.optimal import ac_params_from_calibration
 from iap.execution.signal import URGENCY_REGIMES, AlphaUrgencySource
 from iap.execution.types import FILL_PROVENANCES
+from iap.research.two_venue import (
+    ALIGNMENT_RULE,
+    IEX_CLOCKS,
+    ROUTE_POLICIES,
+    instrument_map,
+    load_calibrations,
+    merge_events,
+    remap_instruments,
+    router_from_calibrations,
+    symbols_of,
+)
 from iap.tca.markout import DEFAULT_HORIZONS_NS, build_gated_timeline
 from iap.tca.markout_decomposition import FILL_TYPES, decompose, fill_rows, fill_type
 from iap.tca.shortfall import parent_costs
@@ -266,9 +277,28 @@ def parent_qty(adv: float, pct_adv: float, lot: int = 100) -> int:
     return max(lot, int(round(pct_adv / 100.0 * adv / lot)) * lot)
 
 
+def split_route(name: str) -> tuple[str, str | None]:
+    """v1.17 B8: ``"passive@sor+dark"`` -> ``("passive+dark", "sor")``; a bare
+    route name is the native style (``"pin_iex"`` -> ``("native", "pin_iex")``);
+    no route -> ``(name, None)`` (the pinned SmartOrderRouter, unchanged)."""
+    head, plus, variant = name.partition("+")
+    if "@" in head:
+        style, _, route = head.partition("@")
+    elif head in ROUTE_POLICIES:
+        style, route = "native", head
+    else:
+        return name, None
+    if route not in ROUTE_POLICIES:
+        raise SystemExit(
+            f"unknown route {route!r} in {name!r}; choose from {sorted(ROUTE_POLICIES)}"
+        )
+    return style + plus + variant, route
+
+
 def parse_policy(name: str) -> tuple[str, str | None]:
-    """``"native+urgency"`` -> ``("native", "urgency")``; ``"native"`` -> ``("native", None)``."""
-    base, _, variant = name.partition("+")
+    """``"native+urgency"`` -> ``("native", "urgency")``; ``"native"`` -> ``("native", None)``.
+    A B8 route (``sor`` / ``pin_*``, :func:`split_route`) is stripped first."""
+    base, _, variant = split_route(name)[0].partition("+")
     if base not in POLICIES:
         raise SystemExit(f"unknown policy {name!r}; bases are {sorted(POLICIES)}")
     if variant and variant not in VARIANTS:
@@ -284,6 +314,9 @@ def control_policy(name: str) -> str | None:
     if variant is None:
         return None
     ctrl = VARIANTS[variant]
+    route = split_route(name)[1]
+    if route is not None:
+        base = route if base == "native" else f"{base}@{route}"
     return base if ctrl is None else f"{base}+{ctrl}"
 
 
@@ -596,8 +629,27 @@ def run_benchmark(
     dark_max_participation: float = 0.1,
     dark_participation_window_s: float = 30.0,
     dark_max_notional: float = 0.0,
+    second_data_dir: Path | None = None,
+    iex_clock: str = "exchange",
+    venue_calibration: Path | None = None,
+    router_tox_horizon: str = "1s",
+    router_fill_horizon_s: float = 1.0,
+    more_pairs: tuple[tuple[Path, Path], ...] = (),
 ) -> dict[str, object]:
     """Run the grid; returns the JSON document (see the module docstring).
+
+    ``second_data_dir`` (v1.17 B8) is the IEX dataset of the same days:
+    each session is the merged two-venue stream (``iap.research.two_venue``,
+    ``iex_clock`` = its alignment rule; only sessions present in both are
+    run) and the venue table is the union of both datasets' venues unless
+    ``venues`` is given. Route policies (``sor``, ``pin_nasdaq``,
+    ``pin_iex``, or ``style@route``) pin every child to one venue or route
+    it through the ``sor_v2`` cost-aware router built from the per-venue
+    calibration documents in ``venue_calibration`` (the VenueModel defaults
+    without them). ``more_pairs`` adds further ``(Nasdaq dataset, IEX
+    dataset)`` day pairs (one session each on the overlap days), re-keyed
+    onto ``data_dir``'s instrument ids by symbol; ``data_dir``'s configs
+    (instruments, ADV) serve every day.
 
     ``venues`` replaces the venue table; the ``dark_*`` knobs build the B10
     :class:`DarkFirstParams` of the ``dark`` variant (``dark_model`` = a
@@ -715,7 +767,39 @@ def run_benchmark(
     )
     if venues is not None:
         cfg = replace(cfg, venues=load_venues(venues))
+    elif second_data_dir is not None:
+        merged_venues = dict(cfg.venues)
+        merged_venues.update(
+            load_venues(Path(second_data_dir) / "configs" / "venues" / "venues.json")
+        )
+        cfg = replace(cfg, venues=merged_venues)
     sor = load_sor_options(config_dir / "execution" / "execution.json")
+    # v1.17 B8: route policies (pinned venue or the sor_v2 router)
+    if iex_clock not in IEX_CLOCKS:
+        raise SystemExit(f"--iex-clock must be one of {IEX_CLOCKS}")
+    routes_used = sorted({r for pol in policies if (r := split_route(pol)[1]) is not None})
+    venue_by_name = {s.name: v for v, s in cfg.venues.items()}
+    pin_of: dict[str, int] = {}
+    for r in routes_used:
+        vname = ROUTE_POLICIES[r]
+        if vname is not None:
+            if vname not in venue_by_name:
+                raise SystemExit(
+                    f"route {r!r} pins to venue {vname} but the venue table has "
+                    f"{sorted(venue_by_name)} (--second-data-dir / --venues)"
+                )
+            pin_of[r] = venue_by_name[vname]
+    cal_docs = None if venue_calibration is None else load_calibrations(venue_calibration)
+    router = None
+    router_fp = None
+    if "sor" in routes_used:
+        router, router_fp = router_from_calibrations(
+            cfg.venues,
+            cal_docs,
+            tox_horizon=router_tox_horizon,
+            fill_horizon_s=router_fill_horizon_s,
+            sor_options=sor,
+        )
     lit_venues = sorted(v for v, s in cfg.venues.items() if s.is_lit)
     if not lit_venues:
         raise SystemExit("the venue table has no lit venue")
@@ -787,6 +871,52 @@ def run_benchmark(
     ]
     if not files:
         raise SystemExit(f"no session of {data_dir} matches --sessions {sessions}")
+    second_of: dict[str, Path] = {}
+    unmatched: list[str] = []
+    id_map: dict[int, int] | None = None
+    merge_counts: dict[str, dict[str, int]] = {}
+    if second_data_dir is not None:
+        second_files = {_session_label(p): p for p in _session_files(Path(second_data_dir))}
+        for sp in files:
+            lab = _session_label(sp)
+            if lab in second_files:
+                second_of[lab] = second_files[lab]
+            else:
+                unmatched.append(lab)
+        files = [sp for sp in files if _session_label(sp) in second_of]
+        if not files:
+            raise SystemExit(f"no session of {data_dir} has a match in {second_data_dir}")
+        id_map = instrument_map(symbols_of(data_dir), symbols_of(Path(second_data_dir)))
+    id_map_of: dict[str, dict[int, int] | None] = {lab: id_map for lab in second_of}
+    primary_map_of: dict[str, dict[int, int]] = {}
+    # v1.17 B8: further (Nasdaq day, IEX day) dataset pairs, keyed onto the
+    # first dataset's instrument ids by symbol (its configs are the run's)
+    for nd, xd in more_pairs:
+        if second_data_dir is None:
+            raise SystemExit("more day pairs need --second-data-dir (the first pair's IEX dataset)")
+        nd, xd = Path(nd), Path(xd)
+        pm = instrument_map(symbols_of(data_dir), symbols_of(nd))
+        xm = instrument_map(symbols_of(data_dir), symbols_of(xd))
+        sec = {_session_label(sp): sp for sp in _session_files(xd)}
+        for sp in _session_files(nd):
+            lab = _session_label(sp)
+            if sessions and not any(x in lab for x in sessions):
+                continue
+            if lab in second_of or lab in unmatched:
+                raise SystemExit(f"session {lab} appears in more than one --pair-dir")
+            if lab not in sec:
+                unmatched.append(lab)
+                continue
+            files.append(sp)
+            second_of[lab] = sec[lab]
+            id_map_of[lab] = xm
+            primary_map_of[lab] = pm
+    if more_pairs:
+        files = sorted(files, key=_session_label)
+    # two-venue mode only: drop unwanted symbols before the merge (memory)
+    keep_ids = None
+    if second_of and want_symbols:
+        keep_ids = {iid for iid, sym in names.items() if sym in want_symbols}
     window_ns = int(window_min * 60 * SEC)
     warmup_ns = int(warmup_min * 60 * SEC)
     rng = SplitMix64(seed)
@@ -795,6 +925,7 @@ def run_benchmark(
     pull_rows_of: dict[str, list[dict]] = {p: [] for p in policies}
     pull_lost: dict[str, int] = {p: 0 for p in policies}
     mk_rows_of: dict[str, list[dict]] = {p: [] for p in policies}
+    venue_rows_of: dict[str, dict[str, list[dict]]] = {}
     session_labels: list[str] = []
     n_events = 0
     source = None
@@ -835,6 +966,22 @@ def run_benchmark(
         events = _read_events(path)
         if max_events > 0:
             events = events[:max_events]
+        if label in primary_map_of:
+            events = remap_instruments(events, primary_map_of[label])
+        if label in second_of:
+            other = _read_events(second_of[label])
+            if max_events > 0:
+                other = other[:max_events]
+            cnt: dict[str, int] = {}
+            events = merge_events(
+                events,
+                other,
+                id_map=id_map_of[label],
+                iex_clock=iex_clock,
+                keep=keep_ids,
+                counters=cnt,
+            )
+            merge_counts[label] = cnt
         n_events += len(events)
         per_instrument: dict[int, list] = {}
         for ev in events:
@@ -901,23 +1048,35 @@ def run_benchmark(
                         cells_of.append((p, pct))
                 if not worked:
                     continue
-                res = ExecutionReplay(cfg, worked, sor).run(evs)
+                route = split_route(pol)[1]
+                if route is not None and route in pin_of:
+                    worked = [replace(q, venue_id=pin_of[route]) for q in worked]
+                if route == "sor":
+                    res = ExecutionReplay(
+                        cfg, worked, sor, router=router, router_fill_prob=router_fp
+                    ).run(evs)
+                else:
+                    res = ExecutionReplay(cfg, worked, sor).run(evs)
                 fills_of: dict[int, list] = {p.parent_id: [] for p in worked}
                 for f in res.fills:
                     fills_of[f.parent_id].append(f)
                 orders_of = {o.order_id: o for kids in res.children.values() for o in kids}
                 # v1.17 B6: every fill priced by type / regime, clustered by session
-                mk_rows_of[pol].extend(
-                    fill_rows(
-                        res.fills,
-                        orders_of,
-                        timeline,
-                        ins.tick_size,
-                        qty_unit=ins.qty_unit,
-                        horizons_ns=mk_horizons,
-                        cluster=label,
-                    )
+                frows = fill_rows(
+                    res.fills,
+                    orders_of,
+                    timeline,
+                    ins.tick_size,
+                    qty_unit=ins.qty_unit,
+                    horizons_ns=mk_horizons,
+                    cluster=label,
                 )
+                mk_rows_of[pol].extend(frows)
+                if routes_used:
+                    for f, fr in zip(res.fills, frows, strict=True):
+                        venue_rows_of.setdefault(pol, {}).setdefault(
+                            cfg.venues[f.venue_id].name, []
+                        ).append(fr)
                 # v1.17 B4: the pulls, priced after the fact (counterfactual)
                 if res.pulls:
                     pull_rows_of[pol].extend(
@@ -936,9 +1095,12 @@ def run_benchmark(
                     row = parent_costs(p, fills_of[p.parent_id], timeline, ins.tick_size, taker_fee)
                     rep = res.parents[p.parent_id]
                     type_qty: dict[str, int] = {}
+                    venue_qty: dict[str, int] = {}
                     for f in fills_of[p.parent_id]:
                         k = fill_type(f, orders_of[f.order_id])
                         type_qty[k] = type_qty.get(k, 0) + f.qty
+                        vn = cfg.venues[f.venue_id].name
+                        venue_qty[vn] = venue_qty.get(vn, 0) + f.qty
                     row.update(
                         {
                             "session": label,
@@ -957,6 +1119,7 @@ def run_benchmark(
                             "urgency_qty": rep.urgency_qty,
                             "sor_no_route": res.sor_no_route,
                             "fill_type_qty": type_qty,
+                            "venue_qty": venue_qty,
                             "pulls": rep.pulls,
                             "pulled_qty": rep.pulled_qty,
                             "pulls_lost_race": rep.pulls_lost_race,
@@ -1103,9 +1266,76 @@ def run_benchmark(
         # v1.17 B10 (modelled, not measured)
         "dark": {**dark_doc, "totals": dark_totals},
     }
+    if second_data_dir is not None or routes_used:
+        doc["two_venue"] = two_venue_block(
+            rows,
+            venue_rows_of,
+            policies,
+            list(mk_horizons),
+            routes={r: (cfg.venues[pin_of[r]].name if r in pin_of else None) for r in routes_used},
+            second_data_dir=None if second_data_dir is None else str(second_data_dir),
+            iex_clock=iex_clock,
+            unmatched=unmatched,
+            merge_counts=merge_counts,
+            calibration=None if venue_calibration is None else str(venue_calibration),
+            router_models={
+                str(v): {"p_fill_touch": m.p_fill_touch, "toxicity_bps": dict(m.toxicity_bps)}
+                for v, m in (router.models.items() if router is not None else ())
+            },
+            router_tox_horizon=router_tox_horizon,
+            router_fill_horizon_s=router_fill_horizon_s,
+        )
     if timestamp:
         doc["generated"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     return doc
+
+
+def two_venue_block(
+    rows: dict[str, list[dict]],
+    venue_rows_of: dict[str, dict[str, list[dict]]],
+    policies: tuple[str, ...],
+    horizons: list[str],
+    **meta: object,
+) -> dict[str, object]:
+    """v1.17 B8: per policy, the venue split (fill qty share per venue) and
+    the markout of each venue's fills by horizon (day-clustered); plus the
+    run's routing / alignment metadata. The shortfall / fill-rate cells and
+    the paired router-vs-pinned differences are the benchmark's own
+    ``cells`` / ``paired_vs_baseline``."""
+    split: dict[str, object] = {}
+    vmk: dict[str, object] = {}
+    for pol in policies:
+        tot: dict[str, int] = {}
+        for r in rows[pol]:
+            for vn, q in r.get("venue_qty", {}).items():
+                tot[vn] = tot.get(vn, 0) + q
+        filled = sum(tot.values())
+        split[pol] = {
+            "filled_qty": filled,
+            "venue_qty": dict(sorted(tot.items())),
+            "venue_share": {vn: (q / filled if filled else None) for vn, q in sorted(tot.items())},
+        }
+        per = venue_rows_of.get(pol, {})
+        vmk[pol] = {}
+        for vn in sorted(per):
+            cell: dict[str, object] = {"n_fills": len(per[vn])}
+            for h in horizons:
+                vals: list[float] = []
+                cl: list[str] = []
+                for fr in per[vn]:
+                    v = fr["markout_bps"][h]
+                    if v is not None:
+                        vals.append(float(v))
+                        cl.append(str(fr["cluster"]))
+                cell[h] = cluster_mean_stats(vals, cl)
+            vmk[pol][vn] = cell  # type: ignore[index]
+    return {
+        "item": "v1.17 B8",
+        "alignment": ALIGNMENT_RULE,
+        **meta,
+        "venue_split": split,
+        "venue_markouts_bps": vmk,
+    }
 
 
 # ------------------------------------------------------------- rendering --
@@ -1124,6 +1354,51 @@ def _stat(s: dict) -> str:
         return f"{_f(s['mean'])} (1 session)"
     lo, hi = s["ci95"]
     return f"{_f(s['mean'])} ± {_f(s['se'])} [{_f(lo)}, {_f(hi)}]"
+
+
+def _two_venue_lines(doc: dict) -> list[str]:
+    tv = doc.get("two_venue")
+    if not tv:
+        return []
+    hz = doc["markout_horizons"]
+    out = [
+        "## Two venues: router vs pinned (v1.17 B8)",
+        "",
+        f"Second dataset `{tv['second_data_dir']}` (IEX clock `{tv['iex_clock']}`); "
+        f"alignment: {tv['alignment']}. Routes: "
+        + ", ".join(f"`{r}` -> {v or 'sor_v2 router'}" for r, v in tv["routes"].items())
+        + f". Router calibration: `{tv['calibration'] or 'VenueModel defaults (uncalibrated)'}`."
+        + (
+            f" Sessions without an IEX match (not run): {', '.join(tv['unmatched'])}."
+            if tv["unmatched"]
+            else ""
+        ),
+        "",
+        "| policy | filled qty | venue share | "
+        + " | ".join(f"markout {h} by venue" for h in hz)
+        + " |",
+        "|---|---:|---|" + "---|" * len(hz),
+    ]
+    for pol, sp in tv["venue_split"].items():
+        share = ", ".join(
+            f"{vn} {x:.1%}" if x is not None else f"{vn} -" for vn, x in sp["venue_share"].items()
+        )
+        cols = []
+        for h in hz:
+            cols.append(
+                "; ".join(
+                    f"{vn} {_stat(c[h])}" for vn, c in tv["venue_markouts_bps"].get(pol, {}).items()
+                )
+                or "-"
+            )
+        out.append(f"| {pol} | {sp['filled_qty']} | {share or '-'} | " + " | ".join(cols) + " |")
+    out += [
+        "",
+        "Shortfall, fill rate and the paired router-vs-pinned differences are in the cells and "
+        "paired tables above (same parents and windows for every route).",
+        "",
+    ]
+    return out
 
 
 def render(doc: dict) -> str:
@@ -1269,6 +1544,7 @@ def render(doc: dict) -> str:
         lines += ["", dk["b8_pairing"] + "."]
     lines += [
         "",
+        *_two_venue_lines(doc),
         "## Reading it",
         "",
         "- `all_in = shortfall + fees_net + sim_impact + completion` per parent; the unfilled "
@@ -1490,6 +1766,30 @@ def main(argv: list[str] | None = None) -> int:
     dg.add_argument("--dark-max-participation", type=float, default=0.1)
     dg.add_argument("--dark-participation-window-s", type=float, default=30.0)
     dg.add_argument("--dark-max-notional", type=float, default=0.0, help="0 = off")
+    tg = ap.add_argument_group("two venues: router vs pinned (v1.17 B8)")
+    tg.add_argument(
+        "--second-data-dir",
+        type=Path,
+        default=None,
+        help="the IEX dataset of the same days (merged two-venue replay)",
+    )
+    tg.add_argument("--iex-clock", choices=IEX_CLOCKS, default="exchange")
+    tg.add_argument(
+        "--pair-dir",
+        nargs=2,
+        action="append",
+        default=[],
+        metavar=("NASDAQ_DIR", "IEX_DIR"),
+        help="a further (Nasdaq dataset, IEX dataset) day pair; repeat per overlap day",
+    )
+    tg.add_argument(
+        "--venue-calibration",
+        type=Path,
+        default=None,
+        help="directory of venue_calibration_*.json (python -m iap.research.two_venue calibrate)",
+    )
+    tg.add_argument("--router-tox-horizon", default="1s")
+    tg.add_argument("--router-fill-horizon-s", type=float, default=1.0)
     args = ap.parse_args(argv)
     doc = run_benchmark(
         args.data_dir,
@@ -1548,6 +1848,12 @@ def main(argv: list[str] | None = None) -> int:
         dark_max_participation=args.dark_max_participation,
         dark_participation_window_s=args.dark_participation_window_s,
         dark_max_notional=args.dark_max_notional,
+        second_data_dir=args.second_data_dir,
+        iex_clock=args.iex_clock,
+        venue_calibration=args.venue_calibration,
+        router_tox_horizon=args.router_tox_horizon,
+        router_fill_horizon_s=args.router_fill_horizon_s,
+        more_pairs=tuple((Path(a), Path(b)) for a, b in args.pair_dir),
     )
     tag = args.tag or Path(args.data_dir).name
     args.out.mkdir(parents=True, exist_ok=True)

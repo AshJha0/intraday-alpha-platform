@@ -165,6 +165,8 @@ Placeholder for the G5 truth pass: quote fading, queue cancels, the markout
 decomposition, the dark midpoint model and the two-venue router as released.
 Nothing is claimed here.
 
+The two-venue router's evaluation design is section 8 (B8); it has no result yet.
+
 ### 6.2 B7 (the signed gate run)
 
 Placeholder for the G5 truth pass: the signed `prereg.json`, the run and its
@@ -173,7 +175,7 @@ verdict, or the statement that the gate was not signed. The draft is in
 
 ### 6.3 B8-B10
 
-Placeholder for the G5 truth pass (B8 / B9). B10 is below.
+Placeholder for the G5 truth pass (B9). B10 is section 7, B8 section 8.
 
 ## 7. The dark-venue model (B10) — modelled, not measured
 
@@ -233,3 +235,45 @@ router-vs-pinned on the Nasdaq / IEX overlap days with both lit venues in
 `--venues`. The multi7 dark benchmark was not run in the B10 PR; the command
 is in API_TRADING.md §2.17. Whatever it produces, the dark rows are a model's
 output: they say what the proxy implies, never what a dark pool did.
+
+## 8. Two venues on real books (B8) — designed, not yet run
+
+Until v1.17 every multi-venue routing statement in this repository rested on
+synthetic venues: the real data was Nasdaq only, so the cost-aware router had
+one candidate and always chose it. B8 replaces that with real books of two lit
+venues on the same day: the Nasdaq ITCH dataset and the IEX DEEP+ dataset of
+each overlap day (docs/DATA_SOURCES.md section 5), merged into one
+consolidated stream (API_TRADING.md section 2.19).
+
+**Alignment.** Both clocks are nanoseconds since New York midnight on the
+exchange's UTC clock. Nasdaq stamps are used as they are; the IEX reader
+already takes the messages' own UTC send times, so the 37 s TAI offset of the
+capture host does not touch an ingested IEX day (a capture-clock stream is
+shifted by -37 s). Ties go to the lower venue id; neither stream is re-sorted.
+
+**Per-venue calibration.** For each venue, from its own book in the merged
+stream: the fill probability is the queue-depletion hazard with the X-4 split
+(executions only count as fills; cancels of the queue ahead are reported but
+do not fill us), and toxicity is the markout of every displayed execution on
+that venue, taken as a maker fill and measured against the consolidated mid
+at 1 s / 5 s / 30 s, with one cluster per day. One document per venue
+(`venue_calibration_XNAS.json`, `venue_calibration_IEXG.json`) feeds the
+router.
+
+**The evaluation.** The B1 benchmark works the same parents in the same
+windows three ways: routed by the cost-aware router across both venues
+(`sor`), pinned to Nasdaq (`pin_nasdaq`) and pinned to IEX (`pin_iex`). It
+reports implementation shortfall and all-in cost, fill rate, the markouts of
+our fills by venue and horizon, and the venue split, all with day-clustered
+standard errors, and the paired differences router minus pinned.
+
+**Status.** Built and tested on synthetic two-venue books (the golden stream
+replayed as both venues, one tick apart). No real number exists: no overlap
+day has both venues' normalized events on disk yet, and the IEX
+process-and-delete chain removes them unless it is told to keep them. Three
+things to settle before a result counts as evidence are in
+`research/execution/b8/README.md`: the calibration is in-sample unless it
+is done leave-one-day-out, the fees are list prices, and venue latency is zero
+because both feeds carry exchange timestamps only. With two to nine days the
+standard errors rest on very few clusters; treat any router gain under a
+couple of bps as unresolved.

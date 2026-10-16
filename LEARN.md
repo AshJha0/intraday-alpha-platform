@@ -2211,7 +2211,9 @@ children generated of which 347 submitted (149 blocked by the 500 ms
 slice-interval control, exactly as the Java loop would), 163 fills, 15.4 %
 fill rate. Risk: 347 ALLOW, 0 REJECT, 0 KILL, 8 sequence gaps each
 recovered by the following SNAPSHOT burst, 28 mark regressions dropped.
-Routing: XV3 69.2 %, XV1 19.6 %, XV2 11.2 % of filled quantity (aggressive
+Routing (synthetic venues XV1-XV3; superseded as a routing claim by the v1.17 B8
+real two-venue evaluation, pending data): XV3 69.2 %, XV1 19.6 %, XV2 11.2 % of
+filled quantity (aggressive
 routing picks the cheapest taker fee on price ties; passive routing
 prefers XV1's rebate). TCA: implementation shortfall +0.065 bps
 quantity-weighted; TWAP fills 0.4 % (passive limits at a 1 s horizon
@@ -5250,6 +5252,11 @@ builds one; a `None` skips the venue.
 **Honest scope.** The real data here is Nasdaq only, so multi-venue
 routing is capability for multi-venue data, tested on synthetic venues.
 The pinned `SmartOrderRouter` and its C++ parity are unchanged.
+
+> **Superseded (v1.17 B8, pending data).** This rests on synthetic venues. The
+> real two-venue evaluation (Nasdaq + IEX books merged on the overlap days, per-venue
+> calibration, router vs pinned) replaces it: `research/execution/b8/README.md`,
+> docs/EXECUTION_QUALITY.md section 8. No real result exists yet; kept as history.
 
 **Check yourself.**
 

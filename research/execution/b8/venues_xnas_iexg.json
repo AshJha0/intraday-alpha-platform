@@ -1,0 +1,38 @@
+{
+  "x-version": 1,
+  "description": "v1.17 B8: the two lit venues of the Nasdaq / IEX overlap days. Fees are indicative list prices (XNAS: the ingested dataset's; IEXG: 0.0009 USD/share to remove, 0 to add displayed) - edit to your own tier. Latency is zero: both feeds carry exchange timestamps only.",
+  "venues": [
+    {
+      "venue": "XNAS",
+      "venue_id": 101,
+      "asset_class": "EQUITY",
+      "taker_fee_per_share": 0.003,
+      "maker_rebate_per_share": 0.002,
+      "latency": {
+        "mean_ns": 0,
+        "jitter_ns": 0
+      },
+      "supports": [
+        "MBO",
+        "AUCTION",
+        "HALT"
+      ]
+    },
+    {
+      "venue": "IEXG",
+      "venue_id": 102,
+      "asset_class": "EQUITY",
+      "taker_fee_per_share": 0.0009,
+      "maker_rebate_per_share": 0.0,
+      "latency": {
+        "mean_ns": 0,
+        "jitter_ns": 0
+      },
+      "supports": [
+        "MBO",
+        "AUCTION",
+        "HALT"
+      ]
+    }
+  ]
+}
