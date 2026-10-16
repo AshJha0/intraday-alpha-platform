@@ -1,0 +1,53 @@
+# THROWAWAY (never merged): runs the real "cyclonedx-bom SBOMs" and "write
+# release-manifest.json" step scripts of release.yml's manifest job on a runner,
+# with stand-in digests, so the first real run is not their first run.
+# The two attest-sbom steps are NOT run here: they write permanent entries to
+# the public Sigstore transparency log.
+name: release-manifest-dryrun
+
+on:
+  pull_request:
+    paths: [".github/workflows/release-manifest-dryrun.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  dryrun:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: stand-ins for the artefacts the images job produces
+        run: |
+          mkdir -p digests sboms
+          for l in python cpp rust; do
+            printf 'sha256:%064d\n' 0 | tr 0 a > "digests/$l.txt"
+            printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"components":[{"type":"library","name":"x","version":"1"}]}\n' > "sboms/sbom-image-$l.cdx.json"
+          done
+          cat digests/python.txt
+      - name: run the real step scripts of release.yml
+        run: |
+          python -m pip install -q pyyaml
+          python - <<'PY'
+          import os, subprocess, sys
+          import yaml
+          wf = yaml.safe_load(open(".github/workflows/release.yml", encoding="utf-8"))
+          steps = wf["jobs"]["manifest"]["steps"]
+          env = {**os.environ, "GITHUB_REF_NAME": "v0.0.0-manifest-test"}
+          for name in ("cyclonedx-bom SBOMs of the Python lock files", "write release-manifest.json"):
+              step = next(s for s in steps if s.get("name") == name)
+              print("== running:", name, flush=True)
+              r = subprocess.run(["bash", "-e", "-c", step["run"]], env=env)
+              if r.returncode:
+                  sys.exit(f"step failed: {name} (exit {r.returncode})")
+          PY
+      - name: what the upload step would attach
+        run: |
+          ls -l release-manifest.json sboms/*.cdx.json
+          test "$(ls sboms/*.cdx.json | wc -l)" = 5
