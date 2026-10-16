@@ -356,38 +356,87 @@ class FillHazardModel:
         if self.alpha is None or self.beta is None:
             raise RuntimeError("FillHazardModel used before fit() / from_dict()")
 
-    def bucket_hazards(self, features: pd.DataFrame | Mapping[str, float]) -> np.ndarray:
-        """``h_b(x)``, shape (rows, buckets)."""
-        self._check()
-        assert self.alpha is not None and self.beta is not None  # _check
+    def _row_hazards(self, x: Sequence[float]) -> list[float]:
+        """``h_b`` for one feature row, in the C++ port's exact operation order.
+
+        Scalar :mod:`math` calls and left-to-right sums only: numpy's
+        vectorised ``exp`` / ``log1p`` / ``sin`` and BLAS ``@`` pick CPU-specific
+        kernels (SIMD dispatch, FMA, lane splits), so their last bit moved
+        between CI runners.  This order is ``cpp/src/execution/fill_hazard.cpp``
+        ``bucket_hazards`` line for line."""
+        assert self.alpha is not None and self.beta is not None and self.mean is not None
+        assert self.std is not None
+        q = max(float(x[0]), 0.0)
+        d = max(float(x[1]), 0.0)
+        tod = float(x[4])
+        design = (
+            math.log1p(q),
+            math.log1p(d),
+            float(x[2]),
+            float(x[3]),
+            math.sin(2 * math.pi * tod),
+            math.cos(2 * math.pi * tod),
+        )
+        dot = 0.0
+        for i in range(6):
+            z = (design[i] - float(self.mean[i])) / float(self.std[i])
+            dot += z * float(self.beta[i])
+        eps = 1e-12
+        out = []
+        for a in self.alpha:
+            eta = min(max(float(a) + dot, -30.0), 30.0)
+            if self.link == "cloglog":
+                m = -math.expm1(-math.exp(eta))
+            else:
+                m = 1.0 / (1.0 + math.exp(-eta))
+            out.append(min(max(m, eps), 1 - eps))
+        return out
+
+    def _rows(self, features: pd.DataFrame | Mapping[str, float]) -> list[tuple[float, ...]]:
         frame = pd.DataFrame([features]) if isinstance(features, Mapping) else features
-        z = (_design(frame) - self.mean) / self.std
-        # z @ beta as a plain left-to-right sum over the columns (elementwise
-        # IEEE ops, no BLAS): ``@`` routes to OpenBLAS ddot, whose reduction
-        # order (FMA, lane splits) depends on the runner's CPU kernel, so the
-        # last bit moved between CI runners; this order is also the C++ port's
-        # (cpp/src/execution/fill_hazard.cpp, ``dot += z * beta_[i]``).
-        zv = np.asarray(z, dtype=float)
-        lin = np.zeros(zv.shape[0])
-        for j in range(zv.shape[1]):
-            lin = lin + zv[:, j] * self.beta[j]
-        eta = self.alpha[None, :] + lin[:, None]
-        mu, _ = _inv_link(eta, self.link)
-        return mu
+        for f in FEATURES:
+            if f not in frame.columns:
+                raise ValueError(f"hazard features need column {f!r}")
+        cols = [
+            frame["queue_ahead"].to_numpy(dtype=float),
+            frame["depletion_per_s"].to_numpy(dtype=float),
+            frame["spread_ticks"].to_numpy(dtype=float),
+            frame["imbalance"].to_numpy(dtype=float),
+            frame["tod"].to_numpy(dtype=float),
+        ]
+        return list(zip(*cols, strict=True))
+
+    def bucket_hazards(self, features: pd.DataFrame | Mapping[str, float]) -> np.ndarray:
+        """``h_b(x)``, shape (rows, buckets) (scalar order: :meth:`_row_hazards`)."""
+        self._check()
+        rows = [self._row_hazards(r) for r in self._rows(features)]
+        return np.asarray(rows, dtype=float).reshape(len(rows), len(self.edges_ns) - 1)
 
     def p_fill_within(
         self, features: pd.DataFrame | Mapping[str, float], t_ns: int
     ) -> np.ndarray | float:
-        """``P(fill within t_ns | x)``; a float for a single mapping."""
-        h = self.bucket_hazards(features)
-        edges = np.asarray(self.edges_ns, dtype=float)
-        width = np.diff(edges)
-        overlap = np.clip(float(t_ns) - edges[:-1], 0.0, width)
-        extra = max(float(t_ns) - edges[-1], 0.0)
-        overlap = overlap.copy()
-        overlap[-1] += extra  # the last bucket's hazard continues
-        log_s = (np.log1p(-h) * (overlap / width)[None, :]).sum(axis=1)
-        p = -np.expm1(log_s)
+        """``P(fill within t_ns | x)``; a float for a single mapping.
+
+        Sequential sum over the buckets with scalar ``math.log1p`` / ``expm1``,
+        the C++ port's order (``p_fill_within``)."""
+        self._check()
+        edges = [float(e) for e in self.edges_ns]
+        t = float(t_ns)
+        nb = len(edges) - 1
+        extra = max(t - edges[-1], 0.0)
+        out = []
+        for r in self._rows(features):
+            h = self._row_hazards(r)
+            log_s = 0.0
+            for b in range(nb):
+                lo = edges[b]
+                width = edges[b + 1] - lo
+                overlap = min(max(t - lo, 0.0), width)
+                if b + 1 == nb:
+                    overlap += extra
+                log_s += math.log1p(-h[b]) * (overlap / width)
+            out.append(-math.expm1(log_s))
+        p = np.asarray(out, dtype=float)
         return float(p[0]) if isinstance(features, Mapping) else p
 
     # --------------------------------------------------------- persistence
