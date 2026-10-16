@@ -265,7 +265,7 @@ flowchart LR
     RSTOOL["rust/risk/src/bin/make_risk_golden<br/>(Rust is the risk reference;<br/>Python iap.risk consumes it too)"] --> EXP
     GV --> PY["python: pytest -k golden<br/>193 tests"]
     GV --> CPP["cpp: ctest -R Golden<br/>72 tests"]
-    GV --> RS["rust: 10 golden test targets<br/>72 tests"]
+    GV --> RS["rust: 12 golden test targets<br/>75 tests"]
     EXP --> PY
     EXP --> CPP
     EXP --> RS
@@ -294,9 +294,9 @@ and are matched by Java, Rust and C++ (the trace and canonical-JSON ports)
 and by Java and Rust (the lifecycle ports). The harness
 (`tests/harness/run_all.sh`, with `run_golden.sh` as the golden-only alias)
 runs every suite with the canonical commands and prints the parity table; a
-v1.14.0 CI run (2026-10-11) passes 2411/302/366 tests (193/72/72
+v1.14.0 CI run (2026-10-11) passes 2411/302/376 tests (193/72/75
 golden; rust was 365/71 at the v1.14.0 tag itself, CI run 38142218467, and
-366/72 after the v1.15 fee commits) across python/cpp/rust (Java archived in v1.15, `archive/java/`), plus the repo-level `integration` (35)
+366/72 after the v1.15 fee commits, 376/75 after the v1.17 F8 / B9 goldens) across python/cpp/rust (Java archived in v1.15, `archive/java/`), plus the repo-level `integration` (35)
 and `replay` (6) rows — the same counts the README parity table records.
 
 ## 7. Hot-path engineering notes per language

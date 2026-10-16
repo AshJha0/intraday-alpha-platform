@@ -94,9 +94,10 @@ python -m iap.marketdata process-iex-day ... --date D1 --date D2 ... --render-cm
 python tools\iex_hist.py recent --n 5 --out research\v117\iex_recent_manifest.json
 ```
 
-**Round lots.** TOPS quotes the best level that holds at least a round lot (measured on
-2025-11-28: AAPL sizes never below 100, MSFT / QQQ never below 40), so the oracle compares
-the book's best round-lot level. `--round-lots-from` takes the paired Nasdaq day's
+**Round lots.** TOPS quotes the first price at which the displayed quantity accumulated
+from the top reaches a round lot, with that cumulative size (measured on 2025-11-28: AAPL
+sizes never below 100, MSFT / QQQ never below 40; the rule matched 113,807 of 113,807
+sampled quotes), so the oracle compares the book's cumulative round-lot quote. `--round-lots-from` takes the paired Nasdaq day's
 `dataset.json` (`lot_size` per symbol); without it the smallest quoted TOPS size per symbol
 is used and `process_report.json` says `round_lots_source: tops_min_quoted_size`.
 

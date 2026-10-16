@@ -342,8 +342,10 @@ implements it (`docs/SCENARIOS.md`, TRADING section).
   20 `NET_NOTIONAL`; 21 `DAILY_LOSS`; 22 `STRATEGY_LOSS`; then the SEC 15c3-5 set (v1.14,
   each off unless its `pre_trade` key is configured) 23 `RESTRICTED_INSTRUMENT`;
   24 `MAX_OPEN_ORDERS`; 25 `MAX_OPEN_NOTIONAL`; 26 `STRATEGY_POSITION`; 27 `PARTICIPATION`;
-  28 `CANCEL_RATE`; 29 `VENUE_MESSAGE_RATE`; else `ALLOW`. Check 7 also rejects
-  `STATE_CAPACITY` (rule index 30) when `pre_trade.max_tracked_keys` is reached.
+  28 `CANCEL_RATE`; then the v1.17 F8 dark-venue controls 31 `VENUE_TYPE_RESTRICTED`;
+  32 `DARK_PARTICIPATION`; 33 `DARK_FILL_NOTIONAL`; then 29 `VENUE_MESSAGE_RATE` (last, because
+  it spends the venue token); else `ALLOW`. Check 7 also rejects `STATE_CAPACITY` (rule index 30)
+  when `pre_trade.max_tracked_keys` is reached.
 - **SEC 15c3-5 pre-trade controls (v1.14, review item G-P0-2; `risk.json` x-version 4)**. Every
   x-version 4 key is optional: absent or `null` turns that control off, a present key is parsed
   strictly in this order after `currency` (the first error names its key):
@@ -372,6 +374,53 @@ implements it (`docs/SCENARIOS.md`, TRADING section).
   {seen order ids|open orders|strategies} (fail-closed)`. The repo config turns on every control
   except participation (it needs the live gateway's trade-print feed) at values that do not bind
   before the legacy limits.
+- **Dark-venue pre-trade controls (v1.17 F8; owner row of 2026-10-15; Rust first, Python and the
+  archived Java mirror byte-identical)**. The controls the B10 dark-venue model needs live in the
+  risk engine, not in the execution layer. Every key is optional under `pre_trade` and is parsed
+  strictly AFTER every x-version 4 key, in this order: `venue_types` (object, decimal u16 venue id
+  -> `lit` / `dark` / `midpoint`; an unmapped venue, venue 0 included, is `lit`),
+  `allowed_venue_types` (non-empty array of those names), `max_dark_participation_bps` (+ required
+  `dark_participation_floor_qty`), `max_dark_fill_notional`. Checks 31-33 run after check 28 and
+  before check 29. 31: the order's venue type is not in `allowed_venue_types` (`venue <id> is
+  <type>, allowed venue types: <names in the pinned order lit, dark, midpoint>`; VENUE scope).
+  32, dark orders only (a venue typed `dark` or `midpoint`): `dark executed qty (session fills of
+  open orders routed to a dark venue) + every open dark order's qty + qty` as f64 against
+  `max(floor, market_volume × bps / 1e4)` (`projected dark session qty <q> exceeds dark
+  participation cap <c> (<bps>bps of market volume <v>, floor <f>)`; INSTRUMENT scope). 33, dark
+  orders only: the session notional filled on dark venues (kept per quote currency, converted at
+  the current rate; a missing rate rejects `FX_RATE_MISSING`: `dark fill notional in <ccy> has no
+  conversion rate (fail-closed)`) plus this order's notional, `!(total <= max)` (`projected dark
+  fill notional <x> exceeds max_dark_fill_notional <m>`; GLOBAL scope). A fill counts as dark when
+  its `order_id` is an open order routed to a dark venue at fill time (an external adjustment or
+  an order already done has no venue and is not counted); `roll_session` zeroes both dark
+  counters with the lit ones. **Snapshot x-version 3**: `open.*.venue_id`, `dark_executed`
+  (instrument -> qty), `dark_filled` (`[{ccy, notional}]`); restore is strict (a v2 snapshot is
+  refused). Off by default: the repo config sets none of the keys, so every pre-F8 golden row is
+  unchanged apart from the new snapshot fields and the `restored snapshot v3` text.
+
+  | control (v1.17 F8) | `risk.json` key (`pre_trade`) | check | default |
+  |---|---|---|---|
+  | venue type table | `venue_types` | read by 31-33 | empty (every venue `lit`) |
+  | venue-type restriction | `allowed_venue_types` | 31 `VENUE_TYPE_RESTRICTED` | off |
+  | dark participation cap (dark-first router rule) | `max_dark_participation_bps` + `dark_participation_floor_qty` | 32 `DARK_PARTICIPATION` | off |
+  | dark-fill notional limit | `max_dark_fill_notional` | 33 `DARK_FILL_NOTIONAL` | off |
+
+  **Two forms, by design.** The B10 hand-over (`docs/research/B10_F8_HANDOVER.md`) defines the
+  same three controls as a STATELESS function the execution replay evaluates before a dark post,
+  from inputs the risk engine never sees: the trailing displayed lit EXECUTE volume over
+  `participation_window_ns`, the PARENT's cumulative dark-filled notional and the child notional
+  at the midpoint (`dark_pretrade_check` in `python/src/iap/execution/dark.py` (B10 branch), `DarkControls{max_participation,
+  participation_window_ns, allowed_venue_types, max_dark_notional}`, codes `venue_type` /
+  `participation` / `notional`, first failure wins; a rejected post goes to the lit book). The
+  Rust risk crate carries that pure function too (`risk::dark_pretrade_check`,
+  `rust/risk/src/dark.rs`), pinned by `tests/golden/expected_dark_controls.json` (the hand-over's
+  ten rows, which the Python `DARK_CONTROL_GOLDENS` must equal). The engine checks 31-33 above
+  guard the GATEWAY path: every order of the session, on the engine's own fail-closed state
+  (session market volume, the firm's dark fills across parents), with no caller input to trust.
+  The stateless check guards the REPLAY path: one parent's next dark step, windowed and
+  parent-scoped. Only `allowed_venue_types` is shared by name; the participation and notional
+  keys differ on purpose because a bps-of-session-volume cap and a fraction-of-trailing-volume
+  cap, or a firm session notional and a parent notional, are different quantities.
 - **Reference-price sanity gate (v1.14, G-P2-6)**. `on_market` drops (and counts) an update for
   a new instrument once `max_tracked_keys` markets exist, a regression (as before), a crossed
   two-sided book (`bid > ask`, `risk_market_crossed_dropped_total`; a locked book is accepted),
@@ -564,6 +613,20 @@ check. The simulator has no PEG/MID order types (documented optimism) in any of 
 languages; the risk engine tracks them, simulator callers must not submit them. Since v1.5.0
 every `ChildOrder` also records `entry_ahead_qty` — `ahead_qty` at the moment it came to rest,
 never updated afterwards — a read-only diagnostic for the markout analysis (no rule reads it).
+
+- **Rust venue simulator queue parity (v1.17 B9, review row X-10).** `rust/venue` (the
+  `SimulatedVenue` the Rust replay container drives) now carries rule 4 — `ahead_qty` on post
+  (displayed size at the level plus our own earlier orders there), pay-down by applied EXECUTEs
+  and by cancels / size-down MODIFYs of orders known to be ahead, the behind set, marketable-ADD
+  expansion, the crossing check with the aggressive-leg exemption and the rule-3b overlay, the
+  rule-8 reopen at the touch — ported from the Python reference with zero latency (submission and
+  cancel are immediate; an order submitted after event k is the Python order activated before
+  event k + 1). Pinned by `tests/golden/expected_venue_queue.json`, generated by
+  `python/tools/make_golden_venue_queue.py` from the Python simulator and replayed by
+  `rust/venue/tests/golden_venue_queue.rs` (golden group) and `python/tests/test_venue_queue_golden.py`.
+  Not ported: rules 1, 2 and 7 (latency, activation and cancel legs), rule 6 impact, PEG / MID
+  semantics (Rust-only order types), hidden prints and the execution-policy layer; the Rust venue
+  is a venue endpoint, not a replacement for `cpp/execution` (F7).
 
 ### 11.3 SOR and algos
 

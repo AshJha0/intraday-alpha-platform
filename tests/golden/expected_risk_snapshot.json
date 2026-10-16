@@ -18,6 +18,8 @@
     }
   },
   "cancel_buckets": {},
+  "dark_executed": {},
+  "dark_filled": [],
   "executed": {
     "1": 95000
   },
@@ -202,5 +204,5 @@
   "venues_down": {
     "2": false
   },
-  "x-version": 2
+  "x-version": 3
 }

@@ -34,11 +34,11 @@ was regenerated. One fixture was added: the risk edge golden.
 
 ```
 python/src/iap/risk/
-  limits.py     RiskLimits, FxConversion, RISK_CONFIG_VERSION = 3 — strict configs/risk/risk.json parser
+  limits.py     RiskLimits, FxConversion, VENUE_TYPES, RISK_CONFIG_VERSION = 4 — strict configs/risk/risk.json parser
   refdata.py    InstrumentRef + builders (instruments.json / ReferenceData / the golden table)
   orders.py     OrderType, OrderRequest, Fill, order_validation_error
   events.py     Scope, Severity, Decision, Rules (all pinned ids + CHECK_ORDER), RiskEvent, fmt_fixed
-  engine.py     RiskEngine, RiskDecision, RiskMetrics, SNAPSHOT_VERSION = 1
+  engine.py     RiskEngine, RiskDecision, RiskMetrics, SNAPSHOT_VERSION = 3
   serialize.py  to_canonical_json, format_f64, rust_display_f64, json_escape — serde_json / ryu byte-identical
 ```
 
@@ -61,6 +61,11 @@ reproduces the audit tail and final snapshot bytes").
     max_instrument_notional: float; strategy_max_daily_loss: float
     max_sequence_gap_before_halt: int; stale_feed_timeout_ns: int
     reporting_ccy: str; fx_conversion: Mapping[str, FxConversion]   # sorted
+    # x-version 4 optional keys (None / empty = off), then the v1.17 F8 keys:
+    venue_types: Mapping[int, str]; allowed_venue_types: frozenset[str] | None
+    max_dark_participation_bps: float | None; dark_participation_floor_qty: int | None
+    max_dark_fill_notional: float | None
+    venue_type(venue_id) -> str                        # "lit" unless pre_trade.venue_types maps it
     @classmethod from_json(doc) -> RiskLimits          # ValueError("risk.json: ...")
     @classmethod load(path) -> RiskLimits              # ValueError("io error: ..." / "codec error: risk.json: ...")
 
@@ -82,7 +87,8 @@ class OrderType(IntEnum): MARKET=1 LIMIT=2 IOC=3 FOK=4 PEG=5 MID=6
 # iap.risk.events
 class Scope(Enum): GLOBAL STRATEGY INSTRUMENT VENUE;   class Severity(IntEnum): INFO=1 WARN=2 BREACH=3
 class Decision(IntEnum): ALLOW=1 REJECT=2 KILL=3
-class Rules: KILL_GLOBAL ... STRATEGY_LOSS, FX_RATE_MISSING, NOT_BOOTSTRAPPED, ALLOW, CONFIG_MISSING, ...; CHECK_ORDER (23-tuple)
+class Rules: KILL_GLOBAL ... STRATEGY_LOSS, FX_RATE_MISSING, NOT_BOOTSTRAPPED, ALLOW, CONFIG_MISSING, ...,
+             VENUE_TYPE_RESTRICTED, DARK_PARTICIPATION, DARK_FILL_NOTIONAL (v1.17 F8); CHECK_ORDER (index = check number)
 @dataclass(frozen=True) class RiskEvent(timestamp, scope, scope_id, rule_id, severity, decision, reason,
                                         seq=0, prev_sha256="")   # v1.14: hash-chained audit (x-version 2)
 GENESIS_SHA256 = "0" * 64                             # prev_sha256 of the first record of a chain
@@ -238,6 +244,40 @@ fills inside `[arrival, expire]` and monotone, the book identical to a bare
 `test_sor.py` (12). One addition outside the package:
 `iap.orderbook.book.OrderBook.level_qty(side, price_ticks)`, the accessor the
 C++ book already had, used by rules 3b and 4.
+
+### 1.5 Dark-venue pre-trade controls (v1.17 F8; checks 31-33)
+
+Normative text: PLATFORM_CONVENTIONS.md §11.1 ("Dark-venue pre-trade controls"); Rust first
+(`rust/risk/src/limits.rs`, `limits_eval.rs`), Python mirrored statement for statement, the
+archived Java mirror updated only to keep the Rust-Java pair identical (it is not compiled in CI).
+All four `pre_trade` keys are optional and off in the repo config:
+
+| key | type | control |
+|---|---|---|
+| `venue_types` | `{"<u16 venue id>": "lit" \| "dark" \| "midpoint"}` | the venue type table; an unmapped venue is `lit` |
+| `allowed_venue_types` | non-empty array of those names | check 31 `VENUE_TYPE_RESTRICTED` (VENUE scope) |
+| `max_dark_participation_bps` + `dark_participation_floor_qty` | > 0 number, > 0 integer | check 32 `DARK_PARTICIPATION` (INSTRUMENT scope): dark fills + open dark orders + this order vs `max(floor, volume × bps / 1e4)`, dark orders only |
+| `max_dark_fill_notional` | > 0 number | check 33 `DARK_FILL_NOTIONAL` (GLOBAL scope): session dark-fill notional (converted at the current rate, missing rate = `FX_RATE_MISSING`) + this order, dark orders only |
+
+Checks 31-33 run after check 28 and before check 29 (the venue token is still spent last).
+The B10 hand-over (`docs/research/B10_F8_HANDOVER.md`) also defines a STATELESS form of the
+three controls that the execution replay evaluates itself before a dark post, from inputs the
+risk engine does not track (the trailing displayed lit volume, the parent's cumulative dark
+notional, the child notional at the midpoint): `dark_pretrade_check` in `python/src/iap/execution/dark.py` (B10 branch)
+(`DarkControls`: `max_participation`, `participation_window_ns`, `allowed_venue_types`,
+`max_dark_notional`; codes `venue_type` / `participation` / `notional`, first failure wins). The
+Rust crate carries the same pure function (`risk::dark_pretrade_check`, `rust/risk/src/dark.rs`),
+pinned by `tests/golden/expected_dark_controls.json` (the hand-over's ten rows; the Python
+`DARK_CONTROL_GOLDENS` must equal them). The two forms differ by design: the engine checks are
+session-scoped and fail-closed on the engine's own state (the gateway path), the stateless check
+is parent-scoped and window-based (the replay path).
+`RiskEngine.snapshot()` is x-version 3: `open.*.venue_id`, `dark_executed`, `dark_filled`
+(`[{ccy, notional}]`, sorted by currency); `restore` refuses a version-2 document. The goldens
+of §1.2 were regenerated for the new snapshot fields and the `restored snapshot v3` text only:
+every decision row is unchanged. Tests: `test_risk_rules.py::test_f8_*`,
+`::test_venue_type_restriction_check_31`, `::test_dark_participation_check_32`,
+`::test_dark_fill_notional_check_33_and_snapshot_roundtrip`,
+`::test_dark_fill_notional_missing_rate_is_fail_closed`; Rust `rules.rs` (same names).
 
 ### 2.1 Public API
 
@@ -1257,9 +1297,27 @@ pairing note and per-policy totals; the Markdown has a "Dark venue" section
 and the `dark` row of the markout decomposition. Not run on multi7 in the
 PR (the B1 timings: ~70 min for three policies).
 
+### 2.18 Rust venue simulator queue parity (v1.17 B9, review row X-10)
+
+`rust/venue`'s `SimulatedVenue` now implements rule 4 (and the rule-3b overlay the crossing
+check needs) as pinned above, with zero latency: submission and cancel take effect at once, so
+an order submitted after event k is in the state this simulator reaches by activating it before
+event k + 1. `tests/golden/expected_venue_queue.json` (five vectors: EXECUTE pay-down and fills
+at / through the level, CANCEL / MODIFY credits only from orders ahead, the sibling queue served
+from one print, the crossing exemption and overlay, marketable-ADD expansion with a dropped
+duplicate and a cancel) is generated from THIS simulator by
+`python/tools/make_golden_venue_queue.py` and replayed by `rust/venue/tests/golden_venue_queue.rs`
+(fills: order, event time, quantity, price, liquidity; final remaining / `ahead_qty`) and by
+`python/tests/test_venue_queue_golden.py`. `SimulatedVenue::queue_position(order_id)` reads a
+resting order's `remaining` / `ahead_qty`. PLATFORM_CONVENTIONS.md §11.2 lists what is not ported
+(latency legs, impact, PEG / MID, hidden prints, the policy layer).
+
+## 3. Where the rules live
+
 | rule set | normative text | Python port entry |
 |---|---|---|
-| pinned risk check order 0..22 and, since v1.14, the SEC 15c3-5 checks 23..29 after them; money, marks, projections, loss limits, throttle, re-arm precedence, snapshot / restore, audit parity, the v1.3.0 fail-closed branches | PLATFORM_CONVENTIONS.md §11.1 | `iap.risk.engine.RiskEngine.check_order` and friends |
+| pinned risk check order 0..22 and, since v1.14, the SEC 15c3-5 checks 23..29 after them (since v1.17 F8 the dark-venue checks 31..33 between 28 and 29); money, marks, projections, loss limits, throttle, re-arm precedence, snapshot / restore, audit parity, the v1.3.0 fail-closed branches | PLATFORM_CONVENTIONS.md §11.1 | `iap.risk.engine.RiskEngine.check_order` and friends |
+| simulator rule 4 in the Rust venue endpoint (queue position, overlay, crossing check, reopen) | §11.2 "Rust venue simulator queue parity"; `rust/venue/src/sim.rs` | `tests/golden/expected_venue_queue.json` from `iap.execution.simulator` |
 | simulator rules 1–9 (latency, activation, aggressive walk, overlay, queue position, fees, impact, cancels / expiry, venue gate, processing order) | `cpp/include/iap/execution/execution.hpp`; §11.2 | `iap.execution.simulator.ExecutionSimulator` |
 | SOR eligibility + tie-break ladder; algo slicing, child split, `expire_ts`, POV deficit | §11.3 | `iap.execution.sor`, `iap.execution.algos`, `iap.execution.replay` |
 | paper / backtest wiring (incl. the per-instrument gap gate: `on_feed_recovered` only when no venue of the instrument is stale) | §11.4 (Java `BacktestEngine`, `PaperTrading.RiskWiring`) | `iap.mvp.engine.MvpEngine` (docs/MVP.md §4, row by row) |

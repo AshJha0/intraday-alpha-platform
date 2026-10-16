@@ -330,6 +330,29 @@ def test_dark_controls_golden_vectors_for_f8():
     assert DarkControls().to_dict()["allowed_venue_types"] == ["dark", "midpoint"]
 
 
+def test_dark_controls_python_rows_equal_the_rust_golden():
+    """F8 (#195) commits the B10 vectors as the Rust golden; the Python rows
+    and the file must stay one set, evaluated the same way."""
+    import json
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[2] / "tests" / "golden" / "expected_dark_controls.json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    assert tuple(doc["codes"]) == DARK_CONTROL_CODES
+    rows = doc["rows"]
+    assert len(rows) == len(DARK_CONTROL_GOLDENS)
+    for row, (kw, vt, qty, lit, so_far, child, want) in zip(
+        rows, DARK_CONTROL_GOLDENS, strict=True
+    ):
+        assert row["controls"] == {
+            k: (list(v) if isinstance(v, tuple) else v) for k, v in kw.items()
+        }
+        assert (row["venue_type"], row["qty"], row["trailing_lit_volume"]) == (vt, qty, lit)
+        assert (row["dark_notional_so_far"], row["child_notional"]) == (so_far, child)
+        got = dark_pretrade_check(DarkControls(**row["controls"]), vt, qty, lit, so_far, child)
+        assert (got or "") == row["expected"] == (want or "")
+
+
 def test_midpoint_rounds_against_us():
     assert midpoint_ticks(9_999, 10_001, 0) == 10_000 == midpoint_ticks(9_999, 10_001, 1)
     assert midpoint_ticks(9_999, 10_002, 0) == 10_001  # buy rounds up

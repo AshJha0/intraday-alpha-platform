@@ -280,6 +280,8 @@ impl RiskEngine {
         self.loss_override_strategy.clear();
         self.market_volume.clear();
         self.executed.clear();
+        self.dark_executed.clear();
+        self.dark_filled.clear();
         self.refresh_pnl_gauges();
         self.emit(RiskEvent {
             seq: 0,

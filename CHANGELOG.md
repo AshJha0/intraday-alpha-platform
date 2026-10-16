@@ -23,6 +23,40 @@ that tag.
   Python is the same on every runner and agrees with C++ for any model. The
   fit stays vectorised. Opt-in users only (B5 queue-aware cancels, the maker
   backtester's `fill_hazard`); values move in the last bit at most.
+- v1.17 WS-F item F8 and WS-B item B9 (review row X-10). **F8**: the three pre-trade controls the
+  B10 dark-venue model needs, Rust first and mirrored byte-identically (Python `iap.risk`; the
+  archived Java mirror updated only to keep the pair identical): `pre_trade.venue_types` (lit /
+  dark / midpoint per venue id), check 31 `VENUE_TYPE_RESTRICTED` (`allowed_venue_types`), check 32
+  `DARK_PARTICIPATION` (`max_dark_participation_bps` + `dark_participation_floor_qty`: the
+  participation cap of the dark-first router rule), check 33 `DARK_FILL_NOTIONAL`
+  (`max_dark_fill_notional`); every key optional and off in the repo config, the checks run after
+  28 and before 29 (PLATFORM_CONVENTIONS §11.1, API_TRADING §1.5); plus the B10 hand-over's
+  stateless `dark_pretrade_check` in Rust, pinned by `tests/golden/expected_dark_controls.json`. Risk snapshot x-version 2 -> 3
+  (`open.*.venue_id`, `dark_executed`, `dark_filled`); the three risk goldens, the edge / prints
+  goldens and the fuzz corpus regenerated for the new fields and the `restored snapshot v3` text
+  only — every decision row unchanged (schemas/MIGRATIONS.md). **B9**: the Rust venue simulator
+  gets execution rule 4 (deterministic queue position, the rule-3b overlay, the crossing check
+  with the aggressive-leg exemption, the rule-8 reopen) ported from the Python reference, pinned by
+  `tests/golden/expected_venue_queue.json` (`python/tools/make_golden_venue_queue.py`;
+  `rust/venue/tests/golden_venue_queue.rs` joins the golden group; API_TRADING §2.18). No
+  execution, SOR or dark-venue logic moved to Rust (C++ owns that path, F7).
+- v1.17 C8 (DRAFT, unsigned): the breadth-book pre-registration is drafted in
+  `research/preregs/breadth_book_prereg_DRAFT.json` with a Markdown rendering. Its holdout is
+  nine 2025/26 Nasdaq days for the breadth names outside AAPL/MSFT/QQQ, taken from manifests
+  only. The DSR is computed at the registered N (410 at draft), and the C6 screen
+  dependency is 0 pass / 22 fail / 1 not screened. Three owner options are stated: (a) screen as a hard gate, (b) an EQ10/1s/linear_z_v2 override, (c) defer to v1.18.
+  `test_v117_breadth_prereg_draft.py` dry-runs the screen gate. Option (a) has been chosen.
+  `tools/breadth_book_register.py` (`--dry-run`, `--require-ci-env`) is the owner-run
+  registration: the screen gate refuses, and it writes a signed record of the refusal. The owner commands are in
+  `docs/runbooks/RUNBOOK_prereg_environment.md`.
+- v1.17 A4 fix 2: the TOPS oracle quotes the **cumulative** round lot: per side the first price
+  at which the displayed quantity accumulated from the top reaches the round lot, with that
+  cumulative size (odd lots at better prices fold in). On 2025-11-28 the best-round-lot-level
+  rule of the previous fix still diverged (AAPL 56,540 of 434,022: the level held 100, TOPS said
+  102); the cumulative rule matched 113,807 of 113,807 sampled quotes (first 15 M DEEP+
+  messages, AAPL / MSFT / QQQ). Oracle label `tops_quote_equals_deep_cumulative_round_lot`;
+  unit test from the 09:19:58.6 case.
+
 - v1.17 WS-F item F7, part 1: hand-written C++ parity ports of the execution rules already on
   main (no translation tools), one commit per rule, next to `SmartOrderRouter` and the execution
   simulator in `cpp/`: `sor/sor_v2.hpp` (`CostAwareRouter::plan_sweep` all-in / price ranking,

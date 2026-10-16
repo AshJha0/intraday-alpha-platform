@@ -1,0 +1,208 @@
+{
+  "schema": "iap.prereg_draft/v1",
+  "kind": "breadth_book",
+  "status": "DRAFT - not signed, not on the blackboard, not approved for any run",
+  "signed": false,
+  "signature": null,
+  "on_blackboard": false,
+  "plan_item": "C8 (IAP_v1.17_Plan.md, WS-C: 'Prereg of the breadth book; holdout = the 2025/26 Nasdaq days for names outside AAPL/MSFT/QQQ'); consumes C1/C2/C7 (iap.research.breadth_book, breadth_report) and C6 (iap.research.screen)",
+  "drafted": "2026-10-16",
+  "drafted_by": "Claude (session v117-c8); every choice below is a proposal for the owner; no statistic is filled in, nothing is signed or registered",
+  "decision_required": {
+    "why": "The C6 net-of-cost screen this pre-registration depends on passed no candidate. The owner chooses one option before signing; the draft does not choose.",
+    "screen_result": "0 pass, 22 fail, 1 not screened of 23 candidates",
+    "screen_artefact": "research/breadth/screen/SCREEN_multi7.md (data: research/breadth/screen/screen_multi7.json)",
+    "options": {
+      "a": {
+        "title": "Register the breadth book with the screen as a hard gate",
+        "means": "the confirmatory run passes --require-screen research/breadth/screen/screen_multi7.json; every candidate failed or was not screened, so the run refuses before reading any data (breadth_book.screen_check, WriteBroker.preregister(screen=)). Expected outcome: no confirmatory look - a documented negative result (no registered equity alpha clears spread + fee + impact at one round lot on multi7). The holdout stays unread and unspent.",
+        "ledger": "the registration debits one look of kind prereg; the refused run reads nothing and debits nothing"
+      },
+      "b": {
+        "title": "Register a named candidate with a screen override",
+        "candidate": "EQ10/1s/linear_z_v2 (book score eq10_beta_gap)",
+        "why_this_one": "best reading on the screen's pre-registered gate statistic (net day-clustered t) among the candidates the book can run: the book's scores are eq11 (EQ11/15m, not screened: no scored row on three names) and eq10_beta_gap (EQ10/1s). Screen-wide, the best net day-clustered t is EQ09/10s/linear_z_v1 (-8.93), which has no book score; registering it would need a new score, i.e. new code under a new fingerprint.",
+        "screen_numbers": {
+          "EQ10/1s/linear_z_v2": {
+            "gross_ic": 0.0702,
+            "net_ic": -0.5932,
+            "net_t_hac": -39.13,
+            "net_t_day": -19.12,
+            "net_return_per_trip_bps": -1.975,
+            "cost_per_trip_bps": 2.015,
+            "days": 6,
+            "pairs": 1465672,
+            "result": "fail (net_ic_min, net_return_mean_min, net_return_tstat_min, net_tstat_day_cluster_min)"
+          },
+          "EQ10/1s/linear_z_v1": {
+            "gross_ic": 0.0757,
+            "net_ic": -0.5922,
+            "net_t_hac": -39.11,
+            "net_t_day": -21.49,
+            "net_return_per_trip_bps": -1.972,
+            "cost_per_trip_bps": 2.015,
+            "days": 6,
+            "pairs": 1465920,
+            "result": "fail (net_ic_min, net_return_mean_min, net_return_tstat_min, net_tstat_day_cluster_min)"
+          },
+          "EQ09/10s/linear_z_v1": {
+            "gross_ic": 0.0058,
+            "net_ic": -0.4612,
+            "net_t_hac": -15.12,
+            "net_t_day": -8.93,
+            "net_return_per_trip_bps": -1.987,
+            "cost_per_trip_bps": 2.015,
+            "days": 6,
+            "pairs": 1464987,
+            "result": "fail (net_ic_min, net_return_mean_min, net_return_tstat_min, net_tstat_day_cluster_min)"
+          }
+        },
+        "means": "the confirmatory run omits --require-screen and records the screen status (fail) on its report; the override is a ledger entry of its own, stating the screen path, sha256, the candidate's FAIL status and the owner's reason, written at registration. The prior from the screen is strongly negative: the candidate loses about 1.97 bps per round trip net at one lot on the in-sample days.",
+        "ledger": "one look of kind prereg plus one override entry; the confirmatory run debits one breadth_book look on the holdout dataset"
+      },
+      "c": {
+        "title": "Defer C8 to v1.18 pending new candidates",
+        "means": "no registration in v1.17; v1.17 ships the in-sample book (plan section 7 fallback). New candidates come from screening the 100-name breadth day(s) (data/real/breadth, in-sample 2019/20 only) or a different registered size; C8 is redrafted against that screen. The holdout stays unread and unspent.",
+        "ledger": "nothing charged"
+      }
+    },
+    "chosen": {
+      "option": "a",
+      "owner_words": "go with your recommendation",
+      "recommendation": "option (a): register the breadth book with the C6 screen as a hard gate",
+      "date": "2026-10-16",
+      "given_to": "the coordinating Claude session, in the owner's chat"
+    }
+  },
+  "hypothesis": "On the breadth holdout (the 2025/26 Nasdaq days, names of the fixed breadth universe outside AAPL / MSFT / QQQ), the cross-sectional book driven by the registered score, through the cost-aware optimizer at the registered notional, earns a mean daily net P&L (gross minus spread, fee and impact) whose day-clustered t is at least 2.0 with a positive mean per-rebalance rank IC; and its deflated Sharpe at the registered N is at least 0.95. Anything less is a negative result, recorded as such.",
+  "book": {
+    "driver": "python -m iap.research.breadth_book (iap.research.breadth_book.run_book; BookConfig defaults of the C7 report research/breadth/book/book_multi7.json)",
+    "score": "eq11 (option a, chosen 2026-10-16)",
+    "weights": "linear (centred rank, gross 1)",
+    "decile_q": 0.1,
+    "alpha_bps": 5.0,
+    "rebalance": "5 min on the feature-row clock (rebalance_ns 300000000000); max_age 60 s; exec_delay 1 s; flatten at session end",
+    "neutrality": {
+      "dollar_neutral": true,
+      "beta_neutral": true,
+      "sector_neutral": true,
+      "neutral_bound": 0.0,
+      "sector_source": "configs/reference/sectors.json (sha256 f4f3c028178ba22aa01e31c4acb2bc001eb6d943fd34315820a53b768961d07d; public-knowledge GICS-style, open for owner: vendor file)",
+      "note": "sector_neutral is false on the 3-name multi7 report only because two sectors of one and two names pin the book at zero; on the breadth universe it is on"
+    },
+    "sizes": {
+      "notional": 1000000.0,
+      "size_sweep_multipliers": [
+        0.25,
+        0.5,
+        1.0,
+        2.0,
+        4.0
+      ],
+      "gross_cap": 1.0,
+      "w_max": 0.1,
+      "participation_cap": 0.01,
+      "turnover_cap": 0.5,
+      "min_names": 3
+    },
+    "optimizer": {
+      "risk_aversion": 1000.0,
+      "cov_lam": 0.94,
+      "cov_init": 20,
+      "cov_shrinkage": null,
+      "projection": "dykstra",
+      "dykstra_max_iter": 30,
+      "dykstra_tol": 1e-09,
+      "feas_tol": 1e-06,
+      "solver_iters": 20
+    },
+    "costs": {
+      "impact": "cost_model (sqrt rule, 100 bps at one ADV)",
+      "impact_coeff": null,
+      "impact_exponent": null,
+      "accounting": "net = gross - spread - fee - impact to the last float"
+    },
+    "universe": "research/breadth/universe.json (sha256 ec50340f9897600ab9dbf48629a870d7801d6d7ec8cc2834b94a8230bdcb81a1; rule research/breadth/UNIVERSE_RULE.md, fixed on the 2019-01-30 selection day) minus AAPL, MSFT, QQQ",
+    "c7_reference": "research/breadth/book/book_multi7.json (sha256 b2217ff2e1c21c3ac0510d141fb77cec93cf6bef7de47cd91ef031d9921eb6e2)"
+  },
+  "statistic": {
+    "confirmatory": "mean daily net book P&L at the registered notional, t-statistic clustered by session day (n_days - 1 df, Student-t critical value), computed by breadth_report.cluster_mean on the per-day net P&L of the one registered run",
+    "secondary_gate": "mean per-rebalance rank IC of the score, day-clustered t, in the v1.17 gate form (iap.validation.metrics.gate_statistics at STATS_REVISION v1.17, methods bundle v2: HAC auto bandwidth, day-separated); expected sign +1",
+    "stats_revision": "v1.17",
+    "acceptance": {
+      "net_pnl_tstat_day_cluster_min": 2.0,
+      "net_pnl_mean_min": 0.0,
+      "rank_ic_min": 0.0,
+      "dsr_min": 0.95,
+      "n_days_min": 9
+    },
+    "deflated_sharpe": {
+      "form": "iap.validation.deflated.deflated_sharpe_block on the per-day net P&L",
+      "n_trials": "registered N = ExperimentLedger(research/experiments.json).distinct_experiments + 1 at the signing commit (the plan's R-1 rule: never the holdout dataset's own ledger)",
+      "n_trials_at_draft": 410,
+      "n_trials_at_draft_basis": "distinct_experiments 409 on main c5a9b11 + 1; recomputed and frozen at signing",
+      "trials_basis": "distinct_configurations",
+      "sr_benchmark": 0.0
+    },
+    "power_note": "nine holdout days: the day-clustered t has 8 df; a book that is net negative in-sample (multi7 net daily Sharpe -30.10) has a negligible prior of passing"
+  },
+  "holdout": {
+    "rule": "the 2025/26 Nasdaq ITCH days, for every name of the breadth universe outside AAPL / MSFT / QQQ (docs/PORTFOLIO_BREADTH.md 'The breadth holdout rule'); no statistic has ever been computed on those names there",
+    "computed_from": "dataset.json manifests only (sessions and universe keys), no feature, label or statistic read: data/real/r7_20251128, r7_20251208, r7_20251209, r7_20251210, r7_20251211, r7_20251212, r7_20260612, holdout2026",
+    "days": [
+      "2025-11-28",
+      "2025-12-08",
+      "2025-12-09",
+      "2025-12-10",
+      "2025-12-11",
+      "2025-12-12",
+      "2026-05-15",
+      "2026-05-18",
+      "2026-06-12"
+    ],
+    "existing_dataset_versions_3_names_spent": {
+      "535f4868b0a5f6d14305018142221bea100b615dcc3a212de4eb7a715aecd8fb": "r7_20251128 (AAPL, MSFT, QQQ)",
+      "284629a29df4e6419fb527990abf34e3a8dd25f42902e56604df840860ce8ecc": "r7_20251208 (AAPL, MSFT, QQQ)",
+      "24d5d38b9e50ed676d0cceca46cd9cad89be186a6f3517e5a06903b17fb28a1b": "r7_20251209 (AAPL, MSFT, QQQ)",
+      "dea2a6b03ae35df24e5c8751bea8ddcc0f9ca8b93e02c9e2fdb656b6ab62fd80": "r7_20251210 (AAPL, MSFT, QQQ)",
+      "62632989c86d77a14b061ddd8fd175dd71c4c03a96992cc02715d684451dd73c": "r7_20251211 (AAPL, MSFT, QQQ)",
+      "081ff2cdd7844587613518df6d0ed8a64eea9513ef5b2ed3f5a2f8901829d861": "r7_20251212 (AAPL, MSFT, QQQ)",
+      "6a495deeb3fc02a6ef5447a6a82e3a04d0491926bf09b4133398a3c4261ddce9": "r7_20260612 (AAPL, MSFT, QQQ)",
+      "ca5d079831be4e63aa76e350bb840a29a6964c0152f4bbbcce5010269a193854": "r7_holdout (7 days, AAPL, MSFT, QQQ; R7-CONFIRM-1)",
+      "d7f7ffd14fbc363550a5bc9afd886e36df0d851511f840615f1f089b22f5f237": "holdout2026 (2026-05-15, 05-18; AAPL, MSFT, QQQ)"
+    },
+    "breadth_dataset_versions": [],
+    "breadth_dataset_note": "no dataset of the breadth names exists on these days (every manifest above holds AAPL / MSFT / QQQ only; the raw .gz are not on disk). The holdout dataset is built after signature from the re-downloaded files, under a path containing 'holdout' (the book driver refuses such a path for in-sample use), and its dataset_version is appended here by the owner's registration commit before the one confirmatory run",
+    "never": "no feature, label, IC or P&L on these days for these names before the signed run; AAPL / MSFT / QQQ are excluded from the book on these days (spent on R7)"
+  },
+  "screen_dependency": {
+    "path": "research/breadth/screen/screen_multi7.json",
+    "sha256": "b860740cb7230dc69372ec9c71214766a597f730a7f7415c8b19b7bb605891ac",
+    "document": "research/breadth/screen/SCREEN_multi7.md",
+    "screen_prereg": "research/preregs/net_of_cost_screen_prereg_DRAFT.json (sha256 7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848, DRAFT, unsigned)",
+    "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+    "status": "0 pass, 22 fail, 1 not screened",
+    "book_candidates": {
+      "EQ11/15m/linear_z_v1": "not_screened",
+      "EQ10/1s/linear_z_v1": "fail",
+      "EQ10/1s/linear_z_v2": "fail"
+    },
+    "wiring": "python -m iap.research.breadth_book --screen PATH --require-screen [--screen-candidate ALPHA/HORIZON/MODEL]; WriteBroker.preregister(screen=PATH)"
+  },
+  "ledger": {
+    "path": "research/experiments.json",
+    "registration": "tools/breadth_book_register.py calls WriteBroker.preregister(EQ11, 15m:breadth-book-c8, screen=screen_multi7.json); the broker's screen gate refuses before any blackboard write or ledger debit, so the expected registration charges NO look (the refusal is recorded in the signed research/preregs/breadth_book_prereg.json); run by the owner from .venv-ci with --require-ci-env",
+    "confirmatory": "none under option (a): no confirmatory run, no breadth_book look, no holdout dataset",
+    "override": "option (b) only: one entry recording the screen override (screen path, sha256, candidate status, reason)",
+    "screen_looks_already_charged": "23 looks of kind net_of_cost_screen (C6)"
+  },
+  "ordering": "sign -> register (owner, .venv-ci, --require-ci-env) -> build the holdout breadth dataset -> append its dataset_version -> one confirmatory run -> outcome on the board. No step before signature reads the holdout.",
+  "what_this_does_not_claim": "no edge, no promotion, no holdout read, no change to any registered alpha's fingerprint; the in-sample book is net negative on multi7 and the screen passed nothing",
+  "open_for_owner": [
+    "option (a) chosen 2026-10-16: confirm by signing; no breadth holdout dataset is built or downloaded under this registration",
+    "approve the book configuration (rebalance clock, linear weights, alpha_bps, risk aversion, notional) - the C7 open questions",
+    "replace configs/reference/sectors.json with a vendor taxonomy or accept it",
+    "approve the acceptance thresholds and the registered N rule",
+    "sign and register from .venv-ci with --require-ci-env"
+  ]
+}
