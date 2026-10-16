@@ -200,6 +200,29 @@ the screen passes nothing to C8 from this dataset, so the C8 prereg needs
 either the 100-name breadth day screened first or a different registered
 size, both the owner's call.
 
+## The C8 pre-registration draft (decision needed)
+
+`research/preregs/breadth_book_prereg_DRAFT.json` (rendered in
+`research/preregs/BREADTH_BOOK_PREREG_DRAFT.md`) is the breadth-book
+pre-registration. It is a DRAFT: unsigned and not on the blackboard. Its holdout
+is the 2025/26 Nasdaq days for the breadth names outside AAPL / MSFT / QQQ:
+2025-11-28, 2025-12-08 to 12-12, 2026-05-15, 2026-05-18 and 2026-06-12. The
+list comes from the `dataset.json` manifests only, and no breadth dataset of
+those days exists yet. The C6 screen it depends on reads **0 pass, 22 fail,
+1 not screened**, so the owner chooses one of three options before signing:
+
+- **(a)** Register with the screen as a hard gate. The confirmatory run
+  refuses every book candidate, and the outcome is no confirmatory look: a
+  documented negative result.
+- **(b)** Register EQ10/1s/linear_z_v2 (score `eq10_beta_gap`) with a screen
+  override recorded in the ledger. Its screen readings are a net day-clustered
+  t of -19.12, a net IC of -0.5932 and -1.975 bps net per round trip, the best
+  of the candidates the book can run.
+- **(c)** Defer C8 to v1.18 until new candidates exist.
+
+The draft does not choose. `python/tests/test_v117_breadth_prereg_draft.py`
+checks the draft and dry-runs the screen gate that the registration uses.
+
 ## What C8 will add (placeholder for the G5 truth pass)
 
 - **C6** is above: the screen document a C8 prereg cites.
