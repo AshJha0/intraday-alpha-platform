@@ -609,20 +609,25 @@ def committed():
     return json.loads((COMBINATION_DIR / "COMBINATION.json").read_text(encoding="utf-8"))
 
 
-def test_committed_report_evaluates_eight_experiments_and_promotes_none(committed):
+def test_committed_report_evaluates_ten_experiments_and_promotes_none(committed):
     assert committed["x-version"] == combine_report.COMBINATION_X_VERSION
-    assert committed["default_method"] == DEFAULT_METHOD and committed["methods_bundle"] == "v2"
+    # v1.17.0 regenerate: the stacking revision's default (C3); DEFAULT_METHOD stays
+    # the model's default for un-stacked runs
+    assert committed["stacking_revision"] == "v1.17"
+    assert committed["default_method"] == combine_report.DEFAULT_STACKING_METHOD
+    assert committed["methods_bundle"] == "v2"
     assert sorted(committed["combinations"]) == ["EQUITY", "FX"]
     looks = committed["looks"]
-    assert looks["experiments"] == 8 and looks["declared_by_this_report"] == 8 * 13
+    # the v1.17.0 regenerate: five methods (incl. decay_aware) x two asset classes
+    assert looks["experiments"] == 10 and looks["declared_by_this_report"] == 10 * 13
     assert looks["gate_looks"] == looks["ledger_before"] + looks["declared_by_this_report"]
     assert looks["tstat_threshold"] == pytest.approx(
         ExperimentLedger.bonferroni_t_threshold_at(looks["gate_looks"])
     )
     for ac, block in committed["combinations"].items():
         assert block["members"] == combine_report.default_members(ac)
-        # the committed report is the pre-v1.17 run: the four original methods
-        assert sorted(block["methods"]) == sorted(set(METHODS) - {"decay_aware"})
+        # the committed report is the v1.17.0 run: every method, decay_aware included
+        assert sorted(block["methods"]) == sorted(METHODS)
         assert all(block["weights_ignore_test_rows"].values()), ac
         for name, m in block["methods"].items():
             # honest result: nothing is promotable, and the reason is costs
@@ -648,7 +653,7 @@ def test_committed_report_evaluates_eight_experiments_and_promotes_none(committe
         assert block["breadth"]["measured_ic_equal_weight"] == equal["gate_ic"]
 
 
-def test_committed_ledger_holds_the_eight_combination_entries(committed):
+def test_committed_ledger_holds_the_combination_entries(committed):
     ledger = json.loads((ROOT / "research" / "experiments.json").read_text(encoding="utf-8"))
     entries = [e for e in ledger["entries"] if e["kind"] == combine_report.LEDGER_KIND]
     # the v1.13.0 entries stay (history, scoped as v2_v113); the report in
@@ -656,19 +661,27 @@ def test_committed_ledger_holds_the_eight_combination_entries(committed):
     from iap.validation.methods import ledger_bundle
 
     assert sum(ledger_bundle(e["config"]) == "v2_v113" for e in entries) == 8
-    entries = [e for e in entries if ledger_bundle(e["config"]) == "v2"]
-    assert len(entries) == 8 and {e["alpha_id"] for e in entries} == {"COMB_EQ", "COMB_FX"}
+    # history: the eight pre-v1.17 identities (no stacking key) stay in the ledger
+    old = [
+        e for e in entries if ledger_bundle(e["config"]) == "v2" and "stacking" not in e["config"]
+    ]
+    assert len(old) == 8 and {e["config"]["method"] for e in old} == set(METHODS) - {"decay_aware"}
+    # the report in force is the v1.17.0 regenerate: decay-aware stacking identities
+    entries = [
+        e for e in entries if ledger_bundle(e["config"]) == "v2" and "stacking" in e["config"]
+    ]
+    assert len(entries) == 10 and {e["alpha_id"] for e in entries} == {"COMB_EQ", "COMB_FX"}
+    assert {e["config"]["stacking"] for e in entries} == {"v1.17"}
     assert {e["count"] for e in entries} == {13}
     assert {e["gate_looks"] for e in entries} == {committed["looks"]["gate_looks"]}
-    assert {e["config"]["method"] for e in entries} == set(METHODS) - {"decay_aware"}
-    assert all("stacking" not in e["config"] for e in entries)  # pre-v1.17 identities
+    assert {e["config"]["method"] for e in entries} == set(METHODS)
     assert all(len(e["config"]["members"]) == 12 for e in entries)
     ids = {
         m["experiment_id"]
         for block in committed["combinations"].values()
         for m in block["methods"].values()
     }
-    assert {e["result"]["experiment_id"] for e in entries} == ids and len(ids) == 8
+    assert {e["result"]["experiment_id"] for e in entries} == ids and len(ids) == 10
 
 
 def test_committed_correlation_document_feeds_the_lifecycle_gate(committed):
