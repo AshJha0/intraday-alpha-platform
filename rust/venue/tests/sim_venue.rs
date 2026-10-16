@@ -90,8 +90,15 @@ fn market_order_walks_depth_and_cancels_remainder() {
     // taker fees are charged per share
     assert!((reps[1].fees - 0.003 * 200.0).abs() < 1e-12);
     // rule 3b (v1.17 B9): the display our walk consumed is not available
-    // again until it changes — a second buy on the same venue finds nothing
-    let reps = v.submit(&order(2, 0, 100, 0, OrderType::Market)).unwrap();
+    // again until it changes — a second buy on the same venue finds only the
+    // 100 @ 2453 the first walk left, and a third finds nothing
+    let reps = v.submit(&order(2, 0, 150, 0, OrderType::Market)).unwrap();
+    assert_eq!(
+        statuses(&reps),
+        vec![ExecStatus::New.as_u8(), ExecStatus::Partial.as_u8(), ExecStatus::Canceled.as_u8()]
+    );
+    assert_eq!((reps[1].filled_qty, reps[1].fill_price_ticks), (100, 2453));
+    let reps = v.submit(&order(3, 0, 100, 0, OrderType::Market)).unwrap();
     assert_eq!(statuses(&reps), vec![ExecStatus::New.as_u8(), ExecStatus::Canceled.as_u8()]);
     // buy 10_000 on a fresh venue: exhausts the ask side (600), remainder canceled
     let mut v = venue_with_book();
@@ -151,7 +158,7 @@ fn limit_order_fills_marketable_part_and_rests() {
 #[test]
 fn resting_order_pays_down_its_queue_before_filling() {
     let mut v = venue_with_book();
-    // buy 50 @ 2450 behind the displayed 300 (orders 11 and 12)
+    // buy 50 @ 2450 behind the displayed 300 (order 11; order 12 rests at 2449)
     let reps = v.submit(&order(1, 0, 50, 2450, OrderType::Limit)).unwrap();
     assert_eq!(statuses(&reps), vec![ExecStatus::New.as_u8()]);
     assert_eq!(v.queue_position(1).unwrap().ahead_qty, 300);
@@ -162,12 +169,15 @@ fn resting_order_pays_down_its_queue_before_filling() {
     // an execution of 100 at our level pays our queue down, no fill
     assert!(v.on_market_event(&execute(7, 0, 2450, 100, 11)).unwrap().is_empty());
     assert_eq!(v.queue_position(1).unwrap().ahead_qty, 200);
-    // a cancel of the order ahead of us credits the displayed size removed
-    assert!(v.on_market_event(&cancel(8, 0, 2450, 12)).unwrap().is_empty());
+    // a cancel at another level moves nothing; a cancel of the order ahead
+    // of us credits the displayed size it removed from our level
+    assert!(v.on_market_event(&cancel(8, 0, 2449, 12)).unwrap().is_empty());
+    assert_eq!(v.queue_position(1).unwrap().ahead_qty, 200);
+    assert!(v.on_market_event(&cancel(9, 0, 2450, 11)).unwrap().is_empty());
     assert_eq!(v.queue_position(1).unwrap().ahead_qty, 0);
     // the next execution at (or through) our level is ours
-    assert!(v.on_market_event(&add(9, 0, 2450, 80, 16)).unwrap().is_empty());
-    let fills = v.on_market_event(&execute(10, 0, 2450, 80, 16)).unwrap();
+    assert!(v.on_market_event(&add(10, 0, 2450, 80, 16)).unwrap().is_empty());
+    let fills = v.on_market_event(&execute(11, 0, 2450, 80, 16)).unwrap();
     assert_eq!(fills.len(), 1);
     assert_eq!((fills[0].filled_qty, fills[0].fill_price_ticks), (50, 2450));
     assert_eq!(fills[0].status, ExecStatus::Filled.as_u8());
