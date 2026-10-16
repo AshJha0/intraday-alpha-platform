@@ -8,6 +8,14 @@ that tag.
 
 ## Unreleased
 
+- v1.17 A4 fix 2: the TOPS oracle quotes the **cumulative** round lot: per side the first price
+  at which the displayed quantity accumulated from the top reaches the round lot, with that
+  cumulative size (odd lots at better prices fold in). On 2025-11-28 the best-round-lot-level
+  rule of the previous fix still diverged (AAPL 56,540 of 434,022: the level held 100, TOPS said
+  102); the cumulative rule matched 113,807 of 113,807 sampled quotes (first 15 M DEEP+
+  messages, AAPL / MSFT / QQQ). Oracle label `tops_quote_equals_deep_cumulative_round_lot`;
+  unit test from the 09:19:58.6 case.
+
 - v1.17 WS-F item F7, part 1: hand-written C++ parity ports of the execution rules already on
   main (no translation tools), one commit per rule, next to `SmartOrderRouter` and the execution
   simulator in `cpp/`: `sor/sor_v2.hpp` (`CostAwareRouter::plan_sweep` all-in / price ranking,
