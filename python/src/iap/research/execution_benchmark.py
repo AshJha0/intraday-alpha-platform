@@ -793,6 +793,7 @@ def run_benchmark(
     cal_docs = None if venue_calibration is None else load_calibrations(venue_calibration)
     router = None
     router_fp = None
+    sweep_router = None
     if "sor" in routes_used:
         router, router_fp = router_from_calibrations(
             cfg.venues,
@@ -801,6 +802,19 @@ def run_benchmark(
             fill_horizon_s=router_fill_horizon_s,
             sor_options=sor,
         )
+    if "sor_sweep" in routes_used:
+        # v1.17.1: the same router with an all-in sweep over the walk depth
+        sweep_router, sweep_fp = router_from_calibrations(
+            cfg.venues,
+            cal_docs,
+            tox_horizon=router_tox_horizon,
+            fill_horizon_s=router_fill_horizon_s,
+            sor_options=sor,
+            sweep_rank="all_in",
+            sweep_levels=walk_depth_levels,
+        )
+        if router is None:
+            router, router_fp = sweep_router, sweep_fp
     lit_venues = sorted(v for v, s in cfg.venues.items() if s.is_lit)
     if not lit_venues:
         raise SystemExit("the venue table has no lit venue")
@@ -927,6 +941,7 @@ def run_benchmark(
     pull_lost: dict[str, int] = {p: 0 for p in policies}
     mk_rows_of: dict[str, list[dict]] = {p: [] for p in policies}
     venue_rows_of: dict[str, dict[str, list[dict]]] = {}
+    sweep_unsent: dict[str, int] = {}
     session_labels: list[str] = []
     n_events = 0
     source = None
@@ -1069,6 +1084,16 @@ def run_benchmark(
                     res = ExecutionReplay(
                         cfg, worked, sor, router=router, router_fill_prob=router_fp
                     ).run(evs)
+                elif route == "sor_sweep":
+                    res = ExecutionReplay(
+                        cfg,
+                        worked,
+                        sor,
+                        router=sweep_router,
+                        router_fill_prob=router_fp,
+                        router_sweep=True,
+                    ).run(evs)
+                    sweep_unsent[pol] = sweep_unsent.get(pol, 0) + res.sweep_unsent_qty
                 else:
                     res = ExecutionReplay(cfg, worked, sor).run(evs)
                 fills_of: dict[int, list] = {p.parent_id: [] for p in worked}
@@ -1301,6 +1326,9 @@ def run_benchmark(
             baseline_policy=baseline_policy,
             seed=seed,
         )
+        if sweep_unsent:
+            # v1.17.1 sor_sweep: child qty beyond both books' displayed depth (not sent)
+            doc["two_venue"]["sweep_unsent_qty"] = dict(sorted(sweep_unsent.items()))
     if timestamp:
         doc["generated"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     return doc

@@ -326,6 +326,18 @@ def test_paired_router_vs_pinned(pair, tmp_path):
     assert "Two venues: router vs pinned (v1.17 B8)" in md
 
 
+def test_sor_sweep_pairs_with_pinned(pair, tmp_path):
+    """v1.17.1: ``sor_sweep`` (plan_sweep across both books) runs on the
+    same parents as the pinned and single-venue routes."""
+    doc = _run(pair, tmp_path, ["--policies", "pin_nasdaq,sor,sor_sweep"])
+    t = doc["two_venue"]
+    assert t["routes"] == {"pin_nasdaq": "XNAS", "sor": None, "sor_sweep": None}
+    n = doc["n_parents"]
+    assert n["sor_sweep"] == n["sor"] == n["pin_nasdaq"] > 0
+    assert any(k.startswith("sor_sweep-pin_nasdaq|") for k in doc["paired_vs_baseline"])
+    assert set(t["venue_split"]["sor_sweep"]["venue_qty"]) <= {"XNAS", "IEXG"}
+
+
 def test_paired_benchmark_is_deterministic(pair, tmp_path):
     a = _run(pair, tmp_path / "a")
     b = _run(pair, tmp_path / "b")

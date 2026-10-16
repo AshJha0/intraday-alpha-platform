@@ -216,6 +216,8 @@ class ExecReplayResult:
     parents: dict[int, ParentReport] = field(default_factory=dict)
     events_processed: int = 0
     sor_no_route: int = 0  #: children not submitted: no eligible venue
+    #: v1.17.1 B8 ``router_sweep``: child qty beyond every venue's displayed depth (not sent)
+    sweep_unsent_qty: int = 0
     #: PASSIVE transition counters, one row per PASSIVE parent (parent_id order).
     passive: dict[int, PassiveStats] = field(default_factory=dict)
     #: every submitted child in its final state, by parent_id, submission order.
@@ -323,6 +325,7 @@ class ExecutionReplay:
         *,
         router: CostAwareRouter | None = None,
         router_fill_prob: FillProb | None = None,
+        router_sweep: bool = False,
     ) -> None:
         self._config = config
         self._sim = ExecutionSimulator(config)
@@ -331,6 +334,15 @@ class ExecutionReplay:
         # cost-aware router (sor_v2) instead of the pinned one; None = unchanged.
         self._router = router
         self._router_fill_prob = router_fill_prob
+        # v1.17.1 B8 (opt-in, needs ``router``): a marketable unpinned child is
+        # split by ``router.plan_sweep`` across every lit venue's displayed
+        # depth, one IOC LIMIT per venue capped at the qty planned there (its
+        # limit = the deepest planned level); qty beyond the displayed depth
+        # of all venues is not sent (``sweep_unsent_qty``). False = unchanged.
+        if router_sweep and router is None:
+            raise ValueError("router_sweep needs a router")
+        self._router_sweep = router_sweep
+        self._sweep_unsent_qty = 0
         # v1.17 B10: a dark / midpoint venue has no displayed book and is
         # never a candidate of the pinned router (no config has one unless
         # a caller opted in, so the candidate list of every golden is unchanged).
@@ -684,6 +696,8 @@ class ExecutionReplay:
             return True
         p = ps.order
         book = self._sim.instrument_book(p.instrument_id)
+        if not passive and p.venue_id == 0 and self._router_sweep:
+            return self._issue_sweep(ps, child_qty, decision_ts)
         if p.venue_id != 0:
             venue_id = p.venue_id
         elif self._router is not None:
@@ -733,6 +747,44 @@ class ExecutionReplay:
         oid = self._sim.submit(child)
         ps.child_ids.append(oid)
         ps.open_child_ids.append(oid)
+        return True
+
+    def _issue_sweep(self, ps: _ParentState, child_qty: int, decision_ts: int) -> bool:
+        """v1.17.1 B8 ``sor_sweep``: one IOC LIMIT per venue from ``plan_sweep``
+        (``__init__``); False when no venue shows opposite-side depth."""
+        p = ps.order
+        assert self._router is not None
+        book = self._sim.instrument_book(p.instrument_id)
+        tick = self._config.instrument(p.instrument_id).tick_size
+        plan = self._router.plan_sweep(
+            book, p.side, child_qty, decision_ts, candidates=self._sor_candidates, tick=tick
+        )
+        if not plan:
+            self._sor_no_route += 1
+            return False
+        per_venue: dict[int, list[int]] = {}
+        for c in plan:
+            q_px = per_venue.setdefault(c.venue_id, [0, c.price_ticks])
+            q_px[0] += c.qty
+            # the deepest planned level on the venue (worst price for us)
+            q_px[1] = max(q_px[1], c.price_ticks) if p.side == 0 else min(q_px[1], c.price_ticks)
+        self._sweep_unsent_qty += child_qty - sum(q for q, _ in per_venue.values())
+        for vid, (q, px) in sorted(per_venue.items()):
+            oid = self._sim.submit(
+                ChildOrder(
+                    parent_id=p.parent_id,
+                    instrument_id=p.instrument_id,
+                    venue_id=vid,
+                    side=p.side,
+                    type=OrderType.IOC,
+                    limit_ticks=px,
+                    qty=q,
+                    decision_ts=decision_ts,
+                    expire_ts=p.end_ts,
+                )
+            )
+            ps.child_ids.append(oid)
+            ps.open_child_ids.append(oid)
         return True
 
     def _issue_slice(
@@ -1362,6 +1414,7 @@ class ExecutionReplay:
             # modelled dark fills merged by time; the lit order is unchanged
             res.fills = sorted(res.fills + self._dark_fills, key=lambda f: (f.ts, f.fill_id))
         res.sor_no_route = self._sor_no_route
+        res.sweep_unsent_qty = self._sweep_unsent_qty
         res.pulls = list(self._pulls)
         fills_of: dict[int, list[Fill]] = {}
         for f in res.fills:

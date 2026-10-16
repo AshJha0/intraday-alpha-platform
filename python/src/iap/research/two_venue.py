@@ -97,6 +97,9 @@ ALIGNMENT_RULE = (
 #: benchmark policy -> venue name it is pinned to (``None`` = the sor_v2 router)
 ROUTE_POLICIES: dict[str, str | None] = {
     "sor": None,
+    #: v1.17.1: the same router, marketable children swept across both books'
+    #: displayed depth (``plan_sweep``, all-in rank) instead of one venue each
+    "sor_sweep": None,
     "pin_nasdaq": NASDAQ_VENUE,
     "pin_iex": IEX_VENUE,
 }
@@ -472,12 +475,16 @@ def router_from_calibrations(
     tox_horizon: str = "1s",
     fill_horizon_s: float = DEFAULT_FILL_HORIZON_S,
     sor_options=None,
+    sweep_rank: str = "price",
+    sweep_levels: int = 10,
 ) -> tuple[CostAwareRouter, FillProb | None]:
     """The ``sor`` policy's router: one :class:`VenueModel` per lit venue
     (``p_fill_touch`` and ``toxicity_bps`` from its calibration; the
     VenueModel defaults without one) and, when calibrated, the queue-aware
     ``fill_prob`` = :func:`hazard_fill_prob` over each venue's EXECUTION
-    depletion hazard (X-4)."""
+    depletion hazard (X-4). ``sweep_rank`` / ``sweep_levels`` set the
+    router's :meth:`~CostAwareRouter.plan_sweep` (``sor_sweep`` passes
+    ``"all_in"`` and the walk depth); the defaults leave ``sor`` unchanged."""
     models: dict[int, VenueModel] = {}
     for vid, spec in sorted(venues.items()):
         if not spec.is_lit:
@@ -492,7 +499,11 @@ def router_from_calibrations(
             p_fill_touch=0.5 if p is None else float(p),
             toxicity_bps={k: float(v) for k, v in sorted(doc["toxicity"]["toxicity_bps"].items())},
         )
-    router = CostAwareRouter(models, RouterOptions(tox_horizon=tox_horizon), sor_options)
+    router = CostAwareRouter(
+        models,
+        RouterOptions(tox_horizon=tox_horizon, sweep_rank=sweep_rank, sweep_levels=sweep_levels),
+        sor_options,
+    )
     if not docs:
         return router, None
     edges = {
