@@ -220,5 +220,6 @@ def test_all_in_identity_per_parent(dataset):
 def test_committed_prereg_draft_is_unsigned():
     draft = json.loads((REPO / "research/execution/benchmark/prereg_DRAFT.json").read_text())
     assert draft["signed"] is False and draft["on_blackboard"] is False
-    assert "DRAFT" in draft["status"]
+    # B7 was closed on its in-sample result (2026-10-16): the draft is the record, never signed
+    assert "DRAFT" in draft["status"] or "CLOSED" in draft["status"]
     assert draft["grid"]["sizes_pct_adv"] == [0.1, 0.5, 1.0, 2.0]

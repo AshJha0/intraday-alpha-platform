@@ -98,9 +98,10 @@ negative ones first, is written down with the artefact that produced it.
   no digest-pinned k8s manifests; fixed by PR #211, ships with v1.17.1.
 <!-- source: CHANGELOG.md "## v1.17.0"; docs/release/v1.17.0_RELEASE_NOTES.md -->
 
-**Next: v1.17.1.** B7 (signal-aware execution) and B8 (two-venue router)
-real-data results, the remaining 8 IEX overlap days, and the #211
-manifest/SBOM/digest-pinning fix.
+**Next: v1.17.1.** B8 (two-venue router) real-data results, the remaining
+8 IEX overlap days, and the #211 manifest/SBOM/digest-pinning fix. B7
+(signal-aware execution) was closed on 2026-10-16 on its in-sample result,
+no fresh test (research/preregs/B7_CLOSED_v117.md).
 
 ## Numbers a CI check re-derives
 

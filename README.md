@@ -111,9 +111,10 @@ in v1.15 (predictive, not tradable at 1x cost;
 quoting or DeepLOB edge; v1.17 adds the screen and breadth results above
 ([docs/REAL_DATA.md](docs/REAL_DATA.md) §3, [LEARN.md](LEARN.md) §31-§44).
 
-**Next: v1.17.1.** The B7 (fresh test of signal-aware execution) and B8 (two-venue router on
-real Nasdaq + IEX books) real-data results, from the eight remaining IEX overlap days; the
-release manifest, lock-file SBOMs and digest pinning (#211). Beyond that (v1.18): the C++
+**Next: v1.17.1.** The B8 (two-venue router on real Nasdaq + IEX books) real-data
+results from the eight remaining IEX overlap days; the release manifest, lock-file SBOMs and
+digest pinning (#211). B7 (signal-aware execution) was **closed on 2026-10-16 on its in-sample
+result**, no fresh test ([research/preregs/B7_CLOSED_v117.md](research/preregs/B7_CLOSED_v117.md)). Beyond that (v1.18): the C++
 ports not done in v1.17 (the B2-regime arm of dark eligibility, the B10 proxy sampler and fit,
 the exchange-local hazard clock; PLATFORM_CONVENTIONS.md §11.3). Plan:
 [docs/ROADMAP.md](docs/ROADMAP.md).

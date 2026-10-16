@@ -79,7 +79,13 @@ The tool exits with an error, and writes nothing, in any of these cases:
 - the screen's sha256 differs from the pinned value
 - the output file already exists
 
-## B7 shortfall gate: signal-aware vs plain execution (v1.17.1)
+## B7 shortfall gate: signal-aware vs plain execution (SUPERSEDED 2026-10-16)
+
+> **Superseded.** B7 was closed on its in-sample result on 2026-10-16
+> (`research/preregs/B7_CLOSED_v117.md`): the draft carries status CLOSED, nothing was
+> registered or signed, the nine overlap days were not read. `tools/b7_shortfall_register.py`
+> refuses the CLOSED draft. The steps below are kept as the procedure a NEW B7 draft would
+> follow; they do not apply to the closed one.
 
 The draft is `research/execution/benchmark/prereg_DRAFT.json` (the B1 grid, the owner's
 2026-10-15 decisions, the B2/B3 signal arm, walk depth 50, the fresh-test day list and the

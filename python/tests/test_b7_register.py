@@ -23,7 +23,8 @@ def _root(tmp_path: Path, **patch) -> Path:
     (root / "configs/prereg").mkdir(parents=True)
     shutil.copy(REPO / "configs/prereg/v2.json", root / "configs/prereg/v2.json")
     doc = json.loads((REPO / reg.DRAFT).read_text(encoding="utf-8"))
-    doc.update(patch)
+    if patch:  # a patched draft replaces the committed one (no closure block carried over)
+        doc = dict(patch)
     (root / reg.DRAFT).write_text(json.dumps(doc), encoding="utf-8")
     return root
 
@@ -56,13 +57,26 @@ def _complete(doc: dict) -> dict:
     }
     doc["signed"] = False
     doc["status"] = "DRAFT - complete, awaiting the owner's signature"
+    doc.pop("closed", None)  # a reopened B7 would be a NEW draft without the closure
     return doc
 
 
-def test_committed_draft_is_unsigned_and_the_tool_refuses_it(tmp_path):
+def test_committed_draft_is_closed_and_the_tool_refuses_it_outright(tmp_path):
     doc = json.loads((REPO / reg.DRAFT).read_text(encoding="utf-8"))
-    assert doc["signed"] is False and "DRAFT" in doc["status"]
-    root = _root(tmp_path)
+    assert "CLOSED" in doc["status"] and doc["signed"] is False
+    assert doc["on_blackboard"] is False and doc["closed"]["fresh_days_read"] is False
+    assert (REPO / "research/preregs/B7_CLOSED_v117.md").exists()
+    with pytest.raises(SystemExit, match="CLOSED"):
+        reg.checks(_root(tmp_path))
+    with pytest.raises(SystemExit, match="CLOSED"):
+        reg.main([str(_root(tmp_path / "b")), "--dry-run"])
+
+
+def test_an_open_but_incomplete_draft_is_refused_as_incomplete(tmp_path):
+    doc = json.loads((REPO / reg.DRAFT).read_text(encoding="utf-8"))
+    doc.pop("closed", None)
+    doc["status"] = "DRAFT - not signed"
+    root = _root(tmp_path, **doc)
     with pytest.raises(SystemExit, match="incomplete"):
         reg.checks(root)
 

@@ -5,8 +5,11 @@ Run by the OWNER (human sign-off), never by an agent::
     python tools/b7_shortfall_register.py <repo_root> [--dry-run] [--require-ci-env]
 
 The draft is research/execution/benchmark/prereg_DRAFT.json (the B1 driver's
-grid plus the owner's decisions and the B2/B3 signal arm). The tool refuses
-to do anything unless the draft is COMPLETE:
+grid plus the owner's decisions and the B2/B3 signal arm). **B7 was CLOSED
+on 2026-10-16 on its in-sample result** (research/preregs/B7_CLOSED_v117.md):
+the draft carries status CLOSED and this tool refuses it outright; reopening
+B7 needs a new draft and a new signature. For a draft that is not closed, the
+tool refuses to do anything unless it is COMPLETE:
 
 - ``status`` still says DRAFT, ``signed`` is false and the output record
   does not exist;
@@ -83,6 +86,12 @@ def checks(root: Path) -> tuple[dict, str]:
     draft = root / DRAFT
     doc = json.loads(draft.read_text(encoding="utf-8"))
     problems: list[str] = []
+    if "CLOSED" in str(doc.get("status", "")).upper() or doc.get("closed"):
+        rec = (doc.get("closed") or {}).get("record", "research/preregs/B7_CLOSED_v117.md")
+        raise SystemExit(
+            f"{LABEL}: the draft is CLOSED ({rec}); B7 was closed on its in-sample result and "
+            "is not registered. Reopening needs a NEW draft and a new owner signature."
+        )
     if doc.get("signed") or "DRAFT" not in str(doc.get("status", "")):
         problems.append("draft is already signed or its status is not DRAFT")
     if (root / OUT).exists():

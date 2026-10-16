@@ -1,4 +1,10 @@
 {
+  "closed": {
+    "date": "2026-10-16",
+    "decided_by": "owner (AshJha0)",
+    "fresh_days_read": false,
+    "record": "research/preregs/B7_CLOSED_v117.md"
+  },
   "command": "python -m iap.research.execution_benchmark --data-dir data/real/multi7 --out research/execution/benchmark --tag multi7_signal --walk-depth 50 --window-min 30 --signal EQ10 --policies native,native+urgency,native+pacing,native+ac,native+ac_drift",
   "decisions": "owner 2026-10-15: 30-min windows, 2 bp minimum effect, 2 pp fill-rate tolerance, Holm over algos, depth-exhausted eligibility rule, v2 realism + parent impact for the signed run",
   "drafted": "2026-10-15",
@@ -199,7 +205,7 @@
   ],
   "on_blackboard": false,
   "primary_metric": "all_in bps per parent (shortfall + fees_net + sim_impact + completion), labelled replay + linear child adder (rule 6)",
-  "registration_tool": "tools/b7_shortfall_register.py <root> --dry-run --require-ci-env (owner only; refuses until every field above is filled)",
+  "registration_tool": "tools/b7_shortfall_register.py refuses a CLOSED draft; a new draft and signature are needed to reopen B7",
   "schema": "iap.execution_benchmark_prereg/v1",
   "signal_arm": {
     "ac_drift": "IS cells only: native+ac_drift vs native+ac (plain Almgren-Chriss, sigma = price * 0.015 per sqrt(day), eta from the simulator slope, lambda 1e-6)",
@@ -223,6 +229,6 @@
     "walk_depth_levels": 50
   },
   "source": "IAP_v1.17_Plan.md section 6, items B1 and B7",
-  "status": "DRAFT - not signed, not on the blackboard, not approved for any fresh-day run (v1.17.1 B7 scope)",
+  "status": "CLOSED 2026-10-16 on the in-sample result (research/preregs/B7_CLOSED_v117.md): not signed, not registered, not on the blackboard, no fresh day read; kept as the record",
   "walk_depth_split": "ExecConfig.walk_depth_levels governs OUR aggressive children only; the market's marketable-ADD expansion keeps the book's fixed DEPTH_LEVELS (the venue's matching, pinned by the passive goldens)"
 }

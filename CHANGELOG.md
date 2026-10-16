@@ -8,6 +8,16 @@ that tag.
 
 ## Unreleased
 
+- v1.17.1 B7 CLOSED (owner decision 2026-10-16, `research/preregs/B7_CLOSED_v117.md`): the
+  signal-aware execution gate is not signed, not registered and not run on the fresh days; the
+  nine Nasdaq / IEX overlap days stay unread by B7 and available to B8. Basis: the multi7
+  in-sample run (no cell cheaper by the 2 bp minimum; urgency dearer on TWAP / VWAP at 1-2 % ADV;
+  the registered EQ10 sign opposite its real IC; AC drift inert; `no_signal` 21-33 % on QQQ).
+  `prereg_DRAFT.json` carries status CLOSED as the record and `tools/b7_shortfall_register.py`
+  refuses it; the runbook section is marked superseded; README, the site, ROADMAP,
+  EXECUTION_QUALITY §6.2 and SHOWCASE no longer announce a B7 fresh test for v1.17.1 (the tagged
+  v1.17.0 notes get a dated one-line update only).
+
 - v1.17.1 B7 preparation: `tools/b7_shortfall_register.py` (owner-only registration of the
   shortfall gate through `WriteBroker.preregister`, `--dry-run` / `--require-ci-env`, refuses until
   the draft is complete: filled `expected_effect`, decided alpha and thresholds, walk depth 50, the
