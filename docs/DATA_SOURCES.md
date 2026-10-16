@@ -139,14 +139,14 @@ docs/research/IEX_OVERLAP_SET.md as the detached chain finishes the day.
 | date | Nasdaq dataset | TOPS gz | DEEP+ gz | DEEP gz (not downloaded) | state |
 |---|---|---|---|---|---|
 | 2025-11-28 | r7_20251128 | 4.37 GB | 4.31 GB | 4.60 GB | done 2026-10-16: oracle match 435,973 / 72,883 / 998,642 compared, 0 mismatched; 0.325 GB kept (IAP1 + Parquet + features); captures deleted |
-| 2025-12-08 | r7_20251208 | 9.30 GB | 8.99 GB | 9.43 GB | not yet processed in a committed artefact as of 2026-10-16; v1.17.1 (docs/research/IEX_OVERLAP_SET.md) |
-| 2025-12-09 | r7_20251209 | 8.61 GB | 8.43 GB | 8.89 GB | not yet processed in a committed artefact as of 2026-10-16; v1.17.1 (docs/research/IEX_OVERLAP_SET.md) |
-| 2025-12-10 | r7_20251210 | 12.29 GB | 11.45 GB | 11.74 GB | not yet processed in a committed artefact as of 2026-10-16; v1.17.1 (docs/research/IEX_OVERLAP_SET.md) |
-| 2025-12-11 | r7_20251211 | 11.15 GB | 10.55 GB | 11.00 GB | not yet processed in a committed artefact as of 2026-10-16; v1.17.1 (docs/research/IEX_OVERLAP_SET.md) |
-| 2025-12-12 | r7_20251212 | 13.67 GB | 12.71 GB | 12.98 GB | not yet processed in a committed artefact as of 2026-10-16; v1.17.1 (docs/research/IEX_OVERLAP_SET.md) |
-| 2026-05-15 | holdout2026 | 12.15 GB | 11.91 GB | 12.60 GB | not yet processed in a committed artefact as of 2026-10-16; v1.17.1 (docs/research/IEX_OVERLAP_SET.md) |
-| 2026-05-18 | holdout2026 | 14.87 GB | 14.21 GB | 14.90 GB | not yet processed in a committed artefact as of 2026-10-16; v1.17.1 (docs/research/IEX_OVERLAP_SET.md) |
-| 2026-06-12 | r7_20260612 | 15.62 GB | 14.69 GB | 15.33 GB | not yet processed in a committed artefact as of 2026-10-16; v1.17.1 (docs/research/IEX_OVERLAP_SET.md) |
+| 2025-12-08 | r7_20251208 | 9.30 GB | 8.99 GB | 9.43 GB | done 2026-10-16: oracle match 832,770 / 152,908 / 3,496,249 compared, 0 mismatched; 0.671 GB kept; captures deleted |
+| 2025-12-09 | r7_20251209 | 8.61 GB | 8.43 GB | 8.89 GB | done 2026-10-16: oracle match 711,762 / 101,120 / 3,045,150 compared, 0 mismatched; 0.706 GB kept; captures deleted |
+| 2025-12-10 | r7_20251210 | 12.29 GB | 11.45 GB | 11.74 GB | chain: running |
+| 2025-12-11 | r7_20251211 | 11.15 GB | 10.55 GB | 11.00 GB | queued |
+| 2025-12-12 | r7_20251212 | 13.67 GB | 12.71 GB | 12.98 GB | queued |
+| 2026-05-15 | holdout2026 | 12.15 GB | 11.91 GB | 12.60 GB | queued |
+| 2026-05-18 | holdout2026 | 14.87 GB | 14.21 GB | 14.90 GB | queued |
+| 2026-06-12 | r7_20260612 | 15.62 GB | 14.69 GB | 15.33 GB | queued |
 
 The rolling "recent IEX days" list (`tools/iex_hist.py recent --n 5`: the
 latest five HIST days with TOPS and DEEP+, `research/v117/iex_recent_manifest.json`)
