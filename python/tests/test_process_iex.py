@@ -226,11 +226,19 @@ def test_process_iex_day_runs_the_chain_and_keeps_features_and_hashes(tmp_path):
     keep = json.loads((ds / pix.KEEP_NAME).read_text())
     assert "dataset.json" in keep["files"] and "features/features_1.parquet" in keep["files"]
     assert pix.verify_keep(ds) == []
-    # both captures, the extract, raw and normalized data are gone; the QC report stays
+    # both captures, the extract and raw are gone; the QC report stays; with the
+    # default --keep-normalized the IAP1 and Parquet stay too and are in KEEP.json
     assert not tops.exists() and not book.exists()
     assert not list((ds.parent / "iex_20251128.markers").glob("*.tops.json.gz"))
-    assert not (ds / "raw").exists() and not list((ds / "normalized").glob("*.normalized.*"))
+    assert not (ds / "raw").exists()
     assert (ds / "normalized" / "qc_report.json").is_file()
+    iap1 = sorted((ds / "normalized").glob("*.normalized.iap1"))
+    assert iap1 and not list((ds / "normalized").glob("*.normalized.jsonl"))
+    assert all(f"normalized/{q.name}" in keep["files"] for q in iap1)
+    assert keep["kept_normalized"] is True and "raw" in keep["deleted"]
+    last = rep["steps"][-1]
+    assert last["kept_normalized"] is True and last["kept_normalized_gb"] >= 0
+    assert last["kept_dataset_gb"] >= last["kept_normalized_gb"]
     assert (ds.parent / "iex_20251128.markers" / "_DONE_ALL").is_file()
     report = json.loads((ds / "process_report.json").read_text())
     assert report["approval"] == APPROVAL and report["free_gb_min_seen"] > 0
@@ -251,6 +259,69 @@ def test_process_iex_day_runs_the_chain_and_keeps_features_and_hashes(tmp_path):
         run=_features_fake,
     )
     assert all(s["status"].startswith("skipped") for s in rep2["steps"])
+
+
+def test_delete_normalized_removes_the_iap1_and_parquet(tmp_path):
+    vendor, _tops, _book = _vendor(tmp_path)
+    man = _manifest(tmp_path, vendor)
+    out_root = tmp_path / "iex"
+    rep = pix.process_iex_day(
+        man,
+        DATE,
+        vendor,
+        out_root,
+        SYMS,
+        configs_dir=CONFIGS_DIR,
+        partition_instruments=1,
+        min_free_gb=0.0,
+        keep_normalized=False,
+        log=lambda _l: None,
+        run=_features_fake,
+    )
+    ds = out_root / "iex_20251128"
+    assert not list((ds / "normalized").glob("*.normalized.*"))
+    assert not list((ds / "normalized").glob("*.parquet"))
+    keep = json.loads((ds / pix.KEEP_NAME).read_text())
+    assert "kept_normalized" not in keep and not any(k.endswith(".iap1") for k in keep["files"])
+    assert rep["steps"][-1]["kept_normalized"] is False
+    assert rep["steps"][-1]["kept_normalized_gb"] == 0
+    # the wrapper carries the opt-out, never the default
+    cmd = tmp_path / "x.cmd"
+    pix.main(
+        [
+            "--manifest",
+            "m",
+            "--date",
+            DATE,
+            "--vendor-dir",
+            "v",
+            "--out-root",
+            "o",
+            "--symbols",
+            "AAPL",
+            "--delete-normalized",
+            "--render-cmd",
+            str(cmd),
+        ]
+    )
+    assert "--delete-normalized" in cmd.read_bytes().decode("ascii")
+    pix.main(
+        [
+            "--manifest",
+            "m",
+            "--date",
+            DATE,
+            "--vendor-dir",
+            "v",
+            "--out-root",
+            "o",
+            "--symbols",
+            "AAPL",
+            "--render-cmd",
+            str(cmd),
+        ]
+    )
+    assert "--delete-normalized" not in cmd.read_bytes().decode("ascii")
 
 
 def test_divergent_tops_refuses_the_ingest_unless_allowed(tmp_path):

@@ -8,6 +8,12 @@ that tag.
 
 ## Unreleased
 
+- v1.17 A4: `process-iex-day --keep-normalized` (default; `--delete-normalized` opts out) keeps
+  the IEX day's `normalized/*.iap1` and Parquet after the feature build and hashes them into
+  `KEEP.json` (the owner's A6 rule: IAP1 + Parquet + features + manifests stay, raw and the
+  `*.normalized.jsonl` twin go), so the two-venue router (B8) can replay both venues of an
+  overlap day; `process_report.json` records `kept_normalized_gb` and `kept_dataset_gb`.
+
 - v1.17 WS-F item F7, part 2: C++ port of the B10 dark / midpoint venue model and the
   dark-first replay rule, next to the simulator and router in `cpp/`: `VenueSpec::venue_type`
   (`venues.json` `"venue_type"`), `execution/dark.hpp` (`sigmoid`, `dark_features`,
