@@ -13,8 +13,12 @@ that tag.
   the draft is complete: filled `expected_effect`, decided alpha and thresholds, walk depth 50, the
   fresh-day list with both dataset hashes, the v2 fingerprint), the B7 section of
   RUNBOOK_prereg_environment.md, `python/tests/test_b7_register.py`; `prereg_DRAFT.json` records
-  walk depth 50 and the nine overlap days (IEX hashes filled as the days are ingested). The multi7
-  in-sample signal-aware run (EQ10, depth 50) and its `expected_effect` follow in this branch.
+  walk depth 50 and the nine overlap days (IEX hashes filled as the days are ingested), and the
+  in-sample `expected_effect` from the multi7 signal-aware run (EQ10 registered, depth 50, 30-min
+  windows; `BENCHMARK_multi7_signal.md` + `_PROVENANCE.md`): NEGATIVE in-sample — no cell cheaper
+  by the 2 bp minimum; urgency makes TWAP/VWAP dearer at 1-2 % ADV (+1.7 / +2.0 ± 0.5 bps) while
+  filling 6-10 pp more, IS -0.2 to -0.6 bps (n.s.), pacing within ±1 bp, the AC drift arm inert at
+  the registered beta (0.00 vs plain AC). Unsigned; the alpha and thresholds stay the owner's call.
 
 - v1.17 B8 first real-book run (2 overlap days, AAPL + MSFT; `research/execution/b8/REPORT_overlap2.md`):
   NEGATIVE: `sor` +5.1 ± 1.3 bps all-in and -8 pp fill vs pinned Nasdaq, pinned IEX +11.6 ± 0.6 bps;

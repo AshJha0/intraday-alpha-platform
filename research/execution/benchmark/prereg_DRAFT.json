@@ -2,7 +2,52 @@
   "command": "python -m iap.research.execution_benchmark --data-dir data/real/multi7 --out research/execution/benchmark --tag multi7_signal --walk-depth 50 --window-min 30 --signal EQ10 --policies native,native+urgency,native+pacing,native+ac,native+ac_drift",
   "decisions": "owner 2026-10-15: 30-min windows, 2 bp minimum effect, 2 pp fill-rate tolerance, Holm over algos, depth-exhausted eligibility rule, v2 realism + parent impact for the signed run",
   "drafted": "2026-10-15",
-  "expected_effect": "to be filled from the multi7 in-sample run (B2/B3 session, 2026-10-15): paired signal-aware minus plain all_in bps per cell with day-clustered CIs; see research/execution/benchmark/BENCHMARK_multi7_signal.md",
+  "expected_effect": {
+    "ac_drift_vs_ac": {
+      "IS|0.1": "+0.00 bps \u00b1 0.00 [-0.00, 0.00]",
+      "IS|0.5": "+0.00 bps \u00b1 0.00 [-0.00, 0.00]",
+      "IS|1": "+0.00 bps \u00b1 0.00 [-0.00, 0.00]",
+      "IS|2": "+0.00 bps \u00b1 0.00 [-0.00, 0.00]"
+    },
+    "basis": "multi7 in-sample (7 sessions 2019-20, AAPL/MSFT/QQQ), EQ10 registered params (beta < 0, synthetic fit), walk depth 50, 30-min windows, 5 slices, POV 10 %, threshold_z 1.0, passive_urgency 0.1, gain 0.5; paired per parent, day-clustered (7 clusters), all_in bps signal-aware minus plain; research/execution/benchmark/BENCHMARK_multi7_signal.md, code at 73f3ddb (v1.17.0)",
+    "pacing_vs_native": {
+      "IS|0.1": "+0.58 bps \u00b1 0.59 [-1.31, 2.47]",
+      "IS|0.5": "+0.84 bps \u00b1 0.40 [-0.13, 1.81]",
+      "IS|1": "+0.12 bps \u00b1 0.28 [-0.58, 0.82]",
+      "IS|2": "+0.20 bps \u00b1 0.22 [-0.75, 1.15]",
+      "POV|0.1": "-0.18 bps \u00b1 0.21 [-1.07, 0.72]",
+      "POV|0.5": "-0.07 bps \u00b1 0.08 [-0.28, 0.13]",
+      "POV|1": "+0.41 bps \u00b1 0.36 [-0.48, 1.30]",
+      "POV|2": "+0.03 bps \u00b1 0.08 [-0.23, 0.29]",
+      "TWAP|0.1": "+0.51 bps \u00b1 0.28 [-0.68, 1.71]",
+      "TWAP|0.5": "+0.34 bps \u00b1 0.56 [-1.20, 1.88]",
+      "TWAP|1": "+0.89 bps \u00b1 0.55 [-0.45, 2.23]",
+      "TWAP|2": "-0.12 bps \u00b1 0.07 [-0.30, 0.06]",
+      "VWAP|0.1": "+1.68 bps \u00b1 1.75 [-5.85, 9.21]",
+      "VWAP|0.5": "+0.78 bps \u00b1 0.29 [0.02, 1.53]",
+      "VWAP|1": "+0.26 bps \u00b1 0.24 [-0.32, 0.84]",
+      "VWAP|2": "-0.18 bps \u00b1 0.20 [-0.74, 0.39]"
+    },
+    "reading": "No cell reaches the 2 bp minimum effect in the cheaper direction. Urgency: IS -0.2 to -0.6 bps (n.s.), POV within 0.1 bps, TWAP/VWAP DEARER at 1-2 % ADV (+1.7 \u00b1 0.5 and +2.0 \u00b1 0.5 bps TWAP, +0.8 to +2.5 bps VWAP) with 6-10 pp HIGHER fill rate: the adverse-crossing arm buys completion at a price. Pacing: within \u00b11 bp everywhere (VWAP 0.5 % +0.8 \u00b1 0.3). AC drift: identical to plain AC in every cell (difference 0.00): at the registered beta (|expected_return| <= 4e-7) the drift is far below the temporary-impact scale, the arm is inert. Shares: no_signal 21-33 % (QQQ outside EQ10's universe), agree 13-46 %, adverse 10-28 %. The registered EQ10 sign is opposite to its real in-sample IC, so agree/adverse may be swapped relative to the true direction; an in-sample refit arm was not run. Expected effect for the gate under this configuration: none in the cheaper direction; the fresh test is expected to FAIL unless the alpha/thresholds decision changes the arm.",
+    "urgency_vs_native": {
+      "IS|0.1": "-0.20 bps \u00b1 0.07 [-0.42, 0.02]",
+      "IS|0.5": "-0.63 bps \u00b1 0.39 [-1.58, 0.33]",
+      "IS|1": "-0.47 bps \u00b1 0.31 [-1.22, 0.28]",
+      "IS|2": "-0.21 bps \u00b1 0.31 [-1.56, 1.14]",
+      "POV|0.1": "+0.08 bps \u00b1 0.05 [-0.13, 0.28]",
+      "POV|0.5": "+0.04 bps \u00b1 0.04 [-0.07, 0.14]",
+      "POV|1": "+0.01 bps \u00b1 0.02 [-0.05, 0.07]",
+      "POV|2": "-0.01 bps \u00b1 0.00 [-0.01, -0.00]",
+      "TWAP|0.1": "-1.25 bps \u00b1 1.98 [-9.78, 7.29]",
+      "TWAP|0.5": "+0.39 bps \u00b1 1.09 [-2.63, 3.41]",
+      "TWAP|1": "+1.66 bps \u00b1 0.54 [0.35, 2.98]",
+      "TWAP|2": "+1.95 bps \u00b1 0.48 [0.72, 3.18]",
+      "VWAP|0.1": "+1.16 bps \u00b1 0.19 [0.33, 2.00]",
+      "VWAP|0.5": "-0.59 bps \u00b1 2.71 [-7.57, 6.38]",
+      "VWAP|1": "+0.82 bps \u00b1 0.63 [-0.71, 2.35]",
+      "VWAP|2": "+2.47 bps \u00b1 0.99 [-0.29, 5.22]"
+    }
+  },
   "fingerprints": {
     "configs/prereg/v2.json": "db79bef71fe82399dd228e10c5ee79c0c91d59cb357b43ed944fe9392d647d60"
   },
@@ -128,6 +173,21 @@
   "holdout": "data/real/r7_holdout and the 2026 holdout are never read by this benchmark; the signed test runs once on the IEX fresh days and the Nasdaq/IEX overlap days (B7)",
   "id": "B1-IS-BENCHMARK-1",
   "in_sample_dataset": "data/real/multi7 (AAPL, MSFT, QQQ; git-ignored)",
+  "in_sample_run": {
+    "code": "73f3ddb (v1.17.0 main at launch)",
+    "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+    "json_sha256": "97797df340fba9e9695bc3e3156ac530c8a682aad2116fc8b2a5c2a5dcaacbd9",
+    "n_events": 44718339,
+    "n_parents": {
+      "native": 252,
+      "native+ac": 63,
+      "native+ac_drift": 63,
+      "native+pacing": 252,
+      "native+urgency": 252
+    },
+    "report": "research/execution/benchmark/BENCHMARK_multi7_signal.md",
+    "run": "2026-10-16 12:59-15:30 local, detached"
+  },
   "in_sample_sessions": [
     "2019-01-30",
     "2019-03-27",
