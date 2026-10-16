@@ -300,12 +300,14 @@ ChildOrder: parent_id, instrument_id, venue_id, side, type, limit_ticks, qty, de
 
 # iap.execution.config
 SorOptions(prefer_rebate=True, max_venue_latency_ns=2**63-1)
-ExecConfig(latency=LatencyConfig(), seed=20260829, impact_coeff_bps_per_pct_adv=2.0, instruments={}, venues={})
+ExecConfig(latency=LatencyConfig(), seed=20260829, impact_coeff_bps_per_pct_adv=2.0, instruments={}, venues={},
+           regulatory_fees=None, impact_model="child", impact_exponent=1.0, permanent_impact_bps_per_pct_adv=0.0,
+           impact_fit_support_pct_adv=None, walk_depth_levels=10, adv_by_session=None)   # fields after venues: §2.13, §2.15
     .venue(vid) / .instrument(iid)                     # ValueError on unknown ids (C++ std::invalid_argument)
 load_venues(path) -> Dict[int, VenueSpec]              # exact port of C++ load_venues
 load_instruments(path) -> Dict[int, InstrumentSpec]    # = Java ConfigService.instruments()
 load_sor_options(path) -> SorOptions                   # strict sor.{prefer_rebate, max_venue_latency_ns}
-load_exec_config(config_dir, latency=LatencyConfig()) -> ExecConfig   # the Java PaperTrading wiring
+load_exec_config(config_dir, latency=LatencyConfig(), *, regulatory_fees=False, adv_table=None) -> ExecConfig   # the Java PaperTrading wiring; adv_table: §2.15
 
 # iap.execution.simulator
 class ExecutionSimulator(config):
@@ -341,6 +343,16 @@ The MVP wraps these as `AlgoScheduler` (`ExecutionAlgorithm`), `SorAdapter`
 (`SmartOrderRouterLike`, every candidate scored into a `VenueDecision`) and
 `SimulatorAdapter` (`ExecutionSimulatorLike`, emitting `ExecutionReport`s)
 in `iap.mvp.adapters`.
+
+**Loop latency (v1.17 F4, Python only).** `iap.mvp.latency.measure_loop_latency(prep,
+work_dir, *, limit=None) -> LoopLatency` times every `MvpEngine.on_event` of
+a prepared symbol (`iap.mvp.real.PreparedSymbol`) with `perf_counter_ns` and
+returns `LoopLatency(events, mean_ns, quantiles_ns, total_s, decisions,
+children_submitted, fills)` (`quantiles_ns` keys `p50`, `p90`, `p99`,
+`p99.9`, `max`; nearest rank; `.to_dict()`); `PERCENTILES = (0.50, 0.90,
+0.99, 0.999)`. It changes nothing in the loop; the budget guard is
+`tests/harness/check_mvp_latency_budget.py` against
+`benchmarks/latency_budget.json`.
 
 ### 2.2 Golden parity
 
@@ -935,8 +947,8 @@ on the dataset (mean / std of `expected_return` over the alpha's scored
 rows of that instrument), so every threshold below is "so many standard
 deviations of this alpha's scores", whatever its `beta`. The sign is the
 alpha's (positive = price expected to rise). `AlphaUrgencySource.
-from_dataset(alpha_id, features_dir, params_path=None, instruments_json=None,
-refit=False)` scores a flagship alpha (`EQ10`, `EQ05`, ...) with the
+from_dataset(alpha_id, features_dir, *, params_path=None,
+instruments_json=None, refit=False, instrument_ids=None)` (a classmethod; everything after `features_dir` is keyword-only, `instrument_ids` limits the instruments scored) scores a flagship alpha (`EQ10`, `EQ05`, ...) with the
 registered parameters of `configs/strategies/alpha_params.json` (its
 `feature_version` must match the registry) over `features_*.parquet`;
 `refit=True` fits in-sample first and labels the source `refit:in-sample`
@@ -1025,6 +1037,16 @@ and records the choice in its provenance block. Without a table every
 rule is byte-identical to v1.16 (`expected_replay_fills.json` unchanged);
 the C++ rule text keeps the static `adv`.
 
+**Depth walk (`ExecConfig.walk_depth_levels`, default 10).** The number of
+displayed price levels the taker walk (simulator rule 3) reads on the
+opposite side, best first; a positive `int` (anything else raises
+`ValueError`). The default 10 is the pinned value of the goldens and the C++
+rule text; a larger value is an opt-in for deep books
+(`python -m iap.research.execution_benchmark ... --walk-depth 50`, recorded in
+the benchmark's simulator provenance). A MARKET/IOC/FOK remainder left because
+the walk ran out of depth is counted in `ParentReport.depth_exhausted` /
+`depth_exhausted_qty`.
+
 ### 2.16 Quote fading, queue-aware cancels, markout decomposition (v1.17 WS-B items B4 / B5 / B6, Python only)
 
 Every option here is off by default. A `ParentOrder` without `fade` /
@@ -1098,8 +1120,9 @@ emptied through cancels as if it had traded.
 `outcome` ∈ `pulled` / `partial` / `lost_race`); `ParentReport.pulls` /
 `pulled_qty` (by rule), `pulls_lost_race`, `held_unsent_qty` are in
 `diagnostics()` (outside every golden row). **Fades saved vs fills missed:**
-`pull_outcomes(pulls, timeline, tick_size, horizons_ns=..., rules=...)` (=
-`pull_summary(pull_rows(...))`, poolable across sessions) prices every pulled
+`pull_outcomes(pulls, timeline, tick_size, *, horizons_ns=None, qty_unit=1.0,
+rules=None)` (= `pull_summary(pull_rows(..., cluster=""), horizons=None, *,
+lost_race=0, rules=None)`, poolable across sessions) prices every pulled
 quantity after the fact: per horizon `h`, whether the opposite best reached
 the pulled price inside `[effect_ts, effect_ts + h]` (`would_have_filled`:
 the touch-through proxy for "it would have filled") and, when it did, the
@@ -1115,7 +1138,7 @@ order.cancel_rule_ts` of a child with a `cancel_rule` → `faded` (the cancel
 lost the race); a MAKER fill of a child with `replaces_order_id` →
 `cancelled_replaced`; else `passive`. `regime_of(order)` is the B2
 `urgency_regime`, `plain` without one. `fill_rows(fills, orders, timeline,
-tick_size, qty_unit=1, horizons_ns=None, cluster=None, day_ns=1 day)` prices
+tick_size, *, qty_unit=1.0, horizons_ns=None, cluster=None, day_ns=1 day, algo="")` prices
 each fill (`markout_bps[h]`, `price_impact_bps[h]`, the §2.9 definitions,
 `None` where undefined) and tags it with its cluster (the fill's day, or a
 caller label such as the session); `decompose(rows, horizons)` gives `all`,
@@ -1153,7 +1176,128 @@ variant pairs with plain `passive` on the same windows; the report adds
 and `markout_decomposition` per policy (clusters = sessions). Multi7
 command (not run in the PR): see CHANGELOG / HOW_IT_WORKS §3.5.
 
-### 2.17 Rust venue simulator queue parity (v1.17 B9, review row X-10)
+### 2.17 Dark / midpoint venue model (v1.17 WS-B item B10, Python only; **modelled, not measured**)
+
+Everything here is off by default: a venue table without a non-lit venue and a
+`ParentOrder` without `dark_first` replay byte-identically (every golden; a
+dark venue merely present in the config leaves the lit replay identical,
+`test_v117_dark_venue.py`, because a non-lit venue is never a candidate of the
+pinned router nor quoted by `sor_v2`). No free dark-pool data exists, so every
+dark fill is **modelled, not measured**: the calibration document, the replay
+diagnostics and the benchmark report all carry that label. Python is the
+reference; the C++ port is F7 and the three pre-trade controls are Rust-owned
+per F8 (PLATFORM_CONVENTIONS.md §11.3; `docs/research/B10_F8_HANDOVER.md`).
+
+**`VenueSpec.venue_type`** ∈ `lit` (default) / `dark` / `midpoint`
+(`iap.execution.dark.VENUE_TYPES`; `venues.json` key `"venue_type"`;
+`VenueSpec.is_lit`). A dark / midpoint venue has no displayed book: nothing
+in the stream is ever applied to it, so its fills can only come from the
+model below. Equity only. Its `taker_fee_per_share` is the per-share fee a
+dark fill pays on both sides.
+
+**Fill model (`iap.execution.dark.DarkFillModel`).** The probability that a
+midpoint order of `qty` shares, posted at displayed spread `spread_ticks`
+with `queue_ahead` of our own earlier dark shares open, fills within
+`horizon_ns` once `lit_volume` displayed shares have traded:
+`p = sigmoid(b0 + b1 * log1p(lit_volume / 100) + b2 * spread_ticks + b3 *
+log1p((qty + queue_ahead) / 100))` (`dark_features`, `p_fill`; plain scalar
+arithmetic). **Proxy and fit.** `hidden_print_samples(events, horizon_ns,
+step_ns, probe_sizes)` streams one session: a hidden print is a TRADE that is
+not the print of the EXECUTE immediately before it on the same venue book at
+the same `exchange_ts` (simulator rule 4, X-P2-7 — ITCH `P`); it counts for
+the proxy only when its price lies strictly inside the displayed best bid /
+ask at that moment. Every `step_ns` while the consolidated book is two-sided,
+for each probe size `q`, the label is "inside-spread hidden volume in `[t, t +
+horizon) >= q`", the lit-volume feature is the displayed EXECUTE volume of
+`[t - horizon, t)` (causal) and the spread is the displayed spread at `t`.
+`fit_logistic` (Newton-Raphson, tiny ridge off the intercept) fits the four
+coefficients; `calibrate_dark_model(sessions, ...)` pools sessions. The
+document (`to_dict` / `save` / `load`) carries `label: "modelled, not
+measured"` (a document without it is refused), the verbatim `proxy`
+definition, `coef`, `fitted`, `n_samples` / `n_positive`, `sessions`,
+`instruments`, `probe_sizes`, `step_ns`, `log_likelihood`, the hidden-print
+counts and the `source`. `DarkFillModel.prior()` is the documented prior
+(`fitted: false`; p = 0.5 at 1,000 lit shares, a 1-tick spread, 100
+shares) for smoke runs. CLI: `python -m iap.execution.dark --data-dir
+data/real/multi7 --out research/execution/dark/dark_fill_model_multi7.json
+[--sessions ...] [--instruments ...] [--horizon-s 30] [--step-s 5]
+[--probe-sizes 100,300,1000,3000] [--max-events N]` (streamed; a session
+of 6 M events takes ~2 min, the seven multi7 sessions 19 min, under 150 MB). The committed fit is
+`research/execution/dark/dark_fill_model_multi7.json` (all seven multi7
+sessions, AAPL / MSFT / QQQ).
+
+**Dark-first rule (`ParentOrder.dark_first = DarkFirstParams(model,
+venue_id=0, controls=DarkControls(), max_urgency=0.5, regimes=("agree",),
+horizon_ns=0)`).** `venue_id` 0 picks the first non-lit venue of the config
+(none ⇒ `ValueError`); `horizon_ns` 0 is the model's horizon. A step is
+posted dark first when the parent is *low-urgency*: a B2 `urgency_policy=
+"alpha"` parent when the regime of the decision is in `regimes` (`agree` =
+the signal favours waiting), any other parent when `ParentOrder.urgency <=
+max_urgency`. The rule intercepts every step of every algo and policy
+(TWAP / VWAP / IS slices, the POV deficit, the PASSIVE post steps, the B2
+per-child decisions) at the `max_child_qty` split, after the pre-trade
+controls and only while `t < end_ts - end_margin_ns` and the consolidated
+displayed book is two-sided. A dark child is a `ChildOrder` on the dark
+venue (`order_id >= iap.execution.dark.DARK_ID_BASE`, `venue_type`,
+`dark_u`, `dark_p_fill`, `dark_outcome` ∈ `filled` / `expired`; it never
+enters the simulator). It draws one uniform `u` from its own SplitMix64
+stream (`ExecConfig.seed ^ 0xB10`: no lit draw moves) and, at every event of
+its instrument, fills when `p_fill(displayed EXECUTE volume since the post,
+spread at the post, qty + own dark queue at the post) >= u` — the
+inverse-CDF realisation of the fitted horizon probability, driven by the lit
+tape — at the consolidated displayed midpoint rounded against us on a half
+tick (`midpoint_ticks`: buy up, sell down), `Liquidity.MAKER`, fee =
+`taker_fee_per_share * qty`, `impact_cost` 0, `Fill.provenance =
+"dark_midpoint"`. At `min(post + horizon, end_ts - end_margin_ns)` an
+unfilled child expires (`CancelReason.EXPIRED`) and its quantity is sent to
+the lit book at once in the parent's base child style (a B2 parent
+re-decides the regime; the remainder never goes dark again); a child still
+open at the end of the stream expires unsent. Open dark quantity counts as
+committed (POV deficit, BEHIND).
+
+**Pre-trade controls (`DarkControls`, `dark_pretrade_check`; Rust-owned per
+F8, mirrored here).** `DarkControls(max_participation=0.0,
+participation_window_ns=30 s, allowed_venue_types=("dark", "midpoint"),
+max_dark_notional=0.0)`. `dark_pretrade_check(controls, venue_type, qty,
+trailing_lit_volume, dark_notional_so_far, child_notional)` returns `""` or
+the first failing code of `DARK_CONTROL_CODES = ("venue_type",
+"participation", "notional")`, in that order: the venue's type must be in
+`allowed_venue_types`; with `max_participation > 0`, `qty <=
+max_participation * trailing displayed EXECUTE volume over
+participation_window_ns` (a zero trailing volume rejects every post); with
+`max_dark_notional > 0`, the parent's dark-filled notional plus this child's
+at the current midpoint must not exceed it. A rejected post goes to the lit
+path at once and is counted. `DARK_CONTROL_GOLDENS` are the vectors the
+Rust engine must reproduce (pinned by the tests).
+
+**Accounting.** `ParentReport.dark_children`, `dark_posted_qty`,
+`dark_filled_qty`, `dark_expired_qty` (re-sent lit), `dark_unsent_qty` (the
+window closed on it), `dark_notional`, `dark_rejected` (by code) — in
+`diagnostics()` with `dark_fills_label`, outside every golden row.
+`ExecReplayResult.fills` merges the dark fills by time (the lit order is
+unchanged); `children` lists the dark children with the simulator's. **B6:**
+`fill_type` returns `dark` for a `dark_midpoint` fill (tested before the
+liquidity split; `FILL_TYPES` gains `dark`), so the decomposition reports
+the dark fills' markout and price impact per horizon with day-clustered
+SEs; the negated `price_impact` of the `dark` type is the **adverse
+selection of the modelled dark fills**.
+
+**Benchmark (B1).** `python -m iap.research.execution_benchmark --data-dir
+data/real/multi7 --venues research/execution/dark/venues_multi7_dark.json
+--policies native,native+dark,passive,passive+dark --baseline-policy native
+--dark-model research/execution/dark/dark_fill_model_multi7.json
+[--dark-venue-id 0] [--dark-horizon-s 30] [--dark-max-urgency 0.5]
+[--dark-regimes agree] [--dark-max-participation 0.1]
+[--dark-participation-window-s 30] [--dark-max-notional 0] --tag
+multi7_dark`: `--venues` replaces the dataset's venue table (a lit Nasdaq
+entry plus a `"venue_type": "dark"` one), the `dark` variant works on any
+base and pairs with it on the same windows; the JSON `dark` block records the
+label, the venue, the model document, the controls, the fill rule, the B8
+pairing note and per-policy totals; the Markdown has a "Dark venue" section
+and the `dark` row of the markout decomposition. Not run on multi7 in the
+PR (the B1 timings: ~70 min for three policies).
+
+### 2.18 Rust venue simulator queue parity (v1.17 B9, review row X-10)
 
 `rust/venue`'s `SimulatedVenue` now implements rule 4 (and the rule-3b overlay the crossing
 check needs) as pinned above, with zero latency: submission and cancel take effect at once, so

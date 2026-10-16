@@ -9,6 +9,20 @@
 
 namespace iap {
 
+std::int64_t pov_target(const ParentOrder& p, std::int64_t market_volume) {
+    if (p.pov_exact) {
+        if (!(p.participation > 0.0 && p.participation < 1.0)) {
+            throw std::invalid_argument(
+                "pov_exact needs 0 < participation < 1");
+        }
+        return static_cast<std::int64_t>(std::floor(
+            p.participation / (1.0 - p.participation) *
+            static_cast<double>(market_volume)));
+    }
+    return static_cast<std::int64_t>(
+        std::floor(p.participation * static_cast<double>(market_volume)));
+}
+
 std::vector<double> slice_weights(const ParentOrder& parent) {
     if (parent.algo == AlgoType::POV) {
         throw std::invalid_argument("POV has no precomputed slice weights");

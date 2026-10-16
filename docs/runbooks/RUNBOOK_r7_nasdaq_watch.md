@@ -25,9 +25,9 @@
 
 ## Run by hand
 
-```
-set PYTHONUTF8=1
-set PYTHONPATH=python\src
+```powershell
+$env:PYTHONUTF8 = "1"
+$env:PYTHONPATH = "python\src"
 python tools\r7_watch_nasdaq.py --json-out data\real\r7_watch\last.json
 ```
 
@@ -66,8 +66,8 @@ Remove with `schtasks /Delete /TN "IAP R7 Nasdaq watch" /F`.
 Check it ran (expect `Last Result: 0` nothing new, or `10` usable new day(s);
 anything else is a failure, see `data\real\r7_watch\watch.log`):
 
-```
-schtasks /query /tn "IAP R7 Nasdaq watch" /v /fo LIST | findstr /c:"Last Result"
+```powershell
+schtasks /query /tn "IAP R7 Nasdaq watch" /v /fo LIST | Select-String "Last Result"
 ```
 
 ## When it reports something

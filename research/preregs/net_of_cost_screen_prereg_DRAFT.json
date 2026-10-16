@@ -1,0 +1,88 @@
+{
+  "schema": "iap.prereg_draft/v1",
+  "kind": "net_of_cost_screen",
+  "status": "DRAFT - not signed, not on the blackboard, not approved for any run",
+  "signed": false,
+  "signature": null,
+  "on_blackboard": false,
+  "plan_item": "C6 (IAP_v1.17_Plan.md); review finding R-P2-5 folded in; consumed by C7 (breadth report) and C8 (breadth book prereg)",
+  "drafted": "2026-10-15",
+  "drafted_by": "Claude (session v117-c6); every threshold below is a proposal for the owner, every statistic is computed by iap.research.screen, none is filled in here",
+  "hypothesis": "On the multi7 in-sample sessions, at least one candidate (alpha id x horizon x model identity) has a positive net-of-cost edge at the registered size: its day-clustered net gate t and the day-clustered t of its mean net return per round trip are both at or above 2.0 with a positive net IC over at least 4 session days. Candidates that do not reach every rule are not taken to a confirmatory look; the screen itself confirms nothing.",
+  "statistic": {
+    "form": "iap.validation.metrics.gate_statistics (v1.17, STATS_REVISION) on the pooled test rows of EVERY walk-forward fold of the methods bundle, computed twice: gross on the scored label y, net on the cost-adjusted label y - sign(z) * cost; plus the mean of sign(z) * y - cost per scored row with its day-clustered t (n_days - 1 df)",
+    "signal": "z = expected_return / beta of the fold's fitted model (the walk-forward gate's pooled signal), confidence <= 0 rows unscored",
+    "cost": "CostModel.round_trip_cost_return (spread + fee, both legs) + 2 x impact at participation size.qty x unit / adv under the cost model's impact rule (sqrt, 100 bps at one ADV), as a return per row; per-session ADV from the dataset's instruments.json",
+    "folds": "all in-sample folds at once; nothing per fold is a gate",
+    "r_p2_5": "a candidate with target maker_fill_conditional is screened on the fill-conditional maker target (iap.research.screen.maker_fill_target: the markout of the side the alpha points to where the label order FILLED, NaN otherwise - an unfilled order is not a loss) and its label TTL must equal the cell horizon; the default target is the mid label"
+  },
+  "size": {
+    "qty": 100,
+    "unit": "shares (lot_size base units for FX)",
+    "rationale": "one round lot, the size the maker study and the R7 lot-size deviation trade; the owner may register another size before the screen runs"
+  },
+  "candidate_rule": "every registered EQUITY alpha (iap.alpha.build_all, EQ01..EQ12) at its pinned horizon, under linear_z_v1 and, where a _z2 twin exists (EQ11 is cross-sectional and has none), under linear_z_v2; FX alphas are not in the multi7 universe and are not screened here",
+  "candidates": [
+    {"alpha_id": "EQ01", "horizon": "1s", "model": "linear_z_v1"},
+    {"alpha_id": "EQ01", "horizon": "1s", "model": "linear_z_v2"},
+    {"alpha_id": "EQ02", "horizon": "5s", "model": "linear_z_v1"},
+    {"alpha_id": "EQ02", "horizon": "5s", "model": "linear_z_v2"},
+    {"alpha_id": "EQ03", "horizon": "5s", "model": "linear_z_v1"},
+    {"alpha_id": "EQ03", "horizon": "5s", "model": "linear_z_v2"},
+    {"alpha_id": "EQ04", "horizon": "5s", "model": "linear_z_v1"},
+    {"alpha_id": "EQ04", "horizon": "5s", "model": "linear_z_v2"},
+    {"alpha_id": "EQ05", "horizon": "1s", "model": "linear_z_v1"},
+    {"alpha_id": "EQ05", "horizon": "1s", "model": "linear_z_v2"},
+    {"alpha_id": "EQ06", "horizon": "10s", "model": "linear_z_v1"},
+    {"alpha_id": "EQ06", "horizon": "10s", "model": "linear_z_v2"},
+    {"alpha_id": "EQ07", "horizon": "10s", "model": "linear_z_v1"},
+    {"alpha_id": "EQ07", "horizon": "10s", "model": "linear_z_v2"},
+    {"alpha_id": "EQ08", "horizon": "10s", "model": "linear_z_v1"},
+    {"alpha_id": "EQ08", "horizon": "10s", "model": "linear_z_v2"},
+    {"alpha_id": "EQ09", "horizon": "10s", "model": "linear_z_v1"},
+    {"alpha_id": "EQ09", "horizon": "10s", "model": "linear_z_v2"},
+    {"alpha_id": "EQ10", "horizon": "1s", "model": "linear_z_v1"},
+    {"alpha_id": "EQ10", "horizon": "1s", "model": "linear_z_v2"},
+    {"alpha_id": "EQ11", "horizon": "15m", "model": "linear_z_v1"},
+    {"alpha_id": "EQ12", "horizon": "5s", "model": "linear_z_v1"},
+    {"alpha_id": "EQ12", "horizon": "5s", "model": "linear_z_v2"}
+  ],
+  "dataset": "data/real/multi7 (the seven in-sample Nasdaq sessions 2019-01-30 .. 2020-01-30, AAPL / MSFT / QQQ); dataset_version recorded by the screen",
+  "protocol": {
+    "methods_bundle": "v2 at statistics revision v1.17 (iap.validation.methods): row-mass walk-forward, 4 folds, 60 s embargo, HAC auto bandwidth, day-separated, per-instrument scaling",
+    "folds": 4,
+    "embargo_s": 60,
+    "ic_rows": "blackout_reopen",
+    "cost_multiplier": 1.0,
+    "looks": "ONE ledger look per candidate, kind net_of_cost_screen, dataset-scoped (23 looks for this list); a re-run of the same prereg sha256, size, rules and bundle on the same dataset is the same identity and adds no look"
+  },
+  "acceptance": {
+    "rules": {
+      "net_ic_min": 0.0,
+      "net_tstat_day_cluster_min": 2.0,
+      "net_return_tstat_min": 2.0,
+      "net_return_mean_min": 0.0,
+      "n_days_min": 4,
+      "n_pairs_min": 1000
+    },
+    "unit": "per candidate; every rule is a >= test on the named statistic and every rule must hold for a pass",
+    "reading": "pass = worth ONE confirmatory look under its own signed pre-registration; fail = no confirmatory run at this size on these days; a candidate that could not be screened is not_screened and is refused like a fail"
+  },
+  "holdout_exclusions": {
+    "breadth_holdout": "the 2025/26 Nasdaq days for every name outside AAPL / MSFT / QQQ (docs/PORTFOLIO_BREADTH.md, the C8 holdout): never in any candidates manifest, never read by the screen; a --dataset-dir whose path contains 'holdout' is refused",
+    "registered_holdouts": "every dataset a signed pre-registration names as its holdout; their dataset_version values are listed below and the screen refuses them",
+    "dataset_versions": [
+      "ca5d079831be4e63aa76e350bb840a29a6964c0152f4bbbcce5010269a193854"
+    ],
+    "dataset_version_notes": {
+      "ca5d079831be4e63aa76e350bb840a29a6964c0152f4bbbcce5010269a193854": "data/real/r7_holdout, the R7-CONFIRM-1 holdout (research/r7/r7_confirm_prereg.json); AAPL / MSFT / QQQ are spent there"
+    }
+  },
+  "ordering": "No confirmatory look at any candidate of this list happens before this screen has run and its document is committed under research/breadth/screen/; the C7 breadth report (--require-screen) and the C8 pre-registration (WriteBroker.preregister(screen=), python -m iap.research run --require-screen) refuse a candidate that failed or was not screened.",
+  "what_this_does_not_claim": "no promotion, no holdout read, no change to any registered alpha's fingerprint, no evidence of an edge; the screen filters the candidate list for the C8 pre-registration, which is its own signed document",
+  "open_for_owner": [
+    "approve the size (100 units) and the six thresholds before the screen runs on multi7",
+    "approve the candidate rule (EQUITY alphas at their pinned horizons under both linear models)",
+    "sign-off and blackboard registration before any confirmatory run of a survivor"
+  ]
+}

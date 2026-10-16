@@ -478,7 +478,7 @@ def test_fill_type_and_regime_follow_the_child_provenance():
     assert fill_type(_fill(1, 3, T0, 10_000, Liquidity.MAKER), repl) == "cancelled_replaced"
     assert fill_type(_fill(1, 4, T0 + 1, 10_000, Liquidity.MAKER), both) == "faded"  # lost race
     assert fill_type(_fill(1, 3, T0, 10_000, Liquidity.TAKER), repl) == "aggressive"
-    assert set(FILL_TYPES) == {"passive", "aggressive", "faded", "cancelled_replaced"}
+    assert set(FILL_TYPES) == {"passive", "aggressive", "faded", "cancelled_replaced", "dark"}
 
 
 def test_cluster_mean_is_the_cr1_day_cluster_statistic():

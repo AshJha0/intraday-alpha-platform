@@ -1,8 +1,8 @@
 {
-  "bonferroni_p_threshold": 8.96700143472023e-06,
-  "bonferroni_t_threshold": 4.440692110389091,
-  "chain_head": "b2d9f258b8308a29296d4e766659107d9850ebc676b70c9989d2348a8f507fc7",
-  "chain_length": 386,
+  "bonferroni_p_threshold": 8.93016610108948e-06,
+  "bonferroni_t_threshold": 4.441577770073068,
+  "chain_head": "dc638269166bcb61f722b8c50e4a1c4d3fd0ec9b56e3ace37fa4c1778a97c915",
+  "chain_length": 409,
   "datasets": [
     {
       "dataset_version": "203c8f540f75de984fa80f5ec9c04a91a1252819586a9fca6d48483f1462e67b",
@@ -21,12 +21,12 @@
     },
     {
       "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
-      "entries": 1,
-      "looks": 1
+      "entries": 24,
+      "looks": 24
     }
   ],
   "description": "Multiple-testing ledger (spec \u00a713). Deterministic: no wall-clock; identical rerun => identical file. Experiments are de-duplicated by (alpha_id, kind, canonical config, dataset_version): re-running the same script on the same dataset does not inflate the Bonferroni denominator; the same configuration on a new dataset is a new look, and the looks of earlier datasets are kept (`datasets`). An entry judged under the ledger t-stat policy carries `gate_looks`, the look count its threshold was derived from.",
-  "distinct_experiments": 386,
+  "distinct_experiments": 409,
   "entries": [
     {
       "alpha_id": "ALL",
@@ -9720,10 +9720,930 @@
         "net_pnl": -9553.027442587627,
         "net_sharpe_daily": -30.09570712864743
       }
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ01",
+          "horizon": "1s",
+          "id": "EQ01/1s/linear_z_v1",
+          "model": "linear_z_v1",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "43fdb0fa3fa84421b99f5ad29f7153ccf4c40cae870304c84d5e09a9f5c638ba",
+      "kind": "net_of_cost_screen",
+      "n": 5577,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.7618455099955124,
+        "net_return_mean": -0.00018300607873302532,
+        "net_tstat_day_cluster": -17.94208835034516,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ01",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ01",
+          "horizon": "1s",
+          "id": "EQ01/1s/linear_z_v2",
+          "model": "linear_z_v2",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "ca2bb13fc85a6f957642e4b5de4b7a759ec9b7a53c7d2e38faeec922a548df06",
+      "kind": "net_of_cost_screen",
+      "n": 5578,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.7574154792637953,
+        "net_return_mean": -0.00018304426221903136,
+        "net_tstat_day_cluster": -57.23211811406207,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ02",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ02",
+          "horizon": "5s",
+          "id": "EQ02/5s/linear_z_v1",
+          "model": "linear_z_v1",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "8696ba447648658f7e4f31dfc963a931db2867e68a27295b71974abec480f781",
+      "kind": "net_of_cost_screen",
+      "n": 5579,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.5468723953689261,
+        "net_return_mean": -0.00018373703244568203,
+        "net_tstat_day_cluster": -21.90009293602019,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ02",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ02",
+          "horizon": "5s",
+          "id": "EQ02/5s/linear_z_v2",
+          "model": "linear_z_v2",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "35549cc70a648fb94f5878a37fb986ab1d60383661305e82745170ba431f13b6",
+      "kind": "net_of_cost_screen",
+      "n": 5580,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.5448530649818009,
+        "net_return_mean": -0.0001837879237581817,
+        "net_tstat_day_cluster": -41.79503610370494,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ03",
+          "horizon": "5s",
+          "id": "EQ03/5s/linear_z_v1",
+          "model": "linear_z_v1",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "b63e5a82c92e0816eba8e80d956276efffd7f349b0c7203498d99b5fd20c1212",
+      "kind": "net_of_cost_screen",
+      "n": 5581,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.5563443491359762,
+        "net_return_mean": -0.00018276144520063,
+        "net_tstat_day_cluster": -22.192762712724118,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ03",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ03",
+          "horizon": "5s",
+          "id": "EQ03/5s/linear_z_v2",
+          "model": "linear_z_v2",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "5ecd2afb895b46cb38cee9dee0e310e8a8a55ab0183384d8709722f2f74ed98c",
+      "kind": "net_of_cost_screen",
+      "n": 5582,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.5540325692113642,
+        "net_return_mean": -0.00018276989681084366,
+        "net_tstat_day_cluster": -41.43679282012919,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ04",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ04",
+          "horizon": "5s",
+          "id": "EQ04/5s/linear_z_v1",
+          "model": "linear_z_v1",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "c322e42d544014c92829be507d7fed560af5b7853dfeee647f568a8efea81c68",
+      "kind": "net_of_cost_screen",
+      "n": 5583,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.6612721322120587,
+        "net_return_mean": -0.0001884942825801689,
+        "net_tstat_day_cluster": -23.26192390753177,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ04",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ04",
+          "horizon": "5s",
+          "id": "EQ04/5s/linear_z_v2",
+          "model": "linear_z_v2",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "4c9051ba272b7663d1a4754d03b5463fd99c26ab940e119774636b17ddb74e97",
+      "kind": "net_of_cost_screen",
+      "n": 5584,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.6629816735728503,
+        "net_return_mean": -0.00018853470447046446,
+        "net_tstat_day_cluster": -51.52328996083054,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ05",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ05",
+          "horizon": "1s",
+          "id": "EQ05/1s/linear_z_v1",
+          "model": "linear_z_v1",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "3eb42152761ed1386d1d932eca42cb0dbfaf6731a8e62b4605fa58e1e762bb4b",
+      "kind": "net_of_cost_screen",
+      "n": 5585,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.6713255607562494,
+        "net_return_mean": -0.0001865570388637563,
+        "net_tstat_day_cluster": -15.106043099099372,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ05",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ05",
+          "horizon": "1s",
+          "id": "EQ05/1s/linear_z_v2",
+          "model": "linear_z_v2",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "c49812a216911bf4158475d6bdc0f06b8a7162e0bc8fbc711bca6c1deac65200",
+      "kind": "net_of_cost_screen",
+      "n": 5586,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.688457698281591,
+        "net_return_mean": -0.00018662731455103602,
+        "net_tstat_day_cluster": -41.892616510633744,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ06",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ06",
+          "horizon": "10s",
+          "id": "EQ06/10s/linear_z_v1",
+          "model": "linear_z_v1",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "b3e4207c120dfb8787367006c4e3081ba86cfaf5189baf65f3999d83460dff8d",
+      "kind": "net_of_cost_screen",
+      "n": 5587,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.4947293531574246,
+        "net_return_mean": -0.00018620601018590703,
+        "net_tstat_day_cluster": -24.73302987879871,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ06",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ06",
+          "horizon": "10s",
+          "id": "EQ06/10s/linear_z_v2",
+          "model": "linear_z_v2",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "74a3af27d320644bdaaa91d2ce48ac019a87a21175d8bc28f3f910257f26420b",
+      "kind": "net_of_cost_screen",
+      "n": 5588,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.5019055813491252,
+        "net_return_mean": -0.0001865802346137231,
+        "net_tstat_day_cluster": -33.92849118811174,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ07",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ07",
+          "horizon": "10s",
+          "id": "EQ07/10s/linear_z_v1",
+          "model": "linear_z_v1",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "1d5abea43513f74ad6cc40a7f849430fd99f908de6863fa0337659e5d376f779",
+      "kind": "net_of_cost_screen",
+      "n": 5589,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.4343801470488581,
+        "net_return_mean": -0.00019190518986976507,
+        "net_tstat_day_cluster": -14.694776042678502,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ07",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ07",
+          "horizon": "10s",
+          "id": "EQ07/10s/linear_z_v2",
+          "model": "linear_z_v2",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "8ecdbc36b6af82eb8a205cf980645db457cb77be280b6156445d1404de7d2515",
+      "kind": "net_of_cost_screen",
+      "n": 5590,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.4388994362177675,
+        "net_return_mean": -0.00019142589233412156,
+        "net_tstat_day_cluster": -24.563302152228733,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ08",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ08",
+          "horizon": "10s",
+          "id": "EQ08/10s/linear_z_v1",
+          "model": "linear_z_v1",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "ac4d4741533b3ab9ad60816acd2fad60cec416deb1900334100aa3f467ae91ad",
+      "kind": "net_of_cost_screen",
+      "n": 5591,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.5040025125629141,
+        "net_return_mean": -0.00019126839247285676,
+        "net_tstat_day_cluster": -10.336530316395685,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ08",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ08",
+          "horizon": "10s",
+          "id": "EQ08/10s/linear_z_v2",
+          "model": "linear_z_v2",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "ac38921e6e53edc56e9ee6b8d205229497dc3cf55da0f31ad543d7f0fb3e5a9a",
+      "kind": "net_of_cost_screen",
+      "n": 5592,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.5365944766851206,
+        "net_return_mean": -0.00018959906739119694,
+        "net_tstat_day_cluster": -42.44206619278684,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ09",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ09",
+          "horizon": "10s",
+          "id": "EQ09/10s/linear_z_v1",
+          "model": "linear_z_v1",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "18fa0515e35aad473f1c36ac4e97994eaa8f82ea87a49613d1eaeb165d021ecb",
+      "kind": "net_of_cost_screen",
+      "n": 5593,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.4612156036643486,
+        "net_return_mean": -0.00019865601447758384,
+        "net_tstat_day_cluster": -8.92792238818645,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ09",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ09",
+          "horizon": "10s",
+          "id": "EQ09/10s/linear_z_v2",
+          "model": "linear_z_v2",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "3ab8a7888592c6d5baedc7c9cabaa749612221180fabbe002660f5b2cf844481",
+      "kind": "net_of_cost_screen",
+      "n": 5594,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.4838122513744537,
+        "net_return_mean": -0.0001986242651293979,
+        "net_tstat_day_cluster": -29.614558567363094,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ10",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ10",
+          "horizon": "1s",
+          "id": "EQ10/1s/linear_z_v1",
+          "model": "linear_z_v1",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "15772a0637845de4ea98e83d02a1b6920a7a166c1ae577dc16752a3c404a8192",
+      "kind": "net_of_cost_screen",
+      "n": 5595,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.5922200522707513,
+        "net_return_mean": -0.00019720360652457185,
+        "net_tstat_day_cluster": -21.490101821945952,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ10",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ10",
+          "horizon": "1s",
+          "id": "EQ10/1s/linear_z_v2",
+          "model": "linear_z_v2",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "6c67a9e49570a25a1068200017c6791b67a49c8b7332fe9e6884896cafce4ff5",
+      "kind": "net_of_cost_screen",
+      "n": 5596,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.5932087301949771,
+        "net_return_mean": -0.00019751138985738283,
+        "net_tstat_day_cluster": -19.11887979233847,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ11",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ11",
+          "horizon": "15m",
+          "id": "EQ11/15m/linear_z_v1",
+          "model": "linear_z_v1",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "9effcd1b3f0aa809995fa06057738cac26605e0f588ba4e5821e5a0db20ef0f9",
+      "kind": "net_of_cost_screen",
+      "n": 5597,
+      "reruns": 1,
+      "result": {
+        "net_ic": null,
+        "net_return_mean": null,
+        "net_tstat_day_cluster": null,
+        "status": "not_screened"
+      }
+    },
+    {
+      "alpha_id": "EQ12",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ12",
+          "horizon": "5s",
+          "id": "EQ12/5s/linear_z_v1",
+          "model": "linear_z_v1",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "b966ef01148e222f3ad7cf4502f026e25e063cf3eab840544e4e9b407bfb7704",
+      "kind": "net_of_cost_screen",
+      "n": 5598,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.5473131658377475,
+        "net_return_mean": -0.0001837374943899903,
+        "net_tstat_day_cluster": -22.09470770872327,
+        "status": "fail"
+      }
+    },
+    {
+      "alpha_id": "EQ12",
+      "config": {
+        "candidate": {
+          "alpha_id": "EQ12",
+          "horizon": "5s",
+          "id": "EQ12/5s/linear_z_v2",
+          "model": "linear_z_v2",
+          "target": "mid"
+        },
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "ic_rows": "blackout_reopen",
+        "methods": "v2",
+        "n_folds": 4,
+        "prereg_sha256": "7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848",
+        "rules": {
+          "n_days_min": 4.0,
+          "n_pairs_min": 1000.0,
+          "net_ic_min": 0.0,
+          "net_return_mean_min": 0.0,
+          "net_return_tstat_min": 2.0,
+          "net_tstat_day_cluster_min": 2.0
+        },
+        "size_qty": 100.0,
+        "stats_revision": "v1.17"
+      },
+      "count": 1,
+      "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+      "key": "8fc265c676a64b67f8518bc427ce8bf60f8c711e2d828bb41414bca94bed7c84",
+      "kind": "net_of_cost_screen",
+      "n": 5599,
+      "reruns": 1,
+      "result": {
+        "net_ic": -0.5461912824497807,
+        "net_return_mean": -0.00018375222964971282,
+        "net_tstat_day_cluster": -43.44443074688215,
+        "status": "fail"
+      }
     }
   ],
-  "expected_max_null_t": 4.153607336386135,
+  "expected_max_null_t": 4.154598245161352,
   "pinned_alpha": 0.05,
-  "total_experiments": 5576,
+  "total_experiments": 5599,
   "x-version": 4
 }

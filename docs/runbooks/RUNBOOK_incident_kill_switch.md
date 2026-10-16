@@ -1,5 +1,17 @@
 # RUNBOOK — Incident: Kill Switch
 
+> **Shells.** These procedures run on the Linux side (the cluster, the containers, WSL or
+> Git Bash): the `bash` blocks are bash. From the owner's Windows PowerShell, translate
+> as follows: `curl` is `curl.exe` (in PowerShell `curl` is an alias of `Invoke-WebRequest`);
+> `export NAME=value` is `$env:NAME = "value"`; `PYTHONPATH=python/src python ...` is
+> `$env:PYTHONPATH = "python/src"; python ...`; `python3` is `python`; `grep X file` is
+> `Select-String -Path file -Pattern X`; `| head -N` is `| Select-Object -First N`;
+> `tail -N file` is `Get-Content file -Tail N`; `cat file` is `Get-Content file`;
+> `ls -l dir` is `Get-ChildItem dir`; `$(...)` command substitution is `$(...)` too but
+> with PowerShell inside (for example `$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())`
+> for `$(date +%s)`); `a && b` is `a; if ($?) { b }`; a trailing `\` continuation is a
+> backtick. `kubectl` and `docker` take the same arguments in both shells.
+
 **Scope:** engaging, verifying and clearing kill switches (global / strategy /
 instrument / venue — spec §16), and the incident procedure around them.
 **Owner:** risk. **Related alerts:** `KillSwitchEngaged`,
@@ -285,6 +297,11 @@ chain head in `session_state.json`:
 ```bash
 PYTHONPATH=python/src python -c "import sys; from iap.risk.events import verify_audit_chain; print(verify_audit_chain(open(sys.argv[1], encoding='utf-8').read()))" <state-dir>/risk_audit.jsonl
 # (last_seq, head_sha256)   -- compare the head with session_state.json
+```
+
+```powershell
+$env:PYTHONPATH = "python/src"
+python -c "import sys; from iap.risk.events import verify_audit_chain; print(verify_audit_chain(open(sys.argv[1], encoding='utf-8').read()))" <state-dir>\risk_audit.jsonl
 ```
 
 A `ValueError` names the first line whose recorded hash does not match the

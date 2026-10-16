@@ -23,8 +23,29 @@ that tag.
   gets execution rule 4 (deterministic queue position, the rule-3b overlay, the crossing check
   with the aggressive-leg exemption, the rule-8 reopen) ported from the Python reference, pinned by
   `tests/golden/expected_venue_queue.json` (`python/tools/make_golden_venue_queue.py`;
-  `rust/venue/tests/golden_venue_queue.rs` joins the golden group; API_TRADING §2.17). No
+  `rust/venue/tests/golden_venue_queue.rs` joins the golden group; API_TRADING §2.18). No
   execution, SOR or dark-venue logic moved to Rust (C++ owns that path, F7).
+- v1.17 WS-F item F7, part 1: hand-written C++ parity ports of the execution rules already on
+  main (no translation tools), one commit per rule, next to `SmartOrderRouter` and the execution
+  simulator in `cpp/`: `sor/sor_v2.hpp` (`CostAwareRouter::plan_sweep` all-in / price ranking,
+  passive routing with fill probability, `aggressive_costs`, `allocate_passive`, `VenueModel`
+  / `FeeLedger`), simulator rule 6b (`ExecConfig::impact_model = PARENT`,
+  `ExecutionSimulator::parent_impact`), `ParentOrder::pov_exact` (`pov_target`, the deficit
+  loops), `execution/optimal.hpp` (the Almgren-Chriss eta path with the B3 drift),
+  `execution/signal.hpp` (signal units, `ArraySignalSource`, `regime_from_z`, `read_signal`),
+  `execution/pacing.hpp` (B3), `execution/fading.hpp` (B4 / B5 rules, `PullRecord`, the B4
+  counterfactual), `execution/fill_hazard.hpp` (hazard prediction on the UTC clock),
+  `execution/queue_depletion.hpp` (the X-4 split read), `tca/markout.hpp` +
+  `tca/markout_decomposition.hpp` (B6 with the CR1 day-clustered SE). Every port reproduces a
+  golden the Python reference generates (`python/tools/make_golden_f7.py` ->
+  `tests/golden/expected_f7_*.json`: fixed vectors + the sampled real slice) byte for byte as
+  canonical JSON (`cpp/tests/test_f7_*.cpp`; `python/tests/test_f7_golden.py` pins the bytes);
+  the only tolerance is the two SciPy Student-t readings of B6 (`expected_tol`, 1e-9).
+  PLATFORM_CONVENTIONS §11.3 carries the owning-language table; `bench_exec_rules`
+  (`benchmarks/results_exec_rules.md`, CI artifact `bench-exec-rules`) the per-event latency
+  rows. Not in part 1: the replay-scheduler wiring of B2-B5 (Python `iap.execution.replay`),
+  the X-8 IANA-zone clock, the A5 per-session ADV in rule 6b, and the B10 dark-venue model
+  (F7 part 2). Python rule code untouched.
 - v1.17 A4 fix: the TOPS oracle compares the book's best **round-lot** level (TOPS quotes the
   best level holding at least a round lot; on 2025-11-28 the raw-L1 rule diverged 53,506 of
   431,744 AAPL comparisons, the first on a 1-share bid), `IexReader(round_lots=)` /
@@ -32,6 +53,49 @@ that tag.
   (else the smallest quoted TOPS size per symbol, recorded as `round_lots_source`); the
   synthesised directory row takes the same round lot; `odd_lot_top` counter; oracle label
   `tops_l1_equals_deep_round_lot_l1`.
+- v1.17 WS-C item C6 (review row R-P2-5 folded in), additive and opt-in. **The
+  pre-registered net-of-cost screen** `iap.research.screen`
+  (`python -m iap.research.screen --dataset-dir DIR`): every candidate of
+  `research/preregs/net_of_cost_screen_prereg_DRAFT.json` (DRAFT, unsigned; alpha id x
+  horizon x model identity) is screened ONCE over ALL in-sample walk-forward folds of the
+  methods bundle, net of the modelled round-trip cost at the registered size (100 units:
+  spread + fee of both legs + 2 x sqrt impact at `size / adv`), in the v1.17 gate form
+  (`gate_statistics` on the cost-adjusted label `y - sign(z) * cost`, day-clustered t
+  beside the HAC t) plus the day-clustered mean net return per round trip; pass / fail per
+  candidate from the pre-registration's rules, one ledger look per candidate of kind
+  `net_of_cost_screen`, holdout paths and the registered holdout dataset versions refused.
+  Consumers, all opt-in with defaults unchanged: `breadth_book --screen PATH
+  --require-screen` (C7), `python -m iap.research run --require-screen PATH` and
+  `WriteBroker.preregister(screen=)` (C8) refuse a confirmatory run on a candidate that
+  failed or was not screened. **R-P2-5**: `maker_labels` adds the fill-conditional
+  `{side}_run_over` label and `attrs["ttl_ns"]`; `maker_real` gains
+  `alpha_side_target_fill_conditional` and the prereg opt-ins `filter_target:
+  fill_conditional` / `label_ttl: cell` (label orders rest for the cell's horizon); the
+  screen's `maker_fill_conditional` target refuses a label TTL that is not the cell horizon.
+  Multi7 screen document under `research/breadth/screen/` (see docs/SIGNAL_RESEARCH.md
+  section 8). Docs: SIGNAL_RESEARCH.md section 8, PORTFOLIO_BREADTH.md, API_PORTFOLIO_TCA.md
+  section 1.10, API_AGENTS.md. Tests: `tests/test_v117_screen.py`.
+- v1.17 WS-B item B10, the dark / midpoint venue model (**modelled, not measured**; opt-in,
+  Python only). `VenueSpec.venue_type` ∈ lit / dark / midpoint (default lit: every golden
+  byte-identical; a non-lit venue is never a router candidate); `iap.execution.dark`: the
+  logistic midpoint fill model `DarkFillModel` fitted on Nasdaq inside-spread hidden prints as
+  the proxy (`hidden_print_samples`, `fit_logistic`, `calibrate_dark_model`, CLI `python -m
+  iap.execution.dark`; the committed seven-session fit
+  `research/execution/dark/dark_fill_model_multi7.json` carries the label and the proxy
+  definition), the dark-first rule `ParentOrder.dark_first = DarkFirstParams(...)` (low-urgency
+  parents post each step dark first, fill at the first event where the model's probability on
+  the displayed volume since the post reaches a seeded draw, at the midpoint rounded against
+  us; the unfilled remainder goes lit after the horizon), and the three pre-trade controls
+  `DarkControls` / `dark_pretrade_check` (venue type, participation cap, dark notional limit;
+  Rust-owned per F8, mirrored here with `DARK_CONTROL_GOLDENS`;
+  `docs/research/B10_F8_HANDOVER.md`). B6 fill type `dark` (`Fill.provenance
+  "dark_midpoint"`) with its day-clustered markout / adverse selection; the B1 benchmark takes
+  `--venues` and the `dark` variant on any base (`--dark-model`, `--dark-*` controls), reports
+  a labelled "Dark venue" section and the B8 pairing note. `ParentReport.dark_*` diagnostics.
+  API_TRADING §2.17, EXECUTION_QUALITY §7, PLATFORM_CONVENTIONS §11.3 rows (Python reference;
+  C++ port = F7, controls = F8); 19 tests in `test_v117_dark_venue.py`.
+- v1.17 WS-G items G3 and G4, docs only (no code, no number moved). **G3**: COOKBOOK 101 -> 140 recipes (102-140: one per v1.17 opt-in on main, from the IEX HIST ingest with the TOPS oracle, process-and-delete and the breadth book to fading, queue cancels, markout decomposition, `linear_z_v2`, regime, GBM, meta-label split, conformal sizing, zoo gates, the agents and spend ledger, docs checks, reproducible build, latency guards, sharenorm, per-session ADV and TRADE_BUST), LEARN 101 -> 140 entries (101-139 new, Further reading is 140) with glossary rows; the API_*.md entries for the v1.17 opt-ins were checked against the signatures (about 25 names/defaults fixed, 5 entries added); the B10, C6, F7 and B9/F8 items are left as placeholders for G5. **G4**: every runbook is PowerShell-safe (cmd syntax converted, PowerShell variants beside the bash blocks) and GOVERNANCE section 0 states the `docs` job is ready to be required (owner action).
+
 - v1.17 WS-F items F4 and F5 (#188). **The committed real slice**
   `benchmarks/slices/itch50_20190130_AAPL` (`tools/extract_real_slice.py`; Nasdaq ITCH 5.0, AAPL,
   2019-01-30 from the 09:30 open: 1,132 book-reconstruction ADDs + 64,000 real events, 4.69 MB,
@@ -232,7 +296,7 @@ that tag.
   cpcv_path_ic="demeaned")` (bundle field `cpcv_path_ic`) standardises every (split, group) of a CPCV
   path before pooling; `path_ics_demeaned` and its summary sit beside the pooled reading in every
   `cpcv` block, `path_ic_rule` names the headline; a test shows the pooled rule biased by a fit of
-  another scale and the demeaned one not. Docs: RESEARCH_VALIDITY §4d, API_ALPHA §7.3, LEARN §100.
+  another scale and the demeaned one not. Docs: RESEARCH_VALIDITY §4d, API_ALPHA §7.4, LEARN §100.
 
 
 - v1.17 WS-A item A2b: slim ingest for breadth datasets. `ingest --slim` / `normalize_run(write_normalized_jsonl=False)`

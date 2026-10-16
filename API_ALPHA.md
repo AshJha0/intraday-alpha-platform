@@ -316,6 +316,30 @@ naming it.
   `load_params` equal the fitting instance's scores exactly
   (`validate_alpha(frozen_params=...)` reads this path).
 
+### 7.4 Opt-in gate readings: `cpcv_path_ic` and `gate="clustered"` — v1.17 WS-D (Python research; not a port contract)
+
+Both default to the pinned earlier rule, so no registered result moves.
+
+- `iap.validation.validate.validate_alpha(..., cpcv_path_ic="pooled",
+  ...)` (also a field of the methods bundle, `iap.validation.methods`,
+  default `"pooled"`): `"pooled"` is the v1.12 rule (each CPCV path
+  concatenates the standardized signal of its groups and takes the pooled
+  IC); `"demeaned"` (review R-9) demeans and scales signal and label per
+  (split, group) before pooling, so the path IC is a pair-count-weighted mean
+  of per-group ICs. Both readings are always in the `cpcv` block (`path_ics`
+  / `path_ics_demeaned` with mean, spread, min, max, positive share);
+  `path_ic_rule` names the one the headline `path_ic_*` fields read.
+- `iap.models.pipeline.run_model_comparison(ds, tracker=None, n_folds=4,
+  embargo_ns=60 s, ledger=None, gate="literal", gate_t_threshold=2.0)`
+  (`GATE_RULES = ("literal", "clustered")`, review R-6): `"literal"` is the
+  pooled tier-0 mean OOS IC > 0; `"clustered"` passes only when the fold-mean
+  rank IC against the mid label is > 0 AND the day-clustered t of the
+  per-fold-standardised pooled OOS predictions
+  (`iap.validation.metrics.gate_statistics`) clears `gate_t_threshold`. Both
+  readings are recorded in `results["gate"]["literal"]` / `["clustered"]`
+  whichever decides (`gate_rule` names it); with a `ledger` the decision is
+  ONE look of kind `model_zoo_gate`.
+
 ## 8. Signal combination — `iap.combine` (Python research; not a port contract)
 
 `CombinedAlpha(member_ids, method="equal_weight", *, asset_class=None,
@@ -406,14 +430,14 @@ method="adaptive", gamma=0.005, window=500, ref_width=None)`; the flag is OFF
 in code defaults and is not set in any prereg config — enable it explicitly in
 a research run.
 
-- `SplitConformal(alpha).fit(y_cal, pred_cal).interval(pred)` — `pred ± q`,
+- `SplitConformal(alpha=0.1, score="absolute", sigma_floor=1e-12).fit(y_cal, pred_cal, sigma_cal=None).interval(pred, sigma=None)` — `pred ± q`,
   `q` the `ceil((n+1)(1-alpha))`-th absolute calibration residual. Valid only
   under exchangeability.
 - `AdaptiveConformal(alpha, gamma, window)` — ACI (Gibbs & Candes 2021):
   `interval(pred)` then `update(y, pred)`; `alpha_t` moves by
   `gamma·(alpha − miss)`, so coverage recovers under intraday non-stationarity.
 - `confidence_from_width(width, ref_width)` → `min(1, ref_width/width)`.
-- `conformal_size(target_qty, confidence, max_position, lot=1)` — scales the
+- `conformal_size(target_qty, confidence, max_position, *, lot=1)` — scales the
   base target by confidence, caps at `max_position`, rounds toward zero; it is
   applied before the existing risk checks, which still run unchanged.
 - `calibration_report(y, lo, hi, sessions, alpha)` — overall and per-session
@@ -459,7 +483,7 @@ v1.17 WS-D item D2 (review finding R-5). Opt-in; `sizing_hook=None` and
 `split_mode="legacy"` are the pinned behaviour of every released result.
 
 - `SizingHook = Callable[[SignalRow], float]`; `Backtester(cost_model,
-  instrument_meta, config, reporting_ccy, sizing_hook=None)`, carried by
+  instrument_meta, config=None, reporting_ccy="USD", sizing_hook=None)`, carried by
   `for_horizon`. The hook is called once per decision row with a finite
   non-zero target, at the DECISION row (before latency, the row block, the
   session flatten and the fill cap), and returns a multiplier in `[0, 1]`
@@ -477,7 +501,8 @@ v1.17 WS-D item D2 (review finding R-5). Opt-in; `sizing_hook=None` and
   `p ≥ tau` else 0; `linear` → `(p − tau) / (1 − tau)` clipped to `[0, 1]`;
   a missing or non-finite `p` → `missing`. The caller scores the frame's
   rows with the calibrator and writes the column before the backtest.
-- `run_meta_labeling(..., split_mode="legacy", primary_selection_window=None,
+- `run_meta_labeling(ds, primary_pred, tracker=None, primary_name="primary", tau=0.5,
+  impute_nan=False, ledger=None, split_mode="legacy", primary_selection_window=None,
   return_model=False)`:
   - `split_mode="calibrate_select"` splits the OOS region four ways
     (40/20/20/20 row mass, purged and embargoed at every boundary): the
@@ -531,7 +556,7 @@ is bit-identical whatever rows follow it. The params carry `model:
 blob and a different `std_window`; every `linear_z_v1` loader (Python and
 the ports) rejects `linear_z_v2`.
 
-Identities: `linear_z_v2(cls, std_window, min_obs)` builds the twin of a
+Identities: `linear_z_v2(base, std_window="30m", min_obs=32)` builds the twin of a
 registered per-instrument class; `V2_ALPHA_CLASSES` / `V2_ALPHA_IDS` hold
 the 21 twins `EQ01_z2 … EQ12_z2, FX01_z2 … FX12_z2` (EQ11, FX05, FX06 are
 cross-sectional and have none); `build_v2("EQ02")` or `build_v2("EQ02_z2")`.
@@ -569,7 +594,8 @@ the masking leakage guard covers them).
 ### 11.3 Regime as a gate input (`iap.validation.regime_gate`, C5)
 
 `regime_gate_statistics(ts, scores, labels, regime, *, horizon_ns,
-regime_features, min_pairs=256, hac_bandwidth="auto", day_separated=True)`
+regime_features=("vol_regime_flag_v1",), min_pairs=256, hac_bandwidth="auto",
+day_separated=True, bucket_ns=300 s, day_ns=1 day)`
 returns `{"pooled": gate_statistics(known rows), "by_regime": {str(r):
 gate_statistics(rows of r) + regime, flags, judged}, "n_unknown",
 "regime_features", "min_pairs"}` — the SAME statistic every gate reads

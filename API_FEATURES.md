@@ -758,7 +758,7 @@ base emission it reads the merged-book state and emits a second
 `FeatureVector` (`feature_version = v2_registry_hash(families)`);
 `on_vector(base_vector, v2_vector)`; the engine's previous callback still
 receives the base vector first, which is byte-identical with or without
-the extension; `detach()` restores all three; `v2_frame(vectors,
+the extension; `detach()` restores all three; `compute(instrument_id, t) -> FeatureVector` builds the v2 vector for one instrument at `t` on demand; `v2_frame(vectors,
 families)` builds the per-instrument frame (`exchange_ts` + one float64
 column per feature, 26 with both families, NaN where invalid). Counters:
 `prints_recorded`, `busts_applied`, `busts_unmatched`, `session_resets`.

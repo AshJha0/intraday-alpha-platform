@@ -295,6 +295,14 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         "",
     ]
     ds = report.get("dataset") or {}
+    sc = report.get("screen")
+    if sc:
+        lines += [
+            f"C6 net-of-cost screen `{sc.get('path')}`: candidate {sc.get('candidate')} "
+            f"{sc.get('status')}"
+            + (" (required: this book is a confirmatory run)" if sc.get("required") else ""),
+            "",
+        ]
     if ds.get("smoke_test"):
         lines += [
             f"**Smoke test: a breadth of {b['n_names']} names exercises the plumbing, not breadth.** "

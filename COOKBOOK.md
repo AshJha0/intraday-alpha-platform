@@ -109,6 +109,46 @@ Contents:
 98. [Shrink the EWMA covariance and watch the condition number (v1.15, opt-in)](#98-shrink-the-ewma-covariance-and-watch-the-condition-number-v115-opt-in)
 99. [Verify main's board, anchors and signed agent registry as CI does (v1.16)](#99-verify-mains-board-anchors-and-signed-agent-registry-as-ci-does-v116)
 100. [Promote a model only with a model card (v1.15)](#100-promote-a-model-only-with-a-model-card-v115)
+101. [Run the shortfall benchmark with signal-aware urgency and pacing (v1.17 B2 / B3, opt-in)](#101-run-the-shortfall-benchmark-with-signal-aware-urgency-and-pacing-v117-b2--b3-opt-in)
+102. [Ingest an IEX HIST DEEP+ day with the TOPS oracle (v1.17 A1, owner-run)](#102-ingest-an-iex-hist-deep-day-with-the-tops-oracle-v117-a1-owner-run)
+103. [Process one IEX day end to end and delete the vendor files (v1.17 A4, owner-run)](#103-process-one-iex-day-end-to-end-and-delete-the-vendor-files-v117-a4-owner-run)
+104. [List IEX days and apply the download approval rule (v1.17 A4)](#104-list-iex-days-and-apply-the-download-approval-rule-v117-a4)
+105. [Process-and-delete a full-market day with `KEEP.json` (v1.17 A2, owner-run)](#105-process-and-delete-a-full-market-day-with-keepjson-v117-a2-owner-run)
+106. [Measure the breadth universe in one streaming pass (v1.17 A3)](#106-measure-the-breadth-universe-in-one-streaming-pass-v117-a3)
+107. [Cut ingest memory with slim output and instrument partitions (v1.17 A2 / A2b)](#107-cut-ingest-memory-with-slim-output-and-instrument-partitions-v117-a2--a2b)
+108. [Run the B1 shortfall benchmark on a smoke window (v1.17 B1)](#108-run-the-b1-shortfall-benchmark-on-a-smoke-window-v117-b1)
+109. [Read the depth-50 comparison before trusting a deep cell (v1.17 B7 prerequisite)](#109-read-the-depth-50-comparison-before-trusting-a-deep-cell-v117-b7-prerequisite)
+110. [Drive Almgren-Chriss drift and pacing from a signal in Python (v1.17 B3, opt-in)](#110-drive-almgren-chriss-drift-and-pacing-from-a-signal-in-python-v117-b3-opt-in)
+111. [Pull resting quotes when the signal or the book turns (v1.17 B4, opt-in)](#111-pull-resting-quotes-when-the-signal-or-the-book-turns-v117-b4-opt-in)
+112. [Cancel hopeless queue positions (v1.17 B5, opt-in)](#112-cancel-hopeless-queue-positions-v117-b5-opt-in)
+113. [Split queue depletion into executions and cancels (v1.17 B5, review X-4)](#113-split-queue-depletion-into-executions-and-cancels-v117-b5-review-x-4)
+114. [Decompose markouts by fill type and regime, day-clustered (v1.17 B6)](#114-decompose-markouts-by-fill-type-and-regime-day-clustered-v117-b6)
+115. [Fit the fill-hazard time-of-day on the exchange clock (v1.17 B6, review X-8)](#115-fit-the-fill-hazard-time-of-day-on-the-exchange-clock-v117-b6-review-x-8)
+116. [Run the cross-sectional breadth book (v1.17 C1 / C2)](#116-run-the-cross-sectional-breadth-book-v117-c1--c2)
+117. [Read the breadth report: effective bets and break-even size (v1.17 C7)](#117-read-the-breadth-report-effective-bets-and-break-even-size-v117-c7)
+118. [Standardise each instrument against itself: `linear_z_v2` (v1.17 C3)](#118-standardise-each-instrument-against-itself-linear_z_v2-v117-c3)
+119. [Combine signals with `decay_aware` and the v1.17 stacking fixes (v1.17 C3)](#119-combine-signals-with-decay_aware-and-the-v117-stacking-fixes-v117-c3)
+120. [Compute long-window features and session-truncated labels (v1.17 C4)](#120-compute-long-window-features-and-session-truncated-labels-v117-c4)
+121. [Condition an alpha on the volatility regime and gate by regime (v1.17 C5)](#121-condition-an-alpha-on-the-volatility-regime-and-gate-by-regime-v117-c5)
+122. [Fit a gradient-boosted alpha behind the `AlphaModel` interface: `ML01` (v1.17 D1)](#122-fit-a-gradient-boosted-alpha-behind-the-alphamodel-interface-ml01-v117-d1)
+123. [Choose the meta-label threshold on rows the calibrator never saw (v1.17 D2, review R-5)](#123-choose-the-meta-label-threshold-on-rows-the-calibrator-never-saw-v117-d2-review-r-5)
+124. [Size by conformal width and report coverage by regime (v1.17 D3)](#124-size-by-conformal-width-and-report-coverage-by-regime-v117-d3)
+125. [Gate the model zoo on a day-clustered reading and demean CPCV paths (v1.17 D4)](#125-gate-the-model-zoo-on-a-day-clustered-reading-and-demean-cpcv-paths-v117-d4)
+126. [Run the v1.17 statistics revision and the DSR recompute (v1.17 0.1-0.3)](#126-run-the-v117-statistics-revision-and-the-dsr-recompute-v117-01-03)
+127. [Put every ML look in the multiple-testing ledger (v1.17 0.4, R-4)](#127-put-every-ml-look-in-the-multiple-testing-ledger-v117-04-r-4)
+128. [Draft a pre-registration with the research assistant (v1.17 E2, spend)](#128-draft-a-pre-registration-with-the-research-assistant-v117-e2-spend)
+129. [Read the morning ops brief (v1.17 E3)](#129-read-the-morning-ops-brief-v117-e3)
+130. [Propose documentation edits for a PR with the docs-sync agent (v1.17 E4)](#130-propose-documentation-edits-for-a-pr-with-the-docs-sync-agent-v117-e4)
+131. [Inspect and cap LLM spend (v1.17 E1)](#131-inspect-and-cap-llm-spend-v117-e1)
+132. [Check the documentation structure as CI does (v1.17 E4, advisory)](#132-check-the-documentation-structure-as-ci-does-v117-e4-advisory)
+133. [Build the wheel reproducibly and read the SBOMs (v1.17 F1 / F2)](#133-build-the-wheel-reproducibly-and-read-the-sboms-v117-f1--f2)
+134. [Run the type check and the coverage floor locally (v1.17 F1 / F3)](#134-run-the-type-check-and-the-coverage-floor-locally-v117-f1--f3)
+135. [Guard Python-loop latency and memory on the committed real slice (v1.17 F4 / F5)](#135-guard-python-loop-latency-and-memory-on-the-committed-real-slice-v117-f4--f5)
+136. [Serve the Python `/metrics` process that replaced the Java registry (v1.17 F9)](#136-serve-the-python-metrics-process-that-replaced-the-java-registry-v117-f9)
+137. [Normalise volumes and depths by ADV and by session volume (v1.17 A5, D-P1-5)](#137-normalise-volumes-and-depths-by-adv-and-by-session-volume-v117-a5-d-p1-5)
+138. [Size impact on the ADV of the fill's own session (v1.17 A5, X-9)](#138-size-impact-on-the-adv-of-the-fills-own-session-v117-a5-x-9)
+139. [Apply, skip and count a broken trade: `TRADE_BUST` (v1.17 A5, X-11)](#139-apply-skip-and-count-a-broken-trade-trade_bust-v117-a5-x-11)
+140. [Apply every realism opt-in at once and window the VWAP curve (v1.17 X-1 / X-2)](#140-apply-every-realism-opt-in-at-once-and-window-the-vwap-curve-v117-x-1--x-2)
 
 Where to start: if you are new, run recipes 1, 2, 3, 4 and 22 in that
 order. They generate the data, show a book, build features, validate one
@@ -117,8 +157,11 @@ a gate threshold is, and when a result counts as evidence) before any
 recipe whose number you might quote. Recipes 69 to 74 cover v1.14; each
 says what moved and which flag gives the old behaviour back. Recipes 75 to
 100 cover v1.15 and v1.16 (execution realism, the router and algo opt-ins,
-report-only statistics, governance and release tooling). Python blocks with
-no save-as line run from the repo root with `PYTHONPATH=python/src`.
+report-only statistics, governance and release tooling). Recipes 101 to 140
+cover v1.17 (signal-aware execution, quote fading, the IEX second venue, the
+breadth book, the new models and gates, the agents and the CI guards), all
+opt-in; the shell note before recipe 102 gives the PowerShell forms. Python
+blocks with no save-as line run from the repo root with `PYTHONPATH=python/src`.
 
 The Java engine was archived in v1.15 (`archive/java/`, frozen at
 v1.14.0, no longer in CI). Recipes that still show a Java command run the
@@ -5636,3 +5679,1714 @@ positive; `--signal-refit` fits in-sample (labelled `refit:in-sample`) and
 flips the sign. Which alpha and which thresholds go into the signed B7
 draft is the owner's decision; the benchmark reports both arms, it does not
 choose.
+
+---
+
+**Recipes 102–140 cover v1.17 (the Unreleased section of the CHANGELOG).** Every
+option they use is **opt-in or report-only**: off by default, so no golden,
+registered feature, pre-registration fingerprint or published number moves
+unless you turn it on. Items that are modelled (counterfactuals, proxies,
+fitted impact) say so in a **What it is not** line. Recipes that need vendor
+data or an owner approval say "owner-run": they are shown from the code and
+its `--help`, not executed here. Every other command in this block was run
+in the v1.17 worktree before it was written down (on a generated dataset, a
+`--dry-run`, or the recipe's test file), and a quoted number names the
+committed artefact it is copied from.
+
+*Shell.* After `pip install -e python` every `python -m iap...` command below
+works unchanged from the repo root in bash and in PowerShell. Without the
+install, set the path once per shell: bash `export PYTHONPATH=python/src`,
+PowerShell `$env:PYTHONPATH = "python/src"` (the older recipes' one-shot
+`cd python && PYTHONPATH=src python ...` is the bash form of the same thing).
+Commands are written on one line with forward slashes so they paste into
+either shell; Python blocks run from the repo root. `data/scratch/` is a
+git-ignored place for outputs you do not want to commit.
+
+## 102. Ingest an IEX HIST DEEP+ day with the TOPS oracle (v1.17 A1, owner-run)
+
+**Goal:** turn one IEX HIST capture (free, daily, pcap/pcapng, IEX-TP v1) into
+a dataset the unchanged ITCH mapper, book, feature and execution code can
+read, with IEX's own TOPS best bid/offer as the book's oracle. `iex-deep-plus`
+reads DEEP+ (`0x8005`, displayed orders one by one, the book feed);
+`iex-deep` reads DEEP (price levels, with synthetic orders per level). The
+venue is `IEXG` (id 102). `--tops` records the TOPS quote at every BBO change
+as the session's `book_verification`; a divergence refuses the ingest unless
+`--allow-book-divergence`.
+
+```bash
+python -m iap.marketdata ingest --format iex-deep-plus --input data/vendor/20251128_IEXTP1_DPLS1.0.pcap.gz --tops data/vendor/20251128_IEXTP1_TOPS1.6.pcap.gz --date 2025-11-28 --symbols AAPL,MSFT,QQQ --out data/real/iex_20251128 --partition-instruments 10 --slim
+```
+
+It writes the dataset directory of recipe 93 (`dataset.json`, the IAP1 file,
+`normalized/qc_report.json` with the per-symbol `book_verification`
+compared/mismatched counts). `--slim` skips the 3x-larger `*.normalized.jsonl`
+twin and `--partition-instruments N` bounds memory (recipe 107). The codec is
+covered by synthetic captures; run it here with
+`python -m pytest python/tests/test_iex_codec.py -q` (10 passed).
+
+A real-capture conformance pass (first 250 MB of the 2026-10-13 TOPS file:
+7,619,846 messages, 0 unknown types, 0 sequence gaps, 0 crossed quotes) is
+committed as `research/v117/IEX_HIST_CONFORMANCE_20261013_TOPS.md`; rerun the
+tool on any capture with
+`python tools/iex_hist_conformance.py --file <capture> --date 2026-10-13 --max-packets 100000 --out data/scratch/conf`.
+
+**Pitfall:** the HIST files are pcapng (not classic pcap as the HIST page
+says; the reader accepts both) and the capture clock is TAI, 37 s ahead of
+UTC. The reader takes `exchange_ts` from the messages' own UTC stamps, but
+anything that uses the capture stamp as a clock must subtract
+`IEX_TAI_OFFSET_S` (recipe 115). The codec downloads nothing and the files are
+4-16 GB each; do not fetch one without the approval flow of recipe 104.
+
+**What it is not:** a venue-wide book. IEX is one exchange; DEEP+ is its own
+displayed book, not the consolidated market, and TOPS alone has no book.
+
+## 103. Process one IEX day end to end and delete the vendor files (v1.17 A4, owner-run)
+
+**Goal:** run the overlap-set chain for one day with only one vendor file on
+disk at a time: disk guard, TOPS download, universe quote extract, TOPS
+deleted, DEEP+ download, ingest with the extract as oracle, features,
+`KEEP.json`, delete. The plan is inspectable without any data:
+
+```bash
+python -m iap.marketdata process-iex-day --manifest research/v117/iex_overlap_manifest.json --date 2025-11-28 --vendor-dir data/vendor --out-root data/real/iex --symbols AAPL,MSFT,QQQ --dry-run
+```
+
+`--dry-run` runs the disk guard and prints the nine steps (`download_tops`,
+`tops_extract`, `delete_tops`, `download_book`, `ingest`, `delete_raw`,
+`features`, `keep`, `delete`) and a JSON plan (`disk.needed_gb`, the
+estimate); nothing is downloaded. A real run adds
+`--download --i-have-approval`; without the pair it stops at the first absent
+capture. Every step leaves a marker beside the dataset directory
+(`iex_<yyyymmdd>.markers/`), so a crashed day resumes, and `process_report.json`
+records sizes, sha256 of both captures, timings, the oracle counts and the disk
+peak. To run several days detached, repeat `--date` and render the wrapper
+(the `.cmd` and a watchdog entry are written, nothing runs):
+
+```bash
+python -m iap.marketdata process-iex-day --manifest research/v117/iex_overlap_manifest.json --date 2025-11-28 --date 2025-12-08 --vendor-dir data/vendor --out-root data/real/iex --symbols AAPL,MSFT,QQQ --render-cmd data/real/run_iex.cmd --jobs-registry data/real/jobs.json
+```
+
+The wrapper `cd`s into `python/`, sets `PYTHONPATH=src` and logs to a `.log`
+beside itself. The nine approved overlap days and their sizes are in
+`docs/research/IEX_OVERLAP_SET.md`; its results table is empty until the
+detached chain has finished a day.
+
+**Pitfall:** `--peak-gb N` replaces the disk guard's estimate with a measured
+value; nothing is ever deleted to make room, so a refused guard needs space,
+not a flag. `--feed deep` switches the book feed to price levels.
+
+**What it is not:** an approval. The manifest's `approval` sentence is the
+owner's, recorded verbatim; the chain refuses to download without
+`--i-have-approval` on top of it. Runbook:
+`docs/runbooks/RUNBOOK_process_and_delete.md` (IEX section).
+
+## 104. List IEX days and apply the download approval rule (v1.17 A4)
+
+**Goal:** build a download manifest from the HIST index and select the rolling
+"recent IEX days" set, without downloading a capture. `index` makes one small
+JSON GET per day (never a capture) and records every feed file the index lists
+(`TOPS`, `DEEP`, `DEEP+`, `DEEP+C`: name, size, link); it carries the owner's
+approval sentence only when you pass it. `recent` selects the latest N calendar
+days, walking back from UTC today minus one, whose index lists both a TOPS and
+a DEEP+ file, and writes the manifest **without** an approval sentence.
+
+```bash
+python tools/iex_hist.py index --date 2025-11-28 --date 2025-12-08 --out data/scratch/iex_manifest.json --approval "<the owner's sentence, verbatim>"
+python tools/iex_hist.py recent --n 5 --lookback 21 --out data/scratch/iex_recent.json
+python tools/iex_download.py --manifest research/v117/iex_overlap_manifest.json --vendor-dir data/vendor --date 2025-11-28 --feed TOPS --i-have-approval
+```
+
+Committed artefacts: `research/v117/iex_overlap_manifest.json` (the nine
+overlap days, carrying the owner's 2026-10-15 approval sentence) and
+`research/v117/iex_recent_manifest.json` (`"approval": null`; 2026-10-08, 09,
+12, 13 and 14 as of its run). `tools/iex_download.py` downloads one named feed
+of one day and refuses unless `--i-have-approval` is given **and** the manifest
+carries a non-empty `approval`.
+
+**Pitfall:** `recent` is a list, not permission; never add `--i-have-approval`
+for a manifest whose `approval` is null. Weekends and holidays have no index
+entry and drop out of the walk by themselves (`select_recent` is a pure
+function). `index` and `recent` need network access for the index GET, so
+they are shown here from `--help` and the committed manifests, not rerun, and
+the third command is owner-run only.
+
+**What it is not:** a data pull. Nothing in `tools/iex_hist.py` downloads a
+capture; downloads are the owner's decision, per file, per session.
+
+## 105. Process-and-delete a full-market day with `KEEP.json` (v1.17 A2, owner-run)
+
+**Goal:** ingest one free full-market ITCH day into a breadth dataset while
+keeping only what research reads. The chain is disk guard, (approved)
+download, ingest, Rust features, `KEEP.json` (sha256 of every kept file),
+deletion of `raw/`, `normalized/` and the vendor file, `_DONE` marker. Each
+step has a marker beside the dataset directory and is skipped when present.
+
+```bash
+python -m iap.marketdata process-day --manifest research/breadth/candidates.json --date 2019-01-30 --vendor-dir data/vendor --out-root data/real --symbols-file research/breadth/universe.json --partition-instruments 10 --dry-run
+```
+
+Run here against the committed 100-name universe the guard refuses
+(`disk guard refused: 165.85 GB free, 844.72 GB required (peak 834.72 + margin
+10.0); nothing was deleted to make room`; the free figure is this machine's).
+The symbol-scaled estimate overstates a 100-name day many times (CHANGELOG
+A2b: 830 GB estimated against about 50 GB expected), so an owner-run day passes
+`--peak-gb 50`. `process-day` is slim by default (no `*.normalized.jsonl`
+twin, manifest `layout: "slim"`; `--no-slim` opts out), deletes `raw/` right
+after normalisation (before the feature build) and keeps the vendor file only
+with `--keep-gz`. Verify a finished day from Python:
+
+```python
+from pathlib import Path
+from iap.marketdata.process_delete import verify_keep
+print(verify_keep(Path("data/real/ds_20190130")))   # [] = every kept file matches KEEP.json
+```
+
+`--render-cmd data/real/run_day.cmd --jobs-registry data/real/jobs.json` writes
+the detached wrapper and the watchdog entry instead of running (recipe 103
+shows the same flags for IEX days). The chain is covered end to end by
+`python -m pytest python/tests/test_process_delete.py -q` (12 passed).
+
+**Pitfall:** the download needs `--download --i-have-approval`, and the
+2019-01-30 file is not downloaded yet (CHANGELOG A3); the refusal above is the
+disk guard working, not a bug. The `delete` step runs only after `KEEP.json`
+verifies; `--keep-raw` / `--keep-gz` skip their deletions. A `--dry-run`
+creates the empty out-root directory.
+
+## 106. Measure the breadth universe in one streaming pass (v1.17 A3)
+
+**Goal:** apply the pre-registered universe rule
+(`research/breadth/UNIVERSE_RULE.md`, `breadth_universe/v1`: the top 100
+Nasdaq-listed symbols by displayed continuous-session volume, ITCH `E` +
+printable `C` shares between the system events `Q` and `M`; ETFs kept and
+flagged, test securities excluded, survivorship explicit) to a selection day's
+full-market ITCH file.
+
+```bash
+python -m iap.marketdata breadth-universe --input data/vendor/01302019.NASDAQ_ITCH50.gz --date 2019-01-30 --top 100 --out data/scratch/universe.json
+```
+
+`--limit-messages N` is a smoke pass over the head; `--no-hash` skips the
+sha256 of the input. The committed result is `research/breadth/universe.json`
+with the readable `research/breadth/UNIVERSE_2019-01-30.md`, measured on the
+owner-approved 2019-01-30 file (368 M messages): 100 names, 29 ETFs, with AAPL,
+QQQ and MSFT at ranks 6, 12 and 15; it also lists the next 50 and the source
+sha256. Check the tooling without the file:
+`python -m pytest python/tests/test_breadth_universe.py -q` (2 passed). The ten
+in-sample candidate days are `research/breadth/candidates.json`.
+
+**Pitfall:** the rule is fixed before any breadth statistic; do not re-rank on a
+second day to improve a result. The selection day is itself in-sample.
+
+**What it is not:** a tradable universe. It is chosen on one day's displayed
+volume, so it carries that day's survivorship and look-ahead by construction.
+
+## 107. Cut ingest memory with slim output and instrument partitions (v1.17 A2 / A2b)
+
+**Goal:** normalise a wide-universe day inside the 16 GB of a laptop.
+`--partition-instruments N` routes packed records to on-disk partitions of N
+instruments, sorts each on its own and merges in event-time windows, so memory
+is one partition plus one window instead of the whole day; the output is
+byte-identical (tested on the synthetic pipeline and an ingested ITCH day).
+`--slim` writes no JSONL twin (the feature build and the MVP read the IAP1).
+
+```bash
+python -m iap.marketdata ingest --format itch50 --input data/vendor/01302019.NASDAQ_ITCH50.gz --date 2019-01-30 --symbols AAPL,MSFT,QQQ --out data/real/ds_20190130 --partition-instruments 10 --slim
+```
+
+Without a 4 GB file, check the claim on the synthetic pipeline:
+`python -m pytest python/tests/test_process_delete.py -q` and
+`python -m pytest python/tests/test_process_iex.py -q` (12 and 8 passed). In
+Python the same switches are `normalize_run(partition_instruments=N,
+write_normalized_jsonl=False)`.
+
+**Pitfall:** `--slim` datasets have `layout: "slim"` in the manifest and no
+`*.normalized.jsonl`; anything that reads the JSONL twin (the older recipes'
+`--normalized-dir` probes) needs the full layout. Memory is bounded by the
+partition, the disk is not: partitions use temporary space, which
+`process-day`'s disk guard counts.
+
+## 108. Run the B1 shortfall benchmark on a smoke window (v1.17 B1)
+
+**Goal:** price a parent order's implementation shortfall by algo (TWAP, VWAP,
+POV, IS), policy (`native`, `aggressive`, `passive`) and parent size in % of
+ADV, with day-clustered SEs, on an ingested dataset directory. It is an
+in-sample tool: a path containing `holdout` is refused without
+`--allow-holdout`.
+
+```bash
+python -m iap.research.execution_benchmark --data-dir data --out data/scratch/bench --tag smoke --sessions 20260824 --max-events 150000 --algos TWAP,IS --sizes-pct 0.1,0.5 --policies native,aggressive --no-timestamp
+python -m iap.research.execution_benchmark --data-dir data/real/multi7 --out data/scratch/bench --tag multi7 --write-prereg-draft
+```
+
+The first command runs on the generated dataset of recipes 1 and 3 (one
+session, 150,000 events; it finishes in well under a minute and writes the two
+files below). `data/real/multi7` in the second is a git-ignored real dataset
+(7 sessions, 44,718,339 events), so it is not in a fresh checkout; it is the
+full committed grid. Artefacts in `--out`: `benchmark_<tag>.json`,
+`BENCHMARK_<tag>.md` and, with `--write-prereg-draft`, `prereg_DRAFT.json`, the
+**unsigned** draft of the B7 gate. The committed run is
+`research/execution/benchmark/BENCHMARK_multi7.md`
+(252 parents per policy; grid 30-min windows after 5 min warm-up, 5 slices,
+seed 20260829). Deterministic: same dataset and arguments give the same JSON
+bytes (`--no-timestamp` drops the one wall-clock field).
+
+**Pitfall:** every cost is labelled `replay + linear child adder (rule 6)`: the
+replayed book never moves for your fills and the impact is an adder, not a
+measured reaction. Cells with fewer than 10 sessions are low-power and say so.
+Recipe 101 adds the signal-aware arms; recipe 109 the depth cap.
+
+**What it is not:** evidence of an edge. It prices execution policies on
+recorded books; nothing here is signed or registered until the owner signs the
+B7 draft.
+
+## 109. Read the depth-50 comparison before trusting a deep cell (v1.17 B7 prerequisite)
+
+**Goal:** decide whether a high `depth_exhausted` share is the simulator's
+10-level walk cap or the displayed book running out. `ExecConfig.walk_depth_levels`
+defaults to 10 (pinned); `--walk-depth 50` is the opt-in. The committed
+comparison is `research/execution/benchmark/DEPTH_COMPARISON_multi7.md`, built
+from three runs of the same grid and windows (`benchmark_multi7.json`,
+`benchmark_multi7_depth50.json`, `benchmark_multi7_depth50_child300.json`):
+
+```bash
+python -m iap.research.execution_benchmark --data-dir data/real/multi7 --out data/scratch/bench --tag multi7_depth50 --walk-depth 50
+python -m iap.research.execution_benchmark --data-dir data/real/multi7 --out data/scratch/bench --tag multi7_depth50_child300 --walk-depth 50 --max-child-qty 300
+```
+
+Read the committed comparison's Answer section (copied from it): at 0.5 % ADV
+the under-fill was the cap (depth-exhausted parent share 60-67 % -> 0 %, 11 %
+for VWAP); at 1 % about half cap, half book (67 % -> 38-57 %); at 2 % it is the
+book (72-100 % -> 67-89 %); capping children at 300 shares does not help and
+hurts native TWAP/VWAP fills; all-in cost rises by 2-5 bps at 1-2 % ADV because
+cancelled quantity is now walked instead of priced by the completion term. Its
+recommendation for B7: `--walk-depth 50` with the default child cap, 1 % and
+2 % ADV cells of TWAP/VWAP/IS reported only.
+
+**Pitfall:** the depth-10 numbers understated cost exactly where under-fill was
+largest, so never compare a depth-10 cost with a depth-50 cost across cells.
+
+**What it is not:** a result about the market. It is in-sample on 7 sessions,
+nothing is signed and no default changed.
+
+## 110. Drive Almgren-Chriss drift and pacing from a signal in Python (v1.17 B3, opt-in)
+
+**Goal:** see what the signal-aware schedule does to one parent without the
+benchmark driver. Recipe 101 covers the driver flags (`native+pacing`,
+`native+ac`, `native+ac_drift`); this is the arithmetic underneath.
+`ac_holdings(qty, params, n, drift=0.0)` takes the expected price drift per
+time unit **in the direction that favours waiting**; `ac_drift_from_signal(side,
+expected_return, price, remaining_horizon)` builds it from an alpha's expected
+return (`-er` for a buy, `+er` for a sell). `pacing_scale` is the POV /
+slice-tilt multiplier `clip(1 - gain * alignment, min, max)`, `1` without a
+reading. Save as `recipe110.py`, run from the repo root:
+
+```python
+from iap.execution.optimal import ACParams, ac_drift_from_signal, ac_holdings
+from iap.execution.pacing import PacingParams, pacing_scale, tilted_slice_qty
+
+p = ACParams(sigma=0.5, eta=2.5e-6, horizon=1.0, risk_aversion=1e-6)
+buy = 0
+drift = ac_drift_from_signal(buy, 0.0002, 100.0, 1.0)   # buy, price expected to RISE: drift < 0, trade earlier
+print("plain       ", [round(x) for x in ac_holdings(10_000, p, 5)])
+print("signal drift", [round(x) for x in ac_holdings(10_000, p, 5, drift=drift)])
+print("opposite    ", [round(x) for x in ac_holdings(10_000, p, 5, drift=-drift)])
+
+pace = PacingParams(gain=0.5)                           # min_scale 0.25, max_scale 3.0
+print([pacing_scale(buy, z, pace) for z in (2.0, 0.0, -2.0, None)])
+print(tilted_slice_qty(1000, [0.25] * 4, pacing_scale(buy, 2.0, pace)))
+```
+
+Output (run here, `python recipe110.py`):
+
+```text
+plain        [10000, 7952, 5937, 3945, 1968, 0]
+signal drift [10000, 7636, 5462, 3470, 1652, 0]
+opposite     [10000, 8269, 6412, 4420, 2285, 0]
+[2.0, 1.0, 0.25, 1.0]
+400
+```
+
+A buy expecting a rise holds less after each slice (it front-loads); the
+opposite sign holds more (it waits). On a `ParentOrder` the same switches are
+`pov_signal_pacing`, `slice_signal_tilt` and `ac_signal_drift` (all default
+`False`), with a `signal_source` (recipe 101). The tests are
+`python -m pytest python/tests/test_v117_signal_aware.py -q` (16 passed).
+
+**Pitfall:** the sign convention is the whole recipe: `alignment` is `-z` for a
+buy, so a positive z (price going up) is *adverse* to a buy and shortens the
+schedule. An `expected_return` is taken as the move over the parent's
+**remaining window**, never extrapolated from the alpha's much shorter horizon.
+
+**What it is not:** a forecast of cost. The drift only reshapes the trajectory;
+whether it lowers shortfall is the paired comparison of recipe 101, in-sample.
+
+## 111. Pull resting quotes when the signal or the book turns (v1.17 B4, opt-in)
+
+**Goal:** make a PASSIVE child leave the book before it is picked off. `FadeParams`
+pulls a resting child when the signal turns adverse by `threshold_z` (signal
+units, same alignment as recipe 110) **or** the opposite side's share of the two
+L1 sizes reaches `pressure_threshold`. The pull is an ordinary cancel through
+simulator rule 7, so it travels the latency path and **can lose the race** to a
+fill. `action` decides the remainder: `hold` (off the book until the condition
+clears, then re-post or cross), `repost`, or `cross`. Save as `recipe111.py`:
+
+```python
+from iap.execution import (AlgoType, ArraySignalSource, ExecPolicy, FadeParams, ParentOrder)
+from iap.execution.fading import book_pressure, fade_rule
+
+T0, SEC = 1_787_578_200 * 10**9, 10**9
+print(book_pressure(300, 700))                                   # the opposite side holds 70 % of the two L1 sizes
+print(fade_rule(0, 2.0, 1.0, 0.95, 0.8))                         # a buy, z>0 = price going up = adverse
+print(fade_rule(0, -2.0, 1.0, 0.95, 0.8), fade_rule(0, -2.0, 1.0, 0.7, 0.8) == "")
+src = ArraySignalSource({2: [(T0 + 5 * SEC, 3.0, 3e-4)]})        # (ts, z, expected_return) per instrument id
+p = ParentOrder(parent_id=1, instrument_id=2, venue_id=1, side=0, qty=100, algo=AlgoType.TWAP,
+                start_ts=T0, end_ts=T0 + 30 * SEC, slices=1, max_child_qty=100,
+                policy=ExecPolicy.PASSIVE, urgency=0.0, signal_source=src,
+                fade=FadeParams(threshold_z=1.0, pressure_threshold=0.8, action="hold", max_fades=3))
+print(p.pulls_resting)
+```
+
+Output (run here): `0.7`, `fade:signal`, `fade:pressure True`, `True`. Replay
+the parent with `ExecutionReplay(config, [p]).run(events)`; every pull is a
+`PullRecord` on `result.pulls` (decision, rule, qty pulled, qty that filled
+while the cancel was in flight; outcome `pulled`, `partial` or `lost_race`).
+`pull_outcomes(result.pulls, timeline, tick_size)` prices the **fades saved vs
+fills missed** counterfactual. From the driver:
+
+```bash
+python -m iap.research.execution_benchmark --data-dir data --out data/scratch/bench --tag fade --sessions 20260824 --max-events 150000 --algos TWAP --sizes-pct 0.1 --policies passive,passive+fade --baseline-policy passive --signal synthetic --fade-threshold-z 1.0 --fade-pressure 0.8 --fade-action hold --fade-max 3 --markout-horizons 1s,5s --no-timestamp
+```
+
+The command runs on the generated dataset of recipes 1 and 3 in about 15
+seconds (`--signal synthetic` is the tests' deterministic sine wave; use
+`--signal EQ10` on a dataset with features). `--baseline-policy` must be one of
+`--policies` (default `native`). `BENCHMARK_fade.md` gains the sections "Fades
+saved vs fills missed" and "Markout by fill type and regime"; the JSON gains
+`fades_saved_vs_fills_missed`, `pull_rules` and `markout_decomposition`.
+`--markout-horizons` takes keys of `iap.tca.markout.DEFAULT_HORIZONS_NS`
+(`100ms`, `1s`, `5s`, `30s`, `60s`, `5min`). The rules are tested on synthetic books by
+`python -m pytest python/tests/test_v117_fading_cancels_markout.py -q` (19
+passed). The B4 study itself has not been run on multi7 (CHANGELOG B4-B6); no
+fade result is quoted here.
+
+**Pitfall:** the rules need children posted through the PASSIVE state machine:
+a `NATIVE` parent without alpha urgency, or `threshold_z > 0` with no
+`signal_source`, raises `ValueError`. A pull that loses the race is a fill the
+fade tried to avoid; the markout decomposition (recipe 114) calls it `faded`.
+
+**What it is not:** a measured saving. "Saved" and "missed" use a touch-through
+proxy (the opposite best reached the pulled price inside the horizon) on a
+book that never moved for our order; it is labelled a counterfactual.
+
+## 112. Cancel hopeless queue positions (v1.17 B5, opt-in)
+
+**Goal:** cancel a resting child whose queue position is hopeless instead of
+waiting for the deadline. `QueueCancelParams` fires on `ahead_qty >
+max_ahead_qty` (the simulator's deterministic queue position, rule 4) or, with a
+fitted `FillHazardModel`, on `P(fill within horizon_ns) < min_p_fill`. The
+depletion feature should be the **execution** depletion rate (recipe 113). The
+remainder is crossed (default) or re-posted. Save as `recipe112.py`:
+
+```python
+from iap.execution import QueueCancelParams
+from iap.execution.fading import queue_cancel_rule
+
+print(queue_cancel_rule(1500, 1000, 0.9, 0.5))     # more than max_ahead_qty ahead
+print(queue_cancel_rule(500, 1000, 0.1, 0.5))      # hazard P(fill) below the floor
+print(queue_cancel_rule(500, 1000, 0.6, 0.5) == "")
+q = QueueCancelParams(max_ahead_qty=1000, action="cross")
+print(q.horizon_ns, q.action, q.min_rest_ns)
+try:
+    QueueCancelParams(min_p_fill=0.5)              # a probability floor needs a fitted hazard model
+except ValueError as e:
+    print("refused:", e)
+```
+
+Output (run here): `queue:ahead`, `queue:p_fill`, `True`, `1000000000 cross 0`,
+`refused: QueueCancelParams.min_p_fill needs a fitted hazard model`. On a parent
+it is `ParentOrder(..., policy=ExecPolicy.PASSIVE, queue_cancel=QueueCancelParams(
+max_ahead_qty=1000))`; `min_rest_ns` is a grace period after arrival. From the
+driver, with a hazard model and a calibration estimated with the depletion
+split:
+
+```bash
+python -m iap.research.execution_benchmark --data-dir data --out data/scratch/bench --tag q --sessions 20260824 --max-events 150000 --algos TWAP --sizes-pct 0.1 --policies passive,passive+qcancel --baseline-policy passive --qcancel-max-ahead 1000 --qcancel-action cross --no-timestamp
+```
+
+That command (the queue-position leg only; it runs on the generated dataset of
+recipes 1 and 3) was run here. The probability leg adds
+`--qcancel-min-pfill 0.1 --qcancel-horizon-s 1 --qcancel-hazard hazard.json
+--qcancel-calibration calibration_split.json`: `--qcancel-hazard` is a
+`FillHazardModel` JSON (`iap.fill_hazard/1`, written by `model.save(path)`) and
+`--qcancel-calibration` must have been estimated with `depletion_split=True`
+(recipe 113); that form needs a fitted model and was not run here.
+
+**Pitfall:** `max_ahead_qty` and `min_p_fill` both `0` is an error (nothing to
+do), and `action="hold"` is not allowed here (it is a fade action). `passive+fade_qcancel`
+runs both rules; each variant pairs with plain `passive` on the same windows.
+
+**What it is not:** a fill-probability measurement. The hazard is a model fitted
+on a book that does not react to our order; B5 has not been run on multi7.
+
+## 113. Split queue depletion into executions and cancels (v1.17 B5, review X-4)
+
+**Goal:** stop pricing a passive fill with a depletion rate that counts cancels.
+A level of size `q` ahead of you empties through executions (it filled someone)
+or through cancels (the orders left). `estimate_calibration(..., depletion_split=True)`
+splits every `queue_depletion` cell into `exec_depletions` and
+`cancel_depletions` with both rates; `ExecCalibration.queue_exec_depletion_hazard`
+is the rate that fills a resting order and is what
+`sor_v2.hazard_fill_prob` now documents as its input. Default off: the
+document is byte-identical without the flag. Save as `recipe113.py`:
+
+```python
+from iap.core.events import EventType, MarketEvent
+from iap.execution.calibration import ExecCalibration, estimate_calibration
+
+T0, SEC = 1_787_578_200 * 10**9, 10**9
+def ev(seq, ts, et, side, px, qty, oid):
+    return MarketEvent(seq, 7, 1, ts, ts, seq, int(et), side, px, qty, oid, 0)
+
+evs = [ev(1, T0, EventType.ADD, 1, 105, 100, 900),            # a standing ask
+       ev(2, T0 + 1, EventType.ADD, 0, 100, 100, 1),
+       ev(3, T0 + SEC, EventType.EXECUTE, 0, 100, 100, 1),    # bid 100 traded through
+       ev(4, T0 + 2 * SEC, EventType.ADD, 0, 100, 100, 2),
+       ev(5, T0 + 4 * SEC, EventType.CANCEL, 0, 100, 100, 2), # bid 100 cancelled away
+       ev(6, T0 + 5 * SEC, EventType.ADD, 0, 100, 100, 3),
+       ev(7, T0 + 9 * SEC, EventType.HEARTBEAT, 0, 0, 0, 0)]
+split = estimate_calibration(evs, {7: 0.01}, queue_edges=(0, 500), depletion_split=True)
+cell = split["queue_depletion"]["bid"]["1-500"]
+print({k: cell[k] for k in ("depletions", "exec_depletions", "cancel_depletions", "exposure_s")})
+print(round(cell["hazard_per_s"], 4), round(cell["exec_hazard_per_s"], 4), round(cell["cancel_hazard_per_s"], 4))
+cal = ExecCalibration.from_dict(split)
+print(cal.queue_exec_depletion_hazard(0, 10), cal.queue_depletion_hazard(0, 10))
+```
+
+Output (run here; the same stream as the unit test, 7 s of exposure):
+
+```text
+{'depletions': 2, 'exec_depletions': 1, 'cancel_depletions': 1, 'exposure_s': 6.999999999}
+0.2857 0.1429 0.1429
+0.14285714287755102 0.28571428575510205
+```
+
+The pooled rate (2/7) is double the fill rate (1/7) because half the
+depletions were cancels. Write a real calibration to a file with
+`json.dump(split, open(...))` and pass it to recipe 112's
+`--qcancel-calibration`; the module's own CLI
+(`python -m iap.execution.calibration --events ... --tick 7=0.01 --out ...`) does
+not expose the split.
+
+**Pitfall:** `queue_exec_depletion_hazard` returns `None` for a calibration
+estimated without the split, or for an empty cell: check before using it as a
+fill rate.
+
+**What it is not:** a fill model by itself. It is an empirical rate per queue
+bucket and side; it ignores that your own order changes nothing in the replay.
+
+## 114. Decompose markouts by fill type and regime, day-clustered (v1.17 B6)
+
+**Goal:** stop pooling every fill into one markout. `iap.tca.markout_decomposition`
+labels each fill `passive`, `aggressive`, `faded` (a maker fill that landed after
+a B4/B5 cancel was sent: the cancel lost the race) or `cancelled_replaced` (a
+maker fill of a child that re-sent a cancelled remainder), tags it with its B2
+regime (`agree`, `adverse`, `neutral`, `no_signal`, `stale`, or `plain`), and
+reports the mean markout and price impact per cell with the **day-clustered**
+standard error of the v1.17 gate form (CR1, one cluster per day, Student-t with
+`G - 1` df). Save as `recipe114.py`:
+
+```python
+from iap.tca.markout_decomposition import FILL_TYPES, cluster_mean
+
+print(FILL_TYPES)
+r = cluster_mean([1.0, 3.0, 2.0, 6.0, 5.0, 7.0], ["d1", "d1", "d2", "d2", "d3", "d3"])
+print({k: (round(v, 3) if isinstance(v, float) else v) for k, v in r.items() if k != "ci95"}, [round(x, 2) for x in r["ci95"]])
+print(cluster_mean([1.0, 3.0], ["d1", "d1"])["se"])      # one day: no standard error
+```
+
+Output (run here): `('passive', 'aggressive', 'faded', 'cancelled_replaced')`,
+then `{'n': 6, 'n_clusters': 3, 'mean': 4.0, 'se': 1.155, 't': 3.464, 'df': 2,
+'p_student_t': 0.074} [-0.97, 8.97]` and `None`. On a replay, a sketch (`res`, `timeline`, `tick_size` come from your own
+`ExecutionReplay` run and `build_timeline`):
+
+```python
+orders = {o.order_id: o for kids in res.children.values() for o in kids}
+rows = fill_rows(res.fills, orders, timeline, tick_size, cluster="20190130")   # one session -> plain rows
+table = decompose(rows, list(DEFAULT_HORIZONS_NS))                              # any pooled list of rows
+```
+
+`from iap.tca.markout_decomposition import decompose, fill_rows` and
+`from iap.tca.markout import DEFAULT_HORIZONS_NS`; `markout_decomposition(fills,
+orders, timeline, tick_size)` is the one-session shortcut. The benchmark driver
+does the pooling per policy (`markout_decomposition` in
+`benchmark_<tag>.json`; horizons from `--markout-horizons`).
+
+**Pitfall:** fills of one day are never independent: with a single day the SE is
+`None`, and with two or three days the t-interval is very wide (df 2 above).
+Positive markout means the fill looks good `h` later (the `iap.tca.markout`
+sign).
+
+**What it is not:** a causal split of adverse selection. It conditions on how a
+fill arose in a replay whose book never reacts; it is report-only, no gate reads
+it.
+
+## 115. Fit the fill-hazard time-of-day on the exchange clock (v1.17 B6, review X-8)
+
+**Goal:** make the hazard model's time-of-day feature mean the same thing on
+Nasdaq (local New York clock) and IEX (capture clock is TAI, 37 s ahead of UTC).
+`FillHazardModel(clock="America/New_York", capture_offset_s=IEX_TAI_OFFSET_S)`
+fits `tod` on the exchange clock; `to_dict` names the clock, and a v1.12
+document without one loads as `"utc"`. The default stays the pinned UTC day
+fraction. Save as `recipe115.py`:
+
+```python
+from iap.execution.fill_hazard import IEX_TAI_OFFSET_S, FillHazardModel, time_of_day
+
+ts = 1_779_114_600 * 10**9                      # 2026-05-18 14:30:00 UTC = 10:30 in New York
+print(time_of_day(ts), time_of_day(ts, "America/New_York"), 10.5 / 24)
+tai = ts + IEX_TAI_OFFSET_S * 10**9             # the same instant on the IEX capture clock (TAI = UTC + 37 s)
+print(time_of_day(tai, "America/New_York", IEX_TAI_OFFSET_S))
+m = FillHazardModel(clock="America/New_York", capture_offset_s=IEX_TAI_OFFSET_S)
+print(m.clock, m.capture_offset_s, FillHazardModel().clock)
+```
+
+Output (run here): `0.6041666666666666 0.4375 0.4375`, `0.4375`,
+`America/New_York 37 utc`. A model must be queried with the clock it was fitted
+on: `model.features(..., ts_ns=...)` and `hazard_features` take the model's
+`clock` and `capture_offset_s`, and the replay's B5 rule uses the model's own
+(`test_queue_p_fill_cancel_uses_the_hazard_on_the_models_clock`).
+
+**Pitfall:** a UTC-clock model fitted on New York sessions puts the 09:30 open at
+0.5625 of the day in summer (13:30 UTC) and 0.604 in winter (14:30 UTC), because
+daylight saving moves it; the exchange-clock fit removes that. Use `capture_offset_s=0` for Nasdaq ITCH.
+
+## 116. Run the cross-sectional breadth book (v1.17 C1 / C2)
+
+**Goal:** backtest a cross-sectional book through the optimizer, with costs in
+the objective. At every rebalance (fixed clock, `--rebalance-min`) the driver
+scores the universe (`eq11`, or `eq10_beta_gap`: EQ10's demeaned beta gap),
+maps ranks to target weights (`linear`, or `deciles`), solves the portfolio
+problem with spread, fee and a sqrt/power impact term inside, dollar, beta and
+sector neutrality (`configs/reference/sectors.json`), a participation cap and a
+turnover cap (Dykstra projection, so the neutrality rows are met exactly), and
+accounts the P&L exactly (`net == gross - spread - fee - impact`). After
+recipes 1 and 3:
+
+```bash
+python -m iap.research.breadth_book --features-dir data/features --out data/scratch/book --tag synthetic --ledger data/scratch/book_ledger.json --no-timestamp
+```
+
+Output (run here on the generated dataset):
+`names=11 rebalances=156 gross=-1799.79 net=-12092.74 costs=10292.95`, the same
+figures as the committed `research/breadth/book/BOOK_synthetic.md` (spread
+5452.46, fee 1251.95, impact 3588.54, 11 names, 2 sessions). Other switches:
+`--score eq10_beta_gap`, `--weights deciles --decile-q 0.2`,
+`--impact calibration --calibration <json> --impact-shape power`,
+`--no-dollar-neutral`, `--no-beta-neutral`, `--no-sector-neutral`,
+`--dataset-dir <ingested dir>` instead of `--features-dir`. Tests:
+`python -m pytest python/tests/test_v117_breadth_book.py -q` (15 passed).
+
+**Pitfall:** every run that reads a statistic is **one ledger look** of kind
+`breadth_book` in `--ledger` (default `research/experiments.json`, a tracked
+file): point `--ledger` elsewhere for experiments, and never pass `--no-ledger`
+outside tests. A `holdout` path is refused without `--allow-holdout`. A name
+with a stale mid at a rebalance is frozen, not traded.
+
+**What it is not:** a breadth result at 3 names. `BOOK_multi7.md` is the 3-name
+plumbing smoke (net -9553.03 at 1,000,000 notional); it carries a "Smoke test" notice. Net P&L is negative in both committed books.
+
+## 117. Read the breadth report: effective bets and break-even size (v1.17 C7)
+
+**Goal:** read what the book's P&L means against breadth. The report is written by
+the book driver (recipe 116) as `BOOK_<tag>.md` / `book_<tag>.json` via
+`iap.research.breadth_report.breadth_report`; it is report-only arithmetic that no
+gate reads. It gives breadth (names scored, rebalances per session), **effective
+bets** (participation ratio of the return-correlation eigenvalues), the
+fundamental-law yardstick (`IR_implied = IC * sqrt(BR)`, no costs, no
+constraints), net Sharpe **at size** (the book re-run at `--sizes` multiples of
+the notional), the break-even notional and a single-name capacity proxy, with
+day-clustered SEs. The committed `research/breadth/book/BOOK_synthetic.md`
+reads: effective bets 10.33 of 11; mean rank IC -0.0745 (day-clustered t -1.68,
+df 1); IR implied -33.59; break-even "below (at 0.25x)", i.e. net P&L is
+negative already at the smallest size. Its 3-name multi7 sibling reads effective
+bets 1.46 of 3 and mean rank IC 0.0626 (t 2.73, df 6). The break-even helper is
+pure and checkable (save as `recipe117.py`):
+
+```python
+from iap.research.breadth_report import breakeven_notional
+
+print(breakeven_notional([0.25, 0.5, 1, 2], [3.0, 1.0, -1.0, -5.0]))   # net P&L by size multiple
+```
+
+Output (run here): `{'notional': 0.75, 'status': 'crossed', 'at': None}`:
+linear interpolation between the sizes where net P&L changes sign.
+
+**Pitfall:** `IR_implied` is what the IC *would* imply with no costs; the realised
+net Sharpe is the number to read. The per-rebalance Sharpe is annualised by
+`sqrt(rebalances_per_day * 252)` over non-independent intervals, so it is a
+scale, not a test. With 1 or 2 sessions the day-clustered `df` is 1 and the t is
+meaningless.
+
+**What it is not:** a capacity estimate for the book. The capacity line is a
+single-name proxy at the median mid, half spread and ADV.
+
+## 118. Standardise each instrument against itself: `linear_z_v2` (v1.17 C3)
+
+**Goal:** stop the loudest instrument from setting every z. `linear_z_v1` pools
+`mu`/`sigma` of the raw signal across the universe, so on a real multi-name
+dataset QQQ sets the `conf_min` eligibility of the others (review R-7).
+`linear_z_v2` standardises each instrument against its own causal window
+(`std_window`, default `30m`, at least 32 observations). It is a **new model
+identity**: the twins are `EQ01_z2 ... FX12_z2` (21 of them; the cross-sectional
+EQ11, FX05 and FX06 have none), the registered alphas and their fingerprints do
+not change. After recipes 1 and 3, save as `recipe118.py`:
+
+```python
+from iap.alpha import build
+from iap.alpha.data import load_features
+from iap.alpha.linear_v2 import build_v2, linear_z_v2
+
+frames = load_features("data/features")
+v1, v2 = build("EQ03"), build_v2("EQ03")            # build_v2("EQ03_z2") is the same
+v1.fit(frames); v2.fit(frames)
+print(v1.params()["model"], v2.params()["model"], v2.alpha_id, v2.params()["std_window"])
+for name, m in (("v1", v1), ("v2", v2)):
+    s = m.score(frames)
+    print(name, "rows with confidence>0:", sum(int((d["confidence"] > 0).sum()) for d in s.values()))
+```
+
+The first line reads `linear_z_v1 linear_z_v2 EQ03_z2 30m`. A non-default
+window is its own id: `linear_z_v2(type(build("EQ03")), std_window="1h")` is
+`EQ03_z2_1h`. Tests: `python -m pytest python/tests/test_linear_v2.py -q` (30
+passed). The first study is pre-registered as a DRAFT only
+(`research/preregs/linear_z_v2_prereg_DRAFT.json`, unsigned).
+
+**Pitfall:** the research CLI cannot run a twin: `python -m iap.research run
+--alpha EQ03_z2` prints `unknown alpha_id` (it lists only the registered ids and
+`ML01`). Validate a twin from Python (`validate_alpha` with a `model_factory`,
+API_ALPHA §11.1). The ports reject `linear_z_v2` by design; it is Python-only.
+
+**What it is not:** a better alpha. It changes the standardisation, not the
+signal, and no number is claimed: no study has run.
+
+## 119. Combine signals with `decay_aware` and the v1.17 stacking fixes (v1.17 C3)
+
+**Goal:** run the combiner with the revised ridge/shrinkage solve and the new
+`decay_aware` method. Review R-8: `ridge` and `shrinkage_mv` now solve on
+**pairwise-complete moments** (a no-opinion row no longer enters `Z'Z/n` as 0)
+and the ridge penalty search re-standardises inside each forward-chained split;
+`decay_aware` weights members by IC times a survival ratio at the combination
+horizon (purge-masked own-horizon labels). `STACKING_REVISION = "v1.17"` goes
+into every **new** combination experiment identity; existing identities
+reproduce byte for byte. After recipes 1 and 3 (a dry run still debits the
+ledger, so use a scratch one):
+
+```bash
+python -m iap.research combine --asset-class EQUITY --method decay_aware --horizon 5s --dry-run --no-prereg --ledger data/scratch/ledger_combine.json --combine-out-dir data/scratch/comb
+```
+
+On the generated dataset this prints `COMB_EQ: member pass (12 members, horizon
+5s)`, `COMB_EQ: validating decay_aware` and `dry run: no report written (the
+looks are debited)`. The methods are `iap.combine.METHODS` = `equal_weight`,
+`ic_weighted`, `ridge`, `shrinkage_mv`, `decay_aware`; without `--method` the
+driver runs its default set of methods (`run_combination` presents
+`decay_aware` as the default method).
+`CombinedAlpha(member_ids, method="decay_aware")` is the Python form. Tests:
+`python -m pytest python/tests/test_combine_v117.py -q` (9 passed).
+
+**Pitfall:** `--no-prereg` marks the run exploratory and says so; a combination
+that is meant as evidence needs its combination id pre-registered on the
+blackboard first (recipe 99). A dry run is still a look in the ledger.
+
+**What it is not:** a claim that combining helps. The report is whatever the data
+say; the synthetic dataset's numbers are not evidence.
+
+## 120. Compute long-window features and session-truncated labels (v1.17 C4)
+
+**Goal:** get 15 m / 30 m / 1 h features and labels without touching the
+registered 205-feature set. `FeatureV2Extension` attaches to a running
+`FeatureEngine` and emits a second vector per base emission; the `longwin`
+family has 12 features (`ret_log_w`, `rvol_w`, `trend_score_w`, `range_w` x 3
+windows, names ending `_v2`) and its own registry hash on top of the default
+set's (`585dd7b9...`, unchanged). A window never spans a session: the state is
+cleared at each session-local day and after a stale recovery, so the 1 h
+features exist from 10:30 on a 09:30 open. After recipe 1:
+
+```python
+import itertools
+from pathlib import Path
+from iap.core.codec import iter_iap1
+from iap.features.context import build_contexts
+from iap.features.engine import FeatureEngine
+from iap.features.feature_v2 import FeatureV2Extension, v2_frame, v2_registry_hash
+
+eng = FeatureEngine(build_contexts(Path("configs")), cadence_ns=0)
+ext = FeatureV2Extension(eng, keep=True, families=["longwin"])        # longwin only: no ADV needed
+for ev in itertools.islice(iter_iap1("data/normalized/eq_20260824.normalized.iap1"), 120_000):
+    eng.apply(ev)
+df = v2_frame(ext.vectors, ["longwin"])
+print(len(ext.vectors), df.shape, v2_registry_hash(["longwin"])[:12])
+print([c for c in df.columns if c.endswith("_v2")][:4], int(df["ret_log_w15m_v2"].notna().sum()))
+```
+
+On the generated dataset the frame has 13 columns (`exchange_ts` plus the 12
+features) and the first four feature columns are `ret_log_w15m_v2`,
+`rvol_w15m_v2`, `trend_score_w15m_v2`, `range_w15m_v2`. The labels
+(`iap.labels.labels_v2.compute_labels_v2`) truncate at the session close and
+flag it; save as `recipe120b.py`:
+
+```python
+from iap.labels.labels import MidSeries
+from iap.labels.labels_v2 import compute_labels_v2
+
+SEC = 10**9
+close = 1_787_600_000 * SEC                     # the session close instant (epoch ns)
+s = MidSeries()                                 # an always-tradable mid, one sample a second
+for k in range(2 * 3600 + 1):
+    s.ts.append(close - 2 * 3600 * SEC + k * SEC); s.mid.append(100.0 + 0.0001 * k)
+    s.half_spread.append(0.005); s.tradable.append(True)
+anchors = [close - 3600 * SEC, close - 1200 * SEC, close - 60 * SEC, close]
+res = compute_labels_v2(anchors, s, last_event_ts=close, session_close=close)
+for h in ("15m", "30m", "1h"):
+    r = res[h]
+    print(h, r.valid, r.truncated, [t // SEC for t in r.effective_horizon_ns])
+```
+
+Output (run here):
+
+```text
+15m [True, True, True, False] [False, False, True, False] [900, 900, 60, 0]
+30m [True, True, True, False] [False, True, True, False] [1800, 1200, 60, 0]
+1h [True, True, True, False] [False, True, True, False] [3600, 1200, 60, 0]
+```
+
+An anchor at the close is invalid (`AFTER_CLOSE`); one 60 s before it has a
+`truncated` label whose effective horizon is 60 s, not 900 s. Goldens:
+`tests/golden/expected_features_v2.json` and `expected_labels_v2.json`
+(`python -m pytest python/tests/test_feature_v2.py python/tests/test_labels_v2.py -q`).
+
+**Pitfall:** a truncated label is a return over a shorter horizon, not an `h`
+return: filter on `truncated` for full-horizon labels. The feature store CLI does
+not write v2 features and no port computes them (Python reference only,
+pending F7/F8), and `HORIZONS_NS` / `VALID_HORIZONS` still stop at 15 m / 5 m.
+
+## 121. Condition an alpha on the volatility regime and gate by regime (v1.17 C5)
+
+**Goal:** let an alpha's slope differ by regime, and judge it regime by regime.
+`RegimeConditionedAlpha(member_id, mode, regime_features)` wraps a registered
+per-instrument alpha (id `<member>_rc`, model `regime_conditioned_v1`): in
+`per_regime` mode `er = beta_r * z` with `beta_r` the OLS slope inside regime `r`
+(the pooled slope where a regime has fewer than 32 pairs); `interaction` fits one
+OLS with `z * flag` terms. The regime is the declared flags read as bits, `-1`
+where a flag is missing. After recipes 1 and 3:
+
+```python
+from iap.alpha.data import load_features
+from iap.alpha.regime_conditioned import RegimeConditionedAlpha
+
+frames = load_features("data/features")
+m = RegimeConditionedAlpha("EQ03", mode="per_regime", regime_features=("vol_regime_flag_v1",))
+m.fit(frames)
+p = m.params()
+print(m.alpha_id, p["model"], p["beta"] != 0, sorted(p["beta_by_regime"]), p["n_by_regime"])
+```
+
+Output (run here on the generated dataset): `EQ03_rc regime_conditioned_v1 True
+['0', '1'] {'-1': 10545, '0': 85921, '1': 63121}`. The gate side is
+`iap.validation.regime_gate`: the same `gate_statistics` every gate reads, per
+regime. Save as `recipe121.py`:
+
+```python
+import numpy as np
+from iap.validation.regime_gate import regime_gate, regime_gate_statistics
+
+rng = np.random.default_rng(7)
+day = 86_400 * 10**9
+ts = np.concatenate([d * day + np.arange(4000) * 10**9 for d in range(5)])
+label = rng.normal(size=ts.size)
+regime = (np.arange(ts.size) // 100) % 2                       # 0 = calm, 1 = volatile, in blocks of 100 s
+score = np.where(regime == 0, 0.3 * label, 0.0) + rng.normal(size=ts.size)   # the signal works in regime 0 only
+stats = regime_gate_statistics(ts, score, label, regime, horizon_ns=5 * 10**9)
+for r, b in sorted(stats["by_regime"].items()):
+    print("regime", r, "ic", round(b["ic"], 3), "t_hac", round(b["tstat_hac"], 2), "pairs", b["n_pairs"])
+print(regime_gate(stats))
+print(regime_gate(stats, min_t=2.0)["passed"])
+```
+
+Output (run here): regime 0 has IC 0.295 and t_hac 41.26, regime 1 has IC 0.005
+and t_hac 0.5 (10,000 pairs each); the default `regime_gate(stats)` **passes**
+(`worst_regime '1'`, `worst_ic 0.005`) and `regime_gate(stats, min_t=2.0)["passed"]`
+is `False`. Tests: `python -m pytest python/tests/test_regime_conditioned.py -q`
+(10 passed).
+
+**Pitfall:** the default thresholds (`min_ic=0`, `min_t=0`) pass a regime whose IC
+is a hair above zero; set `min_t` and `max_ic_ratio` deliberately, before you
+look. A regime with fewer than `min_pairs` (256) finite pairs is reported but not
+judged. Nothing calls the gate by default: `validate_alpha` and every published
+verdict are unchanged.
+
+**What it is not:** a fit that survives out of sample. The per-regime slope is
+estimated on the training rows and the planted example above is a demonstration
+of the mechanism, not a market result.
+
+## 122. Fit a gradient-boosted alpha behind the `AlphaModel` interface: `ML01` (v1.17 D1)
+
+**Goal:** judge a GBM by the same chain as the linear alphas. `GbmAlpha` (id
+`ML01`) fits one model per horizon (1 s, 5 s, 30 s; the pinned horizon is 5 s) on
+the curated ML predictor set, runs a hypothesis sign check on a held-out slice
+of the training fold, and writes its fitted models to a SHA-256-checked pickle
+sidecar so that `load_params` reproduces the scores exactly. It is opt-in:
+`register_ml_alphas()` adds it to `ALPHA_CLASSES` and never to `ALPHA_IDS`, so
+`run_all.py` and every report are unchanged. After recipes 1 and 3, save as
+`recipe122.py`:
+
+```python
+import tempfile
+from iap.alpha import ALPHA_IDS, build, register_ml_alphas
+from iap.alpha.data import load_features
+from iap.alpha.gbm import GbmAlpha
+
+print(register_ml_alphas(), "ML01" in ALPHA_IDS)          # opt-in: never in ALPHA_IDS
+frames = load_features("data/features")
+m = build("ML01")
+m.max_iter = 40                                           # a quick fit for the recipe; None = the zoo's pinned count
+m.fit(frames)
+p = m.params()
+print(p["model"], p["backend"], p["horizon"], p["hypothesis_confirmed"], p["dead"])
+m.save_sidecar(tempfile.mkdtemp())                        # default: research/models/gbm/
+q = GbmAlpha(); q.load_params(m.params())
+a, b = m.score(frames), q.score(frames)
+print(all((a[i]["expected_return"].to_numpy() == b[i]["expected_return"].to_numpy()).all() for i in a))
+```
+
+Output (run here on the generated dataset, about 15 s): `['ML01'] False`, then
+`gbm_v1 hist_gbdt 5s True False`, then `True` (the reloaded model scores
+identically). Through the research chain, naming it registers it:
+
+```bash
+python -m iap.research run --alpha ML01 --no-prereg --dry-run --ledger data/scratch/ledger_ml.json
+```
+
+(after recipes 1 and 3; `--no-prereg` marks the run exploratory). The CHANGELOG
+records the synthetic dry run: IC +0.055, gate t +6.0, verdict ITERATE,
+exploratory. That command was not run end to end here (the tracker needs the
+repo's `data/normalized`); the registration message and flags were checked, and
+the path is tested by `python -m pytest python/tests/test_wsd_gbm_gates.py -q`
+(15 passed). `xgboost` / `lightgbm` backends are used when installed and are
+named in the params.
+
+**Pitfall:** `load_params` refuses a sidecar whose digest differs from
+`model_sha256` (checked before unpickling, and the unpickler admits only the
+learner libraries' classes), so keep the `.pkl` with the params. A fit with fewer
+than 32 usable rows at a horizon has no model there and is dead at it.
+
+**What it is not:** a new result. No registered alpha, golden or published number
+moves; ML01 is judged only if you run it, and the synthetic dry run is not evidence.
+
+## 123. Choose the meta-label threshold on rows the calibrator never saw (v1.17 D2, review R-5)
+
+**Goal:** stop selecting `tau` on the rows the calibrator was fitted on.
+`run_meta_labeling(split_mode="calibrate_select")` splits the OOS region 40/20/20/20
+into train / calibration / **select** / test (purged and embargoed at every
+boundary): the calibrator is fitted on calibration, `best_tau` is chosen on the
+disjoint select segment, both taus are read on test. `"legacy"` (default) is the
+v1.16 split, unchanged. `primary_selection_window=(start_ts, end_ts)` purges the
+fold the primary signal was selected on from the calibration rows and counts them.
+Save as `recipe123.py` (the helper builds a planted dataset; use
+`iap.models.dataset.load_dataset()` for real features):
+
+```python
+import numpy as np
+from iap.core.rng import SplitMix64
+from iap.models.dataset import Dataset
+from iap.models.metalabel import run_meta_labeling
+
+def planted_dataset(n_days=6, per_day=500, rho=0.6, seed=11) -> Dataset:
+    rng = SplitMix64(seed); ts, xs, ys = [], [], []
+    for d in range(n_days):
+        for i in range(per_day):
+            ts.append(d * 86_400 * 10**9 + 14 * 3600 * 10**9 + i * 30 * 10**9)
+            x0, x1, e = rng.normal(), rng.normal(), rng.normal()
+            xs.append((x0, x1)); ys.append((rho * x0 + np.sqrt(1 - rho * rho) * e) * 1e-3)
+    y = np.array(ys); meta = np.zeros((len(y), 6)); meta[:, 4] = 1.0
+    return Dataset(X=np.array(xs), y=y, y_mid=y.copy(), ts=np.array(ts, dtype=np.int64),
+                   instrument_id=np.ones(len(y), dtype=np.int32), feature_names=["f0", "f1"], meta_context=meta)
+
+ds = planted_dataset()
+for mode in ("legacy", "calibrate_select"):
+    r = run_meta_labeling(ds, ds.X[:, 0], split_mode=mode, tau=0.5)
+    print(mode, r["segments"], r["selection_segment"])
+r = run_meta_labeling(ds, ds.X[:, 0], split_mode="calibrate_select", primary_selection_window=(int(ds.ts[0]), int(ds.ts[700])))
+print(r["n_calibration_rows_purged_for_primary_selection"], r["calibration_overlaps_primary_selection"])
+```
+
+Output (run here): the `calibrate_select` line reads `{'train': 1200,
+'calibration': 597, 'select': 597, 'test': 597} select`, the legacy line has
+`selection_segment` `calibration`, and the last line is `0 False` (the window
+covers no calibration rows here). The result also records `segment_windows`,
+`best_tau_from_calibration` and the economics gate at `tau` and at the chosen tau.
+With a `ledger` the choice is **one look** of kind `metalabel_tau` (recipe 127).
+Tests: `python -m pytest python/tests/test_wsd_sizing_v117.py -q` (14 passed).
+
+**Pitfall:** the result key `best_tau_from_calibration` keeps its v1.16 name in both
+modes; the result's `selection_segment` (`calibration` or `select`) says which rows
+the tau was actually chosen on. Pass `primary_selection_window` whenever the primary was selected on one of
+the folds, or the calibration fold can overlap it.
+
+**What it is not:** an out-of-sample guarantee; the test segment is the only
+segment no choice saw, and it is one slice of one dataset.
+
+## 124. Size by conformal width and report coverage by regime (v1.17 D3)
+
+**Goal:** scale a target by how wide its conformal interval is, and check that the
+interval is honest in each regime. `conformal_sizing_hook(calibrator)` is a
+`SizingHook` for `Backtester(sizing_hook=hook)`: the multiplier is
+`confidence_from_width(hi - lo, ref_width)` in `[0, 1]` (`ref_width` defaults to
+the calibration's median width, `cal_median_width`), applied at the **decision
+row** before latency, session flatten and the fill cap. `coverage_by_regime`
+reports empirical coverage against nominal per regime with the day-clustered t of
+the shortfall `1{covered} - nominal`. Save as `recipe124.py`:
+
+```python
+import numpy as np
+from iap.models.conformal import SplitConformal, confidence_from_width, conformal_sizing_hook, coverage_by_regime
+
+rng = np.random.default_rng(3)
+n = 4000
+regime = (np.arange(n) // 250) % 2                      # 0 = calm, 1 = volatile (3x the noise)
+pred = rng.normal(size=n)
+y = pred + np.where(regime == 0, 1.0, 3.0) * rng.normal(size=n)
+cal = SplitConformal(alpha=0.1).fit(y[:2000], pred[:2000])            # calibrated on a mixed window
+lo, hi = cal.interval(pred[2000:])
+print("n_cal", cal.n_cal, "median width", round(cal.cal_median_width, 2))
+print([confidence_from_width(w, cal.cal_median_width) for w in (cal.cal_median_width, 2 * cal.cal_median_width)])
+hook = conformal_sizing_hook(cal)                       # a SizingHook for Backtester(sizing_hook=hook)
+
+day = 86_400 * 10**9
+idx = np.arange(2000, n)
+rep = coverage_by_regime(idx * 10**9 + (idx // 3000) * day, y[2000:], lo, hi, regime[2000:], alpha=0.1, day_ns=day)
+for r, b in sorted(rep["by_regime"].items()):
+    print("regime", r, "coverage", round(b["coverage"], 3), "nominal", b["nominal"], "under_coverage", b["under_coverage"])
+print(rep["under_covered_regimes"], rep["enforced"], rep["passed"])
+```
+
+Output (run here):
+
+```text
+n_cal 2000 median width 7.85
+[1.0, 0.5]
+regime 0 coverage 1.0 nominal 0.9 under_coverage False
+regime 1 coverage 0.815 nominal 0.9 under_coverage True
+['1'] False None
+```
+
+A single interval calibrated on a mixed window over-covers the calm regime and
+under-covers the volatile one: the pooled number would have read about nominal.
+The MVP engine takes the same rule through the optional `portfolio.conformal`
+block of `mvp.json` (`ConformalSpec`: `alpha`, `method`, `gamma`, `window`,
+`warmup`, `ref_width`, `enabled`; docs/MVP.md §11); the block is absent from
+`configs/mvp/mvp.json` and `mvp_tiny.json`, so the golden run is byte-identical.
+Tests: `python -m pytest python/tests/test_wsd_sizing_v117.py python/tests/test_conformal_v115.py -q`.
+
+**Pitfall:** coverage by regime is **reported, not enforced**: `enforced` is
+`false` and `passed` is `None` unless you pass `enforce=True`, and nothing in the
+platform calls it. With fewer than two days the clustered t is meaningless (the
+calm regime above has zero variance in its shortfall, so its t is astronomically
+large: read `coverage` and `under_coverage`). With a `ledger` the read is one look
+of kind `conformal_coverage_gate`. Conformal validity needs exchangeability;
+`AdaptiveConformal` (v1.15) is the non-stationary variant.
+
+**What it is not:** a position-size optimiser. The multiplier only scales an
+existing target down (it is clipped to `[0, 1]`) and a missing sigma returns `missing`.
+
+## 125. Gate the model zoo on a day-clustered reading and demean CPCV paths (v1.17 D4)
+
+**Goal:** two opt-in readings that default to the pinned rule. (1) The zoo's tier-0
+gate: `run_model_comparison(gate="clustered")` passes only when the fold-mean rank
+IC against the mid label is positive **and** the day-clustered t of the
+per-fold-standardised pooled OOS predictions clears `gate_t_threshold` (default
+2.0); both the literal and the clustered reading are recorded in
+`results["gate"]` whichever decides. (2) `validate_alpha(cpcv_path_ic="demeaned")`
+standardises every (split, group) before pooling a CPCV path, so a fit of another
+scale cannot bias the path IC (review R-9). Save as `recipe125.py` (it reuses the
+`planted_dataset` helper of recipe 123 from a module named `zoo.py`):
+
+```python
+from zoo import planted_dataset
+from iap.models.pipeline import run_model_comparison
+
+ds = planted_dataset()
+for rule in ("literal", "clustered"):
+    g = run_model_comparison(ds, n_folds=3, embargo_ns=5 * 10**9, gate=rule)["gate"]
+    print(rule, g["gate_rule"], g["passed"], g["literal"]["passed"], g["clustered"]["passed"], g["clustered"]["n_days"])
+one_day = planted_dataset(n_days=1, per_day=1200)
+g = run_model_comparison(one_day, n_folds=3, embargo_ns=5 * 10**9, gate="clustered")["gate"]
+print("one day", g["passed"], g["literal"]["passed"], g["clustered"]["n_days"])
+```
+
+Output (run here): `literal literal True True True 5`, `clustered clustered True True True 5` (five out-of-sample days), then `one day False True 1`: on a single day no clustered t exists,
+so the clustered gate fails even though the IC is large and the literal rule
+passes. For CPCV, `validate_alpha(..., cpcv_path_ic="demeaned")` (also the
+`cpcv_path_ic` field of the methods bundle) puts `path_ics_demeaned` beside the
+pooled `path_ics` in every `cpcv` block and `path_ic_rule` names the headline;
+`python -m pytest python/tests/test_wsd_gbm_gates.py -q` (15 passed) includes the
+test that shows the pooled rule biased by a scaled fit and the demeaned one not.
+
+**Pitfall:** `gate_t_threshold <= 0` and an unknown gate name raise `ValueError`.
+A model skipped by a closed clustered gate is recorded in `skipped_models`. The
+zoo gate is one ledger look (kind `model_zoo_gate`) when a `ledger` is passed.
+
+**What it is not:** a change to any published verdict. Both defaults are the old
+rules; no registered result is recomputed.
+
+## 126. Run the v1.17 statistics revision and the DSR recompute (v1.17 0.1-0.3)
+
+**Goal:** know what the revised statistics change and how to get the old ones back.
+(0.2, R-2) one `gate_statistics()` (pooled IC, pooled-slope HAC t at the bundle's
+bandwidth and day separation, day-cluster t, `n_pairs`, `n_days`) now sits behind
+the walk-forward gate, the frozen-params block, the `validity` block and
+`tools/r7_confirm.py`; the gate t values are unchanged. (0.3, R-3) the `v2`, `v3`
+and `v4` bundles pass `feature_window_ns="registry"`: every two-sided split
+(`leave_one_day_out`, the `cpcv` block) gets a post-block embargo of at least the
+longest feature window (5 m), not the 60 s embargo alone. The v1.14.0 rules are
+frozen as `v2_v114`, `v3_v114`, `v4_v114`. Save as `recipe126.py`:
+
+```python
+import numpy as np
+from iap.validation.methods import METHODS, STATS_REVISION, methods
+from iap.validation.metrics import gate_statistics
+
+print(STATS_REVISION, sorted(METHODS))
+for k in ("v2", "v2_v114", "v3", "v4_v114"):
+    b = methods(k)
+    print(k, b.feature_window, b.revision)
+
+rng = np.random.default_rng(7)
+day = 86_400 * 10**9
+ts = np.concatenate([d * day + np.arange(2000) * 10**9 for d in range(5)])
+y = rng.normal(size=ts.size)
+print(sorted(gate_statistics(ts, 0.1 * y + rng.normal(size=ts.size), y, horizon_ns=5 * 10**9)))
+```
+
+Output (run here): `v1.17 ['legacy_v1', 'v2', 'v2_v113', 'v2_v114', 'v3', 'v3_v113',
+'v3_v114', 'v4', 'v4_v113', 'v4_v114']`, then `v2 registry v1.17`, `v2_v114 None
+v1.14`, `v3 registry v1.17`, `v4_v114 None v1.14`, then the statistic's keys
+(`hac_bandwidth`, `hac_day_separated`, `hac_lags`, `ic`, `n_days`, `n_pairs`,
+`tstat_day_cluster`, `tstat_hac`). Run a study under the old rules with
+`python -m iap.research run --alpha EQ03 --methods v2_v114 ...`. Ledger identities
+carry `stats_revision: "v1.17"`, and entries recorded at `"v1.14"` scope to the
+`*_v114` bundles (an unknown revision raises).
+
+The R7 confirmatory deflated Sharpe had been recorded at the holdout ledger's own
+trial count (N = 1 or 2). The re-deflation at the registered N is committed:
+`research/r7/r7_confirm_result_dsr_recompute.md` (EQ10@1s DSR 0.99995 -> 0.99886 at
+N = 297 at the look, 0.99885 at N = 308 today; EQ05@1s 0.9999998 -> 0.99996 at both
+N; both verdicts unchanged) with the deviation note
+`research/r7/R7_DEVIATION_dsr_trials.md`.
+
+```bash
+python tools/r7_confirm.py --recompute-dsr
+```
+
+**Pitfall:** `--recompute-dsr` takes no look but it **rewrites the two committed
+`..._dsr_recompute.{json,md}` files** with today's repo-ledger N; run it on a
+branch and read the diff, do not commit it by accident. The walk-forward gate is
+one-sided, so the embargo change moves no `v2` number; it matters for the
+two-sided splits.
+
+**What it is not:** a re-judgement of R7. Both verdicts are unchanged by the
+recompute; it corrects a trial count, not an outcome.
+
+## 127. Put every ML look in the multiple-testing ledger (v1.17 0.4, R-4)
+
+**Goal:** make the ML choices count as looks. Passing a `ledger` records:
+`run_model_comparison(ledger=)` the zoo gate decision (kind `model_zoo_gate`),
+`run_meta_labeling(ledger=)` the tau decision (`metalabel_tau`),
+`research/ml_reports/run_ml.py` the primary-model choice (`primary_model_choice`),
+`promotion_decision(ledger=)` a shadow promotion (`shadow_promotion`); all are
+dataset-scoped in `research/experiments.json` beside the model ledger's per-fit
+counter. `ShadowRunner.compare(y, ts=)` adds a paired day-block bootstrap of the
+candidate-minus-champion IC (`iap.validation.metrics.paired_day_block_bootstrap`);
+when it ran, `candidate_better` also needs its 5th percentile above 0. Save as
+`recipe127.py` (with `zoo.py` from recipe 125):
+
+```python
+import tempfile
+from pathlib import Path
+import numpy as np
+from zoo import planted_dataset
+from iap.contracts.versions import content_hash
+from iap.models.metalabel import run_meta_labeling
+from iap.models.pipeline import run_model_comparison
+from iap.validation.ledger import ExperimentLedger
+from iap.validation.metrics import paired_day_block_bootstrap
+
+ds = planted_dataset()
+ledger = ExperimentLedger(Path(tempfile.mkdtemp()) / "ledger.json", dataset_version=content_hash("recipe127"))
+run_model_comparison(ds, n_folds=3, embargo_ns=5 * 10**9, ledger=ledger)                 # one look: model_zoo_gate
+run_meta_labeling(ds, ds.X[:, 0], split_mode="calibrate_select", ledger=ledger)          # one look: metalabel_tau
+print([e["kind"] for e in ledger.entries])
+
+rng = np.random.default_rng(1)
+champion = ds.X[:, 1] + rng.normal(size=len(ds.y))                                        # a weak champion
+candidate = ds.X[:, 0] + rng.normal(size=len(ds.y))                                       # a candidate that sees the driver
+b = paired_day_block_bootstrap(ds.ts, champion, candidate, ds.y, seed=1, n_boot=500)
+print(sorted(b), round(b["delta"], 3), round(b["p05"], 3), b["n_days"], b["low_power"])
+```
+
+Output (run here): `['model_zoo_gate', 'metalabel_tau']`, then the bootstrap keys
+(`delta`, `ic_a`, `ic_b`, `low_power`, `n_days`, `p05`, `p95`, `se`, `tstat`) with `delta 0.44`, `p05 0.42`, `6` days and `low_power True` (six days is few).
+Tests: `python -m pytest python/tests/test_ml_ledger_v117.py -q` (4 passed).
+
+**Pitfall:** the ledger default (`ledger=None`, no `ts`) keeps the v1.16 behaviour,
+so an ML run that passes no ledger leaves no trace: the multiple-testing count
+understates the trials. A real run passes the dataset's ledger; a scratch one in
+experiments.
+
+**What it is not:** a correction for the looks. The ledger counts them (and the
+deflated Sharpe reads the count); it does not undo a lucky selection.
+
+## 128. Draft a pre-registration with the research assistant (v1.17 E2, spend)
+
+**Goal:** let a model explore **in-sample** data and write **unsigned drafts**, with
+every number checked in code. `python -m iap.agents research` runs a budgeted,
+ledgered tool loop (`claude-sonnet-5-5`, the `research` pin): in-sample runs go
+through the research CLI into a **scratch** store, holdout datasets are refused by
+name, preregistration drafts are `status: DRAFT` under `research/preregs/drafts/`
+(unsigned, they register nothing), and `iap.llm.verify` refuses any number not found
+in the cited report, the closing text included. The scripted client costs nothing:
+
+```bash
+python -m iap.agents research --dry-run --task "Explore EQ10 at 1s in-sample and draft a pre-registration" --workspace data/scratch/ws
+```
+
+`--dry-run` uses the scripted client (no key, no network, no spend, no ledger row)
+and prints a JSON summary (`status` `end_turn`, `prereg_drafts`, `report_drafts`,
+`runs`, `unverified_numbers`, the session id and its USD figure) and the artefact
+directory `<workspace>/research/agents/llm_sessions/<session>`. A live run drops the
+flag and supplies the owner's key:
+
+```bash
+python -m iap.agents research --env-file ~/.config/iap/anthropic.env --task "Explore EQ02 at 1s on ds3_20190130 in-sample and draft a pre-registration" --max-usd 0.5
+```
+
+(owner-run; `ANTHROPIC_API_KEY` in the environment works too; the key is never
+printed or logged). Options: `--model` (`claude-haiku-5-5`, `claude-opus-5-5`,
+`claude-sonnet-5-5`), `--max-usd` (default per-run budget USD 1), `--max-tool-calls`,
+`--max-tokens`, `--effort`, `--data-root`, `--runner {cli,planted}`. Roster, caps
+and refusals: `docs/AGENTS.md` §1, `API_AGENTS.md`. Tests:
+`python -m pytest python/tests/test_agents_wse.py -q` (16 passed).
+
+**Pitfall:** a draft is for a human: signing and registering are separate human
+commands (`python -m iap.agents.cli prereg`, `sign-registry`); an agent session never
+does either, and every report says `confirmatory: false`. A live run is paid from the
+owner's key; the cap check (recipe 131) refuses the call before it is made.
+
+**What it is not:** a researcher. It proposes and runs; the human decides what to
+register, and a number it states that no report holds is refused.
+
+## 129. Read the morning ops brief (v1.17 E3)
+
+**Goal:** get a one-page alerts document over the paper-trade, drift and cost reports
+and the spend ledger. The alerts are decided by threshold rules **in code**; the model
+(`claude-haiku-5-5`, the `ops` pin) writes only the narrative, and a narrative whose
+numbers are not in the alerts document is replaced by the code-written fallback.
+
+```bash
+python -m iap.agents ops --dry-run --paper-out-root data/scratch/paper --out data/scratch/ops
+```
+
+With no paper-trade output the dry run writes `alerts_<date>.md` and `.json` and prints
+(abridged, run here; the date is today's):
+
+```text
+# Morning ops alerts 2026-10-15
+
+> Paper trade 2026-10-15: 1 alert(s), 0 warning(s). First: no complete paper-trade report found.
+
+_Narrative by code (fallback); numbers verified against this document: True._
+
+| severity | rule | value | threshold | message |
+| alert | `paper.report_missing` |  |  | no complete paper-trade report found |
+```
+
+Point `--paper-out-root` at the `iap.paper` output root (`data/real/paper` in
+`docs/AGENTS.md`) for a real brief; `--today YYYY-MM-DD` pins the date. A live run is
+`python -m iap.agents ops --env-file ~/.config/iap/anthropic.env --paper-out-root data/real/paper`
+(owner-run). The same scripted-client switch is `--dry-run` for all three agents.
+
+**Pitfall:** a missing report is itself an alert (`paper.report_missing`), so a dry
+run on an empty directory always shows one; that is the rule working. The agent
+never decides an alert, changes a report or touches a prereg or gate.
+
+**What it is not:** monitoring. It reads reports written elsewhere; the watchdog and
+Prometheus alerts (recipe 136) are what run continuously.
+
+## 130. Propose documentation edits for a PR with the docs-sync agent (v1.17 E4)
+
+**Goal:** get a reviewer-ready patch of documentation edits for a diff, never applied.
+`python -m iap.agents docs-sync --base <ref> [--head <ref>]` (model
+`claude-haiku-5-5`, the `docs` pin) writes one patch file plus a JSON sidecar; it
+refuses to edit a non-documentation file, refuses an ambiguous excerpt, and does not
+invent a number or a date.
+
+```bash
+python -m iap.agents docs-sync --dry-run --base HEAD~1 --out data/scratch/dsync
+```
+
+The dry run uses the scripted client and prints the changed-file list, `"patch": null`
+and the line `patch (NOT applied): none; no edit proposed`: the scripted client
+proposes nothing. A live run (`--env-file ...`, owner-run) writes the patch under
+`--out` for you to review and `git apply` yourself. The structural checks that make a
+doc edit safe are in recipe 132; the agent's evals are part of
+`python -m iap.agents.eval_harness` (one per WS-E agent, `iap.agents.wse_evals`).
+
+**Pitfall:** the patch is a proposal; nothing applies it for you, and it never touches
+code, goldens or the ledger.
+
+**What it is not:** a replacement for `check_docs.py`: it proposes prose; the checker
+finds broken links and stale names.
+
+## 131. Inspect and cap LLM spend (v1.17 E1)
+
+**Goal:** see, before any live call, what the month-to-date is and what is refused.
+Prices are configuration (`configs/reference/llm_prices.json`: `source` + `checked`
+date; an unknown model is refused, never guessed). Per-role model pins are in
+`configs/agents/llm.json`. The ledger is an append-only, file-locked JSONL **outside
+the repository** (`IAP_LLM_SPEND_LEDGER`, else `%LOCALAPPDATA%/iap/llm_spend.jsonl` on
+Windows or `~/.local/state/iap/llm_spend.jsonl`), one row per API call with tokens,
+USD and month-to-date. The monthly cap is USD 30, the per-run budget USD 1, with one
+WARNING at 80 %; a call is refused before it is made when month-to-date plus its
+maximum cost would pass the cap. Use a scratch ledger **outside the checkout** to try it (`../` is next to the repo
+folder and works in both shells; a path inside the repo is refused with `the spend
+ledger must live outside the repository`):
+
+```bash
+python -m iap.llm spend --ledger ../iap_spend.jsonl --last 5
+```
+
+Output (run here, empty ledger): `2026-10: month-to-date $0.0000  cap $30.00
+remaining $30.0000  per-run $1.00  alert at 80%` and `last 0 of 0 rows:`. The
+environment variable form (bash `export IAP_LLM_SPEND_LEDGER=data/scratch/spend.jsonl`,
+PowerShell `$env:IAP_LLM_SPEND_LEDGER = "data/scratch/spend.jsonl"`) redirects every
+agent command. From Python (save as `recipe131.py`):
+
+```python
+from types import SimpleNamespace
+from iap.llm.prices import UnknownModelError, load_llm_config, usage_cost
+
+c = load_llm_config()
+print(c.monthly_cap_usd, c.per_run_budget_usd, c.alert_fraction, {r: p.model for r, p in c.pins.items()})
+try:
+    usage_cost("some-unknown-model", SimpleNamespace(input_tokens=1000, output_tokens=500))
+except UnknownModelError as e:
+    print("refused:", str(e).split(":")[0])
+```
+
+Output (run here): `30.0 1.0 0.8 {'research': 'claude-sonnet-5-5', 'ops':
+'claude-haiku-5-5', 'docs': 'claude-haiku-5-5', 'eval': 'claude-haiku-5-5'}` and
+`refused: no price for model 'some-unknown-model'`. Tests:
+`python -m pytest python/tests/test_llm_spend.py -q` (14 passed). Governance:
+`docs/governance/GOVERNANCE.md` §2c.
+
+**Pitfall:** a `--dry-run` writes no ledger row, so month-to-date does not move; only
+live calls are charged. The ledger lives outside the repo on purpose: the class refuses
+an in-repo path (`ValueError`) unless `allow_in_repo=True`, which is for tests.
+
+## 132. Check the documentation structure as CI does (v1.17 E4, advisory)
+
+**Goal:** catch broken relative links, a diagram missing from the index, a stale
+`iap.*` name in an `API_*.md`, and status text older than the last tag, before a
+reviewer does. `tests/harness/check_docs.py` runs four structural checks: relative
+links (including anchors) in the Markdown files, the diagram index, every `iap.*`
+name in `API_*.md` resolving by import, and status-text freshness against the last
+tag (words such as "in progress" written before the last release). Failures exit
+non-zero; stale status rows are listed but only fail with `--strict`.
+
+```bash
+PYTHONUTF8=1 python tests/harness/check_docs.py
+```
+
+PowerShell: `$env:PYTHONUTF8 = "1"; python tests/harness/check_docs.py`. The last line
+reads `<n> failure(s), <m> stale status row(s)`; `--json` prints one machine-readable document, `--verbose` prints more detail and `--strict` makes stale status text fail. On the
+v1.17 worktree before the COOKBOOK block of this section was written the run printed
+`0 failure(s)` and a list of stale `status_freshness` rows in `docs/EPICS.md`,
+`docs/ROADMAP.md`  and a few others. CI runs the same
+script in the `docs` job, plus the external-link check (`lychee`, configured in
+`lychee.toml`: it excludes the GitHub API, loopback and private hosts). The `docs`
+job is **advisory** until the owner adds it to the ruleset
+(`docs/governance/GOVERNANCE.md` §0).
+
+**Pitfall:** the relative-link check follows links that end in a `#anchor`; a heading rename
+breaks every anchor that pointed at it, and recipe headings with a slash or a comma
+change their GitHub anchor (`b2 / b3` becomes `b2--b3`). Set `PYTHONUTF8=1` on Windows, as the repo's harness commands do, so the UTF-8 files are read as UTF-8.
+
+**What it is not:** a spell or fact check. It proves that names and links resolve,
+not that the sentence around them is true (that is what `iap.agents docs-sync`,
+recipe 130, proposes edits for and a human reviews).
+
+## 133. Build the wheel reproducibly and read the SBOMs (v1.17 F1 / F2)
+
+**Goal:** rebuild the Python wheel twice from the same commit and get the same
+sha256, the way the `reproducible-build` CI job does. `SOURCE_DATE_EPOCH` is the
+commit date; the wheel is built with `pip wheel --no-deps --no-build-isolation
+--no-cache-dir`, twice, into `dist1` and `dist2`, and the names and hashes must
+match. The python image is built twice with BuildKit `rewrite-timestamp` as a
+**report-only** compare. In bash:
+
+```bash
+export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+pip install --require-hashes -r python/requirements-image.txt
+for i in 1 2; do rm -rf python/build python/src/iap.egg-info dist$i; pip wheel --no-deps --no-build-isolation --no-cache-dir -w dist$i ./python; done
+python -c "import hashlib,glob; print([hashlib.sha256(open(f,'rb').read()).hexdigest() for f in sorted(glob.glob('dist*/*.whl'))])"
+```
+
+PowerShell: `$env:SOURCE_DATE_EPOCH = git log -1 --format=%ct` for the first line and a
+`foreach ($i in 1,2) { ... }` loop for the second; the Python hash line is portable. The
+two hashes must be identical (CI fails the job otherwise and diffs the `unzip -l`
+listings). This was **not** run here: it writes `python/build` and an egg-info into the
+tree and is the CI job's work (`.github/workflows/ci.yml`, job `reproducible-build`).
+
+Every release also carries CycloneDX SBOMs (`.github/workflows/release.yml`): one per
+image from `syft` (`sbom-image-python.cdx.json`, `-cpp`, `-rust`), attested and pushed
+to GHCR next to the provenance, and one per hashed lock file from `cyclonedx-bom`
+(`sbom-python-requirements-image.cdx.json`, `sbom-python-requirements-ci.cdx.json`;
+the pins and their sha256 hashes become component hashes), all uploaded as release
+assets. To regenerate the lock SBOM yourself:
+
+```bash
+pip install cyclonedx-bom==7.5.0
+cyclonedx-py requirements -i python/requirements-image.txt --of JSON -o data/scratch/sbom-python-requirements-image.cdx.json
+```
+
+The k8s manifests are pinned by digest after a release (review F2):
+`python tools/release.py pin-digests --manifest release-manifest.json --version 1.17.0`
+is a dry run (add `--execute` before the subcommand to rewrite
+`deployment/k8s/*.yaml` to `name:vX.Y.Z@sha256:<digest>`); `publish` does the same as
+one step of the release flow (recipe 87 prints the flow). Tests on a fixture manifest:
+`python -m pytest python/tests/test_release_tool.py -q` (28 passed).
+
+**Pitfall:** `reproducible-build` is not a required check until the owner adds it to
+the ruleset (`docs/governance/GOVERNANCE.md` §0). Hash-pinned installs apply to a
+whole `pip` command (`--require-hashes`), so do not mix a hashed lock with an unpinned
+package in one call. `--execute` goes **before** the subcommand (recipe 87).
+
+**What it is not:** a guarantee that the images are bit-reproducible. The wheel compare is blocking; the image compare is report-only in CI, so a mismatch there warns and does not fail the job.
+
+## 134. Run the type check and the coverage floor locally (v1.17 F1 / F3)
+
+**Goal:** reproduce the two CI gates that moved in v1.17. **mypy** is blocking and its
+scope grew from `core`, `orderbook`, `execution`, `backtest`, `features` to also
+`agents`, `llm`, `mvp` and `paper` (258 errors to 0, type-only changes). **Coverage**:
+the `python-slow` job runs the `slow`-marked files with `--cov-fail-under=54`.
+
+```bash
+cd python && python -m pip install mypy==2.3.1 && python -m mypy
+```
+
+Output (run here, from a cold cache, about a minute): `Success: no issues found in 117
+source files`. The scope is the `files = [...]` list under `[tool.mypy]` in
+`python/pyproject.toml`; `paper/monitors.py` carries the one `type: ignore[attr-defined]`
+(`signals()` lives on the concrete alpha classes, not the `AlphaModel` ABC). The
+coverage command is the CI step's:
+
+```bash
+cd python && PYTHONPATH=src python -m pytest -q -n auto --dist loadfile -m slow --cov=iap --cov-report=term-missing --cov-fail-under=54
+```
+
+(PowerShell: `cd python; $env:PYTHONPATH = "src"; python -m pytest ...`; it needs `pytest-cov` and `pytest-xdist` from `python/requirements-ci.txt`. This machine's Python has no `pytest-cov`, so the command is shown, not run.)
+
+**Pitfall:** the floor is a **measured** figure rounded down, not a target: the CI
+comment records 55.90 % on the wave-2 integration PR (run 38794738398) and
+54.76 % on main after wave 3 (run 38805345163), which is why the floor is 54 and the
+CHANGELOG says so. The `slow` job does not count the modules the fast `python` job
+covers, so a new module under test only there lowers the percentage. Raise the floor
+when coverage rises; never lower it without a CHANGELOG line. mypy runs with
+Python 3.12 semantics (`python_version = "3.12"`).
+
+**What it is not:** a test-quality measure. 54 % of statements run under the slow
+tests; it catches a wholesale loss of coverage, not a missing assertion.
+
+## 135. Guard Python-loop latency and memory on the committed real slice (v1.17 F4 / F5)
+
+**Goal:** have a real-session workload that every CI run measures. The slice
+`benchmarks/slices/itch50_20190130_AAPL` is a self-contained ingested dataset: AAPL on
+2019-01-30 from the 09:30 open, 1,132 book-reconstruction ADDs plus 64,000 real events
+(ADD 49,482, CANCEL 9,197, EXECUTE 2,119, MODIFY 125, STATUS 1, TRADE 3,076), a 4,689,536
+byte IAP1 file whose book grows to 2,702 bid and 2,651 ask levels. Provenance (source
+dataset, vendor-file sha256, window, the exact command) is in its `SLICE.md` and
+`dataset.json`. It is a benchmark workload, listed in no pre-registration.
+
+```bash
+python tests/harness/check_mvp_latency_budget.py --advisory
+python tests/harness/check_slice_memory.py --advisory
+```
+
+The first replays the slice through the Python MVP loop (`iap.mvp.latency.
+measure_loop_latency`) and compares per-event p50 and p99 with
+`benchmarks/latency_budget.json`; it takes about a minute. The second runs the
+normaliser and the feature build each in a fresh child process and compares peak RSS
+with `benchmarks/memory_budget.json`; it takes a few seconds. Without `--advisory` both
+**fail** when a guarded figure is over its limit (blocking in the `python` job). Each
+prints a table of measured against budget with an `ok` verdict. Both budgets are a
+**measured CI figure times a margin**, with provenance recorded in the file: latency p50
+116,659 ns and p99 1,794,957 ns at margin 4 give limits of 500,000 and 8,000,000 ns; peak
+RSS ingest 203,681,792 bytes and features 181,170,176 bytes at margin 2 give 419,430,400
+and 377,487,360 bytes (run 38803984951, AMD EPYC 7763). The committed local reference on
+a Windows laptop is p50 255 us and p99 3.8 ms. The C++ tick-to-trade benchmark replays
+the same slice as a third workload; its guard rows in
+`benchmarks/results_tick_to_trade.md` are `t2t realslice p50` 1,535 ns and `p99` 2,943
+ns (CI run 38805495578). Re-cut a slice with
+`python tools/extract_real_slice.py --dataset <ingested dir> --date 2019-01-30 --symbol AAPL --start 09:30:00 --events 64000 --out benchmarks/slices/itch50_20190130_AAPL`
+(owner-run: it needs the real dataset, and it replaces the output directory).
+`python -m pytest python/tests/test_v117_f4_slice_latency.py -q` (4 passed).
+
+**Pitfall:** only p50 and p99 are guarded, never p99.9 or max (shared-runner outliers),
+and the margin catches a path that holds the day in memory again, not drift. A local
+run on a busy laptop can exceed a CI-measured number; the limits leave room for it. The same change made `ExecutionReplay` keep an open count and compact the PASSIVE working list (outputs unchanged, goldens pass; 12 parents on the slice 239 to 59 us/event, CHANGELOG).
+
+**What it is not:** a hardware benchmark. The CI numbers are a shared VM's; the
+guards say "this did not get several times worse", not "this is fast".
+
+## 136. Serve the Python `/metrics` process that replaced the Java registry (v1.17 F9)
+
+**Goal:** scrape the platform's metrics without the retired Java stack. `iap.metrics`
+is a stdlib Prometheus exposition: a file-backed exporter over the live risk limits,
+the `session_exit.json` marker and the newest MVP run's `report.json` / `traces.jsonl`,
+served at `/metrics`, `/health`, `/ready` and `/status` (default port 8080, bind address
+`$IAP_BIND_ADDR`, default `127.0.0.1`). The Java engine is frozen at v1.14.0 under
+`archive/java/` (not built, not a port target); the three live engines are Python,
+C++ and Rust, and `java` is out of `release.yml`, the CI `images` job and
+`check_docker_build.py`.
+
+```bash
+python -m iap.metrics run-session --state-dir data/scratch/state -- python -c "print('session body')"
+python -m iap.metrics serve --once --configs-dir configs --state-dir data/scratch/state --runs-root data/scratch/runs
+python -m iap.metrics names
+```
+
+`run-session` runs the command and maintains the marker around it (`RUNNING`, then
+`FINISHED` on exit 0, `FAILED` on a non-zero exit, `STOPPED` when interrupted) and
+prints `run-session: FINISHED (exit 0, event_cursor 0)`; the marker is
+`<state-dir>/session_exit.json`. `serve --once` prints one exposition and exits (a smoke
+test); it contains `platform_mode`, `platform_session_state`,
+`platform_persisted_session_*` and `risk_limit{limit="max_daily_loss"} 250000` (from
+`configs`), plus `<name>_available 0` for each Java-only family. `names` prints every
+family as `live` or `retired` (31 and 15 in this run). Drop `--once` to serve. Compose
+runs it as `platform-metrics` beside `mvp-session`
+(`deployment/docker/docker-compose.yml`), k8s as `deployment/k8s/platform-metrics.yaml`,
+and Prometheus scrapes the job `platform-metrics`. Tests:
+`python -m pytest python/tests/test_metrics_exporter.py -q` (17 passed).
+
+**Pitfall:** there is no admin API any more; the kill-switch runbook's manual halt is
+the config path. The alerts, recording rules, event-path SLO and dashboard panels that
+were built only on Java metrics were removed (listed in `alerts.yml`), so a retired family is exposed only as `<name>_available 0`, never under its old name.
+The CHANGELOG counts 30 live and 16 retired families; `names` printed 31 and 15 here
+(a family moved between the lists after the note was written).
+
+**What it is not:** a trading control plane. It reads files and exposes numbers; it
+cannot halt, amend or place anything.
+
+## 137. Normalise volumes and depths by ADV and by session volume (v1.17 A5, D-P1-5)
+
+**Goal:** features that compare across instruments of any size. The `sharenorm` family
+of the v2 spec has 14 features (`*_v2`) that divide share counts by the instrument's
+**session ADV** (`SessionAdvTable`, the as-of value of the session the emission falls
+in, from the dataset's `adv_by_session`; a static map; or `None`, which makes every
+`*_adv_*` feature invalid) or by the **running session volume**: `session_volume_adv_v2`,
+`traded_volume_adv_w<1m|5m|15m>_v2`, `signed_volume_adv_w..._v2`,
+`traded_volume_session_w..._v2`, `depth_l1_adv_v2`, `depth_l10_adv_v2`,
+`depth_diff_l1_adv_v2`, `depth_diff_l10_adv_v2`. The registered 205-feature set and its
+hash are untouched. After recipe 1, save as `recipe137.py`:
+
+```python
+import itertools
+from pathlib import Path
+from iap.core.codec import iter_iap1
+from iap.features.context import build_contexts
+from iap.features.engine import FeatureEngine
+from iap.features.feature_v2 import FeatureV2Extension, v2_frame, v2_feature_names
+from iap.reference.session_adv import SessionAdvTable
+
+adv = SessionAdvTable.from_instruments_json("configs/instruments/instruments.json")   # static ADV where no adv_by_session
+eng = FeatureEngine(build_contexts(Path("configs")), cadence_ns=0)
+ext = FeatureV2Extension(eng, keep=True, families=["sharenorm"], adv=adv)
+for ev in itertools.islice(iter_iap1("data/normalized/eq_20260824.normalized.iap1"), 120_000):
+    eng.apply(ev)
+df = v2_frame(ext.vectors, ["sharenorm"])
+print(len(v2_feature_names(["sharenorm"])), df.shape, df["session_volume_adv_v2"].dropna().iloc[-1] > 0)
+print(ext.prints_recorded, ext.busts_applied, ext.busts_unmatched)
+```
+
+Output (run here on the generated dataset): `14 (105282, 15) True` and `12961 0 0`
+(prints recorded, no busts). With both families the frame has 26 feature columns
+(`families=None`); the golden is `tests/golden/expected_features_v2.json` (x-version 2,
+static ADV 2e6 shares), regenerated for this change.
+
+**Pitfall:** the quantities and the ADV are in the `instruments.json` units (shares; FX:
+lots). A window never spans a session, so the 15 m volume features are invalid until
+15 minutes into the session. The ports do not compute these (Python reference only,
+pending F7/F8, conventions §11.7); `FeatureV2Extension` is the only producer and the
+feature store CLI does not write them.
+
+## 138. Size impact on the ADV of the fill's own session (v1.17 A5, X-9)
+
+**Goal:** stop the execution simulator pricing impact on one dataset-level ADV when the
+dataset has an ADV per session. `ExecConfig.adv_by_session` (a `SessionAdvTable`) makes
+the impact rules 6 / 6b and the X-3 support check divide by the ADV **of the session of
+the fill** (the as-of value: the mean volume of the dataset's earlier sessions). Default
+`None`: the static ADV, byte-identical, `expected_replay_fills.json` unchanged. Save as
+`recipe138.py`:
+
+```python
+import json, os, tempfile
+from iap.execution import load_exec_config
+from iap.reference.session_adv import SessionAdvTable
+
+a = load_exec_config("configs")
+b = load_exec_config("configs", adv_table=True)          # the config dir's own instruments.json adv_by_session
+print(a.adv_by_session, type(b.adv_by_session).__name__, b.adv_by_session.is_static)
+
+p = os.path.join(tempfile.mkdtemp(), "adv.json")          # a plain table: {instrument_id: {date: adv}}
+json.dump({"x-version": 1, "timezone": "America/New_York",
+           "adv_by_session": {"1": {"2026-05-15": 40_000_000.0, "2026-05-18": 41_234_567.0}},
+           "adv": {"1": 40_500_000.0}}, open(p, "w"))
+t = SessionAdvTable.from_path(p)
+ts = 1_779_114_600 * 10**9                                # 2026-05-18 14:30 UTC
+print(t.is_static, t.session_date(ts), t.adv(1, ts), t.adv(1, ts - 5 * 86_400 * 10**9), t.adv(2, ts))
+print(load_exec_config("configs", adv_table=p).adv_by_session.adv(1, ts))
+```
+
+Output (run here): `None SessionAdvTable True` (the committed `configs` have only static
+ADVs, so `is_static` is true and every reader behaves as without a table), then `False
+2026-05-18 41234567.0 40500000.0 None`: the session's value, the static fallback for a
+date not in the table, and `None` for an unknown instrument; then `41234567.0`. From the
+benchmark driver: `--adv-table static|instruments|<path>`:
+
+```bash
+python -m iap.research.execution_benchmark --data-dir data/real/multi7 --out data/scratch/bench --tag advtable --adv-table instruments
+```
+
+(real ingested datasets carry `adv_by_session`; the generated dataset does not, so on it
+`instruments` equals `static`.) Tests:
+`python -m pytest python/tests/test_session_adv.py python/tests/test_exec_session_adv.py -q` (8 passed).
+
+**Pitfall:** the session date is the calendar date in the table's `timezone`
+(`America/New_York` unless it says otherwise); a UTC date would assign a late fill to the
+next day. Lookups are cached per hour of event time. The first session's ADV is its own
+volume (no earlier session), which is the least reliable entry in the table.
+
+**What it is not:** a better impact model. It fixes the denominator; the coefficient and
+the shape are whatever the config or the calibration's residual fit say.
+
+## 139. Apply, skip and count a broken trade: `TRADE_BUST` (v1.17 A5, X-11)
+
+**Goal:** make a busted print leave the tape without moving the registered feature vectors. The
+new canonical event kind `TRADE_BUST = 10` (`schemas/FORMAT.md` §4) names an earlier
+print by `trade_id`; the ITCH mapper emits it for a `B` (broken trade) message (the
+match number is the id) and the IEX codec for a trade break. Every book (Python, Rust,
+C++) applies it as a **no-op**; the registered feature engines skip it before the book,
+so registered vectors are byte-identical with or without busts; the `sharenorm` volumes
+remove the print from the bust time forward. After recipe 1, save as `recipe139.py`:
+
+```python
+import itertools
+from dataclasses import replace
+from pathlib import Path
+from iap.core.codec import iter_iap1
+from iap.core.events import EventType
+from iap.features.context import build_contexts
+from iap.features.engine import FeatureEngine
+from iap.features.feature_v2 import FeatureV2Extension
+
+print(int(EventType.TRADE_BUST))                                     # 10
+events = list(itertools.islice(iter_iap1("data/normalized/eq_20260824.normalized.iap1"), 20_000))
+trade = next(e for e in events if e.event_type == EventType.TRADE)
+last = events[-1]
+bust = replace(last, event_id=last.event_id + 1, sequence=last.sequence + 1, exchange_ts=last.exchange_ts + 1,
+               receive_ts=last.receive_ts + 1, event_type=int(EventType.TRADE_BUST), instrument_id=trade.instrument_id,
+               venue_id=trade.venue_id, side=0, price_ticks=0, qty=0, order_id=0, trade_id=trade.trade_id)
+
+eng = FeatureEngine(build_contexts(Path("configs")), cadence_ns=0)
+ext = FeatureV2Extension(eng, keep=True, families=["sharenorm"], adv={trade.instrument_id: 2_000_000.0})
+for ev in events + [bust]:
+    eng.apply(ev)
+print(eng.trade_busts_skipped, ext.busts_applied, ext.busts_unmatched)
+```
+
+Output (run here): `10`, then `1 1 0`: the base engine skipped one bust, the v2 extension
+applied one, none was unmatched. A bust naming a print the extension did not record (a
+cross print, a print before the session reset, an unknown id, a bust with a regressed
+timestamp) is counted in `busts_unmatched` and changes nothing. In ingest the mapping
+counter is `invalid_broken_trades` (`qc_report.json`). Tests:
+`python -m pytest python/tests/test_trade_bust.py -q` (5 passed).
+
+**Pitfall:** the anomaly fixture's two deliberately unknown events now use event code 250
+(code 10 is a real kind); a fixture or stream that used 10 as a deliberately unknown code must use another value. Emissions before the bust are what they were, because the print was on the
+tape then.
+
+## 140. Apply every realism opt-in at once and window the VWAP curve (v1.17 X-1 / X-2)
+
+**Goal:** one entry point for the execution-realism pre-registration keys, and the
+VWAP fix. `iap.execution.realism.apply(prereg, exec_config, calibration=, impact=,
+maker_config=, quoting_config=)` returns an `AppliedRealism` (configs, grids, keyword
+arguments and an `applied` statement per v3 key) and puts the prereg latency table on
+**every venue** of a calibration, which the simulator would otherwise read in place of
+the prereg venue latency; the MVP loop uses it (`MvpEngine.realism_applied`). Save as
+`recipe140.py`:
+
+```python
+from iap.execution import load_exec_config
+from iap.execution.realism import apply, load_prereg
+
+cfg = load_exec_config("configs")
+a = apply(load_prereg("configs/prereg/v3.json"), cfg, impact=False)   # impact=False: no calibration in hand
+print(a.applied)
+print(a.exec_config is cfg)
+
+from iap.execution.volume_curve import curve_slice_weights, curve_window, u_shape
+SEC = 10**9
+curve = u_shape(78)                                                   # the pinned 1 + x^2 shape, 78 five-minute bins
+start, end = curve_window(48_600 * SEC + 3_600 * SEC, 48_600 * SEC + 5_400 * SEC)   # a 30-minute window 1 h after the open
+print(round(start, 4), round(end, 4))
+print([round(w, 3) for w in curve_slice_weights(curve, 5, start, end)], [round(w, 3) for w in curve_slice_weights(curve, 5)])
+```
+
+Output (run here):
+
+```text
+{'venue_latency': 'applied', 'fee_tier': 'applied', 'impact_model': 'not applied: the caller runs no execution calibration (rule 6 stays)', 'impact_shape': 'not applied: the caller runs no execution calibration (rule 6 stays)', 'latency_stress': 'applied: 3 configs', 'fee_tier_sensitivity': 'applied: 2 configs', 'exec_prints': 'applied'}
+False
+0.1538 0.2308
+[0.017, 0.016, 0.016, 0.015, 0.015] [0.249, 0.176, 0.151, 0.176, 0.249]
+```
+
+`configs/prereg/v2.json` sets none of the keys (every `applied` value is `not set`), and
+with `impact=True` (the default) a prereg that asks for the parent impact rule without a
+calibration carrying an `impact_fit` raises `ValueError`. The prereg `venue_latency.mean_ns`
+is now the **mean** of the simulator's `base + U[0, jitter]` draw
+(`simulator_latency_base_ns`; it was the minimum), and `iap.marketdata.ingest` writes
+the assumed latency of `configs/reference/venue_latency.json` into a real dataset's
+`venues.json` instead of 0 / 0. VWAP slices follow the forecast curve over the **parent**
+window (`curve_slice_weights(curve, n, start_frac, end_frac)`, `ParentOrder.curve_window`):
+the second list above is the whole-session shape (the default, pinned), the first the
+mass a window in the first hour actually sees (the first list is raw curve mass over the
+window, not renormalised). The residual impact fit also records its `%ADV` support
+(`impact.residual.by_horizon[h].support_pct_adv`), a parent beyond it is flagged
+(`ExecutionSimulator.impact_beyond_support`) and the cost is labelled "replay + fitted
+adder", never a measurement. Tests: `python -m pytest python/tests/test_v117_realism.py -q`
+(7 passed).
+
+**Pitfall:** `apply` does not mutate `exec_config` (`a.exec_config is cfg` is `False`);
+use the returned configs. A caller that cannot apply a key passes `impact=False` and the
+`applied` text records why.
+
+**What it is not:** a calibration. It applies what the prereg declares; the numbers in
+the prereg are assumptions until a calibration measures them.
+
+<!-- G5 placeholders: B10 dark model; C6 screen; F7 C++ ports; B9/F8 Rust -->
+
+Placeholder for the G5 truth pass: the dark midpoint model (B10), the cross-sectional
+screen (C6), the C++ ports of the v1.17 rules (F7) and the Rust ports (B9/F8) are not on
+main at this commit, so they have no recipe here; G5 adds each as it lands. Nothing is
+claimed for them.

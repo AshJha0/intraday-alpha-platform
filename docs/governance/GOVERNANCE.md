@@ -33,6 +33,12 @@ run and does not block a merge. No required check was renamed in v1.17:
 `python` still carries the blocking mypy step, whose scope grew to `agents`,
 `llm`, `mvp` and `paper` (F3).
 
+**Ready to be required (owner action, v1.17 G4):** the `docs` job (E4) has been green on
+main in the CI runs 38803067354 (62b9f0e) and 38805345163 (4eea5d5); it is ready to be added
+to the ruleset as a required check (Settings > Rules > the main ruleset > Require status
+checks > `docs`). `reproducible-build` was green in the same two runs and can be added with
+it. Until the owner does, both stay advisory.
+
 **Recommended owner actions** (repository settings; code cannot do them):
 
 1. require 1 approving review (and code-owner review) as soon as a second

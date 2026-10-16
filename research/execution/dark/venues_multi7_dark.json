@@ -1,0 +1,35 @@
+{
+  "x-version": 1,
+  "description": "v1.17 B10: the multi7 source venue (XNAS, as data/real/multi7/configs/venues/venues.json) plus a modelled dark venue for the dark-first benchmark variant. The dark venue has no displayed book; its fills are modelled, not measured (iap.execution.dark). Fee = an indicative dark-pool per-share rate on both sides.",
+  "venues": [
+    {
+      "venue": "XNAS",
+      "venue_id": 101,
+      "asset_class": "EQUITY",
+      "taker_fee_per_share": 0.003,
+      "maker_rebate_per_share": 0.002,
+      "latency": {
+        "mean_ns": 0,
+        "jitter_ns": 0
+      },
+      "supports": [
+        "MBO",
+        "AUCTION",
+        "HALT"
+      ]
+    },
+    {
+      "venue": "DARK1",
+      "venue_id": 190,
+      "asset_class": "EQUITY",
+      "venue_type": "dark",
+      "taker_fee_per_share": 0.001,
+      "maker_rebate_per_share": 0.0,
+      "latency": {
+        "mean_ns": 0,
+        "jitter_ns": 0
+      },
+      "supports": []
+    }
+  ]
+}

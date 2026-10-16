@@ -251,6 +251,7 @@ def load_venues(path: PathLike) -> dict[int, VenueSpec]:
             per_share_fee_sell_only=bool(row.get("per_share_fee_sell_only", True)),
             latency_mean_ns=_integer(lat, "mean_ns", f"{where} latency"),
             latency_jitter_ns=_integer(lat, "jitter_ns", f"{where} latency"),
+            venue_type=str(row.get("venue_type", "lit")),
         )
         if vid in out:
             raise ValueError(f"{path}: duplicate venue_id {vid}")
