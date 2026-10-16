@@ -99,3 +99,22 @@ def test_registration_dry_run_refuses_every_book_candidate(candidate: str) -> No
         require_screened(SCREEN, alpha, horizon, model)
     block = screen_check(SCREEN, True, candidate, "eq11")
     assert block is not None and "refused" in block
+
+
+def test_register_tool_dry_run(capsys: pytest.CaptureFixture[str]) -> None:
+    """tools/breadth_book_register.py --dry-run: checks only, writes nothing."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "breadth_book_register", REPO / "tools" / "breadth_book_register.py"
+    )
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    out_path = REPO / mod.OUT
+    assert mod.main([str(REPO), "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    assert "draft option (a) ok; screen research/breadth/screen/screen_multi7.json" in out
+    assert "refused (expected under option a)" in out
+    assert "was NOT screened" in out or "not screened" in out.lower()
+    assert not out_path.exists()

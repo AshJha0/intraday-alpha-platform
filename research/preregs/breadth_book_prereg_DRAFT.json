@@ -23,9 +23,39 @@
         "candidate": "EQ10/1s/linear_z_v2 (book score eq10_beta_gap)",
         "why_this_one": "best reading on the screen's pre-registered gate statistic (net day-clustered t) among the candidates the book can run: the book's scores are eq11 (EQ11/15m, not screened: no scored row on three names) and eq10_beta_gap (EQ10/1s). Screen-wide, the best net day-clustered t is EQ09/10s/linear_z_v1 (-8.93), which has no book score; registering it would need a new score, i.e. new code under a new fingerprint.",
         "screen_numbers": {
-          "EQ10/1s/linear_z_v2": {"gross_ic": 0.0702, "net_ic": -0.5932, "net_t_hac": -39.13, "net_t_day": -19.12, "net_return_per_trip_bps": -1.975, "cost_per_trip_bps": 2.015, "days": 6, "pairs": 1465672, "result": "fail (net_ic_min, net_return_mean_min, net_return_tstat_min, net_tstat_day_cluster_min)"},
-          "EQ10/1s/linear_z_v1": {"gross_ic": 0.0757, "net_ic": -0.5922, "net_t_hac": -39.11, "net_t_day": -21.49, "net_return_per_trip_bps": -1.972, "cost_per_trip_bps": 2.015, "days": 6, "pairs": 1465920, "result": "fail (net_ic_min, net_return_mean_min, net_return_tstat_min, net_tstat_day_cluster_min)"},
-          "EQ09/10s/linear_z_v1": {"gross_ic": 0.0058, "net_ic": -0.4612, "net_t_hac": -15.12, "net_t_day": -8.93, "net_return_per_trip_bps": -1.987, "cost_per_trip_bps": 2.015, "days": 6, "pairs": 1464987, "result": "fail (net_ic_min, net_return_mean_min, net_return_tstat_min, net_tstat_day_cluster_min)"}
+          "EQ10/1s/linear_z_v2": {
+            "gross_ic": 0.0702,
+            "net_ic": -0.5932,
+            "net_t_hac": -39.13,
+            "net_t_day": -19.12,
+            "net_return_per_trip_bps": -1.975,
+            "cost_per_trip_bps": 2.015,
+            "days": 6,
+            "pairs": 1465672,
+            "result": "fail (net_ic_min, net_return_mean_min, net_return_tstat_min, net_tstat_day_cluster_min)"
+          },
+          "EQ10/1s/linear_z_v1": {
+            "gross_ic": 0.0757,
+            "net_ic": -0.5922,
+            "net_t_hac": -39.11,
+            "net_t_day": -21.49,
+            "net_return_per_trip_bps": -1.972,
+            "cost_per_trip_bps": 2.015,
+            "days": 6,
+            "pairs": 1465920,
+            "result": "fail (net_ic_min, net_return_mean_min, net_return_tstat_min, net_tstat_day_cluster_min)"
+          },
+          "EQ09/10s/linear_z_v1": {
+            "gross_ic": 0.0058,
+            "net_ic": -0.4612,
+            "net_t_hac": -15.12,
+            "net_t_day": -8.93,
+            "net_return_per_trip_bps": -1.987,
+            "cost_per_trip_bps": 2.015,
+            "days": 6,
+            "pairs": 1464987,
+            "result": "fail (net_ic_min, net_return_mean_min, net_return_tstat_min, net_tstat_day_cluster_min)"
+          }
         },
         "means": "the confirmatory run omits --require-screen and records the screen status (fail) on its report; the override is a ledger entry of its own, stating the screen path, sha256, the candidate's FAIL status and the owner's reason, written at registration. The prior from the screen is strongly negative: the candidate loses about 1.97 bps per round trip net at one lot on the in-sample days.",
         "ledger": "one look of kind prereg plus one override entry; the confirmatory run debits one breadth_book look on the holdout dataset"
@@ -52,10 +82,46 @@
     "decile_q": 0.1,
     "alpha_bps": 5.0,
     "rebalance": "5 min on the feature-row clock (rebalance_ns 300000000000); max_age 60 s; exec_delay 1 s; flatten at session end",
-    "neutrality": {"dollar_neutral": true, "beta_neutral": true, "sector_neutral": true, "neutral_bound": 0.0, "sector_source": "configs/reference/sectors.json (sha256 f4f3c028178ba22aa01e31c4acb2bc001eb6d943fd34315820a53b768961d07d; public-knowledge GICS-style, open for owner: vendor file)", "note": "sector_neutral is false on the 3-name multi7 report only because two sectors of one and two names pin the book at zero; on the breadth universe it is on"},
-    "sizes": {"notional": 1000000.0, "size_sweep_multipliers": [0.25, 0.5, 1.0, 2.0, 4.0], "gross_cap": 1.0, "w_max": 0.1, "participation_cap": 0.01, "turnover_cap": 0.5, "min_names": 3},
-    "optimizer": {"risk_aversion": 1000.0, "cov_lam": 0.94, "cov_init": 20, "cov_shrinkage": null, "projection": "dykstra", "dykstra_max_iter": 30, "dykstra_tol": 1e-09, "feas_tol": 1e-06, "solver_iters": 20},
-    "costs": {"impact": "cost_model (sqrt rule, 100 bps at one ADV)", "impact_coeff": null, "impact_exponent": null, "accounting": "net = gross - spread - fee - impact to the last float"},
+    "neutrality": {
+      "dollar_neutral": true,
+      "beta_neutral": true,
+      "sector_neutral": true,
+      "neutral_bound": 0.0,
+      "sector_source": "configs/reference/sectors.json (sha256 f4f3c028178ba22aa01e31c4acb2bc001eb6d943fd34315820a53b768961d07d; public-knowledge GICS-style, open for owner: vendor file)",
+      "note": "sector_neutral is false on the 3-name multi7 report only because two sectors of one and two names pin the book at zero; on the breadth universe it is on"
+    },
+    "sizes": {
+      "notional": 1000000.0,
+      "size_sweep_multipliers": [
+        0.25,
+        0.5,
+        1.0,
+        2.0,
+        4.0
+      ],
+      "gross_cap": 1.0,
+      "w_max": 0.1,
+      "participation_cap": 0.01,
+      "turnover_cap": 0.5,
+      "min_names": 3
+    },
+    "optimizer": {
+      "risk_aversion": 1000.0,
+      "cov_lam": 0.94,
+      "cov_init": 20,
+      "cov_shrinkage": null,
+      "projection": "dykstra",
+      "dykstra_max_iter": 30,
+      "dykstra_tol": 1e-09,
+      "feas_tol": 1e-06,
+      "solver_iters": 20
+    },
+    "costs": {
+      "impact": "cost_model (sqrt rule, 100 bps at one ADV)",
+      "impact_coeff": null,
+      "impact_exponent": null,
+      "accounting": "net = gross - spread - fee - impact to the last float"
+    },
     "universe": "research/breadth/universe.json (sha256 ec50340f9897600ab9dbf48629a870d7801d6d7ec8cc2834b94a8230bdcb81a1; rule research/breadth/UNIVERSE_RULE.md, fixed on the 2019-01-30 selection day) minus AAPL, MSFT, QQQ",
     "c7_reference": "research/breadth/book/book_multi7.json (sha256 b2217ff2e1c21c3ac0510d141fb77cec93cf6bef7de47cd91ef031d9921eb6e2)"
   },
@@ -63,7 +129,13 @@
     "confirmatory": "mean daily net book P&L at the registered notional, t-statistic clustered by session day (n_days - 1 df, Student-t critical value), computed by breadth_report.cluster_mean on the per-day net P&L of the one registered run",
     "secondary_gate": "mean per-rebalance rank IC of the score, day-clustered t, in the v1.17 gate form (iap.validation.metrics.gate_statistics at STATS_REVISION v1.17, methods bundle v2: HAC auto bandwidth, day-separated); expected sign +1",
     "stats_revision": "v1.17",
-    "acceptance": {"net_pnl_tstat_day_cluster_min": 2.0, "net_pnl_mean_min": 0.0, "rank_ic_min": 0.0, "dsr_min": 0.95, "n_days_min": 9},
+    "acceptance": {
+      "net_pnl_tstat_day_cluster_min": 2.0,
+      "net_pnl_mean_min": 0.0,
+      "rank_ic_min": 0.0,
+      "dsr_min": 0.95,
+      "n_days_min": 9
+    },
     "deflated_sharpe": {
       "form": "iap.validation.deflated.deflated_sharpe_block on the per-day net P&L",
       "n_trials": "registered N = ExperimentLedger(research/experiments.json).distinct_experiments + 1 at the signing commit (the plan's R-1 rule: never the holdout dataset's own ledger)",
@@ -77,7 +149,17 @@
   "holdout": {
     "rule": "the 2025/26 Nasdaq ITCH days, for every name of the breadth universe outside AAPL / MSFT / QQQ (docs/PORTFOLIO_BREADTH.md 'The breadth holdout rule'); no statistic has ever been computed on those names there",
     "computed_from": "dataset.json manifests only (sessions and universe keys), no feature, label or statistic read: data/real/r7_20251128, r7_20251208, r7_20251209, r7_20251210, r7_20251211, r7_20251212, r7_20260612, holdout2026",
-    "days": ["2025-11-28", "2025-12-08", "2025-12-09", "2025-12-10", "2025-12-11", "2025-12-12", "2026-05-15", "2026-05-18", "2026-06-12"],
+    "days": [
+      "2025-11-28",
+      "2025-12-08",
+      "2025-12-09",
+      "2025-12-10",
+      "2025-12-11",
+      "2025-12-12",
+      "2026-05-15",
+      "2026-05-18",
+      "2026-06-12"
+    ],
     "existing_dataset_versions_3_names_spent": {
       "535f4868b0a5f6d14305018142221bea100b615dcc3a212de4eb7a715aecd8fb": "r7_20251128 (AAPL, MSFT, QQQ)",
       "284629a29df4e6419fb527990abf34e3a8dd25f42902e56604df840860ce8ecc": "r7_20251208 (AAPL, MSFT, QQQ)",
@@ -100,13 +182,17 @@
     "screen_prereg": "research/preregs/net_of_cost_screen_prereg_DRAFT.json (sha256 7d4c25664a181b23524541f41aed6dc86db574013fc1245c3d66c6d46f2e0848, DRAFT, unsigned)",
     "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
     "status": "0 pass, 22 fail, 1 not screened",
-    "book_candidates": {"EQ11/15m/linear_z_v1": "not_screened", "EQ10/1s/linear_z_v1": "fail", "EQ10/1s/linear_z_v2": "fail"},
+    "book_candidates": {
+      "EQ11/15m/linear_z_v1": "not_screened",
+      "EQ10/1s/linear_z_v1": "fail",
+      "EQ10/1s/linear_z_v2": "fail"
+    },
     "wiring": "python -m iap.research.breadth_book --screen PATH --require-screen [--screen-candidate ALPHA/HORIZON/MODEL]; WriteBroker.preregister(screen=PATH)"
   },
   "ledger": {
     "path": "research/experiments.json",
-    "registration": "one look of kind prereg (WriteBroker.preregister), by the owner from .venv-ci with --require-ci-env",
-    "confirmatory": "one look of kind breadth_book, scoped to the holdout breadth dataset_version; a re-run of the same identity adds no look",
+    "registration": "tools/breadth_book_register.py calls WriteBroker.preregister(EQ11, 15m:breadth-book-c8, screen=screen_multi7.json); the broker's screen gate refuses before any blackboard write or ledger debit, so the expected registration charges NO look (the refusal is recorded in the signed research/preregs/breadth_book_prereg.json); run by the owner from .venv-ci with --require-ci-env",
+    "confirmatory": "none under option (a): no confirmatory run, no breadth_book look, no holdout dataset",
     "override": "option (b) only: one entry recording the screen override (screen path, sha256, candidate status, reason)",
     "screen_looks_already_charged": "23 looks of kind net_of_cost_screen (C6)"
   },
