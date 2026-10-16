@@ -361,9 +361,10 @@ def test_tops_oracle_matches_the_mapped_book_and_reports_divergence(tmp_path):
         TopsQuotes.load(dp, ["AAPL"], MID)
 
 
-def test_tops_oracle_quotes_the_best_round_lot_level_not_an_odd_lot_top(tmp_path):
-    """v1.17 A4 (measured on 2025-11-28): TOPS shows the best level holding at
-    least a round lot; an odd lot in front of it is not quoted."""
+def test_tops_oracle_quotes_the_cumulative_round_lot_not_an_odd_lot_top(tmp_path):
+    """v1.17 A4 (measured on 2025-11-28): TOPS quotes the first price at which
+    the displayed quantity accumulated from the top reaches a round lot, with
+    that cumulative size; an odd lot alone in front is not quoted on its own."""
     w = ix.IexPcapWriter(PROTOCOL_DEEP_PLUS)
     t = OPEN + 5 * NS
     w.segment(
@@ -385,7 +386,7 @@ def test_tops_oracle_quotes_the_best_round_lot_level_not_an_odd_lot_top(tmp_path
     tops.segment(
         [
             ix.quote("MSFT", _ep(t), 40, 4_000_000, 4_000_100, 100),
-            ix.quote("MSFT", _ep(t + 1), 40, 4_000_000, 4_000_100, 100),  # unchanged by the 1
+            ix.quote("MSFT", _ep(t + 1), 41, 4_000_000, 4_000_100, 100),  # the 1 folds in
             ix.quote("MSFT", _ep(t + 2), 40, 4_000_050, 4_000_100, 100),
             ix.quote("MSFT", _ep(t + 3), 0, 0, 4_000_100, 100),  # no round-lot bid left
         ],
@@ -395,13 +396,51 @@ def test_tops_oracle_quotes_the_best_round_lot_level_not_an_odd_lot_top(tmp_path
     quotes = TopsQuotes.load(tp, ["MSFT"], MID)
     _, mapper, reader = _map_iex(dp, symbols=("MSFT",), tops=quotes, round_lots={"MSFT": 40})
     rep = reader.oracle.report()["MSFT"]
-    assert rep["status"] == "match" and rep["compared"] == 3 and rep["mismatched"] == 0
-    assert rep["oracle"] == "tops_l1_equals_deep_round_lot_l1"
+    assert rep["status"] == "match" and rep["compared"] == 4 and rep["mismatched"] == 0
+    assert rep["oracle"] == "tops_quote_equals_deep_cumulative_round_lot"
     assert reader.counters["odd_lot_top"] == 2  # t+1 (1 in front of 40) and t+3 (1 alone)
     assert mapper.directory["MSFT"].round_lot_size == 40  # synthesised from round_lots
     # with the default 100-share lot the same day diverges at once (40 < 100)
     _, _, reader = _map_iex(dp, symbols=("MSFT",), tops=TopsQuotes.load(tp, ["MSFT"], MID))
     assert reader.oracle.report()["MSFT"]["status"] == "diverged"
+
+
+def test_tops_oracle_folds_odd_lots_at_better_prices_into_the_quote(tmp_path):
+    """The 2025-11-28 09:19:58.6 AAPL case: two 1-share bids above a 100-share
+    level; TOPS quoted that level with size 102 (and no bid before it came)."""
+    w = ix.IexPcapWriter(PROTOCOL_DEEP_PLUS)
+    t = OPEN - 10 * NS
+    w.segment(
+        [
+            ix.system_event("O", _ep(hms_ns(3))),
+            ix.system_event("S", _ep(hms_ns(4))),
+            ix.add_order("AAPL", _ep(t), "S", 9, 100, 2_923_800),
+            ix.add_order("AAPL", _ep(t + 1), "B", 1, 1, 2_775_300),
+            ix.add_order("AAPL", _ep(t + 2), "B", 2, 1, 2_700_000),
+            ix.add_order("AAPL", _ep(t + 3), "B", 3, 100, 2_643_800),
+            ix.delete_order("AAPL", _ep(t + 4), 1),  # 101 left at or above 264.38
+            ix.executed("AAPL", _ep(t + 5), 3, 100, 2_643_800, 77),  # only the odd lot left
+        ],
+        send_time=_ep(t),
+    )
+    dp = w.write(tmp_path / "dp.pcap")
+    tops = ix.IexPcapWriter(PROTOCOL_TOPS)
+    tops.segment(
+        [
+            ix.quote("AAPL", _ep(t), 0, 0, 2_923_800, 100),
+            ix.quote("AAPL", _ep(t + 1), 0, 0, 2_923_800, 100),
+            ix.quote("AAPL", _ep(t + 2), 0, 0, 2_923_800, 100),
+            ix.quote("AAPL", _ep(t + 3), 102, 2_643_800, 2_923_800, 100),
+            ix.quote("AAPL", _ep(t + 4), 101, 2_643_800, 2_923_800, 100),
+            ix.quote("AAPL", _ep(t + 5), 0, 0, 2_923_800, 100),
+        ],
+        send_time=_ep(t),
+    )
+    tp = tops.write(tmp_path / "tops.pcap")
+    _, _, reader = _map_iex(dp, symbols=("AAPL",), tops=TopsQuotes.load(tp, ["AAPL"], MID))
+    rep = reader.oracle.report()["AAPL"]
+    assert rep["status"] == "match" and rep["mismatched"] == 0 and rep["compared"] == 4
+    assert reader.counters["odd_lot_top"] >= 3
 
 
 # ---------------------------------------------------------------- ingest

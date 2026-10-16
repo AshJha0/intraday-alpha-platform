@@ -866,7 +866,7 @@ class TopsOracle:
                 status = "no_comparison"
             out[s] = {
                 "status": status,
-                "oracle": "tops_l1_equals_deep_round_lot_l1",
+                "oracle": "tops_quote_equals_deep_cumulative_round_lot",
                 "compared": self.compared[s],
                 "mismatched": self.mismatched[s],
                 "bbo_changes_without_tops_quote": self.no_tops_quote[s],
@@ -1058,12 +1058,16 @@ class IexReader:
             self.counters["odd_lot_trades"] += 1
 
     def _bbo(self, inst: int) -> tuple[int, int, int, int]:
-        """The mapper's book as TOPS quotes it: per side the best price level
-        whose resting quantity is at least the symbol's round lot, with that
-        level's quantity; (0, 0) when no level qualifies.  Odd-lot levels in
-        front of it are not quoted (measured on 2025-11-28: AAPL's TOPS sizes
-        are never below 100, MSFT's and QQQ's never below 40, their round
-        lots), so a book whose top is an odd lot counts ``odd_lot_top``."""
+        """The mapper's book as TOPS quotes it (v1.17 A4, measured on
+        2025-11-28): per side, walk the levels from the best price and
+        accumulate the displayed quantity; the quote is the FIRST price at
+        which the cumulative quantity reaches the symbol's round lot, with
+        that cumulative quantity as its size (odd lots resting at better
+        prices are folded into it); (0, 0) when the whole side holds less
+        than a round lot.  The rule matched every one of 113,807 TOPS quotes
+        of AAPL / MSFT / QQQ in the first 15 M DEEP+ messages of that day,
+        where the raw top matched 87.6 % and the best round-lot level 89.2 %.
+        A top level that is itself below a round lot counts ``odd_lot_top``."""
         book = self.mapper._levels[inst]
         lot = self.round_lots.get(self.symbols[inst], 100)
         out = []
@@ -1073,15 +1077,15 @@ class IexReader:
             if best is None:
                 out += [0, 0]
                 continue
-            qty = totals[best]
-            if qty < lot:
+            if totals[best] < lot:
                 self.counters["odd_lot_top"] += 1
-                best, qty = 0, 0
-                for price in sorted(totals, reverse=side == 0):
-                    if totals[price] >= lot:
-                        best, qty = price, totals[price]
-                        break
-            out += [best, qty]
+            price, cum = 0, 0
+            for level in sorted(totals, reverse=side == 0):
+                cum += totals[level]
+                if cum >= lot:
+                    price = level
+                    break
+            out += [price, cum] if price else [0, 0]
         return (out[0], out[1], out[2], out[3])
 
     def _close_ts(self, inst: int, ts: int) -> Iterator[tuple]:
