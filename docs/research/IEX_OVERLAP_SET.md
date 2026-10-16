@@ -54,6 +54,7 @@ disk = free GB at the lowest point of the day, then at its end.
 | 2025-12-08 | 9.30 / 8.99 | ~4 min + ~2 min | 1:49 h | 1:23:12 (parse under load) | 317,211,767 | 5,590,941 | 832,770/0 / 152,908/0 / 3,496,249/0 | 0.671 (normalized 0.547) | 136.4 / 146.4 | `6c94942ab59d` |
 | 2025-12-09 | 8.61 / 8.43 | 5:02 min (28.5 MB/s) + 20:20 min (6.9 MB/s) | 1:21 h | 1:45:41 (parse 6,157 s) | 295,426,880 | 4,829,986 | 711,762/0 / 101,120/0 / 3,045,150/0 | 0.706 (normalized 0.472) | 137.1 / 166.2 | `9517c4efa19b` |
 | 2025-12-10 | 12.29 / 11.45 | 6:01 min (34.1 MB/s) + 16:28 min (11.6 MB/s) | 1:53 h | 2:46:02 | 428,701,502 | 5,614,109 | 580,122/0 / 257,034/0 / 3,763,770/0 | 0.678 (normalized 0.550) | 119.6 / 131.1 | `33d0cbe8a660` |
+| 2026-05-15 | 12.15 / 11.91 | 16:31 min (12.3 MB/s) + 8:34 min (23.2 MB/s) | 1:48 h | 2:24:32 (parse 8,341 s) | 437,934,866 | 7,268,375 | 706,497/0 / 131,039/0 / 4,554,801/0 | 1.001 (normalized 0.707) | 121.9 / 165.0 | `bd6f9c707d89` |
 
 Notes per day:
 
@@ -93,3 +94,12 @@ Notes per day:
   `d9d2a708f52a5f8efcf4ef450a8d79f0a0ed95553f25e46c05f720df6d3ac30f`. Events per symbol:
   AAPL 681,087, MSFT 347,485, QQQ 4,585,537. From here the remaining days run in the owner's
   reordered chain B (2026-05-15, 2026-05-18, 2026-06-12, 2025-12-11, 2025-12-12).
+- **2026-05-15** (done 2026-10-16 21:17, chain B day 1, 5 h 9 min end to end). Round lots
+  **40 / 40 / 40** inferred from the TOPS extract: AAPL's round lot is 40 shares in 2026 (the
+  Nasdaq `holdout2026` directory says the same), which the inference handles per day; 5,410,448 TOPS
+  quotes extracted; 320,807,484 segments, 0 sequence gaps, 0 outside the session date, 3 directory
+  rows synthesised; `odd_lot_top` 834,914; the ingest overlapped the end of day 4's ingest for its
+  first minutes; features 1,824 s; TOPS sha256
+  `a583bc3163efa28452d037f0eff081ffae3d0c8ec8777c5401694741f0ccfae9`, DEEP+ sha256
+  `1b917e6101c1e1af9e082a5c79961e97e66d123d94aefbe7db0efc154ce2c683`. Events per symbol:
+  AAPL 876,741, MSFT 184,497, QQQ 6,207,137 (the busiest day so far).

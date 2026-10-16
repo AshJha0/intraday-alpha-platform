@@ -144,8 +144,8 @@ docs/research/IEX_OVERLAP_SET.md as the detached chain finishes the day.
 | 2025-12-10 | r7_20251210 | 12.29 GB | 11.45 GB | 11.74 GB | done 2026-10-16: oracle match 580,122 / 257,034 / 3,763,770 compared, 0 mismatched; 0.678 GB kept; captures deleted |
 | 2025-12-11 | r7_20251211 | 11.15 GB | 10.55 GB | 11.00 GB | queued |
 | 2025-12-12 | r7_20251212 | 13.67 GB | 12.71 GB | 12.98 GB | queued |
-| 2026-05-15 | holdout2026 | 12.15 GB | 11.91 GB | 12.60 GB | chain B: ingest running |
-| 2026-05-18 | holdout2026 | 14.87 GB | 14.21 GB | 14.90 GB | queued |
+| 2026-05-15 | holdout2026 | 12.15 GB | 11.91 GB | 12.60 GB | done 2026-10-16: oracle match 706,497 / 131,039 / 4,554,801 compared, 0 mismatched; 1.001 GB kept; captures deleted |
+| 2026-05-18 | holdout2026 | 14.87 GB | 14.21 GB | 14.90 GB | chain B: running |
 | 2026-06-12 | r7_20260612 | 15.62 GB | 14.69 GB | 15.33 GB | queued |
 
 The rolling "recent IEX days" list (`tools/iex_hist.py recent --n 5`: the
