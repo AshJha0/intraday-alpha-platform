@@ -1,0 +1,163 @@
+{
+  "alignment": "both streams on ns since the session's New York midnight, exchange (UTC) clock; Nasdaq ITCH as stamped; IEX: exchange_ts from the messages' own UTC send times (iex_clock='exchange', no shift) or, for a capture-clock (TAI) stream, exchange_ts/receive_ts - 37 s (iex_clock='capture'); merge order (exchange_ts, venue_id), each stream's own order kept inside a tie",
+  "fill_probability": {
+    "exec_hazard_per_s": 0.28448979609642305,
+    "horizon_s": 1.0,
+    "model": "queue-depletion hazard, X-4 execution split (exec_hazard_per_s)",
+    "p_fill_touch": 0.24760196717819816,
+    "queue_depletion": {
+      "ask": {
+        "1-100": {
+          "cancel_depletions": 42044,
+          "cancel_hazard_per_s": 0.34681031540850377,
+          "depletions": 73659,
+          "exec_depletions": 31615,
+          "exec_hazard_per_s": 0.26078413380363064,
+          "exposure_s": 121230.53476790871,
+          "hazard_per_s": 0.6075944492121343
+        },
+        "101-500": {
+          "cancel_depletions": 5597,
+          "cancel_hazard_per_s": 0.20294507937612608,
+          "depletions": 14569,
+          "exec_depletions": 8972,
+          "exec_hazard_per_s": 0.32532128857648795,
+          "exposure_s": 27578.8899006852,
+          "hazard_per_s": 0.5282663679526141
+        },
+        "501-2000": {
+          "cancel_depletions": 76,
+          "cancel_hazard_per_s": 0.03488748625366471,
+          "depletions": 718,
+          "exec_depletions": 642,
+          "exec_hazard_per_s": 0.29470744966911505,
+          "exposure_s": 2178.4315283540004,
+          "hazard_per_s": 0.3295949359227798
+        },
+        ">2000": {
+          "cancel_depletions": 11,
+          "cancel_hazard_per_s": 0.05232160762126742,
+          "depletions": 105,
+          "exec_depletions": 94,
+          "exec_hazard_per_s": 0.44711191967264885,
+          "exposure_s": 210.238188391,
+          "hazard_per_s": 0.4994335272939162
+        }
+      },
+      "bid": {
+        "1-100": {
+          "cancel_depletions": 35019,
+          "cancel_hazard_per_s": 0.28820921438560126,
+          "depletions": 68854,
+          "exec_depletions": 33835,
+          "exec_hazard_per_s": 0.27846479821630593,
+          "exposure_s": 121505.48369750363,
+          "hazard_per_s": 0.5666740126019072
+        },
+        "101-500": {
+          "cancel_depletions": 4430,
+          "cancel_hazard_per_s": 0.1848330772913914,
+          "depletions": 14402,
+          "exec_depletions": 9972,
+          "exec_hazard_per_s": 0.4160621775958815,
+          "exposure_s": 23967.571524094987,
+          "hazard_per_s": 0.6008952548872729
+        },
+        "501-2000": {
+          "cancel_depletions": 72,
+          "cancel_hazard_per_s": 0.02845206115998569,
+          "depletions": 924,
+          "exec_depletions": 852,
+          "exec_hazard_per_s": 0.3366827237264973,
+          "exposure_s": 2530.572375587998,
+          "hazard_per_s": 0.36513478488648304
+        },
+        ">2000": {
+          "cancel_depletions": 9,
+          "cancel_hazard_per_s": 0.0028162252783242897,
+          "depletions": 56,
+          "exec_depletions": 47,
+          "exec_hazard_per_s": 0.014706954231249068,
+          "exposure_s": 3195.767067809,
+          "hazard_per_s": 0.01752317950957336
+        }
+      }
+    },
+    "queue_edges": [
+      0,
+      100,
+      500,
+      2000
+    ]
+  },
+  "item": "v1.17 B8",
+  "schema": "iap.venue_calibration/v1",
+  "sessions": [
+    "20251128",
+    "20251208"
+  ],
+  "source": {
+    "iex_clock": "exchange",
+    "iex_dirs": [
+      "C:\\Work\\Claude\\intraday-alpha-platform\\intraday-alpha-platform\\data\\real\\iex\\iex_20251128",
+      "C:\\Work\\Claude\\intraday-alpha-platform\\intraday-alpha-platform\\data\\real\\iex\\iex_20251208"
+    ],
+    "max_events": 0,
+    "nasdaq_dirs": [
+      "C:\\Work\\Claude\\intraday-alpha-platform\\intraday-alpha-platform\\data\\real\\r7_20251128",
+      "C:\\Work\\Claude\\intraday-alpha-platform\\intraday-alpha-platform\\data\\real\\r7_20251208"
+    ]
+  },
+  "toxicity": {
+    "definition": "-(maker markout bps vs the consolidated mid), day-clustered CR1",
+    "markout_bps": {
+      "1s": {
+        "ci95": [
+          -0.6645034326349518,
+          0.4840789819404073
+        ],
+        "df": 1,
+        "mean": -0.09021222534727225,
+        "n": 252044,
+        "n_clusters": 2,
+        "p_student_t": 0.29568407429192795,
+        "se": 0.045197698227911136,
+        "t": -1.9959473354676962
+      },
+      "30s": {
+        "ci95": [
+          -0.3063655011772489,
+          0.04671082518432507
+        ],
+        "df": 1,
+        "mean": -0.12982733799646193,
+        "n": 245138,
+        "n_clusters": 2,
+        "p_student_t": 0.0678714188075258,
+        "se": 0.01389385476201095,
+        "t": -9.344227373920754
+      },
+      "5s": {
+        "ci95": [
+          -0.9696722466310618,
+          0.6949961250810909
+        ],
+        "df": 1,
+        "mean": -0.13733806077498548,
+        "n": 251127,
+        "n_clusters": 2,
+        "p_student_t": 0.2833304119014266,
+        "se": 0.0655061210753524,
+        "t": -2.0965683591156927
+      }
+    },
+    "n_fills": 255907,
+    "toxicity_bps": {
+      "1s": 0.09021222534727225,
+      "30s": 0.12982733799646193,
+      "5s": 0.13733806077498548
+    }
+  },
+  "venue": "XNAS",
+  "venue_id": 101
+}

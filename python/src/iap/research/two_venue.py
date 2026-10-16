@@ -63,7 +63,7 @@ from collections.abc import Container, Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from iap.core.codec import read_iap1, read_jsonl
+from iap.core.codec import iter_iap1, iter_jsonl, read_iap1, read_jsonl
 from iap.core.events import EventType, MarketEvent
 from iap.execution.calibration import DEFAULT_QUEUE_EDGES, estimate_calibration, queue_bucket
 from iap.execution.fill_hazard import IEX_TAI_OFFSET_S
@@ -224,8 +224,13 @@ def session_file(dataset_dir: Path, label: str | None = None) -> Path:
     return files[0]
 
 
-def read_events(path: Path) -> list[MarketEvent]:
-    return read_iap1(path) if path.suffix == ".iap1" else read_jsonl(path)
+def read_events(path: Path, instruments: Container[int] | None = None) -> list[MarketEvent]:
+    """The session's events; with ``instruments`` the file is STREAMED and
+    only those instrument ids are kept (a real day never exists in full)."""
+    if instruments is None:
+        return read_iap1(path) if path.suffix == ".iap1" else read_jsonl(path)
+    it = iter_iap1(path) if path.suffix == ".iap1" else iter_jsonl(path)
+    return [ev for ev in it if ev.instrument_id in instruments]
 
 
 def load_merged_session(
@@ -240,17 +245,19 @@ def load_merged_session(
 ) -> list[MarketEvent]:
     """The merged stream of one overlap day (``max_events`` caps EACH input;
     ``symbols`` keeps only those instruments)."""
-    a = read_events(session_file(nasdaq_dir, label))
-    b = read_events(session_file(iex_dir, label))
-    if max_events > 0:
-        a, b = a[:max_events], b[:max_events]
     prim = symbols_of(nasdaq_dir)
+    id_map = instrument_map(prim, symbols_of(iex_dir))
     want = set(symbols)
     keep = {iid for sym, iid in prim.items() if sym in want} if want else None
+    keep_iex = None if keep is None else {k for k, v in id_map.items() if v in keep}
+    a = read_events(session_file(nasdaq_dir, label), keep)
+    b = read_events(session_file(iex_dir, label), keep_iex)
+    if max_events > 0:
+        a, b = a[:max_events], b[:max_events]
     return merge_events(
         a,
         b,
-        id_map=instrument_map(prim, symbols_of(iex_dir)),
+        id_map=id_map,
         iex_clock=iex_clock,
         keep=keep,
         counters=counters,
@@ -438,7 +445,9 @@ def save_calibrations(docs: Mapping[int, Mapping[str, object]], out_dir: Path) -
     paths = []
     for _vid, doc in sorted(docs.items()):
         p = out_dir / f"venue_calibration_{doc['venue']}.json"
-        p.write_text(json.dumps(doc, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        p.write_text(
+            json.dumps(doc, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
+        )
         paths.append(p)
     return paths
 

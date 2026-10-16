@@ -395,3 +395,24 @@ def test_keep_drops_other_instruments_of_both_streams(golden_dir):
         counters=cnt,
     )
     assert m == [] and cnt["dropped_by_keep"] == 4000
+
+
+def test_symbols_stream_path_gives_the_same_report(pair, tmp_path):
+    """--symbols in two-venue mode streams the files with the filter; the
+    report equals the unfiltered one when the filter keeps everything."""
+    a = _run(pair, tmp_path / "a")
+    b = _run(pair, tmp_path / "b", ["--symbols", SYMBOL])
+    for k in ("cells", "paired_vs_baseline", "n_events"):
+        assert a[k] == b[k]
+    c = tv.read_events(tv.session_file(pair[0]), {99})
+    assert c == []
+
+
+def test_pooled_paired_summary_and_rows(pair, tmp_path):
+    doc = _run(pair, tmp_path)
+    t = doc["two_venue"]
+    assert set(t["paired_pooled"]) == {"pin_iex-pin_nasdaq", "sor-pin_nasdaq"}
+    n = doc["n_parents"]["sor"]
+    assert t["paired_pooled"]["sor-pin_nasdaq"]["n_pairs"] == n
+    rows = t["paired_rows"]["sor-pin_nasdaq"]
+    assert len(rows) == n and {"all_in", "shortfall"} <= set(rows[0]["costs_bps_diff"])

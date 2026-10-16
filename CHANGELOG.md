@@ -8,6 +8,10 @@ that tag.
 
 ## Unreleased
 
+- v1.17 B8 first real-book run (2 overlap days, AAPL + MSFT; `research/execution/b8/REPORT_overlap2.md`):
+  NEGATIVE: `sor` +5.1 ± 1.3 bps all-in and -8 pp fill vs pinned Nasdaq, pinned IEX +11.6 ± 0.6 bps;
+  2 clusters, provisional. Two-venue reads now stream with the `--symbols` filter; the `two_venue`
+  block gains `paired_pooled` / `paired_rows`.
 - v1.17 G5, the post-release docs truth pass: README "Current status" and "Next" (v1.17.1), the
   site (docs/index.html: v1.17.0 block and history, four result cards), SHOWCASE, ROADMAP, EPICS,
   LEARN, COOKBOOK, HOW_IT_WORKS, API references, runbooks (prereg environment: Python 3.11 or
