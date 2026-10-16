@@ -1,0 +1,587 @@
+{
+  "groups": {
+    "pin_iex/IEXG/LIMIT": {
+      "behind_nbbo_ticks": {
+        "mean": 48.1554054054054,
+        "n": 296,
+        "p50": 4.0,
+        "p90": 134.0
+      },
+      "child_qty": {
+        "mean": 954.0540540540541,
+        "n": 296,
+        "p50": 1000,
+        "p90": 1000
+      },
+      "children": 296,
+      "fill_ratio": 0.34274787535410767,
+      "fill_vs_decision_mid_bps_qty_weighted": -2.312366502594099,
+      "filled_qty": 96792,
+      "filled_qty_skipped": 0,
+      "first_fill_ms": {
+        "mean": 268067.8082256038,
+        "n": 106,
+        "p50": 207638.198448,
+        "p90": 672106.334156
+      },
+      "levels_skipped": {
+        "mean": 0.0,
+        "n": 106,
+        "p50": 0,
+        "p90": 0
+      },
+      "levels_walked": {
+        "mean": 0.3581081081081081,
+        "n": 296,
+        "p50": 0,
+        "p90": 1
+      },
+      "limit_vs_mid_bps": {
+        "mean": -10.26908861956915,
+        "n": 296,
+        "p50": -1.5287870603463212,
+        "p90": -0.40837161817253703
+      },
+      "maker_qty": 96792,
+      "share_qty_gt_depth10": 0.9831081081081081,
+      "share_qty_gt_touch": 1.0,
+      "share_qty_gt_touch_avail": 1.0,
+      "share_skipped_ge1": 0.0,
+      "share_touch_consumed": 0.22635135135135134,
+      "share_walked_ge2": 0.0,
+      "total_bps_qty_weighted": -2.312366502594099,
+      "touch_bps": {
+        "mean": 7.007994242777008,
+        "n": 106,
+        "p50": 2.650518890044243,
+        "p90": 19.856422789063693
+      },
+      "touch_size": {
+        "mean": 19.0777027027027,
+        "n": 296,
+        "p50": 6,
+        "p90": 40
+      },
+      "touch_vs_other": {
+        "better": 23,
+        "equal": 75,
+        "worse": 198
+      },
+      "walk_bps": {
+        "mean": -9.329156791683236,
+        "n": 106,
+        "p50": -7.35354195604216,
+        "p90": -0.8142410764267031
+      },
+      "walk_bps_qty_weighted": -9.01523893122982,
+      "walk_bps_qty_weighted_skipped": 0.0
+    },
+    "pin_iex/IEXG/MARKET": {
+      "behind_nbbo_ticks": {
+        "n": 0
+      },
+      "child_qty": {
+        "mean": 147.3345418589321,
+        "n": 12136,
+        "p50": 10,
+        "p90": 504
+      },
+      "children": 12136,
+      "fill_ratio": 0.02262853653025751,
+      "fill_vs_decision_mid_bps_qty_weighted": 20.09178363220281,
+      "filled_qty": 40461,
+      "filled_qty_skipped": 3793,
+      "first_fill_ms": {
+        "mean": 0.2,
+        "n": 2378,
+        "p50": 0.2,
+        "p90": 0.2
+      },
+      "levels_skipped": {
+        "mean": 0.7165685449957948,
+        "n": 2378,
+        "p50": 0,
+        "p90": 2
+      },
+      "levels_walked": {
+        "mean": 0.2069874752801582,
+        "n": 12136,
+        "p50": 0,
+        "p90": 1
+      },
+      "limit_vs_mid_bps": {
+        "n": 0
+      },
+      "maker_qty": 0,
+      "share_qty_gt_depth10": 0.1378543177323665,
+      "share_qty_gt_touch": 0.524390243902439,
+      "share_qty_gt_touch_avail": 0.8779663810151616,
+      "share_skipped_ge1": 0.2430613961312027,
+      "share_touch_consumed": 0.8159195781147001,
+      "share_walked_ge2": 0.008075148319050759,
+      "total_bps_qty_weighted": 20.09178363220281,
+      "touch_bps": {
+        "mean": 1.7185514427004038,
+        "n": 2378,
+        "p50": 0.6114338122898196,
+        "p90": 2.3411813804826904
+      },
+      "touch_size": {
+        "mean": 32.896423862887275,
+        "n": 12136,
+        "p50": 23,
+        "p90": 60
+      },
+      "touch_vs_other": {
+        "better": 758,
+        "equal": 2584,
+        "worse": 8794
+      },
+      "walk_bps": {
+        "mean": 39.457091360167894,
+        "n": 2378,
+        "p50": -0.0,
+        "p90": 47.01189543414773
+      },
+      "walk_bps_qty_weighted": 17.619955174306,
+      "walk_bps_qty_weighted_skipped": 176.68847631167978
+    },
+    "pin_nasdaq/XNAS/LIMIT": {
+      "behind_nbbo_ticks": {
+        "mean": 0.02702702702702703,
+        "n": 296,
+        "p50": 0.0,
+        "p90": 0.0
+      },
+      "child_qty": {
+        "mean": 954.0540540540541,
+        "n": 296,
+        "p50": 1000,
+        "p90": 1000
+      },
+      "children": 296,
+      "fill_ratio": 0.5817209631728045,
+      "fill_vs_decision_mid_bps_qty_weighted": -0.4806754805058971,
+      "filled_qty": 164278,
+      "filled_qty_skipped": 0,
+      "first_fill_ms": {
+        "mean": 223092.87048688135,
+        "n": 177,
+        "p50": 88476.881599,
+        "p90": 623679.67848
+      },
+      "levels_skipped": {
+        "mean": 0.0,
+        "n": 177,
+        "p50": 0,
+        "p90": 0
+      },
+      "levels_walked": {
+        "mean": 0.597972972972973,
+        "n": 296,
+        "p50": 1,
+        "p90": 1
+      },
+      "limit_vs_mid_bps": {
+        "mean": -0.44172697387522414,
+        "n": 296,
+        "p50": -0.40837161817253703,
+        "p90": -0.20373652792209115
+      },
+      "maker_qty": 164278,
+      "share_qty_gt_depth10": 0.9222972972972973,
+      "share_qty_gt_touch": 0.9966216216216216,
+      "share_qty_gt_touch_avail": 0.9966216216216216,
+      "share_skipped_ge1": 0.0,
+      "share_touch_consumed": 0.14864864864864866,
+      "share_walked_ge2": 0.0,
+      "total_bps_qty_weighted": -0.4806754805058971,
+      "touch_bps": {
+        "mean": 0.48920997645149555,
+        "n": 177,
+        "p50": 0.508538359048423,
+        "p90": 0.7133467170765013
+      },
+      "touch_size": {
+        "mean": 71.66891891891892,
+        "n": 296,
+        "p50": 60,
+        "p90": 140
+      },
+      "touch_vs_other": {
+        "better": 198,
+        "equal": 75,
+        "worse": 23
+      },
+      "walk_bps": {
+        "mean": -0.9726625137014052,
+        "n": 177,
+        "p50": -1.017076718096846,
+        "p90": -0.40847170312276615
+      },
+      "walk_bps_qty_weighted": -0.9669091233820319,
+      "walk_bps_qty_weighted_skipped": 0.0
+    },
+    "pin_nasdaq/XNAS/MARKET": {
+      "behind_nbbo_ticks": {
+        "n": 0
+      },
+      "child_qty": {
+        "mean": 10.650260250205461,
+        "n": 10951,
+        "p50": 3,
+        "p90": 8
+      },
+      "children": 10951,
+      "fill_ratio": 0.4522468297450935,
+      "fill_vs_decision_mid_bps_qty_weighted": 0.7632065352780711,
+      "filled_qty": 52746,
+      "filled_qty_skipped": 10622,
+      "first_fill_ms": {
+        "mean": 0.2,
+        "n": 10887,
+        "p50": 0.2,
+        "p90": 0.2
+      },
+      "levels_skipped": {
+        "mean": 0.4205933682373473,
+        "n": 10887,
+        "p50": 0,
+        "p90": 1
+      },
+      "levels_walked": {
+        "mean": 1.0282166012236325,
+        "n": 10951,
+        "p50": 1,
+        "p90": 1
+      },
+      "limit_vs_mid_bps": {
+        "n": 0
+      },
+      "maker_qty": 0,
+      "share_qty_gt_depth10": 0.004657108939822847,
+      "share_qty_gt_touch": 0.033238973609716005,
+      "share_qty_gt_touch_avail": 0.10565245183088302,
+      "share_skipped_ge1": 0.27197575089556353,
+      "share_touch_consumed": 0.6915350196329102,
+      "share_walked_ge2": 0.018811067482421697,
+      "total_bps_qty_weighted": 0.7632065352780711,
+      "touch_bps": {
+        "mean": 0.4778166315274798,
+        "n": 10887,
+        "p50": 0.4083215940875033,
+        "p90": 0.7140744065531628
+      },
+      "touch_size": {
+        "mean": 72.9179983563145,
+        "n": 10951,
+        "p50": 55,
+        "p90": 141
+      },
+      "touch_vs_other": {
+        "better": 7876,
+        "equal": 2367,
+        "worse": 708
+      },
+      "walk_bps": {
+        "mean": 0.04157598372071011,
+        "n": 10887,
+        "p50": -0.0,
+        "p90": 0.4084383360222191
+      },
+      "walk_bps_qty_weighted": 0.30931775650085364,
+      "walk_bps_qty_weighted_skipped": 0.5046698320461052
+    },
+    "sor/IEXG/LIMIT": {
+      "behind_nbbo_ticks": {
+        "mean": 131.6346153846154,
+        "n": 104,
+        "p50": 41.0,
+        "p90": 445.0
+      },
+      "child_qty": {
+        "mean": 969.7980769230769,
+        "n": 104,
+        "p50": 1000,
+        "p90": 1000
+      },
+      "children": 104,
+      "fill_ratio": 0.20699193924191198,
+      "fill_vs_decision_mid_bps_qty_weighted": -6.779809185372847,
+      "filled_qty": 20877,
+      "filled_qty_skipped": 0,
+      "first_fill_ms": {
+        "mean": 306767.9538548636,
+        "n": 22,
+        "p50": 218257.124429,
+        "p90": 652257.328165
+      },
+      "levels_skipped": {
+        "mean": 0.0,
+        "n": 22,
+        "p50": 0,
+        "p90": 0
+      },
+      "levels_walked": {
+        "mean": 0.21153846153846154,
+        "n": 104,
+        "p50": 0,
+        "p90": 1
+      },
+      "limit_vs_mid_bps": {
+        "mean": -27.246085198468254,
+        "n": 104,
+        "p50": -8.637421374061315,
+        "p90": -3.165300141927974
+      },
+      "maker_qty": 20877,
+      "share_qty_gt_depth10": 0.9903846153846154,
+      "share_qty_gt_touch": 1.0,
+      "share_qty_gt_touch_avail": 1.0,
+      "share_skipped_ge1": 0.0,
+      "share_touch_consumed": 0.0673076923076923,
+      "share_walked_ge2": 0.0,
+      "total_bps_qty_weighted": -6.779809185372846,
+      "touch_bps": {
+        "mean": 7.3450154374581125,
+        "n": 22,
+        "p50": 1.0213252716725223,
+        "p90": 24.42648645347772
+      },
+      "touch_size": {
+        "mean": 11.625,
+        "n": 104,
+        "p50": 2,
+        "p90": 40
+      },
+      "touch_vs_other": {
+        "better": 18,
+        "equal": 9,
+        "worse": 77
+      },
+      "walk_bps": {
+        "mean": -14.050600047395216,
+        "n": 22,
+        "p50": -8.145727057050635,
+        "p90": -7.3257837062360736
+      },
+      "walk_bps_qty_weighted": -12.965283862976937,
+      "walk_bps_qty_weighted_skipped": 0.0
+    },
+    "sor/IEXG/MARKET": {
+      "behind_nbbo_ticks": {
+        "n": 0
+      },
+      "child_qty": {
+        "mean": 13.796934865900383,
+        "n": 3132,
+        "p50": 4,
+        "p90": 11
+      },
+      "children": 3132,
+      "fill_ratio": 0.21452374340460983,
+      "fill_vs_decision_mid_bps_qty_weighted": 44.2201605297927,
+      "filled_qty": 9270,
+      "filled_qty_skipped": 2563,
+      "first_fill_ms": {
+        "mean": 0.2,
+        "n": 2235,
+        "p50": 0.2,
+        "p90": 0.2
+      },
+      "levels_skipped": {
+        "mean": 0.5131991051454139,
+        "n": 2235,
+        "p50": 0,
+        "p90": 1
+      },
+      "levels_walked": {
+        "mean": 0.7710727969348659,
+        "n": 3132,
+        "p50": 1,
+        "p90": 1
+      },
+      "limit_vs_mid_bps": {
+        "n": 0
+      },
+      "maker_qty": 0,
+      "share_qty_gt_depth10": 0.008939974457215836,
+      "share_qty_gt_touch": 0.32630906768837803,
+      "share_qty_gt_touch_avail": 0.46871008939974457,
+      "share_skipped_ge1": 0.3042505592841163,
+      "share_touch_consumed": 0.5338441890166028,
+      "share_walked_ge2": 0.04533844189016603,
+      "total_bps_qty_weighted": 44.22016052979269,
+      "touch_bps": {
+        "mean": 0.48171295512033374,
+        "n": 2235,
+        "p50": 0.40845501889104463,
+        "p90": 0.7140161367646909
+      },
+      "touch_size": {
+        "mean": 22.67624521072797,
+        "n": 3132,
+        "p50": 38,
+        "p90": 41
+      },
+      "touch_vs_other": {
+        "better": 724,
+        "equal": 2408
+      },
+      "walk_bps": {
+        "mean": 14.443550745247617,
+        "n": 2235,
+        "p50": -0.0,
+        "p90": 5.699165479340525
+      },
+      "walk_bps_qty_weighted": 43.74960453896074,
+      "walk_bps_qty_weighted_skipped": 51.953188790172746
+    },
+    "sor/XNAS/LIMIT": {
+      "behind_nbbo_ticks": {
+        "mean": 0.041666666666666664,
+        "n": 192,
+        "p50": 0.0,
+        "p90": 0.0
+      },
+      "child_qty": {
+        "mean": 945.5260416666666,
+        "n": 192,
+        "p50": 1000,
+        "p90": 1000
+      },
+      "children": 192,
+      "fill_ratio": 0.652568841198407,
+      "fill_vs_decision_mid_bps_qty_weighted": -0.48722330799331576,
+      "filled_qty": 118468,
+      "filled_qty_skipped": 0,
+      "first_fill_ms": {
+        "mean": 244807.7437918203,
+        "n": 128,
+        "p50": 130569.730845,
+        "p90": 787387.306737
+      },
+      "levels_skipped": {
+        "mean": 0.0,
+        "n": 128,
+        "p50": 0,
+        "p90": 0
+      },
+      "levels_walked": {
+        "mean": 0.6666666666666666,
+        "n": 192,
+        "p50": 1,
+        "p90": 1
+      },
+      "limit_vs_mid_bps": {
+        "mean": -0.4833984007274265,
+        "n": 192,
+        "p50": -0.508538359048423,
+        "p90": -0.20418580908626852
+      },
+      "maker_qty": 118468,
+      "share_qty_gt_depth10": 0.9010416666666666,
+      "share_qty_gt_touch": 0.9947916666666666,
+      "share_qty_gt_touch_avail": 0.9947916666666666,
+      "share_skipped_ge1": 0.0,
+      "share_touch_consumed": 0.046875,
+      "share_walked_ge2": 0.0,
+      "total_bps_qty_weighted": -0.48722330799331576,
+      "touch_bps": {
+        "mean": 0.4964730270439881,
+        "n": 128,
+        "p50": 0.508538359048423,
+        "p90": 0.7134339614949499
+      },
+      "touch_size": {
+        "mean": 79.796875,
+        "n": 192,
+        "p50": 75,
+        "p90": 163
+      },
+      "touch_vs_other": {
+        "better": 121,
+        "equal": 66,
+        "worse": 5
+      },
+      "walk_bps": {
+        "mean": -0.9849845951920331,
+        "n": 128,
+        "p50": -1.017076718096846,
+        "p90": -0.40847170312276615
+      },
+      "walk_bps_qty_weighted": -0.9821540458230256,
+      "walk_bps_qty_weighted_skipped": 0.0
+    },
+    "sor/XNAS/MARKET": {
+      "behind_nbbo_ticks": {
+        "n": 0
+      },
+      "child_qty": {
+        "mean": 10.293576826196473,
+        "n": 7940,
+        "p50": 3,
+        "p90": 8
+      },
+      "children": 7940,
+      "fill_ratio": 0.5078366837552458,
+      "fill_vs_decision_mid_bps_qty_weighted": 0.7587731733699268,
+      "filled_qty": 41506,
+      "filled_qty_skipped": 8643,
+      "first_fill_ms": {
+        "mean": 0.2,
+        "n": 7899,
+        "p50": 0.2,
+        "p90": 0.2
+      },
+      "levels_skipped": {
+        "mean": 0.428915052538296,
+        "n": 7899,
+        "p50": 0,
+        "p90": 1
+      },
+      "levels_walked": {
+        "mean": 1.0345088161209068,
+        "n": 7940,
+        "p50": 1,
+        "p90": 1
+      },
+      "limit_vs_mid_bps": {
+        "n": 0
+      },
+      "maker_qty": 0,
+      "share_qty_gt_depth10": 0.00415617128463476,
+      "share_qty_gt_touch": 0.03828715365239295,
+      "share_qty_gt_touch_avail": 0.10251889168765743,
+      "share_skipped_ge1": 0.2801620458285859,
+      "share_touch_consumed": 0.6181360201511334,
+      "share_walked_ge2": 0.023425692695214106,
+      "total_bps_qty_weighted": 0.7587731733699268,
+      "touch_bps": {
+        "mean": 0.45677887521666855,
+        "n": 7899,
+        "p50": 0.40800505926273484,
+        "p90": 0.7132158904500392
+      },
+      "touch_size": {
+        "mean": 67.68942065491184,
+        "n": 7940,
+        "p50": 50,
+        "p90": 130
+      },
+      "touch_vs_other": {
+        "better": 7940
+      },
+      "walk_bps": {
+        "mean": 0.053883491933102746,
+        "n": 7899,
+        "p50": -0.0,
+        "p90": 0.6105565222700492
+      },
+      "walk_bps_qty_weighted": 0.32543824710330055,
+      "walk_bps_qty_weighted_skipped": 0.5129662196506758
+    }
+  },
+  "levels_recorded": 10,
+  "symbol": "MSFT"
+}
