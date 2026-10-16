@@ -15,8 +15,8 @@ PROMOTE here would be a reason to look for leakage before anything else.
 - **Members:** every flagship alpha of the asset class, whatever its verdict.
 - **Outer validation:** `validate_alpha`, 4 expanding walk-forward folds purged at the combination horizon, 60 s embargo, method bundle `v2` — the chain of the alpha reports.
 - **Weights:** fitted inside each fold's training window on the members' out-of-sample predictions from 3 inner walk-forward folds (same splitter); standardisation, weights, ridge penalty and scale never see a test row.
-- **Methods:** `equal_weight`, `ic_weighted`, `ridge`, `shrinkage_mv`; default `equal_weight` (the baseline). `ridge` and `shrinkage_mv` account for member correlation explicitly; `equal_weight` and `ic_weighted` do not, and nothing is orthogonalised.
-- **Looks:** each experiment debits `looks_per_validation(4) + K` (83 + members); this report declared 104 looks over 8 experiments on a ledger of 5,430 and was judged at 5,534 looks: PROMOTE needs gate t >= 4.439.
+- **Methods:** `equal_weight`, `ic_weighted`, `ridge`, `shrinkage_mv`, `decay_aware`; default `decay_aware` (the baseline). `ridge` and `shrinkage_mv` account for member correlation explicitly; `equal_weight` and `ic_weighted` do not, and nothing is orthogonalised.
+- **Looks:** each experiment debits `looks_per_validation(4) + K` (83 + members); this report declared 130 looks over 10 experiments on a ledger of 5,599 and was judged at 5,729 looks: PROMOTE needs gate t >= 4.447.
 
 ## COMB_EQ — EQUITY, horizon 5s
 
@@ -31,8 +31,9 @@ member's committed report at its own horizon.
 |--------|---------|--------|--------|-----|------|--------------------|----------------------|-------------------|--------|---------|---------|-------|
 | **equal_weight** | +0.0284 | +6.93 | 1.00 | yes | pass | 0 | +0 | +0 | +0 | +0 | **ITERATE** | cost |
 | **ic_weighted** | +0.0451 | +10.78 | 1.00 | yes | pass | 3 | +0 | -29 | -88 | +0 | **ITERATE** | cost |
-| **ridge** | +0.0541 | +11.58 | 1.00 | yes | pass | 7 | +0 | -200 | -572 | +0 | **ITERATE** | cost |
-| **shrinkage_mv** | +0.0532 | +11.45 | 1.00 | yes | pass | 6 | +0 | -33 | -95 | +0 | **ITERATE** | cost |
+| **ridge** | +0.0522 | +10.43 | 1.00 | yes | pass | 7 | +0 | -200 | -572 | +0 | **ITERATE** | cost |
+| **shrinkage_mv** | +0.0554 | +12.27 | 1.00 | yes | pass | 6 | +0 | -33 | -95 | +0 | **ITERATE** | cost |
+| **decay_aware** | +0.0423 | +10.36 | 1.00 | yes | pass | 0 | +0 | +0 | +0 | +0 | **ITERATE** | cost |
 
 | member | own horizon | own gate IC | own gate t | own verdict | gate IC here | gate t here | trades (all folds) | net P&L 1x (all folds) |
 |--------|-------------|-------------|------------|-------------|--------------|-------------|--------------------|------------------------|
@@ -105,31 +106,41 @@ Pairs above the lifecycle's `max_cross_alpha_correlation` (0.7): EQ02/EQ03 (+0.9
 | 3 | +0.121 | +0.187 | +0.145 | +0.000 | +0.144 | +0.214 | +0.000 | +0.000 | +0.000 | +0.000 | +0.000 | +0.189 | yes | - |
 | 4 | +0.125 | +0.203 | +0.159 | +0.000 | +0.127 | +0.176 | +0.000 | +0.000 | +0.000 | +0.000 | +0.000 | +0.210 | yes | - |
 
-**ridge** — mean pairwise cosine of the fold weight vectors +0.618 (min +0.301); largest |signal correlation| with a member 0.58.
+**ridge** — mean pairwise cosine of the fold weight vectors +0.466 (min +0.008); largest |signal correlation| with a member 0.56.
 
 | fold | EQ01 | EQ02 | EQ03 | EQ04 | EQ05 | EQ06 | EQ07 | EQ08 | EQ09 | EQ10 | EQ11 | EQ12 | beta > 0 | detail |
 |------|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | -0.068 | +0.118 | +0.063 | +0.095 | +0.175 | +0.057 | -0.027 | -0.093 | +0.158 | -0.017 | -0.006 | +0.123 | yes | lambda 1 |
-| 2 | +0.000 | +0.106 | +0.088 | -0.033 | +0.085 | +0.188 | -0.018 | -0.160 | -0.125 | -0.012 | -0.079 | +0.106 | yes | lambda 1 |
-| 3 | +0.106 | +0.089 | +0.022 | -0.071 | +0.064 | +0.131 | -0.008 | -0.173 | -0.060 | -0.003 | -0.182 | +0.090 | yes | lambda 1 |
-| 4 | +0.109 | +0.092 | +0.024 | -0.075 | +0.059 | +0.110 | +0.011 | -0.223 | +0.001 | -0.004 | -0.191 | +0.101 | yes | lambda 1 |
+| 1 | -0.052 | +0.090 | +0.049 | +0.110 | +0.127 | +0.082 | -0.036 | -0.090 | +0.244 | -0.012 | -0.012 | +0.096 | yes | lambda 1 |
+| 2 | +0.005 | +0.103 | +0.083 | -0.047 | +0.071 | +0.157 | -0.008 | -0.131 | -0.213 | -0.011 | -0.067 | +0.105 | yes | lambda 1 |
+| 3 | +0.104 | +0.085 | +0.021 | -0.096 | +0.059 | +0.113 | -0.002 | -0.146 | -0.109 | -0.002 | -0.176 | +0.087 | yes | lambda 1 |
+| 4 | +0.105 | +0.087 | +0.023 | -0.103 | +0.061 | +0.113 | +0.013 | -0.199 | +0.005 | -0.004 | -0.192 | +0.096 | yes | lambda 1 |
 
-**shrinkage_mv** — mean pairwise cosine of the fold weight vectors +0.638 (min +0.297); largest |signal correlation| with a member 0.54.
+**shrinkage_mv** — mean pairwise cosine of the fold weight vectors +0.643 (min +0.413); largest |signal correlation| with a member 0.54.
 
 | fold | EQ01 | EQ02 | EQ03 | EQ04 | EQ05 | EQ06 | EQ07 | EQ08 | EQ09 | EQ10 | EQ11 | EQ12 | beta > 0 | detail |
 |------|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | -0.040 | +0.118 | -0.177 | +0.068 | +0.101 | +0.048 | +0.007 | -0.064 | +0.183 | -0.008 | +0.023 | +0.162 | yes | shrinkage 0.001 |
-| 2 | +0.006 | +0.134 | -0.066 | -0.056 | +0.071 | +0.191 | +0.060 | -0.134 | -0.156 | -0.011 | -0.007 | +0.107 | yes | shrinkage 0.001 |
-| 3 | +0.071 | +0.204 | -0.220 | -0.065 | +0.050 | +0.082 | +0.025 | -0.075 | -0.043 | -0.002 | -0.087 | +0.076 | yes | shrinkage 0.000 |
-| 4 | +0.070 | +0.091 | -0.211 | -0.067 | +0.052 | +0.076 | +0.037 | -0.108 | +0.025 | -0.003 | -0.079 | +0.181 | yes | shrinkage 0.000 |
+| 1 | -0.027 | -0.098 | -0.124 | +0.055 | +0.059 | +0.078 | -0.002 | -0.069 | +0.161 | -0.003 | +0.021 | +0.302 | yes | shrinkage 0.001 |
+| 2 | +0.010 | +0.049 | -0.088 | -0.058 | +0.072 | +0.138 | +0.058 | -0.115 | -0.185 | -0.010 | +0.002 | +0.215 | yes | shrinkage 0.001 |
+| 3 | +0.073 | +0.116 | -0.223 | -0.066 | +0.057 | +0.067 | +0.029 | -0.061 | -0.051 | -0.001 | -0.089 | +0.165 | yes | shrinkage 0.000 |
+| 4 | +0.056 | -0.105 | -0.158 | -0.055 | +0.051 | +0.067 | +0.036 | -0.078 | +0.024 | -0.003 | -0.063 | +0.305 | yes | shrinkage 0.000 |
+
+**decay_aware** — mean pairwise cosine of the fold weight vectors +0.861 (min +0.742); largest |signal correlation| with a member 0.91.
+
+| fold | EQ01 | EQ02 | EQ03 | EQ04 | EQ05 | EQ06 | EQ07 | EQ08 | EQ09 | EQ10 | EQ11 | EQ12 | beta > 0 | detail |
+|------|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | +0.000 | +0.170 | +0.151 | +0.125 | +0.181 | +0.021 | +0.000 | +0.000 | +0.178 | +0.000 | +0.000 | +0.173 | yes | - |
+| 2 | +0.000 | +0.216 | +0.212 | +0.000 | +0.182 | +0.172 | +0.000 | +0.000 | +0.000 | +0.000 | +0.000 | +0.218 | yes | - |
+| 3 | +0.129 | +0.200 | +0.155 | +0.000 | +0.154 | +0.160 | +0.000 | +0.000 | +0.000 | +0.000 | +0.000 | +0.202 | yes | - |
+| 4 | +0.135 | +0.219 | +0.171 | +0.000 | +0.137 | +0.113 | +0.000 | +0.000 | +0.000 | +0.000 | +0.000 | +0.226 | yes | - |
 
 ### Leakage checks
 
-- Fitted parameters of the last fold are identical when every label from the test start onwards is replaced by garbage: `equal_weight` yes, `ic_weighted` yes, `ridge` yes, `shrinkage_mv` yes.
+- Fitted parameters of the last fold are identical when every label from the test start onwards is replaced by garbage: `equal_weight` yes, `ic_weighted` yes, `ridge` yes, `shrinkage_mv` yes, `decay_aware` yes.
 - `equal_weight`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0284 against the validation's +0.0284.
 - `ic_weighted`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0451 against the validation's +0.0451.
-- `ridge`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0541 against the validation's +0.0541.
-- `shrinkage_mv`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0532 against the validation's +0.0532.
+- `ridge`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0522 against the validation's +0.0522.
+- `shrinkage_mv`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0554 against the validation's +0.0554.
+- `decay_aware`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0423 against the validation's +0.0423.
 
 ## COMB_FX — FX, horizon 1m
 
@@ -144,8 +155,9 @@ member's committed report at its own horizon.
 |--------|---------|--------|--------|-----|------|--------------------|----------------------|-------------------|--------|---------|---------|-------|
 | **equal_weight** | +0.0501 | +5.91 | 1.00 | yes | pass | 2 | +0 | -1 | -3 | +0 | **ITERATE** | cost |
 | **ic_weighted** | +0.0577 | +5.42 | 1.00 | yes | pass | 4217 | -290 | -1511 | -1816 | -1200 | **ITERATE** | cost |
-| **ridge** | +0.0670 | +6.82 | 1.00 | no | pass | 6523 | -452 | -2434 | -2748 | -2096 | **ITERATE** | hypothesis, cost |
-| **shrinkage_mv** | +0.0663 | +6.84 | 1.00 | no | pass | 6518 | -466 | -2446 | -2770 | -2105 | **ITERATE** | hypothesis, cost |
+| **ridge** | +0.0667 | +6.60 | 1.00 | yes | pass | 6308 | -450 | -2374 | -2700 | -2042 | **ITERATE** | cost |
+| **shrinkage_mv** | +0.0665 | +6.85 | 1.00 | no | pass | 6503 | -451 | -2444 | -2766 | -2092 | **ITERATE** | hypothesis, cost |
+| **decay_aware** | +0.0564 | +5.37 | 1.00 | yes | pass | 4240 | -293 | -1485 | -1777 | -1195 | **ITERATE** | cost |
 
 | member | own horizon | own gate IC | own gate t | own verdict | gate IC here | gate t here | trades (all folds) | net P&L 1x (all folds) |
 |--------|-------------|-------------|------------|-------------|--------------|-------------|--------------------|------------------------|
@@ -220,33 +232,43 @@ Pairs above the lifecycle's `max_cross_alpha_correlation` (0.7): none. Of such a
 | 3 | +0.000 | +0.000 | +0.000 | +0.059 | +0.000 | +0.077 | +0.000 | +0.336 | +0.000 | +0.248 | +0.253 | +0.026 | yes | - |
 | 4 | +0.053 | +0.000 | +0.000 | +0.047 | +0.000 | +0.100 | +0.000 | +0.325 | +0.000 | +0.158 | +0.303 | +0.013 | yes | - |
 
-**ridge** — mean pairwise cosine of the fold weight vectors +0.915 (min +0.850); largest |signal correlation| with a member 0.87.
+**ridge** — mean pairwise cosine of the fold weight vectors +0.909 (min +0.866); largest |signal correlation| with a member 0.86.
 
 | fold | FX01 | FX02 | FX03 | FX04 | FX05 | FX06 | FX07 | FX08 | FX09 | FX10 | FX11 | FX12 | beta > 0 | detail |
 |------|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | -0.025 | -0.127 | +0.017 | +0.036 | +0.026 | -0.016 | +0.030 | +0.218 | -0.374 | +0.074 | +0.041 | +0.017 | yes | lambda 0.1 |
-| 2 | -0.024 | -0.052 | -0.022 | +0.065 | +0.014 | +0.070 | -0.026 | +0.187 | -0.304 | +0.126 | +0.076 | +0.033 | yes | lambda 1 |
-| 3 | +0.022 | -0.033 | -0.040 | +0.082 | -0.033 | +0.041 | -0.056 | +0.174 | -0.349 | +0.132 | +0.029 | +0.009 | yes | lambda 0.1 |
-| 4 | +0.079 | -0.006 | -0.005 | +0.071 | -0.089 | +0.056 | -0.028 | +0.170 | -0.330 | +0.044 | +0.114 | -0.008 | yes | lambda 0.1 |
+| 1 | -0.035 | -0.091 | +0.000 | +0.033 | -0.020 | +0.009 | +0.019 | +0.221 | -0.279 | +0.119 | +0.150 | +0.024 | yes | lambda 100 |
+| 2 | -0.021 | -0.088 | -0.018 | +0.059 | +0.030 | +0.059 | -0.029 | +0.179 | -0.295 | +0.122 | +0.070 | +0.031 | yes | lambda 1 |
+| 3 | +0.025 | -0.039 | -0.038 | +0.084 | -0.025 | +0.036 | -0.055 | +0.173 | -0.357 | +0.133 | +0.024 | +0.009 | yes | lambda 0.1 |
+| 4 | +0.083 | -0.009 | -0.002 | +0.074 | -0.098 | +0.053 | -0.017 | +0.164 | -0.345 | +0.043 | +0.104 | -0.009 | yes | lambda 0.1 |
 
-**shrinkage_mv** — mean pairwise cosine of the fold weight vectors +0.899 (min +0.829); largest |signal correlation| with a member 0.89.
+**shrinkage_mv** — mean pairwise cosine of the fold weight vectors +0.899 (min +0.823); largest |signal correlation| with a member 0.89.
 
 | fold | FX01 | FX02 | FX03 | FX04 | FX05 | FX06 | FX07 | FX08 | FX09 | FX10 | FX11 | FX12 | beta > 0 | detail |
 |------|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | -0.023 | -0.145 | +0.019 | +0.035 | +0.032 | -0.015 | +0.030 | +0.214 | -0.381 | +0.068 | +0.023 | +0.015 | yes | shrinkage 0.009 |
-| 2 | -0.014 | -0.099 | -0.029 | +0.075 | +0.032 | +0.073 | -0.033 | +0.152 | -0.344 | +0.101 | -0.024 | +0.025 | yes | shrinkage 0.005 |
-| 3 | +0.024 | -0.038 | -0.043 | +0.088 | -0.037 | +0.043 | -0.057 | +0.168 | -0.361 | +0.129 | +0.006 | +0.006 | yes | shrinkage 0.003 |
-| 4 | +0.081 | -0.007 | -0.006 | +0.075 | -0.101 | +0.056 | -0.027 | +0.161 | -0.338 | +0.037 | +0.097 | -0.012 | yes | shrinkage 0.003 |
+| 1 | -0.023 | -0.146 | +0.018 | +0.033 | +0.050 | -0.015 | +0.025 | +0.214 | -0.362 | +0.076 | +0.027 | +0.011 | yes | shrinkage 0.009 |
+| 2 | -0.014 | -0.098 | -0.025 | +0.072 | +0.044 | +0.066 | -0.041 | +0.153 | -0.338 | +0.104 | -0.019 | +0.026 | yes | shrinkage 0.005 |
+| 3 | +0.028 | -0.040 | -0.041 | +0.091 | -0.025 | +0.038 | -0.056 | +0.168 | -0.370 | +0.131 | +0.004 | +0.007 | yes | shrinkage 0.003 |
+| 4 | +0.086 | -0.009 | -0.003 | +0.080 | -0.099 | +0.054 | -0.017 | +0.156 | -0.357 | +0.038 | +0.089 | -0.013 | yes | shrinkage 0.003 |
+
+**decay_aware** — mean pairwise cosine of the fold weight vectors +0.980 (min +0.969); largest |signal correlation| with a member 0.83.
+
+| fold | FX01 | FX02 | FX03 | FX04 | FX05 | FX06 | FX07 | FX08 | FX09 | FX10 | FX11 | FX12 | beta > 0 | detail |
+|------|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | +0.000 | +0.000 | +0.000 | +0.042 | +0.000 | +0.007 | +0.033 | +0.396 | +0.000 | +0.214 | +0.266 | +0.043 | yes | - |
+| 2 | +0.000 | +0.000 | +0.000 | +0.076 | +0.000 | +0.074 | +0.000 | +0.338 | +0.000 | +0.236 | +0.228 | +0.049 | yes | - |
+| 3 | +0.000 | +0.000 | +0.000 | +0.061 | +0.000 | +0.048 | +0.000 | +0.347 | +0.000 | +0.256 | +0.261 | +0.027 | yes | - |
+| 4 | +0.000 | +0.000 | +0.000 | +0.046 | +0.000 | +0.075 | +0.000 | +0.357 | +0.000 | +0.174 | +0.334 | +0.014 | yes | - |
 
 ### Leakage checks
 
-- Fitted parameters of the last fold are identical when every label from the test start onwards is replaced by garbage: `equal_weight` yes, `ic_weighted` yes, `ridge` yes, `shrinkage_mv` yes.
+- Fitted parameters of the last fold are identical when every label from the test start onwards is replaced by garbage: `equal_weight` yes, `ic_weighted` yes, `ridge` yes, `shrinkage_mv` yes, `decay_aware` yes.
 - `equal_weight`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0501 against the validation's +0.0501.
 - `ic_weighted`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0577 against the validation's +0.0577.
-- `ridge`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0670 against the validation's +0.0670.
-- `shrinkage_mv`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0663 against the validation's +0.0663.
+- `ridge`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0667 against the validation's +0.0667.
+- `shrinkage_mv`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0665 against the validation's +0.0665.
+- `decay_aware`: label guard ok, shift ok, truncation ok, recompute ok; member-pass gate IC +0.0564 against the validation's +0.0564.
 
 ## Result
 
-**0 PROMOTE / 8 ITERATE / 0 REJECT** over 8 combination experiments. No combination is promotable.
+**0 PROMOTE / 10 ITERATE / 0 REJECT** over 10 combination experiments. No combination is promotable.
 

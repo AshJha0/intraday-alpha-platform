@@ -2080,7 +2080,7 @@ reproduces them with string concatenation and one hash (pinned:
 digest is sha256 over every canonical line + newline in emission order;
 same seed ⇒ same digest; one changed field or one swapped line changes it.
 Known answers are pinned for one trace, the same trace twice, and the empty
-stream; the MVP golden pins a whole session's digest (`d4659d8c…`, 800
+stream; the MVP golden pins a whole session's digest (`a7f1ee60…`, 800
 traces).
 
 ### 18.3 Four languages, one line
@@ -2167,7 +2167,7 @@ index that lied about what its sources contain would be worse than none.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=231 children=347 fills=163 pnl=-82.837333 USD digest=d4659d8c1bb40b5b...
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=231 children=347 fills=163 pnl=-82.837333 USD digest=a7f1ee6066f6eba9...
 ```
 
 Seven seconds later `data/mvp/58a10f2194a3c81c/` holds the captured stream,
@@ -2199,7 +2199,7 @@ and the `config_version` it covers (`f293e7e7…` → `439bbad5…`), because
 names its impact model, and `alpha_params.json`, whose header names the
 regeneration commit. A digest that changes when a hashed configuration
 document changes, with every count and every dollar the same, is the
-digest doing its job. In v1.14.0 the digest moved again (`d4659d8c…`) and
+digest doing its job. In v1.14.0 the digest moved again (`a7f1ee60…`) and
 this time a few counts moved too, because the refitted `alpha_params.json`
 changes the expected returns the loop trades on: 231 parents and 163 fills
 (was 235 and 169), −82.84 USD (was −81.53).

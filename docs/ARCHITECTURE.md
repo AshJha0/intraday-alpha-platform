@@ -652,7 +652,7 @@ book → `FeatureEngine` → three fitted `linear_z_v1` alphas ensembled →
 and compares bytes; `replay` re-runs it from the captured stream and must
 reproduce the trace digest; `tests/golden/expected_mvp.json` pins the golden
 run (seed 12345: 15,805 events, 800 decisions, 231 parents, 163 fills,
-−82.84 USD, digest `d4659d8c…`) as the cross-language pin for any port of
+−82.84 USD, digest `a7f1ee60…`) as the cross-language pin for any port of
 the loop (docs/MVP.md §9 lists what a port must reproduce). The result is
 cost-negative and the realized-IC audit (docs/MVP.md §7.1) is part of the
 document: the MVP's mid-to-mid IC is 0.13–0.21 away from the research IC

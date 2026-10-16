@@ -1,5 +1,5 @@
 {
-  "experiment_count": 89,
+  "experiment_count": 96,
   "runs": [
     {
       "name": "ols",
@@ -356,6 +356,34 @@
     {
       "name": "metalabel_ridge",
       "run_id": "run_0089_metalabel_ridge"
+    },
+    {
+      "name": "ols",
+      "run_id": "run_0090_ols"
+    },
+    {
+      "name": "ridge",
+      "run_id": "run_0091_ridge"
+    },
+    {
+      "name": "elasticnet",
+      "run_id": "run_0092_elasticnet"
+    },
+    {
+      "name": "xgboost",
+      "run_id": "run_0093_xgboost"
+    },
+    {
+      "name": "lightgbm",
+      "run_id": "run_0094_lightgbm"
+    },
+    {
+      "name": "mlp",
+      "run_id": "run_0095_mlp"
+    },
+    {
+      "name": "metalabel_ridge",
+      "run_id": "run_0096_metalabel_ridge"
     }
   ]
 }

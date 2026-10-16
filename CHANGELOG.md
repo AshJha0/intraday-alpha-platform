@@ -8,6 +8,10 @@ that tag.
 
 ## Unreleased
 
+## v1.17.0 — 2026-10-16
+
+Theme: execution quality and breadth. The platform gains a real second venue (IEX HIST, free), an implementation-shortfall benchmark with signal-aware urgency, pacing, quote fading, queue-aware cancels, markout decomposition and a modelled dark venue, a cross-sectional breadth book with a pre-registered net-of-cost screen, the v1.17 statistics revision, budgeted LLM agents, and C++/Rust parity for the new execution rules. Headline results are negative and stated as such: the net-of-cost screen passes 0 of 22 candidates on multi7, so the breadth book is registered with the screen as a hard gate and makes no confirmatory look. B7 (signal-aware execution fresh test) and B8 (two-venue router on real books) ship as code and run commands; their real-data results land in v1.17.1 as the IEX overlap days are ingested. Notes: docs/release/v1.17.0_RELEASE_NOTES.md.
+
 - v1.17 WS-B item B8: two-venue SOR on real books, ready for the Nasdaq / IEX overlap days
   (Python only, opt-in). `iap.research.two_venue`: `merge_events` (one consolidated stream,
   `(exchange_ts, venue_id)` order, IEX ids re-keyed by symbol, clock rule stated and tested:
@@ -78,7 +82,7 @@ that tag.
   `tests/golden/expected_venue_queue.json` (`python/tools/make_golden_venue_queue.py`;
   `rust/venue/tests/golden_venue_queue.rs` joins the golden group; API_TRADING §2.18). No
   execution, SOR or dark-venue logic moved to Rust (C++ owns that path, F7).
-- v1.17 C8 (DRAFT, unsigned): the breadth-book pre-registration is drafted in
+- v1.17 C8 (registered by the owner 2026-10-16 under option (a), #204/#205; drafted as below): the breadth-book pre-registration is drafted in
   `research/preregs/breadth_book_prereg_DRAFT.json` with a Markdown rendering. Its holdout is
   nine 2025/26 Nasdaq days for the breadth names outside AAPL/MSFT/QQQ, taken from manifests
   only. The DSR is computed at the registered N (410 at draft), and the C6 screen
@@ -246,7 +250,6 @@ that tag.
   (`research/v117/iex_overlap_manifest.json`, approved 2026-10-15) and their results:
   docs/research/IEX_OVERLAP_SET.md. The recent days are listed only (not approved). `test_iex_codec.py` and `test_process_iex.py`
   carry the `slow` marker so the python-slow coverage floor counts the IEX codec and chain.
-- v1.17 WS-G item G2: four topical documents, docs only, no code and no number moved. `docs/EXECUTION_QUALITY.md` (the shortfall benchmark, the multi7 and depth-50 results with their artefact paths, signal-aware urgency and pacing, the realism layer), `docs/PORTFOLIO_BREADTH.md` extended (universe rule, the measured 2019-01-30 universe, the breadth holdout rule, committed book results), `docs/SIGNAL_RESEARCH.md` (statistics revision, `linear_z_v2`, long horizons, regime model and gate, GBM, meta-labelling split, conformal sizing, zoo gates, each with its opt-in), `docs/DATA_SOURCES.md` (free Nasdaq days, IEX HIST, process-and-delete, the download approval rule); `iap.paper` in ARCHITECTURE section 9.2 and API_TRADING section 4; linked from the README docs table, ARCHITECTURE, DIAGRAMS and the site nav. B4-B10, C6/C8, the A4 overlap table and the first completed 100-name day are marked placeholders for the G5 truth pass.
 - v1.17 WS-B item B7 (prerequisite): depth-cap vs book re-run of the multi7 shortfall
   benchmark with `--walk-depth 50` (and a `--max-child-qty 300` variant), summaries
   `research/execution/benchmark/{benchmark,BENCHMARK}_multi7_depth50*` and the comparison
@@ -522,26 +525,6 @@ that tag.
   docs/index.html gains a "Start here" block and a Showcase nav link; both new pages are read
   by `check_headline_numbers.py`. No number changed.
 
-
-- v1.17 WS-F item F9 (+F2 digest pinning): Java retired from the release (DECISION_N7 closed
-  2026-10-15). New `iap.metrics` (`python -m iap.metrics serve`): a stdlib Prometheus exposition
-  (the retired Java registry's format, log2 histograms), a file-backed exporter over the live risk
-  limits, the `session_exit.json` marker (`python -m iap.metrics run-session -- CMD`) and the newest
-  MVP run's `report.json` / `traces.jsonl`, and `/metrics`, `/health`, `/ready`, `/status` on :8080;
-  30 metric families kept live, 16 Java-only names exposed as `<name>_available 0` (`python -m
-  iap.metrics names`). Deployment: compose `platform-metrics` + `mvp-session` and k8s
-  `deployment/k8s/platform-metrics.yaml` replace `java-platform` / `java-platform-state`; claims
-  `iap-platform-state*`; Prometheus job `platform-metrics`; the alerts, recording rules, event-path
-  SLO and dashboard panels built only on Java metrics removed (listed in `alerts.yml`); no admin API
-  (the kill-switch runbook's manual halt is the config path). `java` dropped from `release.yml`
-  (three images, manifest schema `images` length 3), the CI `images` job and `check_docker_build.py`;
-  `Dockerfile.java` moved under `archive/java/` (unbuilt); `archive/java/README.md`: frozen at
-  v1.14.0, not built, not a port target, the risk engine kept only as the byte-identical mirror of
-  the Rust risk engine. F2: `tools/release.py publish` pins the k8s manifests to
-  `name:vX.Y.Z@sha256:<digest>` from `release-manifest.json` (`pin-digests`, dry-run default,
-  tests on a fixture manifest); manifests moved from `:v1.14.0` to `:v1.17.0`. Docs: README,
-  ARCHITECTURE §2/§8/§9, POLYGLOT, PLATFORM_CONVENTIONS §12, the site, SECURITY, REPO_SETTINGS,
-  the Grafana README and the runbooks describe the three-language platform.
 
 - v1.17 WS-A item A1: IEX HIST codec. `iap.marketdata.iex` reads IEX's free daily pcap[.gz]
   captures (classic pcap, UDP/IPv4, IEX-TP v1 segments) and translates DEEP+ (orders, `0x8005`)

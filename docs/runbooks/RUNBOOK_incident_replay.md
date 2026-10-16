@@ -37,7 +37,7 @@ are below.
 
 ```bash
 cd python && PYTHONPATH=src python3 -m iap.mvp run                 # -> ../data/mvp/<run_id>/
-# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=231 children=347 fills=163 pnl=-82.837333 USD digest=d4659d8c1bb40b5b... out=.../data/mvp/58a10f2194a3c81c
+# mvp run 58a10f2194a3c81c: events=15805 decisions=800 parents=231 children=347 fills=163 pnl=-82.837333 USD digest=a7f1ee6066f6eba9... out=.../data/mvp/58a10f2194a3c81c
 ```
 
 ```powershell

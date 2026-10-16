@@ -60,7 +60,19 @@ the repository map, the real-world usage notes and the references) is in
 
 The full list with descriptions is the [Documentation index](#documentation-index).
 
-## Current status (v1.16.0 released 2026-10-15; v1.17 in progress)
+## Current status (v1.17.0 released 2026-10-16)
+
+**v1.17.0, the execution-quality and breadth release, shipped on 2026-10-16.** It adds a real second
+venue (IEX HIST), an implementation-shortfall benchmark with signal-aware execution, quote fading,
+queue-aware cancels and a modelled dark venue, a cross-sectional breadth book, the v1.17 statistics
+revision, budgeted LLM agents and C++/Rust parity for the new rules. The net-of-cost screen passes
+0 of 22 candidates on multi7, so the breadth book is registered with the screen as a hard gate and
+makes no confirmatory look. B7 and B8 real-data results follow in v1.17.1
+([CHANGELOG.md](CHANGELOG.md) v1.17.0 and
+[docs/release/v1.17.0_RELEASE_NOTES.md](docs/release/v1.17.0_RELEASE_NOTES.md)). The v1.16.0 summary
+below is kept until the post-release docs pass.
+
+### v1.16.0 (2026-10-15)
 
 **v1.16.0, the monetisation release, shipped on 2026-10-15.** v1.15 proved
 the alphas predict on unseen data; v1.16 asked whether any of that survives
@@ -161,7 +173,7 @@ the full design, data flow, and diagrams.
 | Experiments ledger | 5,574 recorded looks over **384 distinct configurations** (de-duplicated by alpha × kind × config × dataset × statistics revision: 70 configurations holding 1,068 of the looks on the v1.3.0 dataset are kept as history, 223 holding 4,290 of them are on the current one, 77 of them added by the v1.14 regeneration); expected max \|t\| under the global null ≈ 4.154, Bonferroni per-test \|t\| ≥ 4.441; a hash chain since v1.14 | `research/experiments.json` |
 | Contracts | **17** JSON Schemas (all `x-version` 1 except `risk_event`, 2 since v1.14) mirrored by **22** typed Python contracts and **18** runtime-checkable Protocols; one pinned instance each | `schemas/`, `python/src/iap/contracts/`, `tests/golden/expected_contracts_examples.json` |
 | Python reference ports proven by the ports' own goldens | risk: `expected_risk_decisions.json` exact, audit JSONL + snapshot **byte-identical**; execution: `expected_replay_fills.json` **bit-identical** | `python/tests/test_risk_golden.py`, `python/tests/test_execution_golden.py` |
-| MVP golden run (`python -m iap.mvp run`, seed 12345) | **15,805** events · **800** decisions · **231** parent orders · **163** fills · P&L **−82.84 USD** (cost-negative: +0.0245 bps alpha vs −0.4367 bps execution cost) · trace digest `d4659d8c…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
+| MVP golden run (`python -m iap.mvp run`, seed 12345) | **15,805** events · **800** decisions · **231** parent orders · **163** fills · P&L **−82.84 USD** (cost-negative: +0.0245 bps alpha vs −0.4367 bps execution cost) · trace digest `a7f1ee60…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
 | Adaptive deployment study | 4 refit policies × 10 alphas; 88 drift-triggered refits; FX01 retired under every policy; 19 of 40 deployments make no trade, none ends above zero | `research/adaptive_reports/ADAPTIVE_REPORT.md` |
 | Bundled dataset | 2 synthetic sessions, 19 instruments, 308,975 normalized events (`data_version` `116b7787…`; equity flow runs to the close since v1.4.0) | `data/normalized/qc_report.json` |
 | Feature emission | 213,021 vectors at 100 ms cadence | `data/features/features_summary.json` |
