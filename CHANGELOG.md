@@ -8,6 +8,13 @@ that tag.
 
 ## Unreleased
 
+- v1.17 fix: `FillHazardModel.bucket_hazards` computes `z @ beta` as a plain
+  left-to-right sum over the feature columns instead of a BLAS `ddot`. OpenBLAS
+  picks its reduction kernel (FMA, lane splits) by CPU, so the last bit of the
+  hazard moved between CI runners and the F7 queue-cancel golden failed at
+  random (seen on #195); the new order is the C++ port's, so Python and C++
+  now agree for any beta. Opt-in users only (B5 queue-aware cancels, the maker
+  backtester's `fill_hazard`); values move in the last bit at most.
 - v1.17 WS-F item F7, part 1: hand-written C++ parity ports of the execution rules already on
   main (no translation tools), one commit per rule, next to `SmartOrderRouter` and the execution
   simulator in `cpp/`: `sor/sor_v2.hpp` (`CostAwareRouter::plan_sweep` all-in / price ranking,

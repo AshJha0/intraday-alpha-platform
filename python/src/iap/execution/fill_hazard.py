@@ -362,7 +362,16 @@ class FillHazardModel:
         assert self.alpha is not None and self.beta is not None  # _check
         frame = pd.DataFrame([features]) if isinstance(features, Mapping) else features
         z = (_design(frame) - self.mean) / self.std
-        eta = self.alpha[None, :] + (z @ self.beta)[:, None]
+        # z @ beta as a plain left-to-right sum over the columns (elementwise
+        # IEEE ops, no BLAS): ``@`` routes to OpenBLAS ddot, whose reduction
+        # order (FMA, lane splits) depends on the runner's CPU kernel, so the
+        # last bit moved between CI runners; this order is also the C++ port's
+        # (cpp/src/execution/fill_hazard.cpp, ``dot += z * beta_[i]``).
+        zv = np.asarray(z, dtype=float)
+        lin = np.zeros(zv.shape[0])
+        for j in range(zv.shape[1]):
+            lin = lin + zv[:, j] * self.beta[j]
+        eta = self.alpha[None, :] + lin[:, None]
         mu, _ = _inv_link(eta, self.link)
         return mu
 
