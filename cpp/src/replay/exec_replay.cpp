@@ -56,8 +56,8 @@ ExecutionReplay::ExecutionReplay(const ExecConfig& config,
     : config_(config),
       sim_(config),
       sor_(config.venues, sor_options),
-      sor_options_(sor_options),
-      dark_rng_(config.seed ^ 0xB10) {
+      dark_rng_(config.seed ^ 0xB10),
+      sor_options_(sor_options) {
     for (const auto& [vid, spec] : config.venues) {
         // v1.17 B10: a dark / midpoint venue has no displayed book and is
         // never a candidate of the pinned router.
