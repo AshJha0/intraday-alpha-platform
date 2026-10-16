@@ -8,6 +8,12 @@ that tag.
 
 ## Unreleased
 
+- v1.17 fix: intermittent `test_legacy_methods` failures under xdist —
+  `iap.research.screen.main` and `iap.research` `main` (`--dataset-dir`) left
+  the process-global alpha universe (`configure_universe`) pointed at the
+  dataset's instruments, emptying FX01's universe for later tests in the same
+  worker; both now restore the pinned default, and an autouse conftest fixture
+  fails any test that leaves the universe changed.
 - v1.17 fix: `FillHazardModel.bucket_hazards` / `p_fill_within` evaluate each
   row with scalar `math` calls (`log1p`, `sin`, `cos`, `exp`, `expm1`) and
   left-to-right sums, line for line the C++ port's order, instead of BLAS `@`

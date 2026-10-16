@@ -18,6 +18,21 @@ from iap.core.events import EventType, MarketEvent  # noqa: E402
 from iap.reference.refdata import ReferenceData  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _alpha_universe_is_restored():
+    """``iap.alpha.configure_universe`` sets process-global state: a test that
+    leaves it pointed at another dataset changes every later alpha test in
+    the same (xdist) worker.  Restore it and fail the leaking test."""
+    from iap.alpha.base import _UNIVERSE, configure_universe
+
+    before = dict(_UNIVERSE)
+    yield
+    after = dict(_UNIVERSE)
+    if after != before:
+        configure_universe(None)
+        pytest.fail(f"test left the alpha universe changed: {after} (was {before})")
+
+
 @pytest.fixture(scope="session")
 def refdata() -> ReferenceData:
     return ReferenceData.load(CONFIGS_DIR)
