@@ -112,9 +112,36 @@ def test_register_tool_dry_run(capsys: pytest.CaptureFixture[str]) -> None:
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     out_path = REPO / mod.OUT
+    if out_path.exists():
+        # Registered (the owner ran the tool on 2026-10-16): the tool must
+        # refuse a second registration, and the committed record must carry a
+        # valid owner signature from the trust root.
+        with pytest.raises(SystemExit, match="already signed|exists"):
+            mod.main([str(REPO), "--dry-run"])
+        _assert_registration_signed(out_path)
+        return
     assert mod.main([str(REPO), "--dry-run"]) == 0
     out = capsys.readouterr().out
     assert "draft option (a) ok; screen research/breadth/screen/screen_multi7.json" in out
     assert "refused (expected under option a)" in out
     assert "was NOT screened" in out or "not screened" in out.lower()
     assert not out_path.exists()
+
+
+def _assert_registration_signed(path: Path) -> None:
+    import hashlib
+
+    from iap.agents import signing
+    from iap.agents.blackboard import canonical
+
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    sig = doc.pop("signature")
+    msg = canonical(doc).encode("ascii")
+    roots = json.loads(
+        (REPO / "research" / "agents" / "trust_roots.json").read_text(encoding="utf-8")
+    )
+    assert sig["public_key"] == roots["maintainers"][sig["maintainer"]]
+    assert hashlib.sha256(msg).hexdigest() == sig["message_sha256"]
+    assert signing.verify_ed25519(sig["public_key"], msg, sig["sig"])
+    assert doc["signed"] is True and doc["registration"]["holdout_read"] is False
+    assert doc["decision_required"]["chosen"]["option"] == "a"
