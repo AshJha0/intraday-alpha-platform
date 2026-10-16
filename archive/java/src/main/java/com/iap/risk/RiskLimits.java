@@ -55,7 +55,21 @@ public record RiskLimits(
         Double venueMsgBurst,
         Long maxTrackedKeys,
         Double maxLossOverrideMultiple,
-        Long minApprovers) {
+        Long minApprovers,
+        TreeMap<Integer, String> venueTypes,
+        Set<String> allowedVenueTypes,
+        Double maxDarkParticipationBps,
+        Long darkParticipationFloorQty,
+        Double maxDarkFillNotional) {
+
+    /** The pinned venue types (v1.17 F8), in the order reasons list them. */
+    public static final List<String> VENUE_TYPES = List.of("lit", "dark", "midpoint");
+
+    /** The type of {@code venueId} as the pre-trade controls see it ("lit" unless mapped). */
+    public String venueType(int venueId) {
+        String t = venueTypes.get(venueId);
+        return t == null ? "lit" : t;
+    }
 
     /** The x-version 3 limit set: every x-version 4 control off. */
     public RiskLimits(boolean killSwitchEngaged, double maxGrossNotional,
@@ -271,6 +285,13 @@ public record RiskLimits(
         Long maxKeys = optPosI64(doc, "pre_trade", "max_tracked_keys");
         Double overrideMult = optPosF64(doc, "overrides", "max_loss_override_multiple");
         Long minApprovers = optPosI64(doc, "overrides", "min_approvers");
+        // v1.17 F8 keys, parsed after every x-version 4 key, in this order
+        TreeMap<Integer, String> venueTypes = parseVenueTypes(doc);
+        Set<String> allowedVenueTypes = parseAllowedVenueTypes(doc);
+        Double darkBps = optPosF64(doc, "pre_trade", "max_dark_participation_bps");
+        Long darkFloor = darkBps == null ? null
+                : needPosI64(doc, "pre_trade", "dark_participation_floor_qty");
+        Double maxDarkNotional = optPosF64(doc, "pre_trade", "max_dark_fill_notional");
         return new RiskLimits(base.killSwitchEngaged(), base.maxGrossNotional(),
                 base.maxNetNotional(), base.maxDailyLoss(), base.maxOrderRatePerSec(),
                 base.orderRateBurst(), base.maxOrderQty(), base.maxOrderNotional(),
@@ -280,7 +301,59 @@ public record RiskLimits(
                 base.staleFeedTimeoutNs(), base.reportingCcy(), base.fxConversion(),
                 jump, restricted, maxOpenOrders, maxOpenNotional, maxStrategyPos,
                 partBps, partFloor, cancelRate, cancelBurst, venueRate, venueBurst,
-                maxKeys, overrideMult, minApprovers);
+                maxKeys, overrideMult, minApprovers, venueTypes, allowedVenueTypes,
+                darkBps, darkFloor, maxDarkNotional);
+    }
+
+    /** {@code pre_trade.venue_types}: absent / null = empty; keys decimal u16 ids. */
+    private static TreeMap<Integer, String> parseVenueTypes(Map<String, Object> doc) {
+        Object v = section(doc, "pre_trade").get("venue_types");
+        TreeMap<Integer, String> out = new TreeMap<>();
+        if (v == null) {
+            return out;
+        }
+        if (!(v instanceof Map)) {
+            throw new IllegalArgumentException("risk.json: pre_trade.venue_types must be an object");
+        }
+        for (Map.Entry<String, Object> e : Json.object(v).entrySet()) {
+            int vid;
+            try {
+                vid = Integer.parseUnsignedInt(e.getKey());
+            } catch (NumberFormatException ex) {
+                vid = -1;
+            }
+            if (vid < 0 || vid > 0xFFFF) {
+                throw new IllegalArgumentException("risk.json: pre_trade.venue_types key "
+                        + e.getKey() + " is not a u16 venue id");
+            }
+            if (!(e.getValue() instanceof String) || !VENUE_TYPES.contains(e.getValue())) {
+                throw new IllegalArgumentException("risk.json: pre_trade.venue_types."
+                        + e.getKey() + " must be one of lit, dark, midpoint");
+            }
+            out.put(vid, (String) e.getValue());
+        }
+        return out;
+    }
+
+    /** {@code pre_trade.allowed_venue_types}: absent / null = off; else non-empty. */
+    private static Set<String> parseAllowedVenueTypes(Map<String, Object> doc) {
+        Object v = section(doc, "pre_trade").get("allowed_venue_types");
+        if (v == null) {
+            return null;
+        }
+        String msg = "risk.json: pre_trade.allowed_venue_types must be a non-empty array of "
+                + "lit, dark, midpoint";
+        if (!(v instanceof List) || Json.array(v).isEmpty()) {
+            throw new IllegalArgumentException(msg);
+        }
+        TreeSet<String> out = new TreeSet<>();
+        for (Object item : Json.array(v)) {
+            if (!(item instanceof String) || !VENUE_TYPES.contains(item)) {
+                throw new IllegalArgumentException(msg);
+            }
+            out.add((String) item);
+        }
+        return Collections.unmodifiableSet(out);
     }
 
     private static long sequenceGaps(Map<String, Object> doc) {

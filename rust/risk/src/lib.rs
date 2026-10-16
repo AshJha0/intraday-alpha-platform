@@ -16,15 +16,17 @@
 //! `expected_risk_snapshot.json` (state snapshot mid-script).
 
 mod audit;
+pub mod dark;
 pub mod engine;
 pub mod event;
 mod killswitch;
 pub mod limits;
 mod limits_eval;
 
+pub use dark::{dark_pretrade_check, DarkControls, DARK_CONTROL_CODES};
 pub use engine::{Fill, InstrumentRef, RiskDecision, RiskEngine, SNAPSHOT_VERSION, TAPE_EVENT_TYPE};
 pub use event::{
     fmt_fixed, line_sha256, rules, unchained_line, verify_audit_chain, Decision, RiskEvent, Scope,
     Severity, GENESIS_SHA256,
 };
-pub use limits::{FxConversion, RiskLimits};
+pub use limits::{FxConversion, RiskLimits, VenueType};

@@ -1,5 +1,5 @@
 //! Audit-log emission (hash-chained, G-P0-1) and full-state
-//! snapshot/restore (schema x-version 2),
+//! snapshot/restore (schema x-version 3),
 //! split out of `engine.rs` verbatim. This is an `impl RiskEngine`
 //! continued from `engine.rs`.
 
@@ -64,7 +64,7 @@ impl RiskEngine {
             "open": Value::Object(self.open.iter().map(|(k, o)| (k.to_string(), json!({
                 "instrument_id": o.instrument_id, "side": o.side,
                 "price_ticks": o.price_ticks, "qty": o.qty,
-                "strategy_id": o.strategy_id }))).collect()),
+                "strategy_id": o.strategy_id, "venue_id": o.venue_id }))).collect()),
             "positions": Value::Object(self.positions.iter()
                 .map(|(k, v)| (k.to_string(), json!(v))).collect()),
             "lots": self.lots.iter().map(|((sid, iid), lot)| json!({
@@ -83,6 +83,10 @@ impl RiskEngine {
                 .map(|(k, v)| (k.to_string(), json!(v))).collect()),
             "executed": Value::Object(self.executed.iter()
                 .map(|(k, v)| (k.to_string(), json!(v))).collect()),
+            "dark_executed": Value::Object(self.dark_executed.iter()
+                .map(|(k, v)| (k.to_string(), json!(v))).collect()),
+            "dark_filled": self.dark_filled.iter().map(|(ccy, notional)| json!({
+                "ccy": ccy, "notional": notional })).collect::<Vec<_>>(),
         })
     }
 
@@ -191,6 +195,10 @@ impl RiskEngine {
                         .as_str()
                         .ok_or_else(|| bad("open.strategy_id"))?
                         .to_string(),
+                    venue_id: o["venue_id"]
+                        .as_u64()
+                        .and_then(|v| u16::try_from(v).ok())
+                        .ok_or_else(|| bad("open.venue_id"))?,
                 },
             );
         }
@@ -275,6 +283,20 @@ impl RiskEngine {
                 k.parse::<u32>().map_err(|_| bad("executed"))?,
                 v.as_i64().ok_or_else(|| bad("executed"))?,
             );
+        }
+        for (k, v) in snap["dark_executed"].as_object().ok_or_else(|| bad("dark_executed"))? {
+            eng.dark_executed.insert(
+                k.parse::<u32>().map_err(|_| bad("dark_executed"))?,
+                v.as_i64().ok_or_else(|| bad("dark_executed"))?,
+            );
+        }
+        for d in snap["dark_filled"].as_array().ok_or_else(|| bad("dark_filled"))? {
+            let ccy = d["ccy"].as_str().ok_or_else(|| bad("dark_filled.ccy"))?;
+            let notional = d["notional"].as_f64().ok_or_else(|| bad("dark_filled.notional"))?;
+            if !notional.is_finite() {
+                return Err(bad("dark_filled.notional"));
+            }
+            eng.dark_filled.insert(ccy.to_string(), notional);
         }
         if let Some((seq, head)) = chain {
             if head.len() != 64 || !head.bytes().all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c)) {

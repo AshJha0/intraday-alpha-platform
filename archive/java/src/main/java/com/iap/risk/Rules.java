@@ -105,6 +105,12 @@ public final class Rules {
     public static final String VENUE_MESSAGE_RATE = "VENUE_MESSAGE_RATE";
     /** Check 7: a bounded per-key state map is full ({@code pre_trade.max_tracked_keys}). */
     public static final String STATE_CAPACITY = "STATE_CAPACITY";
+    /** Check 31 (v1.17 F8): the order's venue type is not in the allowed set. */
+    public static final String VENUE_TYPE_RESTRICTED = "VENUE_TYPE_RESTRICTED";
+    /** Check 32 (v1.17 F8): the firm's projected dark session quantity exceeds the cap. */
+    public static final String DARK_PARTICIPATION = "DARK_PARTICIPATION";
+    /** Check 33 (v1.17 F8): the firm's session dark-fill notional plus the order exceeds the cap. */
+    public static final String DARK_FILL_NOTIONAL = "DARK_FILL_NOTIONAL";
 
     private Rules() {
     }

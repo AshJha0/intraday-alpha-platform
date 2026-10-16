@@ -1964,7 +1964,7 @@ BRANCHES: tuple[tuple[str, ...], ...] = (
     ("LOSS_LIMIT_OVERRIDE", "daily loss limit"),
     ("SESSION_ROLLED", ""),
     ("BOOTSTRAP_COMPLETE", "drop-copy fills"),
-    ("STATE_RESTORED", "restored snapshot v2"),
+    ("STATE_RESTORED", "restored snapshot v3"),
 )
 #: Branches no input can reach, with the reason (reported, never required).
 UNREACHABLE: dict[tuple[str, ...], str] = {

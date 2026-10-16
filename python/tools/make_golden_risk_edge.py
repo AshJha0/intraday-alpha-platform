@@ -384,7 +384,7 @@ MUST_PIN = [
     ["NOT_BOOTSTRAPPED", "positions not bootstrapped (fail-closed)"],
     ["BOOTSTRAP_COMPLETE", "bootstrapped from 3 drop-copy fills (1 rejected)"],
     ["MALFORMED_FILL", "fill for order 9 rejected"],
-    ["STATE_RESTORED", "restored snapshot v2"],
+    ["STATE_RESTORED", "restored snapshot v3"],
     ["DUPLICATE_ORDER_ID", "already used"],
     ["SELF_MATCH", "would cross own open order 2"],
     ["RESTRICTED_INSTRUMENT", "instrument 2 is on the restricted list"],

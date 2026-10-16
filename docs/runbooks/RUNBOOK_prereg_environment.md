@@ -40,3 +40,40 @@ $env:PYTHONUTF8 = "1"
 The first line must print `[ci-env] deps match requirements-ci.txt: OK`. When the lock
 is bumped, rebuild the venv (`Remove-Item -Recurse -Force .venv-ci`, then the steps above) before
 registering. `.venv-ci/` is git-ignored.
+
+## C8 breadth book (v1.17, option a)
+
+Run these from the repository root in PowerShell. First build the one-time `.venv-ci` (see above), then:
+
+```powershell
+git pull
+$env:PYTHONUTF8 = "1"
+.\.venv-ci\Scripts\python tools\breadth_book_register.py . --dry-run --require-ci-env
+.\.venv-ci\Scripts\python tools\breadth_book_register.py . --require-ci-env
+git add research\preregs\breadth_book_prereg.json
+git commit -m "C8: register the breadth book (option a, screen refused)"
+```
+
+A good dry run prints the following lines. The sha256 values are whatever is on disk:
+
+```
+[ci-env] deps match requirements-ci.txt: OK
+draft option (a) ok; screen research/breadth/screen/screen_multi7.json sha256 matches the pin
+[dry-run] draft sha256 <64 hex>
+[dry-run] screen gate for EQ11/15m/linear_z_v1: EQ11/15m/linear_z_v1 was NOT screened by the net-of-cost screen ...: no confirmatory run (v1.17 C6)
+[dry-run] would call WriteBroker.preregister(EQ11/15m:breadth-book-c8, screen=...) -> refused (expected under option a); would write research/preregs/breadth_book_prereg.json
+```
+
+A good registration prints `maintainer key matches trust root ashjha0`, then
+`C8-BREADTH-BOOK: screen gate REFUSED: EQ11/15m/linear_z_v1 was NOT screened ...`, then
+`C8-BREADTH-BOOK: wrote research/preregs/breadth_book_prereg.json (sha256 ...)`.
+
+That file is signed. Its status reads "REGISTERED under option (a) ... no confirmatory
+look", `on_blackboard` is false and `registration.holdout_read` is false. The refusal
+happens before any ledger debit, so no look is charged. No data is read and no holdout
+dataset is built or downloaded.
+
+The tool exits with an error, and writes nothing, in any of these cases:
+- the draft's decision is not option (a)
+- the screen's sha256 differs from the pinned value
+- the output file already exists
