@@ -37,6 +37,7 @@ add_library(iap_core STATIC
   src/execution/pacing.cpp
   src/execution/fill_hazard.cpp
   src/execution/fading.cpp
+  src/execution/dark.cpp
   src/sor/sor.cpp
   src/sor/sor_v2.cpp
   src/tca/markout.cpp
@@ -109,6 +110,10 @@ iap_add_test(test_f7_pacing)
 iap_add_test(test_f7_fading)
 iap_add_test(test_f7_queue_cancel)
 iap_add_test(test_f7_markout_decomposition)
+# F7 part 2: the B10 dark-venue model and the dark-first replay rule, and
+# the hazard evaluation over many models.
+iap_add_test(test_f7_dark_venue)
+iap_add_test(test_f7_hazard_grid)
 
 # -------------------------------------------------------------------- tools
 # One-shot golden generator (expected_replay_fills.json, or

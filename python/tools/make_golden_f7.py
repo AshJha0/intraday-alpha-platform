@@ -37,6 +37,8 @@ MODULES = (
     "r08_fading",
     "r09_queue_cancel",
     "r10_markout_decomposition",
+    "r11_dark_venue",
+    "r12_hazard_grid",
 )
 
 
