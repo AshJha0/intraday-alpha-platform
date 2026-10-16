@@ -48,5 +48,19 @@ Columns: download time = TOPS + DEEP+ wall clock; ingest = the DEEP+ ingest
 capture; oracle = `book_verification` per symbol as `compared / mismatched`;
 disk = free GB at the lowest point of the day, then at its end.
 
-| day | TOPS / DEEP+ GB | download | TOPS extract | ingest | messages | events | oracle AAPL / MSFT / QQQ | disk min / end | dataset_version |
-|---|---|---|---|---|---|---|---|---|---|
+| day | TOPS / DEEP+ GB | download | TOPS extract | ingest | messages | events | oracle AAPL / MSFT / QQQ | kept GB | disk min / end | dataset_version |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2025-11-28 | 4.37 / 4.31 | ~1.5 min + ~2 min | 41 min | 16:52 (parse 927 s, normalise 53 s) | 148,115,121 | 1,969,356 | 435,973/0 / 72,883/0 / 998,642/0 | 0.325 (normalized 0.192) | 135.9 / 140.4 | `f977bb3a39d1` |
+
+Notes per day:
+
+- **2025-11-28** (done 2026-10-16 10:12). Round lots 100 / 40 / 40 from `r7_20251128/dataset.json`;
+  121,986,236 IEX-TP segments, 0 sequence gaps, 0 messages outside the session date, 3 directory
+  rows synthesised (AAPL / MSFT / QQQ are not IEX-listed); `odd_lot_top` 304,285; features
+  528 s (Python engine: the Rust extension is not installed on this machine); DEEP+ capture sha256
+  `03b0663ada73b5c23d347dbb5c65332cd8975e3c9b6ba466fecb05b326622256`, TOPS capture sha256 in the
+  extract record of `process_report.json`. The download and extract times are from the first run
+  (2026-10-15 21:34-22:18); the ingest ran three times: the raw-top oracle diverged (AAPL 53,506 of
+  431,744), the best-round-lot-level oracle diverged (56,540 of 434,022), the cumulative round-lot
+  oracle (PR #201) matched every comparison. Events per symbol: AAPL 605,896, MSFT 94,667,
+  QQQ 1,268,793.
