@@ -55,6 +55,7 @@ disk = free GB at the lowest point of the day, then at its end.
 | 2025-12-09 | 8.61 / 8.43 | 5:02 min (28.5 MB/s) + 20:20 min (6.9 MB/s) | 1:21 h | 1:45:41 (parse 6,157 s) | 295,426,880 | 4,829,986 | 711,762/0 / 101,120/0 / 3,045,150/0 | 0.706 (normalized 0.472) | 137.1 / 166.2 | `9517c4efa19b` |
 | 2025-12-10 | 12.29 / 11.45 | 6:01 min (34.1 MB/s) + 16:28 min (11.6 MB/s) | 1:53 h | 2:46:02 | 428,701,502 | 5,614,109 | 580,122/0 / 257,034/0 / 3,763,770/0 | 0.678 (normalized 0.550) | 119.6 / 131.1 | `33d0cbe8a660` |
 | 2026-05-15 | 12.15 / 11.91 | 16:31 min (12.3 MB/s) + 8:34 min (23.2 MB/s) | 1:48 h | 2:24:32 (parse 8,341 s) | 437,934,866 | 7,268,375 | 706,497/0 / 131,039/0 / 4,554,801/0 | 1.001 (normalized 0.707) | 121.9 / 165.0 | `bd6f9c707d89` |
+| 2026-05-18 | 14.87 / 14.21 | TOPS earlier; DEEP+ 5:41 min (41.7 MB/s) | 2:17:29 | 2:40:28 | 548,325,540 | 4,884,147 | 1,262,241/0 / 80,378/0 / 2,403,225/0 | 0.765 (normalized 0.477) | 148.3 / 168.5 | `ba2022d0d53c` |
 
 Notes per day:
 
@@ -103,3 +104,11 @@ Notes per day:
   `a583bc3163efa28452d037f0eff081ffae3d0c8ec8777c5401694741f0ccfae9`, DEEP+ sha256
   `1b917e6101c1e1af9e082a5c79961e97e66d123d94aefbe7db0efc154ce2c683`. Events per symbol:
   AAPL 876,741, MSFT 184,497, QQQ 6,207,137 (the busiest day so far).
+- **2026-05-18** (done 2026-10-17 12:31, chain B day 2, 5 h 26 min of recorded work: the chain
+  was relaunched after the owner's shutdown and this day's TOPS extract restarted from zero, so the
+  wall clock was longer). Round lots **40 / 40 / 40** inferred from the TOPS extract; 3,762,413 TOPS
+  quotes extracted; 362,463,922 segments, 0 sequence gaps, 0 outside the session date, 3 directory
+  rows synthesised; `odd_lot_top` 655,237; features 1,311 s; TOPS sha256
+  `c478b36a1c1488cec829847638e67e110c24005f99ccb651b9dc4ed0f5bf8513`, DEEP+ sha256
+  `a5239f606eb25a11b6621a379e4c6a77ea96545bee6e2482ee5e72d15a6173a2`. TOPS quotes per symbol:
+  AAPL 1,262,644, MSFT 80,984, QQQ 2,418,779.
