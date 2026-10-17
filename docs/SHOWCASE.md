@@ -83,6 +83,10 @@ negative ones first, is written down with the artefact that produced it.
   one fails the net-P&L-after-costs gate.
   <!-- source: README.md "Headline numbers" (Promotion verdicts, Lifecycle registry rows) and docs/index.html "Results so far" -->
 
+**Prepared: v1.17.1 (2026-10-17), a patch release; v1.17.0 released 2026-10-16.**
+- **B7 closed** on its negative in-sample result; **B8 negative on 2 overlap days** (`sor` +5.1 ± 1.3 bps, `sor_sweep` +3.8 ± 2.1; provisional); six-day out-of-sample result: TBD, see PR; 5 of 9 IEX days recorded; #211 fixes the missing manifest, SBOMs and digest pins.
+  <!-- source: CHANGELOG.md "## v1.17.1"; research/execution/b8/REPORT_sweep.md -->
+
 **Released: v1.17.0 (2026-10-16), execution quality and breadth.**
 - **Breadth screen: 0 pass / 22 fail / 1 not screened** of 23 candidates;
   net IC negative in every screened row (round trip about 1.90-2.02 bps).
@@ -98,10 +102,7 @@ negative ones first, is written down with the artefact that produced it.
   no digest-pinned k8s manifests; fixed by PR #211, ships with v1.17.1.
 <!-- source: CHANGELOG.md "## v1.17.0"; docs/release/v1.17.0_RELEASE_NOTES.md -->
 
-**Next: v1.17.1.** B8 (two-venue router) real-data results, the remaining
-8 IEX overlap days, and the #211 manifest/SBOM/digest-pinning fix. B7
-(signal-aware execution) was closed on 2026-10-16 on its in-sample result,
-no fresh test (research/preregs/B7_CLOSED_v117.md).
+**Next: v1.17.1 release, then v1.18.** The release PR waits for the B8 six-day results and the remaining IEX rows.
 
 ## Numbers a CI check re-derives
 

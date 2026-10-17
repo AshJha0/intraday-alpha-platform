@@ -60,14 +60,17 @@ the repository map, the real-world usage notes and the references) is in
 
 The full list with descriptions is the [Documentation index](#documentation-index).
 
-## Current status (v1.17.0, released 2026-10-16)
+## Current status (v1.17.1 prepared 2026-10-17; v1.17.0 released 2026-10-16)
 
-**v1.17.0, the execution-quality and breadth release, shipped on 2026-10-16.** v1.16 showed that
-neither taking nor making pays on these alphas; v1.17 worked on the two things that could still
-change that (how well an order is executed, and how many independent bets a book can hold) and
-added a real second venue. **The headline results are negative**
-([CHANGELOG.md](CHANGELOG.md) v1.17.0 and
-[docs/release/v1.17.0_RELEASE_NOTES.md](docs/release/v1.17.0_RELEASE_NOTES.md)):
+**v1.17.1 is a patch release after v1.17.0 (tag f9e351a), not yet tagged: negative results first, then the fixed release workflow**
+([CHANGELOG.md](CHANGELOG.md) v1.17.1 and [docs/release/v1.17.1_RELEASE_NOTES.md](docs/release/v1.17.1_RELEASE_NOTES.md)):
+
+- **B7 (signal-aware execution) closed on its negative in-sample result** (2026-10-16): no cell cheaper by the 2 bp minimum, urgency dearer on TWAP / VWAP at 1-2 % ADV; nothing signed or registered ([research/preregs/B7_CLOSED_v117.md](research/preregs/B7_CLOSED_v117.md)).
+- **B8 (two-venue router on real Nasdaq + IEX books) is negative on the first two overlap days:** `sor` +5.1 ± 1.3 bps all-in and 8 pp lower fill than pinned Nasdaq; the opt-in `sor_sweep` route +3.8 ± 2.1 bps. 2 day clusters, provisional ([REPORT_overlap2](research/execution/b8/REPORT_overlap2.md), [REPORT_sweep](research/execution/b8/REPORT_sweep.md)). **B8 six-day out-of-sample result: TBD, see PR** (pre-declared in [PREDECLARATION_oos6.md](research/execution/b8/PREDECLARATION_oos6.md)).
+- **IEX overlap days:** 5 of 9 recorded (2025-11-28, 12-08, 12-09, 12-10, 2026-05-15), TOPS oracle 0 mismatches on AAPL / MSFT / QQQ ([docs/research/IEX_OVERLAP_SET.md](docs/research/IEX_OVERLAP_SET.md)).
+- **Release workflow fixed (#211):** v1.17.0 shipped without `release-manifest.json`, the Python lock-file SBOMs and digest-pinned k8s manifests; v1.17.1 is the first release to carry them.
+
+**v1.17.0 (released 2026-10-16), execution quality and breadth; its headline results stand:**
 
 - **Breadth: the net-of-cost screen passes 0 of 22.** The pre-registered C6 screen on multi7
   (7 in-sample sessions): 0 pass, 22 fail, 1 not screened (EQ11 at 15 m had no scored row).
@@ -99,10 +102,6 @@ added a real second venue. **The headline results are negative**
   hand-written C++ ports of the new execution rules with byte-for-byte goldens (F7), the
   dark-first pre-trade controls in Rust (F8), Java retired from the release (F9).
 
-**Known gap in v1.17.0:** no `release-manifest.json`, no Python lock-file SBOMs, and the
-Kubernetes manifests are not digest-pinned (the release workflow's manifest job failed on a
-command-line flag; the images were built, pushed and attested). Fixed by #211; ships with v1.17.1.
-
 **Standing results.** Bundled synthetic data: 24 alphas, 0 PROMOTE, 23 held at CANDIDATE; the
 executable loop loses 82.84 USD on its golden session (the table below). Real data
 (owner-supplied, not bundled): R7-CONFIRM-1 confirmed EQ10@1s and EQ05@1s on 7 unseen sessions
@@ -111,12 +110,7 @@ in v1.15 (predictive, not tradable at 1x cost;
 quoting or DeepLOB edge; v1.17 adds the screen and breadth results above
 ([docs/REAL_DATA.md](docs/REAL_DATA.md) §3, [LEARN.md](LEARN.md) §31-§44).
 
-**Next: v1.17.1.** The B8 (two-venue router on real Nasdaq + IEX books) real-data
-results from the eight remaining IEX overlap days; the release manifest, lock-file SBOMs and
-digest pinning (#211). B7 (signal-aware execution) was **closed on 2026-10-16 on its in-sample
-result**, no fresh test ([research/preregs/B7_CLOSED_v117.md](research/preregs/B7_CLOSED_v117.md)). Beyond that (v1.18): the C++
-ports not done in v1.17 (the B2-regime arm of dark eligibility, the B10 proxy sampler and fit,
-the exchange-local hazard clock; PLATFORM_CONVENTIONS.md §11.3). Plan:
+**Next: v1.17.1 release, then v1.18.** The release PR waits for the B8 six-day results and the remaining IEX rows. Beyond that (v1.18): the C++ ports not done in v1.17 (the B2-regime arm of dark eligibility, the B10 proxy sampler and fit, the exchange-local hazard clock; PLATFORM_CONVENTIONS.md §11.3). Plan:
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
 What each release from v1.9 to v1.16 added, and the 2026-10-11 quality

@@ -140,6 +140,18 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
   </table></div>
 
     <div class="honest new">
+    <strong>v1.17.1 (prepared 2026-10-17): a patch release. Negative results first.</strong>
+    <ul>
+      <li><strong>B7 closed on its negative in-sample result</strong> (2026-10-16): no cell cheaper by the 2 bp minimum; nothing signed or registered (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/preregs/B7_CLOSED_v117.md">B7_CLOSED_v117.md</a>).</li>
+      <li><strong>B8 two-venue router: negative on the first 2 overlap days</strong> &mdash; <code>sor</code> +5.1 &plusmn; 1.3 bps and 8 pp lower fill than pinned Nasdaq; <code>sor_sweep</code> +3.8 &plusmn; 2.1 bps; 2 day clusters, provisional. Six-day out-of-sample result: TBD, see PR.</li>
+      <li><strong>Release workflow fixed (#211):</strong> v1.17.1 is the first release with a release manifest, lock-file SBOMs and digest-pinned k8s manifests.</li>
+      <li><strong>IEX overlap set:</strong> 5 of 9 days recorded, TOPS oracle 0 mismatches.</li>
+    </ul>
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/v1.17.1_RELEASE_NOTES.md">Release notes</a>,
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/CHANGELOG.md">CHANGELOG</a>.
+  </div>
+
+    <div class="honest">
     <strong>v1.17.0 (released 2026-10-16): execution quality and breadth. Negative results first.</strong>
     <ul>
       <li><strong>Breadth screen: 0 pass / 22 fail / 1 not screened</strong> of 23 candidates on the 7 real sessions.
