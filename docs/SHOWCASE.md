@@ -84,7 +84,7 @@ negative ones first, is written down with the artefact that produced it.
   <!-- source: README.md "Headline numbers" (Promotion verdicts, Lifecycle registry rows) and docs/index.html "Results so far" -->
 
 **Prepared: v1.17.1 (2026-10-17), a patch release; v1.17.0 released 2026-10-16.**
-- **B7 closed** on its negative in-sample result; **B8 negative on 2 overlap days** (`sor` +5.1 ± 1.3 bps, `sor_sweep` +3.8 ± 2.1; provisional); six-day out-of-sample result: TBD, see PR; 5 of 9 IEX days recorded; #211 fixes the missing manifest, SBOMs and digest pins.
+- **B7 closed** on its negative in-sample result; **B8 negative on 2 overlap days** (`sor` +5.1 ± 1.3 bps, `sor_sweep` +3.8 ± 2.1; provisional); pre-declared six-day out-of-sample run also negative (`sor` +2.2 / +1.1, `sor_sweep` +0.6 / +1.2 bps; AAPL / MSFT; no interval excludes zero); 6 of 9 IEX days recorded; #211 fixes the missing manifest, SBOMs and digest pins.
   <!-- source: CHANGELOG.md "## v1.17.1"; research/execution/b8/REPORT_sweep.md -->
 
 **Released: v1.17.0 (2026-10-16), execution quality and breadth.**
