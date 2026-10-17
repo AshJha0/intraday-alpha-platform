@@ -491,6 +491,8 @@ change: still 0 alphas promoted, no strategy that trades at 1x costs.
 
 ## 3.10 v1.15.0 (2026-10-13): the confirmatory release
 
+**v1.17.1 (prepared 2026-10-17): patch release.** B7 closed on its in-sample result; B8 negative on the first 2 overlap days and on the pre-declared six-day out-of-sample run (`sor` +2.2 / +1.1 bps, `sor_sweep` +0.6 / +1.2 bps vs pinned Nasdaq; AAPL / MSFT; no interval excludes zero); `sor_sweep`; 6 of 9 IEX overlap days; the #211 release-workflow fix (v1.17.0's missing manifest, lock-file SBOMs and digest pins). Notes: docs/release/v1.17.1_RELEASE_NOTES.md.
+
 **v1.17.0 (2026-10-16): execution quality and breadth.** Shipped: WS0, A1-A5, B1-B6, B8-B10 (B8 results in v1.17.1), C1-C8 (C6 screen 0 of 22 pass; C8 registered under option (a), no confirmatory look), D1-D4, E1-E5, F1-F9, G1-G4. B8 real-book results: v1.17.1; B7 closed 2026-10-16 on its in-sample result, no fresh test (research/preregs/B7_CLOSED_v117.md). Notes: docs/release/v1.17.0_RELEASE_NOTES.md.
 
 **v1.16.0 (2026-10-15): monetisation.** P0 execution items 1-5 done. P0-6 taker study: no-go
@@ -559,13 +561,12 @@ quoting edge, AI4 closed.
 
 ## 3.13 Next: v1.17.1, then v1.18
 
-v1.17.1 (next):
+v1.17.1 (release PR prepared 2026-10-17, draft until the B8 six-day results and the IEX 2026-05-18 rows are merged):
 
-- B8 (two-venue router on real Nasdaq + IEX books) real-data results (B7 was
-  closed on 2026-10-16 on its in-sample result; a new pre-registration would be
-  needed to reopen it);
-- the remaining 8 of the 9 approved IEX overlap days (docs/research/IEX_OVERLAP_SET.md);
-- the release manifest / Python lock-file SBOM / k8s digest-pinning fix (#211).
+- B8 six-day out-of-sample result: negative (research/execution/b8/REPORT_oos6.md; pre-declared in PREDECLARATION_oos6.md);
+- B7 closed 2026-10-16, no fresh test;
+- 5 of the 9 approved IEX overlap days recorded (docs/research/IEX_OVERLAP_SET.md), the rest as they finish;
+- the release manifest / Python lock-file SBOM / k8s digest-pinning fix (#211), first carried by v1.17.1.
 
 v1.18: the C++ ports v1.17 left out (B2-regime arm of the dark eligibility,
 the B10 proxy sampler / fit, the exchange-local hazard clock;

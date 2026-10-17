@@ -428,3 +428,40 @@ def test_pooled_paired_summary_and_rows(pair, tmp_path):
     assert t["paired_pooled"]["sor-pin_nasdaq"]["n_pairs"] == n
     rows = t["paired_rows"]["sor-pin_nasdaq"]
     assert len(rows) == n and {"all_in", "shortfall"} <= set(rows[0]["costs_bps_diff"])
+
+
+def test_multi_session_nasdaq_dataset_pairs_with_per_day_iex_datasets(tmp_path, golden_dir):
+    """One Nasdaq dataset holding two sessions (holdout2026) pairs day by day with
+    one IEX dataset per day: a session another --pair-dir matches is not unmatched."""
+
+    def as_day(root: Path, day: str) -> Path:
+        src = root / "normalized" / "eq_20251208.normalized.jsonl"
+        if day != "20251208":
+            src.rename(src.with_name(f"eq_{day}.normalized.jsonl"))
+        return root
+
+    nas = _dataset(
+        tmp_path / "nas", nasdaq_stream(golden_dir), NAS_IID, ("XNAS", 101, 0.003, 0.002)
+    )
+    shutil.copy(
+        nas / "normalized" / "eq_20251208.normalized.jsonl",
+        nas / "normalized" / "eq_20251209.normalized.jsonl",
+    )
+    iex_a = as_day(
+        _dataset(tmp_path / "ia", iex_stream(golden_dir), IEX_IID, ("IEXG", 102, 0.0009, 0.0)),
+        "20251208",
+    )
+    iex_b = as_day(
+        _dataset(tmp_path / "ib", iex_stream(golden_dir), IEX_IID, ("IEXG", 102, 0.0009, 0.0)),
+        "20251209",
+    )
+    out = tmp_path / "out"
+    rc = bench.main(
+        ["--data-dir", str(nas), "--second-data-dir", str(iex_a)]
+        + ["--pair-dir", str(nas), str(iex_b), "--out", str(out), "--tag", "multi"]
+        + ARGS
+    )
+    assert rc == 0
+    doc = json.loads((out / "benchmark_multi.json").read_text())
+    assert sorted(doc["sessions"]) == ["20251208", "20251209"]
+    assert not doc["two_venue"]["unmatched"]

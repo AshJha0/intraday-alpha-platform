@@ -1,3 +1,3 @@
 """iap — Intraday Alpha Platform, Python reference implementation."""
 
-__version__ = "1.17.0"
+__version__ = "1.17.1"

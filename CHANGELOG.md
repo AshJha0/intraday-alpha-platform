@@ -6,8 +6,11 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
-## Unreleased
+## v1.17.1 — 2026-10-17
 
+Theme: negative results first, plus the release-workflow fix. B7 (signal-aware execution fresh test) is CLOSED on its negative in-sample result: nothing signed, nothing registered, the fresh days unread. B8 (two-venue router on real Nasdaq + IEX books) is negative on the first two overlap days (`sor` +5.1 ± 1.3 bps all-in and 8 pp lower fill than pinned Nasdaq; the opt-in `sor_sweep` route +3.8 ± 2.1 bps; 2 day clusters, provisional); the pre-declared six-day out-of-sample run (calibrated on 3 days, evaluated on 3 others; AAPL, MSFT) is also negative: `sor` +2.2 / +1.1 bps and `sor_sweep` +0.6 / +1.2 bps vs pinned Nasdaq (AAPL / MSFT), no 95 % interval excludes zero (`research/execution/b8/REPORT_oos6.md`). Six of the nine IEX overlap days are recorded on main (2025-11-28, 12-08, 12-09, 12-10, 2026-05-15, 2026-05-18; TOPS oracle 0 mismatches on AAPL / MSFT / QQQ for every day), and `process-iex-day --keep-normalized` keeps the normalized events so both venues can be replayed. Release workflow: the v1.17.0 manifest job failed (`cyclonedx-py requirements -i` is `--index-url`), so v1.17.0 has no `release-manifest.json`, no Python lock-file SBOMs and no digest-pinned k8s manifests; #211 fixes it and v1.17.1 is the first release to carry them. Notes: docs/release/v1.17.1_RELEASE_NOTES.md.
+
+- v1.17.1 B8 six-day OUT-OF-SAMPLE result (`research/execution/b8/REPORT_oos6.md`, pre-declared in #220): calibrated on 2025-11-28 / 12-08 / 12-09, evaluated on 2025-12-10 / 2026-05-15 / 2026-05-18 (AAPL, MSFT). No policy beats pinned Nasdaq: shortfall vs pinned `sor` +2.2 / +1.1 bps, `sor_sweep` +0.6 / +1.2 bps (AAPL / MSFT), no 95 % interval excludes zero. The supplementary pooled in-sample run was not run. `execution_benchmark --pair-dir` now pairs one multi-session Nasdaq dataset with per-day IEX datasets.
 - v1.17.1 A4: IEX overlap day 6 (2026-05-18) recorded: oracle match on AAPL / MSFT / QQQ (0 mismatched of 3,745,844 compared), 0.765 GB kept (`docs/research/IEX_OVERLAP_SET.md`); the six-day B8 set is complete.
 - v1.17.1 B8 six-day re-run PRE-DECLARED (`research/execution/b8/PREDECLARATION_oos6.md`, written
   before any result): headline = calibrate on 2025-11-28 / 12-08 / 12-09, evaluate out of sample on
