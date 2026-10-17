@@ -8,6 +8,7 @@ that tag.
 
 ## Unreleased
 
+- v1.17.1 B8 six-day OUT-OF-SAMPLE result (`research/execution/b8/REPORT_oos6.md`, pre-declared in #220): calibrated on 2025-11-28 / 12-08 / 12-09, evaluated on 2025-12-10 / 2026-05-15 / 2026-05-18 (AAPL, MSFT). No policy beats pinned Nasdaq: shortfall vs pinned `sor` +2.2 / +1.1 bps, `sor_sweep` +0.6 / +1.2 bps (AAPL / MSFT), no 95 % interval excludes zero. The supplementary pooled in-sample run was not run. `execution_benchmark --pair-dir` now pairs one multi-session Nasdaq dataset with per-day IEX datasets.
 - v1.17.1 A4: IEX overlap day 6 (2026-05-18) recorded: oracle match on AAPL / MSFT / QQQ (0 mismatched of 3,745,844 compared), 0.765 GB kept (`docs/research/IEX_OVERLAP_SET.md`); the six-day B8 set is complete.
 - v1.17.1 B8 six-day re-run PRE-DECLARED (`research/execution/b8/PREDECLARATION_oos6.md`, written
   before any result): headline = calibrate on 2025-11-28 / 12-08 / 12-09, evaluate out of sample on

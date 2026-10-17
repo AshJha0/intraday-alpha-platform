@@ -15,6 +15,10 @@ Status (2026-10-16): **two real runs, both on the overlap days 2025-11-28 and
   venue) pooled at +3.8 ± 2.1 bps; AAPL −0.8, MSFT +8.5. No policy beats
   pinned Nasdaq with confidence.
 
+Status (2026-10-17): the pre-declared six-day out-of-sample run is done
+(`PREDECLARATION_oos6.md`, `REPORT_oos6.md`): no two-venue policy beats pinned
+Nasdaq (calibrated on 3 days, evaluated on 3 others; no interval excludes zero).
+
 The four-policy run is `run_b8_sweep.cmd` (`--policies
 pin_nasdaq,pin_iex,sor,sor_sweep`). The diagnosis is `diagnose_depth_walk.py`
 (`run_b8_diag.cmd`).

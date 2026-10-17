@@ -321,6 +321,19 @@ gap comes from its IS 0.1 % cells, which complete more qty at far levels.
 Passive TWAP / VWAP routing, and with it the −7 to −8 pp fill gap, is
 unchanged. No two-venue policy beats pinned Nasdaq with any confidence.
 
+**Pre-declared out-of-sample result (v1.17.1, six-day set, 3 evaluation
+days).** `research/execution/b8/REPORT_oos6.md`, pre-declared in
+`PREDECLARATION_oos6.md` before any result. Calibrated on 2025-11-28 / 12-08 /
+12-09, evaluated on 2025-12-10 / 2026-05-15 / 2026-05-18 (AAPL, MSFT). Versus
+pinned Nasdaq, shortfall in bps with day-clustered Student-t (2 df) intervals:
+`sor` +2.2 [-0.8, 5.2] AAPL and +1.1 [-2.3, 4.5] MSFT; `sor_sweep` +0.6
+[-1.4, 2.5] and +1.2 [-2.3, 4.7]; pinned IEX +3.5 and +5.0. No interval
+excludes zero and every point estimate is on the costlier side: no evidence
+that any two-venue policy beats pinned Nasdaq. The sweep route removes most of
+the IEX toxicity (1 s markout -3.5 bps against -18.7 for `sor` on MSFT) but
+does not turn it into a saving. Three evaluation days, two symbols, list-price
+fees and zero latency: treat it as unresolved, not as a measured cost.
+
 Next steps:
 
 - a price collar on the sweep;
