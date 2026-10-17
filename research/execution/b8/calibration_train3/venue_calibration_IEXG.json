@@ -1,0 +1,157 @@
+{
+  "alignment": "both streams on ns since the session's New York midnight, exchange (UTC) clock; Nasdaq ITCH as stamped; IEX: exchange_ts from the messages' own UTC send times (iex_clock='exchange', no shift) or, for a capture-clock (TAI) stream, exchange_ts/receive_ts - 37 s (iex_clock='capture'); merge order (exchange_ts, venue_id), each stream's own order kept inside a tie",
+  "fill_probability": {
+    "exec_hazard_per_s": 0.04635346783160862,
+    "horizon_s": 1.0,
+    "model": "queue-depletion hazard, X-4 execution split (exec_hazard_per_s)",
+    "p_fill_touch": 0.04529555476654856,
+    "queue_depletion": {
+      "ask": {
+        "1-100": {
+          "cancel_depletions": 277815,
+          "cancel_hazard_per_s": 2.5390841834317066,
+          "depletions": 282442,
+          "exec_depletions": 4627,
+          "exec_hazard_per_s": 0.04228836641915846,
+          "exposure_s": 109415.43482993869,
+          "hazard_per_s": 2.5813725498508653
+        },
+        "101-500": {
+          "cancel_depletions": 18329,
+          "cancel_hazard_per_s": 1.7628000103756045,
+          "depletions": 18963,
+          "exec_depletions": 634,
+          "exec_hazard_per_s": 0.06097524177959154,
+          "exposure_s": 10397.662747967985,
+          "hazard_per_s": 1.823775252155196
+        },
+        "501-2000": {
+          "cancel_depletions": 109,
+          "cancel_hazard_per_s": 0.12521901119426532,
+          "depletions": 122,
+          "exec_depletions": 13,
+          "exec_hazard_per_s": 0.014934377481884855,
+          "exposure_s": 870.4748501079994,
+          "hazard_per_s": 0.14015338867615018
+        },
+        ">2000": {
+          "cancel_depletions": 1,
+          "cancel_hazard_per_s": 848.2289403839254,
+          "depletions": 1,
+          "exec_depletions": 0,
+          "exec_hazard_per_s": 0.0,
+          "exposure_s": 0.001178927,
+          "hazard_per_s": 848.2289403839254
+        }
+      },
+      "bid": {
+        "1-100": {
+          "cancel_depletions": 244592,
+          "cancel_hazard_per_s": 2.275167298132808,
+          "depletions": 249848,
+          "exec_depletions": 5256,
+          "exec_hazard_per_s": 0.0488907213604126,
+          "exposure_s": 107505.0613643808,
+          "hazard_per_s": 2.3240580194932208
+        },
+        "101-500": {
+          "cancel_depletions": 15680,
+          "cancel_hazard_per_s": 1.321130717370701,
+          "depletions": 16273,
+          "exec_depletions": 593,
+          "exec_hazard_per_s": 0.04996368082913429,
+          "exposure_s": 11868.621169603985,
+          "hazard_per_s": 1.3710943981998354
+        },
+        "501-2000": {
+          "cancel_depletions": 92,
+          "cancel_hazard_per_s": 0.3407880269967348,
+          "depletions": 109,
+          "exec_depletions": 17,
+          "exec_hazard_per_s": 0.062971700640701,
+          "exposure_s": 269.9625359809999,
+          "hazard_per_s": 0.40375972763743584
+        }
+      }
+    },
+    "queue_edges": [
+      0,
+      100,
+      500,
+      2000
+    ]
+  },
+  "item": "v1.17 B8",
+  "schema": "iap.venue_calibration/v1",
+  "sessions": [
+    "20251128",
+    "20251208",
+    "20251209"
+  ],
+  "source": {
+    "iex_clock": "exchange",
+    "iex_dirs": [
+      "C:\\Work\\Claude\\intraday-alpha-platform\\intraday-alpha-platform\\data\\real\\iex\\iex_20251128",
+      "C:\\Work\\Claude\\intraday-alpha-platform\\intraday-alpha-platform\\data\\real\\iex\\iex_20251208",
+      "C:\\Work\\Claude\\intraday-alpha-platform\\intraday-alpha-platform\\data\\real\\iex\\iex_20251209"
+    ],
+    "max_events": 0,
+    "nasdaq_dirs": [
+      "C:\\Work\\Claude\\intraday-alpha-platform\\intraday-alpha-platform\\data\\real\\r7_20251128",
+      "C:\\Work\\Claude\\intraday-alpha-platform\\intraday-alpha-platform\\data\\real\\r7_20251208",
+      "C:\\Work\\Claude\\intraday-alpha-platform\\intraday-alpha-platform\\data\\real\\r7_20251209"
+    ]
+  },
+  "toxicity": {
+    "definition": "-(maker markout bps vs the consolidated mid), day-clustered CR1",
+    "markout_bps": {
+      "1s": {
+        "ci95": [
+          -0.20179648233696218,
+          0.07391820946858163
+        ],
+        "df": 2,
+        "mean": -0.06393913643419027,
+        "n": 20215,
+        "n_clusters": 3,
+        "p_student_t": 0.18410372046680396,
+        "se": 0.03204008191262954,
+        "t": -1.9955984072870545
+      },
+      "30s": {
+        "ci95": [
+          -0.3748633321266084,
+          0.056031643034689854
+        ],
+        "df": 2,
+        "mean": -0.15941584454595925,
+        "n": 19962,
+        "n_clusters": 3,
+        "p_student_t": 0.08610906232036475,
+        "se": 0.05007317604114294,
+        "t": -3.183657541813889
+      },
+      "5s": {
+        "ci95": [
+          -0.346645095058935,
+          0.10386459995850646
+        ],
+        "df": 2,
+        "mean": -0.12139024755021426,
+        "n": 20202,
+        "n_clusters": 3,
+        "p_student_t": 0.14626398991557457,
+        "se": 0.052352551241530695,
+        "t": -2.318707391931584
+      }
+    },
+    "n_fills": 20219,
+    "toxicity_bps": {
+      "1s": 0.06393913643419027,
+      "30s": 0.15941584454595925,
+      "5s": 0.12139024755021426
+    }
+  },
+  "venue": "IEXG",
+  "venue_id": 102
+}

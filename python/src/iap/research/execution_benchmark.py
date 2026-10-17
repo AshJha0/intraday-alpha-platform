@@ -917,11 +917,17 @@ def run_benchmark(
             lab = _session_label(sp)
             if sessions and not any(x in lab for x in sessions):
                 continue
-            if lab in second_of or lab in unmatched:
-                raise SystemExit(f"session {lab} appears in more than one --pair-dir")
             if lab not in sec:
-                unmatched.append(lab)
+                # a multi-session Nasdaq dataset can be paired day by day with
+                # one IEX dataset per day: a session another pair matches is
+                # not unmatched
+                if lab not in second_of and lab not in unmatched:
+                    unmatched.append(lab)
                 continue
+            if lab in second_of:
+                raise SystemExit(f"session {lab} appears in more than one --pair-dir")
+            if lab in unmatched:
+                unmatched.remove(lab)
             files.append(sp)
             second_of[lab] = sec[lab]
             id_map_of[lab] = xm
