@@ -8,6 +8,7 @@ that tag.
 
 ## Unreleased
 
+- v1.17.1 A4: IEX overlap day 6 (2026-05-18) recorded: oracle match on AAPL / MSFT / QQQ (0 mismatched of 3,745,844 compared), 0.765 GB kept (`docs/research/IEX_OVERLAP_SET.md`); the six-day B8 set is complete.
 - v1.17.1 B8 six-day re-run PRE-DECLARED (`research/execution/b8/PREDECLARATION_oos6.md`, written
   before any result): headline = calibrate on 2025-11-28 / 12-08 / 12-09, evaluate out of sample on
   2025-12-10 / 2026-05-15 / 2026-05-18; the pooled six-day run is supplementary and labelled in-sample.
