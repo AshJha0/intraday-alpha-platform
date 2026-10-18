@@ -5,8 +5,9 @@ the owner's explicit approval (v1.17, A4).
 Refuses without ``--i-have-approval`` AND without an ``approval`` sentence
 in the manifest; fetches only https URLs on ``r7plan.ALLOWED_HOSTS`` (the
 Google Cloud Storage links HIST hands out).  Streams to ``<file>.part``,
-size-checks against the manifest and renames; a present file of the right
-size is skipped.  One feed per call (``--feed TOPS`` / ``DEEP+`` / ``DEEP``):
+size- and sha256-checks against the manifest (sha256 when the manifest has
+one; default since v1.18, ``--no-verify-sha`` for size only) and renames; a
+present file of the right size and hash is skipped.  One feed per call (``--feed TOPS`` / ``DEEP+`` / ``DEEP``):
 the process-iex-day chain keeps one vendor file on disk at a time.
 
     PYTHONPATH=python/src python tools/iex_download.py --manifest research/v117/iex_overlap_manifest.json \\
@@ -39,6 +40,11 @@ def main(argv: list[str] | None = None, opener=urllib.request.urlopen) -> int:
         action="store_true",
         help="the data owner approved downloading exactly this manifest's files",
     )
+    p.add_argument(
+        "--no-verify-sha",
+        action="store_true",
+        help="size check only (the pre-v1.18 behaviour); default: verify the manifest sha256",
+    )
     a = p.parse_args(argv)
     if not a.i_have_approval:
         print(
@@ -56,7 +62,7 @@ def main(argv: list[str] | None = None, opener=urllib.request.urlopen) -> int:
         return 2
     vendor = Path(a.vendor_dir)
     vendor.mkdir(parents=True, exist_ok=True)
-    r = download_one({**entry, "date": a.date}, vendor, opener)
+    r = download_one({**entry, "date": a.date}, vendor, opener, verify_sha=not a.no_verify_sha)
     print(r, flush=True)
     return 0 if r["status"] != "failed" else 1
 
