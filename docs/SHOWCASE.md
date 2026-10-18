@@ -119,7 +119,7 @@ reported as stale rather than failing).
 | Flagship alphas | 24 (EQ01-EQ12, FX01-FX12); verdicts 0 PROMOTE / 12 ITERATE / 12 REJECT | `research/alpha_reports/REPORT.md` |
 | Promotion lifecycle | 7 states · 17 pinned edges · 20 gates; 23 alphas at CANDIDATE, 0 beyond | `research/alpha_registry.json`, `tests/golden/expected_lifecycle.json` |
 | Contracts | 17 JSON Schemas · 22 typed Python contracts · 18 runtime-checkable Protocols | `schemas/`, `python/src/iap/contracts/` |
-| Experiments ledger | real-data looks: 24; synthetic-data looks: 5,694; no dataset: 14 (per-dataset real ledgers under `data/real` are outside git and this count); total 5,732 recorded looks over 422 distinct configurations (as of v1.17.0); expected max \|t\| 4.160; Bonferroni per-test \|t\| ≥ 4.447 | `research/experiments.json` |
+| Experiments ledger | real data: 256 configurations holding 1,132 of the looks (per-dataset real ledgers and the B7/B8 execution studies merged in by the v1.18 REL-02 migration); synthetic data: 384 configurations holding 5,694 of the looks (excluded from the real-data N); total 6,826 recorded looks over 640 distinct configurations; expected max \|t\| 4.202; Bonferroni per-test \|t\| ≥ 4.484 | `research/experiments.json` |
 | C++ tick-to-trade (shared CI runner AMD EPYC 7763, no pinning, `steady_clock`; not colocation) | p50 1,279 ns · p99 2,559 ns · p99.9 11,263 ns, in-process, decoded frame to order intent | `benchmarks/results_tick_to_trade.md` |
 | Rust feature engine from Python (CI runner ubuntu-24.04; not colocation) | about 790,000 events/s against about 5,250 through the Python reference on the 45 native slots: 150x, not a pipeline speed-up | `rust-pyo3` CI job summary, API_FEATURES.md §7.1 |
 <!-- source: README.md "Headline numbers" table and "Cross-language parity" table (every row); the same figures appear in docs/index.html "Measured, not claimed" -->
@@ -157,7 +157,7 @@ flowchart TD
     FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
-    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,732 looks / 422 configs as of v1.17.0, research/experiments.json)<br/>REPORT.md, ML_REPORT.md, model manifests"]
+    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (6,826 looks / 640 configs as of the v1.18 REL-02 migration, research/experiments.json)<br/>REPORT.md, ML_REPORT.md, model manifests"]
     RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 23 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```

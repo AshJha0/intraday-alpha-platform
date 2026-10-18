@@ -714,10 +714,19 @@ def test_ledger_denominator_and_summary_view(built: Store) -> None:
     # has pipeline looks (a pre-registration is filed before its dataset
     # exists; a v1.17 `breadth_book` look is a research-only statistic on an
     # ingested dataset the promotion pipeline never runs on)
-    research_only = {"prereg", "breadth_book", "net_of_cost_screen"}
+    research_only = {"prereg", "breadth_book", "net_of_cost_screen", "execution_study"}
+    # v1.18 REL-02: the real-data looks merged from the per-dataset ledgers
+    # (runner / combination on ingested datasets) are not promotion-pipeline scopes
+    merged_real = {
+        str(e.get("dataset_version") or (e.get("config") or {}).get("dataset_version"))
+        for e in doc["entries"]
+        if e.get("data_family") == "real" and e["kind"] in ("experiment_runner", "combination")
+    }
     pipeline = [r for r in view if r["kind"] == "promotion_pipeline"]
     scopes_run = {
-        (r["dataset_version"], r["methods"]) for r in view if r["kind"] not in research_only
+        (r["dataset_version"], r["methods"])
+        for r in view
+        if r["kind"] not in research_only and r["dataset_version"] not in merged_real
     }
     assert len(pipeline) == len(scopes_run) >= 3
     assert all(r["n_alphas"] == 24 and r["n_promote"] == 0 for r in pipeline)
@@ -1493,8 +1502,10 @@ def test_cli_selects_the_scope(tmp_path: Path, capsys: pytest.CaptureFixture[str
     # `breadth_book` look of EQ11 on the multi7 dataset (a research-only
     # scope the promotion pipeline never ran on: one row, EQ11) + the v1.17 C6
     # `net_of_cost_screen` looks on multi7 under `v2` (one more research-only
-    # scope: the 12 EQUITY alphas of the screen's candidate list)
-    assert len(everything) == 24 * 5 + 2 + 3 + 1 + 12
+    # scope: the 12 EQUITY alphas of the screen's candidate list) + the v1.18
+    # REL-02 per-dataset real ledgers merged in: 6 holdout2026 and 2 r7_holdout
+    # runner looks (the B7/B8 `execution_study` looks are not registry alphas)
+    assert len(everything) == 24 * 5 + 2 + 3 + 1 + 12 + 8
     # sql binds :dataset_version / :methods to the selected scope
     query = (
         "SELECT COUNT(*) AS n, SUM(count) AS looks FROM ledger_entries "

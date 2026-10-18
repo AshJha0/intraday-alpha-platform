@@ -457,7 +457,11 @@ def test_committed_ledger_names_a_dataset_on_every_entry():
     assert judged, "the committed ledger holds runs judged under the ledger policy"
     for e in judged:
         assert isinstance(e["gate_looks"], int)
-        assert e["n"] <= e["gate_looks"] <= blob["total_experiments"]
+        assert e["gate_looks"] <= blob["total_experiments"]
+        # v1.18 REL-02: an entry merged from a per-dataset real ledger keeps the
+        # gate_looks it was judged at there; its `n` was renumbered by the merge
+        if e.get("data_family") != "real":
+            assert e["n"] <= e["gate_looks"]
     assert not any("gate_looks" in e for e in blob["entries"] if _on_retired_dataset(e))
 
 

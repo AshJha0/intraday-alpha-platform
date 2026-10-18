@@ -91,7 +91,9 @@ def test_dry_run_report_never_writes_the_repo_ledger(tmp_path, capsys):
 
 
 def test_committed_repo_ledger_dry_run_matches_the_baseline():
-    """The committed ledger: 24 real looks (multi7), 14 prereg entries unclassified."""
+    """The committed ledger after the REL-02 migration: the 24 multi7 looks + the 14
+    prereg entries + 12 merged per-dataset entries + 206 B7/B8 looks are real; the
+    384 seeded-generator entries are synthetic; nothing is unclassified."""
     led = ExperimentLedger(REPO / "research" / "experiments.json")
     real = lfr.real_versions(REPO / "research" / "holdout_registry.json")
     synth = {
@@ -100,6 +102,32 @@ def test_committed_repo_ledger_dry_run_matches_the_baseline():
         if (v := ExperimentLedger.entry_dataset_version(e)) and v.startswith(lfr.SYNTHETIC_PREFIXES)
     }
     fam = led.family_counts(real, synth)
-    assert fam["real"]["entries"] == 24
-    assert fam["unknown"]["entries"] == 14  # the prereg looks carry no dataset_version
-    assert sum(f["entries"] for f in fam.values()) == len(led.entries) == 422
+    assert fam["real"]["entries"] >= 256  # later real looks only append
+    assert fam["synthetic"]["entries"] >= 384
+    assert fam["unknown"]["entries"] == 0
+    assert sum(f["entries"] for f in fam.values()) == len(led.entries)
+
+
+def test_committed_ledger_is_migrated_rel02():
+    """REL-02 migration (2026-10-18): every entry tagged, chain descends from the
+    pre-migration head, retroactive B7/B8 looks present, migration idempotent."""
+    from iap.validation.ledger import chain_heads
+
+    path = REPO / "research" / "experiments.json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    led = ExperimentLedger(path)  # verifies chain_head against the entries
+    assert all(e.get("data_family") in ("real", "synthetic") for e in led.entries)
+    pre_head = "1f95affdee760e380149f400b4db86f0b3e87ae0a17181890ede3301116e489d"
+    assert chain_heads(led.entries)[421] == pre_head  # the 422 pre-migration entries
+    kinds = [e["alpha_id"] for e in led.entries if e["kind"] == "execution_study"]
+    assert kinds.count("B7") >= 44 and kinds.count("B8") >= 162
+    assert led.family_counts()["unknown"]["entries"] == 0
+    assert doc["chain_length"] == len(led.entries)
+    spec2 = importlib.util.spec_from_file_location(
+        "mig", REPO / "tools" / "migrate_ledger_rel02.py"
+    )
+    mig = importlib.util.module_from_spec(spec2)
+    spec2.loader.exec_module(mig)
+    again, rep = mig.migrate(REPO / "no-such-data-root", path)
+    assert rep["tagged"] == 0 and rep["retroactive_study_entries"] == {}
+    assert again._render() == path.read_text(encoding="utf-8").replace("\r\n", "\n")
