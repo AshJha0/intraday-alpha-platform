@@ -1,0 +1,172 @@
+{
+  "schema": "iap.rel08_rule/v1",
+  "kind": "rel08_continuation_rule",
+  "status": "DRAFT, unsigned: the screen refuses this file; tools/rel08_rule_sign.py writes the signed copy",
+  "rule_document": "research/v118/REL08_CONTINUATION_RULE.md",
+  "rule_document_sha256": "2ec2b5d8a53f2ade563d352298ed591191e36b6ede901b9bc03c693144122490",
+  "session": "2019-01-30",
+  "label": "hypothesis screen, one session, no edge claim",
+  "dataset": {
+    "label": "ds_20190130",
+    "dataset_version": "9a1297a161fc69c47a770dcab4e3e09d5ecd34e1d2a96b44209011485038041d",
+    "feature_identity": "xasset_v2",
+    "reference_map": "configs/reference/reference_etf_map_v1.json",
+    "universe": "research/breadth/universe.json"
+  },
+  "family": {
+    "name": "rel08_screen",
+    "K": 11,
+    "alpha": 0.05
+  },
+  "variants": [
+    {
+      "id": "V1",
+      "score": "vwap_deviation",
+      "horizon_min": 15,
+      "rebalance_min": 15,
+      "book": "market_neutral"
+    },
+    {
+      "id": "V2",
+      "score": "vwap_deviation",
+      "horizon_min": 15,
+      "rebalance_min": 15,
+      "book": "sector_neutral"
+    },
+    {
+      "id": "V3",
+      "score": "vwap_deviation",
+      "horizon_min": 30,
+      "rebalance_min": 30,
+      "book": "market_neutral"
+    },
+    {
+      "id": "V4",
+      "score": "vwap_deviation",
+      "horizon_min": 30,
+      "rebalance_min": 30,
+      "book": "sector_neutral"
+    },
+    {
+      "id": "V5",
+      "score": "residual_reversion",
+      "horizon_min": 15,
+      "rebalance_min": 15,
+      "book": "market_neutral"
+    },
+    {
+      "id": "V6",
+      "score": "residual_reversion",
+      "horizon_min": 15,
+      "rebalance_min": 15,
+      "book": "sector_neutral"
+    },
+    {
+      "id": "V7",
+      "score": "residual_reversion",
+      "horizon_min": 30,
+      "rebalance_min": 30,
+      "book": "market_neutral"
+    },
+    {
+      "id": "V8",
+      "score": "residual_reversion",
+      "horizon_min": 30,
+      "rebalance_min": 30,
+      "book": "sector_neutral"
+    },
+    {
+      "id": "V9",
+      "score": "etf_catch_up",
+      "horizon_min": 1,
+      "rebalance_min": 5,
+      "book": "market_neutral"
+    },
+    {
+      "id": "V10",
+      "score": "etf_catch_up",
+      "horizon_min": 3,
+      "rebalance_min": 5,
+      "book": "market_neutral"
+    },
+    {
+      "id": "V11",
+      "score": "etf_catch_up",
+      "horizon_min": 5,
+      "rebalance_min": 5,
+      "book": "market_neutral"
+    }
+  ],
+  "book": {
+    "notional": 1000000.0,
+    "gross_cap": 1.0,
+    "participation_cap": 0.01,
+    "w_max": 0.1,
+    "turnover_cap": 0.5,
+    "impact": "cost_model",
+    "exec_delay_s": 1.0,
+    "max_age_s": 60.0,
+    "flatten_at_session_end": true,
+    "weights": "linear",
+    "alpha_bps": 5.0,
+    "risk_aversion": 1000.0,
+    "cov_lam": 0.94,
+    "cov_warmup_min": 100,
+    "solver_iters": 20,
+    "dollar_neutral": true,
+    "beta_neutral": true
+  },
+  "costs": {
+    "conservative_spread_mult": 1.5,
+    "conservative_fee_mult": 1.0,
+    "conservative_impact_mult": 2.0
+  },
+  "sufficiency": {
+    "names_per_rebalance_min": 60,
+    "score_max_age_s": 60.0,
+    "usable_rebalances_min": {
+      "5": 50,
+      "15": 20,
+      "30": 10
+    },
+    "names_usable_min": 70,
+    "names_usable_frac": 0.8,
+    "max_gap_min": 30
+  },
+  "statistics": {
+    "bootstrap": "moving_block",
+    "block_minutes": 30,
+    "draws": 9999,
+    "seed": 20261020,
+    "mde_z_sum": 2.49,
+    "ess_inflation_floor": 1.0
+  },
+  "thresholds": {
+    "C2_mde_max_bps": 2.0,
+    "C3_net_min_bps": 1.0,
+    "C3_lower_min_bps": 0.0,
+    "C4_ess_min": 20,
+    "C5_retention": 0.5,
+    "C6_retention": 0.5,
+    "C6_names_removed": 5,
+    "C7_retention": 0.5,
+    "C8_ic_min": 0.02,
+    "C8_lower_min": 0.0
+  },
+  "decision": {
+    "max_continue": 3,
+    "rank_by": "net_bps_lower"
+  },
+  "implementation": {
+    "label": "spread-netted forward mid log return over the variant horizon: sign(r) * max(|r| - (half-spread at t + half-spread at t+h) / mid, 0); a label whose horizon crosses the session close (the last row of the session) is incomplete (the labels_v2 session rule)",
+    "alt_normalisation": "raw score divided by the name's trailing 30-minute realised volatility of 1-minute mid log returns, then demeaned and studentised",
+    "beta": "beta_w5m_v1 of the xasset_v2 store: last finite value at or before t, at most 30 minutes old; a missing beta reads as 1 and is counted",
+    "cov_warmup": "the book_multi7 warm-up of 20 five-minute returns kept as 100 minutes of the variant's rebalance clock: cov_init = max(2, cov_warmup_min / rebalance_min)",
+    "net_series": "per decision k: the gross P&L over (t_k, t_k+1] minus the costs of the trade at t_k; the session-end flatten cost is added to the last decision; bps of the notional; mean over usable decisions",
+    "conservative_costs": "the same trades re-charged at spread_mult x spread + fee_mult x fee + impact_mult x impact",
+    "influential_names": "per-name net contribution = gross minus the name's traded-notional share of each rebalance's costs; the book is re-run without the C6_names_removed names of largest |contribution|",
+    "universe": "vwap_deviation: every EQUITY / ETF name of the dataset; residual_reversion and etf_catch_up: the EQUITY names whose reference ETF (the map) is another instrument of the dataset",
+    "ess": "n / max(Newey-West variance inflation with lag = block length (Bartlett weights), ess_inflation_floor)",
+    "lower_bound": "the (alpha / K) quantile of the moving-block bootstrap means (one-sided); block length = block_minutes / rebalance_min rebalances"
+  }
+}
