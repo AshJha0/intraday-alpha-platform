@@ -1,8 +1,8 @@
 # Known-null protocol v2: size and power of the inference step (v1.18, REL-06)
 
-**Status: DRAFT, unsigned, nothing run.** It becomes a registered protocol only when its parameters are set, the
-runner changes listed in section 9 exist, and its `analysis_identity` is bound and signed (REL-02a,
-`tools/prereg_bind_identity.py`). No trial of v2 has been drawn. v1 (`NULL_PROTOCOL.md`, signed, run 2026-10-18,
+**Status: PARAMETERS SET, ready for signing (unsigned, nothing run).** Parameters set 2026-10-18 by Claude
+(section 8); the runner implements v2 (section 9, done); it becomes a registered protocol when its
+`analysis_identity` is bound and signed (REL-02a, `tools/prereg_bind_identity.py`). No trial of v2 has been drawn. v1 (`NULL_PROTOCOL.md`, signed, run 2026-10-18,
 `KNOWN_NULL_RESULT.md`) stays the record it is; v2 does not edit it.
 
 ## 1. Why v1 could not test size
@@ -56,7 +56,7 @@ distribution, not trial by trial.
 For each generator, each K and each delta in the grid, in every trial the null label at the entry rows of the
 **first** hypothesis of the family (registered list order) is replaced by `y_j + s_j * delta / (1e4 * f_j)`
 (a planted effect of exactly delta bps per trip on S1 and S2; trips with f_j = 0 are left unchanged; no other
-hypothesis is touched). Delta grid: 0.5, 1.0, 2.0 bps per trip (open parameter 8.4). Reported per
+hypothesis is touched). Delta grid: 0.5, 1.0, 2.0, 4.0 bps per trip (parameter 8.4). Reported per
 (generator, K, delta, statistic):
 
 * power: the confirmation rate of the planted hypothesis, Wilson 95 %;
@@ -71,11 +71,12 @@ JSON and small-G statement.
 * Size arm: 1,000 trials per generator (every K and both statistics evaluated on the same trial labels, as v1).
   Generator A: derangements without replacement, trial i seeded `SplitMix64(base + i)`; B: `SplitMix64(base + i)`.
   New base seeds (open parameter 8.1): **20261101** (A) and **20261102** (B).
-* Power arm: 200 trials per (generator, delta) (open parameter 8.3), base seeds **20261103** (A) and
-  **20261104** (B). Generator A draws without replacement within each delta, independently of the size arm (a
-  power trial may reuse a size-arm permutation; the planted effect differs, so the trial differs).
-* Compute: v1 measured 2.22 s per trial (both generators, all K) at `--workers 2`. Size arm about 40 min; power
-  arm 3 x 200 trials about 8 min; plus setup. Well inside the 12 h ceiling (v1 parameter 10.9 applies).
+* Power arm: 200 trials per generator (parameter 8.3), base seeds **20261103** (A) and **20261104** (B).
+  Each trial's null labels are drawn once and evaluated at every delta (common random numbers: the power curve
+  across deltas is not blurred by different nulls). Generator A draws its 200 derangements without replacement,
+  independently of the size arm (a power trial may reuse a size-arm permutation; the planted effect differs, so
+  the trial differs).
+* Compute: see section 11 (estimate; v1 parameter 10.9 applies: abort and re-plan above 12 h at `--workers 2`).
 
 ## 6. Pass rule (size arm, unchanged from v1 section 7)
 
@@ -90,17 +91,19 @@ test, a larger G, a stricter level), never a threshold edit.
 both statistics' per-trial records, the power arm per delta, every seed and permutation, and the small-G
 statement. Report: `research/v118/KNOWN_NULL_V2_RESULT.md`.
 
-## 8. Open parameters (to be set before signing)
+## 8. Parameters (set 2026-10-18; were open in the draft)
 
-| # | parameter | proposed | why |
+| # | parameter | set to | why |
 |---|---|---|---|
-| 8.1 | size-arm base seeds | 20261101 (A) / 20261102 (B) | new, so no v1 trial is reused by seed |
-| 8.2 | statistics | S1 re-centred net primary; S2 gross must also pass | S1 keeps cost dispersion; S2 isolates the inference |
-| 8.3 | power trials | 200 per (generator, delta), seeds 20261103 / 20261104 | Wilson half-width about 7 pp at 50 % power; enough to place the power curve |
-| 8.4 | delta grid | 0.5, 1.0, 2.0 bps per trip | brackets the trial-level MDE scale (CR1 SE x about 2.8 at 6 df) |
-| 8.5 | planted hypothesis | the first of each registered family | fixed before any trial; does not pick the easiest cell |
+| 8.1 | size-arm base seeds | 20261101 (A) / 20261102 (B) | new, so no v1 trial is reused by seed; fixed before any trial |
+| 8.2 | statistics | S1 re-centred net primary; S2 gross must also pass | S1 keeps the cost dispersion a real run has; S2 isolates the inference |
+| 8.3 | trial counts | size 1,000 per generator (as v1); power 200 per generator, every delta on the same draws | 1,000 keeps the v1 Wilson resolution (about +-1.4 pp at 5 %) where the pass rule binds; 200 gives about +-7 pp at 50 % power, enough to place a power curve that has no pass rule |
+| 8.4 | delta grid | 0.5, 1.0, 2.0, 4.0 bps per trip | spans 0.3x-3x the costs v1 recorded (1.3-1.6 bps per trip), so the curve covers effects smaller than and larger than a round trip; chosen without reading any v2 trial or real-label P&L |
+| 8.5 | planted hypothesis | the first of each registered family (K3: imbalance_l1@1s/all names; K6 and K16: imbalance_l1@10s/AAPL) | fixed by list order before any trial; does not pick the easiest cell |
+| 8.6 | pass rule | unchanged from v1: point <= 5.0 % and Wilson upper <= 7.0 %, over-conservative flag at upper < 2.0 % | the nominal level is the claim being tested; v2 changes where the null sits (the H0 boundary), not how strict the gate is |
+| 8.7 | power base seeds | 20261103 (A) / 20261104 (B) | distinct from the size arm and from v1 |
 
-## 9. Runner changes required before signing (not made in this draft)
+## 9. Runner changes (done; the identity binds them)
 
 1. `iap.research.known_null`: a `statistic` option (`net` = v1, `net_recentred` = S1, `gross` = S2) in
    `session_means` / `run_trial`, with `cbar_h` from the trip table; v1 output byte-identical by default.
@@ -109,6 +112,16 @@ statement. Report: `research/v118/KNOWN_NULL_V2_RESULT.md`.
    v2 document; the v1 path and its signed identity are untouched (a v2 run binds its own identity).
 4. Tests: S1 and S2 zero-mean over the permutation distribution on a synthetic panel; the planted delta moves the
    S1 mean by exactly delta; v1 output unchanged.
+
+## 10a. Compute estimate
+
+v1 measured 2.22 s per trial (both generators, K = 3, 6, 16, one statistic) at `--workers 2` on multi7, 0.62 h
+projected for 1,000 trials and 49 min actual. Measured on a synthetic G = 7 panel (same code, both
+generators, K = 3 families): a v2 size trial (two statistics) costs 1.09x a v1 trial, and a power trial (four
+deltas, two statistics, one label draw) costs 2.07x. Estimate on multi7: size arm 1,000 x 2.22 s x 1.09 = about
+40 min; power arm 200 x 2.22 s x 2.07 = about 15 min; setup about 1 min: **about 1 h** at `--workers 2` beside
+the IEX ingest (12 h ceiling). `tools/rel06_known_null.py --config research/v118/known_null_v2_config.json --timing 20` measures it (wall time
+only) if the coordinator wants a measured number before the run.
 
 ## 10. What this document does not do
 
