@@ -481,6 +481,38 @@ estimator gives a reliable day-level t. The `few_sessions` reading says so
 instead of printing a t. The time-shift detector flags; it cannot prove a
 leak, and a slow-moving causal signal can fail it.
 
+## 4g. Claim taxonomy: what a result may say (v1.18 review finding 7)
+
+Every scorecard, screen and lifecycle summary labels its result with exactly one evidence
+status (`iap.research.claims.ClaimStatus`). Five form a ladder, weakest first; two are off it.
+
+| status | means | needs |
+|---|---|---|
+| `feature_correct` | the feature or label computes what it says | parity, leakage and unit tests; says nothing about predictive value |
+| `exploratory_signal` | something worth a registered test | a positive IC, a ranking, one session, or any unregistered result |
+| `passes_registered_net_screen` | a signed, pre-registered net-of-cost screen passed | a signature before the data were seen, and at least 2 sessions (clusters) |
+| `confirmed_untouched_oos` | the registered hypothesis held on data never touched before | the above, plus a confirmation on an untouched out-of-sample set |
+| `strategy_validated_execution_capacity` | a tradable strategy at a stated size | the above, plus execution (fills, queue, latency) and capacity validated against real or independently calibrated fills |
+| `inconclusive` | the test could not decide | underpowered, insufficient or missing evidence; never a pass |
+| `rejected` | a registered test with adequate power failed | |
+
+Rules (pinned by `python/tests/test_claims.py`):
+
+- A positive IC alone, a single session, or a top rank never classifies above
+  `exploratory_signal`. A ranking is accepted as an input and ignored.
+- Promotion (a lifecycle move into PAPER or beyond, or any "promote" verdict) requires
+  `confirmed_untouched_oos`; ACTIVE requires `strategy_validated_execution_capacity`
+  (`claims.require_promotable`). The lifecycle bootstrap refuses to leave an alpha at PAPER or
+  beyond without it, and reports each alpha's status (in-sample reports: `exploratory_signal`
+  or `rejected` at best).
+- A screen never confirms: its best status is `passes_registered_net_screen`. The REL-08
+  scorecard and the REL-08c decision carry `evidence_status`; a one-session REL-08 `continue`
+  is `exploratory_signal`. REL-09 and REL-10 map their verdicts through
+  `claims.from_screen_verdict`.
+- Unknown verdicts map to `inconclusive`.
+
+No result in this repository is `confirmed_untouched_oos` today, so nothing may be promoted.
+
 ## 4e. v1.17 WS-D: meta-label calibrate/select split, sizing hook, conformal sizing (opt-in)
 
 Review finding R-5: `run_meta_labeling` chose `best_tau` on the calibration
