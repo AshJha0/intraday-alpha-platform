@@ -1,0 +1,140 @@
+{
+  "clone_dir": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-ag1ww63l\\repo",
+  "clone_dirty_after_run": [
+    " M research/v118/BASELINE_v1_18.md",
+    " M research/v118/baseline_metrics.json"
+  ],
+  "commands": [
+    {
+      "cmd": "git clone --quiet --no-hardlinks https://github.com/AshJha0/intraday-alpha-platform.git C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-ag1ww63l\\repo",
+      "cwd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-ag1ww63l",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "git -c advice.detachedHead=false checkout --quiet 8fb189b67bd6a2b6a2c868ed378d2a5a92c628f0",
+      "cwd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-ag1ww63l\\repo",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "git rev-parse HEAD",
+      "cwd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-ag1ww63l\\repo",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "8fb189b67bd6a2b6a2c868ed378d2a5a92c628f0\n"
+    },
+    {
+      "cmd": "C:\\Users\\ashis\\AppData\\Local\\Programs\\Python\\Python312\\python.exe -m venv C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-ag1ww63l\\venv",
+      "cwd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-ag1ww63l",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-ag1ww63l\\venv\\Scripts\\python.exe -m pip install --quiet --disable-pip-version-check --no-input --require-hashes --only-binary :all: -r python/requirements-ci.txt",
+      "cwd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-ag1ww63l\\repo",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-ag1ww63l\\venv\\Scripts\\python.exe -c import json,sys,platform,importlib.metadata as m;print(json.dumps({'python_version':sys.version.split()[0],'implementation':platform.python_implementation(),'executable':sys.executable,'packages':{d.metadata['Name']:d.version for d in m.distributions()}}))",
+      "cwd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-ag1ww63l\\repo",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "(recorded under environment)"
+    },
+    {
+      "cmd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-ag1ww63l\\venv\\Scripts\\python.exe tools/v118_baseline.py --check",
+      "cwd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-ag1ww63l\\repo",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "baseline_metrics.json is current\n"
+    },
+    {
+      "cmd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-ag1ww63l\\venv\\Scripts\\python.exe tools/v118_baseline.py",
+      "cwd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-ag1ww63l\\repo",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "wrote research\\v118\\baseline_metrics.json and research\\v118\\BASELINE_v1_18.md\n"
+    },
+    {
+      "cmd": "git status --porcelain",
+      "cwd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-ag1ww63l\\repo",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": " M research/v118/BASELINE_v1_18.md\n M research/v118/baseline_metrics.json\n"
+    }
+  ],
+  "commit": "8fb189b67bd6a2b6a2c868ed378d2a5a92c628f0",
+  "comparison": {
+    "byte_identical": false,
+    "committed_sha256": "23fd6f95dde455ed1f0068db445f56cac108c3fff5c32a53b975bb83c1c94c22",
+    "discrepancies": [],
+    "provenance": [
+      {
+        "committed": "8a43652c172b081f680ccfa1e3448d5904745ede",
+        "kind": "exact",
+        "path": "commit",
+        "reproduced": "8fb189b67bd6a2b6a2c868ed378d2a5a92c628f0"
+      }
+    ],
+    "reproduced_sha256": "f5b53612c3193e6f2717ee0b3b721ce4884d2c019c9615ad9e2e03b3f0189c27",
+    "within_tolerance": []
+  },
+  "contract": "IAP_Release_Programme_2026-10-17 section 9.6: byte-identical, else counts and strings exact, bps floats to 2 decimals, other floats rel 1e-12; provenance fields ['commit', 'toolchain.python_used_for_this_baseline', 'tree_is_clean_at_inputs'] expected to differ",
+  "date_utc": "2026-10-18T16:30:32+00:00",
+  "environment": {
+    "executable": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-ag1ww63l\\venv\\Scripts\\python.exe",
+    "implementation": "CPython",
+    "packages": {
+      "PyYAML": "6.0.3",
+      "Pygments": "2.21.0",
+      "attrs": "26.1.0",
+      "cffi": "2.1.1",
+      "cloudpickle": "3.1.2",
+      "colorama": "0.4.6",
+      "coverage": "7.16.2",
+      "cryptography": "50.0.2",
+      "databento-dbn": "0.71.0",
+      "execnet": "2.1.2",
+      "iniconfig": "2.3.1",
+      "joblib": "1.6.0",
+      "jsonschema": "4.26.0",
+      "jsonschema-specifications": "2025.9.1",
+      "narwhals": "2.26.0",
+      "numpy": "2.4.6",
+      "packaging": "26.3",
+      "pandas": "3.0.6",
+      "pip": "25.0.1",
+      "pluggy": "1.6.0",
+      "pyarrow": "25.0.1",
+      "pycparser": "3.0",
+      "pytest": "9.1.1",
+      "pytest-cov": "7.1.0",
+      "pytest-xdist": "3.8.0",
+      "python-dateutil": "2.9.0.post0",
+      "referencing": "0.37.0",
+      "rpds-py": "2026.9.1",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.17.1",
+      "six": "1.17.0",
+      "threadpoolctl": "3.7.0",
+      "typing_extensions": "4.16.0",
+      "tzdata": "2026.5"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python_version": "3.12.10",
+    "requirements_ci_sha256": "945e9c0dcf3328a1cf81a20fd97eea52fb28d2a98c8aa97636da90298d951f20"
+  },
+  "exit_code": 0,
+  "host_python": "3.12.10",
+  "repo": "https://github.com/AshJha0/intraday-alpha-platform.git",
+  "requested_commit": "8fb189b67bd6a2b6a2c868ed378d2a5a92c628f0",
+  "schema": "iap.reproduction_record/1",
+  "verdict": "REPRODUCED (within the declared tolerance)",
+  "verdict_detail": "Every non-provenance value matches; differences are listed below."
+}

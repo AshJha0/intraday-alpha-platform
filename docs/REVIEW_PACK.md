@@ -88,10 +88,37 @@ PYTHONPATH=python/src python -m pytest -q python/tests/test_v118_baseline.py
 ``` One headline to reproduce: the repo ledger holds 5,732 recorded looks, of
 which 24 are real-data looks (`ledger.total_looks`, `ledger.real_data_looks_per_document_summary`).
 
-**REL-04b execution JSON (later).** The REL-04b benchmark is not on main yet. When it lands its PR
-adds the exact command, the bound commit and the output path to this section; the comparison is
-byte-identical where the goldens already achieve it, otherwise within the declared tolerance with
-every difference listed.
+**Clean-environment reproduction (review finding 6).** One command clones the repository at a
+commit into a temporary folder, builds the venv from the CI lock with `--require-hashes`, records
+the interpreter and every package version, runs the baseline tool and its `--check`, compares the
+regenerated JSON with the committed one under section 9.6 and writes a record (commit, environment,
+commands, exit codes, output tails, discrepancies). Stdlib only; run it with any Python 3.12:
+
+```bash
+python tools/reproduce_baseline.py --repo https://github.com/AshJha0/intraday-alpha-platform.git --commit 8fb189b67bd6a2b6a2c868ed378d2a5a92c628f0 --out repro/baseline.json
+```
+
+Exit 0 = reproduced under the contract. The maintainer's own run is committed as
+[review/REPRODUCTION_BASELINE_2026-10-18.md](review/REPRODUCTION_BASELINE_2026-10-18.md).
+
+**REL-04b execution JSON (placeholder, to be filled when the B8 v2 run finishes).** The REL-04b
+benchmark is not on main yet. When it lands its PR fills in:
+
+- bound commit: `TBD` (the commit named in the signed pre-declaration)
+- command: `TBD` (exact `iap.research.execution_benchmark` invocation, venue file
+  `research/execution/b8/venues_xnas_iexg_v2.json`)
+- inputs: the six declared sessions (needs the ITCH + IEX data; not reproducible from the clone alone)
+- output path and sha256: `TBD`
+- comparison: byte-identical where the goldens already achieve it, otherwise within the declared
+  tolerance (bps to two decimals, counts exact) with every difference listed.
+
+**REL-08 alpha scorecard (placeholder, to be filled when the REL-08 screen run finishes).**
+
+- bound commit and signed continuation rule: `TBD` (`research/v118/rel08_rule_signed.json`)
+- command: `TBD`
+- inputs: `TBD` (data sessions; holdout registry state)
+- output path and sha256: `TBD`
+- comparison: as above; every verdict field (including INCONCLUSIVE) exact.
 
 ## 4. Signed documents and how to verify them
 
