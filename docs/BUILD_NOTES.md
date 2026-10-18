@@ -26,9 +26,9 @@ cd python && PYTHONPATH=src python3 tools/make_golden.py   # regen goldens (deli
 ```
 
 - **Test counts.** The current per-language counts live in one place, the README parity
-  table (2411 python / 302 cpp / 366 rust, 193 / 72 / 72 golden; the same numbers as
-  docs/ARCHITECTURE.md §6; rust was 365 / 71 at the v1.14.0 tag, CI run 38142218467, and
-  366 / 72 after the v1.15 fee commits); for anything newer see the latest `ci` run on main.
+  table (3208 python / 333 cpp / 376 rust, 217 / 74 / 75 golden, main CI run 39043729536 (2026-10-17, v1.17.1 at 838e103); the same
+  numbers as docs/ARCHITECTURE.md §6; since v1.18 the deployment job derives them from the
+  CI jobs' own artefacts, `tests/harness/parity_counts.py`, and warns when the table drifts); for anything newer see the latest `ci` run on main.
   Every other count in this file is **historical**, recorded with the release it was measured on.
 - **Timing (historical, v1.5.0).** The suite was 1988 tests at v1.5.0 (192 in the `-k golden` group; 1573 and 166 at v1.4.0).
   Measured in CI on the `ubuntu-24.04` runner (4 vCPU), Python 3.11, on one
@@ -81,7 +81,7 @@ cd cpp && bash build.sh && ctest --test-dir build --output-on-failure
 ```
 
 C++17, g++13/CMake/GoogleTest/Eigen available; `-Wall -Wextra -Werror` clean; build
-with `-j2` (2-CPU environment); 302 tests, 72 in the golden group. Layout: `include/iap/{marketdata,orderbook,features,
+with `-j2` (2-CPU environment); 333 tests, 74 in the golden group (main CI run 39043729536 (2026-10-17, v1.17.1 at 838e103)). Layout: `include/iap/{marketdata,orderbook,features,
 alpha,execution,sor,replay,contracts,util}` + `src/` mirrors; `contracts/` is the
 canonical-JSON / decision-trace contract (`canonical_json.hpp`, `trace.hpp`),
 `util/sha256.hpp` the SHA-256 the codec goldens and the trace digest share. The
