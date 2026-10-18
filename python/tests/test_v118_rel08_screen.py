@@ -19,6 +19,9 @@ from iap.research import rel08_rule as rr
 from iap.research import rel08_screen as rs
 from iap.validation.ledger import ExperimentLedger
 
+#: runs whole books on 11 variants; counted by the python-slow job (and its coverage floor)
+pytestmark = pytest.mark.slow
+
 NS_S = 1_000_000_000
 NS_MIN = 60 * NS_S
 REPO = Path(__file__).resolve().parents[2]
