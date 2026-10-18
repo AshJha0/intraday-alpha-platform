@@ -1,0 +1,74 @@
+{
+  "date": "2019-01-30",
+  "itch_file": "01302019.NASDAQ_ITCH50.gz",
+  "itch_messages_read": 368366634,
+  "yahoo_source": "https://query1.finance.yahoo.com/v8/finance/chart/<SYM>?period1=1548806400&period2=1548892800&interval=1d (fetched 2026-10-18; AAPL split-adjusted by Yahoo, multiplied/divided by 4 here)",
+  "symbols": {
+    "AAPL": {
+      "itch_open_cross": 163.22,
+      "yahoo_open_unadjusted": 163.25,
+      "open_diff": -0.03,
+      "itch_close_cross": 165.25,
+      "yahoo_close_unadjusted": 165.25,
+      "close_diff": 0.0,
+      "open_cross_shares": 770817,
+      "close_cross_shares": 2340937,
+      "nasdaq_matched_volume_all_day": 14515529,
+      "nasdaq_matched_volume_0930_1600": 11485217,
+      "yahoo_consolidated_volume_unadjusted": 61109800,
+      "ratio_all_day": 0.2375,
+      "ratio_0930_1600": 0.1879,
+      "components": {
+        "exec_E": 9762295,
+        "exec_C_printable": 58490,
+        "exec_C_nonprintable": 0,
+        "trade_P": 1582990,
+        "cross_Q": 3111754
+      }
+    },
+    "MSFT": {
+      "itch_open_cross": 104.62,
+      "yahoo_open_unadjusted": 104.62,
+      "open_diff": -0.0,
+      "itch_close_cross": 106.38,
+      "yahoo_close_unadjusted": 106.38,
+      "close_diff": 0.0,
+      "open_cross_shares": 500581,
+      "close_cross_shares": 2606642,
+      "nasdaq_matched_volume_all_day": 13347965,
+      "nasdaq_matched_volume_0930_1600": 8542067,
+      "yahoo_consolidated_volume_unadjusted": 49471900,
+      "ratio_all_day": 0.2698,
+      "ratio_0930_1600": 0.1727,
+      "components": {
+        "exec_E": 8019431,
+        "exec_C_printable": 106929,
+        "exec_C_nonprintable": 1200,
+        "trade_P": 2114382,
+        "cross_Q": 3107223
+      }
+    },
+    "QQQ": {
+      "itch_open_cross": 163.4,
+      "yahoo_open_unadjusted": 163.4,
+      "open_diff": 0.0,
+      "itch_close_cross": 165.68,
+      "yahoo_close_unadjusted": 165.68,
+      "close_diff": 0.0,
+      "open_cross_shares": 68994,
+      "close_cross_shares": 570261,
+      "nasdaq_matched_volume_all_day": 9803170,
+      "nasdaq_matched_volume_0930_1600": 8500380,
+      "yahoo_consolidated_volume_unadjusted": 41346500,
+      "ratio_all_day": 0.2371,
+      "ratio_0930_1600": 0.2056,
+      "components": {
+        "exec_E": 8167390,
+        "exec_C_printable": 238590,
+        "exec_C_nonprintable": 4111,
+        "trade_P": 757935,
+        "cross_Q": 639255
+      }
+    }
+  }
+}
