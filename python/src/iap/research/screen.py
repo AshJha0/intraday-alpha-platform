@@ -80,7 +80,7 @@ import json
 import math
 import sys
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -985,7 +985,11 @@ def _main(argv: Sequence[str] | None) -> int:
     fdir, inst_path, exe_path, version = resolve_dataset(
         args.dataset_dir, args.features_dir, args.config_dir
     )
-    if not args.allow_holdout:
+    if args.allow_holdout:
+        # review finding 2: the flag only lifts the prereg's own exclusion list;
+        # the holdout registry still decides (no prereg id can authorise the screen)
+        assert_not_holdout(args.dataset_dir, version, replace(spec, excluded_dataset_versions=()))
+    else:
         assert_not_holdout(args.dataset_dir, version, spec)
     configure_universe(inst_path)
     instruments = instruments_from_config(inst_path)

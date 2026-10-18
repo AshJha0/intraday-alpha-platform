@@ -481,6 +481,38 @@ estimator gives a reliable day-level t. The `few_sessions` reading says so
 instead of printing a t. The time-shift detector flags; it cannot prove a
 leak, and a slow-moving causal signal can fail it.
 
+## 4g. Claim taxonomy: what a result may say (v1.18 review finding 7)
+
+Every scorecard, screen and lifecycle summary labels its result with exactly one evidence
+status (`iap.research.claims.ClaimStatus`). Five form a ladder, weakest first; two are off it.
+
+| status | means | needs |
+|---|---|---|
+| `feature_correct` | the feature or label computes what it says | parity, leakage and unit tests; says nothing about predictive value |
+| `exploratory_signal` | something worth a registered test | a positive IC, a ranking, one session, or any unregistered result |
+| `passes_registered_net_screen` | a signed, pre-registered net-of-cost screen passed | a signature before the data were seen, and at least 2 sessions (clusters) |
+| `confirmed_untouched_oos` | the registered hypothesis held on data never touched before | the above, plus a confirmation on an untouched out-of-sample set |
+| `strategy_validated_execution_capacity` | a tradable strategy at a stated size | the above, plus execution (fills, queue, latency) and capacity validated against real or independently calibrated fills |
+| `inconclusive` | the test could not decide | underpowered, insufficient or missing evidence; never a pass |
+| `rejected` | a registered test with adequate power failed | |
+
+Rules (pinned by `python/tests/test_claims.py`):
+
+- A positive IC alone, a single session, or a top rank never classifies above
+  `exploratory_signal`. A ranking is accepted as an input and ignored.
+- Promotion (a lifecycle move into PAPER or beyond, or any "promote" verdict) requires
+  `confirmed_untouched_oos`; ACTIVE requires `strategy_validated_execution_capacity`
+  (`claims.require_promotable`). The lifecycle bootstrap refuses to leave an alpha at PAPER or
+  beyond without it, and reports each alpha's status (in-sample reports: `exploratory_signal`
+  or `rejected` at best).
+- A screen never confirms: its best status is `passes_registered_net_screen`. The REL-08
+  scorecard and the REL-08c decision carry `evidence_status`; a one-session REL-08 `continue`
+  is `exploratory_signal`. REL-09 and REL-10 map their verdicts through
+  `claims.from_screen_verdict`.
+- Unknown verdicts map to `inconclusive`.
+
+No result in this repository is `confirmed_untouched_oos` today, so nothing may be promoted.
+
 ## 4e. v1.17 WS-D: meta-label calibrate/select split, sizing hook, conformal sizing (opt-in)
 
 Review finding R-5: `run_meta_labeling` chose `best_tau` on the calibration
@@ -566,6 +598,21 @@ multiple-testing number; the ledger's Bonferroni |t| is the alternative),
 and whether `gate="clustered"` / `cpcv_path_ic="demeaned"` become the
 defaults in the release (the ML report and the `v4` cpcv blocks would be
 regenerated under them).
+
+## 4f. Ledger coverage (v1.18 review finding 4)
+
+The ledger (`research/experiments.json`) is the multiple-testing denominator, and it is
+**not a complete historical record of every look**. `tools/ledger_inventory.py` lists the
+central ledger and every other ledger-shaped record (per-dataset ledgers under the data root,
+the ML model-run ledger, the ExperimentRunner records) with hashes, entry and look counts,
+chain heads, overlaps and the entries the central ledger lacks, and writes
+`research/v118/LEDGER_INVENTORY.md` / `.json`. Its coverage statement lists the known gaps:
+per-dataset ledgers the REL-02 merge did not pick up (a multi7 `alpha_reports` ledger of real
+looks), pre-v1.4 unscoped entries overwritten in place, ML fits compressed into a few decision
+entries, AI4 in-sample model selection, and studies whose sweeps were never recorded. Where a
+gap cannot be reconstructed from the files on disk the inventory says so. Read every
+threshold, expected max |t| and real-data N computed from the ledger as a **lower bound on the
+search breadth**.
 
 ## 5. Tooling
 

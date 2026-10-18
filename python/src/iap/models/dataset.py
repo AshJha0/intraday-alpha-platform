@@ -162,6 +162,9 @@ def load_dataset(
 
     frames = []
     for path in files:
+        from iap.research.holdout_registry import reader_guard
+
+        reader_guard(path)  # holdout backstop: refuses before the parquet is read
         df = pd.read_parquet(path, columns=cols)
         df = df[df[TARGET_VALID_COLUMN].astype(bool)]
         df = df[np.isfinite(df[TARGET_COLUMN].to_numpy())]

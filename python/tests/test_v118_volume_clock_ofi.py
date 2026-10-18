@@ -180,3 +180,25 @@ def test_summary_separate_uses_and_deterministic(tape):
     assert json.dumps(s, sort_keys=True) == json.dumps(
         summarise(trips, ["d1", "d2", "d3"]), sort_keys=True
     )
+
+
+def test_fees_enter_net_and_default_to_zero(tape):
+    rows = volume_clock_rows(tape, 500, session="d1")
+    kw = dict(h_ns=MIN, threshold=1, qty=100, tick=TICK, session="d1")
+    t0 = evaluate_taker(tape, rows, "flow_1m", **kw)
+    t1 = evaluate_taker(tape, rows, "flow_1m", taker_fee_per_share=0.003, **kw)
+    for a, b in zip(t0, t1, strict=True):
+        assert a["fees_usd"] == 0.0
+        assert b["fees_usd"] == pytest.approx(-2 * 0.003 * b["filled"])
+        assert b["net_usd"] == pytest.approx(b["gross_usd"] - b["cost_usd"] + b["fees_usd"])
+    mk = dict(kw, entry_window_ns=30 * SEC, exit_window_ns=30 * SEC)
+    m1 = evaluate_maker(
+        tape, rows, "flow_1m", taker_fee_per_share=0.003, maker_rebate_per_share=0.002, **mk
+    )
+    for t in m1:
+        if t["filled"] == 0:
+            assert t["fees_usd"] == 0.0
+        elif t["exit"] == "passive":
+            assert t["fees_usd"] == pytest.approx(2 * 0.002 * t["filled"])
+        elif t["exit"] == "cross":
+            assert t["fees_usd"] == pytest.approx((0.002 - 0.003) * t["filled"])

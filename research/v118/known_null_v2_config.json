@@ -28,7 +28,7 @@
       "QQQ"
     ]
   },
-  "description": "DRAFT (unsigned, nothing run): REL-06 known-null protocol v2 (research/v118/NULL_PROTOCOL_v2.md). Same dataset, generators, estimator, families and pass rule as v1; adds a cost-neutral size arm (S1 re-centred net, S2 gross) and a planted-effect power arm. Requires the runner changes of protocol section 9 before it can be bound and signed.",
+  "description": "REL-06 known-null protocol v2 (research/v118/NULL_PROTOCOL_v2.md), parameters set 2026-10-18, unsigned, nothing run. Same dataset, generators, estimator, families and pass rule as v1; adds a cost-neutral size arm (S1 re-centred net primary, S2 gross must also pass) and a planted-effect power arm. Bound by the analysis_identity of its signed prereg.",
   "execution": {
     "adv_table": "session",
     "impact_exponent": 1.0,
@@ -51,10 +51,12 @@
     "max_upper": 0.07
   },
   "power_arm": {
+    "common_random_numbers": "each trial's null labels are evaluated at every delta",
     "delta_bps_per_trip": [
       0.5,
       1.0,
-      2.0
+      2.0,
+      4.0
     ],
     "generators": {
       "A": {
@@ -77,7 +79,7 @@
     "primary": "net_recentred",
     "v1": "net"
   },
-  "status": "DRAFT",
+  "status": "PARAMETERS SET, ready for signing",
   "variants": {
     "K16": [
       {

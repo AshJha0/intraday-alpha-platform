@@ -26,6 +26,32 @@ does not run the analysis.  That residual is documented, not hidden.
 
 Legacy preregs (R7, signed before v1.18) carry no block; ``legacy_ok=True``
 accepts only those, and reports them as legacy.
+
+Identity versions (review finding 1, 2026-10-18).  A block without
+``identity_version`` is **v1**: exactly the fields above, verified exactly as
+when it was signed, so preregs signed under v1 stay verifiable history and are
+never re-signed.  :func:`build_identity` now writes **v2**, which also binds
+every other input that can change a result
+(``docs/governance/ANALYSIS_IDENTITY.md`` lists them):
+
+* ``code_tree_sha256`` over EVERY file of ``python/src/iap`` (package data
+  too, not only ``*.py``): feature registry and spec code, label
+  definitions, cost and fill models;
+* ``configs_tree_sha256``: every file under ``configs/`` (instruments,
+  venues, fee tiers, regulatory fees, venue latency, execution, risk, ...);
+* ``reference_tree_sha256``: every file under ``data/reference/`` (the
+  feature registry JSON);
+* ``inputs``: any further file the study reads (a calibration, a venue file
+  under ``research/``), path -> sha256, declared at bind time;
+* ``deps_lock_sha256``: the hashed lock ``python/requirements-ci.txt``, and
+  ``environment``: the installed version of every package the lock pins (a
+  matching lock with a drifted environment is refused);
+* ``interpreter``: implementation and exact ``major.minor.micro``.
+
+Datasets are bound by ``data_versions``, which are content hashes
+(``iap.marketdata.ingest.real_dataset_version``): a changed byte is a
+different version, and :func:`dataset_version_of` re-hashes the files
+against their manifest, so a tampered tree is refused before it is used.
 """
 
 from __future__ import annotations
@@ -33,6 +59,7 @@ from __future__ import annotations
 import hashlib
 import os
 import subprocess
+import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -40,6 +67,13 @@ from typing import Any
 from iap.agents.blackboard import canonical
 
 BLOCK = "analysis_identity"
+#: what :func:`build_identity` writes; a block without the field is version 1
+IDENTITY_VERSION = 2
+SUPPORTED_VERSIONS = (1, 2)
+LOCK_REL = "python/requirements-ci.txt"
+CODE_REL = "python/src/iap"
+CONFIGS_REL = "configs"
+REFERENCE_REL = "data/reference"
 #: environment variables whose presence means this process can sign
 SIGNING_ENV = ("IAP_MAINTAINER_KEY", "IAP_SIGNING_KEY", "IAP_AGENT_PRIVATE_KEY", "IAP_KEYFILE")
 ACTOR_ENV = "IAP_RUN_ACTOR"
@@ -100,6 +134,105 @@ def code_tree_sha256(root: Path) -> str:
     return h.hexdigest()
 
 
+def _file_sha(path: Path) -> str:
+    """Text hashes LF-normalised (checkout line endings do not matter); a file
+    that is not UTF-8 hashes its raw bytes."""
+    try:
+        return _norm_sha(path)
+    except UnicodeDecodeError:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def tree_sha256(root: Path, rel: str) -> str | None:
+    """One hash over every file under ``root/rel`` (relative path and content;
+    byte-code caches excluded); ``None`` when the directory does not exist."""
+    base = Path(root) / rel
+    if not base.is_dir():
+        return None
+    h = hashlib.sha256()
+    for p in sorted(base.rglob("*")):
+        if not p.is_file() or "__pycache__" in p.parts or p.suffix in (".pyc", ".pyo"):
+            continue
+        h.update(p.relative_to(base).as_posix().encode() + b"\n" + _file_sha(p).encode() + b"\n")
+    return h.hexdigest()
+
+
+def lock_pins(root: Path) -> dict[str, str]:
+    """``name -> version`` of every ``name==version`` line of the hashed lock."""
+    p = Path(root) / LOCK_REL
+    if not p.is_file():
+        return {}
+    out = {}
+    for line in p.read_text(encoding="utf-8").splitlines():
+        if line[:1].isalnum() and "==" in line:
+            name, ver = line.split("==", 1)
+            out[name.strip().lower()] = ver.split()[0].strip()
+    return out
+
+
+def environment(root: Path) -> dict[str, str]:
+    """Installed version of every package the lock pins (``"absent"`` when it
+    is not installed)."""
+    from importlib import metadata
+
+    out = {}
+    for name in sorted(lock_pins(root)):
+        try:
+            out[name] = metadata.version(name)
+        except metadata.PackageNotFoundError:
+            out[name] = "absent"
+    return out
+
+
+def interpreter() -> str:
+    v = sys.version_info
+    return f"{sys.implementation.name}-{v.major}.{v.minor}.{v.micro}"
+
+
+def input_fingerprints(root: Path, inputs: Sequence[str]) -> dict[str, str]:
+    out = {}
+    for rel in sorted(inputs):
+        p = Path(root) / rel
+        if not p.is_file():
+            raise IdentityError(f"bound input {rel} does not exist")
+        out[rel] = _file_sha(p)
+    return out
+
+
+def dataset_version_of(dataset_dir: Path | str) -> str:
+    """The content version of a dataset directory after re-hashing its files
+    against the manifest (a tampered file is refused, never versioned)."""
+    from iap.research.holdout_registry import HoldoutRefused, dataset_identity
+
+    try:
+        ident = dataset_identity(dataset_dir, rehash=True)
+    except HoldoutRefused as exc:
+        raise IdentityError(str(exc)) from exc
+    if not ident.get("dataset_version"):
+        raise IdentityError(f"{dataset_dir}: the manifest declares no dataset_version")
+    return str(ident["dataset_version"])
+
+
+def _environment_block(root: Path) -> dict[str, Any]:
+    """The v2 fields computed from the checkout and the running process."""
+    lock = Path(root) / LOCK_REL
+    return {
+        "code_tree_sha256": tree_sha256(root, CODE_REL),
+        "configs_tree_sha256": tree_sha256(root, CONFIGS_REL),
+        "reference_tree_sha256": tree_sha256(root, REFERENCE_REL),
+        "deps_lock_sha256": _norm_sha(lock) if lock.is_file() else None,
+        "environment": environment(root),
+        "interpreter": interpreter(),
+    }
+
+
+def identity_version(bound: Mapping[str, Any]) -> int:
+    v = bound.get("identity_version", 1)
+    if v not in SUPPORTED_VERSIONS:
+        raise IdentityError(f"unknown analysis identity version {v!r}")
+    return int(v)
+
+
 def _git(root: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["git", "-C", str(root), *args], capture_output=True, text=True, check=False
@@ -120,14 +253,17 @@ def build_identity(
     metrics: Sequence[str],
     thresholds: Mapping[str, Any],
     commit: str | None = None,
+    inputs: Sequence[str] = (),
 ) -> dict[str, Any]:
-    """The block to embed in a prereg draft before the owner signs it."""
+    """The (version 2) block to embed in a prereg draft before the owner signs it."""
     c = commit or head_commit(root)
     if not c:
         raise IdentityError("not a git checkout: the identity needs an exact commit")
     return {
+        "identity_version": IDENTITY_VERSION,
         "scripts": script_fingerprints(root, scripts),
-        "code_tree_sha256": code_tree_sha256(root),
+        "inputs": input_fingerprints(root, inputs),
+        **_environment_block(root),
         "commit": c,
         "data_versions": sorted(data_versions),
         "family": family,
@@ -152,17 +288,8 @@ def verify_identity(
         if legacy_ok:
             return {"legacy": True}
         raise IdentityError("the signed prereg binds no analysis_identity; refusing to run")
-    bad: list[str] = []
-    for rel, want in (bound.get("scripts") or {}).items():
-        p = Path(root) / rel
-        if not p.is_file():
-            bad.append(f"script {rel} missing")
-        elif _norm_sha(p) != want:
-            bad.append(f"script {rel} changed since signing")
-    if not bound.get("scripts"):
-        bad.append("no script fingerprint bound")
-    if code_tree_sha256(root) != bound.get("code_tree_sha256"):
-        bad.append("python/src/iap code tree differs from the bound code_tree_sha256")
+    version = identity_version(bound)
+    bad = environment_mismatches(root, bound)
     commit = bound.get("commit")
     head = head_commit(root)
     if not commit or head is None:
@@ -179,7 +306,62 @@ def verify_identity(
         bad.append(f"thresholds {dict(thresholds)} != bound {bound.get('thresholds')}")
     if bad:
         raise IdentityError("analysis identity mismatch: " + "; ".join(bad))
-    return {"legacy": False, "commit": commit, "scripts": sorted(bound["scripts"])}
+    return {
+        "legacy": False,
+        "identity_version": version,
+        "commit": commit,
+        "scripts": sorted(bound["scripts"]),
+    }
+
+
+def environment_mismatches(root: Path, bound: Mapping[str, Any]) -> list[str]:
+    """Every difference between the checkout / process and ``bound`` that needs
+    no runner declaration: scripts and code tree and, for v2, inputs,
+    configs, reference data, lock, installed packages and interpreter.
+    :func:`verify_identity` and the holdout guard both use it (a prereg
+    cannot authorise a holdout read from code it did not bind)."""
+    version = identity_version(bound)
+    bad: list[str] = []
+    for rel, want in (bound.get("scripts") or {}).items():
+        p = Path(root) / rel
+        if not p.is_file():
+            bad.append(f"script {rel} missing")
+        elif _norm_sha(p) != want:
+            bad.append(f"script {rel} changed since signing")
+    if not bound.get("scripts"):
+        bad.append("no script fingerprint bound")
+    if version == 1:
+        if code_tree_sha256(root) != bound.get("code_tree_sha256"):
+            bad.append("python/src/iap code tree differs from the bound code_tree_sha256")
+        return bad
+    for rel, want in (bound.get("inputs") or {}).items():
+        p = Path(root) / rel
+        if not p.is_file():
+            bad.append(f"input {rel} missing")
+        elif _file_sha(p) != want:
+            bad.append(f"input {rel} changed since signing")
+    now = _environment_block(root)
+    labels = {
+        "code_tree_sha256": "python/src/iap code tree (code, features, labels, costs)",
+        "configs_tree_sha256": "configs/ tree (instruments, venues, fees)",
+        "reference_tree_sha256": "data/reference/ tree (feature registry)",
+        "deps_lock_sha256": f"dependency lock {LOCK_REL}",
+        "interpreter": "interpreter",
+    }
+    for key, what in labels.items():
+        if now[key] != bound.get(key):
+            bad.append(
+                f"{what.split(' (')[0]} differs from the bound {key} ({what}: {bound.get(key)} -> {now[key]})"
+            )
+    want_env = bound.get("environment") or {}
+    drift = sorted(
+        f"{n} {want_env.get(n)} -> {now['environment'].get(n)}"
+        for n in set(want_env) | set(now["environment"])
+        if want_env.get(n) != now["environment"].get(n)
+    )
+    if drift:
+        bad.append(f"installed packages differ from the bound environment: {drift}")
+    return bad
 
 
 def require_independent_runner(doc: Mapping[str, Any], env: Mapping[str, str] | None = None) -> str:

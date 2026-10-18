@@ -122,6 +122,7 @@ from iap.lifecycle.evidence import (
 )
 from iap.lifecycle.machine import STATE_COUNT, AlphaLifecycle
 from iap.lifecycle.registry import AlphaRegistry, LifecycleTransitionLog
+from iap.research import claims
 from iap.validation.methods import DEFAULT_METHODS
 
 __all__ = [
@@ -133,6 +134,7 @@ __all__ = [
     "TransitionLogExists",
     "bootstrap_event_ts",
     "capacity_from_report",
+    "report_claim_status",
     "cross_alpha_evidence",
     "load_signal_correlations",
     "pnl_bootstrap_from_report",
@@ -527,6 +529,26 @@ class BootstrapRow:
     state: LifecycleState
     failed_gates: tuple[str, ...]
     missing_metrics: tuple[str, ...]
+    #: review finding 7: the evidence status of the in-sample report (never above
+    #: ``exploratory_signal``: bootstrap evidence is unregistered research)
+    claim_status: str = claims.ClaimStatus.INCONCLUSIVE.value
+
+
+def report_claim_status(report: Mapping[str, Any]) -> claims.ClaimStatus:
+    """The evidence status of one in-sample alpha report: ``rejected`` on a REJECT
+    verdict, else ``exploratory_signal`` on a positive gate IC, else ``inconclusive``.
+    An unregistered in-sample report never classifies higher, whatever its t or rank."""
+    if str(report.get("verdict", "")).upper() == "REJECT":
+        return claims.ClaimStatus.REJECTED
+    ic = report.get("gate_ic")
+    days = report.get("gate_n_days")
+    return claims.classify(
+        claims.ClaimFacts(
+            positive_ic=isinstance(ic, int | float) and ic > 0,
+            sessions=int(days) if isinstance(days, int | float) else 0,
+            registered=False,
+        )
+    )
 
 
 @dataclass
@@ -619,7 +641,14 @@ def run_bootstrap(
                 break
         rec = registry.get(aid)
         failed = tuple(rec.last_evaluation.failed_gates) if rec.last_evaluation else ()
-        rows.append(BootstrapRow(aid, str(report["verdict"]), rec.state, failed, tuple(missing)))
+        claim = report_claim_status(report)
+        if rec.state.name in claims.LIFECYCLE_REQUIRED_CLAIM or rec.state.name == "WATCH":
+            claims.require_promotable(claim, rec.state.name)
+        rows.append(
+            BootstrapRow(
+                aid, str(report["verdict"]), rec.state, failed, tuple(missing), claim.value
+            )
+        )
     if write:
         registry.save(root / REGISTRY_RELPATH)
     return BootstrapResult(event_ts=event_ts, registry=registry, machine=machine, rows=rows)

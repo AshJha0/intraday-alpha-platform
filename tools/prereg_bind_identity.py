@@ -3,7 +3,9 @@
 v1.18 REL-02a lets a signed prereg bind the analysis it authorises
 (:mod:`iap.agents.analysis_identity`): script fingerprints, the
 ``python/src/iap`` tree hash, the exact commit, data versions, family,
-metrics and thresholds.  This tool builds that block for one protocol
+metrics and thresholds; identity v2 also binds ``configs/``,
+``data/reference/``, declared ``--inputs``, the dependency lock, the
+installed packages and the interpreter.  This tool builds that block for one protocol
 document and writes the unsigned prereg JSON; ``sign`` is the separate step
 the coordinator (owner delegation) runs on a machine holding the maintainer
 key.  Neither step reads data or touches the ledger.
@@ -112,7 +114,8 @@ def identity_inputs(a: argparse.Namespace, root: Path) -> dict[str, Any]:
         args = identity_args(cfg)
         if cfg_rel not in args["scripts"]:
             raise Refused(f"{cfg_rel} is not among the study's bound scripts {args['scripts']}")
-        return args
+        extra = list(getattr(a, "inputs", None) or [])
+        return {**args, "inputs": extra} if extra else args
     missing = [
         n
         for n in ("scripts", "data_version", "family", "metric", "thresholds")
@@ -128,6 +131,7 @@ def identity_inputs(a: argparse.Namespace, root: Path) -> dict[str, Any]:
         "family": a.family,
         "metrics": list(a.metric),
         "thresholds": json.loads(a.thresholds),
+        "inputs": list(getattr(a, "inputs", None) or []),
     }
 
 
@@ -143,7 +147,7 @@ def cmd_bind(a: argparse.Namespace) -> int:
     if dirty:
         raise Refused(f"working tree is dirty: {dirty[:10]}{' ...' if len(dirty) > 10 else ''}")
     inputs = identity_inputs(a, root)
-    check_committed(root, [proto_rel, *inputs["scripts"]])
+    check_committed(root, [proto_rel, *inputs["scripts"], *inputs.get("inputs", [])])
     commit = head_commit(root)
     try:
         block = build_identity(root, commit=commit, **inputs)
@@ -245,6 +249,12 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--family")
     b.add_argument("--metric", nargs="+")
     b.add_argument("--thresholds", help="JSON object")
+    b.add_argument(
+        "--inputs",
+        nargs="+",
+        help="further files the study reads outside python/src/iap, configs/ and "
+        "data/reference/ (identity v2 binds their hashes)",
+    )
     b.add_argument("--dry-run", action="store_true", help="print the document, write nothing")
     s = sub.add_parser("sign", help="(coordinator only) verify the identity, then sign")
     s.add_argument("--prereg", required=True, type=Path)

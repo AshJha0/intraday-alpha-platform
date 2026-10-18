@@ -1,5 +1,10 @@
 # Execution quality: the shortfall benchmark, signal-aware execution and the realism layer (v1.17 WS-B)
 
+> **Level 2: not validated.** Every fill here is simulated (Level 1,
+> deterministic replay validation only); no real orders or fills exist
+> (D4(a)). Question-to-test map, assumptions and unsupported claims:
+> [review/SIMULATOR_CORRECTNESS.md](review/SIMULATOR_CORRECTNESS.md).
+
 Status: in-sample, report-only, opt-in. Nothing here gates a promotion and no
 registered result moves. Every number below is copied from a committed
 artefact named next to it; the LLM computes none of them. The negative and

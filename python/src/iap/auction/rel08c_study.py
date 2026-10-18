@@ -74,6 +74,7 @@ from iap.auction.rel08c_extract import (
     NOII_FILE,
     NS_S,
 )
+from iap.research import claims
 
 STUDY_VERSION = 1
 POLICIES = ("baseline", "imbalance")
@@ -292,7 +293,9 @@ def mde_bps(sd_session: float, n_sessions: int, alpha: float, power: float) -> f
     return q * sd_session / math.sqrt(n_sessions)
 
 
-def decide(sessions: pd.DataFrame, n_trades: int, cfg: Rel08cConfig) -> dict:
+def decide(
+    sessions: pd.DataFrame, n_trades: int, cfg: Rel08cConfig, *, registered: bool = False
+) -> dict:
     s = len(sessions)
     x = sessions["incremental_bps"].to_numpy(float) if s else np.array([])
     mean = float(x.mean()) if s else math.nan
@@ -322,6 +325,11 @@ def decide(sessions: pd.DataFrame, n_trades: int, cfg: Rel08cConfig) -> dict:
         reasons.append(f"mean incremental {mean:.3g} bps, CI low {lo:.3g}")
     return {
         "verdict": verdict,
+        # review finding 7: the screen's evidence status (never above
+        # passes_registered_net_screen; one session caps it at exploratory_signal)
+        "evidence_status": claims.from_screen_verdict(
+            verdict, sessions=s, registered=registered
+        ).value,
         "reasons": reasons,
         "n_sessions": s,
         "n_imbalance_trades": n_trades,
@@ -334,10 +342,25 @@ def decide(sessions: pd.DataFrame, n_trades: int, cfg: Rel08cConfig) -> dict:
 
 
 def prereg_signed(prereg_id: str, root: Path | None = None) -> bool:
-    """The repo-relative prereg JSON verifies under the trust root."""
-    from iap.research.holdout_registry import prereg_is_signed
+    """The repo-relative prereg JSON verifies under the trust root AND its bound
+    analysis identity matches the code, configs, lock and interpreter on disk
+    (review finding 1: calling :func:`run_study` directly must not bypass the
+    identity check that the runner performs)."""
+    import json
 
-    return prereg_is_signed(prereg_id, root)
+    from iap.agents.analysis_identity import IdentityError, environment_mismatches
+    from iap.research.holdout_registry import REPO, prereg_is_signed
+
+    if not prereg_is_signed(prereg_id, root):
+        return False
+    r = Path(root or REPO)
+    bound = json.loads((r / prereg_id).read_text(encoding="utf-8")).get("analysis_identity")
+    if not bound:
+        return False
+    try:
+        return not environment_mismatches(r, bound)
+    except IdentityError:
+        return False
 
 
 def run_study(
@@ -349,7 +372,9 @@ def run_study(
     root: Path | None = None,
 ) -> Rel08cResult:
     if not synthetic and (prereg_id is None or not prereg_signed(prereg_id, root)):
-        raise PermissionError("REL-08c: refusing to run on real extracts without a SIGNED prereg")
+        raise PermissionError(
+            "REL-08c: refusing to run on real extracts without a SIGNED prereg whose identity matches"
+        )
     dates, frames = [], []
     for d in extract_dirs:
         date, noii, crosses, grid = load_extract(d)
@@ -358,7 +383,7 @@ def run_study(
     trades = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
     sessions = session_table(trades, dates)
     imb = trades[trades["policy"] == "imbalance"] if not trades.empty else trades
-    summary = decide(sessions, int(len(imb)), cfg)
+    summary = decide(sessions, int(len(imb)), cfg, registered=not synthetic)
 
     def _m(p: pd.DataFrame, c: str) -> float:
         return float(p[c].mean()) if len(p) and c in p else math.nan

@@ -1000,7 +1000,8 @@ written to be consistent with:
 3. **What transfers is the discipline, not the numbers**: contracts with
    versions, one semantics proven across implementations, determinism,
    fail-closed defaults with their failure modes written down, a ledger of
-   every look, and reports that state a negative result as the result.
+   recorded looks (a lower bound with its known gaps written down,
+   `research/v118/LEDGER_INVENTORY.md`), and reports that state a negative result as the result.
 
 ## 15. The research subsystems of v1.9 and v1.10
 

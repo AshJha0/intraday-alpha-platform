@@ -88,10 +88,37 @@ PYTHONPATH=python/src python -m pytest -q python/tests/test_v118_baseline.py
 ``` One headline to reproduce: the repo ledger holds 5,732 recorded looks, of
 which 24 are real-data looks (`ledger.total_looks`, `ledger.real_data_looks_per_document_summary`).
 
-**REL-04b execution JSON (later).** The REL-04b benchmark is not on main yet. When it lands its PR
-adds the exact command, the bound commit and the output path to this section; the comparison is
-byte-identical where the goldens already achieve it, otherwise within the declared tolerance with
-every difference listed.
+**Clean-environment reproduction (review finding 6).** One command clones the repository at a
+commit into a temporary folder, builds the venv from the CI lock with `--require-hashes`, records
+the interpreter and every package version, runs the baseline tool and its `--check`, compares the
+regenerated JSON with the committed one under section 9.6 and writes a record (commit, environment,
+commands, exit codes, output tails, discrepancies). Stdlib only; run it with any Python 3.12:
+
+```bash
+python tools/reproduce_baseline.py --repo https://github.com/AshJha0/intraday-alpha-platform.git --commit 8fb189b67bd6a2b6a2c868ed378d2a5a92c628f0 --out repro/baseline.json
+```
+
+Exit 0 = reproduced under the contract. The maintainer's own run is committed as
+[review/REPRODUCTION_BASELINE_2026-10-18.md](review/REPRODUCTION_BASELINE_2026-10-18.md).
+
+**REL-04b execution JSON (placeholder, to be filled when the B8 v2 run finishes).** The REL-04b
+benchmark is not on main yet. When it lands its PR fills in:
+
+- bound commit: `TBD` (the commit named in the signed pre-declaration)
+- command: `TBD` (exact `iap.research.execution_benchmark` invocation, venue file
+  `research/execution/b8/venues_xnas_iexg_v2.json`)
+- inputs: the six declared sessions (needs the ITCH + IEX data; not reproducible from the clone alone)
+- output path and sha256: `TBD`
+- comparison: byte-identical where the goldens already achieve it, otherwise within the declared
+  tolerance (bps to two decimals, counts exact) with every difference listed.
+
+**REL-08 alpha scorecard (placeholder, to be filled when the REL-08 screen run finishes).**
+
+- bound commit and signed continuation rule: `TBD` (`research/v118/rel08_rule_signed.json`)
+- command: `TBD`
+- inputs: `TBD` (data sessions; holdout registry state)
+- output path and sha256: `TBD`
+- comparison: as above; every verdict field (including INCONCLUSIVE) exact.
 
 ## 4. Signed documents and how to verify them
 
@@ -99,12 +126,20 @@ Signatures are Ed25519 over the canonical JSON of the document without its `sign
 under the maintainer key in [research/agents/trust_roots.json](../research/agents/trust_roots.json)
 ([docs/governance/TRUST_ROOTS.md](governance/TRUST_ROOTS.md)). Signed on main today:
 `research/preregs/breadth_book_prereg.json`, `research/quoting_real/prereg_v2.json`,
-`research/r7/ai4_deeplob_prereg.json`, `research/r7/r7_confirm_prereg.json`. Verify all signed
-JSON documents under `research/` (prints OK or the reason per file):
+`research/r7/ai4_deeplob_prereg.json`, `research/r7/r7_confirm_prereg.json`,
+`research/preregs/b8v2_prereg.json`, `research/v118/null_protocol_prereg.json`,
+`research/v118/rel08_rule_signed.json` (the tool lists the current set). Verify every signed document (trust root against its pinned version, every signed JSON document,
+the agent key registry, the main and archived blackboards). It prints `OK` or `FAIL <reason>` per
+item and exits 1 on any failure. A blackboard anchor whose commit is not in the clone (a shallow fetch) is reported as
+`UNVERIFIABLE-HERE`, never `OK`; `--strict` (reviewer and release, on a full-history clone) makes that
+fatal too. Signature, chain and trust-root problems always fail. Run it from a full clone:
 
 ```bash
-PYTHONPATH=python/src python -c "import json,subprocess;from pathlib import Path;from iap.agents.analysis_identity import verify_signed_document as v;[print(p, v(Path('.'), d) and 'OK') for p in subprocess.run(['git','ls-files','research/*.json'],capture_output=True,text=True).stdout.split() for d in [json.load(open(p,encoding='utf-8'))] if isinstance(d,dict) and d.get('signed') is True]"
+PYTHONPATH=python/src python tools/verify_signatures.py --trust-ref origin/main --strict
 ```
+
+The maintainer key fingerprint, the pinned trust-root version, and the rotation and revocation
+procedure are in [docs/governance/TRUST_ROOT.md](governance/TRUST_ROOT.md).
 
 The agent key registry and the blackboard chain verify with:
 
@@ -112,8 +147,8 @@ The agent key registry and the blackboard chain verify with:
 PYTHONPATH=python/src python -m iap.agents.cli verify-board --trust-ref origin/main
 ```
 
-The known-null protocol and the REL-08 continuation rule are written but not signed on main;
-their signatures will bind the runner scripts.
+The known-null protocol, the REL-08 continuation rule and the B8 v2 prereg are signed, and each
+binds its runner scripts through an `analysis_identity` block.
 
 ## 5. Known limitations
 

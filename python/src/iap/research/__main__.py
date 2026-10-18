@@ -231,7 +231,9 @@ def _guard_dataset(args: argparse.Namespace) -> None:
     from iap.research.holdout_registry import HoldoutRefused, dataset_root, guard
 
     if not (dataset_root(args.dataset_dir) / "dataset.json").is_file():
-        return  # nothing can be read without a manifest: the caller reports "needs dataset.json"
+        # nothing is read without a manifest (the caller reports "needs dataset.json");
+        # the low-level readers' reader_guard still covers a manifest-less path
+        return
 
     try:
         guard(

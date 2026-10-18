@@ -26,6 +26,18 @@ a byte of data.  ``guard`` fails closed: a real dataset the registry does
 not know is refused too.  Each attempt, allowed or refused, appends one
 JSON line to ``data/real/holdout_access.jsonl`` (git-ignored with the data).
 
+Blocked, not logged (review finding 2, 2026-10-18).  ``guard`` decides from
+the manifest and the registry FIRST and refuses before any data file is
+opened; only an allowed read re-hashes the files (and is refused if a byte
+differs from the manifest).  The access log is append-only and hash-chained:
+every line carries ``prev_sha256`` (the sha256 of the line before it), so an
+edited, removed or reordered line shows in :func:`verify_access_log`
+(``python -m iap.research.holdout_registry verify-log``).  Refusals are
+logged too.  The low-level readers (IAP1 events, feature parquet) call
+:func:`reader_guard`, a backstop for entry points that forgot their own
+guard.  The supported routes and the unsupported ones are listed in
+``docs/governance/DATA_ACCESS_PATHS.md``.
+
 The registry body carries ``body_sha256``; :func:`load_registry` refuses a
 file whose body no longer matches, so an edit must go through
 ``python -m iap.research.holdout_registry seal`` and shows in review.  What
@@ -191,15 +203,68 @@ def _scope_decisions(
     return out
 
 
+GENESIS = "0" * 64
+
+
+def _log_path(path: Path | None) -> Path:
+    return Path(path) if path else Path(os.environ.get(LOG_ENV) or REPO / LOG_REL)
+
+
+def _last_line(p: Path) -> bytes | None:
+    if not p.is_file() or p.stat().st_size == 0:
+        return None
+    with p.open("rb") as f:
+        f.seek(max(0, p.stat().st_size - (1 << 16)))
+        lines = [ln for ln in f.read().split(b"\n") if ln.strip()]
+    return lines[-1] if lines else None
+
+
 def _log(path: Path | None, record: dict[str, Any], must: bool) -> None:
-    p = Path(path) if path else Path(os.environ.get(LOG_ENV) or REPO / LOG_REL)
+    p = _log_path(path)
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
-        with p.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(record, sort_keys=True) + "\n")
+        last = _last_line(p)
+        record = {
+            **record,
+            "prev_sha256": hashlib.sha256(last).hexdigest() if last else GENESIS,
+        }
+        with p.open("ab") as f:
+            f.write((json.dumps(record, sort_keys=True) + "\n").encode("utf-8"))
     except OSError as exc:
         if must:
             raise HoldoutRefused(f"access log {p} not writable ({exc}); refusing") from exc
+
+
+def verify_access_log(path: Path | None = None) -> list[str]:
+    """Problems with the access log's hash chain (empty list = intact).  Lines
+    written before the chain existed (no ``prev_sha256``) may only precede the
+    first chained line."""
+    p = _log_path(path)
+    if not p.is_file():
+        return []
+    problems: list[str] = []
+    prev: bytes | None = None
+    chained = False
+    for n, line in enumerate(p.read_bytes().split(b"\n"), 1):
+        if not line.strip():
+            continue
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            problems.append(f"line {n}: not JSON")
+            prev = line
+            continue
+        want = rec.get("prev_sha256")
+        if want is None:
+            if chained:
+                problems.append(f"line {n}: unchained line after the chain started")
+        else:
+            chained = True
+            have = hashlib.sha256(prev).hexdigest() if prev is not None else GENESIS
+            if want != have:
+                problems.append(f"line {n}: prev_sha256 does not match the line before it")
+        prev = line
+    return problems
 
 
 def refuse_unit_name(name: str, *, root: Path | None = None, registry=None) -> None:
@@ -323,13 +388,65 @@ def guard(
         raise
     rec.update(decision="allowed", **decision)
     _log(log_path, rec, must=decision.get("state") != "in_sample")
+    _authorise(dataset_dir, rec)
     return rec
+
+
+# ----------------------------------------------------- reader backstop --
+#: dataset roots ``guard`` allowed in this process (and, via the environment,
+#: in its child processes): the low-level readers accept these without a
+#: second decision.  Setting the variable by hand is an ad-hoc route
+#: (unsupported, docs/governance/DATA_ACCESS_PATHS.md).
+AUTH_ENV = "IAP_HOLDOUT_AUTHORISED"
+_REAL_ROOT = REPO / "data" / "real"
+
+
+def _authorised() -> set[str]:
+    return {x for x in os.environ.get(AUTH_ENV, "").split(os.pathsep) if x}
+
+
+def _authorise(dataset_dir, rec: Mapping[str, Any]) -> None:
+    if rec.get("state") == "synthetic":
+        return
+    roots = _authorised() | {str(dataset_root(dataset_dir))}
+    os.environ[AUTH_ENV] = os.pathsep.join(sorted(roots))
+
+
+def reader_guard(path: Path | str) -> None:
+    """Backstop the low-level readers call before they open a data file.
+
+    * the file belongs to a dataset (``dataset.json`` up to three levels up):
+      a synthetic dataset passes; a real one passes when :func:`guard` already
+      allowed it in this process; otherwise :func:`guard` runs now WITHOUT a
+      prereg id (only in-sample scope can pass) and refuses before the read;
+    * no manifest, but the file sits under ``data/real``: its name must not
+      carry a restricted or unregistered session date (:func:`refuse_unit_name`);
+    * anything else (synthetic fixtures, temp files) passes.
+
+    Granularity is the dataset: once a guard allowed one session of a dataset,
+    the readers open that dataset's other files in the same process."""
+    p = Path(path)
+    root = dataset_root(p.parent if p.is_file() else p)
+    man = root / "dataset.json"
+    if man.is_file():
+        if str(root) in _authorised():
+            return
+        if json.loads(man.read_text(encoding="utf-8")).get("kind") != "real":
+            return
+        guard(root, purpose=f"reader_guard {p.name}")
+        return
+    try:
+        rel = p.resolve().relative_to(_REAL_ROOT.resolve())
+    except ValueError:
+        return
+    refuse_unit_name(rel.as_posix())
 
 
 def _decide(
     dataset_dir, prereg_id, sessions, symbols, root, registry, rehash, rec
 ) -> dict[str, Any]:
-    ident = dataset_identity(dataset_dir, rehash=rehash)
+    # decide from the manifest and the registry first: a refusal opens no data file
+    ident = dataset_identity(dataset_dir, rehash=False)
     rec.update(
         dataset_version=ident["dataset_version"],
         content_hash=ident["content_hash"],
@@ -360,6 +477,7 @@ def _decide(
     worst = max(decisions, key=lambda d: _SEVERITY.get(d["state"], 3))
     state = worst["state"]
     if state == "in_sample":
+        _verify_content(dataset_dir, rehash, rec)
         return {"state": "in_sample"}
     if state == "unregistered":
         raise HoldoutRefused(
@@ -383,7 +501,44 @@ def _decide(
             )
     if not prereg_is_signed(prereg_id, root):
         raise HoldoutRefused(f"{dataset_dir}: prereg {prereg_id!r} is not a signed prereg")
+    check_prereg_identity(prereg_id, ident["dataset_version"], root)
+    _verify_content(dataset_dir, rehash, rec)
     return {"state": state, "authorised_by": prereg_id}
+
+
+def check_prereg_identity(prereg_id: str, dataset_version: str | None, root: Path | None) -> None:
+    """Review finding 1: a prereg document that binds an ``analysis_identity``
+    authorises a restricted read only from the code, configs, lock and
+    interpreter it bound, and only of a dataset version it bound.  This runs
+    inside :func:`guard`, so an entry point that skips its own identity check
+    still cannot read the holdout under that prereg.  Legacy preregs (no
+    block; their looks are spent) and blackboard ids carry nothing to check."""
+    r = Path(root or REPO)
+    p = r / prereg_id
+    if not (prereg_id.endswith(".json") and p.is_file()):
+        return
+    bound = json.loads(p.read_text(encoding="utf-8")).get("analysis_identity")
+    if not bound:
+        return
+    from iap.agents.analysis_identity import IdentityError, environment_mismatches
+
+    try:
+        bad = environment_mismatches(r, bound)
+    except IdentityError as exc:
+        bad = [str(exc)]
+    if dataset_version not in (bound.get("data_versions") or []):
+        bad.append(f"dataset_version {dataset_version} is not bound by the prereg")
+    if bad:
+        raise HoldoutRefused(
+            f"prereg {prereg_id!r} does not authorise this read: " + "; ".join(bad)
+        )
+
+
+def _verify_content(dataset_dir, rehash: bool, rec: dict[str, Any]) -> None:
+    """Only after an allow: re-hash the files against the manifest (refuses a
+    tampered tree whose manifest claims an in-sample identity)."""
+    if rehash:
+        rec["content_verified"] = dataset_identity(dataset_dir, rehash=True)["content_verified"]
 
 
 # --------------------------------------------------------------- seed / CLI --
@@ -476,6 +631,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     s.add_argument("--data-root", type=Path, default=REPO / "data" / "real")
     s.add_argument("--out", type=Path, default=REPO / REGISTRY_REL)
     sub.add_parser("check", help="verify the committed registry's body hash")
+    v = sub.add_parser("verify-log", help="verify the access log's hash chain")
+    v.add_argument("--log", type=Path, default=None)
     c = sub.add_parser("guard", help="dry-run a read of a dataset directory")
     c.add_argument("dataset_dir", type=Path)
     c.add_argument("--prereg-id")
@@ -486,6 +643,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif a.cmd == "check":
         load_registry()
         print("registry body hash ok")
+    elif a.cmd == "verify-log":
+        problems = verify_access_log(a.log)
+        for msg in problems:
+            print(f"BROKEN: {msg}", file=sys.stderr)
+        if problems:
+            return 1
+        print(f"access log chain intact: {_log_path(a.log)}")
     else:
         try:
             print(json.dumps(guard(a.dataset_dir, purpose="cli", prereg_id=a.prereg_id), indent=2))

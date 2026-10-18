@@ -404,6 +404,11 @@ class TripTable:
     def n(self) -> int:
         return int(self.entry_row.size)
 
+    @property
+    def mean_fixed_bps(self) -> float:
+        """``cbar_h`` of protocol v2 section 3: label-independent, fixed before any trial."""
+        return float(self.fixed_bps.mean()) if self.n else 0.0
+
 
 def _first_at_or_after(ts: np.ndarray, t: int) -> int:
     return int(np.searchsorted(ts, t, side="left"))
@@ -537,14 +542,44 @@ def build_trips(
     )
 
 
-def session_means(
-    trips: TripTable, labels: np.ndarray, n_sessions: int
+#: per-trip statistics: ``net`` (v1), and protocol v2's cost-neutral
+#: ``net_recentred`` (S1: net plus the hypothesis mean fixed cost) and ``gross`` (S2)
+STATISTICS = ("net", "net_recentred", "gross")
+
+
+def trip_values(
+    trips: TripTable, labels: np.ndarray, statistic: str = "net", planted_bps: float = 0.0
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Equal-weight mean net bps per session (sessions with no trip dropped) and
-    the trip counts behind them."""
+    """Per-trip value of ``statistic`` (bps) and its validity mask.
+
+    ``planted_bps`` (protocol v2 section 4) replaces each entry label ``y`` by
+    ``y + side * delta / (1e4 * f)``, i.e. adds exactly ``delta`` bps to the
+    gross of every trip with a non-zero fill (``f = 0`` trips unchanged)."""
+    if statistic not in STATISTICS:
+        raise ValueError(f"unknown statistic {statistic!r}; known: {STATISTICS}")
     lab = labels[trips.entry_row]
     ok = np.isfinite(lab)
-    net = trips.fill_frac * trips.side * 1e4 * np.where(ok, lab, 0.0) - trips.fixed_bps
+    gross = trips.fill_frac * trips.side * 1e4 * np.where(ok, lab, 0.0)
+    if planted_bps:
+        gross = gross + planted_bps * (trips.fill_frac > 0)
+    if statistic == "gross":
+        return gross, ok
+    net = gross - trips.fixed_bps
+    if statistic == "net_recentred":
+        net = net + trips.mean_fixed_bps
+    return net, ok
+
+
+def session_means(
+    trips: TripTable,
+    labels: np.ndarray,
+    n_sessions: int,
+    statistic: str = "net",
+    planted_bps: float = 0.0,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Equal-weight mean of ``statistic`` per session (sessions with no trip
+    dropped) and the trip counts behind them."""
+    net, ok = trip_values(trips, labels, statistic, planted_bps)
     cnt = np.bincount(trips.sess[ok], minlength=n_sessions)
     tot = np.bincount(trips.sess[ok], weights=net[ok], minlength=n_sessions)
     have = cnt > 0
@@ -622,12 +657,22 @@ def run_trial(
     *,
     alpha: float,
     eligible: bool,
+    statistic: str = "net",
+    planted: Mapping[str, float] | None = None,
 ) -> dict[str, Any]:
     """One trial of one family: per hypothesis inference, Holm over K (a
-    hypothesis with no p counts as p = 1), the decision rule."""
+    hypothesis with no p counts as p = 1), the decision rule ("mean > 0" read
+    on ``statistic``).  ``planted`` maps hypothesis ids to a planted effect in
+    bps per trip (protocol v2 power arm)."""
     infs = []
     for h in family:
-        x, cnt = session_means(trips[h.id], labels_by_h[h.horizon], n_sessions)
+        x, cnt = session_means(
+            trips[h.id],
+            labels_by_h[h.horizon],
+            n_sessions,
+            statistic,
+            (planted or {}).get(h.id, 0.0),
+        )
         inf = cluster_inference(x, alpha)
         inf["trips"] = int(cnt.sum())
         infs.append(inf)
@@ -744,6 +789,21 @@ METRICS = (
 )
 
 
+V1_CONFIG = "research/v118/known_null_config.json"
+V2_CONFIG = "research/v118/known_null_v2_config.json"
+
+
+def is_v2(config: Mapping[str, Any]) -> bool:
+    return "power_arm" in config
+
+
+def bound_scripts(config: Mapping[str, Any]) -> tuple[str, ...]:
+    """v1 binds :data:`BOUND_SCRIPTS`; v2 binds the same with its own config."""
+    if not is_v2(config):
+        return BOUND_SCRIPTS
+    return tuple(sorted({*BOUND_SCRIPTS, V2_CONFIG} - {V1_CONFIG}))
+
+
 def identity_args(config: Mapping[str, Any]) -> dict[str, Any]:
     """The ``analysis_identity`` arguments of the study (everything but the
     file hashes and the commit): the binder and the runner both call this, so
@@ -770,8 +830,11 @@ def identity_args(config: Mapping[str, Any]) -> dict[str, Any]:
         "execution": dict(config["execution"]),
         "compute_budget_hours": config["compute_budget_hours"],
     }
+    if is_v2(config):
+        thresholds["statistics"] = dict(config["statistics"])
+        thresholds["power_arm"] = dict(config["power_arm"])
     return {
-        "scripts": list(BOUND_SCRIPTS),
+        "scripts": list(bound_scripts(config)),
         "data_versions": [config["dataset"]["dataset_version"]],
         "family": family,
         "metrics": list(METRICS),
@@ -852,14 +915,21 @@ def prepare(
 
 
 def trial_labels(
-    study: Study, generator: str, trial: int, perm: Sequence[int] | None
+    study: Study,
+    generator: str,
+    trial: int,
+    perm: Sequence[int] | None,
+    base_seed: int | None = None,
 ) -> dict[str, np.ndarray]:
+    """Null labels of one trial; generator B is seeded ``SplitMix64(base + trial)``
+    with ``base`` the size-arm seed of the config unless ``base_seed`` is given."""
     if generator == "A":
         assert perm is not None
         return {
             h: labels_a(study.panel, study.real[h], perm, study.grids[h]) for h in study.horizons
         }
-    rng = SplitMix64(int(study.config["generators"]["B"]["base_seed"]) + trial)
+    base = int(study.config["generators"]["B"]["base_seed"]) if base_seed is None else base_seed
+    rng = SplitMix64(base + trial)
     return {h: labels_b(study.panel, study.real[h], study.ar1[h], rng) for h in study.horizons}
 
 
@@ -951,6 +1021,192 @@ def study_document(
             "execution": dict(cfg["execution"]),
             "trip_tables": trips,
             "generators": gens,
+            "complete": complete,
+            "verdict": ("PASS" if passed else "FAIL")
+            if complete
+            else "INCOMPLETE (not a protocol verdict)",
+            **dict(provenance),
+        }
+    )
+
+
+# ------------------------------------------------------------ protocol v2 --
+def delta_key(d: float) -> str:
+    return f"delta={float(d):g}"
+
+
+def run_trials_v2(
+    study: Study,
+    generator: str,
+    trials: Sequence[int],
+    perms: Mapping[int, Sequence[int]],
+    *,
+    statistics: Sequence[str],
+    deltas: Sequence[float] = (),
+    base_seed: int | None = None,
+) -> dict[int, dict[str, Any]]:
+    """Protocol v2 trials of one generator.  Size arm (``deltas`` empty):
+    ``{trial: {variant: {statistic: record}}}``.  Power arm: one label draw per
+    trial is evaluated at every delta, planted on the FIRST hypothesis of each
+    family: ``{trial: {variant: {"delta=<d>": {statistic: record}}}}``."""
+    alpha = float(study.config["alpha"])
+    ok = bool(study.eligible["gate_eligible"])
+    g = len(study.panel.sessions)
+    out: dict[int, dict[str, Any]] = {}
+    for i in trials:
+        labs = trial_labels(study, generator, i, perms.get(i), base_seed)
+        rec: dict[str, Any] = {}
+        for k, fam in study.variants.items():
+            if not deltas:
+                rec[k] = {
+                    st: run_trial(study.trips, labs, fam, g, alpha=alpha, eligible=ok, statistic=st)
+                    for st in statistics
+                }
+                continue
+            rec[k] = {
+                delta_key(d): {
+                    st: run_trial(
+                        study.trips,
+                        labs,
+                        fam,
+                        g,
+                        alpha=alpha,
+                        eligible=ok,
+                        statistic=st,
+                        planted={fam[0].id: float(d)},
+                    )
+                    for st in statistics
+                }
+                for d in deltas
+            }
+        out[i] = rec
+    return out
+
+
+def summarise_power(
+    trials: Sequence[Mapping[str, Any]], family: Sequence[Hypothesis]
+) -> dict[str, Any]:
+    """Power of the planted (first) hypothesis, false confirmations among the
+    others, and the planted hypothesis median analytic MDE (80 % power)."""
+    n = len(trials)
+    planted, others = family[0].id, [h.id for h in family[1:]]
+    mdes = [t["mde_bps"][0] for t in trials if t["mde_bps"][0] is not None]
+    out: dict[str, Any] = {
+        "planted": planted,
+        "power": _rate(sum(1 for t in trials if planted in t["confirmed"]), n),
+        "median_mde_bps_80pct": float(np.median(mdes)) if mdes else None,
+    }
+    if others:
+        out["others_any_false_confirmation"] = _rate(
+            sum(1 for t in trials if set(t["confirmed"]) - {planted}), n
+        )
+        out["others_per_hypothesis_pooled"] = _rate(
+            sum(len(set(t["confirmed"]) - {planted}) for t in trials), n * len(others)
+        )
+    return out
+
+
+def study_document_v2(
+    study: Study,
+    size: Mapping[str, Mapping[int, Mapping[str, Any]]],
+    power: Mapping[str, Mapping[int, Mapping[str, Any]]],
+    size_perms: Sequence[Mapping[str, Any]],
+    power_perms: Sequence[Mapping[str, Any]],
+    *,
+    provenance: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Canonical protocol v2 output (programme section 9.6)."""
+    cfg = study.config
+    rule = {k: float(v) for k, v in cfg["pass_rule"].items()}
+    stats = [cfg["statistics"]["primary"], *cfg["statistics"]["also_must_pass"]]
+    pa = cfg["power_arm"]
+    deltas = [float(d) for d in pa["delta_bps_per_trip"]]
+    g = len(study.panel.sessions)
+    verdicts: list[bool] = []
+    size_doc: dict[str, Any] = {}
+    for gen, res in sorted(size.items()):
+        idx = sorted(res)
+        block: dict[str, Any] = {
+            "base_seed": int(cfg["generators"][gen]["base_seed"]),
+            "n_trials": len(idx),
+            "variants": {},
+        }
+        if gen == "A":
+            block["permutations"] = [dict(p) for p in size_perms if p["trial"] in res]
+        else:
+            block["seeds"] = [block["base_seed"] + i for i in idx]
+            block["ar1"] = study.ar1
+        for k, fam in study.variants.items():
+            vb: dict[str, Any] = {
+                "K": len(fam),
+                "hypotheses": [h.id for h in fam],
+                "statistics": {},
+            }
+            for st in stats:
+                recs = [res[i][k][st] for i in idx]
+                summ = summarise(recs, fam, rule)
+                verdicts.append(summ["pass"])
+                vb["statistics"][st] = {
+                    "summary": summ,
+                    "trials": [{"trial": i, **res[i][k][st]} for i in idx],
+                }
+            block["variants"][k] = vb
+        size_doc[gen] = block
+    power_doc: dict[str, Any] = {}
+    for gen, res in sorted(power.items()):
+        idx = sorted(res)
+        pb: dict[str, Any] = {
+            "base_seed": int(pa["generators"][gen]["base_seed"]),
+            "n_trials": len(idx),
+            "variants": {},
+        }
+        if gen == "A":
+            pb["permutations"] = [dict(p) for p in power_perms if p["trial"] in res]
+        else:
+            pb["seeds"] = [pb["base_seed"] + i for i in idx]
+        for k, fam in study.variants.items():
+            pb["variants"][k] = {
+                delta_key(d): {
+                    st: {
+                        "summary": summarise_power([res[i][k][delta_key(d)][st] for i in idx], fam),
+                        "trials": [{"trial": i, **res[i][k][delta_key(d)][st]} for i in idx],
+                    }
+                    for st in stats
+                }
+                for d in deltas
+            }
+        power_doc[gen] = pb
+    complete = (
+        set(size) == set(cfg["generators"])
+        and all(len(r) == int(cfg["n_trials"]) for r in size.values())
+        and set(power) == set(pa["generators"])
+        and all(len(r) == int(pa["n_trials"]) for r in power.values())
+        and set(study.variants) == set(cfg["variants"])
+    )
+    passed = bool(verdicts) and all(verdicts)
+    return round_floats(
+        {
+            "x-version": 1,
+            "protocol": str(cfg["protocol"]),
+            "kind": "rel06_known_null_v2",
+            "small_g_statement": small_g_statement(g),
+            "G": g,
+            "sessions": study.panel.sessions,
+            "names": study.panel.names,
+            "eligibility": study.eligible,
+            "alpha": float(cfg["alpha"]),
+            "pass_rule": rule,
+            "statistics": stats,
+            "registered_size_shares": int(cfg["registered_size_shares"]),
+            "configuration": dict(cfg["configuration"]),
+            "execution": dict(cfg["execution"]),
+            "cbar_bps": {hid: t.mean_fixed_bps for hid, t in sorted(study.trips.items())},
+            "trip_tables": {
+                hid: {"trips": t.n, "fill_rate": float(t.fill_frac.mean()) if t.n else None}
+                for hid, t in sorted(study.trips.items())
+            },
+            "size_arm": size_doc,
+            "power_arm": {"delta_bps_per_trip": deltas, "generators": power_doc},
             "complete": complete,
             "verdict": ("PASS" if passed else "FAIL")
             if complete
