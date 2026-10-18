@@ -294,7 +294,7 @@ def test_model_identity_helpers():
 # ---------------------------------------------------------------- prereg --
 
 
-def test_prereg_draft_is_unsigned_and_loads():
+def test_prereg_draft_is_unsigned_and_loads(tmp_path):
     doc = json.loads(PREREG.read_text(encoding="utf-8"))
     assert doc["signed"] is False and doc["signature"] is None
     assert doc["status"].startswith("DRAFT")
@@ -313,7 +313,21 @@ def test_prereg_draft_is_unsigned_and_loads():
         sc.assert_not_holdout(Path("data/real/r7_holdout"), "x", spec)
     with pytest.raises(sc.ScreenError, match="registered holdout"):
         sc.assert_not_holdout(Path("data/real/x"), spec.excluded_dataset_versions[0], spec)
-    sc.assert_not_holdout(Path("data/real/multi7"), "other", spec)
+    # an in-sample dataset passes, identified by its content (the registry), not its name
+    ds = tmp_path / "anything"
+    ds.mkdir()
+    (ds / "dataset.json").write_text(
+        json.dumps(
+            {
+                "kind": "real",
+                "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+                "sessions": {"2019-01-30": {}},
+                "universe": [{"symbol": "AAPL"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    sc.assert_not_holdout(ds, "other", spec)
 
 
 def test_prereg_claiming_a_signature_without_one_is_refused(tmp_path):

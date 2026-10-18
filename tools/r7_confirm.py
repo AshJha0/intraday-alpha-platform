@@ -101,27 +101,46 @@ def load_prereg(root: Path) -> dict:
 
 def verify_prereg(root: Path, doc: Mapping[str, Any]) -> str:
     """Signed, on the blackboard, Ed25519 signature valid under the trust root."""
-    from iap.agents import signing, trust
-    from iap.agents.blackboard import canonical
+    from iap.agents.analysis_identity import SignatureError, verify_signed_document
 
     if doc.get("signed") is not True or doc.get("on_blackboard") is not True:
         raise CheckError("prereg is not signed / not on the blackboard")
     if doc.get("open_for_owner"):
         raise CheckError(f"prereg has open owner items: {doc['open_for_owner']}")
-    sig = doc.get("signature")
-    if not isinstance(sig, dict) or sig.get("scheme") != "ed25519":
-        raise CheckError("prereg has no ed25519 signature block")
-    roots = trust.read_roots(root) or {}
-    pub = (roots.get("maintainers") or {}).get(sig.get("maintainer"))
-    if pub is None or pub != sig.get("public_key"):
-        raise CheckError("prereg signing key is not the trust-root maintainer key")
-    body = {k: v for k, v in doc.items() if k != "signature"}
-    msg = canonical(body).encode("ascii")
-    if hashlib.sha256(msg).hexdigest() != sig.get("message_sha256"):
-        raise CheckError("prereg message sha256 mismatch (document changed after signing)")
-    if not signing.verify_ed25519(pub, msg, sig.get("sig", "")):
-        raise CheckError("prereg Ed25519 signature INVALID")
-    return pub
+    try:
+        return verify_signed_document(root, doc)
+    except SignatureError as exc:
+        raise CheckError(str(exc)) from exc
+
+
+def verify_analysis_identity(root: Path, doc: Mapping[str, Any]) -> None:
+    """v1.18 REL-02a: refuse when the scripts, code tree, commit, data versions, family,
+    metrics or thresholds differ from the signed ``analysis_identity``, or when this
+    process could also have signed.  A prereg signed before v1.18 carries no block and
+    is reported as legacy (it cannot be re-run: its look is spent)."""
+    from iap.agents.analysis_identity import (
+        BLOCK,
+        IdentityError,
+        require_independent_runner,
+        verify_identity,
+    )
+
+    bound = doc.get(BLOCK)
+    try:
+        if bound:
+            require_independent_runner(doc)
+        out = verify_identity(
+            root,
+            bound,
+            data_versions=[EXPECTED_DATASET_VERSION],
+            family=str((bound or {}).get("family", "")),
+            metrics=list((bound or {}).get("metrics", [])),
+            thresholds=dict((bound or {}).get("thresholds", {})),
+            legacy_ok=True,
+        )
+    except IdentityError as exc:
+        raise CheckError(str(exc)) from exc
+    print("ok  analysis identity " + ("LEGACY prereg: nothing bound" if out["legacy"] else "bound"))
 
 
 def verify_fingerprints(root: Path, doc: Mapping[str, Any]) -> None:
@@ -310,6 +329,8 @@ def run_command(alpha: str, ds: Path) -> list[str]:
         METHODS,
         "--dataset-dir",
         str(ds),
+        "--holdout-prereg-id",
+        PREREG_REL,
     ]
 
 
@@ -318,6 +339,7 @@ def preflight(root: Path, ds: Path, signed_ok: Path, retry: int = 0) -> dict[str
     doc = load_prereg(root)
     verify_prereg(root, doc)
     print("ok  prereg signed; Ed25519 signature valid under the trust root")
+    verify_analysis_identity(root, doc)
     verify_fingerprints(root, doc)
     print("ok  prereg fingerprints match")
     verify_signed_ok(root, signed_ok)
@@ -519,11 +541,19 @@ def sensitivity(
     return out
 
 
-def verdict(look_ok: bool, g: Mapping[str, Any]) -> str:
-    """Prereg decision rule: pass -> confirmed; any failure is final -> rejected."""
+def verdict(look_ok: bool, g: Mapping[str, Any], eligibility: Mapping[str, Any] | None) -> str:
+    """Prereg decision rule: pass -> confirmed; any failure is final -> rejected.
+
+    v1.18 REL-02d: eligibility is part of the verdict.  A pass by a method that is not
+    gate-eligible (``eligibility['gate_eligible']`` is not True, or no eligibility
+    record) is ``ineligible``, never ``confirmed``."""
     if not look_ok:
         return "no_result"
-    return "confirmed" if g["passed"] else "rejected"
+    if not g["passed"]:
+        return "rejected"
+    if (eligibility or {}).get("gate_eligible") is not True:
+        return "ineligible"
+    return "confirmed"
 
 
 # ------------------------------------------------------------------ live --
@@ -642,7 +672,7 @@ def analyse(
         },
         "per_session_ic": ics,
         "gate": g,
-        "verdict": verdict(bool(look.get("ok")), g),
+        "verdict": verdict(bool(look.get("ok")), g, elig),
         "net_pnl_descriptive": {
             k: res.get(k)
             for k in (
@@ -756,7 +786,7 @@ def recompute_dsr(root: Path, result_rel: str = RESULT_REL) -> dict[str, Any]:
                 "n_trials": n,
                 "deflated_sharpe": primary,
                 "gate": g,
-                "verdict": verdict(True, g),
+                "verdict": verdict(True, g, r.get("eligibility")),
                 "sensitivity": sens,
             }
         results.append(

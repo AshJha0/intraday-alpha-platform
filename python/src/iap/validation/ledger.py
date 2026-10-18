@@ -32,6 +32,27 @@ already part of their identity, so the runner opens the ledger unscoped and
 its keys are unchanged.  The rendered file lists the datasets with their
 entry and look counts (``datasets``, first-appearance order).
 
+**One ledger family (pinned, v1.18 REL-02c).**  An entry may carry a
+``data_family`` tag, ``"real"`` (computed on an ingested market-data
+dataset) or ``"synthetic"`` (the seeded generator).  The tag is set by a
+ledger opened with ``data_family=`` and written only when given: it is NOT
+part of the chained identity (``_CHAINED``), so no existing key, chain head
+or golden changes.  The denominator that matters for a claim about markets
+is the number of DISTINCT CONFIGURATIONS TRIED ON REAL DATA
+(:meth:`ExperimentLedger.real_distinct_experiments`): a synthetic look stays
+recorded - it is a look, and a reader can see it - but is excluded from N
+for the gates and the deflated Sharpe.  An entry without a tag is classified
+by :meth:`ExperimentLedger.entry_data_family` from its ``dataset_version``
+against the set of real dataset versions (the holdout registry lists them);
+one that cannot be classified is ``"unknown"`` and counts in neither family.
+Execution studies (benchmarks, B7/B8-style policy comparisons, fill-model
+calibrations) are LOOKS like any other: each configuration run on a real
+session is a distinct configuration and belongs in the real-data N.
+Merging the per-dataset real ledgers (``data/real/*/research/experiments.json``)
+into one family is a TOOL with a dry-run report
+(``tools/ledger_family_report.py``); nothing here rewrites
+``research/experiments.json``.
+
 Multiple-testing math reported with every batch:
 
 - Bonferroni: a per-test significance threshold ``alpha / n_experiments``
@@ -84,7 +105,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from pathlib import Path
 
 from iap.experiment.locking import FileLock, atomic_write_text
@@ -100,6 +121,9 @@ PINNED_ALPHA = 0.05
 LEDGER_X_VERSION = 4
 
 LEDGER_GENESIS = "0" * 64
+
+#: ``data_family`` values (module docs, "One ledger family").
+DATA_FAMILIES = ("real", "synthetic")
 
 #: The immutable part of an entry, chained (G-P1-5).  ``result``, ``reruns``
 #: and ``gate_looks`` are updated in place by a rerun and are not chained;
@@ -195,8 +219,14 @@ class ExperimentLedger:
         lock_timeout_s: float = 30.0,
         dataset_version: str | None = None,
         config_version: str | None = None,
+        data_family: str | None = None,
     ) -> None:
+        if data_family is not None and data_family not in DATA_FAMILIES:
+            raise ValueError(f"data_family must be one of {DATA_FAMILIES}, got {data_family!r}")
         self.path = Path(path)
+        #: v1.18 REL-02c: stamped on every NEW entry of this instance when given;
+        #: a tag only, not part of the identity or the chain.
+        self.data_family = data_family
         self.lock_timeout_s = float(lock_timeout_s)
         #: Dataset scope of every ``record`` of this instance (module docs);
         #: ``None`` = unscoped (identity is alpha, kind and config alone).
@@ -336,6 +366,8 @@ class ExperimentLedger:
             entry["dataset_version"] = self.dataset_version
         if self.config_version is not None:
             entry["config_version"] = self.config_version
+        if self.data_family is not None:
+            entry["data_family"] = self.data_family
         if gate_looks is not None:
             entry["gate_looks"] = int(gate_looks)
         self.entries.append(entry)
@@ -417,6 +449,43 @@ class ExperimentLedger:
     def distinct_experiments(self) -> int:
         """Distinct (alpha, kind, config[, dataset]) identities recorded."""
         return len(self._index)
+
+    @staticmethod
+    def entry_data_family(
+        entry: dict,
+        real_versions: Collection[str] | None = None,
+        synthetic_versions: Collection[str] | None = None,
+    ) -> str:
+        """``"real"``, ``"synthetic"`` or ``"unknown"``: the entry's own ``data_family``
+        tag, else ``"real"`` / ``"synthetic"`` when its dataset version is in the given
+        set, else ``"unknown"`` (never guessed)."""
+        tag = entry.get("data_family")
+        if tag in DATA_FAMILIES:
+            return str(tag)
+        version = ExperimentLedger.entry_dataset_version(entry)
+        if version is not None and real_versions is not None and version in real_versions:
+            return "real"
+        if version is not None and synthetic_versions is not None and version in synthetic_versions:
+            return "synthetic"
+        return "unknown"
+
+    def family_counts(
+        self,
+        real_versions: Collection[str] | None = None,
+        synthetic_versions: Collection[str] | None = None,
+    ) -> dict[str, dict]:
+        """Entries and looks per family (``real`` / ``synthetic`` / ``unknown``)."""
+        out = {f: {"entries": 0, "looks": 0} for f in (*DATA_FAMILIES, "unknown")}
+        for e in self.entries:
+            row = out[self.entry_data_family(e, real_versions, synthetic_versions)]
+            row["entries"] += 1
+            row["looks"] += int(e.get("count", 1))
+        return out
+
+    def real_distinct_experiments(self, real_versions: Collection[str] | None = None) -> int:
+        """N for the gates and the deflated Sharpe: distinct configurations on REAL
+        data (synthetic and unclassifiable looks excluded, but still recorded)."""
+        return self.family_counts(real_versions)["real"]["entries"]
 
     def datasets(self) -> list[dict]:
         """Entries and looks per dataset, in first-appearance order

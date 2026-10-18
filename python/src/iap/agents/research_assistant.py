@@ -145,9 +145,9 @@ def holdout_patterns(repo: Path) -> list[str]:
     """``forbidden_datasets`` of the paper-trade config (the holdout names)."""
     path = Path(repo) / PAPER_CONFIG
     if not path.is_file():
-        return ["*holdout*"]
+        return []
     doc = json.loads(path.read_text(encoding="utf-8"))
-    return [str(p) for p in doc.get("forbidden_datasets", [])] + ["*holdout*"]
+    return [str(p) for p in doc.get("forbidden_datasets", [])]
 
 
 def is_holdout(name: str, patterns: Sequence[str]) -> bool:
@@ -291,6 +291,12 @@ class ResearchAssistant:
         ds = self.data_root / dataset
         if not (ds / "dataset.json").is_file():
             raise ToolRefused(f"no ingested dataset {dataset!r} under {self.data_root}")
+        from iap.research.holdout_registry import HoldoutRefused, guard
+
+        try:  # v1.18 REL-02b: an agent holds no prereg id; only in-sample data passes
+            guard(ds, purpose="research_assistant")
+        except HoldoutRefused as exc:
+            raise ToolRefused(f"{dataset!r}: {exc}") from exc
         key = f"{alpha_id}/{horizon}/{dataset}"
         if key in self.runs:
             ref = self.runs[key]

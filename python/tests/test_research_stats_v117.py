@@ -271,6 +271,7 @@ def test_dsr_recompute_uses_the_repo_ledger_count_at_the_look(tmp_path):
                 "per_session_ic": series,
                 "gate": {"passed": True},
                 "verdict": "confirmed",
+                "eligibility": {"gate_eligible": True},
                 "sensitivity": {
                     "all_sessions": {
                         "raw_ic": 0.07,

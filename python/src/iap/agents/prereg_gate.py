@@ -63,6 +63,7 @@ def require(
     board: Path | None = None,
     fingerprinter: Callable[[str], dict[str, Any] | None] | None = None,
     agents: frozenset[str] | set[str] | None = None,
+    identity_actual: dict[str, Any] | None = None,
 ) -> dict:
     """The (latest) pre-registration entry for (alpha, horizon), or
     :class:`PreregistrationError`.  ``agents`` (default: the ids in
@@ -110,6 +111,30 @@ def require(
                 "ref": outcome["body"].get("ref"),
             },
         }
+    bound = found["body"].get("analysis_identity")
+    if bound is not None:
+        # v1.18 REL-02a: a prereg that binds the analysis identity refuses a
+        # run whose scripts, code tree, commit, data, family, metrics or
+        # thresholds differ; a run that declares nothing is refused too.
+        from iap.agents.analysis_identity import IdentityError, verify_identity
+
+        if identity_actual is None:
+            raise PreregistrationError(
+                f"{alpha_id}/{horizon}: the pre-registration binds an analysis identity "
+                "(entry {}); the runner must declare its data versions, family, metrics "
+                "and thresholds".format(found["seq"])
+            )
+        try:
+            verify_identity(
+                repo_root,
+                bound,
+                data_versions=identity_actual.get("data_versions", []),
+                family=identity_actual.get("family", ""),
+                metrics=identity_actual.get("metrics", []),
+                thresholds=identity_actual.get("thresholds", {}),
+            )
+        except IdentityError as exc:
+            raise PreregistrationError(f"{alpha_id}/{horizon}: {exc}") from exc
     registered = found["body"].get("code")
     if registered is not None:
         now = (fingerprinter or _current)(alpha_id)

@@ -41,7 +41,6 @@ import numpy as np
 from iap.models.deeplob import smoothed_labels
 
 __all__ = [
-    "HOLDOUT_DATES",
     "WindowIndex",
     "build_cache",
     "iter_events",
@@ -52,17 +51,7 @@ __all__ = [
 ]
 
 LEVELS = 10
-#: R7 holdout sessions: never read for AI4 development (AI4_DEFERRED.md).
-HOLDOUT_DATES = (
-    "20251128",
-    "20251208",
-    "20251209",
-    "20251210",
-    "20251211",
-    "20251212",
-    "20260612",
-)
-HOLDOUT_DIRS = ("r7_holdout", "holdout2026")
+# R7 holdout sessions are refused through iap.research.holdout_registry (v1.18 REL-02b).
 
 
 EVENT_COLS = (
@@ -106,8 +95,14 @@ def iter_events(session_dir: Path, iid: int, end_ns: int | None = None) -> Itera
 
 
 def _refuse_holdout(name: str) -> None:
-    if any(d in name for d in HOLDOUT_DATES) or any(h in name for h in HOLDOUT_DIRS):
-        raise ValueError(f"{name}: R7 holdout session, refused for AI4 development")
+    """v1.18 REL-02b: refuse by the holdout registry (session date / dataset label),
+    not by a hard-coded list; an unregistered date is refused too."""
+    from iap.research.holdout_registry import HoldoutRefused, refuse_unit_name
+
+    try:
+        refuse_unit_name(name)
+    except HoldoutRefused as exc:
+        raise ValueError(f"{name}: holdout session, refused for AI4 development ({exc})") from exc
 
 
 def session_snapshots(
@@ -310,6 +305,12 @@ def build_cache(
     for sess in sessions:
         _refuse_holdout(sess)
         sdir = data_root / sess
+        from iap.research.holdout_registry import HoldoutRefused, guard
+
+        try:
+            guard(sdir, purpose="ai4_build_cache")
+        except HoldoutRefused as exc:
+            raise ValueError(f"{sess}: refused for AI4 development ({exc})") from exc
         instruments = json.loads(
             (sdir / "configs" / "instruments" / "instruments.json").read_text(encoding="utf-8")
         )

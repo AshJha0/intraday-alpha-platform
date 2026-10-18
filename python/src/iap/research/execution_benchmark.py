@@ -673,11 +673,9 @@ def run_benchmark(
     instrument spec, horizon = the window).
     """
     data_dir = Path(data_dir)
-    if "holdout" in str(data_dir).lower() and not allow_holdout:
-        raise SystemExit(
-            f"{data_dir}: looks like a holdout dataset; the benchmark is in-sample only "
-            "(--allow-holdout overrides, for a signed pre-registered run)"
-        )
+    from iap.research.holdout_registry import guard_or_exit
+
+    guard_or_exit(data_dir, "execution_benchmark", allow_holdout)
     if config_dir is None:
         config_dir = data_dir / "configs"
         if not config_dir.is_dir():
