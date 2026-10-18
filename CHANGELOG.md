@@ -8,6 +8,8 @@ that tag.
 
 ## Unreleased
 
+- v1.18 REL-17 factor risk model: `iap.portfolio.factor_risk` builds factor exposures (market beta to the REL-07 `xasset_v2` reference ETF, REL-07 sectors, size and liquidity buckets), fits a shrunk factor covariance (EWMA or sample, estimated Ledoit-Wolf), and reports ex-ante volatility, factor/specific Euler decomposition, parametric and historical VaR/ES, and named stress scenarios (`configs/risk/stress_scenarios.json`). Validated against Hull's two-asset VaR example (to $1), the normal VaR/ES constants and a hand-computed single-index decomposition; `docs/FACTOR_RISK.md`.
+
 - v1.18 batch 5 integration fix: the identity-v2 guard (`test_no_prereg_consumer_skips_the_identity_check`) found the new REL-08c, REL-09 and REL-10 runners unregistered; they are registered (each calls `verify_identity`). `iap.auction.rel08c_study.run_study` accepted any signed prereg id when called directly; it now also requires the prereg's bound analysis identity to match the code, configs, lock and interpreter on disk (`environment_mismatches`), closing a library-level bypass of review finding 1.
 
 - v1.18 gitleaks: the existing narrow allowlist for ledger content keys (`"key": "<64 hex>"`, SHA-256 digests of the experiment spec) now also covers `research/v118/LEDGER_INVENTORY.json`, the reviewer-finding-4 inventory copy of those keys. CI scans the whole history of all fetched branches, so the inventory branch had turned every PR's `advisory` check red with generic-api-key false positives.
