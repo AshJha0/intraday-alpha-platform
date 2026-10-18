@@ -1,4 +1,4 @@
-# REL-06 known-null study: result (v1.18, protocol `research/v118/NULL_PROTOCOL.md`)
+# REL-06 known-null study: PASS, size untested (cost-dominated null) (v1.18, protocol `research/v118/NULL_PROTOCOL.md`)
 
 Run 2026-10-18 13:27-14:16 BST (49 min, `--workers 2`, the IEX ingest running beside it) from a clean checkout of
 `origin/main` at `b3be34f`, under the signed prereg `research/v118/null_protocol_prereg.json` (identity bound at
@@ -11,7 +11,7 @@ every seed, permutation and AR(1) parameter recorded). No trial outcome was exam
 > Intervals are Student-t at G-1 = 6 degrees of freedom; the minimum detectable effect and the effective sample
 > size are printed beside every interval.
 
-## Verdict: PASS (and flagged over-conservative in every cell)
+## Verdict: PASS, size untested: cost-dominated null (flagged over-conservative in every cell)
 
 | generator | K | family-level false confirmations (95 % Wilson) | per hypothesis, worst (95 % Wilson) | pooled per hypothesis | pass | over-conservative |
 |---|---|---|---|---|---|---|
