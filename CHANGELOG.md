@@ -8,6 +8,8 @@ that tag.
 
 ## Unreleased
 
+- Data manifest check: a prereg may cite the sha256 of a raw vendor input when that file is a recorded input of a manifest-listed dataset (`listed_inputs`); REL-08c reads the full-market 2019-01-30 ITCH file directly and cites its hash, which the manifest records as an input of `breadth/ds_20190130`. Unknown hashes still fail; test added.
+
 - v1.18 signatures (2026-10-18, Claude under the owner's written delegation, maintainer key `ashjha0`, from `.venv-ci`, identity v2, before any run): `research/v118/null_protocol_v2_prereg.json` (cost-neutral re-centred null as primary, gross must also pass, power arm 0.5-4 bps, new seeds, unchanged pass rule), `research/preregs/rel08c_prereg.json` (one-session close-imbalance screen, K = 1, verdicts underpowered / continue / reject), `research/preregs/rel09_prereg.json` (stale-quote protection, K = 2, 4 evaluation days, missed fills priced) and `research/preregs/rel10_prereg.json` (volume-clock OFI, K = 24 on 4 evaluation days: expected to be underpowered, which the rule reports as such). Each binds its own commit on this branch, so the PR is merged with a merge commit to keep those commits reachable. Runs must be started by a non-signing actor.
 
 - v1.18 batch 5 integration fix: the identity-v2 guard (`test_no_prereg_consumer_skips_the_identity_check`) found the new REL-08c, REL-09 and REL-10 runners unregistered; they are registered (each calls `verify_identity`). `iap.auction.rel08c_study.run_study` accepted any signed prereg id when called directly; it now also requires the prereg's bound analysis identity to match the code, configs, lock and interpreter on disk (`environment_mismatches`), closing a library-level bypass of review finding 1.
