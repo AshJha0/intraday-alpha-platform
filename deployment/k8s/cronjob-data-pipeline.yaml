@@ -137,6 +137,8 @@ spec:
                     path: reference/sectors.json
                   - key: reference__venue_latency.json
                     path: reference/venue_latency.json
+                  - key: risk__portfolio_limits.json
+                    path: risk/portfolio_limits.json
                   - key: risk__risk.json
                     path: risk/risk.json
                   - key: strategies__alpha_params.json
