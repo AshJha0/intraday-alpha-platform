@@ -1,4 +1,9 @@
-# Proposal: D5(a), C++ demoted to parity-only (v1.18 REL-13), NOT APPLIED
+# Proposal: D5(a), C++ demoted to parity-only (v1.18 REL-13), APPLIED 2026-10-18
+
+Applied on 2026-10-18 with the owner's approval: the live ruleset `protect-main` no longer requires
+`cpp-sanitizers` and now requires `docs` and `reproducible-build` (17 checks, read back from the API);
+the bench guard step and the C++ image smoke run are `continue-on-error`. `coverage` is not yet
+required (the owner adds it once the job has a run history on main).
 
 Status: **proposal for the owner**. Nothing here has been applied: the
 ruleset is the owner's to edit, and the CI changes below land only with the

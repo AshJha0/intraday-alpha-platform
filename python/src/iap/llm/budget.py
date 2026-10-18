@@ -18,10 +18,12 @@ Three caps, in the order checked by :meth:`Budget.check_model_call`:
   this session's own spend;
 * the token and tool-call caps.
 
-A :class:`Budget` without a ledger (``ledger=None``, the test default with
-the scripted client) enforces only its own caps; :func:`iap.llm.agent.run_session`
-refuses a real ``anthropic`` client on such a budget, so every live path
-records spend.  Dated pins (``role`` -> model, pinned date, price-table
+v1.18 REL-13: a :class:`Budget` without a ledger refuses every model call
+(no monthly cap would apply) unless it is explicitly ``unmetered=True``, the
+opt-out for tests and the scripted client; :func:`iap.llm.agent.run_session`
+marks a ledger-less budget unmetered only for :class:`iap.llm.fake.ScriptedClient`
+and attaches the operator ledger for any other client, so every path that
+can spend records spend.  Dated pins (``role`` -> model, pinned date, price-table
 date) come from ``configs/agents/llm.json``: research = Sonnet 5.5, ops /
 docs / eval = Haiku 5.5.
 
@@ -128,6 +130,8 @@ class Budget:
     run_id: str = ""
     role: str = "research"
     pin: ModelPin | None = field(default=None, repr=False, compare=False)
+    #: REL-13: explicit opt-out of the ledger requirement (tests, scripted client)
+    unmetered: bool = False
 
     _LEDGER_FIELDS = ("ledger", "pin")
 
@@ -157,6 +161,11 @@ class Budget:
             raise BudgetExceeded(str(exc)) from exc
         next_in = self.projected_input_tokens()
         growth = self.context_growth
+        if self.ledger is None and not self.unmetered:
+            raise BudgetExceeded(
+                "no spend ledger: a Budget needs a SpendLedger (monthly cap) "
+                "or unmetered=True (tests and the scripted client only)"
+            )
         if self.ledger is not None:
             try:
                 self.ledger.check_call(model, next_in, self.max_tokens_per_call, cache_write=growth)

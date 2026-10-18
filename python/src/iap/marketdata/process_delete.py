@@ -26,7 +26,7 @@ make room.  The wrapper for a detached run and the ``jobs.json`` entry for
 
     python -m iap.marketdata process-day --manifest M --date D --vendor-dir V \\
         --out-root R --symbols-file research/breadth/universe.json \\
-        [--download --i-have-approval] [--partition-instruments 10] \\
+        [--download --i-have-approval] [--partition-instruments N|auto] \\
         [--engine rust] [--workers 1] [--keep-raw] [--keep-gz] [--min-free-gb 10] [--dry-run]
     python -m iap.marketdata process-day ... --render-cmd R\\run_process_20190130.cmd \\
         [--jobs-registry data/real/jobs.json]
@@ -58,6 +58,7 @@ from iap.marketdata.r7plan import (
     load_candidates,
     verify_file,
 )
+from iap.marketdata.runmem import auto_partition_instruments, available_ram_gb, peak_rss_fields
 
 __all__ = [
     "KEEP_NAME",
@@ -166,6 +167,28 @@ def verify_keep(ds: Path) -> list[str]:
 # ------------------------------------------------------------- the chain
 
 
+def partition_arg(value: str) -> int | str:
+    """``--partition-instruments``: a positive int or ``auto``."""
+    if value == "auto":
+        return value
+    n = int(value)
+    if n < 1:
+        raise argparse.ArgumentTypeError("--partition-instruments must be >= 1 or auto")
+    return n
+
+
+def resolve_partition(value: int | str | None, n_symbols: int) -> tuple[int | None, dict]:
+    """REL-13: ``"auto"`` -> chosen from available RAM
+    (:func:`iap.marketdata.runmem.auto_partition_instruments`); an int or
+    ``None`` is used as given.  Returns the value and its report entry."""
+    if value == "auto":
+        choice = auto_partition_instruments(n_symbols, available_ram_gb())
+        return int(choice["instruments"] or 1), choice
+    if isinstance(value, str):
+        raise ValueError(f"partition_instruments: {value!r} is not an int, None or 'auto'")
+    return value, {"instruments": value, "source": "given", "available_ram_gb": None}
+
+
 def _marker(ds: Path, step: str) -> Path:
     """Markers live BESIDE the dataset directory (``<ds>.markers/``): the
     ingest refuses a non-empty, non-dataset directory, and the download
@@ -185,7 +208,7 @@ def process_day(
     configs_dir: Path | None = None,
     download: bool = False,
     approval: bool = False,
-    partition_instruments: int | None = 10,
+    partition_instruments: int | str | None = 10,
     engine: str = "rust",
     workers: int = 1,
     keep_raw: bool = False,
@@ -222,6 +245,9 @@ def process_day(
         "steps": [],
         "dry_run": dry_run,
     }
+    partition_instruments, report["partition"] = resolve_partition(
+        partition_instruments, len(symbols)
+    )
     t0 = time.perf_counter()
 
     def step(name: str, fn: Callable[[], dict | None]) -> None:
@@ -237,6 +263,7 @@ def process_day(
                 "step": name,
                 "status": "ok",
                 "seconds": round(time.perf_counter() - clock, 1),
+                **peak_rss_fields(),
                 **(detail or {}),
             }
         )
@@ -516,7 +543,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--i-have-approval", action="store_true", help="the owner approved this download"
     )
-    p.add_argument("--partition-instruments", type=int, default=10)
+    p.add_argument(
+        "--partition-instruments",
+        type=partition_arg,
+        default="auto",
+        help="instruments per normaliser partition, or auto (default: chosen from available RAM)",
+    )
     p.add_argument("--engine", choices=("python", "rust"), default="rust")
     p.add_argument("--workers", type=int, default=1)
     p.add_argument("--keep-raw", action="store_true")
@@ -554,9 +586,10 @@ def main(argv: list[str] | None = None) -> int:
                 extra.append("--keep-gz")
             if a.tops:
                 extra.append(f'--tops "{a.tops}"')
+            if a.partition_instruments != "auto":
+                extra.append(f"--partition-instruments {a.partition_instruments}")
             extra.append(
-                f"--partition-instruments {a.partition_instruments} --engine {a.engine} "
-                f"--workers {a.workers} --min-free-gb {a.min_free_gb:g}"
+                f"--engine {a.engine} --workers {a.workers} --min-free-gb {a.min_free_gb:g}"
             )
             if a.peak_gb is not None:
                 extra.append(f"--peak-gb {a.peak_gb:g}")

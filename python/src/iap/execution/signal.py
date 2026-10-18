@@ -29,7 +29,6 @@ Nothing here runs unless a ``ParentOrder`` names a signal opt-in
 from __future__ import annotations
 
 import bisect
-import json
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -267,9 +266,3 @@ class AlphaUrgencySource(ArraySignalSource):
             }
         )
         return d
-
-
-def write_signal_description(src: SignalSource, path: str | Path) -> None:
-    """Dump ``src.describe()`` (when available) as JSON next to a study."""
-    desc = src.describe() if hasattr(src, "describe") else {"source": type(src).__name__}
-    Path(path).write_text(json.dumps(desc, indent=2, sort_keys=True) + "\n", encoding="utf-8")

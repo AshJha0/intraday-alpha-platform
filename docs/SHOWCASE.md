@@ -119,10 +119,15 @@ reported as stale rather than failing).
 | Flagship alphas | 24 (EQ01-EQ12, FX01-FX12); verdicts 0 PROMOTE / 12 ITERATE / 12 REJECT | `research/alpha_reports/REPORT.md` |
 | Promotion lifecycle | 7 states · 17 pinned edges · 20 gates; 23 alphas at CANDIDATE, 0 beyond | `research/alpha_registry.json`, `tests/golden/expected_lifecycle.json` |
 | Contracts | 17 JSON Schemas · 22 typed Python contracts · 18 runtime-checkable Protocols | `schemas/`, `python/src/iap/contracts/` |
-| Experiments ledger | 5,732 recorded looks over 422 distinct configurations (as of v1.17.0); expected max \|t\| 4.160; Bonferroni per-test \|t\| ≥ 4.447 | `research/experiments.json` |
-| C++ tick-to-trade (CI runner) | p50 1,279 ns · p99 2,559 ns · p99.9 11,263 ns, in-process, decoded frame to order intent | `benchmarks/results_tick_to_trade.md` |
-| Rust feature engine from Python | about 790,000 events/s against about 5,250 through the Python reference on the 45 native slots: 150x, not a pipeline speed-up | `rust-pyo3` CI job summary, API_FEATURES.md §7.1 |
+| Experiments ledger | real-data looks: 24; synthetic-data looks: 5,694; no dataset: 14 (per-dataset real ledgers under `data/real` are outside git and this count); total 5,732 recorded looks over 422 distinct configurations (as of v1.17.0); expected max \|t\| 4.160; Bonferroni per-test \|t\| ≥ 4.447 | `research/experiments.json` |
+| C++ tick-to-trade (shared CI runner AMD EPYC 7763, no pinning, `steady_clock`; not colocation) | p50 1,279 ns · p99 2,559 ns · p99.9 11,263 ns, in-process, decoded frame to order intent | `benchmarks/results_tick_to_trade.md` |
+| Rust feature engine from Python (CI runner ubuntu-24.04; not colocation) | about 790,000 events/s against about 5,250 through the Python reference on the 45 native slots: 150x, not a pipeline speed-up | `rust-pyo3` CI job summary, API_FEATURES.md §7.1 |
 <!-- source: README.md "Headline numbers" table and "Cross-language parity" table (every row); the same figures appear in docs/index.html "Measured, not claimed" -->
+
+**No latency edge; benchmarks are not colocation numbers.** The two speed rows above are in-process
+figures from a shared CI runner (no network, NIC, kernel bypass or venue round trip). The signals are
+execution inputs, not strategies (B7, the net-of-cost screen and the v1.16 monetisation study found no
+edge).
 
 ## Architecture, one diagram
 

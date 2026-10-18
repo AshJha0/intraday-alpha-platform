@@ -465,6 +465,9 @@ jobs:
       # few-percent drift; see the header of the script. The table of ratios
       # goes to the job summary and the raw output is uploaded.
       - name: benchmark regression guard (coarse)
+        # D5(a), v1.18 REL-13: C++ is parity-only; the guard still runs and uploads its artifact
+        # but no longer gates a merge (a noisy shared runner must not block through C++ timing).
+        continue-on-error: true
         run: |
           cpp/build/bench_all "$RUNNER_TEMP/bench_ci.md" > /dev/null
           python3 tests/harness/check_bench_regression.py \
@@ -1280,6 +1283,7 @@ jobs:
           done
           exit "$rc"
       - name: the C++ replay container runs bench_all to completion
+        continue-on-error: true  # D5(a): the C++ image is built and scanned, its smoke run is report-only
         run: docker run --rm "iap/cpp:ci-${GITHUB_SHA::12}"
       - name: the Rust replay container exits 0
         run: docker run --rm "iap/rust:ci-${GITHUB_SHA::12}" /golden

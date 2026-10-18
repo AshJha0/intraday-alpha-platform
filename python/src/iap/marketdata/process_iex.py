@@ -33,7 +33,7 @@ carries the owner's approval sentence; nothing here contacts the network
     python -m iap.marketdata process-iex-day --manifest research/v117/iex_overlap_manifest.json \\
         --date 2025-11-28 --vendor-dir data/vendor --out-root data/real/iex \\
         --symbols AAPL,MSFT,QQQ [--feed deep-plus|deep] [--download --i-have-approval] \\
-        [--partition-instruments 10] [--engine rust] [--workers 1] [--min-free-gb 30] \\
+        [--partition-instruments N|auto] [--engine rust] [--workers 1] [--min-free-gb 30] \\
         [--peak-gb N] [--allow-book-divergence] [--keep-gz] [--dry-run]
     python -m iap.marketdata process-iex-day ... --render-cmd data/real/run_iex_20251128.cmd \\
         [--jobs-registry data/real/jobs.json]
@@ -65,9 +65,12 @@ from iap.marketdata.process_delete import (
     disk_guard,
     estimate_peak_gb,
     keep_manifest,
+    partition_arg,
+    resolve_partition,
     verify_keep,
 )
 from iap.marketdata.r7plan import _check_url, verify_file
+from iap.marketdata.runmem import peak_rss_fields
 
 __all__ = [
     "BOOK_FEEDS",
@@ -141,7 +144,7 @@ def process_iex_day(
     configs_dir: Path | None = None,
     download: bool = False,
     approval: bool = False,
-    partition_instruments: int | None = 10,
+    partition_instruments: int | str | None = 10,
     engine: str = "rust",
     workers: int = 1,
     keep_gz: bool = False,
@@ -199,6 +202,9 @@ def process_iex_day(
         "steps": [],
         "dry_run": dry_run,
     }
+    partition_instruments, report["partition"] = resolve_partition(
+        partition_instruments, len(symbols)
+    )
     t0 = time.perf_counter()
     peak_seen = {"free_min_gb": None}
 
@@ -222,6 +228,7 @@ def process_iex_day(
                 "step": name,
                 "status": "ok",
                 "seconds": round(time.perf_counter() - clock, 1),
+                **peak_rss_fields(),
                 "free_gb_after": round(f, 2),
                 **(detail or {}),
             }
@@ -611,7 +618,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--i-have-approval", action="store_true", help="the owner approved these downloads"
     )
-    p.add_argument("--partition-instruments", type=int, default=10)
+    p.add_argument(
+        "--partition-instruments",
+        type=partition_arg,
+        default="auto",
+        help="instruments per normaliser partition, or auto (default: chosen from available RAM)",
+    )
     p.add_argument("--engine", choices=("python", "rust"), default="rust")
     p.add_argument("--workers", type=int, default=1)
     p.add_argument("--keep-gz", action="store_true")
@@ -663,9 +675,10 @@ def main(argv: list[str] | None = None) -> int:
                 extra.append("--allow-book-divergence")
             if a.round_lots_from:
                 extra.append(f'--round-lots-from "{Path(a.round_lots_from).resolve()}"')
+            if a.partition_instruments != "auto":
+                extra.append(f"--partition-instruments {a.partition_instruments}")
             extra.append(
-                f"--partition-instruments {a.partition_instruments} --engine {a.engine} "
-                f"--workers {a.workers} --min-free-gb {a.min_free_gb:g}"
+                f"--engine {a.engine} --workers {a.workers} --min-free-gb {a.min_free_gb:g}"
             )
             if a.peak_gb is not None:
                 extra.append(f"--peak-gb {a.peak_gb:g}")

@@ -102,17 +102,20 @@ class LoopResult:
         }
 
 
-def _is_live_client(client: Any) -> bool:
-    return type(client).__module__.split(".")[0] == "anthropic"
-
-
 def wire_spend(client: Any, budget: Budget, model: str, session_id: str) -> None:
-    """E1: a live client always records to the operator ledger; the budget
-    carries the dated pin the model runs under."""
-    if budget.ledger is None and _is_live_client(client):
-        from iap.llm.spend import SpendLedger
+    """E1: any client other than the scripted one records to the operator
+    ledger (REL-13: a ledger-less budget is ``unmetered`` only for
+    :class:`iap.llm.fake.ScriptedClient`); the budget carries the dated pin
+    the model runs under."""
+    if budget.ledger is None:
+        from iap.llm.fake import ScriptedClient
 
-        budget.ledger = SpendLedger.default()
+        if isinstance(client, ScriptedClient):
+            budget.unmetered = True
+        else:
+            from iap.llm.spend import SpendLedger
+
+            budget.ledger = SpendLedger.default()
     if not budget.session_id:
         budget.session_id = session_id
     if budget.pin is None:

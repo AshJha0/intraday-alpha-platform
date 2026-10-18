@@ -22,3 +22,6 @@ tests/golden/** -text
 *.tar binary
 *.woff binary
 *.woff2 binary
+
+# Windows batch wrapper started detached by cmd.exe: keep CRLF.
+tools/run_rel08c_extract.cmd text eol=crlf
