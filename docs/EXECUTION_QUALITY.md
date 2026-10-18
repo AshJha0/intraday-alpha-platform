@@ -342,3 +342,158 @@ Next steps:
 - leave-one-day-out calibration;
 - QQQ, which did not fit in memory beside the ingest;
 - the remaining overlap days.
+
+## 9. Benchmark v2 metrics (v1.18 REL-03)
+
+The v1 headline was the Perold implementation shortfall per parent in bps of
+the PARENT notional. On parents that mostly do not fill it is dominated by
+`opportunity`, and the fill rate confounds both `trading` and `opportunity`
+(review ids X-A, X-G): a cell that fills little looks cheap on `trading` and
+dear on `opportunity` for the same reason. v2 separates what was bought from
+what was not. The code is `iap.research.execution_metrics`; the JSON carries
+`cells.*.metrics_v2`, `metrics_v2_slices` (by arrival-spread regime, time of
+day, size and liquidity bucket) and `metric_definitions`; the Markdown report
+prints the table below with the definitions.
+
+**Sign: positive = worse for the trader, for every cost metric.**
+
+| metric | arrival price | target qty | horizon | benchmark | sign | unit | denominator |
+|---|---|---|---|---|---|---|---|
+| `cost_per_filled_share_bps` (PRIMARY) | mid at window start | filled qty only | fill time | trading cost + net fees + simulated impact adder | positive = worse | bps of arrival mid | filled shares x arrival mid |
+| `trading_cost_per_filled_share_bps` = `arrival_markout_bps` | mid at window start | filled qty | fill time | fill price vs arrival mid | positive = worse | bps of arrival mid | filled shares x arrival mid |
+| `fill_rate` | n/a | parent qty | window | none (a diagnostic, never a target) | higher = more traded | fraction | sum of target qty (qty-weighted); per-parent distribution beside it |
+| `completion_ratio` | n/a | parent qty | window | none | higher = more parents finished | fraction of parents | parents (filled == target is complete) |
+| `residual_qty` | n/a | parent qty | window end | target - filled | positive = unfilled | shares | none (total, mean, share of target) |
+| `completion_charge_bps` | mid at window start | residual qty | window end | half-spread at the end + taker fee per residual share | positive = worse | bps of arrival mid of the residual | residual shares x arrival mid |
+| `shortfall_per_target_share_bps` (SECONDARY) | mid at window start | parent qty | window end | Perold: trading + opportunity | positive = worse | bps of target notional | target qty x arrival mid |
+| `post_trade_markout_bps[h]` | n/a | filled qty | h = 1 s, 5 s, 30 s after each fill | side-signed fill price vs mid at fill + h | positive = adverse | bps of fill price | filled shares with a defined mid at +h (undefined fills are excluded, never zero) |
+
+**Two aggregates, always both.** The pooled value is the quantity-weighted
+ratio of sums (a big parent weighs more); `per_parent` is the distribution of
+the per-parent ratio over parents that filled (mean, sd, 10/25/50/75/90 %
+quantiles) plus the count of parents with no fill. They differ whenever cost
+and size correlate, and the report shows both.
+
+**Uncertainty.** One cluster per session. The pooled ratio's standard error is
+the CR1 cluster-linearised ratio estimator
+`G/(G-1) * sum_g (C_g - R Q_g)^2 / (sum Q)^2`; the interval is Student-t at
+`G - 1` degrees of freedom. Next to every interval the JSON and the report
+print `n` (parents), `n_clusters` (G), the design effect (CR1 variance over
+the independent-sampling variance of the same ratio), the effective sample size
+`ESS = n / design effect`, and the minimum detectable effect
+(`mde`: `iap.research.study_stats.mde` on the cluster-level sd `se * sqrt(G)`,
+normal approximation; `mde_t`: the Student-t version at 80 % power, two-sided
+5 %). With G = 2 the interval is very wide by design. A narrower interval is a
+diagnostic about the estimator, never a gate.
+
+**Size labels.** The grid sizes parents from the venue ADV in
+`instruments.json`, one venue's volume: "2 % ADV" there is a fraction of a
+percent of the consolidated market (X-F). `--consolidated-adv <json>`
+(`{symbol: consolidated daily shares}`) adds `size_pct_consolidated_adv` to
+every parent row and buckets liquidity by consolidated ADV; the cell labels
+are unchanged (so keys stay comparable with v1) and the JSON states the basis
+in `grid.size_basis`.
+
+**All 16 cells every day (X-E).** A 30-minute window on a 6.5-hour session
+gives 12 windows for the 16 cells of the default grid, so `IS|2 %` and
+`POV|2 %` never ran and several cells had n = 1-2. `--cover-all-cells` adds
+overlapping passes (each replayed on its own, so parents of different passes
+never interact) until every cell runs at least once per session; the default
+keeps the v1.17 rotation so committed JSONs reproduce. `coverage_by_session`
+gives n per cell per session and lists any cell that did not run; the report
+prints it. Per-cell n is therefore the number of parents, not days: cells keep
+the `n_sessions` clustering unit.
+
+**Opportunity cost.** Not trading is never free: `completion_charge` prices
+finishing the residual at the window end, and `shortfall` (secondary) marks
+the residual at the end mid. Neither is a manufactured fill.
+
+## 10. Venue-aware child execution and venue fidelity (v1.18 REL-04)
+
+Every item is Python only and **opt-in; the default replay is byte-identical**
+(goldens and published JSONs unchanged). Review ids X-B, X-C, X-D, X-E.
+
+**Child orders (X-B).** The v1.17 IS / POV / aggressive child is a 1000-share
+MARKET order walked down 10 levels of a venue whose touch can be 19-155
+shares; the remainder is cancelled, IS never re-posts, and `depth_exhausted`
+only counts it. `ParentOrder.child_exec = ChildExecParams(...)`
+(`iap.execution.child_exec`; benchmark variants `base+capped` and `base+peg`)
+replaces the non-passive child with:
+
+- `capped_ioc`: a marketable IOC LIMIT whose size is the ELIGIBLE displayed
+  depth: the top `max_levels` opposite levels within `max_slippage_ticks` of the
+  touch, net of what our own fills already consumed (simulator rule 3b:
+  displayed liquidity is never consumed twice), times `depth_fraction`; the
+  limit is the deepest level used.
+- `midpoint_peg`: see below.
+- **Remaining-quantity state.** What the cap withholds, and the unfilled
+  remainder of an IOC or of an expired peg, is OWED (`carry`), re-posted no
+  sooner than `repost_interval_ns` apart, at most `max_reposts` times, never
+  after the window closes. POV parents carry nothing (the next TRADE's deficit
+  is their re-post). Anything still owed at the end is **residual**: reported
+  (`residual_qty`, `carry_unsent_qty`), priced by the completion charge and the
+  opportunity cost, **never filled**.
+- **Participation.** `max_participation` caps committed quantity at that
+  fraction of the TRADE-print volume of the instrument on the EXECUTING venue
+  since the window opened (what the child can trade against; our simulated
+  fills never enter the stream). The POV `participation` keeps its v1.16
+  measure (all TRADE prints of the instrument in the stream).
+- **Failures are counters.** `cap_no_depth` (a post found no eligible depth or
+  no venue), `cap_withheld_qty`, `reposts`, `carry_unsent_qty`, the legacy
+  `depth_exhausted`, and the cell's `failures` block (incomplete parents,
+  residual, ...) are in the JSON and nothing is silent. A capped child can
+  still be counted `depth_exhausted` when the display shrinks between the
+  decision and the arrival.
+
+**Event ordering.** One chain for every child, order and cancel:
+market data seen at `t` (`md_delay_ns` shifts the decision to `t + md_delay`) ->
+decision -> internal legs (decision, risk, wire) -> venue leg (+ jitter) ->
+`inbound_delay_ns` -> arrival and activation, in `(arrival, order_id)` order,
+cancel arrivals merged by time with activations (rule 7). A cancel takes the
+same path, never overtakes its own order, and **never erases an earlier
+effective fill**: a cancel arriving after the order filled is a no-op counted
+in `ExecutionSimulator.cancel_rejected_filled`; a cancel that lands before a
+fill wins. There is no separate acknowledgement event: the ack is implied by
+activation, so a cancel decided before the venue acknowledges waits for
+arrival. Order eligibility (state, venue open, limit, time in force) and fill
+eligibility (displayed size net of consumption, queue ahead, observed volume)
+are separate checks in the simulator, and the adversarial cases (partial
+fills, rejected orders, price moves, exhausted depth, incomplete parents, feed
+gaps, locked/crossed books, stale quotes, duplicates, partial acks, rejected
+cancels, end-of-session residuals) each have a deterministic expected outcome in
+`tests/test_rel04_child_execution.py`.
+
+**IEX fidelity (X-C), all default off.**
+
+- `ExecutionReplay(hidden_prints=True)` (benchmark `--hidden-prints`): the
+  simulator option of v1.14 now reaches replayed parents; non-displayed `T`
+  prints fill resting children.
+- `ChildOrder.peg == "midpoint"` (style `midpoint_peg`): a non-displayed peg,
+  never takes displayed liquidity, fills only against hidden prints within half
+  a tick of the venue midpoint at the PRINTED price, never through its limit
+  (the opposite touch). The pool is the print left over after the displayed
+  queue, budgeted once. The midpoint book is not observable: `peg_ahead_qty`
+  (default 0 = an optimistic upper bound) is an assumption, never a measurement.
+- `VenueSpec.inbound_delay_ns` (venue JSON key `inbound_delay_ns`;
+  `--inbound-delay IEXG=350000`): IEX's published 350 microsecond speed bump,
+  added to every order and cancel. `research/execution/b8/venues_xnas_iexg_v2.json`
+  is the B8 v2 venue file; the v1 file is unchanged so published B8 JSONs still
+  reproduce. Not modelled: D-Peg, D-Limit and the crumbling-quote signal.
+- Plausibility only: the share of displayed vs non-displayed volume in a
+  replay vs IEX's published split compares different populations.
+
+**Capture timestamp (X-D).** `IexReader.receive_ts` keeps the capture host's
+packet timestamp per segment (it was discarded), and `IexReader.feed_latency`
+summarises `receive_ts - send_ts` (count, min, max, mean, negatives, a log2
+histogram). Resolution: the pcapng interface's `if_tsresol` (microsecond or
+nanosecond) or the classic pcap magic; a pcapng simple packet block has no stamp
+(`capture_ts_missing`). Clock source: not recorded in the file (hardware or
+software stamp, NTP/PTP, all unknown). Offset: the capture host's offset to
+IEX's send clock is unknown, so `receive - send` contains an unidentified
+constant; only differences within one capture (jitter, spikes, ordering) are
+interpretable; absolute feed latency and cross-venue skew against another
+host's Nasdaq stamps are NOT identified. `CAPTURE_TS_PROVENANCE` carries these
+statements; any figure derived from the field is reported with them and **never
+as a trading advantage or an order-entry latency**. Nothing consumes the field
+in the simulator yet, and the six overlap days must be re-ingested (after chain
+B) before a measured distribution exists; no value is quoted here.

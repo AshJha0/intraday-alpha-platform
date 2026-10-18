@@ -232,6 +232,8 @@ spec:
                 path: reference/fee_tiers.json
               - key: reference__llm_prices.json
                 path: reference/llm_prices.json
+              - key: reference__reference_etf_map_v1.json
+                path: reference/reference_etf_map_v1.json
               - key: reference__regulatory_fee_schedule.json
                 path: reference/regulatory_fee_schedule.json
               - key: reference__sectors.json

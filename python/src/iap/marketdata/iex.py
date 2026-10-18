@@ -885,6 +885,68 @@ _TRADING_STATES = {"H": "H", "P": "P", "O": "Q", "T": "T"}
 LEVEL_ORDER_ID_BASE = 1 << 48
 
 
+#: What the capture timestamp is and is NOT (v1.18 REL-04, review X-D).  The
+#: file stores one timestamp per packet, taken by the capture host that
+#: recorded the multicast feed; it is the nearest thing this repository has
+#: to a ``receive_ts`` for IEX, and it must never be read as more than that.
+CAPTURE_TS_PROVENANCE: dict[str, str] = {
+    "what": "the capture host's packet timestamp (pcapng enhanced packet block / pcap record); "
+    "kept per IEX-TP segment as IexReader.receive_ts, session-relative nanoseconds",
+    "resolution": "pcapng: the interface's if_tsresol (microsecond or nanosecond, read from the "
+    "file); classic pcap: by magic number; a pcapng SIMPLE packet block carries no timestamp "
+    "(then receive_ts is None and counted in capture_ts_missing)",
+    "clock_source": "unknown and not recorded in the file: whether the stamp is hardware (NIC) or "
+    "kernel software, and whether the host was NTP- or PTP-disciplined, is not stated by IEX",
+    "offset_limits": "the host clock's offset to IEX's send clock is unknown, so receive - send "
+    "contains an unidentified constant offset (and the 37 s TAI/UTC leap-second question for the "
+    "capture host, already removed from the ingested send times); only DIFFERENCES within one "
+    "capture (jitter, spikes, ordering) are interpretable; the ABSOLUTE feed latency, and the "
+    "skew against a Nasdaq stamp from another host, are not identified",
+    "use": "report feed latency and cross-venue skew with these qualifications; never as a "
+    "trading advantage or a measured order-entry latency",
+}
+
+
+class FeedLatency:
+    """Streaming summary of ``receive_ts - send_ts`` (ns) of the messages read.
+
+    Count, min, max, sum, the number negative (impossible for a single clock:
+    evidence of the unknown offset or of reordering) and a base-2 histogram of
+    the non-negative values; exact quantiles are not kept (memory).  The
+    values carry the offset limits of :data:`CAPTURE_TS_PROVENANCE`.
+    """
+
+    def __init__(self) -> None:
+        self.n = 0
+        self.negative = 0
+        self.total = 0
+        self.min: int | None = None
+        self.max: int | None = None
+        self.hist: dict[int, int] = {}  #: floor(log2(ns + 1)) -> count
+
+    def add(self, delta_ns: int) -> None:
+        self.n += 1
+        self.total += delta_ns
+        self.min = delta_ns if self.min is None else min(self.min, delta_ns)
+        self.max = delta_ns if self.max is None else max(self.max, delta_ns)
+        if delta_ns < 0:
+            self.negative += 1
+        else:
+            b = (delta_ns + 1).bit_length() - 1
+            self.hist[b] = self.hist.get(b, 0) + 1
+
+    def summary(self) -> dict[str, Any]:
+        return {
+            "n": self.n,
+            "negative": self.negative,
+            "mean_ns": None if not self.n else self.total / self.n,
+            "min_ns": self.min,
+            "max_ns": self.max,
+            "log2_histogram": {str(k): v for k, v in sorted(self.hist.items())},
+            "qualification": CAPTURE_TS_PROVENANCE["offset_limits"],
+        }
+
+
 class IexReader:
     """An IEX HIST capture -> ITCH message tuples for a fixed universe.
 
@@ -957,6 +1019,7 @@ class IexReader:
             "trades_matched_to_level": 0,
             "level_negative_size": 0,
             "odd_lot_top": 0,
+            "capture_ts_missing": 0,
         }
         self.directory_seen: set[str] = set()
         self.oracle = TopsOracle(tops, self.symbols) if tops is not None else None
@@ -969,6 +1032,12 @@ class IexReader:
         self._next_ref = LEVEL_ORDER_ID_BASE
         self._last_ts: list[int | None] = [None] * len(self.symbols)
         self._expected_seq: int | None = None
+        #: v1.18 REL-04 (X-D): session-relative capture time (ns since midnight of
+        #: ``date``) of the packet whose message was last yielded; ``None`` when the
+        #: packet carries no timestamp.  A consumer building events reads it right
+        #: after each yielded message (:data:`CAPTURE_TS_PROVENANCE` for its limits).
+        self.receive_ts: int | None = None
+        self.feed_latency = FeedLatency()
 
     @property
     def bytes_read(self) -> int:
@@ -984,7 +1053,11 @@ class IexReader:
             yield from pcap_packets(f, self.pcap)
 
     def _messages(self) -> Iterator[tuple]:
-        for _capture_ts, payload in self._payloads():
+        for capture_ts, payload in self._payloads():
+            # kept (v1.18, X-D) as ``receive_ts``: 0 = a simple packet block, no stamp
+            self.receive_ts = capture_ts - self.midnight if capture_ts > 0 else None
+            if capture_ts <= 0:
+                self.counters["capture_ts_missing"] += 1
             seg = tp_segment(payload)
             if seg is None:
                 continue
@@ -1025,6 +1098,9 @@ class IexReader:
                     continue
                 code = chr(data[0])
                 self.counts[code] = self.counts.get(code, 0) + 1
+                sent = getattr(m, "ts", None)
+                if self.receive_ts is not None and isinstance(sent, int):
+                    self.feed_latency.add(self.receive_ts - (sent - self.midnight))
                 yield m
 
     # -- helpers --------------------------------------------------------

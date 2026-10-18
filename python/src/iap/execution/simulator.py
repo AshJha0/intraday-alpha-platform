@@ -183,6 +183,7 @@ class ExecutionSimulator:
         *,
         hidden_prints: bool = False,
         exec_print_price: bool = False,
+        peg_ahead_qty: int = 0,
     ) -> None:
         """``calibration`` (v1.9, opt-in; :mod:`iap.execution.calibration`)
         replaces the rule-1 venue leg ``latency_mean_ns + jitter`` by a draw
@@ -208,8 +209,16 @@ class ExecutionSimulator:
         ``price_ticks`` differs from the resting order's book price (an ITCH
         ``C`` price-improved execution ingested with ``exec_prints=True``),
         our passive fills from it are at that PRINTED price instead of our
-        limit. Off (the default) keeps the pinned rule-4 fill at our limit."""
+        limit. Off (the default) keeps the pinned rule-4 fill at our limit.
+
+        ``peg_ahead_qty`` (v1.18 REL-04, opt-in; Python only): the modelled
+        midpoint queue a ``ChildOrder.peg == "midpoint"`` child sits behind on
+        activation (shares); the venue's non-displayed midpoint book is not
+        observable, so 0 (the default) is an OPTIMISTIC upper bound on peg fills
+        and any value is an assumption, never a measurement."""
         self._config = config
+        self._peg_ahead_qty = max(0, int(peg_ahead_qty))
+        self._peg_fills = 0
         self._calibration = calibration
         #: rule 6b state: cumulative taker qty per (instrument, parent) and
         #: cumulative signed taker qty per instrument.
@@ -324,9 +333,17 @@ class ExecutionSimulator:
             table = self._calibration.latency_for(venue.venue_id)
             if table is not None:
                 sample = table.sample(self._rng.uniform())
-                return decision_ts + self._config.latency.internal_ns + sample
+                return (
+                    decision_ts + self._config.latency.internal_ns + venue.inbound_delay_ns + sample
+                )
         jitter = self._rng.below(venue.latency_jitter_ns + 1) if venue.latency_jitter_ns > 0 else 0
-        return decision_ts + self._config.latency.internal_ns + venue.latency_mean_ns + jitter
+        return (
+            decision_ts
+            + self._config.latency.internal_ns
+            + venue.latency_mean_ns
+            + venue.inbound_delay_ns  # v1.18 REL-04 (X-C): IEX speed bump, 0 by default
+            + jitter
+        )
 
     def submit(self, child: ChildOrder) -> int:
         """Submit a child order (decision-time semantics, rule 1); returns its order_id.
@@ -432,6 +449,23 @@ class ExecutionSimulator:
     def depth_exhausted_qty(self) -> int:
         """Qty cancelled by those depth-exhausted walks (base units)."""
         return self._depth_exhausted_qty
+
+    @property
+    def cancel_rejected_filled(self) -> int:
+        """v1.18 REL-04: cancels whose order FILLED IN FULL before the cancel
+        could take effect ("too late to cancel"): the fill stands, the cancel is
+        a no-op (rule 7).  Cancels that merely cut a partly filled remainder
+        are ordinary cancels and not counted."""
+        return sum(
+            1
+            for o in self._orders.values()
+            if o.cancel_arrival_ts != 0 and o.state == OrderState.FILLED
+        )
+
+    @property
+    def peg_fills(self) -> int:
+        """Fills of ``peg == "midpoint"`` children against hidden prints."""
+        return self._peg_fills
 
     @property
     def hidden_print_trades(self) -> int:
@@ -659,6 +693,16 @@ class ExecutionSimulator:
         is_open = self.venue_open(book)
         if o.post_only and is_open and book is not None and not self._post_only_admit(o, book):
             return  # rule 10: rejected rather than crossing
+        if o.peg:
+            # v1.18 REL-04: a non-displayed midpoint peg never walks the display
+            # and has no displayed queue; it rests until a hidden print reaches it.
+            o.state = OrderState.ACTIVE
+            o.resting = True
+            o.ahead_qty = self._peg_ahead_qty
+            o.entry_ahead_qty = o.ahead_qty
+            o.cross_exempt = True
+            self._resting.append(o.order_id)
+            return
         limit_bound = False
         if is_open and book is not None:
             limit_bound = self._aggressive_fill(o, book)
@@ -683,6 +727,7 @@ class ExecutionSimulator:
                 ahead = self._orders[oid]
                 if (
                     ahead.state == OrderState.ACTIVE
+                    and not ahead.peg
                     and ahead.instrument_id == o.instrument_id
                     and ahead.venue_id == o.venue_id
                     and ahead.side == o.side
@@ -757,8 +802,10 @@ class ExecutionSimulator:
         ts: int,
         fill_price: int | None = None,
         provenance: str = "exec_print",
-    ) -> None:
+    ) -> int:
         """Rule 4: one observed trade of ``qty`` at one level, budgeted once.
+        Returns the budget left after the displayed queue (the midpoint pegs of
+        v1.18 REL-04 may take it).
 
         Handing each resting order the full ``qty`` would manufacture
         liquidity that never traded — n children at one level would each
@@ -777,6 +824,7 @@ class ExecutionSimulator:
                 and o.venue_id == venue_id
                 and o.side == side
                 and o.state == OrderState.ACTIVE
+                and not o.peg
             ):
                 # A trade reaches us when it prints AT our limit, or STRICTLY
                 # WORSE than it (below our bid / above our ask) — the market
@@ -795,6 +843,52 @@ class ExecutionSimulator:
                         px = o.limit_ticks if fill_price is None else fill_price
                         self._emit_fill(o, px, fill, ts, Liquidity.MAKER, provenance)
                         budget -= fill
+            if o.state == OrderState.FILLED:
+                del self._resting[i]
+            else:
+                i += 1
+        return budget
+
+    def _track_pegs(
+        self, ev: MarketEvent, pre: OrderBook | None, budget: int, ts: int, aggressor_side: int
+    ) -> None:
+        """v1.18 REL-04 (X-C): a hidden print of ``budget`` shares at
+        ``ev.price_ticks`` fills our resting midpoint pegs on the opposite side.
+
+        Eligible when the print is within half a tick of the venue's midpoint
+        (``|2 * price - (bid + ask)| <= 1``) and inside the peg's limit; the fill
+        is at the PRINTED price.  The pool is the print's quantity left after the
+        displayed queue, budgeted once across the pegs in activation order, each
+        peg first paying down its modelled ``ahead_qty``.
+        """
+        if pre is None or budget <= 0:
+            return
+        bid, ask = pre.best_bid(), pre.best_ask()
+        if bid is None or ask is None:
+            return
+        px = ev.price_ticks
+        if abs(2 * px - (bid[0] + ask[0])) > 1:
+            return
+        i = 0
+        while i < len(self._resting):
+            o = self._orders[self._resting[i]]
+            if (
+                budget > 0
+                and o.peg
+                and o.state == OrderState.ACTIVE
+                and o.instrument_id == ev.instrument_id
+                and o.venue_id == ev.venue_id
+                and o.side == 1 - aggressor_side
+                and (px <= o.limit_ticks if o.side == 0 else px >= o.limit_ticks)
+            ):
+                dec = min(o.ahead_qty, budget)
+                o.ahead_qty -= dec
+                budget -= dec
+                if budget > 0:
+                    fill = min(budget, o.remaining)
+                    self._emit_fill(o, px, fill, ts, Liquidity.MAKER, "midpoint_peg")
+                    self._peg_fills += 1
+                    budget -= fill
             if o.state == OrderState.FILLED:
                 del self._resting[i]
             else:
@@ -837,6 +931,7 @@ class ExecutionSimulator:
                 o.instrument_id == ev.instrument_id
                 and o.venue_id == ev.venue_id
                 and o.state == OrderState.ACTIVE
+                and not o.peg
             ):
                 opp = best_ask if o.side == 0 else best_bid
                 crossed = opp is not None and (
@@ -885,6 +980,7 @@ class ExecutionSimulator:
                 o.instrument_id == ev.instrument_id
                 and o.venue_id == ev.venue_id
                 and o.state == OrderState.ACTIVE
+                and not o.peg
             ):
                 out.append((oid, 0 if pre is None else pre.level_qty(o.side, o.limit_ticks)))
         return out
@@ -965,7 +1061,7 @@ class ExecutionSimulator:
                 # X-P2-7 (opt-in): a non-displayed execution at ev.price_ticks
                 # against the resting side opposite the aggressor.
                 self._hidden_print_trades += 1
-                self._track_consumption(
+                left = self._track_consumption(
                     ev.instrument_id,
                     ev.venue_id,
                     1 - ev.side,
@@ -974,6 +1070,7 @@ class ExecutionSimulator:
                     t,
                     provenance="hidden_print",
                 )
+                self._track_pegs(ev, pre, left, t, ev.side)
             elif et == EventType.CANCEL:
                 for oid, before in level_before:
                     o = self._orders[oid]

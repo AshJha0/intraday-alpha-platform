@@ -61,6 +61,7 @@ pinned outputs above are unchanged.
 
 from __future__ import annotations
 
+import bisect
 import heapq
 import math
 from collections.abc import Iterable, Sequence
@@ -77,6 +78,7 @@ from iap.execution.algos import (
     slice_times,
     slice_weights,
 )
+from iap.execution.child_exec import eligible_depth, participation_room
 from iap.execution.config import ExecConfig, SorOptions
 from iap.execution.dark import DARK_ID_BASE, DarkFirstParams, dark_pretrade_check, midpoint_ticks
 from iap.execution.fading import (
@@ -160,6 +162,17 @@ class ParentReport:
     dark_unsent_qty: int = 0
     dark_notional: float = 0.0
     dark_rejected: dict[str, int] = field(default_factory=dict)
+    # ---- v1.18 REL-04 child execution (``ParentOrder.child_exec``; zero otherwise) ----
+    #: posts that found NO eligible displayed depth (a failure counter, never silent)
+    cap_no_depth: int = 0
+    #: qty a fresh post withheld because the depth / participation cap was lower
+    cap_withheld_qty: int = 0
+    #: re-posts of owed quantity
+    reposts: int = 0
+    #: qty still owed (never sent) when the window closed
+    carry_unsent_qty: int = 0
+    #: target minus filled: always visible, never a manufactured fill
+    residual_qty: int = 0
 
     def to_dict(self) -> dict:
         """Row in the key order of ``expected_replay_fills.json`` ``parents``."""
@@ -195,6 +208,11 @@ class ParentReport:
             "dark_notional": self.dark_notional,
             "dark_rejected": dict(self.dark_rejected),
             "dark_fills_label": "modelled, not measured" if self.dark_children else "",
+            "cap_no_depth": self.cap_no_depth,
+            "cap_withheld_qty": self.cap_withheld_qty,
+            "reposts": self.reposts,
+            "carry_unsent_qty": self.carry_unsent_qty,
+            "residual_qty": self.residual_qty,
         }
 
 
@@ -297,6 +315,14 @@ class _ParentState:
     dark_unsent_qty: int = 0
     dark_notional: float = 0.0
     dark_rejected: dict[str, int] = field(default_factory=dict)
+    # ---- v1.18 REL-04 child execution (None = off) ----
+    idx: int = 0
+    carry_qty: int = 0  #: qty owed (withheld by the cap or left by a cancelled child)
+    next_repost_ts: int = 0
+    reposts: int = 0
+    cap_no_depth: int = 0
+    cap_withheld_qty: int = 0
+    ce_open: list[int] = field(default_factory=list)  #: capped children not yet collected
 
 
 @dataclass(slots=True)
@@ -326,9 +352,32 @@ class ExecutionReplay:
         router: CostAwareRouter | None = None,
         router_fill_prob: FillProb | None = None,
         router_sweep: bool = False,
+        hidden_prints: bool = False,
+        peg_ahead_qty: int = 0,
+        md_delay_ns: int = 0,
     ) -> None:
+        """``hidden_prints`` / ``peg_ahead_qty`` (v1.18 REL-04, opt-in) are passed
+        to the simulator (non-displayed prints fill resting children / midpoint
+        pegs); ``md_delay_ns`` (opt-in) delays every child decision of a
+        ``child_exec`` parent by the market-data delay: the replayed event at
+        ``t`` is only SEEN at ``t + md_delay_ns``, so the child is decided,
+        sent and arrives that much later (order: market data seen, decision,
+        send, venue arrival including the inbound delay; a cancel takes the same
+        path and never overtakes its order)."""
+        if md_delay_ns < 0:
+            raise ValueError("md_delay_ns must be >= 0")
         self._config = config
-        self._sim = ExecutionSimulator(config)
+        self._md_delay_ns = md_delay_ns
+        self._sim = ExecutionSimulator(
+            config, hidden_prints=hidden_prints, peg_ahead_qty=peg_ahead_qty
+        )
+        self._live_ce: set[int] = set()
+        #: (instrument, venue) -> (ts list, cumulative TRADE volume list); only built
+        #: when a parent caps its participation
+        self._vol_log: dict[tuple[int, int], tuple[list[int], list[int]]] = {}
+        self._need_vol = any(
+            q.child_exec is not None and q.child_exec.max_participation > 0.0 for q in parents
+        )
         self._sor = SmartOrderRouter(config.venues, sor_options)
         # v1.17 B8 (opt-in): unpinned children (venue_id 0) route through the
         # cost-aware router (sor_v2) instead of the pinned one; None = unchanged.
@@ -392,6 +441,7 @@ class ExecutionReplay:
             if p.dark_first is not None:
                 self._init_dark_state(ps)
             idx = len(self._parents)
+            ps.idx = idx
             self._parents.append(ps)
             self._by_parent_id.setdefault(p.parent_id, []).append(ps)
             if p.algo == AlgoType.POV:
@@ -695,9 +745,26 @@ class ExecutionReplay:
         if child_qty <= 0:
             return True
         p = ps.order
-        book = self._sim.instrument_book(p.instrument_id)
         if not passive and p.venue_id == 0 and self._router_sweep:
             return self._issue_sweep(ps, child_qty, decision_ts)
+        venue_id = self._route(ps, decision_ts, passive)
+        if venue_id == NO_ROUTE:
+            self._sor_no_route += 1  # no eligible venue: do not submit (pinned)
+            if p.child_exec is not None and not passive:
+                # REL-04: the quantity is owed, and the failure is counted, never silent
+                ps.cap_no_depth += 1
+                if p.algo != AlgoType.POV:
+                    ps.carry_qty += child_qty
+                    self._live_ce.add(ps.idx)
+            return False
+        if p.child_exec is not None and not passive:
+            return self._issue_capped(ps, child_qty, decision_ts, venue_id, fresh=True)
+        return self._issue_routed(ps, child_qty, decision_ts, passive, post, venue_id)
+
+    def _route(self, ps: _ParentState, decision_ts: int, passive: bool) -> int:
+        """The venue of the next child (pinned venue, cost-aware router or SOR)."""
+        p = ps.order
+        book = self._sim.instrument_book(p.instrument_id)
         if p.venue_id != 0:
             venue_id = p.venue_id
         elif self._router is not None:
@@ -714,9 +781,18 @@ class ExecutionReplay:
             venue_id = self._sor.route_passive(book, p.side, self._sor_candidates)
         else:
             venue_id = self._sor.route_aggressive(book, p.side, self._sor_candidates)
-        if venue_id == NO_ROUTE:
-            self._sor_no_route += 1  # no eligible venue: do not submit (pinned)
-            return False
+        return venue_id
+
+    def _issue_routed(
+        self,
+        ps: _ParentState,
+        child_qty: int,
+        decision_ts: int,
+        passive: bool,
+        post: bool,
+        venue_id: int,
+    ) -> bool:
+        p = ps.order
         order_type = OrderType.MARKET
         limit_ticks = 0
         if passive:
@@ -748,6 +824,130 @@ class ExecutionReplay:
         ps.child_ids.append(oid)
         ps.open_child_ids.append(oid)
         return True
+
+    # ------------------------------------------------ v1.18 REL-04 child execution
+
+    def _venue_volume(self, iid: int, venue_id: int, start: int, t: int) -> int:
+        """TRADE-print volume of ``iid`` on ``venue_id`` in ``[start, t]`` (the measure
+        ``max_participation`` caps against: what the child can trade against)."""
+        log = self._vol_log.get((iid, venue_id))
+        if log is None:
+            return 0
+        ts, cum = log
+        hi = bisect.bisect_right(ts, t)
+        lo = bisect.bisect_left(ts, start)
+        top = cum[hi - 1] if hi > 0 else 0
+        base = cum[lo - 1] if lo > 0 else 0
+        return top - base
+
+    def _issue_capped(
+        self, ps: _ParentState, qty: int, t: int, venue_id: int, *, fresh: bool
+    ) -> bool:
+        """One child of ``qty`` under ``ParentOrder.child_exec``: sized to the eligible
+        displayed depth and the participation room; what is withheld is owed."""
+        p = ps.order
+        ce = p.child_exec
+        assert ce is not None
+        sim = self._sim
+        iid = p.instrument_id
+        vb = sim.venue_book(iid, venue_id)
+        opp = 1 if p.side == 0 else 0
+        open_ = vb is not None and sim.venue_open(vb)
+        levels = vb.depth(opp, ce.max_levels) if (open_ and vb is not None) else []
+        if ce.style == "midpoint_peg":
+            limit = levels[0][0] if levels else 0
+            sendable = qty if limit else 0
+        else:
+            elig, limit = eligible_depth(
+                levels, p.side, ce, lambda px: sim._consumed_at(iid, venue_id, opp, px)
+            )
+            sendable = min(qty, elig)
+        if ce.max_participation > 0.0:
+            vol = self._venue_volume(iid, venue_id, p.start_ts, t)
+            sendable = min(sendable, participation_room(ce, vol, self._committed_qty(ps), p.qty))
+        if sendable < ce.min_child_qty:
+            sendable = 0
+        ps.next_repost_ts = t + ce.repost_interval_ns  # re-posts are spaced from the last post
+        if sendable == 0:
+            ps.cap_no_depth += 1  # a failure counter: the post found nothing it may take
+        withheld = qty - sendable
+        if withheld > 0:
+            if fresh:
+                ps.cap_withheld_qty += withheld
+            if p.algo != AlgoType.POV:
+                ps.carry_qty += withheld  # owed: re-posted by _work_carry
+        if sendable > 0:
+            is_peg = ce.style == "midpoint_peg"
+            expire = p.end_ts
+            if is_peg and ce.deadline_ns > 0:
+                expire = min(p.end_ts, t + self._md_delay_ns + ce.deadline_ns)
+            oid = sim.submit(
+                ChildOrder(
+                    parent_id=p.parent_id,
+                    instrument_id=iid,
+                    venue_id=venue_id,
+                    side=p.side,
+                    type=OrderType.LIMIT if is_peg else OrderType.IOC,
+                    limit_ticks=limit,
+                    qty=sendable,
+                    decision_ts=t + self._md_delay_ns,
+                    expire_ts=expire,
+                    peg="midpoint" if is_peg else "",
+                )
+            )
+            ps.child_ids.append(oid)
+            ps.open_child_ids.append(oid)
+            ps.ce_open.append(oid)
+        if ps.ce_open or ps.carry_qty > 0:
+            self._live_ce.add(ps.idx)
+        return True
+
+    def _work_carry(self, ps: _ParentState, t: int) -> None:
+        """Collect the unfilled remainder of finished capped children into the owed
+        quantity and re-post it (spacing, count and window limits of ``child_exec``)."""
+        p = ps.order
+        ce = p.child_exec
+        assert ce is not None
+        still: list[int] = []
+        for oid in ps.ce_open:
+            o = self._order(oid)
+            if not o.is_terminal:
+                still.append(oid)
+                continue
+            if (
+                p.algo != AlgoType.POV
+                and o.remaining > 0
+                and (
+                    o.cancel_reason
+                    in (CancelReason.UNFILLED_REMAINDER, CancelReason.VENUE_NOT_TRADING)
+                    or (o.cancel_reason == CancelReason.EXPIRED and o.expire_ts < p.end_ts)
+                )
+            ):
+                ps.carry_qty += o.remaining
+        ps.ce_open = still
+        if (
+            ps.carry_qty > 0
+            and t < p.end_ts
+            and t >= ps.next_repost_ts
+            and ps.reposts < ce.max_reposts
+        ):
+            owed = min(ps.carry_qty, max(p.qty - self._committed_qty(ps), 0))
+            ps.carry_qty = 0
+            if owed > 0:
+                ps.reposts += 1
+                ps.next_repost_ts = t + ce.repost_interval_ns
+                venue_id = self._route(ps, t, False)
+                if venue_id == NO_ROUTE:
+                    self._sor_no_route += 1
+                    ps.cap_no_depth += 1
+                    ps.carry_qty = owed
+                else:
+                    while owed > 0:
+                        q = min(owed, p.max_child_qty)
+                        self._issue_capped(ps, q, t, venue_id, fresh=False)
+                        owed -= q
+        if not ps.ce_open and (ps.carry_qty == 0 or t >= p.end_ts or ps.reposts >= ce.max_reposts):
+            self._live_ce.discard(ps.idx)
 
     def _issue_sweep(self, ps: _ParentState, child_qty: int, decision_ts: int) -> bool:
         """v1.17.1 B8 ``sor_sweep``: one IOC LIMIT per venue from ``plan_sweep``
@@ -1404,9 +1604,16 @@ class ExecutionReplay:
             self._book_new_fills()
             if self._lit_volume:
                 self._track_lit_volume(ev)
+            if self._need_vol and ev.event_type == EventType.TRADE:
+                ts_l, cum_l = self._vol_log.setdefault((ev.instrument_id, ev.venue_id), ([], []))
+                ts_l.append(ev.exchange_ts)
+                cum_l.append((cum_l[-1] if cum_l else 0) + ev.qty)
             for idx in self._visits(ev):
                 self._schedule(parents[idx], ev)
                 self._after_visit(idx)
+            if self._live_ce:
+                for idx in sorted(self._live_ce):
+                    self._work_carry(parents[idx], ev.exchange_ts)
             res.events_processed += 1
         self._sim.cancel_all()
         self._book_new_fills()
@@ -1456,6 +1663,11 @@ class ExecutionReplay:
                     r.depth_exhausted += 1
                     r.depth_exhausted_qty += o.remaining
             r.unfilled_qty = p.qty - r.filled_qty
+            r.residual_qty = r.unfilled_qty
+            r.cap_no_depth = ps.cap_no_depth
+            r.cap_withheld_qty = ps.cap_withheld_qty
+            r.reposts = ps.reposts
+            r.carry_unsent_qty = ps.carry_qty
             r.avg_price = r.notional / (float(r.filled_qty) * lot) if r.filled_qty > 0 else 0.0
             r.total_cost = r.fees - r.rebates + r.impact
             if ps.signal:

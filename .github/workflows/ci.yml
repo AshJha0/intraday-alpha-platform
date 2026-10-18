@@ -124,6 +124,10 @@ jobs:
       matrix:
         # 3.11 = the pinned CI interpreter; 3.12 = what the studies run on (E-P1-6)
         python-version: ["3.11", "3.12"]
+    env:
+      # v1.18 (REL-14a): the 3.11 run's JUnit XML is the python half of the
+      # parity counts the deployment job derives (tests/harness/parity_counts.py).
+      PYTEST_ADDOPTS: ${{ matrix.python-version == '3.11' && '--junitxml=/tmp/parity/junit.xml' || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -195,6 +199,13 @@ jobs:
         run: >
           python -m pytest -q -n auto --dist loadfile --durations=25
           -m "not slow"
+      - name: upload parity counts input (v1.18 REL-14a)
+        if: always() && matrix.python-version == '3.11'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: parity-python
+          path: /tmp/parity/junit.xml
+          if-no-files-found: ignore
       # v1.17 (F4 / F5): the Python MVP loop latency budget and the peak-RSS
       # guards on the committed real slice (benchmarks/slices/
       # itch50_20190130_AAPL). Serial, after pytest, on the pinned 3.11 only:
@@ -262,6 +273,8 @@ jobs:
   python-slow:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      PYTEST_ADDOPTS: --junitxml=/tmp/parity/junit.xml   # v1.18 REL-14a parity counts
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -334,6 +347,13 @@ jobs:
           name: coverage-python
           path: coverage-python.xml
           if-no-files-found: ignore
+      - name: upload parity counts input (v1.18 REL-14a)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: parity-python-slow
+          path: /tmp/parity/junit.xml
+          if-no-files-found: ignore
 
   integration:
     runs-on: ubuntu-24.04
@@ -349,9 +369,16 @@ jobs:
           pip install --require-hashes -r python/requirements-ci.txt
       # Run from the repo root: tests/conftest.py puts python/src on sys.path.
       - name: integration (cross-component end-to-end runs)
-        run: python3 -m pytest -q tests/integration
+        run: python3 -m pytest -q tests/integration --junitxml=/tmp/parity/integration.xml
       - name: replay (same seed => identical bytes)
-        run: python3 -m pytest -q tests/replay
+        run: python3 -m pytest -q tests/replay --junitxml=/tmp/parity/replay.xml
+      - name: upload parity counts input (v1.18 REL-14a)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: parity-integration
+          path: /tmp/parity/
+          if-no-files-found: ignore
 
   cpp:
     runs-on: ubuntu-24.04
@@ -368,7 +395,17 @@ jobs:
         run: bash build.sh
       - name: ctest
         working-directory: cpp
-        run: ctest --test-dir build --output-on-failure
+        shell: bash
+        run: |
+          mkdir -p /tmp/parity
+          ctest --test-dir build --output-on-failure | tee /tmp/parity/ctest.txt
+      - name: upload parity counts input (v1.18 REL-14a)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: parity-cpp
+          path: /tmp/parity/ctest.txt
+          if-no-files-found: ignore
       # Coarse latency guard: run the Release bench_all (about 20 s) and fail
       # only when a hot row is more than 5x slower than the committed table
       # (benchmarks/results_cpp.md). A shared runner is not the 2-CPU Xeon the
@@ -466,7 +503,17 @@ jobs:
           workspaces: rust
       - name: cargo test (workspace)
         working-directory: rust
-        run: cargo test --workspace --locked
+        shell: bash
+        run: |
+          mkdir -p /tmp/parity
+          cargo test --workspace --locked 2>&1 | tee /tmp/parity/cargo_test.txt
+      - name: upload parity counts input (v1.18 REL-14a)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: parity-rust
+          path: /tmp/parity/cargo_test.txt
+          if-no-files-found: ignore
       # v1.16 item 13: benches (risk check_order) must keep compiling.
       - name: cargo bench --no-run (workspace)
         working-directory: rust
@@ -726,9 +773,21 @@ jobs:
           python3 -m iap.marketdata
           python3 -m iap.features
       - name: cross-language golden suite (promotion gate 10)
-        run: bash tests/harness/run_golden.sh
+        shell: bash
+        run: |
+          mkdir -p /tmp/parity
+          bash tests/harness/run_golden.sh | tee /tmp/parity/golden.txt
+      - name: upload parity counts input (v1.18 REL-14a)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: parity-golden
+          path: /tmp/parity/golden.txt
+          if-no-files-found: ignore
 
   deployment:
+    # v1.18 (REL-14a): after the jobs whose outputs give the parity counts.
+    needs: [python, python-slow, integration, cpp, rust, golden]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -774,12 +833,23 @@ jobs:
           elif [ -n "$BEFORE_SHA" ] && git cat-file -e "$BEFORE_SHA^{commit}" 2>/dev/null; then
             python3 tests/harness/check_polyglot_policy.py --base "$BEFORE_SHA" --advisory
           fi
+      # v1.18 (REL-14a): the parity counts from the CI jobs' own outputs
+      # (run_all.sh is not run in CI); README's table is compared with them
+      # below. Drift is a warning with the derived table in the job summary
+      # (python counts move with every PR that adds a test); --parity-strict
+      # makes it a failure for the release check.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: parity-*
+          path: parity
+      - name: derive the parity counts from the CI artefacts
+        run: python3 tests/harness/parity_counts.py derive --dir parity --out parity_ci.json
       - name: headline numbers vs artefacts
         # exit 2 = only the research-ledger rows are stale (they move on every
         # research rerun); exit 1 = a platform number is wrong.
         run: |
           set +e
-          python3 tests/harness/check_headline_numbers.py
+          python3 tests/harness/check_headline_numbers.py --parity-json parity_ci.json
           rc=$?
           set -e
           if [ "$rc" = "1" ]; then exit 1; fi
@@ -825,6 +895,10 @@ jobs:
         env:
           PYTHONPATH: python/src
         run: python -m iap.mlops --registry research/models/registry check-promotions
+      # v1.18 (REL-12): every dataset version a prereg or ledger cites is in
+      # the committed research/data_manifest.json (the data is git-ignored).
+      - name: preregs and ledgers cite only manifest-listed dataset versions
+        run: python tools/data_manifest.py check
       - name: ledgers and blackboard are monotone vs the base
         env:
           EVENT_NAME: ${{ github.event_name }}

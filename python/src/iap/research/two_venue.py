@@ -30,6 +30,14 @@ shift. ``iex_clock="capture"`` is for a stream stamped by the capture clock:
 ``exchange_ts`` and ``receive_ts`` are shifted by ``-37 s`` before the
 merge. Nothing else is adjusted (no latency, no skew estimate).
 
+**Feed latency and cross-venue skew (v1.18 REL-04, X-D).** The IEX reader keeps the
+capture host's packet timestamp as ``IexReader.receive_ts`` and summarises
+``receive_ts - send_ts`` in ``IexReader.feed_latency``; that quantity contains an
+unidentified clock offset between the capture host and IEX (and says nothing about
+the Nasdaq stamps of another host), so any latency or skew figure derived from it
+must carry :data:`SKEW_QUALIFICATION` and is never a trading advantage or an
+order-entry latency.  The replay does not use it: venue legs stay as configured.
+
 **Per-venue calibration** (:func:`calibrate_day`, :func:`combine_days`):
 
 - *fill probability*: the queue-depletion hazard of each venue's own book
@@ -87,6 +95,14 @@ IEX_CLOCKS = ("exchange", "capture")
 DEFAULT_OUT = Path("research/execution/b8")
 DEFAULT_TOX_HORIZONS: tuple[str, ...] = ("1s", "5s", "30s")
 DEFAULT_FILL_HORIZON_S = 1.0
+#: v1.18 REL-04 (X-D): the qualification every feed-latency / cross-venue skew figure carries.
+SKEW_QUALIFICATION = (
+    "feed latency = capture-host packet time minus IEX send time: an unidentified clock offset "
+    "is included, only within-capture differences are interpretable, cross-venue skew against "
+    "Nasdaq stamps from another host is not identified, and none of it is a trading advantage "
+    "or an order-entry latency (iap.marketdata.iex.CAPTURE_TS_PROVENANCE)"
+)
+
 ALIGNMENT_RULE = (
     "both streams on ns since the session's New York midnight, exchange (UTC) clock; "
     "Nasdaq ITCH as stamped; IEX: exchange_ts from the messages' own UTC send times "

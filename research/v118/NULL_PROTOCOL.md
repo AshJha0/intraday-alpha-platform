@@ -1,9 +1,11 @@
-# Known-null protocol (v1.18, programme section 9.4): DRAFT for the owner
+# Known-null protocol (v1.18, programme section 9.4)
 
-**Status: draft. Not signed, not registered, nothing run.** The owner reviews, edits the open parameters
-in section 10, and signs (Ed25519, trust-root maintainer key, on a machine that does not run the study).
-It must be signed before REL-06 runs and approved in writing by the outside reviewer (gate F3, section 9.3)
-before the statistical gate becomes mandatory. Edits after the first trial is examined void the signature.
+**Status: parameters SET 2026-10-18 by Claude under the owner's written delegation (owner, in chat:
+"think what is best and then set parameters and sign on my behalf"). NOT YET SIGNED: a signature must
+bind the analysis scripts and commit (REL-02a), and those scripts do not exist yet. It is signed, by the same
+delegation, as soon as they do and before any trial or result is examined. The outside reviewer's written
+approval (gate F3, programme section 9.3) remains the independent check and is required before the method
+becomes mandatory.** Edits after the first trial or result is examined void the signature.
 
 Purpose: measure the false-confirmation rate of the *whole* prereg path (signal rows, net P&L per round trip,
 cluster-robust inference, family correction, decision rule) when there is, by construction, nothing to find.
@@ -17,8 +19,8 @@ every trial exactly as in a real confirmatory run. The protocol reports two rate
 
 * **per hypothesis**: the fraction of trials in which a given pre-declared hypothesis is confirmed;
 * **family level**: the fraction of trials in which *any* hypothesis of the family is confirmed
-  (the quantity a promotion decision actually risks). Run for K = 3 (one signal at three horizons) and K = 16
-  (the REL-04 cell count) as two registered variants.
+  (the quantity a promotion decision actually risks). Run for K = 3 (one signal at three horizons), K = 6 (the REL-04b family: three policies against pinned
+  Nasdaq on two symbols) and K = 16 (the REL-04 cell count) as three registered variants.
 
 ## 2. Real material the generators start from
 
@@ -84,8 +86,8 @@ The full path that a REL-04b confirmatory run uses, nothing simplified:
 * Target: false confirmations at most 5 % (per hypothesis, and family level), i.e. the nominal level.
 * Reported with the Monte Carlo 95 % Wilson interval. At 1,000 trials and a true rate of 5 % the interval is
   about 3.7 % to 6.5 % (roughly 1.4 percentage points either side).
-* **Pass** iff the Wilson lower limit is <= 5.0 % for each of: generator A and B, per hypothesis and family level,
-  K = 3 and K = 16. Flag **over-conservative** if the Wilson upper limit is < 2.0 % (the gate is safe but its
+* **Pass** iff, for each of generator A and B, per hypothesis and family level, K = 3, 6 and 16: the point
+  estimate is <= 5.0 % **and** the Wilson upper limit is <= 7.0 %. Flag **over-conservative** if the Wilson upper limit is < 2.0 % (the gate is safe but its
   power will be poor; reported, does not fail).
 * **Fail** otherwise. A failed protocol means the method cannot be mandatory; the remedy list (a different
   small-G test, a larger G, a stricter level) is a new registered protocol, not a threshold edit.
@@ -119,21 +121,21 @@ otherwise they are not claimed.
   Aggregation: equal-weight mean of per-session trip means, so the cluster count is the session count.
   Dollars per trip and trips per session are reported beside, never instead.
 
-## 10. Open parameters for the owner
+## 10. Parameters (set 2026-10-18, owner-delegated)
 
-| # | parameter | proposed | note |
+| # | parameter | set to | why |
 |---|---|---|---|
-| 10.1 | base seeds | 20261018 / 20261019 | any fixed pair; record them in the signed text |
-| 10.2 | registered size for the economic unit | one round lot (100 shares) | must equal the size of the later REL-04b run |
-| 10.3 | pass rule | Wilson lower limit <= 5.0 % | stricter alternative: point estimate <= 5.0 % |
-| 10.4 | family sizes | K = 3 and K = 16 | K must equal the registered family of REL-04b |
-| 10.5 | tail of the cost model | registered spread, fee and impact | fixed by REL-03/04 before signing |
-| 10.6 | AR(1) pooling | pooled within session, per name | alternative: per session |
-| 10.7 | wild-bootstrap weights | Webb six-point, full enumeration | alternative: Rademacher (2^7 = 128 draws, coarse p grid) |
-| 10.8 | reviewer | outside reviewer named in programme section 9.3 | approval is in writing, attached to the release |
-| 10.9 | compute budget | not measured | to be measured on 20 trials before the 1,000-trial run; `-n 2` |
+| 10.1 | base seeds | 20261018 (A) / 20261019 (B) | fixed before any trial; any pair is equally valid |
+| 10.2 | registered size for the economic unit | one round lot (100 shares) | equals the breadth screen's size; the REL-04b pre-declaration must use the same |
+| 10.3 | pass rule | point estimate <= 5.0 % **and** Wilson upper <= 7.0 % | the draft's "Wilson lower <= 5 %" would pass a method whose true false-confirm rate is about 6.4 %; the gate must not be easier than its nominal level |
+| 10.4 | family sizes | K = 3, 6 and 16 | K = 6 is the actual REL-04b family (three policies x two symbols); 3 and 16 bracket it |
+| 10.5 | cost model | the REL-03/04 registered spread, fee, impact and completion charge, at the commit the signature binds | the null must run through exactly the path a real run uses |
+| 10.6 | AR(1) pooling | pooled within session, per name | seven sessions are too few for stable per-session phi; pooling is the conservative choice |
+| 10.7 | wild-bootstrap weights | Webb six-point, full enumeration (6^7 = 279,936) | Rademacher gives only 128 distinct draws at G = 7, too coarse a p grid |
+| 10.8 | reviewer | the outside reviewer of programme section 9.3 | written approval attached to the release before the gate is mandatory |
+| 10.9 | compute budget | measure on 20 trials first; abort and re-plan if the 1,000-trial run exceeds 12 h at `-n 2` | the laptop also runs ingests; a run that blocks the machine for days is not acceptable |
 
 ## 11. What this document does not do
 
-It signs nothing, registers nothing and reads no data. It defines the test; passing it does not show that any
+It registers nothing and reads no data; its signature, when made, binds the runner scripts. It defines the test; passing it does not show that any
 signal works, only that the machinery does not manufacture confirmations.
