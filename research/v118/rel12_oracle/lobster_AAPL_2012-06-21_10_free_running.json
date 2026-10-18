@@ -1,0 +1,1027 @@
+{
+  "converter_counters": {
+    "absorbed_first_message": 0,
+    "backfilled_levels": 424,
+    "cross_trades": 0,
+    "duplicate_order_ids": 0,
+    "events_on_seed_orders": 1336,
+    "halt_messages": 0,
+    "hidden_trades": 11332,
+    "overfilled_executions": 0,
+    "seeded_levels": 19,
+    "unresolved_cancels": 22,
+    "unresolved_deletes": 5478,
+    "unresolved_executions": 1545
+  },
+  "first_onset_examples_by_cause": {
+    "deepest_level": [
+      {
+        "actual": [
+          5876500,
+          1160
+        ],
+        "class": "price",
+        "expected": [
+          5879000,
+          500
+        ],
+        "level": 10,
+        "message_type": 3,
+        "row": 13,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5873900,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5873000,
+          200
+        ],
+        "level": 10,
+        "message_type": 4,
+        "row": 48,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5876500,
+          1160
+        ],
+        "class": "price",
+        "expected": [
+          5873000,
+          200
+        ],
+        "level": 10,
+        "message_type": 1,
+        "row": 70,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5871000,
+          10
+        ],
+        "class": "price",
+        "expected": [
+          5870700,
+          10
+        ],
+        "level": 10,
+        "message_type": 3,
+        "row": 85,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 10,
+        "message_type": 3,
+        "row": 147,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5863300,
+          5
+        ],
+        "class": "price",
+        "expected": [
+          5865000,
+          58
+        ],
+        "level": 10,
+        "message_type": 3,
+        "row": 235,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5863300,
+          5
+        ],
+        "class": "price",
+        "expected": [
+          5865000,
+          58
+        ],
+        "level": 10,
+        "message_type": 4,
+        "row": 512,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5863300,
+          5
+        ],
+        "class": "price",
+        "expected": [
+          5865000,
+          58
+        ],
+        "level": 10,
+        "message_type": 4,
+        "row": 514,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5863300,
+          5
+        ],
+        "class": "price",
+        "expected": [
+          5865000,
+          58
+        ],
+        "level": 10,
+        "message_type": 3,
+        "row": 538,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5863300,
+          5
+        ],
+        "class": "price",
+        "expected": [
+          5865000,
+          58
+        ],
+        "level": 10,
+        "message_type": 3,
+        "row": 540,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5863300,
+          5
+        ],
+        "class": "price",
+        "expected": [
+          5865000,
+          58
+        ],
+        "level": 10,
+        "message_type": 3,
+        "row": 563,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5863300,
+          5
+        ],
+        "class": "price",
+        "expected": [
+          5865000,
+          58
+        ],
+        "level": 10,
+        "message_type": 3,
+        "row": 575,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5863300,
+          5
+        ],
+        "class": "price",
+        "expected": [
+          5865000,
+          58
+        ],
+        "level": 10,
+        "message_type": 3,
+        "row": 593,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5863300,
+          5
+        ],
+        "class": "price",
+        "expected": [
+          5865000,
+          58
+        ],
+        "level": 10,
+        "message_type": 3,
+        "row": 603,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5863300,
+          5
+        ],
+        "class": "price",
+        "expected": [
+          5865000,
+          58
+        ],
+        "level": 10,
+        "message_type": 3,
+        "row": 613,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5863300,
+          5
+        ],
+        "class": "price",
+        "expected": [
+          5865000,
+          58
+        ],
+        "level": 10,
+        "message_type": 3,
+        "row": 643,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5863300,
+          5
+        ],
+        "class": "price",
+        "expected": [
+          5865000,
+          58
+        ],
+        "level": 10,
+        "message_type": 3,
+        "row": 652,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5863300,
+          5
+        ],
+        "class": "price",
+        "expected": [
+          5865000,
+          58
+        ],
+        "level": 10,
+        "message_type": 3,
+        "row": 664,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5863300,
+          5
+        ],
+        "class": "price",
+        "expected": [
+          5865000,
+          58
+        ],
+        "level": 10,
+        "message_type": 3,
+        "row": 674,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5863300,
+          5
+        ],
+        "class": "price",
+        "expected": [
+          5865000,
+          58
+        ],
+        "level": 10,
+        "message_type": 3,
+        "row": 687,
+        "side": "ask"
+      }
+    ],
+    "inner_level_message_on_known_order": [
+      {
+        "actual": [
+          5873900,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5873000,
+          200
+        ],
+        "level": 9,
+        "message_type": 4,
+        "row": 49,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 9,
+        "message_type": 3,
+        "row": 150,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 8,
+        "message_type": 3,
+        "row": 151,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 8,
+        "message_type": 4,
+        "row": 153,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 7,
+        "message_type": 4,
+        "row": 154,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 6,
+        "message_type": 4,
+        "row": 155,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 5,
+        "message_type": 4,
+        "row": 156,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 4,
+        "message_type": 4,
+        "row": 157,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 3,
+        "message_type": 4,
+        "row": 160,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 3,
+        "message_type": 3,
+        "row": 169,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 4,
+        "message_type": 3,
+        "row": 176,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 3,
+        "message_type": 3,
+        "row": 183,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 4,
+        "message_type": 4,
+        "row": 203,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 3,
+        "message_type": 4,
+        "row": 204,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 2,
+        "message_type": 3,
+        "row": 226,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 2,
+        "message_type": 3,
+        "row": 237,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 2,
+        "message_type": 3,
+        "row": 239,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 2,
+        "message_type": 3,
+        "row": 246,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 2,
+        "message_type": 3,
+        "row": 259,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5852500,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          50
+        ],
+        "level": 2,
+        "message_type": 4,
+        "row": 268,
+        "side": "bid"
+      }
+    ],
+    "inner_level_message_on_unseen_order": [
+      {
+        "actual": [
+          5846500,
+          300
+        ],
+        "class": "price",
+        "expected": [
+          5849000,
+          50
+        ],
+        "level": 3,
+        "message_type": 4,
+        "row": 2118,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5849300,
+          300
+        ],
+        "class": "price",
+        "expected": [
+          5849000,
+          50
+        ],
+        "level": 2,
+        "message_type": 4,
+        "row": 2128,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5846300,
+          100
+        ],
+        "class": "size",
+        "expected": [
+          5846300,
+          105
+        ],
+        "level": 2,
+        "message_type": 4,
+        "row": 2243,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5861100,
+          200
+        ],
+        "class": "price",
+        "expected": [
+          5862800,
+          10
+        ],
+        "level": 2,
+        "message_type": 4,
+        "row": 4509,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5865000,
+          58
+        ],
+        "class": "price",
+        "expected": [
+          5865700,
+          204
+        ],
+        "level": 4,
+        "message_type": 4,
+        "row": 4509,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5865000,
+          58
+        ],
+        "class": "price",
+        "expected": [
+          5865700,
+          4
+        ],
+        "level": 2,
+        "message_type": 4,
+        "row": 4574,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5876500,
+          1160
+        ],
+        "class": "price",
+        "expected": [
+          5872200,
+          1000
+        ],
+        "level": 2,
+        "message_type": 4,
+        "row": 5561,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5874800,
+          350
+        ],
+        "class": "price",
+        "expected": [
+          5874900,
+          19
+        ],
+        "level": 2,
+        "message_type": 4,
+        "row": 7097,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5875700,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5875900,
+          100
+        ],
+        "level": 2,
+        "message_type": 4,
+        "row": 7214,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5877100,
+          200
+        ],
+        "class": "price",
+        "expected": [
+          5877200,
+          100
+        ],
+        "level": 2,
+        "message_type": 4,
+        "row": 7258,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5862500,
+          58
+        ],
+        "class": "price",
+        "expected": [
+          5861200,
+          100
+        ],
+        "level": 9,
+        "message_type": 3,
+        "row": 7741,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5862500,
+          58
+        ],
+        "class": "price",
+        "expected": [
+          5861500,
+          100
+        ],
+        "level": 8,
+        "message_type": 3,
+        "row": 10893,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5856700,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5856600,
+          100
+        ],
+        "level": 3,
+        "message_type": 3,
+        "row": 12084,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5856600,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5856400,
+          100
+        ],
+        "level": 4,
+        "message_type": 3,
+        "row": 12084,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5855200,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5855000,
+          50
+        ],
+        "level": 6,
+        "message_type": 3,
+        "row": 12084,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5854300,
+          13
+        ],
+        "class": "price",
+        "expected": [
+          5854000,
+          100
+        ],
+        "level": 7,
+        "message_type": 3,
+        "row": 12085,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5854000,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5853200,
+          105
+        ],
+        "level": 8,
+        "message_type": 3,
+        "row": 12085,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5853100,
+          50
+        ],
+        "class": "price",
+        "expected": [
+          5853000,
+          50
+        ],
+        "level": 8,
+        "message_type": 4,
+        "row": 12114,
+        "side": "bid"
+      },
+      {
+        "actual": [
+          5867700,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5867900,
+          100
+        ],
+        "level": 6,
+        "message_type": 3,
+        "row": 15190,
+        "side": "ask"
+      },
+      {
+        "actual": [
+          5856900,
+          100
+        ],
+        "class": "price",
+        "expected": [
+          5856800,
+          200
+        ],
+        "level": 9,
+        "message_type": 3,
+        "row": 15709,
+        "side": "bid"
+      }
+    ]
+  },
+  "full_book_match_rate": 0.003704,
+  "levels": 10,
+  "match_rate_per_level": {
+    "ask": [
+      0.574179,
+      0.52163,
+      0.472665,
+      0.423124,
+      0.371984,
+      0.318384,
+      0.266462,
+      0.218904,
+      0.173753,
+      0.127353
+    ],
+    "bid": [
+      0.546838,
+      0.480655,
+      0.413526,
+      0.353996,
+      0.296603,
+      0.248944,
+      0.203459,
+      0.161058,
+      0.128832,
+      0.095087
+    ]
+  },
+  "match_rate_per_level_pooled": [
+    0.560508,
+    0.501143,
+    0.443096,
+    0.38856,
+    0.334293,
+    0.283664,
+    0.23496,
+    0.189981,
+    0.151292,
+    0.11122
+  ],
+  "message_counts": {
+    "1": 191015,
+    "2": 3260,
+    "3": 171126,
+    "4": 23658,
+    "5": 11332,
+    "6": 0,
+    "7": 0
+  },
+  "messages_read": 400391,
+  "mismatch_level_rows_by_class": {
+    "extra_level": 0,
+    "missing_level": 7694,
+    "price": 5081979,
+    "size": 356672
+  },
+  "mode": "free_running",
+  "onsets_by_cause": {
+    "deepest_level": 8465,
+    "inner_level_message_on_known_order": 66975,
+    "inner_level_message_on_unseen_order": 194
+  },
+  "onsets_by_level": {
+    "ask": [
+      2076,
+      2844,
+      3431,
+      4124,
+      4704,
+      5007,
+      5149,
+      5102,
+      4911,
+      5198
+    ],
+    "bid": [
+      2009,
+      2683,
+      3080,
+      3586,
+      3712,
+      3770,
+      3820,
+      3666,
+      3495,
+      3267
+    ]
+  },
+  "onsets_by_message_type": {
+    "1": 21480,
+    "2": 1,
+    "3": 46235,
+    "4": 7918
+  },
+  "rejected_events": 6699,
+  "rejected_events_by_message_type": {
+    "2": 11,
+    "3": 4928,
+    "4": 1760
+  },
+  "resyncs": 0,
+  "rows": 400391,
+  "rows_full_book_match": 1483
+}
