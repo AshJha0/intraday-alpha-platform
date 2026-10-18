@@ -850,7 +850,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--max-rebalances", type=int, default=None)
     ap.add_argument("--ledger", type=Path, default=_REPO / "research" / "experiments.json")
     ap.add_argument("--no-ledger", action="store_true", help="tests only: record no look")
-    ap.add_argument("--allow-holdout", action="store_true")
+    ap.add_argument(
+        "--holdout-prereg-id",
+        default=None,
+        help="signed prereg id that authorises a spent / unread dataset (holdout registry)",
+    )
     ap.add_argument("--no-timestamp", action="store_true")
     ap.add_argument(
         "--screen",
@@ -870,13 +874,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = ap.parse_args(argv)
 
-    if args.dataset_dir is not None and "holdout" in str(args.dataset_dir).lower():
-        if not args.allow_holdout:
-            print(
-                f"{args.dataset_dir}: looks like a holdout dataset; the book is in-sample only "
-                "(--allow-holdout to override)",
-                file=sys.stderr,
-            )
+    from iap.research.holdout_registry import HoldoutRefused, guard
+
+    for _d in (args.dataset_dir, args.features_dir if args.dataset_dir is None else None):
+        if _d is None:
+            continue
+        try:  # v1.18 REL-02b: content-hash registry, not a path substring
+            guard(_d, purpose="breadth_book", prereg_id=args.holdout_prereg_id)
+        except HoldoutRefused as exc:
+            print(str(exc), file=sys.stderr)
             return 2
     screen_block = screen_check(args.screen, args.require_screen, args.screen_candidate, args.score)
     if screen_block is not None and screen_block.get("refused"):

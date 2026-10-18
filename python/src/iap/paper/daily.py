@@ -197,6 +197,12 @@ def run_day(
     dataset = Path(dataset)
     if is_forbidden(dataset.name, forbidden):
         raise ValueError(f"{dataset.name} is a forbidden (holdout) dataset")
+    from iap.research.holdout_registry import HoldoutRefused, guard
+
+    try:  # v1.18 REL-02b: the content-hash registry, whatever the directory is called
+        guard(dataset, purpose="paper_daily")
+    except HoldoutRefused as exc:
+        raise ValueError(f"{dataset.name}: {exc}") from exc
     if date not in _sessions(dataset):
         raise ValueError(f"{dataset}: no session {date}")
     if out.exists():

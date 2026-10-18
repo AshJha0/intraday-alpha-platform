@@ -76,3 +76,36 @@ def mkev(
 
 def add(seq, side, price, qty, oid, **kw):
     return mkev(seq, EventType.ADD, side, price, qty, oid, **kw)
+
+
+#: modules that test the holdout registry itself, or rely on its refusals, run unpatched
+_REAL_REGISTRY_MODULES = {"test_holdout_registry", "test_v116_lob_real", "test_v117_screen"}
+
+
+@pytest.fixture(autouse=True)
+def _fixture_datasets_are_not_registered_real_data(request, monkeypatch, tmp_path):
+    """Test fixtures build throw-away dataset directories (often without a dataset.json)
+    that the holdout registry cannot know.  Outside the registry's own tests an
+    UNREGISTERED directory is treated as synthetic; a directory the registry does know
+    (by version, content hash or session) is still judged by it."""
+    if request.module.__name__.rsplit(".", 1)[-1] in _REAL_REGISTRY_MODULES:
+        return
+    from iap.research import holdout_registry as hr
+
+    monkeypatch.setenv(hr.LOG_ENV, str(tmp_path / "holdout_access.jsonl"))
+    real_decide = hr._decide
+
+    def decide(*a, **k):
+        try:
+            return real_decide(*a, **k)
+        except hr.HoldoutRefused as exc:
+            unknown = (
+                "no dataset.json" in str(exc)
+                or "not in research/holdout_registry.json" in str(exc)
+                or "no session / symbol selected" in str(exc)
+            )
+            if unknown and Path(a[0]).exists():
+                return {"state": "synthetic", "reason": "test fixture: unregistered"}
+            raise
+
+    monkeypatch.setattr(hr, "_decide", decide)
