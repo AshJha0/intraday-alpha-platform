@@ -25,9 +25,16 @@ Four named checks over the tracked Markdown (and ``docs/index.html``):
                       expected max |t|, Bonferroni |t|) that differs from the
                       committed research/experiments.json; on any other
                       commit the same findings are reported as STALE
+  latency_claims      (v1.18 REL-14a, gate F9) every latency or speed figure
+                      (``ns``, ``µs``, ``events/s``) in README.md,
+                      docs/index.html and docs/SHOWCASE.md names its
+                      measurement environment (``CI runner`` or ``container``)
+                      and says ``not colocation``, on its own table row or
+                      within two lines of it in the same paragraph; a file
+                      quoting any such figure also states "no latency edge"
 
 Exit codes, as check_headline_numbers.py: 0 all good · 1 a structural
-check failed (links, diagrams, API names) · 2 only status text is stale
+check failed (links, diagrams, API names, latency claims) · 2 only status text is stale
 (``--strict`` makes that 1 too); a ``release_truth`` failure exits 1.  ``--json`` prints the findings as one
 JSON document (what the docs-sync agent reads).
 
@@ -325,6 +332,63 @@ def check_release_truth(f: Findings, release: bool) -> None:
         )
 
 
+#: the pages a reader meets first (gate F9 of the v1.18 programme)
+LATENCY_DOCS = ("README.md", "docs/index.html", "docs/SHOWCASE.md")
+#: a latency or speed figure: 1,279 ns · 31.7 µs · 27.2M events/s · 790,000 events/s
+LATENCY_FIGURE = re.compile(
+    r"\d[\d,.]*\s*(?:ns|µs|μs)(?![A-Za-z])|\d[\d,.]*\s*M?\s*events?/s(?:ec)?\b", re.I
+)
+LATENCY_ENV = re.compile(r"\bCI runner\b|\bcontainer\b", re.I)
+LATENCY_NOT_COLO = re.compile(r"\bnot\s+(?:a\s+)?colocation\b", re.I)
+NO_LATENCY_EDGE = re.compile(r"\bno latency edge\b", re.I)
+
+
+def latency_findings(text: str) -> list[tuple[int, str]]:
+    """(line, problem) for every unqualified latency figure in ``text`` (line 0 = the file)."""
+    lines = text.splitlines()
+    out: list[tuple[int, str]] = []
+    seen_figure = False
+    for i, line in enumerate(lines):
+        m = LATENCY_FIGURE.search(line)
+        if not m:
+            continue
+        seen_figure = True
+        if line.lstrip().startswith("|"):
+            ctx = line  # a table row stands alone: a caveat elsewhere in the table does not count
+        else:
+            lo = i
+            while lo > 0 and i - lo < 2 and lines[lo - 1].strip():
+                lo -= 1
+            hi = i
+            while hi + 1 < len(lines) and hi - i < 2 and lines[hi + 1].strip():
+                hi += 1
+            ctx = "\n".join(lines[lo : hi + 1])
+        missing = [
+            what
+            for what, rx in (("environment", LATENCY_ENV), ("'not colocation'", LATENCY_NOT_COLO))
+            if not rx.search(ctx)
+        ]
+        if missing:
+            out.append((i + 1, f"{m.group(0).strip()!r} without {' and '.join(missing)}"))
+    if seen_figure and not NO_LATENCY_EDGE.search(text):
+        out.append((0, "quotes latency figures but never states 'no latency edge'"))
+    return out
+
+
+def check_latency_claims(f: Findings, docs: tuple[str, ...] = LATENCY_DOCS) -> None:
+    n = 0
+    for rel in docs:
+        path = ROOT / rel
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        n += len(LATENCY_FIGURE.findall(text))
+        for line, problem in latency_findings(text):
+            f.add("latency_claims", "FAIL", f"{rel}:{line}", problem)
+    if not f.failed("latency_claims"):
+        f.add("latency_claims", "PASS", "", f"{n} latency figures, each with its environment")
+
+
 # ---------------------------------------------------------------------------
 def run_all(release: bool = False) -> Findings:
     f = Findings()
@@ -333,6 +397,7 @@ def run_all(release: bool = False) -> Findings:
     check_api_names(f)
     check_status_freshness(f)
     check_release_truth(f, release)
+    check_latency_claims(f)
     return f
 
 
