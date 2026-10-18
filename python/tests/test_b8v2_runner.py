@@ -221,10 +221,9 @@ def test_bind_refuses_while_consolidated_adv_is_null(repo):
     assert not (r / "research/preregs/b8v2_prereg.json").exists()
 
 
-def test_committed_declaration_still_refuses_to_bind():
-    """The committed consolidated ADV file is a placeholder until the owner fills it."""
-    with pytest.raises(SystemExit):
-        rb.check_consolidated(rb.load_decl(), REPO)
+def test_committed_consolidated_adv_is_filled_and_accepted():
+    """The committed consolidated ADV file is filled (2026-10-18, sourced) and passes the check."""
+    rb.check_consolidated(rb.load_decl(), REPO)
 
 
 # --------------------------------------------------------- the good path --
