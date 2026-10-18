@@ -152,3 +152,37 @@ The rolling "recent IEX days" list (`tools/iex_hist.py recent --n 5`: the
 latest five HIST days with TOPS and DEEP+, `research/v117/iex_recent_manifest.json`)
 is listed only: no approval sentence, not downloaded, and `tools/iex_download.py`
 refuses it.
+
+## 6. Provenance: the data manifest and pre-ingest hashes (v1.18 REL-12)
+
+- **Manifest.** `research/data_manifest.json` lists every dataset on the data
+  root (`tools/data_manifest.py generate --data-root data/real`): path,
+  `dataset_version`, every vendor input's file, sha256 and bytes as recorded at
+  ingest, the TOPS oracle capture a `process_report.json` records, the
+  `KEEP.json` sha256 of a processed-and-deleted day, and the purpose / spend
+  status the v1.18 baseline records. It reads `dataset.json`, `KEEP.json` and
+  `process_report.json` only, never the raw or normalized files. The cited
+  synthetic and legacy versions are listed with their provenance (`non_disk`).
+- **CI.** The governance job runs `tools/data_manifest.py check`: every dataset
+  version a committed preregistration or ledger cites must be listed. The data
+  is git-ignored, so the committed manifest is the list; regenerate and commit
+  it after each ingest (`check --data-root data/real` says when it is stale).
+- **Hashes before an ingest.** `tools/r7_download.py` and `tools/iex_download.py`
+  hash while streaming and refuse a file whose sha256 differs from the
+  manifest's (default since v1.18; `--no-verify-sha` restores the size-only
+  check). A manifest without a sha256 gets the computed one in the result,
+  marked `sha256_verified: false`, to pin before the ingest.
+- **Known gap.** The TOPS captures of 2026-05-15 and 05-18 are in
+  docs/research/IEX_OVERLAP_SET.md but in no small file on disk, so the
+  manifest reproduces 8 of that document's 10 hashes
+  (`python/tests/test_data_manifest.py` pins the two missing).
+
+## 7. IEX HIST terms of use
+
+> **TODO (owner):** record the IEX HIST terms here (the terms page URL, the
+> date read, and what they say about research use, redistribution and
+> attribution). The committed documents only state "free, no account, T+1"
+> (§1); the terms themselves are not recorded anywhere in the repository, and
+> a Claude session cannot read them without a download. Until this is filled
+> in, nothing derived from IEX data beyond aggregate results is committed
+> (docs/REAL_DATA.md, "Never redistributed").

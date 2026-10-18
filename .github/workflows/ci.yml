@@ -825,6 +825,10 @@ jobs:
         env:
           PYTHONPATH: python/src
         run: python -m iap.mlops --registry research/models/registry check-promotions
+      # v1.18 (REL-12): every dataset version a prereg or ledger cites is in
+      # the committed research/data_manifest.json (the data is git-ignored).
+      - name: preregs and ledgers cite only manifest-listed dataset versions
+        run: python tools/data_manifest.py check
       - name: ledgers and blackboard are monotone vs the base
         env:
           EVENT_NAME: ${{ github.event_name }}

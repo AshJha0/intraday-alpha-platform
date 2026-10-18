@@ -4,8 +4,13 @@
 Refuses to run without ``--i-have-approval`` and fetches only https URLs on
 ``iap.marketdata.r7plan.ALLOWED_HOSTS``, named in a validated candidate
 manifest (research/r7/r7_candidates.json).  Each file is streamed to
-``<vendor-dir>/<file>.part``, size-checked against the manifest and renamed;
-a file already present with the right size is skipped.  Read the provider's
+``<vendor-dir>/<file>.part``, size- and sha256-checked against the manifest
+and renamed; a file already present is skipped once its size (and sha256)
+match.  The sha256 is computed while streaming (no second pass) and checked
+whenever the manifest carries one; that is the default since v1.18 (REL-12),
+``--no-verify-sha`` restores the size-only check.  The result records the
+computed sha256 and whether it was verified, so a manifest without one gets
+the hash to pin before the ingest.  Read the provider's
 terms first (docs/R7_DATA_PLAN.md §1).
 
     PYTHONPATH=python/src python tools/r7_download.py --manifest research/r7/r7_candidates.json \\
@@ -15,6 +20,7 @@ terms first (docs/R7_DATA_PLAN.md §1).
 from __future__ import annotations
 
 import argparse
+import hashlib
 import sys
 import urllib.request
 from pathlib import Path
@@ -27,20 +33,38 @@ from iap.marketdata.r7plan import _check_url, load_candidates, verify_file  # no
 CHUNK = 1 << 22
 
 
-def download_one(day: dict, vendor_dir: Path, opener=urllib.request.urlopen) -> dict:
+def download_one(
+    day: dict, vendor_dir: Path, opener=urllib.request.urlopen, *, verify_sha: bool = True
+) -> dict:
+    """Fetch one manifest file; ``verify_sha`` (default) checks the manifest's
+    sha256 when it has one, on the streamed bytes and on a present file."""
     _check_url(day["url"])
     dest = vendor_dir / day["file"]
+    expected = (day.get("sha256") or "").lower() or None
     if dest.is_file() and dest.stat().st_size == day["bytes"]:
-        return {"date": day["date"], "status": "present"}
+        if not (verify_sha and expected):
+            return {"date": day["date"], "status": "present", "sha256_verified": False}
+        res = verify_file(dest, day["bytes"], expected)
+        if res["ok"]:
+            return {"date": day["date"], "status": "present", "sha256_verified": True}
+        # a present file of the right size but the wrong bytes is re-fetched
     part = dest.with_name(dest.name + ".part")
+    h = hashlib.sha256()
     with opener(day["url"]) as resp, open(part, "wb") as out:
         while chunk := resp.read(CHUNK):
+            h.update(chunk)
             out.write(chunk)
-    res = verify_file(part, day["bytes"], day.get("sha256"), hash_file=False)
+    res = verify_file(part, day["bytes"], None, hash_file=False)
     if not res["ok"]:
         return {"date": day["date"], "status": "failed", "reason": res["reason"]}
+    digest = h.hexdigest()
+    verified = bool(verify_sha and expected)
+    if verified and digest != expected:
+        return {"date": day["date"], "status": "failed", "reason": "sha256 mismatch",
+                "sha256": digest}  # fmt: skip
     part.replace(dest)
-    return {"date": day["date"], "status": "downloaded"}
+    return {"date": day["date"], "status": "downloaded", "sha256": digest,
+            "sha256_verified": verified}  # fmt: skip
 
 
 def main(argv: list[str] | None = None, opener=urllib.request.urlopen) -> int:
@@ -52,6 +76,11 @@ def main(argv: list[str] | None = None, opener=urllib.request.urlopen) -> int:
         "--i-have-approval",
         action="store_true",
         help="the data owner approved downloading exactly these files",
+    )
+    p.add_argument(
+        "--no-verify-sha",
+        action="store_true",
+        help="size check only (the pre-v1.18 behaviour); default: verify the manifest sha256",
     )
     a = p.parse_args(argv)
     if not a.i_have_approval:
@@ -68,7 +97,7 @@ def main(argv: list[str] | None = None, opener=urllib.request.urlopen) -> int:
     vendor.mkdir(parents=True, exist_ok=True)
     ok = True
     for d in days:
-        r = download_one(d, vendor, opener)
+        r = download_one(d, vendor, opener, verify_sha=not a.no_verify_sha)
         print(r, flush=True)
         ok &= r["status"] != "failed"
     return 0 if ok else 1
