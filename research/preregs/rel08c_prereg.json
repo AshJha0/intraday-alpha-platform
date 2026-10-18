@@ -1,0 +1,126 @@
+{
+  "analysis_identity": {
+    "code_tree_sha256": "e176da9546a80322a7a20810db6bcbee95ee54e30552f9306f1d7a454498bed7",
+    "commit": "67db845a4f97572a91fee5ab93e54061453439f6",
+    "configs_tree_sha256": "5ef6e7a09954184176dc626a4fddcd93d31c5b13ec60fd9ae5a1088b30870c29",
+    "data_versions": [
+      "8c97b5b13bc451c012c2466fb7e258da134dab29aa47b67fe7b0088c78e870be"
+    ],
+    "deps_lock_sha256": "3a4352e0d19d1a41021264ef8d382472f7c668520c42535e5f45971600a28375",
+    "environment": {
+      "attrs": "26.1.0",
+      "cffi": "2.1.1",
+      "cloudpickle": "3.1.2",
+      "colorama": "0.4.6",
+      "coverage": "7.16.2",
+      "cryptography": "50.0.2",
+      "databento-dbn": "0.71.0",
+      "execnet": "2.1.2",
+      "hypothesis": "absent",
+      "iniconfig": "2.3.1",
+      "joblib": "1.6.0",
+      "jsonschema": "4.26.0",
+      "jsonschema-specifications": "2025.9.1",
+      "narwhals": "2.26.0",
+      "numpy": "2.4.6",
+      "packaging": "26.3",
+      "pandas": "3.0.6",
+      "pluggy": "1.6.0",
+      "pyarrow": "25.0.1",
+      "pycparser": "3.0",
+      "pygments": "2.21.0",
+      "pytest": "9.1.1",
+      "pytest-cov": "7.1.0",
+      "pytest-xdist": "3.8.0",
+      "python-dateutil": "2.9.0.post0",
+      "pyyaml": "6.0.3",
+      "referencing": "0.37.0",
+      "rpds-py": "2026.9.1",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.17.1",
+      "six": "1.17.0",
+      "sortedcontainers": "absent",
+      "threadpoolctl": "3.7.0",
+      "typing-extensions": "4.16.0",
+      "tzdata": "2026.5"
+    },
+    "family": "REL-08c close imbalance (real) (K=1); session 2019-01-30",
+    "identity_version": 2,
+    "inputs": {},
+    "interpreter": "cpython-3.12.10",
+    "metrics": [
+      "fill_entry",
+      "fill_exit",
+      "gross_cross_bps",
+      "gross_taker_bps",
+      "hit_rate",
+      "incremental_net_taker_bps",
+      "loc_fill",
+      "net_cross_bps",
+      "net_taker_bps"
+    ],
+    "reference_tree_sha256": "9020e008efdb1ac41015cea4c31f8b9e4cb65a1324db0a42224cb2a22f18fa88",
+    "scripts": {
+      "research/auction/rel08c/predeclaration.json": "da9e5643fa0948295379e64e711fc33ec77a3986742a89ffeef435efaa51150f",
+      "research/auction/rel08c/run_rel08c.py": "8bdfd919cec04e8096cd7db0eaa9f3899921e0e139f646294738fab3fbc7061e",
+      "research/breadth/universe.json": "ec50340f9897600ab9dbf48629a870d7801d6d7ec8cc2834b94a8230bdcb81a1"
+    },
+    "thresholds": {
+      "input": {
+        "extract_out": "data/real/rel08c_2019-01-30",
+        "file": "data/vendor/01302019.NASDAQ_ITCH50.gz",
+        "holdout_state_required": "in_sample",
+        "session": "2019-01-30",
+        "sha256": "8c97b5b13bc451c012c2466fb7e258da134dab29aa47b67fe7b0088c78e870be",
+        "universe": "research/breadth/universe.json"
+      },
+      "statistics": {
+        "family": "REL-08c close imbalance (real)",
+        "family_k": 1,
+        "primary": "incremental_net_taker_bps (imbalance minus baseline), per-session mean, Student-t over sessions",
+        "verdicts": [
+          "underpowered",
+          "continue",
+          "reject"
+        ]
+      },
+      "study": {
+        "alpha": 0.05,
+        "cross_fee_per_share": 0.001,
+        "decision_times": [
+          "15:51:00",
+          "15:53:00"
+        ],
+        "exit_lead_s": 5.0,
+        "fee_per_share": 0.003,
+        "grid_start": "15:30:00",
+        "min_persistence": 2,
+        "min_sessions": 5,
+        "min_trades": 30,
+        "orientation": 1,
+        "power": 0.8,
+        "qty": 100,
+        "target_bps": 2.0,
+        "threshold": 0.2
+      }
+    }
+  },
+  "bound_utc": "2026-10-18T17:58:45+00:00",
+  "kind": "analysis_prereg",
+  "prereg_id": "research/preregs/rel08c_prereg.json",
+  "protocol": "research/auction/rel08c/PREDECLARATION.md",
+  "protocol_sha256": "21e73f52d357aaccc0b8bdc746ecdacc5d7b4f6e3355ec1bbbe8c1ae3ad70b92",
+  "signature": {
+    "maintainer": "ashjha0",
+    "message": "iap.agents.blackboard.canonical(this document without 'signature')",
+    "message_sha256": "ff178d758d6e8458828c2b9aeef20d75fd4f263b8d08c258c780ca3c2d283dcb",
+    "public_key": "02a3e278cda3efac7dcd266fb8a3821a1415f0725a73f8b255aac84083c2106c",
+    "scheme": "ed25519",
+    "sig": "e47ba845c631b786f3c54cdf30efbcde020cc20e8281e7352471ac6644c01fd5f66a9aebdbdb453c9052d472f9245593fd701dcb667f61e635dd6a5dac831901",
+    "trust_root": "research/agents/trust_roots.json"
+  },
+  "signed": true,
+  "signed_utc": "2026-10-18T17:58:46+00:00",
+  "status": "SIGNED: the analysis identity is bound; edits void the signature",
+  "x-version": 1
+}
