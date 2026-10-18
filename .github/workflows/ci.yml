@@ -17,6 +17,9 @@
 #                                run instead of skipping
 #   python-slow                  the files marked `slow` (pytest -m slow),
 #                                in parallel with python, with --cov
+#   coverage                     v1.18 (REL-13): combines the python (3.11)
+#                                and python-slow coverage data and enforces
+#                                the whole-suite floor
 #   integration                  tests/integration + tests/replay (tests/README.md
 #                                levels 3-4: cross-component runs and same-seed
 #                                byte determinism) — the `integration` and
@@ -189,16 +192,27 @@ jobs:
       # once, not once per worker. The seeded dataset is the cache step above,
       # shared read-only. Same tests, same outcomes as the serial run
       # (compared test by test on the PR that introduced this, #23). pytest-cov
-      # combines the workers' data into one coverage-python.xml.
-      # E-P2-7: the files marked `slow` run in the parallel python-slow job
-      # (which also carries coverage), so this PR job stays short.
+      # combines the workers' data into one .coverage file.
+      # E-P2-7: the files marked `slow` run in the parallel python-slow job,
+      # so this PR job stays short.  v1.18 (REL-13): the 3.11 entry also
+      # records coverage data (no report, no floor here); the `coverage` job
+      # combines it with python-slow's and enforces the whole-suite floor.
       - name: pytest (not slow)
         working-directory: python
         env:
           PYTHONPATH: src
+          COV_ARGS: ${{ matrix.python-version == '3.11' && '--cov=iap --cov-report=' || '' }}
         run: >
           python -m pytest -q -n auto --dist loadfile --durations=25
-          -m "not slow"
+          -m "not slow" $COV_ARGS
+      - name: upload fast-suite coverage data
+        if: matrix.python-version == '3.11'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-data-fast
+          path: python/.coverage
+          include-hidden-files: true
+          if-no-files-found: error
       - name: upload parity counts input (v1.18 REL-14a)
         if: always() && matrix.python-version == '3.11'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -316,43 +330,81 @@ jobs:
       # once, not once per worker. The seeded dataset is the cache step above,
       # shared read-only. Same tests, same outcomes as the serial run
       # (compared test by test on the PR that introduced this, #23). pytest-cov
-      # combines the workers' data into one coverage-python.xml.
+      # combines the workers' data into one .coverage file.
       # E-P2-7: the files marked `slow` (python/tests, pytestmark), with
       # coverage; runs in parallel with the python job.  The coverage
       # report therefore covers the slow files' tests.
-      # v1.17 (F1): coverage floor. --cov-fail-under=55 is the figure this
-      # job measured on the wave-2 integration PR #183 on 2026-10-15 (ci run
-      # 38794738398: TOTAL 39638 statements, 17482 missed, 55.90%), rounded
-      # down to the whole percent.  (58% was the pre-integration figure on
-      # main at 6814b2d; the B2/B3, D2/D3 and E2-E5 modules are covered by
-      # the fast `python` job, which this slow run does not count.)  Raise it
-      # when coverage rises; never lower it without a CHANGELOG line.
-      # 2026-10-15 (A5, PR #189): lowered to 54 — main at 4eea5d5 (after the
-      # wave-3 merges #185/#186) already measured 54.76% in this job (run
-      # 38805345163), i.e. under the 55 floor before this PR; the A5 PR
-      # measured 54.47%.  CHANGELOG (Unreleased) records the change.
+      # Coverage: this job records the slow files' coverage data; the floor
+      # is enforced on the WHOLE suite (fast + slow) by the `coverage` job
+      # (v1.18 REL-13).  History: v1.17 F1 set a slow-only floor of 55
+      # (PR #183, 55.90%), A5 / PR #189 lowered it to 54 (54.76% on main);
+      # that slow-only floor is retired, see the `coverage` job.
       - name: pytest (slow)
         working-directory: python
         env:
           PYTHONPATH: src
         run: >
           python -m pytest -q -n auto --dist loadfile --durations=25 -m slow
-          --cov=iap --cov-report=term-missing
-          --cov-report=xml:../coverage-python.xml
-          --cov-fail-under=54
-      - name: upload python coverage report
-        if: always()
+          --cov=iap --cov-report=
+      - name: upload slow-suite coverage data
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: coverage-python
-          path: coverage-python.xml
-          if-no-files-found: ignore
+          name: coverage-data-slow
+          path: python/.coverage
+          include-hidden-files: true
+          if-no-files-found: error
       - name: upload parity counts input (v1.18 REL-14a)
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: parity-python-slow
           path: /tmp/parity/junit.xml
+          if-no-files-found: ignore
+
+  # v1.18 (REL-13): whole-suite Python coverage.  Combines the fast (python,
+  # 3.11) and slow (python-slow) coverage data and enforces ONE floor on the
+  # total.  The floor is the measured whole-suite total rounded down to the
+  # whole percent (measurement in the CHANGELOG line of the PR that set it);
+  # raise it when coverage rises, never lower it without a CHANGELOG line.
+  coverage:
+    needs: [python, python-slow]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install coverage (hashed pin)
+        run: |
+          python -m pip install --upgrade pip
+          awk '/^coverage==/{p=1;print;next} p&&/^    /{print;next} {p=0}'             python/requirements-ci.txt > /tmp/req-cov.txt
+          pip install --require-hashes --no-deps -r /tmp/req-cov.txt
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: coverage-data-*
+          path: covdata
+      - name: combine and enforce the whole-suite floor
+        working-directory: python
+        run: |
+          cp ../covdata/coverage-data-fast/.coverage .coverage.fast
+          cp ../covdata/coverage-data-slow/.coverage .coverage.slow
+          python -m coverage combine .coverage.fast .coverage.slow
+          python -m coverage report --skip-covered --sort=cover | tail -n 40
+          python -m coverage xml -o ../coverage-python.xml
+          total=$(python -m coverage report --format=total)
+          echo "### Python coverage (whole suite)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "total: **${total}%** (floor ${COV_FLOOR}%)" >> "$GITHUB_STEP_SUMMARY"
+          python -m coverage report --fail-under="$COV_FLOOR" > /dev/null
+        env:
+          COV_FLOOR: "92"
+      - name: upload python coverage report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-python
+          path: coverage-python.xml
           if-no-files-found: ignore
 
   integration:

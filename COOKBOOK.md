@@ -7078,7 +7078,9 @@ package in one call. `--execute` goes **before** the subcommand (recipe 87).
 **Goal:** reproduce the two CI gates that moved in v1.17. **mypy** is blocking and its
 scope grew from `core`, `orderbook`, `execution`, `backtest`, `features` to also
 `agents`, `llm`, `mvp` and `paper` (258 errors to 0, type-only changes). **Coverage**:
-the `python-slow` job runs the `slow`-marked files with `--cov-fail-under=54`.
+since v1.18 (REL-13) the floor is on the whole suite: the `python` (3.11) and
+`python-slow` jobs record coverage data and the `coverage` job combines them and
+enforces 92 % (measured 92.64 % on 2026-10-18; the slow files alone were 55 %).
 
 ```bash
 cd python && python -m pip install mypy==2.3.1 && python -m mypy
@@ -7091,7 +7093,9 @@ source files`. The scope is the `files = [...]` list under `[tool.mypy]` in
 coverage command is the CI step's:
 
 ```bash
-cd python && PYTHONPATH=src python -m pytest -q -n auto --dist loadfile -m slow --cov=iap --cov-report=term-missing --cov-fail-under=54
+cd python && PYTHONPATH=src python -m pytest -q -n auto --dist loadfile -m "not slow" --cov=iap --cov-report= && mv .coverage .coverage.fast
+cd python && PYTHONPATH=src python -m pytest -q -n auto --dist loadfile -m slow --cov=iap --cov-report= && mv .coverage .coverage.slow
+cd python && python -m coverage combine .coverage.fast .coverage.slow && python -m coverage report --fail-under=92
 ```
 
 (PowerShell: `cd python; $env:PYTHONPATH = "src"; python -m pytest ...`; it needs `pytest-cov` and `pytest-xdist` from `python/requirements-ci.txt`. This machine's Python has no `pytest-cov`, so the command is shown, not run.)
