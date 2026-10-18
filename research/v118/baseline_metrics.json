@@ -1,0 +1,766 @@
+{
+  "alpha_registry": {
+    "alphas": {
+      "EQ01": {
+        "failed_gates": [
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "oos_ic_gate_value": 0.023715054750760297,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "EQ02": {
+        "failed_gates": [
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "oos_ic_gate_value": 0.03615667524798832,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "EQ03": {
+        "failed_gates": [
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "oos_ic_gate_value": 0.030006669428547718,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "EQ04": {
+        "failed_gates": [
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "oos_ic_gate_value": -0.01009290085663633,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "EQ05": {
+        "failed_gates": [
+          "statistical_significance",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "oos_ic_gate_value": 0.010238611171428906,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "EQ06": {
+        "failed_gates": [
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "oos_ic_gate_value": 0.055581904699236545,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "EQ07": {
+        "failed_gates": [
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "oos_ic_gate_value": -0.027920793561234523,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "EQ08": {
+        "failed_gates": [
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "oos_ic_gate_value": -0.05119648045272018,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "EQ09": {
+        "failed_gates": [
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity",
+          "stability"
+        ],
+        "oos_ic_gate_value": -0.020390348662252485,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "EQ10": {
+        "failed_gates": [
+          "oos_ic",
+          "statistical_significance",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "oos_ic_gate_value": 0.002520382594774899,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "EQ11": {
+        "failed_gates": [
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity",
+          "stability"
+        ],
+        "oos_ic_gate_value": 0.005928771738486058,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "EQ12": {
+        "failed_gates": [
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "oos_ic_gate_value": 0.03765375914692193,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "FX01": {
+        "failed_gates": [
+          "statistical_significance",
+          "fold_consistency",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "oos_ic_gate_value": 0.022178665280762035,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "FX02": {
+        "failed_gates": [
+          "statistical_significance",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "oos_ic_gate_value": 0.018087426932042724,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "FX03": {
+        "failed_gates": [
+          "statistical_significance",
+          "fold_consistency",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "oos_ic_gate_value": 0.023717590474316912,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "FX04": {
+        "failed_gates": [
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "oos_ic_gate_value": 0.054802313837150646,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "FX05": {
+        "failed_gates": [
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity",
+          "stability"
+        ],
+        "oos_ic_gate_value": -0.012513882965842896,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "FX06": {
+        "failed_gates": [
+          "oos_ic",
+          "statistical_significance",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity",
+          "stability"
+        ],
+        "oos_ic_gate_value": 0.008065958601219544,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "FX07": {
+        "failed_gates": [
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity"
+        ],
+        "oos_ic_gate_value": -0.011695064635264202,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "FX08": {
+        "failed_gates": [
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity",
+          "stability"
+        ],
+        "oos_ic_gate_value": 0.04711541356263969,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "FX09": {
+        "failed_gates": [
+          "oos_ic",
+          "statistical_significance",
+          "fold_consistency",
+          "hypothesis_sign",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity",
+          "stability"
+        ],
+        "oos_ic_gate_value": -0.06043687252015987,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "FX10": {
+        "failed_gates": [
+          "statistical_significance",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity",
+          "stability"
+        ],
+        "oos_ic_gate_value": 0.02189832315185954,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      },
+      "FX11": {
+        "failed_gates": [
+          "leakage_clean"
+        ],
+        "oos_ic_gate_value": null,
+        "outcome": "HOLD",
+        "state": "RESEARCH"
+      },
+      "FX12": {
+        "failed_gates": [
+          "statistical_significance",
+          "net_pnl_after_costs",
+          "net_pnl_bootstrap_ci",
+          "capacity",
+          "stability"
+        ],
+        "oos_ic_gate_value": 0.020484713552572344,
+        "outcome": "HOLD",
+        "state": "CANDIDATE"
+      }
+    },
+    "sha256": "ae4151a33620087d86cbb0b655787ae791350441af27cb91e450dfe72ec19d9c",
+    "source": "research/alpha_registry.json",
+    "state_counts": {
+      "CANDIDATE": 23,
+      "RESEARCH": 1
+    }
+  },
+  "b8_oos3": {
+    "AAPL": {
+      "pairs": {
+        "pin_iex-pin_nasdaq": {
+          "opportunity_bps": {
+            "ci95": [
+              -6.821437746338367,
+              8.64522178317372
+            ],
+            "mde_at_t_crit": 7.733329764756044,
+            "mean": 0.9118920184176768,
+            "n_clusters": 3,
+            "n_parents": 36,
+            "per_cluster_mean": {
+              "20251210": 4.48336157951196,
+              "20260515": -1.226736423226468,
+              "20260518": -0.5209491010324608
+            },
+            "se": 1.7973202325879203,
+            "t_crit_95": 4.3027
+          },
+          "parents_gt0": 22,
+          "parents_with_zero_diff": 0,
+          "shortfall_bps": {
+            "ci95": [
+              -1.239814753800319,
+              8.252032197273545
+            ],
+            "mde_at_t_crit": 4.745923475536932,
+            "mean": 3.506108721736613,
+            "n_clusters": 3,
+            "n_parents": 36,
+            "per_cluster_mean": {
+              "20251210": 5.376398646705719,
+              "20260515": 1.5578455578328276,
+              "20260518": 3.5840819606712926
+            },
+            "se": 1.1030105458286499,
+            "t_crit_95": 4.3027
+          },
+          "trading_bps": {
+            "ci95": [
+              -1.41631021681855,
+              6.604743623456423
+            ],
+            "mde_at_t_crit": 4.010526920137487,
+            "mean": 2.5942167033189367,
+            "n_clusters": 3,
+            "n_parents": 36,
+            "per_cluster_mean": {
+              "20251210": 0.8930370671937601,
+              "20260515": 2.7845819810592967,
+              "20260518": 4.1050310617037535
+            },
+            "se": 0.9320954098908794,
+            "t_crit_95": 4.3027
+          }
+        },
+        "sor-pin_nasdaq": {
+          "opportunity_bps": {
+            "ci95": [
+              -3.4225292180168956,
+              4.3981894935234696
+            ],
+            "mde_at_t_crit": 3.9103593557701823,
+            "mean": 0.4878301377532869,
+            "n_clusters": 3,
+            "n_parents": 36,
+            "per_cluster_mean": {
+              "20251210": 2.285910399576364,
+              "20260515": -0.6414619835296177,
+              "20260518": -0.18095800278688537
+            },
+            "se": 0.9088152452576713,
+            "t_crit_95": 4.3027
+          },
+          "parents_gt0": 16,
+          "parents_with_zero_diff": 13,
+          "shortfall_bps": {
+            "ci95": [
+              -0.8386376071042072,
+              5.2387900416986755
+            ],
+            "mde_at_t_crit": 3.0387138244014413,
+            "mean": 2.200076217297234,
+            "n_clusters": 3,
+            "n_parents": 36,
+            "per_cluster_mean": {
+              "20251210": 3.2279352125540792,
+              "20260515": 0.8471416045213873,
+              "20260518": 2.5251518348162363
+            },
+            "se": 0.7062341842102497,
+            "t_crit_95": 4.3027
+          },
+          "trading_bps": {
+            "ci95": [
+              -0.5310951696359785,
+              3.9555873287238725
+            ],
+            "mde_at_t_crit": 2.2433412491799256,
+            "mean": 1.7122460795439471,
+            "n_clusters": 3,
+            "n_parents": 36,
+            "per_cluster_mean": {
+              "20251210": 0.9420248129777145,
+              "20260515": 1.488603588051005,
+              "20260518": 2.706109837603122
+            },
+            "se": 0.5213798891811945,
+            "t_crit_95": 4.3027
+          }
+        },
+        "sor_sweep-pin_nasdaq": {
+          "opportunity_bps": {
+            "ci95": [
+              -2.8381496689192978,
+              4.608826328363238
+            ],
+            "mde_at_t_crit": 3.723487998641268,
+            "mean": 0.88533832972197,
+            "n_clusters": 3,
+            "n_parents": 36,
+            "per_cluster_mean": {
+              "20251210": 2.60452629000538,
+              "20260515": 0.19884341444963857,
+              "20260518": -0.14735471528910848
+            },
+            "se": 0.8653840608551068,
+            "t_crit_95": 4.3027
+          },
+          "parents_gt0": 13,
+          "parents_with_zero_diff": 12,
+          "shortfall_bps": {
+            "ci95": [
+              -1.4168907701875262,
+              2.530498328482126
+            ],
+            "mde_at_t_crit": 1.9736945493348261,
+            "mean": 0.5568037791472998,
+            "n_clusters": 3,
+            "n_parents": 36,
+            "per_cluster_mean": {
+              "20251210": 1.4665907033445749,
+              "20260515": 0.20419592884694762,
+              "20260518": -0.0003752947496229823
+            },
+            "se": 0.4587107047516272,
+            "t_crit_95": 4.3027
+          },
+          "trading_bps": {
+            "ci95": [
+              -2.078702530749584,
+              1.421633429600245
+            ],
+            "mde_at_t_crit": 1.7501679801749146,
+            "mean": -0.3285345505746695,
+            "n_clusters": 3,
+            "n_parents": 36,
+            "per_cluster_mean": {
+              "20251210": -1.1379355866608045,
+              "20260515": 0.005352514397309753,
+              "20260518": 0.14697942053948612
+            },
+            "se": 0.4067604016489448,
+            "t_crit_95": 4.3027
+          }
+        }
+      },
+      "sha256": "cd2e90128cdaaf6e7ad33a31af63a66507d93c5f9c0b2bb4a7f5244ca2d71128",
+      "source": "research/execution/b8/benchmark_oos3_AAPL.json"
+    },
+    "MSFT": {
+      "pairs": {
+        "pin_iex-pin_nasdaq": {
+          "opportunity_bps": {
+            "ci95": [
+              -6.4928329383124606,
+              9.437524825935936
+            ],
+            "mde_at_t_crit": 7.9651788821241984,
+            "mean": 1.472345943811738,
+            "n_clusters": 3,
+            "n_parents": 36,
+            "per_cluster_mean": {
+              "20251210": 1.8246735647934271,
+              "20260515": 4.488011787653502,
+              "20260518": -1.895647521011715
+            },
+            "se": 1.8512047974816275,
+            "t_crit_95": 4.3027
+          },
+          "parents_gt0": 21,
+          "parents_with_zero_diff": 0,
+          "shortfall_bps": {
+            "ci95": [
+              -2.5161988583193526,
+              12.555407268623036
+            ],
+            "mde_at_t_crit": 7.535803063471194,
+            "mean": 5.0196042051518415,
+            "n_clusters": 3,
+            "n_parents": 36,
+            "per_cluster_mean": {
+              "20251210": 1.8906741755399203,
+              "20260515": 7.947772306513431,
+              "20260518": 5.220366133402174
+            },
+            "se": 1.7514126161413053,
+            "t_crit_95": 4.3027
+          },
+          "trading_bps": {
+            "ci95": [
+              -5.211462573754691,
+              12.3059790964349
+            ],
+            "mde_at_t_crit": 8.758720835094795,
+            "mean": 3.547258261340105,
+            "n_clusters": 3,
+            "n_parents": 36,
+            "per_cluster_mean": {
+              "20251210": 0.06600061074649341,
+              "20260515": 3.4597605188599303,
+              "20260518": 7.116013654413891
+            },
+            "se": 2.0356336335544647,
+            "t_crit_95": 4.3027
+          }
+        },
+        "sor-pin_nasdaq": {
+          "opportunity_bps": {
+            "ci95": [
+              -2.0348211641942946,
+              3.5473675077597333
+            ],
+            "mde_at_t_crit": 2.791094335977014,
+            "mean": 0.7562731717827195,
+            "n_clusters": 3,
+            "n_parents": 36,
+            "per_cluster_mean": {
+              "20251210": 0.45110548745704687,
+              "20260515": 2.0008867007599664,
+              "20260518": -0.18317267286885475
+            },
+            "se": 0.6486843925853567,
+            "t_crit_95": 4.3027
+          },
+          "parents_gt0": 20,
+          "parents_with_zero_diff": 10,
+          "shortfall_bps": {
+            "ci95": [
+              -2.273476392605443,
+              4.518616451213545
+            ],
+            "mde_at_t_crit": 3.396046421909494,
+            "mean": 1.1225700293040515,
+            "n_clusters": 3,
+            "n_parents": 36,
+            "per_cluster_mean": {
+              "20251210": 0.502706292828864,
+              "20260515": 2.689771946509771,
+              "20260518": 0.17523184857351973
+            },
+            "se": 0.7892826415761021,
+            "t_crit_95": 4.3027
+          },
+          "trading_bps": {
+            "ci95": [
+              -0.4254450775032975,
+              1.1580387925459625
+            ],
+            "mde_at_t_crit": 0.7917419350246301,
+            "mean": 0.36629685752133256,
+            "n_clusters": 3,
+            "n_parents": 36,
+            "per_cluster_mean": {
+              "20251210": 0.05160080537181661,
+              "20260515": 0.6888852457498063,
+              "20260518": 0.35840452144237495
+            },
+            "se": 0.1840104899306552,
+            "t_crit_95": 4.3027
+          }
+        },
+        "sor_sweep-pin_nasdaq": {
+          "opportunity_bps": {
+            "ci95": [
+              -3.185562503987817,
+              4.406495886147711
+            ],
+            "mde_at_t_crit": 3.796029195067764,
+            "mean": 0.6104666910799474,
+            "n_clusters": 3,
+            "n_parents": 36,
+            "per_cluster_mean": {
+              "20251210": 0.05107726492209793,
+              "20260515": 2.3394279393748447,
+              "20260518": -0.5591051310571001
+            },
+            "se": 0.8822435203634379,
+            "t_crit_95": 4.3027
+          },
+          "parents_gt0": 21,
+          "parents_with_zero_diff": 5,
+          "shortfall_bps": {
+            "ci95": [
+              -2.300554256291247,
+              4.737123436285574
+            ],
+            "mde_at_t_crit": 3.5188388462884106,
+            "mean": 1.218284589997164,
+            "n_clusters": 3,
+            "n_parents": 36,
+            "per_cluster_mean": {
+              "20251210": -0.014776580548822546,
+              "20260515": 2.765494586403307,
+              "20260518": 0.9041357641370075
+            },
+            "se": 0.8178210998415903,
+            "t_crit_95": 4.3027
+          },
+          "trading_bps": {
+            "ci95": [
+              -1.331275888984917,
+              2.5469116868193526
+            ],
+            "mde_at_t_crit": 1.9390937879021348,
+            "mean": 0.6078178989172178,
+            "n_clusters": 3,
+            "n_parents": 36,
+            "per_cluster_mean": {
+              "20251210": -0.06585384547092014,
+              "20260515": 0.4260666470284658,
+              "20260518": 1.4632408951941078
+            },
+            "se": 0.45066906544777346,
+            "t_crit_95": 4.3027
+          }
+        }
+      },
+      "sha256": "fa4d531a7117a98734a1ccf95e886d302cdb700b94b78fd8700a38a3b2afd0da",
+      "source": "research/execution/b8/benchmark_oos3_MSFT.json"
+    }
+  },
+  "commit": "8fb189b67bd6a2b6a2c868ed378d2a5a92c628f0",
+  "ledger": {
+    "bonferroni_t_threshold": 4.4466258141863175,
+    "chain_ok": true,
+    "distinct_experiments": 422,
+    "document_datasets_summary": [
+      {
+        "dataset_version_prefix": "203c8f54",
+        "entries": 70,
+        "looks": 1068
+      },
+      {
+        "dataset_version_prefix": "116b7787",
+        "entries": 314,
+        "looks": 4626
+      },
+      {
+        "dataset_version_prefix": "none",
+        "entries": 14,
+        "looks": 14
+      },
+      {
+        "dataset_version_prefix": "ee4c2187",
+        "entries": 24,
+        "looks": 24
+      }
+    ],
+    "entries": 422,
+    "entries_by_dataset_version_prefix": {
+      "116b7787": 294,
+      "203c8f54": 65,
+      "ee4c2187": 24,
+      "none": 39
+    },
+    "entries_without_dataset_version": {
+      "entries": 39,
+      "kinds": {
+        "experiment_runner": 25,
+        "prereg": 14
+      },
+      "looks": 734,
+      "note": "attribution of these entries to a dataset comes only from the document-level datasets summary, not from the entry itself"
+    },
+    "looks_by_dataset_version_prefix": {
+      "116b7787": 4046,
+      "203c8f54": 928,
+      "ee4c2187": 24,
+      "none": 734
+    },
+    "looks_by_kind": {
+      "adaptive_deployment": 200,
+      "breadth_book": 2,
+      "combination": 1098,
+      "design_horizon_scan": 216,
+      "experiment_runner": 720,
+      "metalabel_tau": 1,
+      "model_zoo_gate": 1,
+      "net_of_cost_screen": 23,
+      "prereg": 14,
+      "primary_model_choice": 1,
+      "promotion_pipeline": 3456
+    },
+    "real_data_looks_per_document_summary": 24,
+    "recomputed_chain_head": "1f95affdee760e380149f400b4db86f0b3e87ae0a17181890ede3301116e489d",
+    "sha256": "218967c800bc2a24b27424d79f8f6b842041235b5aadbd184fc9e16c0aeb4cc7",
+    "source": "research/experiments.json",
+    "stored_chain_head": "1f95affdee760e380149f400b4db86f0b3e87ae0a17181890ede3301116e489d",
+    "sum_of_entry_counts": 5732,
+    "total_looks": 5732
+  },
+  "r7_confirm": {
+    "results": [
+      {
+        "alpha": "EQ10@1s",
+        "dsr": 0.999953795752005,
+        "dsr_n_trials": 1,
+        "dsr_sr0": 0.0,
+        "eligibility_reasons": [
+          "configuration.methods='v4' must be 'v2' for a gate-eligible result"
+        ],
+        "gate_eligible": false,
+        "git_commit_of_run": "24e90ca2320c565df8419580f1f9d6fa18091449",
+        "methods": "v4",
+        "verdict": "confirmed"
+      },
+      {
+        "alpha": "EQ05@1s",
+        "dsr": 0.9999997741015421,
+        "dsr_n_trials": 2,
+        "dsr_sr0": 0.212189230681051,
+        "eligibility_reasons": [
+          "configuration.methods='v4' must be 'v2' for a gate-eligible result"
+        ],
+        "gate_eligible": false,
+        "git_commit_of_run": "ed98ff41a86d15484c2a7db9389c0485b69ca898",
+        "methods": "v4",
+        "verdict": "confirmed"
+      }
+    ],
+    "sha256": "a5489ef0f3d34296d8e5ecb2b64621f47e6b80000653ac76da110c58436b586a",
+    "source": "research/r7/r7_confirm_result.json"
+  },
+  "schema": "iap.v118_baseline/1",
+  "toolchain": {
+    "ci_yml_sha256": "52c100b9f9a3e3faca20d5f8db7a2b0c77d686ce3c4e8f3e9f3c27bf9ec899fc",
+    "note": "rustc and a C++ compiler are not installed on the baseline machine; the Rust and C++ toolchains are those pinned in the CI workflow files above",
+    "python_used_for_this_baseline": "3.12.10",
+    "requirements_ci_hash_lines": 808,
+    "requirements_ci_sha256": "945e9c0dcf3328a1cf81a20fd97eea52fb28d2a98c8aa97636da90298d951f20",
+    "workflows": [
+      "ci.yml",
+      "codeql.yml",
+      "release.yml",
+      "risk-fuzz.yml"
+    ]
+  },
+  "tree_is_clean_at_inputs": true
+}
