@@ -74,6 +74,7 @@ from iap.auction.rel08c_extract import (
     NOII_FILE,
     NS_S,
 )
+from iap.research import claims
 
 STUDY_VERSION = 1
 POLICIES = ("baseline", "imbalance")
@@ -292,7 +293,9 @@ def mde_bps(sd_session: float, n_sessions: int, alpha: float, power: float) -> f
     return q * sd_session / math.sqrt(n_sessions)
 
 
-def decide(sessions: pd.DataFrame, n_trades: int, cfg: Rel08cConfig) -> dict:
+def decide(
+    sessions: pd.DataFrame, n_trades: int, cfg: Rel08cConfig, *, registered: bool = False
+) -> dict:
     s = len(sessions)
     x = sessions["incremental_bps"].to_numpy(float) if s else np.array([])
     mean = float(x.mean()) if s else math.nan
@@ -322,6 +325,11 @@ def decide(sessions: pd.DataFrame, n_trades: int, cfg: Rel08cConfig) -> dict:
         reasons.append(f"mean incremental {mean:.3g} bps, CI low {lo:.3g}")
     return {
         "verdict": verdict,
+        # review finding 7: the screen's evidence status (never above
+        # passes_registered_net_screen; one session caps it at exploratory_signal)
+        "evidence_status": claims.from_screen_verdict(
+            verdict, sessions=s, registered=registered
+        ).value,
         "reasons": reasons,
         "n_sessions": s,
         "n_imbalance_trades": n_trades,
@@ -358,7 +366,7 @@ def run_study(
     trades = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
     sessions = session_table(trades, dates)
     imb = trades[trades["policy"] == "imbalance"] if not trades.empty else trades
-    summary = decide(sessions, int(len(imb)), cfg)
+    summary = decide(sessions, int(len(imb)), cfg, registered=not synthetic)
 
     def _m(p: pd.DataFrame, c: str) -> float:
         return float(p[c].mean()) if len(p) and c in p else math.nan

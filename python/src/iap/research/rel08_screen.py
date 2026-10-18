@@ -72,6 +72,7 @@ import pandas as pd
 from iap.alpha.data import asof_to_grid, make_grid
 from iap.backtest.costs import CostModel
 from iap.research import breadth_book as bb
+from iap.research import claims
 from iap.research.rel08_rule import FAMILY, METRICS, Rule, RuleRefused
 
 _REPO = Path(__file__).resolve().parents[4]
@@ -80,6 +81,8 @@ NS_MIN = 60 * NS_S
 NS_DAY = 86_400 * NS_S
 LEDGER_KIND = FAMILY
 SCREEN_LABEL = "hypothesis screen, one session, no edge claim"
+#: sessions a REL-08 screen reads (one session is one cluster)
+SCREEN_SESSIONS = 1
 DEFAULT_OUT = _REPO / "research" / "v118" / "rel08"
 #: columns read from the store
 COLUMNS = (
@@ -609,6 +612,14 @@ def decide(results: Sequence[Mapping[str, Any]], rule: Rule) -> list[dict[str, A
         if rank >= cap:
             rows[k]["outcome"] = "passed_not_expanded"
             rows[k]["reason"] = f"passed; not among the {cap} highest net-bps lower bounds"
+    for row in rows:
+        # review finding 7: one session caps the claim at exploratory_signal
+        row["evidence_status"] = claims.from_screen_verdict(
+            row["outcome"],
+            sessions=SCREEN_SESSIONS,
+            registered=bool(rule.signed),
+            positive_ic=row["criteria"]["C8"],
+        ).value
     return rows
 
 
@@ -808,19 +819,21 @@ def render_scorecard(raw: Mapping[str, Any]) -> str:
         "",
         "## 8. Verdict (decision map, rule section 5)",
         "",
-        "| variant | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | outcome | reason |",
-        "|---|---|---|---|---|---|---|---|---|---|---|",
+        "| variant | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | outcome | evidence status | reason |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for v in raw["variants"]:
         d = dec[v["id"]]
         c = d["criteria"]
         cells = " | ".join("pass" if c[k] else "fail" for k in sorted(c, key=lambda s: int(s[1:])))
-        L.append(f"| {v['id']} | {cells} | **{d['outcome']}** | {d['reason']} |")
+        status = d.get("evidence_status", "n/a")
+        L.append(f"| {v['id']} | {cells} | **{d['outcome']}** | `{status}` | {d['reason']} |")
     L += [
         "",
         "## 9. What this does not claim",
         "",
-        "* No edge claim: one session, in-sample, a hypothesis screen.",
+        "* No edge claim: one session, in-sample, a hypothesis screen. The evidence status "
+        "(docs/RESEARCH_VALIDITY.md section 4g) is at most `exploratory_signal`.",
         "* `continue` is permission to spend REL-08b machine time; `stop` and `underpowered` are "
         "final results of the screen.",
         "* The 2025/26 breadth holdout stays unread; promotion needs an untouched confirmation "

@@ -67,6 +67,10 @@ def cmd_bootstrap(root: Path, dry_run: bool, force: bool) -> int:
     print(f"bootstrap event_ts = {result.event_ts}")
     print(render_status(result.registry))
     print(f"states: {result.count_by_state()}")
+    claimed: dict[str, int] = {}
+    for row in result.rows:
+        claimed[row.claim_status] = claimed.get(row.claim_status, 0) + 1
+    print(f"evidence status (docs/RESEARCH_VALIDITY.md 4g): {dict(sorted(claimed.items()))}")
     for row in result.rows:
         if row.missing_metrics:
             print(
