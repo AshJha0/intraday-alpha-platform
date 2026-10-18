@@ -8,6 +8,8 @@ that tag.
 
 ## Unreleased
 
+- Dependencies (minor/major, Dependabot, batched 2026-10-18; merged only with every check and golden green): pyarrow 25.0.1 -> 26.0.0 (#231, major; CI and image locks), databento-dbn 0.71.0 -> 0.72.0 (#227; CI lock), pycparser 3.0 -> 3.11 in requirements-ci.in (#232; the hashed lock already pinned 3.11), anthropic >=1.14.0,<2 (#228) and torch >=2.14.1 (#229) as declared minimums of the optional `llm` and `deep` extras (CI installs neither, so those two are not exercised by CI). The Dependabot PRs changed only pyproject.toml / requirements-ci.in; the hashed locks were updated here by replacing exactly the bumped entries with PyPI sha256 hashes (no transitive changes; a full re-resolve on Windows was rejected because it added Windows-only pins).
+
 - v1.18 batch 5 integration fix: the identity-v2 guard (`test_no_prereg_consumer_skips_the_identity_check`) found the new REL-08c, REL-09 and REL-10 runners unregistered; they are registered (each calls `verify_identity`). `iap.auction.rel08c_study.run_study` accepted any signed prereg id when called directly; it now also requires the prereg's bound analysis identity to match the code, configs, lock and interpreter on disk (`environment_mismatches`), closing a library-level bypass of review finding 1.
 
 - v1.18 gitleaks: the existing narrow allowlist for ledger content keys (`"key": "<64 hex>"`, SHA-256 digests of the experiment spec) now also covers `research/v118/LEDGER_INVENTORY.json`, the reviewer-finding-4 inventory copy of those keys. CI scans the whole history of all fetched branches, so the inventory branch had turned every PR's `advisory` check red with generic-api-key false positives.
