@@ -252,6 +252,9 @@ def load_venues(path: PathLike) -> dict[int, VenueSpec]:
             latency_mean_ns=_integer(lat, "mean_ns", f"{where} latency"),
             latency_jitter_ns=_integer(lat, "jitter_ns", f"{where} latency"),
             venue_type=str(row.get("venue_type", "lit")),
+            inbound_delay_ns=(
+                _integer(row, "inbound_delay_ns", where) if "inbound_delay_ns" in row else 0
+            ),
         )
         if vid in out:
             raise ValueError(f"{path}: duplicate venue_id {vid}")

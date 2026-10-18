@@ -31,8 +31,8 @@ replays the book and ADDS a fitted or linear impact adder; nothing here is
 a measured market reaction, and the replayed book never moves for our
 fills (``docs/HOW_IT_WORKS.md`` section 3.5).
 
-Holdout discipline: a data directory whose path contains ``holdout`` is
-refused unless ``--allow-holdout`` is given; the benchmark is an in-sample
+Holdout discipline: every data directory is checked against the hash-locked
+holdout registry (REL-02) before it is read; the benchmark is an in-sample
 tool. The pre-registration draft for the B7 gate is written by
 ``--write-prereg-draft`` (NOT signed: the owner signs it with the usual
 register tool before any fresh-day run).
@@ -129,6 +129,7 @@ from iap.execution import (
     load_sor_options,
 )
 from iap.execution.calibration import load_calibration
+from iap.execution.child_exec import ChildExecParams
 from iap.execution.config import load_venues
 from iap.execution.dark import (
     DARK_CONTROL_CODES,
@@ -141,10 +142,12 @@ from iap.execution.fading import CANCEL_RULES, pull_rows, pull_summary
 from iap.execution.optimal import ac_params_from_calibration
 from iap.execution.signal import URGENCY_REGIMES, AlphaUrgencySource
 from iap.execution.types import FILL_PROVENANCES
+from iap.research import execution_metrics as exm
 from iap.research.two_venue import (
     ALIGNMENT_RULE,
     IEX_CLOCKS,
     ROUTE_POLICIES,
+    SKEW_QUALIFICATION,
     instrument_map,
     load_calibrations,
     merge_events,
@@ -178,7 +181,11 @@ VARIANTS: dict[str, str | None] = {
     "qcancel": None,  #: B5: queue-aware cancels on posted children (passive base only)
     "fade_qcancel": None,  #: B4 + B5 together (passive base only)
     "dark": None,  #: B10: dark-first posting on any base (needs a dark venue)
+    "capped": None,  #: REL-04: IS / POV / aggressive children capped at eligible depth
+    "peg": None,  #: REL-04: midpoint-peg children (needs --hidden-prints to fill)
 }
+#: REL-04 child-execution variants: need no signal
+CHILD_VARIANTS: tuple[str, ...] = ("capped", "peg")
 DARK_VARIANT = "dark"
 #: the variants that pull resting children: they need the ``passive`` base
 PULL_VARIANTS: tuple[str, ...] = ("fade", "qcancel", "fade_qcancel")
@@ -346,6 +353,7 @@ def signal_variant(
     fade: FadeParams | None = None,
     queue_cancel: QueueCancelParams | None = None,
     dark: DarkFirstParams | None = None,
+    child_exec: ChildExecParams | None = None,
 ) -> ParentOrder | None:
     """``p`` worked under policy ``name``; ``None`` when the variant does not
     apply to this parent's algo (AC variants are IS-only)."""
@@ -357,6 +365,10 @@ def signal_variant(
         if dark is None:
             raise SystemExit("the dark variant needs a dark venue (--venues) and --dark-model")
         return replace(p, dark_first=dark)
+    if variant in CHILD_VARIANTS:
+        ce = child_exec or ChildExecParams()
+        style = "midpoint_peg" if variant == "peg" else "capped_ioc"
+        return replace(p, child_exec=replace(ce, style=style))
     if variant in PULL_VARIANTS:
         if variant in ("fade", "fade_qcancel"):
             if fade is None:
@@ -410,6 +422,10 @@ def make_parents(
     participation: float,
     max_child_qty: int,
     urgency: float,
+    pass_index: int = 0,
+    n_passes: int = 1,
+    id_offset: int = 0,
+    cell_offset: int = 0,
 ) -> list[tuple[ParentOrder, float]]:
     """The parents of one (session, instrument) stream with their size cell.
 
@@ -422,14 +438,15 @@ def make_parents(
     """
     cells = [(pct, algo) for pct in sizes_pct for algo in algos]
     out: list[tuple[ParentOrder, float]] = []
-    starts = cut_windows(first_ts, last_ts, window_ns, warmup_ns)
+    shift = pass_index * window_ns // max(1, n_passes)
+    starts = cut_windows(first_ts + shift, last_ts, window_ns, warmup_ns)
     for k, start in enumerate(starts):
-        pct, algo = cells[(k + session_index) % len(cells)]
+        pct, algo = cells[(cell_offset + k + session_index) % len(cells)]
         side = rng.randint(0, 1)
         out.append(
             (
                 ParentOrder(
-                    parent_id=k + 1,
+                    parent_id=id_offset + k + 1,
                     instrument_id=instrument_id,
                     venue_id=0,
                     side=side,
@@ -446,6 +463,69 @@ def make_parents(
                 pct,
             )
         )
+    return out
+
+
+MAX_COVER_PASSES = 6
+
+
+def make_parent_passes(
+    first_ts: int,
+    last_ts: int,
+    instrument_id: int,
+    adv: float,
+    sizes_pct: tuple[float, ...],
+    algos: tuple[AlgoType, ...],
+    session_index: int,
+    rng: SplitMix64,
+    *,
+    window_ns: int,
+    warmup_ns: int,
+    cover_all_cells: bool = False,
+    **kw,
+) -> list[list[tuple[ParentOrder, float]]]:
+    """The parents of one stream as one or more PASSES (v1.18 REL-03, X-E).
+
+    Without ``cover_all_cells`` (the v1.17 rule, the default) there is one
+    pass: back-to-back windows, cell ``(k + session) % n_cells``.  The day
+    holds ``(session - 2 * warmup) / window`` windows (12 for a 30-minute
+    window on a 6.5 h session) while the grid has ``sizes x algos`` cells
+    (16 by default), so some cells never ran on a day.  With
+    ``cover_all_cells`` extra passes are added, pass ``j`` starting
+    ``j / n_passes`` of a window later, until the day holds at least one
+    window per cell; the cell index runs on across passes, so every cell
+    runs at least once per day.  Passes overlap in time: each is replayed
+    in its own :class:`ExecutionReplay` so parents of different passes never
+    interact (every parent still sees the untouched replayed book, as in v1).
+    Parent ids are unique within the stream.
+    """
+    n_cells = len(sizes_pct) * len(algos)
+    if not cover_all_cells:
+        return [
+            make_parents(
+                first_ts, last_ts, instrument_id, adv, sizes_pct, algos, session_index, rng,
+                window_ns=window_ns, warmup_ns=warmup_ns, **kw,
+            )
+        ]  # fmt: skip
+    n = 1
+    while n < MAX_COVER_PASSES:
+        total = sum(
+            len(cut_windows(first_ts + j * window_ns // n, last_ts, window_ns, warmup_ns))
+            for j in range(n)
+        )
+        if total >= n_cells:
+            break
+        n += 1
+    out: list[list[tuple[ParentOrder, float]]] = []
+    done = 0
+    for j in range(n):
+        ps = make_parents(
+            first_ts, last_ts, instrument_id, adv, sizes_pct, algos, session_index, rng,
+            window_ns=window_ns, warmup_ns=warmup_ns, pass_index=j, n_passes=n,
+            id_offset=done, cell_offset=done, **kw,
+        )  # fmt: skip
+        done += len(ps)
+        out.append(ps)
     return out
 
 
@@ -482,6 +562,40 @@ def _symbols(config_dir: Path) -> dict[int, str]:
 
 def _bps(row: dict[str, float], key: str) -> float:
     return 1e4 * row[key] / row["notional"]
+
+
+def parent_extras(
+    row: dict,
+    p: ParentOrder,
+    timeline,
+    tick: float,
+    venue_adv: float,
+    consolidated_adv: float | None,
+    liq_edges: list[float],
+    markout: dict[str, list[float]],
+    span: tuple[int, int],
+) -> dict[str, object]:
+    """v1.18 REL-03 columns of one parent row: the arrival mid, the v2 metric
+    inputs (``m_*``), the regime / liquidity labels and the post-trade
+    markout accumulators (:mod:`iap.research.execution_metrics`)."""
+    mid = timeline.mid_at(p.start_ts)
+    r = dict(row)
+    r["decision_mid"] = mid
+    out: dict[str, object] = {"decision_mid": mid}
+    for k, v in exm.parent_metrics(r).items():
+        out[f"m_{k}"] = v
+    i = timeline.prevailing(p.start_ts)
+    out["spread_regime"] = (
+        exm.spread_regime(timeline.half_spread(i) / tick) if i is not None else None
+    )
+    third = max(1, (span[1] - span[0]) // 3)
+    out["tod"] = ("open", "mid", "close")[min(2, max(0, (p.start_ts - span[0]) // third))]
+    adv = consolidated_adv if consolidated_adv else venue_adv
+    out["liquidity"] = exm.liquidity_bucket(adv, liq_edges)
+    out["size_pct_venue_adv"] = exm.size_label(p.qty, venue_adv)
+    out["size_pct_consolidated_adv"] = exm.size_label(p.qty, consolidated_adv)
+    out["markout_w"] = markout
+    return out
 
 
 def _cell_summary(rows: list[dict], seed: int) -> dict[str, object]:
@@ -552,6 +666,22 @@ def _cell_summary(rows: list[dict], seed: int) -> dict[str, object]:
             for key in REPORT_COSTS
         },
     }
+    # REL-04: every way a parent under-delivers is a COUNTER here, never silent
+    out["failures"] = {
+        "incomplete_parents": sum(1 for r in rows if r["filled_qty"] < r["qty"]),
+        "incomplete_share": sum(1 for r in rows if r["filled_qty"] < r["qty"]) / len(rows),
+        "residual_qty": sum(r["qty"] - r["filled_qty"] for r in rows),
+        "depth_exhausted_children": sum(r["depth_exhausted"] for r in rows),
+        "cap_no_depth_posts": sum(r.get("cap_no_depth", 0) for r in rows),
+        "cap_no_depth_parents": sum(1 for r in rows if r.get("cap_no_depth", 0) > 0),
+        "cap_withheld_qty": sum(r.get("cap_withheld_qty", 0) for r in rows),
+        "reposts": sum(r.get("reposts", 0) for r in rows),
+        "carry_unsent_qty": sum(r.get("carry_unsent_qty", 0) for r in rows),
+        "note": "residual is reported, never filled; depth_exhausted is the legacy MARKET "
+        "walk running out of depth, cap_no_depth a capped post that found no eligible depth",
+    }
+    if rows and "m_fill_cost" in rows[0]:
+        out["metrics_v2"] = exm.aggregate(rows)
     return out
 
 
@@ -574,6 +704,16 @@ def _paired_summary(base: list[dict], other: list[dict], seed: int) -> dict[str,
         "fill_rate_diff": cluster_mean_stats(fill_diff, clusters, seed=seed),
         "costs_bps": {k: cluster_mean_stats(v, clusters, seed=seed) for k, v in diffs.items()},
     }
+
+
+def check_data_access(data_dir: Path, *, allow_holdout: bool = False) -> None:
+    """The single entry-point data-access check of the benchmark: delegates to the
+    REL-02 hash-locked holdout registry (``iap.research.holdout_registry``), which
+    replaced the v1.17 path-substring rule. A legacy ``allow_holdout`` bool
+    authorises nothing; a signed prereg id does."""
+    from iap.research.holdout_registry import guard_or_exit
+
+    guard_or_exit(data_dir, "execution_benchmark", allow_holdout)
 
 
 def run_benchmark(
@@ -636,6 +776,13 @@ def run_benchmark(
     router_tox_horizon: str = "1s",
     router_fill_horizon_s: float = 1.0,
     more_pairs: tuple[tuple[Path, Path], ...] = (),
+    cover_all_cells: bool = False,
+    consolidated_adv: Path | None = None,
+    hidden_prints: bool = False,
+    peg_ahead_qty: int = 0,
+    md_delay_ns: int = 0,
+    venue_inbound_delay_ns: dict[str, int] | None = None,
+    child_exec: ChildExecParams | None = None,
 ) -> dict[str, object]:
     """Run the grid; returns the JSON document (see the module docstring).
 
@@ -651,6 +798,21 @@ def run_benchmark(
     dataset)`` day pairs (one session each on the overlap days), re-keyed
     onto ``data_dir``'s instrument ids by symbol; ``data_dir``'s configs
     (instruments, ADV) serve every day.
+
+    ``cover_all_cells`` (v1.18 REL-03, X-E; default off = the v1.17 rotation,
+    so committed JSONs reproduce) adds overlapping passes until every grid
+    cell runs on every day (:func:`make_parent_passes`).  ``consolidated_adv``
+    is a JSON ``{symbol: consolidated daily shares}``: sizes are then also
+    labelled in % of consolidated ADV (X-F); the grid itself is still sized
+    from the venue ADV in ``instruments.json``.
+
+    REL-04 fidelity (all opt-in, default off): ``hidden_prints`` lets
+    non-displayed TRADE prints fill resting children and midpoint pegs;
+    ``peg_ahead_qty`` is the modelled midpoint queue; ``md_delay_ns`` delays
+    child decisions of the ``capped`` / ``peg`` variants by the market-data
+    delay; ``venue_inbound_delay_ns`` maps a venue name to its inbound delay
+    (IEX: 350_000, the speed bump); ``child_exec`` holds the cap knobs of the
+    ``capped`` / ``peg`` variants (:mod:`iap.execution.child_exec`).
 
     ``venues`` replaces the venue table; the ``dark_*`` knobs build the B10
     :class:`DarkFirstParams` of the ``dark`` variant (``dark_model`` = a
@@ -673,11 +835,7 @@ def run_benchmark(
     instrument spec, horizon = the window).
     """
     data_dir = Path(data_dir)
-    if "holdout" in str(data_dir).lower() and not allow_holdout:
-        raise SystemExit(
-            f"{data_dir}: looks like a holdout dataset; the benchmark is in-sample only "
-            "(--allow-holdout overrides, for a signed pre-registered run)"
-        )
+    check_data_access(data_dir, allow_holdout=allow_holdout)
     if config_dir is None:
         config_dir = data_dir / "configs"
         if not config_dir.is_dir():
@@ -688,7 +846,8 @@ def run_benchmark(
     if baseline_policy not in policies:
         raise SystemExit(f"baseline policy {baseline_policy!r} is not in --policies")
     if signal == "none" and any(
-        parse_policy(pol)[1] not in (None, DARK_VARIANT, *PULL_VARIANTS) for pol in policies
+        parse_policy(pol)[1] not in (None, DARK_VARIANT, *PULL_VARIANTS, *CHILD_VARIANTS)
+        for pol in policies
     ):
         raise SystemExit("signal-aware policies need --signal (an alpha id or 'synthetic')")
     pull_variants_used = {parse_policy(pol)[1] for pol in policies} & set(PULL_VARIANTS)
@@ -774,7 +933,26 @@ def run_benchmark(
             load_venues(Path(second_data_dir) / "configs" / "venues" / "venues.json")
         )
         cfg = replace(cfg, venues=merged_venues)
+    if venue_inbound_delay_ns:
+        by_name = {sp.name: v for v, sp in cfg.venues.items()}
+        unknown = sorted(set(venue_inbound_delay_ns) - set(by_name))
+        if unknown:
+            raise SystemExit(f"--inbound-delay names unknown venues {unknown} ({sorted(by_name)})")
+        cfg = replace(
+            cfg,
+            venues={
+                v: replace(
+                    sp, inbound_delay_ns=venue_inbound_delay_ns.get(sp.name, sp.inbound_delay_ns)
+                )
+                for v, sp in cfg.venues.items()
+            },
+        )
     sor = load_sor_options(config_dir / "execution" / "execution.json")
+    rkw = {
+        "hidden_prints": hidden_prints,
+        "peg_ahead_qty": peg_ahead_qty,
+        "md_delay_ns": md_delay_ns,
+    }
     # v1.17 B8: route policies (pinned venue or the sor_v2 router)
     if iex_clock not in IEX_CLOCKS:
         raise SystemExit(f"--iex-clock must be one of {IEX_CLOCKS}")
@@ -982,6 +1160,19 @@ def run_benchmark(
                 "units": "z-score of the alpha's expected_return per instrument on this dataset",
             }
         )
+    consolidated: dict[str, float] = {}
+    if consolidated_adv is not None:
+        consolidated = {
+            str(k): float(v)
+            for k, v in json.loads(Path(consolidated_adv).read_text(encoding="utf-8")).items()
+            if not str(k).startswith("_")
+        }
+    adv_pool = sorted(consolidated.values() or [i.adv for i in cfg.instruments.values()])
+    liq_edges = (
+        [adv_pool[len(adv_pool) // 3], adv_pool[(2 * len(adv_pool)) // 3]]
+        if len(adv_pool) >= 3
+        else []
+    )
     for s_index, path in enumerate(files):
         label = _session_label(path)
         session_labels.append(label)
@@ -1030,7 +1221,7 @@ def run_benchmark(
             timeline = build_gated_timeline(evs, iid, ins.tick_size)
             if not timeline.ts:
                 continue  # never two-sided: nothing to benchmark
-            parents = make_parents(
+            passes = make_parent_passes(
                 timeline.ts[0],
                 timeline.ts[-1],
                 iid,
@@ -1045,166 +1236,201 @@ def run_benchmark(
                 participation=participation,
                 max_child_qty=max_child_qty,
                 urgency=urgency,
+                cover_all_cells=cover_all_cells,
             )
-            if not parents:
-                continue
-            src = source
-            if signal == SYNTHETIC_SIGNAL:
-                src = synthetic_signal([iid], timeline.ts[0], timeline.ts[-1])
-            for pol in policies:
-                worked = []
-                cells_of = []
-                for p, pct in parents:
-                    acp = None
-                    if parse_policy(pol)[1] in ("ac", "ac_drift") and p.algo == AlgoType.IS:
-                        price = timeline.mid_at(p.start_ts)
-                        if math.isfinite(price) and price > 0:
-                            acp = ac_params_from_calibration(
-                                sigma=price * ac_daily_vol,
-                                adv_per_day=ins.adv,
-                                price=price,
-                                horizon_s=window_ns / SEC,
-                                risk_aversion=ac_risk_aversion,
-                                config=cfg,
-                            )
-                    q = signal_variant(
-                        p,
-                        pol,
-                        src,
-                        urgency=urgency_policy,
-                        pacing=pacing_params,
-                        ac_params=acp,
-                        fade=fade_params,
-                        queue_cancel=qcancel_params,
-                        dark=dark_params,
-                    )
-                    if q is not None:
-                        worked.append(q)
-                        cells_of.append((p, pct))
-                if not worked:
+            for parents in passes:
+                if not parents:
                     continue
-                route = split_route(pol)[1]
-                if route is not None and route in pin_of:
-                    worked = [replace(q, venue_id=pin_of[route]) for q in worked]
-                if route == "sor":
-                    res = ExecutionReplay(
-                        cfg, worked, sor, router=router, router_fill_prob=router_fp
-                    ).run(evs)
-                elif route == "sor_sweep":
-                    res = ExecutionReplay(
-                        cfg,
-                        worked,
-                        sor,
-                        router=sweep_router,
-                        router_fill_prob=router_fp,
-                        router_sweep=True,
-                    ).run(evs)
-                    sweep_unsent[pol] = sweep_unsent.get(pol, 0) + res.sweep_unsent_qty
-                else:
-                    res = ExecutionReplay(cfg, worked, sor).run(evs)
-                fills_of: dict[int, list] = {p.parent_id: [] for p in worked}
-                for f in res.fills:
-                    fills_of[f.parent_id].append(f)
-                orders_of = {o.order_id: o for kids in res.children.values() for o in kids}
-                # v1.17 B6: every fill priced by type / regime, clustered by session
-                frows = fill_rows(
-                    res.fills,
-                    orders_of,
-                    timeline,
-                    ins.tick_size,
-                    qty_unit=ins.qty_unit,
-                    horizons_ns=mk_horizons,
-                    cluster=label,
-                )
-                mk_rows_of[pol].extend(frows)
-                if routes_used:
-                    for f, fr in zip(res.fills, frows, strict=True):
-                        venue_rows_of.setdefault(pol, {}).setdefault(
-                            cfg.venues[f.venue_id].name, []
-                        ).append(fr)
-                # v1.17 B4: the pulls, priced after the fact (counterfactual)
-                if res.pulls:
-                    pull_rows_of[pol].extend(
-                        pull_rows(
-                            res.pulls,
-                            timeline,
-                            ins.tick_size,
-                            horizons_ns=mk_horizons,
-                            qty_unit=ins.qty_unit,
-                            rules=CANCEL_RULES,
-                            cluster=label,
-                        )
-                    )
-                    pull_lost[pol] += sum(1 for r in res.pulls if r.outcome == "lost_race")
-                for (p0, pct), p in zip(cells_of, worked, strict=True):
-                    row = parent_costs(p, fills_of[p.parent_id], timeline, ins.tick_size, taker_fee)
-                    rep = res.parents[p.parent_id]
-                    type_qty: dict[str, int] = {}
-                    venue_qty: dict[str, int] = {}
-                    for f in fills_of[p.parent_id]:
-                        k = fill_type(f, orders_of[f.order_id])
-                        type_qty[k] = type_qty.get(k, 0) + f.qty
-                        vn = cfg.venues[f.venue_id].name
-                        venue_qty[vn] = venue_qty.get(vn, 0) + f.qty
-                    row.update(
-                        {
-                            "session": label,
-                            "symbol": sym,
-                            "instrument_id": iid,
-                            "window": p0.parent_id,
-                            "algo": p.algo.name,
-                            "size_pct_adv": pct,
-                            "policy": pol,
-                            "side": p.side,
-                            "children": rep.children,
-                            "depth_exhausted": rep.depth_exhausted,
-                            "depth_exhausted_qty": rep.depth_exhausted_qty,
-                            "provenance_qty": rep.provenance_qty,
-                            "urgency_children": rep.urgency_children,
-                            "urgency_qty": rep.urgency_qty,
-                            "sor_no_route": res.sor_no_route,
-                            "fill_type_qty": type_qty,
-                            "venue_qty": venue_qty,
-                            "pulls": rep.pulls,
-                            "pulled_qty": rep.pulled_qty,
-                            "pulls_lost_race": rep.pulls_lost_race,
-                            "held_unsent_qty": rep.held_unsent_qty,
-                            "dark_children": rep.dark_children,
-                            "dark_posted_qty": rep.dark_posted_qty,
-                            "dark_filled_qty": rep.dark_filled_qty,
-                            "dark_expired_qty": rep.dark_expired_qty,
-                            "dark_unsent_qty": rep.dark_unsent_qty,
-                            "dark_rejected": rep.dark_rejected,
-                        }
-                    )
-                    rows[pol].append(row)
-                    if rep.dark_children or rep.dark_rejected:
-                        tot = dark_totals.setdefault(
+                src = source
+                if signal == SYNTHETIC_SIGNAL:
+                    src = synthetic_signal([iid], timeline.ts[0], timeline.ts[-1])
+                for pol in policies:
+                    worked = []
+                    cells_of = []
+                    for p, pct in parents:
+                        acp = None
+                        if parse_policy(pol)[1] in ("ac", "ac_drift") and p.algo == AlgoType.IS:
+                            price = timeline.mid_at(p.start_ts)
+                            if math.isfinite(price) and price > 0:
+                                acp = ac_params_from_calibration(
+                                    sigma=price * ac_daily_vol,
+                                    adv_per_day=ins.adv,
+                                    price=price,
+                                    horizon_s=window_ns / SEC,
+                                    risk_aversion=ac_risk_aversion,
+                                    config=cfg,
+                                )
+                        q = signal_variant(
+                            p,
                             pol,
-                            {
-                                "label": MODELLED_LABEL,
-                                "parents": 0,
-                                "dark_children": 0,
-                                "dark_posted_qty": 0,
-                                "dark_filled_qty": 0,
-                                "dark_expired_qty": 0,
-                                "dark_unsent_qty": 0,
-                                "dark_rejected": {},
-                            },
+                            src,
+                            urgency=urgency_policy,
+                            pacing=pacing_params,
+                            ac_params=acp,
+                            fade=fade_params,
+                            queue_cancel=qcancel_params,
+                            dark=dark_params,
+                            child_exec=child_exec,
                         )
-                        tot["parents"] += 1  # type: ignore[operator]
-                        for k in (
-                            "dark_children",
-                            "dark_posted_qty",
-                            "dark_filled_qty",
-                            "dark_expired_qty",
-                            "dark_unsent_qty",
-                        ):
-                            tot[k] += getattr(rep, k)  # type: ignore[operator]
-                        rej = tot["dark_rejected"]
-                        assert isinstance(rej, dict)
-                        for k, n in rep.dark_rejected.items():
-                            rej[k] = rej.get(k, 0) + n
+                        if q is not None:
+                            worked.append(q)
+                            cells_of.append((p, pct))
+                    if not worked:
+                        continue
+                    route = split_route(pol)[1]
+                    if route is not None and route in pin_of:
+                        worked = [replace(q, venue_id=pin_of[route]) for q in worked]
+                    if route == "sor":
+                        res = ExecutionReplay(
+                            cfg, worked, sor, router=router, router_fill_prob=router_fp, **rkw
+                        ).run(evs)
+                    elif route == "sor_sweep":
+                        res = ExecutionReplay(
+                            cfg,
+                            worked,
+                            sor,
+                            router=sweep_router,
+                            router_fill_prob=router_fp,
+                            router_sweep=True,
+                            **rkw,
+                        ).run(evs)
+                        sweep_unsent[pol] = sweep_unsent.get(pol, 0) + res.sweep_unsent_qty
+                    else:
+                        res = ExecutionReplay(cfg, worked, sor, **rkw).run(evs)
+                    fills_of: dict[int, list] = {p.parent_id: [] for p in worked}
+                    for f in res.fills:
+                        fills_of[f.parent_id].append(f)
+                    orders_of = {o.order_id: o for kids in res.children.values() for o in kids}
+                    # v1.17 B6: every fill priced by type / regime, clustered by session
+                    frows = fill_rows(
+                        res.fills,
+                        orders_of,
+                        timeline,
+                        ins.tick_size,
+                        qty_unit=ins.qty_unit,
+                        horizons_ns=mk_horizons,
+                        cluster=label,
+                    )
+                    mk_rows_of[pol].extend(frows)
+                    if routes_used:
+                        for f, fr in zip(res.fills, frows, strict=True):
+                            venue_rows_of.setdefault(pol, {}).setdefault(
+                                cfg.venues[f.venue_id].name, []
+                            ).append(fr)
+                    # v1.17 B4: the pulls, priced after the fact (counterfactual)
+                    if res.pulls:
+                        pull_rows_of[pol].extend(
+                            pull_rows(
+                                res.pulls,
+                                timeline,
+                                ins.tick_size,
+                                horizons_ns=mk_horizons,
+                                qty_unit=ins.qty_unit,
+                                rules=CANCEL_RULES,
+                                cluster=label,
+                            )
+                        )
+                        pull_lost[pol] += sum(1 for r in res.pulls if r.outcome == "lost_race")
+                    # v1.18 REL-03: qty-weighted post-trade markout per parent, COST sign
+                    # (positive = adverse); [sum(qty * bps), qty] per horizon, undefined fills out
+                    mk_of: dict[int, dict[str, list[float]]] = {}
+                    for f, fr in zip(res.fills, frows, strict=True):
+                        acc = mk_of.setdefault(f.parent_id, {})
+                        for h, v in fr["markout_bps"].items():
+                            if v is None:
+                                continue
+                            a = acc.setdefault(h, [0.0, 0.0])
+                            a[0] += -float(v) * f.qty
+                            a[1] += f.qty
+                    for (p0, pct), p in zip(cells_of, worked, strict=True):
+                        row = parent_costs(
+                            p, fills_of[p.parent_id], timeline, ins.tick_size, taker_fee
+                        )
+                        row.update(
+                            parent_extras(
+                                row,
+                                p,
+                                timeline,
+                                ins.tick_size,
+                                ins.adv,
+                                consolidated.get(sym),
+                                liq_edges,
+                                mk_of.get(p.parent_id, {}),
+                                (timeline.ts[0], timeline.ts[-1]),
+                            )
+                        )
+                        rep = res.parents[p.parent_id]
+                        type_qty: dict[str, int] = {}
+                        venue_qty: dict[str, int] = {}
+                        for f in fills_of[p.parent_id]:
+                            k = fill_type(f, orders_of[f.order_id])
+                            type_qty[k] = type_qty.get(k, 0) + f.qty
+                            vn = cfg.venues[f.venue_id].name
+                            venue_qty[vn] = venue_qty.get(vn, 0) + f.qty
+                        row.update(
+                            {
+                                "session": label,
+                                "symbol": sym,
+                                "instrument_id": iid,
+                                "window": p0.parent_id,
+                                "algo": p.algo.name,
+                                "size_pct_adv": pct,
+                                "policy": pol,
+                                "side": p.side,
+                                "children": rep.children,
+                                "depth_exhausted": rep.depth_exhausted,
+                                "depth_exhausted_qty": rep.depth_exhausted_qty,
+                                "provenance_qty": rep.provenance_qty,
+                                "urgency_children": rep.urgency_children,
+                                "urgency_qty": rep.urgency_qty,
+                                "sor_no_route": res.sor_no_route,
+                                "fill_type_qty": type_qty,
+                                "venue_qty": venue_qty,
+                                "pulls": rep.pulls,
+                                "pulled_qty": rep.pulled_qty,
+                                "pulls_lost_race": rep.pulls_lost_race,
+                                "held_unsent_qty": rep.held_unsent_qty,
+                                "dark_children": rep.dark_children,
+                                "dark_posted_qty": rep.dark_posted_qty,
+                                "dark_filled_qty": rep.dark_filled_qty,
+                                "dark_expired_qty": rep.dark_expired_qty,
+                                "dark_unsent_qty": rep.dark_unsent_qty,
+                                "dark_rejected": rep.dark_rejected,
+                                "cap_no_depth": rep.cap_no_depth,
+                                "cap_withheld_qty": rep.cap_withheld_qty,
+                                "reposts": rep.reposts,
+                                "carry_unsent_qty": rep.carry_unsent_qty,
+                                "residual_qty": rep.residual_qty,
+                            }
+                        )
+                        rows[pol].append(row)
+                        if rep.dark_children or rep.dark_rejected:
+                            tot = dark_totals.setdefault(
+                                pol,
+                                {
+                                    "label": MODELLED_LABEL,
+                                    "parents": 0,
+                                    "dark_children": 0,
+                                    "dark_posted_qty": 0,
+                                    "dark_filled_qty": 0,
+                                    "dark_expired_qty": 0,
+                                    "dark_unsent_qty": 0,
+                                    "dark_rejected": {},
+                                },
+                            )
+                            tot["parents"] += 1  # type: ignore[operator]
+                            for k in (
+                                "dark_children",
+                                "dark_posted_qty",
+                                "dark_filled_qty",
+                                "dark_expired_qty",
+                                "dark_unsent_qty",
+                            ):
+                                tot[k] += getattr(rep, k)  # type: ignore[operator]
+                            rej = tot["dark_rejected"]
+                            assert isinstance(rej, dict)
+                            for k, n in rep.dark_rejected.items():
+                                rej[k] = rej.get(k, 0) + n
     cells: dict[str, object] = {}
     by_symbol: dict[str, object] = {}
     for pol in policies:
@@ -1236,6 +1462,31 @@ def run_benchmark(
                         paired[f"{pol}-{control}|{algo}|{pct:g}"] = _paired_summary(
                             base, other, seed
                         )
+    # v1.18 REL-03: coverage (n per day and cell) and the slices of the v2 metrics
+    expected_cells = [
+        f"{pol}|{algo}|{pct:g}" for pol in policies for algo in algos for pct in sizes_pct
+    ]
+    coverage: dict[str, object] = {}
+    for lab in session_labels:
+        per_cell: dict[str, int] = {}
+        for pol in policies:
+            for r in rows[pol]:
+                if r["session"] == lab:
+                    k = f"{pol}|{r['algo']}|{r['size_pct_adv']:g}"
+                    per_cell[k] = per_cell.get(k, 0) + 1
+        coverage[lab] = {
+            "n_parents_by_cell": dict(sorted(per_cell.items())),
+            "cells_missing": [k for k in expected_cells if k not in per_cell],
+        }
+    slices: dict[str, object] = {}
+    for pol in policies:
+        if rows[pol] and "m_fill_cost" in rows[pol][0]:
+            slices[pol] = {
+                "by_spread_regime": exm.split_by(rows[pol], "spread_regime"),
+                "by_time_of_day": exm.split_by(rows[pol], "tod"),
+                "by_size_pct_adv": exm.split_by(rows[pol], "size_pct_adv"),
+                "by_liquidity_bucket": exm.split_by(rows[pol], "liquidity"),
+            }
     fades: dict[str, object] = {}
     markouts: dict[str, object] = {}
     for pol in policies:
@@ -1258,6 +1509,7 @@ def run_benchmark(
             markouts[pol] = decompose(mk_rows_of[pol], list(mk_horizons))
     doc: dict[str, object] = {
         "schema": "iap.execution_benchmark/v1",
+        "metrics_schema": "iap.execution_metrics/v2",
         "item": "v1.17 WS-B B1",
         "data_dir": str(data_dir),
         "config_dir": str(config_dir),
@@ -1276,6 +1528,12 @@ def run_benchmark(
             "seed": seed,
             "baseline_policy": baseline_policy,
             "max_events": max_events,
+            "cover_all_cells": cover_all_cells,
+            "size_basis": (
+                "% of the venue ADV in instruments.json (one venue, NOT consolidated); "
+                "size_pct_consolidated_adv is on each parent row"
+                + ("" if not consolidated else f" from {consolidated_adv}")
+            ),
         },
         "simulator": {
             "impact_model": impact_model,
@@ -1301,6 +1559,9 @@ def run_benchmark(
         "n_parents": {pol: len(rows[pol]) for pol in policies},
         "cells": cells,
         "cells_by_symbol": by_symbol,
+        "coverage_by_session": coverage,
+        "metrics_v2_slices": slices,
+        "metric_definitions": exm.METRIC_DEFINITIONS,
         "paired_vs_baseline": paired,
         # v1.17 B4 / B5 / B6
         "pull_rules": pull_doc,
@@ -1409,6 +1670,7 @@ def two_venue_block(
     return {
         "item": "v1.17 B8",
         "alignment": ALIGNMENT_RULE,
+        "feed_latency_skew_note": SKEW_QUALIFICATION,
         **meta,
         "paired_pooled": pooled,
         "paired_rows": pairs,
@@ -1494,6 +1756,64 @@ def _two_venue_lines(doc: dict) -> list[str]:
     return out
 
 
+def _ratio(s: dict | None, digits: int = 2) -> str:
+    """``estimate ± se [ci]`` with n, clusters, ESS and MDE beside it."""
+    if not s or s.get("estimate") is None:
+        return "—"
+    out = f"{s['estimate']:.{digits}f}"
+    if s.get("se") is not None:
+        lo, hi = s["ci95"]
+        out += f" ± {s['se']:.{digits}f} [{lo:.{digits}f}, {hi:.{digits}f}]"
+        ess = s.get("ess")
+        m = s.get("mde_t")
+        out += f" (G={s['n_clusters']}, ESS {'—' if ess is None else f'{ess:.1f}'}"
+        out += f", MDE {'—' if m is None else f'{m:.{digits}f}'})"
+    else:
+        out += f" (G={s['n_clusters']}: no interval)"
+    return out
+
+
+def _metrics_v2_lines(doc: dict) -> list[str]:
+    cells = [(k, c["metrics_v2"]) for k, c in doc["cells"].items() if "metrics_v2" in c]
+    if not cells:
+        return []
+    lines = [
+        "",
+        "## Metrics v2 (REL-03; cost per FILLED share is primary, Perold shortfall secondary)",
+        "",
+        "Positive = worse for the trader. Pooled values are quantity-weighted ratios of sums "
+        "(cluster-linearised CR1 SE, one cluster per session, Student-t at G − 1 df); ESS = "
+        "parents / design effect; MDE = minimum detectable effect (80 % power, two-sided 5 %, "
+        "Student-t). Narrower intervals are a diagnostic, never a gate.",
+        "",
+        "| cell | n | cost / filled share (bps) | fill rate | completion ratio | residual share of target | completion charge (bps, residual) | Perold shortfall / target share (bps) | per-parent median cost (bps) |",
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+    for key, m in cells:
+        pp = m["per_parent"]["cost_per_filled_share_bps"]
+        lines.append(
+            f"| {key} | {m['n_parents']} | {_ratio(m['cost_per_filled_share_bps'])} | "
+            f"{_ratio(m['fill_rate'], 3)} | {_ratio(m['completion_ratio'], 3)} | "
+            f"{_f(m['residual_qty']['share_of_target'], 3)} | {_ratio(m['completion_charge_bps'])} | "
+            f"{_ratio(m['shortfall_per_target_share_bps'])} | {_f(pp['q50'])} |"
+        )
+    cov = doc.get("coverage_by_session", {})
+    missing = {lab: c["cells_missing"] for lab, c in cov.items() if c["cells_missing"]}
+    lines += [
+        "",
+        "Grid coverage: "
+        + (
+            "every cell ran on every session."
+            if not missing
+            else "cells that did NOT run on a session: "
+            + "; ".join(f"{lab}: {len(v)}" for lab, v in sorted(missing.items()))
+            + " (use `--cover-all-cells`)."
+        ),
+    ]
+    lines += ["", "### Metric definitions", "", exm.definitions_markdown(), ""]
+    return lines
+
+
 def render(doc: dict) -> str:
     sim = doc["simulator"]
     g = doc["grid"]
@@ -1546,6 +1866,7 @@ def render(doc: dict) -> str:
             f"{de['parents']} ({de['parent_share']:.0%}) | {_f(de['qty_share_of_unfilled'], 3)} | "
             f"{prov or 'none'} | {urg or '—'} |"
         )
+    lines += _metrics_v2_lines(doc)
     if doc["paired_vs_baseline"]:
         lines += [
             "",
@@ -1779,6 +2100,45 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--baseline-policy", default="native")
     ap.add_argument("--max-events", type=int, default=0, help="per session (smoke runs / tests)")
     ap.add_argument("--allow-holdout", action="store_true")
+    ap.add_argument(
+        "--cover-all-cells",
+        action="store_true",
+        help="REL-03: add overlapping passes so every grid cell runs on every day (default: "
+        "the v1.17 rotation, 12 windows for 16 cells)",
+    )
+    ap.add_argument(
+        "--hidden-prints",
+        action="store_true",
+        help="REL-04: non-displayed TRADE prints fill resting children and midpoint pegs",
+    )
+    ap.add_argument("--peg-ahead-qty", type=int, default=0, help="REL-04: modelled midpoint queue")
+    ap.add_argument(
+        "--md-delay-ns",
+        type=int,
+        default=0,
+        help="REL-04: market-data delay of capped / peg children",
+    )
+    ap.add_argument(
+        "--inbound-delay",
+        action="append",
+        default=[],
+        metavar="VENUE=NS",
+        help="REL-04: inbound order/cancel delay of a venue (IEX speed bump: IEXG=350000)",
+    )
+    ap.add_argument("--child-max-levels", type=int, default=3, help="REL-04 capped / peg variants")
+    ap.add_argument("--child-depth-fraction", type=float, default=1.0)
+    ap.add_argument("--child-max-slippage-ticks", type=int, default=0)
+    ap.add_argument("--child-max-participation", type=float, default=0.0)
+    ap.add_argument("--child-repost-interval-s", type=float, default=1.0)
+    ap.add_argument("--child-max-reposts", type=int, default=20)
+    ap.add_argument("--child-peg-deadline-s", type=float, default=0.0)
+    ap.add_argument(
+        "--consolidated-adv",
+        type=Path,
+        default=None,
+        help="REL-03: JSON {symbol: consolidated daily shares}; labels sizes in %% of "
+        "consolidated ADV",
+    )
     ap.add_argument("--no-timestamp", action="store_true")
     ap.add_argument("--write-prereg-draft", action="store_true")
     sg = ap.add_argument_group("signal-aware arms (v1.17 B2 / B3)")
@@ -1947,6 +2307,24 @@ def main(argv: list[str] | None = None) -> int:
         router_tox_horizon=args.router_tox_horizon,
         router_fill_horizon_s=args.router_fill_horizon_s,
         more_pairs=tuple((Path(a), Path(b)) for a, b in args.pair_dir),
+        cover_all_cells=args.cover_all_cells,
+        consolidated_adv=args.consolidated_adv,
+        hidden_prints=args.hidden_prints,
+        peg_ahead_qty=args.peg_ahead_qty,
+        md_delay_ns=args.md_delay_ns,
+        venue_inbound_delay_ns={
+            k: int(v) for k, _, v in (a.partition("=") for a in args.inbound_delay)
+        }
+        or None,
+        child_exec=ChildExecParams(
+            max_levels=args.child_max_levels,
+            depth_fraction=args.child_depth_fraction,
+            max_slippage_ticks=args.child_max_slippage_ticks,
+            max_participation=args.child_max_participation,
+            repost_interval_ns=int(args.child_repost_interval_s * SEC),
+            max_reposts=args.child_max_reposts,
+            deadline_ns=int(args.child_peg_deadline_s * SEC),
+        ),
     )
     tag = args.tag or Path(args.data_dir).name
     args.out.mkdir(parents=True, exist_ok=True)

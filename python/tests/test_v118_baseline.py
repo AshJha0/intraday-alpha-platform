@@ -49,19 +49,25 @@ def test_single_cluster_has_no_se(tool):
     assert math.isnan(out["se"])
 
 
-def test_committed_baseline_is_current(tool):
+def test_frozen_baseline_recomputes_where_its_inputs_are_unchanged(tool):
+    """The baseline is frozen history (REL-01): later PRs may change ci.yml, the lock
+    file or a research artefact. Each section is recomputed only while the input file
+    it was built from still has the recorded sha256; a changed input means the
+    section describes an earlier tree and is skipped, never silently rewritten."""
     committed = json.loads(
         (ROOT / "research/v118/baseline_metrics.json").read_text(encoding="utf-8")
     )
     fresh = json.loads(json.dumps(tool.build()))
-    committed.pop("commit", None)
-    fresh.pop("commit", None)
-    committed.pop("tree_is_clean_at_inputs", None)
-    fresh.pop("tree_is_clean_at_inputs", None)
-    # the interpreter that generated the file is recorded but differs across CI runners
-    committed["toolchain"].pop("python_used_for_this_baseline", None)
-    fresh["toolchain"].pop("python_used_for_this_baseline", None)
-    assert committed == fresh
+    checked = 0
+    for section in ("ledger", "r7_confirm", "alpha_registry"):
+        if committed[section]["sha256"] == fresh[section]["sha256"]:
+            assert committed[section] == fresh[section], section
+            checked += 1
+    for sym, block in committed["b8_oos3"].items():
+        if block["sha256"] == fresh["b8_oos3"][sym]["sha256"]:
+            assert block == fresh["b8_oos3"][sym], sym
+            checked += 1
+    assert checked >= 1, "every baseline input has changed; regenerate a new baseline"
 
 
 def test_ledger_chain_recomputes_and_counts_agree():

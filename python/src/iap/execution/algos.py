@@ -65,6 +65,7 @@ from typing import TYPE_CHECKING
 from iap.execution.passive import ExecPolicy, PassiveParams
 
 if TYPE_CHECKING:  # pragma: no cover
+    from iap.execution.child_exec import ChildExecParams
     from iap.execution.dark import DarkFirstParams
     from iap.execution.fading import FadeParams, QueueCancelParams
     from iap.execution.optimal import ACParams
@@ -161,6 +162,13 @@ class ParentOrder:
     #: and sends the unfilled remainder to the lit book. Its dark fills are
     #: modelled, not measured. ``None`` = off (the pinned behaviour).
     dark_first: DarkFirstParams | None = None
+    #: v1.18 REL-04 venue-aware child execution (``iap.execution.child_exec``,
+    #: Python only, opt-in): the non-passive children of this parent are
+    #: marketable IOC LIMITs capped at the eligible displayed depth (or
+    #: midpoint pegs) with explicit remaining-quantity state and controlled
+    #: re-posts, instead of 1000-share MARKET orders.  ``None`` = off (the
+    #: pinned behaviour).
+    child_exec: ChildExecParams | None = None
 
     @property
     def pulls_resting(self) -> bool:

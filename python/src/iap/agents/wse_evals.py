@@ -34,11 +34,17 @@ def _budget(ledger: SpendLedger, role: str) -> Budget:
 
 
 def fake_dataset(root: Path, name: str, date: str = "2019-01-30") -> Path:
+    # synthetic: the holdout registry (REL-02b) refuses unregistered real data, and this is a stand-in
     ds = root / name
     ds.mkdir(parents=True, exist_ok=True)
     (ds / "dataset.json").write_text(
         json.dumps(
-            {"x-version": 1, "kind": "real", "dataset_version": "f" * 64, "sessions": {date: {}}}
+            {
+                "x-version": 1,
+                "kind": "synthetic",
+                "dataset_version": "f" * 64,
+                "sessions": {date: {}},
+            }
         ),
         encoding="utf-8",
     )

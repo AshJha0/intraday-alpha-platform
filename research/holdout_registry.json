@@ -1,0 +1,742 @@
+{
+  "body_sha256": "51a0e4e7b12c9fc71cbc2da7091143699d181315e3db4f912a8f19cb50b911df",
+  "datasets": {
+    "00121a37bb26ac1d504f761f481d2786339ff9cc51bc3457dbf2b47eb87068ac": {
+      "content_hash": "7589ed2c8ede152993547cc88362b067f68249110bfb18291e50c68a05792c5b",
+      "label": "r7_20210813",
+      "sessions": [
+        "2021-08-13"
+      ],
+      "state": "in_sample",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "06419d749910a8f0a6d089d5ed13a40500481d581a93f276bb62c339940c7293": {
+      "content_hash": "545000d31674c77dab60419549cd3ef05e7a472e8be1c14c700c93bfe9f73776",
+      "label": "ds3_20190130",
+      "sessions": [
+        "2019-01-30"
+      ],
+      "state": "in_sample",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "081ff2cdd7844587613518df6d0ed8a64eea9513ef5b2ed3f5a2f8901829d861": {
+      "content_hash": "733799a3947c4e4ac0a6c6d7472758d2ced7b53fe05368afa62d341d42eb4ae0",
+      "label": "r7_20251212",
+      "sessions": [
+        "2025-12-12"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "24d5d38b9e50ed676d0cceca46cd9cad89be186a6f3517e5a06903b17fb28a1b": {
+      "content_hash": "867ede82b7815a67436ce45bb132e593b3da2b1d1162ab220d4ea92b798f4a3a",
+      "label": "r7_20251209",
+      "sessions": [
+        "2025-12-09"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "284629a29df4e6419fb527990abf34e3a8dd25f42902e56604df840860ce8ecc": {
+      "content_hash": "b4c10f1dd761d54beb8327a0a1a692a5d66074acac0a22cfb32f5b7a29d13915",
+      "label": "r7_20251208",
+      "sessions": [
+        "2025-12-08"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "33d0cbe8a6601850472f584a919b98211dd1841af6667b4cd6faf22c51ffc157": {
+      "content_hash": "fd80e5232cc16287079ab2879b969dd40c8038db8b6b3cf20319b597723c0689",
+      "label": "iex_20251210",
+      "sessions": [
+        "2025-12-10"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "3731bbd4a40acdd4833f1f42c4d14a0df027e5a310c08408d608a0e18ffa2ced": {
+      "content_hash": "10dcbdd8f8ace0ee7c1b43fd2fe72edfc7538fdff579f57afc5020e4f42ea1fc",
+      "label": "ds3_20190730",
+      "sessions": [
+        "2019-07-30"
+      ],
+      "state": "in_sample",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "517f666c3350057897eeaba1e8a3753f34aed3fa2c377911f27a2dafe54cf005": {
+      "content_hash": "f186feecaf6a3bd194635d5914b5291de68113269c477859d4e936ee5c8af229",
+      "label": "ds3_20191030",
+      "sessions": [
+        "2019-10-30"
+      ],
+      "state": "in_sample",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "535f4868b0a5f6d14305018142221bea100b615dcc3a212de4eb7a715aecd8fb": {
+      "content_hash": "6aba3b762698670860d0cd52d096a024dd025d5e78f80da8ce2ca6e728255f03",
+      "label": "r7_20251128",
+      "sessions": [
+        "2025-11-28"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "53f48feb7e4f2451dbf9a30cd375998e3765bced3d653f55d7c404494d33540a": {
+      "content_hash": "6892ea56bd26e8b95b2c5db3e0c5f786a4b9ff82aa1a789b870548f48ecaffa3",
+      "label": "ds3_20191230",
+      "sessions": [
+        "2019-12-30"
+      ],
+      "state": "in_sample",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "62632989c86d77a14b061ddd8fd175dd71c4c03a96992cc02715d684451dd73c": {
+      "content_hash": "e0ca679f95ab1f92ddc92240a70a42f8b34ef39644bf42604fefb8ce521055b9",
+      "label": "r7_20251211",
+      "sessions": [
+        "2025-12-11"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "6a495deeb3fc02a6ef5447a6a82e3a04d0491926bf09b4133398a3c4261ddce9": {
+      "content_hash": "2b22bd8470601d44543683010c60e552f995f1ce9d76d82d43e4092ebf968e17",
+      "label": "r7_20260612",
+      "sessions": [
+        "2026-06-12"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "6c94942ab59df29f8b93cc20e6526e6794affd0b9f2851eeb00cb1c2fef1a1e6": {
+      "content_hash": "31cc35384d721eca5664661b95017c86309e242488f16708a385d059aa498b32",
+      "label": "iex_20251208",
+      "sessions": [
+        "2025-12-08"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "77e9d00c5266eb3abc92d5ec6f2b140f951cf245bec6cb5b0b41394a4298a706": {
+      "content_hash": "9ea256bd1c27cc481873dfdf889536b030013c888dfffeb02a4f8376f18c5958",
+      "label": "r7_20191018",
+      "sessions": [
+        "2019-10-18"
+      ],
+      "state": "in_sample",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "7c6ddcf3429a021a4cdeb2b9976c7fe9167eade399b1c85bb5c95b3847995784": {
+      "content_hash": "7c15a7017e87da777af58a1bbd4367ee3969d903fbe458a30952e4d8048a556d",
+      "label": "ds3_20190327",
+      "sessions": [
+        "2019-03-27"
+      ],
+      "state": "in_sample",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "9517c4efa19b32fd3632ee04782c5d0c07f390e5e27e3618dd2533aa90d0938c": {
+      "content_hash": "1308e8c51de7d4050cae1ea78333b5d28cf6538a8093f3efaa0b2ec36fa480b0",
+      "label": "iex_20251209",
+      "sessions": [
+        "2025-12-09"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "9a1297a161fc69c47a770dcab4e3e09d5ecd34e1d2a96b44209011485038041d": {
+      "content_hash": "c5feca35ff71e06526dc08d650afffc209b5a3273f93284dad5ebbb72e64a7ca",
+      "label": "ds_20190130",
+      "sessions": [
+        "2019-01-30"
+      ],
+      "state": "in_sample",
+      "symbols": [
+        "AABA",
+        "AAL",
+        "AAPL",
+        "ABEV",
+        "AMAT",
+        "AMD",
+        "AMLP",
+        "ATVI",
+        "AUY",
+        "BABA",
+        "BAC",
+        "BBD",
+        "C",
+        "CHK",
+        "CLF",
+        "CMCSA",
+        "CODX",
+        "CRON",
+        "CSCO",
+        "CZR",
+        "DAL",
+        "DWDP",
+        "EBAY",
+        "ECA",
+        "EEM",
+        "EFA",
+        "EWZ",
+        "F",
+        "FB",
+        "FCX",
+        "FDC",
+        "FISV",
+        "FLEX",
+        "FXI",
+        "GDX",
+        "GDXJ",
+        "GE",
+        "GGB",
+        "GLD",
+        "HMNY",
+        "HYG",
+        "IEMG",
+        "INTC",
+        "ITUB",
+        "IWM",
+        "JD",
+        "JNUG",
+        "JPM",
+        "KEY",
+        "MO",
+        "MRVL",
+        "MS",
+        "MSFT",
+        "MU",
+        "MYL",
+        "NBEV",
+        "NIO",
+        "NLY",
+        "NOK",
+        "NUGT",
+        "NVDA",
+        "OHGI",
+        "ORCL",
+        "P",
+        "PBR",
+        "PCG",
+        "PDD",
+        "PFE",
+        "PYPL",
+        "QCOM",
+        "QQQ",
+        "RWLK",
+        "SBUX",
+        "SGYP",
+        "SIRI",
+        "SMH",
+        "SPY",
+        "SQ",
+        "SQQQ",
+        "T",
+        "TLT",
+        "TQQQ",
+        "TSLA",
+        "TVIX",
+        "USO",
+        "VALE",
+        "VWO",
+        "VXXB",
+        "VZ",
+        "WFC",
+        "WMT",
+        "X",
+        "XLE",
+        "XLF",
+        "XLI",
+        "XLK",
+        "XLP",
+        "XLU",
+        "XLV",
+        "XOP"
+      ]
+    },
+    "ad9a62dea3664c98cc475bf824a058fe8d53f5ac609d675e005b8dc930535498": {
+      "content_hash": "97cf8497a34f9be59092d5cb6bae8360ec260d2f14580d1ca907e88665dbb3aa",
+      "label": "ds3_20190830",
+      "sessions": [
+        "2019-08-30"
+      ],
+      "state": "in_sample",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "b39c7d3bba39727ba73f13184442d5ee119329929a562fb782877f0126e1301c": {
+      "content_hash": "d80e3624492265b79ccef94bf9c6dd36a404242f761e05665e016e4f1fce41b0",
+      "label": "r7_20210713",
+      "sessions": [
+        "2021-07-13"
+      ],
+      "state": "in_sample",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "ba2022d0d53c013be27f9b3ce6eeef13baa4280009ef32f6c2761b43e61037f4": {
+      "content_hash": "c020aee480f9742e97def78ad48dc1a051b400d66c7302752f31eb1ab291a57f",
+      "label": "iex_20260518",
+      "sessions": [
+        "2026-05-18"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "bd6f9c707d898007ca281ff093602176c39ac1cf45e0894808e7d1f14bdd3904": {
+      "content_hash": "61864e670ea3b3ac0a194cc663eda32e18e7f00c42b2bca6fb9be7fe1e64ca87",
+      "label": "iex_20260515",
+      "sessions": [
+        "2026-05-15"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "c54e97e44674993f94c2929f49fdb39c08fb770d4d2f01cc4de4b6d69740dd9f": {
+      "content_hash": "53b993795f3b05cfd532aa6d5f73b8f5ead37faadfc7a9c887914b471b8c122a",
+      "label": "r7_smoke_20191018",
+      "sessions": [
+        "2019-10-18"
+      ],
+      "state": "in_sample",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "ca5d079831be4e63aa76e350bb840a29a6964c0152f4bbbcce5010269a193854": {
+      "content_hash": "de25e2bab9ecc404c7633a3ffefb61e5c1c59c726e5f19bf3ec130436217a3f2",
+      "label": "r7_holdout",
+      "sessions": [
+        "2025-11-28",
+        "2025-12-08",
+        "2025-12-09",
+        "2025-12-10",
+        "2025-12-11",
+        "2025-12-12",
+        "2026-06-12"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "d7f7ffd14fbc363550a5bc9afd886e36df0d851511f840615f1f089b22f5f237": {
+      "content_hash": "f5b33bba048a03e547c4cb00355fc2063aeaf97f7a83748728e719cd6bebebc4",
+      "label": "holdout2026",
+      "sessions": [
+        "2026-05-15",
+        "2026-05-18"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "dea2a6b03ae35df24e5c8751bea8ddcc0f9ca8b93e02c9e2fdb656b6ab62fd80": {
+      "content_hash": "e3eccf329b16b42d0c4be7fcb6e3dc6959516091d8412e13c8bc02d775f1b544",
+      "label": "r7_20251210",
+      "sessions": [
+        "2025-12-10"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "edb9b750a642befdbed19e5b877e959390befc438dd91e840838a4c167791e19": {
+      "content_hash": "1db7cfcecadffc1b7ec4cb391632d6567f4828441da7685151be29344a328dbe",
+      "label": "ds3_20200130",
+      "sessions": [
+        "2020-01-30"
+      ],
+      "state": "in_sample",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4": {
+      "content_hash": "597b78827f3a700b6b037c76ba17e876d5d03ea96a0136a9082f688d941b1673",
+      "label": "multi7",
+      "sessions": [
+        "2019-01-30",
+        "2019-03-27",
+        "2019-07-30",
+        "2019-08-30",
+        "2019-10-30",
+        "2019-12-30",
+        "2020-01-30"
+      ],
+      "state": "in_sample",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "f977bb3a39d16557c79ae6fbc9303a69317fdcc19d0e7f4162d1a06a9120ec79": {
+      "content_hash": "b253b96f054daa2387a6286ffef8b155c7aede72b1204d21e0f07fcb0e641f4d",
+      "label": "iex_20251128",
+      "sessions": [
+        "2025-11-28"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    }
+  },
+  "description": "Hash-locked holdout registry (v1.18 REL-02b, review R-G).",
+  "schema": "iap.holdout_registry/v1",
+  "sessions": {
+    "2019-01-30": [
+      {
+        "state": "in_sample",
+        "symbols": "*"
+      }
+    ],
+    "2019-03-27": [
+      {
+        "state": "in_sample",
+        "symbols": "*"
+      }
+    ],
+    "2019-07-30": [
+      {
+        "state": "in_sample",
+        "symbols": "*"
+      }
+    ],
+    "2019-08-30": [
+      {
+        "state": "in_sample",
+        "symbols": "*"
+      }
+    ],
+    "2019-10-18": [
+      {
+        "state": "in_sample",
+        "symbols": "*"
+      }
+    ],
+    "2019-10-30": [
+      {
+        "state": "in_sample",
+        "symbols": "*"
+      }
+    ],
+    "2019-12-30": [
+      {
+        "state": "in_sample",
+        "symbols": "*"
+      }
+    ],
+    "2020-01-30": [
+      {
+        "state": "in_sample",
+        "symbols": "*"
+      }
+    ],
+    "2021-07-13": [
+      {
+        "state": "in_sample",
+        "symbols": "*"
+      }
+    ],
+    "2021-08-13": [
+      {
+        "state": "in_sample",
+        "symbols": "*"
+      }
+    ],
+    "2025-11-28": [
+      {
+        "spent_by": [
+          "a6c5af759082b68f",
+          "de2488a2a245cf2c",
+          "b8-oos-2026-10-16"
+        ],
+        "state": "spent",
+        "symbols": [
+          "AAPL",
+          "MSFT",
+          "QQQ"
+        ]
+      },
+      {
+        "reserved_for": [
+          "research/preregs/breadth_book_prereg.json"
+        ],
+        "state": "unread",
+        "symbols": "*"
+      }
+    ],
+    "2025-12-08": [
+      {
+        "spent_by": [
+          "a6c5af759082b68f",
+          "de2488a2a245cf2c",
+          "b8-oos-2026-10-16"
+        ],
+        "state": "spent",
+        "symbols": [
+          "AAPL",
+          "MSFT",
+          "QQQ"
+        ]
+      },
+      {
+        "reserved_for": [
+          "research/preregs/breadth_book_prereg.json"
+        ],
+        "state": "unread",
+        "symbols": "*"
+      }
+    ],
+    "2025-12-09": [
+      {
+        "spent_by": [
+          "a6c5af759082b68f",
+          "de2488a2a245cf2c",
+          "b8-oos-2026-10-16"
+        ],
+        "state": "spent",
+        "symbols": [
+          "AAPL",
+          "MSFT",
+          "QQQ"
+        ]
+      },
+      {
+        "reserved_for": [
+          "research/preregs/breadth_book_prereg.json"
+        ],
+        "state": "unread",
+        "symbols": "*"
+      }
+    ],
+    "2025-12-10": [
+      {
+        "spent_by": [
+          "a6c5af759082b68f",
+          "de2488a2a245cf2c",
+          "b8-oos-2026-10-16"
+        ],
+        "state": "spent",
+        "symbols": [
+          "AAPL",
+          "MSFT",
+          "QQQ"
+        ]
+      },
+      {
+        "reserved_for": [
+          "research/preregs/breadth_book_prereg.json"
+        ],
+        "state": "unread",
+        "symbols": "*"
+      }
+    ],
+    "2025-12-11": [
+      {
+        "spent_by": [
+          "a6c5af759082b68f",
+          "de2488a2a245cf2c",
+          "b8-oos-2026-10-16"
+        ],
+        "state": "spent",
+        "symbols": [
+          "AAPL",
+          "MSFT",
+          "QQQ"
+        ]
+      },
+      {
+        "reserved_for": [
+          "research/preregs/breadth_book_prereg.json"
+        ],
+        "state": "unread",
+        "symbols": "*"
+      }
+    ],
+    "2025-12-12": [
+      {
+        "spent_by": [
+          "a6c5af759082b68f",
+          "de2488a2a245cf2c",
+          "b8-oos-2026-10-16"
+        ],
+        "state": "spent",
+        "symbols": [
+          "AAPL",
+          "MSFT",
+          "QQQ"
+        ]
+      },
+      {
+        "reserved_for": [
+          "research/preregs/breadth_book_prereg.json"
+        ],
+        "state": "unread",
+        "symbols": "*"
+      }
+    ],
+    "2026-05-15": [
+      {
+        "spent_by": [
+          "v1.8.0-holdout",
+          "auc01",
+          "b8-oos-2026-10-16"
+        ],
+        "state": "spent",
+        "symbols": [
+          "AAPL",
+          "MSFT",
+          "QQQ"
+        ]
+      },
+      {
+        "reserved_for": [
+          "research/preregs/breadth_book_prereg.json"
+        ],
+        "state": "unread",
+        "symbols": "*"
+      }
+    ],
+    "2026-05-18": [
+      {
+        "spent_by": [
+          "v1.8.0-holdout",
+          "auc01",
+          "b8-oos-2026-10-16"
+        ],
+        "state": "spent",
+        "symbols": [
+          "AAPL",
+          "MSFT",
+          "QQQ"
+        ]
+      },
+      {
+        "reserved_for": [
+          "research/preregs/breadth_book_prereg.json"
+        ],
+        "state": "unread",
+        "symbols": "*"
+      }
+    ],
+    "2026-06-12": [
+      {
+        "spent_by": [
+          "a6c5af759082b68f",
+          "de2488a2a245cf2c",
+          "b8-oos-2026-10-16"
+        ],
+        "state": "spent",
+        "symbols": [
+          "AAPL",
+          "MSFT",
+          "QQQ"
+        ]
+      },
+      {
+        "reserved_for": [
+          "research/preregs/breadth_book_prereg.json"
+        ],
+        "state": "unread",
+        "symbols": "*"
+      }
+    ]
+  },
+  "x-version": 1
+}

@@ -870,8 +870,8 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. The v1.14.0 counts (CI): python 2411 / cpp 302 /
-rust 376 tests passed (golden groups 193/72/75; Java archived in v1.15), plus
+the first line. The counts from main CI run 39043729536 (2026-10-17, v1.17.1 at 838e103): python 3208 / cpp 333 /
+rust 376 tests passed (golden groups 217/74/75; Java archived in v1.15), plus
 `integration` (35) and `replay` (6) rows for the repo-level pytest suites, a
 `deployment` row (29 structural checks passed in CI, where `promtool` and
 `kubeconform` are installed; a machine without them reports those checks as

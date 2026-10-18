@@ -113,7 +113,7 @@ reported as stale rather than failing).
 
 | what | number | artefact |
 |---|---|---|
-| Cross-language parity (CI counts) | tests python 2411 / cpp 302 / rust 366; golden 193 / 72 / 72; integration 35, replay 6 | `tests/harness/run_all.sh` table in README.md |
+| Cross-language parity (CI counts) | tests python 3208 / cpp 333 / rust 376; golden 217 / 74 / 75; integration 35, replay 6 | `tests/harness/run_all.sh` table in README.md |
 | MVP golden run (`python -m iap.mvp run`, seed 12345) | 15,805 events · 800 decisions · 231 parent orders · 163 fills · P&L −82.84 USD · digest `a7f1ee60…` | `tests/golden/expected_mvp.json` |
 | Registered features | 205 in 10 families | `data/reference/feature_registry.json` |
 | Flagship alphas | 24 (EQ01-EQ12, FX01-FX12); verdicts 0 PROMOTE / 12 ITERATE / 12 REJECT | `research/alpha_reports/REPORT.md` |

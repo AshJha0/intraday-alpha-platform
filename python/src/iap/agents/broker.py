@@ -279,6 +279,7 @@ class WriteBroker:
         dataset_version: str | None = None,
         supersede: bool = False,
         screen: Path | Mapping | None = None,
+        analysis_identity: Mapping[str, Any] | None = None,
     ) -> str:
         """Commit a hypothesis before any run.  One per (alpha, horizon).
 
@@ -334,6 +335,10 @@ class WriteBroker:
         body: dict[str, Any] = {**args, "prereg_id": pid, "format": PREREG_FORMAT}
         if screen_block is not None:
             body["screen"] = screen_block
+        if analysis_identity is not None:
+            # v1.18 REL-02a: scripts, code tree, commit, data, family, metrics and
+            # thresholds the signed run is bound to (iap.agents.analysis_identity)
+            body["analysis_identity"] = dict(analysis_identity)
         if code is not None:
             body["code"] = code
         if prior is not None:

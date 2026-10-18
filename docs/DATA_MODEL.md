@@ -296,6 +296,14 @@ is not a `ledger_entries` column (it is provenance, not part of the key).
 same-timestamp events + trailing label freshness) beside the
 `feature_versions.registry_hash` the store indexes; a store row's numbers
 are only comparable across feature stores of the same `store_version`.
+Two v1.18 (REL-07) opt-in keys are absent from a default store and not
+indexed either: `xasset_reference` (the store was built with
+`--xasset-reference symbol_map`, feature identity `xasset_v2`: the same feature
+names measured against the reference ETF of a versioned symbol map, so its
+`xasset` columns are not comparable with a store that lacks the key) and
+`labels_v2` (the store also holds `labels_v2_<instrument_id>.parquet`, the
+15 m / 30 m / 1 h session-grid labels keyed by `instrument_id, anchor_ts`;
+docs/SIGNAL_RESEARCH.md section 10).
 
 `import_all` runs them in that order (alpha rows must exist before the
 state writers run). Each importer returns an `ImportReport(inserted={table:

@@ -129,9 +129,38 @@ def test_gate_requires_t_threshold_dsr_and_positive_ic():
     assert not rc.gate(0.05, 6.0, 5.0, 0.95)["passed"]  # strictly > 0.95
     assert not rc.gate(0.05, 6.0, 5.0, None)["passed"]
     assert not rc.gate(-0.05, 6.0, 5.0, 0.99)["passed"]
-    assert rc.verdict(True, rc.gate(0.05, 6.0, 5.0, 0.99)) == "confirmed"
-    assert rc.verdict(True, rc.gate(0.05, 1.0, 5.0, 0.99)) == "rejected"
-    assert rc.verdict(False, rc.gate(0.05, 6.0, 5.0, 0.99)) == "no_result"
+    ok = {"gate_eligible": True}
+    assert rc.verdict(True, rc.gate(0.05, 6.0, 5.0, 0.99), ok) == "confirmed"
+    assert rc.verdict(True, rc.gate(0.05, 1.0, 5.0, 0.99), ok) == "rejected"
+    assert rc.verdict(False, rc.gate(0.05, 6.0, 5.0, 0.99), ok) == "no_result"
+
+
+def test_ineligible_method_cannot_confirm():
+    """REL-02d: a pass by a method that is not gate-eligible is not a confirmation."""
+    passed = rc.gate(0.05, 6.0, 5.0, 0.99)
+    assert passed["passed"]
+    bad = {"gate_eligible": False, "reasons": ["configuration.methods='v4' must be 'v2'"]}
+    assert rc.verdict(True, passed, bad) == "ineligible"
+    assert rc.verdict(True, passed, None) == "ineligible"  # no record -> not eligible
+    assert rc.verdict(True, passed, {}) == "ineligible"
+    assert rc.verdict(True, passed, {"gate_eligible": "yes"}) == "ineligible"  # only True counts
+    # a failed gate is still a rejection, and a failed look still no result
+    assert rc.verdict(True, rc.gate(0.05, 1.0, 5.0, 0.99), bad) == "rejected"
+    assert rc.verdict(False, passed, bad) == "no_result"
+    assert (
+        "ineligible"
+        not in rc.record_commands([{"prereg_id": "p", "verdict": "ineligible", "alpha": "A"}])[0:0]
+    )
+
+
+def test_recompute_does_not_reconfirm_a_recorded_ineligible_result():
+    """The committed result (EQ10/EQ05 on methods v4, gate_eligible False) recomputes to
+    'ineligible', so the recompute reports a verdict change instead of repeating 'confirmed'."""
+    doc = json.loads((REPO / rc.RESULT_REL).read_text(encoding="utf-8"))
+    for r in doc["results"]:
+        assert r["eligibility"]["gate_eligible"] is False
+        g = rc.gate(r["result"]["ic"], r["result"]["t_stat"], r["gate_threshold"]["used"], 0.99)
+        assert rc.verdict(True, g, r["eligibility"]) != "confirmed"
 
 
 def test_dsr_on_session_series_uses_n_trials():
@@ -372,7 +401,8 @@ def test_live_runs_each_look_once_and_writes_result(tmp_path, no_board, monkeypa
     assert rc.live(root, ds, ok, runner=run, frames_loader=lambda d: {}) == 1
     cmds = [" ".join(c[1:]) for c in run.calls]
     assert cmds == [
-        f"-m iap.research run --alpha {a} --horizon 1s --methods v4 --dataset-dir {ds}"
+        f"-m iap.research run --alpha {a} --horizon 1s --methods v4 --dataset-dir {ds} "
+        f"--holdout-prereg-id {rc.PREREG_REL}"
         for a in ("EQ10", "EQ05")
     ]
     assert seen == ["EQ10"]

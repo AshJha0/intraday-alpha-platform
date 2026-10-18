@@ -96,7 +96,9 @@ def _runner(alpha, horizon, ds):
 def test_holdout_patterns_and_refusal(ws):
     pats = ra.holdout_patterns(ws)
     assert ra.is_holdout("r7_holdout", pats) and ra.is_holdout("r7_20250115", pats)
-    assert ra.is_holdout("holdout2026", pats) and ra.is_holdout("my_holdout_x", pats)
+    assert ra.is_holdout("holdout2026", pats) and not ra.is_holdout(
+        "my_holdout_x", pats
+    )  # names are no longer matched by substring
     assert not ra.is_holdout("ds3_20190130", pats)
     a = ra.ResearchAssistant(ws, "s1", _runner, ws / "data" / "real", holdout=pats)
     with pytest.raises(ToolRefused, match="holdout"):
