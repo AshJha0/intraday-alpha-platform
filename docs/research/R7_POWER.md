@@ -6,8 +6,8 @@ This is a planning aid for the owner before sign-off. It does not change the dra
 
 ## Gate modelled
 
-- HAC t >= 4.447: the Bonferroni threshold of the committed ledger (5,732 looks). The R7 looks themselves will raise it slightly; a threshold fixed in the pre-registration (`threshold_policy="prereg"`) would freeze it.
-- Deflated Sharpe > 0.95: N = 423 (ledger distinct experiments + 1), V = 1/(S-1), normal moments, on the per-session series.
+- HAC t >= 4.484: the Bonferroni threshold of the committed ledger (6,826 looks). The R7 looks themselves will raise it slightly; a threshold fixed in the pre-registration (`threshold_policy="prereg"`) would freeze it.
+- Deflated Sharpe > 0.95: N = 641 (ledger distinct experiments + 1), V = 1/(S-1), normal moments, on the per-session series.
 - Tier 1 = 7 holdout sessions; tier 2 = 47 (7 + 40 approved dates).
 - Power = P(pass | true effect); MDE = smallest effect passed with 80 % probability. `joint <=` is the smaller of the two component powers (an upper bound on passing both).
 
@@ -34,30 +34,30 @@ The tables below are the analysis the decisions were taken on; they still list e
 
 | alpha | effect (IC) | sd/session | S | power HAC | power DSR | joint <= | MDE HAC | MDE DSR | MDE joint |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| EQ01 @1s (in-sample) | +0.1051 | 0.0502 | 7 | 1.00 | 0.22 | 0.22 | 0.0387 | 0.1801 | 0.1801 |
-| EQ01 @1s (in-sample) | +0.1051 | 0.0502 | 47 | 1.00 | 1.00 | 1.00 | 0.0149 | 0.0431 | 0.0431 |
-| EQ01 @1s (v1.8 decayed) | +0.0368 | 0.0502 | 7 | 0.77 | 0.00 | 0.00 | 0.0387 | 0.1801 | 0.1801 |
-| EQ01 @1s (v1.8 decayed) | +0.0368 | 0.0502 | 47 | 1.00 | 0.54 | 0.54 | 0.0149 | 0.0431 | 0.0431 |
-| EQ02 @5s (in-sample) | +0.0419 | 0.0163 | 7 | 1.00 | 0.46 | 0.46 | 0.0126 | 0.0587 | 0.0587 |
-| EQ02 @5s (in-sample) | +0.0419 | 0.0163 | 47 | 1.00 | 1.00 | 1.00 | 0.0049 | 0.0140 | 0.0140 |
-| EQ02 @5s (v1.8 decayed) | +0.0161 | 0.0163 | 7 | 0.92 | 0.00 | 0.00 | 0.0126 | 0.0587 | 0.0587 |
-| EQ02 @5s (v1.8 decayed) | +0.0161 | 0.0163 | 47 | 1.00 | 0.93 | 0.93 | 0.0049 | 0.0140 | 0.0140 |
-| EQ04 @5s (in-sample) | +0.0137 | 0.0089 | 7 | 0.27 | 0.03 | 0.03 | 0.0211 | 0.0319 | 0.0319 |
-| EQ04 @5s (in-sample) | +0.0137 | 0.0089 | 47 | 1.00 | 1.00 | 1.00 | 0.0082 | 0.0076 | 0.0082 |
-| EQ04 @5s (v1.8 decayed) | +0.0276 | 0.0089 | 7 | 0.98 | 0.68 | 0.68 | 0.0211 | 0.0319 | 0.0319 |
-| EQ04 @5s (v1.8 decayed) | +0.0276 | 0.0089 | 47 | 1.00 | 1.00 | 1.00 | 0.0082 | 0.0076 | 0.0082 |
-| EQ05 @1s (in-sample) | +0.0627 | 0.0176 | 7 | 1.00 | 0.79 | 0.79 | 0.0175 | 0.0634 | 0.0634 |
-| EQ05 @1s (in-sample) | +0.0627 | 0.0176 | 47 | 1.00 | 1.00 | 1.00 | 0.0068 | 0.0152 | 0.0152 |
-| EQ05 @1s (v1.8 decayed) | +0.0331 | 0.0176 | 7 | 1.00 | 0.13 | 0.13 | 0.0175 | 0.0634 | 0.0634 |
-| EQ05 @1s (v1.8 decayed) | +0.0331 | 0.0176 | 47 | 1.00 | 1.00 | 1.00 | 0.0068 | 0.0152 | 0.0152 |
-| EQ07 @10s (in-sample) | -0.0120 | 0.0159 | 7 | 0.00 | 0.00 | 0.00 | 0.0236 | 0.0570 | 0.0570 |
-| EQ07 @10s (in-sample) | -0.0120 | 0.0159 | 47 | 0.00 | 0.00 | 0.00 | 0.0091 | 0.0136 | 0.0136 |
-| EQ07 @10s (v1.8 decayed) | -0.0206 | 0.0159 | 7 | 0.00 | 0.00 | 0.00 | 0.0236 | 0.0570 | 0.0570 |
-| EQ07 @10s (v1.8 decayed) | -0.0206 | 0.0159 | 47 | 0.00 | 0.00 | 0.00 | 0.0091 | 0.0136 | 0.0136 |
-| EQ10 @1s (in-sample) | +0.0756 | 0.0209 | 7 | 1.00 | 0.80 | 0.80 | 0.0336 | 0.0751 | 0.0751 |
-| EQ10 @1s (in-sample) | +0.0756 | 0.0209 | 47 | 1.00 | 1.00 | 1.00 | 0.0130 | 0.0180 | 0.0180 |
-| EQ10 @1s (v1.8 decayed) | +0.0966 | 0.0209 | 7 | 1.00 | 0.92 | 0.92 | 0.0336 | 0.0751 | 0.0751 |
-| EQ10 @1s (v1.8 decayed) | +0.0966 | 0.0209 | 47 | 1.00 | 1.00 | 1.00 | 0.0130 | 0.0180 | 0.0180 |
+| EQ01 @1s (in-sample) | +0.1051 | 0.0502 | 7 | 1.00 | 0.19 | 0.19 | 0.0389 | 0.1858 | 0.1858 |
+| EQ01 @1s (in-sample) | +0.1051 | 0.0502 | 47 | 1.00 | 1.00 | 1.00 | 0.0150 | 0.0442 | 0.0442 |
+| EQ01 @1s (v1.8 decayed) | +0.0368 | 0.0502 | 7 | 0.77 | 0.00 | 0.00 | 0.0389 | 0.1858 | 0.1858 |
+| EQ01 @1s (v1.8 decayed) | +0.0368 | 0.0502 | 47 | 1.00 | 0.50 | 0.50 | 0.0150 | 0.0442 | 0.0442 |
+| EQ02 @5s (in-sample) | +0.0419 | 0.0163 | 7 | 1.00 | 0.42 | 0.42 | 0.0127 | 0.0605 | 0.0605 |
+| EQ02 @5s (in-sample) | +0.0419 | 0.0163 | 47 | 1.00 | 1.00 | 1.00 | 0.0049 | 0.0144 | 0.0144 |
+| EQ02 @5s (v1.8 decayed) | +0.0161 | 0.0163 | 7 | 0.92 | 0.00 | 0.00 | 0.0127 | 0.0605 | 0.0605 |
+| EQ02 @5s (v1.8 decayed) | +0.0161 | 0.0163 | 47 | 1.00 | 0.92 | 0.92 | 0.0049 | 0.0144 | 0.0144 |
+| EQ04 @5s (in-sample) | +0.0137 | 0.0089 | 7 | 0.26 | 0.02 | 0.02 | 0.0213 | 0.0329 | 0.0329 |
+| EQ04 @5s (in-sample) | +0.0137 | 0.0089 | 47 | 1.00 | 1.00 | 1.00 | 0.0082 | 0.0078 | 0.0082 |
+| EQ04 @5s (v1.8 decayed) | +0.0276 | 0.0089 | 7 | 0.98 | 0.64 | 0.64 | 0.0213 | 0.0329 | 0.0329 |
+| EQ04 @5s (v1.8 decayed) | +0.0276 | 0.0089 | 47 | 1.00 | 1.00 | 1.00 | 0.0082 | 0.0078 | 0.0082 |
+| EQ05 @1s (in-sample) | +0.0627 | 0.0176 | 7 | 1.00 | 0.77 | 0.77 | 0.0176 | 0.0654 | 0.0654 |
+| EQ05 @1s (in-sample) | +0.0627 | 0.0176 | 47 | 1.00 | 1.00 | 1.00 | 0.0068 | 0.0155 | 0.0155 |
+| EQ05 @1s (v1.8 decayed) | +0.0331 | 0.0176 | 7 | 1.00 | 0.10 | 0.10 | 0.0176 | 0.0654 | 0.0654 |
+| EQ05 @1s (v1.8 decayed) | +0.0331 | 0.0176 | 47 | 1.00 | 1.00 | 1.00 | 0.0068 | 0.0155 | 0.0155 |
+| EQ07 @10s (in-sample) | -0.0120 | 0.0159 | 7 | 0.00 | 0.00 | 0.00 | 0.0238 | 0.0588 | 0.0588 |
+| EQ07 @10s (in-sample) | -0.0120 | 0.0159 | 47 | 0.00 | 0.00 | 0.00 | 0.0092 | 0.0140 | 0.0140 |
+| EQ07 @10s (v1.8 decayed) | -0.0206 | 0.0159 | 7 | 0.00 | 0.00 | 0.00 | 0.0238 | 0.0588 | 0.0588 |
+| EQ07 @10s (v1.8 decayed) | -0.0206 | 0.0159 | 47 | 0.00 | 0.00 | 0.00 | 0.0092 | 0.0140 | 0.0140 |
+| EQ10 @1s (in-sample) | +0.0756 | 0.0209 | 7 | 1.00 | 0.78 | 0.78 | 0.0338 | 0.0775 | 0.0775 |
+| EQ10 @1s (in-sample) | +0.0756 | 0.0209 | 47 | 1.00 | 1.00 | 1.00 | 0.0131 | 0.0184 | 0.0184 |
+| EQ10 @1s (v1.8 decayed) | +0.0966 | 0.0209 | 7 | 1.00 | 0.91 | 0.91 | 0.0338 | 0.0775 | 0.0775 |
+| EQ10 @1s (v1.8 decayed) | +0.0966 | 0.0209 | 47 | 1.00 | 1.00 | 1.00 | 0.0131 | 0.0184 | 0.0184 |
 
 | alpha | recommendation (in-sample effect) | if decayed to v1.8 |
 |---|---|---|
@@ -66,7 +66,7 @@ The tables below are the analysis the decisions were taken on; they still list e
 | EQ04 | wait for tier 2 | wait for tier 2 |
 | EQ05 | wait for tier 2 | wait for tier 2 |
 | EQ07 | do not test as drafted (in-sample effect has the wrong sign) | do not test as drafted (in-sample effect has the wrong sign) |
-| EQ10 | test now (tier 1) | test now (tier 1) |
+| EQ10 | wait for tier 2 | test now (tier 1) |
 
 ## H3 (AUC01 closing cross)
 
@@ -74,8 +74,8 @@ No in-sample IC exists for AUC01: the in-sample statistic is the session-cluster
 
 | S | active S | power t-gate | power DSR | joint <= | MDE (bp) | MDE IC (n decisions) |
 |---:|---:|---:|---:|---:|---:|---:|
-| 7 | 3 | 0.00 | 0.00 | 0.00 | 649.3 | 0.77 (21) |
-| 47 | 16 | 0.03 | 0.00 | 0.00 | 52.0 | 0.41 (141) |
+| 7 | 3 | 0.00 | 0.00 | 0.00 | 674.6 | 0.77 (21) |
+| 47 | 16 | 0.03 | 0.00 | 0.00 | 53.4 | 0.41 (141) |
 
 Recommendation: **underpowered even on tier 2**.
 
@@ -88,12 +88,12 @@ Recommendation: **underpowered even on tier 2**.
 | 0.25 | 7 | 0.00 | 0.00 | 0.00 |
 | 0.25 | 47 | 0.00 | 0.00 | 0.00 |
 | 0.5 | 7 | 0.00 | 0.00 | 0.00 |
-| 0.5 | 47 | 0.15 | 0.09 | 0.09 |
-| 1.0 | 7 | 0.04 | 0.00 | 0.00 |
-| 1.0 | 47 | 0.99 | 0.94 | 0.94 |
-| 2.0 | 7 | 0.80 | 0.18 | 0.18 |
+| 0.5 | 47 | 0.15 | 0.07 | 0.07 |
+| 1.0 | 7 | 0.03 | 0.00 | 0.00 |
+| 1.0 | 47 | 0.99 | 0.93 | 0.93 |
+| 2.0 | 7 | 0.79 | 0.15 | 0.15 |
 | 2.0 | 47 | 1.00 | 1.00 | 1.00 |
 
-MDE (d, 80 %): 3.59 on tier 1, 0.86 on tier 2.
+MDE (d, 80 %): 3.70 on tier 1, 0.88 on tier 2.
 
 Recommendation: **PENDING maker_real summary (rerun with --h1-mean-bps/--h1-sd-bps)**.
