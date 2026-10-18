@@ -25,7 +25,6 @@ from iap.auction.rel08c_study import (
     decision_trades,
     load_extract,
     mde_bps,
-    predeclaration_signed,
     run_study,
 )
 from itch50_encoder import Itch50Encoder, hms_ns
@@ -190,7 +189,7 @@ CFG = Rel08cConfig()
 
 
 def test_strong_effect_many_sessions_continues(tmp_path):
-    r = run_study(_sessions(tmp_path, 8, 10.0), CFG, predeclaration=None, synthetic=True)
+    r = run_study(_sessions(tmp_path, 8, 10.0), CFG, prereg_id=None, synthetic=True)
     assert r.summary["verdict"] == "continue"
     m = r.summary["measures"]["imbalance"]
     assert m["prediction"]["gross_taker_bps"] > 8
@@ -202,12 +201,12 @@ def test_strong_effect_many_sessions_continues(tmp_path):
 
 
 def test_no_effect_rejects(tmp_path):
-    r = run_study(_sessions(tmp_path, 8, 0.0), CFG, predeclaration=None, synthetic=True)
+    r = run_study(_sessions(tmp_path, 8, 0.0), CFG, prereg_id=None, synthetic=True)
     assert r.summary["verdict"] == "reject" and r.summary["mde_bps"] < CFG.target_bps
 
 
 def test_one_session_is_underpowered(tmp_path):
-    r = run_study(_sessions(tmp_path, 1, 10.0), CFG, predeclaration=None, synthetic=True)
+    r = run_study(_sessions(tmp_path, 1, 10.0), CFG, prereg_id=None, synthetic=True)
     assert r.summary["verdict"] == "underpowered"
     assert math.isinf(r.summary["mde_bps"])
     assert any("screen only" in x for x in r.summary["reasons"])
@@ -241,15 +240,12 @@ def test_no_look_ahead_in_features(tmp_path):
     assert set(t["policy"]) == {"baseline"}
 
 
-def test_refuses_without_signed_predeclaration(tmp_path):
+def test_refuses_without_signed_prereg(tmp_path):
     dirs = _sessions(tmp_path, 1, 0.0)
-    draft = REPO / "research/auction/rel08c_PREDECLARATION_DRAFT.md"
-    assert not predeclaration_signed(draft)
     with pytest.raises(PermissionError):
-        run_study(dirs, CFG, predeclaration=draft)
-    signed = tmp_path / "p.md"
-    signed.write_text("Status: SIGNED\n")
-    assert run_study(dirs, CFG, predeclaration=signed).summary["verdict"] == "underpowered"
+        run_study(dirs, CFG, prereg_id=None)
+    with pytest.raises(PermissionError):  # does not exist / not signed
+        run_study(dirs, CFG, prereg_id="research/preregs/rel08c_prereg.json")
 
 
 def test_decision_time_after_cutoff_refused():

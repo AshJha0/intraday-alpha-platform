@@ -48,9 +48,11 @@ the unit.  With ``S`` sessions the minimum detectable effect is
   lower confidence bound ``> 0``;
 * ``reject`` - powered otherwise.
 
-``run_study`` refuses to run on real extracts unless the pre-declaration
-file is signed (``Status: SIGNED``); synthetic inputs pass
-``predeclaration=None, synthetic=True``.
+``run_study`` refuses to run on real extracts unless ``prereg_id`` (the
+repo-relative ``research/preregs/rel08c_prereg.json``) carries a signature
+that verifies under the trust root; synthetic inputs pass
+``prereg_id=None, synthetic=True``.  The signed run is
+``research/auction/rel08c/run_rel08c.py``.
 """
 
 from __future__ import annotations
@@ -331,22 +333,23 @@ def decide(sessions: pd.DataFrame, n_trades: int, cfg: Rel08cConfig) -> dict:
     }
 
 
-def predeclaration_signed(path: str | Path) -> bool:
-    text = Path(path).read_text(encoding="utf-8")
-    return any(line.strip().lower() == "status: signed" for line in text.splitlines())
+def prereg_signed(prereg_id: str, root: Path | None = None) -> bool:
+    """The repo-relative prereg JSON verifies under the trust root."""
+    from iap.research.holdout_registry import prereg_is_signed
+
+    return prereg_is_signed(prereg_id, root)
 
 
 def run_study(
     extract_dirs: list[str | Path],
     cfg: Rel08cConfig,
     *,
-    predeclaration: str | Path | None,
+    prereg_id: str | None,
     synthetic: bool = False,
+    root: Path | None = None,
 ) -> Rel08cResult:
-    if not synthetic and (predeclaration is None or not predeclaration_signed(predeclaration)):
-        raise PermissionError(
-            "REL-08c: refusing to run on real extracts without a SIGNED pre-declaration"
-        )
+    if not synthetic and (prereg_id is None or not prereg_signed(prereg_id, root)):
+        raise PermissionError("REL-08c: refusing to run on real extracts without a SIGNED prereg")
     dates, frames = [], []
     for d in extract_dirs:
         date, noii, crosses, grid = load_extract(d)
