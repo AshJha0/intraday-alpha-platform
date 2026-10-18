@@ -795,8 +795,11 @@ class TopsQuotes:
                 for s, rows in self.by_symbol.items()
             },
         }
-        with gzip.open(p, "wt", encoding="utf-8") as f:
-            json.dump(doc, f, separators=(",", ":"))
+        # mtime=0: the same quotes give the same bytes (REL-13: a resumed day
+        # reproduces the extract's sha256 recorded in dataset.json)
+        data = json.dumps(doc, separators=(",", ":")).encode("utf-8")
+        with open(p, "wb") as raw, gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as f:
+            f.write(data)
         return p
 
     @classmethod
