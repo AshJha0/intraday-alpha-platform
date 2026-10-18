@@ -41,6 +41,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from iap.marketdata.runmem import available_ram_gb  # REL-13: moved; re-exported
+
 ROOT = Path(__file__).resolve().parents[4]
 #: v1.16 item 11: this study's pre-registrations were made on the
 #: research/maker-real fork board, archived unchanged (not replayed onto main) under
@@ -708,36 +710,6 @@ def alpha_worker(spec: Mapping[str, Any], day: int, symbol: str, alpha_id: str) 
     out["peak_rss_gb"] = peak_rss_gb()
     study.write_alpha(day, symbol, alpha_id, out)
     return out
-
-
-def available_ram_gb() -> float | None:
-    """Available physical memory (Windows GlobalMemoryStatusEx, else /proc)."""
-    try:
-        if sys.platform == "win32":
-
-            class MS(ctypes.Structure):
-                _fields_ = [
-                    ("dwLength", ctypes.c_ulong),
-                    ("dwMemoryLoad", ctypes.c_ulong),
-                    ("ullTotalPhys", ctypes.c_ulonglong),
-                    ("ullAvailPhys", ctypes.c_ulonglong),
-                    ("ullTotalPageFile", ctypes.c_ulonglong),
-                    ("ullAvailPageFile", ctypes.c_ulonglong),
-                    ("ullTotalVirtual", ctypes.c_ulonglong),
-                    ("ullAvailVirtual", ctypes.c_ulonglong),
-                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
-                ]
-
-            ms = MS()
-            ms.dwLength = ctypes.sizeof(MS)
-            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(ms))
-            return ms.ullAvailPhys / 2**30
-        for line in Path("/proc/meminfo").read_text().splitlines():
-            if line.startswith("MemAvailable:"):
-                return int(line.split()[1]) / 2**20
-    except Exception:  # pragma: no cover - diagnostics only
-        return None
-    return None
 
 
 # ------------------------------------------------------------------ summary
