@@ -58,6 +58,9 @@ def test_committed_baseline_is_current(tool):
     fresh.pop("commit", None)
     committed.pop("tree_is_clean_at_inputs", None)
     fresh.pop("tree_is_clean_at_inputs", None)
+    # the interpreter that generated the file is recorded but differs across CI runners
+    committed["toolchain"].pop("python_used_for_this_baseline", None)
+    fresh["toolchain"].pop("python_used_for_this_baseline", None)
     assert committed == fresh
 
 

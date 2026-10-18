@@ -386,10 +386,12 @@ def main() -> int:
     text = json.dumps(doc, indent=2, sort_keys=True) + "\n"
     if args.check:
         cur = json.loads(OUT.read_text(encoding="utf-8")) if OUT.exists() else {}
-        cur.pop("commit", None)
-        new = dict(doc)
-        new.pop("commit", None)
-        if cur != json.loads(json.dumps(new)):
+        new = json.loads(json.dumps(doc))
+        for d in (cur, new):
+            d.pop("commit", None)
+            d.pop("tree_is_clean_at_inputs", None)
+            d.get("toolchain", {}).pop("python_used_for_this_baseline", None)
+        if cur != new:
             print("baseline_metrics.json is stale", file=sys.stderr)
             return 1
         print("baseline_metrics.json is current")
