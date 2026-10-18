@@ -447,6 +447,66 @@ data:
     \   \"qty_units_max\": 20\n  },\n  \"anomalies\": {\n    \"gap_prob\": 0.0006,\n    \"gap_max_events\"\
     : 3,\n    \"dup_prob\": 0.0015,\n    \"ooo_prob\": 0.001,\n    \"invalid_prob\": 0.0005,\n    \"ts_violation_prob\"\
     : 0.0005\n  }\n}\n"
+  monitoring__policy.json: |
+    {
+      "x-version": 1,
+      "policy_id": "rel16-monitoring-v1",
+      "description": "REL-16 feedback and monitoring policy for any signal at paper or live stage (docs/MONITORING_POLICY.md). The state machine in iap.monitoring reads only this file; its sha256 over canonical JSON is stamped on every evaluation and report.",
+      "freshness_s": {
+        "sessions": 129600,
+        "positions": 900,
+        "orders": 300,
+        "heartbeat": 120
+      },
+      "window_sessions": 20,
+      "min_sessions": 10,
+      "data_quality": {
+        "invalid_below_completeness": 0.5,
+        "watch_below_completeness": 0.98
+      },
+      "cusum": {
+        "k": 0.5,
+        "h_watch": 4.0,
+        "h_review": 7.0
+      },
+      "band": {
+        "watch_z": 2.5,
+        "review_z": 3.5,
+        "upside_watch_z": 4.0
+      },
+      "turnover": {
+        "watch_ratio": [0.5, 1.5],
+        "review_ratio": [0.25, 2.5]
+      },
+      "drawdown": {
+        "watch_frac": 0.5,
+        "review_frac": 0.75
+      },
+      "exposure": {
+        "watch_utilisation": 0.9
+      },
+      "fill": {
+        "watch_shortfall": 0.1,
+        "review_shortfall": 0.25
+      },
+      "reconciliation": {
+        "halt_after_evaluations": 2
+      },
+      "persistence": {
+        "WATCH": 2,
+        "REVIEW": 2,
+        "HALT": 1
+      },
+      "clear_after": 3,
+      "unknown_escalate_after": 3,
+      "declared": {
+        "horizon_sessions": 60,
+        "false_alarm_rate_review": 0.05,
+        "planted_decay_sd": 1.0,
+        "max_detection_delay_sessions": 25,
+        "detection_quantile": 0.95
+      }
+    }
   mvp__generator.json: |
     {
       "x-version": 2,
@@ -1700,6 +1760,25 @@ data:
         }
       }
     }
+  risk__portfolio_limits.json: |
+    {
+      "x-version": 1,
+      "limits_version": "portfolio_limits_v1",
+      "description": "Enforced book-level limits (v1.18 REL-17; iap.risk.portfolio_limits). Weights are fractions of capital. Research defaults for a dollar- and beta-neutral intraday book, chosen before any result was computed with them; a paper or live deployment must commit its own version. null = inactive.",
+      "limits": {
+        "gross_max": 2.0,
+        "net_max": 0.05,
+        "name_max": 0.10,
+        "sector_net_max": 0.10,
+        "sector_gross_max": 0.60,
+        "beta_max": 0.10,
+        "participation_max": 0.01,
+        "signal_share_max": 0.60,
+        "signal_corr_max": 0.80,
+        "daily_loss_limit": 0.02,
+        "drawdown_stop": 0.05
+      }
+    }
   risk__risk.json: |
     {
       "x-version": 4,
@@ -1758,6 +1837,20 @@ data:
         "max_loss_override_multiple": 2.0,
         "min_approvers": 2
       }
+    }
+  risk__stress_scenarios.json: |
+    {
+      "x-version": 1,
+      "description": "Named stress scenarios for iap.portfolio.factor_risk.run_stress (v1.18 REL-17). Each scenario is a set of factor moves in return units: 'market' is the reference-ETF return (it reaches each name through its beta); 'sector:<name>' moves are residual sector returns ON TOP of the market move. Market magnitudes are rounded one-day S&P 500 closes on the named dates from public index history; sector and size moves are hypothetical, stated as such, and not calibrated to any dataset.",
+      "scenarios": [
+        {"name": "market_down_5pct", "description": "Hypothetical: reference ETFs -5 %.", "factor_moves": {"market": -0.05}},
+        {"name": "market_up_5pct", "description": "Hypothetical: reference ETFs +5 % (short-side squeeze).", "factor_moves": {"market": 0.05}},
+        {"name": "black_monday_1987", "description": "S&P 500 close-to-close 1987-10-19, about -20.5 %.", "factor_moves": {"market": -0.205}},
+        {"name": "covid_2020_03_16", "description": "S&P 500 close-to-close 2020-03-16, about -12 %.", "factor_moves": {"market": -0.12}},
+        {"name": "tech_selloff", "description": "Hypothetical: market -3 % with Information Technology a further -6 % and Communication Services -4 %.", "factor_moves": {"market": -0.03, "sector:Information Technology": -0.06, "sector:Communication Services": -0.04}},
+        {"name": "rotation_value", "description": "Hypothetical: no market move; Information Technology -4 %, Financials +4 %, Energy +5 %.", "factor_moves": {"sector:Information Technology": -0.04, "sector:Financials": 0.04, "sector:Energy": 0.05}},
+        {"name": "liquidity_crunch", "description": "Hypothetical: market -4 % and the least-liquid names (bucket q1, the baseline) lag: the middle bucket q2 +2 % and the most-liquid bucket q3 +4 % relative to q1.", "factor_moves": {"market": -0.04, "liquidity:q2": 0.02, "liquidity:q3": 0.04}}
+      ]
     }
   strategies__alpha_params.json: |
     {
