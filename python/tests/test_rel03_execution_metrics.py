@@ -257,3 +257,38 @@ def test_holdout_check_is_one_function_and_uses_the_registry(monkeypatch):
     )
     bench.check_data_access(Path("x/r7_holdout"), allow_holdout=True)
     assert calls == [(Path("x/r7_holdout"), "execution_benchmark", True)]
+
+
+def _refuse_spent(monkeypatch):
+    import iap.research.holdout_registry as reg
+
+    seen: list[str] = []
+
+    def guard(d, purpose, pid=None):
+        seen.append(Path(d).name)
+        if "spent" in Path(d).name:
+            raise SystemExit(f"{d}: SPENT in the holdout registry")
+
+    monkeypatch.setattr(reg, "guard_or_exit", guard)
+    return seen
+
+
+@pytest.mark.parametrize(
+    "kw, refused",
+    [
+        ({"second_data_dir": "iex_spent"}, "iex_spent"),
+        ({"second_data_dir": "iex_ok", "more_pairs": (("holdout_spent", "iex_ok2"),)},
+         "holdout_spent"),
+        ({"second_data_dir": "iex_ok", "more_pairs": (("r7_ok", "iex_spent2"),)}, "iex_spent2"),
+    ],
+)  # fmt: skip
+def test_every_dataset_argument_goes_through_the_registry(dataset, monkeypatch, kw, refused):
+    seen = _refuse_spent(monkeypatch)
+    kw = {
+        k: (dataset.parent / v if isinstance(v, str) else
+            tuple((dataset.parent / a, dataset.parent / b) for a, b in v))
+        for k, v in kw.items()
+    }  # fmt: skip
+    with pytest.raises(SystemExit, match="SPENT"):
+        _run(dataset, **kw)
+    assert seen[0] == dataset.name and seen[-1] == refused  # refused before any read

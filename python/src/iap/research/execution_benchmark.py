@@ -835,7 +835,14 @@ def run_benchmark(
     instrument spec, horizon = the window).
     """
     data_dir = Path(data_dir)
-    check_data_access(data_dir, allow_holdout=allow_holdout)
+    # every dataset the run reads goes through the registry, not only --data-dir:
+    # the IEX second dataset and every --pair-dir pair too
+    for d in (
+        data_dir,
+        *([] if second_data_dir is None else [second_data_dir]),
+        *(x for pair in more_pairs for x in pair),
+    ):
+        check_data_access(Path(d), allow_holdout=allow_holdout)
     if config_dir is None:
         config_dir = data_dir / "configs"
         if not config_dir.is_dir():
