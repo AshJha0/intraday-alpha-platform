@@ -128,6 +128,11 @@ C++ and Rust (and Java until its archive at v1.14.0), a look ledger that prices 
 pre-registration that is checked by code. It runs the full loop from
 market data to TCA on one instrument and paper-trades a universe.
 
+**Execution simulator: Level 1 only, Level 2 not validated.** Fills are
+modelled on replayed books; no real orders or real fills exist, so no fill
+rate, shortfall, impact or capacity figure is empirically validated
+([docs/review/SIMULATOR_CORRECTNESS.md](docs/review/SIMULATOR_CORRECTNESS.md)).
+
 It is not a profitable strategy. Nothing has been promoted, and the
 documents say so at the top rather than in a footnote. It is not connected
 to a live venue: there is no order gateway, so the 15c3-5 checks guard a
