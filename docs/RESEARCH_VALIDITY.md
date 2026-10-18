@@ -567,6 +567,21 @@ and whether `gate="clustered"` / `cpcv_path_ic="demeaned"` become the
 defaults in the release (the ML report and the `v4` cpcv blocks would be
 regenerated under them).
 
+## 4f. Ledger coverage (v1.18 review finding 4)
+
+The ledger (`research/experiments.json`) is the multiple-testing denominator, and it is
+**not a complete historical record of every look**. `tools/ledger_inventory.py` lists the
+central ledger and every other ledger-shaped record (per-dataset ledgers under the data root,
+the ML model-run ledger, the ExperimentRunner records) with hashes, entry and look counts,
+chain heads, overlaps and the entries the central ledger lacks, and writes
+`research/v118/LEDGER_INVENTORY.md` / `.json`. Its coverage statement lists the known gaps:
+per-dataset ledgers the REL-02 merge did not pick up (a multi7 `alpha_reports` ledger of real
+looks), pre-v1.4 unscoped entries overwritten in place, ML fits compressed into a few decision
+entries, AI4 in-sample model selection, and studies whose sweeps were never recorded. Where a
+gap cannot be reconstructed from the files on disk the inventory says so. Read every
+threshold, expected max |t| and real-data N computed from the ledger as a **lower bound on the
+search breadth**.
+
 ## 5. Tooling
 
 - `python -m iap.research run --alpha ML01`: the opt-in GBM alpha (§4d);

@@ -901,10 +901,10 @@ What it **cannot**:
 - **The universe is chosen with hindsight.** `--symbols AAPL,MSFT` on a
   2019 file is a list of survivors. Nothing learned from it generalises to
   "equities".
-- **Every look counts.** Each alpha × configuration run debits the
+- **Every look should count.** Each alpha × configuration run debits the
   dataset's ledger; re-running with a tweak until something passes is the
   failure mode the ledger exists to expose. Decide the list of runs before
-  looking.
+  looking. Not every past look was recorded (`research/v118/LEDGER_INVENTORY.md`).
 - **Alphas were written against the generator.** Thresholds and horizons
   in `configs/strategies/alpha_params.json` were chosen on synthetic data.
   A REJECT on real data says that parameterisation did not carry over; it

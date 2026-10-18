@@ -1,0 +1,326 @@
+{
+  "central": {
+    "by_family": {
+      "real": {
+        "entries": 256,
+        "looks": 1132
+      },
+      "synthetic": {
+        "entries": 384,
+        "looks": 5694
+      }
+    },
+    "by_kind": {
+      "adaptive_deployment|synthetic": {
+        "entries": 200,
+        "looks": 200
+      },
+      "breadth_book|real": {
+        "entries": 1,
+        "looks": 1
+      },
+      "breadth_book|synthetic": {
+        "entries": 1,
+        "looks": 1
+      },
+      "combination|real": {
+        "entries": 4,
+        "looks": 380
+      },
+      "combination|synthetic": {
+        "entries": 34,
+        "looks": 1098
+      },
+      "design_horizon_scan|synthetic": {
+        "entries": 1,
+        "looks": 216
+      },
+      "execution_study|real": {
+        "entries": 206,
+        "looks": 206
+      },
+      "experiment_runner|real": {
+        "entries": 8,
+        "looks": 508
+      },
+      "experiment_runner|synthetic": {
+        "entries": 25,
+        "looks": 720
+      },
+      "metalabel_tau|synthetic": {
+        "entries": 1,
+        "looks": 1
+      },
+      "model_zoo_gate|synthetic": {
+        "entries": 1,
+        "looks": 1
+      },
+      "net_of_cost_screen|real": {
+        "entries": 23,
+        "looks": 23
+      },
+      "prereg|real": {
+        "entries": 14,
+        "looks": 14
+      },
+      "primary_model_choice|synthetic": {
+        "entries": 1,
+        "looks": 1
+      },
+      "promotion_pipeline|synthetic": {
+        "entries": 120,
+        "looks": 3456
+      }
+    },
+    "chain_head_recomputed": "5dc957df3bf2674307ebe8da14a3cd037a54c3fc013b8b049a353817a752e669",
+    "chain_head_stored": "5dc957df3bf2674307ebe8da14a3cd037a54c3fc013b8b049a353817a752e669",
+    "entries": 640,
+    "looks": 6826,
+    "path": "research/experiments.json",
+    "sha256": "e1f15f6889a3d2b504aa8a5dd66c2b78497f15b6697f00e6beb635a32197994e",
+    "total_experiments": 6826
+  },
+  "external_ledgers": [
+    {
+      "by_family": {
+        "real": {
+          "entries": 6,
+          "looks": 504
+        }
+      },
+      "chain_head_recomputed": "3fb149c7f08a3a6cb9de544bc9076f3f83aba7ac06cea7c9be50a721322c7cab",
+      "chain_head_stored": null,
+      "count_differs": [],
+      "dataset_versions": [
+        "d7f7ffd14fbc363550a5bc9afd886e36df0d851511f840615f1f089b22f5f237"
+      ],
+      "entries": 6,
+      "in_central": 6,
+      "looks": 504,
+      "missing_from_central": [],
+      "missing_looks": 0,
+      "path": "<data-root>/holdout2026/research/experiments.json",
+      "relation": "fully merged",
+      "sha256": "22f99d84f2c6891a486af949e52b5efbf728ac12a3cd5c10233b0dc9e24eb188",
+      "total_experiments": 504
+    },
+    {
+      "by_family": {
+        "real": {
+          "entries": 13,
+          "looks": 1224
+        }
+      },
+      "chain_head_recomputed": "af5e97abfa3531328287937771565b9a165bc1ea52bdf029de29fbdf3842c2f7",
+      "chain_head_stored": null,
+      "count_differs": [],
+      "dataset_versions": [
+        "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+      ],
+      "entries": 13,
+      "in_central": 0,
+      "looks": 1224,
+      "missing_from_central": [
+        {
+          "alpha_id": "EQ12",
+          "count": 84,
+          "family": "real",
+          "key": "071b7502b1d84df6b1332385755885a93fc497452d1cb0751f7c806620d22936",
+          "kind": "promotion_pipeline"
+        },
+        {
+          "alpha_id": "EQ02",
+          "count": 84,
+          "family": "real",
+          "key": "07ec64347e14b657234393a70aeca6045a18a99b72407adfcfd89df90d819615",
+          "kind": "promotion_pipeline"
+        },
+        {
+          "alpha_id": "EQ03",
+          "count": 84,
+          "family": "real",
+          "key": "1b5113f6b719f27192744868979652f3704393087afabd572a275568a1846b2b",
+          "kind": "promotion_pipeline"
+        },
+        {
+          "alpha_id": "EQ07",
+          "count": 84,
+          "family": "real",
+          "key": "1f1ee9462970e70e78ad0cacbeb4b17d752030a8e2db0d32dd04070bfcc07d5a",
+          "kind": "promotion_pipeline"
+        },
+        {
+          "alpha_id": "ALL",
+          "count": 216,
+          "family": "real",
+          "key": "3dffca3b2f76413356ed6fe485283deaf266136c22f0c81412c7b4c2cd2e10c3",
+          "kind": "design_horizon_scan"
+        },
+        {
+          "alpha_id": "EQ05",
+          "count": 84,
+          "family": "real",
+          "key": "4b37907dd1f76da98f81083fdcc458a0e782847484aebff992b0f030f8f0d242",
+          "kind": "promotion_pipeline"
+        },
+        {
+          "alpha_id": "EQ06",
+          "count": 84,
+          "family": "real",
+          "key": "9c91a09b2eacc2af18635314d9f0c734e8c24ff0e30848f3dbd99728936e5e02",
+          "kind": "promotion_pipeline"
+        },
+        {
+          "alpha_id": "EQ04",
+          "count": 84,
+          "family": "real",
+          "key": "9cfeb67b8bcdc670e95f5c01cd3992bd6a307664cd532f75024b4329bc7207fd",
+          "kind": "promotion_pipeline"
+        },
+        {
+          "alpha_id": "EQ10",
+          "count": 84,
+          "family": "real",
+          "key": "bb022177acddcc4727dcc06235c3635aa07a3e4c89e151cfc2566f8ac5edc9c4",
+          "kind": "promotion_pipeline"
+        },
+        {
+          "alpha_id": "EQ01",
+          "count": 84,
+          "family": "real",
+          "key": "c5edd2e031597db7028acbeb8bbe17cc907858a254192d40a1c697be700ef852",
+          "kind": "promotion_pipeline"
+        },
+        {
+          "alpha_id": "EQ11",
+          "count": 84,
+          "family": "real",
+          "key": "c610401afeed5002730404a318af75d535195c139e1da6e4f9cc2afde866c65f",
+          "kind": "promotion_pipeline"
+        },
+        {
+          "alpha_id": "EQ08",
+          "count": 84,
+          "family": "real",
+          "key": "e80d36aff2881a22f8e64cca2d41c8cdaba7fbe01979a4ede4baeb7ea9cf56ad",
+          "kind": "promotion_pipeline"
+        },
+        {
+          "alpha_id": "EQ09",
+          "count": 84,
+          "family": "real",
+          "key": "ebe5334991f67a97bc4dfe690f70f67fc150f8a761bafbcee5e1f049344df769",
+          "kind": "promotion_pipeline"
+        }
+      ],
+      "missing_looks": 1224,
+      "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
+      "relation": "not merged",
+      "sha256": "31a4a707e5aa38c670d66e8d71f099dc867f82385d6511a5bc114779069071be",
+      "total_experiments": 1224
+    },
+    {
+      "by_family": {
+        "real": {
+          "entries": 4,
+          "looks": 380
+        }
+      },
+      "chain_head_recomputed": "1f6f9d221d935e1d1b50e4e6af1b6ddb8c4fc41ab697c14adf12285436f2b6b6",
+      "chain_head_stored": null,
+      "count_differs": [],
+      "dataset_versions": [
+        "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+      ],
+      "entries": 4,
+      "in_central": 4,
+      "looks": 380,
+      "missing_from_central": [],
+      "missing_looks": 0,
+      "path": "<data-root>/multi7/research/experiments.json",
+      "relation": "fully merged",
+      "sha256": "fdde1533b6afa0c36969b09b3f0409b7c265245a329f04ecbaf65fee5bd6b857",
+      "total_experiments": 380
+    },
+    {
+      "by_family": {
+        "real": {
+          "entries": 2,
+          "looks": 4
+        }
+      },
+      "chain_head_recomputed": "d313fd43b48b04087e4cac61067e77497c62de5ae44a174b37ba487dd4e9a68d",
+      "chain_head_stored": "d313fd43b48b04087e4cac61067e77497c62de5ae44a174b37ba487dd4e9a68d",
+      "count_differs": [],
+      "dataset_versions": [
+        "ca5d079831be4e63aa76e350bb840a29a6964c0152f4bbbcce5010269a193854"
+      ],
+      "entries": 2,
+      "in_central": 2,
+      "looks": 4,
+      "missing_from_central": [],
+      "missing_looks": 0,
+      "path": "<data-root>/r7_holdout/research/experiments.json",
+      "relation": "fully merged",
+      "sha256": "7512f82108c2a4cf6e28faccf3783662819a6cc488f70d5996b799bc55ac69e6",
+      "total_experiments": 4
+    }
+  ],
+  "external_overlaps": [],
+  "ml_model_ledger": {
+    "central_entries": 3,
+    "central_looks": 3,
+    "experiment_count": 96,
+    "fits": 96,
+    "fits_by_model": {
+      "elasticnet": 15,
+      "lightgbm": 12,
+      "metalabel_elasticnet": 3,
+      "metalabel_lightgbm": 2,
+      "metalabel_ridge": 9,
+      "metalabel_xgboost": 1,
+      "mlp": 12,
+      "ols": 15,
+      "ridge": 15,
+      "xgboost": 12
+    },
+    "path": "research/models/ledger.json",
+    "present": true,
+    "sha256": "5f72280dd2489124fe26b721207edb1633f556fd53c24a1192e9b9aed3989ce7"
+  },
+  "runner_records": {
+    "in_central": [
+      "00ebeb2b537b5155",
+      "20f1b9093e7d0d04",
+      "217fa0cb1d89a9c8",
+      "4a2900e4a6705542",
+      "695e7b1e2bd2253e",
+      "6e4a3431a3acf8a5",
+      "838e0c2d75de4db6",
+      "852863faa44b7b07",
+      "876b08e20c46e6fd",
+      "9d895cf7148c4a8d",
+      "c73bb6294d226163",
+      "d0dd1ab0711d33a1",
+      "d7b554d0a3fa3b26",
+      "d87e34a9c67c1891",
+      "f0f6c49b553f6b59"
+    ],
+    "not_in_central": [],
+    "path": "research/experiments",
+    "records": 15
+  },
+  "summary": {
+    "central_entries": 640,
+    "central_looks": 6826,
+    "central_real_entries": 256,
+    "central_real_looks": 1132,
+    "chain_ok": true,
+    "external_entries_missing_from_central": 13,
+    "external_ledgers": 4,
+    "external_looks_missing_from_central": 1224,
+    "ml_central_entries": 3,
+    "ml_fits_recorded_in_ml_ledger": 96,
+    "runner_records_not_in_central": 0
+  }
+}

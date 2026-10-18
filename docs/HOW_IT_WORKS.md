@@ -274,8 +274,11 @@ buckets gain (FX08 2.18 → 3.84). The threshold the t is compared with is
 
 ### 2.7 The multiple-testing ledger and looks
 
-Try enough things and something will look significant. So every look at
-the data is recorded in a ledger (`research/experiments.json`), identified
+Try enough things and something will look significant. So looks at the
+data are recorded in a ledger (`research/experiments.json`). The ledger is
+not a complete history: earlier looks were overwritten, compressed or never
+recorded, so its count is a lower bound (v1.18 inventory and coverage
+statement: `research/v118/LEDGER_INVENTORY.md`). Entries are identified
 by alpha, kind, configuration and — since v1.4.0 — dataset, so that
 re-running a script does not inflate the count. As of v1.17.0 it holds
 5,732 looks over 422 entries (`research/experiments.json`, its `datasets`
