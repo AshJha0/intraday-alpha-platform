@@ -19,7 +19,7 @@ from iap.research import rel08_rule as rr
 from iap.research import rel08_screen as rs
 from iap.validation.ledger import ExperimentLedger
 
-#: runs whole books on 11 variants; counted by the python-slow job (and its coverage floor)
+#: runs whole books on the 7 variants; counted by the python-slow job (and its coverage floor)
 pytestmark = pytest.mark.slow
 
 NS_S = 1_000_000_000
@@ -92,8 +92,11 @@ def _test_rule(**suff) -> rr.Rule:
 
 def test_committed_draft_matches_markdown_and_registered_list():
     rule = rr.load_draft()
-    assert not rule.signed and rule.K == 11 == len(rule.variants)
-    assert rule.level == pytest.approx(1 - 0.05 / 11)
+    assert not rule.signed and rule.K == 7 == len(rule.variants)
+    assert rule.level == pytest.approx(1 - 0.05 / 7)
+    ids = [v["id"] for v in rule.variants]
+    assert ids == ["V1", "V2", "V5", "V6", "V9", "V10", "V11"]
+    assert [v["id"] for v in rule.doc["deferred_variants"]] == ["V3", "V4", "V7", "V8"]
     th = rule.thresholds
     assert (th["C2_mde_max_bps"], th["C3_net_min_bps"], th["C4_ess_min"]) == (2.0, 1.0, 20)
     assert (th["C6_names_removed"], th["C8_ic_min"]) == (5, 0.02)
@@ -116,6 +119,10 @@ def test_validate_rule_rejects_edits():
     doc = copy.deepcopy(rr.load_draft().doc)
     doc["family"]["K"] = 10
     with pytest.raises(rr.RuleRefused, match="family.K"):
+        rr.validate_rule(doc)
+    doc = copy.deepcopy(rr.load_draft().doc)
+    doc["variants"].append(doc["deferred_variants"].pop(0))  # V3 back into the one-day family
+    with pytest.raises(rr.RuleRefused, match="registered"):
         rr.validate_rule(doc)
 
 
@@ -400,15 +407,15 @@ def test_run_screen_ledger_look_before_result_and_deterministic(tmp_path):
 
     led = ExperimentLedger(ledger_path, dataset_version="dsv", data_family="real")
     rep = rs.run_screen(data, rule, led, evaluate=evaluate)
-    assert seen == [f"V{k}" for k in range(1, 12)]
-    assert ExperimentLedger(ledger_path).total_experiments == 11
+    assert seen == ["V1", "V2", "V5", "V6", "V9", "V10", "V11"]
+    assert ExperimentLedger(ledger_path).total_experiments == 7
     # every variant evaluated; decisions cover all; outcomes are from the map
     assert {d["outcome"] for d in rep["decisions"]} <= set(rs.OUTCOMES)
-    assert len(rep["variants"]) == 11 and rep["label"] == rs.SCREEN_LABEL
+    assert len(rep["variants"]) == 7 and rep["label"] == rs.SCREEN_LABEL
     v1 = rep["variants"][0]
     assert v1["n_usable"] > 0 and v1["net_bps"]["n"] > 0
     assert v1["book"]["max_abs_net_exposure"] < 1e-6
-    v6 = rep["variants"][5]
+    v6 = rep["variants"][3]
     assert v6["n_names"] == N_EQ and v6["book"]["max_abs_sector_exposure"] < 1e-6
     assert len(v1["influential_names"]) == 5
     # deterministic bytes; a rerun adds no look
@@ -417,7 +424,7 @@ def test_run_screen_ledger_look_before_result_and_deterministic(tmp_path):
     assert rs.dumps({**rep, "ledger": None}) == rs.dumps({**rep2, "ledger": None})
     fresh = ExperimentLedger(tmp_path / "fresh.json", dataset_version="dsv", data_family="real")
     assert rs.dumps(rs.run_screen(data, rule, fresh)) == rs.dumps(rep)
-    assert ExperimentLedger(ledger_path).total_experiments == 11
+    assert ExperimentLedger(ledger_path).total_experiments == 7
     # scorecard from the raw JSON alone
     raw = json.loads(rs.dumps(rep))
     card = rs.render_scorecard(raw)
@@ -431,7 +438,7 @@ def test_run_screen_ledger_look_before_result_and_deterministic(tmp_path):
 def test_underpowered_when_the_universe_is_thin():
     data = _fixture()
     rule = _test_rule(names_per_rebalance_min=8, names_usable_min=40)
-    v = rule.variants[8]  # V9
+    v = rule.variants[4]  # V9
     res = rs.evaluate_variant(data, rule, v)
     (d,) = rs.decide([res], rule)
     assert d["outcome"] == "underpowered" and not d["criteria"]["C1"]

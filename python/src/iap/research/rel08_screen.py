@@ -1,4 +1,4 @@
-"""REL-08 hypothesis screen: 11 registered variants on one session (v1.18, programme 9.5).
+"""REL-08 hypothesis screen: the 7 registered one-day variants (K = 7) (v1.18, programme 9.5).
 
     IAP_RUN_ACTOR=<runner> python -m iap.research.rel08_screen \\
         --dataset-dir data/real/breadth/ds_20190130 [--rule research/v118/rel08_rule_signed.json]

@@ -73,15 +73,18 @@ BOUND_SCRIPTS = (
 REGISTERED_VARIANTS: tuple[tuple[str, str, int, int, str], ...] = (
     ("V1", "vwap_deviation", 15, 15, "market_neutral"),
     ("V2", "vwap_deviation", 15, 15, "sector_neutral"),
-    ("V3", "vwap_deviation", 30, 30, "market_neutral"),
-    ("V4", "vwap_deviation", 30, 30, "sector_neutral"),
     ("V5", "residual_reversion", 15, 15, "market_neutral"),
     ("V6", "residual_reversion", 15, 15, "sector_neutral"),
-    ("V7", "residual_reversion", 30, 30, "market_neutral"),
-    ("V8", "residual_reversion", 30, 30, "sector_neutral"),
     ("V9", "etf_catch_up", 1, 5, "market_neutral"),
     ("V10", "etf_catch_up", 3, 5, "market_neutral"),
     ("V11", "etf_catch_up", 5, 5, "market_neutral"),
+)
+#: Removed from the one-day screen (ESS <= 13 cannot reach C4); deferred to REL-08b.
+DEFERRED_VARIANTS: tuple[tuple[str, str, int, int, str], ...] = (
+    ("V3", "vwap_deviation", 30, 30, "market_neutral"),
+    ("V4", "vwap_deviation", 30, 30, "sector_neutral"),
+    ("V7", "residual_reversion", 30, 30, "market_neutral"),
+    ("V8", "residual_reversion", 30, 30, "sector_neutral"),
 )
 SCORES = ("vwap_deviation", "residual_reversion", "etf_catch_up")
 BOOKS = ("market_neutral", "sector_neutral")
@@ -226,6 +229,12 @@ def validate_rule(doc: Mapping[str, Any]) -> None:
     )
     if got != REGISTERED_VARIANTS:
         bad.append("variants differ from the registered list (rule section 9)")
+    deferred = tuple(
+        (v.get("id"), v.get("score"), v.get("horizon_min"), v.get("rebalance_min"), v.get("book"))
+        for v in doc.get("deferred_variants", [])
+    )
+    if deferred != DEFERRED_VARIANTS:
+        bad.append("deferred_variants differ from the registered deferral (rule section 9)")
     if doc["family"]["K"] != len(variants):
         bad.append(f"family.K {doc['family']['K']} != {len(variants)} variants")
     if not (0 < doc["family"]["alpha"] < 1):

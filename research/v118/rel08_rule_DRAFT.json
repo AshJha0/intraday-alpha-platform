@@ -3,7 +3,7 @@
   "kind": "rel08_continuation_rule",
   "status": "DRAFT, unsigned: the screen refuses this file; tools/rel08_rule_sign.py writes the signed copy",
   "rule_document": "research/v118/REL08_CONTINUATION_RULE.md",
-  "rule_document_sha256": "2ec2b5d8a53f2ade563d352298ed591191e36b6ede901b9bc03c693144122490",
+  "rule_document_sha256": "8015169978166c0f6a10aac2f1e95d4473d539a19dd3a2a2d07c5ddb72b37bee",
   "session": "2019-01-30",
   "label": "hypothesis screen, one session, no edge claim",
   "dataset": {
@@ -15,7 +15,7 @@
   },
   "family": {
     "name": "rel08_screen",
-    "K": 11,
+    "K": 7,
     "alpha": 0.05
   },
   "variants": [
@@ -34,20 +34,6 @@
       "book": "sector_neutral"
     },
     {
-      "id": "V3",
-      "score": "vwap_deviation",
-      "horizon_min": 30,
-      "rebalance_min": 30,
-      "book": "market_neutral"
-    },
-    {
-      "id": "V4",
-      "score": "vwap_deviation",
-      "horizon_min": 30,
-      "rebalance_min": 30,
-      "book": "sector_neutral"
-    },
-    {
       "id": "V5",
       "score": "residual_reversion",
       "horizon_min": 15,
@@ -59,20 +45,6 @@
       "score": "residual_reversion",
       "horizon_min": 15,
       "rebalance_min": 15,
-      "book": "sector_neutral"
-    },
-    {
-      "id": "V7",
-      "score": "residual_reversion",
-      "horizon_min": 30,
-      "rebalance_min": 30,
-      "book": "market_neutral"
-    },
-    {
-      "id": "V8",
-      "score": "residual_reversion",
-      "horizon_min": 30,
-      "rebalance_min": 30,
       "book": "sector_neutral"
     },
     {
@@ -95,6 +67,44 @@
       "horizon_min": 5,
       "rebalance_min": 5,
       "book": "market_neutral"
+    }
+  ],
+  "deferred_variants": [
+    {
+      "id": "V3",
+      "score": "vwap_deviation",
+      "horizon_min": 30,
+      "rebalance_min": 30,
+      "book": "market_neutral",
+      "deferred_to": "REL-08b (five sessions, ~65 rebalances at 30 m)",
+      "reason": "removed from the one-day screen because ESS <= 13 cannot reach the C4 floor of 20"
+    },
+    {
+      "id": "V4",
+      "score": "vwap_deviation",
+      "horizon_min": 30,
+      "rebalance_min": 30,
+      "book": "sector_neutral",
+      "deferred_to": "REL-08b (five sessions, ~65 rebalances at 30 m)",
+      "reason": "removed from the one-day screen because ESS <= 13 cannot reach the C4 floor of 20"
+    },
+    {
+      "id": "V7",
+      "score": "residual_reversion",
+      "horizon_min": 30,
+      "rebalance_min": 30,
+      "book": "market_neutral",
+      "deferred_to": "REL-08b (five sessions, ~65 rebalances at 30 m)",
+      "reason": "removed from the one-day screen because ESS <= 13 cannot reach the C4 floor of 20"
+    },
+    {
+      "id": "V8",
+      "score": "residual_reversion",
+      "horizon_min": 30,
+      "rebalance_min": 30,
+      "book": "sector_neutral",
+      "deferred_to": "REL-08b (five sessions, ~65 rebalances at 30 m)",
+      "reason": "removed from the one-day screen because ESS <= 13 cannot reach the C4 floor of 20"
     }
   ],
   "book": {
