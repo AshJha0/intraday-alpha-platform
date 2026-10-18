@@ -77,6 +77,7 @@ def test_closed_or_one_sided_book_is_skipped():
 
 
 def test_holdout_sessions_refused():
+    # v1.18 REL-02b: refused through research/holdout_registry.json (dates and labels)
     for name in ("r7_holdout", "r7_20251128", "ds_20260612", "holdout2026"):
         with pytest.raises(ValueError, match="holdout"):
             _refuse_holdout(name)

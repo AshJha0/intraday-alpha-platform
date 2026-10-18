@@ -264,6 +264,10 @@ def load_merged_session(
 ) -> list[MarketEvent]:
     """The merged stream of one overlap day (``max_events`` caps EACH input;
     ``symbols`` keeps only those instruments)."""
+    from iap.research.holdout_registry import guard_session_label
+
+    for _d in (nasdaq_dir, iex_dir):  # v1.18 REL-02b: content-hash registry
+        guard_session_label(_d, label, "two_venue")
     prim = symbols_of(nasdaq_dir)
     id_map = instrument_map(prim, symbols_of(iex_dir))
     want = set(symbols)

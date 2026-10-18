@@ -82,6 +82,10 @@ from iap.validation.ledger import ExperimentLedger
 from iap.validation.methods import METHODS
 
 REPO = Path(__file__).resolve().parents[4]
+_HOLDOUT_ID_HELP = (
+    "signed prereg id that authorises reading a spent or unread dataset "
+    "(research/holdout_registry.json); omit for in-sample data"
+)
 #: exit status of ``run`` when the result contradicts the pre-registered direction
 DIRECTION_CONTRADICTED_EXIT = 3
 
@@ -222,6 +226,23 @@ def _print_json(doc: Any) -> None:
     print(json.dumps(doc, indent=2, sort_keys=True, ensure_ascii=True, allow_nan=False))
 
 
+def _guard_dataset(args: argparse.Namespace) -> None:
+    """v1.18 REL-02b: the content-hash holdout registry check, before any read."""
+    from iap.research.holdout_registry import HoldoutRefused, dataset_root, guard
+
+    if not (dataset_root(args.dataset_dir) / "dataset.json").is_file():
+        return  # nothing can be read without a manifest: the caller reports "needs dataset.json"
+
+    try:
+        guard(
+            args.dataset_dir,
+            purpose=f"iap.research {getattr(args, 'command', 'run')}",
+            prereg_id=getattr(args, "holdout_prereg_id", None),
+        )
+    except HoldoutRefused as exc:
+        raise ResearchError(str(exc), code="holdout_refused") from exc
+
+
 def _dataset_versions(args: argparse.Namespace) -> tuple[str | None, str | None]:
     """``--dataset-dir``: run on an ingested dataset (docs/REAL_DATA.md).
 
@@ -235,6 +256,7 @@ def _dataset_versions(args: argparse.Namespace) -> tuple[str | None, str | None]
     if args.dataset_dir is None:
         return None, None
     root = Path(args.dataset_dir)
+    _guard_dataset(args)
     try:
         manifest = json.loads((root / "dataset.json").read_text())
         dataset_version = manifest["dataset_version"]
@@ -266,6 +288,22 @@ def _dataset_versions(args: argparse.Namespace) -> tuple[str | None, str | None]
     return dataset_version, feature_version
 
 
+def _identity_actual(args: argparse.Namespace) -> dict | None:
+    """What this run declares for ``analysis_identity``: the dataset versions it reads
+    (from the manifest) plus the family / metrics / thresholds in
+    ``--analysis-declaration``.  ``None`` when the run declares nothing; a prereg that
+    binds an identity then refuses it."""
+    decl_path = getattr(args, "analysis_declaration", None)
+    if decl_path is None:
+        return None
+    decl = json.loads(Path(decl_path).read_text(encoding="utf-8"))
+    versions: list[str] = []
+    if args.dataset_dir is not None:
+        manifest = json.loads((Path(args.dataset_dir) / "dataset.json").read_text())
+        versions = [manifest["dataset_version"]]
+    return {"data_versions": versions, **decl}
+
+
 def _check_prereg(args: argparse.Namespace) -> dict | None:
     """Pre-registration gate: before any data is read (AL02).
 
@@ -279,7 +317,9 @@ def _check_prereg(args: argparse.Namespace) -> dict | None:
     root = args.repo_root if args.repo_root is not None else REPO
     horizon = args.horizon or pinned_horizon(args.alpha)
     try:
-        entry = require(root, args.alpha, horizon, args.prereg_board)
+        entry = require(
+            root, args.alpha, horizon, args.prereg_board, identity_actual=_identity_actual(args)
+        )
     except PreregistrationError as exc:
         raise ResearchError(str(exc), code="not_preregistered") from exc
     print(
@@ -535,6 +575,7 @@ def _power_real(args: argparse.Namespace) -> int:
     from iap.research import power_real
 
     _check_prereg_pairs(args, _declared_pairs(), "the real-data power study")
+    _guard_dataset(args)
 
     out_dir = args.power_out_dir or args.dataset_dir / "research" / "power"
     doc = power_real.run_real_power_study(
@@ -727,6 +768,14 @@ def _parser() -> argparse.ArgumentParser:
         help="an ingested real dataset (python -m iap.marketdata ingest): features, configs, "
         "ledger and experiments default to that directory and its dataset_version is recorded",
     )
+    run.add_argument("--holdout-prereg-id", default=None, help=_HOLDOUT_ID_HELP)
+    run.add_argument(
+        "--analysis-declaration",
+        type=Path,
+        default=None,
+        help="JSON {family, metrics, thresholds} the run declares; checked against the "
+        "analysis_identity a signed prereg binds (iap.agents.analysis_identity)",
+    )
     run.add_argument("--features-dir", type=Path, default=REPO / "data" / "features")
     run.add_argument(
         "--normalized-dir",
@@ -820,6 +869,7 @@ def _parser() -> argparse.ArgumentParser:
         "power-real", help="planted-signal power study on an ingested real dataset"
     )
     preal.add_argument("--dataset-dir", type=Path, required=True)
+    preal.add_argument("--holdout-prereg-id", default=None, help=_HOLDOUT_ID_HELP)
     preal.add_argument(
         "--levels", default="0,0.005,0.01,0.02,0.04", help="planted ICs (comma-separated)"
     )
@@ -879,6 +929,7 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="compute and print; write no report (the looks are still debited)",
     )
+    combine.add_argument("--holdout-prereg-id", default=None, help=_HOLDOUT_ID_HELP)
     combine.add_argument("--features-dir", type=Path, default=REPO / "data" / "features")
     combine.add_argument("--normalized-dir", type=Path, default=None)
     combine.add_argument("--ledger", type=Path, default=REPO / "research" / "experiments.json")

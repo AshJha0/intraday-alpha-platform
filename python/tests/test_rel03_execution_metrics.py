@@ -248,7 +248,12 @@ def test_driver_with_v2_metrics_is_deterministic(dataset):
     assert a == b
 
 
-def test_holdout_check_is_one_function():
-    with pytest.raises(SystemExit, match="holdout"):
-        bench.check_data_access(Path("x/r7_holdout"))
+def test_holdout_check_is_one_function_and_uses_the_registry(monkeypatch):
+    import iap.research.holdout_registry as reg
+
+    calls = []
+    monkeypatch.setattr(
+        reg, "guard_or_exit", lambda d, purpose, pid=None: calls.append((d, purpose, pid))
+    )
     bench.check_data_access(Path("x/r7_holdout"), allow_holdout=True)
+    assert calls == [(Path("x/r7_holdout"), "execution_benchmark", True)]

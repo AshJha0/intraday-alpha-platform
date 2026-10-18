@@ -31,8 +31,8 @@ replays the book and ADDS a fitted or linear impact adder; nothing here is
 a measured market reaction, and the replayed book never moves for our
 fills (``docs/HOW_IT_WORKS.md`` section 3.5).
 
-Holdout discipline: a data directory whose path contains ``holdout`` is
-refused unless ``--allow-holdout`` is given; the benchmark is an in-sample
+Holdout discipline: every data directory is checked against the hash-locked
+holdout registry (REL-02) before it is read; the benchmark is an in-sample
 tool. The pre-registration draft for the B7 gate is written by
 ``--write-prereg-draft`` (NOT signed: the owner signs it with the usual
 register tool before any fresh-day run).
@@ -707,14 +707,13 @@ def _paired_summary(base: list[dict], other: list[dict], seed: int) -> dict[str,
 
 
 def check_data_access(data_dir: Path, *, allow_holdout: bool = False) -> None:
-    """The single entry-point data-access check of the benchmark (REL-02 adds
-    its holdout-registry content-hash call HERE and nowhere else; the path
-    substring test below is the v1.17 rule it replaces)."""
-    if "holdout" in str(data_dir).lower() and not allow_holdout:
-        raise SystemExit(
-            f"{data_dir}: looks like a holdout dataset; the benchmark is in-sample only "
-            "(--allow-holdout overrides, for a signed pre-registered run)"
-        )
+    """The single entry-point data-access check of the benchmark: delegates to the
+    REL-02 hash-locked holdout registry (``iap.research.holdout_registry``), which
+    replaced the v1.17 path-substring rule. A legacy ``allow_holdout`` bool
+    authorises nothing; a signed prereg id does."""
+    from iap.research.holdout_registry import guard_or_exit
+
+    guard_or_exit(data_dir, "execution_benchmark", allow_holdout)
 
 
 def run_benchmark(

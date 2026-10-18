@@ -932,14 +932,17 @@ def instruments_from_config(path: str | Path) -> dict[int, InstrumentCost]:
 
 
 def assert_not_holdout(dataset_dir: Path | None, dataset_version: str, spec: ScreenSpec) -> None:
-    if dataset_dir is not None and "holdout" in str(dataset_dir).lower():
-        raise ScreenError(
-            f"{dataset_dir}: looks like a holdout dataset; the screen is in-sample only"
-        )
     if dataset_version in spec.excluded_dataset_versions:
         raise ScreenError(
             f"dataset {dataset_version[:16]}... is a registered holdout of the pre-registration"
         )
+    if dataset_dir is not None:
+        from iap.research.holdout_registry import HoldoutRefused, guard
+
+        try:  # the screen is in-sample only: no prereg id can authorise it (REL-02b)
+            guard(dataset_dir, purpose="net_of_cost_screen")
+        except HoldoutRefused as exc:
+            raise ScreenError(str(exc)) from exc
 
 
 def main(argv: Sequence[str] | None = None) -> int:
