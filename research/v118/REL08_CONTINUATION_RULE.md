@@ -107,29 +107,34 @@ configuration); they were set under the owner's delegation on 2026-10-18 and may
 
 ## 9. Parameters (set 2026-10-18, owner-delegated)
 
-**The registered variant list (K = 11).** Robustness (conservative costs, influential names, alternative
+**The registered variant list of the one-day screen (K = 7).** Robustness (conservative costs, influential names, alternative
 normalisation) is applied as criteria C5 to C7 to every variant, not as extra variants, so it does not inflate K.
 
 | # | score | horizon / rebalance | book |
 |---|---|---|---|
 | V1 | VWAP deviation (EQ08-style, reversion sign) | 15 m | market-neutral |
 | V2 | VWAP deviation | 15 m | sector-neutral |
-| V3 | VWAP deviation | 30 m | market-neutral |
-| V4 | VWAP deviation | 30 m | sector-neutral |
+| V3 | VWAP deviation | 30 m | market-neutral — **deferred to REL-08b** (five sessions, ~65 rebalances at 30 m); not part of the one-day family |
+| V4 | VWAP deviation | 30 m | sector-neutral — **deferred to REL-08b** (five sessions, ~65 rebalances at 30 m); not part of the one-day family |
 | V5 | ETF-residual reversion (EQ09-style) | 15 m | market-neutral |
 | V6 | ETF-residual reversion | 15 m | sector-neutral |
-| V7 | ETF-residual reversion | 30 m | market-neutral |
-| V8 | ETF-residual reversion | 30 m | sector-neutral |
+| V7 | ETF-residual reversion | 30 m | market-neutral — **deferred to REL-08b** (five sessions, ~65 rebalances at 30 m); not part of the one-day family |
+| V8 | ETF-residual reversion | 30 m | sector-neutral — **deferred to REL-08b** (five sessions, ~65 rebalances at 30 m); not part of the one-day family |
 | V9 | ETF catch-up (constituent minus beta x reference return, catch-up sign) | 1 m | market-neutral |
 | V10 | ETF catch-up | 3 m | market-neutral |
 | V11 | ETF catch-up | 5 m | market-neutral |
 
 The reference ETF is the REL-07 `xasset_v2` map (QQQ for Nasdaq-100 names, SPY otherwise, as of 2019-01-30);
-the sector-neutral books use that map's sector field. Bonferroni level for every lower bound: 1 - 0.05/11.
+the sector-neutral books use that map's sector field. Bonferroni level for every lower bound: 1 - 0.05/7.
+
+**Revision 2026-10-18 (before any signature, trial or data read; coordinator under the owner's delegation).** V3, V4, V7
+and V8 (30 m) are removed from the one-day screen because ESS <= 13 cannot reach the C4 floor of 20: on one session
+they could only return underpowered while spending four real-data ledger looks and loosening the Bonferroni level.
+They are deferred to REL-08b (five sessions); numbering is unchanged. The 30 m sufficiency floor (section 2) applies there.
 
 | # | parameter | set to | why |
 |---|---|---|---|
-| 9.1 | K and the variant list | K = 11, the table above | every variant is one ledger look recorded before its result |
+| 9.1 | K and the variant list | K = 7: V1, V2, V5, V6, V9, V10, V11 (V3, V4, V7, V8 deferred to REL-08b) | every variant is one ledger look recorded before its result; the 30 m variants are removed from the one-day screen because ESS <= 13 cannot reach the C4 floor of 20 |
 | 9.2 | maximum variants that continue | 3 | bounds REL-08b machine time and the family carried forward |
 | 9.3 | net threshold C3 | +1.0 bps per rebalance | below that, a one-day screen cannot distinguish an edge from cost-model error |
 | 9.4 | MDE ceiling C2 | 2.0 bps | if one day cannot detect 2 bps the honest verdict is underpowered, not stop |
