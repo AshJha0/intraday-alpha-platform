@@ -1,0 +1,139 @@
+{
+  "x-version": 1,
+  "kind": "rel10_predeclaration",
+  "id": "REL-10 volume-clock OFI",
+  "protocol": "research/v118/rel10/PREDECLARATION.md",
+  "prereg": "research/preregs/rel10_prereg.json",
+  "status": "DECLARED, not run; the prereg binding this file is unsigned until the coordinator signs it",
+  "symbols": [
+    "AAPL",
+    "MSFT"
+  ],
+  "venues": [
+    "XNAS",
+    "IEXG"
+  ],
+  "iex_clock": "exchange",
+  "sessions": {
+    "calibrate": [
+      {
+        "session": "2025-11-28",
+        "nasdaq_dir": "r7_20251128",
+        "iex_dir": "iex_20251128"
+      },
+      {
+        "session": "2025-12-08",
+        "nasdaq_dir": "r7_20251208",
+        "iex_dir": "iex_20251208"
+      }
+    ],
+    "evaluate": [
+      {
+        "session": "2025-12-09",
+        "nasdaq_dir": "r7_20251209",
+        "iex_dir": "iex_20251209"
+      },
+      {
+        "session": "2025-12-10",
+        "nasdaq_dir": "r7_20251210",
+        "iex_dir": "iex_20251210"
+      },
+      {
+        "session": "2026-05-15",
+        "nasdaq_dir": "holdout2026",
+        "iex_dir": "iex_20260515"
+      },
+      {
+        "session": "2026-05-18",
+        "nasdaq_dir": "holdout2026",
+        "iex_dir": "iex_20260518"
+      }
+    ],
+    "excluded": {
+      "2025-12-11": "IEX side not in the holdout registry",
+      "2025-12-12": "IEX side not ingested",
+      "2026-06-12": "IEX side not in the holdout registry"
+    }
+  },
+  "datasets": {
+    "r7_20251128": "535f4868b0a5f6d14305018142221bea100b615dcc3a212de4eb7a715aecd8fb",
+    "iex_20251128": "f977bb3a39d16557c79ae6fbc9303a69317fdcc19d0e7f4162d1a06a9120ec79",
+    "r7_20251208": "284629a29df4e6419fb527990abf34e3a8dd25f42902e56604df840860ce8ecc",
+    "iex_20251208": "6c94942ab59df29f8b93cc20e6526e6794affd0b9f2851eeb00cb1c2fef1a1e6",
+    "r7_20251209": "24d5d38b9e50ed676d0cceca46cd9cad89be186a6f3517e5a06903b17fb28a1b",
+    "iex_20251209": "9517c4efa19b32fd3632ee04782c5d0c07f390e5e27e3618dd2533aa90d0938c",
+    "r7_20251210": "dea2a6b03ae35df24e5c8751bea8ddcc0f9ca8b93e02c9e2fdb656b6ab62fd80",
+    "iex_20251210": "33d0cbe8a6601850472f584a919b98211dd1841af6667b4cd6faf22c51ffc157",
+    "holdout2026": "d7f7ffd14fbc363550a5bc9afd886e36df0d851511f840615f1f089b22f5f237",
+    "iex_20260515": "bd6f9c707d898007ca281ff093602176c39ac1cf45e0894808e7d1f14bdd3904",
+    "iex_20260518": "ba2022d0d53c013be27f9b3ce6eeef13baa4280009ef32f6c2761b43e61037f4"
+  },
+  "dataset_paths": {
+    "r7_20251128": "r7_20251128",
+    "iex_20251128": "iex/iex_20251128",
+    "r7_20251208": "r7_20251208",
+    "iex_20251208": "iex/iex_20251208",
+    "r7_20251209": "r7_20251209",
+    "iex_20251209": "iex/iex_20251209",
+    "r7_20251210": "r7_20251210",
+    "iex_20251210": "iex/iex_20251210",
+    "holdout2026": "holdout2026",
+    "iex_20260515": "iex/iex_20260515",
+    "iex_20260518": "iex/iex_20260518"
+  },
+  "calibration": {
+    "n_shares_rule": "per symbol: total traded shares (displayed and hidden, both venues) over the calibrate sessions / (sessions x 390), rounded to the nearest 100, at least 100 (about one row per minute)",
+    "threshold_rule": "per symbol, signal and window: the 0.8 quantile of |signal| over the calibrate rows (rows with a value only)",
+    "threshold_quantile": 0.8,
+    "minutes_per_session": 390,
+    "reads": "rows and signals only; no label, fill or P&L is computed on the calibrate sessions"
+  },
+  "signals": [
+    "ofi",
+    "flow",
+    "hid_imb"
+  ],
+  "horizons_min": [
+    1,
+    5
+  ],
+  "window_rule": "window = horizon (ofi_1m with h = 1 m, ofi_5m with h = 5 m)",
+  "target": "spread-netted label sign(signal) * gross_h - cost_h (bps); taker and maker P&L in USD as the decision unit",
+  "execution": {
+    "qty": 100,
+    "entry_window_ns": 30000000000,
+    "exit_window_ns": 30000000000,
+    "taker_fee_per_share": 0.003,
+    "maker_rebate_per_share": 0.002
+  },
+  "statistics": {
+    "unit": "per-session net USD per cell (use x signal x horizon x symbol), sessions without trips at 0",
+    "family_k": 24,
+    "family": "2 uses x 3 signals x 2 horizons x 2 symbols",
+    "alpha": 0.05,
+    "power": 0.8,
+    "economic_threshold_usd": 20.0,
+    "g_evaluate": 4,
+    "mde_sd_units": {
+      "normal": 1.401,
+      "t_df3": 2.012,
+      "t_df3_family": 5.526
+    }
+  },
+  "decision_rule": {
+    "per_cell": {
+      "candidate": "family CI lower bound > 0",
+      "reject": "family CI upper bound < 0, or the family CI contains 0 and the family MDE <= economic_threshold_usd",
+      "underpowered": "the family CI contains 0 and the family MDE > economic_threshold_usd, or no interval"
+    },
+    "per_use": {
+      "candidate": "some (signal, horizon) is candidate on both symbols",
+      "iterate": "some cell is candidate, none on both symbols",
+      "underpowered": "every cell underpowered",
+      "reject": "otherwise"
+    },
+    "missed_opportunity": "reported per cell beside the P&L, never inside it",
+    "promotion": "none in v1.18 (no untouched confirmation sample)"
+  },
+  "small_g": "inference rests on G = 4 evaluate session clusters (3 df); at G <= 5 the result is a size statement, not a power statement, and no generalisation beyond these sessions is claimed"
+}

@@ -47,8 +47,9 @@ round trip at the touch); the maker and taker uses are evaluated separately:
   quantity is a missed opportunity, priced as above.
 
 Each trip reports ``gross_usd`` (mid to mid), ``cost_usd`` (touch versus
-mid at entry and exit, negative when earned) and ``net_usd = gross - cost``
-(tested). :func:`summarise` gives per-session clustered statistics
+mid at entry and exit, negative when earned), ``fees_usd`` (taker fees paid
+negative, maker rebates positive; zero unless the per-share rates are
+passed) and ``net_usd = gross - cost + fees`` (tested). :func:`summarise` gives per-session clustered statistics
 (:func:`iap.research.study_stats.summarise_study`: every session counts,
 no interval below 3 sessions, MDE) with the small-G statement.
 
@@ -275,10 +276,11 @@ def _trip(
     tick: float,
     missed_gross_ticks: float,
     exit_kind: str,
+    fees: float = 0.0,
 ) -> dict[str, Any]:
     gross = s * filled * (exit_mid - entry_mid) * tick
     cost = filled * (s * (entry_px - entry_mid) - s * (exit_px - exit_mid)) * tick
-    net = gross - cost
+    net = gross - cost + fees
     notional = filled * entry_mid * tick
     return {
         "session": session,
@@ -290,6 +292,7 @@ def _trip(
         "unfilled": qty - filled,
         "gross_usd": gross,
         "cost_usd": cost,
+        "fees_usd": fees,
         "net_usd": net,
         "net_bps": 1e4 * net / notional if notional else 0.0,
         "missed_usd": (qty - filled) * missed_gross_ticks * tick,
@@ -307,8 +310,9 @@ def evaluate_taker(
     qty: int,
     tick: float,
     session: str,
+    taker_fee_per_share: float = 0.0,
 ) -> list[dict[str, Any]]:
-    """Taker round trips at the touch (module docstring)."""
+    """Taker round trips at the touch (module docstring); both legs pay the taker fee."""
     trips: list[dict[str, Any]] = []
     busy_until = -1
     for r in rows:
@@ -342,6 +346,7 @@ def evaluate_taker(
                 tick,
                 s * (m1 - m0),
                 "cross",
+                -2.0 * taker_fee_per_share * filled,
             )
         )
         busy_until = ts + h_ns
@@ -387,8 +392,11 @@ def evaluate_maker(
     session: str,
     entry_window_ns: int,
     exit_window_ns: int,
+    taker_fee_per_share: float = 0.0,
+    maker_rebate_per_share: float = 0.0,
 ) -> list[dict[str, Any]]:
-    """Maker round trips with passive entry and exit (module docstring)."""
+    """Maker round trips with passive entry and exit (module docstring); passive
+    fills earn the rebate, the crossed remainder of the exit pays the taker fee."""
     trips: list[dict[str, Any]] = []
     busy_until = -1
     for r in rows:
@@ -443,6 +451,7 @@ def evaluate_maker(
                 tick,
                 missed_ticks,
                 kind,
+                maker_rebate_per_share * (filled + xfill) - taker_fee_per_share * (filled - xfill),
             )
         )
         busy_until = tx + exit_window_ns
