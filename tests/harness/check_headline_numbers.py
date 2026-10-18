@@ -37,6 +37,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -659,6 +660,14 @@ def check_repo_level_rows(sources: dict[str, str]) -> None:
     )
 
 
+_N = r"(\d{2,5})"
+_PROSE_TRIPLES = re.compile(
+    r"python[ :]{1,3}" + _N + r"\W{1,30}cpp[ :]{1,3}" + _N + r"\W{1,30}rust[ :]{1,3}" + _N
+    + r"|" + _N + r"\W{1,4}python\W{1,6}" + _N + r"\W{1,4}cpp\W{1,6}" + _N + r"\W{1,4}rust"
+    + r"|(?<![\d,./])(\d{3,4}) / (\d{2,4}) / (\d{2,4})(?![\d,./])"
+)  # fmt: skip
+
+
 def check_parity_triples(
     sources: dict[str, str], t_tuple: tuple[int, ...], g_tuple: tuple[int, ...]
 ) -> None:
@@ -686,6 +695,31 @@ def check_parity_triples(
                 f"{'/'.join(map(str, t_tuple))} tests and "
                 f"{'/'.join(map(str, g_tuple))} golden"
             )
+        # v1.18 (REL-14a): the prose forms the bare a/b/c pattern cannot see:
+        # "python 2411 / cpp 302 / rust 366", "python 2411&nbsp; · cpp 302
+        # · rust 376 tests", "2411 python / 302 cpp / 366 rust" and a spaced
+        # "193 / 72 / 72"; a "N green" right after a test triple is its sum.
+        flat = text.replace("&nbsp;", " ")
+        for m in _PROSE_TRIPLES.finditer(flat):
+            window = flat[max(0, m.start() - 120) : m.end() + 120].lower()
+            if not any(w in window for w in ("test", "golden", "parity")):
+                continue
+            seen += 1
+            nums = [g for g in m.groups() if g is not None]
+            triple = tuple(int(g) for g in nums)
+            if triple not in (t_tuple, g_tuple):
+                problems.append(
+                    f"{name}: '{' '.join(m.group(0).split())}' — the harness table says "
+                    f"{'/'.join(map(str, t_tuple))} tests and "
+                    f"{'/'.join(map(str, g_tuple))} golden"
+                )
+            elif triple == t_tuple:
+                g = re.match(r"[^.\n<]{0,40}?(\d[\d,]*) green", flat[m.end() : m.end() + 60])
+                if g and int(g.group(1).replace(",", "")) != sum(t_tuple):
+                    problems.append(
+                        f"{name}: '{g.group(1)} green' after {'/'.join(nums)} — "
+                        f"their sum is {sum(t_tuple):,}"
+                    )
         # A four-number count is a pre-v1.15 python/cpp/rust/java quote that
         # the Java archive left stale (the triple pattern cannot see it).
         for m in re.finditer(r"(?<![\d,./])\d{3,4}(?:/\d{2,4}){3}(?![\d,./])", text):
@@ -901,8 +935,53 @@ def report(case: str, ok: bool, detail: str, sink: list[str]) -> None:
         sink.append(case)
 
 
+def check_parity_vs_ci(path: Path, strict: bool) -> None:
+    """README's parity table vs the counts CI derived from its own jobs'
+    artefacts (tests/harness/parity_counts.py, v1.18 REL-14a).  Drift is a
+    warning (python counts move with every PR that adds a test) unless
+    ``--parity-strict``, which the release check uses."""
+    print("parity table vs the counts CI derived from its artefacts:")
+    ci = json.loads(path.read_text(encoding="utf-8"))
+    parsed = parity_table_counts()
+    readme = DOCS["README.md"].read_text(encoding="utf-8")
+    rows = {
+        m.group(1): int(m.group(2))
+        for m in re.finditer(r"(?m)^\s*(integration|replay)\s*\|\s*(\d+)\s*\|", readme)
+    }
+    tests, golden = parsed if parsed else ({}, {})
+    tests = {**tests, **rows}
+    drift = []
+    for kind, table, derived in (("tests", tests, ci["tests"]), ("golden", golden, ci["golden"])):
+        for row, n in derived.items():
+            if n is None:
+                drift.append(f"{row} {kind}: not derivable from the artefacts")
+            elif table.get(row) != n:
+                drift.append(f"{row} {kind}: README {table.get(row)}, CI {n}")
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        with open(summary, "a", encoding="utf-8") as f:
+            f.write("### Parity counts derived from CI artefacts\n\n```\n")
+            for row in ("python", "cpp", "rust", "integration", "replay"):
+                g = ci["golden"].get(row, "-")
+                f.write(f"{row:<8} | {ci['tests'].get(row)!s:<12} | {g!s:<14} |    -s | PASS\n")
+            f.write("```\n\n" + ("; ".join(drift) or "README table matches") + "\n")
+    if drift and not strict:
+        print(f"::warning::README parity table differs from CI: {'; '.join(drift)}")
+        print(f"  [warn] parity_table_vs_ci: {'; '.join(drift)}")
+        return
+    report(
+        "parity_table_vs_ci",
+        not drift,
+        "; ".join(drift) or "README table = the counts CI derived (tests and golden)",
+        PLATFORM_FAILURES,
+    )
+
+
 def main() -> int:
     strict = "--strict" in sys.argv
+    parity_json = None
+    if "--parity-json" in sys.argv:
+        parity_json = Path(sys.argv[sys.argv.index("--parity-json") + 1])
     docs = texts()
     print(
         "headline numbers vs artefacts "
@@ -910,6 +989,8 @@ def main() -> int:
     )
     check_platform(docs)
     check_test_counts(docs)
+    if parity_json is not None:
+        check_parity_vs_ci(parity_json, "--parity-strict" in sys.argv)
     check_research(docs)
     print()
     if PLATFORM_FAILURES:

@@ -248,8 +248,8 @@ under [archive/java/](archive/java/README.md), frozen at v1.14.0 (575 tests,
 ===================== cross-language parity table =====================
 language | tests passed | golden passed  | time   | status
 ---------+--------------+----------------+--------+-------
-python   | 2411         | 193            |    -s | PASS
-cpp      | 302          | 72             |    -s | PASS
+python   | 3208         | 217            |    -s | PASS
+cpp      | 333          | 74             |    -s | PASS
 rust     | 376          | 75             |    -s | PASS
 integration | 35           | -              |    -s | PASS
 replay   | 6            | -              |    -s | PASS
