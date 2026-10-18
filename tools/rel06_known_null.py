@@ -38,6 +38,7 @@ from iap.research import known_null as kn  # noqa: E402
 
 CONFIG = ROOT / "research" / "v118" / "known_null_config.json"
 OUT = ROOT / "research" / "v118" / "known_null_result.json"
+OUT_V2 = ROOT / "research" / "v118" / "known_null_v2_result.json"
 MAX_TIMING_TRIALS = 20
 MAX_WORKERS = 2
 
@@ -116,37 +117,95 @@ def _init_worker(data_dir: str, config: dict[str, Any]) -> None:
     _STUDY = build_study(Path(data_dir), config)
 
 
-def _work(job: tuple[str, list[int], dict[int, list[int]]]) -> tuple[str, dict]:
-    gen, trials, perms = job
+Job = tuple[str, str, list[int], dict[int, list[int]], dict[str, Any] | None]
+
+
+def _run_job(study: kn.Study, job: Job) -> tuple[str, str, dict]:
+    """``(arm, generator, trials, perms, v2 arm spec)``; the spec is ``None`` for v1."""
+    arm, gen, trials, perms, spec = job
+    if spec is None:
+        return arm, gen, kn.run_trials(study, gen, trials, perms)
+    return arm, gen, kn.run_trials_v2(study, gen, trials, perms, **spec)
+
+
+def _work(job: Job) -> tuple[str, str, dict]:
     assert _STUDY is not None
-    return gen, kn.run_trials(_STUDY, gen, trials, perms)
+    return _run_job(_STUDY, job)
+
+
+def _jobs(
+    arm: str,
+    gens: dict[str, Any],
+    n_trials: int,
+    g: int,
+    workers: int,
+    spec_of: Any,
+) -> tuple[list[Job], list[dict[str, Any]]]:
+    """Chunked jobs of one arm: A's permutations drawn up front from the arm's
+    A seed (without replacement), B seeded per trial from the arm's B seed."""
+    perms = kn.draw_permutations(g, n_trials, int(gens["A"]["base_seed"]))
+    pmap = {p["trial"]: p["permutation"] for p in perms}
+    chunk = max(1, -(-n_trials // max(1, workers * 4)))
+    jobs: list[Job] = []
+    for gen in sorted(gens):
+        for lo in range(0, n_trials, chunk):
+            idx = list(range(lo, min(n_trials, lo + chunk)))
+            pm = {i: pmap[i] for i in idx} if gen == "A" else {}
+            jobs.append((arm, gen, idx, pm, spec_of(gen)))
+    return jobs, perms
 
 
 def run_all(
-    data_dir: Path, config: dict[str, Any], n_trials: int, workers: int, study: kn.Study | None
-) -> tuple[dict[str, dict[int, dict]], list[dict[str, Any]], kn.Study]:
-    """Every generator x trial; deterministic whatever ``workers`` is (A's
-    permutations are drawn up front, B's seeds depend on the trial only)."""
+    data_dir: Path,
+    config: dict[str, Any],
+    n_trials: int,
+    workers: int,
+    study: kn.Study | None,
+    power_trials: int | None = None,
+) -> tuple[dict[str, dict[str, dict[int, dict]]], dict[str, list[dict[str, Any]]], kn.Study]:
+    """Every arm x generator x trial; deterministic whatever ``workers`` is.
+    v1: arm ``size`` only.  v2 (``power_arm`` in the config): arms ``size`` and
+    ``power`` (``power_trials`` defaults to the config's)."""
     study = study or build_study(data_dir, config)
     g = len(study.panel.sessions)
-    perms = kn.draw_permutations(g, n_trials, int(config["generators"]["A"]["base_seed"]))
-    pmap = {p["trial"]: p["permutation"] for p in perms}
-    jobs = []
-    chunk = max(1, -(-n_trials // max(1, workers * 4)))
-    for gen in sorted(config["generators"]):
-        for lo in range(0, n_trials, chunk):
-            idx = list(range(lo, min(n_trials, lo + chunk)))
-            jobs.append((gen, idx, {i: pmap[i] for i in idx} if gen == "A" else {}))
-    results: dict[str, dict[int, dict]] = {gen: {} for gen in config["generators"]}
+    jobs: list[Job] = []
+    perms: dict[str, list[dict[str, Any]]] = {}
+    if not kn.is_v2(config):
+        j, perms["size"] = _jobs(
+            "size", config["generators"], n_trials, g, workers, lambda _g: None
+        )
+        jobs += j
+    else:
+        st = [config["statistics"]["primary"], *config["statistics"]["also_must_pass"]]
+        pa = config["power_arm"]
+        j, perms["size"] = _jobs(
+            "size", config["generators"], n_trials, g, workers, lambda _g: {"statistics": st}
+        )
+        jobs += j
+        npow = int(pa["n_trials"]) if power_trials is None else power_trials
+        j, perms["power"] = _jobs(
+            "power",
+            pa["generators"],
+            npow,
+            g,
+            workers,
+            lambda gen: {
+                "statistics": st,
+                "deltas": [float(d) for d in pa["delta_bps_per_trip"]],
+                "base_seed": int(pa["generators"][gen]["base_seed"]),
+            },
+        )
+        jobs += j
+    results: dict[str, dict[str, dict[int, dict]]] = {arm: {} for arm in perms}
     if workers <= 1:
-        for gen, idx, pm in jobs:
-            results[gen].update(kn.run_trials(study, gen, idx, pm))
+        done = [_run_job(study, job) for job in jobs]
     else:
         with ProcessPoolExecutor(
             workers, initializer=_init_worker, initargs=(str(data_dir), config)
         ) as ex:
-            for gen, res in ex.map(_work, jobs):
-                results[gen].update(res)
+            done = list(ex.map(_work, jobs))
+    for arm, gen, res in done:
+        results[arm].setdefault(gen, {}).update(res)
     return results, perms, study
 
 
@@ -190,11 +249,13 @@ def main(argv: list[str] | None = None) -> int:
         "--timing", type=int, metavar="N", help=f"timing only, N <= {MAX_TIMING_TRIALS}"
     )
     ap.add_argument("--workers", type=int, default=1)
-    ap.add_argument("--out", type=Path, default=OUT)
+    ap.add_argument("--out", type=Path, help=f"default {OUT.name} (v1) / {OUT_V2.name} (v2)")
     a = ap.parse_args(argv)
     if not 1 <= a.workers <= MAX_WORKERS:
         raise SystemExit(f"--workers must be 1..{MAX_WORKERS} (machine rule)")
     config = json.loads(a.config.read_text(encoding="utf-8"))
+    if a.out is None:
+        a.out = OUT_V2 if kn.is_v2(config) else OUT
     data_dir = (a.data_root / config["dataset"]["dir"]).resolve()
     from iap.research.holdout_registry import guard_or_exit
 
@@ -211,10 +272,14 @@ def main(argv: list[str] | None = None) -> int:
         t0 = time.perf_counter()
         study = build_study(data_dir, config)
         t1 = time.perf_counter()
-        run_all(data_dir, config, a.timing, a.workers, study if a.workers == 1 else None)
+        run_all(data_dir, config, a.timing, a.workers, study if a.workers == 1 else None, a.timing)
         t2 = time.perf_counter()
         per = (t2 - t1) / a.timing
         full = int(config["n_trials"])
+        if kn.is_v2(config):
+            # one timed unit = one size trial + one power trial (every generator,
+            # K, statistic and delta); conservative: the larger arm sets the count
+            full = max(full, int(config["power_arm"]["n_trials"]))
         doc = {
             "trials_timed": a.timing,
             "workers": a.workers,
@@ -234,7 +299,17 @@ def main(argv: list[str] | None = None) -> int:
     prov["config_sha256"] = kn.config_hash(a.config)
     prov["dataset_version"] = config["dataset"]["dataset_version"]
     results, perms, study = run_all(data_dir, config, int(config["n_trials"]), a.workers, None)
-    doc = kn.study_document(study, results, perms, provenance=prov)
+    if kn.is_v2(config):
+        doc = kn.study_document_v2(
+            study,
+            results["size"],
+            results["power"],
+            perms["size"],
+            perms["power"],
+            provenance=prov,
+        )
+    else:
+        doc = kn.study_document(study, results["size"], perms["size"], provenance=prov)
     from iap.research.runner import render_document
 
     a.out.parent.mkdir(parents=True, exist_ok=True)
