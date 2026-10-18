@@ -25,3 +25,6 @@ tests/golden/** -text
 
 # Windows batch wrapper started detached by cmd.exe: keep CRLF.
 tools/run_rel08c_extract.cmd text eol=crlf
+
+# REL-04c: cmd.exe needs CRLF (a LF .cmd mis-parses labels / goto).
+research/execution/rel04c/*.cmd text eol=crlf

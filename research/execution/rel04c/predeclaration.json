@@ -1,0 +1,37 @@
+{
+  "schema": "iap.rel04c_predeclaration/v1",
+  "item": "REL-04c",
+  "status": "draft",
+  "frozen_by": null,
+  "frozen_utc": null,
+  "result_class": "secondary",
+  "label": "single-venue (Nasdaq) execution benchmark v2 on a 20-name universe, three in-sample days, per liquidity bucket; SECONDARY, no promotion, no edge claim",
+  "universe_rule": "rel04c_universe/v1 (python/src/iap/research/rel04c_universe.py; research/execution/rel04c/README.md)",
+  "sessions": ["2019-10-18", "2021-07-13", "2021-08-13"],
+  "holdout_state_required": "in_sample",
+  "primary_metric": "cost_per_filled_share_bps (REL-03 benchmark v2, pooled ratio, CR1 by session)",
+  "reported_beside": ["fill_rate", "completion_ratio", "completion_charge_bps", "shortfall_per_target_share_bps", "post_trade_markout_bps"],
+  "buckets": ["L1", "L2", "L3"],
+  "parameters": {
+    "algos": null,
+    "policies": null,
+    "sizes_pct_venue_adv": null,
+    "sizes_target_pct_consolidated_adv": null,
+    "window_min": null,
+    "mde_report": null
+  },
+  "fixed": {
+    "cover_all_cells": true,
+    "consolidated_adv": "research/execution/rel04c/consolidated_adv.json (written by the volume stage)",
+    "seed": 20260829,
+    "clusters": "session (G = 3): the interval is wide by design and the small-G limitation is printed with every number"
+  },
+  "open_parameter_notes": {
+    "algos": "suggested TWAP,VWAP,POV,IS (the REL-03 default grid)",
+    "policies": "suggested native,aggressive,passive (single venue; no SOR)",
+    "sizes_pct_venue_adv": "the benchmark sizes parents on Nasdaq (venue) ADV; suggested 0.1,0.5,1,2",
+    "sizes_target_pct_consolidated_adv": "the consolidated-equivalent the grid aims at = venue % x median Nasdaq/consolidated ratio from volume_check.json; record it before the benchmark runs",
+    "window_min": "suggested 30",
+    "mde_report": "suggested: print mde and mde_t (80 % power, two-sided 5 %) for every bucket x cell; a cell whose MDE exceeds its point estimate is labelled 'not informative'"
+  }
+}
