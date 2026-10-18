@@ -438,16 +438,6 @@ LEAK_IC_MULTIPLE = 3.0
 MIN_OOS_IC_GATE = 0.010
 
 
-@dataclass
-class LeakageResultExtras:
-    """Diagnostics attached to a leakage run (JSON-serializable)."""
-
-    suspicious_ic: float
-    required_ratio: float
-    median_row_gap_ns: int
-    horizon_ns: int
-
-
 class LeakageTester:
     """Runs the detectors against a fitted model on test frames."""
 
