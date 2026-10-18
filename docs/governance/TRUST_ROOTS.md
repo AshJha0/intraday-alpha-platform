@@ -1,5 +1,8 @@
 # Trust roots and model promotion (v1.15, G-P1-2 / G-P0-1)
 
+Pinned version, key fingerprint, rotation and revocation: [TRUST_ROOT.md](TRUST_ROOT.md).
+Verify everything (full-history clone): `PYTHONPATH=python/src python tools/verify_signatures.py --trust-ref origin/main --strict`.
+
 ## What is enforced
 
 - `research/agents/trust_roots.json` lists the maintainers' Ed25519 **public**

@@ -126,12 +126,20 @@ Signatures are Ed25519 over the canonical JSON of the document without its `sign
 under the maintainer key in [research/agents/trust_roots.json](../research/agents/trust_roots.json)
 ([docs/governance/TRUST_ROOTS.md](governance/TRUST_ROOTS.md)). Signed on main today:
 `research/preregs/breadth_book_prereg.json`, `research/quoting_real/prereg_v2.json`,
-`research/r7/ai4_deeplob_prereg.json`, `research/r7/r7_confirm_prereg.json`. Verify all signed
-JSON documents under `research/` (prints OK or the reason per file):
+`research/r7/ai4_deeplob_prereg.json`, `research/r7/r7_confirm_prereg.json`,
+`research/preregs/b8v2_prereg.json`, `research/v118/null_protocol_prereg.json`,
+`research/v118/rel08_rule_signed.json` (the tool lists the current set). Verify every signed document (trust root against its pinned version, every signed JSON document,
+the agent key registry, the main and archived blackboards). It prints `OK` or `FAIL <reason>` per
+item and exits 1 on any failure. A blackboard anchor whose commit is not in the clone (a shallow fetch) is reported as
+`UNVERIFIABLE-HERE`, never `OK`; `--strict` (reviewer and release, on a full-history clone) makes that
+fatal too. Signature, chain and trust-root problems always fail. Run it from a full clone:
 
 ```bash
-PYTHONPATH=python/src python -c "import json,subprocess;from pathlib import Path;from iap.agents.analysis_identity import verify_signed_document as v;[print(p, v(Path('.'), d) and 'OK') for p in subprocess.run(['git','ls-files','research/*.json'],capture_output=True,text=True).stdout.split() for d in [json.load(open(p,encoding='utf-8'))] if isinstance(d,dict) and d.get('signed') is True]"
+PYTHONPATH=python/src python tools/verify_signatures.py --trust-ref origin/main --strict
 ```
+
+The maintainer key fingerprint, the pinned trust-root version, and the rotation and revocation
+procedure are in [docs/governance/TRUST_ROOT.md](governance/TRUST_ROOT.md).
 
 The agent key registry and the blackboard chain verify with:
 
@@ -139,8 +147,8 @@ The agent key registry and the blackboard chain verify with:
 PYTHONPATH=python/src python -m iap.agents.cli verify-board --trust-ref origin/main
 ```
 
-The known-null protocol and the REL-08 continuation rule are written but not signed on main;
-their signatures will bind the runner scripts.
+The known-null protocol, the REL-08 continuation rule and the B8 v2 prereg are signed, and each
+binds its runner scripts through an `analysis_identity` block.
 
 ## 5. Known limitations
 
