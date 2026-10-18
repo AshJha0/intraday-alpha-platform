@@ -253,6 +253,10 @@ RUNNERS = {
     "python/src/iap/research/rel08_rule.py": "verify_identity",
     "python/src/iap/agents/prereg_gate.py": "verify_identity",
     "python/src/iap/research/holdout_registry.py": "environment_mismatches",
+    "research/auction/rel08c/run_rel08c.py": "verify_identity",
+    "research/v118/rel09/run_rel09.py": "verify_identity",
+    "research/v118/rel10/run_rel10.py": "verify_identity",
+    "python/src/iap/auction/rel08c_study.py": "environment_mismatches",
 }
 # Consume a signed document but run no analysis: binders / signers / the
 # identity module itself / tools that only verify signatures.

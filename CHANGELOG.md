@@ -8,6 +8,8 @@ that tag.
 
 ## Unreleased
 
+- v1.18 batch 5 integration fix: the identity-v2 guard (`test_no_prereg_consumer_skips_the_identity_check`) found the new REL-08c, REL-09 and REL-10 runners unregistered; they are registered (each calls `verify_identity`). `iap.auction.rel08c_study.run_study` accepted any signed prereg id when called directly; it now also requires the prereg's bound analysis identity to match the code, configs, lock and interpreter on disk (`environment_mismatches`), closing a library-level bypass of review finding 1.
+
 - v1.18 gitleaks: the existing narrow allowlist for ledger content keys (`"key": "<64 hex>"`, SHA-256 digests of the experiment spec) now also covers `research/v118/LEDGER_INVENTORY.json`, the reviewer-finding-4 inventory copy of those keys. CI scans the whole history of all fetched branches, so the inventory branch had turned every PR's `advisory` check red with generic-api-key false positives.
 
 - v1.18 REL-06 known-null protocol v2: runner implemented and parameters set (unsigned, nothing run). `iap.research.known_null` gains per-trip statistics `net` (v1, default; v1 output unchanged), `net_recentred` (S1) and `gross` (S2), a planted-effect hook, `run_trials_v2` (size arm; power arm with one label draw evaluated at every delta, planted on the first hypothesis of each family), `summarise_power` and `study_document_v2`. `tools/rel06_known_null.py --config research/v118/known_null_v2_config.json` runs both arms. v2 binds its own config in `analysis_identity`. `NULL_PROTOCOL_v2.md` is marked "parameters set, ready for signing": seeds 20261101-04; 1,000 size and 200 power trials per generator; deltas 0.5/1/2/4 bps; pass rule unchanged. Estimated compute is about 1 h at `--workers 2`.
