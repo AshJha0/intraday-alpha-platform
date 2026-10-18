@@ -33,8 +33,8 @@ appended to open CSV writers, never held in memory.  Prices stay in the
 feed's 1/10000-dollar integers (``*_px4``).
 
 This module never reads a real file by itself: the run is the detached job
-``tools/run_rel08c_extract.cmd``, started by the coordinator only after the
-REL-08c pre-declaration is signed.
+``research/auction/rel08c/run_rel08c.cmd``, started by the coordinator only after the
+REL-08c prereg is signed.
 """
 
 from __future__ import annotations

@@ -1,0 +1,39 @@
+{
+  "x-version": 1,
+  "kind": "rel08c_predeclaration",
+  "id": "REL-08c close imbalance",
+  "protocol": "research/auction/rel08c/PREDECLARATION.md",
+  "prereg": "research/preregs/rel08c_prereg.json",
+  "status": "DECLARED, not run; the prereg binding this file is unsigned until the coordinator signs it",
+  "framing": "one session = one cluster: a hypothesis screen only; the registered verdict on one day is underpowered whatever the per-trade numbers show",
+  "input": {
+    "file": "data/vendor/01302019.NASDAQ_ITCH50.gz",
+    "sha256": "8c97b5b13bc451c012c2466fb7e258da134dab29aa47b67fe7b0088c78e870be",
+    "session": "2019-01-30",
+    "holdout_state_required": "in_sample",
+    "universe": "research/breadth/universe.json",
+    "extract_out": "data/real/rel08c_2019-01-30"
+  },
+  "study": {
+    "grid_start": "15:30:00",
+    "decision_times": ["15:51:00", "15:53:00"],
+    "threshold": 0.2,
+    "min_persistence": 2,
+    "orientation": 1,
+    "qty": 100,
+    "exit_lead_s": 5.0,
+    "fee_per_share": 0.003,
+    "cross_fee_per_share": 0.001,
+    "target_bps": 2.0,
+    "alpha": 0.05,
+    "power": 0.8,
+    "min_sessions": 5,
+    "min_trades": 30
+  },
+  "statistics": {
+    "primary": "incremental_net_taker_bps (imbalance minus baseline), per-session mean, Student-t over sessions",
+    "family": "REL-08c close imbalance (real)",
+    "family_k": 1,
+    "verdicts": ["underpowered", "continue", "reject"]
+  }
+}
