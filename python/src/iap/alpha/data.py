@@ -69,6 +69,9 @@ def load_features(
     ``columns``, when given, maps a file's column names to the subset to read
     (keeps memory bounded on multi-day real datasets)."""
     features_dir = Path(features_dir)
+    from iap.research.holdout_registry import reader_guard
+
+    reader_guard(features_dir)  # holdout backstop: refuses before any parquet is read
     paths = sorted(features_dir.glob("features_*.parquet"))
     if not paths:
         raise ValueError(f"no feature parquet files in {features_dir}")
