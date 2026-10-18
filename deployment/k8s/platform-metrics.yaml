@@ -206,6 +206,8 @@ spec:
                 path: instruments/instruments.json
               - key: marketdata__generator.json
                 path: marketdata/generator.json
+              - key: monitoring__policy.json
+                path: monitoring/policy.json
               - key: mvp__generator.json
                 path: mvp/generator.json
               - key: mvp__generator_tiny.json
@@ -240,8 +242,12 @@ spec:
                 path: reference/sectors.json
               - key: reference__venue_latency.json
                 path: reference/venue_latency.json
+              - key: risk__portfolio_limits.json
+                path: risk/portfolio_limits.json
               - key: risk__risk.json
                 path: risk/risk.json
+              - key: risk__stress_scenarios.json
+                path: risk/stress_scenarios.json
               - key: strategies__alpha_params.json
                 path: strategies/alpha_params.json
               - key: strategies__lifecycle.json
