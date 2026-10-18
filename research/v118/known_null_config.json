@@ -1,0 +1,320 @@
+{
+  "alpha": 0.05,
+  "compute_budget_hours": 12.0,
+  "configuration": {
+    "cost_multiplier": 1.0,
+    "embargo_ns": 60000000000,
+    "flatten_at_session_end": true,
+    "latency_ns": 1000000000,
+    "max_decision_age_ns": 60000000000,
+    "methods": "v2",
+    "n_folds": 4
+  },
+  "dataset": {
+    "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+    "dir": "data/real/multi7",
+    "sessions": [
+      "2019-01-30",
+      "2019-03-27",
+      "2019-07-30",
+      "2019-08-30",
+      "2019-10-30",
+      "2019-12-30",
+      "2020-01-30"
+    ],
+    "symbols": [
+      "AAPL",
+      "MSFT",
+      "QQQ"
+    ]
+  },
+  "description": "REL-06 known-null study, the registered parameters of research/v118/NULL_PROTOCOL.md. Bound by the analysis_identity of the signed protocol prereg (scripts, commit, data version, family, metrics, thresholds); a change here is a change of the registered analysis.",
+  "execution": {
+    "adv_table": "session",
+    "impact_exponent": 1.0,
+    "impact_model": "parent",
+    "regulatory_fees": true,
+    "venue_id": 101
+  },
+  "generators": {
+    "A": {
+      "base_seed": 20261018
+    },
+    "B": {
+      "base_seed": 20261019
+    }
+  },
+  "n_trials": 1000,
+  "pass_rule": {
+    "flag_upper_below": 0.02,
+    "max_point": 0.05,
+    "max_upper": 0.07
+  },
+  "protocol": "research/v118/NULL_PROTOCOL.md",
+  "registered_size_shares": 100,
+  "variants": {
+    "K16": [
+      {
+        "horizon": "10s",
+        "id": "imbalance_l1@10s/AAPL",
+        "sign": 1,
+        "signal": "imbalance_l1_v1",
+        "symbols": [
+          "AAPL"
+        ],
+        "threshold": 0.5
+      },
+      {
+        "horizon": "10s",
+        "id": "imbalance_l1@10s/MSFT",
+        "sign": 1,
+        "signal": "imbalance_l1_v1",
+        "symbols": [
+          "MSFT"
+        ],
+        "threshold": 0.5
+      },
+      {
+        "horizon": "1m",
+        "id": "imbalance_l1@1m/AAPL",
+        "sign": 1,
+        "signal": "imbalance_l1_v1",
+        "symbols": [
+          "AAPL"
+        ],
+        "threshold": 0.5
+      },
+      {
+        "horizon": "1m",
+        "id": "imbalance_l1@1m/MSFT",
+        "sign": 1,
+        "signal": "imbalance_l1_v1",
+        "symbols": [
+          "MSFT"
+        ],
+        "threshold": 0.5
+      },
+      {
+        "horizon": "10s",
+        "id": "imbalance_l5@10s/AAPL",
+        "sign": 1,
+        "signal": "imbalance_l5_v1",
+        "symbols": [
+          "AAPL"
+        ],
+        "threshold": 0.3
+      },
+      {
+        "horizon": "10s",
+        "id": "imbalance_l5@10s/MSFT",
+        "sign": 1,
+        "signal": "imbalance_l5_v1",
+        "symbols": [
+          "MSFT"
+        ],
+        "threshold": 0.3
+      },
+      {
+        "horizon": "1m",
+        "id": "imbalance_l5@1m/AAPL",
+        "sign": 1,
+        "signal": "imbalance_l5_v1",
+        "symbols": [
+          "AAPL"
+        ],
+        "threshold": 0.3
+      },
+      {
+        "horizon": "1m",
+        "id": "imbalance_l5@1m/MSFT",
+        "sign": 1,
+        "signal": "imbalance_l5_v1",
+        "symbols": [
+          "MSFT"
+        ],
+        "threshold": 0.3
+      },
+      {
+        "horizon": "10s",
+        "id": "trade_imbalance_w10s@10s/AAPL",
+        "sign": 1,
+        "signal": "trade_imbalance_w10s_v1",
+        "symbols": [
+          "AAPL"
+        ],
+        "threshold": 0.5
+      },
+      {
+        "horizon": "10s",
+        "id": "trade_imbalance_w10s@10s/MSFT",
+        "sign": 1,
+        "signal": "trade_imbalance_w10s_v1",
+        "symbols": [
+          "MSFT"
+        ],
+        "threshold": 0.5
+      },
+      {
+        "horizon": "1m",
+        "id": "trade_imbalance_w10s@1m/AAPL",
+        "sign": 1,
+        "signal": "trade_imbalance_w10s_v1",
+        "symbols": [
+          "AAPL"
+        ],
+        "threshold": 0.5
+      },
+      {
+        "horizon": "1m",
+        "id": "trade_imbalance_w10s@1m/MSFT",
+        "sign": 1,
+        "signal": "trade_imbalance_w10s_v1",
+        "symbols": [
+          "MSFT"
+        ],
+        "threshold": 0.5
+      },
+      {
+        "horizon": "10s",
+        "id": "imbalance_l10@10s/AAPL",
+        "sign": 1,
+        "signal": "imbalance_l10_v1",
+        "symbols": [
+          "AAPL"
+        ],
+        "threshold": 0.3
+      },
+      {
+        "horizon": "10s",
+        "id": "imbalance_l10@10s/MSFT",
+        "sign": 1,
+        "signal": "imbalance_l10_v1",
+        "symbols": [
+          "MSFT"
+        ],
+        "threshold": 0.3
+      },
+      {
+        "horizon": "1m",
+        "id": "imbalance_l10@1m/AAPL",
+        "sign": 1,
+        "signal": "imbalance_l10_v1",
+        "symbols": [
+          "AAPL"
+        ],
+        "threshold": 0.3
+      },
+      {
+        "horizon": "1m",
+        "id": "imbalance_l10@1m/MSFT",
+        "sign": 1,
+        "signal": "imbalance_l10_v1",
+        "symbols": [
+          "MSFT"
+        ],
+        "threshold": 0.3
+      }
+    ],
+    "K3": [
+      {
+        "horizon": "1s",
+        "id": "imbalance_l1@1s/AAPL+MSFT+QQQ",
+        "sign": 1,
+        "signal": "imbalance_l1_v1",
+        "symbols": [
+          "AAPL",
+          "MSFT",
+          "QQQ"
+        ],
+        "threshold": 0.5
+      },
+      {
+        "horizon": "10s",
+        "id": "imbalance_l1@10s/AAPL+MSFT+QQQ",
+        "sign": 1,
+        "signal": "imbalance_l1_v1",
+        "symbols": [
+          "AAPL",
+          "MSFT",
+          "QQQ"
+        ],
+        "threshold": 0.5
+      },
+      {
+        "horizon": "1m",
+        "id": "imbalance_l1@1m/AAPL+MSFT+QQQ",
+        "sign": 1,
+        "signal": "imbalance_l1_v1",
+        "symbols": [
+          "AAPL",
+          "MSFT",
+          "QQQ"
+        ],
+        "threshold": 0.5
+      }
+    ],
+    "K6": [
+      {
+        "horizon": "10s",
+        "id": "imbalance_l1@10s/AAPL",
+        "sign": 1,
+        "signal": "imbalance_l1_v1",
+        "symbols": [
+          "AAPL"
+        ],
+        "threshold": 0.5
+      },
+      {
+        "horizon": "10s",
+        "id": "imbalance_l1@10s/MSFT",
+        "sign": 1,
+        "signal": "imbalance_l1_v1",
+        "symbols": [
+          "MSFT"
+        ],
+        "threshold": 0.5
+      },
+      {
+        "horizon": "10s",
+        "id": "imbalance_l5@10s/AAPL",
+        "sign": 1,
+        "signal": "imbalance_l5_v1",
+        "symbols": [
+          "AAPL"
+        ],
+        "threshold": 0.3
+      },
+      {
+        "horizon": "10s",
+        "id": "imbalance_l5@10s/MSFT",
+        "sign": 1,
+        "signal": "imbalance_l5_v1",
+        "symbols": [
+          "MSFT"
+        ],
+        "threshold": 0.3
+      },
+      {
+        "horizon": "10s",
+        "id": "trade_imbalance_w10s@10s/AAPL",
+        "sign": 1,
+        "signal": "trade_imbalance_w10s_v1",
+        "symbols": [
+          "AAPL"
+        ],
+        "threshold": 0.5
+      },
+      {
+        "horizon": "10s",
+        "id": "trade_imbalance_w10s@10s/MSFT",
+        "sign": 1,
+        "signal": "trade_imbalance_w10s_v1",
+        "symbols": [
+          "MSFT"
+        ],
+        "threshold": 0.5
+      }
+    ]
+  },
+  "x-version": 1
+}
