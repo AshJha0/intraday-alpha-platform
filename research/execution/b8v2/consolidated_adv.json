@@ -1,0 +1,6 @@
+{
+  "_note": "REL-04b: consolidated (all US venues) average daily volume, shares, per symbol, for SIZE LABELS ONLY (cell keys and the decision do not use it). Owner-supplied from a free public source before the prereg is bound; the runner and the bind helper refuse while a value is null. State the source and averaging window in _source.",
+  "_source": null,
+  "AAPL": null,
+  "MSFT": null
+}

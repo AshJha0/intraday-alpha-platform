@@ -497,3 +497,29 @@ statements; any figure derived from the field is reported with them and **never
 as a trading advantage or an order-entry latency**. Nothing consumes the field
 in the simulator yet, and the six overlap days must be re-ingested (after chain
 B) before a measured distribution exists; no value is quoted here.
+
+## B8 v2 (pre-declared, not yet run)
+
+REL-04b re-measures the v1.17.1 B8 oos6 comparison (section 8) with the v1.18
+instrument, on the same split: the router calibration of 2025-11-28, 12-08 and
+12-09 (`research/execution/b8/calibration_train3/`, reused unchanged) and the
+evaluation days 2025-12-10, 2026-05-15 and 2026-05-18, `pin_nasdaq` (baseline)
+against `pin_iex`, `sor` and `sor_sweep` on AAPL and MSFT. What changes is the
+measurement: the primary statistic is the section 9 trading cost per filled
+share, with the completion charge and the fill rate as co-primaries (a route
+that looks cheap because it fills less is not better) and Perold shortfall
+secondary; the contrast is the paired difference of pooled ratios against
+`pin_nasdaq` (`--paired-v2`, per-session sums in the JSON), with a family
+correction over K = 6 (three policies x two symbols) and the MDE beside every
+interval; `impact_model: parent`, per-session ADV, all 16 cells every session,
+consolidated-ADV size labels, and the section 10 fidelity options (hidden
+prints, the IEXG speed bump). Latency is assumption L0 (exchange timestamps,
+no measured order-entry latency): the IEX capture-timestamp re-ingest has not
+run, and a re-run with measured latency is a separate declaration. With G = 3
+sessions and 2 df the family interval uses t = 10.89, so "underpowered" is the
+expected verdict for effects near 1 bps and is said so before the run.
+2025-12-11, 12-12 and 2026-06-12 are a separate supplementary set, never in
+the headline. Declaration: `research/execution/b8v2/PREDECLARATION.md` and
+`predeclaration.json`; runner `research/execution/b8v2/run_b8v2.py` (refuses
+without a signed prereg whose analysis identity matches the checkout, or when
+the runner is the signer); no number is published until the prereg is signed.

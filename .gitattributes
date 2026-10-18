@@ -22,3 +22,6 @@ tests/golden/** -text
 *.tar binary
 *.woff binary
 *.woff2 binary
+
+# Windows batch files of the B8 v2 run must stay CRLF on checkout.
+research/execution/b8v2/*.cmd text eol=crlf
