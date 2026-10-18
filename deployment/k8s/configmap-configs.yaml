@@ -447,6 +447,66 @@ data:
     \   \"qty_units_max\": 20\n  },\n  \"anomalies\": {\n    \"gap_prob\": 0.0006,\n    \"gap_max_events\"\
     : 3,\n    \"dup_prob\": 0.0015,\n    \"ooo_prob\": 0.001,\n    \"invalid_prob\": 0.0005,\n    \"ts_violation_prob\"\
     : 0.0005\n  }\n}\n"
+  monitoring__policy.json: |
+    {
+      "x-version": 1,
+      "policy_id": "rel16-monitoring-v1",
+      "description": "REL-16 feedback and monitoring policy for any signal at paper or live stage (docs/MONITORING_POLICY.md). The state machine in iap.monitoring reads only this file; its sha256 over canonical JSON is stamped on every evaluation and report.",
+      "freshness_s": {
+        "sessions": 129600,
+        "positions": 900,
+        "orders": 300,
+        "heartbeat": 120
+      },
+      "window_sessions": 20,
+      "min_sessions": 10,
+      "data_quality": {
+        "invalid_below_completeness": 0.5,
+        "watch_below_completeness": 0.98
+      },
+      "cusum": {
+        "k": 0.5,
+        "h_watch": 4.0,
+        "h_review": 7.0
+      },
+      "band": {
+        "watch_z": 2.5,
+        "review_z": 3.5,
+        "upside_watch_z": 4.0
+      },
+      "turnover": {
+        "watch_ratio": [0.5, 1.5],
+        "review_ratio": [0.25, 2.5]
+      },
+      "drawdown": {
+        "watch_frac": 0.5,
+        "review_frac": 0.75
+      },
+      "exposure": {
+        "watch_utilisation": 0.9
+      },
+      "fill": {
+        "watch_shortfall": 0.1,
+        "review_shortfall": 0.25
+      },
+      "reconciliation": {
+        "halt_after_evaluations": 2
+      },
+      "persistence": {
+        "WATCH": 2,
+        "REVIEW": 2,
+        "HALT": 1
+      },
+      "clear_after": 3,
+      "unknown_escalate_after": 3,
+      "declared": {
+        "horizon_sessions": 60,
+        "false_alarm_rate_review": 0.05,
+        "planted_decay_sd": 1.0,
+        "max_detection_delay_sessions": 25,
+        "detection_quantile": 0.95
+      }
+    }
   mvp__generator.json: |
     {
       "x-version": 2,

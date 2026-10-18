@@ -206,6 +206,8 @@ spec:
                 path: instruments/instruments.json
               - key: marketdata__generator.json
                 path: marketdata/generator.json
+              - key: monitoring__policy.json
+                path: monitoring/policy.json
               - key: mvp__generator.json
                 path: mvp/generator.json
               - key: mvp__generator_tiny.json
