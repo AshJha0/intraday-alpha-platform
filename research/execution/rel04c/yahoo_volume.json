@@ -1,0 +1,14 @@
+{
+  "_source": null,
+  "_how": "owner fills from Yahoo Finance historical daily data (finance.yahoo.com/quote/<SYM>/history) for the three dates, after the select stage names the 20 symbols; record URL + retrieval date in _source. Yahoo volume is split-adjusted: split_factor[date][symbol] = cumulative split ratio from that date to the retrieval date (AAPL 4 on 2019-10-18 and 1 on the 2021 days; MSFT 1), the job divides by it. Nothing is downloaded by the job.",
+  "split_factor": {
+    "2019-10-18": {},
+    "2021-07-13": {},
+    "2021-08-13": {}
+  },
+  "volume": {
+    "2019-10-18": {},
+    "2021-07-13": {},
+    "2021-08-13": {}
+  }
+}

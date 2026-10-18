@@ -27,3 +27,6 @@ tests/golden/** -text
 tools/run_rel08c_extract.cmd text eol=crlf
 # Windows batch files of the B8 v2 run must stay CRLF on checkout.
 research/execution/b8v2/*.cmd text eol=crlf
+
+# REL-04c: cmd.exe needs CRLF (a LF .cmd mis-parses labels / goto).
+research/execution/rel04c/*.cmd text eol=crlf
