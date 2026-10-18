@@ -1,0 +1,26 @@
+# cargo-fuzz harness for the IAP1 decoder (v1.18 REL-12).  UNVERIFIED: no
+# Rust toolchain on the authoring machine and no CI job runs it yet.  Not a
+# workspace member (cargo-fuzz needs nightly + libFuzzer); run with
+#   cd rust/marketdata && cargo +nightly fuzz run decode_iap1 -- -max_total_time=60
+[package]
+name = "marketdata-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+marketdata = { path = ".." }
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "decode_iap1"
+path = "fuzz_targets/decode_iap1.rs"
+test = false
+doc = false
+bench = false
