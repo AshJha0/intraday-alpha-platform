@@ -8,6 +8,8 @@ that tag.
 
 ## Unreleased
 
+- v1.18 REL-17 enforced limits and kill switch: `iap.risk.portfolio_limits` reads a versioned declarative limit set (`configs/risk/portfolio_limits.json`: gross, net, per-name, sector net and gross, beta, liquidity-adjusted participation, signal concentration and correlation, daily loss, drawdown) and refuses any breaching weight set or order (`LimitRefused`); the kill switch latches until an explicit operator reset and reports through a one-method `HaltSink` hook for REL-16. `iap.portfolio.enforced.solve_enforced` builds the optimizer constraints from the limits and refuses any result that still breaches. The order-level risk engine and its Rust parity goldens are unchanged; `docs/PORTFOLIO_LIMITS.md`.
+
 - v1.18 batch 5 integration fix: the identity-v2 guard (`test_no_prereg_consumer_skips_the_identity_check`) found the new REL-08c, REL-09 and REL-10 runners unregistered; they are registered (each calls `verify_identity`). `iap.auction.rel08c_study.run_study` accepted any signed prereg id when called directly; it now also requires the prereg's bound analysis identity to match the code, configs, lock and interpreter on disk (`environment_mismatches`), closing a library-level bypass of review finding 1.
 
 - v1.18 gitleaks: the existing narrow allowlist for ledger content keys (`"key": "<64 hex>"`, SHA-256 digests of the experiment spec) now also covers `research/v118/LEDGER_INVENTORY.json`, the reviewer-finding-4 inventory copy of those keys. CI scans the whole history of all fetched branches, so the inventory branch had turned every PR's `advisory` check red with generic-api-key false positives.

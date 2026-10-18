@@ -1,0 +1,18 @@
+{
+  "x-version": 1,
+  "limits_version": "portfolio_limits_v1",
+  "description": "Enforced book-level limits (v1.18 REL-17; iap.risk.portfolio_limits). Weights are fractions of capital. Research defaults for a dollar- and beta-neutral intraday book, chosen before any result was computed with them; a paper or live deployment must commit its own version. null = inactive.",
+  "limits": {
+    "gross_max": 2.0,
+    "net_max": 0.05,
+    "name_max": 0.10,
+    "sector_net_max": 0.10,
+    "sector_gross_max": 0.60,
+    "beta_max": 0.10,
+    "participation_max": 0.01,
+    "signal_share_max": 0.60,
+    "signal_corr_max": 0.80,
+    "daily_loss_limit": 0.02,
+    "drawdown_stop": 0.05
+  }
+}
