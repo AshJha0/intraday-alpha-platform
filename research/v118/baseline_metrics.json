@@ -646,7 +646,7 @@
       "source": "research/execution/b8/benchmark_oos3_MSFT.json"
     }
   },
-  "commit": "8a43652c172b081f680ccfa1e3448d5904745ede",
+  "commit": "8fb189b67bd6a2b6a2c868ed378d2a5a92c628f0",
   "ledger": {
     "bonferroni_t_threshold": 4.4466258141863175,
     "chain_ok": true,

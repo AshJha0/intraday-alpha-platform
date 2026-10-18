@@ -80,8 +80,9 @@ def cluster_mean(rows: list[tuple[str, float]]) -> dict:
     for g, v in rows:
         by[g].append(v)
     G = len(by)
-    mean = sum(v for _, v in rows) / n
-    s = sum((sum(vs) - len(vs) * mean) ** 2 for vs in by.values())
+    # math.fsum: exact and identical on every Python version (3.12 changed float sum())
+    mean = math.fsum(v for _, v in rows) / n
+    s = math.fsum((math.fsum(vs) - len(vs) * mean) ** 2 for vs in by.values())
     se = math.sqrt(G / (G - 1) * s) / n if G > 1 else float("nan")
     tc = _T95.get(G - 1, 1.96) if G > 1 else float("nan")
     return {
@@ -92,7 +93,7 @@ def cluster_mean(rows: list[tuple[str, float]]) -> dict:
         "t_crit_95": tc,
         "ci95": [mean - tc * se, mean + tc * se],
         "mde_at_t_crit": tc * se,
-        "per_cluster_mean": {g: sum(vs) / len(vs) for g, vs in sorted(by.items())},
+        "per_cluster_mean": {g: math.fsum(vs) / len(vs) for g, vs in sorted(by.items())},
     }
 
 
