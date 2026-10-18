@@ -237,14 +237,20 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
   </div>
 
   <h2>Measured, not claimed</h2>
+  <p><strong>No latency edge; benchmarks are not colocation numbers.</strong> Every latency or speed
+     figure below was measured in-process on a shared CI runner or a small container with
+     steady_clock and no CPU pinning: no network, NIC, kernel bypass or venue round trip. The signals
+     are <strong>execution inputs, not strategies</strong>: B7 saved no cell the 2 bp minimum, the
+     net-of-cost screen passes 0 of 22, and the v1.16 monetisation study found no taker, capacity,
+     quoting or DeepLOB edge. Real-data and synthetic-data looks are counted separately below.</p>
   <div class="numbers">
     Cross-language parity&nbsp;&nbsp;&nbsp; python 3208&nbsp; · cpp 333&nbsp; · rust 376 tests — 3,917 green, one command; golden groups 217/74/75 (Java archived in v1.15)<br>
     Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in python, cpp and rust (Java archived in v1.15)<br>
-    C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
+    C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 2-CPU container (Intel Xeon 2.10 GHz, no pinning, steady_clock, cache-resident means; not colocation): IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
     Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly; the MVP run twice and replayed from its capture reproduces its trace digest<br>
     Contracts&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 17 JSON Schemas · 22 typed contracts · 18 Protocols; Python risk and execution ports proven by the Rust and C++ goldens (audit + snapshot byte-identical, fills bit-identical)<br>
     Feature factory&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 205 registered, versioned features across 10 families; validity-bitset semantics, no NaN ever valid<br>
-    Alpha research&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 24 flagship alphas · walk-forward + purging/embargo · 5,732-look multiple-testing ledger over 422 distinct configurations as of v1.17.0, every dataset and method revision counted, hash-chained (expected max |t| 4.160, Bonferroni |t| ≥ 4.447; source <code>research/experiments.json</code>)<br>
+    Alpha research&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 24 flagship alphas · walk-forward + purging/embargo · 5,732-look multiple-testing ledger over 422 distinct configurations as of v1.17.0 (real-data looks: 24; synthetic-data looks: 5,694; no dataset: 14; real in-sample looks on multi7 and the holdouts sit in per-dataset ledgers outside git), every dataset and method revision counted, hash-chained (expected max |t| 4.160, Bonferroni |t| ≥ 4.447; source <code>research/experiments.json</code>)<br>
     Promotion lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 7 states · 17 pinned edges · 20 gates; bundled data: 23 alphas at CANDIDATE, 0 beyond (FX11 held in RESEARCH by the time-shift leakage gate) — every candidate fails net P&amp;L after costs and capacity<br>
     MVP golden run&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 15,805 events · 800 decisions · 231 parent orders · 163 fills · P&amp;L −82.84 USD (cost-negative, stated) · digest a7f1ee60…<br>
     Adaptive lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; PSI/KS drift monitors · 88 drift-triggered refits in the study · CUSUM retirement rule · RETIRED halts allocation in the backtest, pages a human live<br>
@@ -256,10 +262,10 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     Quoting&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Avellaneda–Stoikov two-sided quoter with an alpha-skewed reservation price, hard inventory limit, calibrated adverse-selection floor and end-of-session flatten · P&amp;L split into spread, markout, inventory, flatten, rebates, fees · real-data result (v1.16 quoting v2, in-sample, 6 test sessions): no quoting edge, every cell loses $5.0&ndash;6.9k per session, skew with EQ01/EQ05 cuts the loss by $750&ndash;920 per session<br>
     Auctions &amp; execution&nbsp;&nbsp; ITCH NOII decoded in a separate opt-in pass (dataset bytes unchanged) · closing-cross strategy with purged day-aligned walk-forward, pre-registration required · Almgren–Chriss trajectory and efficient frontier, alpha urgency, forecast VWAP curve — all opt-in, pinned schedules unchanged<br>
     Research governance&nbsp;&nbsp;&nbsp; a pre-registration costs one look and records a code + feature + dependency fingerprint · blackboard history checked against git and anchored to the first commit holding each entry · agent writes Ed25519-signed, broker holds public keys only<br>
-    Rust engine (pyo3)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; the 45 native feature slots from Python: ~790,000 events/s in Rust vs ~5,250 through the Python reference, 150x on the golden vectors (CI, ubuntu-24.04) · not a pipeline speed-up: 160 features stay in Python · opt-in <code>--engine rust</code><br>
+    Rust engine (pyo3)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; the 45 native feature slots from Python: ~790,000 events/s in Rust vs ~5,250 through the Python reference, 150x on the golden vectors (CI runner ubuntu-24.04, wall clock; not colocation) · not a pipeline speed-up: 160 features stay in Python · opt-in <code>--engine rust</code><br>
     LLM agent evals&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 4 of 4 mocked in CI (p-hacking, prompt injection, hallucinated citation, task success), each control also shown to fail when removed · live on claude-haiku-5-5 (2026-10-10): 4 of 4, est. $0.0096 — the model behaved, so the live run did not stress the controls<br>
     Polyglot policy&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 18 canonical / 20 frozen copies (24 paths) · 2 retire candidates kept as parity evidence · nothing deleted · a change to a frozen copy needs <code>POLYGLOT-OVERRIDE:</code><br>
-    Tick-to-trade (C++)&nbsp;&nbsp;&nbsp;&nbsp; decoded IAP1 frame → book → features → alpha → order decision, per event, CI runner (AMD EPYC): golden eq_mbo p50 1,279 ns · p99 2,559 ns · p99.9 11,263 ns · max 33,112 ns; generated day p50 1,407 · p99 1,727 · p99.9 12,287 ns · in-process only: no network, no kernel bypass, no C++ risk engine<br>
+    Tick-to-trade (C++)&nbsp;&nbsp;&nbsp;&nbsp; decoded IAP1 frame → book → features → alpha → order decision, per event, shared CI runner (AMD EPYC 7763, no pinning, steady_clock; not colocation): golden eq_mbo p50 1,279 ns · p99 2,559 ns · p99.9 11,263 ns · max 33,112 ns; generated day p50 1,407 · p99 1,727 · p99.9 12,287 ns · in-process only: no network, no kernel bypass, no C++ risk engine<br>
     Deflated Sharpe&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; CPCV paths, PBO, PSR / DSR / minimum track record with N from the ledger's distinct configurations (DSR at raw looks beside it) · paper's worked example reproduced (DSR 0.9004) · opt-in <code>v4</code> bundle, report-only<br>
     Auction study (AUC01)&nbsp;&nbsp; exploratory, in-sample, 7 real sessions: closing cross C-300s 3 trades, 2 of 6 test sessions, session-clustered mean +19.4 bp, 95% CI −254 to +293 bp → no demonstrated edge (underpowered: 21 decisions; below the registered 4 active sessions) · opening O-300s 4 trades, +6.1 bp, 95% CI −9.7 to +21.9 → no demonstrated edge · 2026 holdout not confirmed (0 trades) · maker and quoting forks merged onto main in v1.16 (boards archived unchanged); quoting v2: no edge; taker capacity: 0 of 45 cells; AI4 DeepLOB closed (net −0.69 bp per trade in-sample, holdout not used)
   </div>
@@ -392,7 +398,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     rather than chosen by the author (opt-in <code>v4</code> bundle, report-only; the paper's
     worked example reproduces at DSR 0.9004). A C++ tick-to-trade benchmark times every event from
     a decoded frame to an order decision: p50 1,279 ns and p99 2,559 ns on the golden vector on a
-    CI runner, with the boundary stated (no network, no kernel bypass, no C++ risk engine). Also
+    CI runner (not colocation), with the boundary stated (no network, no kernel bypass, no C++ risk engine). Also
     opt-in and Python-only: 19 extended features with event and volume clocks, a cost-aware
     multi-venue router (capability only: the real data is one Nasdaq book), and a fill-hazard model
     with post-only posting, hazard-driven reprices and markout feedback. Ops: page / ticket /
@@ -703,7 +709,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
          alpha scoring and execution-sim stages, plus demo-scale Rust/Java replay
          throughput. Since v1.12 a tick-to-trade benchmark reports per-event p50 / p99 / p99.9 /
          max latency end to end and per stage (decode 271, book 83, features 735, alpha 135,
-         decision 30 ns at p50 on the golden vector), guarded in CI at 8× the baseline.</p></div>
+         decision 30 ns at p50 on the golden vector, shared CI runner, not colocation), guarded in CI at 8× the baseline.</p></div>
   </div>
 
   <h2>Part of a wider portfolio</h2>

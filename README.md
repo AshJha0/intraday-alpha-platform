@@ -97,8 +97,10 @@ The full list with descriptions is the [Documentation index](#documentation-inde
   assistant on `claude-sonnet-5-5` (E2), a morning ops agent and a docs-sync agent on
   `claude-haiku-5-5` (E3 / E4); the LLM never computes a number, signs, registers or merges
   ([docs/AGENTS.md](docs/AGENTS.md)).
-- **Engineering.** C++ tick-to-trade on a real ITCH slice (AAPL, 2019-01-30): p50 1,535 ns,
-  p99 2,943 ns ([benchmarks/results_tick_to_trade.md](benchmarks/results_tick_to_trade.md));
+- **Engineering.** C++ tick-to-trade on a real ITCH slice (AAPL, 2019-01-30), measured on a
+  shared GitHub-hosted CI runner (AMD EPYC 7763, no pinning, `steady_clock`, in-process; not
+  colocation): p50 1,535 ns, p99 2,943 ns
+  ([benchmarks/results_tick_to_trade.md](benchmarks/results_tick_to_trade.md));
   hand-written C++ ports of the new execution rules with byte-for-byte goldens (F7), the
   dark-first pre-trade controls in Rust (F8), Java retired from the release (F9).
 
@@ -135,6 +137,15 @@ not enough to say much about their size. The Java tree is an archived
 copy frozen at v1.14.0 ([archive/java/](archive/java/README.md)), not a
 production service.
 
+## AI assistance and who checked what
+
+The code, tests, reviews and documents in this repository were produced with Claude (AI)
+assistance. Checks are human or mechanical, never the assistant's own word: the owner merges
+every pull request and signs every pre-registration and continuation rule; CI enforces the
+goldens, parity counts and documentation checks; an outside reviewer is engaged but has **not
+yet** reported (status: pending). What the reviewer is asked to check, and how to reproduce the
+headline results without trusting this text, is in [docs/REVIEW_PACK.md](docs/REVIEW_PACK.md).
+
 ## Architecture in one line
 
 Spec §4, realized end to end in this repository:
@@ -161,18 +172,31 @@ the full design, data flow, and diagrams.
 | Flagship alphas | **24** (EQ01–EQ12, FX01–FX12), each with an enforced `Economic rationale:` docstring | `python/src/iap/alpha/`, `research/alpha_reports/` |
 | Promotion verdicts | **0 PROMOTE / 12 ITERATE / 12 REJECT** (gated on the pooled *uncrossed* IC and its HAC t against the ledger threshold, 4.426 at the run's look count; the v1.14.0 methods: causal row block, automatic day-separated HAC, time-shift leakage; FX11 fails leakage) | `research/alpha_reports/REPORT.md` |
 | Lifecycle registry | **23 alphas at CANDIDATE, 0 beyond** (FX11 held in RESEARCH by the v1.14 time-shift leakage gate) — every candidate fails `net_pnl_after_costs` at 1× costs, its bootstrap bound `net_pnl_bootstrap_ci` and `capacity`; the cross-alpha correlation gate passes vacuously (7 states, 17 pinned edges, 20 gates) | `research/alpha_registry.json`, `research/lifecycle_transitions.jsonl`, `tests/golden/expected_lifecycle.json` |
-| Experiments ledger (as of v1.17.0) | 5,732 recorded looks over **422 distinct configurations** (de-duplicated by alpha × kind × config × dataset × statistics revision; the ledger's `datasets` block: 70 configurations holding 1,068 of the looks on the v1.3.0 dataset kept as history, 314 holding 4,626 on the bundled synthetic one, 24 holding 24 on the real multi7 dataset, 14 holding 14 with no dataset); expected max \|t\| 4.160 under the global null, Bonferroni per-test \|t\| ≥ 4.447; a hash chain since v1.14 | `research/experiments.json` |
+| Experiments ledger (as of v1.17.0) | **real-data looks: 24**; synthetic-data looks: 5,694 (1,068 + 4,626); no dataset: 14; total 5,732 recorded looks over **422 distinct configurations** (de-duplicated by alpha × kind × config × dataset × statistics revision; the ledger's `datasets` block: 70 configurations holding 1,068 of the looks on the v1.3.0 dataset kept as history, 314 holding 4,626 on the bundled synthetic one, 24 holding 24 on the real multi7 dataset, 14 holding 14 with no dataset); expected max \|t\| 4.160 under the global null, Bonferroni per-test \|t\| ≥ 4.447; a hash chain since v1.14. Real-data in-sample looks on multi7 and the holdout datasets are counted in per-dataset ledgers under `data/real` (outside git and outside this count) | `research/experiments.json`, `research/v118/baseline_metrics.json` |
 | Contracts | **17** JSON Schemas (all `x-version` 1 except `risk_event`, 2 since v1.14) mirrored by **22** typed Python contracts and **18** runtime-checkable Protocols; one pinned instance each | `schemas/`, `python/src/iap/contracts/`, `tests/golden/expected_contracts_examples.json` |
 | Python reference ports proven by the ports' own goldens | risk: `expected_risk_decisions.json` exact, audit JSONL + snapshot **byte-identical**; execution: `expected_replay_fills.json` **bit-identical** | `python/tests/test_risk_golden.py`, `python/tests/test_execution_golden.py` |
 | MVP golden run (`python -m iap.mvp run`, seed 12345) | **15,805** events · **800** decisions · **231** parent orders · **163** fills · P&L **−82.84 USD** (cost-negative: +0.0245 bps alpha vs −0.4367 bps execution cost) · trace digest `a7f1ee60…` reproduced by run-twice and replay-from-capture | `tests/golden/expected_mvp.json` |
 | Adaptive deployment study | 4 refit policies × 10 alphas; 88 drift-triggered refits; FX01 retired under every policy; 19 of 40 deployments make no trade, none ends above zero | `research/adaptive_reports/ADAPTIVE_REPORT.md` |
 | Bundled dataset | 2 synthetic sessions, 19 instruments, 308,975 normalized events (`data_version` `116b7787…`; equity flow runs to the close since v1.4.0) | `data/normalized/qc_report.json` |
 | Feature emission | 213,021 vectors at 100 ms cadence | `data/features/features_summary.json` |
-| Rust feature engine from Python (v1.11, CI-measured) | about 5,250 events/s (Python reference, full 205-feature engine) against about 790,000 events/s (Rust, the 45 native slots): **150x** on the golden vectors, 123x on a seeded equity day at 100 ms; not a pipeline speed-up, the other 160 features still run in Python | `API_FEATURES.md` §7.1, `rust-pyo3` CI job summary |
+| Rust feature engine from Python (v1.11, CI runner ubuntu-24.04, wall clock; not colocation) | about 5,250 events/s (Python reference, full 205-feature engine) against about 790,000 events/s (Rust, the 45 native slots): **150x** on the golden vectors, 123x on a seeded equity day at 100 ms; not a pipeline speed-up, the other 160 features still run in Python | `API_FEATURES.md` §7.1, `rust-pyo3` CI job summary |
 | LLM agent behaviour evals (v1.11) | 4 of 4 pass mocked in CI, each control-bearing eval also failing with its control removed; live 2026-10-10 on `claude-haiku-5-5`: 4 of 4, estimated $0.0096 (the model behaved well, so the live run did not stress the controls) | `python -m iap.llm.evals`, GOVERNANCE.md §2b |
-| C++ tick-to-trade (v1.12, CI runner AMD EPYC) | golden `eq_mbo`: p50 **1,279 ns**, p99 **2,559 ns**, p99.9 11,263 ns, max 33,112 ns; generated 100,000-event day: p50 1,407, p99 1,727, p99.9 12,287 ns; stage p50s decode 271, book 83, features 735, alpha 135, decision 30 ns. In-process, decoded frame to order intent: no network, no kernel bypass, no C++ risk engine | `benchmarks/results_tick_to_trade.md`, `benchmarks/RESULTS.md` |
+| C++ tick-to-trade (v1.12, shared CI runner AMD EPYC 7763, no pinning, `steady_clock`; not colocation) | golden `eq_mbo`: p50 **1,279 ns**, p99 **2,559 ns**, p99.9 11,263 ns, max 33,112 ns; generated 100,000-event day: p50 1,407, p99 1,727, p99.9 12,287 ns; stage p50s decode 271, book 83, features 735, alpha 135, decision 30 ns. In-process, decoded frame to order intent: no network, no kernel bypass, no C++ risk engine | `benchmarks/results_tick_to_trade.md`, `benchmarks/RESULTS.md` |
 | Deflated Sharpe (v1.12, opt-in `v4`) | PSR / DSR / minimum track record with N = the ledger's distinct configurations (`dsr_at_looks` at the raw looks beside it); CPCV paths and PBO; the published worked example reproduced, DSR **0.9004** (SR0 0.1132) | `iap.validation.deflated`, `iap.validation.cpcv`, COOKBOOK 56 |
-| C++ hot path | IAP1 decode 184.1 ns/event (CRC-32 verified); book update 26.4 ns; replay 27.2M events/s; one 5.6 KB decision trace serialised in 31.7 µs off the event loop | `benchmarks/results_cpp.md` |
+| C++ hot path (2-CPU container, Intel Xeon 2.10 GHz, no pinning, `steady_clock`, cache-resident mean; not colocation) | IAP1 decode 184.1 ns/event (CRC-32 verified); book update 26.4 ns; replay 27.2M events/s; one 5.6 KB decision trace serialised in 31.7 µs off the event loop | `benchmarks/results_cpp.md` |
+
+**No latency edge; benchmarks are not colocation numbers.** Every latency or speed figure above
+was measured on a shared CI runner or a small container with `steady_clock` and no CPU pinning,
+in-process, with no network, NIC, kernel bypass or venue round trip
+([benchmarks/RESULTS.md](benchmarks/RESULTS.md)). They measure the code's cost, not a competitive
+position; nothing here claims a speed advantage at any venue.
+
+**What the signals are.** The alphas are **execution inputs, not strategies**: B7 found no
+cell where signal-aware execution saved the 2 bp minimum
+([research/preregs/B7_CLOSED_v117.md](research/preregs/B7_CLOSED_v117.md)), the net-of-cost screen
+passes 0 of 22, and the v1.16 monetisation study found no taker, capacity, quoting or DeepLOB edge
+([research/v116/MONETISATION_P0-6.md](research/v116/MONETISATION_P0-6.md)). They are studied as
+inputs to child-order timing and routing, and measured as such.
 
 The honesty is the point (spec §32): of 24 alphas on the bundled synthetic
 data, **none** survives every promotion gate, and none makes money net of
