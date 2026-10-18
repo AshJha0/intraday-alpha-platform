@@ -1,0 +1,142 @@
+{
+  "analysis_identity": {
+    "code_tree_sha256": "e176da9546a80322a7a20810db6bcbee95ee54e30552f9306f1d7a454498bed7",
+    "commit": "ee7d86b58b71901d02c2b3dbec39d3016743a24e",
+    "configs_tree_sha256": "5ef6e7a09954184176dc626a4fddcd93d31c5b13ec60fd9ae5a1088b30870c29",
+    "data_versions": [
+      "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+    ],
+    "deps_lock_sha256": "3a4352e0d19d1a41021264ef8d382472f7c668520c42535e5f45971600a28375",
+    "environment": {
+      "attrs": "26.1.0",
+      "cffi": "2.1.1",
+      "cloudpickle": "3.1.2",
+      "colorama": "0.4.6",
+      "coverage": "7.16.2",
+      "cryptography": "50.0.2",
+      "databento-dbn": "0.71.0",
+      "execnet": "2.1.2",
+      "hypothesis": "absent",
+      "iniconfig": "2.3.1",
+      "joblib": "1.6.0",
+      "jsonschema": "4.26.0",
+      "jsonschema-specifications": "2025.9.1",
+      "narwhals": "2.26.0",
+      "numpy": "2.4.6",
+      "packaging": "26.3",
+      "pandas": "3.0.6",
+      "pluggy": "1.6.0",
+      "pyarrow": "25.0.1",
+      "pycparser": "3.0",
+      "pygments": "2.21.0",
+      "pytest": "9.1.1",
+      "pytest-cov": "7.1.0",
+      "pytest-xdist": "3.8.0",
+      "python-dateutil": "2.9.0.post0",
+      "pyyaml": "6.0.3",
+      "referencing": "0.37.0",
+      "rpds-py": "2026.9.1",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.17.1",
+      "six": "1.17.0",
+      "sortedcontainers": "absent",
+      "threadpoolctl": "3.7.0",
+      "typing-extensions": "4.16.0",
+      "tzdata": "2026.5"
+    },
+    "family": "REL-06 known-null: K16 (K=16), K3 (K=3), K6 (K=6); hypotheses sha256 6c280093f5d3b7c319100faa284881d8c094c3d6c264895dfe0ff21abba691b5",
+    "identity_version": 2,
+    "inputs": {},
+    "interpreter": "cpython-3.12.10",
+    "metrics": [
+      "cr1_se_student_t",
+      "false_confirmation_rate_family",
+      "false_confirmation_rate_per_hypothesis",
+      "net_bps_per_round_trip_session_mean",
+      "wild_cluster_webb_full_enumeration_p",
+      "wilson95"
+    ],
+    "reference_tree_sha256": "9020e008efdb1ac41015cea4c31f8b9e4cb65a1324db0a42224cb2a22f18fa88",
+    "scripts": {
+      "python/src/iap/research/known_null.py": "510902c3bd05a87b91ef948172da528921cd24f94dc05c8e3e58bc509d7737c0",
+      "research/v118/known_null_v2_config.json": "44adf8231f1a5345e89e6f67c868b3feaf80c75bc1c5858e89055923681c32d1",
+      "tools/rel06_known_null.py": "148b21605ed562fd4b8613e5b2201f6f90f47f266b1ee73c76b10f906c35f4ad"
+    },
+    "thresholds": {
+      "alpha": 0.05,
+      "base_seeds": {
+        "A": 20261101,
+        "B": 20261102
+      },
+      "compute_budget_hours": 12.0,
+      "configuration": {
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "flatten_at_session_end": true,
+        "latency_ns": 1000000000,
+        "max_decision_age_ns": 60000000000,
+        "methods": "v2",
+        "n_folds": 4
+      },
+      "execution": {
+        "adv_table": "session",
+        "impact_exponent": 1.0,
+        "impact_model": "parent",
+        "regulatory_fees": true,
+        "venue_id": 101
+      },
+      "n_trials": 1000,
+      "pass_rule": {
+        "flag_upper_below": 0.02,
+        "max_point": 0.05,
+        "max_upper": 0.07
+      },
+      "power_arm": {
+        "common_random_numbers": "each trial's null labels are evaluated at every delta",
+        "delta_bps_per_trip": [
+          0.5,
+          1.0,
+          2.0,
+          4.0
+        ],
+        "generators": {
+          "A": {
+            "base_seed": 20261103
+          },
+          "B": {
+            "base_seed": 20261104
+          }
+        },
+        "n_trials": 200,
+        "pass_rule": null,
+        "planted": "first hypothesis of each registered family"
+      },
+      "registered_size_shares": 100,
+      "statistics": {
+        "also_must_pass": [
+          "gross"
+        ],
+        "primary": "net_recentred",
+        "v1": "net"
+      }
+    }
+  },
+  "bound_utc": "2026-10-18T17:57:40+00:00",
+  "kind": "analysis_prereg",
+  "prereg_id": "research/v118/null_protocol_v2_prereg.json",
+  "protocol": "research/v118/NULL_PROTOCOL_v2.md",
+  "protocol_sha256": "3fd0954b61ce8f8707f185195088f0314c814ea3c175c52dbee05000f753a561",
+  "signature": {
+    "maintainer": "ashjha0",
+    "message": "iap.agents.blackboard.canonical(this document without 'signature')",
+    "message_sha256": "ce0066d8672de304677a99baee8697c6871c6c7590035f10386d6952992a0c1d",
+    "public_key": "02a3e278cda3efac7dcd266fb8a3821a1415f0725a73f8b255aac84083c2106c",
+    "scheme": "ed25519",
+    "sig": "741e9d72e714cd62b492759014d17a6a6b28811043b0edeee8c502ffed16d625152dd6da7be03cd33edcebd3dcf315cd09079399f36a80e11153ede661e23c09",
+    "trust_root": "research/agents/trust_roots.json"
+  },
+  "signed": true,
+  "signed_utc": "2026-10-18T17:57:40+00:00",
+  "status": "SIGNED: the analysis identity is bound; edits void the signature",
+  "x-version": 1
+}
