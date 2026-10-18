@@ -1270,7 +1270,7 @@ places below.
   backtest/features since v1.16, item 16, plus agents/llm/mvp/paper since
   v1.17, F3; 0 errors on both). `reproducible-build` (v1.17, F1) builds the
   wheel twice under a fixed SOURCE_DATE_EPOCH and fails on a sha256
-  mismatch; `python-slow` enforces the coverage floor (`--cov-fail-under`).
+  mismatch; the `coverage` job enforces the whole-suite coverage floor (fast + slow data combined, v1.18).
   The required checks are listed in GOVERNANCE.md §0.
 - **Dependencies.** Python installs come from hashed lock files
   (`requirements-ci.txt`, `requirements-image.txt`) with

@@ -7630,8 +7630,9 @@ owner must add it to the ruleset (`docs/governance/GOVERNANCE.md`, section 0).
 perfect score today?
 
 **The idea.** A ratchet fixes a floor at the measured level and only moves it
-with evidence. The `python-slow` coverage floor is `--cov-fail-under=54`
-(`.github/workflows/ci.yml`). It began at 55 when measured at 55.90 % on the
+with evidence. The whole-suite coverage floor is 92 % (the `coverage` job of
+`.github/workflows/ci.yml`, v1.18 REL-13, measured 92.64 %); before v1.18 it was a
+slow-files-only floor of `--cov-fail-under=54`. It began at 55 when measured at 55.90 % on the
 wave-2 integration PR, then moved to 54 when main measured 54.76 % after
 later merges: the changelog records both measurements and the reason, that
 the 55.90 % predated modules only the fast job covers. A floor taken from a
