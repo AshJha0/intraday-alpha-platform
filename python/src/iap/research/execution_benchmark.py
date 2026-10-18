@@ -706,7 +706,7 @@ def _paired_summary(base: list[dict], other: list[dict], seed: int) -> dict[str,
     }
 
 
-def check_data_access(data_dir: Path, *, allow_holdout: bool = False) -> None:
+def check_data_access(data_dir: Path, *, allow_holdout: bool | str = False) -> None:
     """The single entry-point data-access check of the benchmark: delegates to the
     REL-02 hash-locked holdout registry (``iap.research.holdout_registry``), which
     replaced the v1.17 path-substring rule. A legacy ``allow_holdout`` bool
@@ -738,7 +738,7 @@ def run_benchmark(
     adv_table: Path | bool | None = None,
     baseline_policy: str = "native",
     max_events: int = 0,
-    allow_holdout: bool = False,
+    allow_holdout: bool | str = False,
     timestamp: bool = True,
     signal: str = "none",
     signal_features: Path | None = None,
@@ -783,6 +783,8 @@ def run_benchmark(
     md_delay_ns: int = 0,
     venue_inbound_delay_ns: dict[str, int] | None = None,
     child_exec: ChildExecParams | None = None,
+    paired_v2: bool = False,
+    family_k: int = 1,
 ) -> dict[str, object]:
     """Run the grid; returns the JSON document (see the module docstring).
 
@@ -1469,6 +1471,16 @@ def run_benchmark(
                         paired[f"{pol}-{control}|{algo}|{pct:g}"] = _paired_summary(
                             base, other, seed
                         )
+    # v1.18 REL-04b (opt-in): paired v2 ratio differences vs the baseline over
+    # every cell, with the per-session sums and a family-adjusted interval
+    paired_v2_doc: dict[str, object] = {}
+    if paired_v2:
+        for pol in policies:
+            if pol == baseline_policy or not rows[pol] or "m_fill_cost" not in rows[pol][0]:
+                continue
+            paired_v2_doc[f"{pol}-{baseline_policy}"] = exm.paired_v2(
+                rows[baseline_policy], rows[pol], family_k=family_k
+            )
     # v1.18 REL-03: coverage (n per day and cell) and the slices of the v2 metrics
     expected_cells = [
         f"{pol}|{algo}|{pct:g}" for pol in policies for algo in algos for pct in sizes_pct
@@ -1603,6 +1615,8 @@ def run_benchmark(
         if sweep_unsent:
             # v1.17.1 sor_sweep: child qty beyond both books' displayed depth (not sent)
             doc["two_venue"]["sweep_unsent_qty"] = dict(sorted(sweep_unsent.items()))
+    if paired_v2:
+        doc["paired_v2_vs_baseline"] = paired_v2_doc
     if timestamp:
         doc["generated"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     return doc
@@ -2147,6 +2161,12 @@ def main(argv: list[str] | None = None) -> int:
         "consolidated ADV",
     )
     ap.add_argument("--no-timestamp", action="store_true")
+    ap.add_argument(
+        "--paired-v2",
+        action="store_true",
+        help="REL-04b: paired v2 ratio differences vs --baseline-policy over all cells",
+    )
+    ap.add_argument("--family-k", type=int, default=1, help="REL-04b: Bonferroni family size")
     ap.add_argument("--write-prereg-draft", action="store_true")
     sg = ap.add_argument_group("signal-aware arms (v1.17 B2 / B3)")
     sg.add_argument(
@@ -2332,6 +2352,8 @@ def main(argv: list[str] | None = None) -> int:
             max_reposts=args.child_max_reposts,
             deadline_ns=int(args.child_peg_deadline_s * SEC),
         ),
+        paired_v2=args.paired_v2,
+        family_k=args.family_k,
     )
     tag = args.tag or Path(args.data_dir).name
     args.out.mkdir(parents=True, exist_ok=True)
