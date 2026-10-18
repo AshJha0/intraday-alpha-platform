@@ -21,6 +21,12 @@ research/models/*/model.pkl
 /cpp/build/
 /rust/target/
 /rust/features_py/target/
+/rust/marketdata/fuzz/target/
+/rust/marketdata/fuzz/corpus/
+/rust/marketdata/fuzz/artifacts/
+/rust/marketdata/fuzz/Cargo.lock
+/python/.hypothesis/
+/.hypothesis/
 /archive/java/out/
 
 # --- python

@@ -569,13 +569,22 @@ def _dec_l(buf: bytes, start: int) -> MarketParticipantPosition:
 
 def _dec_a(buf: bytes, start: int) -> AddOrder:
     loc, _, hi, lo, ref, side, shares, stock, price = _A.unpack_from(buf, start)
-    return AddOrder(loc, (hi << 32) | lo, ref, side.decode("ascii"), shares, _txt(stock), price, "")
+    return AddOrder(
+        loc, (hi << 32) | lo, ref, side.decode("ascii", "replace"), shares, _txt(stock), price, ""
+    )
 
 
 def _dec_f(buf: bytes, start: int) -> AddOrder:
     loc, _, hi, lo, ref, side, shares, stock, price, mpid = _F.unpack_from(buf, start)
     return AddOrder(
-        loc, (hi << 32) | lo, ref, side.decode("ascii"), shares, _txt(stock), price, _txt(mpid)
+        loc,
+        (hi << 32) | lo,
+        ref,
+        side.decode("ascii", "replace"),
+        shares,
+        _txt(stock),
+        price,
+        _txt(mpid),
     )
 
 
