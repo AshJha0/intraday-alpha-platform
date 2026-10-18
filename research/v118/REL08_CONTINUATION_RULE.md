@@ -1,9 +1,11 @@
-# REL-08 continuation rule (v1.18, programme section 9.5): DRAFT for the owner
+# REL-08 continuation rule (v1.18, programme section 9.5)
 
-**Status: draft. Not signed, not registered, no REL-08 result exists or has been examined.** The owner reviews,
-sets the open parameters in section 9 and signs (Ed25519, trust-root maintainer key, a machine that does not run
-the screen) before the first REL-08 result is examined. The signed file's sha256 is bound in the REL-08
-`analysis_identity` block (REL-02a). Any edit after a result is examined voids it.
+**Status: parameters SET 2026-10-18 by Claude under the owner's written delegation (owner, in chat:
+"think what is best and then set parameters and sign on my behalf"). NOT YET SIGNED: a signature must
+bind the analysis scripts and commit (REL-02a), and those scripts do not exist yet. It is signed, by the same
+delegation, as soon as they do and before any trial or result is examined. The outside reviewer's written
+approval (gate F3, programme section 9.3) remains the independent check and is required before the method
+becomes mandatory.** Edits after the first trial or result is examined void the signature.
 
 The rule is quantitative and immutable. REL-08 is a hypothesis screen on one session; it cannot promote and its
 output is labelled "hypothesis screen, one session, no edge claim".
@@ -99,22 +101,42 @@ any single number outside this table.
 
 ## 8. What this document does not do
 
-It signs and registers nothing and reads no data. The thresholds are proposals sized from this repository's
+It registers nothing and reads no data; its signature, when made, binds the screen scripts. The thresholds are proposals sized from this repository's
 numbers (78 rebalances a day, shortfall of about 0.6 to 5 bps in the B8 comparison, the `book_multi7`
-configuration); the owner may change any of them before signing, and not after.
+configuration); they were set under the owner's delegation on 2026-10-18 and may not change after a result is examined.
 
-## 9. Open parameters for the owner
+## 9. Parameters (set 2026-10-18, owner-delegated)
 
-| # | parameter | proposed |
-|---|---|---|
-| 9.1 | K, the registered variant count (and the variant list) | the REL-08 list, fixed before signing (about 12 to 16) |
-| 9.2 | maximum variants that continue | 3 |
-| 9.3 | net threshold C3 | +1.0 bps per rebalance |
-| 9.4 | MDE ceiling C2 | 2.0 bps |
-| 9.5 | usable-rebalance floor | 50 (5 m), 20 (15 m), 10 (30 m); 60 of 100 names per rebalance |
-| 9.6 | robustness retention C5 to C7 | 50 % of baseline net |
-| 9.7 | conservative-cost multipliers | 1.5 x half-spread plus fee, 2 x impact |
-| 9.8 | influential names removed (C6) | 5 |
-| 9.9 | rank IC floor C8 | 0.02 |
-| 9.10 | bootstrap | moving block, 30-minute blocks, 9,999 draws |
-| 9.11 | notional | USD 1,000,000 (must equal the book configuration used) |
+**The registered variant list (K = 11).** Robustness (conservative costs, influential names, alternative
+normalisation) is applied as criteria C5 to C7 to every variant, not as extra variants, so it does not inflate K.
+
+| # | score | horizon / rebalance | book |
+|---|---|---|---|
+| V1 | VWAP deviation (EQ08-style, reversion sign) | 15 m | market-neutral |
+| V2 | VWAP deviation | 15 m | sector-neutral |
+| V3 | VWAP deviation | 30 m | market-neutral |
+| V4 | VWAP deviation | 30 m | sector-neutral |
+| V5 | ETF-residual reversion (EQ09-style) | 15 m | market-neutral |
+| V6 | ETF-residual reversion | 15 m | sector-neutral |
+| V7 | ETF-residual reversion | 30 m | market-neutral |
+| V8 | ETF-residual reversion | 30 m | sector-neutral |
+| V9 | ETF catch-up (constituent minus beta x reference return, catch-up sign) | 1 m | market-neutral |
+| V10 | ETF catch-up | 3 m | market-neutral |
+| V11 | ETF catch-up | 5 m | market-neutral |
+
+The reference ETF is the REL-07 `xasset_v2` map (QQQ for Nasdaq-100 names, SPY otherwise, as of 2019-01-30);
+the sector-neutral books use that map's sector field. Bonferroni level for every lower bound: 1 - 0.05/11.
+
+| # | parameter | set to | why |
+|---|---|---|---|
+| 9.1 | K and the variant list | K = 11, the table above | every variant is one ledger look recorded before its result |
+| 9.2 | maximum variants that continue | 3 | bounds REL-08b machine time and the family carried forward |
+| 9.3 | net threshold C3 | +1.0 bps per rebalance | below that, a one-day screen cannot distinguish an edge from cost-model error |
+| 9.4 | MDE ceiling C2 | 2.0 bps | if one day cannot detect 2 bps the honest verdict is underpowered, not stop |
+| 9.5 | usable-rebalance floor | 50 (5 m), 20 (15 m), 10 (30 m); 60 of 100 names per rebalance | as proposed; sized from 78 / 26 / 13 rebalances in a session |
+| 9.6 | robustness retention C5 to C7 | 50 % of baseline net | an effect that halves under mild perturbation is fragile |
+| 9.7 | conservative-cost multipliers | 1.5 x half-spread plus fee, 2 x impact | impact is the least validated component, so it gets the larger stress |
+| 9.8 | influential names removed (C6) | 5 | 5 % of the universe |
+| 9.9 | rank IC floor C8 | 0.02 | about the IC the EQ08/EQ09 decay curves reached at 5 to 15 min on multi7 |
+| 9.10 | bootstrap | moving block, 30-minute blocks, 9,999 draws, seed 20261020 | seed fixed before any result |
+| 9.11 | notional | USD 1,000,000 | equals the `book_multi7` configuration |
