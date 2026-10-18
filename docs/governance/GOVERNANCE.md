@@ -16,17 +16,17 @@ active ruleset, `protect-main` (id 24455225), targets the default branch with
   code-owner review (the repository has one maintainer, and GitHub does not
   let an author approve their own pull request);
 - `required_status_checks`, **strict** (a branch must be up to date with
-  `main` before merging), 16 checks: `python`, `integration`, `cpp`, `rust`,
-  `golden`, `deployment`, `CodeQL`, `governance`, `advisory`, `rust-pyo3`,
-  `python-slow`, `supply-chain`, `analyze (rust)` (the CodeQL matrix entry),
-  `python-312`, `cpp-sanitizers` and `agent-evals` (the last three since
-  2026-10-15, owner item 0.8; `java` is not required: the Java tree was
-  archived in v1.15);
+  `main` before merging), 17 checks (live ruleset read back 2026-10-18 after the owner-approved
+  edit): `python`, `integration`, `cpp`, `rust`, `golden`, `deployment`, `CodeQL`, `governance`,
+  `advisory`, `rust-pyo3`, `python-slow`, `supply-chain`, `analyze (rust)` (the CodeQL matrix
+  entry), `python-312`, `agent-evals`, `docs` and `reproducible-build`. `cpp-sanitizers` stopped
+  being required on 2026-10-18 (D5(a), C++ parity-only; the job still runs and is reported);
+  `java` is not required (archived in v1.15);
 - `non_fast_forward` (no force-push) and `deletion` (no branch deletion).
 
-Not required (2026-10-16): `docs` (v1.17 E4: the documentation checks),
-`reproducible-build` (v1.17 F1: the wheel built twice must match; the python
-image is report-only) and `images`. The lychee link check is an advisory step
+Not required (2026-10-18): `cpp-sanitizers` (D5(a)), `coverage` (v1.18 REL-13; to be required
+by the owner once it has a run history) and `images`. `reproducible-build` (v1.17 F1: the wheel
+built twice must match; the python image is report-only) and `docs` became required on 2026-10-18. The lychee link check is an advisory step
 (`continue-on-error`), so a dead link annotates the run and does not block a
 merge. No required check was renamed in v1.17: `python` still carries the
 blocking mypy step, whose scope grew to `agents`, `llm`, `mvp` and `paper` (F3).
@@ -42,15 +42,15 @@ advisory.
 
 1. require 1 approving review (and code-owner review) as soon as a second
    maintainer exists;
-2. consider adding `docs` and `reproducible-build` as required checks once green on main;
+2. (done 2026-10-18) `docs` and `reproducible-build` are required checks;
 3. restrict merge methods to merge commits for research branches, or at
    least never rebase them (section 2c).
 
 | Control | Status (2026-10-16) | Enforced by |
 |---|---|---|
-| CI green on every push and pull request (python, cpp and rust, golden gate, deployment validation; Java archived in v1.15) | **Enforced as a merge gate for the sixteen required checks** | `protect-main` ruleset; other jobs run but do not block |
+| CI green on every push and pull request (python, cpp and rust, golden gate, deployment validation; Java archived in v1.15) | **Enforced as a merge gate for the seventeen required checks** | `protect-main` ruleset; other jobs run but do not block |
 | Pull requests only, no direct push to `main` | **Enforced** | `protect-main` (`pull_request` rule, no bypass actors) |
-| Required status checks before merge | **Enforced, strict**: python, integration, cpp, rust, golden, deployment, CodeQL, governance, advisory, rust-pyo3, python-slow, supply-chain, analyze (rust), python-312, cpp-sanitizers, agent-evals | `protect-main` |
+| Required status checks before merge | **Enforced, strict**: python, integration, cpp, rust, golden, deployment, CodeQL, governance, advisory, rust-pyo3, python-slow, supply-chain, analyze (rust), python-312, agent-evals, docs, reproducible-build | `protect-main` |
 | "1 to 2 reviewers" by change class (section 1) | **Not enforced: the ruleset requires 0 approvals**; not satisfiable by one maintainer | Needs a second maintainer; GitHub does not let an author approve their own pull request |
 | Reviewer ownership by path | Enforced as a file, applied only once the ruleset requires code-owner review | `CODEOWNERS` (every path owned by `@AshJha0`) |
 | Force-push and branch-deletion protection | **Enforced** | `protect-main` (`non_fast_forward`, `deletion`) |
