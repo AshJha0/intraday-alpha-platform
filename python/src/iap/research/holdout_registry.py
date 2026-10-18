@@ -400,6 +400,9 @@ _R7_DAYS = [
     "2026-06-12",
 ]  # fmt: skip
 _V18_DAYS = ["2026-05-15", "2026-05-18"]
+#: v1.18 REL-04b: the B8 v2 headline replays its three evaluation days
+_B8V2 = "research/preregs/b8v2_prereg.json"
+_B8V2_DAYS = ["2025-12-10", "2026-05-15", "2026-05-18"]
 _THREE = ["AAPL", "MSFT", "QQQ"]
 
 
@@ -414,7 +417,8 @@ def seed_sessions() -> dict[str, list[dict[str, Any]]]:
                 "symbols": _THREE,
                 "state": "spent",
                 "spent_by": list(_R7_IDS)
-                + ["research/r7/r7_confirm_prereg.json", "b8-oos-2026-10-16"],
+                + ["research/r7/r7_confirm_prereg.json", "b8-oos-2026-10-16"]
+                + ([_B8V2] if d in _B8V2_DAYS else []),
             },
             unread,
         ]
@@ -423,7 +427,8 @@ def seed_sessions() -> dict[str, list[dict[str, Any]]]:
             {
                 "symbols": _THREE,
                 "state": "spent",
-                "spent_by": ["v1.8.0-holdout", "auc01", "b8-oos-2026-10-16"],
+                "spent_by": ["v1.8.0-holdout", "auc01", "b8-oos-2026-10-16"]
+                + ([_B8V2] if d in _B8V2_DAYS else []),
             },
             unread,
         ]

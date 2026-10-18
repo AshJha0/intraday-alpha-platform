@@ -358,6 +358,119 @@ def split_by(rows: Sequence[Mapping[str, object]], key: str) -> dict[str, dict[s
     return out
 
 
+#: (metric, numerator key, denominator key) of the paired v2 comparison; the
+#: numerators are currency, the denominators notional (or shares for fill rate)
+PAIRED_V2_METRICS = (
+    ("trading_cost_per_filled_share_bps", "m_trading_cost", "m_filled_notional"),
+    ("cost_per_filled_share_bps", "m_fill_cost", "m_filled_notional"),
+    ("completion_charge_bps", "completion", "m_residual_notional"),
+    ("shortfall_per_target_share_bps", "shortfall", "m_target_notional"),
+    ("fill_rate", "filled_qty", "qty"),
+)
+
+
+def ratio_diff_stats(
+    a: Sequence[Mapping[str, object]],
+    b: Sequence[Mapping[str, object]],
+    num_key: str,
+    den_key: str,
+    *,
+    scale: float = 1.0,
+    family_k: int = 1,
+) -> dict[str, object]:
+    """``R_a - R_b`` of two pooled ratios on the SAME clusters (v1.18 REL-04b).
+
+    ``R = sum(num) / sum(den)`` per arm.  The CR1 cluster-linearised variance of
+    the difference uses, per cluster ``g``, ``e_g = (N_ag - R_a D_ag) / D_a -
+    (N_bg - R_b D_bg) / D_b``: ``G / (G - 1) * sum_g e_g^2``.  Student-t at
+    ``G - 1`` df; ``ci95`` and ``ci_family`` (two-sided ``1 - 0.05 / family_k``,
+    Bonferroni over the declared family) and the MDE beside them.  The
+    per-cluster sums are returned so the statistic can be recomputed exactly.
+    """
+    labels = sorted({str(r["session"]) for r in a} | {str(r["session"]) for r in b})
+    sums = {g: {"num_a": 0.0, "den_a": 0.0, "num_b": 0.0, "den_b": 0.0} for g in labels}
+    for arm, rows in (("a", a), ("b", b)):
+        for r in rows:
+            s = sums[str(r["session"])]
+            s[f"num_{arm}"] += float(r[num_key])  # type: ignore[arg-type]
+            s[f"den_{arm}"] += float(r[den_key])  # type: ignore[arg-type]
+    g = len(labels)
+    out: dict[str, object] = {
+        "n_a": len(a),
+        "n_b": len(b),
+        "n_clusters": g,
+        "family_k": family_k,
+        "estimate": None,
+        "estimate_a": None,
+        "estimate_b": None,
+        "se": None,
+        "df": None,
+        "ci95": None,
+        "ci_family": None,
+        "family_level": 1.0 - 0.05 / family_k,
+        "mde_t": None,
+        "mde_t_family": None,
+        "cluster_sums": sums,
+    }
+    da = sum(s["den_a"] for s in sums.values())
+    db = sum(s["den_b"] for s in sums.values())
+    if da <= 0.0 or db <= 0.0:
+        return out
+    ra = sum(s["num_a"] for s in sums.values()) / da
+    rb = sum(s["num_b"] for s in sums.values()) / db
+    out.update(estimate=scale * (ra - rb), estimate_a=scale * ra, estimate_b=scale * rb)
+    if g < MIN_CLUSTERS_FOR_INTERVAL:
+        return out
+    e = [
+        (s["num_a"] - ra * s["den_a"]) / da - (s["num_b"] - rb * s["den_b"]) / db
+        for s in sums.values()
+    ]
+    se = scale * math.sqrt(g / (g - 1) * sum(x * x for x in e))
+    est = scale * (ra - rb)
+    t95 = _t_crit(g - 1, 0.975)
+    tfam = _t_crit(g - 1, 1.0 - 0.025 / family_k)
+    tpow = _t_crit(g - 1, POWER)
+    out.update(
+        se=se,
+        df=g - 1,
+        ci95=[est - t95 * se, est + t95 * se],
+        ci_family=[est - tfam * se, est + tfam * se],
+        mde_t=(t95 + tpow) * se,
+        mde_t_family=(tfam + tpow) * se,
+    )
+    return out
+
+
+def paired_v2(
+    base: Sequence[Mapping[str, object]],
+    other: Sequence[Mapping[str, object]],
+    *,
+    family_k: int = 1,
+) -> dict[str, object]:
+    """``other - base`` for every :data:`PAIRED_V2_METRICS` entry on the parents
+    both arms ran (same session, symbol, window, algo and size)."""
+
+    def key(r: Mapping[str, object]) -> tuple:
+        return (r["session"], r["symbol"], r["window"], r["algo"], r["size_pct_adv"])
+
+    kb = {key(r) for r in base}
+    ko = {key(r) for r in other}
+    both = kb & ko
+    a = [r for r in other if key(r) in both]
+    b = [r for r in base if key(r) in both]
+    out: dict[str, object] = {
+        "n_pairs": len(both),
+        "unpaired": {"base": len(kb - ko), "other": len(ko - kb)},
+        "sign": "other - base; positive = the policy is worse, except fill_rate "
+        "(positive = the policy fills more)",
+    }
+    for name, num, den in PAIRED_V2_METRICS:
+        out[name] = ratio_diff_stats(
+            a, b, num, den, scale=1.0 if name == "fill_rate" else 1e4, family_k=family_k
+        )
+    return out
+
+
 def definitions_markdown() -> str:
     """The metric-definition table (for the report and docs)."""
     head = (
