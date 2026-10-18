@@ -8,6 +8,8 @@ that tag.
 
 ## Unreleased
 
+- v1.18 REL-17 capacity curves: `iap.portfolio.capacity` reports net bps and net USD versus notional and participation under the REL-03/04 square-root impact rule, with a band from the study's sampling error and the 0.5/1/1.5 impact scales, plus breakeven and USD-maximising sizes. `iap.research.scorecard_capacity` (also a CLI) appends a `Capacity (REL-17)` section to every REL-08/08c/09/10 scorecard, labelled not applicable when a study has no positive candidate. It reads raw study output, so the study modules bound into signed pre-registrations are unchanged.
+
 - v1.18 batch 5 integration fix: the identity-v2 guard (`test_no_prereg_consumer_skips_the_identity_check`) found the new REL-08c, REL-09 and REL-10 runners unregistered; they are registered (each calls `verify_identity`). `iap.auction.rel08c_study.run_study` accepted any signed prereg id when called directly; it now also requires the prereg's bound analysis identity to match the code, configs, lock and interpreter on disk (`environment_mismatches`), closing a library-level bypass of review finding 1.
 
 - v1.18 gitleaks: the existing narrow allowlist for ledger content keys (`"key": "<64 hex>"`, SHA-256 digests of the experiment spec) now also covers `research/v118/LEDGER_INVENTORY.json`, the reviewer-finding-4 inventory copy of those keys. CI scans the whole history of all fetched branches, so the inventory branch had turned every PR's `advisory` check red with generic-api-key false positives.
