@@ -1,0 +1,73 @@
+{"kind": "mem", "orders": 0, "rss_mb": 87.51, "seq": 10, "t_s": 0.0}
+{"kind": "mem", "orders": 1115, "rss_mb": 93.57, "seq": 44720, "t_s": 60.0}
+{"kind": "mem", "orders": 2330, "rss_mb": 101.39, "seq": 93620, "t_s": 120.0}
+{"kind": "mem", "orders": 3503, "rss_mb": 108.49, "seq": 140730, "t_s": 180.0}
+{"kind": "mem", "orders": 4525, "rss_mb": 113.78, "seq": 181810, "t_s": 240.0}
+{"exceptions": {}, "journal_bytes": 4503524, "kind": "session", "orders": 5521, "positions": {"0": -14399}, "recon_ok": true, "residual_orders": 0, "session": 0, "venue_orders": 5521}
+{"kind": "mem", "orders": 5521, "rss_mb": 112.21, "seq": 221900, "t_s": 300.1}
+{"kind": "mem", "orders": 6596, "rss_mb": 113.0, "seq": 265340, "t_s": 360.1}
+{"kind": "mem", "orders": 7759, "rss_mb": 113.61, "seq": 312060, "t_s": 420.1}
+{"kind": "mem", "orders": 8831, "rss_mb": 112.48, "seq": 355420, "t_s": 480.1}
+{"kind": "mem", "orders": 9846, "rss_mb": 112.54, "seq": 396370, "t_s": 540.1}
+{"exceptions": {}, "journal_bytes": 4271847, "kind": "session", "orders": 5322, "positions": {"0": -16486}, "recon_ok": true, "residual_orders": 0, "session": 1, "venue_orders": 5322}
+{"kind": "mem", "orders": 10844, "rss_mb": 111.7, "seq": 436360, "t_s": 600.1}
+{"kind": "mem", "orders": 12094, "rss_mb": 113.8, "seq": 486580, "t_s": 660.1}
+{"kind": "mem", "orders": 13226, "rss_mb": 113.73, "seq": 532550, "t_s": 720.1}
+{"kind": "mem", "orders": 14368, "rss_mb": 112.59, "seq": 578620, "t_s": 780.1}
+{"kind": "mem", "orders": 15456, "rss_mb": 115.85, "seq": 622400, "t_s": 840.1}
+{"exceptions": {}, "journal_bytes": 4562290, "kind": "session", "orders": 5593, "positions": {"0": -23797}, "recon_ok": true, "residual_orders": 0, "session": 2, "venue_orders": 5593}
+{"kind": "mem", "orders": 16436, "rss_mb": 114.45, "seq": 662110, "t_s": 900.2}
+{"kind": "mem", "orders": 17719, "rss_mb": 115.67, "seq": 713950, "t_s": 960.2}
+{"kind": "mem", "orders": 18950, "rss_mb": 116.46, "seq": 763420, "t_s": 1020.2}
+{"kind": "mem", "orders": 20038, "rss_mb": 116.04, "seq": 807200, "t_s": 1080.2}
+{"kind": "mem", "orders": 20998, "rss_mb": 116.03, "seq": 845920, "t_s": 1140.2}
+{"exceptions": {}, "journal_bytes": 4472572, "kind": "session", "orders": 5517, "positions": {"0": -35464}, "recon_ok": true, "residual_orders": 0, "session": 3, "venue_orders": 5517}
+{"kind": "mem", "orders": 21954, "rss_mb": 114.86, "seq": 884560, "t_s": 1200.3}
+{"kind": "mem", "orders": 23245, "rss_mb": 115.11, "seq": 936320, "t_s": 1260.3}
+{"kind": "mem", "orders": 24465, "rss_mb": 116.51, "seq": 985580, "t_s": 1320.3}
+{"kind": "mem", "orders": 25472, "rss_mb": 115.93, "seq": 1026160, "t_s": 1380.3}
+{"kind": "mem", "orders": 26497, "rss_mb": 116.71, "seq": 1067520, "t_s": 1440.3}
+{"kind": "mem", "orders": 27410, "rss_mb": 117.64, "seq": 1104130, "t_s": 1500.3}
+{"exceptions": {}, "journal_bytes": 4392470, "kind": "session", "orders": 5457, "positions": {"0": -5537}, "recon_ok": true, "residual_orders": 0, "session": 4, "venue_orders": 5457}
+{"kind": "mem", "orders": 28240, "rss_mb": 116.51, "seq": 1137670, "t_s": 1560.3}
+{"kind": "mem", "orders": 29471, "rss_mb": 117.8, "seq": 1187240, "t_s": 1620.3}
+{"kind": "mem", "orders": 30610, "rss_mb": 117.8, "seq": 1233130, "t_s": 1680.3}
+{"kind": "mem", "orders": 31642, "rss_mb": 117.69, "seq": 1274620, "t_s": 1740.3}
+{"kind": "mem", "orders": 32596, "rss_mb": 112.34, "seq": 1312980, "t_s": 1800.3}
+{"exceptions": {}, "journal_bytes": 4184115, "kind": "session", "orders": 5188, "positions": {"0": 7905}, "recon_ok": true, "residual_orders": 0, "session": 5, "venue_orders": 5188}
+{"kind": "mem", "orders": 33809, "rss_mb": 111.05, "seq": 1361780, "t_s": 1860.3}
+{"kind": "mem", "orders": 35041, "rss_mb": 112.25, "seq": 1411540, "t_s": 1920.3}
+{"kind": "mem", "orders": 36189, "rss_mb": 112.83, "seq": 1457750, "t_s": 1980.3}
+{"kind": "mem", "orders": 37233, "rss_mb": 111.98, "seq": 1499760, "t_s": 2040.3}
+{"kind": "mem", "orders": 38156, "rss_mb": 112.36, "seq": 1536920, "t_s": 2100.3}
+{"exceptions": {}, "journal_bytes": 4541294, "kind": "session", "orders": 5561, "positions": {"0": -6783}, "recon_ok": true, "residual_orders": 0, "session": 6, "venue_orders": 5561}
+{"kind": "mem", "orders": 39442, "rss_mb": 109.62, "seq": 1588760, "t_s": 2160.3}
+{"kind": "mem", "orders": 40527, "rss_mb": 110.13, "seq": 1632500, "t_s": 2220.3}
+{"kind": "mem", "orders": 41651, "rss_mb": 110.41, "seq": 1677580, "t_s": 2280.3}
+{"kind": "mem", "orders": 42681, "rss_mb": 110.41, "seq": 1718900, "t_s": 2340.3}
+{"kind": "mem", "orders": 43631, "rss_mb": 111.79, "seq": 1757020, "t_s": 2400.3}
+{"exceptions": {}, "journal_bytes": 4453852, "kind": "session", "orders": 5476, "positions": {"0": -45544}, "recon_ok": true, "residual_orders": 0, "session": 7, "venue_orders": 5476}
+{"kind": "mem", "orders": 44899, "rss_mb": 105.27, "seq": 1807980, "t_s": 2460.3}
+{"kind": "mem", "orders": 46069, "rss_mb": 105.54, "seq": 1855200, "t_s": 2520.3}
+{"kind": "mem", "orders": 47147, "rss_mb": 105.39, "seq": 1898530, "t_s": 2580.3}
+{"kind": "mem", "orders": 48206, "rss_mb": 105.49, "seq": 1941160, "t_s": 2640.3}
+{"kind": "mem", "orders": 49144, "rss_mb": 105.37, "seq": 1978800, "t_s": 2700.3}
+{"exceptions": {}, "journal_bytes": 4453216, "kind": "session", "orders": 5514, "positions": {"0": -75600}, "recon_ok": true, "residual_orders": 0, "session": 8, "venue_orders": 5514}
+{"kind": "mem", "orders": 50389, "rss_mb": 104.86, "seq": 2029180, "t_s": 2760.3}
+{"kind": "mem", "orders": 51604, "rss_mb": 106.25, "seq": 2077960, "t_s": 2820.3}
+{"kind": "mem", "orders": 52698, "rss_mb": 105.73, "seq": 2122010, "t_s": 2880.3}
+{"kind": "mem", "orders": 53745, "rss_mb": 105.25, "seq": 2164180, "t_s": 2940.3}
+{"kind": "mem", "orders": 54679, "rss_mb": 105.37, "seq": 2201880, "t_s": 3000.3}
+{"exceptions": {}, "journal_bytes": 4484991, "kind": "session", "orders": 5535, "positions": {"0": -63519}, "recon_ok": true, "residual_orders": 0, "session": 9, "venue_orders": 5535}
+{"kind": "mem", "orders": 55924, "rss_mb": 105.27, "seq": 2252020, "t_s": 3060.3}
+{"kind": "mem", "orders": 57047, "rss_mb": 106.42, "seq": 2297430, "t_s": 3120.3}
+{"kind": "mem", "orders": 58126, "rss_mb": 106.42, "seq": 2340870, "t_s": 3180.3}
+{"kind": "mem", "orders": 59158, "rss_mb": 105.29, "seq": 2382470, "t_s": 3240.3}
+{"kind": "mem", "orders": 60100, "rss_mb": 105.38, "seq": 2420420, "t_s": 3300.3}
+{"exceptions": {}, "journal_bytes": 4426260, "kind": "session", "orders": 5423, "positions": {"0": -62350}, "recon_ok": true, "residual_orders": 0, "session": 10, "venue_orders": 5423}
+{"kind": "mem", "orders": 61391, "rss_mb": 104.52, "seq": 2472170, "t_s": 3360.3}
+{"kind": "mem", "orders": 62621, "rss_mb": 105.31, "seq": 2521710, "t_s": 3420.3}
+{"kind": "mem", "orders": 63745, "rss_mb": 105.31, "seq": 2566900, "t_s": 3480.3}
+{"kind": "mem", "orders": 64765, "rss_mb": 105.31, "seq": 2607930, "t_s": 3540.3}
+{"exceptions": {}, "journal_bytes": 4540049, "kind": "session", "orders": 5557, "positions": {"0": -71884}, "recon_ok": true, "residual_orders": 0, "session": 11, "venue_orders": 5557}
+{"kind": "done", "verdict": "PASS"}

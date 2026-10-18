@@ -342,3 +342,18 @@ def test_recon_sink_receives_report(tmp_path):
 
     reconcile(_filled(tmp_path), [], sinks=[Sink()])
     assert got and not got[0].ok and got[0].to_dict()["unreconciled_positions"] == 1
+
+
+def test_pre_trade_gate_refuses_before_journal(tmp_path):
+    oms = _oms(tmp_path)
+
+    def gate(m, cl, inst, side, qty, px):
+        if qty * px > 50_000:
+            raise ValueError("limit")
+
+    oms.pre_trade = gate
+    n = oms.journal.n
+    with pytest.raises(ValueError):
+        oms.submit("A", **ORDER)
+    assert oms.journal.n == n and "A" not in oms.orders
+    assert not oms.submit("B", **{**ORDER, "qty": 10}).duplicate

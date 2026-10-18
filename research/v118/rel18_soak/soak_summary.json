@@ -1,0 +1,189 @@
+{
+ "schema": "iap.rel18_soak",
+ "version": 1,
+ "args": {
+  "minutes": 60.0,
+  "session_minutes": 5.0,
+  "rate": 1000,
+  "seed": 18,
+  "out": "research/v118/rel18_soak",
+  "clock_tolerance_ms": 1000.0
+ },
+ "elapsed_minutes": 60.0,
+ "totals": {
+  "messages_sent": 2669475,
+  "orders": 65664,
+  "kills": 511,
+  "recon_runs": 523,
+  "recon_exceptions": 0,
+  "unreconciled_positions": 0,
+  "venue_dup_submits": 53,
+  "resyncs": 1253,
+  "silences": 110,
+  "residual_orders": 0
+ },
+ "feed": {
+  "delivered": 2626982,
+  "duplicates": 26521,
+  "out_of_order": 63414,
+  "missing": 1253,
+  "dropped_resync": 15972,
+  "stale_events": 467
+ },
+ "health_transitions": 3440,
+ "unknown_episodes": 1720,
+ "clock_max_abs_drift_ms": 15.77,
+ "memory_mb": {
+  "first": 87.51,
+  "max": 117.8,
+  "last": 105.31,
+  "second_half_range": 8.31
+ },
+ "sessions": [
+  {
+   "session": 0,
+   "orders": 5521,
+   "venue_orders": 5521,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": -14399
+   },
+   "journal_bytes": 4503524
+  },
+  {
+   "session": 1,
+   "orders": 5322,
+   "venue_orders": 5322,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": -16486
+   },
+   "journal_bytes": 4271847
+  },
+  {
+   "session": 2,
+   "orders": 5593,
+   "venue_orders": 5593,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": -23797
+   },
+   "journal_bytes": 4562290
+  },
+  {
+   "session": 3,
+   "orders": 5517,
+   "venue_orders": 5517,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": -35464
+   },
+   "journal_bytes": 4472572
+  },
+  {
+   "session": 4,
+   "orders": 5457,
+   "venue_orders": 5457,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": -5537
+   },
+   "journal_bytes": 4392470
+  },
+  {
+   "session": 5,
+   "orders": 5188,
+   "venue_orders": 5188,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 7905
+   },
+   "journal_bytes": 4184115
+  },
+  {
+   "session": 6,
+   "orders": 5561,
+   "venue_orders": 5561,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": -6783
+   },
+   "journal_bytes": 4541294
+  },
+  {
+   "session": 7,
+   "orders": 5476,
+   "venue_orders": 5476,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": -45544
+   },
+   "journal_bytes": 4453852
+  },
+  {
+   "session": 8,
+   "orders": 5514,
+   "venue_orders": 5514,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": -75600
+   },
+   "journal_bytes": 4453216
+  },
+  {
+   "session": 9,
+   "orders": 5535,
+   "venue_orders": 5535,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": -63519
+   },
+   "journal_bytes": 4484991
+  },
+  {
+   "session": 10,
+   "orders": 5423,
+   "venue_orders": 5423,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": -62350
+   },
+   "journal_bytes": 4426260
+  },
+  {
+   "session": 11,
+   "orders": 5557,
+   "venue_orders": 5557,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": -71884
+   },
+   "journal_bytes": 4540049
+  }
+ ],
+ "verdict": "PASS"
+}
