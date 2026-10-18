@@ -186,7 +186,7 @@ def test_the_v117_rotation_never_runs_two_cells_of_the_default_grid():
 
 @pytest.fixture(scope="module")
 def dataset(tmp_path_factory, golden_dir) -> Path:
-    root = tmp_path_factory.mktemp("bench03")
+    root = tmp_path_factory.mktemp("rel03ds")
     norm = root / "normalized"
     norm.mkdir()
     for day in ("20190101", "20190102"):

@@ -8,7 +8,11 @@ that tag.
 
 ## Unreleased
 
+<<<<<<< HEAD
 - v1.18 REL-03 execution benchmark v2 metrics (`iap.research.execution_metrics`, `docs/EXECUTION_QUALITY.md` section 9): primary statistic is trading cost per FILLED share, with fill rate, completion ratio, residual quantity and completion charge, Perold shortfall kept as secondary, arrival and post-trade markouts, cost by spread regime / time of day / size / liquidity; every metric states arrival price, target qty, horizon, benchmark, sign, unit and denominator; quantity-weighted and per-parent distributions; ESS and MDE beside every interval; opt-in `--cover-all-cells` runs all 16 grid cells every session and `coverage_by_session` reports n per cell; `--consolidated-adv` labels sizes in % of consolidated ADV. Defaults and all committed JSONs unchanged (new keys only).
+=======
+- v1.18 REL-05 (Level 1 only): recorded-fill vs replay harness. `iap.tca.report_loader` (versioned `iap.execution_reports` JSON/CSV -> `ExecutionReport` / TCA `ParentOrder`, deterministic rejection of duplicate ids, timestamp regressions and post-terminal reports), `iap.paper.recorder` (monotonic clock mapped to wall once with stated uncertainty; IAP1 market file + `orders.jsonl` + manifest; state-machine and quantity-conservation checks; no broker code), `iap.paper.sim_to_real` (same parents replayed on the same tape, per-child error distributions by venue / order type / regime, signal -> risk -> routing -> fills -> TCA trace) and `iap.paper.fill_tape` (fill-hazard tape test: fit on days A, Brier and reliability vs a naive baseline on separate days B). **Level 2: not validated** - no real fills exist (D4(a)); nothing here is empirical validation of the live fill model. New files only, no golden moved. Docs: `docs/SIM_TO_REAL.md`.
+>>>>>>> origin/main
 
 ## v1.17.1 — 2026-10-17
 
