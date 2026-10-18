@@ -549,7 +549,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1 (toolchain pinned by input)
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1 (toolchain pinned by input)
         with:
           toolchain: "1.99.0"      # == rust/rust-toolchain.toml (check_deployment.py enforces)
           components: clippy, llvm-tools-preview
@@ -581,7 +581,7 @@ jobs:
       # PLATFORM_CONVENTIONS.md §11.1). Report-only, uploaded as an artifact;
       # no threshold gate (no existing baseline).
       - name: install cargo-llvm-cov
-        uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
+        uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
         with:
           tool: cargo-llvm-cov
       - name: rust/risk coverage (cargo-llvm-cov)
@@ -610,7 +610,7 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1 (toolchain pinned by input)
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1 (toolchain pinned by input)
         with:
           toolchain: "1.99.0"      # == rust/rust-toolchain.toml (check_deployment.py enforces)
           components: clippy
@@ -744,11 +744,11 @@ jobs:
             pip-audit -r "$req" --no-deps --disable-pip --strict $IGNORES
             echo "::endgroup::"
           done
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1 (toolchain pinned by input)
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1 (toolchain pinned by input)
         with:
           toolchain: "1.99.0"      # == rust/rust-toolchain.toml (check_deployment.py enforces)
       - name: install cargo-audit + cargo-deny
-        uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
+        uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
         with:
           tool: cargo-audit@0.22.2,cargo-deny@0.19.9
       - name: lockfile for rust/features_py (standalone package, not committed)
@@ -794,7 +794,7 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1 (toolchain pinned by input)
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1 (toolchain pinned by input)
         with:
           toolchain: "1.99.0"      # == rust/rust-toolchain.toml (check_deployment.py enforces)
           components: clippy, llvm-tools-preview
