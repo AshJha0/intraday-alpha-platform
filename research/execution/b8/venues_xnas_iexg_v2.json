@@ -1,0 +1,39 @@
+{
+  "x-version": 2,
+  "description": "v1.18 REL-04 variant of venues_xnas_iexg.json for the B8 v2 run (the v1 file is unchanged and still reproduces the published v1.17 B8 JSONs). Only change: IEXG carries inbound_delay_ns = 350000, IEX's published 350 microsecond speed bump (applied to every order and cancel; no jitter draw). The venue legs latency.mean_ns / jitter_ns stay 0 because NO order-entry latency has been measured for either venue (the IEX feed capture timestamp bounds feed latency only, with an unidentified clock offset; see docs/EXECUTION_QUALITY.md section 10): the internal decision/risk/wire legs of ExecConfig.latency (200 us) apply to both. A different assumption must be declared in the pre-declaration BEFORE the run. Fees are indicative list prices as in v1.",
+  "venues": [
+    {
+      "venue": "XNAS",
+      "venue_id": 101,
+      "asset_class": "EQUITY",
+      "taker_fee_per_share": 0.003,
+      "maker_rebate_per_share": 0.002,
+      "latency": {
+        "mean_ns": 0,
+        "jitter_ns": 0
+      },
+      "supports": [
+        "MBO",
+        "AUCTION",
+        "HALT"
+      ]
+    },
+    {
+      "venue": "IEXG",
+      "venue_id": 102,
+      "asset_class": "EQUITY",
+      "taker_fee_per_share": 0.0009,
+      "maker_rebate_per_share": 0.0,
+      "latency": {
+        "mean_ns": 0,
+        "jitter_ns": 0
+      },
+      "supports": [
+        "MBO",
+        "AUCTION",
+        "HALT"
+      ],
+      "inbound_delay_ns": 350000
+    }
+  ]
+}

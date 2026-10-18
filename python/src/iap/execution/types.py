@@ -90,6 +90,12 @@ class VenueSpec:
     #: ``"midpoint"`` (no displayed book; fills come only from the
     #: ``iap.execution.dark`` model and are *modelled, not measured*).
     venue_type: str = "lit"
+    #: v1.18 REL-04 (X-C, opt-in, default 0): a fixed INBOUND delay added to
+    #: every order and cancel before it reaches the matching engine (IEX's
+    #: speed bump: 350 microseconds = 350_000).  It is part of rule 1's
+    #: arrival time, adds no jitter draw, and applies to cancels as well as
+    #: orders, so a cancel never overtakes an order or a fill it chases.
+    inbound_delay_ns: int = 0
 
     @property
     def is_lit(self) -> bool:
@@ -122,6 +128,8 @@ class VenueSpec:
             raise ValueError(f"venue_id must be u16, got {self.venue_id}")
         if self.latency_mean_ns < 0 or self.latency_jitter_ns < 0:
             raise ValueError(f"venue {self.venue_id}: latency mean/jitter must be >= 0")
+        if self.inbound_delay_ns < 0:
+            raise ValueError(f"venue {self.venue_id}: inbound_delay_ns must be >= 0")
         if self.venue_type not in ("lit", "dark", "midpoint"):
             raise ValueError(
                 f"venue {self.venue_id}: venue_type must be lit, dark or midpoint, "
@@ -210,6 +218,7 @@ FILL_PROVENANCES: tuple[str, ...] = (
     "cross",  #: rule 4 last bullet: the display crossed our resting limit
     "reopen_touch",  #: rule 8: uncrossed at the touch when the venue reopened
     "dark_midpoint",  #: v1.17 B10: a MODELLED midpoint fill on a dark venue (iap.execution.dark)
+    "midpoint_peg",  #: v1.18 REL-04 (opt-in): a midpoint-peg child met a hidden print at the mid
 )
 
 
@@ -298,6 +307,13 @@ class ChildOrder:
     #: behaviour), ``"reject"`` = cancelled on arrival when it would cross,
     #: ``"slide"`` = repriced one tick inside the opposite touch instead.
     post_only: str = ""
+    #: v1.18 REL-04 (X-C, opt-in; Python only): ``""`` = an ordinary order, ``"midpoint"`` =
+    #: a non-displayed midpoint-peg LIMIT (IEX's midpoint peg).  It never takes
+    #: displayed liquidity and has no place in the displayed queue; it fills only
+    #: against NON-DISPLAYED prints (``ExecutionSimulator(hidden_prints=True)``) that
+    #: print within half a tick of the venue's midpoint, at the printed price, never
+    #: through ``limit_ticks`` (the most it would pay / the least it would take).
+    peg: str = ""
     #: v1.17 B1 (X-5): set by the simulator when an aggressive (MARKET /
     #: IOC / FOK) child walked the configured depth without reaching its
     #: limit and still had a remainder, which was cancelled
