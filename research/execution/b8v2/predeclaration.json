@@ -96,7 +96,19 @@
     "router_tox_horizon": "1s",
     "router_fill_horizon_s": 1.0,
     "md_delay_ns": 0,
-    "child_exec": "none (the v1.17 child; capped / peg variants are not in this family)"
+    "child_variant": "capped",
+    "child_exec": {
+      "style": "capped_ioc",
+      "max_levels": 3,
+      "depth_fraction": 1.0,
+      "max_slippage_ticks": 0,
+      "max_participation": 0.0,
+      "repost_interval_ns": 1000000000,
+      "max_reposts": 20,
+      "min_child_qty": 1,
+      "deadline_ns": 0
+    },
+    "child_exec_note": "Headline policies run as <route>+capped: every non-passive child (IS, POV, and the marketable catch-up children of every algo) is a marketable IOC LIMIT capped at the eligible displayed depth (top 3 opposite levels, net of our own consumption, full fraction, no tick band), unfilled or withheld quantity owed and re-posted at most every 1 s, at most 20 times, never after the window; what is still owed at the end is residual, priced by the completion charge, never filled. TWAP / VWAP passive slices are unchanged. sor_sweep: its non-passive children take the sweep path (sized to both books' displayed depth, excess counted in sweep_unsent_qty) before the cap applies, so the cap does not change them; this is the existing REL-04 replay rule, declared here, not altered."
   },
   "latency_assumption": {
     "name": "L0: exchange timestamps, no measured order-entry latency",
@@ -124,6 +136,13 @@
         "impact_model": "child"
       },
       "why": "impact model: per-child adder"
+    },
+    {
+      "tag": "s3_v117_child",
+      "change": {
+        "child_variant": null
+      },
+      "why": "the v1.17 1,000-share MARKET child, for comparability with the v1.17.1 oos6 result (finding X-B: it depth-exhausts IS parents)"
     }
   ],
   "sensitivity_note": "reported beside the headline; never part of the decision; completion-cost sensitivity is read from completion_charge_bps (co-primary) and residual_qty, no extra run",
@@ -166,5 +185,8 @@
     },
     "reproduced": "byte-identical JSON where achievable; otherwise every bps within 0.01, every fraction within 0.0001 and every count exact, with each difference listed"
   },
-  "outputs_dir": "research/execution/b8v2"
+  "outputs_dir": "research/execution/b8v2",
+  "diagnostics": {
+    "depth_exhausted_parent_share": "per cell (policy x algo x size) and symbol, from cells.*.depth_exhausted.parent_share of the headline JSON; in DECISION.json; a diagnostic, never part of the decision"
+  }
 }

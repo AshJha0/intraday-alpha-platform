@@ -8,7 +8,7 @@ identity). No B8 v2 number may be published before that prereg is signed (gate F
 ## What changes from the v1.17.1 oos6 run, and what does not
 
 Unchanged, so the headline stays comparable with `research/execution/b8/REPORT_oos6.md`:
-the six days and the split, the four policies, the two symbols, the venue fees, the
+the six days and the split, the four routes, the two symbols, the venue fees, the
 router calibration (`research/execution/b8/calibration_train3/`, reused byte for byte and
 fingerprinted; the calibrate days are not read again), the grid (TWAP, VWAP, POV, IS x
 0.1, 0.5, 1, 2 % venue ADV), windows (30 min, 5 min warm-up), seed 20260829.
@@ -17,7 +17,8 @@ Changed (the v1.18 foundation): the REL-03 v2 metrics as the decision statistic,
 `impact_model: parent`, `adv_table: session` (each dataset's `adv_by_session`), all 16
 cells every session (`cover_all_cells`), size labels in % of consolidated ADV, REL-04
 fidelity (`hidden_prints` on; the IEXG 350 microsecond speed bump from
-`research/execution/b8/venues_xnas_iexg_v2.json`), a family correction over K = 6.
+`research/execution/b8/venues_xnas_iexg_v2.json`), a family correction over K = 6, and the
+REL-04 venue-aware child for every non-passive child (see Child execution).
 
 ## Days
 
@@ -38,8 +39,41 @@ prereg id in `spent_by` for the three evaluation days only.
 
 ## Policies, symbols, run order
 
-`pin_nasdaq` (baseline), `pin_iex`, `sor`, `sor_sweep`; AAPL then MSFT, one process at a
+routes `pin_nasdaq` (baseline), `pin_iex`, `sor`, `sor_sweep`, each with the `+capped` child; AAPL then MSFT, one process at a
 time, with chain B (the IEX ingest) suspended for the duration.
+
+## Child execution
+
+**Reason.** The v1.18 audit (finding X-B, the reason REL-04 exists) showed that the v1.17 IS
+/ POV / aggressive child is a 1,000-share MARKET order walked down 10 levels of a venue whose
+displayed touch can be 19-155 shares: it depth-exhausts essentially every IS parent, the
+remainder is cancelled and IS never re-posts. A headline on that child would again measure a
+simulator artefact, so the headline does not use it.
+
+**Headline:** every policy runs as `<route>+capped` (`pin_nasdaq+capped`, `pin_iex+capped`,
+`sor+capped`, `sor_sweep+capped`), i.e. `ChildExecParams(style="capped_ioc", max_levels=3,
+depth_fraction=1.0, max_slippage_ticks=0, max_participation=0.0,
+repost_interval_ns=1_000_000_000, max_reposts=20, min_child_qty=1, deadline_ns=0)`
+(`iap.execution.child_exec`): each non-passive child is a marketable IOC LIMIT sized to the
+eligible displayed depth (top 3 opposite levels, net of our own earlier consumption), limit at
+the deepest level used; withheld or unfilled quantity is owed and re-posted at most once a
+second, at most 20 times, never after the window closes; POV carries nothing (its next deficit
+is the re-post); anything still owed at the end is residual, priced by the completion charge,
+never filled.
+
+Scope, as the REL-04 replay implements it (declared, not changed):
+- The cap applies to every NON-PASSIVE child of every algo: IS and POV children, and also
+  the marketable catch-up children TWAP / VWAP send. TWAP / VWAP passive slices are
+  unchanged.
+- `sor_sweep`: its non-passive children take the sweep path first. That path is sized to
+  both books' displayed depth, and the excess is counted in `sweep_unsent_qty`, so the cap
+  does not alter them. Unsent sweep quantity is not re-posted.
+
+**Diagnostic:** `DECISION.json` reports the `depth_exhausted` parent share for every cell
+(policy x algo x size) and symbol of the headline. It is never part of the decision.
+
+**The v1.17 child** is kept as the pre-declared sensitivity `s3_v117_child`, for
+comparability with the v1.17.1 oos6 result only.
 
 ## Statistics
 
@@ -86,6 +120,8 @@ before the run.
 
 - `s1_no_hidden`: `hidden_prints` off (fill assumption: no non-displayed prints).
 - `s2_child_impact`: `impact_model: child` (impact assumption).
+- `s3_v117_child`: the v1.17 1,000-share MARKET child (no `+capped`), for comparability
+  with `research/execution/b8/REPORT_oos6.md`; known to depth-exhaust IS parents (X-B).
 - Completion cost: read from the co-primary `completion_charge_bps` and `residual_qty`; no
   extra run.
 
