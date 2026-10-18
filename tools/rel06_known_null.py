@@ -93,12 +93,16 @@ def make_pricer(data_dir: Path, config: dict[str, Any]) -> kn.SimulatorPricer:
     ex = config["execution"]
     cfg = load_exec_config(
         data_dir / "configs",
-        regulatory_fees=bool(ex["regulatory_fees"]),
         adv_table=True if ex["adv_table"] == "session" else None,
     )
     cfg = replace(
         cfg, impact_model=ex["impact_model"], impact_exponent=float(ex["impact_exponent"])
     )
+    if ex["regulatory_fees"]:
+        # the dated Section 31 + TAF schedule is repo reference data, not per dataset
+        from iap.execution.regulatory import load_default_schedule
+
+        cfg = replace(cfg, regulatory_fees=load_default_schedule(ROOT / "configs"))
     return kn.SimulatorPricer(cfg, int(ex["venue_id"]))
 
 
