@@ -423,12 +423,22 @@ def _replay_file(
     return n_events, counts, buffers, logs
 
 
+def _contexts(configs, reference_map: str | None = None):
+    """The v1 contexts, or (``--xasset-reference symbol_map``) the
+    ``xasset_v2`` references of :mod:`iap.features.reference_map`."""
+    if reference_map is None:
+        return build_contexts(configs)
+    from iap.features.reference_map import build_contexts_v2
+
+    return build_contexts_v2(configs, reference_map)
+
+
 def _worker(job):
     """Process-pool entry point: replay one day against an empty profile."""
-    path, configs, cadence_ns, backend, opts, spool_dir, cross, same_ts = job
+    path, configs, cadence_ns, backend, opts, spool_dir, cross, same_ts, ref_map = job
     return _replay_file(
         Path(path),
-        build_contexts(configs),
+        _contexts(configs, ref_map),
         cadence_ns,
         {},
         record=True,
@@ -554,8 +564,10 @@ def _flush_file(
     row_counts: dict[int, int],
     label_stats: dict[int, dict],
     label_freshness: str = STORE_FRESHNESS,
+    grid: _GridV2 | None = None,
 ) -> None:
-    """Write one row group per instrument for the just-processed file."""
+    """Write one row group per instrument for the just-processed file
+    (and, with ``grid``, its v2 grid labels: ``--labels-v2``)."""
     nfeat = len(names)
     nbytes = (nfeat + 7) // 8
     for iid in sorted(buffers):
@@ -626,6 +638,9 @@ def _flush_file(
                     for nm in LabelReason.describe(r):
                         hv["reason"][nm] = hv["reason"].get(nm, 0) + 1
 
+        if grid is not None:
+            grid.write(iid, buf, label_freshness)
+
         cols: dict[str, pa.Array] = {
             "instrument_id": pa.array(np.full(rows, iid, dtype=np.uint32), type=pa.uint32()),
             "exchange_ts": pa.array(ts_arr, type=pa.int64()),
@@ -650,6 +665,65 @@ def _flush_file(
             )
             writers[iid] = writer
         writer.write_table(table)
+
+
+class _GridV2:
+    """``--labels-v2 STEP``: the 15 m / 30 m / 1 h labels of
+    :mod:`iap.labels.grid_v2` on a session-local grid, one
+    ``labels_v2_<iid>.parquet`` per instrument (row group per input file),
+    from the same mid series as the v1 row labels."""
+
+    def __init__(self, out_dir: Path, contexts, step_ns: int) -> None:
+        from iap.labels.labels_v2 import HORIZON_V2_ORDER
+
+        self.out_dir = out_dir
+        self.contexts = contexts
+        self.step_ns = step_ns
+        self.writers: dict[int, pq.ParquetWriter] = {}
+        self.rows = 0
+        self.by_h = {h: {"valid": 0, "truncated": 0} for h in HORIZON_V2_ORDER}
+
+    def write(self, iid: int, buf: _InstrumentBuffer, freshness: str) -> None:
+        from iap.labels.grid_v2 import grid_labels_v2
+        from iap.labels.labels_v2 import label_columns_v2
+
+        table = grid_labels_v2(
+            iid, buf.series, buf.last_event_ts, self.contexts[iid], self.step_ns, freshness
+        )
+        if table is None:
+            return
+        self.rows += table.num_rows
+        for h, acc in self.by_h.items():
+            c = label_columns_v2(h)
+            acc["valid"] += int(np.asarray(table[c["valid"]]).sum())
+            acc["truncated"] += int(np.asarray(table[c["truncated"]]).sum())
+        writer = self.writers.get(iid)
+        if writer is None:
+            writer = self.writers[iid] = pq.ParquetWriter(
+                self.out_dir / f"labels_v2_{iid}.parquet", table.schema, compression="zstd"
+            )
+        writer.write_table(table)
+
+    def close(self) -> dict:
+        from iap.labels.grid_v2 import GRID_V2_VERSION
+
+        for w in self.writers.values():
+            w.close()
+        return {
+            "grid_version": GRID_V2_VERSION,
+            "grid_step_ns": self.step_ns,
+            "horizons": list(self.by_h),
+            "files": "labels_v2_<instrument_id>.parquet",
+            "rows": self.rows,
+            "valid_frac_by_horizon": {
+                h: (round(a["valid"] / self.rows, 6) if self.rows else None)
+                for h, a in self.by_h.items()
+            },
+            "truncated_frac_by_horizon": {
+                h: (round(a["truncated"] / self.rows, 6) if self.rows else None)
+                for h, a in self.by_h.items()
+            },
+        }
 
 
 def _build_schema(names: list[str]) -> pa.Schema:
@@ -683,6 +757,7 @@ def _build_days(
     consume,
     cross: str = "fold",
     same_ts: str = "coalesce",
+    reference_map: str | None = None,
 ) -> None:
     """Replay every day (serially, or ``workers`` processes) and hand each
     day's buffers to ``consume`` in file (= trading-day) order."""
@@ -704,7 +779,8 @@ def _build_days(
         return
     norm_idx = [names.index(f"norm_{m}_m5_v1") for m in PROFILE_METRICS]
     jobs = [
-        (str(p), str(configs), cadence_ns, backend, opts, str(spool), cross, same_ts) for p in files
+        (str(p), str(configs), cadence_ns, backend, opts, str(spool), cross, same_ts, reference_map)
+        for p in files
     ]
     # Under `python -m iap.features` this file runs as `__main__`, and a
     # spawn-start worker (Windows, macOS) does not re-import a package's
@@ -794,7 +870,37 @@ def main(argv: list[str] | None = None) -> int:
         help="row clock: clock (--cadence-ms, default), events:N (every N applied "
         "events) or volume:N (every N traded shares)",
     )
+    ap.add_argument(
+        "--xasset-reference",
+        choices=("first_etf", "symbol_map"),
+        default="first_etf",
+        help="cross-asset reference of EQUITY rows: first_etf (default, the v1 rule) or "
+        "symbol_map (v1.18 REL-07, feature identity xasset_v2: the reference ETF of "
+        "--reference-map, recorded in the summary)",
+    )
+    ap.add_argument(
+        "--reference-map",
+        default=str(_REPO / "configs" / "reference" / "reference_etf_map_v1.json"),
+        help="with --xasset-reference symbol_map: the versioned symbol -> ETF map",
+    )
+    ap.add_argument(
+        "--labels-v2",
+        default="off",
+        metavar="STEP",
+        help="off (default) or a grid step (e.g. 1m): also write labels_v2_<iid>.parquet, "
+        "the 15m / 30m / 1h session-close-truncated labels on a session-local grid "
+        "(v1.18 REL-07, iap.labels.grid_v2)",
+    )
     args = ap.parse_args(argv)
+    grid_step_ns = 0
+    if args.labels_v2 != "off":
+        from iap.labels.grid_v2 import parse_step
+
+        try:
+            grid_step_ns = parse_step(args.labels_v2)
+        except ValueError as exc:
+            ap.error(f"--labels-v2: {exc}")
+    reference_map = args.reference_map if args.xasset_reference == "symbol_map" else None
     sampling, _, sample_n = args.sampling.partition(":")
     if sampling == "clock" and not sample_n:
         sample_n_i = 0
@@ -823,7 +929,8 @@ def main(argv: list[str] | None = None) -> int:
     if not files:
         raise SystemExit(f"no normalized input files in {data_dir}")
 
-    contexts = build_contexts(args.configs)
+    contexts = _contexts(args.configs, reference_map)
+    grid = _GridV2(out_dir, contexts, grid_step_ns) if grid_step_ns else None
     if args.feature_set == "extended":
         from iap.features.extended import (
             EXT_FAMILY_ORDER,
@@ -873,6 +980,7 @@ def main(argv: list[str] | None = None) -> int:
             row_counts,
             label_stats,
             args.label_freshness,
+            grid,
         )
         print(f"{path.name}: {n_events} events -> {counts[1]} vectors", file=sys.stderr)
 
@@ -894,6 +1002,7 @@ def main(argv: list[str] | None = None) -> int:
             _consume,
             cross=args.cross_prints,
             same_ts=args.same_ts,
+            reference_map=reference_map,
         )
     finally:
         shutil.rmtree(spool, ignore_errors=True)
@@ -959,6 +1068,12 @@ def main(argv: list[str] | None = None) -> int:
         summary["feature_set"] = args.feature_set
     if sampling != "clock":
         summary["sampling"] = args.sampling
+    if reference_map is not None:  # keys absent on the default path
+        from iap.features.reference_map import load_reference_map
+
+        summary["xasset_reference"] = load_reference_map(reference_map).identity()
+    if grid is not None:
+        summary["labels_v2"] = grid.close()
     if backend != "python":  # key absent on the default path: summary bytes unchanged
         summary["native_engine"] = backend
     if total_crosses or args.cross_prints != "fold":  # absent on synthetic data
