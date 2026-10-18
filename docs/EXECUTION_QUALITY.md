@@ -512,8 +512,12 @@ secondary; the contrast is the paired difference of pooled ratios against
 `pin_nasdaq` (`--paired-v2`, per-session sums in the JSON), with a family
 correction over K = 6 (three policies x two symbols) and the MDE beside every
 interval; `impact_model: parent`, per-session ADV, all 16 cells every session,
-consolidated-ADV size labels, and the section 10 fidelity options (hidden
-prints, the IEXG speed bump). Latency is assumption L0 (exchange timestamps,
+consolidated-ADV size labels, the section 10 fidelity options (hidden
+prints, the IEXG speed bump), and the section 10 `capped_ioc` child on every
+route (`<route>+capped`: the v1.17 1,000-share MARKET child depth-exhausts IS
+parents, finding X-B, so it is only the sensitivity `s3_v117_child`, kept for
+comparability with v1.17.1; the depth-exhausted share per cell is reported as
+a diagnostic). Latency is assumption L0 (exchange timestamps,
 no measured order-entry latency): the IEX capture-timestamp re-ingest has not
 run, and a re-run with measured latency is a separate declaration. With G = 3
 sessions and 2 df the family interval uses t = 10.89, so "underpowered" is the

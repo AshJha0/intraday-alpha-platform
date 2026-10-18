@@ -115,12 +115,16 @@ def _paired(est: float, ci: list[float], fr_ci: list[float]) -> dict:
     }
 
 
-def _stub(calls: list[str]):
+def _stub(calls: list[str], seen: list[dict] | None = None):
     def run_one(**kw):
         calls.append(kw["symbols"][0])
-        pv = {f"{p}-pin_nasdaq": _paired(0.3, [-1.0, 2.0], [-0.1, 0.1])
-              for p in ("pin_iex", "sor", "sor_sweep")}  # fmt: skip
-        return {"paired_v2_vs_baseline": pv}
+        if seen is not None:
+            seen.append(kw)
+        base = kw["baseline_policy"]
+        pv = {f"{p}-{base}": _paired(0.3, [-1.0, 2.0], [-0.1, 0.1])
+              for p in kw["policies"] if p != base}  # fmt: skip
+        cells = {f"{p}|IS|2": {"depth_exhausted": {"parent_share": 0.25}} for p in kw["policies"]}
+        return {"paired_v2_vs_baseline": pv, "cells": cells}
 
     return run_one
 
@@ -234,23 +238,37 @@ def test_signed_run_suspends_chain_b_runs_aapl_then_msft_and_resumes(repo, monke
     monkeypatch.setenv("IAP_RUN_ACTOR", "b8v2-runner")
     _no_data(monkeypatch)
     calls: list[str] = []
+    seen: list[dict] = []
     events: list[tuple[str, int]] = []
     rc = rb.cmd_run(
         _ns(r),
-        run_one=_stub(calls),
+        run_one=_stub(calls, seen),
         find=lambda: [4242],
         pause=lambda p: events.append(("suspend", p)) or True,
         unpause=lambda p: events.append(("resume", p)) or True,
     )
     assert rc == 0
-    assert calls == ["AAPL", "MSFT", "AAPL", "MSFT", "AAPL", "MSFT"]  # headline, s1, s2
+    assert calls == ["AAPL", "MSFT"] * 4  # headline, s1, s2, s3
+    # headline: the REL-04 capped child on every route; s3: the v1.17 child
+    head, s3 = seen[0], seen[-1]
+    assert head["policies"] == ("pin_nasdaq+capped", "pin_iex+capped", "sor+capped",
+                                "sor_sweep+capped")  # fmt: skip
+    assert head["baseline_policy"] == "pin_nasdaq+capped"
+    ce = head["child_exec"]
+    assert (ce.style, ce.max_levels, ce.depth_fraction, ce.repost_interval_ns, ce.max_reposts) == (
+        "capped_ioc", 3, 1.0, 1_000_000_000, 20)  # fmt: skip
+    assert s3["policies"] == ("pin_nasdaq", "pin_iex", "sor", "sor_sweep")
+    assert s3["baseline_policy"] == "pin_nasdaq" and s3["child_exec"] is None
     assert events == [("suspend", 4242), ("resume", 4242)]
     out = r / "research/execution/b8v2"
     man = json.loads((out / "run_manifest.json").read_text())
     assert man["runner_actor"] == "b8v2-runner" and man["signer"] == "owner"
     assert man["chain_b_resumed"] == [4242]
     dec = json.loads((out / "DECISION.json").read_text())
-    assert dec["family_k"] == 6
+    assert dec["family_k"] == 6 and dec["child_variant"] == "capped"
+    assert set(dec["cells"]) == {f"{p}|{s}" for p in ("pin_iex", "sor", "sor_sweep")
+                                 for s in ("AAPL", "MSFT")}  # fmt: skip
+    assert dec["depth_exhausted_parent_share_by_cell"]["sor+capped|IS|2|MSFT"] == 0.25
     assert {c["verdict"] for c in dec["cells"].values()} == {"no_evidence"}
     assert not any(dec["better_than_baseline_on_both_symbols"].values())
 

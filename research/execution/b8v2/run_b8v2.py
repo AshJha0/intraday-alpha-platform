@@ -237,6 +237,13 @@ def resume(pid: int) -> bool:
 
 
 # --------------------------------------------------------------------- run --
+def run_policy(pol: str, b: Mapping[str, Any]) -> str:
+    """The benchmark policy name of a declared route under the declared child
+    variant: ``sor`` -> ``sor+capped`` (REL-04 capped_ioc); no variant -> ``sor``."""
+    v = b.get("child_variant")
+    return f"{pol}+{v}" if v else pol
+
+
 def benchmark_kwargs(
     decl: Mapping[str, Any],
     data_root: Path,
@@ -252,8 +259,9 @@ def benchmark_kwargs(
         "more_pairs": tuple((data_root / a, data_root / x) for a, x in h["pairs"]),
         "symbols": (symbol,),
         "algos": tuple(b["algos"]),
-        "policies": tuple(decl["policies"]),
-        "baseline_policy": decl["baseline_policy"],
+        "policies": tuple(run_policy(p, b) for p in decl["policies"]),
+        "baseline_policy": run_policy(decl["baseline_policy"], b),
+        "child_exec": child_exec_params(b),
         "sizes_pct": tuple(float(x) for x in b["sizes_pct"]),
         "window_min": float(b["window_min"]),
         "warmup_min": float(b["warmup_min"]),
@@ -279,6 +287,15 @@ def benchmark_kwargs(
         "family_k": int(decl["statistics"]["family_k"]),
         "timestamp": False,
     }
+
+
+def child_exec_params(b: Mapping[str, Any]) -> Any:
+    """The declared :class:`ChildExecParams` (``None`` = the v1.17 child)."""
+    if not b.get("child_variant"):
+        return None
+    from iap.execution.child_exec import ChildExecParams
+
+    return ChildExecParams(**b["child_exec"])
 
 
 def write_json(path: Path, doc: Any) -> None:
@@ -378,13 +395,18 @@ def _r(x: Any, nd: int) -> Any:
 def decide(decl: Mapping[str, Any], docs: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     st = decl["statistics"]
     base = decl["baseline_policy"]
+    b = decl["benchmark"]
     cells: dict[str, Any] = {}
+    diag: dict[str, Any] = {}
     for sym in decl["symbols"]:
+        for key, c in sorted((docs[sym].get("cells") or {}).items()):
+            de = c.get("depth_exhausted") or {}
+            diag[f"{key}|{sym}"] = _r(de.get("parent_share"), 4)
         pv = docs[sym].get("paired_v2_vs_baseline") or {}
         for pol in decl["policies"]:
             if pol == base:
                 continue
-            p = pv.get(f"{pol}-{base}")
+            p = pv.get(f"{run_policy(pol, b)}-{run_policy(base, b)}")
             if p is None:
                 cells[f"{pol}|{sym}"] = {"verdict": "not_estimable", "underpowered": False}
                 continue
@@ -410,6 +432,8 @@ def decide(decl: Mapping[str, Any], docs: Mapping[str, Mapping[str, Any]]) -> di
         "family_level": 1 - 0.05 / st["family_k"],
         "cells": cells,
         "better_than_baseline_on_both_symbols": policy_claim,
+        "child_variant": b.get("child_variant"),
+        "depth_exhausted_parent_share_by_cell": diag,
         "small_g": decl["small_g"],
         "latency_assumption": decl["latency_assumption"]["name"],
     }
