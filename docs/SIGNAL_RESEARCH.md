@@ -61,8 +61,9 @@ its own identity; every pre-registration stays at the bundle it names.
   hash; windows reset per session-local day and on recovery.
 - `iap.labels.labels_v2.compute_labels_v2`: 15 m / 30 m / 1 h labels truncated at
   the session close and flagged (`AFTER_CLOSE`).
-- **Opt-in:** constructed or called explicitly; the store CLI does not write
-  them. Goldens `tests/golden/expected_features_v2.json` and
+- **Opt-in:** constructed or called explicitly. Since v1.18 (REL-07) the store
+  CLI writes the labels on a session grid with `--labels-v2 STEP` (section 10);
+  without the flag it writes nothing new. Goldens `tests/golden/expected_features_v2.json` and
   `expected_labels_v2.json` are new; no older golden moved.
 - No registered result changes. Left open: a `--feature-set v2` store path and a
   first study, both owner-gated.
@@ -204,3 +205,72 @@ pre-registration is the owner's document.
 Placeholder: which of the opt-ins above the owner turned on for the v1.17.0 tag,
 the first `linear_z_v2` study (if run), and the C6 net-of-cost screen. This page
 claims none of them.
+
+## 10. Data and feature foundations for the breadth day (v1.18 REL-07)
+
+Three opt-in pieces for the 100-name 2019-01-30 store. Nothing here runs on
+real data in the PR that adds it; the later machine job is in
+`docs/runbooks/RUNBOOK_rel07_breadth_labels.md`.
+
+**Reference ETF by symbol, feature identity `xasset_v2`.** The v1 rule gives
+every EQUITY row the FIRST ETF row of `instruments.json` as its cross-asset
+reference (`features/context.py`); on the 100-name store that is AMLP
+(instrument 7), so every `xasset` feature there is measured against an MLP
+fund. `--xasset-reference symbol_map` (default `first_etf`) takes each EQUITY
+row's reference from `configs/reference/reference_etf_map_v1.json`: QQQ for
+the 21 names that were Nasdaq-100 members on 2019-01-30, SPY for the other 50.
+The map is versioned, point-in-time (`as_of` 2019-01-30, not current
+membership), records its source and limitations (recalled from public
+reconstitution notices, not a licensed constituent file; three names marked
+low confidence; ADRs and the two VIX ETNs poorly served by SPY), and carries a
+sector per name. ETF rows reference themselves and FX rows are untouched, as
+in v1. Feature names and formulas do not change, so the registry hash does
+not move; the store records `xasset_reference = {feature_identity:
+"xasset_v2", map_version, map_sha256, as_of}` in `features_summary.json`
+(absent on the default path) and a consumer must read it before mixing
+stores. A symbol missing from the map, or a reference ETF missing from the
+dataset, is a start-up error. `iap.alpha.universe_v2.configure_universe_many_etfs(path)`
+accepts a universe with many ETFs for such a store; `configure_universe` is
+unchanged and still refuses more than one (a new module rather than an edit:
+`iap.alpha.base` is in every alpha's code fingerprint). Test: the v2 `beta_w5m_v1` of AAPL equals, within the v1
+golden tolerance (1e-9), the v1 beta of a universe whose first ETF is QQQ
+(`tests/test_v118_reference_map.py`).
+
+**15 m / 30 m / 1 h labels on the session grid.** `--labels-v2 1m` writes
+`labels_v2_<instrument_id>.parquet` beside each feature file: one row per
+grid instant `open + k * step < close` of the session-local day (the same
+instants for every instrument, so a cross-sectional study joins on
+`anchor_ts`), with the six `label_*_<h>_v2` columns of
+`iap.labels.labels_v2` and `session_close_ts`. `anchor_ts` is the decision
+time; the anchor mid is the last book-refresh sample at or before it, the
+forward mid the last sample at or before `min(anchor_ts + h, close)`. A label
+pulled back to the close has `label_truncated_<h>_v2 = True` and
+`label_horizon_ns_<h>_v2 = close - anchor_ts`; filter on it for full-horizon
+labels. The prices are the same mid series as the v1 row labels. Tests: a
+truncation probe at the close, a series-truncation invariance test (no sample
+after the forward instant is read) and a shift-by-one canary
+(`tests/test_v118_labels_grid.py`). The summary gets a `labels_v2` block
+(grid step, rows, valid and truncated fractions per horizon).
+
+**Labels on a non-uniform (volume) clock.** `--sampling volume:N` (v1.12)
+emits a row when N more shares have traded for that instrument (TRADE qty and
+folded cross prints). The row's `exchange_ts` is the event that completed the
+N shares, at the end of its same-timestamp group, and its features read only
+events at or before it. The row clock decides WHICH instants carry a row,
+never what a label at an instant is: `label_<kind>_<h>` stays the event-time
+forward return over the calendar horizon `h` from the row's `exchange_ts`, on
+the same per-refresh mid series and the same freshness bound as the cadence
+store. So (i) a volume row's features and labels equal those of the
+every-event store at the same instant
+(`tests/test_v118_volume_clock_store.py`, all `_v1` features except the
+`norm_*_m5_v1` profile ratios, whose session profile is folded once per
+emitted row and therefore depends on the row clock); (ii) rows are denser in
+busy periods, so consecutive labels overlap more there and any statistic must
+use the row-overlap-aware standard errors, not the row count; (iii) N is one
+number for every instrument, so on the 100-name day a liquid name gets far
+more rows than a thin one (a per-name N would be a new option). A volume
+"horizon" (the return over the next N shares) is NOT what these labels are;
+it would be a new label contract.
+
+No registered result changes: no default flipped, no golden, registry hash or
+fingerprint of an open pre-registration moved.
