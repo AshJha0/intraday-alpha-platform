@@ -1,0 +1,305 @@
+{
+  "clone_dir": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-us39nphe\\repo",
+  "clone_dirty_after_run": [
+    " M research/v118/BASELINE_v1_18.md",
+    " M research/v118/baseline_metrics.json"
+  ],
+  "commands": [
+    {
+      "cmd": "git clone --quiet --no-hardlinks https://github.com/AshJha0/intraday-alpha-platform.git C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-us39nphe\\repo",
+      "cwd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-us39nphe",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "git -c advice.detachedHead=false checkout --quiet 83f08210879263e03d2b8d068cc4bc21f04ed76d",
+      "cwd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-us39nphe\\repo",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "git rev-parse HEAD",
+      "cwd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-us39nphe\\repo",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "83f08210879263e03d2b8d068cc4bc21f04ed76d\n"
+    },
+    {
+      "cmd": "C:\\Users\\ashis\\AppData\\Local\\Programs\\Python\\Python312\\python.exe -m venv C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-us39nphe\\venv",
+      "cwd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-us39nphe",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-us39nphe\\venv\\Scripts\\python.exe -m pip install --quiet --disable-pip-version-check --no-input --require-hashes --only-binary :all: -r python/requirements-ci.txt",
+      "cwd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-us39nphe\\repo",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-us39nphe\\venv\\Scripts\\python.exe -c import json,sys,platform,importlib.metadata as m;print(json.dumps({'python_version':sys.version.split()[0],'implementation':platform.python_implementation(),'executable':sys.executable,'packages':{d.metadata['Name']:d.version for d in m.distributions()}}))",
+      "cwd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-us39nphe\\repo",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "(recorded under environment)"
+    },
+    {
+      "cmd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-us39nphe\\venv\\Scripts\\python.exe tools/v118_baseline.py --check",
+      "cwd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-us39nphe\\repo",
+      "exit_code": 1,
+      "stderr_tail": "baseline_metrics.json is stale\n",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-us39nphe\\venv\\Scripts\\python.exe tools/v118_baseline.py",
+      "cwd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-us39nphe\\repo",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "wrote research\\v118\\baseline_metrics.json and research\\v118\\BASELINE_v1_18.md\n"
+    },
+    {
+      "cmd": "git status --porcelain",
+      "cwd": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-us39nphe\\repo",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": " M research/v118/BASELINE_v1_18.md\n M research/v118/baseline_metrics.json\n"
+    }
+  ],
+  "commit": "83f08210879263e03d2b8d068cc4bc21f04ed76d",
+  "comparison": {
+    "byte_identical": false,
+    "committed_sha256": "f5b53612c3193e6f2717ee0b3b721ce4884d2c019c9615ad9e2e03b3f0189c27",
+    "discrepancies": [
+      {
+        "committed": 4.4466258141863175,
+        "kind": "float",
+        "path": "ledger.bonferroni_t_threshold",
+        "reproduced": 4.484021317917086
+      },
+      {
+        "committed": 422,
+        "kind": "exact",
+        "path": "ledger.distinct_experiments",
+        "reproduced": 640
+      },
+      {
+        "committed": 4,
+        "kind": "length",
+        "path": "ledger.document_datasets_summary",
+        "reproduced": 8
+      },
+      {
+        "committed": 422,
+        "kind": "exact",
+        "path": "ledger.entries",
+        "reproduced": 640
+      },
+      {
+        "committed": null,
+        "kind": "key",
+        "path": "ledger.entries_by_dataset_version_prefix.535f4868",
+        "reproduced": 78
+      },
+      {
+        "committed": null,
+        "kind": "key",
+        "path": "ledger.entries_by_dataset_version_prefix.dea2a6b0",
+        "reproduced": 84
+      },
+      {
+        "committed": 24,
+        "kind": "exact",
+        "path": "ledger.entries_by_dataset_version_prefix.ee4c2187",
+        "reproduced": 72
+      },
+      {
+        "committed": 39,
+        "kind": "exact",
+        "path": "ledger.entries_by_dataset_version_prefix.none",
+        "reproduced": 47
+      },
+      {
+        "committed": 39,
+        "kind": "exact",
+        "path": "ledger.entries_without_dataset_version.entries",
+        "reproduced": 47
+      },
+      {
+        "committed": 25,
+        "kind": "exact",
+        "path": "ledger.entries_without_dataset_version.kinds.experiment_runner",
+        "reproduced": 33
+      },
+      {
+        "committed": 734,
+        "kind": "exact",
+        "path": "ledger.entries_without_dataset_version.looks",
+        "reproduced": 1242
+      },
+      {
+        "committed": null,
+        "kind": "key",
+        "path": "ledger.looks_by_dataset_version_prefix.535f4868",
+        "reproduced": 78
+      },
+      {
+        "committed": null,
+        "kind": "key",
+        "path": "ledger.looks_by_dataset_version_prefix.dea2a6b0",
+        "reproduced": 84
+      },
+      {
+        "committed": 24,
+        "kind": "exact",
+        "path": "ledger.looks_by_dataset_version_prefix.ee4c2187",
+        "reproduced": 448
+      },
+      {
+        "committed": 734,
+        "kind": "exact",
+        "path": "ledger.looks_by_dataset_version_prefix.none",
+        "reproduced": 1242
+      },
+      {
+        "committed": 1098,
+        "kind": "exact",
+        "path": "ledger.looks_by_kind.combination",
+        "reproduced": 1478
+      },
+      {
+        "committed": null,
+        "kind": "key",
+        "path": "ledger.looks_by_kind.execution_study",
+        "reproduced": 206
+      },
+      {
+        "committed": 720,
+        "kind": "exact",
+        "path": "ledger.looks_by_kind.experiment_runner",
+        "reproduced": 1228
+      },
+      {
+        "committed": 24,
+        "kind": "exact",
+        "path": "ledger.real_data_looks_per_document_summary",
+        "reproduced": 448
+      },
+      {
+        "committed": "1f95affdee760e380149f400b4db86f0b3e87ae0a17181890ede3301116e489d",
+        "kind": "exact",
+        "path": "ledger.recomputed_chain_head",
+        "reproduced": "5dc957df3bf2674307ebe8da14a3cd037a54c3fc013b8b049a353817a752e669"
+      },
+      {
+        "committed": "218967c800bc2a24b27424d79f8f6b842041235b5aadbd184fc9e16c0aeb4cc7",
+        "kind": "exact",
+        "path": "ledger.sha256",
+        "reproduced": "e1f15f6889a3d2b504aa8a5dd66c2b78497f15b6697f00e6beb635a32197994e"
+      },
+      {
+        "committed": "1f95affdee760e380149f400b4db86f0b3e87ae0a17181890ede3301116e489d",
+        "kind": "exact",
+        "path": "ledger.stored_chain_head",
+        "reproduced": "5dc957df3bf2674307ebe8da14a3cd037a54c3fc013b8b049a353817a752e669"
+      },
+      {
+        "committed": 5732,
+        "kind": "exact",
+        "path": "ledger.sum_of_entry_counts",
+        "reproduced": 6826
+      },
+      {
+        "committed": 5732,
+        "kind": "exact",
+        "path": "ledger.total_looks",
+        "reproduced": 6826
+      },
+      {
+        "committed": "52c100b9f9a3e3faca20d5f8db7a2b0c77d686ce3c4e8f3e9f3c27bf9ec899fc",
+        "kind": "exact",
+        "path": "toolchain.ci_yml_sha256",
+        "reproduced": "160b6ced4afc49db8ad80dc0397219758c0dcb015f1f7b8b02ceceb90c181c2d"
+      },
+      {
+        "committed": 808,
+        "kind": "exact",
+        "path": "toolchain.requirements_ci_hash_lines",
+        "reproduced": 812
+      },
+      {
+        "committed": "945e9c0dcf3328a1cf81a20fd97eea52fb28d2a98c8aa97636da90298d951f20",
+        "kind": "exact",
+        "path": "toolchain.requirements_ci_sha256",
+        "reproduced": "3a4352e0d19d1a41021264ef8d382472f7c668520c42535e5f45971600a28375"
+      }
+    ],
+    "provenance": [
+      {
+        "committed": "8fb189b67bd6a2b6a2c868ed378d2a5a92c628f0",
+        "kind": "exact",
+        "path": "commit",
+        "reproduced": "83f08210879263e03d2b8d068cc4bc21f04ed76d"
+      }
+    ],
+    "reproduced_sha256": "42c5e2aa0f2af6c16db4e3a2e4fe7d8fbd117e9d75ff2cbe39ea7a1c1007d291",
+    "within_tolerance": []
+  },
+  "contract": "IAP_Release_Programme_2026-10-17 section 9.6: byte-identical, else counts and strings exact, bps floats to 2 decimals, other floats rel 1e-12; provenance fields ['commit', 'toolchain.python_used_for_this_baseline', 'tree_is_clean_at_inputs'] expected to differ",
+  "date_utc": "2026-10-18T16:32:05+00:00",
+  "environment": {
+    "executable": "C:\\Users\\ashis\\AppData\\Local\\Temp\\claude\\C--Work-Claude\\1fdb53d2-02b4-4f3c-b54f-469a9746bed3\\scratchpad\\iap-repro-us39nphe\\venv\\Scripts\\python.exe",
+    "implementation": "CPython",
+    "packages": {
+      "PyYAML": "6.0.3",
+      "Pygments": "2.21.0",
+      "attrs": "26.1.0",
+      "cffi": "2.1.1",
+      "cloudpickle": "3.1.2",
+      "colorama": "0.4.6",
+      "coverage": "7.16.2",
+      "cryptography": "50.0.2",
+      "databento-dbn": "0.71.0",
+      "execnet": "2.1.2",
+      "hypothesis": "6.140.2",
+      "iniconfig": "2.3.1",
+      "joblib": "1.6.0",
+      "jsonschema": "4.26.0",
+      "jsonschema-specifications": "2025.9.1",
+      "narwhals": "2.26.0",
+      "numpy": "2.4.6",
+      "packaging": "26.3",
+      "pandas": "3.0.6",
+      "pip": "25.0.1",
+      "pluggy": "1.6.0",
+      "pyarrow": "25.0.1",
+      "pycparser": "3.0",
+      "pytest": "9.1.1",
+      "pytest-cov": "7.1.0",
+      "pytest-xdist": "3.8.0",
+      "python-dateutil": "2.9.0.post0",
+      "referencing": "0.37.0",
+      "rpds-py": "2026.9.1",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.17.1",
+      "six": "1.17.0",
+      "sortedcontainers": "2.4.0",
+      "threadpoolctl": "3.7.0",
+      "typing_extensions": "4.16.0",
+      "tzdata": "2026.5"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python_version": "3.12.10",
+    "requirements_ci_sha256": "3a4352e0d19d1a41021264ef8d382472f7c668520c42535e5f45971600a28375"
+  },
+  "exit_code": 1,
+  "host_python": "3.12.10",
+  "repo": "https://github.com/AshJha0/intraday-alpha-platform.git",
+  "requested_commit": "83f08210879263e03d2b8d068cc4bc21f04ed76d",
+  "schema": "iap.reproduction_record/1",
+  "verdict": "NOT REPRODUCED",
+  "verdict_detail": "1 command(s) failed; 27 discrepancies."
+}
