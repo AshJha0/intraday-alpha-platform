@@ -25,3 +25,5 @@ tests/golden/** -text
 
 # Windows batch wrapper started detached by cmd.exe: keep CRLF.
 tools/run_rel08c_extract.cmd text eol=crlf
+# Windows batch files of the B8 v2 run must stay CRLF on checkout.
+research/execution/b8v2/*.cmd text eol=crlf

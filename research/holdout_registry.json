@@ -1,5 +1,5 @@
 {
-  "body_sha256": "51a0e4e7b12c9fc71cbc2da7091143699d181315e3db4f912a8f19cb50b911df",
+  "body_sha256": "5c59e735e0322a1778e8c872cb69da94b4a85ae80a3f437720049d6241d3a80b",
   "datasets": {
     "00121a37bb26ac1d504f761f481d2786339ff9cc51bc3457dbf2b47eb87068ac": {
       "content_hash": "7589ed2c8ede152993547cc88362b067f68249110bfb18291e50c68a05792c5b",
@@ -610,7 +610,8 @@
         "spent_by": [
           "a6c5af759082b68f",
           "de2488a2a245cf2c",
-          "b8-oos-2026-10-16"
+          "b8-oos-2026-10-16",
+          "research/preregs/b8v2_prereg.json"
         ],
         "state": "spent",
         "symbols": [
@@ -676,7 +677,8 @@
         "spent_by": [
           "v1.8.0-holdout",
           "auc01",
-          "b8-oos-2026-10-16"
+          "b8-oos-2026-10-16",
+          "research/preregs/b8v2_prereg.json"
         ],
         "state": "spent",
         "symbols": [
@@ -698,7 +700,8 @@
         "spent_by": [
           "v1.8.0-holdout",
           "auc01",
-          "b8-oos-2026-10-16"
+          "b8-oos-2026-10-16",
+          "research/preregs/b8v2_prereg.json"
         ],
         "state": "spent",
         "symbols": [

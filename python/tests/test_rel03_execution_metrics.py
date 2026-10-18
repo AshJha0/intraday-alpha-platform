@@ -257,3 +257,65 @@ def test_holdout_check_is_one_function_and_uses_the_registry(monkeypatch):
     )
     bench.check_data_access(Path("x/r7_holdout"), allow_holdout=True)
     assert calls == [(Path("x/r7_holdout"), "execution_benchmark", True)]
+
+
+def _refuse_spent(monkeypatch):
+    import iap.research.holdout_registry as reg
+
+    seen: list[str] = []
+
+    def guard(d, purpose, pid=None):
+        seen.append(Path(d).name)
+        if "spent" in Path(d).name:
+            raise SystemExit(f"{d}: SPENT in the holdout registry")
+
+    monkeypatch.setattr(reg, "guard_or_exit", guard)
+    return seen
+
+
+@pytest.mark.parametrize(
+    "kw, refused",
+    [
+        ({"second_data_dir": "iex_spent"}, "iex_spent"),
+        ({"second_data_dir": "iex_ok", "more_pairs": (("holdout_spent", "iex_ok2"),)},
+         "holdout_spent"),
+        ({"second_data_dir": "iex_ok", "more_pairs": (("r7_ok", "iex_spent2"),)}, "iex_spent2"),
+    ],
+)  # fmt: skip
+def test_every_dataset_argument_goes_through_the_registry(dataset, monkeypatch, kw, refused):
+    seen = _refuse_spent(monkeypatch)
+    kw = {
+        k: (dataset.parent / v if isinstance(v, str) else
+            tuple((dataset.parent / a, dataset.parent / b) for a, b in v))
+        for k, v in kw.items()
+    }  # fmt: skip
+    with pytest.raises(SystemExit, match="SPENT"):
+        _run(dataset, **kw)
+    assert seen[0] == dataset.name and seen[-1] == refused  # refused before any read
+
+
+def test_paired_v2_is_opt_in_and_pairs_every_policy_with_the_baseline(dataset):
+    """REL-04b: ``paired_v2`` adds per-session sums and family-adjusted intervals."""
+    assert "paired_v2_vs_baseline" not in _run(dataset)
+    doc = bench.run_benchmark(
+        dataset,
+        config_dir=REPO / "configs",
+        sizes_pct=(0.0005, 0.002),
+        algos=("TWAP", "POV"),
+        policies=("native", "aggressive"),
+        baseline_policy="native",
+        window_min=1.5,
+        warmup_min=0.5,
+        timestamp=False,
+        paired_v2=True,
+        family_k=6,
+    )
+    p = doc["paired_v2_vs_baseline"]["aggressive-native"]
+    assert p["n_pairs"] > 0 and p["unpaired"] == {"base": 0, "other": 0}
+    s = p["trading_cost_per_filled_share_bps"]
+    assert s["family_k"] == 6 and s["n_clusters"] == 2
+    assert set(s["cluster_sums"]) == set(doc["coverage_by_session"])
+    lo, hi = s["ci_family"]
+    lo95, hi95 = s["ci95"]
+    assert hi - lo > hi95 - lo95  # the family interval is wider
+    assert s["mde_t_family"] > s["mde_t"]
