@@ -7,7 +7,10 @@ Two layers (docs/REAL_DATA.md is the user guide and holds the mapping table):
   gzip-compressed (detected by magic, not by file name).  It decodes the
   message types the platform maps (``S R H h Y L A F E C X D U P Q B``),
   length-checks and counts ``I`` (NOII; decoded only with the opt-in
-  ``noii=True``, for ``iap.auction``), and skips every other type by its
+  ``noii=True``, for ``iap.auction``), decodes ``J`` (LULD auction collar)
+  and ``V`` (MWCB decline levels) only with the opt-in
+  ``circuit_breakers=True`` (v1.18; by default they stay unknown types, so
+  every output byte is unchanged), and skips every other type by its
   length prefix with a per-type counter.  With a symbol filter the stock
   locate codes of the wanted symbols are learnt from the day's ``R``
   messages and every other message is skipped after reading three bytes, so
@@ -81,6 +84,13 @@ _P = struct.Struct(">xHHHIQcI8sIQ")
 _Q = struct.Struct(">xHHHIQ8sIQc")
 _B = struct.Struct(">xHHHIQ")
 _I = struct.Struct(">xHHHIQQc8sIIIcc")
+_J = struct.Struct(">xHHHI8sIIII")
+_V = struct.Struct(">xHHHIQQQ")
+
+#: Opt-in message lengths (``circuit_breakers=True``, v1.18): not in
+#: :data:`MESSAGE_LENGTHS`, so the default reader skips and counts them as
+#: unknown types exactly as before.
+OPT_IN_LENGTHS: dict[str, int] = {"J": 35, "V": 35}
 
 #: Pinned message lengths (type byte included), ITCH 5.0 specification.
 MESSAGE_LENGTHS: dict[str, int] = {
@@ -122,8 +132,8 @@ _STRUCTS = {
     "B": _B,
     "I": _I,
 }
-for _code, _st in _STRUCTS.items():
-    if _st.size != MESSAGE_LENGTHS[_code]:
+for _code, _st in (*_STRUCTS.items(), ("J", _J), ("V", _V)):
+    if _st.size != {**MESSAGE_LENGTHS, **OPT_IN_LENGTHS}[_code]:
         raise AssertionError(f"ITCH 5.0 layout {_code}: {_st.size} != {MESSAGE_LENGTHS[_code]}")
 
 #: Message types the reader decodes or length-checks.
@@ -315,6 +325,37 @@ class NetOrderImbalance(NamedTuple):
     price_variation: str
 
 
+class LuldAuctionCollar(NamedTuple):
+    """``J`` — LULD auction collar of a paused security (prices 1/10000 $).
+
+    Only yielded by a reader built with ``circuit_breakers=True`` (opt-in);
+    the mapper ignores it, so it never reaches the canonical stream.
+    """
+
+    locate: int
+    ts: int
+    stock: str
+    reference_price: int
+    upper_collar_price: int
+    lower_collar_price: int
+    collar_extension: int
+
+
+class MwcbDeclineLevel(NamedTuple):
+    """``V`` — market-wide circuit breaker decline levels for the day.
+
+    Prices are ITCH ``Price (8)``: 1/100000000 dollar.  Market wide (locate
+    0), so a symbol filter never drops it.  Opt-in like
+    :class:`LuldAuctionCollar`; the mapper ignores it.
+    """
+
+    locate: int
+    ts: int
+    level1_price: int
+    level2_price: int
+    level3_price: int
+
+
 class BrokenTrade(NamedTuple):
     """``B`` — an earlier execution (``match_number``) was broken."""
 
@@ -373,6 +414,7 @@ class Itch50Reader:
         limit_messages: int | None = None,
         chunk_size: int = 1 << 20,
         noii: bool = False,
+        circuit_breakers: bool = False,
     ) -> None:
         if limit_messages is not None and limit_messages < 0:
             raise ValueError("limit_messages must be >= 0")
@@ -387,6 +429,9 @@ class Itch50Reader:
         self.chunk_size = chunk_size
         #: opt-in: yield ``I`` messages as :class:`NetOrderImbalance`
         self.noii = bool(noii)
+        #: opt-in (v1.18): length-check, count and yield ``J`` / ``V`` as
+        #: :class:`LuldAuctionCollar` / :class:`MwcbDeclineLevel`
+        self.circuit_breakers = bool(circuit_breakers)
         self.counts: dict[str, int] = {t: 0 for t in SUPPORTED_TYPES}
         self.skipped_unknown: dict[str, int] = {}
         self.filtered = 0
@@ -421,13 +466,16 @@ class Itch50Reader:
         known = [0] * 256
         for code, length in MESSAGE_LENGTHS.items():
             known[ord(code)] = length
+        if self.circuit_breakers:
+            for code, length in OPT_IN_LENGTHS.items():
+                known[ord(code)] = length
         limit = self.limit_messages
         total = 0
         filtered = 0
         buf = b""
         pos = 0
         base = 0  # absolute offset of buf[0] in the decompressed stream
-        t_s, t_r, t_i = ord("S"), ord("R"), ord("I")
+        t_s, t_r, t_i, t_v = ord("S"), ord("R"), ord("I"), ord("V")
         keep_noii = self.noii
         try:
             while True:
@@ -476,6 +524,9 @@ class Itch50Reader:
                 if mtype == t_s:
                     _, _, hi, lo, code = _S.unpack_from(buf, start)
                     yield SystemEvent((hi << 32) | lo, code.decode("ascii", "replace"))
+                    continue
+                if mtype == t_v:  # only reached when opted in (known[V] != 0)
+                    yield _dec_v(buf, start)
                     continue
                 if mtype == t_r:
                     if filtering and buf[start + 11 : start + 19] not in wanted_raw:
@@ -657,7 +708,18 @@ def _dec_i(buf: bytes, start: int) -> NetOrderImbalance:
     )
 
 
+def _dec_j(buf: bytes, start: int) -> LuldAuctionCollar:
+    loc, _, hi, lo, stock, ref, upper, lower, ext = _J.unpack_from(buf, start)
+    return LuldAuctionCollar(loc, (hi << 32) | lo, _txt(stock), ref, upper, lower, ext)
+
+
+def _dec_v(buf: bytes, start: int) -> MwcbDeclineLevel:
+    loc, _, hi, lo, l1, l2, l3 = _V.unpack_from(buf, start)
+    return MwcbDeclineLevel(loc, (hi << 32) | lo, l1, l2, l3)
+
+
 _DECODERS = {
+    ord("J"): _dec_j,
     ord("I"): _dec_i,
     ord("H"): _dec_h,
     ord("h"): _dec_op_halt,

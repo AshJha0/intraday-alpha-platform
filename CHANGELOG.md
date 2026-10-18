@@ -6,6 +6,10 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## Unreleased
+
+- v1.18 REL-12 ITCH `J` / `V`: `Itch50Reader(circuit_breakers=True)` (opt-in, off by default) length-checks, counts and yields ITCH 5.0 `J` LULD auction collars and `V` MWCB decline levels as `LuldAuctionCollar` / `MwcbDeclineLevel`; `V` is market wide and survives a symbol filter; the mapper ignores both. The default reader still skips and counts them as unknown types, so no output byte moves: the pinned ingest hashes (`test_real_data_ingest.py`) are unchanged, and `tests/test_itch50_luld_mwcb.py` ingests the same day with and without J / V to identical raw and normalized bytes.
+
 ## v1.17.1 — 2026-10-17
 
 Theme: negative results first, plus the release-workflow fix. B7 (signal-aware execution fresh test) is CLOSED on its negative in-sample result: nothing signed, nothing registered, the fresh days unread. B8 (two-venue router on real Nasdaq + IEX books) is negative on the first two overlap days (`sor` +5.1 ± 1.3 bps all-in and 8 pp lower fill than pinned Nasdaq; the opt-in `sor_sweep` route +3.8 ± 2.1 bps; 2 day clusters, provisional); the pre-declared six-day out-of-sample run (calibrated on 3 days, evaluated on 3 others; AAPL, MSFT) is also negative: `sor` +2.2 / +1.1 bps and `sor_sweep` +0.6 / +1.2 bps vs pinned Nasdaq (AAPL / MSFT), no 95 % interval excludes zero (`research/execution/b8/REPORT_oos6.md`). Six of the nine IEX overlap days are recorded on main (2025-11-28, 12-08, 12-09, 12-10, 2026-05-15, 2026-05-18; TOPS oracle 0 mismatches on AAPL / MSFT / QQQ for every day), and `process-iex-day --keep-normalized` keeps the normalized events so both venues can be replayed. Release workflow: the v1.17.0 manifest job failed (`cyclonedx-py requirements -i` is `--index-url`), so v1.17.0 has no `release-manifest.json`, no Python lock-file SBOMs and no digest-pinned k8s manifests; #211 fixes it and v1.17.1 is the first release to carry them. Notes: docs/release/v1.17.1_RELEASE_NOTES.md.
