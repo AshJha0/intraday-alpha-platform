@@ -8,6 +8,8 @@ that tag.
 
 ## Unreleased
 
+- v1.18 REL-17 / REL-11 code path: `iap.portfolio.rel11_enforced.run_enforced_book` is the walk-forward loop REL-11's books will use, with every rebalance solved under the enforced portfolio limits. A refused target holds the previous book and is logged; a tripped loss stop halts trading until reset. Code only: REL-11 stays conditional on REL-08.
+
 - v1.18 REL-17 enforced limits and kill switch: `iap.risk.portfolio_limits` reads a versioned declarative limit set (`configs/risk/portfolio_limits.json`: gross, net, per-name, sector net and gross, beta, liquidity-adjusted participation, signal concentration and correlation, daily loss, drawdown) and refuses any breaching weight set or order (`LimitRefused`); the kill switch latches until an explicit operator reset and reports through a one-method `HaltSink` hook for REL-16. `iap.portfolio.enforced.solve_enforced` builds the optimizer constraints from the limits and refuses any result that still breaches. The order-level risk engine and its Rust parity goldens are unchanged; `docs/PORTFOLIO_LIMITS.md`.
 
 - v1.18 batch 5 integration fix: the identity-v2 guard (`test_no_prereg_consumer_skips_the_identity_check`) found the new REL-08c, REL-09 and REL-10 runners unregistered; they are registered (each calls `verify_identity`). `iap.auction.rel08c_study.run_study` accepted any signed prereg id when called directly; it now also requires the prereg's bound analysis identity to match the code, configs, lock and interpreter on disk (`environment_mismatches`), closing a library-level bypass of review finding 1.
