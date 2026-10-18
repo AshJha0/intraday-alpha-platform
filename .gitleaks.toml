@@ -6,11 +6,11 @@ title = "iap gitleaks config"
 useDefault = true
 
 [[allowlists]]
-description = "research/experiments.json content keys are SHA-256 digests of the experiment spec, not credentials"
+description = "ledger content keys are SHA-256 digests of the experiment spec, not credentials: research/experiments.json and its v1.18 inventory copy research/v118/LEDGER_INVENTORY.json"
 condition = "AND"
 regexTarget = "line"
 regexes = ['''^\s*"key": "[0-9a-f]{64}",?\s*$''']
-paths = ['''^research/experiments\.json$''']
+paths = ['''^research/experiments\.json$''', '''^research/v118/LEDGER_INVENTORY\.json$''']
 
 [[allowlists]]
 description = "COOKBOOK demo of the local admin kill switch uses the documented placeholder bearer token dev-token"
