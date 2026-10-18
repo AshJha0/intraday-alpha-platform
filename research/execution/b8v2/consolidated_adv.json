@@ -1,6 +1,6 @@
 {
   "_note": "REL-04b: consolidated (all US venues) average daily volume, shares, per symbol, for SIZE LABELS ONLY (cell keys and the decision do not use it). Owner-supplied from a free public source before the prereg is bound; the runner and the bind helper refuse while a value is null. State the source and averaging window in _source.",
-  "_source": null,
-  "AAPL": null,
-  "MSFT": null
+  "_source": "Yahoo Finance public chart data (query1.finance.yahoo.com/v8/finance/chart, interval 1d; consolidated volume, all US venues), arithmetic mean of daily share volume over the 20 trading days 2025-10-30 to 2025-11-26 inclusive, the last full session before the first calibration day 2025-11-28, so no study day enters the labels. Medians over the same window: AAPL 47,829,350, MSFT 26,338,200. Fetched and filled by Claude on 2026-10-18 with the owner's approval; size labels only, the decision does not use it.",
+  "AAPL": 50674810,
+  "MSFT": 27006175
 }
