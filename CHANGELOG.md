@@ -8,6 +8,8 @@ that tag.
 
 ## Unreleased
 
+- v1.18 REL-16 monitoring policy: `docs/MONITORING_POLICY.md` and a new `iap.monitoring` package. It is a deterministic ACTIVE / WATCH / REVIEW / HALT / UNKNOWN state machine driven by `configs/monitoring/policy.json`, a versioned file whose hash is stamped on every evaluation. Any missing, stale or invalid input gives UNKNOWN, and UNKNOWN never allows new risk. HALT latches and is released only by a bound acknowledgement, which moves the state to REVIEW. A report generator replaces the live-to-backtest Sharpe ratio, and AI is limited to explaining the computed state. Synthetic evidence: the noise false-alarm rate is 2.4 % (Wilson [1.6, 3.6] %) against a declared ≤ 5 %, and a 1-sd decay is caught at REVIEW with median delay 11 and p95 19 sessions against a declared 25. `monitoring` is added to the import-policy guard.
+
 - v1.18 batch 5 integration fix: the identity-v2 guard (`test_no_prereg_consumer_skips_the_identity_check`) found the new REL-08c, REL-09 and REL-10 runners unregistered; they are registered (each calls `verify_identity`). `iap.auction.rel08c_study.run_study` accepted any signed prereg id when called directly; it now also requires the prereg's bound analysis identity to match the code, configs, lock and interpreter on disk (`environment_mismatches`), closing a library-level bypass of review finding 1.
 
 - v1.18 gitleaks: the existing narrow allowlist for ledger content keys (`"key": "<64 hex>"`, SHA-256 digests of the experiment spec) now also covers `research/v118/LEDGER_INVENTORY.json`, the reviewer-finding-4 inventory copy of those keys. CI scans the whole history of all fetched branches, so the inventory branch had turned every PR's `advisory` check red with generic-api-key false positives.

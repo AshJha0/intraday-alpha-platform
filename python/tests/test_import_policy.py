@@ -34,6 +34,7 @@ GUARDED_PACKAGES = (
     "alpha",
     "replay",
     "trace",
+    "monitoring",
 )
 
 #: Top-level module names that are network clients / servers or transports.
