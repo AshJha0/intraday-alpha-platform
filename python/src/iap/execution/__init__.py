@@ -15,6 +15,7 @@ from iap.execution.algos import (
     slice_times,
     slice_weights,
 )
+from iap.execution.child_exec import ChildExecParams
 from iap.execution.config import (
     EXECUTION_FILE,
     INSTRUMENTS_FILE,
@@ -98,6 +99,7 @@ __all__ = [
     "VENUE_TYPES",
     "DarkControls",
     "DarkFillModel",
+    "ChildExecParams",
     "DarkFirstParams",
     "dark_pretrade_check",
     "Fill",

@@ -129,6 +129,7 @@ from iap.execution import (
     load_sor_options,
 )
 from iap.execution.calibration import load_calibration
+from iap.execution.child_exec import ChildExecParams
 from iap.execution.config import load_venues
 from iap.execution.dark import (
     DARK_CONTROL_CODES,
@@ -146,6 +147,7 @@ from iap.research.two_venue import (
     ALIGNMENT_RULE,
     IEX_CLOCKS,
     ROUTE_POLICIES,
+    SKEW_QUALIFICATION,
     instrument_map,
     load_calibrations,
     merge_events,
@@ -179,7 +181,11 @@ VARIANTS: dict[str, str | None] = {
     "qcancel": None,  #: B5: queue-aware cancels on posted children (passive base only)
     "fade_qcancel": None,  #: B4 + B5 together (passive base only)
     "dark": None,  #: B10: dark-first posting on any base (needs a dark venue)
+    "capped": None,  #: REL-04: IS / POV / aggressive children capped at eligible depth
+    "peg": None,  #: REL-04: midpoint-peg children (needs --hidden-prints to fill)
 }
+#: REL-04 child-execution variants: need no signal
+CHILD_VARIANTS: tuple[str, ...] = ("capped", "peg")
 DARK_VARIANT = "dark"
 #: the variants that pull resting children: they need the ``passive`` base
 PULL_VARIANTS: tuple[str, ...] = ("fade", "qcancel", "fade_qcancel")
@@ -347,6 +353,7 @@ def signal_variant(
     fade: FadeParams | None = None,
     queue_cancel: QueueCancelParams | None = None,
     dark: DarkFirstParams | None = None,
+    child_exec: ChildExecParams | None = None,
 ) -> ParentOrder | None:
     """``p`` worked under policy ``name``; ``None`` when the variant does not
     apply to this parent's algo (AC variants are IS-only)."""
@@ -358,6 +365,10 @@ def signal_variant(
         if dark is None:
             raise SystemExit("the dark variant needs a dark venue (--venues) and --dark-model")
         return replace(p, dark_first=dark)
+    if variant in CHILD_VARIANTS:
+        ce = child_exec or ChildExecParams()
+        style = "midpoint_peg" if variant == "peg" else "capped_ioc"
+        return replace(p, child_exec=replace(ce, style=style))
     if variant in PULL_VARIANTS:
         if variant in ("fade", "fade_qcancel"):
             if fade is None:
@@ -655,6 +666,20 @@ def _cell_summary(rows: list[dict], seed: int) -> dict[str, object]:
             for key in REPORT_COSTS
         },
     }
+    # REL-04: every way a parent under-delivers is a COUNTER here, never silent
+    out["failures"] = {
+        "incomplete_parents": sum(1 for r in rows if r["filled_qty"] < r["qty"]),
+        "incomplete_share": sum(1 for r in rows if r["filled_qty"] < r["qty"]) / len(rows),
+        "residual_qty": sum(r["qty"] - r["filled_qty"] for r in rows),
+        "depth_exhausted_children": sum(r["depth_exhausted"] for r in rows),
+        "cap_no_depth_posts": sum(r.get("cap_no_depth", 0) for r in rows),
+        "cap_no_depth_parents": sum(1 for r in rows if r.get("cap_no_depth", 0) > 0),
+        "cap_withheld_qty": sum(r.get("cap_withheld_qty", 0) for r in rows),
+        "reposts": sum(r.get("reposts", 0) for r in rows),
+        "carry_unsent_qty": sum(r.get("carry_unsent_qty", 0) for r in rows),
+        "note": "residual is reported, never filled; depth_exhausted is the legacy MARKET "
+        "walk running out of depth, cap_no_depth a capped post that found no eligible depth",
+    }
     if rows and "m_fill_cost" in rows[0]:
         out["metrics_v2"] = exm.aggregate(rows)
     return out
@@ -754,6 +779,11 @@ def run_benchmark(
     more_pairs: tuple[tuple[Path, Path], ...] = (),
     cover_all_cells: bool = False,
     consolidated_adv: Path | None = None,
+    hidden_prints: bool = False,
+    peg_ahead_qty: int = 0,
+    md_delay_ns: int = 0,
+    venue_inbound_delay_ns: dict[str, int] | None = None,
+    child_exec: ChildExecParams | None = None,
 ) -> dict[str, object]:
     """Run the grid; returns the JSON document (see the module docstring).
 
@@ -776,6 +806,14 @@ def run_benchmark(
     is a JSON ``{symbol: consolidated daily shares}``: sizes are then also
     labelled in % of consolidated ADV (X-F); the grid itself is still sized
     from the venue ADV in ``instruments.json``.
+
+    REL-04 fidelity (all opt-in, default off): ``hidden_prints`` lets
+    non-displayed TRADE prints fill resting children and midpoint pegs;
+    ``peg_ahead_qty`` is the modelled midpoint queue; ``md_delay_ns`` delays
+    child decisions of the ``capped`` / ``peg`` variants by the market-data
+    delay; ``venue_inbound_delay_ns`` maps a venue name to its inbound delay
+    (IEX: 350_000, the speed bump); ``child_exec`` holds the cap knobs of the
+    ``capped`` / ``peg`` variants (:mod:`iap.execution.child_exec`).
 
     ``venues`` replaces the venue table; the ``dark_*`` knobs build the B10
     :class:`DarkFirstParams` of the ``dark`` variant (``dark_model`` = a
@@ -809,7 +847,8 @@ def run_benchmark(
     if baseline_policy not in policies:
         raise SystemExit(f"baseline policy {baseline_policy!r} is not in --policies")
     if signal == "none" and any(
-        parse_policy(pol)[1] not in (None, DARK_VARIANT, *PULL_VARIANTS) for pol in policies
+        parse_policy(pol)[1] not in (None, DARK_VARIANT, *PULL_VARIANTS, *CHILD_VARIANTS)
+        for pol in policies
     ):
         raise SystemExit("signal-aware policies need --signal (an alpha id or 'synthetic')")
     pull_variants_used = {parse_policy(pol)[1] for pol in policies} & set(PULL_VARIANTS)
@@ -895,7 +934,26 @@ def run_benchmark(
             load_venues(Path(second_data_dir) / "configs" / "venues" / "venues.json")
         )
         cfg = replace(cfg, venues=merged_venues)
+    if venue_inbound_delay_ns:
+        by_name = {sp.name: v for v, sp in cfg.venues.items()}
+        unknown = sorted(set(venue_inbound_delay_ns) - set(by_name))
+        if unknown:
+            raise SystemExit(f"--inbound-delay names unknown venues {unknown} ({sorted(by_name)})")
+        cfg = replace(
+            cfg,
+            venues={
+                v: replace(
+                    sp, inbound_delay_ns=venue_inbound_delay_ns.get(sp.name, sp.inbound_delay_ns)
+                )
+                for v, sp in cfg.venues.items()
+            },
+        )
     sor = load_sor_options(config_dir / "execution" / "execution.json")
+    rkw = {
+        "hidden_prints": hidden_prints,
+        "peg_ahead_qty": peg_ahead_qty,
+        "md_delay_ns": md_delay_ns,
+    }
     # v1.17 B8: route policies (pinned venue or the sor_v2 router)
     if iex_clock not in IEX_CLOCKS:
         raise SystemExit(f"--iex-clock must be one of {IEX_CLOCKS}")
@@ -1213,6 +1271,7 @@ def run_benchmark(
                             fade=fade_params,
                             queue_cancel=qcancel_params,
                             dark=dark_params,
+                            child_exec=child_exec,
                         )
                         if q is not None:
                             worked.append(q)
@@ -1224,7 +1283,7 @@ def run_benchmark(
                         worked = [replace(q, venue_id=pin_of[route]) for q in worked]
                     if route == "sor":
                         res = ExecutionReplay(
-                            cfg, worked, sor, router=router, router_fill_prob=router_fp
+                            cfg, worked, sor, router=router, router_fill_prob=router_fp, **rkw
                         ).run(evs)
                     elif route == "sor_sweep":
                         res = ExecutionReplay(
@@ -1234,10 +1293,11 @@ def run_benchmark(
                             router=sweep_router,
                             router_fill_prob=router_fp,
                             router_sweep=True,
+                            **rkw,
                         ).run(evs)
                         sweep_unsent[pol] = sweep_unsent.get(pol, 0) + res.sweep_unsent_qty
                     else:
-                        res = ExecutionReplay(cfg, worked, sor).run(evs)
+                        res = ExecutionReplay(cfg, worked, sor, **rkw).run(evs)
                     fills_of: dict[int, list] = {p.parent_id: [] for p in worked}
                     for f in res.fills:
                         fills_of[f.parent_id].append(f)
@@ -1337,6 +1397,11 @@ def run_benchmark(
                                 "dark_expired_qty": rep.dark_expired_qty,
                                 "dark_unsent_qty": rep.dark_unsent_qty,
                                 "dark_rejected": rep.dark_rejected,
+                                "cap_no_depth": rep.cap_no_depth,
+                                "cap_withheld_qty": rep.cap_withheld_qty,
+                                "reposts": rep.reposts,
+                                "carry_unsent_qty": rep.carry_unsent_qty,
+                                "residual_qty": rep.residual_qty,
                             }
                         )
                         rows[pol].append(row)
@@ -1606,6 +1671,7 @@ def two_venue_block(
     return {
         "item": "v1.17 B8",
         "alignment": ALIGNMENT_RULE,
+        "feed_latency_skew_note": SKEW_QUALIFICATION,
         **meta,
         "paired_pooled": pooled,
         "paired_rows": pairs,
@@ -2042,6 +2108,32 @@ def main(argv: list[str] | None = None) -> int:
         "the v1.17 rotation, 12 windows for 16 cells)",
     )
     ap.add_argument(
+        "--hidden-prints",
+        action="store_true",
+        help="REL-04: non-displayed TRADE prints fill resting children and midpoint pegs",
+    )
+    ap.add_argument("--peg-ahead-qty", type=int, default=0, help="REL-04: modelled midpoint queue")
+    ap.add_argument(
+        "--md-delay-ns",
+        type=int,
+        default=0,
+        help="REL-04: market-data delay of capped / peg children",
+    )
+    ap.add_argument(
+        "--inbound-delay",
+        action="append",
+        default=[],
+        metavar="VENUE=NS",
+        help="REL-04: inbound order/cancel delay of a venue (IEX speed bump: IEXG=350000)",
+    )
+    ap.add_argument("--child-max-levels", type=int, default=3, help="REL-04 capped / peg variants")
+    ap.add_argument("--child-depth-fraction", type=float, default=1.0)
+    ap.add_argument("--child-max-slippage-ticks", type=int, default=0)
+    ap.add_argument("--child-max-participation", type=float, default=0.0)
+    ap.add_argument("--child-repost-interval-s", type=float, default=1.0)
+    ap.add_argument("--child-max-reposts", type=int, default=20)
+    ap.add_argument("--child-peg-deadline-s", type=float, default=0.0)
+    ap.add_argument(
         "--consolidated-adv",
         type=Path,
         default=None,
@@ -2218,6 +2310,22 @@ def main(argv: list[str] | None = None) -> int:
         more_pairs=tuple((Path(a), Path(b)) for a, b in args.pair_dir),
         cover_all_cells=args.cover_all_cells,
         consolidated_adv=args.consolidated_adv,
+        hidden_prints=args.hidden_prints,
+        peg_ahead_qty=args.peg_ahead_qty,
+        md_delay_ns=args.md_delay_ns,
+        venue_inbound_delay_ns={
+            k: int(v) for k, _, v in (a.partition("=") for a in args.inbound_delay)
+        }
+        or None,
+        child_exec=ChildExecParams(
+            max_levels=args.child_max_levels,
+            depth_fraction=args.child_depth_fraction,
+            max_slippage_ticks=args.child_max_slippage_ticks,
+            max_participation=args.child_max_participation,
+            repost_interval_ns=int(args.child_repost_interval_s * SEC),
+            max_reposts=args.child_max_reposts,
+            deadline_ns=int(args.child_peg_deadline_s * SEC),
+        ),
     )
     tag = args.tag or Path(args.data_dir).name
     args.out.mkdir(parents=True, exist_ok=True)
