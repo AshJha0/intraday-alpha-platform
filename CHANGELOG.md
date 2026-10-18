@@ -8,6 +8,8 @@ that tag.
 
 ## Unreleased
 
+- v1.18 REL-06 known-null protocol v2 DRAFT (unsigned, nothing run): `research/v118/NULL_PROTOCOL_v2.md` and `research/v118/known_null_v2_config.json`. Explains why v1 could not test size (its null has a net mean of about -1.4 bps per trip after costs); adds a cost-neutral size arm (S1 re-centred net, S2 gross; v1 pass rule; new base seeds 20261101/02) and a planted-effect power arm (200 trials per delta of 0.5/1/2 bps, seeds 20261103/04). The runner changes it needs are listed in its section 9.
+
 - v1.18 signatures (2026-10-18, signed by the owner `ashjha0` with the maintainer key from `.venv-ci`, before any trial or data read): `research/v118/null_protocol_prereg.json` (known-null protocol, analysis identity bound at 4a6f473: runner, config and protocol fingerprints, K = 3/6/16, pass rule point <= 5 % and Wilson upper <= 7 %) and `research/v118/rel08_rule_signed.json` (REL-08 continuation rule, K = 7, identity at ad842df). Parameters were set by Claude under the owner's delegation; Claude's own signing attempt was blocked by the Claude Code permission classifier, so the owner signed. Both runs must be started by an actor other than the signer (`IAP_RUN_ACTOR`); the outside reviewer's written approval of the null protocol is still required before the gate becomes mandatory (programme gate F3).
 
 - v1.18 D5(a) applied (owner-approved 2026-10-18): the `protect-main` ruleset no longer requires `cpp-sanitizers` and now requires `docs` and `reproducible-build` (17 required checks, read back from the API); in ci.yml the C++ benchmark regression guard and the C++ image smoke run are `continue-on-error` (still run and reported). GOVERNANCE.md section 0 and the D5(a) proposal record it.
