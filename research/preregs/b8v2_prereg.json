@@ -1,0 +1,185 @@
+{
+  "analysis_identity": {
+    "code_tree_sha256": "dca0907ec800dfaeaa9c014601c77562f96b9bd82ce0a838abb0202a08ddd84c",
+    "commit": "4980fc11bd7542ab238af4577554058279505382",
+    "data_versions": [
+      "33d0cbe8a6601850472f584a919b98211dd1841af6667b4cd6faf22c51ffc157",
+      "ba2022d0d53c013be27f9b3ce6eeef13baa4280009ef32f6c2761b43e61037f4",
+      "bd6f9c707d898007ca281ff093602176c39ac1cf45e0894808e7d1f14bdd3904",
+      "d7f7ffd14fbc363550a5bc9afd886e36df0d851511f840615f1f089b22f5f237",
+      "dea2a6b03ae35df24e5c8751bea8ddcc0f9ca8b93e02c9e2fdb656b6ab62fd80"
+    ],
+    "family": "REL-04b B8 v2: 3 policies (pin_iex, sor, sor_sweep) x 2 symbols (AAPL, MSFT) (K=6); baseline pin_nasdaq; evaluate 2025-12-10,2026-05-15,2026-05-18",
+    "metrics": [
+      "completion_charge_bps",
+      "cost_per_filled_share_bps",
+      "fill_rate",
+      "shortfall_per_target_share_bps",
+      "trading_cost_per_filled_share_bps"
+    ],
+    "scripts": {
+      "research/execution/b8/calibration_train3/venue_calibration_IEXG.json": "7996482c76248acbf20bca128e93d846505fb95548897d35984b38d078f04e6e",
+      "research/execution/b8/calibration_train3/venue_calibration_XNAS.json": "4d3bebadd93776d8a195496126f49feba430b3e0e6d274c4b8381039026ce67d",
+      "research/execution/b8/venues_xnas_iexg_v2.json": "1261cfc6afd76d1318703d8be56447d79e84f71028399f508f83a4909f7b3a78",
+      "research/execution/b8v2/consolidated_adv.json": "7d070fb6e7da7f5ac2bd77f07044cffe203424f32c7fa288f6a724fd736c63ed",
+      "research/execution/b8v2/predeclaration.json": "0bf8db026accf387e2ec62b445646fa89a7a27c06b256ad4705eebb17d91c7fc",
+      "research/execution/b8v2/run_b8v2.py": "cf4599419ca6f8a87cba4d0de2a93b52ad25634de510bb2b91eff1d85be5c344"
+    },
+    "thresholds": {
+      "baseline_policy": "pin_nasdaq",
+      "benchmark": {
+        "adv_table": "instruments",
+        "adv_table_note": "per-session ADV from each dataset's instruments.json adv_by_session ('session')",
+        "algos": [
+          "TWAP",
+          "VWAP",
+          "POV",
+          "IS"
+        ],
+        "child_exec": {
+          "deadline_ns": 0,
+          "depth_fraction": 1.0,
+          "max_levels": 3,
+          "max_participation": 0.0,
+          "max_reposts": 20,
+          "max_slippage_ticks": 0,
+          "min_child_qty": 1,
+          "repost_interval_ns": 1000000000,
+          "style": "capped_ioc"
+        },
+        "child_exec_note": "Headline policies run as <route>+capped: every non-passive child (IS, POV, and the marketable catch-up children of every algo) is a marketable IOC LIMIT capped at the eligible displayed depth (top 3 opposite levels, net of our own consumption, full fraction, no tick band), unfilled or withheld quantity owed and re-posted at most every 1 s, at most 20 times, never after the window; what is still owed at the end is residual, priced by the completion charge, never filled. TWAP / VWAP passive slices are unchanged. sor_sweep: its non-passive children take the sweep path (sized to both books' displayed depth, excess counted in sweep_unsent_qty) before the cap applies, so the cap does not change them; this is the existing REL-04 replay rule, declared here, not altered.",
+        "child_variant": "capped",
+        "consolidated_adv": "research/execution/b8v2/consolidated_adv.json",
+        "cover_all_cells": true,
+        "hidden_prints": true,
+        "iex_clock": "exchange",
+        "impact_exponent": 1.0,
+        "impact_model": "parent",
+        "max_child_qty": 1000,
+        "md_delay_ns": 0,
+        "participation": 0.1,
+        "router_fill_horizon_s": 1.0,
+        "router_tox_horizon": "1s",
+        "seed": 20260829,
+        "sizes_pct": [
+          0.1,
+          0.5,
+          1.0,
+          2.0
+        ],
+        "slices": 5,
+        "urgency": 0.5,
+        "venues": "research/execution/b8/venues_xnas_iexg_v2.json",
+        "walk_depth_levels": 10,
+        "warmup_min": 5.0,
+        "window_min": 30.0
+      },
+      "calibrate_sessions": [
+        "2025-11-28",
+        "2025-12-08",
+        "2025-12-09"
+      ],
+      "decision_rule": {
+        "better": "ci_family of d(trading cost per filled share) entirely < 0 AND ci_family of d(fill rate) not entirely < 0 AND ci_family of d(completion charge) not entirely > 0",
+        "no_evidence": "anything else; reported with the sign and size",
+        "not_estimable": "fewer than 2 clusters",
+        "order": "negative results are stated first",
+        "policy_claim": "a policy is better than pin_nasdaq only if it is 'better' on BOTH symbols",
+        "underpowered": "added to no_evidence when mde_t_family of the primary exceeds economic_threshold_bps (or of fill rate exceeds fill_rate_threshold)",
+        "worse": "ci_family of d(trading cost per filled share) entirely > 0 OR ci_family of d(fill rate) entirely < 0"
+      },
+      "evaluate_sessions": [
+        "2025-12-10",
+        "2026-05-15",
+        "2026-05-18"
+      ],
+      "latency_assumption": {
+        "iex_clock": "exchange (IEX send timestamps aligned to Nasdaq exchange timestamps)",
+        "iexg_inbound_delay_ns": 350000,
+        "internal_legs": "ExecConfig.latency defaults (decision / risk / wire, 200 microseconds total) for both venues",
+        "md_delay_ns": 0,
+        "name": "L0: exchange timestamps, no measured order-entry latency",
+        "not_measured": "The REL-04 IEX capture-timestamp re-ingest has NOT run; no feed or order-entry latency is measured. A re-run with measured latency is a SEPARATE declaration and prereg.",
+        "venue_legs_ns": {
+          "IEXG": 0,
+          "XNAS": 0
+        }
+      },
+      "policies": [
+        "pin_nasdaq",
+        "pin_iex",
+        "sor",
+        "sor_sweep"
+      ],
+      "reproducibility_tolerance": {
+        "bps": 0.01,
+        "counts": 0,
+        "fraction": 0.0001
+      },
+      "sensitivity": [
+        {
+          "change": {
+            "hidden_prints": false
+          },
+          "tag": "s1_no_hidden",
+          "why": "fill assumption: no non-displayed prints"
+        },
+        {
+          "change": {
+            "impact_model": "child"
+          },
+          "tag": "s2_child_impact",
+          "why": "impact model: per-child adder"
+        },
+        {
+          "change": {
+            "child_variant": null
+          },
+          "tag": "s3_v117_child",
+          "why": "the v1.17 1,000-share MARKET child, for comparability with the v1.17.1 oos6 result (finding X-B: it depth-exhausts IS parents)"
+        }
+      ],
+      "statistics": {
+        "alpha_family": 0.05,
+        "co_primary": [
+          "completion_charge_bps",
+          "fill_rate"
+        ],
+        "contrast": "policy - pin_nasdaq on the same parents (session, symbol, window, algo, size), pooled over all 16 cells, per symbol",
+        "economic_threshold_bps": 1.0,
+        "estimator": "difference of quantity-weighted pooled ratios, CR1 cluster-linearised SE, one cluster per session, Student-t at G-1 df (iap.research.execution_metrics.ratio_diff_stats)",
+        "family": "3 policies (pin_iex, sor, sor_sweep) x 2 symbols (AAPL, MSFT)",
+        "family_k": 6,
+        "fill_rate_threshold": 0.02,
+        "interval_for_decision": "ci_family: two-sided 1 - 0.05/6 (Bonferroni over K = 6)",
+        "primary": "trading_cost_per_filled_share_bps",
+        "secondary": [
+          "shortfall_per_target_share_bps",
+          "cost_per_filled_share_bps"
+        ]
+      },
+      "symbols": [
+        "AAPL",
+        "MSFT"
+      ]
+    }
+  },
+  "bound_utc": "2026-10-18T15:27:10+00:00",
+  "kind": "analysis_prereg",
+  "prereg_id": "research/preregs/b8v2_prereg.json",
+  "protocol": "research/execution/b8v2/PREDECLARATION.md",
+  "protocol_sha256": "cbea27ad5417fab22ba6d594fcc6294213d874c35c38daeb26414c03f42e234b",
+  "signature": {
+    "maintainer": "ashjha0",
+    "message": "iap.agents.blackboard.canonical(this document without 'signature')",
+    "message_sha256": "a41fcacc2ae8887334b6724399e2ec8630fd9f03b6b23b5647cca4885183bceb",
+    "public_key": "02a3e278cda3efac7dcd266fb8a3821a1415f0725a73f8b255aac84083c2106c",
+    "scheme": "ed25519",
+    "sig": "65b4d9c5a16e79f358564899a03cddbdb97e28ad69350c29809f8675622bf013080008c5ff580d5d712a34f93976379acd3e03edf1d94bfbf3841b96ad5f840d",
+    "trust_root": "research/agents/trust_roots.json"
+  },
+  "signed": true,
+  "signed_utc": "2026-10-18T15:27:18+00:00",
+  "status": "SIGNED: the analysis identity is bound; edits void the signature",
+  "x-version": 1
+}
