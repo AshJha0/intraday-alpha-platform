@@ -22,7 +22,7 @@ numpy==2.4.6
 packaging==26.3
 pandas==3.0.6
 pluggy==1.6.0
-pycparser==3.0
+pycparser==3.11
 pyarrow==26.0.0
 pygments==2.21.0
 pytest-cov==7.1.0
