@@ -1,0 +1,72 @@
+{
+  "analysis_identity": {
+    "code_tree_sha256": "63b7e7f667ab3d7eacb3ea3732e163823c6485cf2bcd69dc5f8acb20189b8c2c",
+    "commit": "4a6f4735cf262183bc9d362192e4ca78b60bba8e",
+    "data_versions": [
+      "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+    ],
+    "family": "REL-06 known-null: K16 (K=16), K3 (K=3), K6 (K=6); hypotheses sha256 6c280093f5d3b7c319100faa284881d8c094c3d6c264895dfe0ff21abba691b5",
+    "metrics": [
+      "cr1_se_student_t",
+      "false_confirmation_rate_family",
+      "false_confirmation_rate_per_hypothesis",
+      "net_bps_per_round_trip_session_mean",
+      "wild_cluster_webb_full_enumeration_p",
+      "wilson95"
+    ],
+    "scripts": {
+      "python/src/iap/research/known_null.py": "8a3554a20efe5781d153e919e04c1ab76bc7b7a21b87f79f86d6582157dee946",
+      "research/v118/known_null_config.json": "f77342b5a910e9261282b23abcb77984ecb36f6114f623034fed0aacf7017056",
+      "tools/rel06_known_null.py": "6886e954c84d8f21cb7df48e67078b9eeb3df7574b0fcef755710b85393b004c"
+    },
+    "thresholds": {
+      "alpha": 0.05,
+      "base_seeds": {
+        "A": 20261018,
+        "B": 20261019
+      },
+      "compute_budget_hours": 12.0,
+      "configuration": {
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "flatten_at_session_end": true,
+        "latency_ns": 1000000000,
+        "max_decision_age_ns": 60000000000,
+        "methods": "v2",
+        "n_folds": 4
+      },
+      "execution": {
+        "adv_table": "session",
+        "impact_exponent": 1.0,
+        "impact_model": "parent",
+        "regulatory_fees": true,
+        "venue_id": 101
+      },
+      "n_trials": 1000,
+      "pass_rule": {
+        "flag_upper_below": 0.02,
+        "max_point": 0.05,
+        "max_upper": 0.07
+      },
+      "registered_size_shares": 100
+    }
+  },
+  "bound_utc": "2026-10-18T11:51:27+00:00",
+  "kind": "analysis_prereg",
+  "prereg_id": "research/v118/null_protocol_prereg.json",
+  "protocol": "research/v118/NULL_PROTOCOL.md",
+  "protocol_sha256": "0e102c4d04f9d54c33458d7b5ac065bab17edbe8481ea2bec31662d63b4c3399",
+  "signature": {
+    "maintainer": "ashjha0",
+    "message": "iap.agents.blackboard.canonical(this document without 'signature')",
+    "message_sha256": "0620555b0c3dd0c7342920d6dc8b2ea3a9f98911a06a340c00634e060f85fb26",
+    "public_key": "02a3e278cda3efac7dcd266fb8a3821a1415f0725a73f8b255aac84083c2106c",
+    "scheme": "ed25519",
+    "sig": "495d489c1f1698071d7ea3f60560b849dbb3b6485d355b534361a0672dba1b385bd45f331e28688957d64cb66945a572108ec9291e8dea72147bb70f839c2802",
+    "trust_root": "research/agents/trust_roots.json"
+  },
+  "signed": true,
+  "signed_utc": "2026-10-18T11:51:27+00:00",
+  "status": "SIGNED: the analysis identity is bound; edits void the signature",
+  "x-version": 1
+}
