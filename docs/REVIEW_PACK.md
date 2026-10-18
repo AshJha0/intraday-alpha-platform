@@ -103,10 +103,12 @@ under the maintainer key in [research/agents/trust_roots.json](../research/agent
 `research/preregs/b8v2_prereg.json`, `research/v118/null_protocol_prereg.json`,
 `research/v118/rel08_rule_signed.json` (the tool lists the current set). Verify every signed document (trust root against its pinned version, every signed JSON document,
 the agent key registry, the main and archived blackboards). It prints `OK` or `FAIL <reason>` per
-item and exits 1 on any failure:
+item and exits 1 on any failure. A blackboard anchor whose commit is not in the clone (a shallow fetch) is reported as
+`UNVERIFIABLE-HERE`, never `OK`; `--strict` (reviewer and release, on a full-history clone) makes that
+fatal too. Signature, chain and trust-root problems always fail. Run it from a full clone:
 
 ```bash
-PYTHONPATH=python/src python tools/verify_signatures.py --trust-ref origin/main
+PYTHONPATH=python/src python tools/verify_signatures.py --trust-ref origin/main --strict
 ```
 
 The maintainer key fingerprint, the pinned trust-root version, and the rotation and revocation

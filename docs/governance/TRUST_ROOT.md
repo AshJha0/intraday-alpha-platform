@@ -31,12 +31,14 @@ python -c "import hashlib,json;k=json.load(open('research/agents/trust_roots.jso
 ## Verify every signature
 
 ```bash
-PYTHONPATH=python/src python tools/verify_signatures.py --trust-ref origin/main
+PYTHONPATH=python/src python tools/verify_signatures.py --trust-ref origin/main --strict
 ```
 
 This checks the trust root against the pin, every tracked signed JSON document (preregs, the REL-08
 rule), the agent key registry signature, the main blackboard (chain, anchors, agent signatures) and the
-archived fork boards. It prints `OK` or `FAIL <reason>` per item and exits 1 if anything fails.
+archived fork boards. It prints `OK` or `FAIL <reason>` per item and exits 1 if anything fails. A blackboard anchor whose commit is not in the clone (a shallow fetch) is reported as
+`UNVERIFIABLE-HERE`, never `OK`; `--strict` (reviewer and release, on a full-history clone) makes that
+fatal too. Signature, chain and trust-root problems always fail.
 
 ## Why the repository alone is not an independent anchor
 
