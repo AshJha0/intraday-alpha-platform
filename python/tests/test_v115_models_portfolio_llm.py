@@ -142,13 +142,13 @@ def _usage(i, o):
 
 
 def test_default_projection_unchanged():
-    b = Budget(max_usd=10.0)
+    b = Budget(max_usd=10.0, unmetered=True)
     b.charge(M, _usage(1000, 500))
     assert b.projected_input_tokens() == 1000
 
 
 def test_growing_context_projection_and_pricing():
-    b = Budget(max_usd=10.0, context_growth=True, prompt_estimate_tokens=5000)
+    b = Budget(max_usd=10.0, unmetered=True, context_growth=True, prompt_estimate_tokens=5000)
     assert b.projected_input_tokens() == 5000
     b.charge(M, _usage(5000, 800))
     b.add_pending_tool_tokens(1200)
@@ -164,6 +164,7 @@ def test_growing_context_catches_overshoot_default_misses():
     def run(growth):
         b = Budget(
             max_usd=0.5,
+            unmetered=True,
             max_tokens=10**9,
             context_growth=growth,
             prompt_estimate_tokens=20_000,
@@ -186,6 +187,6 @@ def test_growing_context_catches_overshoot_default_misses():
 
 
 def test_first_call_seeded():
-    b = Budget(max_usd=0.01, context_growth=True, prompt_estimate_tokens=10_000)
+    b = Budget(max_usd=0.01, unmetered=True, context_growth=True, prompt_estimate_tokens=10_000)
     with pytest.raises(BudgetExceeded):
         b.check_model_call(M)

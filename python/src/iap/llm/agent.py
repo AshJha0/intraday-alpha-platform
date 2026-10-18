@@ -484,22 +484,23 @@ class Persister:
         (self.dir / name).write_text(text + "\n", encoding="utf-8")
 
 
-def _is_live_client(client: Any) -> bool:
-    """True for an ``anthropic`` SDK client (anything that spends money)."""
-    return type(client).__module__.split(".")[0] == "anthropic"
-
-
 def _wire_spend(client: Any, session: Session, model: str) -> None:
     """v1.17 E1: every path that can spend records to the shared ledger and
-    obeys its caps.  A live client on a budget without a ledger gets the
-    operator ledger (``iap.llm.spend.SpendLedger.default()``); the scripted
-    client keeps the budget's own caps only.  The budget records the dated
-    pin the model runs under."""
+    obeys its caps.  Any client other than the scripted one on a budget
+    without a ledger gets the operator ledger
+    (``iap.llm.spend.SpendLedger.default()``); the scripted client keeps the
+    budget's own caps only (REL-13: marked ``unmetered``).  The budget records
+    the dated pin the model runs under."""
     b = session.budget
-    if b.ledger is None and _is_live_client(client):
-        from iap.llm.spend import SpendLedger
+    if b.ledger is None:
+        from iap.llm.fake import ScriptedClient
 
-        b.ledger = SpendLedger.default()
+        if isinstance(client, ScriptedClient):
+            b.unmetered = True
+        else:
+            from iap.llm.spend import SpendLedger
+
+            b.ledger = SpendLedger.default()
     if not b.session_id:
         b.session_id = session.session_id
     if b.pin is None:

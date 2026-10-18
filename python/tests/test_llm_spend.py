@@ -75,7 +75,7 @@ def test_unknown_model_refused_never_guessed(tmp_path):
         prices.usage_cost("claude-latest", _u(1, 1))
     with pytest.raises(prices.UnknownModelError):
         prices.max_call_cost("gpt-9", 10, 10)
-    b = Budget(max_usd=100)
+    b = Budget(max_usd=100, unmetered=True)
     with pytest.raises(BudgetExceeded, match="no price"):
         b.check_model_call("claude-opus-9")
     assert "claude-opus-9" not in PRICES
@@ -272,8 +272,10 @@ def test_alert_fires_once_per_month(tmp_path, caplog):
         assert len(calls) == 2
 
 
-def test_budget_without_ledger_keeps_own_caps_only(tmp_path):
-    b = Budget(max_usd=0.001)
+def test_budget_without_ledger_refused_unless_unmetered(tmp_path):
+    with pytest.raises(BudgetExceeded, match="no spend ledger"):
+        Budget(max_usd=100).check_model_call(SONNET)
+    b = Budget(max_usd=0.001, unmetered=True)
     with pytest.raises(BudgetExceeded, match="usd cap"):
         b.check_model_call(SONNET)
     assert b.summary()["ledger"] is None and b.summary()["pin"] is None
@@ -292,3 +294,26 @@ def test_spend_cli(tmp_path, capsys, monkeypatch):
     d = json.loads(capsys.readouterr().out)
     assert d["monthly_cap_usd"] == 30.0 and len(d["last"]) == 2 and d["rows"] == 25
     assert d["remaining_usd"] == pytest.approx(30.0 - d["month_to_date_usd"])
+
+
+def test_run_session_attaches_ledger_to_non_scripted_client(tmp_path, monkeypatch):
+    from iap.llm import agent as ag
+    from iap.llm.fake import ScriptedClient
+
+    led = _ledger(tmp_path)
+    monkeypatch.setattr(spend.SpendLedger, "default", classmethod(lambda cls: led))
+
+    class _Sess:
+        session_id = "s1"
+
+        def __init__(self):
+            self.budget = Budget()
+
+    class _OtherClient:  # e.g. a wrapper around a real SDK client
+        pass
+
+    s1, s2 = _Sess(), _Sess()
+    ag._wire_spend(_OtherClient(), s1, SONNET)
+    assert s1.budget.ledger is led and not s1.budget.unmetered
+    ag._wire_spend(ScriptedClient([]), s2, SONNET)
+    assert s2.budget.ledger is None and s2.budget.unmetered
