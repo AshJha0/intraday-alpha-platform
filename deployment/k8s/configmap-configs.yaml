@@ -1819,6 +1819,20 @@ data:
         "min_approvers": 2
       }
     }
+  risk__stress_scenarios.json: |
+    {
+      "x-version": 1,
+      "description": "Named stress scenarios for iap.portfolio.factor_risk.run_stress (v1.18 REL-17). Each scenario is a set of factor moves in return units: 'market' is the reference-ETF return (it reaches each name through its beta); 'sector:<name>' moves are residual sector returns ON TOP of the market move. Market magnitudes are rounded one-day S&P 500 closes on the named dates from public index history; sector and size moves are hypothetical, stated as such, and not calibrated to any dataset.",
+      "scenarios": [
+        {"name": "market_down_5pct", "description": "Hypothetical: reference ETFs -5 %.", "factor_moves": {"market": -0.05}},
+        {"name": "market_up_5pct", "description": "Hypothetical: reference ETFs +5 % (short-side squeeze).", "factor_moves": {"market": 0.05}},
+        {"name": "black_monday_1987", "description": "S&P 500 close-to-close 1987-10-19, about -20.5 %.", "factor_moves": {"market": -0.205}},
+        {"name": "covid_2020_03_16", "description": "S&P 500 close-to-close 2020-03-16, about -12 %.", "factor_moves": {"market": -0.12}},
+        {"name": "tech_selloff", "description": "Hypothetical: market -3 % with Information Technology a further -6 % and Communication Services -4 %.", "factor_moves": {"market": -0.03, "sector:Information Technology": -0.06, "sector:Communication Services": -0.04}},
+        {"name": "rotation_value", "description": "Hypothetical: no market move; Information Technology -4 %, Financials +4 %, Energy +5 %.", "factor_moves": {"sector:Information Technology": -0.04, "sector:Financials": 0.04, "sector:Energy": 0.05}},
+        {"name": "liquidity_crunch", "description": "Hypothetical: market -4 % and the least-liquid names (bucket q1, the baseline) lag: the middle bucket q2 +2 % and the most-liquid bucket q3 +4 % relative to q1.", "factor_moves": {"market": -0.04, "liquidity:q2": 0.02, "liquidity:q3": 0.04}}
+      ]
+    }
   strategies__alpha_params.json: |
     {
       "data_version": "116b77873de422ddd3b4f875625a0d8bba7dc2850068aae6ed807e944fb34573",

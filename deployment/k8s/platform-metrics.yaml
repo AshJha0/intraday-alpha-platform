@@ -244,6 +244,8 @@ spec:
                 path: reference/venue_latency.json
               - key: risk__risk.json
                 path: risk/risk.json
+              - key: risk__stress_scenarios.json
+                path: risk/stress_scenarios.json
               - key: strategies__alpha_params.json
                 path: strategies/alpha_params.json
               - key: strategies__lifecycle.json
