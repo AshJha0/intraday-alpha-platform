@@ -37,7 +37,17 @@ vs = _load()
 def test_every_signed_document_on_this_checkout_verifies():
     results = vs.run(REPO)
     bad = [r for r in results if not r["ok"]]
-    assert bad == [], bad
+    assert bad == [], bad  # signatures, chains and the trust root never get a pass
+    shallow = subprocess.run(
+        ["git", "-C", str(REPO), "rev-parse", "--is-shallow-repository"],
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.strip()
+    partial = [r for r in results if r["unverifiable"]]
+    if shallow != "true":
+        # a full-history clone must be able to check every anchor (what --strict enforces)
+        assert partial == [], partial
     kinds = {r["kind"] for r in results}
     assert kinds == {"trust_root", "signed_document", "key_registry", "blackboard"}
     docs = {r["item"] for r in results if r["kind"] == "signed_document"}
@@ -186,3 +196,27 @@ def test_tampered_fork_board_fails(tmp_path):
     board.write_bytes(b"\n".join(lines[:-1]) + b"\n")  # drop the last entry
     problems = vs.check_fork_board(board, fork)
     assert any("FORK.json" in p for p in problems)
+
+
+def test_missing_anchor_commit_is_unverifiable_not_ok_and_fatal_only_when_strict(
+    repo, monkeypatch, capsys
+):
+    r, _, _ = repo
+    (r / "research/agents/blackboard.jsonl").write_text("", encoding="utf-8")
+    _git(r, "add", "-A")
+    missing = "anchor seq 1: commit 6723fd0ce0bf missing"
+    monkeypatch.setattr(vs, "check_board", lambda root, rel, ref: [missing])
+    (res,) = [x for x in vs.run(r) if x["kind"] == "blackboard"]
+    assert res["ok"] is True and res["reasons"] == []
+    assert res["unverifiable"] and missing in res["unverifiable"][0]
+    assert vs.main(["--root", str(r)]) == 0
+    out = capsys.readouterr().out
+    assert "UNVERIFIABLE-HERE" in out and "OK    blackboard" not in out
+    assert vs.main(["--root", str(r), "--strict"]) == 1
+    # a real failure on the same board stays a failure without --strict
+    monkeypatch.setattr(
+        vs, "check_board", lambda root, rel, ref: [missing, "entry 3: Ed25519 signature INVALID"]
+    )
+    (res,) = [x for x in vs.run(r) if x["kind"] == "blackboard"]
+    assert res["ok"] is False and res["reasons"] == ["entry 3: Ed25519 signature INVALID"]
+    assert vs.main(["--root", str(r)]) == 1

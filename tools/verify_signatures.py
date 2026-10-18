@@ -22,7 +22,11 @@ What it checks (``docs/governance/TRUST_ROOT.md``):
    agents' Ed25519 request signatures; the main board also its git anchors.
 
 Prints ``OK`` or ``FAIL <reason>`` per item, a summary, and exits 1 on any
-failure (2 on a usage error).  Reads no data and no private key.
+failure (2 on a usage error).  A blackboard anchor whose commit is not in
+this clone (shallow CI fetch) is ``UNVERIFIABLE-HERE``, never ``OK``: it
+exits 0 by default and 1 under ``--strict``, which the reviewer and the
+release run on a full-history clone.  Signature, chain and trust-root
+problems are always failures.  Reads no data and no private key.
 """
 
 from __future__ import annotations
@@ -30,6 +34,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -213,12 +218,32 @@ def check_fork_board(board: Path, fork: Path) -> list[str]:
     return problems + bb.verify_signatures(keys)
 
 
+#: an anchor whose commit object is absent from this clone (shallow fetch, or a
+#: commit only on a deleted branch): the entry's signature and chain still
+#: verify, only its git-history anchor cannot be checked HERE
+_UNVERIFIABLE = re.compile(r"^anchor seq \d+: commit [0-9a-f]+ missing$")
+
+
 def run(root: Path, ref: str | None = None) -> list[dict[str, Any]]:
-    """One result per item: ``{"item", "kind", "ok", "reasons"}``."""
+    """One result per item: ``{"item", "kind", "ok", "reasons", "unverifiable"}``.
+    ``reasons`` are failures (bad signature, broken chain, changed trust root);
+    ``unverifiable`` are checks this clone lacks the history for."""
     results: list[dict[str, Any]] = []
 
-    def add(item: str, kind: str, reasons: list[str]) -> None:
-        results.append({"item": item, "kind": kind, "ok": not reasons, "reasons": reasons})
+    def add(item: str, kind: str, problems: list[str]) -> None:
+        here = [x for x in problems if _UNVERIFIABLE.match(x)]
+        reasons = [x for x in problems if not _UNVERIFIABLE.match(x)]
+        results.append(
+            {
+                "item": item,
+                "kind": kind,
+                "ok": not reasons,
+                "reasons": reasons,
+                "unverifiable": [
+                    f"{x} (not in this clone; use a full-history clone)" for x in here
+                ],
+            }
+        )
 
     add("research/agents/trust_roots.json", "trust_root", check_trust_root(root))
     docs = signed_documents(root)
@@ -243,6 +268,11 @@ def main(argv: list[str] | None = None) -> int:
         help="read the agent trust roots from this git ref (CI: origin/main)",
     )
     ap.add_argument("--json", action="store_true", help="print the results as JSON")
+    ap.add_argument(
+        "--strict",
+        action="store_true",
+        help="also fail on UNVERIFIABLE-HERE items (reviewer and release, full-history clone)",
+    )
     a = ap.parse_args(argv)
     root = a.root.resolve()
     results = run(root, a.trust_ref)
@@ -250,18 +280,22 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(results, indent=2, sort_keys=True))
     else:
         for r in results:
-            if r["ok"]:
+            for reason in r["reasons"]:
+                print(f"FAIL  {r['kind']:<16} {r['item']}: {reason}")
+            for why in r["unverifiable"]:
+                print(f"UNVERIFIABLE-HERE {r['kind']:<16} {r['item']}: {why}")
+            if r["ok"] and not r["unverifiable"]:
                 print(f"OK    {r['kind']:<16} {r['item']}")
-            else:
-                for reason in r["reasons"]:
-                    print(f"FAIL  {r['kind']:<16} {r['item']}: {reason}")
     failed = [r for r in results if not r["ok"]]
+    partial = [r for r in results if r["unverifiable"]]
     print(
-        f"{len(results) - len(failed)}/{len(results)} verified; "
-        f"{len(failed)} failed (trust root version {PINNED['version']})",
+        f"{len(results) - len(failed)}/{len(results)} verified; {len(failed)} failed; "
+        f"{len(partial)} with checks unverifiable here"
+        f"{' (fatal: --strict)' if a.strict and partial else ''} "
+        f"(trust root version {PINNED['version']})",
         file=sys.stderr,
     )
-    return 1 if failed else 0
+    return 1 if failed or (a.strict and partial) else 0
 
 
 if __name__ == "__main__":
