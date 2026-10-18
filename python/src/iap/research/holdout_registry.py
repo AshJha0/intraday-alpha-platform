@@ -383,7 +383,36 @@ def _decide(
             )
     if not prereg_is_signed(prereg_id, root):
         raise HoldoutRefused(f"{dataset_dir}: prereg {prereg_id!r} is not a signed prereg")
+    check_prereg_identity(prereg_id, ident["dataset_version"], root)
     return {"state": state, "authorised_by": prereg_id}
+
+
+def check_prereg_identity(prereg_id: str, dataset_version: str | None, root: Path | None) -> None:
+    """Review finding 1: a prereg document that binds an ``analysis_identity``
+    authorises a restricted read only from the code, configs, lock and
+    interpreter it bound, and only of a dataset version it bound.  This runs
+    inside :func:`guard`, so an entry point that skips its own identity check
+    still cannot read the holdout under that prereg.  Legacy preregs (no
+    block; their looks are spent) and blackboard ids carry nothing to check."""
+    r = Path(root or REPO)
+    p = r / prereg_id
+    if not (prereg_id.endswith(".json") and p.is_file()):
+        return
+    bound = json.loads(p.read_text(encoding="utf-8")).get("analysis_identity")
+    if not bound:
+        return
+    from iap.agents.analysis_identity import IdentityError, environment_mismatches
+
+    try:
+        bad = environment_mismatches(r, bound)
+    except IdentityError as exc:
+        bad = [str(exc)]
+    if dataset_version not in (bound.get("data_versions") or []):
+        bad.append(f"dataset_version {dataset_version} is not bound by the prereg")
+    if bad:
+        raise HoldoutRefused(
+            f"prereg {prereg_id!r} does not authorise this read: " + "; ".join(bad)
+        )
 
 
 # --------------------------------------------------------------- seed / CLI --
