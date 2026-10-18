@@ -176,6 +176,27 @@ def listed_versions(manifest: dict) -> set[str]:
     return out
 
 
+def listed_inputs(manifest: dict) -> set[str]:
+    """sha256 of every raw vendor input recorded for a listed dataset. A study that
+    reads the raw vendor file itself (e.g. REL-08c's NOII extraction from the
+    full-market ITCH file) cites that file's sha256, which is covered when the
+    file is a recorded input of a manifest-listed dataset."""
+    out: set[str] = set()
+    for d in manifest.get("datasets", []):
+        for s in (
+            (d.get("sessions") or {}).values()
+            if isinstance(d.get("sessions"), dict)
+            else d.get("sessions") or []
+        ):
+            for i in (s.get("inputs") or []) if isinstance(s, dict) else []:
+                if i.get("sha256"):
+                    out.add(i["sha256"])
+        for i in d.get("inputs") or []:
+            if isinstance(i, dict) and i.get("sha256"):
+                out.add(i["sha256"])
+    return out
+
+
 def cited_files(repo: Path = ROOT) -> list[Path]:
     """Committed preregistrations and ledgers (``git ls-files research``)."""
     try:
@@ -212,7 +233,7 @@ def check(manifest_path: Path, repo: Path = ROOT, data_root: Path | None = None)
     problems = []
     if manifest.get("schema") != SCHEMA:
         problems.append(f"{manifest_path.name}: schema {manifest.get('schema')!r} != {SCHEMA}")
-    listed = listed_versions(manifest)
+    listed = listed_versions(manifest) | listed_inputs(manifest)
     for f in cited_files(repo):
         try:
             doc = json.loads(f.read_text(encoding="utf-8"))

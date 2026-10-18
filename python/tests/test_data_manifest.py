@@ -189,3 +189,23 @@ def test_no_verify_sha_is_the_old_size_only_check(tmp_path):
     data = b"0123456789"
     r = dl.download_one(_day(data, "0" * 64), tmp_path, lambda u: _Resp(data), verify_sha=False)
     assert r["status"] == "downloaded" and r["sha256_verified"] is False
+
+
+def test_recorded_raw_input_hash_is_a_listed_citation_but_unknown_hash_is_not():
+    """A study that reads a raw vendor file (REL-08c) cites the file's sha256; that is
+    covered when the file is a recorded input of a listed dataset, and nothing else is."""
+    dm = _tool("data_manifest")
+    known = "a" * 64
+    manifest = {
+        "datasets": [
+            {
+                "dataset_version": "b" * 64,
+                "sessions": {"2019-01-30": {"inputs": [{"sha256": known}]}},
+            }
+        ],
+        "non_disk": [],
+    }
+    listed = dm.listed_versions(manifest) | dm.listed_inputs(manifest)
+    assert known in listed
+    assert "b" * 64 in listed
+    assert "c" * 64 not in listed

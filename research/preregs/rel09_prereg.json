@@ -1,0 +1,199 @@
+{
+  "analysis_identity": {
+    "code_tree_sha256": "e176da9546a80322a7a20810db6bcbee95ee54e30552f9306f1d7a454498bed7",
+    "commit": "6dc3783c907231f0bc9ee1e28f2d3ee86909dec3",
+    "configs_tree_sha256": "5ef6e7a09954184176dc626a4fddcd93d31c5b13ec60fd9ae5a1088b30870c29",
+    "data_versions": [
+      "24d5d38b9e50ed676d0cceca46cd9cad89be186a6f3517e5a06903b17fb28a1b",
+      "284629a29df4e6419fb527990abf34e3a8dd25f42902e56604df840860ce8ecc",
+      "33d0cbe8a6601850472f584a919b98211dd1841af6667b4cd6faf22c51ffc157",
+      "535f4868b0a5f6d14305018142221bea100b615dcc3a212de4eb7a715aecd8fb",
+      "6c94942ab59df29f8b93cc20e6526e6794affd0b9f2851eeb00cb1c2fef1a1e6",
+      "9517c4efa19b32fd3632ee04782c5d0c07f390e5e27e3618dd2533aa90d0938c",
+      "ba2022d0d53c013be27f9b3ce6eeef13baa4280009ef32f6c2761b43e61037f4",
+      "bd6f9c707d898007ca281ff093602176c39ac1cf45e0894808e7d1f14bdd3904",
+      "d7f7ffd14fbc363550a5bc9afd886e36df0d851511f840615f1f089b22f5f237",
+      "dea2a6b03ae35df24e5c8751bea8ddcc0f9ca8b93e02c9e2fdb656b6ab62fd80",
+      "f977bb3a39d16557c79ae6fbc9303a69317fdcc19d0e7f4162d1a06a9120ec79"
+    ],
+    "deps_lock_sha256": "3a4352e0d19d1a41021264ef8d382472f7c668520c42535e5f45971600a28375",
+    "environment": {
+      "attrs": "26.1.0",
+      "cffi": "2.1.1",
+      "cloudpickle": "3.1.2",
+      "colorama": "0.4.6",
+      "coverage": "7.16.2",
+      "cryptography": "50.0.2",
+      "databento-dbn": "0.71.0",
+      "execnet": "2.1.2",
+      "hypothesis": "absent",
+      "iniconfig": "2.3.1",
+      "joblib": "1.6.0",
+      "jsonschema": "4.26.0",
+      "jsonschema-specifications": "2025.9.1",
+      "narwhals": "2.26.0",
+      "numpy": "2.4.6",
+      "packaging": "26.3",
+      "pandas": "3.0.6",
+      "pluggy": "1.6.0",
+      "pyarrow": "25.0.1",
+      "pycparser": "3.0",
+      "pygments": "2.21.0",
+      "pytest": "9.1.1",
+      "pytest-cov": "7.1.0",
+      "pytest-xdist": "3.8.0",
+      "python-dateutil": "2.9.0.post0",
+      "pyyaml": "6.0.3",
+      "referencing": "0.37.0",
+      "rpds-py": "2026.9.1",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.17.1",
+      "six": "1.17.0",
+      "sortedcontainers": "absent",
+      "threadpoolctl": "3.7.0",
+      "typing-extensions": "4.16.0",
+      "tzdata": "2026.5"
+    },
+    "family": "REL-09 stale-quote protection: 2 symbols x 1 quoting venue x 1 selected indicator setting (K=2); quote XNAS vs IEXG; evaluate 2025-12-09,2025-12-10,2026-05-15,2026-05-18",
+    "identity_version": 2,
+    "inputs": {},
+    "interpreter": "cpython-3.12.10",
+    "metrics": [
+      "as_reduction",
+      "incremental_fees_usd",
+      "incremental_inventory_usd",
+      "incremental_markout_usd",
+      "incremental_net_usd_per_session",
+      "incremental_spread_usd",
+      "missed_fills_net_usd"
+    ],
+    "reference_tree_sha256": "9020e008efdb1ac41015cea4c31f8b9e4cb65a1324db0a42224cb2a22f18fa88",
+    "scripts": {
+      "research/v118/rel09/predeclaration.json": "1114357a805e0def1e2d349294ce03e180e1297e029c979289862864feae8e8f",
+      "research/v118/rel09/run_rel09.py": "974f226bd3b5488429847ee9adf61cd7bfe19efca41950d6843c884bb82d8728"
+    },
+    "thresholds": {
+      "decision_rule": {
+        "as_reduction_hypothesis": 0.25,
+        "as_reduction_is_criterion": false,
+        "overall": {
+          "candidate": "candidate on both symbols",
+          "iterate": "candidate on one symbol and not candidate on the other (conflicting or partial evidence)",
+          "reject": "reject on both symbols, or reject on one and underpowered on the other",
+          "underpowered": "underpowered on both symbols"
+        },
+        "per_symbol": {
+          "candidate": "family CI lower bound > 0",
+          "reject": "family CI upper bound < 0, or the family CI contains 0 and the family MDE <= economic_threshold_usd",
+          "underpowered": "the family CI contains 0 and the family MDE > economic_threshold_usd"
+        },
+        "promotion": "none in v1.18 (no untouched confirmation sample)"
+      },
+      "indicator": {
+        "min_age_ns_grid": [
+          1000000,
+          5000000,
+          25000000
+        ],
+        "min_displacement_ticks": 1.0,
+        "selection": "argmax of incremental net USD summed over the calibrate sessions and both symbols; ties to the smaller age"
+      },
+      "latency_assumption": {
+        "cancel_latency_ns": 350000,
+        "feed_delay_ns": {
+          "IEXG": 350000,
+          "XNAS": 0
+        },
+        "name": "exchange-clock decisions with declared feed delays",
+        "receive_ts_rule": "receive_ts := exchange_ts + feed_delay_ns[venue]; the capture-host receive_ts is not used"
+      },
+      "other_venue": "IEXG",
+      "quoter": {
+        "iex_clock": "exchange",
+        "lot": 100,
+        "markout_ns": 1000000000,
+        "max_inventory_lots": 5,
+        "rebate_per_share": 0.002,
+        "refresh_ns": 1000000000
+      },
+      "quoting_venue": "XNAS",
+      "sessions": {
+        "calibrate": [
+          {
+            "iex_dir": "iex_20251128",
+            "nasdaq_dir": "r7_20251128",
+            "session": "2025-11-28"
+          },
+          {
+            "iex_dir": "iex_20251208",
+            "nasdaq_dir": "r7_20251208",
+            "session": "2025-12-08"
+          }
+        ],
+        "evaluate": [
+          {
+            "iex_dir": "iex_20251209",
+            "nasdaq_dir": "r7_20251209",
+            "session": "2025-12-09"
+          },
+          {
+            "iex_dir": "iex_20251210",
+            "nasdaq_dir": "r7_20251210",
+            "session": "2025-12-10"
+          },
+          {
+            "iex_dir": "iex_20260515",
+            "nasdaq_dir": "holdout2026",
+            "session": "2026-05-15"
+          },
+          {
+            "iex_dir": "iex_20260518",
+            "nasdaq_dir": "holdout2026",
+            "session": "2026-05-18"
+          }
+        ],
+        "excluded": {
+          "2025-12-11": "IEX side not in the holdout registry",
+          "2025-12-12": "IEX side not ingested",
+          "2026-06-12": "IEX side not in the holdout registry"
+        }
+      },
+      "statistics": {
+        "alpha": 0.05,
+        "economic_threshold_usd": 50.0,
+        "family": "2 symbols x 1 quoting venue x 1 selected indicator setting",
+        "family_k": 2,
+        "g_evaluate": 4,
+        "mde_sd_units": {
+          "normal": 1.401,
+          "t_df3": 2.012,
+          "t_df3_family": 2.509
+        },
+        "power": 0.8,
+        "unit": "per-session incremental net maker P&L, USD, filtered minus baseline, per symbol"
+      },
+      "symbols": [
+        "AAPL",
+        "MSFT"
+      ]
+    }
+  },
+  "bound_utc": "2026-10-18T17:58:47+00:00",
+  "kind": "analysis_prereg",
+  "prereg_id": "research/preregs/rel09_prereg.json",
+  "protocol": "research/v118/rel09/PREDECLARATION.md",
+  "protocol_sha256": "14e2f90a5a690df49776930bda60064aaf7aeb2d1174937f87ed52b89d04ca5c",
+  "signature": {
+    "maintainer": "ashjha0",
+    "message": "iap.agents.blackboard.canonical(this document without 'signature')",
+    "message_sha256": "fb2e11d16fd0ec1ab50493e80fcf41e316a736cc6141c93172fc2d5430a0ff08",
+    "public_key": "02a3e278cda3efac7dcd266fb8a3821a1415f0725a73f8b255aac84083c2106c",
+    "scheme": "ed25519",
+    "sig": "6c242869e9b50dbfb78123d3ca65b91d48591174fda62c00034763fef016b9feb09ebf48a557df8b50d83e8c97ecd4a88f75bb19d3fff5000c4f5944c90d6f0b",
+    "trust_root": "research/agents/trust_roots.json"
+  },
+  "signed": true,
+  "signed_utc": "2026-10-18T17:58:48+00:00",
+  "status": "SIGNED: the analysis identity is bound; edits void the signature",
+  "x-version": 1
+}
