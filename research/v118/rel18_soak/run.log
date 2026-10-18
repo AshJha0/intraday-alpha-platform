@@ -1,0 +1,3 @@
+START 18/10/2026 19:16:35.74 
+{"verdict": "PASS", "totals": {"messages_sent": 2669475, "orders": 65664, "kills": 511, "recon_runs": 523, "recon_exceptions": 0, "unreconciled_positions": 0, "venue_dup_submits": 53, "resyncs": 1253, "silences": 110, "residual_orders": 0}, "memory_mb": {"first": 87.51, "max": 117.8, "last": 105.31, "second_half_range": 8.31}}
+EXIT 0 

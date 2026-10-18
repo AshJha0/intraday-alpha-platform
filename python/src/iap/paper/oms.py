@@ -253,6 +253,10 @@ class OrderManager:
     ) -> None:
         self.journal = journal
         self.sender = sender
+        #: optional pre-trade gate ``(oms, cl_ord_id, instrument_id, side, qty,
+        #: price_ticks)``; raising refuses the order before it is journaled
+        #: (e.g. REL-17 ``PortfolioGuard.check_order`` wrapped by the caller)
+        self.pre_trade: Callable[..., None] | None = None
         self.orders: dict[str, Order] = {}
         self.positions: dict[int, int] = {}
         self.start_positions: dict[int, int] = {}
@@ -424,6 +428,8 @@ class OrderManager:
                 raise DuplicateOrderError(f"order {cl_ord_id!r} reused with different parameters")
             self.dup_submits += 1
             return SubmitResult(existing, duplicate=True)
+        if self.pre_trade is not None:
+            self.pre_trade(self, cl_ord_id, instrument_id, side, qty, price_ticks)
         self._commit(
             {
                 "kind": SUBMIT,
