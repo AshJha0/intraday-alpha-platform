@@ -296,14 +296,14 @@ def _trace(rec: Recording, result, timelines, tick) -> list[dict[str, Any]]:
                 tp.fills.append(
                     stamp_fill(tl, o["exchange_ts"], o["price_ticks"] * tk, o["qty"], p.side, liq)
                 )
-            row["tca_recorded_is_bps"] = order_tca(tp, tl)["perold"]["total_is_bps"]
+            row["tca_recorded_is_bps"] = order_tca(tp, tl)["perold"]["total_is_bps"]  # type: ignore[index]
             rp = _tca_parent(p, pid)
             for f in sorted(
                 (f for f in result.fills if f.parent_id == pid), key=lambda f: (f.ts, f.fill_id)
             ):
                 liq = MAKER if f.liquidity == Liquidity.MAKER else TAKER
                 rp.fills.append(stamp_fill(tl, f.ts, f.price_ticks * tk, f.qty, p.side, liq))
-            row["tca_replayed_is_bps"] = order_tca(rp, tl)["perold"]["total_is_bps"]
+            row["tca_replayed_is_bps"] = order_tca(rp, tl)["perold"]["total_is_bps"]  # type: ignore[index]
         except ValueError as exc:
             row["tca_note"] = f"TCA not computed: {exc}"
         out.append(row)
