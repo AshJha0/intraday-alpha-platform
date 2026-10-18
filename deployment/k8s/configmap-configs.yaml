@@ -930,6 +930,493 @@ data:
         "claude-sonnet-5-5": {"input": 2.00, "output": 10.00, "cache_read": 0.20, "cache_write": 2.50}
       }
     }
+  reference__reference_etf_map_v1.json: |
+    {
+      "x-version": 1,
+      "map_version": "reference_etf_map_v1",
+      "feature_identity": "xasset_v2",
+      "as_of": "2019-01-30",
+      "description": "Symbol -> cross-asset reference ETF and sector for the 71 EQUITY rows of the 100-name breadth universe (research/breadth/universe.json, 2019-01-30). Read by iap.features.reference_map under --xasset-reference symbol_map (feature identity xasset_v2); the v1 'first ETF row' rule (features/context.py) is unchanged and remains the default. ETF rows always reference themselves (as in v1); FX rows are untouched.",
+      "rule": "reference_etf = QQQ when the name was a Nasdaq-100 constituent on the as_of date, SPY otherwise.",
+      "source": "Nasdaq-100 membership as of the 2019-01-30 session as recalled from public index-provider reconstitution announcements (December 2017 and December 2018 annual reconstitutions and intra-year replacements), written by the REL-07 session on 2026-10-18 from public reference knowledge, NOT from a licensed constituent file. Sectors are copied from configs/reference/sectors.json (same as_of, same caveats).",
+      "limitations": [
+        "Membership is point-in-time as of 2019-01-30, NOT current membership; it is not valid for any other date.",
+        "Not taken from the index provider's constituent file; names with confidence 'low' are uncertain and treated as non-members (SPY). The owner should replace this file with a vendor or index-provider constituent file before any registered study (REL-08).",
+        "Foreign ADRs (VALE, ABEV, ITUB, BBD, PBR, GGB, NOK, BABA, JD, NIO, PDD) trade on a US clock but their home-market factor is not captured by SPY or QQQ.",
+        "The two VIX ETNs (TVIX, VXXB) are classed EQUITY by the ingest and get SPY, which is a poor reference for a volatility product.",
+        "One reference per name: no sector ETF is used as the reference even where one is in the universe (XLF, XLE, XLK, ...); a sector-relative variant would be a new map version.",
+        "Every reference ETF named here must be an ETF row of the dataset's instruments.json; a missing reference fails closed at context build."
+      ],
+      "reference_etfs": [
+        "QQQ",
+        "SPY"
+      ],
+      "universe_etfs": [
+        "AMLP",
+        "EEM",
+        "EFA",
+        "EWZ",
+        "FXI",
+        "GDX",
+        "GDXJ",
+        "GLD",
+        "HYG",
+        "IEMG",
+        "IWM",
+        "JNUG",
+        "NUGT",
+        "QQQ",
+        "SMH",
+        "SPY",
+        "SQQQ",
+        "TLT",
+        "TQQQ",
+        "USO",
+        "VWO",
+        "XLE",
+        "XLF",
+        "XLI",
+        "XLK",
+        "XLP",
+        "XLU",
+        "XLV",
+        "XOP"
+      ],
+      "symbols": {
+        "AABA": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Financials",
+          "confidence": "low",
+          "note": "Altaba (ex-Yahoo) became a registered closed-end fund in June 2017; its Nasdaq-100 status on 2019-01-30 is not certain from public recollection. Treated as NOT a member."
+        },
+        "AAL": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Industrials",
+          "confidence": "medium"
+        },
+        "AAPL": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Information Technology",
+          "confidence": "medium"
+        },
+        "ABEV": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Consumer Staples",
+          "confidence": "medium"
+        },
+        "AMAT": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Information Technology",
+          "confidence": "medium"
+        },
+        "AMD": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Information Technology",
+          "confidence": "low",
+          "note": "Believed added to the Nasdaq-100 at the December 2018 annual reconstitution; not checked against the index provider file."
+        },
+        "ATVI": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Communication Services",
+          "confidence": "medium"
+        },
+        "AUY": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Materials",
+          "confidence": "medium"
+        },
+        "BABA": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Consumer Discretionary",
+          "confidence": "medium"
+        },
+        "BAC": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Financials",
+          "confidence": "medium"
+        },
+        "BBD": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Financials",
+          "confidence": "medium"
+        },
+        "C": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Financials",
+          "confidence": "medium"
+        },
+        "CHK": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Energy",
+          "confidence": "medium"
+        },
+        "CLF": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Materials",
+          "confidence": "medium"
+        },
+        "CMCSA": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Communication Services",
+          "confidence": "medium"
+        },
+        "CODX": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Health Care",
+          "confidence": "medium"
+        },
+        "CRON": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Health Care",
+          "confidence": "medium"
+        },
+        "CSCO": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Information Technology",
+          "confidence": "medium"
+        },
+        "CZR": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Consumer Discretionary",
+          "confidence": "medium"
+        },
+        "DAL": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Industrials",
+          "confidence": "medium"
+        },
+        "DWDP": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Materials",
+          "confidence": "medium"
+        },
+        "EBAY": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Consumer Discretionary",
+          "confidence": "medium"
+        },
+        "ECA": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Energy",
+          "confidence": "medium"
+        },
+        "F": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Consumer Discretionary",
+          "confidence": "medium"
+        },
+        "FB": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Communication Services",
+          "confidence": "medium"
+        },
+        "FCX": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Materials",
+          "confidence": "medium"
+        },
+        "FDC": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Information Technology",
+          "confidence": "medium"
+        },
+        "FISV": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Information Technology",
+          "confidence": "medium"
+        },
+        "FLEX": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Information Technology",
+          "confidence": "low",
+          "note": "Nasdaq-listed; Nasdaq-100 membership on 2019-01-30 not certain from public recollection. Treated as NOT a member."
+        },
+        "GE": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Industrials",
+          "confidence": "medium"
+        },
+        "GGB": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Materials",
+          "confidence": "medium"
+        },
+        "HMNY": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "unknown",
+          "confidence": "medium"
+        },
+        "INTC": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Information Technology",
+          "confidence": "medium"
+        },
+        "ITUB": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Financials",
+          "confidence": "medium"
+        },
+        "JD": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Consumer Discretionary",
+          "confidence": "medium"
+        },
+        "JPM": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Financials",
+          "confidence": "medium"
+        },
+        "KEY": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Financials",
+          "confidence": "medium"
+        },
+        "MO": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Consumer Staples",
+          "confidence": "medium"
+        },
+        "MRVL": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Information Technology",
+          "confidence": "low",
+          "note": "Nasdaq-100 membership on 2019-01-30 not certain from public recollection. Treated as NOT a member."
+        },
+        "MS": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Financials",
+          "confidence": "medium"
+        },
+        "MSFT": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Information Technology",
+          "confidence": "medium"
+        },
+        "MU": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Information Technology",
+          "confidence": "medium"
+        },
+        "MYL": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Health Care",
+          "confidence": "medium"
+        },
+        "NBEV": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Consumer Staples",
+          "confidence": "medium"
+        },
+        "NIO": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Consumer Discretionary",
+          "confidence": "medium"
+        },
+        "NLY": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Financials",
+          "confidence": "medium"
+        },
+        "NOK": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Information Technology",
+          "confidence": "medium"
+        },
+        "NVDA": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Information Technology",
+          "confidence": "medium"
+        },
+        "OHGI": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "unknown",
+          "confidence": "medium"
+        },
+        "ORCL": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Information Technology",
+          "confidence": "medium"
+        },
+        "P": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Communication Services",
+          "confidence": "medium"
+        },
+        "PBR": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Energy",
+          "confidence": "medium"
+        },
+        "PCG": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Utilities",
+          "confidence": "medium"
+        },
+        "PDD": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Consumer Discretionary",
+          "confidence": "medium"
+        },
+        "PFE": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Health Care",
+          "confidence": "medium"
+        },
+        "PYPL": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Information Technology",
+          "confidence": "medium"
+        },
+        "QCOM": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Information Technology",
+          "confidence": "medium"
+        },
+        "RWLK": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Health Care",
+          "confidence": "medium"
+        },
+        "SBUX": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Consumer Discretionary",
+          "confidence": "medium"
+        },
+        "SGYP": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Health Care",
+          "confidence": "medium"
+        },
+        "SIRI": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Communication Services",
+          "confidence": "medium"
+        },
+        "SQ": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Information Technology",
+          "confidence": "medium"
+        },
+        "T": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Communication Services",
+          "confidence": "medium"
+        },
+        "TSLA": {
+          "reference_etf": "QQQ",
+          "nasdaq100": true,
+          "sector": "Consumer Discretionary",
+          "confidence": "medium"
+        },
+        "TVIX": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "ETF",
+          "confidence": "low",
+          "note": "Exchange-traded note on VIX futures, classed EQUITY by the ingest; SPY is a poor reference for a volatility product."
+        },
+        "VALE": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Materials",
+          "confidence": "medium"
+        },
+        "VXXB": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "ETF",
+          "confidence": "low",
+          "note": "Exchange-traded note on VIX futures, classed EQUITY by the ingest; SPY is a poor reference for a volatility product."
+        },
+        "VZ": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Communication Services",
+          "confidence": "medium"
+        },
+        "WFC": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Financials",
+          "confidence": "medium"
+        },
+        "WMT": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Consumer Staples",
+          "confidence": "medium"
+        },
+        "X": {
+          "reference_etf": "SPY",
+          "nasdaq100": false,
+          "sector": "Materials",
+          "confidence": "medium"
+        }
+      }
+    }
   reference__regulatory_fee_schedule.json: |
     {
       "x-version": 1,

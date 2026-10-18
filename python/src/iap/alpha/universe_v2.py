@@ -9,7 +9,7 @@ well-defined there.  :func:`configure_universe_many_etfs` derives the same
 four groups as ``configure_universe`` and accepts any number of ETF rows.
 
 A separate module on purpose: ``iap.alpha.base`` is in the code fingerprint
-of every alpha (``iap.agents.fingerprint``), so editing it would move every
+of every alpha (the pre-registration fingerprint), so editing it would move every
 alpha's ``code_hash``; this module is imported by no alpha.
 """
 
