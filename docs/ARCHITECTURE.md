@@ -139,7 +139,7 @@ flowchart TD
     FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
-    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (5,732 looks / 422 configs as of v1.17.0, research/experiments.json)<br/>REPORT.md, ML_REPORT.md, model manifests"]
+    TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (6,826 looks / 640 configs as of the v1.18 REL-02 migration, research/experiments.json)<br/>REPORT.md, ML_REPORT.md, model manifests"]
     RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 23 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```
@@ -830,7 +830,7 @@ will find the cheapest path to a pass faster than a person: cheaper costs, a
 chosen holdout, uncounted looks. v1.3.0 closed those three in the tooling
 (LEARN.md §24) and measured what the validation chain can detect at all
 (the planted-signal power study, LEARN.md §23). It did not build the agents
-(v1.7.0 built the controls; v1.11.0 built the agent on top of them), and on two synthetic sessions whose ledger holds 5,732 looks as of v1.17.0 (`research/experiments.json`, its `datasets` block: 1,068 on
+(v1.7.0 built the controls; v1.11.0 built the agent on top of them), and on two synthetic sessions whose ledger holds 6,826 looks as of the v1.18 REL-02 migration (`research/experiments.json`, its `datasets` block: 1,068 on
 the v1.3.0 dataset, 4,626 on the regenerated synthetic one across the v1.4.0, v1.5.0 and v1.14 method revisions, 24 on the real multi7 dataset, 14 with no dataset: pre-registrations), more searching is not what the platform lacks (HOW_IT_WORKS.md §6.4
 lists what would be theatre on this data, and why). DIAGRAMS.md §19 draws
 the layer as planned at v1.3.0, and §26 the agent loop as built in v1.11.

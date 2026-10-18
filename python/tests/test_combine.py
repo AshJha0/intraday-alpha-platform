@@ -655,7 +655,13 @@ def test_committed_report_evaluates_ten_experiments_and_promotes_none(committed)
 
 def test_committed_ledger_holds_the_combination_entries(committed):
     ledger = json.loads((ROOT / "research" / "experiments.json").read_text(encoding="utf-8"))
-    entries = [e for e in ledger["entries"] if e["kind"] == combine_report.LEDGER_KIND]
+    # the seeded-pipeline entries (v1.18 REL-02 merged the multi7 real-data
+    # combination looks in as data_family "real"; they are not this report's)
+    entries = [
+        e
+        for e in ledger["entries"]
+        if e["kind"] == combine_report.LEDGER_KIND and e.get("data_family") != "real"
+    ]
     # the v1.13.0 entries stay (history, scoped as v2_v113); the report in
     # force is the v1.14.0 revision
     from iap.validation.methods import ledger_bundle

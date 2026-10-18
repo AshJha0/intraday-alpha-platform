@@ -192,6 +192,18 @@ trials a selection was made from, so:
 - a caller with a better estimate of the effective number of trials (for
   example the cluster count of a correlation-clustered sweep) passes it.
 
+**One ledger family (v1.18 REL-02).** Since the REL-02 migration
+(2026-10-18, `research/v118/REL02_LEDGER_MIGRATION.md`) every entry carries
+`data_family`. For a claim about markets the N that matters is the number of
+distinct configurations tried on real data
+(`ExperimentLedger.real_distinct_experiments`): 256 after the migration (24
+before), which includes the per-dataset real ledgers (holdout2026, multi7,
+r7_holdout) merged in as recorded entries and the B7/B8 execution-study
+comparisons recorded retroactively with a deviation note. The 384 synthetic
+configurations stay recorded but are excluded from that N. The gates and the
+headline `dsr` above still read the all-family counts; moving them to the
+real-data N is a separate change.
+
 The cross-trial Sharpe variance V defaults to 1/(T - 1), the sampling
 variance of a Sharpe estimate under the null of no skill, since one
 validation does not see the other trials' Sharpes; a caller that has them
