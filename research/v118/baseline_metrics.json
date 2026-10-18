@@ -646,7 +646,7 @@
       "source": "research/execution/b8/benchmark_oos3_MSFT.json"
     }
   },
-  "commit": "838e103acacca6447845ca7aec0696edfabdde6e",
+  "commit": "8a43652c172b081f680ccfa1e3448d5904745ede",
   "ledger": {
     "bonferroni_t_threshold": 4.4466258141863175,
     "chain_ok": true,
@@ -762,5 +762,5 @@
       "risk-fuzz.yml"
     ]
   },
-  "tree_is_clean_at_inputs": false
+  "tree_is_clean_at_inputs": true
 }
