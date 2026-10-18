@@ -538,7 +538,7 @@ def test_replay_window_end_expires_the_child_and_reports_the_residual():
 def dataset(tmp_path_factory, golden_dir):
     import shutil
 
-    root = tmp_path_factory.mktemp("bench04")
+    root = tmp_path_factory.mktemp("rel04ds")
     norm = root / "normalized"
     norm.mkdir()
     for day in ("20190101", "20190102"):
