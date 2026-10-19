@@ -1,0 +1,78 @@
+{
+  "kind": "analysis_prereg",
+  "prereg_id": "research/v118/null_protocol_v3_prereg.json",
+  "prior_looks": [
+    {
+      "date": "2026-10-18",
+      "id": "null_protocol_prereg.json (v1)",
+      "result": "PASS, size untested (cost-dominated null)"
+    },
+    {
+      "commit_bound": "ee7d86b58b71901d02c2b3dbec39d3016743a24e",
+      "date": "2026-10-19",
+      "id": "null_protocol_v2_prereg.json (v2)",
+      "result": "FAIL, 7 of 12 family cells (research/v118/KNOWN_NULL_V2_RESULT.md)"
+    }
+  ],
+  "protocol": "research/v118/NULL_PROTOCOL_v3.md",
+  "protocol_sha256_at_draft": "a3f81c7440783a5669fd46ca54a73a513ebb8c44790bdd674e21835a2b8abaf1",
+  "signed": false,
+  "status": "DRAFT, unsigned: not approved by the outside reviewer, not signed, nothing run; the v3 runner config is not yet written",
+  "thresholds_draft": {
+    "alpha_rule_under_test": 0.025,
+    "compute_budget_hours": 12.0,
+    "dataset": "data/real/multi7 ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+    "diagnostic_rules": {
+      "R0": "Holm 0.05",
+      "R2": "joint wild maxT 0.025 (optional)"
+    },
+    "null_validity_check": {
+      "max_abs_mean_in_se_of_mean": 4,
+      "statistic": "gross"
+    },
+    "pass_rule": {
+      "flag_upper_below": 0.02,
+      "max_point": 0.05,
+      "max_upper": 0.07
+    },
+    "power_arm": {
+      "base_seeds": {
+        "A0": 20270103,
+        "B": 20270104
+      },
+      "delta_bps_per_trip": [
+        0.5,
+        1.0,
+        2.0,
+        4.0
+      ],
+      "n_trials": 200,
+      "pass_rule": null
+    },
+    "registered_size_shares": 100,
+    "size_arm": {
+      "A0": {
+        "base_seed": 20270101,
+        "draw": "all 1854 derangements, without replacement",
+        "n_trials": 1854
+      },
+      "A_v2_diagnostic": {
+        "base_seed": 20270105,
+        "n_trials": 500,
+        "pass_rule": null
+      },
+      "B": {
+        "base_seed": 20270102,
+        "n_trials": 2000
+      }
+    },
+    "statistics": {
+      "must_pass": [
+        "net_recentred",
+        "gross"
+      ]
+    }
+  },
+  "to_sign": "analysis_identity bound by tools/prereg_bind_identity.py only after owner confirmation and reviewer approval; run by a non-signer actor after the IEX ingest",
+  "x-version": 1
+}
