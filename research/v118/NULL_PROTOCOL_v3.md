@@ -1,6 +1,6 @@
 # Known-null protocol v3: size and power of the inference step, stricter operating level (v1.18, REL-06)
 
-**Status: DRAFT REVISION 2 (2026-10-19, after the outside reviewer's decision APPROVE WITH CHANGES), UNSIGNED, nothing run, not approved, not frozen.** Written 2026-10-19 after the v2 FAIL
+**Status: DRAFT REVISION 3 (2026-10-19, after the outside reviewer's second decision APPROVE WITH NAMED CHANGES; revision 2 followed the first), UNSIGNED, nothing run, not approved, not frozen.** Written 2026-10-19 after the v2 FAIL
 (`KNOWN_NULL_V2_RESULT.md`). It becomes a registered protocol only if (1) the owner confirms it, (2) the outside
 reviewer approves it, and (3) Claude signs it under the owner's delegation (the bound analysis identity,
 `tools/prereg_bind_identity.py`); the run is then done by an actor that is not the signer, after the IEX ingest has
@@ -30,7 +30,7 @@ eligibility, K = 3, 6, 16 with the v1 hypothesis lists, the small-G statement, t
 
 ## 3. Generators, what is random, and the estimand
 
-* **A0 (primary exhaustive arm):** generator A applied to labels with the mean removed per (name, horizon, session)
+* **A0 (primary arm, a conditional randomisation diagnostic):** generator A applied to labels with the mean removed per (name, horizon, session)
   before the derangement.
 * **B** unchanged (AR(1) synthetic; independent realisations; unbiased in v2, |t| <= 1.4 on all 16 hypotheses).
 * **A_v2** (uncentred v2 generator A): strictly diagnostic, labelled "reproduction of the v2 failure mechanism". No
@@ -56,8 +56,22 @@ eligibility, K = 3, 6, 16 with the v1 hypothesis lists, the small-G statement, t
   datasets from the real sessions (session-level bootstrap or a fitted block model) was considered: it resamples
   from only 7 units, adds a generator whose own validity is a new question, and costs a new validation plus about
   2.5 h of compute per 2,000 trials. Not in v3.
-* Consequence for the claim: A0 supports "conditional on these seven sessions, the exhaustive randomisation rate was
-  within the tolerance"; B supports the unconditional statement for the B data-generating process only.
+* **What the derangement preserves and breaks.** Preserved: each session's own label series (its within-session
+  autocorrelation, cross-hypothesis dependence and intraday shape), each session's decision rows, and the
+  between-session dependence within the set of seven series (every derangement reuses the same seven series). Broken:
+  the real pairing between a session's decision rows and its own labels, so any real session-specific
+  decision-to-label relation, and any date, regime or calendar link between a session's rows and its labels (a
+  label series from another day meets these rows). Not touched by centring: the within-session variance of a
+  label series. Removed by centring: the session-level label mean.
+* **Exhaustive enumeration does not establish exchangeability.** Complete enumeration makes the proportion exact for
+  the stated set of 1,854 derangements; it says nothing on whether those pairings are exchangeable under a true
+  null (equal in distribution to the real pairing). Without that invariance the rate is a property of the
+  construction, not a Type I error rate. A0 is therefore a **conditional randomisation diagnostic**, and the
+  word "size" is not used for it. B's rate is the repeated-simulation rejection frequency under B's own synthetic
+  process only.
+* Consequence for the claim: A0 supports "conditional on these seven sessions and this derangement construction, the
+  exhaustive rejection rate was within the tolerance"; B supports a repeated-simulation statement for the B
+  data-generating process only.
 
 ### 3.2 A0: which null, why centring, and a diagnostic that it is not trivial
 
@@ -69,28 +83,59 @@ eligibility, K = 3, 6, 16 with the v1 hypothesis lists, the small-G statement, t
   the between-session variance of the label mean, one ingredient of the S2 session-mean variance that the small-G SE
   must estimate, so A0 could be easier than A. B (independent AR(1), between-session variation generated, not
   centred away) is complementary; B is not proof that A0 is correct, and A0 is not proof for B.
-* **Pre-declared descriptive diagnostic (no pass/fail), from the A0, A_v2 and B trial records:** (a) per hypothesis,
-  the mean of the S2 session-mean statistic and its t (bias removed: |t| small for A0, large for A_v2); (b) sd of the
-  t statistic over trials and the CR1 SE understatement ratio (difficulty retained: A0's ratio is reported beside
-  A_v2's and B's; if A0's ratio is at or below 1.0 while B's is above it, the report states that A0 has lost the
-  difficulty and reads the A0 result as non-informative about the SE problem); (c) the R0 (v2 rule) family rate under
-  A0, A_v2 and B, to show whether the v2 failure mechanism is still visible. The reading rule is fixed here and no
-  threshold is attached to it.
+* **Pre-declared diagnostic: see 3.4 (interpretation gate).** (a) per hypothesis, the mean of the S2 session-mean
+  statistic and its t (3.3); (b) the understatement ratio of 3.4; (c) the R0 (v2 rule) family rate under A0, A_v2 and
+  B, to show whether the v2 failure mechanism is still visible (descriptive only).
 
 ### 3.3 Residual-mean diagnostic (replaces the "4-SE null-validity" rule)
 
 * **Unit averaged:** per generator and hypothesis, the S2 session-mean statistic (mean over the G = 7 sessions of the
   per-session mean gross P&L per trip), one value per trial, averaged over trials.
-* **SE:** B: sd across trials / sqrt(2,000) (trials independent). A0: trials are dependent, so SE = sd / sqrt(7)
-  (n_eff = number of sessions), which is conservative. Flag if |mean| > 4 SE.
-* **Behaviour, to be demonstrated before signing by a synthetic self-test in the runner's unit tests (no data run):**
-  under an injected bias the flag fires for B at a bias of about 0.09 sd of the trial statistic or more; for A0 only
-  at about 1.5 sd or more (n_eff = 7), i.e. it catches only large bias, and the exact property that centring makes each
-  session label mean zero is the main assurance there; under a valid zero-mean null the flag fires at the 4 SE rate
-  (< 0.1 % per hypothesis).
+* **SE.** B: sd across trials / sqrt(2,000); trials are independent, so this is the standard error of the mean. A0:
+  sd across derangements / sqrt(7). **This is a heuristic, not a derived or conservative SE.** The derangement
+  outcomes are dependent and the actual dependence of the trial mean on the seven sessions is not derived here; the
+  false-flag probability of the A0 flag is **not calibrated** and no "< 0.1 %" claim is made for A0. Flag if
+  |mean| > 4 SE. The self-test below shows that the heuristic can be too small by an arbitrary factor when session
+  effects are present.
+* **Synthetic self-test (implemented, `python/tests/test_known_null_diag.py`, module `iap.research.known_null_diag`;
+  seeded synthetic data, no real data).** The calculation, the bias detection and the valid-null false-flag rate are
+  tested **separately** for the B style (independent N(0,1) trial statistics, 2,000 per dataset) and the A0 style
+  (all 1,854 derangements of a synthetic 7 x 7 payoff matrix M[i, j], decision session i with label session j). Measured:
+  * *B, valid null:* 1e-5 over 100,000 datasets (0 of 20,000 in the test); below 0.1 %.
+  * *B, bias detection* (bias in trial sd): 0.05 sd flagged 4 %, 0.09 sd 52 %, 0.15 sd 99.7 %, 0.20 sd 100 %.
+  * *A0, valid null, i.i.d. entries (dependence only from derangement reuse of 49 entries):* 0.22 % over 20,000
+    datasets (seed 11). **This is above 0.1 %**; the < 0.1 % claim is therefore not supported even for the benign dependence.
+  * *A0, valid null, with session effects* (M = r_i + c_j + e): **34.9 %** over 5,000 datasets: each derangement
+    sums each effect once, so the derangement sd is blind to them and the heuristic SE is far too small. Under such
+    dependence the A0 flag is a poor instrument.
+  * *A0, bias detection* (bias in entry sd, i.i.d. entries): 0.5 sd flagged 45 %, 1.0 sd 99 %, 1.5 sd 100 %.
+  The A0 flag is thus only a coarse screen for large bias with an uncalibrated false-flag probability (0.2 % to 35 %
+  across the two dependence models); the main assurance that A0's mean is zero is the construction (each session's
+  label mean is exactly zero after centring).
 * **Meaning:** a flag means "residual mean bias detected: generator reported NULL BIASED, no size verdict for it". A
-  pass says only that no residual mean bias was detected at this resolution; it does **not** certify exchangeability,
+  pass says only that no residual mean bias was detected at this (for A0 uncalibrated) resolution; it does **not** certify exchangeability,
   dependence structure, tail behaviour, or the validity of the inference. Threshold 4 SE, fixed before the run.
+
+### 3.4 A0 interpretation gate (explicit; applies to the A0 cells only)
+
+* **Understatement ratio** per S2 hypothesis h and generator g in {A0, B}, from the stored per-trial records:
+  U(g, h) = sd_trials(m) / sqrt(mean_trials(SE_CR1^2)), where m is the per-trial S2 session-mean statistic (sd about
+  its own trial average, so a constant bias does not enter) and SE_CR1 the per-trial CR1 standard error of the same
+  statistic. U = 1 means the reported SE matches the trial-to-trial variability; U > 1 means it is understated
+  (implemented as `understatement_ratio`, tested). Summary per generator: the median of U over the 16 hypotheses.
+* **Gate.** A0 has **lost the difficulty** iff median U(A0) <= 1.0 while median U(B) > 1.0. This is fixed now and is
+  not tuned after the run. Both medians are reported with the per-hypothesis values.
+* **If not triggered (A0 retained the difficulty):** the A0 conditional result is reported with the limitations of 3.1.
+* **If triggered:** the A0 results stay in the record, but are **not** used as evidence that the small-G SE problem is
+  validated under A0.
+* **Claim an overall PASS supports (the mechanical verdict of section 6 is unchanged):**
+  * gate not triggered: "R1 met the rule in all 12 cells: B on the repeated-simulation process and A0 as a
+    conditional randomisation diagnostic on these seven sessions", with the boundaries of sections 3.1 and 7;
+  * gate triggered: the verdict is still reported as PASS but labelled **"PASS (B-supported only; A0 non-informative)"**
+    and supports only the B-process statement; nothing about the real sessions.
+  An overall FAIL is a FAIL in either case.
+* **Limits of the gate.** It can downgrade A0; it cannot show that A0 represents the original data-generating
+  process, and not triggering it does not show that.
 
 ## 4. Rules under test (same trial draws, common random numbers)
 
@@ -105,7 +150,7 @@ protocol and is never used to rescue an R1 result. The verdict is R1 alone; R0 a
 **Retrospective selection (disclosed).** Choosing R1 and its level used a descriptive look at the stored v2 p-values
 (Holm at 0.025 gives family rates of 0.4-4.2 %). v3 uses fresh seeds and a corrected generator but is **not a blind
 confirmation**. v1, v2 and v3 are recorded as sequential looks at the same question on the same dataset. The level
-0.025 is frozen before any v3 result exists.
+0.025 is fixed in this draft and frozen at signing, before any v3 result exists.
 
 ## 5. Trials, seeds, endpoint, compute
 
@@ -138,8 +183,13 @@ and nothing is changed silently. Both apply per cell, to S1 and S2, K = 3, 6, 16
   and the pass probability near 1 (v2 stored p-values gave 0.4-4.2 % with the biased A, 0.4-2.9 % under B). A pass
   supports "no detected excess over 2.5 % beyond about +0.5 pp on the B process and on these sessions"; it cannot tell
   2.5 % from 3 %.
-* **Cost:** a stricter bar; a cell whose true rate is exactly 2.5 % fails 7 % of the time, and with 18 cells a marginal
-  miss is possible even for a well calibrated test.
+* **Cost:** a stricter bar; a cell whose true rate is exactly 2.5 % fails 7 % of the time, and across the 12 primary cells
+  (generators A0 and B x statistics S1 and S2 x K = 3, 6, 16; A_v2 and R0 are diagnostic only and carry no cell) a marginal
+  miss is possible even for a well calibrated test. (Earlier drafts said "18 cells"; that was a counting error, there is
+  no third primary generator.)
+* **Meaning of 3.0 %.** It is a **pre-specified calibration acceptance threshold**, not a proof of 2.5 % size control: a B
+  pass does not show that the true rate is <= 2.5 %, and an A0 pass is a finite conditional property of one dataset and
+  construction (3.1), not an unconditional size.
 
 ### Rejected alternative, option B: keep 5.0 % / 7.0 %, narrow the claim
 
@@ -153,9 +203,9 @@ Rejected because it would pass a 4 % rate (60 % above nominal) with probability 
 
 ### Decision
 
-**Option A, tolerance 3.0 % (B: count <= 60 of 2,000; A0: count <= 55 of 1,854), is final and frozen with the protocol.** At n = 2,000 it separates a true 2.5 % (pass 93 %) from 3.5 % (12 %) and 4 % (1 %); the limit that it cannot tell 2.5 % from 3 % is recorded. A failure is a calibration failure at this tolerance and no tolerance edit follows it.
+**Option A, tolerance 3.0 % (B: count <= 60 of 2,000; A0: count <= 55 of 1,854), is selected for the current draft, pending approval and freezing.** At n = 2,000 it separates a true 2.5 % (pass 93 %) from 3.5 % (12 %) and 4 % (1 %); the limit that it cannot tell 2.5 % from 3 % is recorded. A failure is a calibration failure at this tolerance and no tolerance edit follows it.
 
-Verdict: PASS iff R1 meets the chosen rule in every cell and neither generator is flagged NULL BIASED (3.3); otherwise
+Verdict (mechanical; the claim it supports is narrowed by 3.4): PASS iff R1 meets the chosen rule in every cell and neither generator is flagged NULL BIASED (3.3); otherwise
 FAIL. No threshold, level or generator edit follows a v3 result in either direction.
 
 ## 7. Scope of any adoption of 0.025 (conditional)
@@ -194,6 +244,11 @@ decides whether to proceed with a larger G; nothing is retried on the same data.
 * v1 (signed, PASS, size untested) and v2 (signed `67db845a`, FAIL, 7 of 12 cells) are preserved verbatim in the final
   report, including the seven failed v2 cells; v3 is presented as the **third** look, never a first attempt. The v3
   ledger entry lists v1 and v2. These studies spend no alpha-hypothesis budget.
+* **What the signed identity binds.** The final protocol file hash (the final text, not a hash of an earlier draft), the
+  exact prereg file (`null_protocol_v3_prereg.json`, with `protocol_sha256` filled), the runner configuration file and
+  the code version (git commit, including `known_null.py`, `known_null_diag.py` and the v3 runner). The
+  `protocol_sha256_at_draft` field of the draft is for tracking only and is replaced at signing. Because revision 3
+  adds `known_null_diag.py` the analysis identity changes; signing is done from a clean checkout of the frozen commit.
 * The run is executed by an actor that is **not** the signer, who first verifies the exact signed protocol hash and
   the bound prereg identity and refuses to run on any mismatch. After signing nothing may change.
 
