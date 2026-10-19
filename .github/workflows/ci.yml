@@ -378,7 +378,7 @@ jobs:
       - name: Install coverage (hashed pin)
         run: |
           python -m pip install --upgrade pip
-          awk '/^coverage==/{p=1;print;next} p&&/^    /{print;next} {p=0}'             python/requirements-ci.txt > /tmp/req-cov.txt
+          awk '/^coverage(\[[a-z]+\])?==/{p=1;print;next} p&&/^    /{print;next} {p=0}'             python/requirements-ci.txt > /tmp/req-cov.txt
           pip install --require-hashes --no-deps -r /tmp/req-cov.txt
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
