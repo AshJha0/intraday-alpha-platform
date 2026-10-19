@@ -10,7 +10,7 @@ cffi==2.1.1
 cloudpickle==3.1.2
 coverage==7.16.2
 cryptography==50.0.2
-databento-dbn==0.71.0
+databento-dbn==0.72.0
 execnet==2.1.2
 hypothesis==6.140.2
 iniconfig==2.3.1
@@ -22,8 +22,8 @@ numpy==2.4.6
 packaging==26.3
 pandas==3.0.6
 pluggy==1.6.0
-pycparser==3.0
-pyarrow==25.0.1
+pycparser==3.11
+pyarrow==26.0.0
 pygments==2.21.0
 pytest-cov==7.1.0
 pytest-xdist==3.8.0
