@@ -18,17 +18,41 @@
   "protocol": "research/v118/NULL_PROTOCOL_v3.md",
   "protocol_sha256_at_draft": "56fd85bab9a8d49099b42e24d251d422c80fb764e2c95308d485bca06a348d62",
   "signed": false,
-  "status": "DRAFT REVISION 3, unsigned: addresses the outside reviewer's second decision (APPROVE WITH NAMED CHANGES, 2026-10-19); option A selected for the current draft, pending approval and freezing; adoption of 0.025 open until after the run; not frozen, not re-reviewed, nothing run; the v3 runner config is not yet written",
+  "status": "DRAFT REVISION 4, unsigned: addresses the outside reviewer's third decision (APPROVE WITH NAMED CHANGES, 2026-10-19); A0 residual-mean flag demoted to descriptive, A0 centring construction invariant added, 3.4 gate fully specified; option A selected, pending approval and freezing; adoption of 0.025 open until after the run; not frozen, not re-reviewed, nothing run; the v3 runner config is not yet written",
   "thresholds_draft": {
     "a0_interpretation_gate": {
-      "if_lost": "A0 kept in record, not evidence of small-G SE validation; overall PASS labelled 'PASS (B-supported only; A0 non-informative)'",
-      "limit": "can downgrade A0; cannot show A0 represents the original data-generating process",
-      "lost_difficulty": "median U(A0) <= 1.0 and median U(B) > 1.0 over the 16 hypotheses",
-      "understatement_ratio": "U = sd_trials(session-mean statistic about own trial mean) / sqrt(mean_trials(CR1 SE^2)), per S2 hypothesis"
+      "aggregation": "median over the 16 hypotheses per generator",
+      "exceptional_values": "any missing/non-finite m or SE, <2 trials, or zero/non-finite mean(SE^2) => U = NaN; trials never dropped; a NaN or absent U for either generator => gate UNDETERMINED (listed, never omitted from the median); UNDETERMINED treated conservatively as non-informative",
+      "hypothesis_set": "the 16 hypotheses of variants.K16 of the frozen config (known_null_v2_config.json list)",
+      "labels": {
+        "never_shortened": true,
+        "not_triggered": "PASS (B on the repeated-simulation process; A0 as a conditional randomisation diagnostic on these seven sessions)",
+        "triggered_or_undetermined": "PASS (B-supported only; A0 non-informative)"
+      },
+      "limit": "can downgrade A0's evidential contribution; cannot show B is representative of market data or that A0 reproduces the original DGP",
+      "lost_difficulty": "median U(A0) <= 1.0 and median U(B) > 1.0 (1.0 is a declared diagnostic rule, not a validated boundary)",
+      "m": "S2 (gross) session-mean statistic of one hypothesis, bps per round trip, one value per trial (A0: per derangement; B: per independent trial); SE_CR1 the per-trial CR1 SE of the same statistic",
+      "n_hypotheses": 16,
+      "nature": "interpretive only; not a significance test; no effect on rejection counts",
+      "never_overrides_rate_failure": "an A0 cell > 55 of 1854 (or a B cell > 60 of 2000) is FAIL even if the gate says A0 non-informative",
+      "statistic": "S2 only",
+      "understatement_ratio": "U = sd_trials(m, ddof=1) / sqrt(mean_trials(SE_CR1^2)), per hypothesis and generator"
     },
     "a0_label": "conditional randomisation diagnostic (not a size estimate)",
     "adoption_scope_if_passed": "CR1+Student-t Webb enumeration, G=7, Holm, multi7 + generator B, K=3/6/16 at 0.025 only; no claim at 0.05 or elsewhere",
     "alpha_rule_under_test": 0.025,
+    "centring_invariant": {
+      "empty_or_invalid_group": "fails (never skipped); infinite label fails; NaN labels excluded from the mean",
+      "groups": "(name, horizon) pairs of the frozen hypothesis lists (1s x AAPL/MSFT/QQQ; 10s, 1m x AAPL/MSFT) x 7 sessions",
+      "implementation": "iap.research.known_null_diag.check_centring_invariant / verify_series_used / require_centring_invariant",
+      "meaning": "passing establishes only that centring was implemented; not exchangeability, dependence assumptions, tail behaviour or validity of the conditional randomisation scheme",
+      "n_groups": 49,
+      "role": "HARD construction check on the centred A0 labels before the derangement; failure => A0 run aborted/INVALID (construction failure, not a statistical null-validity finding)",
+      "rule": "|mean of finite labels| <= tol_rel * max|label| per (name, horizon, session) group",
+      "series_used_check": "derangement input bit-identical to the checked centred array",
+      "tol_rel": 1e-09
+    },
+    "claim_scope": "B pass: observed FWER in the specified independent synthetic trials met the pre-specified calibration threshold. A0 pass: exact conditional rejection proportion over the specified transformations met its threshold. Neither, alone or combined, proves true FWER on real trading data is controlled at 2.5 %.",
     "compute_budget_hours": 12.0,
     "dataset": "data/real/multi7 ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
     "diagnostic_rules": {
@@ -37,14 +61,16 @@
     "estimated_compute_hours": 3.3,
     "further_attempt": "at most one; written rationale before results; CR2/CR3 = new procedure; failure => F3 unattained at G=7 under approaches tested",
     "null_validity_check": {
-      "label": "residual-mean diagnostic (not a validity certificate; A0 SE is a heuristic with uncalibrated false-flag probability)",
+      "a0_role": "descriptive only: reported, no verdict, no NULL BIASED, no invalidation",
+      "b_role": "blocks_pass: a flag => FAIL (generator B NULL BIASED); to be confirmed by the reviewer",
+      "label": "residual-mean diagnostic: DESCRIPTIVE for A0 (uncalibrated heuristic; false-flag 0.22 % iid dependence, 34.9 % with session effects); for B retains its blocking role",
       "max_abs_mean_in_se_of_mean": 4,
-      "outcome_on_flag": "NULL BIASED, no size verdict",
+      "outcome_on_flag": "B only: FAIL (generator B NULL BIASED); A0: none",
       "se": {
         "A0": "heuristic sd/sqrt(7), NOT calibrated, no <0.1 % claim",
         "B": "sd/sqrt(2000)"
       },
-      "self_test": "implemented: python/tests/test_known_null_diag.py (module iap.research.known_null_diag); rates in protocol 3.3",
+      "self_test": "implemented: python/tests/test_known_null_diag.py (module iap.research.known_null_diag); rates in protocol 3.3 (kept in the audit trail)",
       "self_test_required_before_signing": true,
       "statistic": "gross"
     },
@@ -116,7 +142,8 @@
         "net_recentred",
         "gross"
       ]
-    }
+    },
+    "verdict_logic": "INVALID if centring invariant fails; FAIL if any of 12 cells > threshold or missing, or B flagged; else PASS labelled by the gate; implemented as primary_verdict"
   },
   "to_sign": "NOT before: owner decisions made, protocol frozen and re-reviewed by the outside reviewer; then analysis_identity bound by tools/prereg_bind_identity.py; run by a non-signer who verifies the signed hashes",
   "x-version": 1

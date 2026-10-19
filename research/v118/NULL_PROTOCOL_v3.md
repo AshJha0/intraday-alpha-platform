@@ -1,6 +1,6 @@
 # Known-null protocol v3: size and power of the inference step, stricter operating level (v1.18, REL-06)
 
-**Status: DRAFT REVISION 3 (2026-10-19, after the outside reviewer's second decision APPROVE WITH NAMED CHANGES; revision 2 followed the first), UNSIGNED, nothing run, not approved, not frozen.** Written 2026-10-19 after the v2 FAIL
+**Status: DRAFT REVISION 4 (2026-10-19, after the outside reviewer's third decision APPROVE WITH NAMED CHANGES; revisions 2 and 3 followed the first and second), UNSIGNED, nothing run, not approved, not frozen.** Written 2026-10-19 after the v2 FAIL
 (`KNOWN_NULL_V2_RESULT.md`). It becomes a registered protocol only if (1) the owner confirms it, (2) the outside
 reviewer approves it, and (3) Claude signs it under the owner's delegation (the bound analysis identity,
 `tools/prereg_bind_identity.py`); the run is then done by an actor that is not the signer, after the IEX ingest has
@@ -83,11 +83,45 @@ eligibility, K = 3, 6, 16 with the v1 hypothesis lists, the small-G statement, t
   the between-session variance of the label mean, one ingredient of the S2 session-mean variance that the small-G SE
   must estimate, so A0 could be easier than A. B (independent AR(1), between-session variation generated, not
   centred away) is complementary; B is not proof that A0 is correct, and A0 is not proof for B.
-* **Pre-declared diagnostic: see 3.4 (interpretation gate).** (a) per hypothesis, the mean of the S2 session-mean
-  statistic and its t (3.3); (b) the understatement ratio of 3.4; (c) the R0 (v2 rule) family rate under A0, A_v2 and
+* **Pre-declared diagnostics: see 3.3 (construction invariant, descriptive residual mean) and 3.4 (interpretation gate).** (a) per hypothesis, the mean of the S2 session-mean
+  statistic and its t (3.3, descriptive); (b) the understatement ratio of 3.4; (c) the R0 (v2 rule) family rate under A0, A_v2 and
   B, to show whether the v2 failure mechanism is still visible (descriptive only).
 
-### 3.3 Residual-mean diagnostic (replaces the "4-SE null-validity" rule)
+### 3.3 Construction invariant (hard) and residual-mean diagnostic (descriptive)
+
+**Residual-mean diagnostic and construction invariant (reviewer wording, third decision, in substance).** The
+residual-mean heuristic is **descriptive only for A0**. Its false-flag rate is not calibrated for A0 and varies
+substantially under the dependence structures tested (0.22 % to 34.9 %, below). It does not determine whether the A0 size
+result is valid, does not generate a NULL BIASED verdict for A0, and cannot change the primary pass/fail outcome. A0's
+centring construction is checked directly by the **construction invariant** below. Passing it establishes only that
+the specified centring operation was implemented. It does not establish exchangeability, valid dependence assumptions, tail
+behaviour, or the validity of the conditional randomisation scheme; the limitations of 3.1 remain part of the A0
+interpretation.
+
+**A0 centring construction invariant (HARD check; implemented as `check_centring_invariant`, `verify_series_used`,
+`require_centring_invariant` in `iap.research.known_null_diag`).**
+
+* **Groups:** every (name, horizon, session) with (name, horizon) in the pairs used by the frozen hypothesis lists
+  (`variants` K3, K6, K16 of `known_null_v2_config.json`; the v3 runner config carries the same lists): 1s x
+  {AAPL, MSFT, QQQ}, 10s x {AAPL, MSFT}, 1m x {AAPL, MSFT} = 7 pairs x 7 sessions = **49 groups**. The runner derives
+  the list from the config and asserts the count of 49.
+* **When:** on the centred label arrays, **before** the derangement is applied, once per run (centring is
+  deterministic).
+* **Rule:** the mean of the finite labels of the group must satisfy |mean| <= 1e-9 x max|label in group| (relative
+  tolerance `CENTRING_TOL_REL`, about seven orders above float64 rounding of a centred mean, fixed now). Non-finite
+  (NaN) labels are rows without a valid label and do not enter the mean. An all-zero group passes.
+* **Empty or invalid groups:** a required group with no finite label, or any infinite label, **fails**; a missing
+  group is never skipped.
+* **Verification that the centred series is the one used:** `verify_series_used` requires the array the derangement
+  reads to be bit-identical (NaN equal NaN) to the array that passed the check; the runner asserts it for every
+  horizon.
+* **Consequence of failure:** a **construction / implementation failure**: the run aborts
+  (`CentringInvariantError`), or if already complete, the A0 run is **INVALID** (verdict INVALID, not FAIL, no A0
+  rate is reported as a size finding) until resolved under the protocol's pre-run controls (fix, re-review, new signed
+  identity). It is **not** a statistical null-validity finding and no threshold or generator change follows from it.
+  A pass of the invariant does not make the verdict a PASS: the rate rule of section 6 still decides.
+
+**Residual-mean diagnostic (descriptive for A0; for B retains its v3 role).**
 
 * **Unit averaged:** per generator and hypothesis, the S2 session-mean statistic (mean over the G = 7 sessions of the
   per-session mean gross P&L per trip), one value per trial, averaged over trials.
@@ -95,8 +129,13 @@ eligibility, K = 3, 6, 16 with the v1 hypothesis lists, the small-G statement, t
   sd across derangements / sqrt(7). **This is a heuristic, not a derived or conservative SE.** The derangement
   outcomes are dependent and the actual dependence of the trial mean on the seven sessions is not derived here; the
   false-flag probability of the A0 flag is **not calibrated** and no "< 0.1 %" claim is made for A0. Flag if
-  |mean| > 4 SE. The self-test below shows that the heuristic can be too small by an arbitrary factor when session
-  effects are present.
+  |mean| > 4 SE (threshold unchanged, fixed before the run).
+* **Role.** **A0:** the flag and the per-hypothesis means and t are **reported only**; no verdict, no "NULL BIASED",
+  no invalidation, no effect on the primary outcome. **B:** unchanged from revision 3: a flag means "residual mean bias
+  detected: generator B reported NULL BIASED, no PASS" (B's SE is the valid independent-trials SE and the B false-flag
+  rate is 1e-5). *This B handling is stated explicitly because the reviewer's third decision demoted only A0's flag; it
+  is put to the reviewer for confirmation before signing.* A pass of the diagnostic does **not** certify exchangeability,
+  dependence structure, tail behaviour, or the validity of the inference.
 * **Synthetic self-test (implemented, `python/tests/test_known_null_diag.py`, module `iap.research.known_null_diag`;
   seeded synthetic data, no real data).** The calculation, the bias detection and the valid-null false-flag rate are
   tested **separately** for the B style (independent N(0,1) trial statistics, 2,000 per dataset) and the A0 style
@@ -110,32 +149,52 @@ eligibility, K = 3, 6, 16 with the v1 hypothesis lists, the small-G statement, t
     dependence the A0 flag is a poor instrument.
   * *A0, bias detection* (bias in entry sd, i.i.d. entries): 0.5 sd flagged 45 %, 1.0 sd 99 %, 1.5 sd 100 %.
   The A0 flag is thus only a coarse screen for large bias with an uncalibrated false-flag probability (0.2 % to 35 %
-  across the two dependence models); the main assurance that A0's mean is zero is the construction (each session's
-  label mean is exactly zero after centring).
-* **Meaning:** a flag means "residual mean bias detected: generator reported NULL BIASED, no size verdict for it". A
-  pass says only that no residual mean bias was detected at this (for A0 uncalibrated) resolution; it does **not** certify exchangeability,
-  dependence structure, tail behaviour, or the validity of the inference. Threshold 4 SE, fixed before the run.
+  across the two dependence models). **These results are the reason the A0 flag was demoted in revision 4** and stay in
+  the audit trail; the self-test is a required pre-signing check that must pass on the exact code to be signed.
 
-### 3.4 A0 interpretation gate (explicit; applies to the A0 cells only)
+### 3.4 A0 interpretation gate (explicit; applies to the A0 cells only; interpretive, not a significance test)
 
-* **Understatement ratio** per S2 hypothesis h and generator g in {A0, B}, from the stored per-trial records:
-  U(g, h) = sd_trials(m) / sqrt(mean_trials(SE_CR1^2)), where m is the per-trial S2 session-mean statistic (sd about
-  its own trial average, so a constant bias does not enter) and SE_CR1 the per-trial CR1 standard error of the same
-  statistic. U = 1 means the reported SE matches the trial-to-trial variability; U > 1 means it is understated
-  (implemented as `understatement_ratio`, tested). Summary per generator: the median of U over the 16 hypotheses.
-* **Gate.** A0 has **lost the difficulty** iff median U(A0) <= 1.0 while median U(B) > 1.0. This is fixed now and is
-  not tuned after the run. Both medians are reported with the per-hypothesis values.
-* **If not triggered (A0 retained the difficulty):** the A0 conditional result is reported with the limitations of 3.1.
-* **If triggered:** the A0 results stay in the record, but are **not** used as evidence that the small-G SE problem is
-  validated under A0.
-* **Claim an overall PASS supports (the mechanical verdict of section 6 is unchanged):**
-  * gate not triggered: "R1 met the rule in all 12 cells: B on the repeated-simulation process and A0 as a
-    conditional randomisation diagnostic on these seven sessions", with the boundaries of sections 3.1 and 7;
-  * gate triggered: the verdict is still reported as PASS but labelled **"PASS (B-supported only; A0 non-informative)"**
-    and supports only the B-process statement; nothing about the real sessions.
-  An overall FAIL is a FAIL in either case.
-* **Limits of the gate.** It can downgrade A0; it cannot show that A0 represents the original data-generating
-  process, and not triggering it does not show that.
+* **m, exactly.** m is the **S2** (gross) session-mean statistic of one hypothesis: for one trial, the equal-weight mean
+  over the sessions that have at least one valid trip of the per-session mean gross P&L per trip, **in bps per
+  round trip**; one value per trial (A0: per derangement, 1,854; B: per independent trial, 2,000). `SE_CR1` is the
+  per-trial CR1 standard error (in bps) of that same statistic, from the same trial. **The gate is computed for S2
+  only**; S1 is not used (S1 is insensitive, section 1).
+* **Understatement ratio** per hypothesis h and generator g in {A0, B}: U(g, h) = sd_trials(m) / sqrt(mean_trials(SE_CR1^2)),
+  with sd about the trial average (ddof = 1), so a constant bias does not enter. U = 1: the reported SE matches the
+  trial-to-trial variability; U > 1: understated (`understatement_ratio`, tested).
+* **Hypothesis set:** exactly the **16 hypotheses of `variants.K16`** of the frozen config (the v3 runner config holds
+  the same list as `known_null_v2_config.json`; ids as listed there, from `imbalance_l1@10s/AAPL` to
+  `imbalance_l10@1m/MSFT`). The gate takes the ids from that list; the runner and `lost_difficulty` assert 16 distinct ids.
+* **Exceptional values (explicit; nothing is silently omitted).** In `understatement_ratio`, if any trial has a missing
+  or non-finite m or SE, if fewer than two trials exist, or if mean(SE^2) is zero or non-finite, **U(g, h) = NaN
+  (invalid)**; trials are never dropped. In the gate, a hypothesis whose U is NaN or absent for either generator is
+  listed (`invalid_ids`) and makes the gate **UNDETERMINED**; it is never left out of the median. UNDETERMINED is treated
+  conservatively as not retaining A0's evidential contribution (the qualified PASS label below applies) and is reported as such.
+* **Aggregation:** the **median over the 16 hypotheses** of U(g, h) per generator, both medians reported with the 16
+  per-hypothesis values.
+* **Gate (fixed now, not tuned after the run).** A0 has **lost the difficulty (TRIGGERED)** iff median U(A0) <= 1.0 while
+  median U(B) > 1.0. The value 1.0 is a **declared diagnostic rule, not a validated boundary**. The gate is
+  **interpretive**: not a new significance test, no p-value, no effect on any rejection count.
+* **If NOT_TRIGGERED:** the A0 conditional result is reported with the limitations of 3.1.
+* **If TRIGGERED or UNDETERMINED:** the A0 results stay in the record, but are **not** used as evidence that the small-G
+  SE problem is validated under A0.
+* **Labels (exactly; never shortened to an unqualified PASS in the summary, ledger or release decision).**
+  * NOT_TRIGGERED: "PASS (B on the repeated-simulation process; A0 as a conditional randomisation diagnostic on these
+    seven sessions)", with the boundaries of sections 3.1, 7 and 3.5;
+  * TRIGGERED or UNDETERMINED: **"PASS (B-supported only; A0 non-informative)"**, supporting only the B-process
+    statement; nothing about the real sessions.
+* **The gate never overrides a rate failure.** If any A0 cell exceeds its threshold (> 55 of 1,854), the verdict is
+  **FAIL**, even when the gate says A0 is non-informative; likewise any B cell > 60 of 2,000. A FAIL is a FAIL in
+  every case; an INVALID A0 run (3.3) is not a PASS either.
+* **Limits of the gate.** It can downgrade A0's evidential contribution; it cannot show that B is representative of
+  market data or that A0 reproduces the original data-generating process, and not triggering it does not show that.
+
+### 3.5 Claim scope of a pass (no threshold change)
+
+For **B**, a pass means the observed FWER in the specified independent synthetic trials met the pre-specified
+calibration threshold. For **A0**, a pass means the exact conditional rejection proportion over the specified
+transformations met its threshold. **Neither, alone or combined, proves that the true FWER on real trading data is
+controlled at 2.5 %.**
 
 ## 4. Rules under test (same trial draws, common random numbers)
 
@@ -205,8 +264,7 @@ Rejected because it would pass a 4 % rate (60 % above nominal) with probability 
 
 **Option A, tolerance 3.0 % (B: count <= 60 of 2,000; A0: count <= 55 of 1,854), is selected for the current draft, pending approval and freezing.** At n = 2,000 it separates a true 2.5 % (pass 93 %) from 3.5 % (12 %) and 4 % (1 %); the limit that it cannot tell 2.5 % from 3 % is recorded. A failure is a calibration failure at this tolerance and no tolerance edit follows it.
 
-Verdict (mechanical; the claim it supports is narrowed by 3.4): PASS iff R1 meets the chosen rule in every cell and neither generator is flagged NULL BIASED (3.3); otherwise
-FAIL. No threshold, level or generator edit follows a v3 result in either direction.
+Verdict (mechanical; implemented as `primary_verdict`; the claim it supports is narrowed by 3.4 and 3.5): INVALID if the A0 centring invariant (3.3) failed (a construction failure); otherwise FAIL if any of the 12 primary cells exceeds its threshold or is missing (whatever the gate says), or if generator **B** is flagged NULL BIASED by the residual-mean diagnostic (3.3; A0's flag has no role); otherwise PASS, with the label fixed by the gate (3.4). No threshold, level or generator edit follows a v3 result in either direction.
 
 ## 7. Scope of any adoption of 0.025 (conditional)
 
@@ -246,9 +304,9 @@ decides whether to proceed with a larger G; nothing is retried on the same data.
   ledger entry lists v1 and v2. These studies spend no alpha-hypothesis budget.
 * **What the signed identity binds.** The final protocol file hash (the final text, not a hash of an earlier draft), the
   exact prereg file (`null_protocol_v3_prereg.json`, with `protocol_sha256` filled), the runner configuration file and
-  the code version (git commit, including `known_null.py`, `known_null_diag.py` and the v3 runner). The
-  `protocol_sha256_at_draft` field of the draft is for tracking only and is replaced at signing. Because revision 3
-  adds `known_null_diag.py` the analysis identity changes; signing is done from a clean checkout of the frozen commit.
+  the code version (git commit, including `known_null.py`, `known_null_diag.py` and the v3 runner). The synthetic self-test (`python/tests/test_known_null_diag.py`) is a **required pre-signing check** and must pass on the exact code (commit) to be signed. The
+  `protocol_sha256_at_draft` field of the draft is for tracking only and is replaced at signing. Because revisions 3 and 4
+  add and extend `known_null_diag.py` the analysis identity changes; signing is done from a clean checkout of the frozen commit.
 * The run is executed by an actor that is **not** the signer, who first verifies the exact signed protocol hash and
   the bound prereg identity and refuses to run on any mismatch. After signing nothing may change.
 
@@ -257,3 +315,23 @@ decides whether to proceed with a larger G; nothing is retried on the same data.
 It registers nothing, reads no data and runs nothing. A PASS would be a statement about **protocol validity**: the
 inference step, at the stated level, on the stated generators, estimator and K sizes. It says nothing about alpha
 validity, profitability, simulator realism or production readiness.
+
+## 12. Revision 4: consistency table (reviewer's third decision -> where implemented)
+
+| decision | protocol | prereg draft JSON key (under `thresholds_draft`) | code / test | runner config key (to carry the same value) |
+|---|---|---|---|---|
+| A0 residual-mean flag demoted to descriptive, no NULL BIASED | 3.3 Role | `null_validity_check.a0_role`, `.outcome_on_flag` | `primary_verdict` has no A0-flag argument; `test_verdict_*` | `residual_mean.a0_role = "descriptive"` |
+| B flag keeps blocking PASS (point to confirm) | 3.3 Role | `null_validity_check.b_role` | `primary_verdict(b_residual_flag)`; `test_missing_cell_fails_and_b_flag_blocks_pass` | `residual_mean.b_role = "blocks_pass"` |
+| exact centring invariant (tolerance, 49 groups, empty/invalid, series used, INVALID not FAIL) | 3.3 | `centring_invariant` | `check_centring_invariant`, `verify_series_used`, `require_centring_invariant`; `test_centring_*`, `test_nan_rows_*`, `test_required_names_*` | `centring_invariant.tol_rel = 1e-9`, `.n_groups = 49` |
+| reviewer 3.3 wording | 3.3 first paragraph | `centring_invariant.meaning` | n/a | n/a |
+| m defined, S2 only | 3.4 | `a0_interpretation_gate.m`, `.statistic` | `understatement_ratio` docstring | `gate.statistic = "S2"` |
+| frozen 16-hypothesis list | 3.4 | `a0_interpretation_gate.hypothesis_set` | `lost_difficulty(expected_ids)`; `test_frozen_hypothesis_list_*`, `test_gate_missing_*` | `variants.K16` |
+| missing / non-finite / zero-denominator values | 3.4 | `a0_interpretation_gate.exceptional_values` | `understatement_ratio` NaN rule, gate UNDETERMINED; `test_understatement_ratio_exceptional_*` | n/a (code rule) |
+| median aggregation, interpretive only, 1.0 declared | 3.4 | `a0_interpretation_gate.aggregation`, `.nature`, `.lost_difficulty` | `lost_difficulty`; `test_gate_triggered_and_not` | `gate.median_threshold = 1.0` |
+| PASS labels exact | 3.4 Labels | `a0_interpretation_gate.labels` | `PASS_LABEL_GATE`, `PASS_LABEL_PLAIN`; `test_verdict_thresholds_edge_and_labels` | `gate.labels` |
+| A0 rate failure stays FAIL regardless of gate | 3.4, 6 | `a0_interpretation_gate.never_overrides_rate_failure` | `primary_verdict`; `test_a0_rate_failure_is_fail_regardless_of_gate` | n/a |
+| claim-scope wording | 3.5 | `claim_scope` | n/a | n/a |
+| artefacts reconciled; self-test required pre-signing | 10, this table | `null_validity_check.self_test_required_before_signing` | all of `test_known_null_diag.py` | n/a |
+
+The v3 runner and its configuration file do not exist yet; the right-hand column lists the keys it must carry, and the
+signature binds the final runner config.
