@@ -1,4 +1,5 @@
 {
+  "identity_binding": "signed identity binds: final protocol file hash, this exact prereg file (protocol_sha256 filled at signing; protocol_sha256_at_draft is tracking only), the runner configuration file and the code version (git commit incl. known_null.py, known_null_diag.py, the v3 runner)",
   "kind": "analysis_prereg",
   "prereg_id": "research/v118/null_protocol_v3_prereg.json",
   "prior_looks": [
@@ -15,10 +16,17 @@
     }
   ],
   "protocol": "research/v118/NULL_PROTOCOL_v3.md",
-  "protocol_sha256_at_draft": "d0e61e5806a0c83c633ff4447c8798754b42042282fb2d7ca368172007c84197",
+  "protocol_sha256_at_draft": "56fd85bab9a8d49099b42e24d251d422c80fb764e2c95308d485bca06a348d62",
   "signed": false,
-  "status": "DRAFT REVISION 2, unsigned: addresses the outside reviewer's APPROVE WITH CHANGES (2026-10-19); pass rule decided (option A); adoption of 0.025 open until after the run; not frozen, not re-reviewed, nothing run; the v3 runner config is not yet written",
+  "status": "DRAFT REVISION 3, unsigned: addresses the outside reviewer's second decision (APPROVE WITH NAMED CHANGES, 2026-10-19); option A selected for the current draft, pending approval and freezing; adoption of 0.025 open until after the run; not frozen, not re-reviewed, nothing run; the v3 runner config is not yet written",
   "thresholds_draft": {
+    "a0_interpretation_gate": {
+      "if_lost": "A0 kept in record, not evidence of small-G SE validation; overall PASS labelled 'PASS (B-supported only; A0 non-informative)'",
+      "limit": "can downgrade A0; cannot show A0 represents the original data-generating process",
+      "lost_difficulty": "median U(A0) <= 1.0 and median U(B) > 1.0 over the 16 hypotheses",
+      "understatement_ratio": "U = sd_trials(session-mean statistic about own trial mean) / sqrt(mean_trials(CR1 SE^2)), per S2 hypothesis"
+    },
+    "a0_label": "conditional randomisation diagnostic (not a size estimate)",
     "adoption_scope_if_passed": "CR1+Student-t Webb enumeration, G=7, Holm, multi7 + generator B, K=3/6/16 at 0.025 only; no claim at 0.05 or elsewhere",
     "alpha_rule_under_test": 0.025,
     "compute_budget_hours": 12.0,
@@ -29,19 +37,26 @@
     "estimated_compute_hours": 3.3,
     "further_attempt": "at most one; written rationale before results; CR2/CR3 = new procedure; failure => F3 unattained at G=7 under approaches tested",
     "null_validity_check": {
-      "label": "residual-mean diagnostic (not a validity certificate)",
+      "label": "residual-mean diagnostic (not a validity certificate; A0 SE is a heuristic with uncalibrated false-flag probability)",
       "max_abs_mean_in_se_of_mean": 4,
       "outcome_on_flag": "NULL BIASED, no size verdict",
       "se": {
-        "A0": "sd/sqrt(7), n_eff = sessions",
+        "A0": "heuristic sd/sqrt(7), NOT calibrated, no <0.1 % claim",
         "B": "sd/sqrt(2000)"
       },
+      "self_test": "implemented: python/tests/test_known_null_diag.py (module iap.research.known_null_diag); rates in protocol 3.3",
       "self_test_required_before_signing": true,
       "statistic": "gross"
+    },
+    "order_size_shares": {
+      "note": "order size in SHARES per decision passed to build_trips (known_null.py) and part of the v1/v2 identity thresholds; kept at 100 for comparability with v1 and v2; not a count of registrations",
+      "runner_config_key": "registered_size_shares",
+      "value": 100
     },
     "pass_rule": {
       "final": "option_A_calibration",
       "flag_upper_below": 0.02,
+      "meaning_of_threshold": "pre-specified calibration acceptance threshold (3.0 %), not proof of 2.5 % size control",
       "option_A_calibration": {
         "A0_interval": "none (exact enumeration, conditional estimand)",
         "A0_max_count_of_1854": 55,
@@ -72,8 +87,11 @@
       "n_trials": 200,
       "pass_rule": null
     },
+    "primary_cells": {
+      "count": 12,
+      "definition": "generators A0, B x statistics S1, S2 x K = 3, 6, 16; A_v2 and R0 diagnostic only"
+    },
     "primary_endpoint": "family-wise error rate at family level per cell (generator x statistic x K); per-hypothesis marginal rates descriptive",
-    "registered_size_shares": 100,
     "size_arm": {
       "A0": {
         "base_seed": 20270101,
