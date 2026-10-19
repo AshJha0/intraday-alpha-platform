@@ -1,11 +1,11 @@
 # Known-null protocol v3: size and power of the inference step, stricter operating level (v1.18, REL-06)
 
-**Status: DRAFT, UNSIGNED, nothing run, not approved.** Written 2026-10-19 after the v2 FAIL
+**Status: DRAFT REVISION 2 (2026-10-19, after the outside reviewer's decision APPROVE WITH CHANGES), UNSIGNED, nothing run, not approved, not frozen.** Written 2026-10-19 after the v2 FAIL
 (`KNOWN_NULL_V2_RESULT.md`). It becomes a registered protocol only if (1) the owner confirms it, (2) the outside
 reviewer approves it, and (3) Claude signs it under the owner's delegation (the bound analysis identity,
 `tools/prereg_bind_identity.py`); the run is then done by an actor that is not the signer, after the IEX ingest has
 finished (the machine is RAM-limited). Parameters marked **[R]** are for the reviewer to confirm or change before
-signing; after signing none may be edited. The unsigned prereg draft is `null_protocol_v3_prereg_DRAFT.json`.
+signing; after signing none may be edited. Items marked **OWNER DECISION** must be decided before the protocol is frozen and re-reviewed. The unsigned prereg draft is `null_protocol_v3_prereg_DRAFT.json`.
 
 ## 1. What v2 found and what v3 must therefore change
 
@@ -19,95 +19,189 @@ Cited, not reinterpreted: v2 FAILED 7 of 12 family cells (all S2 gross cells; S1
 4. S1 is insensitive (over-conservative), so only S2 measures the inference.
 
 v3 changes the **null** (cause 1) and the **operating level of the rule under test** (causes 2-3). It does not change
-the pass rule, the thresholds, the dataset, the economics, the families or the estimator.
+the dataset, the economics, the families or the estimator. The pass rule conflicted with the level under test and is
+restated as two options in section 6 (owner decision).
 
 ## 2. Unchanged from v2 (and v1)
 
 Dataset `data/real/multi7` (G = 7, `in_sample`), holdout check, decision rows, simulator and cost model, trip tables,
 S1 / S2 statistics (v2 section 3), CR1 + Student-t, Webb full enumeration for G < 10 (restricted, one-sided), REL-02d
-eligibility, K = 3, 6, 16 with the v1 hypothesis lists, the small-G statement, the planted-effect hook, **the pass rule
-and thresholds**: for generators A0 and B, per hypothesis and family level K = 3, 6, 16, for S1 and for S2: point
-<= 5.0 % and Wilson upper <= 7.0 %; over-conservative flag at Wilson upper < 2.0 % (reported only).
+eligibility, K = 3, 6, 16 with the v1 hypothesis lists, the small-G statement, the planted-effect hook, (the pass rule is in section 6; the over-conservative flag at upper bound < 2.0 % is reported only).
 
-## 3. Generators
+## 3. Generators, what is random, and the estimand
 
-* **A0 (primary, replaces A for the pass rule):** generator A applied to labels with the mean removed per
-  (name, horizon, session) before the derangement, so no session carries its drift to another. This removes the
-  session-level source of the v2 bias; the rest of A (real within-session label structure, session dependence) is kept.
-* **B** unchanged (AR(1); already unbiased in v2, |t| <= 1.4 on all 16 hypotheses).
-* **A_v2** (the uncentred v2 generator A) runs beside them with **no pass rule**, to confirm the diagnosis: its bias
-  and over-rejection should reappear under R0.
-* **Null-validity check (new, fixed before any trial):** for each generator and hypothesis, the mean over size trials of
-  the S2 session-mean must satisfy |mean| <= 4 x (sd / sqrt(n_trials)). If any hypothesis violates it, that generator is
-  declared NULL INVALID: its cells are reported "not tested", gate F3 is not met, and no size verdict is issued for it
-  (so a biased null is never read as a test failure or, worse, a pass).
-  (Sign-flipping session means was considered as a generator and **rejected**: the Webb wild bootstrap is itself a
-  reweighting of session means, so a sign-flip null would make the test exact by construction.)
+* **A0 (primary exhaustive arm):** generator A applied to labels with the mean removed per (name, horizon, session)
+  before the derangement.
+* **B** unchanged (AR(1) synthetic; independent realisations; unbiased in v2, |t| <= 1.4 on all 16 hypotheses).
+* **A_v2** (uncentred v2 generator A): strictly diagnostic, labelled "reproduction of the v2 failure mechanism". No
+  pass/fail, no effect on the verdict, and it is never used to retune A0.
 
-## 4. Rules under test (all evaluated on the same trial draws, common random numbers)
+### 3.1 A0: random vs fixed, estimand, uncertainty
+
+* **Fixed:** the seven real sessions, their centred labels, the decision rows, the cost model, the hypothesis lists.
+* **Random:** only the derangement (which session's label series is paired with which session's decision rows). There
+  are exactly 1,854 derangements of 7 sessions and A0 enumerates all of them once.
+* **Independent data-generating realisations: 1** (one dataset). **Transformations: 1,854.** They are reported
+  separately in every table; 1,854 is never called a sample size. The 1,854 outcomes are dependent (every derangement
+  reuses the same seven series).
+* **Estimand:** the exact conditional randomisation rate, i.e. the fraction of the 1,854 derangements in which the
+  family rejects, **for these seven sessions**. It is a finite-population proportion computed by complete
+  enumeration, so there is **no sampling error to put an interval on**; a Wilson interval assumes independent
+  outcomes and is **not used for A0**. The A0 rate is reported as an exact count out of 1,854 and compared with the
+  pass tolerance of section 6 as a deterministic property of this dataset. It is **not** an estimate of
+  repeated-sample Type I error over a broader population of sessions.
+* **Unconditional size** (repeat-sample Type I error) needs independent null datasets. With seven real sessions this
+  cannot be done on real data; **B is the unconditional arm** (2,000 independent synthetic realisations, independent
+  outcomes, so an exact binomial / Wilson interval is valid there and only there). Generating independent null
+  datasets from the real sessions (session-level bootstrap or a fitted block model) was considered: it resamples
+  from only 7 units, adds a generator whose own validity is a new question, and costs a new validation plus about
+  2.5 h of compute per 2,000 trials. Not in v3.
+* Consequence for the claim: A0 supports "conditional on these seven sessions, the exhaustive randomisation rate was
+  within the tolerance"; B supports the unconditional statement for the B data-generating process only.
+
+### 3.2 A0: which null, why centring, and a diagnostic that it is not trivial
+
+* **Null represented:** a randomisation null (labels exchanged between sessions) conditional on these sessions: no
+  label is related to the decision rows beyond session-level association; within-session label structure and
+  session-to-session dependence are retained; session-level mean drift is removed.
+* **What centring changes:** it removes between-session differences in the label mean (the source of the v2 bias, up
+  to +0.2 bps, t up to 33). It keeps within-session autocorrelation and cross-hypothesis dependence. It also removes
+  the between-session variance of the label mean, one ingredient of the S2 session-mean variance that the small-G SE
+  must estimate, so A0 could be easier than A. B (independent AR(1), between-session variation generated, not
+  centred away) is complementary; B is not proof that A0 is correct, and A0 is not proof for B.
+* **Pre-declared descriptive diagnostic (no pass/fail), from the A0, A_v2 and B trial records:** (a) per hypothesis,
+  the mean of the S2 session-mean statistic and its t (bias removed: |t| small for A0, large for A_v2); (b) sd of the
+  t statistic over trials and the CR1 SE understatement ratio (difficulty retained: A0's ratio is reported beside
+  A_v2's and B's; if A0's ratio is at or below 1.0 while B's is above it, the report states that A0 has lost the
+  difficulty and reads the A0 result as non-informative about the SE problem); (c) the R0 (v2 rule) family rate under
+  A0, A_v2 and B, to show whether the v2 failure mechanism is still visible. The reading rule is fixed here and no
+  threshold is attached to it.
+
+### 3.3 Residual-mean diagnostic (replaces the "4-SE null-validity" rule)
+
+* **Unit averaged:** per generator and hypothesis, the S2 session-mean statistic (mean over the G = 7 sessions of the
+  per-session mean gross P&L per trip), one value per trial, averaged over trials.
+* **SE:** B: sd across trials / sqrt(2,000) (trials independent). A0: trials are dependent, so SE = sd / sqrt(7)
+  (n_eff = number of sessions), which is conservative. Flag if |mean| > 4 SE.
+* **Behaviour, to be demonstrated before signing by a synthetic self-test in the runner's unit tests (no data run):**
+  under an injected bias the flag fires for B at a bias of about 0.09 sd of the trial statistic or more; for A0 only
+  at about 1.5 sd or more (n_eff = 7), i.e. it catches only large bias, and the exact property that centring makes each
+  session label mean zero is the main assurance there; under a valid zero-mean null the flag fires at the 4 SE rate
+  (< 0.1 % per hypothesis).
+* **Meaning:** a flag means "residual mean bias detected: generator reported NULL BIASED, no size verdict for it". A
+  pass says only that no residual mean bias was detected at this resolution; it does **not** certify exchangeability,
+  dependence structure, tail behaviour, or the validity of the inference. Threshold 4 SE, fixed before the run.
+
+## 4. Rules under test (same trial draws, common random numbers)
 
 | id | rule | role |
 |---|---|---|
-| R0 | v2 rule: Holm over K at 0.05 | diagnostic, **no pass rule**; expected to still fail S2 under B (v2: 5.2-6.2 %) |
+| R0 | v2 rule: Holm over K at 0.05 | diagnostic, **no pass rule** |
 | **R1** | **Holm over K at 0.025** (Webb p unchanged) | **primary: the pass rule applies to R1** |
-| R2 | single-step joint wild maxT over the family (one common Webb weight vector per draw) at 0.025 | secondary, same metrics, no effect on the verdict; dropped if the runner is not ready when the reviewer approves |
 
-The verdict of v3 is the verdict of R1 alone. R0 and R2 cannot rescue or fail it; they exist so the trade-off is
-measured, not asserted. Choosing R1 and its level used a descriptive look at the v2 trial records (disclosed): Holm at
-0.025 applied to the stored v2 p-values gives family rates of 0.4-2.9 % (generator B) and 0.5-4.2 % (the biased A) in
-every S1 and S2 cell. That is retrospective; v3 uses fresh seeds and a corrected A, so it does not reuse those trials.
+R2 (joint wild maxT) is **dropped** from v3 and from the runner (reviewer decision 9.4). If wanted it is a separate
+protocol and is never used to rescue an R1 result. The verdict is R1 alone; R0 and A_v2 cannot rescue or fail it.
 
-Consequence if R1 passes: the nominal level validated at G = 7 is 0.025 per Holm-adjusted hypothesis, so gate F3 would
-cover only a confirmatory rule run at that level or stricter; a real run at 0.05 would not be covered. **[R]** the
-reviewer and owner should decide now whether the programme adopts 0.025 as the small-G confirmatory level (price: the
-one-sided Student-t critical value at 6 df rises from 1.94 to 2.45, so the minimum detectable effect rises about 26 %).
+**Retrospective selection (disclosed).** Choosing R1 and its level used a descriptive look at the stored v2 p-values
+(Holm at 0.025 gives family rates of 0.4-4.2 %). v3 uses fresh seeds and a corrected generator but is **not a blind
+confirmation**. v1, v2 and v3 are recorded as sequential looks at the same question on the same dataset. The level
+0.025 is frozen before any v3 result exists.
 
-## 5. Trials, seeds, compute
+## 5. Trials, seeds, endpoint, compute
 
-* Size arm **[R]**: A0 draws all 1,854 derangements of 7 sessions without replacement (the maximum without repeats), so
-  n = 1,854; B 2,000 trials (v2: 1,000). Thresholds unchanged; at a true rate near 3 % the Wilson half-width is about
-  0.7 pp, enough to show a margin below 5 %.
-* Fresh base seeds, none used before (checked against the v1 and v2 results): A0 20270101, B 20270102, power A0
-  20270103, power B 20270104, A_v2 diagnostic 20270105 (500 trials, no pass rule).
-* Power arm: 200 trials per generator, deltas 0.5, 1, 2, 4 bps per trip, first hypothesis planted (as v2), reported for
-  R0, R1 and R2; no pass rule.
-* Compute estimate (v2 measured 1.09x for a size trial and 2.07x for a power trial of 2.22 s): size about 3,854 x 2.4 s
-  = 2.6 h, power about 15 min, diagnostics about 20 min: **about 3.5 h at `--workers 2`**, ceiling 12 h (v1
-  parameter 10.9). Not to start before the IEX ingest ends and the reviewer has approved.
+* Size arm: A0 1,854 derangements (1 realisation, 1,854 transformations); B 2,000 independent trials (v2: 1,000).
+* Fresh seeds, none used before: A0 20270101, B 20270102, power A0 20270103, power B 20270104, A_v2 diagnostic
+  20270105 (500 trials).
+* **Primary endpoint:** the family-wise error rate at family level, per cell (generator x S1/S2 x K = 3, 6, 16): the
+  fraction of trials in which at least one of the K hypotheses is rejected. Per-hypothesis marginal rejection rates
+  are reported descriptively and carry no pass rule.
+* Power arm (R1, with R0 shown): 200 trials per generator, deltas 0.5, 1, 2, 4 bps per trip, first hypothesis
+  planted. **Descriptive only**: power with a 95 % exact binomial interval for B (A0 carries the caveat of 3.1), no
+  acceptance criterion, no effect on the verdict.
+* **Compute (R2 removed):** size about 3,854 x 2.4 s = 2.6 h, power about 15 min, diagnostics about 15 min (mostly
+  from stored records): **about 3.3 h at `--workers 2`** (was 3.5 h), ceiling 12 h. Not to start before the IEX ingest
+  and B8 v2 end and the revised protocol is frozen, re-reviewed and signed.
 
-## 6. Pass rule and what a result means
+## 6. Pass rule: the nominal-level mismatch (OWNER DECISION)
 
-Pass iff R1 meets the section 2 rule for A0 and B in every cell **and** the null-validity check holds for both
-generators; otherwise FAIL (or NULL INVALID). No threshold, level or generator edit follows a v3 result in either
-direction. If v3 fails, the programme records it and treats F3 as not met; a v4 would need the reviewer's explicit
-reasons, and this document commits that at most one further attempt is made before the programme decides whether gate F3
-is attainable at G = 7 at all **[R]**.
+The first v3 draft ran R1 at 0.025 but kept v2's permissive rule (point <= 5.0 %, Wilson upper <= 7.0 %), which a 4 %
+family rate passes although it is 60 % above the nominal level. Two formulations follow; the thresholds are proposals
+and nothing is changed silently. Both apply per cell, to S1 and S2, K = 3, 6, 16, to R1 only.
 
-## 7. Options considered, with trade-offs
+### Option A: calibration against 2.5 % (reviewer-preferred)
+
+* **B cells (2,000 independent trials):** FWER count <= 60 of 2,000 (point <= 3.0 %); the Wilson upper bound is then
+  <= 3.9 % and is reported. The tolerance is 0.5 pp above nominal, about 1.4 binomial SD at n = 2,000.
+* **A0 cells:** exact rate over 1,854 derangements <= 3.0 % (<= 55 of 1,854), no interval (3.1).
+* **What it can support (exact binomial, n = 2,000):** a procedure whose true rate is exactly 2.5 % passes 93 % of the
+  time; 3.0 % passes 53 %; 3.5 % 12 %; 4.0 % 1 %. Holm at 0.025 is conservative, so the true FWER should lie below 2.5 %
+  and the pass probability near 1 (v2 stored p-values gave 0.4-4.2 % with the biased A, 0.4-2.9 % under B). A pass
+  supports "no detected excess over 2.5 % beyond about +0.5 pp on the B process and on these sessions"; it cannot tell
+  2.5 % from 3 %.
+* **Cost:** a stricter bar; a cell whose true rate is exactly 2.5 % fails 7 % of the time, and with 18 cells a marginal
+  miss is possible even for a well calibrated test.
+
+### Option B: keep 5.0 % / 7.0 %, narrow the claim
+
+* Rule unchanged (B cells: point <= 5.0 % and Wilson upper <= 7.0 %; A0: exact rate <= 5.0 %).
+* **Claim allowed:** "the operating level 0.025 passed a specified permissive rejection-rate screen". **No claim of
+  demonstrated 2.5 % size control.**
+* **What it can support:** a true 4 % passes 99 %, a true 5 % about 53 %, a true 6 % 3 %. It detects only gross excess
+  over 5 %, at which a 2.5 %-level test would already be badly broken.
+
+### Recommendation and decision
+
+Recommend **Option A**, because F3 is the statistical approval gate for adopting 0.025 (section 7). Use Option B only
+if the gate is a coarse screen and the programme will not claim 2.5 % control. Either way the achievable precision
+(about +/-0.7 pp at 2.5 %, n = 2,000) is recorded as a limit.
+
+**OWNER DECISION: option A or option B (if A, confirm the 3.0 % tolerance). NOT DECIDED.**
+
+Verdict: PASS iff R1 meets the chosen rule in every cell and neither generator is flagged NULL BIASED (3.3); otherwise
+FAIL. No threshold, level or generator edit follows a v3 result in either direction.
+
+## 7. Scope of any adoption of 0.025 (conditional)
+
+A pass, if the programme then adopts 0.025, covers only: the **exact estimator** (CR1 + Student-t critical value, Webb
+full enumeration, restricted, one-sided), the **small-G method** (G = 7), the **multiplicity correction** (Holm), the
+**data-generating conditions** (A0 on `multi7`, and B) and the **tested family sizes K = 3, 6, 16**. It makes **no
+claim at 0.05**, none for other datasets, G, K or dependence structures; a change in any of them needs a new
+validation. Price of 0.025: the minimum detectable effect rises about 26 %. **OWNER DECISION:** adopt 0.025 (yes/no),
+to be taken after the run, with the scope above.
+
+## 8. Options considered
 
 | option | idea | cost | in v3 |
 |---|---|---|---|
-| O1 stricter level (R1) | Holm at 0.025 | needs 26 % larger effects; ties the programme to a non-5 % level; no new estimator | **primary** |
-| O2 joint wild maxT (R2) | one common weight vector across the family: respects dependence between hypotheses, more power than Holm when hypotheses are correlated | new estimator and runner code; size is still about nominal, so at 0.05 it would again sit on the point limit | secondary, measured |
-| O3 permutation-based family test | exact if exchangeable | exchangeability across sessions is exactly what A / A0 do not satisfy (session effects); with G = 7 there are only 5,040 session permutations | not used |
-| O4 better SE (CR2 / CR3 jackknife) | repairs the 17-20 % SE understatement directly | changes the estimator for the whole programme; a reviewer decision | not in v3; the next candidate if v3 fails |
-| O5 larger G | G >= 10 switches to Student-t and removes the 6^G enumeration issue | needs more real sessions: the IEX ingest gives a free daily second venue, a different dataset and eligibility, not available or approved yet | a contingent v3b, its own protocol after the ingest; not pre-registered here |
+| O1 stricter level (R1) | Holm at 0.025 | needs 26 % larger effects; non-5 % level | primary |
+| O2 joint wild maxT | respects hypothesis dependence | new estimator and runner | **dropped** (separate protocol if wanted) |
+| O3 permutation family test | exact if exchangeable | exchangeability fails across sessions | not used |
+| O4 CR2 / CR3 SE | repairs SE understatement | changes the inference procedure | see section 9 |
+| O5 larger G | G >= 10 changes the method | needs more sessions, a different dataset | contingent v3b |
 
-## 8. Ledger accounting
+## 9. Stopping rule for the one further attempt
 
-Prior looks of this method on the same data (`multi7`, `in_sample`): v1 (signed, run 2026-10-18, PASS, size untested)
-and v2 (signed `67db845a`, run 2026-10-19, FAIL). v3 would be the **third** look at the F3 question. These studies
-spend no alpha-hypothesis budget (labels are null by construction) but they are looks at the same inference step; the
-attempt count and the v2 FAIL are written into the prereg and must be quoted by any report that cites an F3 pass. The v3
-ledger entry must list v1 and v2 as prior looks.
+v3 is the third look. At most **one** further attempt is made after v3, and only if all hold:
+1. A written rationale is committed **before any result of that attempt exists**: the specific v3 failure it
+   addresses; which components may change and which stay fixed; its new acceptance criteria; the claim it could
+   support.
+2. Prior attempts (v1, v2, v3) stay in the evidence history and are cited by it.
+3. A change to CR2/CR3 or any other change of inference procedure is **a new procedure** needing its own
+   specification, validation and reviewer approval, not a parameter tweak of v4.
+4. Thresholds, level and generators are not tuned to the observed v3 trial records.
+If that attempt fails, F3 is recorded as **unattained at G = 7 under the approaches tested**, and the programme
+decides whether to proceed with a larger G; nothing is retried on the same data.
 
-## 9. Open parameters for the reviewer **[R]**
+## 10. Audit trail, run separation, ledger
 
-9.1 level 0.025 (vs 0.0125 or another multiplicity method); 9.2 trial counts (1,854 / 2,000 / 200); 9.3 null-validity
-tolerance (4 SE); 9.4 whether R2 is built; 9.5 whether the A_v2 diagnostic is kept; 9.6 the one-further-attempt
-commitment; 9.7 programme adoption of 0.025 (section 4).
+* v1 (signed, PASS, size untested) and v2 (signed `67db845a`, FAIL, 7 of 12 cells) are preserved verbatim in the final
+  report, including the seven failed v2 cells; v3 is presented as the **third** look, never a first attempt. The v3
+  ledger entry lists v1 and v2. These studies spend no alpha-hypothesis budget.
+* The run is executed by an actor that is **not** the signer, who first verifies the exact signed protocol hash and
+  the bound prereg identity and refuses to run on any mismatch. After signing nothing may change.
 
-## 10. What this document does not do
+## 11. What this document does not do
 
-It registers nothing, reads no data and runs nothing. Passing v3 would show that the inference step, run at the
-stricter level, holds its size on these generators at G = 7 sessions; it would not show that any signal works.
+It registers nothing, reads no data and runs nothing. A PASS would be a statement about **protocol validity**: the
+inference step, at the stated level, on the stated generators, estimator and K sizes. It says nothing about alpha
+validity, profitability, simulator realism or production readiness.

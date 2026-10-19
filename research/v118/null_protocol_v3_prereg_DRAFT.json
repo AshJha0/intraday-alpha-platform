@@ -15,25 +15,45 @@
     }
   ],
   "protocol": "research/v118/NULL_PROTOCOL_v3.md",
-  "protocol_sha256_at_draft": "a3f81c7440783a5669fd46ca54a73a513ebb8c44790bdd674e21835a2b8abaf1",
+  "protocol_sha256_at_draft": "2226d7b00a844c892a86676036294d225bba6ab286d9dacdb5bdedb4bed9430f",
   "signed": false,
-  "status": "DRAFT, unsigned: not approved by the outside reviewer, not signed, nothing run; the v3 runner config is not yet written",
+  "status": "DRAFT REVISION 2, unsigned: addresses the outside reviewer's APPROVE WITH CHANGES (2026-10-19); owner decisions open (pass-rule option A/B, adoption of 0.025); not frozen, not re-reviewed, nothing run; the v3 runner config is not yet written",
   "thresholds_draft": {
+    "adoption_scope_if_passed": "CR1+Student-t Webb enumeration, G=7, Holm, multi7 + generator B, K=3/6/16 at 0.025 only; no claim at 0.05 or elsewhere",
     "alpha_rule_under_test": 0.025,
     "compute_budget_hours": 12.0,
     "dataset": "data/real/multi7 ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
     "diagnostic_rules": {
-      "R0": "Holm 0.05",
-      "R2": "joint wild maxT 0.025 (optional)"
+      "R0": "Holm 0.05 (no pass rule)"
     },
+    "estimated_compute_hours": 3.3,
+    "further_attempt": "at most one; written rationale before results; CR2/CR3 = new procedure; failure => F3 unattained at G=7 under approaches tested",
     "null_validity_check": {
+      "label": "residual-mean diagnostic (not a validity certificate)",
       "max_abs_mean_in_se_of_mean": 4,
+      "outcome_on_flag": "NULL BIASED, no size verdict",
+      "se": {
+        "A0": "sd/sqrt(7), n_eff = sessions",
+        "B": "sd/sqrt(2000)"
+      },
+      "self_test_required_before_signing": true,
       "statistic": "gross"
     },
     "pass_rule": {
       "flag_upper_below": 0.02,
-      "max_point": 0.05,
-      "max_upper": 0.07
+      "option_A_calibration": {
+        "A0_interval": "none (exact enumeration, conditional estimand)",
+        "A0_max_count_of_1854": 55,
+        "A0_max_point": 0.03,
+        "B_max_count_of_2000": 60,
+        "B_max_point": 0.03
+      },
+      "option_B_screen": {
+        "claim": "permissive rejection-rate screen only; no 2.5 % size-control claim",
+        "max_point": 0.05,
+        "max_upper": 0.07
+      },
+      "owner_decision": "NOT DECIDED: option A or B"
     },
     "power_arm": {
       "base_seeds": {
@@ -46,18 +66,23 @@
         2.0,
         4.0
       ],
+      "descriptive_only": true,
       "n_trials": 200,
       "pass_rule": null
     },
+    "primary_endpoint": "family-wise error rate at family level per cell (generator x statistic x K); per-hypothesis marginal rates descriptive",
     "registered_size_shares": 100,
     "size_arm": {
       "A0": {
         "base_seed": 20270101,
         "draw": "all 1854 derangements, without replacement",
-        "n_trials": 1854
+        "independent_realisations": 1,
+        "n_trials": 1854,
+        "transformations": 1854
       },
       "A_v2_diagnostic": {
         "base_seed": 20270105,
+        "label": "reproduction of the v2 failure mechanism; strictly diagnostic",
         "n_trials": 500,
         "pass_rule": null
       },
@@ -73,6 +98,6 @@
       ]
     }
   },
-  "to_sign": "analysis_identity bound by tools/prereg_bind_identity.py only after owner confirmation and reviewer approval; run by a non-signer actor after the IEX ingest",
+  "to_sign": "NOT before: owner decisions made, protocol frozen and re-reviewed by the outside reviewer; then analysis_identity bound by tools/prereg_bind_identity.py; run by a non-signer who verifies the signed hashes",
   "x-version": 1
 }
