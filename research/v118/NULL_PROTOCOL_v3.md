@@ -122,13 +122,13 @@ confirmation**. v1, v2 and v3 are recorded as sequential looks at the same quest
   from stored records): **about 3.3 h at `--workers 2`** (was 3.5 h), ceiling 12 h. Not to start before the IEX ingest
   and B8 v2 end and the revised protocol is frozen, re-reviewed and signed.
 
-## 6. Pass rule: the nominal-level mismatch (OWNER DECISION)
+## 6. Pass rule: calibration against the 2.5 % level (DECIDED: option A)
 
 The first v3 draft ran R1 at 0.025 but kept v2's permissive rule (point <= 5.0 %, Wilson upper <= 7.0 %), which a 4 %
 family rate passes although it is 60 % above the nominal level. Two formulations follow; the thresholds are proposals
 and nothing is changed silently. Both apply per cell, to S1 and S2, K = 3, 6, 16, to R1 only.
 
-### Option A: calibration against 2.5 % (reviewer-preferred)
+### Final criterion, option A: calibration against 2.5 % (reviewer-preferred)
 
 * **B cells (2,000 independent trials):** FWER count <= 60 of 2,000 (point <= 3.0 %); the Wilson upper bound is then
   <= 3.9 % and is reported. The tolerance is 0.5 pp above nominal, about 1.4 binomial SD at n = 2,000.
@@ -141,7 +141,9 @@ and nothing is changed silently. Both apply per cell, to S1 and S2, K = 3, 6, 16
 * **Cost:** a stricter bar; a cell whose true rate is exactly 2.5 % fails 7 % of the time, and with 18 cells a marginal
   miss is possible even for a well calibrated test.
 
-### Option B: keep 5.0 % / 7.0 %, narrow the claim
+### Rejected alternative, option B: keep 5.0 % / 7.0 %, narrow the claim
+
+Rejected because it would pass a 4 % rate (60 % above nominal) with probability 99 %, so a pass would say nothing about 2.5 % control, while option A discriminates at the available n. Kept for the record:
 
 * Rule unchanged (B cells: point <= 5.0 % and Wilson upper <= 7.0 %; A0: exact rate <= 5.0 %).
 * **Claim allowed:** "the operating level 0.025 passed a specified permissive rejection-rate screen". **No claim of
@@ -149,13 +151,9 @@ and nothing is changed silently. Both apply per cell, to S1 and S2, K = 3, 6, 16
 * **What it can support:** a true 4 % passes 99 %, a true 5 % about 53 %, a true 6 % 3 %. It detects only gross excess
   over 5 %, at which a 2.5 %-level test would already be badly broken.
 
-### Recommendation and decision
+### Decision
 
-Recommend **Option A**, because F3 is the statistical approval gate for adopting 0.025 (section 7). Use Option B only
-if the gate is a coarse screen and the programme will not claim 2.5 % control. Either way the achievable precision
-(about +/-0.7 pp at 2.5 %, n = 2,000) is recorded as a limit.
-
-**OWNER DECISION: option A or option B (if A, confirm the 3.0 % tolerance). NOT DECIDED.**
+**Option A, tolerance 3.0 % (B: count <= 60 of 2,000; A0: count <= 55 of 1,854), is final and frozen with the protocol.** At n = 2,000 it separates a true 2.5 % (pass 93 %) from 3.5 % (12 %) and 4 % (1 %); the limit that it cannot tell 2.5 % from 3 % is recorded. A failure is a calibration failure at this tolerance and no tolerance edit follows it.
 
 Verdict: PASS iff R1 meets the chosen rule in every cell and neither generator is flagged NULL BIASED (3.3); otherwise
 FAIL. No threshold, level or generator edit follows a v3 result in either direction.
@@ -166,8 +164,7 @@ A pass, if the programme then adopts 0.025, covers only: the **exact estimator**
 full enumeration, restricted, one-sided), the **small-G method** (G = 7), the **multiplicity correction** (Holm), the
 **data-generating conditions** (A0 on `multi7`, and B) and the **tested family sizes K = 3, 6, 16**. It makes **no
 claim at 0.05**, none for other datasets, G, K or dependence structures; a change in any of them needs a new
-validation. Price of 0.025: the minimum detectable effect rises about 26 %. **OWNER DECISION:** adopt 0.025 (yes/no),
-to be taken after the run, with the scope above.
+validation. Price of 0.025: the minimum detectable effect rises about 26 %. **OWNER DECISION (open, after the run):** adopt 0.025 (yes/no), with the scope above.
 
 ## 8. Options considered
 

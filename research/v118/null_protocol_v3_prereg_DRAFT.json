@@ -15,9 +15,9 @@
     }
   ],
   "protocol": "research/v118/NULL_PROTOCOL_v3.md",
-  "protocol_sha256_at_draft": "2226d7b00a844c892a86676036294d225bba6ab286d9dacdb5bdedb4bed9430f",
+  "protocol_sha256_at_draft": "d0e61e5806a0c83c633ff4447c8798754b42042282fb2d7ca368172007c84197",
   "signed": false,
-  "status": "DRAFT REVISION 2, unsigned: addresses the outside reviewer's APPROVE WITH CHANGES (2026-10-19); owner decisions open (pass-rule option A/B, adoption of 0.025); not frozen, not re-reviewed, nothing run; the v3 runner config is not yet written",
+  "status": "DRAFT REVISION 2, unsigned: addresses the outside reviewer's APPROVE WITH CHANGES (2026-10-19); pass rule decided (option A); adoption of 0.025 open until after the run; not frozen, not re-reviewed, nothing run; the v3 runner config is not yet written",
   "thresholds_draft": {
     "adoption_scope_if_passed": "CR1+Student-t Webb enumeration, G=7, Holm, multi7 + generator B, K=3/6/16 at 0.025 only; no claim at 0.05 or elsewhere",
     "alpha_rule_under_test": 0.025,
@@ -40,6 +40,7 @@
       "statistic": "gross"
     },
     "pass_rule": {
+      "final": "option_A_calibration",
       "flag_upper_below": 0.02,
       "option_A_calibration": {
         "A0_interval": "none (exact enumeration, conditional estimand)",
@@ -51,9 +52,10 @@
       "option_B_screen": {
         "claim": "permissive rejection-rate screen only; no 2.5 % size-control claim",
         "max_point": 0.05,
-        "max_upper": 0.07
+        "max_upper": 0.07,
+        "status": "rejected alternative, not used"
       },
-      "owner_decision": "NOT DECIDED: option A or B"
+      "owner_decision": "DECIDED 2026-10-19 (owner delegated): option A, tolerance 3.0 %"
     },
     "power_arm": {
       "base_seeds": {
