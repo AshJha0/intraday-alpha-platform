@@ -1,0 +1,153 @@
+{
+  "analysis_identity": {
+    "code_tree_sha256": "16e1a540cf225a6f2c891120c9076b3c82a1e3d80f65589db396490cc6c3e88a",
+    "commit": "aa2d4b8242bd9cc3db92d44d8bd1653e3f14721a",
+    "configs_tree_sha256": "290b38d8871961c28e81db59ca9cf95791a213acd33461d667de873b907ad7b0",
+    "data_versions": [
+      "06419d749910a8f0a6d089d5ed13a40500481d581a93f276bb62c339940c7293",
+      "3731bbd4a40acdd4833f1f42c4d14a0df027e5a310c08408d608a0e18ffa2ced",
+      "517f666c3350057897eeaba1e8a3753f34aed3fa2c377911f27a2dafe54cf005",
+      "53f48feb7e4f2451dbf9a30cd375998e3765bced3d653f55d7c404494d33540a",
+      "7c6ddcf3429a021a4cdeb2b9976c7fe9167eade399b1c85bb5c95b3847995784",
+      "ad9a62dea3664c98cc475bf824a058fe8d53f5ac609d675e005b8dc930535498",
+      "edb9b750a642befdbed19e5b877e959390befc438dd91e840838a4c167791e19"
+    ],
+    "deps_lock_sha256": "2f68340d1a5c28871356287b00f5af907dd94f429c2551dac5cee0a3a114c18e",
+    "environment": {
+      "attrs": "26.1.0",
+      "cffi": "2.1.1",
+      "cloudpickle": "3.1.2",
+      "coverage[toml]": "absent",
+      "cryptography": "50.0.2",
+      "databento-dbn": "0.71.0",
+      "execnet": "2.1.2",
+      "hypothesis": "absent",
+      "iniconfig": "2.3.1",
+      "joblib": "1.6.0",
+      "jsonschema": "4.26.0",
+      "jsonschema-specifications": "2025.9.1",
+      "narwhals": "2.26.0",
+      "numpy": "2.4.6",
+      "packaging": "26.3",
+      "pandas": "3.0.6",
+      "pluggy": "1.6.0",
+      "pyarrow": "25.0.1",
+      "pycparser": "3.0",
+      "pygments": "2.21.0",
+      "pytest": "9.1.1",
+      "pytest-cov": "7.1.0",
+      "pytest-xdist": "3.8.0",
+      "python-dateutil": "2.9.0.post0",
+      "pyyaml": "6.0.3",
+      "referencing": "0.37.0",
+      "rpds-py": "2026.9.1",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.17.1",
+      "six": "1.17.0",
+      "sortedcontainers": "absent",
+      "threadpoolctl": "3.7.0",
+      "typing-extensions": "4.16.0"
+    },
+    "family": "REL-05 real-tape fill test: per-symbol verdict on the pooled eval days (K=3); fit 2019-01-30,2019-03-27,2019-07-30,2019-08-30; eval 2019-10-30,2019-12-30,2020-01-30",
+    "identity_version": 2,
+    "inputs": {},
+    "interpreter": "cpython-3.12.10",
+    "metrics": [
+      "brier",
+      "reliability_gap_max",
+      "skill_per_day",
+      "skill_pooled"
+    ],
+    "reference_tree_sha256": "9020e008efdb1ac41015cea4c31f8b9e4cb65a1324db0a42224cb2a22f18fa88",
+    "scripts": {
+      "research/execution/rel05/predeclaration.json": "2955ae0168060060c72d9108f32729a3f06215b4649164d269236e034400bba9",
+      "research/execution/rel05/run_rel05.py": "c7839a0e97127b0a4bf4d097acdbc4e47b3cf298767388ab3638b0674abc1d0e"
+    },
+    "thresholds": {
+      "decision_rule": {
+        "contradicts": "pooled skill < 0",
+        "headline": "model_supported_on_all_symbols only if every symbol is 'supports' (K = 3, all-must-pass, so no multiplicity correction)",
+        "otherwise": "inconclusive",
+        "reliability_gap_max": 0.1,
+        "skill_min": 0.02,
+        "supports": "pooled skill >= skill_min AND per-day skill > 0 on every eval day AND max |observed - predicted| over reliability bins with n >= 100 <= reliability_gap_max"
+      },
+      "label": {
+        "calibration": "none (ExecConfig defaults; ITCH has no receive stamp)",
+        "grid": {
+          "end_et": "15:45",
+          "note": "regular session minus 15 minutes at each end; first decision at the start, every stride_s after",
+          "start_et": "09:45",
+          "stride_s": 5
+        },
+        "min_decisions_per_day_symbol": 1000,
+        "qty": 100,
+        "ttl_ns": 1000000000
+      },
+      "model": "iap.execution.fill_hazard.FillHazardModel defaults (fitted on the fit days of one symbol at a time)",
+      "split": {
+        "eval_days": [
+          "2019-10-30",
+          "2019-12-30",
+          "2020-01-30"
+        ],
+        "fit_days": [
+          "2019-01-30",
+          "2019-03-27",
+          "2019-07-30",
+          "2019-08-30"
+        ],
+        "rule": "chronological: every eval day is after every fit day; all seven days are in_sample in research/holdout_registry.json; no spent, unread or reserved session is read"
+      },
+      "statistics": {
+        "family": "per-symbol verdict on the pooled eval days",
+        "family_k": 3,
+        "inference": "none: samples within a second-grid day are serially dependent and G = 3 eval days; per-day skill is reported, no p-value or interval is claimed",
+        "primary": "skill = 1 - Brier(model) / Brier(naive fit-set rate) on the pooled eval days",
+        "secondary": [
+          "brier",
+          "reliability bins",
+          "per-day skill",
+          "by-queue-tercile cells (edges from fit days)"
+        ]
+      },
+      "stop_rules": {
+        "abort": [
+          "a day-symbol has fewer than min_decisions_per_day_symbol decisions or fewer than 1 fill and 1 non-fill in the fit set (symbol reported not_estimable)",
+          "available RAM below min_free_ram_gb at start"
+        ],
+        "min_free_ram_gb": 6.0,
+        "no_rerun": "one run; a parameter change (stride, ttl, split) is a new declaration, never a retry",
+        "refuse": [
+          "prereg unsigned, identity mismatch, runner is the signer, or a signing key in the environment",
+          "any day not in_sample in the holdout registry, any fit/eval overlap, any eval day not after every fit day",
+          "dataset_version on disk differs from the declared one",
+          "guard_or_exit refuses a dataset directory"
+        ]
+      },
+      "symbols": {
+        "AAPL": 1,
+        "MSFT": 2,
+        "QQQ": 3
+      }
+    }
+  },
+  "bound_utc": "2026-10-20T11:31:54+00:00",
+  "kind": "analysis_prereg",
+  "prereg_id": "research/preregs/rel05_prereg.json",
+  "protocol": "research/execution/rel05/PREDECLARATION.md",
+  "protocol_sha256": "07b323bdb91a5b1d49e69ef9690ca9c6a4b800ab5b7251f85ff84bcc12b2c36a",
+  "signature": {
+    "maintainer": "ashjha0",
+    "message": "iap.agents.blackboard.canonical(this document without 'signature')",
+    "message_sha256": "4d2e4b4e150078d858d4de2290782ab53faea89abe420b6ec328173fe7468651",
+    "public_key": "02a3e278cda3efac7dcd266fb8a3821a1415f0725a73f8b255aac84083c2106c",
+    "scheme": "ed25519",
+    "sig": "a8150cfb81ca66c7ff9a958570d8e589186bdc945d758be1406a0fcc9c61da4d98949b2e2db7a1ae2a90239ab44afdb60299f056cb30681021528a1eec2e5100",
+    "trust_root": "research/agents/trust_roots.json"
+  },
+  "signed": true,
+  "signed_utc": "2026-10-20T11:37:29+00:00",
+  "status": "SIGNED: the analysis identity is bound; edits void the signature",
+  "x-version": 1
+}
