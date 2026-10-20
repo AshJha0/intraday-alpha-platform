@@ -2,8 +2,9 @@
 diagnostic (descriptive), SE understatement ratio, interpretation gate and verdict.
 
 Pure functions on arrays of per-trial statistics (no data access, no I/O).  The v3
-runner does not exist yet; these functions are the pieces the protocol needs to have
-tested before signing (``research/v118/NULL_PROTOCOL_v3.md`` sections 3.3, 3.4, 6).
+runner (``tools/rel06_known_null_v3.py`` with ``iap.research.known_null_v3``) calls
+exactly these functions for the centring invariant, the B blocker, the gate and the
+verdict (``research/v118/NULL_PROTOCOL_v3.md`` sections 3.3, 3.4, 6).
 
 Roles: the A0 centring invariant is a HARD construction check (failure = invalid A0
 run, not a statistical finding).  The residual-mean flag is DESCRIPTIVE for A0 (never a
@@ -42,6 +43,16 @@ PASS_LABEL_PLAIN = (
     "PASS (B on the repeated-simulation process; A0 as a conditional randomisation "
     "diagnostic on these seven sessions)"
 )
+
+
+CLAIM_SCOPE = (
+    "A B pass means the observed FWER in the specified independent synthetic trials met "
+    "the pre-specified calibration threshold. An A0 pass means the exact conditional "
+    "rejection proportion over the specified transformations met its threshold. Neither, "
+    "alone or combined, proves that the true FWER on real trading data is controlled at "
+    "2.5 %."
+)
+VERDICT_PASS_B_ONLY = "PASS_B_ONLY"
 
 
 class CentringInvariantError(RuntimeError):
@@ -209,6 +220,7 @@ def lost_difficulty(
         for i, a, b in zip(ids, va, vb, strict=True)
         if not (math.isfinite(a) and math.isfinite(b))
     ]
+    per = {"u_a0": dict(zip(ids, va, strict=True)), "u_b": dict(zip(ids, vb, strict=True))}
     if bad:
         return {
             "status": "UNDETERMINED",
@@ -216,6 +228,11 @@ def lost_difficulty(
             "invalid_ids": bad,
             "median_u_a0": None,
             "median_u_b": None,
+            "reason": (
+                f"U missing, non-finite or not computable for {len(bad)} of {N_HYPOTHESES} "
+                f"hypotheses ({', '.join(bad)}); treated as A0 non-informative"
+            ),
+            **per,
         }
     ma, mb = float(np.median(va)), float(np.median(vb))
     lost = bool(ma <= 1.0 and mb > 1.0)
@@ -225,6 +242,95 @@ def lost_difficulty(
         "invalid_ids": [],
         "median_u_a0": ma,
         "median_u_b": mb,
+        "reason": (
+            f"median U(A0) = {ma:.4f}, median U(B) = {mb:.4f}; triggered iff "
+            "U(A0) <= 1.0 and U(B) > 1.0"
+        ),
+        **per,
+    }
+
+
+def _stats_array(stats_by_id: Mapping[str, Any], hid: str) -> np.ndarray | None:
+    """The per-trial statistics of one hypothesis, or ``None`` if absent, shorter than two
+    trials, or containing any missing / non-finite value (nothing is dropped)."""
+    if hid not in stats_by_id:
+        return None
+    try:
+        x = np.asarray([math.nan if v is None else v for v in stats_by_id[hid]], dtype=float)
+    except (TypeError, ValueError):
+        return None
+    if x.ndim != 1 or x.size < 2 or not np.all(np.isfinite(x)):
+        return None
+    return x
+
+
+def b_residual_blocker(
+    stats_by_id: Mapping[str, Any], expected_ids: Sequence[str], flag_se: float = FLAG_SE
+) -> dict[str, Any]:
+    """Generator B residual-mean blocker at the verdict's aggregation level (protocol 3.3).
+
+    One residual-mean check per hypothesis of the frozen list (``independent`` mode:
+    SE = sd / sqrt(n trials), flag at |t| > 4); the blocker fires if ANY of the
+    ``expected_ids`` is flagged: ``any_flag``.  A hypothesis with a missing, short or
+    non-finite series cannot be checked: it is listed in ``invalid_ids`` and the blocker
+    also fires (``blocks_pass``): an unchecked hypothesis is never read as "no flag".
+
+    What it detects: a mean of the S2 session-mean statistic across the independent B
+    trials that is more than 4 standard errors from zero, i.e. a per-trial-mean bias of
+    roughly 0.09 sd or more is detected half of the time (``measure_b_blocker``).  What it
+    does NOT show: a non-flag is not proof that B is unbiased, only that no bias of that
+    size was detected; it says nothing on dependence, tails or inference validity."""
+    ids = list(expected_ids)
+    if len(ids) != N_HYPOTHESES or len(set(ids)) != N_HYPOTHESES:
+        raise ValueError(f"expected exactly {N_HYPOTHESES} distinct hypothesis ids")
+    per: dict[str, Any] = {}
+    invalid: list[str] = []
+    flagged: list[str] = []
+    for hid in ids:
+        x = _stats_array(stats_by_id, hid)
+        if x is None:
+            invalid.append(hid)
+            per[hid] = None
+            continue
+        r = residual_mean_flag(x, "independent", flag_se=flag_se)
+        per[hid] = r
+        if r["flag"]:
+            flagged.append(hid)
+    return {
+        "any_flag": bool(flagged),
+        "flagged_ids": flagged,
+        "invalid_ids": invalid,
+        "blocks_pass": bool(flagged or invalid),
+        "flag_se": flag_se,
+        "n_hypotheses": len(ids),
+        "per_hypothesis": per,
+    }
+
+
+def a0_residual_descriptive(
+    stats_by_id: Mapping[str, Any], expected_ids: Sequence[str], n_eff: int = 7
+) -> dict[str, Any]:
+    """A0 residual-mean values: DESCRIPTIVE only (heuristic SE, uncalibrated false-flag
+    probability, protocol 3.3).  Never an argument of ``primary_verdict``."""
+    per: dict[str, Any] = {}
+    flagged: list[str] = []
+    invalid: list[str] = []
+    for hid in expected_ids:
+        x = _stats_array(stats_by_id, hid)
+        if x is None:
+            invalid.append(hid)
+            per[hid] = None
+            continue
+        r = residual_mean_flag(x, "dependent", n_eff=n_eff)
+        per[hid] = r
+        if r["flag"]:
+            flagged.append(hid)
+    return {
+        "role": "descriptive only: no verdict, no NULL BIASED, no invalidation",
+        "any_flag": bool(flagged),
+        "flagged_ids": flagged,
+        "invalid_ids": invalid,
+        "per_hypothesis": per,
     }
 
 
@@ -234,34 +340,64 @@ def primary_verdict(
     centring_ok: bool,
     b_residual_flag: bool,
     gate: Mapping[str, Any],
+    *,
+    b_report: Mapping[str, Any] | None = None,
+    a0_report: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Mechanical verdict (protocol 6).  Cells are (statistic in S1/S2, K in 3/6/16).
 
-    * centring invariant failure -> INVALID (A0 construction failure, not a finding);
-    * any cell over its threshold (B > 60 of 2,000, A0 > 55 of 1,854) or missing -> FAIL,
-      whatever the gate says;
-    * B's residual-mean flag -> FAIL (generator B NULL BIASED); A0's flag has no role
-      and is not an argument;
-    * otherwise PASS, labelled PASS (B-supported only; A0 non-informative) when the
-      gate is TRIGGERED or UNDETERMINED (conservative), else the plain scoped label."""
+    * centring invariant not exactly ``True`` -> INVALID (A0 construction failure);
+    * any cell over its threshold (B > 60 of 2,000, A0 > 55 of 1,854), missing, or not an
+      integer count -> FAIL, whatever the gate says;
+    * B blocker not exactly ``False`` (flag, uncheckable, or not supplied) -> FAIL;
+      A0's flag has no role and is not an argument;
+    * otherwise PASS.  Only a gate whose status is exactly ``NOT_TRIGGERED`` gives the
+      scoped label (verdict ``PASS``); every other gate content (TRIGGERED, UNDETERMINED,
+      missing, malformed) gives "PASS (B-supported only; A0 non-informative)" with the
+      verdict ``PASS_B_ONLY``, which is never equal to a plain ``PASS``.
+
+    Every result carries ``claim_scope`` (no real-market FWER claim) and an ``a0`` block
+    (gate status and reason, A0 counts and the descriptive A0 report) so the A0 result
+    and the reason for a downgrade stay visible.  ``b_report`` / ``a0_report`` are passed
+    through for the record only."""
     cells = [(s, k) for s in ("S1", "S2") for k in (3, 6, 16)]
-    if not centring_ok:
+    gate_status = gate.get("status") if isinstance(gate, Mapping) else None
+    a0_block = {
+        "gate_status": gate_status,
+        "gate_reason": gate.get("reason") if isinstance(gate, Mapping) else None,
+        "gate_invalid_ids": list(gate.get("invalid_ids", [])) if isinstance(gate, Mapping) else [],
+        "median_u_a0": gate.get("median_u_a0") if isinstance(gate, Mapping) else None,
+        "median_u_b": gate.get("median_u_b") if isinstance(gate, Mapping) else None,
+        "a0_counts": {f"{s}/K{k}": a0_counts.get((s, k)) for s, k in cells},
+        "a0_residual_mean": dict(a0_report) if a0_report is not None else None,
+    }
+    base = {"claim_scope": CLAIM_SCOPE, "a0": a0_block, "b_residual_mean": b_report}
+    if centring_ok is not True:
         return {
+            **base,
             "verdict": "INVALID",
             "label": "INVALID (A0 construction failure)",
             "reason": "centring",
         }
-    fails = [("B", c) for c in cells if not (c in b_counts and 0 <= b_counts[c] <= B_MAX_COUNT)]
-    fails += [
-        ("A0", c) for c in cells if not (c in a0_counts and 0 <= a0_counts[c] <= A0_MAX_COUNT)
-    ]
+
+    def _ok(counts: Mapping[tuple[str, int], int], c: tuple[str, int], limit: int) -> bool:
+        v = counts.get(c)
+        return isinstance(v, (int, np.integer)) and not isinstance(v, bool) and 0 <= v <= limit
+
+    fails = [("B", c) for c in cells if not _ok(b_counts, c, B_MAX_COUNT)]
+    fails += [("A0", c) for c in cells if not _ok(a0_counts, c, A0_MAX_COUNT)]
     if fails:
-        return {"verdict": "FAIL", "label": "FAIL", "reason": "rate", "cells": fails}
-    if b_residual_flag:
-        return {"verdict": "FAIL", "label": "FAIL (generator B NULL BIASED)", "reason": "b_flag"}
-    if gate.get("status") in ("TRIGGERED", "UNDETERMINED"):
-        return {"verdict": "PASS", "label": PASS_LABEL_GATE, "reason": "gate"}
-    return {"verdict": "PASS", "label": PASS_LABEL_PLAIN, "reason": "ok"}
+        return {**base, "verdict": "FAIL", "label": "FAIL", "reason": "rate", "cells": fails}
+    if b_residual_flag is not False:
+        return {
+            **base,
+            "verdict": "FAIL",
+            "label": "FAIL (generator B residual-mean blocker)",
+            "reason": "b_flag",
+        }
+    if gate_status != "NOT_TRIGGERED":
+        return {**base, "verdict": VERDICT_PASS_B_ONLY, "label": PASS_LABEL_GATE, "reason": "gate"}
+    return {**base, "verdict": "PASS", "label": PASS_LABEL_PLAIN, "reason": "ok"}
 
 
 # ------------------------------------------------------------ measurement helpers --
@@ -334,3 +470,85 @@ def measure_a0_style(
         flags += int(np.sum(np.abs(t) > flag_se))
         done += r
     return flags / n_reps
+
+
+def _synthetic_b_stats(
+    rng: np.random.Generator, n_trials: int, n_hyp: int, model: str, rho: float
+) -> np.ndarray:
+    """(n_hyp, n_trials) mean-zero unit-variance per-trial statistics.  Trials are
+    independent (B's trials are); hypotheses share a common factor with correlation ``rho``
+    (the 16 hypotheses of a B trial are correlated through the shared labels)."""
+    if model in ("iid", "factor"):
+        e = rng.standard_normal((n_hyp, n_trials))
+    elif model == "t3":  # heavy tails, finite variance, scaled to unit variance
+        e = rng.standard_t(3, (n_hyp, n_trials)) / math.sqrt(3.0)
+    elif model == "skew":  # centred exponential, skewness 2
+        e = rng.exponential(1.0, (n_hyp, n_trials)) - 1.0
+    else:
+        raise ValueError(f"unknown model {model!r}")
+    if rho:
+        common = rng.standard_normal((1, n_trials))
+        e = math.sqrt(1.0 - rho) * e + math.sqrt(rho) * common
+    return e
+
+
+def measure_b_blocker(
+    n_reps: int,
+    *,
+    model: str = "iid",
+    rho: float = 0.0,
+    bias_sd: float = 0.0,
+    biased_hypotheses: int = 1,
+    n_trials: int = 2000,
+    seed: int = 1,
+) -> dict[str, Any]:
+    """Rate at which the B blocker makes the VERDICT a ``b_flag`` FAIL, over ``n_reps``
+    synthetic B datasets of 16 hypotheses x ``n_trials`` independent trials.
+
+    This runs the runner's own path: ``b_residual_blocker`` (same statistic, SE,
+    threshold, aggregation over the 16 hypotheses) and then ``primary_verdict`` with every
+    rate cell passing and a NOT_TRIGGERED gate, so a FAIL with reason ``b_flag`` is
+    exactly "at least one false flag across the 16 hypotheses".  ``bias_sd`` adds a
+    constant (in units of the trial sd) to the first ``biased_hypotheses`` hypotheses
+    (injected bias: detection rate)."""
+    rng = np.random.default_rng(seed)
+    ids = [f"h{i:02d}" for i in range(N_HYPOTHESES)]
+    cells = [(s, k) for s in ("S1", "S2") for k in (3, 6, 16)]
+    ok_b = dict.fromkeys(cells, 0)
+    ok_a0 = dict.fromkeys(cells, 0)
+    fails = 0
+    for _ in range(n_reps):
+        x = _synthetic_b_stats(rng, n_trials, N_HYPOTHESES, model, rho)
+        if bias_sd:
+            x[:biased_hypotheses] += bias_sd
+        blk = b_residual_blocker(dict(zip(ids, x, strict=True)), ids)
+        v = primary_verdict(
+            ok_b, ok_a0, True, blk["blocks_pass"], {"status": "NOT_TRIGGERED"}, b_report=blk
+        )
+        fails += int(v["verdict"] == "FAIL" and v["reason"] == "b_flag")
+    return {
+        "model": model,
+        "rho": rho,
+        "bias_sd": bias_sd,
+        "biased_hypotheses": biased_hypotheses if bias_sd else 0,
+        "n_reps": n_reps,
+        "n_trials": n_trials,
+        "n_hypotheses": N_HYPOTHESES,
+        "verdict_b_flag_count": fails,
+        "verdict_b_flag_rate": fails / n_reps,
+    }
+
+
+def b_blocker_union_bound(n_trials: int = 2000, flag_se: float = FLAG_SE) -> dict[str, float]:
+    """Analytic check for normal trial statistics: mean / (sd / sqrt(n)) is exactly
+    Student t with n - 1 df, so one hypothesis false-flags with p = P(|t| > 4), and the
+    probability of at least one false flag among 16 hypotheses, for ANY dependence between
+    them, is at most the union bound 16 p (equal to it up to O(p^2) if independent)."""
+    from scipy import stats
+
+    p = float(2.0 * stats.t.sf(flag_se, n_trials - 1))
+    return {
+        "per_hypothesis": p,
+        "union_bound_16": N_HYPOTHESES * p,
+        "independent_16": 1.0 - (1.0 - p) ** N_HYPOTHESES,
+    }

@@ -109,7 +109,10 @@ def identity_inputs(a: argparse.Namespace, root: Path) -> dict[str, Any]:
     if a.study_config:
         cfg_rel = _rel(root, Path(a.study_config))
         cfg = json.loads((root / cfg_rel).read_text(encoding="utf-8"))
-        from iap.research.known_null import identity_args
+        if cfg.get("kind") == "known_null_v3":
+            from iap.research.known_null_v3 import identity_args_v3 as identity_args
+        else:
+            from iap.research.known_null import identity_args
 
         args = identity_args(cfg)
         if cfg_rel not in args["scripts"]:
