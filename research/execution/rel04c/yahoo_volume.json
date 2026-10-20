@@ -1,14 +1,112 @@
 {
-  "_source": null,
-  "_how": "owner fills from Yahoo Finance historical daily data (finance.yahoo.com/quote/<SYM>/history) for the three dates, after the select stage names the 20 symbols; record URL + retrieval date in _source. Yahoo volume is split-adjusted: split_factor[date][symbol] = cumulative split ratio from that date to the retrieval date (AAPL 4 on 2019-10-18 and 1 on the 2021 days; MSFT 1), the job divides by it. Nothing is downloaded by the job.",
+  "_source": "https://query1.finance.yahoo.com/v8/finance/chart/<SYMBOL>?interval=1d&events=split (the data behind finance.yahoo.com/quote/<SYMBOL>/history), retrieved 2026-10-20 by Claude in the built-in browser; volume is Yahoo's split-adjusted consolidated daily volume",
+  "_how": "split_factor[date][symbol] = product of split ratios (numerator/denominator) of Yahoo split events dated after the session date, up to the retrieval date; the job divides Yahoo volume by it.",
+  "_unavailable": {
+    "FEYE": "Yahoo: no data found (symbol delisted)",
+    "COUP": "Yahoo: no data found (symbol delisted)",
+    "GTLS": "Yahoo: no data found (symbol delisted)",
+    "PFPT": "Yahoo: no data found (symbol delisted)",
+    "CCRN": "Yahoo: no data found (symbol delisted)",
+    "CCMP": "Yahoo: no data found (symbol delisted)"
+  },
   "split_factor": {
-    "2019-10-18": {},
-    "2021-07-13": {},
-    "2021-08-13": {}
+    "2019-10-18": {
+      "AAPL": 4.0,
+      "MSFT": 1.0,
+      "PTEN": 1.0,
+      "MRVL": 1.0,
+      "CRWD": 4.0,
+      "BYND": 0.0333333333,
+      "LSCC": 1.0,
+      "GBDC": 1.021,
+      "MRTN": 1.5,
+      "CHTR": 1.0,
+      "MCBS": 1.0,
+      "PLXS": 1.0,
+      "FBNC": 1.0,
+      "TREE": 1.0
+    },
+    "2021-07-13": {
+      "AAPL": 1.0,
+      "MSFT": 1.0,
+      "PTEN": 1.0,
+      "MRVL": 1.0,
+      "CRWD": 4.0,
+      "BYND": 0.0333333333,
+      "LSCC": 1.0,
+      "GBDC": 1.0,
+      "MRTN": 1.0,
+      "CHTR": 1.0,
+      "MCBS": 1.0,
+      "PLXS": 1.0,
+      "FBNC": 1.0,
+      "TREE": 1.0
+    },
+    "2021-08-13": {
+      "AAPL": 1.0,
+      "MSFT": 1.0,
+      "PTEN": 1.0,
+      "MRVL": 1.0,
+      "CRWD": 4.0,
+      "BYND": 0.0333333333,
+      "LSCC": 1.0,
+      "GBDC": 1.0,
+      "MRTN": 1.0,
+      "CHTR": 1.0,
+      "MCBS": 1.0,
+      "PLXS": 1.0,
+      "FBNC": 1.0,
+      "TREE": 1.0
+    }
   },
   "volume": {
-    "2019-10-18": {},
-    "2021-07-13": {},
-    "2021-08-13": {}
+    "2019-10-18": {
+      "AAPL": 97433600,
+      "MSFT": 32273500,
+      "PTEN": 6052600,
+      "MRVL": 5877200,
+      "CRWD": 14676400,
+      "BYND": 127293,
+      "LSCC": 823900,
+      "GBDC": 686827,
+      "MRTN": 633150,
+      "CHTR": 821700,
+      "MCBS": 22500,
+      "PLXS": 95100,
+      "FBNC": 69100,
+      "TREE": 68000
+    },
+    "2021-07-13": {
+      "AAPL": 100827100,
+      "MSFT": 26120100,
+      "PTEN": 1307600,
+      "MRVL": 4304700,
+      "CRWD": 8985200,
+      "BYND": 51777,
+      "LSCC": 412500,
+      "GBDC": 552300,
+      "MRTN": 236600,
+      "CHTR": 705900,
+      "MCBS": 17900,
+      "PLXS": 83300,
+      "FBNC": 143900,
+      "TREE": 180600
+    },
+    "2021-08-13": {
+      "AAPL": 59375000,
+      "MSFT": 18249000,
+      "PTEN": 1012300,
+      "MRVL": 3155000,
+      "CRWD": 7069600,
+      "BYND": 41090,
+      "LSCC": 420900,
+      "GBDC": 255200,
+      "MRTN": 173300,
+      "CHTR": 463000,
+      "MCBS": 20200,
+      "PLXS": 47700,
+      "FBNC": 42900,
+      "TREE": 137200
+    }
   }
 }

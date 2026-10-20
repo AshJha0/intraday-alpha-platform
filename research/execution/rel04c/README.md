@@ -67,7 +67,7 @@ one JSON line per stage (seconds, `peak_rss_gb`, details) in
 | `select` | rule v1 -> `research/execution/rel04c/universe.json` | `verify` not done; anchors not eligible; a `--limit-messages` pass |
 | `ingest --day D` x3 | one multi-session dataset `data\real\rel04c\r7x20_3day`, date order, `--defer-normalize` for days 1-2, day 3 normalises all; `--partition-instruments` chosen from available RAM (REL-13 `auto_partition_instruments`), `--slim` | out of order; universe file missing or bad; a dataset holding any session set other than the earlier days (it is then deleted with the ingest markers: re-launch redoes the ingest) |
 | `register` | `tools/data_manifest.py generate` + `holdout_registry seed`; then the holdout guard on the dataset must say `in_sample` | sessions are not exactly the three days; guard says spent / unread |
-| `volume` | Nasdaq / consolidated volume ratio per (day, symbol) -> `volume_check.json`; `consolidated_adv.json` for the benchmark | `yahoo_volume.json` has no `_source`, or a value / split factor is missing |
+| `volume` | Nasdaq / consolidated volume ratio per (day, symbol) -> `volume_check.json`; `consolidated_adv.json` for the benchmark; names in `_unavailable` are recorded `unavailable` (no ratio, no consolidated ADV) | `yahoo_volume.json` has no `_source`; a name is neither filled nor in `_unavailable`; a value / split factor is missing; an `_unavailable` entry has no reason, also has a volume, or is not in the dataset; more than 6 names unavailable |
 | `bench --bucket L1/L2/L3` | REL-03 benchmark v2 on the bucket's names, `--cover-all-cells --consolidated-adv` -> `research/execution/rel04c/benchmark/` | pre-declaration not `frozen`, an open parameter, `result_class` not `secondary` |
 | `cleanup` | delete the dataset's `raw/` intermediate (normalised events, `dataset.json`, outputs kept; ITCH inputs never touched) | a bucket's benchmark not done |
 
@@ -88,13 +88,30 @@ Nasdaq is a fraction of consolidated volume (all venues, TRF, extended
 hours); outside 0.05-0.60 is flagged for a look, not failed. The job reads a
 file the owner fills; it downloads nothing.
 
+### Unavailable names (owner option 1, 2026-10-20)
+
+Yahoo has no data for 6 of the 20 names (FEYE, COUP, GTLS, PFPT, CCRN, CCMP:
+delisted / acquired). All 20 are kept; validation covers the **14** with
+Yahoo data (`yahoo_volume.json`: 42 volumes + split factors, retrieved
+2026-10-20 from Yahoo's chart API; the six are under `_unavailable` with a
+reason, at most 6 allowed). In `volume_check.json` they appear as
+`status: unavailable`; `consolidated_adv.json` has no entry for them (only
+`_unavailable` and `_note`). The median Nasdaq/consolidated ratio is computed
+on the 14 validated names only. In the benchmark these names are sized on
+Nasdaq venue ADV only (as every name is), carry an empty
+`size_pct_consolidated_adv`, and the benchmark output (`grid.size_basis`,
+`grid.consolidated_adv_unavailable`) states they have no consolidated-volume
+validation. The bucket labels use Nasdaq displayed volume, so these six keep
+their bucket.
+
 ## 4. Pre-declaration (draft)
 
 `predeclaration.json`: SECONDARY, per liquidity bucket, primary metric
-`cost_per_filled_share_bps`, G = 3 sessions. Open: `algos`, `policies`,
-`sizes_pct_venue_adv` (the benchmark sizes parents on Nasdaq ADV),
-`sizes_target_pct_consolidated_adv` (the consolidated equivalent, from the
-volume stage's median ratio), `window_min`, `mde_report`. Freezing it
+`cost_per_filled_share_bps`, G = 3 sessions. Set (still draft): `algos` TWAP,VWAP,POV,IS; `policies`
+native,aggressive,passive; `sizes_pct_venue_adv` 0.1,0.5,1,2; `window_min` 30;
+`mde_report`; plus a `volume_validation` note (14 validated / 6 unavailable).
+Open: `sizes_target_pct_consolidated_adv` (venue % x the median ratio over the
+14 validated names, from `volume_check.json`). Freezing it
 (`status: frozen`, `frozen_by`, `frozen_utc`) is the owner's step.
 
 ## 5. Estimates for the queue (from existing logs; unmeasured for 20 names)

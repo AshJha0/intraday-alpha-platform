@@ -392,7 +392,9 @@ def test_committed_predeclaration_is_a_draft_with_open_parameters(env):
     doc = json.loads(committed.read_text())
     assert doc["result_class"] == "secondary"
     assert set(job.REQUIRED_PARAMS) == set(doc["parameters"])
-    assert all(v is None for v in doc["parameters"].values())
+    assert [k for k, v in doc["parameters"].items() if v is None] == [
+        "sizes_target_pct_consolidated_adv"
+    ]
 
 
 @pytest.mark.parametrize(
@@ -482,3 +484,107 @@ def test_cmd_is_crlf_and_runs_every_stage_in_order():
     ]
     pos = [text.index(f"%J% {s} ") for s in order]
     assert pos == sorted(pos) and text.count("|| goto fail") == len(order)
+
+
+def _yahoo_unavail(n_unavail=1, reason="Yahoo: no data found (symbol delisted)"):
+    y = _yahoo()
+    y["_unavailable"] = {"MSFT": reason}
+    for d in y["volume"].values():
+        d.pop("MSFT")
+    for d in y["split_factor"].values():
+        d.pop("MSFT")
+    return y
+
+
+def test_volume_report_unavailable_recorded_not_refused():
+    nas = {"2019-10-18": {"AAPL": 8_000_000, "MSFT": 19_000_000}}
+    y = {
+        "_source": "s",
+        "_unavailable": {"MSFT": "delisted"},
+        "split_factor": {"2019-10-18": {"AAPL": 4}},
+        "volume": {"2019-10-18": {"AAPL": 128_000_000}},
+    }
+    rep = job.volume_report(nas, y)
+    row = next(r for r in rep["rows"] if r["symbol"] == "MSFT")
+    assert row["status"] == "unavailable" and row["ratio"] is None and row["consolidated"] is None
+    assert "MSFT" not in rep["consolidated_adv"] and rep["validated_symbols"] == ["AAPL"]
+    assert rep["median_ratio"] == 0.25 and rep["flagged"] == []
+
+
+def test_volume_stage_unavailable_outputs_and_refusals(env):
+    _ingested(env)
+    env.mark("register")
+    env.yahoo.write_text(json.dumps(_yahoo_unavail()))
+    out = job.stage_volume(env)
+    assert out["unavailable"] == ["MSFT"] and out["n_validated"] == 1
+    adv = json.loads(env.consolidated_adv.read_text())
+    assert "MSFT" not in adv and adv["_unavailable"] == {
+        "MSFT": "Yahoo: no data found (symbol delisted)"
+    }
+    assert "validated names only" in adv["_note"]
+    chk = json.loads(env.volume_report.read_text())
+    assert chk["unavailable"] and {r["status"] for r in chk["rows"] if r["symbol"] == "MSFT"} == {
+        "unavailable"
+    }
+    # neither filled nor unavailable
+    y = _yahoo_unavail()
+    y["_unavailable"] = {}
+    env.yahoo.write_text(json.dumps(y))
+    with pytest.raises(job.JobRefused, match="MSFT"):
+        job.stage_volume(env)
+    # missing _source
+    y = _yahoo_unavail()
+    y["_source"] = None
+    env.yahoo.write_text(json.dumps(y))
+    with pytest.raises(job.JobRefused, match="_source"):
+        job.stage_volume(env)
+    # missing split factor of a filled name
+    y = _yahoo_unavail()
+    del y["split_factor"]["2021-07-13"]["AAPL"]
+    env.yahoo.write_text(json.dumps(y))
+    with pytest.raises(job.JobRefused, match="AAPL"):
+        job.stage_volume(env)
+    # empty reason, filled and unavailable, unknown unavailable name
+    for bad, match in (
+        ({"MSFT": " "}, "reason"),
+        ({"MSFT": "x", "AAPL": "x"}, "both"),
+        ({"MSFT": "x", "ZZZZ": "x"}, "not in the dataset"),
+    ):
+        y = _yahoo_unavail()
+        y["_unavailable"] = bad
+        if "AAPL" in bad:
+            pass
+        env.yahoo.write_text(json.dumps(y))
+        with pytest.raises(job.JobRefused, match=match):
+            job.stage_volume(env)
+
+
+def test_volume_report_refuses_more_than_six_unavailable():
+    syms = [f"S{i}" for i in range(7)]
+    y = {
+        "_source": "s",
+        "_unavailable": {s: "delisted" for s in syms},
+        "split_factor": {},
+        "volume": {},
+    }
+    with pytest.raises(job.JobRefused, match="more than 6"):
+        job.volume_report({"2019-10-18": {s: 1 for s in syms}}, y)
+    y["_unavailable"].pop("S6")
+    assert len(job.volume_report({"2019-10-18": {s: 1 for s in syms[:6]}}, y)["rows"]) == 6
+
+
+def test_shipped_yahoo_volume_is_consistent():
+    root = Path(__file__).resolve().parents[2] / "research" / "execution" / "rel04c"
+    y = json.loads((root / "yahoo_volume.json").read_text(encoding="utf-8"))
+    pre = json.loads((root / "predeclaration.json").read_text(encoding="utf-8"))
+    assert y["_source"] and len(y["_unavailable"]) == 6
+    dates = [d["date"] for d in job.DAYS]
+    assert sorted(y["volume"]) == sorted(y["split_factor"]) == sorted(dates)
+    filled = set(y["volume"][dates[0]])
+    assert len(filled) == 14 and not filled & set(y["_unavailable"])
+    for d in dates:
+        assert set(y["volume"][d]) == set(y["split_factor"][d]) == filled
+    assert pre["status"] == "draft"
+    assert pre["parameters"]["sizes_target_pct_consolidated_adv"] is None
+    assert set(pre["volume_validation"]["validated"]) == filled
+    assert set(pre["volume_validation"]["unavailable"]) == set(y["_unavailable"])

@@ -1170,12 +1170,18 @@ def run_benchmark(
             }
         )
     consolidated: dict[str, float] = {}
+    consolidated_meta: dict[str, object] = {}
     if consolidated_adv is not None:
-        consolidated = {
-            str(k): float(v)
-            for k, v in json.loads(Path(consolidated_adv).read_text(encoding="utf-8")).items()
-            if not str(k).startswith("_")
-        }
+        _cdoc = json.loads(Path(consolidated_adv).read_text(encoding="utf-8"))
+        consolidated = {str(k): float(v) for k, v in _cdoc.items() if not str(k).startswith("_")}
+        consolidated_meta = {str(k): v for k, v in _cdoc.items() if str(k).startswith("_")}
+    # names of this run with no consolidated ADV (e.g. REL-04c names Yahoo has no data for):
+    # sized on venue ADV only, labelled None, stated in the output below
+    no_consolidated = (
+        sorted(str(k) for k in (consolidated_meta.get("_unavailable") or {}))
+        if consolidated
+        else []
+    )
     adv_pool = sorted(consolidated.values() or [i.adv for i in cfg.instruments.values()])
     liq_edges = (
         [adv_pool[len(adv_pool) // 3], adv_pool[(2 * len(adv_pool)) // 3]]
@@ -1552,7 +1558,15 @@ def run_benchmark(
                 "% of the venue ADV in instruments.json (one venue, NOT consolidated); "
                 "size_pct_consolidated_adv is on each parent row"
                 + ("" if not consolidated else f" from {consolidated_adv}")
+                + (
+                    ""
+                    if not no_consolidated
+                    else "; names without consolidated-volume validation (sized on venue ADV "
+                    f"only, size_pct_consolidated_adv empty): {','.join(no_consolidated)}; "
+                    + str(consolidated_meta.get("_note", ""))
+                )
             ),
+            "consolidated_adv_unavailable": no_consolidated,
         },
         "simulator": {
             "impact_model": impact_model,

@@ -71,6 +71,8 @@ STAGES = ("verify", "select", "ingest", "register", "volume", "bench", "cleanup"
 BUCKETS = tuple(b[0] for b in ru.LIQ_BUCKETS)
 #: Nasdaq-only share of consolidated volume outside this band is flagged
 RATIO_BAND = (0.05, 0.60)
+#: most names the owner may list in ``_unavailable`` of yahoo_volume.json
+MAX_UNAVAILABLE = 6
 #: pre-declaration fields that must be set (non-null) before ``bench`` runs
 REQUIRED_PARAMS = (
     "algos",
@@ -310,11 +312,41 @@ def volume_report(
         raise JobRefused("yahoo_volume.json has no _source (URL + retrieval date)")
     vol = yahoo.get("volume") or {}
     split = yahoo.get("split_factor") or {}
+    # ``_unavailable``: {symbol: reason} for names Yahoo has no data for (delisted /
+    # acquired); recorded as unavailable, no ratio, no consolidated ADV.  Anything
+    # else missing still refuses.
+    unavailable = yahoo.get("_unavailable") or {}
+    if not isinstance(unavailable, Mapping):
+        raise JobRefused("yahoo_volume.json _unavailable must be {symbol: reason}")
+    for sym, reason in unavailable.items():
+        if not isinstance(reason, str) or not reason.strip():
+            raise JobRefused(f"yahoo_volume.json _unavailable[{sym}] has no reason")
+    if len(unavailable) > MAX_UNAVAILABLE:
+        raise JobRefused(
+            f"{len(unavailable)} names listed unavailable, more than {MAX_UNAVAILABLE}"
+        )
+    unavailable_seen: set[str] = set()
     rows: list[dict[str, Any]] = []
     flags: list[str] = []
     adv: dict[str, list[float]] = {}
     for date, by_sym in sorted(nasdaq.items()):
         for sym, n in sorted(by_sym.items()):
+            if sym in unavailable:
+                if any(sym in (vol.get(d) or {}) for d in vol):
+                    raise JobRefused(f"{sym} is both listed unavailable and has a volume")
+                unavailable_seen.add(sym)
+                rows.append(
+                    {
+                        "date": date,
+                        "symbol": sym,
+                        "nasdaq": n,
+                        "consolidated": None,
+                        "ratio": None,
+                        "status": "unavailable",
+                        "reason": unavailable[sym],
+                    }
+                )
+                continue
             raw = (vol.get(date) or {}).get(sym)
             f = (split.get(date) or {}).get(sym)
             if raw is None or f is None:
@@ -327,6 +359,10 @@ def volume_report(
                 flags.append(f"{sym}@{date}")
             rows.append(row)
             adv.setdefault(sym, []).append(cons)
+    if set(unavailable) - unavailable_seen:
+        raise JobRefused(
+            f"_unavailable names not in the dataset: {sorted(set(unavailable) - unavailable_seen)}"
+        )
     ratios = sorted(float(r["ratio"]) for r in rows if r["ratio"] is not None)
     return {
         "schema": "iap.rel04c_volume_check/v1",
@@ -334,6 +370,8 @@ def volume_report(
         "band": list(RATIO_BAND),
         "rows": rows,
         "median_ratio": ratios[len(ratios) // 2] if ratios else None,
+        "validated_symbols": sorted(adv),
+        "unavailable": {k: unavailable[k] for k in sorted(unavailable)},
         "flagged": flags,
         "consolidated_adv": {s: sum(v) / len(v) for s, v in sorted(adv.items())},
         "note": (
@@ -354,8 +392,20 @@ def stage_volume(paths: Paths) -> dict[str, Any]:
     paths.volume_report.write_text(json.dumps(rep, indent=2, sort_keys=True) + "\n", "utf-8")
     adv = {"_source": f"mean Yahoo consolidated volume, {yahoo['_source']}"}
     adv.update({s: round(v) for s, v in rep["consolidated_adv"].items()})
+    if rep["unavailable"]:
+        adv["_unavailable"] = rep["unavailable"]
+        adv["_note"] = (
+            f"{len(rep['unavailable'])} names have no consolidated-volume validation and no "
+            "consolidated ADV (sized on Nasdaq venue ADV only); the median Nasdaq/consolidated "
+            f"ratio is computed on the {len(rep['validated_symbols'])} validated names only"
+        )
     paths.consolidated_adv.write_text(json.dumps(adv, indent=2, sort_keys=True) + "\n", "utf-8")
-    return {"median_ratio": rep["median_ratio"], "flagged": rep["flagged"]}
+    return {
+        "median_ratio": rep["median_ratio"],
+        "flagged": rep["flagged"],
+        "n_validated": len(rep["validated_symbols"]),
+        "unavailable": sorted(rep["unavailable"]),
+    }
 
 
 def load_predeclaration(paths: Paths) -> dict[str, Any]:

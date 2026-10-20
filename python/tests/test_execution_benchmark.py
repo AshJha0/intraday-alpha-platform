@@ -223,3 +223,28 @@ def test_committed_prereg_draft_is_unsigned():
     # B7 was closed on its in-sample result (2026-10-16): the draft is the record, never signed
     assert "DRAFT" in draft["status"] or "CLOSED" in draft["status"]
     assert draft["grid"]["sizes_pct_adv"] == [0.1, 0.5, 1.0, 2.0]
+
+
+def test_consolidated_adv_unavailable_names_are_stated(dataset, tmp_path):
+    adv = tmp_path / "adv.json"
+    adv.write_text(
+        json.dumps(
+            {
+                "AAA": 1_000_000,
+                "_source": "t",
+                "_unavailable": {"ZZZ": "delisted"},
+                "_note": "median ratio on validated names only",
+            }
+        )
+    )
+    out = tmp_path / "out"
+    rc = bench.main(
+        ["--data-dir", str(dataset), "--config-dir", str(REPO / "configs"), "--out", str(out)]
+        + ARGS
+        + ["--consolidated-adv", str(adv)]
+    )
+    assert rc == 0
+    grid = json.loads((out / "benchmark_bench0.json").read_text())["grid"]
+    assert grid["consolidated_adv_unavailable"] == ["ZZZ"]
+    assert "without consolidated-volume validation" in grid["size_basis"]
+    assert "validated names only" in grid["size_basis"]
