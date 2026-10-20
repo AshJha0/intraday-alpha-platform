@@ -148,8 +148,19 @@ import sys
 sys.path.insert(0, sys.argv[1])
 from iap.validation.ledger import ExperimentLedger
 path, writer, n = sys.argv[2], sys.argv[3], int(sys.argv[4])
+import time
 for i in range(n):
-    ledger = ExperimentLedger(path)
+    # The constructor's load is unlocked; on Windows it can hit the other process's
+    # os.replace and raise PermissionError (an OS-level reader/replace race, not a lost
+    # update).  Retry the read only; every save stays under the ledger lock.
+    for attempt in range(50):
+        try:
+            ledger = ExperimentLedger(path)
+            break
+        except PermissionError:
+            time.sleep(0.02)
+    else:
+        raise
     ledger.record("EQ01", "race", {"writer": writer, "i": i}, {"i": i}, count=2)
     ledger.save()
 """
