@@ -1,5 +1,5 @@
 {
-  "body_sha256": "5c59e735e0322a1778e8c872cb69da94b4a85ae80a3f437720049d6241d3a80b",
+  "body_sha256": "3cd398c686a4f4925269e1c7cf274cc2982ed71218803ea3ad65c1db89a37c28",
   "datasets": {
     "00121a37bb26ac1d504f761f481d2786339ff9cc51bc3457dbf2b47eb87068ac": {
       "content_hash": "7589ed2c8ede152993547cc88362b067f68249110bfb18291e50c68a05792c5b",
@@ -544,7 +544,9 @@
         "spent_by": [
           "a6c5af759082b68f",
           "de2488a2a245cf2c",
-          "b8-oos-2026-10-16"
+          "b8-oos-2026-10-16",
+          "research/preregs/rel09_prereg.json",
+          "research/preregs/rel10_prereg.json"
         ],
         "state": "spent",
         "symbols": [
@@ -566,7 +568,9 @@
         "spent_by": [
           "a6c5af759082b68f",
           "de2488a2a245cf2c",
-          "b8-oos-2026-10-16"
+          "b8-oos-2026-10-16",
+          "research/preregs/rel09_prereg.json",
+          "research/preregs/rel10_prereg.json"
         ],
         "state": "spent",
         "symbols": [
@@ -588,7 +592,9 @@
         "spent_by": [
           "a6c5af759082b68f",
           "de2488a2a245cf2c",
-          "b8-oos-2026-10-16"
+          "b8-oos-2026-10-16",
+          "research/preregs/rel09_prereg.json",
+          "research/preregs/rel10_prereg.json"
         ],
         "state": "spent",
         "symbols": [
@@ -611,7 +617,9 @@
           "a6c5af759082b68f",
           "de2488a2a245cf2c",
           "b8-oos-2026-10-16",
-          "research/preregs/b8v2_prereg.json"
+          "research/preregs/b8v2_prereg.json",
+          "research/preregs/rel09_prereg.json",
+          "research/preregs/rel10_prereg.json"
         ],
         "state": "spent",
         "symbols": [
@@ -678,7 +686,9 @@
           "v1.8.0-holdout",
           "auc01",
           "b8-oos-2026-10-16",
-          "research/preregs/b8v2_prereg.json"
+          "research/preregs/b8v2_prereg.json",
+          "research/preregs/rel09_prereg.json",
+          "research/preregs/rel10_prereg.json"
         ],
         "state": "spent",
         "symbols": [
@@ -701,7 +711,9 @@
           "v1.8.0-holdout",
           "auc01",
           "b8-oos-2026-10-16",
-          "research/preregs/b8v2_prereg.json"
+          "research/preregs/b8v2_prereg.json",
+          "research/preregs/rel09_prereg.json",
+          "research/preregs/rel10_prereg.json"
         ],
         "state": "spent",
         "symbols": [
