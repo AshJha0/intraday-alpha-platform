@@ -47,7 +47,7 @@ the pin and this page together, and every check would still pass. The anchor is 
 the fingerprint is also published somewhere the repository cannot change, under the owner's own
 account, so that a reviewer can compare the two.
 
-### What the owner must publish (owner action, not done yet)
+### What the owner must publish (done 2026-10-20 as a public gist; a second place, e.g. the profile README, is still better)
 
 Publish the block below **verbatim** in at least one place outside this repository that only the
 owner controls. Two are better:
@@ -72,7 +72,7 @@ none of the signatures.
 
 | Published at | Date | By |
 |---|---|---|
-| *(pending: owner)* | | |
+| https://gist.github.com/AshJha0/e1402d88fc53b80fd0d2627e10ee9c3f (public gist, account AshJha0, block verbatim) | 2026-10-20 | AshJha0 (created by Claude at the owner's request) |
 
 ## Rotation (planned key change)
 
