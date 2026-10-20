@@ -45,7 +45,9 @@ the order would have done under the simulator's queue rules. Reports Brier score
 baseline (the fit set's pooled fill rate, constant), the skill, reliability bins, and per-venue and per-queue-tercile
 cells (tercile edges from the fit set only). A day in both sets is refused. The label is tape-implied, not a measured
 fill; this checks the hazard against its own label generator out of sample, not the queue rules against real fills.
-The real-data run is a later job (`tests/test_paper_sim_to_real.py` uses synthetic data only).
+The real-data run is a later job (`tests/test_paper_sim_to_real.py` uses synthetic data only). Its runner, wrapper and
+unsigned draft pre-declaration (proposed fit/score split, K, stop rules) are in `research/execution/rel05/`; nothing has
+been signed or run.
 
 ## Not done here
 
