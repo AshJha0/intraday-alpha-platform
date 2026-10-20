@@ -219,6 +219,14 @@ def test_b8v2_runner_refuses_on_mismatch(monkeypatch, capsys):
     assert "FORCED" in capsys.readouterr().err
 
 
+def test_rel05_runner_refuses_on_mismatch(monkeypatch, capsys):
+    rr = _load("run_rel05_t", REPO / "research/execution/rel05/run_rel05.py")
+    _force_mismatch(monkeypatch)
+    with pytest.raises(rr.Refused):
+        rr.verify(REPO / SIGNED_V1[0], rr.load_decl(), root=REPO, env={ai.ACTOR_ENV: "t"})
+    assert "FORCED" in capsys.readouterr().err
+
+
 def test_rel08_screen_refuses_on_mismatch(monkeypatch):
     from iap.research import rel08_rule
 
@@ -255,6 +263,7 @@ RUNNERS = {
     "tools/rel06_known_null.py": "verify_identity",
     "python/src/iap/research/known_null_v3.py": "verify_identity",
     "research/execution/b8v2/run_b8v2.py": "verify_identity",
+    "research/execution/rel05/run_rel05.py": "verify_identity",
     "python/src/iap/research/rel08_screen.py": "check_identity",
     "python/src/iap/research/rel08_rule.py": "verify_identity",
     "python/src/iap/agents/prereg_gate.py": "verify_identity",

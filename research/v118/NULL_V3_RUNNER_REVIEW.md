@@ -85,7 +85,7 @@ the real B statistic's distribution is not known to match them.
 1. **Centring groups: 63, not 49.** The protocol text and the prereg draft say 49 (7 pairs, omitting QQQ at 10 s and 1 m),
    but K3 trades AAPL+MSFT+QQQ at 1 s, 10 s and 1 m, so 9 pairs x 7 sessions = 63 groups are used. The configuration derives and
    asserts 63 (stricter; the runner aborts on any other count). The protocol and the prereg draft were **not** edited (the text
-   the reviewer approved); they need a one-line reconciliation (49 -> 63) before signing.
+   the reviewer approved); RESOLVED in the rev-2 runner PR: protocol 3.3, section 12 table and the prereg draft now say 63, with the derivation.
 2. **Blocker with an unchecked hypothesis** (missing / non-finite series): blocks PASS (FAIL, `b_flag`), not silently ignored.
    This is stricter than the gate's UNDETERMINED treatment of the same condition; confirm.
 3. **Machine verdict `PASS_B_ONLY`** is new (protocol text says "PASS labelled by the gate"); chosen so no consumer testing

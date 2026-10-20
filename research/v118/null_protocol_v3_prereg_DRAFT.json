@@ -43,13 +43,13 @@
     "alpha_rule_under_test": 0.025,
     "centring_invariant": {
       "empty_or_invalid_group": "fails (never skipped); infinite label fails; NaN labels excluded from the mean",
-      "groups": "(name, horizon) pairs of the frozen hypothesis lists (1s x AAPL/MSFT/QQQ; 10s, 1m x AAPL/MSFT) x 7 sessions",
+      "groups": "(name, horizon) pairs of the frozen hypothesis lists K3/K6/K16 (3 horizons 1s, 10s, 1m x AAPL/MSFT/QQQ = 9 pairs) x 7 sessions = 63 groups",
       "implementation": "iap.research.known_null_diag.check_centring_invariant / verify_series_used / require_centring_invariant",
       "meaning": "passing establishes only that centring was implemented; not exchangeability, dependence assumptions, tail behaviour or validity of the conditional randomisation scheme",
-      "n_groups": 49,
+      "n_groups": 63,
       "role": "HARD construction check on the centred A0 labels before the derangement; failure => A0 run aborted/INVALID (construction failure, not a statistical null-validity finding)",
       "rule": "|mean of finite labels| <= tol_rel * max|label| per (name, horizon, session) group",
-      "series_used_check": "derangement input bit-identical to the checked centred array",
+      "series_used_check": "derangement input bitwise identical (float64 bit patterns) to the checked centred array",
       "tol_rel": 1e-09
     },
     "claim_scope": "B pass: observed FWER in the specified independent synthetic trials met the pre-specified calibration threshold. A0 pass: exact conditional rejection proportion over the specified transformations met its threshold. Neither, alone or combined, proves true FWER on real trading data is controlled at 2.5 %.",
