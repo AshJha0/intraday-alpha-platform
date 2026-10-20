@@ -1,0 +1,71 @@
+{
+  "x-version": 1,
+  "kind": "rel05_predeclaration",
+  "id": "REL-05 real-tape fill test",
+  "protocol": "research/execution/rel05/PREDECLARATION.md",
+  "prereg": "research/preregs/rel05_prereg.json",
+  "status": "DRAFT: proposed by the code session, UNSIGNED, not run. Becomes binding only when the owner decisions in PREDECLARATION.md are settled and the coordinator signs the prereg.",
+  "split": {
+    "fit_days": ["2019-01-30", "2019-03-27", "2019-07-30", "2019-08-30"],
+    "eval_days": ["2019-10-30", "2019-12-30", "2020-01-30"],
+    "rule": "chronological: every eval day is after every fit day; all seven days are in_sample in research/holdout_registry.json; no spent, unread or reserved session is read"
+  },
+  "datasets": {
+    "2019-01-30": {"dir": "ds3_20190130", "dataset_version": "06419d749910a8f0a6d089d5ed13a40500481d581a93f276bb62c339940c7293"},
+    "2019-03-27": {"dir": "ds3_20190327", "dataset_version": "7c6ddcf3429a021a4cdeb2b9976c7fe9167eade399b1c85bb5c95b3847995784"},
+    "2019-07-30": {"dir": "ds3_20190730", "dataset_version": "3731bbd4a40acdd4833f1f42c4d14a0df027e5a310c08408d608a0e18ffa2ced"},
+    "2019-08-30": {"dir": "ds3_20190830", "dataset_version": "ad9a62dea3664c98cc475bf824a058fe8d53f5ac609d675e005b8dc930535498"},
+    "2019-10-30": {"dir": "ds3_20191030", "dataset_version": "517f666c3350057897eeaba1e8a3753f34aed3fa2c377911f27a2dafe54cf005"},
+    "2019-12-30": {"dir": "ds3_20191230", "dataset_version": "53f48feb7e4f2451dbf9a30cd375998e3765bced3d653f55d7c404494d33540a"},
+    "2020-01-30": {"dir": "ds3_20200130", "dataset_version": "edb9b750a642befdbed19e5b877e959390befc438dd91e840838a4c167791e19"}
+  },
+  "config_dir": "ds3_20190130/configs",
+  "symbols": {"AAPL": 1, "MSFT": 2, "QQQ": 3},
+  "label": {
+    "ttl_ns": 1000000000,
+    "qty": 100,
+    "calibration": "none (ExecConfig defaults; ITCH has no receive stamp)",
+    "grid": {"stride_s": 5, "start_et": "09:45", "end_et": "15:45", "note": "regular session minus 15 minutes at each end; first decision at the start, every stride_s after"},
+    "min_decisions_per_day_symbol": 1000
+  },
+  "model": "iap.execution.fill_hazard.FillHazardModel defaults (fitted on the fit days of one symbol at a time)",
+  "statistics": {
+    "family": "per-symbol verdict on the pooled eval days",
+    "family_k": 3,
+    "primary": "skill = 1 - Brier(model) / Brier(naive fit-set rate) on the pooled eval days",
+    "secondary": ["brier", "reliability bins", "per-day skill", "by-queue-tercile cells (edges from fit days)"],
+    "inference": "none: samples within a second-grid day are serially dependent and G = 3 eval days; per-day skill is reported, no p-value or interval is claimed"
+  },
+  "decision_rule": {
+    "supports": "pooled skill >= skill_min AND per-day skill > 0 on every eval day AND max |observed - predicted| over reliability bins with n >= 100 <= reliability_gap_max",
+    "contradicts": "pooled skill < 0",
+    "otherwise": "inconclusive",
+    "skill_min": 0.02,
+    "reliability_gap_max": 0.10,
+    "headline": "model_supported_on_all_symbols only if every symbol is 'supports' (K = 3, all-must-pass, so no multiplicity correction)"
+  },
+  "stop_rules": {
+    "refuse": [
+      "prereg unsigned, identity mismatch, runner is the signer, or a signing key in the environment",
+      "any day not in_sample in the holdout registry, any fit/eval overlap, any eval day not after every fit day",
+      "dataset_version on disk differs from the declared one",
+      "guard_or_exit refuses a dataset directory"
+    ],
+    "abort": [
+      "a day-symbol has fewer than min_decisions_per_day_symbol decisions or fewer than 1 fill and 1 non-fill in the fit set (symbol reported not_estimable)",
+      "available RAM below min_free_ram_gb at start"
+    ],
+    "no_rerun": "one run; a parameter change (stride, ttl, split) is a new declaration, never a retry",
+    "min_free_ram_gb": 6.0
+  },
+  "claims": {
+    "can_claim": "on seven in-sample 2019-2020 ITCH days the fill hazard fitted on 4 days predicts the tape-implied resting-order fill within 1 s better (or not) than the naive rate on 3 later days",
+    "cannot_claim": [
+      "Level 2: no real order or fill exists (decision D4a); the label is the simulator's own queue rule replayed on the tape",
+      "agreement of the queue rules with real fills",
+      "any 2025-26 result, any holdout result, any profit or alpha",
+      "statistical significance (G = 3 eval days)"
+    ]
+  },
+  "reproducibility": {"seed": null, "note": "no random draws; same inputs give byte-identical JSON"}
+}
