@@ -1,0 +1,167 @@
+{
+  "analytic": {
+    "independent_16": 0.0010498499174913523,
+    "per_hypothesis": 6.56479323257979e-05,
+    "union_bound_16": 0.0010503669172127663
+  },
+  "detects": "a mean of the S2 session-mean statistic across B trials further than 4 SE from zero in at least one of the 16 hypotheses; a non-flag is not proof of unbiasedness",
+  "false_flag_valid_null": [
+    {
+      "bias_sd": 0.0,
+      "biased_hypotheses": 0,
+      "model": "iid",
+      "n_hypotheses": 16,
+      "n_reps": 20000,
+      "n_trials": 2000,
+      "rho": 0.0,
+      "verdict_b_flag_count": 24,
+      "verdict_b_flag_rate": 0.0012
+    },
+    {
+      "bias_sd": 0.0,
+      "biased_hypotheses": 0,
+      "model": "factor",
+      "n_hypotheses": 16,
+      "n_reps": 20000,
+      "n_trials": 2000,
+      "rho": 0.5,
+      "verdict_b_flag_count": 25,
+      "verdict_b_flag_rate": 0.00125
+    },
+    {
+      "bias_sd": 0.0,
+      "biased_hypotheses": 0,
+      "model": "factor",
+      "n_hypotheses": 16,
+      "n_reps": 20000,
+      "n_trials": 2000,
+      "rho": 0.9,
+      "verdict_b_flag_count": 6,
+      "verdict_b_flag_rate": 0.0003
+    },
+    {
+      "bias_sd": 0.0,
+      "biased_hypotheses": 0,
+      "model": "t3",
+      "n_hypotheses": 16,
+      "n_reps": 5000,
+      "n_trials": 2000,
+      "rho": 0.0,
+      "verdict_b_flag_count": 5,
+      "verdict_b_flag_rate": 0.001
+    },
+    {
+      "bias_sd": 0.0,
+      "biased_hypotheses": 0,
+      "model": "skew",
+      "n_hypotheses": 16,
+      "n_reps": 5000,
+      "n_trials": 2000,
+      "rho": 0.0,
+      "verdict_b_flag_count": 7,
+      "verdict_b_flag_rate": 0.0014
+    },
+    {
+      "bias_sd": 0.0,
+      "biased_hypotheses": 0,
+      "model": "factor",
+      "n_hypotheses": 16,
+      "n_reps": 5000,
+      "n_trials": 2000,
+      "rho": 0.9,
+      "verdict_b_flag_count": 2,
+      "verdict_b_flag_rate": 0.0004
+    }
+  ],
+  "injected_bias": [
+    {
+      "bias_sd": 0.05,
+      "biased_hypotheses": 1,
+      "model": "iid",
+      "n_hypotheses": 16,
+      "n_reps": 2000,
+      "n_trials": 2000,
+      "rho": 0.0,
+      "verdict_b_flag_count": 76,
+      "verdict_b_flag_rate": 0.038
+    },
+    {
+      "bias_sd": 0.09,
+      "biased_hypotheses": 1,
+      "model": "iid",
+      "n_hypotheses": 16,
+      "n_reps": 2000,
+      "n_trials": 2000,
+      "rho": 0.0,
+      "verdict_b_flag_count": 979,
+      "verdict_b_flag_rate": 0.4895
+    },
+    {
+      "bias_sd": 0.15,
+      "biased_hypotheses": 1,
+      "model": "iid",
+      "n_hypotheses": 16,
+      "n_reps": 2000,
+      "n_trials": 2000,
+      "rho": 0.0,
+      "verdict_b_flag_count": 1992,
+      "verdict_b_flag_rate": 0.996
+    },
+    {
+      "bias_sd": 0.2,
+      "biased_hypotheses": 1,
+      "model": "iid",
+      "n_hypotheses": 16,
+      "n_reps": 2000,
+      "n_trials": 2000,
+      "rho": 0.0,
+      "verdict_b_flag_count": 2000,
+      "verdict_b_flag_rate": 1.0
+    },
+    {
+      "bias_sd": 0.05,
+      "biased_hypotheses": 16,
+      "model": "iid",
+      "n_hypotheses": 16,
+      "n_reps": 2000,
+      "n_trials": 2000,
+      "rho": 0.0,
+      "verdict_b_flag_count": 924,
+      "verdict_b_flag_rate": 0.462
+    },
+    {
+      "bias_sd": 0.09,
+      "biased_hypotheses": 16,
+      "model": "iid",
+      "n_hypotheses": 16,
+      "n_reps": 2000,
+      "n_trials": 2000,
+      "rho": 0.0,
+      "verdict_b_flag_count": 2000,
+      "verdict_b_flag_rate": 1.0
+    },
+    {
+      "bias_sd": 0.15,
+      "biased_hypotheses": 16,
+      "model": "iid",
+      "n_hypotheses": 16,
+      "n_reps": 2000,
+      "n_trials": 2000,
+      "rho": 0.0,
+      "verdict_b_flag_count": 2000,
+      "verdict_b_flag_rate": 1.0
+    },
+    {
+      "bias_sd": 0.2,
+      "biased_hypotheses": 16,
+      "model": "iid",
+      "n_hypotheses": 16,
+      "n_reps": 2000,
+      "n_trials": 2000,
+      "rho": 0.0,
+      "verdict_b_flag_count": 2000,
+      "verdict_b_flag_rate": 1.0
+    }
+  ],
+  "what": "false flags and detection of the generator B residual-mean blocker, measured through b_residual_blocker + primary_verdict (the runner's own path), 16 hypotheses x 2000 independent trials per dataset; verdict_b_flag_rate = P(at least one false flag across the 16 hypotheses) for the valid-null rows"
+}

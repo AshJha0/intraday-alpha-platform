@@ -253,6 +253,7 @@ def test_holdout_guard_refuses_a_prereg_whose_identity_does_not_match(monkeypatc
 RUNNERS = {
     "tools/r7_confirm.py": "verify_identity",
     "tools/rel06_known_null.py": "verify_identity",
+    "python/src/iap/research/known_null_v3.py": "verify_identity",
     "research/execution/b8v2/run_b8v2.py": "verify_identity",
     "python/src/iap/research/rel08_screen.py": "check_identity",
     "python/src/iap/research/rel08_rule.py": "verify_identity",
