@@ -181,13 +181,54 @@
   },
   "signed": true,
   "analysis_identity": {
+    "identity_version": 2,
     "scripts": {
       "python/src/iap/research/rel08_rule.py": "bb84167fc413bd6753da66c26542a887e3dc657338589a2ce316a4cdd9762cda",
-      "python/src/iap/research/rel08_screen.py": "5359cf34212fd7068ae3a09c5123257dca24063fa54254bd3d793f284ce31205",
+      "python/src/iap/research/rel08_screen.py": "a0fb7b11f2c3e853576d9934eb5697b8a466d6aa669602a2facbdf79c521b58c",
       "tools/rel08_rule_sign.py": "33b2a1319e9d139fb349e1034cee17f1fb198d76460271023a0ee2d3c781d113"
     },
-    "code_tree_sha256": "63b7e7f667ab3d7eacb3ea3732e163823c6485cf2bcd69dc5f8acb20189b8c2c",
-    "commit": "ad842df5b89ee9c2e4287aaa26c6c66ff4ad8e7c",
+    "inputs": {},
+    "code_tree_sha256": "8fc411835dfd39ed2f61d389f604b93b4d7969803830202d6756c195d32b26c3",
+    "configs_tree_sha256": "290b38d8871961c28e81db59ca9cf95791a213acd33461d667de873b907ad7b0",
+    "reference_tree_sha256": "9020e008efdb1ac41015cea4c31f8b9e4cb65a1324db0a42224cb2a22f18fa88",
+    "deps_lock_sha256": "2f68340d1a5c28871356287b00f5af907dd94f429c2551dac5cee0a3a114c18e",
+    "environment": {
+      "attrs": "26.1.0",
+      "cffi": "2.1.1",
+      "cloudpickle": "3.1.2",
+      "coverage[toml]": "absent",
+      "cryptography": "50.0.2",
+      "databento-dbn": "0.71.0",
+      "execnet": "2.1.2",
+      "hypothesis": "absent",
+      "iniconfig": "2.3.1",
+      "joblib": "1.6.0",
+      "jsonschema": "4.26.0",
+      "jsonschema-specifications": "2025.9.1",
+      "narwhals": "2.26.0",
+      "numpy": "2.4.6",
+      "packaging": "26.3",
+      "pandas": "3.0.6",
+      "pluggy": "1.6.0",
+      "pyarrow": "25.0.1",
+      "pycparser": "3.0",
+      "pygments": "2.21.0",
+      "pytest": "9.1.1",
+      "pytest-cov": "7.1.0",
+      "pytest-xdist": "3.8.0",
+      "python-dateutil": "2.9.0.post0",
+      "pyyaml": "6.0.3",
+      "referencing": "0.37.0",
+      "rpds-py": "2026.9.1",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.17.1",
+      "six": "1.17.0",
+      "sortedcontainers": "absent",
+      "threadpoolctl": "3.7.0",
+      "typing-extensions": "4.16.0"
+    },
+    "interpreter": "cpython-3.12.10",
+    "commit": "739a7e069dceeec32cec37de7a4443730eeac88a",
     "data_versions": [
       "9a1297a161fc69c47a770dcab4e3e09d5ecd34e1d2a96b44209011485038041d"
     ],
@@ -218,14 +259,14 @@
     }
   },
   "signed_by": "Claude under the owner's written delegation (REL08_CONTINUATION_RULE.md header)",
-  "signed_utc": "2026-10-18T11:51:34+00:00",
+  "signed_utc": "2026-10-20T06:19:47+00:00",
   "signature": {
     "scheme": "ed25519",
     "maintainer": "ashjha0",
     "public_key": "02a3e278cda3efac7dcd266fb8a3821a1415f0725a73f8b255aac84083c2106c",
     "trust_root": "research/agents/trust_roots.json",
     "message": "iap.agents.blackboard.canonical(this document without 'signature')",
-    "message_sha256": "771f41eb8fa947e52d833225df72a3e2e0c3342457398d2c1071297f53e9a1f2",
-    "sig": "719a6b342b3e5936b186e3244f67325a624991e1740363789ae66363a21814a246fbb4c2e74a7bf22f2a8b87c8eeb9e8e700db9d0e5b735b30abb7ec69cb340c"
+    "message_sha256": "b44502181b599f78cfe9377cc60554e01bd8ec9f0a6508659fb6d1c03a10e291",
+    "sig": "b5221b5336f3918ebfe74628c607afa02ad9b3f564128d8e7c3b5820eefeb187a8ea3f1032758ff6ef6a504f3bf802dbeeb5904410f436b92cb3ef412f232707"
   }
 }

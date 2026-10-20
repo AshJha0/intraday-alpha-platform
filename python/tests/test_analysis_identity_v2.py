@@ -159,7 +159,6 @@ def test_v1_block_still_verifies_under_v1_rules(repo):
 SIGNED_V1 = [
     "research/preregs/b8v2_prereg.json",
     "research/v118/null_protocol_prereg.json",
-    "research/v118/rel08_rule_signed.json",
 ]
 
 
@@ -168,6 +167,12 @@ def test_signed_v1_preregs_on_main_keep_verifying(rel):
     doc = json.loads((REPO / rel).read_text(encoding="utf-8"))
     ai.verify_signed_document(REPO, doc)  # signature untouched by v2
     assert ai.identity_version(doc["analysis_identity"]) == 1
+
+
+def test_rel08_rule_resigned_under_identity_v2():
+    doc = json.loads((REPO / "research/v118/rel08_rule_signed.json").read_text(encoding="utf-8"))
+    ai.verify_signed_document(REPO, doc)
+    assert ai.identity_version(doc["analysis_identity"]) == 2
 
 
 # --------------------------------------------------------------- runners --
@@ -218,7 +223,7 @@ def test_rel08_screen_refuses_on_mismatch(monkeypatch):
     from iap.research import rel08_rule
 
     _force_mismatch(monkeypatch)
-    rule = rel08_rule.load_signed_rule(REPO / SIGNED_V1[2], REPO)
+    rule = rel08_rule.load_signed_rule(REPO / "research/v118/rel08_rule_signed.json", REPO)
     want = str(rule.doc["dataset"]["dataset_version"])
     with pytest.raises(rel08_rule.RuleRefused, match="FORCED"):
         rel08_rule.check_identity(rule, REPO, want)
