@@ -1,7 +1,7 @@
 # Null protocol v3: frozen candidate identity (UNSIGNED, NOT RUN)
 
-Candidate code head (all bound files final at this commit; this note and the cover note are docs outside the bound set):
-`0bd377c041aa92cca61827b150575a52d3995c34` (branch `v118-nullv3-runner-rev2`, base main `f023286a`).
+Candidate code head (all bound files final at this commit; commits after it only touch this note, which is outside the bound set):
+`3742d3671afbc33a17a78ba3771acf97b9a752bd` (branch `v118-nullv3-runner-rev2`, base main `f023286a`).
 
 | item | value |
 |---|---|
@@ -19,9 +19,12 @@ change to a bound file changes these and requires a new review.
 
 ## Clean-checkout report (fresh `git clone` of the candidate head, Python 3.12, `PYTHONPATH=python/src`)
 
-* `pytest -n 2 -q python/tests`: **3893 passed, 115 skipped, 1 xfailed, 1 failed** in 12 min.
-  The one failure, `test_research_store_safety.py::test_two_processes_lose_no_ledger_update`, is a two-process timing test
-  unrelated to this change; it passed when re-run alone on the same checkout (1 passed, 4.6 s). The v3 files
-  (`test_known_null_v3.py`, `test_known_null_diag.py`, `test_known_null.py`: 88 tests) pass in the full run and separately.
+* `pytest -n 2 -q python/tests`: **3894 passed, 115 skipped, 1 xfailed, 0 failed** in 9.6 min.
+  History: on the earlier head `0bd377c0` one test failed, `python/tests/test_research_store_safety.py::
+  test_two_processes_lose_no_ledger_update` (ledger/research-store safety suite). Cause: two writer processes each construct
+  `ExperimentLedger`, whose load is unlocked; on Windows that read can hit the other process's `os.replace` and raise
+  `PermissionError` (an OS reader/replace race, not a lost update; saves are under the lock). It is unrelated to the null v3
+  code and passed alone. Fixed test-only in `3742d367` (the writer script retries the unlocked read on `PermissionError`;
+  no `src` file changed); the file then passed 5 of 5 loops alone and the full suite is clean.
 * `ruff check .`: all checks passed. `ruff format --check python tools`: 649 files formatted.
 * `mypy` (in `python/`, CI config): success, no issues in 129 source files.
