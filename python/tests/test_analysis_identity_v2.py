@@ -223,7 +223,7 @@ def test_rel08_screen_refuses_on_mismatch(monkeypatch):
     from iap.research import rel08_rule
 
     _force_mismatch(monkeypatch)
-    rule = rel08_rule.load_signed_rule(REPO / SIGNED_V1[2], REPO)
+    rule = rel08_rule.load_signed_rule(REPO / "research/v118/rel08_rule_signed.json", REPO)
     want = str(rule.doc["dataset"]["dataset_version"])
     with pytest.raises(rel08_rule.RuleRefused, match="FORCED"):
         rel08_rule.check_identity(rule, REPO, want)
