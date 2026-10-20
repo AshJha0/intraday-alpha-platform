@@ -1,4 +1,12 @@
 {
+  "frozen_evidence": {
+    "b_blocker_calibration": {
+      "hash": "known_null_v3._norm_sha (line-ending normalised)",
+      "note": "synthetic, no market data; six rows = five distinct models, factor rho 0.9 run twice (seeds 103, 106); row ids in research/v118/known_null_v3_blocker_calibration_ROWS.md. Bound here by the prereg signature; the code-level identity (analysis_identity) does not carry it because binding it would need a change to identity_args_v3.",
+      "path": "research/v118/known_null_v3_blocker_calibration.json",
+      "sha256": "cfeb6a6d27dbacc0fc9f36232c1deb508e1016488d6cc7c160c78930c987f2ae"
+    }
+  },
   "identity_binding": "signed identity binds: final protocol file hash, this exact prereg file (protocol_sha256 filled at signing; protocol_sha256_at_draft is tracking only), the runner configuration file and the code version (git commit incl. known_null.py, known_null_diag.py, the v3 runner)",
   "kind": "analysis_prereg",
   "prereg_id": "research/v118/null_protocol_v3_prereg.json",

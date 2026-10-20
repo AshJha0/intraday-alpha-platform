@@ -167,21 +167,26 @@ verdicts that are FAIL with reason `b_flag`. Seeds as in the file; no threshold 
 * **Rates distinguished.** *Per hypothesis:* P(one given hypothesis flagged): analytic 6.6e-5; measured 96 / 1,200,000 =
   8.0e-5 on the valid-null scenarios. *Family level (the verdict's level):* P(at least one of 16 flagged) = P(a false
   B block of the verdict): analytic 16 p = 1.05e-3 as a union bound valid for any dependence, 1.05e-3 if independent.
-* **Measured family-level false blocks (valid nulls):** 69 false blocks in 75,000 synthetic datasets, six scenarios (table
-  below). Largest observed family rate 0.14 % (skew); largest one-sided 95 % Clopper-Pearson upper bound 0.263 % (skew,
+* **Measured family-level false blocks (valid nulls):** 69 false blocks in 75,000 synthetic datasets, six rows (five distinct
+  dependence models; factor rho 0.9 is run twice with different seeds; table below). Largest observed family rate 0.14 % (skew); largest one-sided 95 % Clopper-Pearson upper bound 0.263 % (skew,
   5,000 datasets). Wilson intervals are in the file for every row. Pooled, 69 / 75,000 = 0.092 %.
 * **Dependence scenarios (all valid null):** i.i.d.; one common factor with rho 0.5 and 0.9 across the 16 hypotheses;
   Student-t with 3 df; skewed trial statistics. Dependence between hypotheses cannot raise the union bound; the t3 and
   skew rows check the heavy-tail and asymmetry effect on the flag.
 
-| scenario | datasets | false blocks | rate | CP95 upper |
-|---|---|---|---|---|
-| iid | 20,000 | 24 | 0.120 % | 0.169 % |
-| factor rho 0.5 | 20,000 | 25 | 0.125 % | 0.175 % |
-| factor rho 0.9 | 20,000 | 6 | 0.030 % | 0.059 % |
-| Student-t 3 df | 5,000 | 5 | 0.100 % | 0.210 % |
-| skew | 5,000 | 7 | 0.140 % | 0.263 % |
-| factor rho 0.9 | 5,000 | 2 | 0.040 % | 0.126 % |
+| row | scenario | seed | datasets | false blocks | rate | CP95 upper |
+|---|---|---|---|---|---|---|
+| 1 | iid | 101 | 20,000 | 24 | 0.120 % | 0.169 % |
+| 2 | factor rho 0.5 | 102 | 20,000 | 25 | 0.125 % | 0.175 % |
+| 3 | factor rho 0.9 | 103 | 20,000 | 6 | 0.030 % | 0.059 % |
+| 4 | Student-t 3 df | 104 | 5,000 | 5 | 0.100 % | 0.210 % |
+| 5 | skew | 105 | 5,000 | 7 | 0.140 % | 0.263 % |
+| 6 | factor rho 0.9 (independent replication of row 3) | 106 | 5,000 | 2 | 0.040 % | 0.126 % |
+
+Rows 3 and 6 are the same generator setting (model `factor`, rho 0.9, 16 hypotheses x 2,000 trials) drawn from two
+different seeds (103: 20,000 datasets; 106: 5,000 datasets): an independent replication at a smaller size, not a
+duplicated row. Both are kept and both count in the 75,000 / 69 totals. Row-by-row generation notes:
+`research/v118/known_null_v3_blocker_calibration_ROWS.md`.
 
 * **Injected bias (detection of the blocker at the verdict level),** constant added to trial statistics in units of the
   trial sd, 2,000 datasets each (4 SE at n = 2,000 is 0.089 sd). One biased hypothesis of 16: 0.05 sd 3.8 %, 0.09 sd
@@ -373,5 +378,11 @@ validity, profitability, simulator realism or production readiness.
 | claim-scope wording | 3.5 | `claim_scope` | n/a | n/a |
 | artefacts reconciled; self-test required pre-signing | 10, this table | `null_validity_check.self_test_required_before_signing` | all of `test_known_null_diag.py` | n/a |
 
-The v3 runner and its configuration file do not exist yet; the right-hand column lists the keys it must carry, and the
-signature binds the final runner config.
+The v3 runner and its configuration file exist and are frozen at the candidate recorded in
+`research/v118/NULL_V3_FROZEN_IDENTITY.md` (unsigned, nothing run): runner `tools/rel06_known_null_v3.py` (with
+`tools/rel06_known_null.py`), library `python/src/iap/research/known_null_v3.py`, diagnostics
+`python/src/iap/research/known_null_diag.py` (with `known_null.py`), configuration `research/v118/known_null_v3_config.json`,
+prereg draft `research/v118/null_protocol_v3_prereg_DRAFT.json`, B calibration evidence
+`research/v118/known_null_v3_blocker_calibration.json`, and tests `python/tests/test_known_null_v3.py`,
+`python/tests/test_known_null_diag.py`. Their SHA-256 values are listed in the identity note (the single authoritative
+record); the signature binds the final protocol, runner config and code version.
