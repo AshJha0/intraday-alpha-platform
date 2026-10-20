@@ -264,6 +264,7 @@ RUNNERS = {
     "python/src/iap/research/known_null_v3.py": "verify_identity",
     "research/execution/b8v2/run_b8v2.py": "verify_identity",
     "research/execution/rel05/run_rel05.py": "verify_identity",
+    "research/v118/rel04_verify/run_rel04_verify.py": "verify_identity",
     "python/src/iap/research/rel08_screen.py": "check_identity",
     "python/src/iap/research/rel08_rule.py": "verify_identity",
     "python/src/iap/agents/prereg_gate.py": "verify_identity",
