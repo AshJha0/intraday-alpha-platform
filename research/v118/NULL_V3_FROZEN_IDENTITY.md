@@ -72,3 +72,30 @@ Fresh `git clone --no-hardlinks` checked out at `04d6b661`, Python 3.12.10, `PYT
 
 The earlier report at `3742d367` was 3894 passed, 115 skipped, 1 xfailed, 0 failed; the additional passes are the REL-04/05/04c
 tests merged to main since.
+
+## Audit close-out against merged `main` (2026-10-20, coordinator; docs only, answers reviewer conditions 1 to 3)
+
+**1. Merged main preserves the candidate.** Main `87371e13` (after PR #310). For each of the eleven items in the table above, the
+line-ending-normalised SHA-256 (`known_null_v3._norm_sha` semantics) was recomputed from `git show 04d6b661:<path>` and from
+`git show origin/main:<path>`: **all eleven are identical at both refs and equal to the table**
+(protocol 809866cb..., prereg draft 642a77a0..., config 78320d9f..., runner 766fa937..., runner base 148b2160..., library a9465d0a...,
+library base 510902c3..., diagnostics 096449c7..., tests v3 1e80795f..., tests diag 9c84e047..., calibration cfeb6a6d...).
+`git diff 04d6b661 origin/main -- python tools configs research/v118` changes only this note. The signing commit and the
+`python/src/iap` tree hash must still be recorded at signing time (see above).
+
+**2. Calibration hash and prereg coverage.** `sha256(research/v118/known_null_v3_blocker_calibration.json)` =
+`cfeb6a6d27dbacc0fc9f36232c1deb508e1016488d6cc7c160c78930c987f2ae` at the candidate and at main, equal to
+`frozen_evidence.b_blocker_calibration.sha256` in `null_protocol_v3_prereg_DRAFT.json`. The prereg signature covers it through
+`frozen_evidence`; the code-level `analysis_identity` block does not carry it (`identity_args_v3` passes no `inputs`).
+
+**3. The two test runs, side by side.**
+
+| | run A | run B |
+|---|---|---|
+| commit | `04d6b661` | `04d6b661` |
+| environment | Python 3.12.10, `PYTHONPATH=python/src`, machine heavily loaded by other sessions | Windows 11 10.0.26200, Python 3.12.10, pytest 9.1.1, pytest-xdist 3.8.0, numpy 2.4.6, pandas 3.0.6, scipy 1.17.1, `.venv-ci`, machine idle |
+| result | 3935 passed, 115 skipped, 1 xfailed, **1 failed** (`test_maker_real_parallel.py::test_parallel_unit_matches_serial_and_resumes`, worker-count assertion under load; passes alone) | 3917 passed, 123 skipped, **0 failed** (824 s) |
+
+The pass and skip counts differ because the environments differ in optional dependencies and data, so run B is a successful
+clean-checkout run in its own recorded environment, not identical validation evidence. For run B only the tail of the output was
+retained; a re-run that keeps the full log is scheduled on an idle machine and will be attached before signature.
