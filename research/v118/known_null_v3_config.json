@@ -3,7 +3,7 @@
   "alpha_diagnostic_r0": 0.05,
   "centring_invariant": {
     "n_groups": 63,
-    "note": "9 (name, horizon) pairs x 7 sessions: K3 uses AAPL+MSFT+QQQ at 1s, 10s and 1m; protocol 3.3 text says 49 (7 pairs) and omits QQQ at 10s and 1m",
+    "note": "9 (name, horizon) pairs x 7 sessions: K3 uses AAPL+MSFT+QQQ at 1s, 10s and 1m (K6/K16 add no pair); 3 horizons x 3 symbols x 7 sessions = 63; earlier protocol text said 49 in error",
     "tol_rel": 1e-09
   },
   "compute_budget_hours": 12.0,

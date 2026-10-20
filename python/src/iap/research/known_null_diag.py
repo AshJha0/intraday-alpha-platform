@@ -128,11 +128,12 @@ def check_centring_invariant(
 
 
 def verify_series_used(used: np.ndarray, centred: np.ndarray) -> bool:
-    """The array the derangement reads must be the checked centred array: bit-identical
-    (NaN equal NaN)."""
-    a = np.asarray(used, dtype=float)
-    b = np.asarray(centred, dtype=float)
-    return bool(a.shape == b.shape and np.array_equal(a, b, equal_nan=True))
+    """The array the derangement reads must be the checked centred array: bitwise identical
+    (same float64 bit pattern in every element, so -0.0 differs from 0.0 and NaN payloads
+    are compared as bits)."""
+    a = np.ascontiguousarray(np.asarray(used, dtype=np.float64))
+    b = np.ascontiguousarray(np.asarray(centred, dtype=np.float64))
+    return bool(a.shape == b.shape and np.array_equal(a.view(np.uint64), b.view(np.uint64)))
 
 
 def require_centring_invariant(result: Mapping[str, Any]) -> None:
@@ -492,6 +493,22 @@ def _synthetic_b_stats(
     return e
 
 
+def clopper_pearson_upper(k: int, n: int, conf: float = 0.95) -> float:
+    """One-sided exact (Clopper-Pearson) upper confidence bound for a binomial proportion."""
+    from scipy import stats
+
+    return 1.0 if k >= n else float(stats.beta.ppf(conf, k + 1, n - k))
+
+
+def wilson_interval(k: int, n: int, z: float = 1.959963984540054) -> list[float]:
+    """Two-sided 95 % Wilson score interval for a binomial proportion."""
+    p = k / n
+    d = 1.0 + z * z / n
+    c = (p + z * z / (2 * n)) / d
+    h = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
+    return [max(0.0, c - h), min(1.0, c + h)]
+
+
 def measure_b_blocker(
     n_reps: int,
     *,
@@ -517,6 +534,9 @@ def measure_b_blocker(
     ok_b = dict.fromkeys(cells, 0)
     ok_a0 = dict.fromkeys(cells, 0)
     fails = 0
+    hyp_flags_unbiased = 0
+    hyp_flags_biased = 0
+    n_biased = biased_hypotheses if bias_sd else 0
     for _ in range(n_reps):
         x = _synthetic_b_stats(rng, n_trials, N_HYPOTHESES, model, rho)
         if bias_sd:
@@ -526,6 +546,12 @@ def measure_b_blocker(
             ok_b, ok_a0, True, blk["blocks_pass"], {"status": "NOT_TRIGGERED"}, b_report=blk
         )
         fails += int(v["verdict"] == "FAIL" and v["reason"] == "b_flag")
+        for hid in blk["flagged_ids"]:
+            if ids.index(hid) < n_biased:
+                hyp_flags_biased += 1
+            else:
+                hyp_flags_unbiased += 1
+    n_unbiased_checks = n_reps * (N_HYPOTHESES - n_biased)
     return {
         "model": model,
         "rho": rho,
@@ -536,6 +562,15 @@ def measure_b_blocker(
         "n_hypotheses": N_HYPOTHESES,
         "verdict_b_flag_count": fails,
         "verdict_b_flag_rate": fails / n_reps,
+        "verdict_b_flag_rate_cp95_upper": clopper_pearson_upper(fails, n_reps),
+        "verdict_b_flag_rate_wilson95": wilson_interval(fails, n_reps),
+        "per_hypothesis_flags_on_unbiased": hyp_flags_unbiased,
+        "per_hypothesis_checks_on_unbiased": n_unbiased_checks,
+        "per_hypothesis_flag_rate_on_unbiased": (
+            hyp_flags_unbiased / n_unbiased_checks if n_unbiased_checks else None
+        ),
+        "per_hypothesis_flags_on_biased": hyp_flags_biased,
+        "per_hypothesis_checks_on_biased": n_reps * n_biased,
     }
 
 
