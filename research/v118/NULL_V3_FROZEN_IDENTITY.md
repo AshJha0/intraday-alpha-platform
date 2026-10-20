@@ -99,3 +99,19 @@ library base 510902c3..., diagnostics 096449c7..., tests v3 1e80795f..., tests d
 The pass and skip counts differ because the environments differ in optional dependencies and data, so run B is a successful
 clean-checkout run in its own recorded environment, not identical validation evidence. For run B only the tail of the output was
 retained; a re-run that keeps the full log is scheduled on an idle machine and will be attached before signature.
+
+## Full-log clean-checkout run on the candidate (2026-10-20 16:00 to 16:22; attached)
+Fresh clone at exactly `04d6b661b0c8d72cbf654d9e45cb6a1320a3caf9`, clean tree, `.venv-ci` (Python 3.12.10, pytest 9.1.1, xdist 3.8.0,
+numpy 2.4.6, pandas 3.0.6, scipy 1.17.1, Windows 11 10.0.26200), `pytest python/tests -n 2 -q -p no:cacheprovider -rfE`:
+**3917 passed, 123 skipped, 0 failed, 1284 s.** The machine was NOT idle: the REL-04 capture-ts re-download/ingest ran at the same
+time (recorded in the log header); the earlier load-sensitive failure (`test_maker_real_parallel.py`) did not recur.
+Complete output: `research/v118/evidence/pytest_04d6b661_full_20261020.log`, sha256 `1dc1da5833766b897b5018f3b5e986997a3b8225cb249b4515b70a169313ee31 (line endings normalised to LF)`.
+Run A (3935 passed / 1 failed, heavy load) and run B (3917 passed / 0 failed, idle) above remain on record; this third run
+is the retained-log record. Differing pass and skip counts across runs reflect differing environments (optional dependencies and data).
+
+## Signing-procedure note
+`prereg_bind_identity.py bind` writes a new prereg and does not carry `frozen_evidence` or `prior_looks` from the draft. For the
+calibration hash to be covered by the prereg signature, those two keys are copied verbatim from `null_protocol_v3_prereg_DRAFT.json`
+into the bound file between `bind` and `sign` (the signature is over the whole document; `verify_binding` ignores extra keys). The
+insertion refuses unless the normalised sha256 of `known_null_v3_blocker_calibration.json` equals the draft's value
+(`cfeb6a6d...f2ae`). The signing commit and the `python/src/iap` tree hash are recorded after signing.
