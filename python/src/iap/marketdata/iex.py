@@ -1359,9 +1359,19 @@ class IexReader:
         if self.protocol is None and self.messages_read == 0:
             raise IngestError(f"{self.path.name}: no IEX-TP DEEP / DEEP+ segment found")
 
-    def summary(self) -> dict[str, Any]:
-        """The manifest's ``iex`` block."""
+    def summary(self, capture_ts: bool = False) -> dict[str, Any]:
+        """The manifest's ``iex`` block; ``capture_ts`` (a capture-timestamp ingest) adds
+        the feed-latency summary and the provenance of the stamp."""
+        extra: dict[str, Any] = (
+            {
+                "feed_latency": self.feed_latency.summary(),
+                "capture_ts_provenance": dict(CAPTURE_TS_PROVENANCE),
+            }
+            if capture_ts
+            else {}
+        )
         return {
+            **extra,
             "protocol": None if self.protocol is None else PROTOCOL_NAMES[self.protocol],
             "message_protocol_id": self.protocol,
             "level_feed": bool(self.level_feed),
