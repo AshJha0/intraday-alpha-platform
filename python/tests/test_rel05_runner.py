@@ -310,7 +310,9 @@ def test_decision_grid_is_the_declared_regular_session_grid():
 def test_declaration_is_unsigned_and_names_a_non_signer_actor():
     assert "UNSIGNED" in DECL["status"]
     cmd = (REPO / "research/execution/rel05/run_rel05.cmd").read_bytes()
-    assert b"IAP_RUN_ACTOR=claude-queue-runner" in cmd and b"\r\n" in cmd
+    assert b"IAP_RUN_ACTOR=claude-queue-runner" in cmd
+    attrs = (REPO / ".gitattributes").read_text(encoding="utf-8")
+    assert "research/execution/rel05/*.cmd text eol=crlf" in attrs  # CRLF enforced at checkout
 
 
 def test_run_symbol_fits_on_fit_days_and_scores_each_eval_day_on_synthetic_tape():
