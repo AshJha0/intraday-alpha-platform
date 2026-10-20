@@ -34,7 +34,8 @@ carries the owner's approval sentence; nothing here contacts the network
         --date 2025-11-28 --vendor-dir data/vendor --out-root data/real/iex \\
         --symbols AAPL,MSFT,QQQ [--feed deep-plus|deep] [--download --i-have-approval] \\
         [--partition-instruments N|auto] [--engine rust] [--workers 1] [--min-free-gb 30] \\
-        [--peak-gb N] [--allow-book-divergence] [--keep-gz] [--dry-run]
+        [--peak-gb N] [--allow-book-divergence] [--keep-gz] [--dry-run] \
+        [--capture-ts  (receive_ts = capture timestamp; own --out-root, never data/real/iex)]
     python -m iap.marketdata process-iex-day ... --render-cmd data/real/run_iex_20251128.cmd \\
         [--jobs-registry data/real/jobs.json]
 
@@ -86,6 +87,32 @@ MANIFEST_SCHEMA = "iap.iex_hist.manifest/v1"
 BOOK_FEEDS = {"deep-plus": ("DEEP+", "iex-deep-plus"), "deep": ("DEEP", "iex-deep")}
 TOPS_FEED = "TOPS"
 _REPO = Path(__file__).resolve().parents[4]
+#: The A4 overlap datasets (default ingest, ``receive_ts == exchange_ts``).  A
+#: ``--capture-ts`` run (v1.18 REL-04) never writes here.
+LEGACY_IEX_ROOT = _REPO / "data" / "real" / "iex"
+
+
+def _refuse_capture_overwrite(ds: Path, out_root: Path, capture_ts: bool) -> None:
+    """A capture-timestamp run and a default run never share a dataset directory
+    (the markers would skip the ingest and the old bytes would stay): refuse the
+    legacy root, and any directory whose finished dataset has the other mode."""
+    root = Path(out_root).resolve()
+    # the repo's own root, or any checkout's data/real/iex (the data lives outside a worktree)
+    if capture_ts and (
+        root == LEGACY_IEX_ROOT.resolve() or (root.name, root.parent.name) == ("iex", "real")
+    ):
+        raise IngestError(
+            f"--capture-ts must not write to {LEGACY_IEX_ROOT} (the A4 overlap datasets); "
+            "pass another --out-root"
+        )
+    man = ds / "dataset.json"
+    if man.is_file():
+        have = (json.loads(man.read_text(encoding="utf-8")).get("source") or {}).get("receive_ts")
+        if have != ("iex_capture" if capture_ts else None):
+            raise IngestError(
+                f"{ds} holds a dataset ingested {'without' if capture_ts else 'with'} capture "
+                "timestamps; refusing to overwrite it - use another --out-root"
+            )
 
 
 def load_iex_manifest(path: str | Path) -> dict:
@@ -154,6 +181,7 @@ def process_iex_day(
     allow_book_divergence: bool = False,
     round_lots: dict[str, int] | None = None,
     slim: bool = True,
+    capture_ts: bool = False,
     dry_run: bool = False,
     log: Callable[[str], None] | None = None,
     python: str = sys.executable,
@@ -161,6 +189,8 @@ def process_iex_day(
 ) -> dict:
     """Run the chain for one IEX HIST day (module docs); returns the report.
 
+    ``capture_ts`` (v1.18 REL-04) ingests the capture host's packet timestamp as
+    ``receive_ts`` (``iex.CAPTURE_TS_PROVENANCE``); it needs its own ``out_root``.
     ``run`` / ``python`` are the subprocess seam (tests inject a fake)."""
     say = log or (lambda line: print(line, flush=True))
     if feed not in BOOK_FEEDS:
@@ -182,6 +212,7 @@ def process_iex_day(
     tops_file = vendor_dir / tops_entry["file"]
     book_file = vendor_dir / book_entry["file"]
     ds = Path(out_root) / f"iex_{date.replace('-', '')}"
+    _refuse_capture_overwrite(ds, Path(out_root), capture_ts)
     extract = _marker(ds, "").parent / f"{date.replace('-', '')}{TOPS_EXTRACT_SUFFIX}"
     report: dict = {
         "date": date,
@@ -199,6 +230,7 @@ def process_iex_day(
         "round_lots": dict(round_lots or {}),
         "round_lots_source": "nasdaq_dataset" if round_lots else None,
         "keep_normalized": keep_normalized,
+        "capture_ts": capture_ts,
         "steps": [],
         "dry_run": dry_run,
     }
@@ -364,6 +396,7 @@ def process_iex_day(
                 progress=say,
                 slim=slim,
                 round_lots=lots,
+                capture_ts=capture_ts,
             )
         except BookDivergenceError as exc:
             (ds.parent / f"{ds.name}.markers" / "book_divergence.json").write_text(
@@ -378,6 +411,7 @@ def process_iex_day(
             "events": session["raw"].get("events"),
             "messages": msgs.get("total"),
             "iex": msgs.get("iex"),
+            "feed_latency": (msgs.get("iex") or {}).get("feed_latency"),
             "book_verification": {
                 s: {k: r.get(k) for k in ("status", "compared", "mismatched")}
                 for s, r in ver.items()
@@ -650,6 +684,12 @@ def main(argv: list[str] | None = None) -> int:
         help="dataset.json of the paired Nasdaq day: its universe lot_size per symbol",
     )
     p.add_argument("--no-slim", action="store_true")
+    p.add_argument(
+        "--capture-ts",
+        action="store_true",
+        help="write the capture host's packet timestamp as receive_ts (v1.18 REL-04); needs an "
+        "--out-root other than data/real/iex",
+    )
     p.add_argument("--dry-run", action="store_true", help="disk guard and the plan only")
     p.add_argument("--render-cmd", default=None, help="write the detached .cmd chain and exit")
     p.add_argument("--jobs-registry", default=None, help="with --render-cmd: watchdog entry")
@@ -684,6 +724,8 @@ def main(argv: list[str] | None = None) -> int:
                 extra.append(f"--peak-gb {a.peak_gb:g}")
             if a.no_slim:
                 extra.append("--no-slim")
+            if a.capture_ts:
+                extra.append("--capture-ts")
             text = render_iex_wrapper(
                 python_dir=a.python_dir,
                 manifest=str(Path(a.manifest).resolve()),
@@ -724,6 +766,7 @@ def main(argv: list[str] | None = None) -> int:
             allow_book_divergence=a.allow_book_divergence,
             round_lots=round_lots_from_dataset(a.round_lots_from) if a.round_lots_from else None,
             slim=not a.no_slim,
+            capture_ts=a.capture_ts,
             dry_run=a.dry_run,
         )
         print(json.dumps(report, indent=2, sort_keys=True))
