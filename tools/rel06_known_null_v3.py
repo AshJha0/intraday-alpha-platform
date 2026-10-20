@@ -212,7 +212,29 @@ def calibration_report(out: Path) -> dict[str, Any]:
         for nb in (1, 16)
         for b in (0.05, 0.09, 0.15, 0.20)
     ]
+    worst = max(fa, key=lambda r: r["verdict_b_flag_rate_cp95_upper"])
     doc = {
+        "summary": {
+            "level": "family: P(at least one of the 16 hypotheses flagged) = P(B blocker fires "
+            "and the verdict is FAIL b_flag); per-hypothesis: P(one given hypothesis flagged)",
+            "false_flag_scenarios": len(fa),
+            "total_valid_null_datasets": sum(r["n_reps"] for r in fa),
+            "total_false_blocks": sum(r["verdict_b_flag_count"] for r in fa),
+            "max_family_rate_observed": max(r["verdict_b_flag_rate"] for r in fa),
+            "max_family_rate_cp95_upper": worst["verdict_b_flag_rate_cp95_upper"],
+            "max_family_rate_cp95_upper_scenario": {
+                k: worst[k] for k in ("model", "rho", "n_reps")
+            },
+            "per_hypothesis_flags": sum(r["per_hypothesis_flags_on_unbiased"] for r in fa),
+            "per_hypothesis_checks": sum(r["per_hypothesis_checks_on_unbiased"] for r in fa),
+            "dependence_scenarios": "iid; one-factor rho 0.5 and 0.9; Student-t df 3; skewed; "
+            "every scenario is a valid null with unit trial sd and 2000 independent trials",
+            "injected_bias_units": "bias_sd = constant added to the per-trial statistic of the "
+            "first `biased_hypotheses` hypotheses, in units of the trial sd (4 SE at 2000 trials "
+            "is 0.089 sd); detection rate = verdict_b_flag_rate of that row",
+            "limit": "synthetic: shows the aggregation arithmetic and detection size of the "
+            "blocker, not that real generator B output is unbiased",
+        },
         "what": "false flags and detection of the generator B residual-mean blocker, measured "
         "through b_residual_blocker + primary_verdict (the runner's own path), 16 hypotheses x "
         "2000 independent trials per dataset; verdict_b_flag_rate = P(at least one false flag "

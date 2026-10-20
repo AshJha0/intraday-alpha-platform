@@ -44,7 +44,13 @@ def test_frozen_config_validates_and_matches_protocol_values(cfg) -> None:
 
 def test_centring_groups_derived_from_hypothesis_lists_is_63_not_49(cfg) -> None:
     """K3 uses AAPL+MSFT+QQQ at 1s, 10s and 1m: 9 pairs x 7 sessions.  The protocol text
-    says 49 (7 pairs); the configuration carries the derived 63 and the validator refuses 49."""
+    said 49 (7 pairs, a counting error); the configuration carries the derived 63 and the
+    validator refuses 49."""
+    pairs = {
+        (h["horizon"], sym) for fam in cfg["variants"].values() for h in fam for sym in h["symbols"]
+    }
+    assert pairs == {(hz, s) for hz in ("1s", "10s", "1m") for s in ("AAPL", "MSFT", "QQQ")}
+    assert len(pairs) * len(cfg["dataset"]["sessions"]) == 63
     assert v3.n_required_groups(cfg) == 63 == cfg["centring_invariant"]["n_groups"]
     bad = copy.deepcopy(cfg)
     bad["centring_invariant"]["n_groups"] = 49

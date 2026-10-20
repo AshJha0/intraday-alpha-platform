@@ -210,6 +210,21 @@ def test_nan_rows_do_not_enter_the_mean_and_series_used_check() -> None:
     assert d.verify_series_used(c.copy(), c)
     assert not d.verify_series_used(raw, c)
     assert not d.verify_series_used(c[:-1], c)
+    # value-equal but not bitwise identical: -0.0 vs 0.0, and different NaN payloads
+    z = np.array([0.0, 1.0])
+    assert d.verify_series_used(z.copy(), z)
+    assert not d.verify_series_used(np.array([-0.0, 1.0]), z)
+    nan2 = np.array([np.nan]).view(np.uint64) ^ np.uint64(1)
+    assert not d.verify_series_used(nan2.view(np.float64), np.array([np.nan]))
+
+
+def test_blocker_measure_reports_bounds_and_per_hypothesis_counts() -> None:
+    r = d.measure_b_blocker(40, seed=3)
+    assert r["per_hypothesis_checks_on_unbiased"] == 40 * 16
+    assert 0.0 <= r["verdict_b_flag_rate"] <= r["verdict_b_flag_rate_cp95_upper"] <= 1.0
+    lo, hi = r["verdict_b_flag_rate_wilson95"]
+    assert 0.0 <= lo <= hi <= 1.0
+    assert d.clopper_pearson_upper(0, 20000) == pytest.approx(1 - 0.05 ** (1 / 20000), rel=1e-3)
 
 
 # ------------------------------------------------------------------ B style --

@@ -102,9 +102,13 @@ interpretation.
 `require_centring_invariant` in `iap.research.known_null_diag`).**
 
 * **Groups:** every (name, horizon, session) with (name, horizon) in the pairs used by the frozen hypothesis lists
-  (`variants` K3, K6, K16 of `known_null_v2_config.json`; the v3 runner config carries the same lists): 1s x
-  {AAPL, MSFT, QQQ}, 10s x {AAPL, MSFT}, 1m x {AAPL, MSFT} = 7 pairs x 7 sessions = **49 groups**. The runner derives
-  the list from the config and asserts the count of 49.
+  (`variants` K3, K6, K16 of the v3 runner config, which carries the same lists as `known_null_v2_config.json`). Derived
+  from the lists, not chosen: K3 has one hypothesis per horizon 1s, 10s, 1m, each on AAPL+MSFT+QQQ, so each of the three
+  horizons needs all three symbols; K6 and K16 (AAPL and MSFT single-symbol hypotheses at 10s and 1m, nested in K16)
+  add no pair beyond these. That is 3 horizons x {AAPL, MSFT, QQQ} = **9 (name, horizon) pairs x 7 sessions = 63
+  groups**. (Revisions up to 4 said 49 = 7 pairs, omitting QQQ at 10s and 1m, which K3 uses; that was a counting error.)
+  The runner derives the list from the config (`required_pairs`, `n_required_groups`), asserts the count of 63 against
+  `centring_invariant.n_groups`, and refuses a configuration that says 49.
 * **When:** on the centred label arrays, **before** the derangement is applied, once per run (centring is
   deterministic).
 * **Rule:** the mean of the finite labels of the group must satisfy |mean| <= 1e-9 x max|label in group| (relative
@@ -113,7 +117,7 @@ interpretation.
 * **Empty or invalid groups:** a required group with no finite label, or any infinite label, **fails**; a missing
   group is never skipped.
 * **Verification that the centred series is the one used:** `verify_series_used` requires the array the derangement
-  reads to be bit-identical (NaN equal NaN) to the array that passed the check; the runner asserts it for every
+  reads to be bitwise identical (every float64 bit pattern equal, so -0.0 differs from 0.0; compared as uint64) to the array that passed the check; the runner asserts it for every
   horizon.
 * **Consequence of failure:** a **construction / implementation failure**: the run aborts
   (`CentringInvariantError`), or if already complete, the A0 run is **INVALID** (verdict INVALID, not FAIL, no A0
@@ -133,14 +137,14 @@ interpretation.
 * **Role.** **A0:** the flag and the per-hypothesis means and t are **reported only**; no verdict, no "NULL BIASED",
   no invalidation, no effect on the primary outcome. **B:** unchanged from revision 3: a flag means "residual mean bias
   detected: generator B reported NULL BIASED, no PASS" (B's SE is the valid independent-trials SE and the B false-flag
-  rate is 1e-5). *This B handling is stated explicitly because the reviewer's third decision demoted only A0's flag; it
+  rate is about 7e-5 per hypothesis (analytic 6.6e-5) and about 0.1 % for at least one of the 16, see the family-level calibration below). *This B handling is stated explicitly because the reviewer's third decision demoted only A0's flag; it
   is put to the reviewer for confirmation before signing.* A pass of the diagnostic does **not** certify exchangeability,
   dependence structure, tail behaviour, or the validity of the inference.
 * **Synthetic self-test (implemented, `python/tests/test_known_null_diag.py`, module `iap.research.known_null_diag`;
   seeded synthetic data, no real data).** The calculation, the bias detection and the valid-null false-flag rate are
   tested **separately** for the B style (independent N(0,1) trial statistics, 2,000 per dataset) and the A0 style
   (all 1,854 derangements of a synthetic 7 x 7 payoff matrix M[i, j], decision session i with label session j). Measured:
-  * *B, valid null:* 1e-5 over 100,000 datasets (0 of 20,000 in the test); below 0.1 %.
+  * *B, valid null, per hypothesis:* analytic 6.6e-5 (Student t, 1,999 df, |t| > 4); measured 96 flags in 1,200,000 hypothesis checks (8e-5). **Family level (the verdict's level, P(at least one of 16 flagged), through the runner's own `b_residual_blocker` + `primary_verdict` path):** see `research/v118/known_null_v3_blocker_calibration.json` and section 3.3a below.
   * *B, bias detection* (bias in trial sd): 0.05 sd flagged 4 %, 0.09 sd 52 %, 0.15 sd 99.7 %, 0.20 sd 100 %.
   * *A0, valid null, i.i.d. entries (dependence only from derangement reuse of 49 entries):* 0.22 % over 20,000
     datasets (seed 11). **This is above 0.1 %**; the < 0.1 % claim is therefore not supported even for the benign dependence.
@@ -151,6 +155,42 @@ interpretation.
   The A0 flag is thus only a coarse screen for large bias with an uncalibrated false-flag probability (0.2 % to 35 %
   across the two dependence models). **These results are the reason the A0 flag was demoted in revision 4** and stay in
   the audit trail; the self-test is a required pre-signing check that must pass on the exact code to be signed.
+
+### 3.3a B blocker calibration at the verdict's level (family level; synthetic; no market data)
+
+Source: `research/v118/known_null_v3_blocker_calibration.json`, regenerated by
+`tools/rel06_known_null_v3.py --blocker-calibration OUT`, which calls `diag.measure_b_blocker`: per synthetic B dataset
+of 16 hypotheses x 2,000 independent trials it runs the runner's own `b_residual_blocker` (same S2 statistic, SE =
+sd/sqrt(2,000), |t| > 4, "any of the 16" aggregation) and then `primary_verdict` with every rate cell passing, and counts
+verdicts that are FAIL with reason `b_flag`. Seeds as in the file; no threshold changed.
+
+* **Rates distinguished.** *Per hypothesis:* P(one given hypothesis flagged): analytic 6.6e-5; measured 96 / 1,200,000 =
+  8.0e-5 on the valid-null scenarios. *Family level (the verdict's level):* P(at least one of 16 flagged) = P(a false
+  B block of the verdict): analytic 16 p = 1.05e-3 as a union bound valid for any dependence, 1.05e-3 if independent.
+* **Measured family-level false blocks (valid nulls):** 69 false blocks in 75,000 synthetic datasets, six scenarios (table
+  below). Largest observed family rate 0.14 % (skew); largest one-sided 95 % Clopper-Pearson upper bound 0.263 % (skew,
+  5,000 datasets). Wilson intervals are in the file for every row. Pooled, 69 / 75,000 = 0.092 %.
+* **Dependence scenarios (all valid null):** i.i.d.; one common factor with rho 0.5 and 0.9 across the 16 hypotheses;
+  Student-t with 3 df; skewed trial statistics. Dependence between hypotheses cannot raise the union bound; the t3 and
+  skew rows check the heavy-tail and asymmetry effect on the flag.
+
+| scenario | datasets | false blocks | rate | CP95 upper |
+|---|---|---|---|---|
+| iid | 20,000 | 24 | 0.120 % | 0.169 % |
+| factor rho 0.5 | 20,000 | 25 | 0.125 % | 0.175 % |
+| factor rho 0.9 | 20,000 | 6 | 0.030 % | 0.059 % |
+| Student-t 3 df | 5,000 | 5 | 0.100 % | 0.210 % |
+| skew | 5,000 | 7 | 0.140 % | 0.263 % |
+| factor rho 0.9 | 5,000 | 2 | 0.040 % | 0.126 % |
+
+* **Injected bias (detection of the blocker at the verdict level),** constant added to trial statistics in units of the
+  trial sd, 2,000 datasets each (4 SE at n = 2,000 is 0.089 sd). One biased hypothesis of 16: 0.05 sd 3.8 %, 0.09 sd
+  49 %, 0.15 sd 99.6 %, 0.20 sd 100 %. All 16 biased: 0.05 sd 46 %, 0.09 sd and above 100 %.
+* **What the blocker does and does not show.** It detects a mean of the S2 session-mean statistic across B trials more
+  than 4 SE from zero in at least one hypothesis. A non-flag is not proof of unbiasedness; it says nothing on dependence,
+  tails or inference validity, and biases below about 0.05 sd are mostly undetected. These are synthetic checks of the
+  aggregation arithmetic and detection size, not evidence about real generator B output.
+* **Outcomes.** B flag: no PASS (FAIL, `b_flag`); B no flag: proceed to the rate rule; A0 flag: descriptive only.
 
 ### 3.4 A0 interpretation gate (explicit; applies to the A0 cells only; interpretive, not a significance test)
 
@@ -322,7 +362,7 @@ validity, profitability, simulator realism or production readiness.
 |---|---|---|---|---|
 | A0 residual-mean flag demoted to descriptive, no NULL BIASED | 3.3 Role | `null_validity_check.a0_role`, `.outcome_on_flag` | `primary_verdict` has no A0-flag argument; `test_verdict_*` | `residual_mean.a0_role = "descriptive"` |
 | B flag keeps blocking PASS (point to confirm) | 3.3 Role | `null_validity_check.b_role` | `primary_verdict(b_residual_flag)`; `test_missing_cell_fails_and_b_flag_blocks_pass` | `residual_mean.b_role = "blocks_pass"` |
-| exact centring invariant (tolerance, 49 groups, empty/invalid, series used, INVALID not FAIL) | 3.3 | `centring_invariant` | `check_centring_invariant`, `verify_series_used`, `require_centring_invariant`; `test_centring_*`, `test_nan_rows_*`, `test_required_names_*` | `centring_invariant.tol_rel = 1e-9`, `.n_groups = 49` |
+| exact centring invariant (tolerance, 63 groups, empty/invalid, series used, INVALID not FAIL) | 3.3 | `centring_invariant` | `check_centring_invariant`, `verify_series_used`, `require_centring_invariant`; `test_centring_*`, `test_nan_rows_*`, `test_required_names_*`, `test_centring_groups_derived_*` | `centring_invariant.tol_rel = 1e-9`, `.n_groups = 63` |
 | reviewer 3.3 wording | 3.3 first paragraph | `centring_invariant.meaning` | n/a | n/a |
 | m defined, S2 only | 3.4 | `a0_interpretation_gate.m`, `.statistic` | `understatement_ratio` docstring | `gate.statistic = "S2"` |
 | frozen 16-hypothesis list | 3.4 | `a0_interpretation_gate.hypothesis_set` | `lost_difficulty(expected_ids)`; `test_frozen_hypothesis_list_*`, `test_gate_missing_*` | `variants.K16` |
