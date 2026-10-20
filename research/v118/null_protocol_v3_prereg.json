@@ -1,0 +1,196 @@
+{
+  "analysis_identity": {
+    "code_tree_sha256": "16e1a540cf225a6f2c891120c9076b3c82a1e3d80f65589db396490cc6c3e88a",
+    "commit": "c2b34296f392f3b1fdf993d0893e6e13d45c939e",
+    "configs_tree_sha256": "290b38d8871961c28e81db59ca9cf95791a213acd33461d667de873b907ad7b0",
+    "data_versions": [
+      "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+    ],
+    "deps_lock_sha256": "2f68340d1a5c28871356287b00f5af907dd94f429c2551dac5cee0a3a114c18e",
+    "environment": {
+      "attrs": "26.1.0",
+      "cffi": "2.1.1",
+      "cloudpickle": "3.1.2",
+      "coverage[toml]": "absent",
+      "cryptography": "50.0.2",
+      "databento-dbn": "0.71.0",
+      "execnet": "2.1.2",
+      "hypothesis": "absent",
+      "iniconfig": "2.3.1",
+      "joblib": "1.6.0",
+      "jsonschema": "4.26.0",
+      "jsonschema-specifications": "2025.9.1",
+      "narwhals": "2.26.0",
+      "numpy": "2.4.6",
+      "packaging": "26.3",
+      "pandas": "3.0.6",
+      "pluggy": "1.6.0",
+      "pyarrow": "25.0.1",
+      "pycparser": "3.0",
+      "pygments": "2.21.0",
+      "pytest": "9.1.1",
+      "pytest-cov": "7.1.0",
+      "pytest-xdist": "3.8.0",
+      "python-dateutil": "2.9.0.post0",
+      "pyyaml": "6.0.3",
+      "referencing": "0.37.0",
+      "rpds-py": "2026.9.1",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.17.1",
+      "six": "1.17.0",
+      "sortedcontainers": "absent",
+      "threadpoolctl": "3.7.0",
+      "typing-extensions": "4.16.0"
+    },
+    "family": "REL-06 known-null v3: K16 (K=16), K3 (K=3), K6 (K=6); hypotheses sha256 6c280093f5d3b7c319100faa284881d8c094c3d6c264895dfe0ff21abba691b5",
+    "identity_version": 2,
+    "inputs": {},
+    "interpreter": "cpython-3.12.10",
+    "metrics": [
+      "a0_conditional_rejection_count_family",
+      "b_rejection_rate_family",
+      "cr1_se_student_t",
+      "gate_understatement_ratio_s2",
+      "residual_mean_s2",
+      "wild_cluster_webb_full_enumeration_p"
+    ],
+    "reference_tree_sha256": "9020e008efdb1ac41015cea4c31f8b9e4cb65a1324db0a42224cb2a22f18fa88",
+    "scripts": {
+      "python/src/iap/research/known_null.py": "510902c3bd05a87b91ef948172da528921cd24f94dc05c8e3e58bc509d7737c0",
+      "python/src/iap/research/known_null_diag.py": "096449c7974e516286b947ce48a41f52c7b449d9d2cc006304235ddae01460c2",
+      "python/src/iap/research/known_null_v3.py": "a9465d0a23724ada9a25c3146e67d8cc2e13ce1ce7a42bd8ede52cd560726cf1",
+      "research/v118/NULL_PROTOCOL_v3.md": "809866cb093eb6ea464987e859f37bb78ed0d2f3207255ad3af5c90a72f1ccab",
+      "research/v118/known_null_v3_config.json": "78320d9f826546e098ce360415c50dacc7ae99631842d58c4dbd05429002d244",
+      "tools/rel06_known_null.py": "148b21605ed562fd4b8613e5b2201f6f90f47f266b1ee73c76b10f906c35f4ad",
+      "tools/rel06_known_null_v3.py": "766fa937384aec59b39728ac2252766a41fdca912314af5c908bbf9f3797afc5"
+    },
+    "thresholds": {
+      "alpha": 0.025,
+      "alpha_diagnostic_r0": 0.05,
+      "centring_invariant": {
+        "n_groups": 63,
+        "note": "9 (name, horizon) pairs x 7 sessions: K3 uses AAPL+MSFT+QQQ at 1s, 10s and 1m (K6/K16 add no pair); 3 horizons x 3 symbols x 7 sessions = 63; earlier protocol text said 49 in error",
+        "tol_rel": 1e-09
+      },
+      "compute_budget_hours": 12.0,
+      "configuration": {
+        "cost_multiplier": 1.0,
+        "embargo_ns": 60000000000,
+        "flatten_at_session_end": true,
+        "latency_ns": 1000000000,
+        "max_decision_age_ns": 60000000000,
+        "methods": "v2",
+        "n_folds": 4
+      },
+      "execution": {
+        "adv_table": "session",
+        "impact_exponent": 1.0,
+        "impact_model": "parent",
+        "regulatory_fees": true,
+        "venue_id": 101
+      },
+      "gate": {
+        "labels": {
+          "not_triggered": "PASS (B on the repeated-simulation process; A0 as a conditional randomisation diagnostic on these seven sessions)",
+          "triggered_or_undetermined": "PASS (B-supported only; A0 non-informative)"
+        },
+        "median_threshold": 1.0,
+        "n_hypotheses": 16,
+        "statistic": "S2"
+      },
+      "pass_rule": {
+        "A0_max_count": 55,
+        "B_max_count": 60,
+        "flag_upper_below": 0.02
+      },
+      "power_arm": {
+        "common_random_numbers": "each trial's null labels are evaluated at every delta",
+        "delta_bps_per_trip": [
+          0.5,
+          1.0,
+          2.0,
+          4.0
+        ],
+        "generators": {
+          "A0": {
+            "base_seed": 20270103
+          },
+          "B": {
+            "base_seed": 20270104
+          }
+        },
+        "n_trials": 200,
+        "pass_rule": null,
+        "planted": "first hypothesis of each registered family"
+      },
+      "registered_size_shares": 100,
+      "residual_mean": {
+        "a0_n_eff": 7,
+        "a0_role": "descriptive",
+        "aggregation": "B: blocks PASS if ANY of the 16 K16 hypotheses is flagged or cannot be checked",
+        "b_role": "blocks_pass",
+        "flag_se": 4,
+        "statistic": "S2"
+      },
+      "size_arm": {
+        "A0": {
+          "base_seed": 20270101,
+          "draw": "all derangements of the 7 sessions, lexicographic, once each",
+          "n_trials": 1854
+        },
+        "A_v2": {
+          "base_seed": 20270105,
+          "label": "reproduction of the v2 failure mechanism; strictly diagnostic, no pass rule",
+          "n_trials": 500
+        },
+        "B": {
+          "base_seed": 20270102,
+          "n_trials": 2000
+        }
+      },
+      "statistics": {
+        "S1": "net_recentred",
+        "S2": "gross"
+      }
+    }
+  },
+  "bound_utc": "2026-10-20T16:53:27+00:00",
+  "frozen_evidence": {
+    "b_blocker_calibration": {
+      "hash": "known_null_v3._norm_sha (line-ending normalised)",
+      "note": "synthetic, no market data; six rows = five distinct models, factor rho 0.9 run twice (seeds 103, 106); row ids in research/v118/known_null_v3_blocker_calibration_ROWS.md. Bound here by the prereg signature; the code-level identity (analysis_identity) does not carry it because binding it would need a change to identity_args_v3.",
+      "path": "research/v118/known_null_v3_blocker_calibration.json",
+      "sha256": "cfeb6a6d27dbacc0fc9f36232c1deb508e1016488d6cc7c160c78930c987f2ae"
+    }
+  },
+  "kind": "analysis_prereg",
+  "prereg_id": "research/v118/null_protocol_v3_prereg.json",
+  "prior_looks": [
+    {
+      "date": "2026-10-18",
+      "id": "null_protocol_prereg.json (v1)",
+      "result": "PASS, size untested (cost-dominated null)"
+    },
+    {
+      "commit_bound": "ee7d86b58b71901d02c2b3dbec39d3016743a24e",
+      "date": "2026-10-19",
+      "id": "null_protocol_v2_prereg.json (v2)",
+      "result": "FAIL, 7 of 12 family cells (research/v118/KNOWN_NULL_V2_RESULT.md)"
+    }
+  ],
+  "protocol": "research/v118/NULL_PROTOCOL_v3.md",
+  "protocol_sha256": "809866cb093eb6ea464987e859f37bb78ed0d2f3207255ad3af5c90a72f1ccab",
+  "signature": {
+    "maintainer": "ashjha0",
+    "message": "iap.agents.blackboard.canonical(this document without 'signature')",
+    "message_sha256": "26c1d19b96d8e62b4d970b1549cb980824cfeb26f2757da0a250c2be594c11d4",
+    "public_key": "02a3e278cda3efac7dcd266fb8a3821a1415f0725a73f8b255aac84083c2106c",
+    "scheme": "ed25519",
+    "sig": "d2f69fa1719291383de0d637f740f88f0b3722a6967d8850ffc4684dceea86be67d17293ab38e463dcab8b01553b44da7216c8c77b1665fc51b5a7d5cfeafd08",
+    "trust_root": "research/agents/trust_roots.json"
+  },
+  "signed": true,
+  "signed_utc": "2026-10-20T16:53:34+00:00",
+  "status": "SIGNED: the analysis identity is bound; edits void the signature",
+  "x-version": 1
+}
