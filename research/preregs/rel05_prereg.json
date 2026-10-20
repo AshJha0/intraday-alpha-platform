@@ -137,7 +137,17 @@
   "prereg_id": "research/preregs/rel05_prereg.json",
   "protocol": "research/execution/rel05/PREDECLARATION.md",
   "protocol_sha256": "07b323bdb91a5b1d49e69ef9690ca9c6a4b800ab5b7251f85ff84bcc12b2c36a",
-  "signed": false,
-  "status": "DRAFT: analysis identity bound, NOT signed",
+  "signature": {
+    "maintainer": "ashjha0",
+    "message": "iap.agents.blackboard.canonical(this document without 'signature')",
+    "message_sha256": "4d2e4b4e150078d858d4de2290782ab53faea89abe420b6ec328173fe7468651",
+    "public_key": "02a3e278cda3efac7dcd266fb8a3821a1415f0725a73f8b255aac84083c2106c",
+    "scheme": "ed25519",
+    "sig": "a8150cfb81ca66c7ff9a958570d8e589186bdc945d758be1406a0fcc9c61da4d98949b2e2db7a1ae2a90239ab44afdb60299f056cb30681021528a1eec2e5100",
+    "trust_root": "research/agents/trust_roots.json"
+  },
+  "signed": true,
+  "signed_utc": "2026-10-20T11:37:29+00:00",
+  "status": "SIGNED: the analysis identity is bound; edits void the signature",
   "x-version": 1
 }
