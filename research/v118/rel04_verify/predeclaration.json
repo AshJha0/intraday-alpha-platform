@@ -1,0 +1,128 @@
+{
+  "x-version": 1,
+  "kind": "rel04_capts_verify_predeclaration",
+  "id": "REL-04 capture-ts verification",
+  "protocol": "research/v118/rel04_verify/PREDECLARATION.md",
+  "prereg": "research/preregs/rel04_capts_verify_prereg.json",
+  "status": "DRAFT: proposed by a code session, UNSIGNED, not run, capts dataset versions NOT yet pinned (null). Becomes binding only when the coordinator has pinned them (run_rel04_verify.py pin), applied the registry edit, bound and signed the prereg.",
+  "days": {
+    "2025-11-28": {
+      "iex_dir": "iex/iex_20251128",
+      "iex_dataset_version": "f977bb3a39d16557c79ae6fbc9303a69317fdcc19d0e7f4162d1a06a9120ec79",
+      "capts_dir": "iex_capts/iex_20251128",
+      "capts_dataset_version": null
+    },
+    "2025-12-08": {
+      "iex_dir": "iex/iex_20251208",
+      "iex_dataset_version": "6c94942ab59df29f8b93cc20e6526e6794affd0b9f2851eeb00cb1c2fef1a1e6",
+      "capts_dir": "iex_capts/iex_20251208",
+      "capts_dataset_version": null
+    },
+    "2025-12-09": {
+      "iex_dir": "iex/iex_20251209",
+      "iex_dataset_version": "9517c4efa19b32fd3632ee04782c5d0c07f390e5e27e3618dd2533aa90d0938c",
+      "capts_dir": "iex_capts/iex_20251209",
+      "capts_dataset_version": null
+    },
+    "2025-12-10": {
+      "iex_dir": "iex/iex_20251210",
+      "iex_dataset_version": "33d0cbe8a6601850472f584a919b98211dd1841af6667b4cd6faf22c51ffc157",
+      "capts_dir": "iex_capts/iex_20251210",
+      "capts_dataset_version": null
+    },
+    "2026-05-15": {
+      "iex_dir": "iex/iex_20260515",
+      "iex_dataset_version": "bd6f9c707d898007ca281ff093602176c39ac1cf45e0894808e7d1f14bdd3904",
+      "capts_dir": "iex_capts/iex_20260515",
+      "capts_dataset_version": null
+    },
+    "2026-05-18": {
+      "iex_dir": "iex/iex_20260518",
+      "iex_dataset_version": "ba2022d0d53c013be27f9b3ce6eeef13baa4280009ef32f6c2761b43e61037f4",
+      "capts_dir": "iex_capts/iex_20260518",
+      "capts_dataset_version": null
+    }
+  },
+  "symbols": [
+    "AAPL",
+    "MSFT",
+    "QQQ"
+  ],
+  "identity": {
+    "reference": "iex_dir (the receive_ts == exchange_ts ingest)",
+    "candidate": "capts_dir (the --capture-ts ingest)",
+    "file": "normalized/events.parquet",
+    "chunk_rows": 2000000,
+    "must_be_identical": "every column of events.parquet except receive_ts, row for row in file order, same schema, same row count",
+    "receive_ts": "may differ; must be >= exchange_ts in every candidate row; must differ from the reference in at least one row; dataset.json source.receive_ts must be 'iex_capture'",
+    "max_examples_per_column": 5
+  },
+  "features": {
+    "runs_only_if": "identity passes on all six days",
+    "module": "iap.features",
+    "engine": "rust",
+    "workers": 1,
+    "args": "exactly the process-iex-day features step: --data-dir <ds>/normalized --out-dir <ds>/features --configs <ds>/configs --registry-out <ds>/features/feature_registry.json --workers 1 --engine rust; every other iap.features option at its default",
+    "log": "<ds>/features.log",
+    "not_done_here": "the keep and delete steps of process-iex-day (KEEP.json, normalized clean-up) are not run; the normalized files stay"
+  },
+  "latency": {
+    "source": "dataset.json sessions[day].messages.iex.feed_latency and sessions[day].raw.capture_ts_* counters; no event is read",
+    "fields": [
+      "n",
+      "negative",
+      "negative_share",
+      "mean_ns",
+      "min_ns",
+      "max_ns",
+      "log2_histogram",
+      "approx_p50_log2_bucket",
+      "approx_p99_log2_bucket",
+      "capture_ts_before_exchange",
+      "capture_ts_absent"
+    ],
+    "interpretation": "within-capture differences only: the capture clock offset to IEX's send clock is unknown (iex.CAPTURE_TS_PROVENANCE)"
+  },
+  "statistics": {
+    "family": "deterministic identity check and descriptive summary; no hypothesis test",
+    "family_k": 0,
+    "inference": "none: no p-value, interval or comparison across days is claimed; counts are exact"
+  },
+  "decision_rule": {
+    "day_passes": "row counts equal AND schema equal AND zero mismatching rows in every non-receive_ts column AND zero candidate rows with receive_ts < exchange_ts AND at least one candidate row with receive_ts != reference receive_ts AND dataset.json source.receive_ts == 'iex_capture'",
+    "identity": "pass only if all six days pass; otherwise fail",
+    "on_fail": "features are not built; the mismatches are reported as found; the capture-ts datasets are not used downstream until the cause is understood (a fix is a new declaration)"
+  },
+  "stop_rules": {
+    "refuse": [
+      "prereg unsigned, identity mismatch, runner is the signer, or a signing key in the environment",
+      "a capts_dataset_version still null, or the dataset on disk differs from a declared version",
+      "any of the twelve datasets missing, unregistered, not listed in the registry datasets as spent, or not authorised for this prereg id by the guard",
+      "a result file of this run already exists (one run only)"
+    ],
+    "abort": [
+      "available RAM below min_free_ram_gb or free disk below min_free_disk_gb at start",
+      "iap.features exits non-zero on a day: that day's log is kept, the run stops, nothing is retried"
+    ],
+    "no_rerun": "one run; a parameter change is a new declaration, never a retry",
+    "min_free_ram_gb": 8.0,
+    "min_free_disk_gb": 20.0
+  },
+  "claims": {
+    "can_claim": [
+      "on six IEX overlap days the capture-timestamp ingest changed receive_ts and nothing else in events.parquet (or exactly which columns and rows differ)",
+      "the recorded within-capture feed-latency distribution per day, as a descriptive count summary",
+      "features for the six capture-timestamp datasets exist, built by the declared command"
+    ],
+    "cannot_claim": [
+      "the absolute IEX feed latency: the capture clock's source and its offset to IEX's send clock are unknown (iex.CAPTURE_TS_PROVENANCE)",
+      "the skew against any Nasdaq stamp",
+      "that negative latencies are errors or that positive ones are physical delays",
+      "any signal, edge, fill or profit result, any holdout result, any significance"
+    ]
+  },
+  "reproducibility": {
+    "seed": null,
+    "note": "no random draws; same inputs give byte-identical JSON"
+  }
+}
