@@ -121,6 +121,8 @@ HALF_PENNY_GUARD_FRACTION = 0.01
 HALF_PENNY_GUARD_MIN_ORDERS = 100
 
 _SPOOL = struct.Struct("<HqBBqqQQ")
+#: the same plus the capture timestamp (v1.18 REL-04, IEX ``capture_ts`` runs): -1 = none
+_SPOOL_CAP = struct.Struct("<HqBBqqQQq")
 _SPOOL_BATCH = 4096
 
 _ADD = int(EventType.ADD)
@@ -337,7 +339,9 @@ class _IexSource(_ItchSource):
         source_format: str,
         tops: Path | None,
         round_lots: dict[str, int] | None = None,
+        capture_ts: bool = False,
     ) -> None:
+        self.capture_ts = capture_ts
         if len(inputs) != 1:
             raise IngestError(
                 f"--format {source_format} takes exactly one --input file per session date"
@@ -362,6 +366,22 @@ class _IexSource(_ItchSource):
             round_lots=round_lots,
         )
 
+    def events(self) -> Iterator[ProtoEvent]:
+        protos = self.mapper.events(self.reader)
+        if not self.capture_ts:
+            return protos
+        return self._with_capture(protos)
+
+    def _with_capture(self, protos: Iterator[ProtoEvent]) -> Iterator[tuple]:
+        # the mapper is lazy: while it yields the events of a message the reader
+        # still holds that message's packet stamp (``IexReader.receive_ts``).  A
+        # level-feed event flushed by a later message carries that message's stamp.
+        reader = self.reader
+        midnight = reader.midnight  # type: ignore[attr-defined]
+        for ev in protos:
+            rel = reader.receive_ts  # type: ignore[attr-defined]
+            yield (*ev, -1 if rel is None else midnight + rel)
+
     def finish(self) -> None:
         missing = [s for s in self.symbols if s not in self.mapper.directory]
         if missing:
@@ -371,7 +391,7 @@ class _IexSource(_ItchSource):
 
     def messages(self) -> dict:
         doc = super().messages()
-        doc["iex"] = self.reader.summary()
+        doc["iex"] = self.reader.summary(self.capture_ts)  # type: ignore[attr-defined]
         return doc
 
     def verification(self) -> dict | None:
@@ -548,10 +568,13 @@ class _Stage:
         return False
 
 
-def _spool_pass(protos: Iterable[ProtoEvent], spool: Path, n_inst: int) -> list[_InstrumentStats]:
-    """Pass 1: proto events -> fixed-width spool, with per-instrument facts."""
+def _spool_pass(
+    protos: Iterable[ProtoEvent], spool: Path, n_inst: int, capture: bool = False
+) -> list[_InstrumentStats]:
+    """Pass 1: proto events -> fixed-width spool, with per-instrument facts.
+    ``capture``: the events carry a ninth field, the capture timestamp."""
     stats = [_InstrumentStats() for _ in range(n_inst)]
-    pack = _SPOOL.pack
+    pack = (_SPOOL_CAP if capture else _SPOOL).pack
     batch: list[bytes] = []
     append = batch.append
     with open(spool, "wb") as f:
@@ -586,14 +609,15 @@ def _spool_pass(protos: Iterable[ProtoEvent], spool: Path, n_inst: int) -> list[
     return stats
 
 
-def _iter_spool(spool: Path) -> Iterator[ProtoEvent]:
-    size = _SPOOL.size
+def _iter_spool(spool: Path, capture: bool = False) -> Iterator[ProtoEvent]:
+    layout = _SPOOL_CAP if capture else _SPOOL
+    size = layout.size
     with open(spool, "rb") as f:
         while True:
             chunk = f.read(size * _SPOOL_BATCH)
             if not chunk:
                 return
-            yield from _SPOOL.iter_unpack(chunk)
+            yield from layout.iter_unpack(chunk)
 
 
 class _CheckState(LevelBook):
@@ -715,6 +739,7 @@ def sequence_rows(
     ticks_e4: list[int],
     venue_id: int,
     counters: dict | None = None,
+    capture: bool = False,
 ) -> Iterator[tuple]:
     """Proto events -> canonical event rows (the 12 ``MarketEvent`` fields).
 
@@ -742,6 +767,12 @@ def sequence_rows(
 
     ``sequence`` counts from 1 per instrument over the EMITTED events,
     ``event_id`` from 1 over the stream, ``receive_ts == exchange_ts``.
+    With ``capture`` (v1.18 REL-04, IEX) each proto event has a ninth field, the
+    capture timestamp (absolute ns, ``-1`` = none): ``receive_ts`` is that stamp,
+    raised to ``exchange_ts`` when the capture clock reads earlier (counted in
+    ``capture_ts_before_exchange``; the unknown clock offset of
+    ``iex.CAPTURE_TS_PROVENANCE`` makes such rows expected) and ``exchange_ts``
+    when the packet had no stamp (``capture_ts_absent``).
     ``counters`` also receives the per-instrument rejection counts
     (``off_tick_orders_rejected_by_instrument``).
     """
@@ -753,7 +784,10 @@ def sequence_rows(
     n = 0
     rounded = 0
     residues: dict[int, int] = {}
-    for inst, ts, etype, side, price, qty, oid, tid in protos:
+    clamped = 0
+    absent = 0
+    for ev in protos:
+        inst, ts, etype, side, price, qty, oid, tid = ev[:8]
         tick = ticks_e4[inst]
         if etype == _TRADE:
             q, r = divmod(price, tick)
@@ -778,8 +812,20 @@ def sequence_rows(
         seq = seqs[inst] + 1
         seqs[inst] = seq
         n += 1
-        yield (n, inst + 1, venue_id, ts, ts, seq, etype, side, price, qty, oid, tid)
+        rts = ts
+        if capture:
+            cap = ev[8]
+            if cap < 0:
+                absent += 1
+            elif cap < ts:
+                clamped += 1
+            else:
+                rts = cap
+        yield (n, inst + 1, venue_id, ts, rts, seq, etype, side, price, qty, oid, tid)
     if counters is not None:
+        if capture:
+            counters["capture_ts_before_exchange"] = clamped
+            counters["capture_ts_absent"] = absent
         counters["events"] = n
         counters["trade_prices_rounded_to_tick"] = rounded
         counters["trade_price_residue_histogram"] = {str(r): residues[r] for r in sorted(residues)}
@@ -806,6 +852,7 @@ def _raw_pass(
     venue_id: int,
     check: _BookCheck | None,
     keep: bytearray | None = None,
+    capture: bool = False,
 ) -> dict:
     """Pass 2: spool -> canonical raw JSONL (ticks, sequences, event ids).
 
@@ -823,7 +870,7 @@ def _raw_pass(
     append = lines.append
     apply = check.apply if check is not None else None
     with open(tmp, "wb") as f:
-        for row in sequence_rows(_iter_spool(spool), ticks_e4, venue_id, info):
+        for row in sequence_rows(_iter_spool(spool, capture), ticks_e4, venue_id, info, capture):
             if apply is not None:
                 apply(row[1] - 1, row[6], row[7], row[8], row[9], row[10])
             append(_ROW_LINE % row)
@@ -964,8 +1011,14 @@ def _write_configs(out: Path, manifest: dict, configs_dir: Path) -> None:
                 "Source venue of an ingested real dataset. Fees are indicative list prices "
                 "(edit to your own tier); latency is the ASSUMED order-entry leg of "
                 "configs/reference/venue_latency.json (simulator base + U[0, jitter]; the "
-                f"assumed mean is {lat_row['mean_ns']} ns), not a measurement: the feed "
-                "carries exchange timestamps only (receive_ts == exchange_ts)."
+                f"assumed mean is {lat_row['mean_ns']} ns), not a measurement: "
+                + (
+                    "receive_ts is the capture host's packet timestamp "
+                    "(iex.CAPTURE_TS_PROVENANCE: unknown clock offset, only differences "
+                    "within the capture are interpretable)."
+                    if manifest["source"].get("receive_ts")
+                    else "the feed carries exchange timestamps only (receive_ts == exchange_ts)."
+                )
             ),
             "venues": [
                 {
@@ -1114,6 +1167,7 @@ def ingest(
     partition_instruments: int | None = None,
     slim: bool = False,
     round_lots: dict[str, int] | None = None,
+    capture_ts: bool = False,
 ) -> dict:
     """Ingest one session into ``out_dir``; returns the manifest document.
 
@@ -1126,7 +1180,13 @@ def ingest(
     manifest records ``layout: "slim"``.  ``round_lots`` (the IEX formats,
     v1.17 A4) is symbol -> round lot, normally the paired Nasdaq dataset's
     ``lot_size``: it sizes a synthesised directory row and is the TOPS
-    oracle's rule (the quote is the best level holding a round lot)."""
+    oracle's rule (the quote is the best level holding a round lot).
+    ``capture_ts`` (v1.18 REL-04, the IEX formats only) writes the capture
+    host's packet timestamp as ``receive_ts`` (``iex.CAPTURE_TS_PROVENANCE``
+    for what it is and is not) and records ``"receive_ts": "iex_capture"`` in
+    the manifest's ``source`` and the feed-latency summary in the session; the
+    dataset then has other bytes, and so another ``dataset_version``, than a
+    default ingest of the same capture, and cannot be merged with one."""
     if source_format not in FORMATS:
         raise IngestError(f"unknown format {source_format!r}; known: {list(FORMATS)}")
     if tick_size not in TICK_CHOICES:
@@ -1168,12 +1228,19 @@ def ingest(
     if len(universe) != len(list(symbols)):
         raise IngestError("--symbols lists a symbol twice")
     venue, venue_id = SOURCE_VENUE[source_format]
+    if capture_ts and source_format not in IEX_FORMATS:
+        raise IngestError("capture_ts applies to the IEX formats only")
 
     out = Path(out_dir)
     manifest_path = out / MANIFEST_NAME
     if manifest_path.is_file():
         manifest = load_manifest(out)
         have = tuple(e["symbol"] for e in manifest["universe"])
+        if manifest["source"].get("receive_ts") != ("iex_capture" if capture_ts else None):
+            raise IngestError(
+                f"{out} was ingested {'without' if capture_ts else 'with'} capture timestamps; "
+                "a dataset has one receive_ts source — use another --out directory"
+            )
         if manifest["source"]["format"] != source_format or have != universe:
             raise IngestError(
                 f"{out} already holds a {manifest['source']['format']} dataset of {list(have)}; "
@@ -1186,7 +1253,12 @@ def ingest(
             "x-version": MANIFEST_VERSION,
             "ingest_rules_version": INGEST_RULES_VERSION,
             "kind": "real",
-            "source": {"format": source_format, "venue": venue, "venue_id": venue_id},
+            "source": {
+                "format": source_format,
+                "venue": venue,
+                "venue_id": venue_id,
+                **({"receive_ts": "iex_capture"} if capture_ts else {}),
+            },
             "universe": [],
             "sessions": {},
         }
@@ -1213,6 +1285,7 @@ def ingest(
             source_format,
             None if tops is None else Path(tops),
             round_lots,
+            capture_ts,
         )
     else:
         source = _LobsterSource(paths, date, universe, limit_messages, book_paths, input_symbols)
@@ -1226,7 +1299,7 @@ def ingest(
     try:
         clock = time.perf_counter()
         with _Stage(progress, "parse_map_spool", spool):
-            stats = _spool_pass(source.events(), spool, len(universe))
+            stats = _spool_pass(source.events(), spool, len(universe), capture_ts)
         stage["parse_map_spool"] = time.perf_counter() - clock
         source.finish()
         verification = source.verification()
@@ -1245,7 +1318,9 @@ def ingest(
             None if defer_normalize or partition_instruments is not None else bytearray()
         )
         with _Stage(progress, "raw_and_book_check", raw_dir / f"{stem}.jsonl.partial"):
-            raw_info = _raw_pass(spool, raw_dir / f"{stem}.jsonl", ticks, venue_id, check, fresh)
+            raw_info = _raw_pass(
+                spool, raw_dir / f"{stem}.jsonl", ticks, venue_id, check, fresh, capture_ts
+            )
         if raw_info.pop("kept", True) is False:
             fresh = None  # a row out of the IAP1 domain: the normaliser decodes the file
         stage["raw_and_book_check"] = time.perf_counter() - clock
