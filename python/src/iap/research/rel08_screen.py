@@ -720,6 +720,13 @@ def _fmt(v: Any, nd: int = 3) -> str:
     return str(v)
 
 
+def _fmt_sig(v: Any, sig: int = 4) -> str:
+    """Significant-digit format so a tiny non-zero value never prints as ``-0.000``."""
+    if isinstance(v, float) and v != 0.0 and v == v and abs(v) != float("inf"):
+        return f"{v:.{sig}g}"
+    return _fmt(v)
+
+
 def render_scorecard(raw: Mapping[str, Any]) -> str:
     """The scorecard, generated from the raw screen JSON only (no recomputation)."""
     rule = raw["rule"]
@@ -765,9 +772,13 @@ def render_scorecard(raw: Mapping[str, Any]) -> str:
         )
     L += [
         "",
-        "## 4. Net of cost at the registered notional (bps per rebalance)",
+        "## 4. Net of cost at the registered notional",
         "",
-        "| variant | net mean | SE | lower bound | MDE | ESS | gross | costs | net P&L |",
+        "Net mean, SE, lower bound and MDE are bps of notional per rebalance; ESS is a count; "
+        "gross, costs and net P&L are cumulative USD over the whole run.",
+        "",
+        "| variant | net mean (bps) | SE (bps) | lower bound (bps) | MDE (bps) | ESS "
+        "| gross (USD cum.) | costs (USD cum.) | net P&L (USD cum.) |",
         "|---|---|---|---|---|---|---|---|---|",
     ]
     for v in raw["variants"]:
@@ -777,8 +788,8 @@ def render_scorecard(raw: Mapping[str, Any]) -> str:
         if b:
             costs = b["spread_cost"] + b["fee_cost"] + b["impact_cost"]
         L.append(
-            f"| {v['id']} | {_fmt(n.get('mean'))} | {_fmt(n.get('se'))} | "
-            f"{_fmt(n.get('lower'))} | {_fmt(n.get('mde'))} | {_fmt(n.get('ess'), 1)} | "
+            f"| {v['id']} | {_fmt_sig(n.get('mean'))} | {_fmt_sig(n.get('se'))} | "
+            f"{_fmt_sig(n.get('lower'))} | {_fmt_sig(n.get('mde'))} | {_fmt(n.get('ess'), 1)} | "
             f"{_fmt(b.get('gross_pnl'), 2)} | {_fmt(costs, 2)} | {_fmt(b.get('net_pnl'), 2)} |"
         )
     L += [
