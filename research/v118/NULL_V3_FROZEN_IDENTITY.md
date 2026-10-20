@@ -105,7 +105,7 @@ Fresh clone at exactly `04d6b661b0c8d72cbf654d9e45cb6a1320a3caf9`, clean tree, `
 numpy 2.4.6, pandas 3.0.6, scipy 1.17.1, Windows 11 10.0.26200), `pytest python/tests -n 2 -q -p no:cacheprovider -rfE`:
 **3917 passed, 123 skipped, 0 failed, 1284 s.** The machine was NOT idle: the REL-04 capture-ts re-download/ingest ran at the same
 time (recorded in the log header); the earlier load-sensitive failure (`test_maker_real_parallel.py`) did not recur.
-Complete output: `research/v118/evidence/pytest_04d6b661_full_20261020.log`, sha256 `98a93a85fd15dab97e3a3535ae46711fca8c20e80a353700bfda107a3ea0baba`.
+Complete output: `research/v118/evidence/pytest_04d6b661_full_20261020.log`, sha256 `1dc1da5833766b897b5018f3b5e986997a3b8225cb249b4515b70a169313ee31 (line endings normalised to LF)`.
 Run A (3935 passed / 1 failed, heavy load) and run B (3917 passed / 0 failed, idle) above remain on record; this third run
 is the retained-log record. Differing pass and skip counts across runs reflect differing environments (optional dependencies and data).
 
