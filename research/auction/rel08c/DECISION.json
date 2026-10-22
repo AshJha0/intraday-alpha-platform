@@ -1,0 +1,86 @@
+{
+  "config": {
+    "alpha": 0.05,
+    "cross_fee_per_share": 0.001,
+    "decision_tod_ns": [
+      57060000000000,
+      57180000000000
+    ],
+    "exit_lead_s": 5.0,
+    "fee_per_share": 0.003,
+    "grid_start_tod_ns": 55800000000000,
+    "min_persistence": 2,
+    "min_sessions": 5,
+    "min_trades": 30,
+    "orientation": 1,
+    "power": 0.8,
+    "qty": 100,
+    "target_bps": 2.0,
+    "threshold": 0.2
+  },
+  "sessions": [
+    {
+      "date": "2019-01-30",
+      "gross_baseline_bps": 2.2599799560797904,
+      "gross_imbalance_bps": 0.0,
+      "incremental_bps": 48.90899546311392,
+      "n_baseline": 179,
+      "n_imbalance": 0,
+      "net_baseline_bps": -48.90899546311392,
+      "net_imbalance_bps": 0.0
+    }
+  ],
+  "summary": {
+    "ci_high_bps": Infinity,
+    "ci_low_bps": -Infinity,
+    "evidence_status": "inconclusive",
+    "mde_bps": Infinity,
+    "mean_incremental_bps": 48.90899546311392,
+    "measures": {
+      "baseline": {
+        "execution": {
+          "net_cross_bps": 1581.045088970736,
+          "net_taker_bps": -48.90899546311392
+        },
+        "fill": {
+          "entry": 0.990391061452514,
+          "exit": 0.9940782122905027,
+          "loc_at_exit_mid": 0.5083798882681564
+        },
+        "n": 179,
+        "prediction": {
+          "gross_cross_bps": 1614.3528786622917,
+          "gross_taker_bps": 2.2599799560797904,
+          "hit_rate": 0.4972067039106145
+        }
+      },
+      "imbalance": {
+        "execution": {
+          "net_cross_bps": NaN,
+          "net_taker_bps": NaN
+        },
+        "fill": {
+          "entry": NaN,
+          "exit": NaN,
+          "loc_at_exit_mid": NaN
+        },
+        "n": 0,
+        "prediction": {
+          "gross_cross_bps": NaN,
+          "gross_taker_bps": NaN,
+          "hit_rate": NaN
+        }
+      }
+    },
+    "n_imbalance_trades": 0,
+    "n_sessions": 1,
+    "reasons": [
+      "1 session(s) < min_sessions 5 (one session = one cluster; one day supports a screen only)",
+      "0 imbalance trades < min_trades 30",
+      "MDE inf bps > target 2.0 bps"
+    ],
+    "sd_session_bps": Infinity,
+    "verdict": "underpowered"
+  },
+  "version": 1
+}

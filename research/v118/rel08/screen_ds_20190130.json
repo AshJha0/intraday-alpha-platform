@@ -1,0 +1,759 @@
+{
+  "dataset": {
+    "dataset_version": "9a1297a161fc69c47a770dcab4e3e09d5ecd34e1d2a96b44209011485038041d",
+    "tag": "ds_20190130"
+  },
+  "decisions": [
+    {
+      "criteria": {
+        "C1": false,
+        "C2": true,
+        "C3": false,
+        "C4": true,
+        "C5": false,
+        "C6": true,
+        "C7": true,
+        "C8": false
+      },
+      "evidence_status": "inconclusive",
+      "id": "V1",
+      "outcome": "underpowered",
+      "reason": "failed C1"
+    },
+    {
+      "criteria": {
+        "C1": false,
+        "C2": true,
+        "C3": false,
+        "C4": false,
+        "C5": false,
+        "C6": true,
+        "C7": true,
+        "C8": false
+      },
+      "evidence_status": "inconclusive",
+      "id": "V2",
+      "outcome": "underpowered",
+      "reason": "failed C1,C4"
+    },
+    {
+      "criteria": {
+        "C1": false,
+        "C2": true,
+        "C3": false,
+        "C4": true,
+        "C5": false,
+        "C6": false,
+        "C7": true,
+        "C8": false
+      },
+      "evidence_status": "inconclusive",
+      "id": "V5",
+      "outcome": "underpowered",
+      "reason": "failed C1"
+    },
+    {
+      "criteria": {
+        "C1": false,
+        "C2": true,
+        "C3": false,
+        "C4": true,
+        "C5": false,
+        "C6": false,
+        "C7": true,
+        "C8": false
+      },
+      "evidence_status": "inconclusive",
+      "id": "V6",
+      "outcome": "underpowered",
+      "reason": "failed C1"
+    },
+    {
+      "criteria": {
+        "C1": false,
+        "C2": true,
+        "C3": false,
+        "C4": true,
+        "C5": false,
+        "C6": false,
+        "C7": true,
+        "C8": false
+      },
+      "evidence_status": "inconclusive",
+      "id": "V9",
+      "outcome": "underpowered",
+      "reason": "failed C1"
+    },
+    {
+      "criteria": {
+        "C1": false,
+        "C2": true,
+        "C3": false,
+        "C4": true,
+        "C5": false,
+        "C6": false,
+        "C7": true,
+        "C8": false
+      },
+      "evidence_status": "inconclusive",
+      "id": "V10",
+      "outcome": "underpowered",
+      "reason": "failed C1"
+    },
+    {
+      "criteria": {
+        "C1": false,
+        "C2": true,
+        "C3": false,
+        "C4": true,
+        "C5": false,
+        "C6": true,
+        "C7": true,
+        "C8": false
+      },
+      "evidence_status": "inconclusive",
+      "id": "V11",
+      "outcome": "underpowered",
+      "reason": "failed C1"
+    }
+  ],
+  "generated": "2026-10-20T06:53:07.440070+00:00",
+  "label": "hypothesis screen, one session, no edge claim",
+  "ledger": {
+    "data_family": "real",
+    "kind": "rel08_screen",
+    "looks": [
+      {
+        "id": "V1",
+        "total_after": 6827
+      },
+      {
+        "id": "V2",
+        "total_after": 6828
+      },
+      {
+        "id": "V5",
+        "total_after": 6829
+      },
+      {
+        "id": "V6",
+        "total_after": 6830
+      },
+      {
+        "id": "V9",
+        "total_after": 6831
+      },
+      {
+        "id": "V10",
+        "total_after": 6832
+      },
+      {
+        "id": "V11",
+        "total_after": 6833
+      }
+    ]
+  },
+  "rule": {
+    "K": 7,
+    "level": 0.9928571428571429,
+    "message_sha256": "b44502181b599f78cfe9377cc60554e01bd8ec9f0a6508659fb6d1c03a10e291",
+    "metrics": [
+      "rank_ic_mean",
+      "rank_ic_lower",
+      "net_bps_mean",
+      "net_bps_lower",
+      "net_bps_se",
+      "mde_bps",
+      "ess",
+      "conservative_net_bps",
+      "influential_removed_net_bps",
+      "alt_normalisation_net_bps"
+    ],
+    "path": "rel08_rule_signed.json",
+    "rule_document_sha256": "8015169978166c0f6a10aac2f1e95d4473d539a19dd3a2a2d07c5ddb72b37bee",
+    "signed": true,
+    "thresholds": {
+      "C2_mde_max_bps": 2.0,
+      "C3_lower_min_bps": 0.0,
+      "C3_net_min_bps": 1.0,
+      "C4_ess_min": 20,
+      "C5_retention": 0.5,
+      "C6_names_removed": 5,
+      "C6_retention": 0.5,
+      "C7_retention": 0.5,
+      "C8_ic_min": 0.02,
+      "C8_lower_min": 0.0
+    }
+  },
+  "session": "2019-01-30",
+  "summary": {
+    "continue": [],
+    "passed_not_expanded": [],
+    "stop": [],
+    "underpowered": [
+      "V1",
+      "V2",
+      "V5",
+      "V6",
+      "V9",
+      "V10",
+      "V11"
+    ]
+  },
+  "variants": [
+    {
+      "alt_normalisation_net_bps": -1.0046103510872865e-05,
+      "block_length": 2,
+      "book": {
+        "cov_init": 7,
+        "fee_cost": 0.021266656215257855,
+        "gross_pnl": 0.014364774564154175,
+        "impact_cost": 2.7506421489388944e-05,
+        "max_abs_beta_exposure": 3.001943908483038e-19,
+        "max_abs_net_exposure": 2.919394385277543e-20,
+        "max_abs_sector_exposure": 0.0,
+        "mean_turnover": 3.3013766082014982e-06,
+        "n_infeasible": 0,
+        "net_pnl": -0.01842678532432796,
+        "spread_cost": 0.011497397251734895
+      },
+      "conservative_net_bps": -9.68119614867392e-06,
+      "id": "V1",
+      "influential_names": [
+        {
+          "instrument_id": 10,
+          "net_pnl": -0.00802241336871912,
+          "symbol": "BABA"
+        },
+        {
+          "instrument_id": 5,
+          "net_pnl": -0.007936496953287603,
+          "symbol": "AMAT"
+        },
+        {
+          "instrument_id": 6,
+          "net_pnl": 0.005799936441765869,
+          "symbol": "AMD"
+        },
+        {
+          "instrument_id": 84,
+          "net_pnl": 0.005692937568047197,
+          "symbol": "TVIX"
+        },
+        {
+          "instrument_id": 69,
+          "net_pnl": -0.005344161614319765,
+          "symbol": "PYPL"
+        }
+      ],
+      "influential_removed_net_bps": -5.766174193257715e-06,
+      "max_gap_min": 390.0,
+      "missing_beta_cells": 0,
+      "n_names": 100,
+      "n_rebalances": 52,
+      "n_usable": 25,
+      "names_usable_80pct": 100,
+      "net_bps": {
+        "ess": 25.0,
+        "lower": -2.1515562596434967e-05,
+        "mde": 1.4667624569832788e-05,
+        "mean": -7.370714129731185e-06,
+        "n": 25,
+        "nw_inflation": 0.397569435142205,
+        "se": 5.89061227704128e-06
+      },
+      "rank_ic": {
+        "ess": 22.895256741608108,
+        "lower": -0.026276935028063185,
+        "mde": 0.07163072231322751,
+        "mean": 0.040088509788851104,
+        "n": 25,
+        "nw_inflation": 1.0919292271821042,
+        "se": 0.028767358358725903
+      },
+      "usable_floor": 20,
+      "variant": {
+        "book": "market_neutral",
+        "horizon_min": 15,
+        "id": "V1",
+        "rebalance_min": 15,
+        "score": "vwap_deviation"
+      }
+    },
+    {
+      "alt_normalisation_net_bps": -1.71637312381972e-05,
+      "block_length": 2,
+      "book": {
+        "cov_init": 7,
+        "fee_cost": 0.026263431143951944,
+        "gross_pnl": 0.02716197186057397,
+        "impact_cost": 1.7202492519754607e-05,
+        "max_abs_beta_exposure": 7.439066859260893e-19,
+        "max_abs_net_exposure": 4.3263500250720504e-19,
+        "max_abs_sector_exposure": 6.640605957575706e-20,
+        "mean_turnover": 2.380754148674702e-06,
+        "n_infeasible": 0,
+        "net_pnl": -0.009054110759390499,
+        "spread_cost": 0.00993544898349277
+      },
+      "conservative_net_bps": -5.615615097462655e-06,
+      "id": "V2",
+      "influential_names": [
+        {
+          "instrument_id": 78,
+          "net_pnl": 0.007383525679623096,
+          "symbol": "SQ"
+        },
+        {
+          "instrument_id": 69,
+          "net_pnl": -0.006044923774336243,
+          "symbol": "PYPL"
+        },
+        {
+          "instrument_id": 5,
+          "net_pnl": -0.005434091894560542,
+          "symbol": "AMAT"
+        },
+        {
+          "instrument_id": 70,
+          "net_pnl": -0.004995739142579015,
+          "symbol": "QCOM"
+        },
+        {
+          "instrument_id": 60,
+          "net_pnl": 0.0045148558726419725,
+          "symbol": "NUGT"
+        }
+      ],
+      "influential_removed_net_bps": -9.022883965787654e-06,
+      "max_gap_min": 390.0,
+      "missing_beta_cells": 0,
+      "n_names": 100,
+      "n_rebalances": 52,
+      "n_usable": 25,
+      "names_usable_80pct": 100,
+      "net_bps": {
+        "ess": 17.01780208859678,
+        "lower": -1.852283972782987e-05,
+        "mde": 1.6474954633986117e-05,
+        "mean": -3.6216443037562006e-06,
+        "n": 25,
+        "nw_inflation": 1.469049873176742,
+        "se": 6.6164476441711315e-06
+      },
+      "rank_ic": {
+        "ess": 22.895256741608108,
+        "lower": -0.026276935028063185,
+        "mde": 0.07163072231322751,
+        "mean": 0.040088509788851104,
+        "n": 25,
+        "nw_inflation": 1.0919292271821042,
+        "se": 0.028767358358725903
+      },
+      "usable_floor": 20,
+      "variant": {
+        "book": "sector_neutral",
+        "horizon_min": 15,
+        "id": "V2",
+        "rebalance_min": 15,
+        "score": "vwap_deviation"
+      }
+    },
+    {
+      "alt_normalisation_net_bps": -0.011855709020306695,
+      "block_length": 2,
+      "book": {
+        "cov_init": 7,
+        "fee_cost": 4.972859889508069,
+        "gross_pnl": -3.5210725657535438,
+        "impact_cost": 0.01853988948156537,
+        "max_abs_beta_exposure": 1.463672932855431e-18,
+        "max_abs_net_exposure": 6.844026213814747e-19,
+        "max_abs_sector_exposure": 0.0,
+        "mean_turnover": 0.00014586822922711486,
+        "n_infeasible": 0,
+        "net_pnl": -9.472300364412469,
+        "spread_cost": 0.9598280196692917
+      },
+      "conservative_net_bps": -0.004154480943220284,
+      "id": "V5",
+      "influential_names": [
+        {
+          "instrument_id": 84,
+          "net_pnl": -3.421737189065925,
+          "symbol": "TVIX"
+        },
+        {
+          "instrument_id": 78,
+          "net_pnl": -2.0585556127679285,
+          "symbol": "SQ"
+        },
+        {
+          "instrument_id": 10,
+          "net_pnl": -2.0523449317773435,
+          "symbol": "BABA"
+        },
+        {
+          "instrument_id": 3,
+          "net_pnl": -1.1998290234815454,
+          "symbol": "AAPL"
+        },
+        {
+          "instrument_id": 1,
+          "net_pnl": -0.9754996466472674,
+          "symbol": "AABA"
+        }
+      ],
+      "influential_removed_net_bps": null,
+      "max_gap_min": 405.0,
+      "missing_beta_cells": 1129,
+      "n_names": 71,
+      "n_rebalances": 52,
+      "n_usable": 24,
+      "names_usable_80pct": 71,
+      "net_bps": {
+        "ess": 24.0,
+        "lower": -0.010990703478056377,
+        "mde": 0.006318462565228521,
+        "mean": -0.003946791818505197,
+        "n": 24,
+        "nw_inflation": 0.9667433702344161,
+        "se": 0.0025375351667584417
+      },
+      "rank_ic": {
+        "ess": 24.0,
+        "lower": -0.02015777154808018,
+        "mde": 0.06322475451214969,
+        "mean": 0.03591386676448788,
+        "n": 24,
+        "nw_inflation": 0.7240762514536188,
+        "se": 0.02539146767556212
+      },
+      "usable_floor": 20,
+      "variant": {
+        "book": "market_neutral",
+        "horizon_min": 15,
+        "id": "V5",
+        "rebalance_min": 15,
+        "score": "residual_reversion"
+      }
+    },
+    {
+      "alt_normalisation_net_bps": -0.0019258707153435753,
+      "block_length": 2,
+      "book": {
+        "cov_init": 7,
+        "fee_cost": 4.36804263394561,
+        "gross_pnl": 4.570606590162968,
+        "impact_cost": 0.03700390582360274,
+        "max_abs_beta_exposure": 6.666274232251064e-16,
+        "max_abs_net_exposure": 2.1376686956887025e-16,
+        "max_abs_sector_exposure": 6.7166324585477e-17,
+        "mean_turnover": 0.00027486765131326714,
+        "n_infeasible": 0,
+        "net_pnl": -1.23755673028629,
+        "spread_cost": 1.4031167806800462
+      },
+      "conservative_net_bps": -0.0008233829276874654,
+      "id": "V6",
+      "influential_names": [
+        {
+          "instrument_id": 5,
+          "net_pnl": 2.426383006627333,
+          "symbol": "AMAT"
+        },
+        {
+          "instrument_id": 29,
+          "net_pnl": -2.142288156375557,
+          "symbol": "FB"
+        },
+        {
+          "instrument_id": 54,
+          "net_pnl": 2.0658136474550366,
+          "symbol": "MU"
+        },
+        {
+          "instrument_id": 53,
+          "net_pnl": -1.6123719647013397,
+          "symbol": "MSFT"
+        },
+        {
+          "instrument_id": 70,
+          "net_pnl": -1.6010585703304827,
+          "symbol": "QCOM"
+        }
+      ],
+      "influential_removed_net_bps": 0.00045737760132024573,
+      "max_gap_min": 405.0,
+      "missing_beta_cells": 1129,
+      "n_names": 71,
+      "n_rebalances": 52,
+      "n_usable": 24,
+      "names_usable_80pct": 71,
+      "net_bps": {
+        "ess": 24.0,
+        "lower": -0.0041409426902150005,
+        "mde": 0.00409717976617802,
+        "mean": -0.0005156486376192878,
+        "n": 24,
+        "nw_inflation": 0.5517001449999839,
+        "se": 0.0016454537213566344
+      },
+      "rank_ic": {
+        "ess": 24.0,
+        "lower": -0.02015777154808018,
+        "mde": 0.06322475451214969,
+        "mean": 0.03591386676448788,
+        "n": 24,
+        "nw_inflation": 0.7240762514536188,
+        "se": 0.02539146767556212
+      },
+      "usable_floor": 20,
+      "variant": {
+        "book": "sector_neutral",
+        "horizon_min": 15,
+        "id": "V6",
+        "rebalance_min": 15,
+        "score": "residual_reversion"
+      }
+    },
+    {
+      "alt_normalisation_net_bps": -0.04073820946031757,
+      "block_length": 6,
+      "book": {
+        "cov_init": 20,
+        "fee_cost": 187.98632356145552,
+        "gross_pnl": -1.5851498313361168,
+        "impact_cost": 3.0172769710149487,
+        "max_abs_beta_exposure": 1.060870868149072e-10,
+        "max_abs_net_exposure": 6.7166142710562565e-12,
+        "max_abs_sector_exposure": 0.0,
+        "mean_turnover": 0.0025306729408893867,
+        "n_infeasible": 0,
+        "net_pnl": -228.62366005944244,
+        "spread_cost": 36.03490969563586
+      },
+      "conservative_net_bps": -0.03200748613824043,
+      "id": "V9",
+      "influential_names": [
+        {
+          "instrument_id": 29,
+          "net_pnl": -35.43458863822673,
+          "symbol": "FB"
+        },
+        {
+          "instrument_id": 88,
+          "net_pnl": -28.709777037990857,
+          "symbol": "VXXB"
+        },
+        {
+          "instrument_id": 78,
+          "net_pnl": 26.934946035908464,
+          "symbol": "SQ"
+        },
+        {
+          "instrument_id": 84,
+          "net_pnl": -24.4175102709485,
+          "symbol": "TVIX"
+        },
+        {
+          "instrument_id": 40,
+          "net_pnl": -20.91626970901404,
+          "symbol": "HMNY"
+        }
+      ],
+      "influential_removed_net_bps": -0.002113332100363088,
+      "max_gap_min": 380.0,
+      "missing_beta_cells": 3457,
+      "n_names": 71,
+      "n_rebalances": 155,
+      "n_usable": 79,
+      "names_usable_80pct": 71,
+      "net_bps": {
+        "ess": 51.12004811035346,
+        "lower": -0.0763209941947973,
+        "mde": 0.039665759407146076,
+        "mean": -0.02931072564864648,
+        "n": 78,
+        "nw_inflation": 1.525820160255336,
+        "se": 0.015930023858291596
+      },
+      "rank_ic": {
+        "ess": 79.0,
+        "lower": -0.030052601200650075,
+        "mde": 0.035276136262569854,
+        "mean": 0.004639075006496275,
+        "n": 79,
+        "nw_inflation": 0.8257802043196338,
+        "se": 0.014167122997016003
+      },
+      "usable_floor": 50,
+      "variant": {
+        "book": "market_neutral",
+        "horizon_min": 1,
+        "id": "V9",
+        "rebalance_min": 5,
+        "score": "etf_catch_up"
+      }
+    },
+    {
+      "alt_normalisation_net_bps": -0.031021388295069553,
+      "block_length": 6,
+      "book": {
+        "cov_init": 20,
+        "fee_cost": 222.00468943839584,
+        "gross_pnl": 5.594803417463371,
+        "impact_cost": 3.396556905317482,
+        "max_abs_beta_exposure": 2.4203298287545257e-11,
+        "max_abs_net_exposure": 2.354511483243331e-12,
+        "max_abs_sector_exposure": 0.0,
+        "mean_turnover": 0.002395622000576083,
+        "n_infeasible": 0,
+        "net_pnl": -257.1076886764095,
+        "spread_cost": 37.30124575015953
+      },
+      "conservative_net_bps": -0.03578908569959061,
+      "id": "V10",
+      "influential_names": [
+        {
+          "instrument_id": 84,
+          "net_pnl": -41.557463885600455,
+          "symbol": "TVIX"
+        },
+        {
+          "instrument_id": 21,
+          "net_pnl": -31.23110999319773,
+          "symbol": "DAL"
+        },
+        {
+          "instrument_id": 22,
+          "net_pnl": -30.4093537576548,
+          "symbol": "DWDP"
+        },
+        {
+          "instrument_id": 55,
+          "net_pnl": 29.46262626554404,
+          "symbol": "MYL"
+        },
+        {
+          "instrument_id": 40,
+          "net_pnl": -18.036455375157527,
+          "symbol": "HMNY"
+        }
+      ],
+      "influential_removed_net_bps": -0.010388383412264517,
+      "max_gap_min": 380.0,
+      "missing_beta_cells": 3457,
+      "n_names": 71,
+      "n_rebalances": 155,
+      "n_usable": 78,
+      "names_usable_80pct": 71,
+      "net_bps": {
+        "ess": 53.75638216759042,
+        "lower": -0.07255904525939076,
+        "mde": 0.03418657686672956,
+        "mean": -0.03296252418928326,
+        "n": 78,
+        "nw_inflation": 1.4509905029848902,
+        "se": 0.013729548942461669
+      },
+      "rank_ic": {
+        "ess": 78.0,
+        "lower": -0.02594476513384838,
+        "mde": 0.03530224905180215,
+        "mean": 0.010183421176946995,
+        "n": 78,
+        "nw_inflation": 0.9006399349366956,
+        "se": 0.014177610060964716
+      },
+      "usable_floor": 50,
+      "variant": {
+        "book": "market_neutral",
+        "horizon_min": 3,
+        "id": "V10",
+        "rebalance_min": 5,
+        "score": "etf_catch_up"
+      }
+    },
+    {
+      "alt_normalisation_net_bps": -0.025054468862420094,
+      "block_length": 6,
+      "book": {
+        "cov_init": 20,
+        "fee_cost": 116.63104411042008,
+        "gross_pnl": -40.28054706391911,
+        "impact_cost": 1.7197208050536208,
+        "max_abs_beta_exposure": 1.5773934938724705e-10,
+        "max_abs_net_exposure": 1.5342620308445888e-11,
+        "max_abs_sector_exposure": 0.0,
+        "mean_turnover": 0.0014235154579709897,
+        "n_infeasible": 0,
+        "net_pnl": -182.2209188809672,
+        "spread_cost": 23.589606901574395
+      },
+      "conservative_net_bps": -0.02542018742036468,
+      "id": "V11",
+      "influential_names": [
+        {
+          "instrument_id": 61,
+          "net_pnl": -28.87376528029938,
+          "symbol": "NVDA"
+        },
+        {
+          "instrument_id": 55,
+          "net_pnl": -23.82860187573081,
+          "symbol": "MYL"
+        },
+        {
+          "instrument_id": 3,
+          "net_pnl": -16.865202015062657,
+          "symbol": "AAPL"
+        },
+        {
+          "instrument_id": 40,
+          "net_pnl": -16.13532932707101,
+          "symbol": "HMNY"
+        },
+        {
+          "instrument_id": 89,
+          "net_pnl": 15.656137863073411,
+          "symbol": "VZ"
+        }
+      ],
+      "influential_removed_net_bps": -0.012364812351619856,
+      "max_gap_min": 385.0,
+      "missing_beta_cells": 3457,
+      "n_names": 71,
+      "n_rebalances": 155,
+      "n_usable": 77,
+      "names_usable_80pct": 71,
+      "net_bps": {
+        "ess": 55.10694571636808,
+        "lower": -0.050121671032017465,
+        "mde": 0.02355715752189985,
+        "mean": -0.023665054400125615,
+        "n": 77,
+        "nw_inflation": 1.3972830284645799,
+        "se": 0.009460705832088292
+      },
+      "rank_ic": {
+        "ess": 77.0,
+        "lower": -0.02428929910528927,
+        "mde": 0.03349130944591042,
+        "mean": 0.010830072513786499,
+        "n": 77,
+        "nw_inflation": 0.6576285918436098,
+        "se": 0.013450325078678882
+      },
+      "usable_floor": 50,
+      "variant": {
+        "book": "market_neutral",
+        "horizon_min": 5,
+        "id": "V11",
+        "rebalance_min": 5,
+        "score": "etf_catch_up"
+      }
+    }
+  ],
+  "x-version": 1
+}

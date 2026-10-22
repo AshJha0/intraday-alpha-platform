@@ -1,0 +1,77 @@
+{
+  "as_reduction_is_criterion": false,
+  "declaration": "research/v118/rel09/predeclaration.json",
+  "family_k": 2,
+  "family_level": 0.975,
+  "latency_assumption": "exchange-clock decisions with declared feed delays",
+  "overall": "underpowered",
+  "per_symbol": {
+    "AAPL": {
+      "G": 4,
+      "as_reduction": 0.06727734131471008,
+      "as_reduction_hypothesis": 0.25,
+      "as_reduction_is_criterion": false,
+      "ci95_usd": [
+        -355.8672139438859,
+        2194.301213943825
+      ],
+      "ci_family_usd": [
+        -754.1605376720856,
+        2592.5945376720247
+      ],
+      "decomposition_total_usd": {
+        "fees": -105.34200000000004,
+        "inventory": 3592.2250000000486,
+        "markout": 650.1800000000844,
+        "net": 3676.8679999998785,
+        "spread": -460.1950000002562
+      },
+      "df": 3,
+      "extra_net_usd": 7626.867999999893,
+      "mde_family_usd": 2065.4139144952883,
+      "mde_usd": 1122.4878868751578,
+      "mean_usd": 919.2169999999696,
+      "missed_net_usd": 4291.090000000006,
+      "sd_usd": 801.3233933545804,
+      "small_g": "inference rests on G session clusters; for G <= 5 the result is a size statement, not a power statement, and no generalisation beyond these sessions is claimed",
+      "t": 2.294247260526992,
+      "unit": "per-session incremental net maker P&L, USD (filtered - baseline)",
+      "verdict": "underpowered"
+    },
+    "MSFT": {
+      "G": 4,
+      "as_reduction": -0.03548622027805104,
+      "as_reduction_hypothesis": 0.25,
+      "as_reduction_is_criterion": false,
+      "ci95_usd": [
+        -1053.3654337385074,
+        889.9124337384894
+      ],
+      "ci_family_usd": [
+        -1356.872681456242,
+        1193.4196814562238
+      ],
+      "decomposition_total_usd": {
+        "fees": -14.736000000000033,
+        "inventory": 346.3449999998762,
+        "markout": -382.739999999852,
+        "net": -326.9060000000359,
+        "spread": -275.77500000005784
+      },
+      "df": 3,
+      "extra_net_usd": 1171.6390000000943,
+      "mde_family_usd": 1573.8855141196384,
+      "mde_usd": 855.3575690223252,
+      "mean_usd": -81.72650000000897,
+      "missed_net_usd": 1414.6620000001333,
+      "sd_usd": 610.6239877996348,
+      "small_g": "inference rests on G session clusters; for G <= 5 the result is a size statement, not a power statement, and no generalisation beyond these sessions is claimed",
+      "t": -0.2676819176217035,
+      "unit": "per-session incremental net maker P&L, USD (filtered - baseline)",
+      "verdict": "underpowered"
+    }
+  },
+  "selected_min_age_ns": 25000000,
+  "small_g": "inference rests on G = 4 evaluate session clusters (3 df); at G <= 5 the result is a size statement, not a power statement, and no generalisation beyond these sessions is claimed",
+  "x-version": 1
+}
