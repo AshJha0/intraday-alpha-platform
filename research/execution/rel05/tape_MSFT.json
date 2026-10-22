@@ -1,0 +1,210 @@
+{
+  "by_liquidity_bucket": {
+    "high": {
+      "brier": 0.05964589204334823,
+      "brier_naive": 0.06846756635344264,
+      "mean_predicted": 0.11696003791868333,
+      "n": 4873,
+      "observed_rate": 0.058895957315821874,
+      "skill": 0.1288445724002406,
+      "underpowered": false
+    },
+    "low": {
+      "brier": 0.17645007138945473,
+      "brier_naive": 0.17509929952392586,
+      "mean_predicted": 0.22103265547151452,
+      "n": 14609,
+      "observed_rate": 0.22198644671093162,
+      "skill": -0.007714319070387221,
+      "underpowered": false
+    },
+    "mid": {
+      "brier": 0.1071112914031332,
+      "brier_naive": 0.10970671161496218,
+      "mean_predicted": 0.1371903628239097,
+      "n": 6436,
+      "observed_rate": 0.12197016780609074,
+      "skill": 0.023657807016749577,
+      "underpowered": false
+    }
+  },
+  "by_venue": {
+    "101": {
+      "brier": 0.13727069204129735,
+      "brier_naive": 0.1388124281788431,
+      "mean_predicted": 0.18064547818874074,
+      "n": 25918,
+      "observed_rate": 0.16648661162126707,
+      "skill": 0.011106614571711138,
+      "underpowered": false
+    }
+  },
+  "by_venue_bucket": {
+    "101/high": {
+      "brier": 0.05964589204334823,
+      "brier_naive": 0.06846756635344264,
+      "mean_predicted": 0.11696003791868333,
+      "n": 4873,
+      "observed_rate": 0.058895957315821874,
+      "skill": 0.1288445724002406,
+      "underpowered": false
+    },
+    "101/low": {
+      "brier": 0.17645007138945473,
+      "brier_naive": 0.17509929952392586,
+      "mean_predicted": 0.22103265547151452,
+      "n": 14609,
+      "observed_rate": 0.22198644671093162,
+      "skill": -0.007714319070387221,
+      "underpowered": false
+    },
+    "101/mid": {
+      "brier": 0.1071112914031332,
+      "brier_naive": 0.10970671161496218,
+      "mean_predicted": 0.1371903628239097,
+      "n": 6436,
+      "observed_rate": 0.12197016780609074,
+      "skill": 0.023657807016749577,
+      "underpowered": false
+    }
+  },
+  "eval_days": [
+    "2019-10-30",
+    "2019-12-30",
+    "2020-01-30"
+  ],
+  "fit_days": [
+    "2019-01-30",
+    "2019-03-27",
+    "2019-07-30",
+    "2019-08-30"
+  ],
+  "label": "tape-implied under the simulator's queue rules, not a measured real fill",
+  "level2": "not validated",
+  "model": {
+    "link": "cloglog",
+    "n_filled": 5982,
+    "n_samples": 34560
+  },
+  "n_eval": 25918,
+  "n_fit": 34560,
+  "naive_baseline_rate": 0.17309027777777777,
+  "overall": {
+    "brier": 0.13727069204129735,
+    "brier_naive": 0.1388124281788431,
+    "mean_predicted": 0.18064547818874074,
+    "n": 25918,
+    "observed_rate": 0.16648661162126707,
+    "skill": 0.011106614571711138,
+    "underpowered": false
+  },
+  "per_day": {
+    "2019-10-30": {
+      "brier": 0.13136650197520747,
+      "brier_naive": 0.12978520631955406,
+      "mean_predicted": 0.19268788431139242,
+      "n": 8639,
+      "observed_rate": 0.1526797082995717,
+      "skill": -0.012183943767519745,
+      "underpowered": false
+    },
+    "2019-12-30": {
+      "brier": 0.11031478659998395,
+      "brier_naive": 0.1144216981331642,
+      "mean_predicted": 0.1734560391952178,
+      "n": 8639,
+      "observed_rate": 0.12918161824285218,
+      "skill": 0.03589276859359858,
+      "underpowered": false
+    },
+    "2020-01-30": {
+      "brier": 0.17012698429690584,
+      "brier_naive": 0.1722265122653035,
+      "mean_predicted": 0.17579307274562234,
+      "n": 8640,
+      "observed_rate": 0.2175925925925926,
+      "skill": 0.012190503893868998,
+      "underpowered": false
+    }
+  },
+  "queue_ahead_edges_from_fit": [
+    347.0,
+    643.0
+  ],
+  "reliability": [
+    {
+      "bin_hi": 0.1,
+      "bin_lo": 0.0,
+      "mean_predicted": 0.07724764449661108,
+      "n": 4935,
+      "observed_rate": 0.08713272543059777
+    },
+    {
+      "bin_hi": 0.2,
+      "bin_lo": 0.1,
+      "mean_predicted": 0.15051145734050522,
+      "n": 12940,
+      "observed_rate": 0.13964451313755796
+    },
+    {
+      "bin_hi": 0.3,
+      "bin_lo": 0.2,
+      "mean_predicted": 0.2393562056807849,
+      "n": 5977,
+      "observed_rate": 0.23941776811109253
+    },
+    {
+      "bin_hi": 0.4,
+      "bin_lo": 0.3,
+      "mean_predicted": 0.336093206253908,
+      "n": 1113,
+      "observed_rate": 0.31626235399820307
+    },
+    {
+      "bin_hi": 0.5,
+      "bin_lo": 0.4,
+      "mean_predicted": 0.44408082910154706,
+      "n": 325,
+      "observed_rate": 0.28615384615384615
+    },
+    {
+      "bin_hi": 0.6,
+      "bin_lo": 0.5,
+      "mean_predicted": 0.5493200951398529,
+      "n": 154,
+      "observed_rate": 0.35064935064935066
+    },
+    {
+      "bin_hi": 0.7,
+      "bin_lo": 0.6,
+      "mean_predicted": 0.6419061787449276,
+      "n": 338,
+      "observed_rate": 0.3047337278106509
+    },
+    {
+      "bin_hi": 0.8,
+      "bin_lo": 0.7,
+      "mean_predicted": 0.7399827993344539,
+      "n": 113,
+      "observed_rate": 0.2831858407079646
+    },
+    {
+      "bin_hi": 0.9,
+      "bin_lo": 0.8,
+      "mean_predicted": 0.8228883197434638,
+      "n": 23,
+      "observed_rate": 0.5652173913043478
+    },
+    {
+      "bin_hi": 1.0,
+      "bin_lo": 0.9,
+      "mean_predicted": null,
+      "n": 0,
+      "observed_rate": null
+    }
+  ],
+  "schema": "iap.fill_tape_test",
+  "symbol": "MSFT",
+  "ttl_ns": 1000000000,
+  "version": 1
+}

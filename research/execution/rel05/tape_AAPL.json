@@ -1,0 +1,210 @@
+{
+  "by_liquidity_bucket": {
+    "high": {
+      "brier": 0.10746517429740016,
+      "brier_naive": 0.11168222346503147,
+      "mean_predicted": 0.13668184015093782,
+      "n": 5612,
+      "observed_rate": 0.12134711332858161,
+      "skill": 0.037759358981169444,
+      "underpowered": false
+    },
+    "low": {
+      "brier": 0.1379091933266769,
+      "brier_naive": 0.13909013432480724,
+      "mean_predicted": 0.16487351182497986,
+      "n": 13441,
+      "observed_rate": 0.16591027453314486,
+      "skill": 0.008490472770502744,
+      "underpowered": false
+    },
+    "mid": {
+      "brier": 0.1133430102664824,
+      "brier_naive": 0.11810479305302513,
+      "mean_predicted": 0.13850439016347485,
+      "n": 6867,
+      "observed_rate": 0.13178971894568225,
+      "skill": 0.0403182856804537,
+      "underpowered": false
+    }
+  },
+  "by_venue": {
+    "101": {
+      "brier": 0.12480935482873488,
+      "brier_naive": 0.12759632513273975,
+      "mean_predicted": 0.1517836808109259,
+      "n": 25920,
+      "observed_rate": 0.14722222222222223,
+      "skill": 0.021842089112719787,
+      "underpowered": false
+    }
+  },
+  "by_venue_bucket": {
+    "101/high": {
+      "brier": 0.10746517429740016,
+      "brier_naive": 0.11168222346503147,
+      "mean_predicted": 0.13668184015093782,
+      "n": 5612,
+      "observed_rate": 0.12134711332858161,
+      "skill": 0.037759358981169444,
+      "underpowered": false
+    },
+    "101/low": {
+      "brier": 0.1379091933266769,
+      "brier_naive": 0.13909013432480724,
+      "mean_predicted": 0.16487351182497986,
+      "n": 13441,
+      "observed_rate": 0.16591027453314486,
+      "skill": 0.008490472770502744,
+      "underpowered": false
+    },
+    "101/mid": {
+      "brier": 0.1133430102664824,
+      "brier_naive": 0.11810479305302513,
+      "mean_predicted": 0.13850439016347485,
+      "n": 6867,
+      "observed_rate": 0.13178971894568225,
+      "skill": 0.0403182856804537,
+      "underpowered": false
+    }
+  },
+  "eval_days": [
+    "2019-10-30",
+    "2019-12-30",
+    "2020-01-30"
+  ],
+  "fit_days": [
+    "2019-01-30",
+    "2019-03-27",
+    "2019-07-30",
+    "2019-08-30"
+  ],
+  "label": "tape-implied under the simulator's queue rules, not a measured real fill",
+  "level2": "not validated",
+  "model": {
+    "link": "cloglog",
+    "n_filled": 6652,
+    "n_samples": 34559
+  },
+  "n_eval": 25920,
+  "n_fit": 34559,
+  "naive_baseline_rate": 0.19248242136635899,
+  "overall": {
+    "brier": 0.12480935482873488,
+    "brier_naive": 0.12759632513273975,
+    "mean_predicted": 0.1517836808109259,
+    "n": 25920,
+    "observed_rate": 0.14722222222222223,
+    "skill": 0.021842089112719787,
+    "underpowered": false
+  },
+  "per_day": {
+    "2019-10-30": {
+      "brier": 0.10788920398275006,
+      "brier_naive": 0.10980016896181145,
+      "mean_predicted": 0.17898268807880502,
+      "n": 8640,
+      "observed_rate": 0.11828703703703704,
+      "skill": 0.017404025851053273,
+      "underpowered": false
+    },
+    "2019-12-30": {
+      "brier": 0.13747295508084656,
+      "brier_naive": 0.14048074220049184,
+      "mean_predicted": 0.16327783963785553,
+      "n": 8640,
+      "observed_rate": 0.1681712962962963,
+      "skill": 0.02141067218560544,
+      "underpowered": false
+    },
+    "2020-01-30": {
+      "brier": 0.12906590542260804,
+      "brier_naive": 0.13250806423591593,
+      "mean_predicted": 0.11309051471611714,
+      "n": 8640,
+      "observed_rate": 0.15520833333333334,
+      "skill": 0.02597697606675098,
+      "underpowered": false
+    }
+  },
+  "queue_ahead_edges_from_fit": [
+    128.0,
+    300.0
+  ],
+  "reliability": [
+    {
+      "bin_hi": 0.1,
+      "bin_lo": 0.0,
+      "mean_predicted": 0.07112704797746384,
+      "n": 6353,
+      "observed_rate": 0.10199905556430033
+    },
+    {
+      "bin_hi": 0.2,
+      "bin_lo": 0.1,
+      "mean_predicted": 0.1463859669513126,
+      "n": 14024,
+      "observed_rate": 0.14218482601254992
+    },
+    {
+      "bin_hi": 0.3,
+      "bin_lo": 0.2,
+      "mean_predicted": 0.23704829451007953,
+      "n": 4569,
+      "observed_rate": 0.20573429634493326
+    },
+    {
+      "bin_hi": 0.4,
+      "bin_lo": 0.3,
+      "mean_predicted": 0.3365936215076119,
+      "n": 815,
+      "observed_rate": 0.22576687116564417
+    },
+    {
+      "bin_hi": 0.5,
+      "bin_lo": 0.4,
+      "mean_predicted": 0.43400792201375316,
+      "n": 133,
+      "observed_rate": 0.2706766917293233
+    },
+    {
+      "bin_hi": 0.6,
+      "bin_lo": 0.5,
+      "mean_predicted": 0.5340618033130828,
+      "n": 21,
+      "observed_rate": 0.5238095238095238
+    },
+    {
+      "bin_hi": 0.7,
+      "bin_lo": 0.6,
+      "mean_predicted": 0.6220519301004753,
+      "n": 5,
+      "observed_rate": 0.6
+    },
+    {
+      "bin_hi": 0.8,
+      "bin_lo": 0.7,
+      "mean_predicted": null,
+      "n": 0,
+      "observed_rate": null
+    },
+    {
+      "bin_hi": 0.9,
+      "bin_lo": 0.8,
+      "mean_predicted": null,
+      "n": 0,
+      "observed_rate": null
+    },
+    {
+      "bin_hi": 1.0,
+      "bin_lo": 0.9,
+      "mean_predicted": null,
+      "n": 0,
+      "observed_rate": null
+    }
+  ],
+  "schema": "iap.fill_tape_test",
+  "symbol": "AAPL",
+  "ttl_ns": 1000000000,
+  "version": 1
+}
