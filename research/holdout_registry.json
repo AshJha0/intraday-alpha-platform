@@ -1,5 +1,5 @@
 {
-  "body_sha256": "3cd398c686a4f4925269e1c7cf274cc2982ed71218803ea3ad65c1db89a37c28",
+  "body_sha256": "1bec4bd6c28b1e063184d723a93cd2277e0075a0774d1db99be16d6dd1522a95",
   "datasets": {
     "00121a37bb26ac1d504f761f481d2786339ff9cc51bc3457dbf2b47eb87068ac": {
       "content_hash": "7589ed2c8ede152993547cc88362b067f68249110bfb18291e50c68a05792c5b",
@@ -428,6 +428,38 @@
         "AAPL",
         "MSFT",
         "QQQ"
+      ]
+    },
+    "e984166a2fffa36bbd7f00f6139302786efd07cf5c64d8cb6fef334a4302ff94": {
+      "content_hash": "d32eac4d75d3bc979c24b89fa1cd1d4cfdc21db281cafa3f7b330559a49a77ef",
+      "label": "r7x20_3day",
+      "sessions": [
+        "2019-10-18",
+        "2021-07-13",
+        "2021-08-13"
+      ],
+      "state": "in_sample",
+      "symbols": [
+        "AAPL",
+        "BYND",
+        "CCMP",
+        "CCRN",
+        "CHTR",
+        "COUP",
+        "CRWD",
+        "FBNC",
+        "FEYE",
+        "GBDC",
+        "GTLS",
+        "LSCC",
+        "MCBS",
+        "MRTN",
+        "MRVL",
+        "MSFT",
+        "PFPT",
+        "PLXS",
+        "PTEN",
+        "TREE"
       ]
     },
     "edb9b750a642befdbed19e5b877e959390befc438dd91e840838a4c167791e19": {

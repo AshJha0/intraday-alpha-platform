@@ -1,0 +1,344 @@
+{
+  "buckets": {
+    "L1": [
+      "AAPL",
+      "MSFT",
+      "PTEN",
+      "FEYE",
+      "MRVL",
+      "CRWD",
+      "COUP",
+      "BYND"
+    ],
+    "L2": [
+      "LSCC",
+      "GBDC",
+      "GTLS",
+      "MRTN",
+      "PFPT",
+      "CHTR"
+    ],
+    "L3": [
+      "CCRN",
+      "MCBS",
+      "PLXS",
+      "FBNC",
+      "CCMP",
+      "TREE"
+    ]
+  },
+  "cells": {
+    "L1P1": {
+      "n_candidates": 20,
+      "picked": [
+        "PTEN",
+        "FEYE"
+      ],
+      "shortfall": 0
+    },
+    "L1P2": {
+      "n_candidates": 60,
+      "picked": [
+        "MRVL",
+        "CRWD"
+      ],
+      "shortfall": 0
+    },
+    "L1P3": {
+      "n_candidates": 18,
+      "picked": [
+        "COUP",
+        "BYND"
+      ],
+      "shortfall": 0
+    },
+    "L2P1": {
+      "n_candidates": 147,
+      "picked": [
+        "LSCC",
+        "GBDC"
+      ],
+      "shortfall": 0
+    },
+    "L2P2": {
+      "n_candidates": 193,
+      "picked": [
+        "GTLS",
+        "MRTN"
+      ],
+      "shortfall": 0
+    },
+    "L2P3": {
+      "n_candidates": 60,
+      "picked": [
+        "PFPT",
+        "CHTR"
+      ],
+      "shortfall": 0
+    },
+    "L3P1": {
+      "n_candidates": 403,
+      "picked": [
+        "CCRN",
+        "MCBS"
+      ],
+      "shortfall": 0
+    },
+    "L3P2": {
+      "n_candidates": 438,
+      "picked": [
+        "PLXS",
+        "FBNC"
+      ],
+      "shortfall": 0
+    },
+    "L3P3": {
+      "n_candidates": 58,
+      "picked": [
+        "CCMP",
+        "TREE"
+      ],
+      "shortfall": 0
+    }
+  },
+  "later_sessions": [
+    "2021-07-13",
+    "2021-08-13"
+  ],
+  "measured_utc": "2026-10-20T06:41:26+00:00",
+  "messages_read": 302347067,
+  "n_dropped_absent_later": 146,
+  "n_eligible": 1399,
+  "n_symbols_with_directory": 8886,
+  "rule": "one pass over the 2019-10-18 full-market ITCH day; eligible = common stock (issue classification C), Nasdaq-listed (category Q/G/S), not test, not ETP, price >= $5 (closing cross, else last print), displayed regular-hours volume > 0; liquidity rank by displayed regular-hours volume; L1 1-100, L2 101-500, L3 501-1500; P1 [$5,$20), P2 [$20,$100), P3 >= $100; AAPL and MSFT anchors; per (L,P) cell the names at 0-based positions floor(n/3) and floor(2n/3) by rank, anchors excluded; at most 20 names; shortfalls recorded, never back-filled",
+  "rule_version": "rel04c_universe/v1",
+  "schema": "iap.rel04c_universe/v1",
+  "selection_date": "2019-10-18",
+  "source_file": "S101819-v50.txt.gz",
+  "source_sha256": "390acb4df5a01d3d8e6c34557858604ac7c655c8edc0a9e312da3c032c5d8da4",
+  "survivorship_note": "fixed on 2019-10-18; a name missing on 2021-07-13 or 2021-08-13 is reported missing for that day and never replaced",
+  "symbols": [
+    "AAPL",
+    "MSFT",
+    "PTEN",
+    "FEYE",
+    "MRVL",
+    "CRWD",
+    "COUP",
+    "BYND",
+    "LSCC",
+    "GBDC",
+    "GTLS",
+    "MRTN",
+    "PFPT",
+    "CHTR",
+    "CCRN",
+    "MCBS",
+    "PLXS",
+    "FBNC",
+    "CCMP",
+    "TREE"
+  ],
+  "universe": [
+    {
+      "displayed_volume": 3805871,
+      "liq_bucket": "L1",
+      "market_category": "Q",
+      "price": 236.41,
+      "price_bucket": "P3",
+      "rank": 7,
+      "role": "anchor",
+      "symbol": "AAPL"
+    },
+    {
+      "displayed_volume": 5392033,
+      "liq_bucket": "L1",
+      "market_category": "Q",
+      "price": 137.41,
+      "price_bucket": "P3",
+      "rank": 2,
+      "role": "anchor",
+      "symbol": "MSFT"
+    },
+    {
+      "displayed_volume": 992017,
+      "liq_bucket": "L1",
+      "market_category": "Q",
+      "price": 7.83,
+      "price_bucket": "P1",
+      "rank": 34,
+      "role": "cell",
+      "symbol": "PTEN"
+    },
+    {
+      "displayed_volume": 712648,
+      "liq_bucket": "L1",
+      "market_category": "Q",
+      "price": 15.235,
+      "price_bucket": "P1",
+      "rank": 58,
+      "role": "cell",
+      "symbol": "FEYE"
+    },
+    {
+      "displayed_volume": 952703,
+      "liq_bucket": "L1",
+      "market_category": "Q",
+      "price": 23.68,
+      "price_bucket": "P2",
+      "rank": 36,
+      "role": "cell",
+      "symbol": "MRVL"
+    },
+    {
+      "displayed_volume": 578310,
+      "liq_bucket": "L1",
+      "market_category": "Q",
+      "price": 47.04,
+      "price_bucket": "P2",
+      "rank": 73,
+      "role": "cell",
+      "symbol": "CRWD"
+    },
+    {
+      "displayed_volume": 950639,
+      "liq_bucket": "L1",
+      "market_category": "Q",
+      "price": 127.89,
+      "price_bucket": "P3",
+      "rank": 37,
+      "role": "cell",
+      "symbol": "COUP"
+    },
+    {
+      "displayed_volume": 682914,
+      "liq_bucket": "L1",
+      "market_category": "Q",
+      "price": 109.99,
+      "price_bucket": "P3",
+      "rank": 62,
+      "role": "cell",
+      "symbol": "BYND"
+    },
+    {
+      "displayed_volume": 173955,
+      "liq_bucket": "L2",
+      "market_category": "Q",
+      "price": 19.36,
+      "price_bucket": "P1",
+      "rank": 259,
+      "role": "cell",
+      "symbol": "LSCC"
+    },
+    {
+      "displayed_volume": 105317,
+      "liq_bucket": "L2",
+      "market_category": "Q",
+      "price": 17.93,
+      "price_bucket": "P1",
+      "rank": 377,
+      "role": "cell",
+      "symbol": "GBDC"
+    },
+    {
+      "displayed_volume": 189556,
+      "liq_bucket": "L2",
+      "market_category": "Q",
+      "price": 58.09,
+      "price_bucket": "P2",
+      "rank": 242,
+      "role": "cell",
+      "symbol": "GTLS"
+    },
+    {
+      "displayed_volume": 105965,
+      "liq_bucket": "L2",
+      "market_category": "Q",
+      "price": 21.59,
+      "price_bucket": "P2",
+      "rank": 373,
+      "role": "cell",
+      "symbol": "MRTN"
+    },
+    {
+      "displayed_volume": 259649,
+      "liq_bucket": "L2",
+      "market_category": "G",
+      "price": 119.44,
+      "price_bucket": "P3",
+      "rank": 178,
+      "role": "cell",
+      "symbol": "PFPT"
+    },
+    {
+      "displayed_volume": 140229,
+      "liq_bucket": "L2",
+      "market_category": "Q",
+      "price": 440.05,
+      "price_bucket": "P3",
+      "rank": 317,
+      "role": "cell",
+      "symbol": "CHTR"
+    },
+    {
+      "displayed_volume": 22597,
+      "liq_bucket": "L3",
+      "market_category": "Q",
+      "price": 10.575,
+      "price_bucket": "P1",
+      "rank": 853,
+      "role": "cell",
+      "symbol": "CCRN"
+    },
+    {
+      "displayed_volume": 6507,
+      "liq_bucket": "L3",
+      "market_category": "Q",
+      "price": 13.43,
+      "price_bucket": "P1",
+      "rank": 1121,
+      "role": "cell",
+      "symbol": "MCBS"
+    },
+    {
+      "displayed_volume": 28122,
+      "liq_bucket": "L3",
+      "market_category": "Q",
+      "price": 64.38,
+      "price_bucket": "P2",
+      "rank": 789,
+      "role": "cell",
+      "symbol": "PLXS"
+    },
+    {
+      "displayed_volume": 9002,
+      "liq_bucket": "L3",
+      "market_category": "Q",
+      "price": 36.74,
+      "price_bucket": "P2",
+      "rank": 1069,
+      "role": "cell",
+      "symbol": "FBNC"
+    },
+    {
+      "displayed_volume": 41006,
+      "liq_bucket": "L3",
+      "market_category": "Q",
+      "price": 146.13,
+      "price_bucket": "P3",
+      "rank": 652,
+      "role": "cell",
+      "symbol": "CCMP"
+    },
+    {
+      "displayed_volume": 14635,
+      "liq_bucket": "L3",
+      "market_category": "Q",
+      "price": 314.25,
+      "price_bucket": "P3",
+      "rank": 968,
+      "role": "cell",
+      "symbol": "TREE"
+    }
+  ]
+}
