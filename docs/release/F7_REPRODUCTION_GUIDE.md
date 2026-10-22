@@ -91,14 +91,14 @@ PYTHONPATH=python/src python research/execution/b8v2/run_b8v2.py analyse --out r
 sha256sum repro/b8v2/DECISION.json repro/b8v2/REPORT.md      # compare with section 3.4
 ```
 
-`analyse` reads only the two headline files; the six sensitivity files (`s1`, `s2`, `s3`) are
-inputs to the report text via the declaration, not to `analyse`, so check them in tier C.
+`analyse` reads only the two headline files (`benchmark_v2_oos3_{AAPL,MSFT}.json`); the six sensitivity
+files are not inputs to `analyse`, so they are checked only in tier C.
 Expected: byte-identical `DECISION.json` and `REPORT.md`.
 
 ### 3.2 Tier C: full re-run
 
 Use the owner's wrapper as the template (`research/execution/b8v2/run_b8v2.cmd`; it hard-codes
-`DATA=C:\Work\Claude\...\data\real`, see finding F-3). The core command, from a clean checkout at
+`DATA=C:\Work\Claude\...\data\real`, see the findings in the PR description). The core command, from a clean checkout at
 `83f08210`, with `IAP_RUN_ACTOR` set to anything but `ashjha0` and no signing key in the environment:
 
 ```bash
@@ -119,9 +119,8 @@ Settings that matter and are pinned in `predeclaration.json`: seed `20260829`, `
 
 Time and memory: owner's run 2026-10-19 09:36 to 2026-10-20 01:00 UTC, **15 h 24 min** on the
 owner's workstation (the oos6 run took about 95 min for AAPL and 50 min for MSFT per the older
-`REPORT_oos6.md` on fewer cells). Peak RAM was not recorded (finding F-6); the oos6 report says QQQ
-was skipped for memory, so plan for a machine that does not swap on one 12 to 16 GB compressed
-session pair.
+`REPORT_oos6.md` on fewer cells). Peak RAM was not recorded (not recorded in the run manifest); the oos6 report says QQQ
+was skipped for memory, so plan for a machine with ample RAM and say what you used.
 
 ### 3.3 Data you must fetch (Tier C)
 
@@ -139,7 +138,7 @@ same version, and the runner checks it before any analysis. Ingest procedure:
 `docs/runbooks/RUNBOOK_process_and_delete.md` ("IEX HIST days", `process-iex-day`) for the IEX
 days, `python -m iap.marketdata ingest --format itch50 ...` for Nasdaq
 (`docs/REAL_DATA.md` section 3, `docs/runbooks/RUNBOOK_rel07_breadth_labels.md` for an example).
-**The exact ingest invocation per dataset is not recorded in the repository** (finding F-5); the
+**The exact ingest invocation per dataset is not recorded in the repository** (not recorded in the repository); the
 per-session `inputs` and `raw_sha256` in `research/data_manifest.json` are.
 
 **Licensing.** The owner cannot redistribute any of this, raw or normalized (`docs/REAL_DATA.md`
@@ -209,8 +208,8 @@ Data: the seven `ds3_*` Nasdaq sessions (2019-01-30, 03-27, 07-30, 08-30, 10-30,
 `research/data_manifest.json`; raw: Nasdaq ITCH sample files `01302019.NASDAQ_ITCH50.gz` and
 siblings from the Nasdaq public directory. Requires at least **6.0 GB free RAM** (declared stop
 rule; owner's run saw 8.5 GB free). Wall: 13:13 to 13:24 UTC, **11 min 44 s**.
-Expected: `DECISION.json` says the model is supported on all symbols is `true`/`false` as in the
-file hashed below; it states in `cannot_claim` that Level 2 is not reachable (decision D4a).
+Expected: `DECISION.json` has `model_supported_on_all_symbols: false` and states in `cannot_claim` that
+Level 2 is not reachable (decision D4a).
 
 ### 4.2 REL-09 stale-quote protection
 
@@ -244,7 +243,7 @@ but the dataset directory is not a download: the owner's wrapper (`data/real/run
 9a1297a161fc69c47a770dcab4e3e09d5ecd34e1d2a96b44209011485038041d`, builds the store with
 `python -m iap.features --engine rust --workers 1 --xasset-reference symbol_map --labels-v2 1m`
 and then runs the screen. Ingest alone is quoted at up to about 6 h in the wrapper comments. The
-Rust feature engine needs a Rust toolchain or the prebuilt binary (finding F-8).
+`--engine rust` step needs the Rust feature binary; how a reviewer gets it is not documented (unverified).
 It also runs at a commit with `python/src/iap` tree `eca491a2` (not `main`).
 
 Expected: every variant (V1, V2, V5, V6, V9, V10, V11) `underpowered`; summary `continue: []`.
