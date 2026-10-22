@@ -1,0 +1,512 @@
+{
+  "band": [
+    0.05,
+    0.6
+  ],
+  "consolidated_adv": {
+    "AAPL": 61520166.666666664,
+    "BYND": 2201600.0022016005,
+    "CHTR": 663533.3333333334,
+    "CRWD": 2560933.3333333335,
+    "FBNC": 85300.0,
+    "GBDC": 493400.097943193,
+    "LSCC": 552433.3333333334,
+    "MCBS": 20200.0,
+    "MRTN": 277333.3333333333,
+    "MRVL": 4445633.333333333,
+    "MSFT": 25547533.333333332,
+    "PLXS": 75366.66666666667,
+    "PTEN": 2790833.3333333335,
+    "TREE": 128600.0
+  },
+  "flagged": [
+    "FBNC@2021-08-13"
+  ],
+  "median_ratio": 0.37000648944908976,
+  "note": "Nasdaq-only regular-session volume is a fraction of consolidated volume (Yahoo's daily figure includes all venues, TRF prints and extended hours); a flag is a prompt to look, not a failure. consolidated_adv is the mean over the three benchmark days themselves (contemporaneous, not a trailing ADV)",
+  "rows": [
+    {
+      "consolidated": 24358400.0,
+      "date": "2019-10-18",
+      "nasdaq": 8178814,
+      "ratio": 0.3357697549921177,
+      "symbol": "AAPL"
+    },
+    {
+      "consolidated": 3818790.0038187904,
+      "date": "2019-10-18",
+      "nasdaq": 1099754,
+      "ratio": 0.28798493734932945,
+      "symbol": "BYND"
+    },
+    {
+      "consolidated": null,
+      "date": "2019-10-18",
+      "nasdaq": 76797,
+      "ratio": null,
+      "reason": "Yahoo: no data found (symbol delisted)",
+      "status": "unavailable",
+      "symbol": "CCMP"
+    },
+    {
+      "consolidated": null,
+      "date": "2019-10-18",
+      "nasdaq": 52163,
+      "ratio": null,
+      "reason": "Yahoo: no data found (symbol delisted)",
+      "status": "unavailable",
+      "symbol": "CCRN"
+    },
+    {
+      "consolidated": 821700.0,
+      "date": "2019-10-18",
+      "nasdaq": 414243,
+      "ratio": 0.5041292442497262,
+      "symbol": "CHTR"
+    },
+    {
+      "consolidated": null,
+      "date": "2019-10-18",
+      "nasdaq": 1372362,
+      "ratio": null,
+      "reason": "Yahoo: no data found (symbol delisted)",
+      "status": "unavailable",
+      "symbol": "COUP"
+    },
+    {
+      "consolidated": 3669100.0,
+      "date": "2019-10-18",
+      "nasdaq": 832880,
+      "ratio": 0.22699844648551415,
+      "symbol": "CRWD"
+    },
+    {
+      "consolidated": 69100.0,
+      "date": "2019-10-18",
+      "nasdaq": 25762,
+      "ratio": 0.372821997105644,
+      "symbol": "FBNC"
+    },
+    {
+      "consolidated": null,
+      "date": "2019-10-18",
+      "nasdaq": 1024406,
+      "ratio": null,
+      "reason": "Yahoo: no data found (symbol delisted)",
+      "status": "unavailable",
+      "symbol": "FEYE"
+    },
+    {
+      "consolidated": 672700.2938295789,
+      "date": "2019-10-18",
+      "nasdaq": 154765,
+      "ratio": 0.2300653075665342,
+      "symbol": "GBDC"
+    },
+    {
+      "consolidated": null,
+      "date": "2019-10-18",
+      "nasdaq": 346081,
+      "ratio": null,
+      "reason": "Yahoo: no data found (symbol delisted)",
+      "status": "unavailable",
+      "symbol": "GTLS"
+    },
+    {
+      "consolidated": 823900.0,
+      "date": "2019-10-18",
+      "nasdaq": 334823,
+      "ratio": 0.4063879111542663,
+      "symbol": "LSCC"
+    },
+    {
+      "consolidated": 22500.0,
+      "date": "2019-10-18",
+      "nasdaq": 11912,
+      "ratio": 0.5294222222222222,
+      "symbol": "MCBS"
+    },
+    {
+      "consolidated": 422100.0,
+      "date": "2019-10-18",
+      "nasdaq": 160703,
+      "ratio": 0.38072257758824923,
+      "symbol": "MRTN"
+    },
+    {
+      "consolidated": 5877200.0,
+      "date": "2019-10-18",
+      "nasdaq": 1866409,
+      "ratio": 0.3175677193221262,
+      "symbol": "MRVL"
+    },
+    {
+      "consolidated": 32273500.0,
+      "date": "2019-10-18",
+      "nasdaq": 11287232,
+      "ratio": 0.3497368429206625,
+      "symbol": "MSFT"
+    },
+    {
+      "consolidated": null,
+      "date": "2019-10-18",
+      "nasdaq": 393604,
+      "ratio": null,
+      "reason": "Yahoo: no data found (symbol delisted)",
+      "status": "unavailable",
+      "symbol": "PFPT"
+    },
+    {
+      "consolidated": 95100.0,
+      "date": "2019-10-18",
+      "nasdaq": 51609,
+      "ratio": 0.5426813880126183,
+      "symbol": "PLXS"
+    },
+    {
+      "consolidated": 6052600.0,
+      "date": "2019-10-18",
+      "nasdaq": 1344595,
+      "ratio": 0.22215163731289034,
+      "symbol": "PTEN"
+    },
+    {
+      "consolidated": 68000.0,
+      "date": "2019-10-18",
+      "nasdaq": 26380,
+      "ratio": 0.38794117647058823,
+      "symbol": "TREE"
+    },
+    {
+      "consolidated": 100827100.0,
+      "date": "2021-07-13",
+      "nasdaq": 17346416,
+      "ratio": 0.17204120717545185,
+      "symbol": "AAPL"
+    },
+    {
+      "consolidated": 1553310.00155331,
+      "date": "2021-07-13",
+      "nasdaq": 493231,
+      "ratio": 0.3175354562236572,
+      "symbol": "BYND"
+    },
+    {
+      "consolidated": null,
+      "date": "2021-07-13",
+      "nasdaq": 81678,
+      "ratio": null,
+      "reason": "Yahoo: no data found (symbol delisted)",
+      "status": "unavailable",
+      "symbol": "CCMP"
+    },
+    {
+      "consolidated": null,
+      "date": "2021-07-13",
+      "nasdaq": 120414,
+      "ratio": null,
+      "reason": "Yahoo: no data found (symbol delisted)",
+      "status": "unavailable",
+      "symbol": "CCRN"
+    },
+    {
+      "consolidated": 705900.0,
+      "date": "2021-07-13",
+      "nasdaq": 239608,
+      "ratio": 0.3394361807621476,
+      "symbol": "CHTR"
+    },
+    {
+      "consolidated": null,
+      "date": "2021-07-13",
+      "nasdaq": 324134,
+      "ratio": null,
+      "reason": "Yahoo: no data found (symbol delisted)",
+      "status": "unavailable",
+      "symbol": "COUP"
+    },
+    {
+      "consolidated": 2246300.0,
+      "date": "2021-07-13",
+      "nasdaq": 654951,
+      "ratio": 0.2915688020300049,
+      "symbol": "CRWD"
+    },
+    {
+      "consolidated": 143900.0,
+      "date": "2021-07-13",
+      "nasdaq": 80845,
+      "ratio": 0.5618137595552467,
+      "symbol": "FBNC"
+    },
+    {
+      "consolidated": null,
+      "date": "2021-07-13",
+      "nasdaq": 739588,
+      "ratio": null,
+      "reason": "Yahoo: no data found (symbol delisted)",
+      "status": "unavailable",
+      "symbol": "FEYE"
+    },
+    {
+      "consolidated": 552300.0,
+      "date": "2021-07-13",
+      "nasdaq": 110429,
+      "ratio": 0.1999438710845555,
+      "symbol": "GBDC"
+    },
+    {
+      "consolidated": null,
+      "date": "2021-07-13",
+      "nasdaq": 46470,
+      "ratio": null,
+      "reason": "Yahoo: no data found (symbol delisted)",
+      "status": "unavailable",
+      "symbol": "GTLS"
+    },
+    {
+      "consolidated": 412500.0,
+      "date": "2021-07-13",
+      "nasdaq": 216107,
+      "ratio": 0.5238957575757576,
+      "symbol": "LSCC"
+    },
+    {
+      "consolidated": 17900.0,
+      "date": "2021-07-13",
+      "nasdaq": 7695,
+      "ratio": 0.42988826815642456,
+      "symbol": "MCBS"
+    },
+    {
+      "consolidated": 236600.0,
+      "date": "2021-07-13",
+      "nasdaq": 99171,
+      "ratio": 0.4191504649196957,
+      "symbol": "MRTN"
+    },
+    {
+      "consolidated": 4304700.0,
+      "date": "2021-07-13",
+      "nasdaq": 1408565,
+      "ratio": 0.32721560155179225,
+      "symbol": "MRVL"
+    },
+    {
+      "consolidated": 26120100.0,
+      "date": "2021-07-13",
+      "nasdaq": 7858219,
+      "ratio": 0.3008494990447969,
+      "symbol": "MSFT"
+    },
+    {
+      "consolidated": null,
+      "date": "2021-07-13",
+      "nasdaq": 223085,
+      "ratio": null,
+      "reason": "Yahoo: no data found (symbol delisted)",
+      "status": "unavailable",
+      "symbol": "PFPT"
+    },
+    {
+      "consolidated": 83300.0,
+      "date": "2021-07-13",
+      "nasdaq": 32930,
+      "ratio": 0.3953181272509004,
+      "symbol": "PLXS"
+    },
+    {
+      "consolidated": 1307600.0,
+      "date": "2021-07-13",
+      "nasdaq": 429363,
+      "ratio": 0.3283595900887121,
+      "symbol": "PTEN"
+    },
+    {
+      "consolidated": 180600.0,
+      "date": "2021-07-13",
+      "nasdaq": 67965,
+      "ratio": 0.37632890365448507,
+      "symbol": "TREE"
+    },
+    {
+      "consolidated": 59375000.0,
+      "date": "2021-08-13",
+      "nasdaq": 10998418,
+      "ratio": 0.1852365136842105,
+      "symbol": "AAPL"
+    },
+    {
+      "consolidated": 1232700.0012327002,
+      "date": "2021-08-13",
+      "nasdaq": 456107,
+      "ratio": 0.37000648944908976,
+      "symbol": "BYND"
+    },
+    {
+      "consolidated": null,
+      "date": "2021-08-13",
+      "nasdaq": 144460,
+      "ratio": null,
+      "reason": "Yahoo: no data found (symbol delisted)",
+      "status": "unavailable",
+      "symbol": "CCMP"
+    },
+    {
+      "consolidated": null,
+      "date": "2021-08-13",
+      "nasdaq": 57895,
+      "ratio": null,
+      "reason": "Yahoo: no data found (symbol delisted)",
+      "status": "unavailable",
+      "symbol": "CCRN"
+    },
+    {
+      "consolidated": 463000.0,
+      "date": "2021-08-13",
+      "nasdaq": 241014,
+      "ratio": 0.520548596112311,
+      "symbol": "CHTR"
+    },
+    {
+      "consolidated": null,
+      "date": "2021-08-13",
+      "nasdaq": 124613,
+      "ratio": null,
+      "reason": "Yahoo: no data found (symbol delisted)",
+      "status": "unavailable",
+      "symbol": "COUP"
+    },
+    {
+      "consolidated": 1767400.0,
+      "date": "2021-08-13",
+      "nasdaq": 539709,
+      "ratio": 0.3053689034740297,
+      "symbol": "CRWD"
+    },
+    {
+      "consolidated": 42900.0,
+      "date": "2021-08-13",
+      "flag": "outside_band",
+      "nasdaq": 26294,
+      "ratio": 0.6129137529137529,
+      "symbol": "FBNC"
+    },
+    {
+      "consolidated": null,
+      "date": "2021-08-13",
+      "nasdaq": 784149,
+      "ratio": null,
+      "reason": "Yahoo: no data found (symbol delisted)",
+      "status": "unavailable",
+      "symbol": "FEYE"
+    },
+    {
+      "consolidated": 255200.0,
+      "date": "2021-08-13",
+      "nasdaq": 59446,
+      "ratio": 0.23293887147335424,
+      "symbol": "GBDC"
+    },
+    {
+      "consolidated": null,
+      "date": "2021-08-13",
+      "nasdaq": 60459,
+      "ratio": null,
+      "reason": "Yahoo: no data found (symbol delisted)",
+      "status": "unavailable",
+      "symbol": "GTLS"
+    },
+    {
+      "consolidated": 420900.0,
+      "date": "2021-08-13",
+      "nasdaq": 208601,
+      "ratio": 0.4956070325492991,
+      "symbol": "LSCC"
+    },
+    {
+      "consolidated": 20200.0,
+      "date": "2021-08-13",
+      "nasdaq": 5481,
+      "ratio": 0.27133663366336636,
+      "symbol": "MCBS"
+    },
+    {
+      "consolidated": 173300.0,
+      "date": "2021-08-13",
+      "nasdaq": 79099,
+      "ratio": 0.4564281592613964,
+      "symbol": "MRTN"
+    },
+    {
+      "consolidated": 3155000.0,
+      "date": "2021-08-13",
+      "nasdaq": 1046369,
+      "ratio": 0.33165419968304277,
+      "symbol": "MRVL"
+    },
+    {
+      "consolidated": 18249000.0,
+      "date": "2021-08-13",
+      "nasdaq": 4519567,
+      "ratio": 0.24766107731930517,
+      "symbol": "MSFT"
+    },
+    {
+      "consolidated": null,
+      "date": "2021-08-13",
+      "nasdaq": 350397,
+      "ratio": null,
+      "reason": "Yahoo: no data found (symbol delisted)",
+      "status": "unavailable",
+      "symbol": "PFPT"
+    },
+    {
+      "consolidated": 47700.0,
+      "date": "2021-08-13",
+      "nasdaq": 22161,
+      "ratio": 0.46459119496855344,
+      "symbol": "PLXS"
+    },
+    {
+      "consolidated": 1012300.0,
+      "date": "2021-08-13",
+      "nasdaq": 385419,
+      "ratio": 0.38073594784154896,
+      "symbol": "PTEN"
+    },
+    {
+      "consolidated": 137200.0,
+      "date": "2021-08-13",
+      "nasdaq": 59012,
+      "ratio": 0.43011661807580176,
+      "symbol": "TREE"
+    }
+  ],
+  "schema": "iap.rel04c_volume_check/v1",
+  "source": "https://query1.finance.yahoo.com/v8/finance/chart/<SYMBOL>?interval=1d&events=split (the data behind finance.yahoo.com/quote/<SYMBOL>/history), retrieved 2026-10-20 by Claude in the built-in browser; volume is Yahoo's split-adjusted consolidated daily volume",
+  "unavailable": {
+    "CCMP": "Yahoo: no data found (symbol delisted)",
+    "CCRN": "Yahoo: no data found (symbol delisted)",
+    "COUP": "Yahoo: no data found (symbol delisted)",
+    "FEYE": "Yahoo: no data found (symbol delisted)",
+    "GTLS": "Yahoo: no data found (symbol delisted)",
+    "PFPT": "Yahoo: no data found (symbol delisted)"
+  },
+  "validated_symbols": [
+    "AAPL",
+    "BYND",
+    "CHTR",
+    "CRWD",
+    "FBNC",
+    "GBDC",
+    "LSCC",
+    "MCBS",
+    "MRTN",
+    "MRVL",
+    "MSFT",
+    "PLXS",
+    "PTEN",
+    "TREE"
+  ]
+}
