@@ -1,9 +1,9 @@
 {
   "schema": "iap.rel04c_predeclaration/v1",
   "item": "REL-04c",
-  "status": "draft",
-  "frozen_by": null,
-  "frozen_utc": null,
+  "status": "frozen",
+  "frozen_by": "Claude (coordinator) under owner delegation: owner approved fetching Yahoo volumes, option 1 and the recommended parameters on 2026-10-20 and 2026-10-22",
+  "frozen_utc": "2026-10-22T08:03:32+00:00",
   "result_class": "secondary",
   "label": "single-venue (Nasdaq) execution benchmark v2 on a 20-name universe, three in-sample days, per liquidity bucket; SECONDARY, no promotion, no edge claim",
   "universe_rule": "rel04c_universe/v1 (python/src/iap/research/rel04c_universe.py; research/execution/rel04c/README.md)",

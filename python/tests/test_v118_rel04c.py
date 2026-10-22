@@ -582,7 +582,7 @@ def test_shipped_yahoo_volume_is_consistent():
     assert len(filled) == 14 and not filled & set(y["_unavailable"])
     for d in dates:
         assert set(y["volume"][d]) == set(y["split_factor"][d]) == filled
-    assert pre["status"] == "draft"
+    assert pre["status"] == "frozen" and pre["frozen_by"] and pre["frozen_utc"]
     assert pre["parameters"]["sizes_target_pct_consolidated_adv"] == [
         0.037,
         0.185,
