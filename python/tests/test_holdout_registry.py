@@ -81,6 +81,7 @@ def test_committed_registry_is_sealed_and_seeded_from_the_inventory():
     assert by_label["holdout2026"]["state"] == "spent"
     assert by_label["r7_holdout"]["state"] == "spent"
     assert by_label["multi7"]["state"] == "in_sample"
+    assert by_label["r7x20_3day"]["state"] == "in_sample"  # REL-04c 3-day dataset (2019/2021 days)
     assert by_label["ds_20190130"]["state"] == "in_sample"  # the 100-name breadth day
     # the 2025/26 days: spent for the three registered names, UNREAD for every other name
     rules = reg["sessions"]["2025-12-08"]

@@ -2988,6 +2988,299 @@
         }
       },
       "status": null
+    },
+    {
+      "path": "rel04c/r7x20_3day",
+      "dataset_version": "e984166a2fffa36bbd7f00f6139302786efd07cf5c64d8cb6fef334a4302ff94",
+      "kind": "real",
+      "venue": "XNAS",
+      "format": "itch50",
+      "layout": "slim",
+      "universe": [
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 1,
+          "lot_size": 100,
+          "symbol": "AAPL",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 2,
+          "lot_size": 100,
+          "symbol": "BYND",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 3,
+          "lot_size": 100,
+          "symbol": "CCMP",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 4,
+          "lot_size": 100,
+          "symbol": "CCRN",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 5,
+          "lot_size": 100,
+          "symbol": "CHTR",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 6,
+          "lot_size": 100,
+          "symbol": "COUP",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 7,
+          "lot_size": 100,
+          "symbol": "CRWD",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 8,
+          "lot_size": 100,
+          "symbol": "FBNC",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 9,
+          "lot_size": 100,
+          "symbol": "FEYE",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 10,
+          "lot_size": 100,
+          "symbol": "GBDC",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 11,
+          "lot_size": 100,
+          "symbol": "GTLS",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 12,
+          "lot_size": 100,
+          "symbol": "LSCC",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 13,
+          "lot_size": 100,
+          "symbol": "MCBS",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 14,
+          "lot_size": 100,
+          "symbol": "MRTN",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 15,
+          "lot_size": 100,
+          "symbol": "MRVL",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 16,
+          "lot_size": 100,
+          "symbol": "MSFT",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 17,
+          "lot_size": 100,
+          "symbol": "PFPT",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 18,
+          "lot_size": 100,
+          "symbol": "PLXS",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 19,
+          "lot_size": 100,
+          "symbol": "PTEN",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 20,
+          "lot_size": 100,
+          "symbol": "TREE",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        }
+      ],
+      "config_version": "5a3f596b6c83b74a9cc5bf40b12a05387ef0618d33eca0cb06f65b41996a28e1",
+      "dataset_json_sha256": "d7449ee2828c12bbba40d02183a39c87752dde5a360fddd61231e1dae56d6ec0",
+      "keep_json_sha256": null,
+      "oracle_inputs": [],
+      "normalized_files": {
+        "eq_20191018.normalized.iap1": "38fd7da836027cde7e69e66eeb160f5bb9906dcb70a59431aa8d45e33abcd293",
+        "eq_20210713.normalized.iap1": "4c9f38c732e54b4e4bdce0bf98de399fe80e3fc93d24df4f6bd98cbe539bde60",
+        "eq_20210813.normalized.iap1": "0f94c7bb8c73c6c06be5779f6f9f1fe3ec01aa31e1b0c8a68988f02ee50cbb09"
+      },
+      "sessions": {
+        "2019-10-18": {
+          "format": "itch50",
+          "symbols": [
+            "AAPL",
+            "BYND",
+            "CCMP",
+            "CCRN",
+            "CHTR",
+            "COUP",
+            "CRWD",
+            "FBNC",
+            "FEYE",
+            "GBDC",
+            "GTLS",
+            "LSCC",
+            "MCBS",
+            "MRTN",
+            "MRVL",
+            "MSFT",
+            "PFPT",
+            "PLXS",
+            "PTEN",
+            "TREE"
+          ],
+          "inputs": [
+            {
+              "file": "S101819-v50.txt.gz",
+              "sha256": "390acb4df5a01d3d8e6c34557858604ac7c655c8edc0a9e312da3c032c5d8da4",
+              "bytes": 3951201663
+            }
+          ],
+          "raw_sha256": "8563eccb20e4f4ce9cca282904d3969b32c428785f8bdb2ae1de727ab98fbd84",
+          "status": {
+            "purpose": "v1.16 monetisation, AI4 train and validation",
+            "spend": "in-sample"
+          }
+        },
+        "2021-07-13": {
+          "format": "itch50",
+          "symbols": [
+            "AAPL",
+            "BYND",
+            "CCMP",
+            "CCRN",
+            "CHTR",
+            "COUP",
+            "CRWD",
+            "FBNC",
+            "FEYE",
+            "GBDC",
+            "GTLS",
+            "LSCC",
+            "MCBS",
+            "MRTN",
+            "MRVL",
+            "MSFT",
+            "PFPT",
+            "PLXS",
+            "PTEN",
+            "TREE"
+          ],
+          "inputs": [
+            {
+              "file": "S071321-v50.txt.gz",
+              "sha256": "b39b72621a8bc3ff92601701e0e9bd93afbdf30fea2fd68cdbe83c6b0bfb8ccd",
+              "bytes": 5996745270
+            }
+          ],
+          "raw_sha256": "b053bfde92a980d20d362cdf0b783523cf4b0e815545bba33f77239273055f9d",
+          "status": {
+            "purpose": "v1.16 monetisation, AI4 train and validation",
+            "spend": "in-sample"
+          }
+        },
+        "2021-08-13": {
+          "format": "itch50",
+          "symbols": [
+            "AAPL",
+            "BYND",
+            "CCMP",
+            "CCRN",
+            "CHTR",
+            "COUP",
+            "CRWD",
+            "FBNC",
+            "FEYE",
+            "GBDC",
+            "GTLS",
+            "LSCC",
+            "MCBS",
+            "MRTN",
+            "MRVL",
+            "MSFT",
+            "PFPT",
+            "PLXS",
+            "PTEN",
+            "TREE"
+          ],
+          "inputs": [
+            {
+              "file": "S081321-v50.txt.gz",
+              "sha256": "64f4f1b076164ee72971d87fb548ae73cb924e2e45a73de059cc77328bcde4e7",
+              "bytes": 4889328604
+            }
+          ],
+          "raw_sha256": "88abee460b3d45c34d6830265430ec4bc02a26a52f0c2f863b7863cfa4424127",
+          "status": {
+            "purpose": "v1.16 monetisation, AI4 train and validation",
+            "spend": "in-sample"
+          }
+        }
+      },
+      "status": null
     }
   ],
   "non_disk": [
