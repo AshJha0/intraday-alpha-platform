@@ -392,9 +392,7 @@ def test_committed_predeclaration_is_a_draft_with_open_parameters(env):
     doc = json.loads(committed.read_text())
     assert doc["result_class"] == "secondary"
     assert set(job.REQUIRED_PARAMS) == set(doc["parameters"])
-    assert [k for k, v in doc["parameters"].items() if v is None] == [
-        "sizes_target_pct_consolidated_adv"
-    ]
+    assert [k for k, v in doc["parameters"].items() if v is None] == []  # all filled, still a draft
 
 
 @pytest.mark.parametrize(
