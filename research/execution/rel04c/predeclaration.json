@@ -44,7 +44,12 @@
       1,
       2
     ],
-    "sizes_target_pct_consolidated_adv": null,
+    "sizes_target_pct_consolidated_adv": [
+      0.037,
+      0.185,
+      0.37,
+      0.74
+    ],
     "window_min": 30,
     "mde_report": "print mde and mde_t (80 % power, two-sided 5 %) for every bucket x cell; a cell whose MDE exceeds its point estimate is labelled 'not informative'"
   },
@@ -58,7 +63,7 @@
     "algos": "set from the suggestion: TWAP,VWAP,POV,IS",
     "policies": "suggested native,aggressive,passive (single venue; no SOR)",
     "sizes_pct_venue_adv": "the benchmark sizes parents on Nasdaq (venue) ADV; suggested 0.1,0.5,1,2",
-    "sizes_target_pct_consolidated_adv": "OPEN until volume_check.json exists (owner freezes then): venue % x median Nasdaq/consolidated ratio over the 14 validated names (the 6 unavailable names are excluded); record it before the benchmark runs",
+    "sizes_target_pct_consolidated_adv": "DRAFT value, not frozen: sizes_pct_venue_adv [0.1,0.5,1,2] x median Nasdaq/consolidated ratio 0.37 over the 14 validated names (volume_check.json median_ratio 0.37000..., the stage's upper median of 42 name-day ratios; the plain median is 0.3599, which would give 0.036/0.180/0.360/0.720). The 6 unavailable names (CCMP, CCRN, COUP, FEYE, GTLS, PFPT) have no consolidated ADV and are excluded from the ratio. Owner/coordinator freezes.",
     "window_min": "suggested 30",
     "mde_report": "suggested: print mde and mde_t (80 % power, two-sided 5 %) for every bucket x cell; a cell whose MDE exceeds its point estimate is labelled 'not informative'"
   },

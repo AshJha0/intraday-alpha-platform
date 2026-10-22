@@ -585,6 +585,6 @@ def test_shipped_yahoo_volume_is_consistent():
     for d in dates:
         assert set(y["volume"][d]) == set(y["split_factor"][d]) == filled
     assert pre["status"] == "draft"
-    assert pre["parameters"]["sizes_target_pct_consolidated_adv"] is None
+    assert pre["parameters"]["sizes_target_pct_consolidated_adv"] == [0.037, 0.185, 0.37, 0.74]  # draft
     assert set(pre["volume_validation"]["validated"]) == filled
     assert set(pre["volume_validation"]["unavailable"]) == set(y["_unavailable"])
