@@ -384,15 +384,15 @@ def _predecl(**over):
     return doc
 
 
-def test_committed_predeclaration_is_a_draft_with_open_parameters(env):
+def test_committed_predeclaration_is_frozen_with_filled_parameters(env):
     committed = REPO / job.WORK_REL / "predeclaration.json"
     env.predecl.write_text(committed.read_text())
-    with pytest.raises(job.JobRefused, match="draft"):
-        job.load_predeclaration(env)
+    job.load_predeclaration(env)  # frozen and complete: the bench stage may run
     doc = json.loads(committed.read_text())
+    assert doc["status"] == "frozen" and doc["frozen_by"] and doc["frozen_utc"]
     assert doc["result_class"] == "secondary"
     assert set(job.REQUIRED_PARAMS) == set(doc["parameters"])
-    assert [k for k, v in doc["parameters"].items() if v is None] == []  # all filled, still a draft
+    assert [k for k, v in doc["parameters"].items() if v is None] == []
 
 
 @pytest.mark.parametrize(
@@ -582,7 +582,7 @@ def test_shipped_yahoo_volume_is_consistent():
     assert len(filled) == 14 and not filled & set(y["_unavailable"])
     for d in dates:
         assert set(y["volume"][d]) == set(y["split_factor"][d]) == filled
-    assert pre["status"] == "draft"
+    assert pre["status"] == "frozen" and pre["frozen_by"] and pre["frozen_utc"]
     assert pre["parameters"]["sizes_target_pct_consolidated_adv"] == [
         0.037,
         0.185,
