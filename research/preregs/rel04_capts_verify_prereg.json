@@ -1,0 +1,191 @@
+{
+  "analysis_identity": {
+    "code_tree_sha256": "648668b0116b70380b62e12c2f39bf54680eb16559220292cfb39a9cdd987e10",
+    "commit": "6431da8612e3892979ef630cafb08ce9c44ae192",
+    "configs_tree_sha256": "290b38d8871961c28e81db59ca9cf95791a213acd33461d667de873b907ad7b0",
+    "data_versions": [
+      "33d0cbe8a6601850472f584a919b98211dd1841af6667b4cd6faf22c51ffc157",
+      "4f57d32c6747859f76d08c101baa2ff7aaae9aee2d5223e2ea62193797d48439",
+      "5b5e03fbb3fd98d254c751487fb8b64f7bec92d93be7095335fc64cbd6ebf9e5",
+      "6c94942ab59df29f8b93cc20e6526e6794affd0b9f2851eeb00cb1c2fef1a1e6",
+      "9517c4efa19b32fd3632ee04782c5d0c07f390e5e27e3618dd2533aa90d0938c",
+      "95ee935c421092ea66eb909fb78e3cfd5c1f47f10b58ca3c80285231523b2e57",
+      "b1f799a2a287e2de96f8b2b94c95e65d7d5f3d5f462fd93ccd3e0ec76a356a52",
+      "ba2022d0d53c013be27f9b3ce6eeef13baa4280009ef32f6c2761b43e61037f4",
+      "bd6f9c707d898007ca281ff093602176c39ac1cf45e0894808e7d1f14bdd3904",
+      "dd5adfec6f170ad63db8241b0354d295124d9d4ea9367e13e1e806ec7d0e0478",
+      "de76214c48388c1ecacb5e5a4ebbf082ebf22d587602eb6255823bd5a1e7bf6c",
+      "f977bb3a39d16557c79ae6fbc9303a69317fdcc19d0e7f4162d1a06a9120ec79"
+    ],
+    "deps_lock_sha256": "2f68340d1a5c28871356287b00f5af907dd94f429c2551dac5cee0a3a114c18e",
+    "environment": {
+      "attrs": "26.1.0",
+      "cffi": "2.1.1",
+      "cloudpickle": "3.1.2",
+      "coverage[toml]": "absent",
+      "cryptography": "50.0.2",
+      "databento-dbn": "0.71.0",
+      "execnet": "2.1.2",
+      "hypothesis": "absent",
+      "iniconfig": "2.3.1",
+      "joblib": "1.6.0",
+      "jsonschema": "4.26.0",
+      "jsonschema-specifications": "2025.9.1",
+      "narwhals": "2.26.0",
+      "numpy": "2.4.6",
+      "packaging": "26.3",
+      "pandas": "3.0.6",
+      "pluggy": "1.6.0",
+      "pyarrow": "25.0.1",
+      "pycparser": "3.0",
+      "pygments": "2.21.0",
+      "pytest": "9.1.1",
+      "pytest-cov": "7.1.0",
+      "pytest-xdist": "3.8.0",
+      "python-dateutil": "2.9.0.post0",
+      "pyyaml": "6.0.3",
+      "referencing": "0.37.0",
+      "rpds-py": "2026.9.1",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.17.1",
+      "six": "1.17.0",
+      "sortedcontainers": "absent",
+      "threadpoolctl": "3.7.0",
+      "typing-extensions": "4.16.0"
+    },
+    "family": "REL-04 capture-ts verification: identity of events.parquet except receive_ts, feed-latency summary, features; days 2025-11-28,2025-12-08,2025-12-09,2025-12-10,2026-05-15,2026-05-18",
+    "identity_version": 2,
+    "inputs": {},
+    "interpreter": "cpython-3.12.10",
+    "metrics": [
+      "feed_latency_negative_share",
+      "mismatching_rows_excluding_receive_ts",
+      "receive_ts_before_exchange_rows",
+      "receive_ts_differing_rows",
+      "row_count_difference"
+    ],
+    "reference_tree_sha256": "9020e008efdb1ac41015cea4c31f8b9e4cb65a1324db0a42224cb2a22f18fa88",
+    "scripts": {
+      "research/v118/rel04_verify/predeclaration.json": "b1af0485d84feba46e8a0f782968569a6aae6a881fe6ce1c64c29bf8cd3ddd36",
+      "research/v118/rel04_verify/run_rel04_verify.py": "a06f7665a567a3eecc0f67e41a09112de6d02b934392980ffce725f5d394ba7e"
+    },
+    "thresholds": {
+      "days": {
+        "2025-11-28": {
+          "capts_dataset_version": "4f57d32c6747859f76d08c101baa2ff7aaae9aee2d5223e2ea62193797d48439",
+          "capts_dir": "iex_capts/iex_20251128",
+          "iex_dataset_version": "f977bb3a39d16557c79ae6fbc9303a69317fdcc19d0e7f4162d1a06a9120ec79",
+          "iex_dir": "iex/iex_20251128"
+        },
+        "2025-12-08": {
+          "capts_dataset_version": "de76214c48388c1ecacb5e5a4ebbf082ebf22d587602eb6255823bd5a1e7bf6c",
+          "capts_dir": "iex_capts/iex_20251208",
+          "iex_dataset_version": "6c94942ab59df29f8b93cc20e6526e6794affd0b9f2851eeb00cb1c2fef1a1e6",
+          "iex_dir": "iex/iex_20251208"
+        },
+        "2025-12-09": {
+          "capts_dataset_version": "dd5adfec6f170ad63db8241b0354d295124d9d4ea9367e13e1e806ec7d0e0478",
+          "capts_dir": "iex_capts/iex_20251209",
+          "iex_dataset_version": "9517c4efa19b32fd3632ee04782c5d0c07f390e5e27e3618dd2533aa90d0938c",
+          "iex_dir": "iex/iex_20251209"
+        },
+        "2025-12-10": {
+          "capts_dataset_version": "95ee935c421092ea66eb909fb78e3cfd5c1f47f10b58ca3c80285231523b2e57",
+          "capts_dir": "iex_capts/iex_20251210",
+          "iex_dataset_version": "33d0cbe8a6601850472f584a919b98211dd1841af6667b4cd6faf22c51ffc157",
+          "iex_dir": "iex/iex_20251210"
+        },
+        "2026-05-15": {
+          "capts_dataset_version": "5b5e03fbb3fd98d254c751487fb8b64f7bec92d93be7095335fc64cbd6ebf9e5",
+          "capts_dir": "iex_capts/iex_20260515",
+          "iex_dataset_version": "bd6f9c707d898007ca281ff093602176c39ac1cf45e0894808e7d1f14bdd3904",
+          "iex_dir": "iex/iex_20260515"
+        },
+        "2026-05-18": {
+          "capts_dataset_version": "b1f799a2a287e2de96f8b2b94c95e65d7d5f3d5f462fd93ccd3e0ec76a356a52",
+          "capts_dir": "iex_capts/iex_20260518",
+          "iex_dataset_version": "ba2022d0d53c013be27f9b3ce6eeef13baa4280009ef32f6c2761b43e61037f4",
+          "iex_dir": "iex/iex_20260518"
+        }
+      },
+      "decision_rule": {
+        "day_passes": "row counts equal AND schema equal AND zero mismatching rows in every non-receive_ts column AND zero candidate rows with receive_ts < exchange_ts AND at least one candidate row with receive_ts != reference receive_ts AND dataset.json source.receive_ts == 'iex_capture'",
+        "identity": "pass only if all six days pass; otherwise fail",
+        "on_fail": "features are not built; the mismatches are reported as found; the capture-ts datasets are not used downstream until the cause is understood (a fix is a new declaration)"
+      },
+      "features": {
+        "args": "exactly the process-iex-day features step: --data-dir <ds>/normalized --out-dir <ds>/features --configs <ds>/configs --registry-out <ds>/features/feature_registry.json --workers 1 --engine rust; every other iap.features option at its default",
+        "engine": "rust",
+        "log": "<ds>/features.log",
+        "module": "iap.features",
+        "not_done_here": "the keep and delete steps of process-iex-day (KEEP.json, normalized clean-up) are not run; the normalized files stay",
+        "runs_only_if": "identity passes on all six days",
+        "workers": 1
+      },
+      "identity": {
+        "candidate": "capts_dir (the --capture-ts ingest)",
+        "chunk_rows": 2000000,
+        "file": "normalized/events.parquet",
+        "max_examples_per_column": 5,
+        "must_be_identical": "every column of events.parquet except receive_ts, row for row in file order, same schema, same row count",
+        "receive_ts": "may differ; must be >= exchange_ts in every candidate row; must differ from the reference in at least one row; dataset.json source.receive_ts must be 'iex_capture'",
+        "reference": "iex_dir (the receive_ts == exchange_ts ingest)"
+      },
+      "latency": {
+        "fields": [
+          "n",
+          "negative",
+          "negative_share",
+          "mean_ns",
+          "min_ns",
+          "max_ns",
+          "log2_histogram",
+          "approx_p50_log2_bucket",
+          "approx_p99_log2_bucket",
+          "capture_ts_before_exchange",
+          "capture_ts_absent"
+        ],
+        "interpretation": "within-capture differences only: the capture clock offset to IEX's send clock is unknown (iex.CAPTURE_TS_PROVENANCE)",
+        "source": "dataset.json sessions[day].messages.iex.feed_latency and sessions[day].raw.capture_ts_* counters; no event is read"
+      },
+      "statistics": {
+        "family": "deterministic identity check and descriptive summary; no hypothesis test",
+        "family_k": 0,
+        "inference": "none: no p-value, interval or comparison across days is claimed; counts are exact"
+      },
+      "stop_rules": {
+        "abort": [
+          "available RAM below min_free_ram_gb or free disk below min_free_disk_gb at start",
+          "iap.features exits non-zero on a day: that day's log is kept, the run stops, nothing is retried"
+        ],
+        "min_free_disk_gb": 20.0,
+        "min_free_ram_gb": 8.0,
+        "no_rerun": "one run; a parameter change is a new declaration, never a retry",
+        "refuse": [
+          "prereg unsigned, identity mismatch, runner is the signer, or a signing key in the environment",
+          "a capts_dataset_version still null, or the dataset on disk differs from a declared version",
+          "any of the twelve datasets missing, unregistered, not listed in the registry datasets as spent, or not authorised for this prereg id by the guard",
+          "a result file of this run already exists (one run only)"
+        ]
+      }
+    }
+  },
+  "bound_utc": "2026-10-23T10:45:46+00:00",
+  "kind": "analysis_prereg",
+  "prereg_id": "research/preregs/rel04_capts_verify_prereg.json",
+  "protocol": "research/v118/rel04_verify/PREDECLARATION.md",
+  "protocol_sha256": "2158e19d5f54b5e9913fd10973f61f41e4a6a4cc1f813acbdfdfcbf1e51cb106",
+  "signature": {
+    "maintainer": "ashjha0",
+    "message": "iap.agents.blackboard.canonical(this document without 'signature')",
+    "message_sha256": "6a303ad35567b0b1b5281b7758078f7f3ba631bb39da5f5f7fd1482cf94f8156",
+    "public_key": "02a3e278cda3efac7dcd266fb8a3821a1415f0725a73f8b255aac84083c2106c",
+    "scheme": "ed25519",
+    "sig": "f62eb274206159fa6b7f6194dcbe5414e5ce9c964f711da7e610ebdbc8b38e6787b87e63c27219af75480ffcdeabef37bf2f8a4c6a8e37d857a45171e8bed000",
+    "trust_root": "research/agents/trust_roots.json"
+  },
+  "signed": true,
+  "signed_utc": "2026-10-23T10:45:57+00:00",
+  "status": "SIGNED: the analysis identity is bound; edits void the signature",
+  "x-version": 1
+}
