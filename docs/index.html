@@ -140,7 +140,19 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
   </table></div>
 
     <div class="honest new">
-    <strong>v1.17.1 (prepared 2026-10-17): a patch release. Negative results first.</strong>
+    <strong>v1.18.0 (prepared 2026-10-24): a measurement instrument and recorded negative results. No signal promoted, no edge claimed.</strong>
+    <ul>
+      <li><strong>Known-null calibration failed</strong> (null v3, 2026-10-23): 4.3&nbsp;% conditional rejection against a 2.5&nbsp;% target in two cells; the outside reviewer rejected the method as the gate. No real-data error-rate control is claimed.</li>
+      <li><strong>Every signed run is negative or underpowered</strong> (B8 v2, REL-05, REL-08, REL-09, REL-10). The fill model is validated at Level 1 (replay) only; no latency edge.</li>
+      <li><strong>Built:</strong> signed pre-declarations, a fail-closed holdout registry, an execution-correctness suite, monitoring with an UNKNOWN state, enforced portfolio limits, a resilient paper path (6-hour soak PASS).</li>
+      <li><strong>Open gates accepted for this tag:</strong> F3, F7, the reviewer's full findings memo; F5 partly met.</li>
+    </ul>
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/v1.18.0_RELEASE_NOTES.md">Release notes (v1.18.0)</a>,
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/CHANGELOG.md">CHANGELOG</a>.
+  </div>
+
+    <div class="honest">
+    <strong>v1.17.1 (released 2026-10-17): a patch release. Negative results first.</strong>
     <ul>
       <li><strong>B7 closed on its negative in-sample result</strong> (2026-10-16): no cell cheaper by the 2 bp minimum; nothing signed or registered (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/preregs/B7_CLOSED_v117.md">B7_CLOSED_v117.md</a>).</li>
       <li><strong>B8 two-venue router: negative on the first 2 overlap days</strong> &mdash; <code>sor</code> +5.1 &plusmn; 1.3 bps and 8 pp lower fill than pinned Nasdaq; <code>sor_sweep</code> +3.8 &plusmn; 2.1 bps; 2 day clusters, provisional. The pre-declared six-day out-of-sample run is also negative: <code>sor</code> +2.2 / +1.1 bps, <code>sor_sweep</code> +0.6 / +1.2 bps (AAPL / MSFT), no interval excludes zero.</li>

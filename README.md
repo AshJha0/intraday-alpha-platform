@@ -60,9 +60,25 @@ the repository map, the real-world usage notes and the references) is in
 
 The full list with descriptions is the [Documentation index](#documentation-index).
 
-## Current status (v1.17.1 prepared 2026-10-17; v1.17.0 released 2026-10-16)
+## Current status (v1.18.0 prepared 2026-10-24; v1.17.1 released 2026-10-17)
 
-**v1.17.1 is a patch release after v1.17.0 (tag f9e351a), not yet tagged: negative results first, then the fixed release workflow**
+**v1.18.0: a measurement instrument and recorded negative results. No signal is promoted and no edge is claimed**
+([CHANGELOG.md](CHANGELOG.md) v1.18.0, [docs/release/v1.18.0_RELEASE_NOTES.md](docs/release/v1.18.0_RELEASE_NOTES.md)):
+
+- **The known-null calibration FAILED** (null v3, run 2026-10-23): conditional rejection 4.3 % against a 2.5 % target in two cells.
+  The outside reviewer rejected the method as the F3 gate; no real-data error-rate control is claimed
+  ([research/v118/known_null_v3_RESULT.md](research/v118/known_null_v3_RESULT.md), [reviewer close-out](docs/release/REVIEWER_CLOSEOUT_2026-10-23.md)).
+- **Every signed run is negative or underpowered:** B8 v2 (6 comparisons, none better than pinned Nasdaq), REL-05, REL-08, REL-09, REL-10.
+- **The fill model is validated at Level 1 (deterministic replay) only, not at Level 2**; there is no latency edge.
+- **Built:** signed pre-declarations that bind script, commit, data and thresholds; a fail-closed holdout registry; a venue-aware child
+  simulator with an invariant suite; monitoring with an explicit UNKNOWN state; portfolio limits and a kill switch; a paper-path
+  order manager with a journal and reconciliation (6-hour fault-injection soak PASS).
+- **Open gates, accepted open for this tag:** F3, F7 (no independent rerun of the B8 v2 JSON), the reviewer's full findings memo; F5 is partly met
+  ([docs/release/FOUNDATION_COMPLETE_v1.18.md](docs/release/FOUNDATION_COMPLETE_v1.18.md)).
+
+**v1.17.1 (released 2026-10-17):**
+
+**v1.17.1 is a patch release after v1.17.0 (tag f9e351a): negative results first, then the fixed release workflow**
 ([CHANGELOG.md](CHANGELOG.md) v1.17.1 and [docs/release/v1.17.1_RELEASE_NOTES.md](docs/release/v1.17.1_RELEASE_NOTES.md)):
 
 - **B7 (signal-aware execution) closed on its negative in-sample result** (2026-10-16): no cell cheaper by the 2 bp minimum, urgency dearer on TWAP / VWAP at 1-2 % ADV; nothing signed or registered ([research/preregs/B7_CLOSED_v117.md](research/preregs/B7_CLOSED_v117.md)).
@@ -112,7 +128,7 @@ in v1.15 (predictive, not tradable at 1x cost;
 quoting or DeepLOB edge; v1.17 adds the screen and breadth results above
 ([docs/REAL_DATA.md](docs/REAL_DATA.md) §3, [LEARN.md](LEARN.md) §31-§44).
 
-**Next: v1.17.1 release, then v1.18.** The release PR waits for the B8 six-day results and the remaining IEX rows. Beyond that (v1.18): the C++ ports not done in v1.17 (the B2-regime arm of dark eligibility, the B10 proxy sampler and fit, the exchange-local hazard clock; PLATFORM_CONVENTIONS.md §11.3). Plan:
+**Next: v1.18.0 release, then the post-release documentation pass (REL-14c) and v1.19 planning.** The release PR waits for the B8 six-day results and the remaining IEX rows. Beyond that (v1.18): the C++ ports not done in v1.17 (the B2-regime arm of dark eligibility, the B10 proxy sampler and fit, the exchange-local hazard clock; PLATFORM_CONVENTIONS.md §11.3). Plan:
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
 What each release from v1.9 to v1.16 added, and the 2026-10-11 quality
