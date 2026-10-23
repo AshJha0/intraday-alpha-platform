@@ -1,0 +1,26 @@
+{
+  "AAPL": 61520167,
+  "BYND": 2201600,
+  "CHTR": 663533,
+  "CRWD": 2560933,
+  "FBNC": 85300,
+  "GBDC": 493400,
+  "LSCC": 552433,
+  "MCBS": 20200,
+  "MRTN": 277333,
+  "MRVL": 4445633,
+  "MSFT": 25547533,
+  "PLXS": 75367,
+  "PTEN": 2790833,
+  "TREE": 128600,
+  "_note": "6 names have no consolidated-volume validation and no consolidated ADV (sized on Nasdaq venue ADV only); the median Nasdaq/consolidated ratio is computed on the 14 validated names only",
+  "_source": "mean Yahoo consolidated volume, https://query1.finance.yahoo.com/v8/finance/chart/<SYMBOL>?interval=1d&events=split (the data behind finance.yahoo.com/quote/<SYMBOL>/history), retrieved 2026-10-20 by Claude in the built-in browser; volume is Yahoo's split-adjusted consolidated daily volume",
+  "_unavailable": {
+    "CCMP": "Yahoo: no data found (symbol delisted)",
+    "CCRN": "Yahoo: no data found (symbol delisted)",
+    "COUP": "Yahoo: no data found (symbol delisted)",
+    "FEYE": "Yahoo: no data found (symbol delisted)",
+    "GTLS": "Yahoo: no data found (symbol delisted)",
+    "PFPT": "Yahoo: no data found (symbol delisted)"
+  }
+}

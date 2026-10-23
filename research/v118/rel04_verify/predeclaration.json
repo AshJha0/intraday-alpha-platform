@@ -10,37 +10,37 @@
       "iex_dir": "iex/iex_20251128",
       "iex_dataset_version": "f977bb3a39d16557c79ae6fbc9303a69317fdcc19d0e7f4162d1a06a9120ec79",
       "capts_dir": "iex_capts/iex_20251128",
-      "capts_dataset_version": null
+      "capts_dataset_version": "4f57d32c6747859f76d08c101baa2ff7aaae9aee2d5223e2ea62193797d48439"
     },
     "2025-12-08": {
       "iex_dir": "iex/iex_20251208",
       "iex_dataset_version": "6c94942ab59df29f8b93cc20e6526e6794affd0b9f2851eeb00cb1c2fef1a1e6",
       "capts_dir": "iex_capts/iex_20251208",
-      "capts_dataset_version": null
+      "capts_dataset_version": "de76214c48388c1ecacb5e5a4ebbf082ebf22d587602eb6255823bd5a1e7bf6c"
     },
     "2025-12-09": {
       "iex_dir": "iex/iex_20251209",
       "iex_dataset_version": "9517c4efa19b32fd3632ee04782c5d0c07f390e5e27e3618dd2533aa90d0938c",
       "capts_dir": "iex_capts/iex_20251209",
-      "capts_dataset_version": null
+      "capts_dataset_version": "dd5adfec6f170ad63db8241b0354d295124d9d4ea9367e13e1e806ec7d0e0478"
     },
     "2025-12-10": {
       "iex_dir": "iex/iex_20251210",
       "iex_dataset_version": "33d0cbe8a6601850472f584a919b98211dd1841af6667b4cd6faf22c51ffc157",
       "capts_dir": "iex_capts/iex_20251210",
-      "capts_dataset_version": null
+      "capts_dataset_version": "95ee935c421092ea66eb909fb78e3cfd5c1f47f10b58ca3c80285231523b2e57"
     },
     "2026-05-15": {
       "iex_dir": "iex/iex_20260515",
       "iex_dataset_version": "bd6f9c707d898007ca281ff093602176c39ac1cf45e0894808e7d1f14bdd3904",
       "capts_dir": "iex_capts/iex_20260515",
-      "capts_dataset_version": null
+      "capts_dataset_version": "5b5e03fbb3fd98d254c751487fb8b64f7bec92d93be7095335fc64cbd6ebf9e5"
     },
     "2026-05-18": {
       "iex_dir": "iex/iex_20260518",
       "iex_dataset_version": "ba2022d0d53c013be27f9b3ce6eeef13baa4280009ef32f6c2761b43e61037f4",
       "capts_dir": "iex_capts/iex_20260518",
-      "capts_dataset_version": null
+      "capts_dataset_version": "b1f799a2a287e2de96f8b2b94c95e65d7d5f3d5f462fd93ccd3e0ec76a356a52"
     }
   },
   "symbols": [

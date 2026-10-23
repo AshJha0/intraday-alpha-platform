@@ -1,0 +1,58 @@
+{
+  "cannot_claim": [
+    "Level 2: no real order or fill exists (decision D4a); the label is the simulator's own queue rule replayed on the tape",
+    "agreement of the queue rules with real fills",
+    "any 2025-26 result, any holdout result, any profit or alpha",
+    "statistical significance (G = 3 eval days)"
+  ],
+  "cells": {
+    "AAPL": {
+      "brier": 0.12480935482873488,
+      "brier_naive": 0.12759632513273975,
+      "n_eval": 25920,
+      "n_fit": 34559,
+      "reliability_gap_max": 0.16333123028442986,
+      "skill_per_day": {
+        "2019-10-30": 0.017404025851053273,
+        "2019-12-30": 0.02141067218560544,
+        "2020-01-30": 0.02597697606675098
+      },
+      "skill_pooled": 0.021842089112719787,
+      "verdict": "inconclusive"
+    },
+    "MSFT": {
+      "brier": 0.13727069204129735,
+      "brier_naive": 0.1388124281788431,
+      "n_eval": 25918,
+      "n_fit": 34560,
+      "reliability_gap_max": 0.4567969586264893,
+      "skill_per_day": {
+        "2019-10-30": -0.012183943767519745,
+        "2019-12-30": 0.03589276859359858,
+        "2020-01-30": 0.012190503893868998
+      },
+      "skill_pooled": 0.011106614571711138,
+      "verdict": "inconclusive"
+    },
+    "QQQ": {
+      "brier": 0.1713403232133972,
+      "brier_naive": 0.1870393478982679,
+      "n_eval": 25918,
+      "n_fit": 34554,
+      "reliability_gap_max": 0.021633011077806463,
+      "skill_per_day": {
+        "2019-10-30": 0.07656031104519934,
+        "2019-12-30": 0.11385834380957616,
+        "2020-01-30": 0.06845973297363561
+      },
+      "skill_pooled": 0.08393434248610354,
+      "verdict": "supports"
+    }
+  },
+  "declaration": "research/execution/rel05/predeclaration.json",
+  "label": "tape-implied under the simulator's queue rules, not a measured real fill",
+  "level2": "not validated",
+  "model_supported_on_all_symbols": false,
+  "no_inference": "none: samples within a second-grid day are serially dependent and G = 3 eval days; per-day skill is reported, no p-value or interval is claimed",
+  "x-version": 1
+}

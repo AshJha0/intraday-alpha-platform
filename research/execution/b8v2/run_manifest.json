@@ -1,0 +1,28 @@
+{
+  "chain_b_resumed": [],
+  "chain_b_suspended": [],
+  "commit_bound": "4980fc11bd7542ab238af4577554058279505382",
+  "datasets": {
+    "holdout2026": "d7f7ffd14fbc363550a5bc9afd886e36df0d851511f840615f1f089b22f5f237",
+    "iex/iex_20251210": "33d0cbe8a6601850472f584a919b98211dd1841af6667b4cd6faf22c51ffc157",
+    "iex/iex_20260515": "bd6f9c707d898007ca281ff093602176c39ac1cf45e0894808e7d1f14bdd3904",
+    "iex/iex_20260518": "ba2022d0d53c013be27f9b3ce6eeef13baa4280009ef32f6c2761b43e61037f4",
+    "r7_20251210": "dea2a6b03ae35df24e5c8751bea8ddcc0f9ca8b93e02c9e2fdb656b6ab62fd80"
+  },
+  "ended_utc": "2026-10-20T01:00:14+00:00",
+  "prereg": "research/preregs/b8v2_prereg.json",
+  "prereg_sha256": "1c0191b5bef462f398aa6903feb3291ab0b868ed10ce9816af0dd8c21966df56",
+  "runner_actor": "b8v2-runner",
+  "runs": [
+    "v2_oos3_AAPL",
+    "v2_oos3_MSFT",
+    "v2_oos3_s1_no_hidden_AAPL",
+    "v2_oos3_s1_no_hidden_MSFT",
+    "v2_oos3_s2_child_impact_AAPL",
+    "v2_oos3_s2_child_impact_MSFT",
+    "v2_oos3_s3_v117_child_AAPL",
+    "v2_oos3_s3_v117_child_MSFT"
+  ],
+  "signer": "ashjha0",
+  "started_utc": "2026-10-19T09:36:05+00:00"
+}

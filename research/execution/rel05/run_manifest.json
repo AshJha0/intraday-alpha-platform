@@ -1,0 +1,19 @@
+{
+  "commit_bound": "aa2d4b8242bd9cc3db92d44d8bd1653e3f14721a",
+  "datasets": {
+    "2019-01-30": "06419d749910a8f0a6d089d5ed13a40500481d581a93f276bb62c339940c7293",
+    "2019-03-27": "7c6ddcf3429a021a4cdeb2b9976c7fe9167eade399b1c85bb5c95b3847995784",
+    "2019-07-30": "3731bbd4a40acdd4833f1f42c4d14a0df027e5a310c08408d608a0e18ffa2ced",
+    "2019-08-30": "ad9a62dea3664c98cc475bf824a058fe8d53f5ac609d675e005b8dc930535498",
+    "2019-10-30": "517f666c3350057897eeaba1e8a3753f34aed3fa2c377911f27a2dafe54cf005",
+    "2019-12-30": "53f48feb7e4f2451dbf9a30cd375998e3765bced3d653f55d7c404494d33540a",
+    "2020-01-30": "edb9b750a642befdbed19e5b877e959390befc438dd91e840838a4c167791e19"
+  },
+  "ended_utc": "2026-10-20T13:24:54+00:00",
+  "free_ram_gb": 8.506385803222656,
+  "prereg": "research/preregs/rel05_prereg.json",
+  "prereg_sha256": "cb8bf09deaac41cd4f72758fe8ef0b123825006a5da06a6abfc507de0d1d2d8b",
+  "runner_actor": "claude-queue-runner",
+  "signer": "ashjha0",
+  "started_utc": "2026-10-20T13:13:10+00:00"
+}
