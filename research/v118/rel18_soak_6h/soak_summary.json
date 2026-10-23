@@ -1,0 +1,909 @@
+{
+ "schema": "iap.rel18_soak",
+ "version": 1,
+ "args": {
+  "minutes": 360.0,
+  "session_minutes": 5.0,
+  "rate": 1000,
+  "seed": 1801,
+  "out": "research\\v118\\rel18_soak_6h",
+  "clock_tolerance_ms": 1000.0
+ },
+ "elapsed_minutes": 360.0,
+ "totals": {
+  "messages_sent": 15037543,
+  "orders": 369878,
+  "kills": 2931,
+  "recon_runs": 3003,
+  "recon_exceptions": 0,
+  "unreconciled_positions": 0,
+  "venue_dup_submits": 292,
+  "resyncs": 7365,
+  "silences": 754,
+  "residual_orders": 0
+ },
+ "feed": {
+  "delivered": 14793395,
+  "duplicates": 148975,
+  "out_of_order": 357368,
+  "missing": 7368,
+  "dropped_resync": 95167,
+  "stale_events": 2420
+ },
+ "health_transitions": 19566,
+ "unknown_episodes": 9785,
+ "clock_max_abs_drift_ms": 51.955,
+ "memory_mb": {
+  "first": 86.76,
+  "max": 118.23,
+  "last": 111.09,
+  "second_half_range": 3.25
+ },
+ "sessions": [
+  {
+   "session": 0,
+   "orders": 5257,
+   "venue_orders": 5257,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 6520
+   },
+   "journal_bytes": 4247285
+  },
+  {
+   "session": 1,
+   "orders": 5071,
+   "venue_orders": 5071,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": -7365
+   },
+   "journal_bytes": 4122817
+  },
+  {
+   "session": 2,
+   "orders": 5159,
+   "venue_orders": 5159,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": -2930
+   },
+   "journal_bytes": 4177632
+  },
+  {
+   "session": 3,
+   "orders": 5147,
+   "venue_orders": 5147,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 3213
+   },
+   "journal_bytes": 4144230
+  },
+  {
+   "session": 4,
+   "orders": 5249,
+   "venue_orders": 5249,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 3977
+   },
+   "journal_bytes": 4234833
+  },
+  {
+   "session": 5,
+   "orders": 5253,
+   "venue_orders": 5253,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 35333
+   },
+   "journal_bytes": 4290390
+  },
+  {
+   "session": 6,
+   "orders": 5272,
+   "venue_orders": 5272,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 35370
+   },
+   "journal_bytes": 4290511
+  },
+  {
+   "session": 7,
+   "orders": 5324,
+   "venue_orders": 5324,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 24246
+   },
+   "journal_bytes": 4353736
+  },
+  {
+   "session": 8,
+   "orders": 5302,
+   "venue_orders": 5302,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 18791
+   },
+   "journal_bytes": 4271407
+  },
+  {
+   "session": 9,
+   "orders": 5311,
+   "venue_orders": 5311,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 25414
+   },
+   "journal_bytes": 4307057
+  },
+  {
+   "session": 10,
+   "orders": 5304,
+   "venue_orders": 5304,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 26550
+   },
+   "journal_bytes": 4306117
+  },
+  {
+   "session": 11,
+   "orders": 5178,
+   "venue_orders": 5178,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 61612
+   },
+   "journal_bytes": 4234743
+  },
+  {
+   "session": 12,
+   "orders": 5087,
+   "venue_orders": 5087,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 52463
+   },
+   "journal_bytes": 4162876
+  },
+  {
+   "session": 13,
+   "orders": 5077,
+   "venue_orders": 5077,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 75849
+   },
+   "journal_bytes": 4192516
+  },
+  {
+   "session": 14,
+   "orders": 5130,
+   "venue_orders": 5130,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 92546
+   },
+   "journal_bytes": 4184535
+  },
+  {
+   "session": 15,
+   "orders": 5060,
+   "venue_orders": 5060,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 97371
+   },
+   "journal_bytes": 4141555
+  },
+  {
+   "session": 16,
+   "orders": 5078,
+   "venue_orders": 5078,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 92219
+   },
+   "journal_bytes": 4172204
+  },
+  {
+   "session": 17,
+   "orders": 5031,
+   "venue_orders": 5031,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 103326
+   },
+   "journal_bytes": 4086156
+  },
+  {
+   "session": 18,
+   "orders": 5160,
+   "venue_orders": 5160,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 95921
+   },
+   "journal_bytes": 4193404
+  },
+  {
+   "session": 19,
+   "orders": 5048,
+   "venue_orders": 5048,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 105811
+   },
+   "journal_bytes": 4097844
+  },
+  {
+   "session": 20,
+   "orders": 5052,
+   "venue_orders": 5052,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 93435
+   },
+   "journal_bytes": 4133947
+  },
+  {
+   "session": 21,
+   "orders": 5065,
+   "venue_orders": 5065,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 103603
+   },
+   "journal_bytes": 4114804
+  },
+  {
+   "session": 22,
+   "orders": 5164,
+   "venue_orders": 5164,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 86197
+   },
+   "journal_bytes": 4236809
+  },
+  {
+   "session": 23,
+   "orders": 5185,
+   "venue_orders": 5185,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 66610
+   },
+   "journal_bytes": 4243964
+  },
+  {
+   "session": 24,
+   "orders": 5100,
+   "venue_orders": 5100,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 78147
+   },
+   "journal_bytes": 4209319
+  },
+  {
+   "session": 25,
+   "orders": 5143,
+   "venue_orders": 5143,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 57648
+   },
+   "journal_bytes": 4213958
+  },
+  {
+   "session": 26,
+   "orders": 5116,
+   "venue_orders": 5116,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 56943
+   },
+   "journal_bytes": 4225347
+  },
+  {
+   "session": 27,
+   "orders": 5086,
+   "venue_orders": 5086,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 51631
+   },
+   "journal_bytes": 4160666
+  },
+  {
+   "session": 28,
+   "orders": 5280,
+   "venue_orders": 5280,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 53630
+   },
+   "journal_bytes": 4309165
+  },
+  {
+   "session": 29,
+   "orders": 5295,
+   "venue_orders": 5295,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 55241
+   },
+   "journal_bytes": 4325410
+  },
+  {
+   "session": 30,
+   "orders": 5361,
+   "venue_orders": 5361,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 71536
+   },
+   "journal_bytes": 4392271
+  },
+  {
+   "session": 31,
+   "orders": 5127,
+   "venue_orders": 5127,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 78714
+   },
+   "journal_bytes": 4199933
+  },
+  {
+   "session": 32,
+   "orders": 5079,
+   "venue_orders": 5079,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 80454
+   },
+   "journal_bytes": 4156029
+  },
+  {
+   "session": 33,
+   "orders": 4944,
+   "venue_orders": 4944,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 83593
+   },
+   "journal_bytes": 4022972
+  },
+  {
+   "session": 34,
+   "orders": 5389,
+   "venue_orders": 5389,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 53236
+   },
+   "journal_bytes": 4379449
+  },
+  {
+   "session": 35,
+   "orders": 5206,
+   "venue_orders": 5206,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 65005
+   },
+   "journal_bytes": 4225449
+  },
+  {
+   "session": 36,
+   "orders": 5074,
+   "venue_orders": 5074,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 85069
+   },
+   "journal_bytes": 4188057
+  },
+  {
+   "session": 37,
+   "orders": 5181,
+   "venue_orders": 5181,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 104196
+   },
+   "journal_bytes": 4251114
+  },
+  {
+   "session": 38,
+   "orders": 5232,
+   "venue_orders": 5232,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 104108
+   },
+   "journal_bytes": 4237029
+  },
+  {
+   "session": 39,
+   "orders": 5319,
+   "venue_orders": 5319,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 100075
+   },
+   "journal_bytes": 4370332
+  },
+  {
+   "session": 40,
+   "orders": 5215,
+   "venue_orders": 5215,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 89158
+   },
+   "journal_bytes": 4252378
+  },
+  {
+   "session": 41,
+   "orders": 5305,
+   "venue_orders": 5305,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 91109
+   },
+   "journal_bytes": 4328130
+  },
+  {
+   "session": 42,
+   "orders": 5253,
+   "venue_orders": 5253,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 100929
+   },
+   "journal_bytes": 4317224
+  },
+  {
+   "session": 43,
+   "orders": 5249,
+   "venue_orders": 5249,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 92986
+   },
+   "journal_bytes": 4287226
+  },
+  {
+   "session": 44,
+   "orders": 5182,
+   "venue_orders": 5182,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 73982
+   },
+   "journal_bytes": 4262895
+  },
+  {
+   "session": 45,
+   "orders": 5180,
+   "venue_orders": 5180,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 74125
+   },
+   "journal_bytes": 4263839
+  },
+  {
+   "session": 46,
+   "orders": 5228,
+   "venue_orders": 5228,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 83732
+   },
+   "journal_bytes": 4261045
+  },
+  {
+   "session": 47,
+   "orders": 5183,
+   "venue_orders": 5183,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 103719
+   },
+   "journal_bytes": 4235746
+  },
+  {
+   "session": 48,
+   "orders": 5132,
+   "venue_orders": 5132,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 94816
+   },
+   "journal_bytes": 4161062
+  },
+  {
+   "session": 49,
+   "orders": 5277,
+   "venue_orders": 5277,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 115950
+   },
+   "journal_bytes": 4324900
+  },
+  {
+   "session": 50,
+   "orders": 5167,
+   "venue_orders": 5167,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 110992
+   },
+   "journal_bytes": 4202846
+  },
+  {
+   "session": 51,
+   "orders": 5000,
+   "venue_orders": 5000,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 132995
+   },
+   "journal_bytes": 4108465
+  },
+  {
+   "session": 52,
+   "orders": 4958,
+   "venue_orders": 4958,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 136655
+   },
+   "journal_bytes": 4057349
+  },
+  {
+   "session": 53,
+   "orders": 5098,
+   "venue_orders": 5098,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 126420
+   },
+   "journal_bytes": 4177165
+  },
+  {
+   "session": 54,
+   "orders": 5221,
+   "venue_orders": 5221,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 141871
+   },
+   "journal_bytes": 4246917
+  },
+  {
+   "session": 55,
+   "orders": 5115,
+   "venue_orders": 5115,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 131721
+   },
+   "journal_bytes": 4193814
+  },
+  {
+   "session": 56,
+   "orders": 5149,
+   "venue_orders": 5149,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 114160
+   },
+   "journal_bytes": 4214198
+  },
+  {
+   "session": 57,
+   "orders": 5160,
+   "venue_orders": 5160,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 116985
+   },
+   "journal_bytes": 4231896
+  },
+  {
+   "session": 58,
+   "orders": 5257,
+   "venue_orders": 5257,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 128810
+   },
+   "journal_bytes": 4306665
+  },
+  {
+   "session": 59,
+   "orders": 5157,
+   "venue_orders": 5157,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 106015
+   },
+   "journal_bytes": 4206528
+  },
+  {
+   "session": 60,
+   "orders": 5171,
+   "venue_orders": 5171,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 87702
+   },
+   "journal_bytes": 4274426
+  },
+  {
+   "session": 61,
+   "orders": 5011,
+   "venue_orders": 5011,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 104965
+   },
+   "journal_bytes": 4105787
+  },
+  {
+   "session": 62,
+   "orders": 4752,
+   "venue_orders": 4752,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 112845
+   },
+   "journal_bytes": 3939091
+  },
+  {
+   "session": 63,
+   "orders": 5236,
+   "venue_orders": 5236,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 137139
+   },
+   "journal_bytes": 4273599
+  },
+  {
+   "session": 64,
+   "orders": 4935,
+   "venue_orders": 4935,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 154757
+   },
+   "journal_bytes": 4020161
+  },
+  {
+   "session": 65,
+   "orders": 5070,
+   "venue_orders": 5070,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 141419
+   },
+   "journal_bytes": 4155460
+  },
+  {
+   "session": 66,
+   "orders": 4991,
+   "venue_orders": 4991,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 163279
+   },
+   "journal_bytes": 4074514
+  },
+  {
+   "session": 67,
+   "orders": 4892,
+   "venue_orders": 4892,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 165845
+   },
+   "journal_bytes": 3984763
+  },
+  {
+   "session": 68,
+   "orders": 4853,
+   "venue_orders": 4853,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 185472
+   },
+   "journal_bytes": 4008830
+  },
+  {
+   "session": 69,
+   "orders": 4853,
+   "venue_orders": 4853,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 164370
+   },
+   "journal_bytes": 3975648
+  },
+  {
+   "session": 70,
+   "orders": 4895,
+   "venue_orders": 4895,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 160383
+   },
+   "journal_bytes": 3964492
+  },
+  {
+   "session": 71,
+   "orders": 4837,
+   "venue_orders": 4837,
+   "residual_orders": 0,
+   "recon_ok": true,
+   "exceptions": {},
+   "positions": {
+    "0": 165069
+   },
+   "journal_bytes": 3966396
+  }
+ ],
+ "verdict": "PASS"
+}
