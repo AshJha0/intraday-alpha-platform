@@ -1,0 +1,60 @@
+{
+  "can_claim": [
+    "on six IEX overlap days the capture-timestamp ingest changed receive_ts and nothing else in events.parquet (or exactly which columns and rows differ)",
+    "the recorded within-capture feed-latency distribution per day, as a descriptive count summary",
+    "features for the six capture-timestamp datasets exist, built by the declared command"
+  ],
+  "cannot_claim": [
+    "the absolute IEX feed latency: the capture clock's source and its offset to IEX's send clock are unknown (iex.CAPTURE_TS_PROVENANCE)",
+    "the skew against any Nasdaq stamp",
+    "that negative latencies are errors or that positive ones are physical delays",
+    "any signal, edge, fill or profit result, any holdout result, any significance"
+  ],
+  "declaration": "research/v118/rel04_verify/predeclaration.json",
+  "features_built": [
+    "2025-11-28",
+    "2025-12-08",
+    "2025-12-09",
+    "2025-12-10",
+    "2026-05-15",
+    "2026-05-18"
+  ],
+  "features_status": "built",
+  "identity": "pass",
+  "latency_days": [
+    "2025-11-28",
+    "2025-12-08",
+    "2025-12-09",
+    "2025-12-10",
+    "2026-05-15",
+    "2026-05-18"
+  ],
+  "no_inference": "none: no p-value, interval or comparison across days is claimed; counts are exact",
+  "per_day": {
+    "2025-11-28": {
+      "failed_clauses": [],
+      "pass": true
+    },
+    "2025-12-08": {
+      "failed_clauses": [],
+      "pass": true
+    },
+    "2025-12-09": {
+      "failed_clauses": [],
+      "pass": true
+    },
+    "2025-12-10": {
+      "failed_clauses": [],
+      "pass": true
+    },
+    "2026-05-15": {
+      "failed_clauses": [],
+      "pass": true
+    },
+    "2026-05-18": {
+      "failed_clauses": [],
+      "pass": true
+    }
+  },
+  "x-version": 1
+}

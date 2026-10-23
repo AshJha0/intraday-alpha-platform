@@ -1,0 +1,24 @@
+{
+  "approx_p50_log2_bucket": 35,
+  "approx_p99_log2_bucket": 35,
+  "bucket_note": "bucket k holds latencies in [2^k - 1, 2^(k+1) - 2] ns; non-negative values only",
+  "capture_ts_absent": 0,
+  "capture_ts_before_exchange": 0,
+  "day": "2026-05-15",
+  "log2_histogram": {
+    "35": 437934866
+  },
+  "max_ns": 38249720543,
+  "mean_ns": 37000845662.91092,
+  "min_ns": 37000009182,
+  "n": 437934866,
+  "negative": 0,
+  "negative_share": 0.0,
+  "provenance": {
+    "clock_source": "unknown and not recorded in the file: whether the stamp is hardware (NIC) or kernel software, and whether the host was NTP- or PTP-disciplined, is not stated by IEX",
+    "offset_limits": "the host clock's offset to IEX's send clock is unknown, so receive - send contains an unidentified constant offset (and the 37 s TAI/UTC leap-second question for the capture host, already removed from the ingested send times); only DIFFERENCES within one capture (jitter, spikes, ordering) are interpretable; the ABSOLUTE feed latency, and the skew against a Nasdaq stamp from another host, are not identified",
+    "resolution": "pcapng: the interface's if_tsresol (microsecond or nanosecond, read from the file); classic pcap: by magic number; a pcapng SIMPLE packet block carries no timestamp (then receive_ts is None and counted in capture_ts_missing)",
+    "use": "report feed latency and cross-venue skew with these qualifications; never as a trading advantage or a measured order-entry latency",
+    "what": "the capture host's packet timestamp (pcapng enhanced packet block / pcap record); kept per IEX-TP segment as IexReader.receive_ts, session-relative nanoseconds"
+  }
+}
