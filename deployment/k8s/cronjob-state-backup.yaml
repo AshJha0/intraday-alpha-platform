@@ -91,7 +91,7 @@ spec:
           containers:
             - name: backup
               # Same image as platform-metrics (coreutils + tar); no network use.
-              image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.17.1@sha256:4cef6217422e91c64de7b5e15f4f6ba07f3fc5b04cc5bebb95e835ac263c8f37
+              image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.18.0@sha256:ac559d916b6e9cfb4ad812ec53420a31ecb40727411011ff8fdc452d859d65b4
               imagePullPolicy: IfNotPresent
               command: ["/bin/sh", "-c"]
               args:
