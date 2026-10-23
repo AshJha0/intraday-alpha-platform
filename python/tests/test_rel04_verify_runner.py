@@ -162,7 +162,7 @@ def test_declaration_is_an_unsigned_unpinned_draft():
     assert "UNSIGNED" in DECL["status"] and "NOT yet pinned" in DECL["status"]
     assert rr.unpinned(DRAFT) == DAYS
     assert rr.unpinned(DECL) == []
-    assert not (REPO / DECL["prereg"]).exists()
+    assert (REPO / DECL["prereg"]).exists()  # bound and signed after the pin (PR with the signed prereg)
     assert DECL["statistics"]["family_k"] == 0 and "none" in DECL["statistics"]["inference"]
     assert "iex.CAPTURE_TS_PROVENANCE" in " ".join(DECL["claims"]["cannot_claim"])
 
