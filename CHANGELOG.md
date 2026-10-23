@@ -6,7 +6,18 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
-## Unreleased
+## v1.18.0 — 2026-10-24
+
+**Theme: a measurement instrument and recorded negative results. No signal is promoted and no edge is claimed.**
+v1.18 builds the machinery that makes a research or execution number trustworthy (signed pre-declarations that
+bind script, commit, data and thresholds; a fail-closed holdout registry; one real-data ledger family; a
+venue-aware child simulator with an invariant suite; paper-path monitoring, risk and resilience code) and
+records what it found: every signed run is negative or underpowered (B8 v2, REL-05, REL-08, REL-09, REL-10),
+the known-null calibration (null v3) FAILED and the outside reviewer rejected the method as the F3 gate, and
+the fill model is validated at Level 1 (deterministic replay) only, not at Level 2. **Open gates, accepted open
+by the owner for this tag: F3 (known-null method), F7 (independent reproduction of the B8 v2 JSON) and the
+reviewer's full findings memo; F5 (R7 result re-issue) is partly met.** See
+`docs/release/v1.18.0_RELEASE_NOTES.md` and `docs/release/REVIEWER_CLOSEOUT_2026-10-23.md`.
 
 - v1.18 REL-04 capture timestamp for IEX (code only, nothing run): `process-iex-day --capture-ts` / `ingest(capture_ts=True)` writes the IEX capture host's packet timestamp as `receive_ts` (clamped to `exchange_ts` where the capture clock reads earlier, counted), records `source.receive_ts` and the feed-latency summary with its provenance limits in `dataset.json`, and refuses `data/real/iex` and any dataset of the other mode, so the A4 overlap datasets cannot be overwritten. The holdout registry needs no change (identity is content hash or session/symbol scope; tested). Queue wrapper and re-download / disk note: `research/v118/rel04/`.
 
