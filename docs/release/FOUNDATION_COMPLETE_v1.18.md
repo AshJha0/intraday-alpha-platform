@@ -1,4 +1,4 @@
-# v1.18 foundation complete — DRAFT (not signed, milestone NOT complete)
+# v1.18 foundation: complete EXCEPT gates F3, F5 (partial) and F7, accepted open by the owner
 
 **The fill model is validated at Level 1 only (deterministic replay validation), not at Level 2.**
 Level 2 would compare the simulator's fills with real orders and real fills on held-out days; no
@@ -6,10 +6,10 @@ real fills exist (decision D4(a)), so no result in v1.18 is an empirical validat
 model (REL-05, [docs/SIM_TO_REAL.md](../SIM_TO_REAL.md), gate F8). There is no latency edge, and the
 signals are execution inputs, not strategies.
 
-This is a draft of the foundation-milestone note of the v1.18 release programme (REL-14a). The
-milestone carries no tag. It is complete only when every gate F1-F10 below holds, the negatives and
-the minimum detectable effects are written first, and the owner signs this note. Status is as read
-from `main` on 2026-10-18 (at `4a6f473`); "done" means the mechanism is merged and tested.
+This is the foundation-milestone note of the v1.18 release programme (REL-14a), status read from `main`
+on 2026-10-23. The milestone carries no tag. **It is NOT unconditionally complete:** gates F3 and F7 are
+open and F5 is partly met (table below); the owner accepted them as open for the v1.18.0 tag on
+2026-10-23, and the release notes name them. "Done" means the mechanism is merged and tested.
 
 ## Negatives first
 
@@ -18,30 +18,39 @@ from `main` on 2026-10-18 (at `4a6f473`); "done" means the mechanism is merged a
 - The net-of-cost screen passes 0 of 22; the v1.16 monetisation study found no taker, capacity,
   quoting or DeepLOB edge.
 - B8 out of sample is negative ([research/v118/BASELINE_v1_18.md](../../research/v118/BASELINE_v1_18.md)).
-- 24 of the 5,732 recorded looks in the repo ledger are real-data looks.
+- 24 of the 5,732 recorded looks in the repo ledger were real-data looks at the time of the baseline
+  (the ledger has since been migrated: real-data N 24 -> 256, #265).
+- The known-null calibration (null v3, run 2026-10-23) FAILED its pre-declared criterion
+  (`research/v118/known_null_v3_RESULT.md`, #325); the outside reviewer rejected the method as the F3 gate.
+  No real-data family-wise error-rate control is claimed.
+- Signed alpha-track and execution runs (B8 v2, REL-05, REL-08, REL-09, REL-10): no promoted signal;
+  results `underpowered` or negative (`research/` result artefacts, #322).
 
-Minimum detectable effects: to be filled from the REL-04b JSON and the REL-06 outputs (each interval
-with its MDE at G-1 df and its effective sample size, gate F2).
+Minimum detectable effects: each report carries its MDE at G-1 df and ESS; the consolidated table is in
+`docs/release/v1.18.0_RELEASE_NOTES.md`.
 
 ## Gates F1-F10 (programme section 9.2)
 
-| gate | requirement (short) | status on main | blocking item |
+| gate | requirement (short) | status on main (2026-10-23) | note |
 |---|---|---|---|
-| F1 | no execution number published until its pre-declaration is signed and binds script fingerprint, commit, data versions, family, metrics, thresholds | **mechanism done** (REL-02, #245: `analysis_identity`, `prereg_gate.require(identity_actual=)`) | pending: the REL-04b prereg signed with its bound identity (REL-04b in progress) |
-| F2 | every published interval carries its MDE at G-1 df and its effective sample size | **partial**: REL-03 metrics (#238) and the REL-01 baseline carry ESS / MDE | pending: REL-04b and REL-06 outputs, and this note's MDE section |
-| F3 | known-null protocol met and approved in writing by the outside reviewer | **pending** | protocol signature (PR #251, open); REL-06 run not done; reviewer deliverable (a) |
-| F4 | `holdout_registry.json` exists; spent and unread datasets fail closed; access logged; bypass tests | **done** (REL-02, #245; `python/tests/test_holdout_registry.py`) | reviewer memo (c) still to read it |
-| F5 | R7 result file re-issued at the registered N with eligibility applied; `R7_RESULTS.md` says what changed | **pending**: the DSR recompute at N = 297 is documented, the result file is not re-issued | an R7 re-issue item (not started) |
-| F6 | whole-suite coverage floor in force; `docs` and `reproducible-build` required | **partial**: coverage floor 92 % (#246) | the ruleset edit (D5(a), PR #252 open; owner applies the ruleset) |
-| F7 | outside reviewer reproduces the REL-04b JSON under the reproducibility contract | **pending** | REL-04b JSON on main; reviewer deliverable (b) via [docs/REVIEW_PACK.md](../REVIEW_PACK.md) |
-| F8 | this note states in its first paragraph that the fill model is validated at Level 1 only | **done in this draft** (REL-05, #237) | owner signature on the final note |
-| F9 | no latency or speed figure in README, site or SHOWCASE without its environment and clock qualifications | **done** (REL-14a: claims audit, `check_docs.py` `latency_claims`) | none |
-| F10 | execution correctness suite: no impossible fills, no duplicated liquidity, no invalid transitions; unfilled quantity visible | **done** (REL-04, #238; REL-12, #240: `test_rel04_child_execution.py`, `test_property_replay.py`) | reviewer memo (c) on the simulator rules |
+| F1 | no execution number published until its pre-declaration is signed and binds script fingerprint, commit, data versions, family, metrics, thresholds | **met** | REL-02 (#245, #278); B8 v2 prereg signed (#271) and run under it; later preregs signed and `tools/verify_signatures.py` OK |
+| F2 | every published interval carries its MDE at G-1 df and its effective sample size | **met in the reports** | per-report MDE/ESS (B8 v2, REL-09, REL-10, REL-08, null v3); consolidated table in the release notes |
+| F3 | known-null protocol met and approved in writing by the outside reviewer | **OPEN (accepted open)** | null v3 FAILED (#325); reviewer rejected the method as the gate in its current form; no FWER claim |
+| F4 | `holdout_registry.json` exists; spent and unread datasets fail closed; access logged; bypass tests | **met** (reviewer memo (c) incomplete) | REL-02 (#245, #261, #263); `python/tests/test_holdout_registry.py`; the REL-04 verify run refused spent sessions as designed |
+| F5 | R7 result file re-issued at the registered N with eligibility applied; `R7_RESULTS.md` says what changed | **PARTLY MET (accepted)** | DSR recomputed at N = 297 (`research/r7/r7_confirm_result_dsr_recompute.json`), verdicts unchanged, documented; the original result file not re-issued |
+| F6 | whole-suite coverage floor in force; `docs` and `reproducible-build` required | **met** | coverage floor 92 % (#246); ruleset requires 17 checks incl. `docs` and `reproducible-build` |
+| F7 | outside reviewer reproduces the REL-04b JSON under the reproducibility contract | **OPEN (accepted open)** | reviewer inspected the committed report/JSON but could not rerun (no access to the original data and bound checkout) |
+| F8 | this note states in its first paragraph that the fill model is validated at Level 1 only | **met** | first paragraph; REL-05 real-tape result: Level 2 not validated |
+| F9 | no latency or speed figure in README, site or SHOWCASE without its environment and clock qualifications | **met** | REL-14a claims audit, `check_docs.py` `latency_claims` (re-run on the release commit) |
+| F10 | execution correctness suite: no impossible fills, no duplicated liquidity, no invalid transitions; unfilled quantity visible | **met** (reviewer memo (c) incomplete) | REL-04 (#238), REL-12 (#240): `test_rel04_child_execution.py`, `test_property_replay.py` |
 
-Also required by REL-14a and not yet true: `check_docs.py --release` green on the release commit;
-the ruleset showing 18 required checks; the outside reviewer reproducing one headline from the
-review pack alone.
+Also required by REL-14a: `check_docs.py --release` green on the release commit (checked in the release PR);
+the ruleset shows 17 required checks (the owner decided `cpp-sanitizers` is not required); the outside
+reviewer reproducing one headline from the review pack alone is NOT met (see F7).
 
 ## Sign-off
 
-Not signed. The owner signs only when every row above reads done.
+Signed in this limited form only: **foundation complete except gates F3 and F7 (open) and F5 (partly met),
+accepted open by the owner for the v1.18.0 release.** Signed by Claude Code on behalf of the owner under
+the owner's written delegation of 2026-10-23 (session chat), date 2026-10-23. This is not a statement that
+all gates hold, and it does not assert real-data error-rate control or Level 2 fill validation.
