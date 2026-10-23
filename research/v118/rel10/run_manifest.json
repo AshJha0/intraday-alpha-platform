@@ -1,0 +1,24 @@
+{
+  "chain_b_resumed": [],
+  "chain_b_suspended": [],
+  "commit_bound": "620a1c2ce9f645f2391872fa858b04b37c8d0c6e",
+  "datasets": {
+    "holdout2026": "d7f7ffd14fbc363550a5bc9afd886e36df0d851511f840615f1f089b22f5f237",
+    "iex_20251128": "f977bb3a39d16557c79ae6fbc9303a69317fdcc19d0e7f4162d1a06a9120ec79",
+    "iex_20251208": "6c94942ab59df29f8b93cc20e6526e6794affd0b9f2851eeb00cb1c2fef1a1e6",
+    "iex_20251209": "9517c4efa19b32fd3632ee04782c5d0c07f390e5e27e3618dd2533aa90d0938c",
+    "iex_20251210": "33d0cbe8a6601850472f584a919b98211dd1841af6667b4cd6faf22c51ffc157",
+    "iex_20260515": "bd6f9c707d898007ca281ff093602176c39ac1cf45e0894808e7d1f14bdd3904",
+    "iex_20260518": "ba2022d0d53c013be27f9b3ce6eeef13baa4280009ef32f6c2761b43e61037f4",
+    "r7_20251128": "535f4868b0a5f6d14305018142221bea100b615dcc3a212de4eb7a715aecd8fb",
+    "r7_20251208": "284629a29df4e6419fb527990abf34e3a8dd25f42902e56604df840860ce8ecc",
+    "r7_20251209": "24d5d38b9e50ed676d0cceca46cd9cad89be186a6f3517e5a06903b17fb28a1b",
+    "r7_20251210": "dea2a6b03ae35df24e5c8751bea8ddcc0f9ca8b93e02c9e2fdb656b6ab62fd80"
+  },
+  "ended_utc": "2026-10-20T12:55:46+00:00",
+  "prereg": "research/preregs/rel10_prereg.json",
+  "prereg_sha256": "f2dd068ea86d12de6647351f3eed9ce0f41dbeb7e31bc3d0d3c528f37424ef76",
+  "runner_actor": "claude-queue-runner",
+  "signer": "ashjha0",
+  "started_utc": "2026-10-20T12:33:44+00:00"
+}

@@ -251,3 +251,20 @@ def test_refuses_without_signed_prereg(tmp_path):
 def test_decision_time_after_cutoff_refused():
     with pytest.raises(ValueError):
         Rel08cConfig(decision_tod_ns=(hms_ns(15, 55),))
+
+
+def test_no_nasdaq_cross_rows_are_ignored(tmp_path):
+    """A Q row with shares == 0 and price == 0 must not become a 0-price cross."""
+    d = _session(tmp_path / "z", "2019-02-01", np.random.default_rng(3), 5.0, n_sym=6)
+    noii, crosses, grid = (pd.read_csv(d / f, keep_default_na=False) for f in
+                           (NOII_FILE, CROSS_FILE, GRID_FILE))  # fmt: skip
+    crosses.loc[crosses["symbol"] == "S000", ["shares", "price_px4"]] = 0
+    noii["symbol"] = noii["symbol"].astype(str)
+    tr = decision_trades("2019-02-01", noii, crosses, grid, CFG)
+    s0 = tr[tr["symbol"] == "S000"]
+    assert len(s0) > 0
+    assert s0["gross_cross_bps"].isna().all()
+    assert s0["net_cross_bps"].isna().all()
+    assert s0["loc_fill"].isna().all()
+    rest = tr[tr["symbol"] != "S000"]
+    assert rest["gross_cross_bps"].abs().max() < 1000  # no +-10,000 bps artefacts

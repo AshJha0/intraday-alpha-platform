@@ -1,5 +1,5 @@
 {
-  "body_sha256": "1bec4bd6c28b1e063184d723a93cd2277e0075a0774d1db99be16d6dd1522a95",
+  "body_sha256": "2a535228912b11e4564a0a0c8f1476424df8939b7d5ff31c6249528d18bb1370",
   "datasets": {
     "00121a37bb26ac1d504f761f481d2786339ff9cc51bc3457dbf2b47eb87068ac": {
       "content_hash": "7589ed2c8ede152993547cc88362b067f68249110bfb18291e50c68a05792c5b",
@@ -92,6 +92,19 @@
         "QQQ"
       ]
     },
+    "4f57d32c6747859f76d08c101baa2ff7aaae9aee2d5223e2ea62193797d48439": {
+      "content_hash": "5df10df5e4d41753c5a3514f681a37cd141f578e32113e48d95051ec2acbae18",
+      "label": "iex_capts_20251128",
+      "sessions": [
+        "2025-11-28"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
     "517f666c3350057897eeaba1e8a3753f34aed3fa2c377911f27a2dafe54cf005": {
       "content_hash": "f186feecaf6a3bd194635d5914b5291de68113269c477859d4e936ee5c8af229",
       "label": "ds3_20191030",
@@ -125,6 +138,19 @@
         "2019-12-30"
       ],
       "state": "in_sample",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "5b5e03fbb3fd98d254c751487fb8b64f7bec92d93be7095335fc64cbd6ebf9e5": {
+      "content_hash": "be8c609de8eb573967f89e71d0e2af754195ae51e5e66278f3e59a28dc5c8cf9",
+      "label": "iex_capts_20260515",
+      "sessions": [
+        "2026-05-15"
+      ],
+      "state": "spent",
       "symbols": [
         "AAPL",
         "MSFT",
@@ -201,6 +227,19 @@
       "label": "iex_20251209",
       "sessions": [
         "2025-12-09"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "95ee935c421092ea66eb909fb78e3cfd5c1f47f10b58ca3c80285231523b2e57": {
+      "content_hash": "88a45d815864d8fb4391f3fc0e166241785ca010c0ffe19e8f4778cd4329d5c6",
+      "label": "iex_capts_20251210",
+      "sessions": [
+        "2025-12-10"
       ],
       "state": "spent",
       "symbols": [
@@ -332,6 +371,19 @@
         "QQQ"
       ]
     },
+    "b1f799a2a287e2de96f8b2b94c95e65d7d5f3d5f462fd93ccd3e0ec76a356a52": {
+      "content_hash": "e2972645c2e925f235e1dabc1989653eda059d39fbc9415eba87e9fc431a9c7e",
+      "label": "iex_capts_20260518",
+      "sessions": [
+        "2026-05-18"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
     "b39c7d3bba39727ba73f13184442d5ee119329929a562fb782877f0126e1301c": {
       "content_hash": "d80e3624492265b79ccef94bf9c6dd36a404242f761e05665e016e4f1fce41b0",
       "label": "r7_20210713",
@@ -409,6 +461,32 @@
       "sessions": [
         "2026-05-15",
         "2026-05-18"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "dd5adfec6f170ad63db8241b0354d295124d9d4ea9367e13e1e806ec7d0e0478": {
+      "content_hash": "b85ef365615785cca835c1cb69478c9c437e9bab770fd5f9b5377c283a320f82",
+      "label": "iex_capts_20251209",
+      "sessions": [
+        "2025-12-09"
+      ],
+      "state": "spent",
+      "symbols": [
+        "AAPL",
+        "MSFT",
+        "QQQ"
+      ]
+    },
+    "de76214c48388c1ecacb5e5a4ebbf082ebf22d587602eb6255823bd5a1e7bf6c": {
+      "content_hash": "2c34b8a41c9a7a6189f6ce39d280d5351ef1e8c58d03f1252a1158b36d3d0397",
+      "label": "iex_capts_20251208",
+      "sessions": [
+        "2025-12-08"
       ],
       "state": "spent",
       "symbols": [
@@ -578,7 +656,8 @@
           "de2488a2a245cf2c",
           "b8-oos-2026-10-16",
           "research/preregs/rel09_prereg.json",
-          "research/preregs/rel10_prereg.json"
+          "research/preregs/rel10_prereg.json",
+          "research/preregs/rel04_capts_verify_prereg.json"
         ],
         "state": "spent",
         "symbols": [
@@ -602,7 +681,8 @@
           "de2488a2a245cf2c",
           "b8-oos-2026-10-16",
           "research/preregs/rel09_prereg.json",
-          "research/preregs/rel10_prereg.json"
+          "research/preregs/rel10_prereg.json",
+          "research/preregs/rel04_capts_verify_prereg.json"
         ],
         "state": "spent",
         "symbols": [
@@ -626,7 +706,8 @@
           "de2488a2a245cf2c",
           "b8-oos-2026-10-16",
           "research/preregs/rel09_prereg.json",
-          "research/preregs/rel10_prereg.json"
+          "research/preregs/rel10_prereg.json",
+          "research/preregs/rel04_capts_verify_prereg.json"
         ],
         "state": "spent",
         "symbols": [
@@ -651,7 +732,8 @@
           "b8-oos-2026-10-16",
           "research/preregs/b8v2_prereg.json",
           "research/preregs/rel09_prereg.json",
-          "research/preregs/rel10_prereg.json"
+          "research/preregs/rel10_prereg.json",
+          "research/preregs/rel04_capts_verify_prereg.json"
         ],
         "state": "spent",
         "symbols": [
@@ -720,7 +802,8 @@
           "b8-oos-2026-10-16",
           "research/preregs/b8v2_prereg.json",
           "research/preregs/rel09_prereg.json",
-          "research/preregs/rel10_prereg.json"
+          "research/preregs/rel10_prereg.json",
+          "research/preregs/rel04_capts_verify_prereg.json"
         ],
         "state": "spent",
         "symbols": [
@@ -745,7 +828,8 @@
           "b8-oos-2026-10-16",
           "research/preregs/b8v2_prereg.json",
           "research/preregs/rel09_prereg.json",
-          "research/preregs/rel10_prereg.json"
+          "research/preregs/rel10_prereg.json",
+          "research/preregs/rel04_capts_verify_prereg.json"
         ],
         "state": "spent",
         "symbols": [

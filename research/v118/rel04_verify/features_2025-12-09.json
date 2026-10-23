@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "<python>",
+    "-m",
+    "iap.features",
+    "--data-dir",
+    "C:\\Work\\Claude\\intraday-alpha-platform\\intraday-alpha-platform\\data\\real\\iex_capts\\iex_20251209\\normalized",
+    "--out-dir",
+    "C:\\Work\\Claude\\intraday-alpha-platform\\intraday-alpha-platform\\data\\real\\iex_capts\\iex_20251209\\features",
+    "--configs",
+    "C:\\Work\\Claude\\intraday-alpha-platform\\intraday-alpha-platform\\data\\real\\iex_capts\\iex_20251209\\configs",
+    "--registry-out",
+    "C:\\Work\\Claude\\intraday-alpha-platform\\intraday-alpha-platform\\data\\real\\iex_capts\\iex_20251209\\features\\feature_registry.json",
+    "--workers",
+    "1",
+    "--engine",
+    "rust"
+  ],
+  "day": "2025-12-09",
+  "feature_files": {
+    "features_1.parquet": "2e3f779c083282630c5f13cd451dc47e73526658fd5428e0e78d17d8215d0194",
+    "features_2.parquet": "190c668037317c53ddd9707e90d008c8e317e037a3b7f6074bedff075279bbee",
+    "features_3.parquet": "73965c724acdb1f17874b760b691a55f2f0b3c2a946b00f9428619944dac1305"
+  }
+}

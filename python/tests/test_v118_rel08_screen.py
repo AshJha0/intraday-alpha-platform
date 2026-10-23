@@ -433,6 +433,13 @@ def test_run_screen_ledger_look_before_result_and_deterministic(tmp_path):
                  "Risk and neutrality", "Multiple testing", "Verdict", "does not claim"):  # fmt: skip
         assert head in card
     assert card == rs.render_scorecard(json.loads(rs.dumps(rep2)))
+    assert "USD cum." in card and "(bps)" in card
+
+
+def test_tiny_values_never_print_as_negative_zero():
+    assert rs._fmt_sig(-7.37e-6) == "-7.37e-06"
+    assert rs._fmt_sig(0.0) == "0.000"
+    assert rs._fmt_sig(None) == "n/a"
 
 
 def test_underpowered_when_the_universe_is_thin():

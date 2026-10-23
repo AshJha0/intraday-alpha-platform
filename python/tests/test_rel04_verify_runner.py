@@ -36,6 +36,10 @@ def _load(name: str, path: Path):
 rr = _load("run_rel04_verify", RUNNER)
 pbi = _load("prereg_bind_identity", TOOL)
 DECL = rr.load_decl()
+# the committed declaration is pinned (PR pin step); the tests of the unpinned state use this copy
+DRAFT = json.loads(json.dumps(DECL))
+for _d in DRAFT["days"].values():
+    _d["capts_dataset_version"] = None
 
 
 def _pinned(decl=DECL):
@@ -156,8 +160,9 @@ def _run(r, **kw):
 # ------------------------------------------------------------- declaration --
 def test_declaration_is_an_unsigned_unpinned_draft():
     assert "UNSIGNED" in DECL["status"] and "NOT yet pinned" in DECL["status"]
-    assert rr.unpinned(DECL) == DAYS
-    assert not (REPO / DECL["prereg"]).exists()
+    assert rr.unpinned(DRAFT) == DAYS
+    assert rr.unpinned(DECL) == []
+    assert (REPO / DECL["prereg"]).exists()  # bound and signed after the pin
     assert DECL["statistics"]["family_k"] == 0 and "none" in DECL["statistics"]["inference"]
     assert "iex.CAPTURE_TS_PROVENANCE" in " ".join(DECL["claims"]["cannot_claim"])
 
@@ -183,10 +188,10 @@ def test_wrapper_names_a_non_signer_actor_and_is_crlf():
 
 def test_bind_and_run_refuse_an_unpinned_declaration(capsys):
     with pytest.raises(SystemExit) as e:
-        rr.identity_args(DECL)
+        rr.identity_args(DRAFT)
     assert e.value.code == 2 and "not pinned" in capsys.readouterr().err
     with pytest.raises(SystemExit):
-        rr.check_days(DECL)
+        rr.check_days(DRAFT)
 
 
 def test_check_days_refuses_a_swapped_directory(capsys):
@@ -484,7 +489,7 @@ def test_features_step_runs_once_logs_and_refuses_failure(tmp_path):
 # --------------------------------------------------------------------- pin --
 def test_pin_writes_versions_and_refuses_a_non_capture_dataset(tmp_path):
     p = tmp_path / "predeclaration.json"
-    p.write_text(json.dumps(DECL, indent=2) + "\n")
+    p.write_text(json.dumps(DRAFT, indent=2) + "\n")
     data = tmp_path / "data"
     for i, d in enumerate(DAYS):
         _write_dataset(data / DECL["days"][d]["capts_dir"], d, f"{i + 1:064x}")
@@ -494,7 +499,7 @@ def test_pin_writes_versions_and_refuses_a_non_capture_dataset(tmp_path):
         f"{i + 1:064x}" for i in range(6)
     ]
     _write_dataset(data / DECL["days"][DAYS[0]]["capts_dir"], DAYS[0], "9" * 64, receive=None)
-    p.write_text(json.dumps(DECL, indent=2) + "\n")
+    p.write_text(json.dumps(DRAFT, indent=2) + "\n")
     with pytest.raises(SystemExit):
         rr.main(["--decl", str(p), "pin", "--data-root", str(data)])
 
