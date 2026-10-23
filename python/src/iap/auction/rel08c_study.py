@@ -217,7 +217,8 @@ def decision_trades(
     for sym, g in grid.groupby("symbol", sort=True):
         q0 = _quote(g, cfg.grid_start_tod_ns)
         qx = _quote(g, cfg.exit_tod_ns)
-        cx = close[close["symbol"] == sym]
+        # a Q row with shares == 0 / price == 0 means no Nasdaq closing cross for the name
+        cx = close[(close["symbol"] == sym) & (close["shares"] > 0) & (close["price_px4"] > 0)]
         cross_px = float(cx["price_px4"].iloc[-1]) if not cx.empty else math.nan
         if q0 is None or qx is None:
             continue
@@ -388,6 +389,9 @@ def run_study(
     def _m(p: pd.DataFrame, c: str) -> float:
         return float(p[c].mean()) if len(p) and c in p else math.nan
 
+    def _med(p: pd.DataFrame, c: str) -> float:
+        return float(p[c].median()) if len(p) and c in p else math.nan
+
     summary["measures"] = {
         pol: {
             "n": int(len(p)),
@@ -405,6 +409,15 @@ def run_study(
                 "net_taker_bps": _m(p, "net_taker_bps"),
                 "net_cross_bps": _m(p, "net_cross_bps"),
             },
+            # the registered statistic is the mean; the median is a diagnostic (tail-dominated mean)
+            "median": {
+                "net_taker_bps": _med(p, "net_taker_bps"),
+                "gross_taker_bps": _med(p, "gross_taker_bps"),
+                "net_cross_bps": _med(p, "net_cross_bps"),
+            },
+            "n_without_nasdaq_cross": int(p["gross_cross_bps"].isna().sum())
+            if len(p) and "gross_cross_bps" in p
+            else 0,
         }
         for pol in POLICIES
         for p in [trades[trades["policy"] == pol] if not trades.empty else trades]
