@@ -1,0 +1,55 @@
+{
+  "columns": [
+    "event_id",
+    "instrument_id",
+    "venue_id",
+    "exchange_ts",
+    "receive_ts",
+    "sequence",
+    "event_type",
+    "side",
+    "price_ticks",
+    "qty",
+    "order_id",
+    "trade_id",
+    "source"
+  ],
+  "compared": true,
+  "day": "2026-05-15",
+  "examples": {},
+  "instrument_rows": {
+    "1": 876741,
+    "2": 184497,
+    "3": 6207137
+  },
+  "mismatches": {
+    "event_id": 0,
+    "event_type": 0,
+    "exchange_ts": 0,
+    "instrument_id": 0,
+    "order_id": 0,
+    "price_ticks": 0,
+    "qty": 0,
+    "sequence": 0,
+    "side": 0,
+    "source": 0,
+    "trade_id": 0,
+    "venue_id": 0
+  },
+  "mismatching_rows_excluding_receive_ts": 0,
+  "receive_ts": {
+    "after_exchange_rows": 7268375,
+    "before_exchange_rows": 0,
+    "differing_rows": 7268375,
+    "reference_not_equal_exchange_rows": 0
+  },
+  "row_count_difference": 0,
+  "rows_candidate": 7268375,
+  "rows_reference": 7268375,
+  "schema_equal": true,
+  "source_receive_ts": "iex_capture",
+  "verdict": {
+    "failed_clauses": [],
+    "pass": true
+  }
+}
