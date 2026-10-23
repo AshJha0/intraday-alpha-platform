@@ -943,6 +943,943 @@
       }
     },
     {
+      "path": "breadth/ds_20190130_rel07",
+      "dataset_version": "9a1297a161fc69c47a770dcab4e3e09d5ecd34e1d2a96b44209011485038041d",
+      "kind": "real",
+      "venue": "XNAS",
+      "format": "itch50",
+      "layout": "slim",
+      "universe": [
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 1,
+          "lot_size": 100,
+          "symbol": "AABA",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 2,
+          "lot_size": 100,
+          "symbol": "AAL",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 3,
+          "lot_size": 100,
+          "symbol": "AAPL",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 4,
+          "lot_size": 100,
+          "symbol": "ABEV",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 5,
+          "lot_size": 100,
+          "symbol": "AMAT",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 6,
+          "lot_size": 100,
+          "symbol": "AMD",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 7,
+          "lot_size": 100,
+          "symbol": "AMLP",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 8,
+          "lot_size": 100,
+          "symbol": "ATVI",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 9,
+          "lot_size": 100,
+          "symbol": "AUY",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 10,
+          "lot_size": 100,
+          "symbol": "BABA",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 11,
+          "lot_size": 100,
+          "symbol": "BAC",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 12,
+          "lot_size": 100,
+          "symbol": "BBD",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 13,
+          "lot_size": 100,
+          "symbol": "C",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 14,
+          "lot_size": 100,
+          "symbol": "CHK",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 15,
+          "lot_size": 100,
+          "symbol": "CLF",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 16,
+          "lot_size": 100,
+          "symbol": "CMCSA",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 17,
+          "lot_size": 100,
+          "symbol": "CODX",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 18,
+          "lot_size": 100,
+          "symbol": "CRON",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 19,
+          "lot_size": 100,
+          "symbol": "CSCO",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 20,
+          "lot_size": 100,
+          "symbol": "CZR",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 21,
+          "lot_size": 100,
+          "symbol": "DAL",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 22,
+          "lot_size": 100,
+          "symbol": "DWDP",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 23,
+          "lot_size": 100,
+          "symbol": "EBAY",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 24,
+          "lot_size": 100,
+          "symbol": "ECA",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 25,
+          "lot_size": 100,
+          "symbol": "EEM",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 26,
+          "lot_size": 100,
+          "symbol": "EFA",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 27,
+          "lot_size": 100,
+          "symbol": "EWZ",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 28,
+          "lot_size": 100,
+          "symbol": "F",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 29,
+          "lot_size": 100,
+          "symbol": "FB",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 30,
+          "lot_size": 100,
+          "symbol": "FCX",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 31,
+          "lot_size": 100,
+          "symbol": "FDC",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 32,
+          "lot_size": 100,
+          "symbol": "FISV",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 33,
+          "lot_size": 100,
+          "symbol": "FLEX",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 34,
+          "lot_size": 100,
+          "symbol": "FXI",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 35,
+          "lot_size": 100,
+          "symbol": "GDX",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 36,
+          "lot_size": 100,
+          "symbol": "GDXJ",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 37,
+          "lot_size": 100,
+          "symbol": "GE",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 38,
+          "lot_size": 100,
+          "symbol": "GGB",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 39,
+          "lot_size": 100,
+          "symbol": "GLD",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 40,
+          "lot_size": 100,
+          "symbol": "HMNY",
+          "tick_size": 0.0001,
+          "tick_size_e4": 1
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 41,
+          "lot_size": 100,
+          "symbol": "HYG",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 42,
+          "lot_size": 100,
+          "symbol": "IEMG",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 43,
+          "lot_size": 100,
+          "symbol": "INTC",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 44,
+          "lot_size": 100,
+          "symbol": "ITUB",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 45,
+          "lot_size": 100,
+          "symbol": "IWM",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 46,
+          "lot_size": 100,
+          "symbol": "JD",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 47,
+          "lot_size": 100,
+          "symbol": "JNUG",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 48,
+          "lot_size": 100,
+          "symbol": "JPM",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 49,
+          "lot_size": 100,
+          "symbol": "KEY",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 50,
+          "lot_size": 100,
+          "symbol": "MO",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 51,
+          "lot_size": 100,
+          "symbol": "MRVL",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 52,
+          "lot_size": 100,
+          "symbol": "MS",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 53,
+          "lot_size": 100,
+          "symbol": "MSFT",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 54,
+          "lot_size": 100,
+          "symbol": "MU",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 55,
+          "lot_size": 100,
+          "symbol": "MYL",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 56,
+          "lot_size": 100,
+          "symbol": "NBEV",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 57,
+          "lot_size": 100,
+          "symbol": "NIO",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 58,
+          "lot_size": 100,
+          "symbol": "NLY",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 59,
+          "lot_size": 100,
+          "symbol": "NOK",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 60,
+          "lot_size": 100,
+          "symbol": "NUGT",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 61,
+          "lot_size": 100,
+          "symbol": "NVDA",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 62,
+          "lot_size": 100,
+          "symbol": "OHGI",
+          "tick_size": 0.0001,
+          "tick_size_e4": 1
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 63,
+          "lot_size": 100,
+          "symbol": "ORCL",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 64,
+          "lot_size": 100,
+          "symbol": "P",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 65,
+          "lot_size": 100,
+          "symbol": "PBR",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 66,
+          "lot_size": 100,
+          "symbol": "PCG",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 67,
+          "lot_size": 100,
+          "symbol": "PDD",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 68,
+          "lot_size": 100,
+          "symbol": "PFE",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 69,
+          "lot_size": 100,
+          "symbol": "PYPL",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 70,
+          "lot_size": 100,
+          "symbol": "QCOM",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 71,
+          "lot_size": 100,
+          "symbol": "QQQ",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 72,
+          "lot_size": 100,
+          "symbol": "RWLK",
+          "tick_size": 0.0001,
+          "tick_size_e4": 1
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 73,
+          "lot_size": 100,
+          "symbol": "SBUX",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 74,
+          "lot_size": 100,
+          "symbol": "SGYP",
+          "tick_size": 0.0001,
+          "tick_size_e4": 1
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 75,
+          "lot_size": 100,
+          "symbol": "SIRI",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 76,
+          "lot_size": 100,
+          "symbol": "SMH",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 77,
+          "lot_size": 100,
+          "symbol": "SPY",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 78,
+          "lot_size": 100,
+          "symbol": "SQ",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 79,
+          "lot_size": 100,
+          "symbol": "SQQQ",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 80,
+          "lot_size": 100,
+          "symbol": "T",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 81,
+          "lot_size": 100,
+          "symbol": "TLT",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 82,
+          "lot_size": 100,
+          "symbol": "TQQQ",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 83,
+          "lot_size": 100,
+          "symbol": "TSLA",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 84,
+          "lot_size": 100,
+          "symbol": "TVIX",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 85,
+          "lot_size": 100,
+          "symbol": "USO",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 86,
+          "lot_size": 100,
+          "symbol": "VALE",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 87,
+          "lot_size": 100,
+          "symbol": "VWO",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 88,
+          "lot_size": 100,
+          "symbol": "VXXB",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 89,
+          "lot_size": 100,
+          "symbol": "VZ",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 90,
+          "lot_size": 100,
+          "symbol": "WFC",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 91,
+          "lot_size": 100,
+          "symbol": "WMT",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 92,
+          "lot_size": 100,
+          "symbol": "X",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 93,
+          "lot_size": 100,
+          "symbol": "XLE",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 94,
+          "lot_size": 100,
+          "symbol": "XLF",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 95,
+          "lot_size": 100,
+          "symbol": "XLI",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 96,
+          "lot_size": 100,
+          "symbol": "XLK",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 97,
+          "lot_size": 100,
+          "symbol": "XLP",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 98,
+          "lot_size": 100,
+          "symbol": "XLU",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 99,
+          "lot_size": 100,
+          "symbol": "XLV",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "ETF",
+          "instrument_id": 100,
+          "lot_size": 100,
+          "symbol": "XOP",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        }
+      ],
+      "config_version": "938dca61734fff10f8162c4b0fa160a6e72d3088d61059947741e00d1449e1ba",
+      "dataset_json_sha256": "75c654d35fa5f08f647c9254812a9e9af61c616f653ad5936d407706508fb066",
+      "keep_json_sha256": null,
+      "oracle_inputs": [],
+      "normalized_files": {
+        "eq_20190130.normalized.iap1": "e7398a2e2c15fc4de507da7734cbc6de897db8522f82b2148bfb312cc0c91bdf"
+      },
+      "sessions": {
+        "2019-01-30": {
+          "format": "itch50",
+          "symbols": [
+            "AABA",
+            "AAL",
+            "AAPL",
+            "ABEV",
+            "AMAT",
+            "AMD",
+            "AMLP",
+            "ATVI",
+            "AUY",
+            "BABA",
+            "BAC",
+            "BBD",
+            "C",
+            "CHK",
+            "CLF",
+            "CMCSA",
+            "CODX",
+            "CRON",
+            "CSCO",
+            "CZR",
+            "DAL",
+            "DWDP",
+            "EBAY",
+            "ECA",
+            "EEM",
+            "EFA",
+            "EWZ",
+            "F",
+            "FB",
+            "FCX",
+            "FDC",
+            "FISV",
+            "FLEX",
+            "FXI",
+            "GDX",
+            "GDXJ",
+            "GE",
+            "GGB",
+            "GLD",
+            "HMNY",
+            "HYG",
+            "IEMG",
+            "INTC",
+            "ITUB",
+            "IWM",
+            "JD",
+            "JNUG",
+            "JPM",
+            "KEY",
+            "MO",
+            "MRVL",
+            "MS",
+            "MSFT",
+            "MU",
+            "MYL",
+            "NBEV",
+            "NIO",
+            "NLY",
+            "NOK",
+            "NUGT",
+            "NVDA",
+            "OHGI",
+            "ORCL",
+            "P",
+            "PBR",
+            "PCG",
+            "PDD",
+            "PFE",
+            "PYPL",
+            "QCOM",
+            "QQQ",
+            "RWLK",
+            "SBUX",
+            "SGYP",
+            "SIRI",
+            "SMH",
+            "SPY",
+            "SQ",
+            "SQQQ",
+            "T",
+            "TLT",
+            "TQQQ",
+            "TSLA",
+            "TVIX",
+            "USO",
+            "VALE",
+            "VWO",
+            "VXXB",
+            "VZ",
+            "WFC",
+            "WMT",
+            "X",
+            "XLE",
+            "XLF",
+            "XLI",
+            "XLK",
+            "XLP",
+            "XLU",
+            "XLV",
+            "XOP"
+          ],
+          "inputs": [
+            {
+              "file": "01302019.NASDAQ_ITCH50.gz",
+              "sha256": "8c97b5b13bc451c012c2466fb7e258da134dab29aa47b67fe7b0088c78e870be",
+              "bytes": 4764426091
+            }
+          ],
+          "raw_sha256": "d2e9018dcd6636343c7d85fd3180999ca5c0e826030c8fa9ee68ab763140aad3",
+          "status": {
+            "purpose": "multi7 in-sample: all EQ alphas, net-of-cost screen, breadth book, B7",
+            "spend": "in-sample, spent"
+          }
+        }
+      },
+      "status": null
+    },
+    {
       "path": "ds3_20190130",
       "dataset_version": "06419d749910a8f0a6d089d5ed13a40500481d581a93f276bb62c339940c7293",
       "kind": "real",
@@ -1753,6 +2690,134 @@
       "status": null
     },
     {
+      "path": "iex/iex_20251211",
+      "dataset_version": "2182735c070050f4d36eb3516bfdb59ba3d994849cb7af7e61229011a8a34bcd",
+      "kind": "real",
+      "venue": "IEXG",
+      "format": "iex-deep-plus",
+      "layout": "slim",
+      "universe": [
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 1,
+          "lot_size": 100,
+          "symbol": "AAPL",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 2,
+          "lot_size": 40,
+          "symbol": "MSFT",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 3,
+          "lot_size": 40,
+          "symbol": "QQQ",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        }
+      ],
+      "config_version": "6770eff07a7c9756faeed05641ef1aad32f45e0d49fac413361ee5af79f8c196",
+      "dataset_json_sha256": "bd04d96f89ff073dfd72557e10c595282e3c418d72731e8a59f94af47f3cfa57",
+      "keep_json_sha256": "471601d3b6921f7c9d7b8714b096e18c81273181407297dfb81d9a012430e992",
+      "oracle_inputs": [],
+      "normalized_files": {
+        "eq_20251211.normalized.iap1": "cc08c70ee7e714157d96fc43802bf35989c520a1d280c22358db20ca630d8b30"
+      },
+      "sessions": {
+        "2025-12-11": {
+          "format": "iex-deep-plus",
+          "symbols": [
+            "AAPL",
+            "MSFT",
+            "QQQ"
+          ],
+          "inputs": [
+            {
+              "file": "20251211_IEXTP1_DPLS1.0.pcap.gz",
+              "sha256": "e37fb519120f23c7ecf29c0e4bdfb7b97e6d9990960437ecd0798de9c17d617d",
+              "bytes": 10547151935
+            }
+          ],
+          "raw_sha256": "3cf17cd390aaf4af5058c66f87dbeb4ddd0329fd4c9c3ff5c7c270cf7355358c",
+          "status": {
+            "purpose": "R7 confirm (one look each of EQ10 and EQ05); B8 calibration and evaluation",
+            "spend": "holdout read once, then reused"
+          }
+        }
+      },
+      "status": null
+    },
+    {
+      "path": "iex/iex_20251212",
+      "dataset_version": "0380a07f8350bb89bdde2a3fa80b05dfb8eb2c9d01b8c758ba2c767b5a5ae42e",
+      "kind": "real",
+      "venue": "IEXG",
+      "format": "iex-deep-plus",
+      "layout": "slim",
+      "universe": [
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 1,
+          "lot_size": 100,
+          "symbol": "AAPL",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 2,
+          "lot_size": 40,
+          "symbol": "MSFT",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 3,
+          "lot_size": 40,
+          "symbol": "QQQ",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        }
+      ],
+      "config_version": "f41d06cdf6f29a77cc3affe6465780a7019175043f3f468501d026d7a453ff84",
+      "dataset_json_sha256": "874812e81c2514199044d4e35edd78e7c2590ef51c3efb31bdef917b6c3b1c88",
+      "keep_json_sha256": "46371436e6f20557b5bc8a092aab3659cd8d871851fc381bc6484094529ad26c",
+      "oracle_inputs": [],
+      "normalized_files": {
+        "eq_20251212.normalized.iap1": "40b8f1fb38c0f8015dec1c293f0c54e1c4793e085acf962b8795f5cfc954ec3b"
+      },
+      "sessions": {
+        "2025-12-12": {
+          "format": "iex-deep-plus",
+          "symbols": [
+            "AAPL",
+            "MSFT",
+            "QQQ"
+          ],
+          "inputs": [
+            {
+              "file": "20251212_IEXTP1_DPLS1.0.pcap.gz",
+              "sha256": "5fc7c8e9d1d1115fe7fef8a0d04660a93e1e3efec7b7dc38449749fecd7abe0a",
+              "bytes": 12711108353
+            }
+          ],
+          "raw_sha256": "d72965c65c504a7b998404da4577298c066e09cf008134771be58c5e0460df71",
+          "status": {
+            "purpose": "R7 confirm (one look each of EQ10 and EQ05); B8 calibration and evaluation",
+            "spend": "holdout read once, then reused"
+          }
+        }
+      },
+      "status": null
+    },
+    {
       "path": "iex/iex_20260515",
       "dataset_version": "bd6f9c707d898007ca281ff093602176c39ac1cf45e0894808e7d1f14bdd3904",
       "kind": "real",
@@ -1872,6 +2937,454 @@
             }
           ],
           "raw_sha256": "bf1fd0b3bff4d1cb0927d5376622bf1cdd4c4feed9ef44dde339f32ac6375ab2",
+          "status": {
+            "purpose": "v1.8 holdout (6 alphas, 504 looks), AUC01, B8 evaluation",
+            "spend": "spent three times"
+          }
+        }
+      },
+      "status": null
+    },
+    {
+      "path": "iex/iex_20260612",
+      "dataset_version": "9e1d2397f9b7b4a099b4fb0a8f881cdfc422637ba5c68ad215ba4f78821bb4b4",
+      "kind": "real",
+      "venue": "IEXG",
+      "format": "iex-deep-plus",
+      "layout": "slim",
+      "universe": [
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 1,
+          "lot_size": 40,
+          "symbol": "AAPL",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 2,
+          "lot_size": 40,
+          "symbol": "MSFT",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 3,
+          "lot_size": 40,
+          "symbol": "QQQ",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        }
+      ],
+      "config_version": "e6a8d81a8a53dda5fb5c83a2a2aac24b4098455ceedb916df0a2568c3ca77030",
+      "dataset_json_sha256": "a532381e7c0d601c07b370b8a5a315dbd9b5be1e1e5ce2075f32619e9238053e",
+      "keep_json_sha256": "36400c252f0f06cf7f67b0f6d336c79200e61ccd3a3c6fdc72b579108881cf7f",
+      "oracle_inputs": [],
+      "normalized_files": {
+        "eq_20260612.normalized.iap1": "c5ee6528a9ec7cbfe6616cb96591a18312f7eabd1416911acc85a2821d2aaa28"
+      },
+      "sessions": {
+        "2026-06-12": {
+          "format": "iex-deep-plus",
+          "symbols": [
+            "AAPL",
+            "MSFT",
+            "QQQ"
+          ],
+          "inputs": [
+            {
+              "file": "20260612_IEXTP1_DPLS1.0.pcap.gz",
+              "sha256": "383413ae0b0b29b1974d3ffdc8bedced651f5a3e83434f157332e00ca7e746e1",
+              "bytes": 14691476825
+            }
+          ],
+          "raw_sha256": "c0865c4dcf4bc3132f99c11754bc5d483caf694c4cbd380cd7094204522a9d76",
+          "status": {
+            "purpose": "R7 confirm (one look each of EQ10 and EQ05); B8 calibration and evaluation",
+            "spend": "holdout read once, then reused"
+          }
+        }
+      },
+      "status": null
+    },
+    {
+      "path": "iex_capts/iex_20251128",
+      "dataset_version": "4f57d32c6747859f76d08c101baa2ff7aaae9aee2d5223e2ea62193797d48439",
+      "kind": "real",
+      "venue": "IEXG",
+      "format": "iex-deep-plus",
+      "layout": "slim",
+      "universe": [
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 1,
+          "lot_size": 100,
+          "symbol": "AAPL",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 2,
+          "lot_size": 40,
+          "symbol": "MSFT",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 3,
+          "lot_size": 40,
+          "symbol": "QQQ",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        }
+      ],
+      "config_version": "1f5c9679eae31a268cff4d47c7fbc1170fd40f72ca9279b2b38be2d04ca34cbb",
+      "dataset_json_sha256": "f3a7570b007454586b35ea586f71537259c7b455cfa923de7eff738fcf26de9b",
+      "keep_json_sha256": null,
+      "oracle_inputs": [],
+      "normalized_files": {
+        "eq_20251128.normalized.iap1": "dfa7e64acb8569020707251d971a489b2a08ec0e5c0b24c6395adb5cee1d9956"
+      },
+      "sessions": {
+        "2025-11-28": {
+          "format": "iex-deep-plus",
+          "symbols": [
+            "AAPL",
+            "MSFT",
+            "QQQ"
+          ],
+          "inputs": [
+            {
+              "file": "20251128_IEXTP1_DPLS1.0.pcap.gz",
+              "sha256": "03b0663ada73b5c23d347dbb5c65332cd8975e3c9b6ba466fecb05b326622256",
+              "bytes": 4313169306
+            }
+          ],
+          "raw_sha256": "b569156a6b3e9d59b61e244cac6aa07b2ff6233d844db463824241f87db49e71",
+          "status": {
+            "purpose": "R7 confirm (one look each of EQ10 and EQ05); B8 calibration and evaluation",
+            "spend": "holdout read once, then reused"
+          }
+        }
+      },
+      "status": null
+    },
+    {
+      "path": "iex_capts/iex_20251208",
+      "dataset_version": "de76214c48388c1ecacb5e5a4ebbf082ebf22d587602eb6255823bd5a1e7bf6c",
+      "kind": "real",
+      "venue": "IEXG",
+      "format": "iex-deep-plus",
+      "layout": "slim",
+      "universe": [
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 1,
+          "lot_size": 100,
+          "symbol": "AAPL",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 2,
+          "lot_size": 40,
+          "symbol": "MSFT",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 3,
+          "lot_size": 40,
+          "symbol": "QQQ",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        }
+      ],
+      "config_version": "83790fc39c045922a59b51a23329ff1f50a8503e55dec278f4418390f261e684",
+      "dataset_json_sha256": "f56fef3d07e55d3043f6e91de4a46e0772224cee0adc4012f8b153b3d7afb635",
+      "keep_json_sha256": null,
+      "oracle_inputs": [],
+      "normalized_files": {
+        "eq_20251208.normalized.iap1": "c0bc19b721f53f7648b30cbf2bdcf68d26d14f9ef650d11283071d7741fd17b2"
+      },
+      "sessions": {
+        "2025-12-08": {
+          "format": "iex-deep-plus",
+          "symbols": [
+            "AAPL",
+            "MSFT",
+            "QQQ"
+          ],
+          "inputs": [
+            {
+              "file": "20251208_IEXTP1_DPLS1.0.pcap.gz",
+              "sha256": "e4a7f8cbe152947c12fa88a68148fcdca9b206e5bfc992d90973a3673f15d6ab",
+              "bytes": 8992353997
+            }
+          ],
+          "raw_sha256": "f1155c65f1ad5274dc2c825ee16c6ab61123445679f2e5105c9d465b02fa67d2",
+          "status": {
+            "purpose": "R7 confirm (one look each of EQ10 and EQ05); B8 calibration and evaluation",
+            "spend": "holdout read once, then reused"
+          }
+        }
+      },
+      "status": null
+    },
+    {
+      "path": "iex_capts/iex_20251209",
+      "dataset_version": "dd5adfec6f170ad63db8241b0354d295124d9d4ea9367e13e1e806ec7d0e0478",
+      "kind": "real",
+      "venue": "IEXG",
+      "format": "iex-deep-plus",
+      "layout": "slim",
+      "universe": [
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 1,
+          "lot_size": 100,
+          "symbol": "AAPL",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 2,
+          "lot_size": 40,
+          "symbol": "MSFT",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 3,
+          "lot_size": 40,
+          "symbol": "QQQ",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        }
+      ],
+      "config_version": "cf525ee22b6d81d8b5eca03d8841cc0fcf8369f09e98e18f999c7905ebe011ba",
+      "dataset_json_sha256": "44c835330a04b9e816415e881a91c9fb446c3afd518efc17176a5ef7fc5cba9c",
+      "keep_json_sha256": null,
+      "oracle_inputs": [],
+      "normalized_files": {
+        "eq_20251209.normalized.iap1": "9ff784ab1fbf2896ee77eecc95d73f66225a8383ef8a287d9c586c613bbeb9ee"
+      },
+      "sessions": {
+        "2025-12-09": {
+          "format": "iex-deep-plus",
+          "symbols": [
+            "AAPL",
+            "MSFT",
+            "QQQ"
+          ],
+          "inputs": [
+            {
+              "file": "20251209_IEXTP1_DPLS1.0.pcap.gz",
+              "sha256": "2bd48f7924ff8e605f0c2c5f4896d06e4c4ba65c23922f4b38e1861f3eeb06e6",
+              "bytes": 8430281480
+            }
+          ],
+          "raw_sha256": "e48630507177a85db05b1788156c6dfd39f16999c749261944ba896d23c41e8a",
+          "status": {
+            "purpose": "R7 confirm (one look each of EQ10 and EQ05); B8 calibration and evaluation",
+            "spend": "holdout read once, then reused"
+          }
+        }
+      },
+      "status": null
+    },
+    {
+      "path": "iex_capts/iex_20251210",
+      "dataset_version": "95ee935c421092ea66eb909fb78e3cfd5c1f47f10b58ca3c80285231523b2e57",
+      "kind": "real",
+      "venue": "IEXG",
+      "format": "iex-deep-plus",
+      "layout": "slim",
+      "universe": [
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 1,
+          "lot_size": 100,
+          "symbol": "AAPL",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 2,
+          "lot_size": 40,
+          "symbol": "MSFT",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 3,
+          "lot_size": 40,
+          "symbol": "QQQ",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        }
+      ],
+      "config_version": "d482e10d4a01e3ed6bcd01ca54d6fd0221f064b3fcf81aa0c16c2c5b84083ca8",
+      "dataset_json_sha256": "25dcb294cc31a14f57558ab7893f8a9bb77d7cf7e6ed51d559ac94aed378f7f0",
+      "keep_json_sha256": null,
+      "oracle_inputs": [],
+      "normalized_files": {
+        "eq_20251210.normalized.iap1": "1097c57960054e72ec98e35cd28b84e16e7d6f05ebb0514d29a98c3f127c1620"
+      },
+      "sessions": {
+        "2025-12-10": {
+          "format": "iex-deep-plus",
+          "symbols": [
+            "AAPL",
+            "MSFT",
+            "QQQ"
+          ],
+          "inputs": [
+            {
+              "file": "20251210_IEXTP1_DPLS1.0.pcap.gz",
+              "sha256": "d9d2a708f52a5f8efcf4ef450a8d79f0a0ed95553f25e46c05f720df6d3ac30f",
+              "bytes": 11453956522
+            }
+          ],
+          "raw_sha256": "a4e7ebab8dcc11538e5cf01e7143ca9f413e8521768eb8f284840bc842d4a722",
+          "status": {
+            "purpose": "R7 confirm (one look each of EQ10 and EQ05); B8 calibration and evaluation",
+            "spend": "holdout read once, then reused"
+          }
+        }
+      },
+      "status": null
+    },
+    {
+      "path": "iex_capts/iex_20260515",
+      "dataset_version": "5b5e03fbb3fd98d254c751487fb8b64f7bec92d93be7095335fc64cbd6ebf9e5",
+      "kind": "real",
+      "venue": "IEXG",
+      "format": "iex-deep-plus",
+      "layout": "slim",
+      "universe": [
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 1,
+          "lot_size": 40,
+          "symbol": "AAPL",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 2,
+          "lot_size": 40,
+          "symbol": "MSFT",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 3,
+          "lot_size": 40,
+          "symbol": "QQQ",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        }
+      ],
+      "config_version": "6688cea5ec3da445464fba952550af952c3f7ef2ef7d517aa47077a82c5daac5",
+      "dataset_json_sha256": "ef71b1fea1b19d2ead789b5f7aa3a136ce5009657580d9785e6fd112b4a56111",
+      "keep_json_sha256": null,
+      "oracle_inputs": [],
+      "normalized_files": {
+        "eq_20260515.normalized.iap1": "ae7921016f375b5396687fcd97931921ddc13ae1e45c5544bfce9e9a4a01f2d2"
+      },
+      "sessions": {
+        "2026-05-15": {
+          "format": "iex-deep-plus",
+          "symbols": [
+            "AAPL",
+            "MSFT",
+            "QQQ"
+          ],
+          "inputs": [
+            {
+              "file": "20260515_IEXTP1_DPLS1.0.pcap.gz",
+              "sha256": "1b917e6101c1e1af9e082a5c79961e97e66d123d94aefbe7db0efc154ce2c683",
+              "bytes": 11905260029
+            }
+          ],
+          "raw_sha256": "c307328d2a42d1a7fb18b8f2a9fad6864c81a399e4ee3b63b4182f0e52fd64a7",
+          "status": {
+            "purpose": "v1.8 holdout (6 alphas, 504 looks), AUC01, B8 evaluation",
+            "spend": "spent three times"
+          }
+        }
+      },
+      "status": null
+    },
+    {
+      "path": "iex_capts/iex_20260518",
+      "dataset_version": "b1f799a2a287e2de96f8b2b94c95e65d7d5f3d5f462fd93ccd3e0ec76a356a52",
+      "kind": "real",
+      "venue": "IEXG",
+      "format": "iex-deep-plus",
+      "layout": "slim",
+      "universe": [
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 1,
+          "lot_size": 40,
+          "symbol": "AAPL",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 2,
+          "lot_size": 40,
+          "symbol": "MSFT",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        },
+        {
+          "asset_class": "EQUITY",
+          "instrument_id": 3,
+          "lot_size": 40,
+          "symbol": "QQQ",
+          "tick_size": 0.01,
+          "tick_size_e4": 100
+        }
+      ],
+      "config_version": "cc0f6e67a9203aa8102bc175effda37ff49931352e469a8301382f9508387057",
+      "dataset_json_sha256": "06ff4c06615ed8bfb9d80bf3b4623f408b5af9d918de2b140b48b07a2a226015",
+      "keep_json_sha256": null,
+      "oracle_inputs": [],
+      "normalized_files": {
+        "eq_20260518.normalized.iap1": "269da4d16040a62f7c0bda948e9026966797f9e2b144f7e72e2c893c64119c73"
+      },
+      "sessions": {
+        "2026-05-18": {
+          "format": "iex-deep-plus",
+          "symbols": [
+            "AAPL",
+            "MSFT",
+            "QQQ"
+          ],
+          "inputs": [
+            {
+              "file": "20260518_IEXTP1_DPLS1.0.pcap.gz",
+              "sha256": "a5239f606eb25a11b6621a379e4c6a77ea96545bee6e2482ee5e72d15a6173a2",
+              "bytes": 14210389328
+            }
+          ],
+          "raw_sha256": "0118ab4d46a54aa3e0efc1942ace3467102e785c4b838214524ccb699eba6847",
           "status": {
             "purpose": "v1.8 holdout (6 alphas, 504 looks), AUC01, B8 evaluation",
             "spend": "spent three times"
