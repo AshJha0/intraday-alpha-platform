@@ -18,6 +18,20 @@ assert spec and spec.loader
 bind = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bind)
 
+#: a complete planted dry run (R4): every verdict value of the rule demonstrated
+DRY_RUN_REPORT = {
+    "kind": "planted_dry_run",
+    "rule": "test rule",
+    "verdict_values": ["confirmed", "rejected"],
+    "demonstrations": [
+        {"planted": {"input": "planted effect", "observations": 20}, "observed": "confirmed"},
+        {"planted": {"input": "planted null", "observations": 20}, "observed": "rejected"},
+    ],
+    "statistics_planted": True,
+    "confirmation_data_read": False,
+}
+DRY_RUN = ["--planted-dry-run", "dryrun/report.json"]
+
 GENERIC = [
     "--scripts",
     "tools/run.py",
@@ -45,6 +59,8 @@ def repo(tmp_path):
     (r / "tools").mkdir()
     (r / "tools" / "run.py").write_text("print('analysis')\n")
     (r / "PROTOCOL.md").write_text("# protocol\n")
+    (r / "dryrun").mkdir()
+    (r / "dryrun" / "report.json").write_text(json.dumps(DRY_RUN_REPORT, indent=1) + "\n")
     _git(r, "init", "-q")
     _git(r, "config", "user.email", "t@t")
     _git(r, "config", "user.name", "t")
@@ -142,7 +158,10 @@ def _trust(repo: Path) -> tuple[Path, str]:
 
 def test_sign_then_verify_and_refuse_resign(repo):
     key, pub = _trust(repo)
-    assert _bind(repo) == 0
+    assert _bind(repo, *DRY_RUN) == 0
+    doc = json.loads((repo / "preregs/p.json").read_text())
+    assert doc["dry_run"]["path"] == "dryrun/report.json"
+    assert doc["dry_run"]["demonstrated"] == {"confirmed": 1, "rejected": 1}
     argv = [
         "--root",
         str(repo),
@@ -163,9 +182,49 @@ def test_sign_then_verify_and_refuse_resign(repo):
         _bind(repo)  # re-binding a signed prereg would void it
 
 
-def test_sign_refuses_when_a_script_changed_after_binding(repo):
+def _sign_argv(repo: Path, key: Path) -> list[str]:
+    return ["--root", str(repo), "sign", "--prereg", "preregs/p.json", "--keyfile", str(key)] + [
+        "--maintainer",
+        "owner",
+    ]
+
+
+def test_sign_refuses_without_a_planted_dry_run(repo):
+    """R4 (defect D-09): no dry_run block, no signature; the status says so."""
     key, _ = _trust(repo)
     assert _bind(repo) == 0
+    doc = json.loads((repo / "preregs/p.json").read_text())
+    assert "dry_run" not in doc and "NO planted dry run bound" in doc["status"]
+    with pytest.raises(SystemExit) as e:
+        bind.main(_sign_argv(repo, key))
+    assert e.value.code == 2
+    assert json.loads((repo / "preregs/p.json").read_text())["signed"] is False
+
+
+def test_bind_refuses_an_incomplete_dry_run(repo):
+    """A dry run that cannot produce one of the rule's verdicts is refused at bind."""
+    incomplete = dict(DRY_RUN_REPORT, demonstrations=DRY_RUN_REPORT["demonstrations"][:1])
+    (repo / "dryrun" / "report.json").write_text(json.dumps(incomplete, indent=1) + "\n")
+    _git(repo, "commit", "-qam", "incomplete dry run")
+    with pytest.raises(SystemExit) as e:
+        _bind(repo, *DRY_RUN)
+    assert e.value.code == 2
+    assert not (repo / "preregs/p.json").exists()
+
+
+def test_sign_refuses_when_the_dry_run_report_changed_after_binding(repo):
+    key, _ = _trust(repo)
+    assert _bind(repo, *DRY_RUN) == 0
+    (repo / "dryrun" / "report.json").write_text(json.dumps(DRY_RUN_REPORT) + "\n")
+    _git(repo, "commit", "-qam", "re-render the report")
+    with pytest.raises(SystemExit) as e:
+        bind.main(_sign_argv(repo, key))
+    assert e.value.code == 2
+
+
+def test_sign_refuses_when_a_script_changed_after_binding(repo):
+    key, _ = _trust(repo)
+    assert _bind(repo, *DRY_RUN) == 0
     (repo / "tools" / "run.py").write_text("print('changed')\n")
     _git(repo, "commit", "-qam", "change script")
     with pytest.raises(SystemExit) as e:

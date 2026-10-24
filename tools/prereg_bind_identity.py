@@ -26,6 +26,15 @@ Refusals (exit code 2, nothing written): the working tree has uncommitted or
 untracked changes (other than the prereg file itself); a bound script or the
 protocol differs from its committed bytes at HEAD; the prereg is already
 signed (re-binding would void the signature).  Never prints key material.
+
+**Planted dry run (v1.19 R4, defect D-09).**  ``bind --planted-dry-run
+<report.json>`` binds the report of a planted dry run
+(:mod:`iap.agents.planted_dry_run`: the rule run on planted inputs that produce
+every verdict value it can return, with ``confirmation_data_read: false``) as
+the ``dry_run`` block (path, sha256, verdict summary).  ``sign`` REFUSES a prereg
+without that block, with a report that changed since binding, or with a report
+that fails to demonstrate a verdict value.  The REL-08 C1, REL-08c n = 0 and
+A0 signatures of v1.18 would all have been refused by this check.
 """
 
 from __future__ import annotations
@@ -47,6 +56,11 @@ from iap.agents.analysis_identity import (  # noqa: E402
     build_identity,
     head_commit,
     verify_identity,
+)
+from iap.agents.planted_dry_run import (  # noqa: E402
+    DryRunRefused,
+    build_dry_run_block,
+    require_dry_run,
 )
 
 KEYFILE = Path("C:/Users/ashis/.iap_keys/maintainer.key")
@@ -150,7 +164,10 @@ def cmd_bind(a: argparse.Namespace) -> int:
     if dirty:
         raise Refused(f"working tree is dirty: {dirty[:10]}{' ...' if len(dirty) > 10 else ''}")
     inputs = identity_inputs(a, root)
-    check_committed(root, [proto_rel, *inputs["scripts"], *inputs.get("inputs", [])])
+    committed = [proto_rel, *inputs["scripts"], *inputs.get("inputs", [])]
+    if a.planted_dry_run:
+        committed.append(_rel(root, Path(a.planted_dry_run)))
+    check_committed(root, committed)
     commit = head_commit(root)
     try:
         block = build_identity(root, commit=commit, **inputs)
@@ -167,6 +184,13 @@ def cmd_bind(a: argparse.Namespace) -> int:
         "bound_utc": datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"),
         "analysis_identity": block,
     }
+    if a.planted_dry_run:
+        try:
+            doc["dry_run"] = build_dry_run_block(root, _rel(root, Path(a.planted_dry_run)))
+        except DryRunRefused as exc:
+            raise Refused(str(exc)) from exc
+    else:
+        doc["status"] += "; NO planted dry run bound (sign will refuse)"
     if a.dry_run:
         print(json.dumps(doc, indent=2, sort_keys=True))
         return 0
@@ -194,6 +218,10 @@ def cmd_sign(a: argparse.Namespace) -> int:
         raise Refused(f"working tree is dirty: {dirty[:10]}")
     if _norm((root / doc["protocol"]).read_bytes()) != doc.get("protocol_sha256"):
         raise Refused(f"{doc['protocol']} changed since the identity was bound")
+    try:
+        dry = require_dry_run(root, doc)
+    except DryRunRefused as exc:
+        raise Refused(f"planted dry run (R4): {exc}") from exc
     try:
         verify_identity(
             root,
@@ -234,7 +262,9 @@ def cmd_sign(a: argparse.Namespace) -> int:
     with (root / rel).open("w", encoding="ascii", newline="\n") as fh:
         fh.write(json.dumps(doc, indent=2, sort_keys=True, ensure_ascii=True) + "\n")
     print(
-        f"signed {rel} as {a.maintainer}; commit it, then run the analysis from a non-signing actor"
+        f"signed {rel} as {a.maintainer} (planted dry run {dry['path']}, verdict values "
+        f"{dry['verdict_values']} all demonstrated); commit it, then run the analysis from a "
+        "non-signing actor"
     )
     return 0
 
@@ -257,6 +287,12 @@ def main(argv: list[str] | None = None) -> int:
         nargs="+",
         help="further files the study reads outside python/src/iap, configs/ and "
         "data/reference/ (identity v2 binds their hashes)",
+    )
+    b.add_argument(
+        "--planted-dry-run",
+        type=Path,
+        help="committed planted dry-run report (iap.agents.planted_dry_run) to bind as the "
+        "dry_run block; without it, sign refuses",
     )
     b.add_argument("--dry-run", action="store_true", help="print the document, write nothing")
     s = sub.add_parser("sign", help="(coordinator only) verify the identity, then sign")
