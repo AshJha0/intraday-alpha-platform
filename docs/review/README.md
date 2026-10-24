@@ -5,6 +5,14 @@
 | 5 simulator correctness | [SIMULATOR_CORRECTNESS.md](SIMULATOR_CORRECTNESS.md) (PR for finding 5) |
 | 6 reproduction record | [REPRODUCTION_BASELINE_2026-10-18.md](REPRODUCTION_BASELINE_2026-10-18.md) + `.json` |
 
+## v1.19 (stage 0)
+
+| item | file |
+|---|---|
+| defect register (D-01 to D-27, Class A/B/C, blocks column) | [DEFECT_REGISTER_v1.19.md](DEFECT_REGISTER_v1.19.md) |
+| baseline identities and document states | [BASELINE_v1_19.md](BASELINE_v1_19.md) |
+| data-route priced proposal (stage 0-A, B2a) | [DATA_ROUTE_PROPOSAL_v1.19.md](DATA_ROUTE_PROPOSAL_v1.19.md) |
+
 ## Reproduction result (2026-10-18, `tools/reproduce_baseline.py`)
 
 - **At the bound commit `8fb189b` (REL-01): REPRODUCED.** Fresh clone from GitHub, venv from the
