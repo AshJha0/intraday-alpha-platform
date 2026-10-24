@@ -25,7 +25,7 @@ llm = ["anthropic>=1.14.0,<2"]
 # v1.15 DBN MBO reader (ingest --format dbn-mbo): the Databento codec only, no network
 dbn = ["databento-dbn>=0.72.0,<1"]
 # tools/r7_databento_fetch.py only (the network client; never imported by iap)
-databento = ["databento>=0.87.0,<1"]
+databento = ["databento>=0.88.0,<1"]
 # v1.15 AI4 deep LOB models (iap.models.deeplob_torch); CI does not install it, tests skip
 deep = ["torch>=2.14.1"]
 dev = ["pytest>=9.1,<10", "pytest-cov>=7.1,<8", "pytest-xdist>=3.8,<4", "pyyaml>=6.0,<7"]
