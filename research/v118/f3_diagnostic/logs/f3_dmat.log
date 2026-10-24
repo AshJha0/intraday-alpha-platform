@@ -1,0 +1,12 @@
+validation {'max_abs_diff_mean': np.float64(4.999844358567762e-07), 'max_abs_diff_se': np.float64(4.999841897480872e-07), 'max_abs_diff_p': np.float64(5.000000000143778e-07), 'counts': {'K16': 23, 'K3': 79, 'K6': 80}, 'recorded': {'K3': 79, 'K6': 80, 'K16': 23}, 'passed': True}
+V1_uncentred {'K16': 21, 'K3': 81, 'K6': 67}
+V2_profile_removed {'K16': 4, 'K3': 90, 'K6': 28}
+V3_double_centred {'K16': 11, 'K3': 66, 'K6': 77}
+loso 0 {'n_derangements': 265, 'K16': 1, 'K3': 14, 'K6': 1}
+loso 1 {'n_derangements': 265, 'K16': 0, 'K3': 12, 'K6': 6}
+loso 2 {'n_derangements': 265, 'K16': 0, 'K3': 10, 'K6': 2}
+loso 3 {'n_derangements': 265, 'K16': 0, 'K3': 13, 'K6': 2}
+loso 4 {'n_derangements': 265, 'K16': 0, 'K3': 13, 'K6': 8}
+loso 5 {'n_derangements': 265, 'K16': 0, 'K3': 11, 'K6': 1}
+loso 6 {'n_derangements': 265, 'K16': 1, 'K3': 17, 'K6': 0}
+DONE
