@@ -10,6 +10,30 @@ Sections §45-§99 (added for v1.16) and §100-§139 (v1.17) are shorter concept
 teaches one idea behind the platform, says where it lives in the code, and
 ends with questions. If a v1.12-v1.17 term is unfamiliar, start there.
 
+Sections §141-§200 (added for v1.18.0) are teaching entries in six areas, each grounded in code, tests and
+result artefacts of the repository and each stating what it does not show: **alpha and signals** (§141-§150),
+**statistics and the Sharpe ratio** (§151-§160), **quant, portfolio and risk** (§161-§170), **algorithmic
+execution** (§171-§180), **smart order routing and microstructure** (§181-§190), and **latency, systems and
+governance** (§191-§200). They are all in-sample or replay-level material: v1.18.0 promotes no signal,
+claims no edge and validates the fill model at Level 1 (deterministic replay) only. The matching runnable
+recipes are COOKBOOK recipes 141-200, in the same order.
+
+Learning paths by topic (v1.18):
+
+- *Alpha and signals:* §141 (what an alpha is here), §142 (guards), §143 (decay), §145 (the entry bar),
+  §146 (the net-of-cost screen), §149 (purge and embargo), then §150.
+- *Sharpe and statistics:* §151, §152 (how high the bar climbs), §153 (the verdict words), §154-§156
+  (few clusters), §157-§158 (known-null), §159 (signing the analysis), §160 (a stop rule).
+- *Quant and risk:* §161-§163 (factor risk, VaR and ES, stress), §164 (limits), §166 (the kill switch),
+  §167 (capacity), §170 (the researcher's discipline).
+- *Execution algorithms:* §171-§172 (cost per filled share, the capped child), §173-§176 (pooled ratios and clusters, paired differences, B8 v2, B7 and B8),
+  §177-§178 (cancel races and invariants), §179-§180 (replay, Level 1 and the real-tape test).
+- *Routing and microstructure:* §181-§183 (two venues, ITCH, IEX), §184 (clocks), §185 (routing policies),
+  §187-§190 (stale quotes, REL-09, REL-10, the closing imbalance).
+- *Latency and systems:* §191-§193 (latency tables, an unknown capture clock, the REL-04 verification),
+  §194-§197 (the order manager, reconciliation, feed resilience, the soak), §198-§200 (UNKNOWN, signatures,
+  the holdout registry and the data manifest).
+
 Reading order matters less than you'd think; each section stands alone but
 cross-references the others. If you only have an hour, read §6 (honest alpha
 research), §7 (ML and meta-labeling), §12 (golden parity) and §20 (the MVP
@@ -8376,6 +8400,3374 @@ Classic external literature these designs draw on (find current editions):
 Everything else is in the code — which, in this repository, is the point:
 every claim above is a test, a golden file, or a committed report you can
 rerun.
+
+## 141. What an alpha is here: a stated hypothesis, one fitted slope, and a state called dead (v1.18)
+
+**The question.** The registry holds 24 alphas. What must you write to add a 25th, and what does the platform refuse before it has looked at a single row of data?
+
+**What an alpha is.** A class that extends `iap.alpha.base.AlphaModel`, in practice nearly always `LinearAlpha` (`python/src/iap/alpha/base.py`). Four things are pinned on the class:
+
+1. `alpha_id`, `name`, `asset_class` (identity);
+2. `horizon`, one of the 11 label horizons `VALID_HORIZONS` (10 ms to 15 m): the span over which the alpha forecasts the mid-to-mid return;
+3. `features`, the registry names the alpha is allowed to read (the registry entry later in this batch explains the registry);
+4. a class docstring with a section starting `Economic rationale:`.
+
+Item 4 is enforced by `__init_subclass__` at class-definition time: an alpha class without it raises `TypeError` when the module is imported, before any data exists. The platform cannot tell you whether the rationale is *true*. It only guarantees that a hypothesis was written down, in the same file as the code, so the later question "did the data agree with the stated direction?" has something to be asked against.
+
+**What `fit` does.** `LinearAlpha.fit` is deliberately humble. The subclass supplies `raw_signal(df)`, an *oriented* and *causal* signal (oriented means its sign follows the stated hypothesis: a reversal alpha negates the return). `fit` pools every training row where the raw signal is finite, the label is finite and `label_valid_<horizon>` is true, then estimates:
+
+```
+mu, sigma  = mean and standard deviation of the raw signal
+z          = clip((raw - mu) / (sigma + 1e-12), -4, +4)
+beta       = OLS slope of label_mid_<horizon> on z        (free-signed)
+```
+
+and scoring is `expected_return = beta * z`, `confidence = min(1, |z| / 2)`. `expected_return` is a forecast return over the horizon, a pure number (1e-4 is one basis point). Because `z` is clipped at 4, the largest forecast an alpha can ever make is `4 * |beta|`; the entry-bar entry later in this batch uses that bound. `beta` is free-signed: `hypothesis_confirmed` is simply `beta_fit > 0`, i.e. the data agreed with the direction the rationale stated. An alpha whose fitted sign contradicts its rationale can never be PROMOTE, whatever its |IC| (`research/alpha_reports/REPORT.md`).
+
+**The dead state.** If the fit has fewer than 32 usable pairs, or `sigma <= 0`, or `beta == 0`, the alpha is *dead*: every row scores `(expected_return, confidence) = (0.0, 0.0)`. This rule exists because of a bug the code comments record: with `sigma = 0` the old formula gave `z = clip(x / 1e-12) = +/-4` on every row, so the alpha reported confidence 1.0 on a forecast of exactly zero, "maximum conviction in nothing", and the ports loaded such a parameter file happily. An invalid input row (a NaN feature during warm-up, say) is handled the same way: it scores `(0.0, 0.0)`, never a guess.
+
+**Ports never fit.** Fitting is Python's job. The ports read `configs/strategies/alpha_params.json` and apply the formula above (`API_ALPHA.md` section 2). `LinearAlpha.load_params` therefore refuses a file whose `alpha_id`, `horizon` or `features` differ from the class, whose `z_clip` or `conf_scale` is not the pinned 4.0 and 2.0, whose numbers are not finite, or that has `sigma <= 0` with a non-zero `beta`. The clip and the confidence scale are part of the cross-language contract, not tunables.
+
+**One more consequence.** `iap.alpha.base` is part of every alpha's code fingerprint, so editing it would change the identity of every open pre-registration. That is why the v1.18 many-ETF universe helper is a new module (`iap.alpha.universe_v2`) rather than an edit of `configure_universe` (`docs/SIGNAL_RESEARCH.md` section 10).
+
+**Where the 24 stand at v1.18.0.** `research/alpha_registry.json` holds 23 alphas in CANDIDATE and 1 (FX11) in RESEARCH, and every one of them has `outcome: HOLD`. All 23 candidates fail the gates `net_pnl_after_costs`, `net_pnl_bootstrap_ci` and `capacity`; FX11 stops earlier, at `leakage_clean`. No alpha is promoted, and v1.18.0 claims no edge. These are statements about registered hypotheses on the seeded synthetic dataset (`data_version` `116b7787...`), not about markets.
+
+**What this does not show.** The contract proves an alpha is *well-formed and honest about its direction*, not that it is good. A toy alpha written to pass every structural check can still be worthless; the cookbook recipe "Define a toy alpha and watch the contract" builds one on purpose.
+
+**Check yourself.**
+
+1. Why is `beta` free-signed instead of forced positive? *(So the data can contradict the hypothesis. A forced sign would hide the case the `hypothesis_confirmed` gate exists to catch.)*
+2. A parameter file says `sigma = 0` and `beta = 0.3`. Why is it rejected? *(The only legal zero-sigma file is a dead alpha with `beta == 0`; otherwise the scorer would divide by almost nothing and invent conviction.)*
+
+## 142. Three cheap guards and what each is blind to (v1.18)
+
+**The question.** Before any statistic is computed, three inexpensive checks look at how an alpha *reads* its inputs. If each one is blind to something, why run all three?
+
+**The three guards.**
+
+1. **Declared-columns test.** `test_score_uses_only_declared_features` in `python/tests/test_alpha_interface.py` re-scores every one of the 24 alphas on frames cut down to the alpha's declared `features` plus `exchange_ts`/`instrument_id`, and demands identical output. An undeclared dependency, including a label column, changes it or crashes it.
+2. **Label guard.** `LeakageTester.label_guard` (`python/src/iap/validation/leakage.py`) scores the real frames and a copy in which every `label_*` column is replaced by a constant (0.12345), and demands identical `expected_return` and `confidence`. Note what it replaces: label columns only. It is the runtime check inside every validation; the declared-columns test is the unit test that covers the broader "no undeclared column" claim made in the `base.py` docstring.
+3. **Truncation probe.** `LeakageTester.truncation_probe` re-scores on frames cut off at several anchor rows and demands that the score *at* the anchor is bit-identical to the full-frame score. A scorer that peeks at a later row changes.
+
+**What the toys show.** The cookbook recipe "Run the three guards on two toy leaks" builds one honest alpha and two cheaters and runs all three guards. The recorded outcome:
+
+| toy | label guard | declared-columns | truncation probe |
+|---|---|---|---|
+| honest reversal | pass | pass | pass |
+| adds half the label to its signal | **fail** | **fail** (the label column is missing, so scoring raises `KeyError`) | pass |
+| uses the next row's return | pass | pass | **fail** |
+
+Read the middle row: the label peeker passes the truncation probe. The label for row *t* sits in row *t* itself, so cutting off later rows changes nothing. Read the last row: the future-row peeker reads a *declared feature* column, so the first two guards see nothing wrong, and only truncation notices that the score at row *t* moves when row *t+1* is removed. Each guard catches what another cannot, which is the whole argument for keeping all of them.
+
+**What none of the three sees.** A leak *baked into* a precomputed feature: a centred window, a full-sample normalisation. Every guard above takes the feature frame as given. That is the job of the recompute probe, which rebuilds features from a raw-event prefix (§81), and of the statistical detectors (shift-by-one, time-shift, §81-§82). The three guards are the cheap front line, not the whole defence.
+
+**What this does not show.** The toys are three lines of pandas with a planted peek; they are not evidence that any of the 24 flagship alphas ever leaked or ever tried to. The committed report records the real outcome: 23 alphas pass leakage, FX11 fails the time-shift detector and sits in RESEARCH pending human review (`research/alpha_reports/REPORT.md`, `docs/research/FX11_FINDING.md`).
+
+**Check yourself.**
+
+1. A feature is computed with the day's *closing* price as its denominator. Which of the three guards fires? *(None. The column is a declared feature, labels are untouched, and every row is internally consistent. Only the recompute probe, which rebuilds the feature from an event prefix, sees it.)*
+2. `label_guard` returns `False` if scoring raises when the labels are replaced. Is that too harsh? *(No: a scorer that crashes because a label column now holds a constant was reading it. The code treats the crash as the same evidence as a changed score.)*
+
+## 143. The decay curve is a description, not a menu (v1.18)
+
+**The question.** Every validation report carries `decay_ic_by_horizon`: the alpha's IC against all 11 label horizons. EQ06 is pinned at 10 s, but its curve peaks at 1 minute. Why not pin 1 minute?
+
+**What the curve is.** `iap.validation.metrics.decay_curve` takes one score series and computes its IC against every pinned horizon's mid label, on the rows the IC policy scores. In `validate_alpha` it is computed on the *last walk-forward fold's* test rows only, per instrument, and averaged over instruments. Rows with zero confidence are set to NaN first, so an alpha that abstains is not credited with an IC of zero on its abstentions (`test_decay_curve_applies_the_confidence_mask`). The curve is therefore one fold, one description of how far ahead the score keeps its rank order. Read it as a *shape*.
+
+**Worked numbers** (committed reports, `research/alpha_reports/*.json`, synthetic seeded dataset; the cookbook recipe "Read the decay curves and see what picking the best horizon does" prints them):
+
+```
+horizon:      10ms   50ms  100ms  500ms     1s     5s    10s    30s     1m     5m    15m
+EQ03 (5s)   +0.003 -0.001 +0.006 +0.015 +0.018 +0.038 +0.040 +0.025 +0.022 +0.011 +0.005
+EQ06 (10s)  +0.003 +0.011 +0.012 +0.020 +0.026 +0.049 +0.054 +0.084 +0.085 +0.011 +0.020
+EQ08 (10s)  +0.001 -0.002 -0.001 -0.013 -0.014 -0.035 -0.063 -0.057 -0.044 +0.055 +0.067
+```
+
+EQ03 rises to a plateau around its pinned 5 s and 10 s and then fades: the shape of a signal with a finite lifetime. EQ08 is stranger: at its pinned 10 s the IC is -0.063, the wrong sign for its hypothesis (it is REJECTED, `hyp = no`), and at 5 and 15 minutes it is +0.055 and +0.067.
+
+**Why not just take the peak?** Because choosing the best of 11 correlated, noisy numbers after seeing them is a look, and a biased one. Across all 24 reports the mean absolute IC at the pinned horizon is 0.0412; at each alpha's best-looking horizon it is 0.0594, and for 20 of the 24 the best-looking horizon is not the pinned one. Two alphas change *sign* between the two (EQ08, FX01). If you hand-pick the horizon per alpha you promote the selection noise. The gate reads only the pinned horizon, so the curve cannot inflate a verdict. When a study really wants to scan horizons, the ledger's `record` documents `count > 1` as a declared batch of looks, "e.g. a horizon scan", and the gate threshold rises with the look count: `ExperimentLedger.bonferroni_t_threshold_at` gives 4.435 at the look count of the committed run (5,420 in that run, an older ledger than today's), against 1.96 for one look.
+
+**What the curve legitimately gives you.** A *hypothesis* for a new, separately registered study: "EQ06 may live longer than 10 s". It also helps spot a mis-pinned horizon (a curve that is flat everywhere is not a horizon problem; it is no signal) and a sign flip with horizon, which is a reason to look harder, not a result.
+
+**What this does not show.** One fold, equity rows only for the worked numbers, synthetic data. The decay IC at the pinned horizon (EQ03: +0.038) differs from the gate IC (+0.030) because they are different pools: last fold averaged over instruments versus all folds pooled. No curve here is evidence of tradable edge; the same reports show 18 of 24 alphas make no trade at 1x costs and none ends above zero (see the entry-bar entry later in this batch).
+
+**Check yourself.**
+
+1. EQ08's curve is negative at 10 s and positive at 15 m. Is "pin 15 m" a valid fix? *(No. It is a new look chosen because of the sign, on the same data that suggested it; it needs its own registration and a fresh sample.)*
+2. Why zero-out confidence-zero rows as NaN rather than 0? *(A 0 in the score column is a prediction of "no move"; NaN is the absence of a prediction. Zeros dilute the IC toward 0.)*
+
+## 144. Turnover: flips per hour of open market (v1.18)
+
+**The question.** EQ05's report says 528.7 flips per hour; FX06's says 9.0. What is being counted, and why does the denominator matter?
+
+**Definition.** `signal_turnover_detail` (`python/src/iap/validation/metrics.py`) builds a position proxy: `sign(score)` on rows where `confidence >= 0.25`, flat otherwise. A *flip* is any change of that proxy between consecutive rows. The rate is flips divided by **active hours**: the sum of inter-row gaps that are no longer than the session-gap constant `SESSION_GAP_NS` (1.8e12 ns, 30 minutes, the same constant the backtester uses to find session boundaries). A gap longer than that is overnight or weekend, time in which the strategy cannot flip.
+
+**Why the denominator.** Turnover is a *cost* statistic: it estimates how often the strategy pays the spread. Dividing by wall-clock span bills it for hours the market is shut and understates the rate it actually trades at. The cookbook recipe "Measure signal turnover and the gap rule" builds the clearest case: 720 rows over two one-hour sessions 18 hours apart, a score that alternates sign every row.
+
+```
+flips 719, active hours 1.994, span hours 19.997
+flips/h over the wall span   : 36.0
+flips/h over active time     : 360.5
+```
+
+The same signal reads 10 times busier once the overnight gap is excluded. The report carries `turnover_active_hours` and `turnover_span_hours` beside `turnover_flips_per_hour` so the denominator can be audited (`test_signal_turnover_denominator_excludes_session_gaps`, `test_turnover_denominator_is_reported`). On the seeded dataset the last-fold equity test rows contain no gap longer than 30 minutes, so there the two hours figures coincide (28.4 h each, summed over instruments).
+
+**What it measures, and what it does not.** It measures the naive sign-following proxy, not what the default cost-aware backtest does. EQ03 flips 413.8 times per hour yet makes **0 trades** at 1x costs, because its forecast never clears the entry bar (next entry). The committed rates run from 6.8 to 528.7 flips per hour: EQ05 (horizon 1 s) 528.7, EQ03 (5 s) 413.8, EQ08 (10 s) 25.8, FX06 (30 s) 9.0, FX10 (1 min) 6.8. They do not line up neatly with the horizon (EQ01, also 1 s, flips 88.1 per hour), because turnover depends on how quickly the oriented signal changes sign, not on the label horizon. FX10 is the one of these that trades: 247 trades at 1x and a net P&L of -93 USD (`REPORT.md`).
+
+**How to use it.** As a smell test, not a score. A very high turnover with a tiny forecast says the signal changes sign far faster than a forecast of that size could pay for; a low turnover says the first problem is something else. The cost-aware policy builds the same idea into the backtest: it holds a position for the label horizon and renews it above a hysteresis fraction of the entry bar, because staying in costs nothing and getting back in costs the spread again (`engine.py` module docs).
+
+**What this does not show.** Flips per hour is not a P&L, a cost estimate in dollars or a capacity figure. It is measured on one fold, averaged over instruments, with a fixed confidence cut of 0.25.
+
+**Check yourself.**
+
+1. A strategy trades only the first 90 minutes of each day. Which denominator is right? *(Active hours: the gaps between sessions exceed 30 minutes and are excluded.)*
+2. Why can an alpha have 400 flips per hour and zero trades? *(The proxy ignores cost; the backtest enters only when the forecast clears the round-trip cost.)*
+
+## 145. The entry bar: why 18 of 24 alphas trade nothing (v1.18)
+
+**The question.** `REPORT.md` says: at 1x costs on the last fold, 18 alphas make no trade, 6 trade and lose, and 0 end above zero. Gross IC was positive for many of them. How can a positive-IC alpha make no trade at all?
+
+**The rule.** The default backtest policy is `cost_aware` (`python/src/iap/backtest/engine.py`). It enters from flat only when `confidence >= conf_min` and `|expected_return|` exceeds the row's *entry threshold*, the size-free round trip
+
+```
+CostModel.round_trip_cost_return = multiplier * (2 * half_spread + 2 * fee_per_unit) / mid
+```
+
+(impact is excluded because it depends on size). It then holds for the label horizon and renews only above `hysteresis` times that threshold.
+
+**Why it matters: the size of the forecast.** IC is a correlation and has no units. `expected_return = beta * z` has: it is the forecast in return terms, and `z` is clipped at 4, so a forecast can never exceed `4 * |beta|`. The cookbook recipe "Measure how far a forecast sits below the entry bar" scores EQ03, EQ06 and EQ05 on the seeded dataset and compares each row's `|expected_return|` with that row's threshold:
+
+| alpha | horizon | 99th percentile of `|er|` | best `|er| / cost` | rows above the bar |
+|---|---|---|---|---|
+| EQ03 | 5 s | 0.084 bp | 0.58 | 0 |
+| EQ06 | 10 s | 0.200 bp | 1.92 | 53 |
+| EQ05 | 1 s | 0.005 bp | 0.03 | 0 |
+
+The median round-trip threshold on the same rows is 2.94 bp. A forecast whose 99th percentile is 0.08 bp is about 35 times smaller than the median cost it has to beat. The IC is real (gate IC 0.0300 for EQ03) and the forecast it implies is a few hundredths of a basis point. The clip makes the same point from the other side: for EQ03 the fitted `beta` is 2.17e-6, so no row can ever forecast more than `4 * beta` = 0.087 bp.
+
+**Reading the one exception.** EQ06 has 53 rows above its bar out of 159,865. The recipe's extra probe shows what they are: every one of them has a spread of 0 ticks (a locked book), so the threshold on those rows is the fee alone, about 0.15 bp (0.145 to 0.234 bp across the three instruments involved). That is *not* 53 trades: the committed EQ06 report shows 0 trades at 1x (`research/alpha_reports/EQ06.json`). The script scores both days including the one the parameters were fitted on; the report scores out-of-sample folds under the full backtest rules.
+
+**The honest conclusion.** The default does not ask "is IC positive?" but "does the forecast pay for its own spread?". An alpha with a real but tiny signal passes the first question and fails the second, so its net P&L is exactly 0, and 0 does not pass the `net P&L > 0` gate. That is the same finding as the legacy sign policy's large loss, stated without the policy's self-inflicted cost (COOKBOOK recipe 28 prints the comparison for EQ03). It also explains why §46 treats a 0.1 bp edge against a 1 bp spread as hopeless.
+
+**What this does not show.** The spreads here are those of the synthetic generator. On the real Nasdaq sessions of the multi7 screen the round trip is 1.90 bp per row at 100 shares (`research/breadth/screen/SCREEN_multi7.md`), a smaller bar, and the next entry shows the signals still do not clear it. Nothing here says a different alpha, horizon or execution style could not.
+
+**Check yourself.**
+
+1. Could re-fitting EQ03 with a larger `z_clip` make it trade? *(The clip is a pinned port constant, so no. And a bigger clip would give larger forecasts only on rare tail rows: the IC and the fitted `beta` would not change.)*
+2. Why exclude impact from the entry threshold? *(It depends on the order size; the threshold is per unit and must be known before a size is chosen.)*
+
+## 146. The net-of-cost screen: gross IC is not net edge (v1.18)
+
+**The question.** If a gross IC of 0.05 is statistically solid, what does it take to call it a tradable edge? The platform's answer is a screen that every candidate must pass *before* a confirmatory look, and at v1.18.0 nothing passes it.
+
+**What the screen does.** `iap.research.screen` (`python -m iap.research.screen --dataset-dir DIR`, written in v1.17 as C6) takes each candidate of a pre-registration document (alpha id x horizon x model identity) and, on all in-sample walk-forward folds at once, pools the standardised signal `z` and the scored label `y`. It then reads them three ways:
+
+```
+gross      = gate_statistics(ts, z, y)                       the same gate statistic as the validation gate
+net        = gate_statistics(ts, z, y - sign(z) * cost)      the label after paying the round trip
+net_return = mean( sign(z) * y - cost ), day-clustered t     mean P&L per scored row
+```
+
+`cost` is the modelled round trip at the registered size (100 shares): spread and fee of both legs plus two legs of square-root impact. Six rules, all required: net IC >= 0, net day-clustered t >= 2, net-return t >= 2, mean net return >= 0, at least 4 days, at least 1,000 pairs. One ledger look is charged per candidate; the output says "a filter, not evidence".
+
+**What it found.** Committed screen on the seven real in-sample sessions (`research/breadth/screen/SCREEN_multi7.md`): **0 pass, 22 fail, 1 not screened**. For EQ03 at 5 s: gross IC +0.0510, net IC -0.5563, round trip 1.90 bp, mean net return -1.83 bp per round trip over 6 test days and 2,313,485 pairs. So the gross return per round trip is about 0.07 bp against a 1.90 bp cost. The same command on the bundled synthetic features also fails all 23 candidates, including on `n_days_min` because the bundle has only 2 days.
+
+**Why the net IC is so negative.** A net IC of -0.55 does not mean the signal predicts the wrong way. The net label subtracts `sign(z) * cost`, a term strongly anti-correlated with `z`, and its size swamps the edge. Net IC mostly measures how much bigger the cost is than the edge. The cookbook recipe "Run the net-of-cost screen and sweep the cost" shows it on planted data with a gross IC fixed at 0.0499:
+
+```
+cost bp  gross IC   net IC  net ret bp/row
+   0.00    0.0499   0.0499           0.111
+   0.12    0.0499   0.0181          -0.009
+   0.50    0.0499  -0.0820          -0.389
+   1.90    0.0499  -0.3901          -1.789
+```
+
+This also shows why the screen has *two* money rules. At a cost of 0.12 bp the net IC is still positive (+0.0181) while the mean net return is already negative. A correlation can survive a cost that the P&L cannot.
+
+**Consequences in the code.** `python -m iap.research run --require-screen PATH` refuses a confirmatory run before reading data (`not_screened`); `breadth_book --require-screen` and `WriteBroker.preregister(..., screen=PATH)` refuse a candidate that failed or was never screened. The C8 breadth-book pre-registration used the screen as a hard gate and the screen refused the candidate at registration, so no confirmatory look was taken (`docs/SIGNAL_RESEARCH.md` section 8).
+
+**What this does not show.** It is in-sample and uses a one-lot size; it says "not at this size, on these days, under this cost model". It does not say no edge exists anywhere. The prereg that defines the rules is an unsigned DRAFT (`research/preregs/net_of_cost_screen_prereg_DRAFT.json`). Tests: `python/tests/test_v117_screen.py`.
+
+**Check yourself.**
+
+1. A candidate has net IC +0.02 and mean net return -0.1 bp. Pass? *(No: `net_return_mean_min` fails. Both money rules must hold.)*
+2. Why does the screen run before the confirmatory look and not after? *(The pre-registration's ordering statement: no confirmatory look at any candidate before the screen has run. A look at a holdout cannot be undone; an in-sample screen can fail a candidate first.)*
+
+## 147. Neutralising by construction: demeaned cross-sections and currency factors (v1.18)
+
+**The question.** Two alphas, EQ11 (equity) and FX05 (currency pairs), are called cross-sectional. What do they remove from the raw signal, and what is left?
+
+**EQ11: remove the common move.** `CrossSectionalLinearAlpha` (`python/src/iap/alpha/cross_sectional.py`) puts every instrument on a shared 5-second causal grid (each instrument contributes its latest feature value at or before each grid time, with a staleness cap of 60 s for EQ11), then transforms each *column* (one time) across names: subtract the cross-sectional mean, divide by the cross-sectional standard deviation, negate (a reversal). The result is a signal whose sum across names is zero at every time, so the market's common move cancels and only "who outran the others" remains. With fewer than `MIN_NAMES = 4` names quoted at a time, the column is NaN, not a noisy z-score of two stocks. The recipe "Neutralise a cross-section: EQ11 and FX05 on small hand-made inputs" shows a five-name column summing to 0.0 with standard deviation 1.0, and a three-name column returning NaN.
+
+**FX05: remove currency factors.** Pairs share currencies, so their returns are not independent. `iap.alpha.fx_exposure` builds the exposure matrix A (EUR/USD is +1 EUR, -1 USD) and solves for per-currency factor returns `f` by least squares with USD pinned to 0. FX05 trades the *residual* `r - A f`: the part of each pair's return that currency moves cannot explain.
+
+A subtlety found in review (round 3): a currency that appears in exactly one quoted pair has its factor absorb that pair's whole return, so the residual is zero *by construction*. On this universe AUD, CAD, CHF, JPY and NZD each appear in one pair, so five of the eight pairs had a constant signal and were scored as if informative. `identified_pairs` now keeps only pairs whose every free currency appears in at least two quoted pairs; the other five score NaN, confidence 0. Only the EUR/USD, GBP/USD, EUR/GBP triangle carries cross-pair information. In the recipe's run, a 3 bp mispricing planted in EUR/GBP is spread by the least-squares solve across the triangle as residuals of -1, +1 and +1 bp.
+
+**Where else neutrality appears.** The REL-08 screen's books are market- or sector-neutral and its risk table records `max abs net`, `max abs beta` and `max abs sector` of 0.000000 for every variant (`research/v118/rel08/SCORECARD_ds_20190130.md` section 6): the neutrality is enforced by the book's constraints, separately from the signal's own demeaning (§110). (For V1/V2, which trade almost nothing, a zero exposure is easy; the V9-V11 books do trade and still show zero.)
+
+**What neutralising does not do.** It removes an exposure, not a cost. Both alphas are REJECTed in the committed report: EQ11 (15 m) has gate IC +0.0059, 37 trades and net P&L -662; FX05 (5 m) has gate IC -0.0125, 244 trades and -160 (`research/alpha_reports/REPORT.md`). A clean, neutral signal can be exactly as unprofitable as a dirty one.
+
+**Check yourself.**
+
+1. Why drop a name with a stale quote from the cross-section instead of carrying its last value? *(EQ11 drops a name quiet for more than 60 s (`MAX_AGE_NS`). A carried value would be compared with fresh ones, so part of its apparent deviation would be age, not information.)*
+2. Why is a residual of exactly zero a warning sign rather than a good fit? *(A free factor belongs to that pair alone and absorbs its whole return, so nothing is left to explain and nothing is left to trade. The zero is a property of the model, not of the market.)*
+
+## 148. The feature registry as a contract: 205 features, 29 read by alphas (v1.18)
+
+**The question.** What does it mean that a feature "is in the registry", and how much of it do the 24 alphas actually use?
+
+**What the registry is.** `iap.features.registry.build_registry` concatenates the ten family modules in the pinned order `FAMILY_ORDER` and returns 205 specs (price 30, micro 52, flow 47, liquidity 13, vol 13, tod 11, xasset 11, venue 10, regime 10, exec 8). Building it checks three things and raises on any failure: a spec's family matches the module that owns it, no two names are equal, and every `depends_on` name is itself registered. `registry_hash()` is the SHA-256 of the canonical JSON of all entries (`585dd7b92b73...` at v1.18.0), and it is the `feature_version` stamped on every feature vector, golden file, model manifest and parameter file. `load_registry` refuses a registry file whose hash differs from the code's. A feature name is therefore a contract: change a definition, add one or reorder, and the hash, and everything pinned to it, changes visibly. `python/tests/test_feature_registry.py` pins the rules (at least 200 features, unique names, the name pattern, family order, resolvable dependencies, documentation, hash stable and equal to the committed file).
+
+**How much the alphas use.** The recipe "Count which of the 205 registered features the alphas read" walks `build_all()` and tallies each alpha's declared `features`:
+
+```
+alphas: 24 | distinct features read: 29 of 205
+features read, by family: micro 7, flow 7, price 5, regime 3, xasset 2, venue 2, liquidity 1, tod 1, vol 1
+families no alpha reads: exec
+features with exactly one reader: 23
+```
+
+So 176 of the 205 registered features are read by no flagship alpha (this entry does not claim what else reads them). The `exec` family (expected fill probability, impact, urgency) is read by none, as one would expect: those are execution inputs, not return forecasters. The most-shared input is `ofi_norm_l1_w1s_v1`, declared by EQ02, EQ03 and EQ12. That is consistent with the earlier finding that EQ02, EQ03 and EQ12 are close to one signal three times (COOKBOOK recipe 38: effective independent bets 1.64 of 4): alphas with different names and rationales can sit on the same feature.
+
+**A feature is only as good as its reference (v1.18 REL-07).** The `xasset` family measures a stock against a reference ETF. The v1 rule gives every equity row the *first* ETF row of `instruments.json`; on the 100-name 2019-01-30 store that is AMLP, so every `xasset` feature there is measured against an MLP fund. The opt-in `--xasset-reference symbol_map` reads `configs/reference/reference_etf_map_v1.json` instead: QQQ for the 21 names that were Nasdaq-100 members on 2019-01-30, SPY for the other 50. The names and formulas do not change, so the registry hash does not move; the store instead records `xasset_reference` (feature identity `xasset_v2`, map version and SHA) in `features_summary.json`, and a consumer must read it before mixing stores. The map is recalled from public reconstitution notices, not a licensed constituent file, and the file itself marks six names low confidence (AABA, AMD, FLEX, MRVL, TVIX, VXXB) and lists its own limitations, among them that the two VIX ETNs get a poor SPY reference (`configs/reference/reference_etf_map_v1.json`, `docs/SIGNAL_RESEARCH.md` section 10). The REL-08 screen is a consumer: `load_screen_data` refuses a feature store that is not `xasset_v2` and reads its reference ETF and sector for each name from this map, so REL-08's inconclusive result inherits the map's limits.
+
+**What this does not show.** The count of 29 says which features the alphas *declare*; it does not say they are useful. The registry guarantees a stable definition, not predictive power.
+
+**Check yourself.**
+
+1. You rename a feature's doc string only. Does the hash change? *(Yes: the canonical JSON includes `doc`, so every pinned artefact visibly changes version. That is the price of making the registry content-addressed.)*
+2. Why does the symbol-map option leave the registry hash alone yet require a recorded identity? *(Because the definitions are untouched but the *inputs* differ; two stores with the same hash would otherwise look interchangeable.)*
+
+## 149. Purge, embargo and fold shape, in numbers (v1.18)
+
+**The question.** §6.2 says folds are purged and embargoed and cut at row quantiles. What does that remove and change on the bundled data?
+
+**The rule, exactly.** `Fold.train_mask` (`python/src/iap/validation/splits.py`) keeps a training row only if
+
+```
+t + horizon + embargo < test_start
+```
+
+for an expanding walk-forward (and, for two-sided leave-one-day-out folds, also rows at least `embargo` after the test block). A row fails when its label window `[t, t + horizon]` plus the embargo reaches the test block. Test rows satisfy `test_start <= t < test_end`. The default embargo is 60 s.
+
+**The purge costs more for longer labels.** The recipe "Print the walk-forward folds and what purge removes" splits the 11 equity instruments of the bundled features (4 folds). In fold 2, 64,181 rows precede the test block. With EQ03's 5 s horizon the purge-plus-embargo removes 200 of them (0.3 %). With a 15-minute horizon it removes 3,322 (5.2 %). The embargo is the same 60 s in both; the difference is the label window. This is why the "purge width = the alpha's own label horizon" statement matters.
+
+**Row mass versus wall span.** The default `row_mass` mode cuts at quantiles of the pooled row index so every fold carries about the same evidence. On the bundle its four test blocks hold 32,090, 32,091, 32,090 and 32,091 rows. The `wall_span` mode (kept for regression tests) cuts the clock into equal pieces; because an equity session is 6.5 hours of each 24, its folds hold 4,882, **0**, 4,865 and 75,261 rows. A "4-fold walk-forward" with an empty fold is really a 3-fold one, and a report must not call it 4. A fold with fewer than 32 usable pairs is *degenerate*, still yielded so it can be counted, and treated as a failed fold by the gates (`test_walk_forward_degenerate_fold_is_reported_and_fails_the_gate`); PROMOTE needs at least 3 non-degenerate folds.
+
+**Day-aligned folds.** With only two days the `day_aligned` mode yields a single fold (the last `min(n_folds, D - 1)` days are test days). That is the honest answer: with two days there is one held-out day. The same two days are why the net-of-cost screen fails its `n_days_min` rule on this bundle.
+
+**What the folds do not protect against.** Purge and embargo stop *label overlap* leaking across the boundary. They do not stop selection: running 24 alphas and keeping the best is still a multiple-testing problem (§24, §68), and an embargo shorter than the longest feature window can still let a feature carry information across a boundary (§83).
+
+**What this does not show.** Counts are for one dataset and one embargo. The 5.2 % figure is not a cost of purging in general; it is what a 15-minute window removes from a roughly 6.5-hour session split at this boundary.
+
+**Check yourself.**
+
+1. Why does a longer horizon remove more training rows but not more *test* rows? *(The purge protects the test block from training labels that reach into it; the test block itself is fixed by the cut.)*
+2. A report claims 4 folds and one has 0 rows. Which statistic should have caught it? *(`n_degenerate_folds` and `n_nondegenerate_folds` in the report; the PROMOTE gate demands at least 3 non-degenerate folds.)*
+
+## 150. A positive mean IC with a negative lower bound: REL-08 (v1.18)
+
+**The question.** REL-08's VWAP-deviation variant V1 had a mean per-rebalance rank IC of +0.0401, double the 0.02 floor of the rule. Why is its verdict "underpowered", not "continue"?
+
+**What was screened.** REL-08 (`research/v118/rel08/SCORECARD_ds_20190130.md`) is a one-session hypothesis screen on 100 names on 2019-01-30 under a signed rule (family K = 7). Its scores (`python/src/iap/research/rel08_screen.py`) are cross-sectionally demeaned and studentised:
+
+- `vwap_deviation`: minus the gap between the mid and the trailing VWAP over the horizon, relative to the mid (V1, V2; 15 min);
+- `residual_reversion` / `etf_catch_up`: the reference ETF's return times the stock's beta, minus the stock's own return, at 15 min (V5, V6) or 1, 3 and 5 min (V9-V11, rebalanced every 5 min).
+
+The unit of observation is the *rebalance*, not the row: one rank IC (Spearman) per rebalance between score and the spread-netted forward return, averaged over the usable rebalances.
+
+**The arithmetic.** With n = 25 usable rebalances for V1, the moving-block bootstrap standard error of the mean IC is 0.0288. The one-sided lower bound is taken at level 1 - 0.05/7 = 0.992857 (Bonferroni over the 7 variants) and is **-0.0263**. The minimum detectable effect is `2.49 * SE` = 0.0716. The observed mean (+0.0401) is smaller than the MDE, so a true IC of 0.04 would not be reliably detected at this sample size, and a lower bound below zero means the data are consistent with no relationship at all. Criterion C8 needs mean > 0.02 *and* lower bound > 0, so V1 fails it.
+
+The recipe "Re-derive a REL-08 lower bound and see how many rebalances it takes" repeats the bootstrap on synthetic ICs with a fixed mean of 0.04 and sd 0.19 (chosen so that n = 25 gives an SE near V1's): lower bound -0.0197 at n = 25, -0.0056 at 100, +0.0183 at 400, +0.0281 at 1,600. At this spread the same mean needs a few hundred rebalances to clear zero; at the 26 non-overlapping 15-minute decisions per session that the rule counts, 400 rebalances is about 15 sessions.
+
+**The honest verdict.** All 7 variants are `underpowered` (`inconclusive`), none `continue`, none `stop`. The release notes add that the screen has known defects found afterwards: the data-gap criterion C1 is a probable bug that fails by construction, V1/V2 trade a nearly flat book, and the scorecard cumulative-dollar columns sit under a "bps per rebalance" heading. So it is not a clean negative either (`docs/release/v1.18.0_RELEASE_NOTES.md`, items 6-7). The continuation rule v2 is an unsigned draft; REL-08b was not run.
+
+**What this does not show.** It shows nothing about whether VWAP reversion exists in 2019 Nasdaq stocks. One session is one cluster: no day-clustered t is reported or implied. It is in-sample, a hypothesis screen, no edge claim, and the 2025/26 breadth holdout stays unread.
+
+**Check yourself.**
+
+1. Why is a *positive* sample IC not by itself a reason to spend more machine time? *(Because the rule requires C3 to C7 as well, and the lower bound, not the mean, is what separates a signal from noise at 25 observations.)*
+2. What would more rebalances inside the *same* session buy you? *(A narrower SE: V9-V11 have 77-79 rebalances and SE about 0.014, against 0.029 for V1. But the rule still counts one session as one cluster, so no day-clustered inference is possible or implied; only more sessions widen that.)*
+
+## 151. The Sharpe ratio is a per-period number, and a noisy one (v1.18)
+
+**The question.** A 10-day backtest shows an annualised Sharpe of 2.75. Is that
+a lot?
+
+**What the platform computes.** `iap.validation.deflated.pnl_sharpe` takes a
+series of per-day P&L, divides its mean by its sample standard deviation
+(`ddof=1`), and multiplies by `sqrt(252)` (`DAYS_PER_YEAR`) if asked to
+annualise. Two things follow from the docstring. It is a Sharpe of P&L in
+dollars, not of returns on capital, so it says nothing about how much capital
+the P&L needed. And every Sharpe in the module is *per period* first
+(`sharpe_per_day`); the annualised figure is the same number times 15.87,
+printed beside it, not a separate measurement.
+
+**How noisy it is.** Draw skill-less daily P&L (mean 0, sd 100 USD) many times
+and look at the spread of the Sharpe you would report (COOKBOOK recipe on the
+Sharpe ratio, 20,000 histories per row, seed 7):
+
+```
+  T | sd of per-day SR | 1/sqrt(T-1) | sd of annualised SR
+  3 |            1.761 |       0.707 |               27.95
+ 10 |            0.356 |       0.333 |                5.65
+ 40 |            0.162 |       0.160 |                2.58
+252 |            0.064 |       0.063 |                1.01
+```
+
+For anything from 10 days up the spread follows `1 / sqrt(T - 1)`, which is the
+variance the module uses for a skill-less Sharpe. At `T = 10` the annualised
+figure of a strategy with *no skill at all* has a standard deviation of 5.65, so
+2.75 is half a standard deviation: nothing. One simulated 10-day history in that
+run did print a per-day Sharpe of 0.173, annualised 2.75. At `T = 3` the
+approximation breaks (the ratio of a mean to an sd estimated from three points
+has heavy tails), which is one reason the platform returns `None` below
+`MIN_OBSERVATIONS = 3` days and calls 2-7 sessions its power bottleneck.
+
+**The probabilistic Sharpe ratio (PSR).** `probabilistic_sharpe_ratio(sr, sr*, T,
+skew, kurtosis)` is the probability that the true Sharpe exceeds a benchmark,
+given `T` observations and their skew and kurtosis. For a per-day Sharpe of 0.12
+over 40 days against zero the PSR is 0.7724; with skew -3 and kurtosis 10 (a
+strategy that earns a little most days and loses a lot occasionally) it falls to
+0.7373. The skew and kurtosis enter because they inflate the variance of the
+Sharpe estimate.
+
+**How long a track record must be.** `min_track_record_length(sr, sr*, skew,
+kurtosis, alpha)` solves the same formula for `T`. For a per-day Sharpe of 0.12
+against zero at 5 % it is 190 days; with skew -3 and kurtosis 10, 263 days; for
+0.05 per day (about 0.79 annualised), 1,085 days. The real-data studies of
+v1.18 have 1 to 7 sessions.
+
+**Limits worth stating.**
+
+1. The PSR formula as implemented has terms for `T`, skew and kurtosis. It has
+   no term for autocorrelation of daily P&L, so serially correlated days make
+   it too confident. That is a property of the formula, not something the
+   platform corrects.
+2. A Sharpe knows nothing about how many strategies were tried to find it
+   (the next entry, and §40).
+3. The report block (`deflated_sharpe_block`) never feeds a gate; it sits beside
+   a study's registered verdict rule.
+
+**What this does not show.** The table is a Gaussian simulation of the
+estimator. It says how noisy a Sharpe is; it makes no statement about any alpha
+in the repository.
+
+**Check yourself.**
+
+1. Why does annualising make a short backtest look more, not less, impressive?
+   *(It multiplies the point estimate and its noise by 15.87 together; the
+   noise grows in absolute terms while the point estimate alone is quoted.)*
+2. What does a skew of -3 do to the minimum track record? *(It lengthens it,
+   190 to 263 days in the example, because rare large losses make the mean
+   harder to pin down.)*
+
+## 152. How high the bar climbs: SR0, the number of trials, and the null maximum (v1.18)
+
+**The question.** §40 says a Sharpe must be deflated by the number of trials.
+How fast does the bar rise with that number, and what does it do to a result
+that looks strong?
+
+**The bar.** `expected_max_sharpe(N, V)` is `SR0`, the expected best per-day
+Sharpe among `N` skill-less trials whose Sharpe estimates have variance `V`.
+With the module's default `V = 1 / (T - 1)` it is the same multiple of
+`1 / sqrt(T - 1)` for every `T`:
+
+```
+     N |  T=10   T=40  T=252 | SR0*sqrt(T-1)
+     1 |  0.000  0.000  0.000 | 0.000
+    10 |  0.525  0.252  0.099 | 1.575
+   100 |  0.844  0.405  0.160 | 2.531
+   640 |  1.042  0.501  0.197 | 3.126
+  6826 |  1.255  0.603  0.238 | 3.766
+```
+
+The bar rises slowly in `N` (68 times more trials, 100 to 6,826, adds 1.2 units
+of `1 / sqrt(T - 1)`) and falls with `1 / sqrt(T)`. Length of record buys more than a
+smaller search does.
+
+**A worked deflation.** A strategy with a per-day Sharpe of 0.25 over 47 days
+(about 4 annualised) clears a PSR of 0.95 on its own (DSR at `N = 1` is 0.9525).
+Deflate it with the numbers in `research/experiments.json` as of v1.18.0:
+
+```
+N=256   (real-data configurations)  SR0 0.420  DSR 0.1288
+N=640   (all distinct configurations) SR0 0.461  DSR 0.0795
+N=6826  (all looks)                 SR0 0.555  DSR 0.0207
+```
+
+The ledger holds 6,826 looks over 640 distinct configurations, of which 256
+configurations (holding 1,132 of the looks) are on real data and 384 (holding 5,694 of the looks) synthetic.
+`effective_trials` returns the 640 plus one for the run being judged (641); the
+real-data count is what `tools/ledger_family_report.py` calls N for the real
+family. Each reported block names its basis (`trials_basis`), and a reader
+should check which one a given number used before comparing two DSRs.
+
+**What a short study needs.** `iap.research.r7_power.dsr_threshold_sr` and
+`dsr_mde_sr` give, per *session*, the Sharpe needed for DSR > 0.95 and the
+Sharpe detected with 80 % power. At 7 sessions and one trial: threshold 0.763,
+MDE 1.216. At 7 sessions and `N = 308` (the repository ledger when R7 was
+planned): 2.584 and 3.502. At 47 sessions and `N = 308`: 0.699 and 0.843. Seven
+sessions at that `N` need a per-session Sharpe above 2.58 even to clear the
+bar, and about 3.5 to clear it with 80 % power (§77).
+
+**The same idea in t units.** For `N` independent null t-statistics the ledger
+prints `expected_max_null_t = sqrt(2 ln N)` as a yardstick: 4.202 at 6,826
+looks. A Monte Carlo of standard normals (COOKBOOK recipe on the null maximum)
+gives a mean maximum |z| of 3.942 at `N = 6826`, so `sqrt(2 ln N)` is a
+somewhat high approximation. The Bonferroni line (4.484 at 6,826 looks) was
+crossed by the maximum in 4.0 % of 400 runs, close to its 5 % design. The
+difference matters at small `G`: the same maximum over Student-t draws with 6
+degrees of freedom averaged 9.57, and the Bonferroni line for 6 df is 14.30 (and
+369.5 for 2 df). Read through that analogue, a day-clustered t on three sessions (2 df) would need
+to exceed 369.5 to clear a Bonferroni line set for 6,826 looks.
+
+**What this does not show.** `N` is a count of independent trials, and ledger
+entries are correlated, so every `N` above is an upper bound on the effective
+number (the module says so). The DSR is a report; the known-null study (see the
+entries on REL-06) found that the platform's t statistics have not been shown to
+be calibrated, so none of these bars is a calibrated test.
+
+**Check yourself.**
+
+1. Why is `SR0 * sqrt(T - 1)` independent of `T`? *(The default `V` is
+   `1 / (T - 1)`, so `SR0 = sqrt(V) * z`.)*
+2. The same strategy, longer record: does the DSR rise or fall at fixed `N`?
+   *(It rises, since `SR0` shrinks as `1 / sqrt(T)` and the PSR variance
+   shrinks too; a 252-day record at `N = 6826` has an `SR0` of 0.238.)*
+
+## 153. Five words that carry a verdict: reject, iterate, underpowered, candidate, inconclusive (v1.18)
+
+**The question.** Several results say "underpowered", one says "reject" and the
+release notes say nothing was promoted. What do the words mean, and who is
+allowed to say which?
+
+**Three vocabularies, one rule.** The platform has three sets of verdict words,
+each defined where it is used.
+
+1. *The validation gate* (`iap.validation.validate`) returns `PROMOTE`, `ITERATE`
+   or `REJECT` for one alpha. `PROMOTE` needs every gate (leakage, IC at least
+   0.010, significance at least the ledger-derived t, fold consistency, enough
+   non-degenerate folds, hypothesis, cost). `ITERATE` is a weaker pass: leakage clean, IC at least 0.005
+   and t at least 1.5 (`GATES`). Anything else is `REJECT`.
+2. *Registered execution studies* (REL-08, REL-09, REL-10, B8 v2) each define
+   their own words in the signed pre-declaration. REL-10 per cell: `candidate`
+   if the family-adjusted interval lies above 0; `reject` if it lies below 0, or
+   contains 0 while the family MDE is at most USD 20; otherwise `underpowered`.
+   B8 v2 writes `no_evidence` for an underpowered comparison. REL-08 uses
+   `continue`, `stop`, `underpowered` and `passed_not_expanded`.
+3. *The claim ladder* (`iap.research.claims.ClaimStatus`): `feature_correct`,
+   `exploratory_signal`, `passes_registered_net_screen`, `confirmed_untouched_oos`,
+   `strategy_validated_execution_capacity`, plus two off the ladder:
+   `inconclusive` and `rejected`.
+
+**Reject has to be earned.** The one rule common to all three is that "no
+effect found" is not "no effect". In the REL-10 rule a null interval becomes
+`reject` only if the design could have detected USD 20 a session. Re-deriving
+all 24 REL-10 cells from the per-session numbers in `DECISION.json` (COOKBOOK
+recipe on claims) reproduces every verdict and MDE: 12 maker cells and 11 taker
+cells `underpowered`, one taker cell `reject`. That cell is `hid_imb` at 1
+minute on AAPL: family interval [-600.5, -44.2] USD, family MDE 305.2 USD,
+mean -322.4 USD over four sessions. It says that implementation lost money on
+those four sessions; it is a rejection of a profit hypothesis, with a stated
+power, not a claim about order-flow signals in general.
+
+**What the ladder forbids.** `classify` never lets a positive IC, a single
+session or a top ranking above `exploratory_signal` (the `ranked_top` field is
+accepted and ignored). Anything higher needs a signed registration and at
+least two sessions (`MIN_SESSIONS_ABOVE_EXPLORATORY`); promotion into PAPER
+needs `confirmed_untouched_oos` and ACTIVE needs
+`strategy_validated_execution_capacity` (`require_promotable` raises
+`PromotionBlocked`). A registered screen on four sessions that passes classifies
+as `passes_registered_net_screen`, and the code refuses to promote it. Words the
+mapping does not know, such as `candidate`, become `inconclusive` in
+`from_screen_verdict`; `iterate` does too unless a positive IC is passed.
+`candidate` is also a lifecycle state, whose claim ceiling is
+`exploratory_signal`.
+
+**Where v1.18 stands.** The release notes record no promoted signal and no edge
+claimed. That is a statement about these words: nothing reached
+`confirmed_untouched_oos`.
+
+**What this does not show.** The words are labels with rules, not evidence. A
+`reject` at four sessions is a size statement (see the entry on reading a
+three-session interval).
+
+**Check yourself.**
+
+1. Why does an interval containing 0 sometimes give `reject` and sometimes
+   `underpowered`? *(Whether the design could have detected the economic
+   threshold; it is the MDE comparison.)*
+2. Why can a screen never produce `confirmed_untouched_oos`? *(Confirmation
+   needs data untouched before, which a screen on the same sessions does not
+   have.)*
+
+## 154. Reading a three-session interval: critical values, the family, and the MDE (v1.18)
+
+**The question.** B8 v2 compared three routing policies with pinned Nasdaq on
+three evaluation sessions and said `no_evidence` for all six comparisons. How
+wide is "no evidence"?
+
+**Three sessions are two degrees of freedom.** Each interval rests on the mean
+of `G = 3` session values and a Student-t with `G - 1 = 2` df. The 95 % critical
+value is 4.30, not 1.96. B8 v2 also adjusts for `K = 6` comparisons (3 policies
+by 2 symbols), so each interval is taken at level `1 - 0.05 / 6`, a critical
+value of 10.89 (`research/execution/b8v2/REPORT.md`). An interval is the
+estimate plus or minus 10.89 standard errors.
+
+**The detectable effect.** The MDE is the effect the design detects with 80 %
+power: `(critical value + power quantile) * SE`. With the 2-df quantile of 1.061
+the family multiplier is 11.95; the single-test one is `4.303 + 1.061 = 5.363`.
+`iap.research.study_stats.mde` instead uses the *normal* approximation
+(`(1.96 + 0.84) * sd / sqrt(n)`, a multiplier of 2.802); the execution code uses
+the t version.
+
+```
+G | df | t(.975)+t(.80) | z(.975)+z(.80) | ratio
+3 |  2 |          5.363 |          2.802 | 1.91
+4 |  3 |          4.161 |          2.802 | 1.49
+7 |  6 |          3.353 |          2.802 | 1.20
+30| 29 |          2.899 |          2.802 | 1.03
+```
+
+So at three sessions the normal approximation understates the MDE by almost a
+factor of two. Recomputing `(10.89 + 1.061) * SE` from the printed standard
+errors reproduces the file's family MDEs to rounding (`pin_iex` MSFT:
+4.59 * 11.95 = 54.8 against 54.78).
+
+**What the intervals say.**
+
+```
+pin_iex AAPL: -0.78 bps  family CI [-2.25, 0.68]    MDE 1.61
+pin_iex MSFT: -7.55 bps  family CI [-57.46, 42.37]  MDE 54.78
+sor_sweep AAPL: -0.18    [-5.70, 5.34]  MDE 6.06
+```
+
+Even the best-measured cell cannot see a cost difference smaller than 1.6 bps,
+which is the size an improvement would plausibly have; the MSFT cell cannot see
+anything under 55 bps. The pre-declaration said beforehand that `underpowered`
+was the expected verdict for effects near 1 bps. None of the six is better than
+pinned Nasdaq, and none is shown to be worse.
+
+**A small inconsistency to know about.** The REL-10 pre-declaration lists the
+MDE in sd units at `G = 4` as 1.401 (normal), 2.012 (t, 3 df) and 5.526 (family
+t). Recomputed, 2.012 equals `(3.182 + 0.842) / 2`, which uses the normal power
+quantile, while the family figure 5.526 uses the t power quantile and so does
+the code. By the code's convention the single-test t multiple is
+`(3.182 + 0.978) / 2 = 2.080`. The verdicts do not depend on it, since they use
+the family figures.
+
+**What this does not show.** At `G <= 5` an interval is a size statement: it
+says how far the data could move, not that the effect is inside it. The
+interval also assumes session means that are roughly normal, which three
+numbers cannot show.
+
+**Check yourself.**
+
+1. Why does adding a fourth session help more than the `sqrt(4/3)` it adds to
+   the sample size? *(The critical value falls from 4.30 to 3.18 as well.)*
+2. Why can a family-adjusted interval be wider than the plain one by a factor
+   over 2? *(10.89 against 4.30 at 2 df: the Bonferroni level pushes into the
+   steep part of the t tail.)*
+
+## 155. Bootstrap or Student-t when there are three to seven clusters (v1.18)
+
+**The question.** `cluster_mean_stats` prints a Student-t interval and a bootstrap
+5th to 95th percentile range. Which should be believed at four sessions?
+
+**What each does.** The cluster-robust (CR1) standard error is
+`sqrt(G / (G - 1) * sum_g (sum_{i in g} (x_i - mean))^2) / N`; with one value
+per session it is `sd / sqrt(G)`. The Student-t interval is mean plus or minus
+`t(G - 1) * SE`. The bootstrap resamples whole sessions with replacement,
+recomputes the mean, and reports the 5th and 95th percentiles
+(`boot_p05`, `boot_p95`). It sets `low_power` below
+`BOOTSTRAP_LOW_POWER_DAYS = 10` clusters, and the docstring of
+`day_block_bootstrap_tstat` says why: resampling a handful of clusters
+understates the SE.
+
+**A real cell.** REL-10 taker `hid_imb` 1 min AAPL has four session values
+(-353.4, -304.8, -253.2, -378.0 USD): mean -322.36, SE 27.61, t -11.67 on 3 df.
+
+```
+Student-t 95% CI: [-410.2, -234.5]
+Student-t 90% CI: [-387.4, -257.4]
+bootstrap p05..p95: [-359.7, -279.0]
+```
+
+The bootstrap range (a 90 % interval) is about 60 % as wide as the 90 % t
+interval (80.7 against 130.0 USD). With four sessions there are only 256 equally likely resamples and 35
+distinct multisets; four of the 256 repeat one session four times and have zero
+spread.
+
+**The size comparison.** Draw `G` session means from a standard normal (true mean
+0) and count how often each method would declare a positive effect at a nominal
+one-sided 5 % (4,000 trials per row; the bootstrap rule is "5th percentile of the
+resampled mean above 0"):
+
+```
+  G | t-test rejects | bootstrap p05>0 rejects
+  3 |          0.048 |        0.185
+  4 |          0.049 |        0.126
+  7 |          0.048 |        0.094
+ 12 |          0.049 |        0.073
+ 30 |          0.049 |        0.058
+```
+
+The t test holds its size on normal data; the bootstrap rejects 2.5 to 3.7 times
+too often at three to four sessions and still 1.9 times too often at seven. That
+is why the platform reports Student-t at `G - 1` df as the interval for B8 v2,
+REL-09 and REL-10 and treats the bootstrap columns as descriptive. (REL-08's
+moving-block bootstrap resamples rebalances inside one session, a different
+thing, and the rule says one session is one cluster.)
+
+**What this does not show.** The simulation uses normal data, the case in which
+the t is exact. Real session means may be skewed or heavy-tailed, and the
+known-null study (see the entries on REL-06) found that t-based and
+wild-bootstrap rules at `G = 7` were not simply calibrated. The comparison shows
+only that the percentile bootstrap is worse than the t, not that the t is good.
+
+**Check yourself.**
+
+1. Why can the bootstrap not do better than the data's own spread? *(It only
+   re-weights the observed `G` values; with `G = 4` it cannot produce a value
+   outside their range.)*
+2. If 10 or more sessions were available, which would change first? *(The gap
+   closes: at 30 sessions the bootstrap rejects 5.8 % against 4.9 %.)*
+
+## 156. Few-cluster p-values by full enumeration: CR1, Student-t and the Webb wild bootstrap (v1.18)
+
+**The question.** With seven sessions, what p-value should a "mean greater than
+zero" test report, and how can that p-value be exact?
+
+**The inference step.** `iap.research.known_null.cluster_inference` takes one
+value per session `x_g` and computes the mean, the CR1 SE (`sd / sqrt(G)` at
+one value per cluster), `t = mean / SE`, a one-sided Student-t p at `G - 1` df,
+and, for `G < SMALL_G = 10`, a *wild cluster bootstrap* p-value.
+
+**The wild bootstrap, enumerated.** Impose the null by keeping the session
+values uncentred and multiply each one by a random weight `w_g`; recompute the
+t each time; the p-value is the share of weightings whose t is at least the
+observed t. The weights are Webb's six-point set `{-sqrt(1.5), -1, -sqrt(0.5),
+sqrt(0.5), 1, sqrt(1.5)}` (`WEBB`). With six values and seven sessions there are
+`6^7 = 279,936` weight vectors, and `webb_weights(7)` returns all of them, so the
+p-value is computed over every one with no Monte Carlo error. Ties count as at
+least as extreme, which is conservative.
+
+*General background (not a platform feature):* with only two weights (signs), seven
+clusters give 128 distinct patterns and a p-value cannot be finer than 1/128.
+Webb's six-point weights were proposed to give a richer set when clusters are few.
+
+**A worked example.** For `x = [1.0, 2.5, -0.5, 3.0, 0.8, 2.2, 1.4]`
+(COOKBOOK recipe on the wild bootstrap): mean 1.486, SE 0.4496, `t = 3.305`,
+`p_student_t = 0.00816`, `p_wild = 0.01023` (method
+`wild_webb_full_enumeration_6^7`), MDE 1.281. The wild p is a little larger than
+the t p, the cautious direction.
+
+**Does it hold its size?** A direct check on `G = 7` simulated session means with
+true mean zero (2,000 trials each, one-sided rejection at 0.025):
+
+```
+normal                       Student-t 0.0300   Webb wild 0.0340
+centred lognormal (skewed)   Student-t 0.0025   Webb wild 0.0025
+student-t 3 df (fat tails)   Student-t 0.0175   Webb wild 0.0275
+```
+
+At 2,000 trials the 95 % half-width around 0.025 is about 0.7 points, so 0.030 is
+compatible with 0.025 and 0.034 is just outside it. On fat tails the wild
+bootstrap rejects more than the t (0.0275 against 0.0175); on skewed data both
+almost never reject. No rule here is sized correctly in all three; that is the
+point of running a known-null study on the real pipeline (next entries).
+
+**Where it is used.** Only the REL-06 known-null runner uses the Webb enumeration
+(`iap.research.known_null`). The B8 v2, REL-09 and REL-10 intervals use Student-t
+at `G - 1` df.
+
+**What this does not show.** Exactness of the enumeration is exactness of the
+*bootstrap distribution*, not of the test's size on real data. The ties rule and the
+one-sided direction are conventions fixed in the code and the protocol.
+
+**Check yourself.**
+
+1. Why is 0.0025 against a target of 0.025 not good news? *(A rule that almost
+   never rejects under the null has been made conservative, and a conservative
+   rule is also weak at finding real effects; size below nominal is a cost.)*
+2. Why enumerate instead of simulating 10,000 weightings? *(With `6^7` vectors the
+   full set is cheap, and it removes Monte Carlo noise from a p-value near a
+   threshold.)*
+
+## 157. What a known-null study can and cannot measure (v1.18, REL-06)
+
+**The question.** How do you find out whether a confirmation rule fires on noise
+more often than it says?
+
+**The idea.** Run the whole confirmatory path on data where, by construction,
+there is nothing to find, and count how often it confirms. In
+`iap.research.known_null` the path is: signal to decision rows, fills and costs
+through the registered simulator, net P&L per round trip, one mean per session,
+CR1 and the Webb enumeration (previous entry), Holm over the `K` registered
+hypotheses, and the decision rule. The economics are computed once and do not
+read labels; only gross P&L (side times forward mid return) reads the label, so
+replacing the label replaces the signal.
+
+**Null generators.**
+
+* **A**: the labels of session `s` are given to session `pi(s)` with the same
+  name and time-of-day cell, where `pi` is a derangement (no session keeps its
+  own labels). There are `!7 = 1,854` derangements of seven sessions
+  (`derangements(7)`, and `7!/e = 1,854.1`).
+* **A0** (v3): the same, after removing the mean of each (name, horizon,
+  session) label series, because the v2 generator A was found not to be
+  mean-zero (the next entry).
+* **B**: a zero-mean AR(1) per name and horizon with the real standard
+  deviation and lag-1 autocorrelation, and cross-name correlation from the real
+  labels.
+
+Data: `data/real/multi7`, `G = 7` sessions. `K = 3, 6, 16` registered hypotheses.
+Two statistics: S1 (net, re-centred) and S2 (gross). Only S2 measures the
+inference; S1 keeps the cost dispersion in its variance and is insensitive.
+
+**What the number means.** For A0 the 1,854 derangements are *all* enumerated, so
+the count of rejections out of 1,854 is an exact proportion for those seven
+sessions: there is no sampling error and a Wilson interval would be wrong
+(it assumes independent outcomes, and the 1,854 outcomes reuse the same seven
+label series). The protocol calls it a *conditional randomisation diagnostic* and
+does not call it size: complete enumeration does not show the pairings are
+exchangeable under a true null. B has 2,000 independent synthetic realisations,
+so its rate has a valid Wilson interval, but only for B's own process.
+
+**Why v1 was not informative.** Under both v1 nulls the gross P&L has mean zero but
+every trip pays the spread, fees, impact and a completion charge (about 1.4
+bps), so the true net mean is about -1.4 bps, deep inside the null. The rule can
+almost never fire on that: 0 of 1,000 (Wilson upper bound 0.38 %). The result,
+`PASS, size untested`, is a pass that could not have failed.
+
+**What this does not show.** A pass would have supported "conditional on these
+seven sessions and this construction, the rejection rate was within tolerance",
+not that the t statistics control familywise error on real data. The protocol's
+scope statement says that neither an A nor a B pass proves it.
+
+**Check yourself.**
+
+1. Why can't a Wilson interval be put on the 79 of 1,854? *(The 1,854
+   outcomes are dependent and are the whole population of derangements, not a
+   sample from it.)*
+2. Why does a cost-dominated null test nothing? *(The statistic is far from the
+   boundary where size is defined, so a test that over-rejects at the boundary
+   still shows zero rejections.)*
+
+## 158. Three attempts at one gate: v1 passed, v2 and v3 failed (v1.18, REL-06)
+
+**The question.** The known-null study was run three times. What does each result
+say, and why was nothing tuned after the third?
+
+**v1 (2026-10-18): PASS, size untested.** 0 of 1,000 false confirmations in every
+cell, flagged over-conservative (previous entry).
+
+**v2 (2026-10-19): FAIL, 7 of 12 cells.** All six S2 (gross) cells and S1 for
+generator A at `K = 16`. The record names four causes
+(`research/v118/KNOWN_NULL_V2_RESULT.md`): (1) generator A was not mean-zero (a
+bias up to +0.2 bps, with t up to 33 on some hypotheses; `imbalance_l5@1m/MSFT`
+alone had 58 of the 135 hypothesis-level confirmations at `K = 16`); (2) the
+family rate is the union of many small per-hypothesis excesses; (3) under the
+unbiased B the gross test was mildly over-sized (raw rejection at nominal 5 %
+was 5.2-5.5 %, and `sd(mean / SE)` was 1.19-1.20 instead of 1 at `G = 7`); (4)
+S1 was insensitive. The pass rule, "point at most 5.0 % and Wilson upper at most
+7.0 %", was also in tension with testing the nominal level: a test whose true
+rate is exactly 5 % meets "point at most 5.0 %" only about half the time.
+
+**v3 (2026-10-23): FAIL.** The null changed (A0, centred) and so did the
+operating level (alpha 0.025) and the pass rule: B cells at most 60 of 2,000
+(3.0 %), A0 cells at most 55 of 1,854 (2.97 %). The exact binomial probability
+that B passes if its true rate is 2.5 %, 3.0 %, 3.5 % or 4.0 % is 0.93, 0.53, 0.12
+and 0.01 (COOKBOOK recipe on the known-null arithmetic). The result:
+
+```
+count      S1/K3 S1/K6 S1/K16 S2/K3 S2/K6 S2/K16
+A0 of 1854     0     0      9    79    80     23
+B  of 2000     7     0      2    50    49      8
+```
+
+A0 at S2 with `K = 3` and `K = 6` rejected 79 and 80 times, 4.3 %, against 46.4
+expected at 2.5 % and a limit of 55. B was at 2.50 % and 2.45 % and passed
+every cell. The mechanical verdict is FAIL because any primary cell failed.
+
+**No tuning.** The owner decision of 2026-10-19 was that a v3 failure is
+recorded and not followed by a threshold, level or generator edit; any change is a
+new, separately signed protocol. The outside reviewer (2026-10-23) rejected the
+method as the mandatory F3 gate in its current form and asked for the failure
+mechanism to be investigated under a separate plan (the conditional randomisation
+estimand, the removal of the session mean, and the S2 standard-error calibration
+at small `K`). Gate F3 stays open.
+
+**What the failure does and does not mean.** It means the platform has no
+demonstration that its inference step holds 2.5 % familywise error on real data,
+so every gate t in the documents is a descriptive statistic with the stated
+clustering, not a calibrated test. It does not show that the t is over-sized in
+general: B, the unconditional arm, passed. The record does not say which of the
+named mechanisms causes A0's 4.3 %, and this entry does not either.
+
+**Check yourself.**
+
+1. Why was the v2 pass rule changed for v3? *(It could not tell a test at its
+   nominal level from a failing one; the v3 rule is tied to 2.5 %.)*
+2. What would count as a legitimate next step? *(A new protocol, reviewed and
+   signed before running; not editing the v3 threshold.)*
+
+## 159. Signing the analysis, not only the hypothesis (v1.18, REL-02a)
+
+**The question.** A pre-registration says what will be tested. What stops the
+code, data or thresholds changing after it is signed?
+
+**The gap.** Until v1.18 a signature covered the hypothesis text. The same signed
+text could be run with a different script, commit, dataset or threshold.
+`iap.agents.analysis_identity` closes that by putting an `analysis_identity`
+block inside the signed body of a prereg. A v1 block binds script fingerprints
+(sha256 of each LF-normalised source), a hash of the `python/src/iap` tree, the
+exact commit, the dataset content hashes, the family, the metrics and the
+thresholds. The v2 block (`IDENTITY_VERSION = 2`, written by every new bind)
+adds `configs/`, `data/reference/`, any declared `--inputs`, the dependency lock,
+the installed packages and the interpreter version
+(`docs/governance/ANALYSIS_IDENTITY.md`).
+
+**How it is checked.** `verify_identity` compares what is about to run with the
+signed block and raises `IdentityError` listing *every* mismatch, not the first.
+The bound commit must be HEAD or an ancestor; the tree hash is the hard check.
+Runners (`tools/rel06_known_null.py`, `research/execution/b8v2/run_b8v2.py`,
+`python -m iap.research.rel08_screen`, `tools/r7_confirm.py`) call it, a coverage
+test fails if a consumer of a signed prereg skips it, and the holdout guard
+re-checks the identity before reading a spent holdout.
+
+**A real example.** `research/preregs/b8v2_prereg.json` is signed (maintainer
+`ashjha0`) with a v1 block: 6 scripts, 5 data versions, 5 metrics, 11 thresholds
+and a family string naming K = 6 and the three evaluation sessions. Its
+signature verifies, and changing one threshold in a copy makes it fail with
+`prereg message sha256 mismatch (document changed after signing)` (COOKBOOK recipe
+on the analysis identity). The bound code-tree hash starts `dca0907e`; the tree
+on a later checkout hashes to `5be6e3c3`, because 40 files under `python/src/iap`
+changed between the bound commit and this branch. That is not a failure: the
+identity is checked *when the analysis runs*, at the commit it names. It does
+mean an old prereg cannot be re-run on today's code and be called the same
+analysis.
+
+**Signer is not runner.** `require_independent_runner` refuses a runner whose
+declared actor equals the signing maintainer, or whose environment holds signing
+key material. The module says plainly that code cannot prove who is at the
+keyboard; the key sits outside the repository.
+
+**What this does not show.** A signature binds an analysis; it does not make the
+analysis right. REL-08's rule was signed, and its runner's gap computation
+counted idle time before the first rebalance, so criterion C1 failed for every
+variant (next entry). Preregs signed before v1.18 (R7) carry no block and authorise only replays.
+
+**Check yourself.**
+
+1. Why bind the tree hash and the commit? *(The hash catches any changed helper;
+   the commit ties the hash to history.)*
+2. Why list every mismatch rather than stop at the first? *(So one run tells
+   the owner everything that differs, instead of a fix-and-retry loop.)*
+
+## 160. A stop rule written before the data: the REL-08 continuation rule (v1.18)
+
+**The question.** If a screen can only say "continue" or "stop" after looking at
+one session, what must the rule fix first, and what happens when the rule itself
+has a defect?
+
+**The design.** `research/v118/REL08_CONTINUATION_RULE.md` (signed copy
+`rel08_rule_signed.json`) screens `K = 7` variants on session 2019-01-30 (100
+names). It fixes the statistics (per-rebalance rank IC and net bps at USD 1,000,000
+notional), the uncertainty (a moving-block bootstrap over rebalances, 9,999 draws,
+one-sided lower bounds at `1 - 0.05 / 7 = 0.992857`), and eight criteria:
+
+```
+C1 enough data   C2 MDE <= 2.0 bps       C3 net >= +1.0 bps and lower bound > 0
+C4 ESS >= 20     C5 conservative costs   C6 five biggest names removed
+C7 alt. normalisation   C8 rank IC > 0.02 with lower bound > 0
+```
+
+The decision map (`rel08_screen.outcome`): C1, C2 or C4 failing is `underpowered`
+(recorded, not a rejection); C1, C2, C4 holding and C3 failing is `stop`; C3
+holding but any of C5 to C8 failing is `stop` as fragile; all eight holding is
+`continue`, at most three variants. A positive rank IC is necessary and never
+sufficient (C8). The MDE is `(z_0.95 + z_0.80) * SE = 2.49 * SE`, and one
+session is one cluster, so no day-clustered t is reported.
+
+**What happened.** All seven variants came out `underpowered` and
+`inconclusive` on the claim ladder (re-derived from the stored statistics in the
+COOKBOOK recipe on the REL-08 rule: criteria and outcome equal the stored ones for
+7 of 7). Criterion C1 failed for every variant because the maximum gap reported
+was 380-405 minutes against a 30-minute limit.
+
+**The defect.** The investigation
+(`docs/release/ANOMALY_REL08_INVESTIGATION_2026-10-20.md`) called C1 a probable
+bug: `rel08_screen.py` builds the gaps from `grid[0] - rebalance_ns` followed by
+the usable rebalances, so the idle time from the grid origin to the first usable
+rebalance counts, and C1 fails by construction on any dataset. Also, V1 and V2
+trade about USD 2-3 per USD 1M rebalance, so their stored MDE (about 1.5e-05 in
+the screen's own units) passes C2 vacuously. An amendment (`rel08_rule_v2_DRAFT.md`: measure gaps only inside a
+session day) is an **unsigned draft**; the signed v1 verdicts stand as recorded.
+
+**A counterfactual, labelled as such.** Forcing C1 to pass on copies of the stored
+statistics, nothing re-run, sends six variants to `stop` on C3 (net means from
+-0.000 to -0.033 bps against a +1.0 bps requirement) and V2 to `underpowered` on
+C4 (ESS 17). That is an illustration of the decision map, not a second result:
+the screen also has presentation defects in its net-bps columns (release notes,
+item 7), and one session cannot support more.
+
+**What this teaches.** Pre-registration removes the author's freedom after the
+data; it does not remove bugs. The defect was found by reading the output
+against the rule, recorded, and handled as an unsigned amendment, not a quiet fix.
+v1.18 promotes no REL-08 variant and claims no edge; REL-08b was not run.
+
+**Check yourself.**
+
+1. Why is "underpowered" not a rejection here? *(A fixed 30-minute gap rule
+   that fails by construction says nothing about the signal.)*
+2. Why is C2 passing at 1e-5 bps not reassuring? *(The book trades almost
+   nothing, so any effect measured in bps of a nearly flat book is tiny; the test
+   is vacuous, not powerful.)*
+
+## 161. A factor risk model in one line: Sigma = B F B' + D (v1.18)
+
+**The question.** A book holds 100 names. Its risk is the variance of the sum
+of their returns, which needs a 100 x 100 covariance matrix: 5,050 distinct
+numbers estimated from a few hundred bars. How do you get a stable risk
+number, and how do you find out *which* exposure is producing it?
+
+**The idea.** Assume each name's return is a few common-factor returns scaled
+by the name's exposures, plus a name-specific leftover: `r = B f + e`. Write
+`B` for the exposure matrix (names x factors), `F` for the covariance of the
+factor returns, and `D` for the diagonal matrix of the leftovers' variances
+(the "specific" variances). Then `Sigma = B F B' + D`: a K x K matrix to
+estimate (K is the number of factors) plus N variances, not N(N+1)/2
+covariances. `iap.portfolio.factor_risk` builds it (v1.18 REL-17,
+`docs/FACTOR_RISK.md`):
+
+- `build_factor_exposures` makes the columns `market` (each name's beta to its
+  reference ETF), one `sector:<name>` dummy per sector, and quantile-bucket
+  dummies `size:q2..` and `liquidity:q2..`. The first bucket of each is
+  dropped as the baseline, because the sector dummies already sum to one and a
+  full set would be collinear.
+- `estimate_factor_model` runs a cross-sectional least-squares fit per period
+  for the factor returns (minimum-norm when `B` is rank deficient), takes `F`
+  as the RiskMetrics EWMA (lambda 0.94) or the sample covariance, shrinks it
+  with the estimated Ledoit-Wolf intensity, and sets `D` to the mean squared
+  residual per name, floored at 1e-12.
+- `FactorRiskModel.decompose(w)` splits the variance into a factor part `x'Fx`
+  (with `x = B'w`, the book's factor exposures) and a specific part `w'Dw`,
+  and attributes it. The contribution of factor k is `x_k (Fx)_k`; of name i,
+  `w_i (Sigma w)_i`. Each set sums *exactly* to the total (Euler allocation,
+  so "who owns the variance" has no leftover).
+
+**Worked example, by hand.** One factor (the market), betas (0.8, 1.0, 1.5),
+weights (0.5, 0.3, 0.2), market variance 0.0225, specific variances (0.04,
+0.01, 0.09). The book's beta is 0.5x0.8 + 0.3x1.0 + 0.2x1.5 = 1.0. Factor
+variance = 1.0^2 x 0.0225 = 0.0225. Specific variance = 0.25x0.04 + 0.09x0.01
++ 0.04x0.09 = 0.0145. Total 0.037, volatility 0.1924, factor share 60.8 %. The
+model returns the same (I ran it: `total_var 0.037`, per-name contributions
+0.019 / 0.00765 / 0.01035, which add to 0.037). That is the Grinold and Kahn
+single-index identity; the test `test_single_index_decomposition_by_hand` pins
+it.
+
+**Why the decomposition is the point.** On a synthetic 30-name universe
+(seeded, simulated from a known `B`; COOKBOOK recipe on this model), the same
+model gives very different answers for two books. An equal-weight long-only
+book has market exposure 1.04 and a factor share of 92.7 % of its variance:
+its risk is almost all the market. An alternating long/short book with the
+same 30 names has market exposure 0.015 and a factor share of 15.2 %: what is
+left is mostly specific risk, so an index hedge would change little. A limit
+on gross exposure cannot tell these two apart; a factor decomposition can.
+
+**What it is not.**
+
+- Recovery on simulated data, not validation on real data.
+  `test_estimation_recovers_known_model` recovers portfolio volatility within
+  6 % and specific variances within 15 % on 4,000 simulated periods of 60
+  names (sample covariance, four factors). In my 2,000-period run the EWMA
+  estimate of the long/short book's volatility came out about 8 % below the
+  truth (0.000339 against 0.000368) and the sample covariance about 6 % below
+  (0.000346); one seed, so treat that as the size of the noise, not a bias
+  estimate.
+- Whether beta, sector, size and liquidity explain a useful share of
+  *intraday* variance in this universe is not tested (`docs/FACTOR_RISK.md`
+  says so). The sector map's accuracy is the REL-07 map's.
+- Horizon scaling (`FactorRiskModel.scaled(h)`) multiplies variances by h,
+  i.e. volatility by sqrt(h), which assumes independent periods.
+- Nothing else in the repository imports the module yet: no study, optimizer
+  call or limit reads this model (a search of `python/src` and `tools` finds
+  only its own file). The enforced limits (the section on limits as refusals)
+  use betas and sectors directly. It is a tested library.
+
+**Check yourself.**
+
+1. Why drop the first size bucket's dummy? *(A full set of bucket dummies sums
+   to the all-ones vector, exactly as the sector dummies do, so the columns
+   would be collinear and `B` rank deficient.)*
+2. Two books have the same gross exposure and the same name count. One has
+   factor share 93 %, the other 15 %. Which one needs an index hedge? *(The
+   first; the second has little market exposure to hedge.)*
+
+## 162. VaR and ES: one number each, two ways to compute them (v1.18)
+
+**The question.** "How much could this book lose on a bad day?" has no single
+answer. What does the platform's VaR mean, how does it differ from expected
+shortfall, and when do the two ways of computing them disagree?
+
+**Definitions.** At level `a` (say 0.99), **value at risk** (VaR) is the loss
+exceeded with probability `1 - a`: the 99 % VaR is the 1-in-100 loss.
+**Expected shortfall** (ES) is the *average* loss on the days that are at
+least that bad. VaR says where the tail starts; ES says how deep it goes. Both
+are reported as positive losses.
+
+**Two estimators** (`iap.portfolio.factor_risk`):
+
+- `parametric_var_es(sigma, level, mean, z)` assumes P&L is normal: `VaR = z_a
+  * sigma - mean` and `ES = sigma * phi(z_a) / (1 - a) - mean`. With the exact
+  normal quantile, VaR at 99 % is 2.3263 sigma and ES is 2.6652 sigma; ES at
+  97.5 % is 2.3378 sigma, which is why a 97.5 % ES and a 99 % VaR are about
+  the same size for normal data.
+- `historical_var_es(pnl, level)` uses the data: the VaR is the `ceil(n(1 -
+  a))`-th worst observation (no interpolation) and ES is the mean of the
+  observations at or beyond it. On P&L of -49..+50 at 95 % it returns VaR 45
+  and ES 47, exactly as the definition says.
+
+**Worked example, a published answer.** Hull's model-building example: 10
+million in a stock with 2 % daily s.d., 5 million in another with 1 %,
+correlation 0.3, 10-day 99 % with z rounded to 2.33. The platform reproduces
+the one-day s.d. of 220,227 and VaRs of 1,473,621 and 368,405, which combine
+to 1,622,657 for the portfolio. The diversification benefit is the sum of the
+stand-alone VaRs minus the portfolio VaR; my run printed 219,370 (the docs and
+test give 219,369, within the test's tolerance of 2). Using the exact z
+instead of 2.33 gives a portfolio VaR of 1,620,114 and an ES of 1,856,107, so
+the textbook rounding is worth about 2,500 on this number.
+
+**Where the estimators disagree.** I drew 200,000 Student-t values with 3
+degrees of freedom, divided by sqrt(3) so the theoretical s.d. is 1 (0.978 as
+drawn). Historical 99 % VaR 2.612 and ES 3.976, against a normal fitted to the
+same s.d.: VaR 2.275, ES 2.607. At 99.9 % the gap widens: historical VaR 5.823
+and ES 8.503, normal 3.022 and 3.293. A normal model sees only the s.d., so on
+heavy-tailed returns it understates the tail, and ES shows it more than VaR.
+The reverse problem lives in small samples: 50 observations at 99 % use the
+single worst one (order statistic 1), so historical VaR and ES coincide; 250
+observations use the worst three.
+
+**What it is not.**
+
+- Known-answer checks, not a risk forecast. Nothing here says what this
+  platform's books lose; v1.18 runs no live book.
+- The Hull reproduction validates the arithmetic and the sqrt(h) scaling, not
+  that returns are normal or periods independent.
+- The Student-t numbers are one seeded draw from a synthetic distribution,
+  chosen only to show the direction of the error.
+
+**Check yourself.**
+
+1. Why can historical ES never be smaller than historical VaR at the same
+   level? *(It averages observations that are all at least as bad as the VaR
+   observation.)*
+2. A 99 % VaR from 100 observations: what is it? *(The worst observation. With
+   so few points the estimator cannot see past it.)*
+
+## 163. Stress scenarios: a factor shock is a dot product (v1.18)
+
+**The question.** VaR looks at the shape of recent returns. A stress test asks
+a different question: "if the market falls 5 % tomorrow, what do I lose?" How
+is that computed without a forecast?
+
+**The idea.** In the factor model the P&L from a set of factor moves `s` is
+`w' B s`: the book's factor exposures `x = B'w` times the moves.
+`run_stress(model, w, scenarios)` does exactly that, one dot product per
+scenario, and returns the P&L and its split by factor.
+`configs/risk/stress_scenarios.json` (`x-version` 1) names seven scenarios:
+`market_down_5pct`, `market_up_5pct`, `black_monday_1987` (market -20.5 %, a
+rounded S&P 500 one-day close), `covid_2020_03_16` (-12 %), and three
+hypothetical ones (`tech_selloff`, `rotation_value`, `liquidity_crunch`). The
+file states that sector, size and liquidity moves are hypothetical and not
+calibrated to any dataset. A scenario names a factor the model lacks (say
+`liquidity:q2` in a model built without liquidity buckets): it is skipped and
+listed in `skipped_factors`, or refused under `strict=True`.
+
+**Worked example.** Four names with betas 1.5, 0.5, 1.2, 0.9 in Information
+Technology, Energy, Information Technology, Financials. I ran three books
+through the seven scenarios:
+
+| book | net beta exposure | market -5 % | rotation_value |
+|---|---|---|---|
+| long name 1, short name 2 | +1,000,000 | -50,000 | -90,000 |
+| long name 1, short name 4 ("dollar neutral") | +600,000 | -30,000 | -80,000 |
+| long 500k in each name | +2,050,000 | -102,500 | +5,000 |
+
+The first two books are both dollar-neutral, and both lose in a market fall,
+because the long side has the higher beta: dollar-neutral is not
+market-neutral (see the neutral-books section). The first book also loses
+90,000 on a rotation scenario that moves no market at all (IT -4 %, Energy +5
+%: its IT long falls 40,000 and its Energy short loses 50,000), which no
+market hedge would have protected. The long-only book gains 5,000 in that
+rotation, because its sector exposures happen to offset.
+
+**Skipped factors are a reading hazard.** In my run `tech_selloff` skipped
+`sector:Communication Services` for every book, because no name carries that
+sector. The P&L printed (-90,000 for the first book) is therefore the loss
+from the factors the model has, not the scenario as named. The result dict
+says so; a report that drops `skipped_factors` would misstate how severe the
+scenario was.
+
+**What it is not.** Historical magnitudes (1987, 2020) are market closes only;
+the model gives no view of how liquidity, spreads or the sector map behaved on
+those days. A stress test has no probability attached. It also cannot find a
+scenario nobody wrote down.
+
+**Check yourself.**
+
+1. Why does the 1987 scenario move only `market`? *(The file records only the
+   index close. Each name's loss then comes through its beta, with no sector
+   or liquidity effect.)*
+2. A book with exactly zero net beta: what does `market_down_5pct` give?
+   *(Zero, from the market factor alone; sector rows can still move it in the
+   other scenarios.)*
+
+## 164. Limits are refusals: the eleven rules of `portfolio_limits_v1` (v1.18)
+
+**The question.** A risk limit that only prints a warning is a suggestion.
+What does it take for a limit to be a *refusal*, and which of the platform's
+limits can the optimizer respect by construction versus only check afterwards?
+
+**The rules.** `configs/risk/portfolio_limits.json` (`limits_version`
+`portfolio_limits_v1`) holds eleven limits on weights expressed as fractions
+of capital: `gross_max` 2.0, `net_max` 0.05, `name_max` 0.10, `sector_net_max`
+0.10, `sector_gross_max` 0.60, `beta_max` 0.10, `participation_max` 0.01,
+`signal_share_max` 0.60, `signal_corr_max` 0.80, `daily_loss_limit` 0.02 and
+`drawdown_stop` 0.05. The file says the values are research defaults for a
+dollar- and beta-neutral intraday book, "chosen before any result was computed
+with them", and that a paper or live deployment must commit its own version.
+`PortfolioLimits.load` is strict: a wrong `x-version`, an unknown key, or a
+negative, NaN or boolean bound fails the load.
+
+**Where each limit acts** (`docs/PORTFOLIO_LIMITS.md`):
+
+- *Linear limits the optimizer enforces:* gross, net, name, sector-net, beta
+  and participation. `solve_enforced` turns them into the optimizer's
+  constraint set and projects onto it with the exact Dykstra projection.
+- *A check only:* `sector_gross_max` (a sum of absolute values per sector is
+  not linear), and the sleeve rules `signal_share_max` and `signal_corr_max`
+  (`check_signal_mix`). If an optimizer result still breaks
+  `sector_gross_max`, `solve_enforced` raises `LimitRefused` instead of
+  returning it.
+- *Dynamic:* `daily_loss_limit` and `drawdown_stop` act on an equity mark and
+  trip the kill switch (see the kill-switch section).
+
+**Two design choices that matter.**
+
+1. *A missing input is a breach.* `participation_max` needs the name's ADV
+   (average daily volume in notional) and the capital. A name with no ADV may
+   not trade: my check on a six-name weight set that passed every other limit,
+   with no ADV passed in, returned six `participation_max[<id>:no_adv]`
+   breaches. A sector limit with no sector map puts every name in one
+   `sector_unknown` bucket.
+2. *Orders are judged on the post-trade book, and risk-reducing orders pass.*
+   `PortfolioGuard.check_order` refuses an order if the book *after* it
+   breaches a limit by more than the book did *before* it. In my run, a book
+holding 150,000 in one name and -20,000 in another on 1,000,000 capital
+(already over four limits) could not buy 10,000 more of the first (four
+breaches listed), but could sell 40,000.
+
+**Sizing as a constraint.** The participation limit is the platform's
+position-sizing rule, and it is liquidity-adjusted: a trade of `|w - w_prev|`
+x capital may be at most `participation_max` x ADV. With capital of 10
+million, ADV of 50 million per name and 0.01, that is 0.05 of capital per name
+per rebalance. In a 12-name solve under the committed limits (synthetic
+inputs, seeded) the result was gross 0.55, net -0.05, beta -0.0505, largest
+|w| 0.0500, and the first rows of the constraint audit were exactly these
+participation caps, binding. The binding constraint was the liquidity, not the
+0.10 name cap. That is the sense in which size here comes from the market, not
+from conviction.
+
+**What it is not.** These are code paths with unit tests
+(`python/tests/test_v118_portfolio_limits.py`), not a live risk system. The
+only consumers in the repository are the walk-forward loop (see its section)
+and the paper-path `PaperSupervisor`; there is no broker (decision D4(a)). The
+values are defaults, not tuned.
+
+**Check yourself.**
+
+1. Why can the optimizer not just enforce `sector_gross_max` as it does
+   `sector_net_max`? *(It is a sum of absolute values per sector, not one of
+   the linear exposure rows the optimizer's projection takes; the code only
+   checks it, and refuses a result that breaks it.)*
+2. Why check the *post-trade* book? *(An order is judged by what it does to
+   the book, so a limit that is already breached does not block the trade that
+   repairs it.)*
+
+## 165. Dollar-neutral, market-neutral, sector-neutral: what each constraint costs (v1.18)
+
+**The question.** "Market-neutral" and "sector-neutral" are in every fund's
+pitch. They are three different constraints, and each one changes what the
+optimizer will buy. What does each remove, and what does it cost?
+
+**Three constraints, three rows.**
+
+- *Dollar-neutral:* `net_max = 0`. The sum of weights is zero: as much long as
+  short.
+- *Market-neutral (beta-neutral):* add `beta_max = 0`. The beta-weighted sum
+  is zero, `sum beta_i w_i = 0`, so a 1 % rise in the reference ETF moves the
+  book by about zero. `iap.portfolio.exposures.build_exposure_matrix` builds
+  the row from each name's beta (a missing beta reads as 1.0 and is listed).
+- *Sector-neutral:* add `sector_net_max = 0`. One row per sector: the net
+  weight inside each sector is zero. A sector with fewer than `min_members`
+  names is merged into `sector_unknown`; `constraints_from_limits` passes
+  `min_members=1`.
+
+Dollar-neutral does not imply either of the others. If the long side has
+higher betas than the short side, a dollar-neutral book is long the market.
+
+**Worked example, the same signal under three books.** 12 synthetic names in
+three sectors of four (Tech betas about 1.3, Fin 1.0, Energy 0.8), seeded; the
+signal is deliberately mostly a sector bet (Tech looks good, Energy looks bad)
+plus noise. Same alpha, covariance, costs and gross cap of 1.0; only the
+neutrality rows change:
+
+| book | expected return | gross | beta | Tech / Fin / Energy net | vol |
+|---|---|---|---|---|---|
+| dollar-neutral | 1.957 bp | 1.000 | +0.223 | +0.500 / 0.000 / -0.500 | 5.92 bp |
+| + beta-neutral | 1.406 bp | 1.000 | 0.000 | +0.179 / +0.201 / -0.380 | 5.34 bp |
+| + sector-neutral | 0.885 bp | 0.900 | 0.000 | 0.000 / 0.000 / 0.000 | 4.41 bp |
+
+"Expected return" is `alpha . w` in basis points of capital, and it is the
+*model's* expectation, not a result. Read the pattern: the dollar-neutral book
+put half its capital long Tech and half short Energy, which is a sector and
+beta bet (beta +0.22). Removing the beta cost 0.55 bp of expected return and
+0.58 bp of volatility. Removing the sector bets cost another 0.52 bp: with a
+signal that is mostly a sector view, sector-neutrality discards most of it,
+and the book is left with the within-sector noise.
+
+**The same effect shows up in REL-08.** Its variants V1 and V2 (VWAP-deviation
+score, market-neutral and sector-neutral) have the *same* rank IC (0.0401)
+because the IC is computed on the score and labels before any book is built.
+They differ only through the book.
+
+**What it is not.**
+
+- The three rows are exact in the optimizer (Dykstra), but a neutral book is
+  only neutral to the betas and sectors it is given. Betas are estimated
+  (`beta_w5m_v1`), the sector file is a public-knowledge classification, and
+  an exposure the model does not carry is not neutralised.
+- The table is a synthetic illustration of a *constraint cost*. It says
+  nothing about whether any real signal has a sector component.
+- Neutrality is not safety: a sector-neutral book still has stock-specific
+  risk (the factor share of a decomposed long/short book can be small and its
+  remaining risk entirely specific).
+
+**Check yourself.**
+
+1. Why did the sector-neutral book's gross fall to 0.900? *(Most likely
+   because the extra neutrality rows removed the directions that carried the
+   expected return, so more gross added cost and risk for little alpha; the
+   run does not isolate the cause.)*
+2. A signal has IC 0.04 and is nearly all sector. Should you expect the
+   sector-neutral book to keep that IC? *(The IC is a property of the score,
+   so yes; the *book's* return is what shrinks.)*
+
+## 166. The kill switch latches: halting is easy, un-halting is deliberate (v1.18)
+
+**The question.** A daily loss limit that stops trading at 2 % is easy to
+write. What stops it from being quietly re-enabled the next morning, and what
+does "halted" actually mean for positions already open?
+
+**The mechanism** (`PortfolioGuard` in `iap/risk/portfolio_limits.py`):
+
+- It trips on `mark(equity)` when the day's loss `(day-start equity - equity)
+  / capital` exceeds `daily_loss_limit` or the drawdown from the peak exceeds
+  `drawdown_stop`; on `halt(reason)` (an operator or the monitoring layer);
+  and on a non-finite equity mark. A `NaN` mark halts rather than being
+  ignored.
+- Once tripped it *latches*. Every weight set and every order is refused.
+  `start_day(equity)` moves the daily-loss base but does not clear the latch.
+- `reset(operator, reason)` is the only way out. It needs a named operator and
+  a reason (an empty string raises `ValueError`), is refused while a loss
+  limit is still breached, and writes both events to `guard.history`.
+- Each trip and reset also calls `HaltSink.report_halt(source, reason,
+  active)`, the one-method hook that `PaperSupervisor` implements (it keeps
+  the events in `halt_log`) and that the REL-16 monitor can use to show HALT
+  while the switch is active. The reverse direction (monitor says HALT, book
+  stops) is `guard.halt(reason)`.
+
+**Worked example (my run, 1,000,000 capital, committed limits).** Mark
+985,000: loss 1.5 %, no trip. Mark 979,000: loss 2.1 %,
+`daily_loss_limit[book] 0.021 > 0.02`, the sink is told `active = True`.
+`check_order` now raises `LimitRefused` with `halted = True`. A same-day
+`reset` is refused. Call `start_day(979000)` (a new day) and the guard is
+*still halted*. Then `reset("alice", "loss reviewed, limits unchanged")`
+succeeds, because the daily-loss base moved and the 5 % drawdown from the
+1,000,000 peak has not been reached; the sink hears `active = False`, and
+`history` holds one `halt` and one `reset` event naming the operator.
+
+**Two things worth noticing.**
+
+1. *The reset check uses the current bases.* A reset is refused if a loss
+   limit is breached *now*; after a new day starts, the daily-loss base moves,
+   so what blocks an overnight reset of a 2.1 % loss is the operator, not the
+   arithmetic. The drawdown stop does not move with the day, so a loss of 5 %
+or more from the peak keeps refusing the reset until equity recovers.
+2. *Halted is not flat.* While latched, `check_order` refuses every order,
+   risk-reducing ones included, and the walk-forward loop (see its section)
+   holds the previous weights. The positions stay open and keep earning or
+   losing. Flattening is an operator decision; the modules do not do it. (In
+   the walk-forward run in its section, the five halted steps still booked
+   P&L, +0.00138 in total.)
+
+**What it is not.** It is exercised by unit tests and by simulations. The
+6-hour REL-18 soak (15,037,543 messages, 369,878 orders, 2,931 process kills,
+0 reconciliation exceptions, `research/v118/rel18_soak_6h/`) exercises the
+order manager on a synthetic feed with injected faults; it is not evidence
+about live trading, and nothing here has been connected to a broker.
+
+**Check yourself.**
+
+1. Why must a new trading day not clear the latch? *(The loss that tripped it
+   may have been a symptom of something still broken; a calendar change is not
+   a review.)*
+2. Which of the three triggers can come from outside the guard?
+   *(`halt(reason)`: the monitoring layer or an operator. The other two are
+   computed from the equity marks it is given.)*
+
+## 167. Capacity curves: how the net edge shrinks as size grows (v1.18)
+
+**The question.** A strategy nets 2 bp per trade at one million dollars. How
+large can it grow before the net edge hits zero, and how sure are we of that
+size?
+
+**The model** (`iap.portfolio.capacity`). Gross edge, spread and fees are
+linear in notional, so per dollar they do not change with size. Impact does:
+under the square-root rule (`impact_bps = c * sqrt(participation)`, exponent
+`e = 0.5`) and with participation proportional to notional, a base impact of
+`i0` bp becomes `i0 * k^e` at `k` times the size. With measured net `m` at the
+base size:
+
+`net_bps(k) = (m + i0) - i0 * k^e`, and `net_usd(k) = net_bps(k) * 1e-4 * k *
+N0`.
+
+Two closed forms follow. The *break-even multiplier* is where net hits zero,
+`k* = ((m + i0) / i0)^(1/e)`. The size that maximises net dollars is `k_opt =
+((m + i0) / (i0 (1 + e)))^(1/e)`, smaller than `k*` because the marginal
+dollar stops paying before the average one does.
+
+**Worked example (hypothetical numbers, to show the algebra).** Net 2.0 bp
+with standard error 0.5, of which 1.0 bp is impact at 1 % participation, base
+notional 1,000,000. Then `m + i0 = 3`, `k* = (3/1)^2 = 9`, `k_opt = (3/1.5)^2
+= 4`. The code printed, per multiple of base size: 1x net 2.000 bp (USD 200);
+2x 1.586 bp (317.16); 4x 1.000 bp (400.00, the dollar peak); 9x 0.000 bp (0);
+16x -1.000 bp (-1,600). By the formula, 8x gives 0.17 bp, about 137 dollars,
+less than the 400 at 4x: past `k_opt`, more notional earns fewer dollars.
+
+**The uncertainty band.** Each row carries a 95 % band that combines the
+sampling error of `m` (normal, `m +/- 1.96 se`, or a study's own CI) with the
+impact coefficient swept over `COST_SENSITIVITY_SCALES` = (0.5, 1.0, 1.5): the
+lower edge uses 1.5x impact, the upper 0.5x. At 4x the net is 1.000 bp but the
+band is -0.48 to 2.48 bp. The break-even multiplier becomes 9.0 with a band of
+2.8 to 48.4. A point estimate of "9x" with a band from under 3x to nearly 50x
+is the honest answer.
+
+**Three refusals to invent a number.**
+
+- *No impact at base and no base participation:* the curve says
+  `not_computable` ("cannot scale") rather than guess.
+- *Study with no impact at base:* `i0` is taken from the cost model, `100 bps
+  x participation^0.5`, and the row says so (`impact_source`).
+- *Passive (maker) candidates:* the square-root rule is a taker rule. The
+  curve is labelled participation-only, impact is not charged, and the
+  break-even is `unbounded`; fills for a passive order are limited by the
+  queue, not by a price.
+
+**Where it appears.** `iap.research.scorecard_capacity` appends a "Capacity
+(REL-17)" section to the REL-08, REL-08c, REL-09 and REL-10 scorecards *only
+for a candidate the study's own rule passed*. For the REL-08 screen no variant
+did, so running the tool on the committed raw JSON produced one paragraph:
+"Not applicable: REL08 has no positive candidate ... nothing here is a
+capacity claim."
+
+**What it is not.** The curve extrapolates a measured in-sample base point
+with an assumed impact law; the square-root coefficient is a pinned convention
+(100 bp for trading one full ADV, "not a calibration to this dataset" in the
+code's own words), the fill model is validated at Level 1 only, and no
+candidate in v1.18 has a positive net result, so no real capacity number
+exists. Compare section 63 (break-even size from a gross edge) and section 111
+(the book re-run at several sizes): this one scales an observed net result and
+attaches an uncertainty.
+
+**Check yourself.**
+
+1. Why is `k_opt` smaller than `k*`? *(Net dollars are net bps times size; the
+   marginal dollar's impact eventually exceeds its edge before the average
+   edge reaches zero.)*
+2. What does a break-even band of 2.8 to 48.4 tell you about planning a 20x
+   size? *(Plausible and implausible both sit in the band; the data cannot
+   decide.)*
+
+## 168. A walk-forward book under enforced limits: refused, halted, held (v1.18)
+
+**The question.** Walk-forward evaluation steps through time: form the book
+from what is known at `t`, earn the return that follows, step on. If the book
+is also subject to hard limits, what do the logs have to record to make the
+result honest?
+
+**The loop** (`iap.portfolio.rel11_enforced.run_enforced_book`, written for
+REL-11's baseline, candidate and combined books so all three face the *same*
+limits and cost accounting). At each rebalance:
+
+1. If the kill switch is latched, no new weights are formed; the book holds
+   `w_prev` and the step is logged `halted`.
+2. Otherwise `solve_enforced` forms the target. If it raises `LimitRefused`,
+   the step is logged `refused` with its breaches and the book holds `w_prev`.
+3. P&L is `w . r_t` minus linear cost `tc_linear . |w - w_prev|`; an optional
+   `cost_fn` adds impact so accounting matches the objective.
+4. Equity is marked through `guard.mark`, which may trip the daily-loss or
+   drawdown stop. `day_start=True` on a step starts a new trading day.
+
+It returns net, gross and cost series, the weights, the per-step `traded` /
+`refused` / `halted` status, and the list of refusals. It does *not* compute a
+Sharpe or a comparison; REL-11's report does.
+
+**Worked example (synthetic, seeded; 12 rebalances, one day).** Capital 10
+million, committed limits. Steps 0-3 have a weak real signal (realised return
+= 0.5 x alpha + noise). From step 4 the signal *inverts* with 1.5 % moves, the
+kind of break that a limit exists for. The statuses: steps 0-6 `traded`, steps
+7-11 `halted`. Book gross was 0.81, 1.00, 0.81, 0.86 in steps 0-3 and 0.80,
+0.95, 0.835 in steps 4-6, as the book kept trading the inverted signal. The
+losses in steps 4, 5, 6 were -0.00925, -0.00382 and -0.00952 of capital: after
+step 6 the loss was 2.26 % of day-start equity, `daily_loss_limit[book]
+0.0226202 > 0.02`, and the switch latched. Net total -0.0212 (n_traded 7,
+n_halted 5, n_refused 0). The halted rows held gross 0.835 and still booked
+P&L: +0.00083, +0.00667, -0.00279, +0.00043, -0.00376.
+
+Three lessons: (1) the stop acted *after* the third bad step, not before the
+first: a daily-loss limit ends the loss near the limit plus whatever the last
+step added (here 2.26 % against 2 %), not at the limit exactly; (2) after the
+halt the book was neither flat nor protected; (3) the status string is what
+lets a reader separate "the strategy lost money" from "the limits stopped the
+strategy", and the refusal list is what separates "the optimizer found no
+feasible book" from "it chose to hold".
+
+**Why walk-forward here instead of a purged cross-validation (section 79).**
+This loop has state: weights, equity, the latch. Each step depends on the
+previous one, so the order matters and it cannot be shuffled into folds.
+Purged CV tests how a model *predicts*; this tests how a book *behaves* under
+constraints.
+
+**What it is not.** REL-11, the portfolio-level evaluation, was *not run* in
+v1.18: it was conditional on REL-08's rule, which returned no candidate. This
+loop is merged and tested (`python/tests/test_v118_rel11_enforced.py`) and the
+numbers in this section come from a synthetic run of mine; I found no
+real-data run of it in the repository, and no real-data portfolio result
+exists.
+
+**Check yourself.**
+
+1. Why log `refused` steps separately from `halted`? *(A refusal is the
+   optimizer or limits saying no to one target; a halt is the book being
+   switched off. The remedies differ.)*
+2. Could the loss have exceeded 2 % by much more? *(Yes: the mark is checked
+   once per step, so one large step overshoots. A tighter limit or smaller
+   gross is the only protection.)*
+
+## 169. The REL-08 screen: reading a negative result that is really "no information" (v1.18)
+
+**The question.** Seven registered strategy variants were tested on one
+session and none was promoted. Does that mean they do not work? What does the
+stored record support, and what did the process get right and wrong?
+
+**The design (all fixed before any statistic was read).** REL-08
+(`research/v118/REL08_CONTINUATION_RULE.md`, signed copy
+`rel08_rule_signed.json`) screens one session (2019-01-30) for a
+cross-sectional book on up to 100 names with K = 7 registered variants: V1/V2
+a VWAP-deviation score, market-neutral and sector-neutral books; V5/V6 an
+ETF-residual reversion score, same two books; V9/V10/V11 ETF catch-up
+(constituent return minus beta times the reference ETF's return) at 1, 3 and 5
+minutes. The unit is the *rebalance*. Eight criteria C1-C8 decide a variant
+(data sufficiency, power, a net-of-cost threshold of +1.0 bp with a lower
+bound above zero, effective sample size, robustness to costs, to dropping the
+five most influential names, to the normalisation, and a rank IC above 0.02).
+Bounds are Bonferroni-corrected over K: level 1 - 0.05/7 = 0.992857. The
+decision map: fail data, power or sample size -> `underpowered`; those pass
+but no net edge -> `stop`; everything passes -> `continue`. "Underpowered" is
+recorded, not a rejection. A positive IC alone is never enough to continue.
+
+**What was found** (`research/v118/rel08/SCORECARD_ds_20190130.md`,
+`screen_ds_20190130.json`). All seven variants: `underpowered`. Rank IC means
+were positive but small and their lower bounds negative: V1/V2 0.0401 (lower
+bound -0.0263), V5/V6 0.0359 (-0.0202), V9 0.0046 (-0.0301), V10 0.0102
+(-0.0259), V11 0.0108 (-0.0243). The rule needs a mean above 0.02 and a lower
+bound above zero (C8);
+none has one. No capacity section applies.
+
+**What was found afterwards.** The post-run investigation
+(`docs/release/ANOMALY_REL08_INVESTIGATION_2026-10-20.md`, summarised in the
+v1.18 release notes) found defects, so the screen is not a clean negative:
+
+- *C1 fails by construction.* The gap criterion measures from the grid origin
+  to the first usable rebalance, so every variant shows 380-405 minutes
+  against a 30-minute limit. The investigation's reading is that the grid
+  includes extended hours; it did not confirm that from the timestamps.
+- *The V1/V2 book is nearly flat.* Mean turnover is 3.3e-06 and 2.4e-06 of the
+  notional per rebalance (about 2-3 dollars on a million). So the power
+  criterion C2 (MDE below 2 bp) passes vacuously: the MDE is about 1e-5 bp
+  because the P&L itself is about 1e-5 bp. Why V1/V2 trade about 50 times less
+  than V5/V6 was not established ("cannot tell").
+- *The scorecard mixes units.* Gross, costs and net P&L are cumulative dollars
+  under a "bps per rebalance" heading, and net bps print as `-0.000` at three
+  decimals.
+
+**What I could and could not re-derive.** Running
+`iap.research.rel08_screen.decide` on the stored statistics reproduced all
+seven stored decisions. As an arithmetic exercise only, forcing the gap to
+zero in a copy (nothing re-run, no data read) turns six of seven verdicts into
+`stop` and leaves V2 `underpowered` on its effective sample size of 17. Treat
+that as an illustration of how much of the verdict was the gap bug, not as a
+result: the signed v1 record stands, the corrected rule (v2,
+`research/v118/rel08/rel08_rule_v2_DRAFT.json`) is an unsigned draft, and
+signing it needs a synthetic dry run, a reviewer, and signing before any new
+session is read.
+
+**The honest reading.** "Underpowered" plus a flat book means the screen gave
+almost no information about whether the signals work. A more accurate summary
+than "no edge found" is: one session, for V1 and V2 an optimiser that traded a
+few dollars per rebalance, and a gap bug that would block any dataset. REL-08b
+(four more sessions) was not run; REL-08c (closing-auction imbalance) was
+dropped because the closing imbalance stream in the 2019 data starts at
+15:55:00, after the registered 15:54:55 exit.
+
+**Check yourself.**
+
+1. Why can a positive IC with a negative net book be consistent? *(IC ranks
+   names; the book also pays spread, fee and impact, and here barely traded.)*
+2. What would have made a "stop" verdict meaningful? *(A book that trades
+   enough to show a cost-sized P&L, and a power criterion that can fail.)*
+
+## 170. The researcher's side of the discipline: declare, sign, look once, count everything (v1.18)
+
+**The question.** Sections 71-76 explain the machinery. From the chair of
+someone running a study in v1.18, what must be true before you read a number,
+and what happens when your own gate fails its own test?
+
+**Before the look.** (1) *Declare.* A pre-declaration fixes the data, the
+statistic, the family size K, the decision rule and the thresholds. REL-09's
+(`research/v118/rel09/predeclaration.json`) states per symbol: *candidate* if
+the family CI's lower bound is above zero; *reject* if its upper bound is
+below zero, or if it contains zero and the minimum detectable effect (MDE) is
+no larger than the economic threshold (50 USD); *underpowered* if it contains
+zero and the MDE exceeds that threshold. It also records that the 25 %
+adverse-selection reduction is a hypothesis, not a criterion, and that
+promotion is "none in v1.18". (2) *Sign.* The signature binds the analysis
+identity (script, commit, data hashes, thresholds);
+`tools/verify_signatures.py` reported 19 of 19 items verified and 0 failed in
+my run. (3) *Be admitted by the holdout registry.* Every supported
+data-loading entry point calls `iap.research.holdout_registry.guard` before it
+reads a byte, and an unregistered dataset is refused. Identity is the content
+hash, not the path.
+
+**The look.** The registry's states are `in_sample`, `spent` and `unread`. In
+the committed file, 21 datasets are `spent` and 14 `in_sample`, and by
+session: 10 sessions (2019-2021) are in-sample; for each of nine 2025/26
+sessions, AAPL, MSFT and QQQ are `spent` and every other symbol is `unread`.
+Reading a spent scope again needs a signed prereg id listed in `spent_by`. The
+access log is hash-chained (`verify-log`); refusals are logged too.
+
+**After the look: count it.** One ledger family now carries the real-data
+looks. The central ledger holds 640 distinct configurations and 6,826 looks;
+256 configurations (holding 1,132 of the looks) are real-data and 384 (holding 5,694 of the looks)
+synthetic. N for a real-data gate is 256 (plus the look being judged), up from
+24 before the migration (`tools/ledger_family_report.py`).
+
+**A result under the rule.** REL-09 AAPL: the mean difference was +919 USD per
+session, which sounds like a candidate. The family CI was [-754, 2,593] and
+the MDE 2,065, against a 50 USD threshold, with only G = 4 session clusters (3
+degrees of freedom). The rule's verdict: underpowered. REL-09 MSFT: -82 USD,
+CI [-1,357, 1,193], MDE 1,574: underpowered. A point estimate that looks
+positive carried no weight because the rule was written first.
+
+**When your own gate fails.** The REL-06 known-null study (v3, run 2026-10-23)
+generates data with no effect and asks how often the gate falsely rejects. The
+target is 0.025. In the S2 cells (the session-mean statistic whose
+small-sample standard error is the thing being tested) with K = 3 and K = 6
+hypotheses, the A0 arm (a conditional randomisation diagnostic over all 1,854
+derangements of the seven sessions) rejected 79 and 80 of 1,854 (about 4.3 %),
+while generator B rejected 50 and 49 of 2,000 (2.5 % and 2.45 %). The verdict,
+recorded as found: FAIL. Per the owner's decision of 2026-10-19 no parameter
+was changed and nothing was re-run; a change would be a new signed protocol.
+The consequence is on the claims: gate F3 stays open, the outside reviewer
+rejected the method as the F3 gate, no real-data false-positive control is
+claimed, and every v1.18 verdict is `underpowered` or negative regardless.
+
+**What it is not.** Process is not evidence. Fixing the rule before the look
+prevents one kind of error; it does not make a one-session screen informative
+(the REL-08 section above) or a G = 4 interval a power statement. The registry
+is a code-level control: someone who edits and re-seals it is stopped only by
+review and by CI pinning the sealed hash.
+
+**Check yourself.**
+
+1. Why is "+919 USD" not reported as a finding? *(The pre-declared rule judges
+   the interval and the MDE, and both say the data cannot tell it from zero.)*
+2. After a failed known-null study, why not retune and re-run? *(A re-run with
+   changed parameters is another look at the same question; it must be
+   declared and signed as a new protocol, or the failure is erased.)*
+
+## 171. Cost per filled share: why an algorithm that fills less looks cheaper (v1.18)
+
+**The question.** A parent order to buy 1,000 shares comes back with 500 filled
+at 0.85 bp of cost per share, and another policy fills all 1,000 at 1.42 bp.
+Which policy is cheaper?
+
+**The idea.** Cost is only defined for the shares that traded. Dividing the
+cost of 500 shares by the notional of 1,000 makes a policy that under-fills look
+good, and dividing by the filled notional alone hides what the missing shares
+would have cost. v1.18 (REL-03, `iap.research.execution_metrics`) therefore
+reports several numbers side by side and ranks none of them alone:
+
+- **`cost_per_filled_share_bps`** (primary): (trading cost + net fees + the
+  simulator's impact adder) of the *filled* quantity, divided by filled shares
+  times the arrival mid. Arrival mid is the mid at the parent window start.
+  Positive means worse for the trader, for every cost metric.
+- **`fill_rate`** (filled / target, quantity-weighted), **`completion_ratio`**
+  (share of parents filled in full) and **`residual_qty`** (target minus filled).
+- **`completion_charge_bps`**: the price of finishing the residual at the window
+  end, residual shares times (half-spread at the window end + taker fee). It is a
+  price tag, never a manufactured fill.
+- **`shortfall_per_target_share_bps`** (secondary, Perold): trading cost plus the
+  opportunity cost of the residual (the unfilled shares marked at the end mid),
+  per target share.
+
+Every metric has an entry in `METRIC_DEFINITIONS` (arrival price, target
+quantity, horizon, benchmark, sign, unit, denominator), repeated as a table in
+`docs/EXECUTION_QUALITY.md` section 9.
+
+**A worked example.** One hand-built book at $100 (tick 0.01, bids 10000x300 and
+9999x400, asks 10001x200 and 10002x500), a buy of 1,000 shares by IS, and the
+touch assumed 5 ticks higher at the window end (an assumption of this example,
+not data). Three child policies, each priced with `iap.tca.shortfall.parent_costs`
+and `parent_metrics` (COOKBOOK, "Price one parent three ways"):
+
+```
+policy               fill cost/filled compl.chg Perold/target residual
+legacy MARKET child  0.70        1.71      0.80          2.35      300
+capped, 1 level      0.50        0.85      0.80          2.75      500
+capped, 2 levels     1.00        1.42       n/a          1.00        0
+```
+
+Read down the third column: the policy that took only the touch (`capped, 1
+level`) has the lowest cost per filled share, 0.85 bp, and it filled half the
+parent. Read down the fifth column: the same policy has the *highest*
+shortfall per target share, 2.75 bp, because 500 shares were left to a market
+that moved against the buyer (opportunity cost 25.00 currency units against 2.50
+of trading cost). The ordering flips between the two columns. That flip is the
+reason the primary metric always travels with `fill_rate`, `completion_ratio`
+and the completion charge, and the reason a policy is never called better for a
+lower cost per filled share alone. The B8 v2 decision rule writes this down:
+a policy that is cheaper per filled share but fills less is not "better".
+
+The completion charge row can be checked by hand. The legacy child left 300
+shares; the half-spread at the end is $0.005 and the taker fee $0.003, so
+300 x 0.008 = 2.40 currency units, which is 0.80 bp of the residual's arrival
+notional (300 x 100.005).
+
+**On the demo dataset.** The same metrics run on the two-session demo dataset of
+COOKBOOK recipe 36 (`data/real/demo`, 11,255 events; a synthetic ITCH 5.0 file
+written by the test-only encoder, ingested like a vendor file; the directory is
+git-ignored). COOKBOOK, "Run the v2 benchmark on the demo dataset", produced the
+figures below. Native TWAP at 0.5 % of ADV shows a cost per filled share
+of -0.38 bp, a fill rate of 0.47 and a completion ratio of 0.00 (no parent
+finished); aggressive TWAP at the same size shows +0.75 bp and fills everything.
+The negative number comes from passive buys that filled at or below the arrival
+mid and earned rebates (the trading and net-fee components in the cell's
+`costs_bps` are both negative), on less than half of the quantity. It is not a
+saving.
+
+**Two aggregates.** The pooled value is a ratio of sums, so a large parent
+weighs more; `per_parent` is the distribution of the per-parent ratio over
+parents that filled something. A parent with no fill has no per-share cost
+(`None`, tested in `test_unfilled_parent_has_no_per_share_cost_and_a_full_residual`)
+and is counted in `parents_with_no_fill`, not averaged as zero.
+
+**What this does not show.** The impact term is the simulator's adder, labelled
+`replay + linear child adder (rule 6)`; the replayed book never moves for our
+fills. The hand-built book and its drift are an illustration, and the demo cells
+hold six parents on two synthetic sessions, so nothing here ranks policies or
+says anything about a market.
+
+**Check yourself.**
+
+1. A parent fills 50 % at a cost per filled share of 0.85 bp and its shortfall
+   per target share is 2.75 bp. Which number tells you about the other 50 %?
+   *(The shortfall: its opportunity term prices the residual at the end mid.)*
+2. Why does the completion charge use the half-spread at the window end rather
+   than the fill price of some later trade? *(Nothing later exists in the
+   window; the charge prices a hypothetical finish and invents no fill.)*
+
+## 172. The capped child, and the quantity it owes (v1.18)
+
+**The question.** In v1.17 an IS, POV or aggressive child was a 1,000-share
+MARKET order. On IEX the displayed touch can be 19 to 155 shares
+(`iap.execution.child_exec` docstring). What did the simulator do with the
+rest, and what should a child sized for the venue do instead?
+
+**The old behaviour.** The MARKET child walked 10 displayed levels, the
+unfilled remainder was cancelled, IS never re-posted, and the only trace was
+the counter `depth_exhausted`. A parent could look "executed" while most of it
+never traded, and on a sparse book the cost of what it did trade was inflated by
+walking into stray far levels (the B8 diagnosis, in the entry on B7 and B8).
+
+**The idea (REL-04, opt-in).** `ParentOrder.child_exec = ChildExecParams(...)`
+replaces the child with a marketable IOC limit order sized to the *eligible*
+displayed depth: the top `max_levels` opposite levels, within
+`max_slippage_ticks` of the touch (0 = no band), net of what the parent's own
+fills already consumed (simulator rule 3b), times `depth_fraction`. The limit
+is the deepest level used, so the child can never walk past what it was sized
+for. `eligible_depth` returns `(quantity, limit)`. On levels
+`[(101, 200), (102, 500), (103, 900)]` it gave these results when run:
+
+```
+max_levels=2                          -> (700, 102)
+... with 150 already consumed at 101  -> (550, 102)
+max_levels=3, max_slippage_ticks=1    -> (700, 102)   (103 is two ticks away)
+max_levels=1, depth_fraction=0.5      -> (100, 101)
+everything consumed                   -> (0, 0)
+```
+
+**Owed, not dropped.** Quantity the cap withholds, and the unfilled part of an
+IOC, is *owed*. The parent keeps explicit remaining-quantity state (`carry`),
+re-posts it no sooner than `repost_interval_ns` apart and at most `max_reposts`
+times, and never after the window closes. POV carries nothing (its next TRADE
+deficit is the re-post). Whatever is still owed at the end is reported as
+`residual_qty` and priced by the completion charge (previous entry). A
+`max_participation` above zero caps issued quantity at that fraction of the
+TRADE-print volume on the executing venue since the window opened:
+`participation_room(0.1, venue volume 1,000, issued 30)` returned 70.
+
+**The hand-built book again** (same book as the previous entry; at 0.5 s the
+ask at 10001 refills from 200 to 500). Replays of a 1,000-share IS buy:
+
+```
+legacy MARKET child : fills 200@10001 + 500@10002   filled 700, residual 300, depth_exhausted 1
+capped, 1 level     : IOC 200@10001, then IOC 300@10001   filled 500, residual 500,
+                      cap_withheld_qty 800, reposts 1
+capped, 2 levels    : IOC 700@10002, then IOC 300@10001   filled 1000, residual 0,
+                      cap_withheld_qty 300, reposts 1
+```
+
+The legacy child never returns for the 300 shares the refill could have
+filled. The capped children did, because the parent still owed the quantity. No
+fill ever appears beyond the limit price of the child
+that produced it.
+
+**Failure counters, not silence.** `cap_no_depth` (a post found no eligible
+depth), `cap_withheld_qty`, `reposts`, `carry_unsent_qty`, `residual_qty` and the
+legacy `depth_exhausted` are in `ParentReport` and in the benchmark's
+`failures` block.
+
+**What it cost in the signed run.** In the committed B8 v2 JSON for AAPL
+(`research/execution/b8v2/benchmark_v2_oos3_AAPL.json`), pinned-Nasdaq IS
+parents under the capped child filled 0.41, 0.095, 0.05 and 0.037 of their
+target at 0.1, 0.5, 1 and 2 % of the venue ADV, and `incomplete_share` was 1.0
+in all four cells. Under the v1.17 child (the pre-declared sensitivity
+`s3_v117_child`) the same cells filled 0.639, 0.135, 0.068 and 0.047, and every
+parent was depth-exhausted. Honesty about under-fill is the point; a lower
+fill rate is the price, and the residual is priced, not hidden.
+
+**What it does not show.** That the capped child is cheaper or better: it is
+opt-in, default `None` is byte-identical to the pinned behaviour, and on the
+demo dataset the cap never bound (IS cells with and without
+`+capped` gave identical numbers, `depth_exhausted` 0).
+
+**Check yourself.**
+
+1. Why is the limit price the *deepest eligible level* and not the touch?
+   *(The child was sized across several levels; a limit at the touch would
+   reject the part of the quantity that lives deeper.)*
+2. If a capped child withheld 800 shares and the window closed, where do those
+   800 shares appear? *(`carry_unsent_qty` and the residual; never as a fill.)*
+
+## 173. Pooled ratios, session clusters and the design effect (v1.18)
+
+**The question.** A cell has 72 parents but the report prints G = 3. Which
+number is the sample size?
+
+**The idea.** Parents in one session share the day's volatility, spread and
+news, so they are not independent. REL-03 treats each *session* as one cluster
+(`ratio_stats` in `iap.research.execution_metrics`). The pooled value is the
+ratio of sums `R = sum(cost) / sum(filled notional)`. Its variance is the CR1
+cluster-linearised ratio estimator:
+
+    residual_i = cost_i - R * notional_i            (per parent)
+    cluster sum S_g = sum of residual_i in session g
+    var(R) = G / (G - 1) * sum_g S_g^2 / (sum notional)^2
+
+with a Student-t interval at `G - 1` degrees of freedom. Three companions are
+printed next to every interval:
+
+- **design effect** = the CR1 variance divided by the variance you would get
+  if every parent were its own cluster;
+- **effective sample size** (ESS) = n / design effect;
+- **minimum detectable effect** (`mde_t`) = (t at 97.5 % + t at 80 %) x se at
+  `G - 1` df: the smallest true difference the design would catch 80 % of the
+  time at a two-sided 5 % level.
+
+With fewer than `MIN_CLUSTERS_FOR_INTERVAL = 2` sessions only the estimate is
+returned.
+
+**A worked example.** Twelve parents, four per session, three sessions, equal
+weights, and the *same twelve* cost values in bps in both arrangements:
+`[0.8, 1.2, 1.0, 1.0, 2.9, 3.1, 3.0, 3.0, -1.1, -0.9, -1.0, -1.0]`. Run when
+written (COOKBOOK, "See the design effect move"):
+
+```
+by session  mean=1.00 bps  se=1.155  G=3 df=2  design_effect=5.48  ESS=2.2     mde_t=6.19 bps
+mixed       mean=1.00 bps  se=0.043  G=3 df=2  design_effect=0.01  ESS=1557.3  mde_t=0.23 bps
+```
+
+"By session" puts each level in its own day: one day costs about +1, one +3,
+one -1, so the mean of 1.00 bp rests on three numbers and the design effect
+is 5.48: twelve parents carry the information of about two. "Mixed" spreads the
+same values so every day looks alike; the cluster sums nearly cancel, the
+standard error collapses by a factor of 27 and the ESS (1,557) is far *above*
+n = 12. An ESS above n is not good news. With three clusters, two or three
+cluster sums that happen to agree look like precision. That is why the report
+prints G beside the interval and why "a narrower interval is a diagnostic,
+never a gate" (`docs/EXECUTION_QUALITY.md` section 9).
+
+**The same trap on the demo data.** On the two-session demo dataset the native
+TWAP 0.5 % cell has an interval of [-0.42, -0.34] bp and an ESS of 970.9. Two
+sessions, six parents, one degree of freedom (the t quantile there is 12.71):
+the two sessions agree, that is all.
+
+**Denominators and coverage.** The grid sizes a parent from the venue ADV in
+`instruments.json`, one venue's volume, so "2 % of ADV" is a fraction of a
+percent of the consolidated market (review row X-F).
+`--consolidated-adv <json>` adds `size_pct_consolidated_adv` to each parent row
+without changing cell keys; the B8 v2 file
+`research/execution/b8v2/consolidated_adv.json` records its source and window.
+`--cover-all-cells` adds overlapping passes until every cell runs each session
+(X-E) and `coverage_by_session` lists the cells that still did not; on the tiny
+demo dataset it cannot complete the 16-cell grid and says so.
+
+**What this does not show.** That an interval with `G = 3` is trustworthy
+because it is printed. The statistics are a way to say how little is known.
+
+**Check yourself.**
+
+1. Why can ESS exceed n? *(The design effect is below 1 when the cluster sums
+   happen to offset; with G this small it is as likely luck as structure.)*
+2. Why a ratio of sums and not the mean of per-parent ratios? *(A 100-share
+   parent would weigh as much as a 10,000-share one; the dollar cost belongs to
+   the dollars traded.)*
+
+## 174. Paired differences, the family correction and "underpowered" (v1.18)
+
+**The question.** A policy's trading cost per filled share is 0.78 bp lower than
+pinned Nasdaq's, and the 95 % interval excludes zero. Is that evidence?
+
+**The idea.** Compare the policies on the *same* parents: parents are paired by
+(session, symbol, window, algo, size). `ratio_diff_stats` computes `R_a - R_b`
+of two pooled ratios, with the CR1 variance of the difference from per-cluster
+terms `e_g = (N_ag - R_a D_ag) / D_a - (N_bg - R_b D_bg) / D_b`
+(`N` is cost, `D` is filled notional, `g` a session):
+`var = G / (G - 1) * sum_g e_g^2`. Two corrections follow.
+
+- **The family.** B8 v2 tests three policies on two symbols, K = 6. The
+  declared interval is two-sided at `1 - 0.05 / K` (Bonferroni; `ci_family`),
+  and the plain 95 % interval is printed beside it.
+- **The MDE.** `mde_t` and `mde_t_family` say what difference this design could
+  have detected. A comparison is marked *underpowered* when the family MDE of
+  the primary exceeds 1.0 bp or the family MDE of the fill rate exceeds 0.02.
+
+**Recomputing one row from the stored sums.** The committed JSON keeps the
+per-session sums, so anyone can redo the arithmetic
+(`research/execution/b8v2/benchmark_v2_oos3_AAPL.json`, `pin_iex+capped` minus
+`pin_nasdaq+capped`, trading cost per filled share). COOKBOOK, "Recompute one
+B8 v2 interval from its per-session sums", did it with scipy:
+
+```
+G=3 df=2  t95=4.30  t_family=10.89  ratio=2.53
+estimate -0.785 bps (stored -0.785); se 0.135 (stored 0.135)
+95% CI    [-1.37, -0.20]   stored [-1.37, -0.2]
+family CI [-2.25, 0.68]    stored [-2.25, 0.68]
+MDE (95%) 0.72   MDE (family) 1.61   stored 0.72 / 1.61
+```
+
+On AAPL, pinned IEX paid 2.28 bp per filled share and pinned Nasdaq 3.07
+(`estimate_a`, `estimate_b` in the JSON). The 95 % interval excludes zero; the
+family interval, which is the declared one, does not. With three sessions the
+critical value is 4.30 at 95 % and 10.89 at the family level, 2.5 times larger,
+and an MDE of 1.61 bp is larger than the 0.78 bp that was measured. So the
+answer is "no evidence either way", and the report says
+`no_evidence (underpowered)`.
+
+**Why this is not hair-splitting.** The 95 % interval answers a question the
+analysis did not declare. Six comparisons were planned; if each were allowed a
+95 % interval one of them excluding zero is not surprising. The family
+correction is the cost of having asked six questions with three sessions.
+
+**What this does not show.** That pinned IEX is cheaper or dearer; and the
+recomputation is arithmetic on stored sums, not an independent rerun of the
+simulation. The outside reviewer inspected the committed JSON but did not rerun
+it (release gate F7 is open).
+
+**Check yourself.**
+
+1. Why pair on window and size instead of comparing cell means? *(Paired parents
+   see the same book and the same day; the difference removes that variation.)*
+2. If `G` were 30 instead of 3, which numbers move most? *(The two critical
+   values, from 4.30 and 10.89 to 2.05 and 2.83 at 29 df, and with them the
+   MDE.)*
+
+## 175. B8 v2: a rule written before the run, and what it returned (v1.18)
+
+**The question.** Does routing across Nasdaq and IEX (`sor`, `sor_sweep`) or
+pinning to IEX (`pin_iex`) beat pinning to Nasdaq on AAPL and MSFT?
+
+**The declaration.** `research/execution/b8v2/PREDECLARATION.md` fixed the
+design on 2026-10-18, before any B8 v2 number existed. The prereg
+`research/preregs/b8v2_prereg.json` binds the analysis identity (code tree,
+commit, data versions, scripts, thresholds) and carries an Ed25519 signature;
+`tools/verify_signatures.py` verified it. Evaluation sessions: 2025-12-10,
+2026-05-15 and 2026-05-18 (G = 3, two regimes). Calibration sessions
+(2025-11-28, 12-08, 12-09) are not read by the run. The decision rule, per
+policy and symbol:
+
+- **better**: the family interval of the difference in trading cost per filled
+  share lies entirely below zero, *and* the family interval of the fill-rate
+  difference does not lie entirely below zero, *and* the family interval of the
+  completion-charge difference does not lie entirely above zero;
+- **worse**: the cost interval lies entirely above zero, or the fill-rate
+  interval entirely below;
+- **no evidence**: anything else, flagged underpowered by the MDE test of the
+  previous entry;
+- a policy is "better than pinned Nasdaq" only if it is better on *both*
+  symbols.
+
+**What it returned** (`research/execution/b8v2/REPORT.md`; difference in
+trading cost per filled share versus `pin_nasdaq`, bps, family interval, family
+MDE):
+
+```
+pin_iex    AAPL  -0.78  [-2.25, 0.68]    1.61
+pin_iex    MSFT  -7.55  [-57.46, 42.37]  54.78
+sor_sweep  AAPL  -0.18  [-5.70, 5.34]    6.06
+sor_sweep  MSFT  +1.71  [-18.50, 21.92]  22.18
+sor        AAPL  -0.57  [-6.50, 5.37]    6.51
+sor        MSFT  -0.67  [-12.49, 11.15]  12.97
+```
+
+Re-applying the rule to `DECISION.json` (COOKBOOK, "Re-apply the B8 v2 decision
+rule") gave `no evidence (underpowered)` in all six rows, and none of the three
+policies is better than pinned Nasdaq on both symbols. The MSFT pinned-IEX
+point estimate of -7.55 bp has a family interval 100 bp wide: it says the data
+cannot speak, not that IEX saves 7.55 bp. The fill-rate difference for pinned
+IEX on MSFT was -0.1257 with a family interval of [-0.4585, 0.2072].
+
+**Assumptions stated before the run.** Latency is assumption L0: exchange
+timestamps, no measured order-entry latency, plus the modelled 350
+microsecond IEX inbound delay; the IEX capture-timestamp re-ingest had not run.
+The headline uses the capped child on every route. Three sensitivities
+(`s1_no_hidden`, `s2_child_impact`, `s3_v117_child`) are reported beside the
+headline and are never part of the decision.
+
+**What this does not show.** That routing is useless. It shows that three
+sessions, two symbols and a family of six cannot resolve effects near one basis
+point, which the prereg predicted. v1.18.0 promotes no signal and claims no
+execution edge. The fill model remains validated at Level 1 only.
+
+**Check yourself.**
+
+1. Why is the fill rate a *co-primary* and not a footnote? *(Otherwise a route
+   that is cheaper only because it fills less would qualify as "better".)*
+2. Why does the prereg say "underpowered is the expected verdict" in advance?
+   *(So the verdict cannot later be read as a surprise; with 2 df an effect of
+   about 1 bp is unresolvable.)*
+
+## 176. B7 and B8 in v1.17: two results the instrument had to explain (v1.18)
+
+**The question.** Two v1.17-era execution results looked like findings: signal
+urgency made some TWAP cells dearer, and the cost-aware router lost to pinning
+Nasdaq. What were they, and what happened to them?
+
+**B7: closed on its in-sample result.** The signal-aware arms (urgency, pacing,
+Almgren-Chriss drift) were run in-sample on seven sessions
+(`research/execution/benchmark/BENCHMARK_multi7_signal.md` and
+`_PROVENANCE.md`). Paired against the plain control, urgency was dearer on
+TWAP at 1 % ADV by +1.66 bp ± 0.54 (95 % interval [0.35, 2.98]) and at 2 % ADV
+by +1.95 bp ± 0.48 ([0.72, 3.18]). No cell reached the 2 bp minimum effect in
+the cheaper direction. The gate (`prereg_DRAFT.json`) was never signed; the
+owner closed B7 on that result (`research/preregs/B7_CLOSED_v117.md`) and
+`tools/b7_shortfall_register.py` refuses the draft. The record is a negative,
+in-sample, unsigned result on one dataset and one alpha with untuned
+thresholds.
+
+**B8: a loss that was mostly the simulator.** The first real two-venue run
+(two overlap days) found the router +5.12 bp ± 1.25 costlier than pinned
+Nasdaq pooled (95 % interval -10.8 to 21.0, `REPORT_overlap2.md`), and
+pinned-IEX fills marked out at -23 to -28 bp at 1 s. A follow-up recorded
+every child (`research/execution/b8/REPORT_sweep.md`) and found three causes
+inside the replay, not in IEX:
+
+1. **Our own consumption overlay.** The simulator debits the displayed size our
+   fills took until that level changes. IEX's book updates about five times less
+   often than Nasdaq's, so its near levels stayed "used": 57 % (AAPL) and 82 %
+   (MSFT) of pinned-IEX children had their touch already taken at decision time.
+2. **Unlimited MARKET children on a sparse book.** A MARKET child skipped the
+   used levels and filled at stray resting orders; the worst AAPL case was a
+   23-share sell filled at $175.00 against a $277.11 mid. A real order would not
+   trade through protected quotes, so the replay overstated pinned-IEX cost.
+3. **The router chose IEX on fee at an equal touch:** 89 % (AAPL) and 77 %
+   (MSFT) of the router's marketable IEX children had a touch equal to Nasdaq's.
+
+The pre-declared out-of-sample run (`REPORT_oos6.md`) then found `sor` at +2.20
+bp [-0.84, 5.24] (AAPL) and +1.12 [-2.27, 4.52] (MSFT) against pinned Nasdaq,
+pinned IEX at +3.51 and +5.02, and `sor_sweep` at +0.6 and +1.2: no interval
+excluded zero, every point estimate on the costlier side.
+
+**What changed in v1.18.** The artefacts became things to measure and
+bound: the capped child (previous entries), the IEX 350 microsecond inbound
+delay as an option, hidden prints as an option, and the B8 v2 re-measurement
+with a declared rule. The lesson is procedural: when a result is surprising,
+record the children and look at them before believing the market.
+
+**What this does not show.** That IEX is toxic or that the router is bad.
+Both claims depend on a replay in which the book never reacts, impact is an
+adder, and latency is assumed.
+
+**Check yourself.**
+
+1. Why is "the replay overstates pinned-IEX cost" a different statement from
+   "IEX is cheaper"? *(One corrects a simulator artefact; the other would claim a
+   market fact that nothing here measured.)*
+2. Which of the three causes is a modelling choice rather than a venue fact?
+   *(The overlay and the unprotected MARKET child are replay mechanics; the third
+   is the router's own ranking rule, which ranked the displayed touch.)*
+
+## 177. Cancel races and the order of events (v1.18)
+
+**The question.** You decide to cancel a resting order at time t. The venue
+trades through it 0.1 ms later. Did you get filled?
+
+**The idea.** In the simulator a cancel is not instantaneous. It travels the
+same latency path as an order (rule 7): decision, risk and wire legs plus the
+venue leg plus jitter. It takes effect at the first event at or after its
+arrival, merged in time order with order activations (an activation wins a
+tie). It never overtakes its own order. There is no separate acknowledgement
+event: the ack is implied by activation, so a cancel decided before the venue
+has acknowledged simply waits for arrival. Rule 9 fixes the order inside one
+event: expiries, then activations and cancel arrivals by time, then the book
+update, then passive queue tracking, then the crossing check.
+
+**A worked example.** The test configuration has a one-way path of 350,000 ns
+(50,000 + 50,000 + 100,000 decision/risk/wire legs plus a 150,000 venue leg;
+`LAT` in `python/tests/test_execution_rules.py`). A buy of 50 at 100 rests with
+300 shares queued ahead; prints at 2.000 ms pay down the queue and then fill us.
+Two cancels (COOKBOOK, "Replay a cancel race"):
+
+```
+cancel decided 1.9 ms (lands late)   state=FILLED    fills=[50] user_cancels=0 cancel_rejected_filled=1
+cancel decided 1.0 ms (lands first)  state=CANCELLED fills=[]    user_cancels=1 cancel_rejected_filled=0
+```
+
+The first cancel lands at 1.9 + 0.35 = 2.25 ms, after the fill at 2.0 ms: the
+fill stands and the cancel is a no-op counted in `cancel_rejected_filled`. The
+second lands at 1.35 ms and wins. A cancel never erases an earlier effective
+fill. These cases and others (partial fill then cancel, duplicate EXECUTE,
+post-only cross, stale book, halted venue, end-of-session residual) each have a
+deterministic expected outcome in `python/tests/test_rel04_child_execution.py`
+(36 tests passed when run for this entry).
+
+**Why it matters.** Quote fading (§104) and queue-aware cancels (§103) pull
+resting orders. If a pull were instantaneous, every fade would dodge its adverse
+fill. With a path of 350,000 ns the fill that arrives first is the one the fade
+tried to avoid; the fill-type split (§102) records it as `faded`. The latency
+legs are configuration, with `latency_mean_ns` being the *minimum* venue leg,
+not a measurement.
+
+**What this does not show.** That the real venue's cancel path takes 350
+microseconds. The number is a test value; nothing in v1.18.0 measures an
+order-entry path or claims a latency advantage.
+
+**Check yourself.**
+
+1. A cancel and an activation arrive at the same timestamp. Which goes first?
+   *(The activation; rule 7.)*
+2. Why does the cancel take effect at the later of its own and its order's
+   arrival? *(An order that has not reached the venue cannot be cancelled there.)*
+
+## 178. No impossible fills: the invariants (v1.18)
+
+**The question.** Before asking whether a simulator is realistic, what can be
+checked about whether it is *possible*?
+
+**The idea.** `python/tests/test_property_replay.py` (REL-12) generates random
+one-venue event streams (a seeded two-sided book, then adds, cancels, executes
+of live orders and trades) and random parents (TWAP, VWAP, IS or POV; native,
+aggressive or passive; buy or sell) and asserts, for each:
+
+1. **Conservation.** The fills of a parent sum to `filled_qty`; `filled_qty +
+   unfilled_qty` equals the parent quantity; each child's fills sum to
+   `qty - remaining` and never exceed the child's quantity.
+2. **Fills come from the book.** Taker quantity at a price never exceeds the
+   opposite-side quantity ever displayed at that price, and maker quantity never
+   exceeds the venue's printed (EXECUTE + TRADE) volume.
+3. **Fills are well formed.** Positive quantity, our side, inside the parent
+   window.
+4. **Determinism.** Same stream, config and seed give the same fills and the
+   same parent report.
+
+The Hypothesis runs are small and derandomized (30 examples by default,
+`IAP_HYPOTHESIS_EXAMPLES` raises it). When run for this entry the file passed
+at 30 and at 300 examples. The CI-lock virtual environment
+(`.venv-ci`) has no Hypothesis installed, where the file is skipped
+(`pytest.importorskip`); the passes came from a Python 3.12 environment with it.
+
+**Seeing the check bite.** COOKBOOK, "Check a run for impossible fills", applies
+the same conditions to the hand-built book's capped run, then forges fills:
+
+```
+honest run  : no violations | fills [(200, 10001), (500, 10002), (300, 10001)]
+forged price: ['taker 200 @ 10003 exceeds the 0 ever displayed there']
+forged qty  : ['fills do not sum to filled_qty', 'taker 1200 @ 10001 exceeds the 500 ever displayed there']
+```
+
+**How loose it is.** "Ever displayed" is cumulative over the stream, so this
+catches a fill at a price that never had size and fills beyond everything that
+ever showed, but not a level consumed twice at different times. That second
+failure has its own rule (3b, never consume displayed liquidity twice) and
+tests. `docs/review/SIMULATOR_CORRECTNESS.md` maps each reviewer question
+(double consumption, fills before arrival, cancel versus fill, queue position,
+feed gaps, duplicates, partial fills, rejects, residual visibility, determinism)
+to named tests.
+
+**What this does not show.** That simulated fills match a venue. The same
+document lists claims the simulator cannot support without real fills: absolute
+passive fill rates, absolute shortfall of a live strategy, the market impact of
+our own orders, hidden-liquidity capture, any latency advantage, any maker
+profit. The fill model is validated at Level 1 only.
+
+**Check yourself.**
+
+1. Why test invariants on random streams instead of only on the hand-built
+   book? *(A hand case proves one path; a generator hunts for the path nobody
+   thought of.)*
+2. Would these checks catch a passive fill priced at a level the market never
+   traded? *(No: the maker check bounds quantity by printed volume only. The
+   price rule is covered by the queue tests in `test_execution_rules.py`.)*
+
+## 179. Recording, replaying, and why Level 1 passes while Level 2 does not exist (v1.18)
+
+**The question.** If you record a paper-trading run and replay it through the
+simulator, does agreement mean the simulator is right?
+
+**The two levels** (`docs/SIM_TO_REAL.md`). Level 1 is deterministic replay
+validation: the same events and parameters give the same bytes, and the
+recorder, loader and comparison obey stated rules. Level 2 would compare the
+fill model with real orders and real fills on held-out days. Under decision
+D4(a) (paper parents only, no live orders, no broker integration) no real fills
+exist, so Level 2 is not validated and nothing in the harness is evidence about
+live fills.
+
+**What the harness is (REL-05).** `iap.paper.recorder` writes market events
+and every child send, ack, cancel, reject, expire and fill on one monotonic
+clock mapped to the wall clock once (`wall = wall0 + (mono - mono0)`, with an
+`uncertainty_ns` equal to half the bracket in which the wall clock was read;
+the host's offset from true UTC is not in it). Files: `market.iap1`,
+`orders.jsonl`, `recording.json` with sha256 of the other two. Each child must
+follow SEND, ACK, FILL*, then full fill, CANCEL_ACK or EXPIRE (a cancel may lose
+the race); quantity is conserved. `iap.paper.sim_to_real.compare` replays the
+same parents on the same recorded events and matches children on `(parent_id,
+decision_ts, k)`.
+
+**A worked run** (COOKBOOK, "Record a paper run and prove it replays
+byte-identically"; synthetic stream of 1,541 events, 2 parents, 10 children):
+
+```
+market.iap1     60d5bd44ef3993b6  identical=True      (first 16 hex of the sha256;
+orders.jsonl    002aac00ba63cbd2  identical=True       two separate writes)
+recording.json  e792e8c59d3a895c  identical=True
+level2: not validated | children recorded 10 | unmatched 0 0
+fill_frac_err bias 0.0 | price_err_bps bias 0.0 | underpowered True
+tampered file refused: orders.jsonl: sha256 mismatch
+recording one tick worse than replay: price_err_bps n 10 bias 0.2
+```
+
+Two writes of the same recording are byte-identical; one appended newline is
+refused by the hash; a recording one tick worse than its replay shows a bias.
+The error is exactly zero in the honest case because the recording *was built
+from* the replay: both sides are simulations of one tape. The report says so in
+its own `limitations`, and flags strata under 30 children or 10 parents as
+`underpowered`.
+
+**What this does not show.** Realism. Agreement here shows the pipeline is
+consistent. No recorded real-order day exists to replay (decision D4(a)), and no
+live or broker path exists.
+
+**Check yourself.**
+
+1. What is the recorder's `uncertainty_ns` not able to tell you? *(The host
+   clock's offset from UTC; it only bounds how well the monotonic and wall
+   clocks were bracketed.)*
+2. Why is a zero replay error not a pass? *(The recording and the replay come
+   from the same simulator; the comparison could only expose a pipeline bug,
+   never a model error.)*
+
+## 180. The real-tape fill test: Brier skill, three symbols, no verdict on live fills (v1.18)
+
+**The question.** Without real fills, is there any check on the fill-probability
+model that is not circular?
+
+**The idea.** `iap.paper.fill_tape.tape_test` (REL-05). A fill hazard
+(`FillHazardModel`) is fitted on survival samples of *fit* days. For separate
+*evaluation* days it predicts `P(fill within 1 s)` for a hypothetical 100-share
+resting order at every decision; the outcome is what the tape shows that order
+would have done under the simulator's own queue rules (`maker_labels`). So the
+label is tape-implied, not a measured fill, and the test asks only whether a
+hazard fitted on earlier days beats a constant on later days. Scores: the Brier
+score (mean squared error of the probabilities) of the model and of a naive
+baseline (the fit set's pooled fill rate), the skill `1 - Brier / Brier_naive`
+and reliability bins (mean predicted against observed rate). A day in both sets
+is refused. Queue-tercile edges come from the fit set only.
+
+**The declaration.** `research/execution/rel05/predeclaration.json`, signed in
+`research/preregs/rel05_prereg.json`: fit days 2019-01-30, 03-27, 07-30,
+08-30; evaluation days 2019-10-30, 12-30 and 2020-01-30 (G = 3); decisions
+every 5 s from 09:45 to 15:45 ET; one verdict per symbol (K = 3).
+`supports` needs pooled skill of at least 0.02, positive skill on every
+evaluation day, and a largest reliability gap of at most 0.10 over bins with
+at least 100 samples; `contradicts` is pooled skill below 0; otherwise
+`inconclusive`. The thresholds were set before any result existed; the
+declaration's own text calls them arbitrary.
+
+**What it returned** (`research/execution/rel05/REPORT.md`; re-derived from the
+`tape_*.json` files in COOKBOOK, "Re-derive the REL-05 verdicts"):
+
+```
+AAPL: brier=0.1248 naive=0.1276 skill=0.0218 gap(n>=100)=0.1633   inconclusive (gap)
+MSFT: brier=0.1373 naive=0.1388 skill=0.0111 gap(n>=100)=0.4568   inconclusive (skill and gap)
+QQQ : brier=0.1713 naive=0.1870 skill=0.0839 gap(n>=100)=0.0216   supports
+```
+
+AAPL's skill clears 0.02 by a hair and fails on reliability: in its 0.4 to 0.5
+bin (133 samples) it predicted 0.434 and observed 0.271. MSFT fails both: in
+the 0.7 to 0.8 bin (113 samples) it predicted 0.740 and the tape gave 0.283.
+QQQ's top bin (predicted 0.968, observed 0.255) has 98 samples, below the
+100-sample cut, so the declared rule does not count it; that is a property of
+the rule, to be remembered when reading "supports". "Supported on all symbols"
+is no.
+
+**What this does not show.** Level 2. Per-day skill is reported but no p-value
+or interval is claimed: samples within a day on a 5 s grid are serially
+dependent and there are only three evaluation days. A "supports" says a hazard
+matches its own label generator on later days; a failure is a defect finding in
+the hazard, not in a venue.
+
+**Check yourself.**
+
+1. A skill of 0.0218 means what, in words? *(The model's squared error is 2.2 %
+   smaller than a constant guess of the fit-set fill rate.)*
+2. Why can a model have positive skill and still fail the reliability check?
+   *(Skill averages over all bins; a few over-confident high-probability bins
+   can be badly miscalibrated while the large low-probability bins carry the
+   score.)*
+
+## 181. Two venues, one merged book: when "crossed" is only a symptom (v1.18)
+
+**The question.** Two venues quote the same stock. Their merged best bid is
+above their merged best ask. Is the market broken, and where should a buy go?
+
+**The idea.** Each venue keeps its own book (`iap.orderbook.book.OrderBook`) and
+is only guaranteed to be uncrossed on its own. `ConsolidatedBook` is a view over
+them: it sums quantity at equal prices and takes the best price across venues,
+over the **non-stale** venues only. A venue whose sequence has a gap is marked
+stale and drops out of the view until a complete snapshot burst recovers it
+(§3). Nothing in the view says that a crossed pair of quotes can be traded: the
+quote on one side may be late, already gone, or on a venue that is halted.
+
+**What the pinned router does with it** (`iap.execution.sor.SmartOrderRouter`,
+which `python/tests/test_sor.py` pins, 12 tests). A venue is *eligible* when its
+book exists, is not stale, has status `TRADING` and its configured latency is
+within `SorOptions.max_venue_latency_ns`. Among eligible venues quoting the
+needed side an aggressive order takes the best displayed price, ties broken by
+the lower taker fee, then lower per-notional commission, then lower venue id; a
+passive order takes the highest maker rebate. If no venue is eligible the answer
+is `NO_ROUTE` (0) and the caller must not submit.
+
+**A worked example** (synthetic venues XV1 and XV2 from `configs/venues/venues.json`;
+the run is COOKBOOK recipe "Route over two venues with the pinned router").
+Same touch on both, bid 10000 and ask 10001 (ticks): a buy goes to XV2 (taker fee
+0.0028 against 0.003 USD per share), a passive buy to XV1 (rebate 0.002 against
+0.0015). Move XV1's bid to 10002 with its ask at 10003 and the merged book is
+crossed (10002 against 10001) although neither venue's own book is; the router
+still just takes the best displayed price per side: buy on XV2, sell on XV1.
+Halt XV2 and the buy goes to XV1. Then give XV1 a sequence gap: it is stale, the
+merged view shows only XV2, and with XV2 halted the router returns `NO_ROUTE`.
+
+**What this does not show.** It is the **pinned** router: displayed price and
+fees only, no fill probability and no markout. It does not say how often a real
+merged book is crossed, and it says nothing about whether routing helps; the
+only real two-venue evaluation, B8 v2, found no evidence that any policy beats
+sending everything to Nasdaq (see the section on the four routing policies).
+
+**Check yourself.**
+
+1. Why can the merged book be crossed while both venue books are not? *(Each
+   venue only matches inside itself; the merge compares quotes of different
+   venues, which is allowed to disagree.)*
+2. Why does a halted venue stay in the merged view but not in the router's
+   choices? *(The view excludes only stale books; eligibility also requires
+   status `TRADING`.)*
+3. What must a caller do on `NO_ROUTE`? *(Not submit; `ExecutionReplay` skips the
+   child and counts `sor_no_route`.)*
+
+## 182. What the ITCH 5.0 reader decodes, and what the mapper hands on (v1.18)
+
+**The question.** A Nasdaq TotalView-ITCH 5.0 file is a stream of small binary
+messages. Which ones become order-book events, and what is lost on the way?
+
+**The idea.** Two layers, in `iap.marketdata.itch50`. `Itch50Reader` is a
+streaming parser: each record is a 2-byte length and a message; it decodes the 17
+types it knows (`MESSAGE_LENGTHS`: `S R H h Y L A F E C X D U P Q B I`),
+checks their lengths, counts them, and skips any other type by its length prefix
+(`skipped_unknown`). Two opt-ins add types without changing any default output
+byte: `noii=True` yields the closing-imbalance message `I`
+(`NetOrderImbalance`), and `circuit_breakers=True` (v1.18) decodes `J` (LULD
+auction collar) and `V` (market-wide decline levels). With a symbol filter the
+reader learns locate codes from the `R` messages and skips other symbols after
+reading three bytes, so a multi-gigabyte day is reduced in one pass.
+`Itch50Mapper` then turns messages into events with rules worth knowing:
+
+- prices stay integers in 1/10000 dollar (`PRICE_SCALE`); ingest divides by the
+  tick later, so no float touches a price;
+- an order replace `U` becomes `CANCEL` + `ADD` with the new order id: priority
+  is lost, as on the exchange; a partial cancel `X` becomes a `MODIFY` that keeps
+  position;
+- an execution `E` becomes an `EXECUTE` of the resting order **and a `TRADE`
+  twin** with the same trade id, whose side is the **aggressor** (the opposite of
+  the resting side). The book changes on the `EXECUTE`; the `TRADE` only feeds
+  signed trade flow (§3);
+- a non-displayed print `P` is a `TRADE` alone. Before 2014-07-14 its
+  buy/sell indicator names the resting side; from then on it is always `B` and
+  carries nothing, so the aggressor is inferred: against the mapper's own best
+  bid and ask (above the mid is a buy), else by the tick rule against the last
+  print (`docs/REAL_DATA.md` section 4, row `P`; §89).
+
+**A worked example** (an 18-message synthetic file; COOKBOOK recipe "Decode an
+ITCH 5.0 file message by message"). The default reader yields eight kinds of
+message and counts `I`, and the unknown `J` and `W` as skipped; with both opt-ins
+`I` and `J` are decoded and only `W` stays unknown. A print at 150.0050 with no
+bid left on the book is signed by the tick rule: it is below the last print
+(150.0100), so it is a sell, and the mapper's counters say so
+(`hidden_trades_signed_by_tick_rule: 1`).
+
+**What this does not show.** The synthetic bytes come from the test encoder
+(`python/tests/itch50_encoder.py`), not from Nasdaq. The side of a post-2014
+hidden print is a judgement, not an observation. Cross prints `Q` have no
+aggressor and do not enter signed flow.
+
+**Check yourself.**
+
+1. Why does one displayed execution produce two events? *(`EXECUTE` changes the
+   book; `TRADE` carries signed flow. Code that reads both must not count the
+   shares twice.)*
+2. Why is the opt-in for `I` a flag and not the default? *(Decoding it would
+   change nothing the book needs, and the default outputs and dataset hashes are
+   pinned; v1.18 pins the same for `J` and `V`.)*
+3. What does `skipped_unknown` protect against? *(A message type the reader
+   does not know cannot desynchronise the stream: the length prefix is trusted
+   and the type is counted, not decoded.)*
+
+## 183. IEX's three feeds and the HIST codec (v1.18)
+
+**The question.** IEX publishes free daily captures. What can each of its feeds
+tell a book builder, and how does one codec turn them into the same events as a
+Nasdaq day?
+
+**The idea.** IEX distributes three feeds inside IEX-TP v1 segments in pcap or
+pcapng captures (`iap.marketdata.iex`): **TOPS** (protocol `0x8003`) is the best
+bid and offer only; **DEEP** (`0x8004`) is aggregated price levels; **DEEP+**
+(`0x8005`) is every displayed order, one by one. The codec reads the capture
+framing, the UDP payloads, the segments and the messages, and **translates each
+message into the ITCH message tuples** of the section on the ITCH reader, so the unchanged
+mapper, book and feature code run on an IEX day. The venue is `IEXG` (id 102).
+Selected DEEP+ rules: the system event `R` (start of regular hours) becomes the
+ITCH `Q`; an order modify `M` becomes a partial cancel when priority is kept, the
+price is unchanged and the size is smaller, and otherwise a replace that keeps the
+order id (new priority); `L` is an execution; `T` a non-displayed execution, or a
+`CrossTrade` when the single-price-cross flag is set; `C` deletes every live order
+of the symbol.
+
+DEEP is different in kind. A level feed has no orders, so each price level is
+represented by **synthetic orders**: an increase adds one at the back, a decrease
+is consumed from the front when same-timestamp trade reports carry that price and
+from the back otherwise. Queue positions inside a level are therefore **modelled,
+not observed**, and the dataset manifest says so (`iex.level_feed`).
+
+**A worked example.** The TOPS oracle of §116 compares the rebuilt top of book with
+the vendor's own best bid and offer. On a synthetic session (COOKBOOK recipe
+"Ingest an IEX DEEP+ capture against a TOPS oracle") two bids of 100 and 50 shares
+join at the same price, so the DEEP+ book shows a bid size of 150. A TOPS file that
+says 150 gives `status: match` (3 quotes compared, 0 mismatched); a TOPS file that
+says 100 makes the ingest stop with exit code 3 and name both sides of the first
+divergence, or, with `--allow-book-divergence`, record `status: diverged,
+mismatched: 1` in the dataset.
+
+**What this does not show.** The codec is tested on synthetic captures
+(`python/tests/test_iex_codec.py`, 12 tests) and on a framing-only conformance
+pass of a real TOPS capture
+(`research/v117/IEX_HIST_CONFORMANCE_20261013_TOPS.md`). IEX is one exchange: its
+book is not the consolidated market, and the oracle checks only the top of the
+book, not the depth behind it.
+
+**Check yourself.**
+
+1. Why can DEEP not support queue-position research? *(Orders are synthesised
+   from level changes; where an order stood in the queue is invented.)*
+2. What does a modify with priority kept become in ITCH terms? *(An order cancel
+   of the size reduction; ITCH keeps queue position on a partial cancel.)*
+3. Why translate into ITCH messages instead of a new event format? *(One mapper,
+   one book and one set of pinned golden checks serve both venues.)*
+
+## 184. One tape from two venues: which clock, which timestamp (v1.18)
+
+**The question.** Nasdaq and IEX events are stamped by different machines. To
+merge them into one stream, whose clock wins, and how much of the timing can be
+trusted?
+
+**The idea.** `iap.research.two_venue.merge_events` builds one consolidated stream
+from a Nasdaq and an IEX dataset of the same day. Both must be nanoseconds since
+the session's New York midnight on the exchange's UTC-disciplined clock. Nasdaq
+stamps already are. The IEX capture host stamps packets in **TAI**, 37 seconds ahead
+of UTC (`IEX_TAI_OFFSET_S`); the reader takes `exchange_ts` from the messages' own
+UTC send times, so an ingested IEX dataset is already on the exchange clock and
+`iex_clock="exchange"` (the default) shifts nothing. `iex_clock="capture"` is for a
+stream stamped by the capture clock and subtracts 37 s from both `exchange_ts` and
+`receive_ts`. The merge order is `(exchange_ts, venue_id)`, each stream keeping its
+own order inside a tie, and events are renumbered 1..N. IEX symbols that Nasdaq does
+not carry are dropped and counted.
+
+Each event carries two stamps. `exchange_ts` says when the venue says it happened;
+`receive_ts` says when the recording host saw it. The REL-09 study decides on
+`receive_ts` (what a trader could have known) and evaluates fills on `exchange_ts`.
+For IEX, `receive_ts` is the capture host's packet time, and
+`receive_ts - send_time` contains an **unidentified clock offset**
+(`CAPTURE_TS_PROVENANCE`, `SKEW_QUALIFICATION`): only differences within one
+capture mean anything.
+
+**A worked example.** The REL-04 verification
+(`research/v118/rel04_verify/REPORT.md`) re-ingested six IEX days with the capture
+timestamp and found that on every day only `receive_ts` differed (all 1,969,356 rows
+on 2025-11-28, and 0 mismatches in any other column). Its recorded feed latency for that day has a
+minimum of 37,000,009,603 ns and a mean of about 37.00039 s: the 37 s is the TAI
+offset, and the remaining fraction of a millisecond is **not** an IEX latency, it
+still contains the unknown offset. Hence the report's "cannot claim" list: the
+absolute feed latency, the skew against any Nasdaq stamp, any edge, fill or profit.
+Where a delay is needed, the runs declare it: IEX's published 350 microsecond speed
+bump is applied as a feed delay in REL-09 and as `inbound_delay_ns` in the venue file
+of B8 v2; no order-entry latency has been measured for either venue.
+
+**What this does not show.** No latency advantage, no measured skew, no live
+behaviour. A merged tape ordered by `exchange_ts` is an assumption about clocks,
+declared in `ALIGNMENT_RULE`.
+
+**Check yourself.**
+
+1. A stream is 37 s late and `iex_clock="exchange"` is used. What goes wrong? *(Its
+   events land 37 s after the Nasdaq events they belong beside; every cross-venue
+   quantity is wrong.)*
+2. Why decide on `receive_ts` but score on `exchange_ts`? *(A rule may use only
+   what had arrived; the outcome is judged against what actually happened.)*
+3. Is a mean of 0.39 ms over 37 s an IEX latency? *(No; it contains an
+   unidentified offset and is descriptive only.)*
+
+## 185. Four routing policies, one baseline, and a verdict that may say "no evidence" (v1.18)
+
+**The question.** Does sending orders across Nasdaq and IEX with a model beat
+sending them all to Nasdaq? How would you know, with three test days?
+
+**The idea.** B8 v2 (`research/execution/b8v2/`, declared in `PREDECLARATION.md`
+before any number existed) compares four policies on the same parent orders:
+`pin_nasdaq` (every child to Nasdaq; the baseline), `pin_iex` (every child to IEX),
+`sor` (the calibrated cost-aware router of `iap.execution.sor_v2`, with per-venue
+fill and toxicity models fitted on three calibrate days) and `sor_sweep`
+(marketable children swept across both books' displayed depth, ranked by all-in
+price). Every policy uses the same capped child execution, a marketable
+immediate-or-cancel order sized to the displayed depth, and the replay applies
+IEX's 350 microsecond speed bump. The primary statistic is trading cost per
+**filled** share in basis points of the arrival mid (positive = worse); fill rate
+and a completion charge on the unfilled remainder sit beside it, so a policy cannot
+look cheap by not trading. The contrast is policy minus `pin_nasdaq` on the same
+parents, pooled over 16 cells (four algorithms times four sizes), one cluster per
+session, Student-t with G - 1 degrees of freedom, and a Bonferroni correction over
+K = 6 (three policies, two symbols).
+
+**A worked example** (`DECISION.json`, trading cost, bps, G = 3 evaluation days):
+
+| cell | estimate | 95 % interval | family interval | family MDE |
+|---|---|---|---|---|
+| pin_iex AAPL | -0.78 | [-1.37, -0.20] | [-2.25, 0.68] | 1.61 |
+| pin_iex MSFT | -7.55 | [-27.28, 12.18] | [-57.46, 42.37] | 54.78 |
+| sor AAPL | -0.57 | [-2.91, 1.78] | [-6.50, 5.37] | 6.51 |
+| sor_sweep MSFT | 1.71 | [-6.28, 9.70] | [-18.50, 21.92] | 22.18 |
+
+The unadjusted interval of `pin_iex` on AAPL excludes zero; the family interval, which
+uses t of about 10.89 instead of 4.30 at 2 degrees of freedom, does not. All six cells
+are `no_evidence (underpowered)`, and no policy is better than `pin_nasdaq` on both
+symbols. The MDE column says the design could not have seen an effect near 1 bp on
+MSFT at all.
+
+**What this does not show.** Not that routing cannot help: the design had three days,
+two regimes and a fill model validated at Level 1 (deterministic replay) only. It is not a
+live result and claims no routing edge. Three further days (2025-12-11, 2025-12-12, 2026-06-12) were declared as a
+separate supplementary analysis, never to be pooled into the headline.
+
+**Check yourself.**
+
+1. Why report cost per filled share together with fill rate? *(A cheap average cost
+   over a small filled part is not a cheap policy.)*
+2. Why is the 95 % interval not the decision interval? *(Six comparisons were made;
+   the family-adjusted interval controls the chance of one false positive.)*
+3. What would G = 3 become with six days? *(Six clusters and 5 degrees of freedom;
+   t would fall to about 2.57 at 95 %, so the intervals would narrow, but the days
+   would still be few.)*
+
+## 186. Ticks, lots and fees: the three units that decide whether a venue matters (v1.18)
+
+**The question.** A venue charges 0.0009 USD per share, another 0.003. Is that
+difference large or small?
+
+**The idea.** Three units, each defined by a file or a rule in the repo.
+**Tick:** the smallest price step. Prices are stored as integers of ticks
+(`price_ticks`), computed from the feed's 1/10000 dollar integer divided by the
+instrument's tick. `ingest` chooses one tick per instrument (`--tick-size auto`):
+0.0001 when more of the stock's trade prints are below one dollar than at or above
+it, otherwise 0.01, or 0.005 when at least 100 and more than 1 % of its displayed
+orders sit on the half-penny grid (`docs/REAL_DATA.md` section 4.1). A displayed
+order off the grid is rejected and counted, never rounded. **Lot:** the
+round lot, taken from the ITCH stock directory message (`R`) or the IEX directory
+and stored as `lot_size`. **Fee:** per-share list prices in the venue file; B8 v2 and
+REL-09/10 use `research/execution/b8/venues_xnas_iexg_v2.json` (indicative list
+prices): Nasdaq taker 0.003 and maker rebate 0.002, IEX taker 0.0009 and no rebate.
+
+**A worked example** (COOKBOOK recipe "Put venue fees and the tick next to the half
+spread"; the 100 USD price is an illustration, not a quote of any stock). A one-cent
+tick is 100 feed units. On a one-tick spread the half spread is 0.005 USD, so the
+Nasdaq taker fee is 60 % of it and IEX's 18 %; at two ticks 30 % and 9 %. The gap of
+0.0021 USD per share is 0.21 bp at 100 USD, about a fifth of a tick. Set that beside
+the section on the four routing policies: the B8 v2 family MDE for the `pin_iex` cells was 1.61 bps
+(AAPL) and 54.78 bps (MSFT). A fee gap of 0.21 bp is smaller than either, so a
+design like that one cannot confirm or refute it.
+
+**What this does not show.** List prices are not what an account pays: no rebate tiers
+(§62), no regulatory fees (§62, COOKBOOK recipe 67). Hidden and dark liquidity is
+modelled from a proxy, never measured (§108).
+
+**Check yourself.**
+
+1. Why does the tick matter to a fee comparison? *(On a one-tick spread the fee is a
+   large fraction of the half spread; at wide spreads it is small.)*
+2. Why store ticks and not dollars? *(Exact integer comparison of prices; no float
+   rounding can create a crossed or off-grid book.)*
+3. What does "indicative" mean for the fee file? *(Published list prices used for
+   comparability across runs, not a measured cost.)*
+
+## 187. The stale-quote indicator: age and displacement, in receive order (v1.18, REL-09)
+
+**The question.** A maker rests a bid on venue A. Venue B's price falls. How can a
+rule tell, using only what has been received, that A's bid is now probably stale?
+
+**The idea.** `iap.research.stale_quote.StaleQuoteMonitor` keeps one order book per
+venue, fed in **receive order** (it raises `ValueError` otherwise). For a side of
+venue A it reads two numbers at time `t`: the quote's **age**, `t` minus the
+receive time of the last change of A's best price on that side; and the
+**displacement**, the other venue's mid at `t` minus its mid at that moment, in
+ticks, signed so that a falling mid threatens a bid and a rising one an ask. The side
+is stale when age is at least `min_age_ns` and displacement against it is at least
+`min_displacement_ticks`. The rule is a hypothesis fixed in the pre-declaration, not
+tuned: displacement 1 tick, and an age chosen on the two calibrate days from {1 ms,
+5 ms, 25 ms}, where it was 25 ms (summed incremental net 426.5, 2,077.6 and 2,648.9
+USD).
+
+**A worked example** (COOKBOOK recipe "Watch the stale-quote indicator change its
+mind"; rule 25 ms and 1 tick). Venue B's mid drops two ticks at 10 s. If A's bid last
+changed at t = 0 it is flagged at once (age 10 s, displacement 2). If A re-posted it at
+9.990 s it is not flagged at 10.000 s (age 10 ms) and is flagged at 10.020 s (age 30
+ms). If B's feed reaches us 5 ms late, the displacement is invisible until 10.005 s,
+and the flag cannot come earlier than that however fast B moved. That is the point of
+deciding on `receive_ts`: it makes the rule honest about latency, and the
+pre-declaration sets IEX's feed delay to its published 350 microseconds and the
+cancel latency to the same value, a stress value (no order-entry latency was
+measured).
+
+**What this does not show.** The indicator is a causal rule on the book, not a
+statement that a flagged quote would have been picked off. Whether pulling flagged
+quotes pays is a separate question, answered by the study in the next section. The
+`StaleQuoteMonitor` needs exactly two venues.
+
+**Check yourself.**
+
+1. Why is age measured on the quoting venue's side and not since the other venue
+   moved? *(A quote that has just been updated reflects the market as of now and is
+   not stale, however far the other venue moved earlier.)*
+2. What stops a rule from using the future? *(Events are applied in receive order and
+   the state at `t` reads only events with `receive_ts <= t`;
+   `test_indicator_ignores_future_events` and `test_indicator_is_causal_on_receive_time`
+   check it.)*
+3. What is `min_displacement_ticks` for? *(One tick is the smallest move the other
+   venue can show; a smaller threshold would flag noise.)*
+
+## 188. Pricing the fills a filter prevents: reading REL-09 (v1.18)
+
+**The question.** Pulling a resting quote when it looks stale avoids some bad fills.
+It also avoids some good ones. Does the filter pay?
+
+**The idea.** The REL-09 study runs the same reconstructed one-lot quoter twice on
+the same events, once with the filter and once without (`simulate_quoter`,
+`incremental`). Fills are matched by the displayed execution that produced them:
+`missed` fills are baseline fills the filter prevented, **priced in full**, `extra`
+fills exist only under the filter, `common` fills are shared, and
+`d_net = net(extra) - net(missed) + d_net(common)`. Each fill's mark-to-market splits
+into spread captured, markout (adverse selection over 1 s), inventory (the position
+held to the close mark) and fees. The decision unit is the per-session incremental
+net P&L in USD; the 25 % adverse-selection reduction in the hypothesis is reported,
+but the criterion is incremental net.
+
+**A worked example** (`research/v118/rel09/DECISION.json`; evaluate sessions
+2025-12-09, 12-10, 2026-05-15, 05-18, G = 4):
+
+| | per-session d_net (USD) | mean | family interval | family MDE |
+|---|---|---|---|---|
+| AAPL | -68.2, 834.7, 1,025.2, 1,885.1 | +919.2 | [-754.2, 2,592.6] | 2,065.4 |
+| MSFT | -90.5, 284.2, 418.3, -938.8 | -81.7 | [-1,356.9, 1,193.4] | 1,573.9 |
+
+The economic threshold was 50 USD per session, so both symbols are
+`underpowered`, and so is the overall verdict. AAPL's total of +3,676.9 USD splits
+into spread -460.2, fees -105.3, markout +650.2 and inventory +3,592.2; and into extra
+fills +7,626.9, missed fills -4,291.1 and common fills +341.1. Most of the AAPL
+gain is the end-of-day inventory mark, a noisy line, and the adverse-selection
+reduction was 0.067 for AAPL and -0.035 for MSFT against the hypothesised 0.25.
+
+**What this does not show.** Not an edge: the interval for AAPL contains zero and the
+design could not have excluded effects up to about 2,000 USD per session. Four
+evaluate sessions in two regimes (December 2025, May 2026), days already read by B8, so
+"spent days, new question"; the quoter's queue is the back of the displayed level with
+cancels ahead not credited, so fills are conservative. Nothing is promoted.
+
+**Check yourself.**
+
+1. Why price the missed fills? *(Dropping them would credit the filter for avoiding
+   losses while ignoring the profits it also avoided.)*
+2. Why does a positive mean not make a candidate? *(The decision uses the
+   family-adjusted interval and the MDE; here zero is inside and the MDE is far above
+   the 50 USD threshold.)*
+3. Why can inventory dominate a maker comparison? *(Holding to the close mark adds
+   the day's price move to the fills' value, which changes between the two policies
+   by chance as well as by effect.)*
+
+## 189. Volume-clock order-flow imbalance and hidden prints: REL-10 (v1.18)
+
+**The question.** Does signed flow over the last one to five minutes, including
+non-displayed prints, predict the next move well enough to pay the spread?
+
+**The idea.** `iap.research.volume_clock_ofi` samples a feature row each time a fixed
+number of shares has traded (a **volume clock**, so busy and quiet minutes weigh
+alike), reading only events up to the row's time. Per window it computes: `ofi`, the
+Cont-Kukanov-Stoikov order-flow imbalance, the sum of best-level changes (a new best
+bid of 200 shares adds +200, its removal -200); `flow`, signed traded quantity,
+displayed and hidden; `hid_imb`, `(buy - sell) / (buy + sell)` over non-displayed
+prints. The registered target is `sign(signal) * gross move - half-spreads`. The
+taker use enters at the touch, capped at displayed depth, and exits at the far
+touch; the maker use posts behind the queue and crosses the remainder. Unfilled
+quantity is a priced "missed opportunity", reported beside P&L. Bucket size and the
+0.8-quantile thresholds come from two calibrate days; four evaluate days decide.
+
+**A worked example** (`research/v118/rel10/REPORT.md`). The family is K = 24
+(two uses, three signals, two horizons, two symbols), level 0.9979. The **taker**
+use is `reject` because one cell, `hid_imb` at 1 minute on AAPL, has a mean of
+-322.4 USD per session, family interval [-600.5, -44.2], 363 trips. Every other cell,
+and every **maker** cell, is `underpowered`; all intervals contain zero. With G = 4
+the result is a size statement. No signal is promoted.
+
+**A defect found while writing this section (2026-10-24; not yet adjudicated by the
+maintainers).** `build_tape` reads a `TRADE` event's side as the resting side, as the
+ITCH `P` indicator used to mean. The mapper writes it as the **aggressor** and also
+emits a `TRADE` twin for every displayed execution (the section on the ITCH reader). On a
+synthetic day ingested with the real mapper, 205 of 235 `TRADE` events were such twins,
+all counted as hidden prints with the opposite sign, and traded volume came out at
+66,234 shares against 34,772 (COOKBOOK recipe "Build volume-clock rows and check the
+tape's trade signs"). The study's test fixture has no twins and uses the resting-side
+convention, so its tests cannot see it. If the real runs behaved the same way, `flow`,
+`hid_imb` and the volume-clock bucket size were mis-specified; the OFI signal does not
+use trade signs. I did not re-run REL-10, so what this does to the one rejected cell
+is **unknown**. It changes no promoted claim, because none exists.
+
+**What this does not show.** Not a signal, not an edge, and not evidence for or
+against order-flow imbalance in general: one decisive cell out of 24, four sessions,
+fill model validated at Level 1 only.
+
+**Check yourself.**
+
+1. Why report missed opportunity beside P&L and not inside it? *(So the cost of not
+   trading is visible without being mixed into what a realised trade earned.)*
+2. Why separate taker and maker? *(They face different costs and fill rules; a good
+   maker result must not rescue a bad taker result.)*
+3. Why can a test suite pass while a sign convention is wrong? *(The tests build
+   their own fixture; if the fixture shares the code's assumption, they agree with it
+   whatever the real data does. §36.)*
+
+## 190. The closing imbalance feed, and why REL-08c was dropped (v1.18)
+
+**The question.** A study was pre-declared to trade on the closing auction's
+imbalance feed at 15:51 and 15:53. Why did its signed rule never get to say
+anything?
+
+**The idea.** Before a closing cross, Nasdaq publishes the Net Order Imbalance
+Indicator (NOII, ITCH message `I`): paired shares, imbalance shares and direction,
+near and far indicative prices and a reference price. The reader yields it only with
+`noii=True`. REL-08c (`iap.auction.rel08c_study`) took the closing imbalance as a
+signal for a taker round trip: decide at 15:51 or 15:53, exit 5 seconds before the
+15:55 cutoff for entering market-on-close orders (`MOC_CUTOFF_TOD_NS`), i.e. at
+15:54:55. `features_at` reads the latest closing snapshot at or before the decision
+time. If there is none, the level is `NaN`, the direction rule returns 0, and no trade
+is made.
+
+**A worked example.** The pre-declaration assumed the closing NOII starts at 15:50.
+In the 2019-01-30 file every one of the 30,010 closing-cross NOII rows has a time of
+15:55:00.005 or later (`docs/release/ANOMALY_REL08_INVESTIGATION_2026-10-20.md`,
+section 1b). The decision times and the exit all precede the first snapshot, so the
+imbalance arm could never trade; with `min_trades = 30` the rule could never return
+continue or reject. COOKBOOK recipe "Test the premise of a closing-imbalance study"
+shows the mechanism on a synthetic table that starts at 15:55:00.005: the feature is
+`NaN` at 15:51, 15:53 and 15:54:55, and exists from 15:55:01. Two printed metrics were
+also wrong (a 1,614 bps `gross_cross` from zero-price cross rows, and an incremental
++48.9 bps with an infinite interval from a flat arm scored against a tail-heavy
+mean); neither changed the verdict, which was `underpowered` with one session anyway.
+The owner dropped REL-08c on 2026-10-20: no redesign, no further runs
+(`research/v118/rel08c/DROPPED.md`), because the only workable variants trade the cross
+itself, a different question.
+
+**What this does not show.** Nothing about closing auctions in general, and no result:
+the real 2019 file is not in this checkout, so the 15:55:00.005 fact is taken from
+the investigation note. The lesson is one of process: 12 synthetic-data tests of the
+code passed (`python/tests/test_auction_rel08c.py`) and could not catch a false
+premise about the feed. Check the premise on a few seconds of real data before signing.
+
+**Check yourself.**
+
+1. Why could a longer sample not have rescued the design? *(The imbalance arm is
+   structurally empty at the registered times; more sessions only add more empty
+   sessions.)*
+2. Why were the two wrong metrics not the reason for dropping it? *(They did not
+   change the verdict; the premise did.)*
+3. What would a different question look like? *(Trade the cross itself, after the
+   cutoff: a different declaration, signed fresh, not a patch.)*
+
+## 191. Reading a latency table: percentiles, stage sums and the tail (v1.18)
+
+**The question.** `benchmarks/results_tick_to_trade.md` holds 18 rows of
+percentiles. Which readings of them are sound, and which only look sound?
+
+**What the table is.** It was measured by `cpp/bench/bench_tick_to_trade.cpp`
+on a CI runner (AMD EPYC 7763, 4 logical CPUs visible, no pinning, shared
+host), with `std::chrono::steady_clock`, six clock reads per event, a warm-up
+pass discarded. Each percentile is the **upper bound of a histogram bucket**
+at most 6.25 % wide (the code returns the smaller of that bound and the exact
+maximum); the max is exact. The timer's own cost, p50 30 ns and p99 31 ns, is
+inside every figure. The path is in-process: a decoded frame in, an order
+intent out. It is not colocation, it includes no network and no exchange, and
+it carries no latency edge. §41 says what is inside the path; this section is
+about reading the distribution.
+
+**A worked reading** (all ns, from the committed table):
+
+| workload | samples | p50 | p99 | p99.9 | max | p99.9 / p50 | max / p50 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| golden `eq_mbo` (2,000 events x 50 passes) | 100,000 | 1,279 | 2,559 | 11,263 | 33,112 | 8.8 | 25.9 |
+| generated day (seed 20261012) | 100,000 | 1,407 | 1,727 | 12,287 | 298,570 | 8.7 | 212 |
+| real ITCH slice AAPL 2019-01-30 | 651,320 | 1,535 | 2,943 | 12,799 | 1,166,452 | 8.3 | 760 |
+
+1. **p99.9 is stable, the max is not.** Across three very different
+   workloads p99.9 stays at 8.3-8.8 times the median, while the max moves by a
+   factor of 35. The max is the single worst of N samples: it grows with N
+   (the real slice has 6.5 times as many) and is set by whatever the shared
+   host did in that one instant. Quote p50 and p99; treat max as an
+   incident report. This is also why the CI guard
+   (`tests/harness/check_bench_regression.py`, factor 8) compares only the six
+   `t2t ... p50` and `p99` rows.
+2. **Stage percentiles do not add.** Per event the end-to-end time is exactly
+   the sum of the five stages (both come from the same six clock reads), but
+   the percentiles of those sums are not sums of percentiles. Golden p50:
+   271 + 83 + 735 + 135 + 30 = 1,254 against 1,279. Golden p99: the stages add
+   to 2,739, above the end-to-end 2,559. Real slice p99: they add to 2,767,
+   below the end-to-end 2,943. The sum can miss in either direction, so do not
+   build a "budget" by adding stage p99s.
+3. **A stage at the timer floor is a statement about the timer.** The order
+   decision and pre-trade check has p50 30 ns, the same as the timer overhead
+   (p50 30 ns). Read it as "no more than the clock can resolve", not as the cost
+   of the check.
+4. **The workloads exercise different branches.** The golden run makes 17,650
+   orders from 100,000 feature vectors; the generated day makes 150 orders and
+   4,574 pre-trade rejects; the real slice 11,460 orders and 110,310 rejects.
+   Their medians differ by only 20 %, but they are not the same experiment.
+
+**The gate that keeps the figures honest.** `tests/harness/check_docs.py`
+(check `latency_claims`, v1.18 gate F9) scans `README.md`, `docs/index.html`
+and `docs/SHOWCASE.md` for every `ns`, `µs` or `events/s` figure and fails
+unless it names its environment (`CI runner` or `container`) and says `not
+colocation` on its row or within two lines, and unless the file states "no
+latency edge". When this section was written it reported 32 latency figures on this
+branch, each with its environment.
+
+**What this does not show.** Nothing here measures a wire-to-wire time, a
+live feed, a venue or an order that reached an exchange. The Python reference
+path is far slower: one run of `tools/tick_to_trade_py.py` on a Windows 11
+machine (CPython 3.12.10, 12 logical CPUs, not pinned, two passes) gave a
+golden-workload p50 of 201.7 us, about 160 times the C++ figure from a different
+machine, so only the order of magnitude means anything. A shared-VM run says "this did not get several times worse", not
+"this is fast".
+
+**Check yourself.**
+
+1. A new build shows p99 2,000 ns on the golden workload and p99.9 40,000 ns.
+   Does the guard fail it? *(No. Only p50 and p99 are compared, and p99 is
+   within 8x of 2,559. A tail-only regression needs a person reading the
+   table.)*
+2. Why can the five stage p99s add to more than the end-to-end p99? *(Quantiles of different distributions do not compose; the
+   slow events of one stage need not be the slow events of another.)*
+
+## 192. A capture clock with an unknown offset: what a difference can tell you (v1.18)
+
+**The question.** The REL-04 verification ingested six IEX days with the
+capture host's packet stamp as `receive_ts`. The smallest receive-minus-send
+value on each day is about 37.000009 s. Is IEX's feed 37 seconds late?
+
+**No, and the reason is a model, not a guess.** Write each observed value as
+the true delay plus one unknown constant: `observed_i = true_i + c`, where `c`
+is the offset between the capture host's clock and IEX's send clock (a
+37 s level is what the TAI/UTC difference of §117 would predict, but
+`iex.CAPTURE_TS_PROVENANCE` states that the clock source, NIC hardware or kernel
+software, and whether the host was NTP- or PTP-disciplined, are not recorded
+in the file, so what `c` contains is not established). Differences cancel `c`: `observed_i - observed_j = true_i - true_j`.
+Levels, ratios, the sign of a value, and any comparison with a stamp from
+another host do not cancel it.
+
+**The six days** (from `research/v118/rel04_verify/latency_<day>.json`; ns
+converted to ms for the last two columns):
+
+| day | messages with a send time | min (s) | max - min (ms) | mean - min (ms) |
+|---|---:|---:|---:|---:|
+| 2025-11-28 | 148,115,121 | 37.000010 | 791.5 | 0.4 |
+| 2025-12-08 | 317,211,767 | 37.000009 | 1,144.1 | 0.4 |
+| 2025-12-09 | 295,426,880 | 37.000009 | 892.4 | 0.4 |
+| 2025-12-10 | 428,701,502 | 37.000009 | 727.3 | 1.0 |
+| 2026-05-15 | 437,934,866 | 37.000009 | 1,249.7 | 0.8 |
+| 2026-05-18 | 548,325,540 | 37.000009 | 948.9 | 4.6 |
+
+Two things can be read from the right-hand columns and none from the 37 s
+level: the mean sits only 0.4-4.6 ms above the smallest value, and the single
+worst message on each day is 0.7-1.2 s above the smallest. `REPORT.md` states "Inference: none": counts and
+descriptive summaries only.
+
+**Two traps in the recorded fields.**
+
+- `negative_share` is 0.000000 on every day. That is a fact about `c` (it is
+  +37 s), not about the network: with `c = -37 s` every value would be
+  negative. A zero negative share does not show the stamps are well ordered
+  physically. The declaration lists "that negative latencies are errors or
+  that positive ones are physical delays" under *cannot claim*.
+- The stored histogram is in log2 buckets, and every message on every day is
+  in bucket 35, the range 34,359,738,367 to 68,719,476,734 ns. The bucket is
+  about 34 s wide and the whole observed spread is at most 1.25 s, so
+  `approx_p50_log2_bucket` and `approx_p99_log2_bucket` (both 35) say
+  nothing about jitter. The min, mean and max fields can, as differences.
+
+**What the verification may claim** (`DECISION.json`): the capture-stamp ingest
+changed `receive_ts` and nothing else on six overlap days, and a descriptive
+latency summary per day exists. **What it may not**: the absolute IEX feed
+latency, the skew against any Nasdaq stamp, any signal, edge, fill or profit.
+Nothing in v1.18.0 is a measured order-entry latency, and this is no
+latency edge.
+
+**Check yourself.**
+
+1. A colleague reports "median feed latency 37.0 s, so the feed is slow".
+   What is wrong? *(The 37 s is dominated by the unidentified constant; only
+   differences within the capture are interpretable.)*
+2. Would a day with `max - min` of 5 s be informative? *(Yes about that day:
+   a single stall or burst of that size within the capture. Whether it was
+   the network, the host or the recorder is not identified.)*
+
+## 193. Declaring the verification before the run: the REL-04 identity check (v1.18)
+
+**The question.** A new opt-in changes one column of an ingested dataset. How
+do you show it changed nothing else, in a way a sceptic cannot say was tuned
+after the fact?
+
+**The design** (`research/v118/rel04_verify/predeclaration.json`, bound by the
+signed `research/preregs/rel04_capts_verify_prereg.json`). The pass rule was
+written before the run, as one conjunction per day: row counts equal, schema
+equal, zero mismatching rows in every non-`receive_ts` column, zero candidate
+rows with `receive_ts` earlier than `exchange_ts`, **at least one row where
+`receive_ts` differs**, and `dataset.json` says `source.receive_ts` is
+`iex_capture`. The identity passes only if all six days pass; on a failure the
+features step does not run and the mismatches are reported as found.
+
+Three details carry the design:
+
+- **The vacuous-pass clause.** "Everything else identical" is trivially true
+  if the option did nothing. Requiring a difference in `receive_ts` makes
+  the test able to fail in both directions.
+- **One run, no retry.** The refusal rules include "a result file of this run
+  already exists". A changed parameter is a new declaration, never a rerun.
+- **Separation of roles.** The run refuses if the prereg is unsigned, if the
+  runner is the signer, or if a signing key is in the environment. The
+  recorded `runner_actor` is `claude-queue-runner`; the signature is the
+  maintainer's. The twelve datasets (six references, six capture-stamp copies)
+  must each be registered as spent and authorised for this prereg id by the
+  holdout guard, so the verification could not quietly read anything else.
+
+**The result** (`REPORT.md`, failures listed first). 30,156,908 rows over six
+days; mismatching rows outside `receive_ts`: 0 on every day; rows with
+`receive_ts` differing: all of them; rows with the capture stamp earlier than
+the exchange stamp: 0. Identity: pass. The features for the six datasets were
+then built by the declared command.
+
+**What it does not show.** Six days is six days: it is an observation on those
+datasets, not a proof for every future ingest. It says nothing about whether
+the capture stamp is a good clock (see "A capture clock with an unknown offset" above), about any signal, or about
+any holdout result. Its value is procedural: it is an example of a change
+verified against a rule fixed in advance, with its "can claim" and "cannot
+claim" lists in the same file.
+
+**Check yourself.**
+
+1. Why is "zero mismatches" not enough on its own? *(An option that never ran
+   also gives zero mismatches. The clause that `receive_ts` differs in at least
+   one row rules that out.)*
+2. What if one day failed? *(Per the declaration: report the mismatches as
+   found, do not build features, and do not use the capture-stamp datasets
+   downstream until the cause is understood; the fix is a new declaration.)*
+
+## 194. The order manager's journal: idempotent submit, write-ahead, replay (v1.18)
+
+**The question.** A paper process dies halfway through a session. How do you
+restart without sending an order twice, losing a fill, or counting one twice?
+
+**Idempotent submission.** Every order has a caller-chosen `cl_ord_id`
+(`iap.paper.oms.OrderManager.submit`). The same id with the same parameters
+returns the existing order and sends nothing (`SubmitResult.duplicate`); the
+same id with different parameters raises `DuplicateOrderError`. The simulated
+venue (`iap.paper.venue_sim.PaperVenue`) also ignores a repeated id, so the one
+re-send that recovery performs is safe. Fills are deduplicated by `fill_id`
+(ignored and counted in `dup_fills`); a fill beyond the quantity, or for an
+unknown or finished order, is applied to nothing and recorded as an anomaly.
+
+**Write-ahead.** Every state change is validated, appended to `journal.jsonl`
+as one JSON line with a running number and a CRC32 of its body, flushed and
+fsynced, and only then applied in memory. `OrderManager.open` replays the
+journal through the same transition code, so the restarted state is the
+state before the crash, record for record. The sender is called after the
+`SUBMIT` record is durable, so there are two crash windows and each has a
+recovery:
+
+- **Journaled, not sent.** The order is `NEW` in the journal. `recover(venue)`
+  re-sends every `NEW` order; the venue deduplicates by id.
+- **Sent, event missed.** The venue acked or filled while the manager was down.
+  `recover` asks `venue.status(cl_ord_id)` for each open order and applies
+  the missed events.
+
+**Worked run** (a throw-away directory, `PaperVenue(seed=1, fill_p=0.0)`).
+Submit `A1` buy 100, resubmit it (`duplicate` False, then True, the venue saw
+no second submit), resubmit with quantity 200 (`DuplicateOrderError`), submit
+`A2` sell 50, fill 40 of `A1`, replay the same fill id (ignored,
+`dup_fills` 1). Close, append half a record to the file as a crash would, and
+reopen: 6 records replayed, the state dump equal before and after, the torn
+line dropped (the file still has 6 lines). Then corrupt the third line:
+`JournalCorrupt: ... line 3 unreadable`. A torn *last* line is a crash; a bad
+line *anywhere else* is damage, and the manager refuses to guess.
+
+**What it is and is not.** It is paper only (owner decision D4(a)): nothing
+here talks to a broker. The venue is a simulation that happens to honour
+idempotency, so a real venue's behaviour on a duplicate id, a sequence reset or
+a cancel race is untested. The CRC32 detects accidental corruption; it is not a
+hash chain and does not detect deliberate editing (the holdout access log in "Two lists the record must cite" is
+chained, this journal is not).
+Tests: `python/tests/test_paper_resilience_orders.py` (24 passed in the run for
+this section).
+
+**Check yourself.**
+
+1. Why journal first, then send, and not the reverse? *(If the process dies
+   after a send that was never journaled, the order exists at the venue and
+   nowhere in the manager. The other order leaves at worst a journaled order
+   that was never sent, which recovery can see and fix.)*
+2. Why must the journal be replayed through the *same* transition code?
+   *(Otherwise a restart could reach a state that live running cannot.)*
+
+## 195. Reconciling against a second stream: the eight exceptions (v1.18)
+
+**The question.** The order manager says it holds +40 in instrument 1. How do
+you know?
+
+**An independent record.** `iap.paper.reconcile.reconcile(oms, drop_copy)`
+compares the manager with a *drop copy*: a second stream of every fill that
+does not pass through the manager. In the paper setup `PaperVenue.drop_copy`
+is that list. The comparison is read-only (it never edits the manager) and
+returns typed exceptions in a deterministic order:
+
+| kind | meaning |
+|---|---|
+| `MISSING_FILL` | on the drop copy, not booked by the manager |
+| `UNCONFIRMED_FILL` | booked by the manager, absent from the drop copy |
+| `DUPLICATE_FILL` | the same `fill_id` twice on the drop copy |
+| `QTY_MISMATCH` | same fill, different quantity (or a booked overfill) |
+| `PRICE_MISMATCH` | same fill, different price |
+| `UNKNOWN_ORDER` | a fill for an id the manager never sent |
+| `LATE_FILL` | a fill that arrived after the order had ended |
+| `POSITION_MISMATCH` | net position per instrument differs |
+
+The manager's own anomaly log feeds three of these, so an overfill that the
+manager refused to apply still shows up against the drop copy. The report goes
+to any sink with `on_recon_exceptions(report)`; `PaperSupervisor` in
+`iap.paper.supervisor` is one, and turns the exception count into the monitoring
+input `OrdersSnapshot.reconciliation_exceptions` ("UNKNOWN is a state", below).
+
+**Worked case.** Fill 40 of `A1` is booked on both sides: no exceptions,
+positions `{1: 40}`. Now the venue fills `A2` (sell 50) while the manager is
+closed. After reopening the manager, reconciliation returns
+`{'MISSING_FILL': 1, 'POSITION_MISMATCH': 1}`: one event, seen twice, once as a
+fill and once as the position it should have changed. `recover(venue)` replays
+the venue's history for the open order (`applied` 1), and the next
+reconciliation is clean with positions `{1: 40, 2: -50}`.
+
+**Why this is a different check from idempotency.** Idempotency stops the
+manager creating duplicates. Reconciliation notices that two records of the
+world have diverged for any reason, including ones nobody thought of. The
+6 h soak ("What a soak proves", below) runs it after every simulated kill and every session end.
+
+**What it does not show.** In the paper setup the drop copy and the acks come
+from the same simulated venue object, so the independence is logical, not
+physical: a real drop copy has its own latency, gaps and sequence problems that
+this code does not model. A clean report means the two *recorded* streams
+agree, not that the recorded fills are what an exchange did.
+
+**Check yourself.**
+
+1. A fill is on the drop copy with price 10,001 and booked at 10,000. Which
+   kind? *(`PRICE_MISMATCH`; the positions may still agree.)*
+2. Why does reconciliation not repair the manager itself? *(A check that
+   edits what it checks cannot find a fault in it; repair is `recover`, a
+   separate, journaled step.)*
+
+## 196. Feed resilience: duplicates, reorder, gaps and a clock that may not lie (v1.18)
+
+**The question.** A sequenced feed delivers a duplicate, two swapped messages,
+then a hole. What does the consumer see, and what does the rest of the system
+know?
+
+**The guard** (`iap.paper.feed.FeedGuard`, sitting in front of the paper
+recorder or loop). For each `(seq, payload, mono_ns)`:
+
+- a **duplicate** (already delivered or buffered) is dropped and counted;
+- an **out-of-order** message is buffered up to `reorder_window` ahead and
+  released in order when the hole fills;
+- a hole still open past the window is a **gap**, handled by the declared
+  `GapPolicy`: `HALT` (default) raises `FeedGapError`; `RESYNC` reports
+  `UNKNOWN` health, calls `on_gap(expected, got)` to ask for a snapshot and
+  holds messages until `resync(next_seq)` says where to resume; `SKIP` records
+  the gap and continues;
+- a **silent** feed (`stale_after_ns`) reports `UNKNOWN`, and the next message
+  reports `OK` again;
+- `ClockGuard` raises `ClockDriftError` if the monotonic clock goes backwards or
+  the wall clock drifts from the start-time mapping by more than the tolerance
+  (plus the mapping's own uncertainty).
+
+**A hand-run example** (window 2, policy `RESYNC`). Sequence 1, 2, 2, 4, 3, 5
+delivers m1, m2, nothing for the repeated 2, nothing for 4, then m3 and m4
+together when 3 arrives, then m5. Next, 9, 10, 11 arrive with 6-8 missing:
+9 is 3 past the next expected number, beyond the window of 2, so the gap
+is declared at 9 ("sequence gap 6..8; resync requested", `on_gap` receives
+`(6, 9)`), health goes `UNKNOWN`, and 9, 10, 11 are held. `resync(10)` drops m9
+(the snapshot covers it, `dropped_resync` 1), delivers m10 and m11 and
+reports `OK`. After 800 ms of silence against a 500 ms limit `check_stale` is
+true and health is `UNKNOWN`; the next message restores `OK`. Final statistics:
+8 delivered, 1 duplicate, 2 out of order, one gap of 3 missing messages.
+
+**Why `UNKNOWN` and not just a counter.** The guard reports through a two-state
+health interface (`OK` / `UNKNOWN`). `PaperSupervisor.set_state` turns an
+`UNKNOWN` feed into a missing heartbeat in the next monitoring snapshot, so
+the policy evaluates `UNKNOWN` and no new risk is allowed ("UNKNOWN is a state", below).
+A gap does not just bump a statistic; it changes what the system is allowed
+to do.
+
+**What it does not show.** This is sequence-number logic exercised on
+synthetic message streams (`python/tests/test_paper_resilience_feed.py`,
+14 passed in the run for this section, and the soak). Nothing here claims
+behaviour on a live exchange feed, whose retransmit and snapshot semantics
+are venue-specific.
+
+**Check yourself.**
+
+1. Why is `HALT` the default and not `SKIP`? *(Skipping silently produces a
+   book that is wrong from that point; the safe default is to stop and make a
+   person choose a policy.)*
+2. A message arrives with a sequence number lower than the next expected and
+   was never delivered. Is it a duplicate? *(It is treated as one: the guard
+   cannot tell a replay from a late original, and delivering it would break
+   order.)*
+
+## 197. What a soak proves: the 6 h run read figure by figure (v1.18)
+
+**The question.** `research/v118/rel18_soak_6h/soak_summary.json` says `PASS`
+with 15,037,543 messages, 369,878 orders, 2,931 kills and 0 reconciliation
+exceptions. What exactly has been shown?
+
+**The rig** (`tools/rel18_soak.py`). A synthetic sequenced feed goes through
+`FeedGuard` (RESYNC, window 8, stale after 200 ms, a real clock check) into a
+toy strategy that submits one order per 40 delivered messages, through the
+order manager with an fsynced journal, to `PaperVenue` (3 % rejects, 10 %
+partial acks, random fills, cancel races, a drop copy). Faults are injected per
+10 ms batch: 1 % duplicates, 1 % delayed messages, 0.05 % lost messages, a
+0.2 % chance of a "kill", a 0.05 % chance of 300 ms of silence. A kill
+discards the manager object with a random tail of venue events unprocessed,
+reopens it from the journal and calls `recover`. Sessions roll every five
+minutes: end-of-session expiry, reconciliation, a fresh journal carrying
+positions. The verdict is `PASS` exactly when there were no reconciliation
+exceptions and no unreconciled positions.
+
+| | 60 min (seed 18) | 6 h (seed 1801) |
+|---|---:|---:|
+| messages sent | 2,669,475 | 15,037,543 |
+| orders | 65,664 | 369,878 |
+| kills | 511 | 2,931 |
+| reconciliations | 523 | 3,003 |
+| exceptions / unreconciled | 0 / 0 | 0 / 0 |
+| venue de-duplicated re-sends | 53 | 292 |
+| gap resyncs | 1,253 | 7,365 |
+| memory first / max / last (MB) | 87.51 / 117.80 / 105.31 | 86.76 / 118.23 / 111.09 |
+
+**Reading it.**
+
+- **3,003 = 2,931 + 72.** Every kill and each of the 72 five-minute sessions was
+  reconciled. The 2,931 kills are the places an idempotency or recovery bug
+  would have appeared as a duplicate order, a lost fill or a position
+  mismatch. Zero out of 3,003 is a statement about *this* fault mix.
+- **Orders agree with the venue.** In all 72 sessions the manager's order count
+  equals the venue's, and no order is left open at session end.
+- **Memory is flat after warm-up.** The per-minute log rises from 86.76 to
+  112.63 MB in the first four minutes, then stays between about 108 and 118 MB;
+  the second-half range is 3.25 MB. The manager and journal are rebuilt every
+  session, so this bounds growth *within* a session and across sessions, not a
+  leak that needs days.
+- **The rate is lower than nominal.** The nominal feed rate is 1,000 messages a
+  second; the 6 h run averaged 15,037,543 / 21,600 s = about 696. The loop
+  sleeps to fill a 10 ms slot per batch, so the batches must have taken longer
+  than their slot. The volume is real; the nominal rate was not reached.
+
+**What it does not show.** It is a synthetic feed and a simulated venue, not a
+live feed and not a broker. The "kill" is a simulated discard of in-memory
+state, not an operating-system kill; the journal file is intact each time (a
+torn final line is covered by a unit test, `test_torn_tail_is_dropped_and_appends_continue`,
+not by the soak). `PASS` says nothing about latency, profit or any signal, and
+the soak does not exercise real network faults. It shows that the paper order
+path is consistent under these injected faults for six hours.
+
+**Check yourself.**
+
+1. Why run a 60 minute and a 6 hour soak with different seeds? *(Two
+   independent fault sequences; agreement across them is better evidence than
+   one longer run alone, though still within one fault model.)*
+2. What fault would this soak never find? *(One not injected: a corrupted
+   mid-file journal line, a venue that re-uses an id, a clock step in the
+   middle of an order.)*
+
+## 198. UNKNOWN is a state: the monitoring state machine (v1.18)
+
+**The question.** A strategy's input stops arriving. Is it "fine, nothing bad
+reported", or something else?
+
+**The rule** (`iap.monitoring`, `docs/MONITORING_POLICY.md`, policy
+`configs/monitoring/policy.json`). `evaluate(config, snapshot, memory,
+acknowledgement)` is a pure function: no clock (time is
+`snapshot.evaluated_at_ns`), no randomness, no free text. States, highest
+precedence first: **HALT** (latched), **UNKNOWN**, then **REVIEW**, **WATCH**,
+**ACTIVE**. Any required input missing, stale, invalid or too small a sample is
+UNKNOWN, and UNKNOWN never maps to ACTIVE or permits new risk
+(`permits_new_risk` is true only for ACTIVE and WATCH). Freshness limits: sessions
+36 h, positions 900 s, orders 300 s, heartbeat 120 s; minimum sample 10 sessions.
+
+**Worked run** (30 synthetic sessions from `python/tests/monitoring_sim.py`; the
+policy id is `rel16-monitoring-v1`, whose SHA-256 appears in every evaluation):
+
+| snapshot | state | new risk |
+|---|---|---|
+| 30 clean sessions | ACTIVE | yes |
+| only 9 sessions (minimum 10) | UNKNOWN: insufficient sample | no |
+| no heartbeat | UNKNOWN: `heartbeat: missing` | no |
+| heartbeat 200 s old (limit 120) | UNKNOWN: `stale, age 200 s > 120 s` | no |
+| NaN net P&L in the last session | UNKNOWN: `not a finite number` | no |
+| gross exposure 1.2x its limit, no heartbeat | **HALT** | no |
+| good data again, no acknowledgement | HALT (latched) | no |
+| good data and a matching acknowledgement | REVIEW | no |
+
+The sixth row is the subtle one. A hard trigger computed from a *valid* channel
+(exposure over its limit) halts even though another channel is invalid;
+UNKNOWN only suppresses the softer levels. The last two rows show HALT does
+not clear itself: leaving it needs an `Acknowledgement` naming the reviewer, the
+policy hash and the halting evaluation, current evidence with no HALT trigger,
+and it lands in REVIEW, never ACTIVE.
+
+**What is claimed, and its limit.** The policy declares, and
+`python/tests/test_monitoring.py` measured on synthetic streams (reproduced
+for this section): a pure-noise stream reaches REVIEW or worse within 60
+sessions in 24 of 1,000 runs (2.4 %, Wilson 95 % interval 1.6-3.6 %, declared
+at most 5 %); a one-standard-deviation decay at session 20 is caught at REVIEW
+within 25 sessions in 397 of 400 runs (median delay 11 sessions). Those are
+properties of the detector on simulated data. They are not evidence about any
+real signal: v1.18.0 promotes no signal, so nothing in it monitors a live one,
+and the policy itself says a paper signal with no registered expectation is
+UNKNOWN by construction.
+
+**A bounded role for AI.** An explainer may use only `explanation_facts(ev)`,
+and `check_explanation` rejects any text that omits the computed state or names
+another. The monitoring package is on the import-policy guard list, so it
+cannot import a language model or network client.
+
+**Check yourself.**
+
+1. Why is a new signal's first state UNKNOWN and not ACTIVE? *(No sessions
+   means no evidence; "no alarm" is the absence of data, not its result.)*
+2. Why does a missing heartbeat not hide an exposure breach? *(Otherwise a
+   dead process would be the safest way to avoid being halted.)*
+
+## 199. What a signature binds, and what it cannot (v1.18)
+
+**The question.** `tools/verify_signatures.py` prints `19/19 verified; 0 failed`.
+What was checked?
+
+**The chain** (`docs/governance/TRUST_ROOT.md`). (1) The trust root
+`research/agents/trust_roots.json` must equal a version pinned *in the tool
+itself*: its canonical SHA-256 and the maintainer key fingerprint (the SHA-256
+of the 32 raw Ed25519 public-key bytes, recomputable with one line of Python).
+(2) Every git-tracked JSON object with `"signed": true` or a `signature` block
+is verified: Ed25519 over the canonical JSON of the document without its
+signature, under the trust-root key. (3) The agent key registry's maintainer
+signature. (4) Every blackboard: hash chain, agent request signatures, and for
+the main board its git anchors. A board anchor whose commit is missing from a
+shallow clone is `UNVERIFIABLE-HERE`, never `OK`; `--strict` turns that into a
+failure on a full-history clone. On this checkout: 19 items (the trust root, 14
+signed documents, the key registry, 3 boards), all OK.
+
+**What a signature covers: tamper tests** (on in-memory copies of the signed
+REL-09 prereg, nothing written):
+
+| edit | result of `check_document` |
+|---|---|
+| none | passes |
+| decision threshold 0.25 changed to 0.20 | `prereg message sha256 mismatch (document changed after signing)` |
+| bound commit replaced | the same message |
+| public key replaced | `prereg signing key is not the trust-root maintainer key` |
+
+**Two layers, not one.** The signature says the document is unchanged since the
+maintainer signed it. A prereg with an `analysis_identity` block (v2,
+`docs/governance/ANALYSIS_IDENTITY.md`) additionally binds, inside the signed
+body, the analysis scripts, the `python/src/iap` tree, the `configs/` tree,
+the dependency lock and installed versions, the interpreter, the commit and
+the datasets by content hash. At run time `verify_identity` compares the
+*running* checkout and environment with those hashes and refuses on any
+mismatch, naming all of them. The first layer proves the declaration is
+intact; the second proves the analysis being run is the one declared. Signer is
+not runner: the runner must declare an actor id different from the signer's and
+hold no signing key.
+
+**What it cannot do.** It cannot prove who sits at the keyboard; the private
+key lives outside the repository and the owner signs on a machine that does not
+run the analysis, a residual the documents state. There is one pinned
+maintainer, so there is no second signature. Three older signed documents
+(`b8v2_prereg.json`, `null_protocol_prereg.json`, `rel08_rule_signed.json`)
+carry identity v1, which does not cover configs, the lock, the environment or
+the interpreter; they keep verifying and are not re-signed. And a signature
+promises nothing about results: none of the signed v1.18 runs (B8 v2, REL-05,
+REL-08, REL-09, REL-10, null v3) promoted a signal; they are negative,
+underpowered or inconclusive, and the null v3 study failed
+(`docs/release/v1.18.0_RELEASE_NOTES.md`).
+
+**Check yourself.**
+
+1. Someone edits a prereg and re-signs with their own key. What stops it?
+   *(The key must be the trust-root maintainer's, and the trust root must equal
+   the version pinned in the tool; changing either is a reviewed rotation.)*
+2. A tool prints `OK` for a document whose runner used a different script.
+   Which layer failed? *(The identity layer; the signature layer only covers
+   the document's text.)*
+
+## 200. Two lists the record must cite: the holdout registry and the data manifest (v1.18)
+
+**The question.** Two things can go wrong with data in a research record: a
+read that should have been refused, and a result that cites data nobody can
+identify. What stops each?
+
+**The holdout registry** (`research/holdout_registry.json`,
+`iap.research.holdout_registry`). It lists every ingested dataset and each
+(session, symbol) scope as `in_sample`, `spent` (read by a confirmatory look;
+`spent_by` names the signed prereg ids that may replay it) or `unread`
+(reserved for named preregs). On this checkout the file lists 35 datasets: 21
+spent and 14 in sample. Its session index has 19 sessions; for nine of them
+(2025-11-28 to 2025-12-12, 2026-05-15, 2026-05-18, 2026-06-12) AAPL, MSFT and
+QQQ are `spent` and every other symbol is `unread`, reserved for the signed
+breadth-book prereg. Four properties matter.
+
+- **Identity is content.** A dataset is found by the hash of its normalized
+  files, not by its directory name: a renamed copy of a spent dataset is still spent.
+- **Decide before opening.** `guard` decides from `dataset.json` and the
+  registry and refuses before any data file is opened; only an allowed read
+  re-hashes the files and refuses if one byte differs from the manifest.
+- **Fail closed.** A real dataset the registry does not list is refused.
+- **Every attempt is logged**, allowed or refused, to a hash-chained access
+  log (`prev_sha256` on each line), so an edit shows at the line after it.
+
+A run on throw-away synthetic datasets with a sealed in-memory registry: an
+in-sample day was allowed; a spent day with no prereg id was refused; with an
+unlisted prereg id was refused (`allowed: ['P1']`); a never-registered day was
+refused; a renamed copy of the spent day was refused; an in-sample day with
+one edited byte was refused (`content differs from dataset.json`). The chain
+check reported nothing on the intact log and, after the third line was
+edited, `line 4: prev_sha256 does not match the line before it`. Editing the committed
+registry without `seal` is refused at load (`body_sha256 does not match the
+content`).
+
+**The data manifest** (`research/data_manifest.json`, `tools/data_manifest.py`).
+`generate` walks a data root for `dataset.json` files and records, per
+dataset, its version, sessions, vendor input names and hashes and the
+normalized-file hashes the ingest wrote (39 datasets here, all `real`, plus 2
+entries for versions that have no directory: the synthetic generator's and a
+legacy placeholder). `check` is the CI gate: every 64-hex value cited under a
+dataset-named key in the preregistrations and ledgers must be a listed version.
+The data itself is git-ignored, so the committed list is the only thing CI
+can check against. A fake prereg citing `abab...ab` produced `cites unlisted
+dataset abab...`.
+
+**How they differ.** The registry answers "may this be read, and by what?".
+The manifest answers "does this version exist, and what is it?". Neither
+re-hashes the large files on its own: `generate` copies what ingest recorded, and
+the registry re-hashes only on an allowed read.
+
+**What they do not stop.** Someone who edits *and reseals* the registry is
+stopped only by review (CODEOWNERS) and by CI pinning the sealed hash. The log
+chain shows an edit to any line except the last one (nothing follows it to
+disagree), and the log is git-ignored with the data, so it is evidence for the
+machine that wrote it, not a public record. A clean
+`check` says the record cites listed versions, not that the listed bytes
+are intact. The outside reviewer's findings memo, which covers this part,
+is one of the gates accepted open for the v1.18.0 tag
+(`docs/release/v1.18.0_RELEASE_NOTES.md`).
+
+**Check yourself.**
+
+1. Why log refusals as well as reads? *(A pattern of refused attempts is
+   itself evidence of pressure to look; a log of successes alone hides it.)*
+2. A study cites a dataset version not in the manifest. Which check catches it,
+   and when? *(`tools/data_manifest.py check`, in CI, before merge.)*
+
 
 ## Glossary
 

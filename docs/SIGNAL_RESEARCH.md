@@ -237,8 +237,8 @@ row's reference from `configs/reference/reference_etf_map_v1.json`: QQQ for
 the 21 names that were Nasdaq-100 members on 2019-01-30, SPY for the other 50.
 The map is versioned, point-in-time (`as_of` 2019-01-30, not current
 membership), records its source and limitations (recalled from public
-reconstitution notices, not a licensed constituent file; three names marked
-low confidence; ADRs and the two VIX ETNs poorly served by SPY), and carries a
+reconstitution notices, not a licensed constituent file; six names marked
+low confidence (AABA, AMD, FLEX, MRVL, TVIX, VXXB); ADRs and the two VIX ETNs poorly served by SPY), and carries a
 sector per name. ETF rows reference themselves and FX rows are untouched, as
 in v1. Feature names and formulas do not change, so the registry hash does
 not move; the store records `xasset_reference = {feature_identity:

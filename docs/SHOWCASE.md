@@ -217,7 +217,7 @@ in, 308,975 out, from the QC report).
 - [docs/HOW_IT_WORKS.md](HOW_IT_WORKS.md) and [LEARN.md](../LEARN.md): how the
   quant, algo and AI sides work, and the case studies behind each negative
   result.
-- [COOKBOOK.md](../COOKBOOK.md): 140 task-oriented recipes with runnable
+- [COOKBOOK.md](../COOKBOOK.md): 200 task-oriented recipes with runnable
   commands.
 - [docs/release/v1.18.0_RELEASE_NOTES.md](release/v1.18.0_RELEASE_NOTES.md),
   [docs/release/v1.16.0_RELEASE_NOTES.md](release/v1.16.0_RELEASE_NOTES.md)
