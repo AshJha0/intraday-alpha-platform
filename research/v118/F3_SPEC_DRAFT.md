@@ -31,7 +31,7 @@ the reviewer.** The pilot does not show that any procedure is correctly sized (6
 | D2 | Replication unit = one independently generated dataset (G sessions x 16 hypotheses) running the complete pipeline. Families K3, K6, K16 are nested prefixes of the same dataset; one dataset serves all three families | derangements/draws are not replications; sharing datasets across K keeps the cell count at (regime, G) |
 | D3 | Operating domain: G in {5, 7, 10}, independent sessions, no serial dependence beyond what regime (a)/(b) generates, mean-of-session-means statistic | G = 10 already uses t in the platform; below 5 the discrete procedures cannot reject; regime c shows dependence is outside any claim a small-G test can support |
 | D4 | Mandatory regimes: (a) homogeneous independent (a0 hypotheses independent = Holm stress, a1 equicorrelated rho = 0.6 as sensitivity) and (b) heterogeneous (b0 session scales 1..5 log-spaced; b1 scales + normal/t3/lognormal cycle). (c) AR(1) phi 0.3/0.6 is diagnostic only | reviewer table; robustness (b) is mandatory because the platform will quote session-level results from heterogeneous days |
-| D5 | False-fail budget applied **per cell** (regime x G; 9 mandatory cells, D8), with the implied joint false-fail reported | at the design target the per-cell false fail is 1e-9 (below), so the joint bound is trivially inside 5 %; a joint allocation adds complexity without effect |
+| D5 (SUPERSEDED by section 11 item 3: joint bound over 27 evaluations) | False-fail budget applied **per cell** (regime x G; 9 mandatory cells, D8), with the implied joint false-fail reported | at the design target the per-cell false fail is 1e-9 (below), so the joint bound is trivially inside 5 %; a joint allocation adds complexity without effect |
 | D6 | Acceptance rule: for each mandatory cell, 50,000 independent datasets, K3/K6/K16 FWER counted, pass iff the one-sided 95 % Clopper-Pearson UCB <= 2.5 % in every cell and family | reviewer item 4 |
 | D7 | Do **not** run the procedure at its nominal alpha = 0.025 with the 2.5 % claim. Run Holm at an operating level alpha_op = 0.020 and claim FWER <= 2.5 % (a 20 % margin) | power table (section 4): with n = 50,000 an exactly sized procedure at true FWER 2.5 % passes with probability 4.9 %; the largest true FWER certifiable with 95 % pass probability is 2.27 %. The reviewer's "design target 2.0 %" is only reachable this way. Open question 1 |
 | D8 | Cells: mandatory regimes a0 and b0, b1 at G = 5, 7, 10 = 9 cells; each cell is 50,000 datasets x 16 hypotheses. a1 (sensitivity) and c are not acceptance cells | keeps the programme at 450,000 datasets |
@@ -99,3 +99,47 @@ Bind: this spec's sha256, the generator source and `procedures.py` sha256, the g
 4. Is G in {5, 7, 10} the intended operating domain, and should regime c be declared outside it (the pilot shows every procedure fails there)?
 5. Per-cell versus joint false-fail: confirm D5 given the 1e-8 joint figure at the 2.0 % target.
 6. a1 (equicorrelated hypotheses) is sensitivity only; is that acceptable?
+
+## 11. Revision 2 (2026-10-24): reviewer disposition "approved with named changes" incorporated
+
+Reviewer decision (pasted by the owner, to be filed under `docs/release/` by the owner/coordinator): P1 is approved as the
+candidate to be evaluated in a new prospective acceptance study, not as a validated replacement. F3 stays OPEN; null v3
+FAILED; no acceptance run authorised. Still UNSIGNED, nothing run for acceptance. Where this section conflicts with
+sections 1-10, this section wins (D5 and open questions 1-6 are superseded).
+
+1. **Pilot verdict preserved.** The pilot outcome is, and stays, **NO ELIGIBLE PROCEDURE** (plan section 6 applied
+   mechanically). The choice of P1 is a **reviewer-directed prospective selection by methodological review** (exact
+   Student t(G-1) for one value per independent session, intercept only, under normality), not a reinterpretation of
+   the pilot. No further pilot is run to justify P1.
+2. **Separate quantities.** `alpha_op = 0.020` (operational one-sided Holm threshold, applied to the complete
+   Holm procedure per family); `FWER_target = 0.025` (maximum error rate to be demonstrated); `FWER_observed = k/n`
+   (Monte Carlo estimate over n independent datasets); `UCB95` = one-sided 95 % Clopper-Pearson upper bound,
+   `UCB95 = Beta^-1(0.95; k+1, n-k)`. A mandatory evaluation passes iff `UCB95 <= FWER_target`; at n = 50,000 this is
+   k <= 1,192. The claim on a pass is calibration under the specified synthetic regimes only.
+3. **Joint false-fail bound over all 27 mandatory evaluations** (3 regimes a0, b0, b1 x G in {5, 7, 10} x K in {3, 6, 16};
+   K families share datasets, so no independence is assumed). Union bound: P(any fails) <= sum over evaluations of
+   P(fail), each P(fail) = P(Binomial(50,000, true FWER) > 1,192), monotone in the true FWER. At true FWER 2.0 % for
+   all 27: 27 x 1.15e-9 = **3.1e-8**. At 2.1 %: 1.8e-4. At 2.15 %: 4.9e-3. At 2.2 %: 7.2e-2 (exceeds the 5 % budget,
+   so the joint 5 % false-fail holds for any true FWER <= about 2.19 %). The final prereg must restate this table
+   with the exact computation script bound by hash. Pilot P1 values at alpha_op 0.020 (all mandatory cells) were
+   at or below 0.0222, consistent with, but not evidence of, that margin.
+4. **Separate power diagnostic** (not a pass/fail criterion of F3, no power floor). Predeclared: planted per-session
+   mean shift delta in units of the session-mean standard deviation sigma_bar of the cell, delta in {0.5, 1, 1.5, 2, 3}
+   sigma_bar / sqrt(G) scale on all hypotheses in turn (single non-null hypothesis, 15 nulls), generators a0, b0, b1,
+   G = 5, 7, 10, alpha_op 0.020, P1; report power with Wilson intervals, minimum detectable effect at 80 % power, and the
+   homogeneous-vs-heterogeneous ratio. Several thousand datasets suffice; it is a separate study with its own seeds
+   and sign-off, and its results cannot change the Type I criteria. If deployment needs practical power it becomes a
+   separate gate with its own assumptions.
+5. **Operating domain statement (to be copied into the prereg and any release claim).** Valid claim domain: independent
+   sessions, G in {5, 7, 10}, regimes a and b as generated. **Serial dependence (regime c) is outside the validated
+   domain** (pilot: severe size inflation, up to 34x nominal). Passing the synthetic study supports **no** real-data
+   independence claim and **no** real-data FWER claim; the method must not be applied to real session data under an
+   independence assumption unless that is separately justified. Regime a1 is reported as sensitivity, not mandatory.
+6. **Freeze list before any acceptance run:** final generator definitions (sha256), fresh seeds (disjoint from
+   20281100-20281199 and the diagnostic seeds), code and configuration hashes (`procedures.py`, `generators.py`, runner,
+   computation scripts), pinned environment (CI lock venv, `--require-ci-env`), runner/signer separation (Claude
+   prepares and runs; the owner signs locally; reviewer approves the signed protocol), dry run of 200 datasets with
+   output discarded, fixed n, no interim looks.
+
+Open questions remaining for the reviewer: none new from this revision; the exact power-diagnostic effect grid in item 4 is
+a draft for their comment.
