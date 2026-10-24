@@ -1,5 +1,7 @@
 # REL-08 continuation rule v2 (DRAFT, UNSIGNED, 2026-10-20)
 
+> **Superseded 2026-10-24 by `REL08_CONTINUATION_RULE_v2.md` / `rel08_rule_v2.json` (still unsigned).** Kept for the record.
+
 **Status: draft for later signing before any multi-session screen.** Companion data file:
 `rel08_rule_v2_DRAFT.json`. The signed v1 (`research/v118/REL08_CONTINUATION_RULE.md`,
 `rel08_rule_signed.json`) is untouched. **Rule v1 results stay valid as recorded**: the single-session
