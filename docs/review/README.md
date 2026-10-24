@@ -19,6 +19,8 @@
 | item | file |
 |---|---|
 | R0 confirmatory test specification, frozen (reviewer freeze decision 2026-10-24, sha256 `900d9e73...` of the text behind the path header; `python/tests/spec/test_r0_frozen.py` re-hashes it) | [../../python/tests/spec/CONFIRMATORY_TEST_SPEC.md](../../python/tests/spec/CONFIRMATORY_TEST_SPEC.md) |
+| R4 planted dry run before signature (defect D-09): `iap.agents.planted_dry_run`; `tools/prereg_bind_identity.py` and `tools/rel08_rule_sign.py` refuse without a bound dry run; the REL-08 C1, REL-08c n = 0 and A0 fixtures refuse | [../../python/tests/test_planted_dry_run.py](../../python/tests/test_planted_dry_run.py) |
+| R5 real-data dependence audit: predeclared plan (parts A and B, the plan 5.12 decision rule) and runner; NOT RUN, no sealed or spent session opened | [../../research/v119/R5_DEPENDENCE_PLAN.md](../../research/v119/R5_DEPENDENCE_PLAN.md) |
 
 ## Reproduction result (2026-10-18, `tools/reproduce_baseline.py`)
 
