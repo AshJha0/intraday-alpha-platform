@@ -202,8 +202,9 @@ def cmd_run(a: argparse.Namespace) -> int:
     from iap.marketdata.runmem import available_ram_gb
 
     decl = load_decl(a.decl)
-    prereg = (ROOT / decl["prereg"]) if a.prereg is None else Path(a.prereg)
-    rec = verify(prereg, decl)
+    root = Path(a.root)
+    prereg = (root / decl["prereg"]) if a.prereg is None else Path(a.prereg)
+    rec = verify(prereg, decl, root)
     ram = available_ram_gb()
     if ram is not None and ram < float(decl["stop_rules"]["min_free_ram_gb"]):
         raise Refused(f"available RAM {ram:.1f} GB < declared minimum")
