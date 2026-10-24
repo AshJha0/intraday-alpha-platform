@@ -1,0 +1,185 @@
+{
+  "analysis_identity": {
+    "code_tree_sha256": "f24dfab4f656cd2803b396924a0609bc0c07965f1acc696b6b0ee9af388fd7da",
+    "commit": "24eac89be177a357b6df54c4992142467c6351ff",
+    "configs_tree_sha256": "290b38d8871961c28e81db59ca9cf95791a213acd33461d667de873b907ad7b0",
+    "data_versions": [
+      "synthetic-no-data"
+    ],
+    "deps_lock_sha256": "2f68340d1a5c28871356287b00f5af907dd94f429c2551dac5cee0a3a114c18e",
+    "environment": {
+      "attrs": "26.1.0",
+      "cffi": "2.1.1",
+      "cloudpickle": "3.1.2",
+      "coverage[toml]": "absent",
+      "cryptography": "50.0.2",
+      "databento-dbn": "0.71.0",
+      "execnet": "2.1.2",
+      "hypothesis": "absent",
+      "iniconfig": "2.3.1",
+      "joblib": "1.6.0",
+      "jsonschema": "4.26.0",
+      "jsonschema-specifications": "2025.9.1",
+      "narwhals": "2.26.0",
+      "numpy": "2.4.6",
+      "packaging": "26.3",
+      "pandas": "3.0.6",
+      "pluggy": "1.6.0",
+      "pyarrow": "25.0.1",
+      "pycparser": "3.0",
+      "pygments": "2.21.0",
+      "pytest": "9.1.1",
+      "pytest-cov": "7.1.0",
+      "pytest-xdist": "3.8.0",
+      "python-dateutil": "2.9.0.post0",
+      "pyyaml": "6.0.3",
+      "referencing": "0.37.0",
+      "rpds-py": "2026.9.1",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.17.1",
+      "six": "1.17.0",
+      "sortedcontainers": "absent",
+      "threadpoolctl": "3.7.0",
+      "typing-extensions": "4.16.0"
+    },
+    "family": "F3 acceptance study: P1 Student t(G-1) + Holm, FWER calibration, synthetic regimes a0 b0 b1 (a1 sensitivity), G 5 7 10, K 3 6 16; NO market data consumed",
+    "identity_version": 2,
+    "inputs": {
+      "docs/release/REVIEWER_F3_FREEZE_DECISION_2026-10-24.md": "e914f64b21f8f61a5cb80d7dc62852c66387c4903927a9f8cd67ba759bab3ad5",
+      "docs/release/REVIEWER_F3_SPEC_DECISION_2026-10-24.md": "8cf9f286e33afbc5e20b6dcc192f52691b4a222ff237293dc22098166934c745",
+      "research/v118/F3_SPEC_DRAFT.md": "7a7d2fb08f4f241c7e0eda366046aae3a0a21cbe014c7affe53012c1c4c9c8d5",
+      "research/v118/f3_accept/JOINT_BOUND.md": "fb29d83eb44036c7efa783c67aff2824822fca1fe44cc6e5675f9c727edfc63e",
+      "research/v118/f3_spec/generators.py": "16b1871c2cf2afbd3eb1223bf2be67595097a34dd9d201861d13e80775aec693",
+      "research/v118/f3_spec/procedures.py": "89bc7d8d439c3b022febcdba624022ad0cb801ec4411e761dbcc1c21a442857a"
+    },
+    "interpreter": "cpython-3.12.10",
+    "metrics": [
+      "fwer_observed",
+      "nan_p_count",
+      "pass_count_threshold",
+      "ucb95_clopper_pearson"
+    ],
+    "reference_tree_sha256": "9020e008efdb1ac41015cea4c31f8b9e4cb65a1324db0a42224cb2a22f18fa88",
+    "scripts": {
+      "research/v118/f3_accept/check_freeze.py": "36e68bf013773daa084e2665657b44172400295396eb411284c1a8493c565b0f",
+      "research/v118/f3_accept/core.py": "e17cf0719d9d26c6b714b824f065ab624ae0353c5d4f9358e1849b458a1368c2",
+      "research/v118/f3_accept/declaration.json": "41211a5060ac79b7d3828548c40f0397f7e907405777b9435301c573207e3a15",
+      "research/v118/f3_accept/joint_bound.py": "6e133384a6d520bc1ce56e01a8c7847a3e7ebfb7a98dc241f84baefba6507e0d",
+      "research/v118/f3_accept/run_f3_accept.py": "f66447f19432310db237e2a69f8bdbc0894aa4a0e8d0b84ab2c7a44cf23c1e53"
+    },
+    "thresholds": {
+      "alpha_op": 0.02,
+      "chunk": 10000,
+      "data_versions_sentinel": "synthetic-no-data: a declared sentinel only. NO market data are consumed (no data/real access, no holdout registry, no dataset reader); it is not a dataset identifier and not a holdout exemption",
+      "decision_rule": "overall PASS iff every one of the 27 mandatory evaluations (a0, b0, b1 x G 5, 7, 10 x K 3, 6, 16) has UCB95 <= fwer_target, i.e. count <= k_max(n_per_cell); a1 is reported and is not a criterion; a NaN p counts as p = 1 and any NaN is reported; pass supports calibration under the synthetic regimes only, never a real-data claim; serial dependence is outside the validated domain; the report lists the 27 mandatory and the 9 sensitivity results separately; a statistical pass does NOT automatically close F3 or authorise real-data claims (the outside reviewer decides)",
+      "design_target_true_fwer": 0.02,
+      "dry_run": {
+        "n": 200,
+        "output_discarded": true
+      },
+      "families": [
+        3,
+        6,
+        16
+      ],
+      "fwer_target": 0.025,
+      "generators": {
+        "definition": "a0: iid N(0,1) G x 16; a1: sqrt(rho) f_g + sqrt(1-rho) z; b0: z * s_g, s = exp(linspace(0, ln scale_ratio, G)); b1: session distribution cycles normal / t3 (unit variance) / centred lognormal sigma 1 (unit variance) by session index mod 3, times s_g; all true mean 0; SplitMix64 Box-Muller normals; drawn in chunks of `chunk` datasets from one stream per cell in the order z, then f (a1) or the chi-square normals (b1)",
+        "rho_a1": 0.6,
+        "scale_ratio": 5.0
+      },
+      "joint_false_fail_budget": 0.05,
+      "kind": "f3_acceptance_declaration",
+      "mandatory": {
+        "G": [
+          5,
+          7,
+          10
+        ],
+        "regimes": [
+          "a0",
+          "b0",
+          "b1"
+        ]
+      },
+      "market_data_consumed": false,
+      "n_per_cell": 50000,
+      "prereg": "research/preregs/f3_accept_prereg.json",
+      "procedure": "P1: one-sided Student t(G-1) on the CR1 statistic (reviewer-directed prospective selection, 2026-10-24)",
+      "protocol": "research/v118/f3_accept/PROTOCOL.md",
+      "resume": {
+        "failed_study": "a completed run whose DECISION.json says FAIL is final: no resume, no rerun, no new seeds under this prereg (a new prereg and independent approval are required)",
+        "granularity": "cell",
+        "permitted": true,
+        "validation": "every finished cell file is re-verified by deterministic recomputation under the CURRENT verified signed identity: identity_sha256 of the full analysis_identity block, prereg sha256, seed, chunk, n, final RNG state and chunk-count digest must all match; any mismatch refuses"
+      },
+      "seeds": {
+        "base": 20291100,
+        "disjoint_from": [
+          "20281100-20281199 (pilot)",
+          "20271001-20271004 (F3 diagnostic)"
+        ],
+        "dry_run_base": 20291900,
+        "formula": "base + 10 * regime_index + G",
+        "regime_index": {
+          "a0": 0,
+          "a1": 3,
+          "b0": 1,
+          "b1": 2
+        }
+      },
+      "sensitivity": {
+        "G": [
+          5,
+          7,
+          10
+        ],
+        "in_verdict": false,
+        "n_per_cell": 50000,
+        "note": "a1 (rho 0.6) is run at 50,000 datasets per G, all K3/K6/K16 outcomes reported, excluded from the mandatory verdict, never used to redefine the operating domain",
+        "regimes": [
+          "a1"
+        ]
+      },
+      "status": "UNSIGNED DRAFT: nothing here has been run for acceptance",
+      "stop_rules": {
+        "crash_policy": "an interrupted run may be resumed exactly as declared in `resume`; nothing else is permitted",
+        "fail_policy": "a failed evaluation is recorded; no tuning, no rerun with new seeds under this prereg",
+        "min_free_ram_gb": 4.0,
+        "no_interim_looks": true,
+        "one_run_only": true
+      },
+      "stream": {
+        "frozen_in_identity": [
+          "chunk",
+          "ordering of draws within a chunk",
+          "core.py generator implementation",
+          "seeds"
+        ],
+        "reseed_between_chunks": false,
+        "single_stream_per_cell": true
+      },
+      "ucb_conf": 0.95,
+      "version": 1,
+      "workers": 3
+    }
+  },
+  "bound_utc": "2026-10-24T14:53:29+00:00",
+  "kind": "analysis_prereg",
+  "prereg_id": "research/preregs/f3_accept_prereg.json",
+  "protocol": "research/v118/f3_accept/PROTOCOL.md",
+  "protocol_sha256": "8be620e3d161d634c0e612f1f25369ac67a1212d0871246df5852d40b2a9e544",
+  "signature": {
+    "maintainer": "ashjha0",
+    "message": "iap.agents.blackboard.canonical(this document without 'signature')",
+    "message_sha256": "e0e38bc54ce32a25539b996ae7c1c42070606b597810cb7593a924c564d27c8c",
+    "public_key": "02a3e278cda3efac7dcd266fb8a3821a1415f0725a73f8b255aac84083c2106c",
+    "scheme": "ed25519",
+    "sig": "bc71e593bcdcb617d43867d8449e76008272bbaef8335f04aa8da24a9b2a18e2af633a08e7303ae2f085bfa338b57c989783dc8e497f7f6c45ae4368df622d07",
+    "trust_root": "research/agents/trust_roots.json"
+  },
+  "signed": true,
+  "signed_utc": "2026-10-24T14:53:44+00:00",
+  "status": "SIGNED: the analysis identity is bound; edits void the signature",
+  "x-version": 1
+}
