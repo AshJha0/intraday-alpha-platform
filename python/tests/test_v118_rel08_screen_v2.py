@@ -147,3 +147,34 @@ def test_v1_path_unchanged():
     assert out["id"] == "V1" and "sessions_qualifying" not in out
     # v1 still counts the leading idle time from the grid origin as a gap (the documented v1 formula)
     assert out["max_gap_min"] >= 0.0
+
+
+def _same(a, b):
+    if isinstance(a, float) and isinstance(b, float) and a != a and b != b:
+        return True
+    return a == b
+
+
+@pytest.mark.parametrize(
+    ("mode", "amp", "seed"), [("null", 0.0, 20269201), ("revert", 60.0, 20269202)]
+)
+def test_short_circuit_changes_nothing_but_the_skipped_books(mode, amp, seed):
+    """Pure-speed option: decisions and every other statistic are bit-identical to the full evaluation."""
+    data = dr.make_data(mode, amp, seed, days=1)
+    rule = dr.base_rule({"alpha_bps": 20.0, "risk_aversion": 100.0}, draws=99)
+    rule.doc["sufficiency_v2"] = {"sessions_total": 1, "sessions_min_qualifying": 1}
+    days = sorted(data.session_close())
+    full = v2.run_screen_v2(data, rule, days, variant_ids=("V1", "V5"))
+    fast = v2.run_screen_v2(data, rule, days, variant_ids=("V1", "V5"), short_circuit=True)
+    for a, b in zip(full["variants"], fast["variants"], strict=True):
+        skipped = not b["robustness_books_computed"]
+        for k in a:
+            if k in ("robustness_books_computed",):
+                continue
+            if skipped and k in ("influential_removed_net_bps", "alt_normalisation_net_bps"):
+                continue
+            assert _same(a[k], b[k]), k
+    for a, b in zip(full["decisions"], fast["decisions"], strict=True):
+        assert a["outcome"] == b["outcome"] and a["reason"] == b["reason"]
+        for c in ("C1", "C2", "C3", "C4", "C8"):
+            assert a["criteria"][c] == b["criteria"][c]
