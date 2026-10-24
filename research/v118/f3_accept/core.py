@@ -8,6 +8,7 @@ session and an intercept-only model), selected prospectively by the outside revi
 
 from __future__ import annotations
 
+import hashlib
 import math
 import sys
 from collections.abc import Mapping
@@ -19,9 +20,36 @@ from scipy import stats
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "python" / "src"))
-from iap.research import known_null as kn  # noqa: E402
+from iap.core.rng import SplitMix64  # noqa: E402  (pinned RNG; no market-data module is imported)
 
 NH = 16
+_GAMMA = np.uint64(0x9E3779B97F4A7C15)
+_MIX1 = np.uint64(0xBF58476D1CE4E5B9)
+_MIX2 = np.uint64(0x94D049BB133111EB)
+
+
+def splitmix_uniforms(rng: SplitMix64, n: int) -> np.ndarray:
+    """The next ``n`` ``rng.uniform()`` draws as one array; advances ``rng`` (same stream as
+    ``known_null.splitmix_uniforms``; a unit test checks the two agree)."""
+    if n <= 0:
+        return np.empty(0, dtype=float)
+    k = np.arange(1, n + 1, dtype=np.uint64)
+    with np.errstate(over="ignore"):
+        z = np.uint64(rng.state) + k * _GAMMA
+        z = (z ^ (z >> np.uint64(30))) * _MIX1
+        z = (z ^ (z >> np.uint64(27))) * _MIX2
+        z = z ^ (z >> np.uint64(31))
+    rng.state = (rng.state + n * 0x9E3779B97F4A7C15) & ((1 << 64) - 1)
+    return (z >> np.uint64(11)).astype(np.float64) * 2.0**-53
+
+
+def splitmix_normals(rng: SplitMix64, n: int) -> np.ndarray:
+    """``n`` standard normals (Box-Muller, cosine branch on two uniforms)."""
+    u = splitmix_uniforms(rng, 2 * n)
+    u1, u2 = u[0::2], u[1::2]
+    if np.any(u1 == 0.0):
+        raise ArithmeticError("SplitMix64 drew u1 == 0")
+    return np.sqrt(-2.0 * np.log(u1)) * np.cos(2.0 * math.pi * u2)
 
 
 def regime_index(decl: Mapping[str, Any]) -> dict[str, int]:
@@ -37,13 +65,11 @@ def scales(decl: Mapping[str, Any], g: int) -> np.ndarray:
     return np.exp(np.linspace(0.0, math.log(float(decl["generators"]["scale_ratio"])), g))
 
 
-def _normals(rng: kn.SplitMix64, *shape: int) -> np.ndarray:
-    return kn.splitmix_normals(rng, int(np.prod(shape))).reshape(shape)
+def _normals(rng: SplitMix64, *shape: int) -> np.ndarray:
+    return splitmix_normals(rng, int(np.prod(shape))).reshape(shape)
 
 
-def draw_chunk(
-    decl: Mapping[str, Any], regime: str, g: int, n: int, rng: kn.SplitMix64
-) -> np.ndarray:
+def draw_chunk(decl: Mapping[str, Any], regime: str, g: int, n: int, rng: SplitMix64) -> np.ndarray:
     """``n`` independent datasets, shape (n, g, 16), true mean 0 everywhere; advances ``rng``."""
     z = _normals(rng, n, g, NH)
     if regime == "a0":
@@ -86,21 +112,38 @@ def family_rejections(p: np.ndarray, alpha_op: float, families: list[int]) -> di
 def run_cell(
     decl: Mapping[str, Any], regime: str, g: int, n: int, *, dry: bool = False
 ) -> dict[str, Any]:
-    rng = kn.SplitMix64(seed_for(decl, regime, g, dry))
+    """One cell: ONE SplitMix64 stream created from the cell seed and consumed chunk after chunk (the stream is
+    never reset or reseeded between chunks).  Returns the counts plus the stream evidence: the final RNG state
+    and a digest of the per-chunk counts, which a resumed run recomputes and compares."""
+    rng = SplitMix64(seed_for(decl, regime, g, dry))
     chunk = int(decl["chunk"])
     fams = list(decl["families"])
     counts = dict.fromkeys(fams, 0)
+    per_chunk: list[list[int]] = []
     nan = 0
     done = 0
     while done < n:
         m = min(chunk, n - done)
         p = p1_pvalues(draw_chunk(decl, regime, g, m, rng))
         nan += int((~np.isfinite(p)).sum())
-        for k, c in family_rejections(p, float(decl["alpha_op"]), fams).items():
+        rej = family_rejections(p, float(decl["alpha_op"]), fams)
+        per_chunk.append([m, *(rej[k] for k in fams)])
+        for k, c in rej.items():
             counts[k] += c
         done += m
-    return {"regime": regime, "G": g, "n": n, "seed": seed_for(decl, regime, g, dry), "nan_p": nan,
-            "rejections": {f"K{k}": counts[k] for k in fams}}  # fmt: skip
+    digest = hashlib.sha256(repr(per_chunk).encode("ascii")).hexdigest()
+    return {
+        "regime": regime,
+        "G": g,
+        "n": n,
+        "seed": seed_for(decl, regime, g, dry),
+        "chunk": chunk,
+        "n_chunks": len(per_chunk),
+        "nan_p": nan,
+        "rejections": {f"K{k}": counts[k] for k in fams},
+        "rng_final_state": rng.state,
+        "chunk_counts_sha256": digest,
+    }
 
 
 def cp_upper(k: int, n: int, conf: float = 0.95) -> float:
