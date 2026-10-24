@@ -1,0 +1,340 @@
+{
+ "calibration_manifest_sha256": "a554a6be1b86355598fe67fcd26ebf30946a3322ae30810e507de269972dc012",
+ "created_utc": "2026-10-24T20:11:37Z",
+ "frozen_commit_info_only": "c18b1acbfd780115b203af9a3831d0cf3e056a2f",
+ "identity_parts": {
+  "calibration_manifest": {
+   "book": {
+    "alpha_bps": 20.0,
+    "risk_aversion": 100.0,
+    "solver_iters": 20
+   },
+   "bootstrap_draws": 9999,
+   "bootstrap_seed": 20261020,
+   "null_cells": [
+    {
+     "cell": "N1S1",
+     "checkpoint_replications_non_decisional": 100,
+     "model": "N1",
+     "replications": 200,
+     "role": "gating",
+     "seed_first": 20261100,
+     "seed_last": 20261299,
+     "spread_multiplier": 1.0,
+     "spread_regime": "S1"
+    },
+    {
+     "cell": "N1S4",
+     "checkpoint_replications_non_decisional": 100,
+     "model": "N1",
+     "replications": 200,
+     "role": "gating",
+     "seed_first": 20262100,
+     "seed_last": 20262299,
+     "spread_multiplier": 4.0,
+     "spread_regime": "S4"
+    },
+    {
+     "cell": "N2S1",
+     "checkpoint_replications_non_decisional": 100,
+     "model": "N2",
+     "replications": 200,
+     "role": "gating",
+     "seed_first": 20263100,
+     "seed_last": 20263299,
+     "spread_multiplier": 1.0,
+     "spread_regime": "S1"
+    },
+    {
+     "cell": "N2S4",
+     "checkpoint_replications_non_decisional": 100,
+     "model": "N2",
+     "replications": 200,
+     "role": "gating",
+     "seed_first": 20264100,
+     "seed_last": 20264299,
+     "spread_multiplier": 4.0,
+     "spread_regime": "S4"
+    },
+    {
+     "cell": "N3S1",
+     "checkpoint_replications_non_decisional": 100,
+     "model": "N3",
+     "replications": 200,
+     "role": "gating",
+     "seed_first": 20265100,
+     "seed_last": 20265299,
+     "spread_multiplier": 1.0,
+     "spread_regime": "S1"
+    },
+    {
+     "cell": "N3S4",
+     "checkpoint_replications_non_decisional": 100,
+     "model": "N3",
+     "replications": 200,
+     "role": "gating",
+     "seed_first": 20266100,
+     "seed_last": 20266299,
+     "spread_multiplier": 4.0,
+     "spread_regime": "S4"
+    },
+    {
+     "cell": "N4S1",
+     "checkpoint_replications_non_decisional": null,
+     "model": "N4",
+     "replications": 200,
+     "role": "non-gating (stress)",
+     "seed_first": 20267100,
+     "seed_last": 20267299,
+     "spread_multiplier": 1.0,
+     "spread_regime": "S1"
+    },
+    {
+     "cell": "N4S4",
+     "checkpoint_replications_non_decisional": null,
+     "model": "N4",
+     "replications": 200,
+     "role": "non-gating (stress)",
+     "seed_first": 20268100,
+     "seed_last": 20268299,
+     "spread_multiplier": 4.0,
+     "spread_regime": "S4"
+    }
+   ],
+   "plan": "REL08_V2_CALIBRATION_PLAN_REV2.md",
+   "power_cells": [
+    {
+     "amp": 6.0,
+     "kind": "revert",
+     "replications": 30,
+     "role": "non-gating (power-side sanity check)",
+     "seed_first": 20268500,
+     "seed_last": 20268529,
+     "spread_multiplier": 1.0
+    },
+    {
+     "amp": 12.0,
+     "kind": "revert",
+     "replications": 30,
+     "role": "non-gating (power-side sanity check)",
+     "seed_first": 20268600,
+     "seed_last": 20268629,
+     "spread_multiplier": 1.0
+    },
+    {
+     "amp": 24.0,
+     "kind": "revert",
+     "replications": 30,
+     "role": "non-gating (power-side sanity check)",
+     "seed_first": 20268700,
+     "seed_last": 20268729,
+     "spread_multiplier": 1.0
+    },
+    {
+     "amp": 0.3,
+     "kind": "lead",
+     "replications": 30,
+     "role": "non-gating (power-side sanity check)",
+     "seed_first": 20268800,
+     "seed_last": 20268829,
+     "spread_multiplier": 1.0
+    },
+    {
+     "amp": 0.6,
+     "kind": "lead",
+     "replications": 30,
+     "role": "non-gating (power-side sanity check)",
+     "seed_first": 20268900,
+     "seed_last": 20268929,
+     "spread_multiplier": 1.0
+    }
+   ],
+   "sensitivity_cells": [],
+   "sessions_per_screen": 6,
+   "timing_seeds": [
+    20269000,
+    20269001,
+    20269002,
+    20269003
+   ],
+   "totals": {
+    "all_screens": 1750,
+    "gating_screens": 1200,
+    "null_screens": 1600,
+    "power_screens": 150
+   },
+   "variants_per_screen": 7,
+   "x-version": 1
+  },
+  "environment_block": {
+   "code_tree_sha256": "3a8d86779d5fffed738e677f4ce8da5b2492f2361dd58f9ab412097ad975447b",
+   "configs_tree_sha256": "290b38d8871961c28e81db59ca9cf95791a213acd33461d667de873b907ad7b0",
+   "deps_lock_sha256": "2f68340d1a5c28871356287b00f5af907dd94f429c2551dac5cee0a3a114c18e",
+   "environment": {
+    "attrs": "26.1.0",
+    "cffi": "2.1.1",
+    "cloudpickle": "3.1.2",
+    "coverage[toml]": "absent",
+    "cryptography": "50.0.2",
+    "databento-dbn": "0.71.0",
+    "execnet": "2.1.2",
+    "hypothesis": "absent",
+    "iniconfig": "2.3.1",
+    "joblib": "1.6.0",
+    "jsonschema": "4.26.0",
+    "jsonschema-specifications": "2025.9.1",
+    "narwhals": "2.26.0",
+    "numpy": "2.4.6",
+    "packaging": "26.3",
+    "pandas": "3.0.6",
+    "pluggy": "1.6.0",
+    "pyarrow": "25.0.1",
+    "pycparser": "3.0",
+    "pygments": "2.21.0",
+    "pytest": "9.1.1",
+    "pytest-cov": "7.1.0",
+    "pytest-xdist": "3.8.0",
+    "python-dateutil": "2.9.0.post0",
+    "pyyaml": "6.0.3",
+    "referencing": "0.37.0",
+    "rpds-py": "2026.9.1",
+    "scikit-learn": "1.9.1",
+    "scipy": "1.17.1",
+    "six": "1.17.0",
+    "sortedcontainers": "absent",
+    "threadpoolctl": "3.7.0",
+    "typing-extensions": "4.16.0"
+   },
+   "interpreter": "cpython-3.12.10",
+   "reference_tree_sha256": "9020e008efdb1ac41015cea4c31f8b9e4cb65a1324db0a42224cb2a22f18fa88"
+  },
+  "files": {
+   "research/v118/rel08/REL08_V2_CALIBRATION_MANIFEST.json": "12d5917061518f836a2493a2c6bd26625b61d4720500d245c9df40754f9085c0",
+   "research/v118/rel08/REL08_V2_CALIBRATION_PLAN_REV2.md": "0aa70b0bae252cfc21a7047b8472c6f6579fe97a7947a5a7c5903cf9100de407",
+   "research/v118/rel08/REL08_V2_EXECUTION_PROTOCOL.md": "0549567ade30adf8d55090efad05b76eb6860da34fdaacedf7324790555d1381",
+   "research/v118/rel08/calibration/freeze.py": "8df8d6fd7e0d6cb3a33febd970bf60bf47573a8e075f380053fd8d8e810e3e6a",
+   "research/v118/rel08/calibration/integrity.py": "76106dfc8dca21bbf7570c82918ccc89b79f88da0742c02db42c1d54148873cb",
+   "research/v118/rel08/calibration/run_calibration.py": "64736a0bc22b61c542daeb91f9bc9c696ee013557dcb5e332efa5de1575b8490",
+   "research/v118/rel08/dryrun/rel08_v2_dryrun.py": "6fef44685a3c7ee2cd23c1ca4ca15466aa675835be68c45801fc3dd6c32c4949",
+   "research/v118/rel08_rule_DRAFT.json": "c8ef14a03783372a0a9d2cdffb8e5142fb24b03b5897dee61a6542d47f0be90d"
+  },
+  "gate": {
+   "A_conf": 0.95,
+   "A_family_upper_max": 0.05,
+   "B_pooled_variant_c3_upper_max": 0.0143,
+   "C_pooled_family_point_max": 0.05,
+   "D_replications_per_gating_cell": 200
+  },
+  "null_definitions": {
+   "N1": "martingale prices, common factor, i.i.d. idiosyncratic noise (dry-run null mode)",
+   "N2": "N1 plus log-volatility AR(1) clustering (phi 0.95, sd 0.3) and i.i.d. microstructure noise sd 1e-4 on log mid",
+   "N3": "N1 plus uninformative persistent scores: score times a slowly varying random sign (AR(1) sign process, half-life 20 columns)",
+   "N4": "N1 with per-session log-normal volatility and spread multipliers (sd 0.4) and a mean-zero daily common shock"
+  },
+  "short_circuit": true,
+  "x-version": 1
+ },
+ "identity_sha256": "31bb6b91e7a9c9a1450115856162f2e0809624a72f004d94150a8c918be193d7",
+ "kind": "rel08_v2_calibration_execution_manifest",
+ "schema_version": 1,
+ "seed_disjointness": {
+  "disjoint": true,
+  "original_null_seeds_unchanged": true,
+  "overlaps": [],
+  "power_seeds_start_at": 20268500,
+  "stopped_launch_note": "the stopped first launch consumed null-cell seeds 20261100 and 20261101 (N1S1, r = 0, 1); they are the frozen seeds and are re-run from scratch; the discarded records cannot enter the new results (stamped identity + new output directory)",
+  "streams": [
+   {
+    "first": 1,
+    "last": 99999,
+    "name": "dry_run_small"
+   },
+   {
+    "first": 20261100,
+    "last": 20261299,
+    "name": "N1S1"
+   },
+   {
+    "first": 20262100,
+    "last": 20262299,
+    "name": "N1S4"
+   },
+   {
+    "first": 20263100,
+    "last": 20263299,
+    "name": "N2S1"
+   },
+   {
+    "first": 20264100,
+    "last": 20264299,
+    "name": "N2S4"
+   },
+   {
+    "first": 20265100,
+    "last": 20265299,
+    "name": "N3S1"
+   },
+   {
+    "first": 20266100,
+    "last": 20266299,
+    "name": "N3S4"
+   },
+   {
+    "first": 20267100,
+    "last": 20267299,
+    "name": "N4S1"
+   },
+   {
+    "first": 20268100,
+    "last": 20268299,
+    "name": "N4S4"
+   },
+   {
+    "first": 20268500,
+    "last": 20268529,
+    "name": "power_revert_6.0"
+   },
+   {
+    "first": 20268600,
+    "last": 20268629,
+    "name": "power_revert_12.0"
+   },
+   {
+    "first": 20268700,
+    "last": 20268729,
+    "name": "power_revert_24.0"
+   },
+   {
+    "first": 20268800,
+    "last": 20268829,
+    "name": "power_lead_0.3"
+   },
+   {
+    "first": 20268900,
+    "last": 20268929,
+    "name": "power_lead_0.6"
+   },
+   {
+    "first": 20269000,
+    "last": 20269003,
+    "name": "timing"
+   },
+   {
+    "first": 20269201,
+    "last": 20269202,
+    "name": "equivalence_tests_unit"
+   },
+   {
+    "first": 20269300,
+    "last": 20269330,
+    "name": "equivalence_check"
+   },
+   {
+    "first": 20269401,
+    "last": 20269403,
+    "name": "equivalence_tests"
+   }
+  ]
+ },
+ "status": "FROZEN FOR REVIEW (not yet authorised to launch)"
+}
