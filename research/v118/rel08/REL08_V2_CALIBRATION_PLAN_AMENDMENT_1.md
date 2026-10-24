@@ -1,5 +1,7 @@
 # REL-08 v2 calibration plan: amendment 1 PROPOSAL (UNSIGNED; reason: runtime; no calibration result exists)
 
+> **WITHDRAWN (2026-10-24):** the reviewer's amendment decision (`docs/release/REVIEWER_REL08_V2_AMENDMENT_DECISION_2026-10-24.md`) keeps R = 200 as the confirmatory design and allows R = 100 only as a separately labelled preliminary stage. This proposal is not used; see `REL08_V2_CALIBRATION_PLAN_REV2.md`. Kept for the record.
+
 **Status: proposal for the outside reviewer's agreement, 2026-10-24. Nothing in `REL08_V2_CALIBRATION_PLAN.md` changes until this
 amendment is agreed and merged; no calibration cell has produced a number that was looked at.** A first launch was stopped after two
 replications for runtime and those two were deleted unread (`calibration/IMPLEMENTATION_NOTE.md`).
