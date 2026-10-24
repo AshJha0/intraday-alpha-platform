@@ -1,0 +1,40 @@
+{
+  "kind": "f3_acceptance_declaration",
+  "version": 1,
+  "status": "UNSIGNED DRAFT: nothing here has been run for acceptance",
+  "protocol": "research/v118/f3_accept/PROTOCOL.md",
+  "prereg": "research/preregs/f3_accept_prereg.json",
+  "procedure": "P1: one-sided Student t(G-1) on the CR1 statistic (reviewer-directed prospective selection, 2026-10-24)",
+  "alpha_op": 0.02,
+  "fwer_target": 0.025,
+  "ucb_conf": 0.95,
+  "design_target_true_fwer": 0.02,
+  "joint_false_fail_budget": 0.05,
+  "n_per_cell": 50000,
+  "chunk": 10000,
+  "families": [3, 6, 16],
+  "mandatory": {"regimes": ["a0", "b0", "b1"], "G": [5, 7, 10]},
+  "sensitivity": {"regimes": ["a1"], "G": [5, 7, 10]},
+  "generators": {
+    "rho_a1": 0.6,
+    "scale_ratio": 5.0,
+    "definition": "a0: iid N(0,1) G x 16; a1: sqrt(rho) f_g + sqrt(1-rho) z; b0: z * s_g, s = exp(linspace(0, ln scale_ratio, G)); b1: session distribution cycles normal / t3 (unit variance) / centred lognormal sigma 1 (unit variance) by session index mod 3, times s_g; all true mean 0; SplitMix64 Box-Muller normals; drawn in chunks of `chunk` datasets from one stream per cell in the order z, then f (a1) or the chi-square normals (b1)"
+  },
+  "seeds": {
+    "base": 20291100,
+    "dry_run_base": 20291900,
+    "formula": "base + 10 * regime_index + G",
+    "regime_index": {"a0": 0, "b0": 1, "b1": 2, "a1": 3},
+    "disjoint_from": ["20281100-20281199 (pilot)", "20271001-20271004 (F3 diagnostic)"]
+  },
+  "dry_run": {"n": 200, "output_discarded": true},
+  "workers": 3,
+  "stop_rules": {
+    "min_free_ram_gb": 4.0,
+    "no_interim_looks": true,
+    "one_run_only": true,
+    "crash_policy": "completed cell files with the same prereg sha256 are kept and skipped on resume; a parameter change is a new declaration",
+    "fail_policy": "a failed evaluation is recorded; no tuning, no rerun with new seeds under this prereg"
+  },
+  "decision_rule": "overall PASS iff every one of the 27 mandatory evaluations (a0, b0, b1 x G 5, 7, 10 x K 3, 6, 16) has UCB95 <= fwer_target, i.e. count <= k_max(n_per_cell); a1 is reported and is not a criterion; a NaN p counts as p = 1 and any NaN is reported; pass supports calibration under the synthetic regimes only, never a real-data claim; serial dependence is outside the validated domain"
+}
