@@ -82,7 +82,7 @@ The full list with descriptions is the [Documentation index](#documentation-inde
   model, portfolio limits and a kill switch ([docs/FACTOR_RISK.md](docs/FACTOR_RISK.md), [docs/PORTFOLIO_LIMITS.md](docs/PORTFOLIO_LIMITS.md));
   a paper-path order manager with a write-ahead journal and reconciliation (60-minute and 6-hour fault-injection soaks PASS on a synthetic
   feed, not a live venue); a data manifest (`tools/data_manifest.py`).
-- **Open gates, accepted open for this tag:** F3, F7 (no independent rerun of the B8 v2 JSON), the reviewer's full findings memo; F5 is partly met
+- **Open gates, accepted open for this tag:** F3, F7 (no independent rerun of the B8 v2 JSON), the reviewer's full findings memo; F5 was partly met at the tag and is met by the 2026-10-24 R7 re-issue
   ([docs/release/FOUNDATION_COMPLETE_v1.18.md](docs/release/FOUNDATION_COMPLETE_v1.18.md)).
 
 **v1.17.1 (released 2026-10-17):**
@@ -132,15 +132,14 @@ The full list with descriptions is the [Documentation index](#documentation-inde
 **Standing results.** Bundled synthetic data: 24 alphas, 0 PROMOTE, 23 held at CANDIDATE; the
 executable loop loses 82.84 USD on its golden session (the table below). Real data
 (owner-supplied, not bundled): R7-CONFIRM-1 confirmed EQ10@1s and EQ05@1s on 7 unseen sessions
-in v1.15 (predictive, not tradable at 1x cost;
+in v1.15 under the rules of that release (predictive, not tradable at 1x cost; re-issued as `ineligible` under the v1.18 verdict rule, see R7_RESULTS.md;
 [docs/research/R7_RESULTS.md](docs/research/R7_RESULTS.md)); v1.16 found no taker, capacity,
 quoting or DeepLOB edge; v1.17 adds the screen and breadth results above;
 v1.18 adds only negative or underpowered results (the status block at the top)
 ([docs/REAL_DATA.md](docs/REAL_DATA.md) §3, [LEARN.md](LEARN.md) §31-§44).
 
 **Next (after v1.18.0, not part of it):** the post-release documentation pass (REL-14c, this one), a diagnostic review of the failed
-known-null method (F3; not an automatic v4), a REL-08 rule v2 (an unsigned draft) with a multi-session screen, an optional re-issue of the R7
-result with eligibility applied (F5), and v1.19 planning. C++ is parity-only since decision D5(a) (2026-10-18); the C++ ports still listed as pending in
+known-null method (F3; not an automatic v4), a REL-08 rule v2 (an unsigned draft) with a multi-session screen, the R7 re-issue (F5, done 2026-10-24), and v1.19 planning. C++ is parity-only since decision D5(a) (2026-10-18); the C++ ports still listed as pending in
 PLATFORM_CONVENTIONS.md §11.3 are the B2-regime arm of dark eligibility, the exchange-local (IANA zone) hazard
 clock, and the B8 two-venue merge and router hook (the B10 proxy sampler and fit are Python by design). Plan:
 [docs/ROADMAP.md](docs/ROADMAP.md) §3.14.

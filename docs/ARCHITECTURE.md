@@ -1383,7 +1383,7 @@ goldens, stores and reports.
 
 ## 20. v1.15: the confirmatory release
 
-- **R7 confirmed** EQ10@1s and EQ05@1s on 7 owner-signed holdout sessions
+- **R7 confirmed** (v1.15 rules; re-issued 2026-10-24 as `ineligible` under the v1.18 verdict rule) EQ10@1s and EQ05@1s on 7 owner-signed holdout sessions
   (`docs/research/R7_RESULTS.md`), through `tools/r7_confirm.py` (one look,
   `--i-am-the-owner`) after a `--dry-run` that checks signature, data
   fingerprints, dataset version, `prereg_gate.require` and the ledger

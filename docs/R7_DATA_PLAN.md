@@ -15,7 +15,7 @@
 > them once; later signed v1.18 runs read several of them again) and are no longer a
 > holdout. R7-CONFIRM-1 is `confirmed` on its statistic for EQ10 and EQ05 at 1 s, but
 > the recorded result file is `gate_eligible: false` (run under bundle `v4` where `v2`
-> is required; DSR recorded at the wrong trial count) and was not re-issued. The DSR
+> is required; DSR recorded at the wrong trial count); it was re-issued on 2026-10-24 at the registered N with the v1.18 rule applied (`ineligible`, see `docs/research/R7_RESULTS.md`). The DSR
 > recompute at N = 297 leaves both verdicts unchanged (gate F5, partly met in
 > v1.18.0). No signal is promoted and no net-of-cost edge followed. Tier 2 was never
 > bought. The A2 QQQ-basis study (section 7) has synthetic tests only: nothing in the

@@ -31,7 +31,7 @@ negative ones first, is written down with the artefact that produced it.
 **Proven (pre-registered, one look, unseen data).**
 
 - Two microstructure signals predict on sessions nobody had seen. The
-  owner-signed confirmatory pre-registration R7-CONFIRM-1 ran once on 7
+  owner-signed confirmatory pre-registration R7-CONFIRM-1 (re-issued 2026-10-24 as `ineligible` under the v1.18 verdict rule; see R7_RESULTS.md) ran once on 7
   unseen Nasdaq ITCH holdout sessions (AAPL, MSFT, QQQ): EQ10 @1s holdout
   IC +0.0838, HAC t 13.66; EQ05 @1s IC +0.0409, HAC t 13.20; threshold
   4.432; 7 of 7 sessions positive for both. Verdict: **both confirmed**

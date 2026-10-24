@@ -696,7 +696,7 @@ commit between v1.14 and v1.18, see §8.3). The
 state machine still has 7 states, 17 edges and 20 gates
 (`tests/harness/check_headline_numbers.py` `lifecycle_numbers`). The bundled
 research still bootstraps to 23 CANDIDATE and 0 beyond. R7 confirmed EQ10@1s
-and EQ05@1s as predictive on the holdout (v1.15), but the cost gate is
+and EQ05@1s as predictive on the holdout (v1.15; `ineligible` under the v1.18 rule, re-issued 2026-10-24), but the cost gate is
 unchanged and the v1.16 monetisation study found no tradable taker
 configuration (HOW_IT_WORKS.md §3.13), so nothing moves to VALIDATING. The
 v1.16 multiple-testing table in `REPORT.md` is report-only; the promotion

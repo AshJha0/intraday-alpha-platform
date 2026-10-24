@@ -6,6 +6,10 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
+## Unreleased
+
+- Post-release (after v1.18.0): R7 result re-issued at the registered N = 297 with the v1.18 verdict-eligibility rule applied (gate F5 now met): EQ10@1s and EQ05@1s are `ineligible` (numeric gate passes; method bundle `v4` instead of the required `v2`); no data read, no ledger entry (`research/r7/r7_confirm_result_reissue.json`, `docs/research/R7_RESULTS.md`, #332). F3 diagnostic review plan committed (`research/v118/F3_DIAGNOSTIC_REVIEW_PLAN.md`, #333); documentation truth pass and LEARN/COOKBOOK 141-200 (#331).
+
 ## v1.18.0 — 2026-10-23
 
 **Theme: a measurement instrument and recorded negative results. No signal is promoted and no edge is claimed.**
