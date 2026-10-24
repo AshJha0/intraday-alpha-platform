@@ -305,6 +305,12 @@ names measured against the reference ETF of a versioned symbol map, so its
 15 m / 30 m / 1 h session-grid labels keyed by `instrument_id, anchor_ts`;
 docs/SIGNAL_RESEARCH.md section 10).
 
+The v1.18 REL-02 ledger migration (`research/v118/REL02_LEDGER_MIGRATION.md`) appended entries and tagged each
+with a `data_family` (real or synthetic) in the entry JSON. The store has no `data_family` column and does not
+index it (it is not part of the chained identity), so the store's ledger views count looks as they did before;
+the family accounting (6,826 looks over 640 configurations, 256 real) is read from `research/experiments.json`
+through `iap.validation.ledger`, not from the SQL views.
+
 `import_all` runs them in that order (alpha rows must exist before the
 state writers run). Each importer returns an `ImportReport(inserted={table:
 n}, warnings=(…))`.
@@ -455,7 +461,7 @@ FROM ledger_scopes ORDER BY dataset_version, methods;
 -- {"bonferroni_t":4.018,"dataset":"116b7787","looks":852,"methods":"legacy_v1","n_entries":69}
 -- {"bonferroni_t":4.322,"dataset":"116b7787","looks":3236,"methods":"v2","n_entries":77}
 -- {"bonferroni_t":4.071,"dataset":"203c8f54","looks":1068,"methods":"legacy_v1","n_entries":70}
--- (v1.5.0 snapshot, by scope; that snapshot's total was 5,361, the ledger holds 5,732 as of v1.17.0. bonferroni_t is the |t| each scope alone would demand.)
+-- (v1.5.0 snapshot, by scope; that snapshot's total was 5,361; the ledger held 5,732 as of v1.17.0 and holds 6,826 looks over 640 entries after the v1.18 REL-02 migration. bonferroni_t is the |t| each scope alone would demand.)
 
 SELECT kind, n_entries, n_alphas, total_count, n_promote, n_iterate, n_reject,
        max_gate_looks, ROUND(max_promote_t_threshold, 3) AS max_t_threshold

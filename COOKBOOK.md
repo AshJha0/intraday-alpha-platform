@@ -4,8 +4,10 @@ Every recipe below is runnable from a fresh checkout of this repository in
 the standard environment (Python 3.11 + pyarrow, g++ 13/CMake, Rust 1.99.0,
 Java 21 only for the archived engine in `archive/java/`; see [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)). Paths are relative
 to the repo root unless a recipe says otherwise. Recipes that read
-`data/features/` need recipes 1 and 3 to have run first (the repo ships with
-their outputs already generated).
+`data/features/` need recipes 1 and 3 to have run first: generated data is
+git-ignored and never committed, so a fresh checkout has no `data/raw/`,
+`data/normalized/` or `data/features/` until you run them (about 2 minutes for
+recipe 1 plus recipe 3 on one Windows machine).
 
 Contents:
 
@@ -54,7 +56,7 @@ Contents:
 43. [Build features in parallel with causal (trailing) label freshness (v1.9)](#43-build-features-in-parallel-with-causal-trailing-label-freshness-v19)
 44. [Validate under the `v3` bundle and read the validity block (v1.9)](#44-validate-under-the-v3-bundle-and-read-the-validity-block-v19)
 45. [Calibrate the simulator on one real session (v1.9)](#45-calibrate-the-simulator-on-one-real-session-v19)
-46. [Run the maker backtest on a real session (how-to; results pending)](#46-run-the-maker-backtest-on-a-real-session-how-to-results-pending)
+46. [Run the maker backtest on a real session (how-to; no maker edge found)](#46-run-the-maker-backtest-on-a-real-session-how-to-no-maker-edge-found)
 47. [Pre-register with a signed request, anchor it, and verify the board (v1.10)](#47-pre-register-with-a-signed-request-anchor-it-and-verify-the-board-v110)
 48. [Walk the Almgren-Chriss efficient frontier (v1.10)](#48-walk-the-almgren-chriss-efficient-frontier-v110)
 49. [Compute the native features with the Rust engine from Python (v1.11)](#49-compute-the-native-features-with-the-rust-engine-from-python-v111)
@@ -162,6 +164,48 @@ cover v1.17 (signal-aware execution, quote fading, the IEX second venue, the
 breadth book, the new models and gates, the agents and the CI guards), all
 opt-in; the shell note before recipe 102 gives the PowerShell forms. Python
 blocks with no save-as line run from the repo root with `PYTHONPATH=python/src`.
+
+**v1.18.0 (2026-10-24).** This release added no recipe. It is a measurement
+release with recorded negative results (no signal promoted, no edge claimed,
+the fill model validated only against deterministic replay), and it changed
+what several earlier recipes print and what they may read. Four things to
+know before quoting a number from this book:
+
+- The default research bundles `v2`, `v3` and `v4` were revised in v1.14 and
+  again in v1.17: a validation now debits 2 looks (one gate decision plus the
+  holdout), not 84. The v1.13 rules are frozen as `v2_v113`, `v3_v113` and
+  `v4_v113` (recipe 72). The research figures in recipes 4 to 40 show the
+  v1.18.0 values (re-run, or read from the committed reports, see the last
+  paragraph below); where an older figure is kept it is labelled with its
+  release.
+- The committed ledger holds 6,826 looks over 640 distinct configurations
+  (5,694 synthetic, 1,132 real-data, `ExperimentLedger.family_counts()`); a
+  promotion-report run is judged at a look count of 5,420, a PROMOTE t of 4.435
+  (recipes 5, 20 and 29).
+- Every read of an ingested real-data dataset goes through the fail-closed
+  holdout registry, `research/holdout_registry.json`
+  ([docs/REAL_DATA.md](docs/REAL_DATA.md) §3.7): a session it does not classify
+  is refused before any file is opened (recipe 36 uses two registered
+  in-sample dates for that reason). Signed pre-declarations bind a study to its
+  script, commit, data versions and thresholds; verify them with
+  `PYTHONPATH=python/src python3 tools/verify_signatures.py`, and check that
+  the research record cites only listed datasets with
+  `python3 tools/data_manifest.py check`
+  ([docs/governance/TRUST_ROOT.md](docs/governance/TRUST_ROOT.md)).
+- Nothing in these recipes finds an edge. On the bundled data 0 alphas are
+  PROMOTE (12 ITERATE, 12 REJECT), 23 are CANDIDATE and none is beyond it; the
+  MVP loop and the maker and quoting examples lose money after costs. The
+  v1.18 results (B8 v2, REL-05, REL-08, REL-09, REL-10, the failed known-null
+  calibration) are in
+  [docs/release/v1.18.0_RELEASE_NOTES.md](docs/release/v1.18.0_RELEASE_NOTES.md).
+
+Recipes 5, 6, 7 and 18 rewrite committed reports, so their figures were read
+from the committed artefacts (last regenerated at v1.17.0). Recipes 2, 10, 12,
+13, 19, 52, 57 and 60 need Java, Rust, C++ or Docker tooling that was not
+installed for the v1.18.0 check, and 45 and 46 need vendor data; their quoted
+outputs are as captured at the release they name. The runnable blocks of the
+other recipes that print numbers were re-run at v1.18.0 on a Windows machine
+(except 41 and 43).
 
 The Java engine was archived in v1.15 (`archive/java/`, frozen at
 v1.14.0, no longer in CI). Recipes that still show a Java command run the
@@ -443,12 +487,12 @@ old = validate_alpha(lambda: build("EQ03"), frames,
                      meta, max_part, **methods("legacy_v1").validate_kwargs())
 print({k: old[k] for k in ("oos_ic", "nw_tstat", "fold_sign_consistency",
                            "net_pnl_1x_cost", "verdict")})
-# looks: 3936 PROMOTE t >= 4.365
-# default -> gate_ic 0.0189, gate_tstat 5.16, oos_rank_ic 0.0211, oos_hit_rate 0.513,
+# looks: 5420 PROMOTE t >= 4.435
+# default -> gate_ic 0.0300, gate_tstat 7.97, oos_rank_ic 0.0175, oos_hit_rate 0.507,
 #            fold_sign_consistency 1.0, trade_count_1x_cost 0, net_pnl_1x_cost 0.0,
 #            verdict ITERATE
-# legacy  -> oos_ic 0.0190, nw_tstat 5.86, fold_sign_consistency 1.0,
-#            net_pnl_1x_cost -161585.48, verdict ITERATE
+# legacy  -> oos_ic 0.0190, nw_tstat 5.88, fold_sign_consistency 1.0,
+#            net_pnl_1x_cost -159339.13, verdict ITERATE
 EOF
 ```
 
@@ -457,8 +501,8 @@ The default call needs one thing the legacy call does not:
 |t| at the run's look count)`, and `validate_alpha` refuses to guess the
 count — without the argument it raises and names
 `tstat_threshold="fixed"` as the legacy rule. Here the count is the one
-the committed report was judged at (3,936, recorded in `EQ03.json` as
-`ledger_looks`); opening the ledger this way only reads it. The label
+the committed report was judged at (5,420 at v1.18.0, recorded in `EQ03.json`
+as `ledger_looks`); opening the ledger this way only reads it. The label
 horizon the cost-aware backtest needs is set by `validate_alpha` itself.
 
 Compare against the committed `research/alpha_reports/EQ03.json`: the run
@@ -471,11 +515,13 @@ default `BacktestConfig()` where the report's backtester adds the pinned
 research execution model — `latency_ns=1 s, max_decision_age_ns=60 s,
 flatten_at_session_end=True`; with no trade the two cannot differ.)
 
-The second block is the v1.4.0 recipe, reproduced to the cent: the sign
-policy trades every row and loses 161,585.48 on the last fold (the v1.4.0
-report, under the research execution model, said −148,562). 5.86 is
-`nw_tstat`, the within-bucket t over all rows; the legacy gate read its
-uncrossed-row form, 5.85 in today's report (`t other`).
+The second block is the v1.4.0 recipe: the sign policy trades every row and
+loses on the last fold. The v1.4.0 page printed 161,585.48 (the v1.4.0 report,
+under the research execution model, said −148,562); changes since then (not
+bisected) also moved the legacy path, and this block now prints −159,339.13
+with the same verdict, so it no longer reproduces a v1.4.0 number to the cent.
+5.88 is `nw_tstat`, the within-bucket t over all rows; the legacy gate read
+its uncrossed-row form.
 
 ## 5. Run the full 24-alpha promotion report
 
@@ -489,8 +535,8 @@ PYTHONPATH=python/src python3 research/alpha_reports/run_all.py \
 reports — and the figures below are read from the committed
 `REPORT.md`.) Outputs of the first: `research/alpha_reports/REPORT.md`
 (the honest master table — 0 PROMOTE / 12 ITERATE / 12 REJECT on the
-bundled data at v1.14.0; at 1× costs 18 alphas make no trade, 6 trade and lose, none
-ends above zero), one JSON of full
+bundled data, as regenerated at v1.17.0 and unchanged at v1.18.0; at 1× costs 18
+alphas make no trade, 6 trade and lose, none ends above zero), one JSON of full
 evidence per alpha, the appending multiple-testing ledger
 `research/experiments.json`, and refreshed day-1-fitted
 `configs/strategies/alpha_params.json` (the port contract input —
@@ -499,10 +545,11 @@ API_ALPHA.md §6). The ledger is scoped by dataset since v1.4.0 and by
 method bundle since v1.5.0: on a dataset the ledger has already seen under
 the same bundle, a rerun is recorded as a rerun, adds no looks and is
 judged at the look count recorded the first time; a first run adds
-24 × 84 = 2,016 (84 per alpha: 83 for the validation at four folds, one
-for the day-2 backtest; 24 × 28 = 672 under `legacy_v1`). The committed
-report was judged at a look count of 3,936 — the ledger before the run
-plus its own 2,016 — which sets the PROMOTE t threshold at 4.365. After a
+24 × 2 = 48 under the default bundle (since v1.14 one look per gate decision,
+2 per alpha; 24 × 84 = 2,016 under the frozen v1.13 rules `v2_v113`, which is
+what this page said up to v1.13, and 24 × 28 = 672 under `legacy_v1`). The
+committed report was judged at a look count of 5,420 — the ledger before the
+run plus its own 48 — which sets the PROMOTE t threshold at 4.435. After a
 dataset change run the whole chain instead (recipe 1).
 
 `--methods legacy_v1` needs `--out-dir`: `research/alpha_reports/` and
@@ -520,17 +567,21 @@ python3 research/ml_reports/run_ml.py        # < 5 min budget; ~1 min typical
 
 This runs the gated comparison (linear baselines always; XGBoost/LightGBM/MLP
 only if the best linear pooled OOS IC against the mid-to-mid label is
-positive — on the bundled data it is +0.0081 for ridge, so the gate passes
-and all three are fitted) and writes `research/ml_reports/ML_REPORT.md`.
+positive — on the bundled data it is +0.0079 for ridge in the committed
+report, so the gate passes and all three are fitted) and writes
+`research/ml_reports/ML_REPORT.md`.
 Passing the gate is not a result: the mid-label IC of every fitted model is
-between −0.0024 and +0.0081, and the conservative net is negative for all
-six (−0.110 to −2.612 bps per signal). On the v1.3.0 dataset the same gate
+between +0.0001 and +0.0086, and the conservative net is negative for all
+six (−0.047 to −2.668 bps per signal). The report also prints the v1.17
+day-clustered reading of the same gate (ridge fold-mean rank IC 0.0061,
+day-clustered t 0.33 over 2 session days), which would fail it; the literal
+rule above is the one that decided this report. On the v1.3.0 dataset the same gate
 failed (ridge −0.0430) and the trees and the MLP were never fitted. The
 model comparison is not affected by the v1.5.0 method defaults — the table
 of the v1.5.0 report equals the v1.4.0 one — and only the meta-label stage
 changed (recipe 7). Every
-fit is a tracked run — 47 so far; runs 0041–0047 are the v1.5.0 pass
-(the script was not re-run for this page; it appends model runs):
+fit is a tracked run — 96 so far at v1.18.0; runs 0090–0096 are the latest
+pass (the script was not re-run for this page; it appends model runs):
 
 ```bash
 python3 -m json.tool research/models/ledger.json | head
@@ -560,21 +611,23 @@ for row in cc["curve"]:            # predicted-prob bin vs observed frequency
 EOF
 ```
 
-Committed result: primary `ridge`, AUC 0.670, Brier 0.0567, test base
-rate of profitable signals 0.062; both τ = 0.5 and the calibration-chosen
-best τ = 0.300 keep **zero** of the 4,100 test signals. The report flags
+Committed result (v1.18.0): primary `ridge`, AUC 0.609, Brier 0.0684, test
+base rate of profitable signals 0.075; both τ = 0.5 and the calibration-chosen
+best τ = 0.300 keep **zero** of the 3,887 test signals. The report flags
 this `gate_degenerate: true` and does not present it as an economic
 decision — a gate that never fires is no evidence either way (the gate-off
-row shows −746.7 total net bps for the ungated primary). Calibration here
-is Platt scaling, not isotonic: the calibration segment has 255 positives,
+row shows −341.3 total net bps for the ungated primary). Calibration here
+is Platt scaling, not isotonic: the calibration segment has 274 positives,
 below the pinned isotonic minimum of 500. Thresholds are chosen on the
 calibration segment, economically (LEARN.md §7.3). The latest meta-label
-run directory is `research/models/run_0047_metalabel_ridge/`. Since v1.5.0
+run directory is `research/models/run_0096_metalabel_ridge/`. Since v1.5.0
 a missing meta-feature value stays NaN for the tree model
-(`build_meta_features(impute_nan=False)`, the default; 275 of 131,880
+(`build_meta_features(impute_nan=False)`, the default; 115 of 125,016
 values on this data) where v1.4.0 imputed it to zero (`impute_nan=True`,
-the legacy rule): the AUC and Brier score above were 0.655 and 0.0568
-under the old rule, and the gate was degenerate under both.
+the legacy rule). When this page was written for v1.5.0 the AUC and Brier
+score were 0.670 / 0.0567 under the new rule and 0.655 / 0.0568 under the
+old one (not re-run since), and the gate was degenerate under both; the
+numbers above are those of the current committed report.
 
 ## 8. Optimize a portfolio with the golden problem
 
@@ -630,7 +683,7 @@ cd archive/java && bash build.sh && rm -rf out/test && mkdir -p out/test && \
         -d out/test @out/test-sources.txt && \
   java -cp "out/test:out/main:/usr/share/java/junit4.jar:/usr/share/java/hamcrest-core.jar" \
        org.junit.runner.JUnitCore com.iap.RiskGoldenTest
-cd python && PYTHONPATH=src python3 -m pytest -q tests/test_risk_golden.py tests/test_risk_rules.py   # Python port: 9 golden + 89 rule tests (98 passed)
+cd python && PYTHONPATH=src python3 -m pytest -q tests/test_risk_golden.py tests/test_risk_rules.py   # Python port: 9 golden + 99 rule tests (108 passed)
 ```
 
 To understand a decision, read the step in
@@ -726,9 +779,9 @@ EOF
 That output is the result, not a failure of the recipe: EQ01's fitted
 expected return never exceeds the round-trip spread and fee of its own
 row, so the cost-aware policy makes no trade in two sessions (the Sharpe of
-an empty P&L series is NaN). Replace `"EQ01"` with `"EQ11"`, one of the
-six alphas that do trade, and the same lines print 720 trades, gross
-−994.00, costs 11,119.40, net −12,113.40. Without `for_horizon` the run
+an empty P&L series is NaN). Replace `"EQ01"` with `"EQ06"`, the only
+equity alpha that trades on this two-day frame, and the same lines print 137
+trades, gross 52.00, costs 2,055.49, net −2,003.49. Without `for_horizon` the run
 raises `ValueError: position_policy 'cost_aware' needs horizon_ns` and
 names the two ways out; `BacktestConfig.legacy()` with
 `CostModel.load(...).with_linear_impact()` is the v1.4.0 backtest (sign
@@ -744,7 +797,7 @@ non-USD increment with no prevailing rate raises rather than being summed
 as dollars (conventions §11.6). Note this demo scores the *full 2-day* frame — including the day the parameters were
 fitted on — where the REPORT.md day-2 OOS table splits by day with
 `iap.alpha.data.split_by_day` first; for an alpha that trades the two
-differ (EQ11: −12,113 here, −5,948 on day 2 in the report), for EQ01 both
+differ (EQ06: −2,003 here, −987 on day 2 in the report), for EQ01 both
 are zero. The
 pinned EQ01 backtest on the golden frame is golden-tested cross-language
 (`tests/golden/expected_backtest.json`; C++/Java golden groups); that
@@ -753,6 +806,16 @@ Java research backtester implements only those. Full
 procedure and troubleshooting: `docs/runbooks/RUNBOOK_backtest.md`.
 
 ## 12. Run paper trading and scrape /metrics
+
+**Archived path.** This recipe and recipe 19 drive the Java paper-trading
+vertical, which is frozen at v1.14.0 under `archive/java/` and retired from
+CI, the images and the deployment (v1.15, v1.17; `archive/java/README.md`).
+It needs a JDK 21 and is kept as the record of how that engine behaved. The
+maintained equivalents are the MVP loop (recipe 22), the Python `/metrics`
+process (recipe 136) and, since v1.18, the paper-path code in `iap.paper`
+(`PaperSupervisor`, the idempotent order manager with a write-ahead log and
+reconciliation, the feed guard); the 60-minute and 6-hour soaks of that path
+(`tools/rel18_soak.py`) ran on a synthetic feed, not live.
 
 The Java platform streams events through book → features → alphas →
 portfolio → risk → execution with the monitoring endpoints live:
@@ -870,8 +933,10 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 ```
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
-the first line. The counts from main CI run 39043729536 (2026-10-17, v1.17.1 at 838e103): python 3208 / cpp 333 /
-rust 376 tests passed (golden groups 217/74/75; Java archived in v1.15), plus
+the first line. The counts from main CI run 40015853764 (2026-10-23, v1.18.0 at 23b69fb2): python 4062 (3,666 in
+the fast job plus 396 in `python-slow`) / cpp 333 / rust 376 (the `#[test]` count in the source tree, which the
+table reports; the CI rust job's own pass total is higher) tests passed
+(golden groups 217/74/75; Java archived in v1.15), plus
 `integration` (35) and `replay` (6) rows for the repo-level pytest suites, a
 `deployment` row (29 structural checks passed in CI, where `promtool` and
 `kubeconform` are installed; a machine without them reports those checks as
@@ -935,7 +1000,9 @@ too: the harness masks every undeclared column and requires identical
 treatment automatically: 4 purged/embargoed walk-forward folds, shift-by-one
 leakage test, decay curve, cost ×{0.5,1,2} and latency +{0,1,5} stress,
 regime split — and a verdict under the pinned gates: PROMOTE needs leakage
-pass, OOS IC ≥ 0.01, NW t ≥ 3.0, fold consistency ≥ 0.7, **hypothesis
+pass, OOS IC ≥ 0.01, a gate t at or above `max(3.0, the Bonferroni |t| at the
+run's look count)` (4.435 for the committed report at v1.18.0; recipe 29),
+fold consistency ≥ 0.7, **hypothesis
 confirmed** (the fitted sign agrees with your stated rationale), and net
 P&L > 0 at 1× costs. If your fitted beta comes out opposite to your
 rationale, the framework ships it as-is with `hypothesis_confirmed=false` —
@@ -1009,11 +1076,11 @@ PYTHONPATH=python/src python3 research/adaptive_reports/run_adaptive.py
 # alpha subset: ['EQ01', 'EQ03', 'EQ06', 'FX01', 'FX05', 'FX09', 'FX08', 'FX10', 'FX11', 'FX06']
 # EQ01: static:rf=1,pnl=0 ... drift_triggered:rf=1,pnl=0 (...s)
 # ...
-# Done in 63s -> research/adaptive_reports/ADAPTIVE_REPORT.md
+# Done in 66s -> research/adaptive_reports/ADAPTIVE_REPORT.md
 ```
 
-(Those lines are read from the committed v1.5.0 report, which the
-`regenerate` CI job wrote; the script was not re-run here because it
+(Those lines are read from the committed report, last regenerated at v1.17.0
+by the `regenerate` CI job; the script was not re-run here because it
 rewrites the report, the baselines and the ledger.) Takes about a minute and writes `research/adaptive_reports/ADAPTIVE_REPORT.md`
 (the honest comparison + the FX10 false-positive case), per-alpha
 evidence JSONs alongside it, drift baselines to `research/baselines/`
@@ -1032,15 +1099,16 @@ there isn't one. The study runs under the v1.5.0 defaults: the `v2`
 backtest rules, the two-sample HAC z (`adaptive.ic_z_method = "hac"`) and
 the CUSUM retirement rule (`adaptive.lifecycle.breach_rule = "cusum"`),
 all named in `strategies.json`; `"legacy"` and `"consecutive"` are the
-rules up to v1.4.0. Under them the drift-triggered policy fits 88 times in
-total — 78 refits after the ten initial fits, of which 65 name a PSI
-breach and 14 the rolling-IC z — where the v1.4.0 rules gave 122 on the
+rules up to v1.4.0. Under them the drift-triggered policy fits 82 times in
+total in the committed report — 72 refits after the ten initial fits, of which
+59 name a PSI breach and 14 the rolling-IC z (v1.5.0 printed 88, 78, 65 and
+14) — where the v1.4.0 rules gave 122 on the
 same dataset (126 on the v1.3.0 dataset). FX01 is retired under every
 policy, as before. None of the 40 deployments ends above zero: 21 trade
 and lose and 19 make no trade at all, because the forecast never clears
 the round-trip cost. All P&L is in USD; the v1.4.0 report summed
 quote-currency FX P&L as if it were USD (its policy totals of −8.69
-million were wrong in scale), and the static policy now totals −3,921 USD.
+million were wrong in scale), and the static policy now totals −5,420 USD.
 The FX rows of the v1.4.0 report had differed from
 the v1.3.0 report by about one trade per deployment although the FX data is
 byte-identical: the v1.3.0 report had last been generated before the
@@ -1096,7 +1164,8 @@ the summary line stays bit-for-bit reproducible (recipe 12).
 The store (`schemas/sql/iap_v2.sql`, [docs/DATA_MODEL.md](docs/DATA_MODEL.md))
 is a derived, rebuildable SQLite index over the research artefacts and the
 decision traces; the JSON / JSONL / Parquet files stay the source of truth.
-Building it takes about a second and prints one row per table:
+Building it took about a second when this was written and about 9 seconds
+(wall clock, one Windows machine) at v1.18.0; it prints one row per table:
 
 ```bash
 cd python
@@ -1108,15 +1177,19 @@ PYTHONPATH=src python3 -m iap.store build            # -> data/store/iap.sqlite 
 # experiment_results       39
 # experiments              39
 # instruments              19
-# ledger_entries          216
-# ledger_scopes             3
-# lifecycle_transitions   372
-# model_runs               47
+# ledger_entries          640
+# ledger_scopes            13
+# lifecycle_transitions   381
+# model_runs               96
 # store_scope               1
 # tca_orders               36
 # venues                    5
 # ...
 ```
+
+(Counts from a build on the v1.18.0 tree. Since v1.18 REL-02 the build also
+prints, on stderr, one `no dataset_version, filed as 'unstamped'` warning for
+each ledger entry written before entries carried a dataset stamp.)
 
 Every importer is idempotent — run `build` again and the counts do not
 move — and total over its input: a record it cannot map (a NaN metric, a
@@ -1134,52 +1207,68 @@ deterministic output), or print a scope's scorecard with `scorecard`:
 
 ```bash
 PYTHONPATH=src python3 -m iap.store sql "SELECT alpha_id, current_state, verdict, ROUND(ic,4) AS ic, ledger_count FROM v_alpha_scorecard_current ORDER BY alpha_id"
-# {"alpha_id":"EQ01","current_state":"CANDIDATE","ic":-0.0019,"ledger_count":172,"verdict":"REJECT"}
-# {"alpha_id":"EQ02","current_state":"CANDIDATE","ic":0.0251,"ledger_count":84,"verdict":"ITERATE"}
+# {"alpha_id":"EQ01","current_state":"CANDIDATE","ic":0.0187,"ledger_count":8,"verdict":"ITERATE"}
+# {"alpha_id":"EQ02","current_state":"CANDIDATE","ic":0.0362,"ledger_count":2,"verdict":"ITERATE"}
 # ...  (24 rows)
 PYTHONPATH=src python3 -m iap.store sql "SELECT alpha_id, substr(dataset_version, 1, 8) AS dataset, methods, is_current, verdict, ROUND(ic, 4) AS ic, ROUND(t_stat, 2) AS t_stat, ROUND(promote_t_threshold, 3) AS t_threshold, ledger_count, scope_looks FROM v_alpha_scorecard WHERE alpha_id = 'EQ03' ORDER BY dataset_version, methods"
-# {"alpha_id":"EQ03","dataset":"116b7787","ic":0.0271,"is_current":0,"ledger_count":88,"methods":"legacy_v1","scope_looks":852,"t_stat":4.84,"t_threshold":3.0,"verdict":"ITERATE"}
-# {"alpha_id":"EQ03","dataset":"116b7787","ic":0.0132,"is_current":1,"ledger_count":256,"methods":"v2","scope_looks":3236,"t_stat":2.41,"t_threshold":4.37,"verdict":"ITERATE"}
+# {"alpha_id":"EQ03","dataset":"116b7787","ic":0.0271,"is_current":0,"ledger_count":88,"methods":"legacy_v1","scope_looks":856,"t_stat":4.84,"t_threshold":3.0,"verdict":"ITERATE"}
+# {"alpha_id":"EQ03","dataset":"116b7787","ic":0.0229,"is_current":1,"ledger_count":10,"methods":"v2","scope_looks":332,"t_stat":5.37,"t_threshold":4.435,"verdict":"ITERATE"}
+# {"alpha_id":"EQ03","dataset":"116b7787","ic":null,"is_current":0,"ledger_count":256,"methods":"v2_v113","scope_looks":3236,"t_stat":null,"t_threshold":null,"verdict":null}
+# {"alpha_id":"EQ03","dataset":"116b7787","ic":null,"is_current":0,"ledger_count":10,"methods":"v2_v114","scope_looks":202,"t_stat":null,"t_threshold":null,"verdict":null}
 # {"alpha_id":"EQ03","dataset":"203c8f54","ic":0.0165,"is_current":0,"ledger_count":88,"methods":"legacy_v1","scope_looks":1068,"t_stat":4.25,"t_threshold":3.0,"verdict":"ITERATE"}
+# {"alpha_id":"EQ03","dataset":"ee4c2187","ic":null,"is_current":0,"ledger_count":2,"methods":"v2","scope_looks":23,"t_stat":null,"t_threshold":null,"verdict":null}
 PYTHONPATH=src python3 -m iap.store sql "SELECT substr(dataset_version, 1, 8) AS dataset, methods, n_entries, looks, ROUND(bonferroni_t_threshold, 3) AS bonferroni_t FROM ledger_scopes ORDER BY dataset_version, methods"
-# {"bonferroni_t":4.018,"dataset":"116b7787","looks":852,"methods":"legacy_v1","n_entries":69}
-# {"bonferroni_t":4.322,"dataset":"116b7787","looks":3236,"methods":"v2","n_entries":77}
+# {"bonferroni_t":4.019,"dataset":"116b7787","looks":856,"methods":"legacy_v1","n_entries":73}
+# {"bonferroni_t":3.79,"dataset":"116b7787","looks":332,"methods":"v2","n_entries":87}
+# {"bonferroni_t":4.322,"dataset":"116b7787","looks":3236,"methods":"v2_v113","n_entries":77}
+# {"bonferroni_t":3.665,"dataset":"116b7787","looks":202,"methods":"v2_v114","n_entries":77}
 # {"bonferroni_t":4.071,"dataset":"203c8f54","looks":1068,"methods":"legacy_v1","n_entries":70}
+# ...  (13 rows: the five above are the synthetic datasets; the other eight, with datasets
+#       535f4868, ca5d0798, d7f7ffd1, dea2a6b0, ee4c2187 and the 'unstampe' pre-stamp entries,
+#       are ingested real-data ledgers, 1,132 in all)
 PYTHONPATH=src python3 -m iap.store sql "SELECT COUNT(*) AS distinct_experiments, SUM(count) AS total_experiments FROM ledger_entries"
-# {"distinct_experiments":216,"total_experiments":5156}     -- the Bonferroni denominator of the whole ledger
+# {"distinct_experiments":640,"total_experiments":6826}     -- the Bonferroni denominator of the whole ledger
 PYTHONPATH=src python3 -m iap.store scorecard | wc -l                                   # 24: the current scope
 PYTHONPATH=src python3 -m iap.store scorecard --methods legacy_v1 | wc -l               # 24: same dataset, legacy bundle
 PYTHONPATH=src python3 -m iap.store scorecard --dataset-version 203c8f54 --methods legacy_v1 | wc -l   # 24: the earlier dataset
-PYTHONPATH=src python3 -m iap.store scorecard --all-scopes | wc -l                      # 72: three scopes x 24 alphas
+PYTHONPATH=src python3 -m iap.store scorecard --all-scopes | wc -l                      # 144: six scopes x 24 alphas
 ```
 
-(Re-run on the v1.5.0 tree, with `--db` pointing at a scratch file.)
+(Re-run on the v1.18.0 tree. The `ledger_scopes` and `scorecard` lines read the
+committed ledger as indexed by `build`; `--all-scopes` prints one row per
+alpha for each of the six scopes in which the alphas have ledger entries, EQ03's
+six rows above among them, one of which is on a real-data dataset.)
 
 How to read a scorecard row. Each row is one scope and every number in it
 is of that scope alone: `ic`, `t_stat` and `verdict` are the latest
 experiment result recorded in the scope (by `created_ts`, then the largest
 experiment id), `gate_looks` and `promote_t_threshold` the ledger look count
 and \|t\| threshold that result was judged at, `ledger_count` the alpha's
-looks in the scope and `scope_looks` every look made in it. EQ03's three
-rows above add up to the count of 432 the version-1 view printed on a single
-row next to a legacy-rules IC; nothing is pooled any more. Two things to
+looks in the scope and `scope_looks` every look made in it. EQ03's rows
+above are one per scope; the version-1 view printed a single pooled count of
+432 next to a legacy-rules IC, and nothing is pooled any more. Two things to
 keep in mind. First, EQ01, EQ03 and EQ06 also have `ExperimentRunner`
 experiments, and their latest result in a scope is one of those (EQ01's
-current row is `6e4a3431a3acf8a5`, IC −0.0019, REJECT); the alpha-report
+current row is `6e4a3431a3acf8a5`, IC +0.0187, ITERATE); the alpha-report
 pipeline's verdict is in `pipeline_verdict` / `pipeline_nw_tstat` /
-`pipeline_t_threshold`, and that is the column the headline "11 ITERATE /
-13 REJECT" counts (recipe 33). Second, the threshold is the one the result
+`pipeline_t_threshold`, and that is the column the headline "12 ITERATE /
+12 REJECT" counts (recipe 33). Second, the threshold is the one the result
 was judged at, not a re-judgement: `legacy_v1` rows read the fixed 3.0,
 `v2` rows `max(3.0, Bonferroni |t| at gate_looks)`, where `gate_looks`
 counts every look the ledger held at the time, across datasets;
 `scope_bonferroni_t` is what the scope alone would demand. The ledger total
-(a total of 5,156 over 216 entries in the output above, captured at v1.5.0; 5,732
-over 422 as of v1.17.0, source `research/experiments.json`; v1.14.0 added a fourth scope for the v1.14 statistics
-revision) is the sum of the three scopes: 1,068 on the
-v1.3.0 dataset, 852 on the current dataset under the old rules, and 3,236
-under the default rules (24 × 84 for the promotion report, 5 × 84 for the
-runner experiments, 40 adaptive deployments, 8 × 95 for the signal-combination
-experiments of recipe 38).
+(6,826 over 640 distinct configurations in the output above, at v1.18.0,
+source `research/experiments.json`; it was 5,156 over 216 at v1.5.0 and 5,732
+over 422 at v1.17.0) is the sum of the thirteen scopes. Five are the
+synthetic datasets (5,694 in all): 1,068 on the v1.3.0 dataset, and on the
+current dataset 856 under the old rules, 332 under the default `v2`, 202
+under `v2_v114` and 3,236 under `v2_v113` (24 × 84 for the promotion report,
+5 × 84 for the runner experiments, 40 adaptive deployments, 8 × 95 for the
+signal-combination experiments of recipe 38: the default rules of v1.5.0 to
+v1.13, which v1.14 froze under that name). The other eight are ingested
+real-data ledgers, 1,132 in all over 256 configurations; since v1.18 REL-02
+each ledger entry carries a `data_family` (`synthetic` or `real`) and
+`ExperimentLedger.family_counts()` prints the split.
 
 `sql` binds `:dataset_version` and `:methods` to the scope the command line
 selects (the current one by default), and `build --ledger <path>` indexes
@@ -1251,7 +1340,8 @@ loop — seeded market data → books → features → EQ01/EQ03/EQ06 ensemble �
 portfolio → hard risk → TWAP/POV/IS → SOR over XV1/XV2/XV3 → execution
 simulator → TCA → attribution → decision trace → SQLite → report — on the
 synthetic equity `SYN.EQ.AAPL` and writes every artefact under
-`data/mvp/<run_id>/` (git-ignored). About 7 seconds:
+`data/mvp/<run_id>/` (git-ignored). About 7 seconds when this recipe was
+written; 32 seconds wall clock on one Windows machine at v1.18.0:
 
 ```bash
 cd python
@@ -1287,9 +1377,11 @@ with it the trace digest (`f51890da…` in v1.4.0, `2affe409…` in v1.5.0,
 counts and P&L moved slightly (231 parents, 347 children submitted, 163
 fills, −82.84 USD; it was 235 / 348 / 169 / −81.53) and the digest became
 `a7f1ee60…` with `config_version` `62d78a3b…`: `alpha_params.json` and the
-risk configuration are hashed, and both changed in the v1.14 regeneration. The summary line was re-run for this
-page with `--out` pointing at a scratch directory; `replay` (recipe 23)
-and `explain` (recipe 24) were re-run against that directory.
+risk configuration are hashed, and both changed in the v1.14 regeneration.
+The summary line was re-run at v1.18.0 with `--out` pointing at a scratch
+directory and is unchanged (same run id, counts, P&L and digest prefix);
+`replay` (recipe 23) and `explain` (recipe 24) were re-run against that
+directory. The MVP loses money on its golden session: no edge is claimed.
 Outside the checkout (the Python image bakes `configs/` and
 `research/alpha_registry.json` under `/app`) add `--repo-root /app` to
 `run` / `replay` / `verify`.
@@ -1331,7 +1423,7 @@ PYTHONPATH=src python3 -m iap.mvp explain --run ../data/mvp/58a10f2194a3c81c 5
 # Alpha:      EQ01  expected return = +0.0 bps  confidence = 0.14
 # Alpha:      EQ03  expected return = +0.1 bps  confidence = 1.00
 # Alpha:      EQ06  expected return = +0.0 bps  confidence = 0.00
-# Portfolio:  target = +5 shares
+# Portfolio:  target = +0 shares
 # Risk:       ALLOW
 # Risk:       ALLOW
 # Execution:  IS
@@ -1359,10 +1451,12 @@ The seven-state machine ([docs/LIFECYCLE.md](docs/LIFECYCLE.md)) reads the
 24 alpha reports, the ledger and `alpha_params.json`, registers every alpha
 at RESEARCH at the pinned bootstrap event time (the latest fold `test_end`)
 and advances it until it stops moving. On the bundled data that is one
-step: every alpha reaches CANDIDATE and holds there. All 24 fail
+step for 23 of the 24 alphas: they reach CANDIDATE and hold there. FX11 stays
+at RESEARCH, held by the v1.14 time-shift leakage gate (`leakage_clean`,
+docs/research/FX11_FINDING.md). All 23 candidates fail
 `net_pnl_after_costs`, its bootstrap bound `net_pnl_bootstrap_ci` and
-`capacity`; for three of them (EQ02, EQ03, EQ12)
-those are the only failed gates.
+`capacity`; for six of them (EQ01, EQ02, EQ03, EQ06, EQ12, FX04)
+those are the only failed gates. Nothing is beyond CANDIDATE.
 
 ```bash
 cd python
@@ -1372,13 +1466,19 @@ PYTHONPATH=src python3 -m iap.lifecycle bootstrap --force        # rewrite resea
 PYTHONPATH=src python3 -m iap.lifecycle status
 # alpha | state | since_ts | failed gates
 # ----- | ----- | -------- | ------------
-# EQ01 | CANDIDATE | 1787691480577291027 | statistical_significance, net_pnl_after_costs, net_pnl_bootstrap_ci, capacity, stability
+# EQ01 | CANDIDATE | 1787691480577291027 | net_pnl_after_costs, net_pnl_bootstrap_ci, capacity
 # EQ03 | CANDIDATE | 1787691480577291027 | net_pnl_after_costs, net_pnl_bootstrap_ci, capacity
-# EQ04 | CANDIDATE | 1787691480577291027 | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs, net_pnl_bootstrap_ci, capacity, stability
+# EQ04 | CANDIDATE | 1787691480577291027 | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs, net_pnl_bootstrap_ci, capacity
 # FX09 | CANDIDATE | 1787691480577291027 | oos_ic, statistical_significance, fold_consistency, hypothesis_sign, net_pnl_after_costs, net_pnl_bootstrap_ci, capacity, stability
-# ...  (24 rows, all CANDIDATE)
-PYTHONPATH=src python3 -m iap.lifecycle retire FX09 --reason "desk decision: rationale contradicted by the fitted sign"   # HUMAN edge -> RETIRED
-PYTHONPATH=src python3 -m iap.lifecycle reset FX09 --reason "re-run the evidence chain after the refit"                # HUMAN edge RETIRED -> RESEARCH
+# FX11 | RESEARCH | 1787691480577291027 | leakage_clean
+# ...  (24 rows: 23 CANDIDATE, FX11 at RESEARCH)
+# retire / reset are HUMAN edges and, since v1.13, need a signed approval record: a refused edge
+# exits 2. Issue one first (keys live outside the repository; both steps write to the board and
+# the registry, so use a scratch clone; the three lines below were not run for this page):
+#   python3 -m iap.agents.cli --root .. keygen --approver desk --keyfile $HOME/.iap-keys/approvers.json
+#   python3 -m iap.agents.cli --root .. issue --approver desk --keyfile $HOME/.iap-keys/approvers.json --alpha FX09 --action retire --reason "desk decision: rationale contradicted by the fitted sign" --out /tmp/retire-FX09.json
+PYTHONPATH=src python3 -m iap.lifecycle retire FX09 --reason "desk decision: rationale contradicted by the fitted sign" --approval /tmp/retire-FX09.json --keyfile $HOME/.iap-keys/approvers.json   # HUMAN edge -> RETIRED
+#   (reset is the same with --action reset and `lifecycle reset FX09 --reason ... --approval ... --keyfile ...`: RETIRED -> RESEARCH)
 git checkout -- ../research/alpha_registry.json ../research/lifecycle_transitions.jsonl                                 # the committed state is the bundled result
 ```
 
@@ -1397,11 +1497,13 @@ Changing a threshold is a `lifecycle.json` x-version bump + `python3
 tools/make_golden_lifecycle.py --force` + a MIGRATIONS entry, never an edit
 of the registry by hand (GOVERNANCE.md §1). The MVP's `paper_evidence.json`
 (recipe 22) is the `PaperEvidence` document the PAPER → ACTIVE gates read.
-The `status` table above was re-run on the v1.5.0 tree; the `bootstrap`,
-`retire` and `reset` lines write the registry and were not.
+The `status` table above and `bootstrap --dry-run` were re-run on the v1.18.0
+tree; the `bootstrap --force`, `retire` and `reset` lines write the registry
+and were not.
 The committed registry (`x-version` 2: each record carries the CUSUM
 statistic) and transition log were rebuilt for the v1.5.0 methods with
-`bootstrap --force`, as they had been for the v1.4.0 dataset; the earlier
+`bootstrap --force`, as they had been for the v1.4.0 dataset (the log now
+holds 23 transitions, one per CANDIDATE alpha); the earlier
 logs are kept at
 `research/archive/lifecycle_transitions.dataset-203c8f54.jsonl` (the
 v1.3.0 dataset) and
@@ -1414,9 +1516,11 @@ under the v1.5.0 defaults every alpha also fails `capacity` — the
 edge-breakeven capacity of an alpha that makes no trade, or loses, is
 below the 1,000,000 USD gate — and FX04 fails `statistical_significance`
 against the ledger threshold (gate t 4.24 against 4.365), so three alphas
-fail cost and capacity alone. Across the registry the counts are cost 24,
-capacity 24, significance 21, stability 14, IC 12, fold consistency 10,
-hypothesis sign 9.
+fail cost and capacity alone. Across the registry the counts were then cost
+24, capacity 24, significance 21, stability 14, IC 12, fold consistency 10,
+hypothesis sign 9. At v1.18.0 (the committed registry, 23 candidates and
+FX11 at RESEARCH): cost 23, bootstrap bound 23, capacity 23, significance 16,
+hypothesis sign 11, IC 10, fold consistency 10, stability 8, leakage 1 (FX11).
 
 ## 26. Run one alpha as a contract-driven experiment
 
@@ -1453,20 +1557,20 @@ v1.5.0 defaults:
 
 ```
 experiment        alpha   horizon  dataset           IC      NW t     net bps  verdict
-00ebeb2b537b5155  EQ03    5s       116b7787   +0.026570    +4.213     +0.0000  ITERATE
+00ebeb2b537b5155  EQ03    5s       116b7787   +0.032803    +5.457     +0.0000  ITERATE
 20f1b9093e7d0d04  EQ06    10s      116b7787   +0.034528    +3.598  -1148.3084  ITERATE
 217fa0cb1d89a9c8  EQ03    5s       203c8f54   +0.036305   +10.449  -1172.9449  ITERATE
 4a2900e4a6705542  EQ06    1s       203c8f54   +0.019676    +3.509   -531.1169  ITERATE
 695e7b1e2bd2253e  EQ01    1s       116b7787   -0.001674    +0.771   -531.3535  REJECT
-6e4a3431a3acf8a5  EQ01    1s       116b7787   -0.001917    -0.221     +0.0000  REJECT
-838e0c2d75de4db6  EQ03    1s       116b7787   +0.013243    +2.414     +0.0000  ITERATE
+6e4a3431a3acf8a5  EQ01    1s       116b7787   +0.018690    +2.970     +0.0000  ITERATE
+838e0c2d75de4db6  EQ03    1s       116b7787   +0.022876    +5.370     +0.0000  ITERATE
 852863faa44b7b07  EQ06    1s       116b7787   +0.004702    +0.918  -1148.2478  REJECT
 876b08e20c46e6fd  EQ03    1s       116b7787   +0.013610    +3.488  -2174.7262  ITERATE
-9d895cf7148c4a8d  EQ06    1s       116b7787   +0.003345    +0.690     +0.0000  REJECT
+9d895cf7148c4a8d  EQ06    1s       116b7787   +0.008086    +1.979     +0.0000  ITERATE
 c73bb6294d226163  EQ01    1s       203c8f54   +0.027590    +3.044   -301.4984  ITERATE
 d0dd1ab0711d33a1  EQ06    10s      203c8f54   +0.050475    +6.755   -531.1169  ITERATE
 d7b554d0a3fa3b26  EQ03    1s       203c8f54   +0.016471    +4.250  -1173.0925  ITERATE
-d87e34a9c67c1891  EQ06    10s      116b7787   +0.034331    +3.711     -1.0134  ITERATE
+d87e34a9c67c1891  EQ06    10s      116b7787   +0.060234    +7.694     -5.5989  ITERATE
 f0f6c49b553f6b59  EQ03    5s       116b7787   +0.027114    +4.840  -2174.7262  ITERATE
 ```
 
@@ -1481,11 +1585,18 @@ other ten.
 From the v1.3.0 to the v1.4.0 dataset every pair moved the same way: a
 smaller IC, a smaller t and a larger holdout loss, and EQ01 @ 1 s and
 EQ06 @ 1 s went from ITERATE to REJECT. From the v1.4.0 to the v1.5.0
-rules, on the same dataset, the five verdicts are unchanged (three
-ITERATE, two REJECT) and the reasons moved: four of the five holdouts make
-no trade and net exactly 0, EQ06 @ 10 s trades and nets −1.01 bps, and the
-gate t fell for the two EQ03 runs (4.84 → 4.21 at 5 s, 3.49 → 2.41 at
-1 s). No run is net-positive under either rule set on either dataset. The
+rules, on the same dataset, the five verdicts were unchanged when this page
+was written for v1.5.0 (three ITERATE, two REJECT), with four of the five
+holdouts making no trade and netting exactly 0 and the gate t falling for
+the two EQ03 runs (4.84 → 4.21 at 5 s, 3.49 → 2.41 at 1 s). The five
+default-method experiments are dropped and re-run in place, under the same
+ids, by the `regenerate` job at each release, so they carry the current
+statistics: at v1.18.0 all five are ITERATE (EQ01 @ 1 s and EQ06 @ 1 s, REJECT
+at v1.5.0, now read IC +0.0187 / t 2.97 and +0.0081 / 1.98), four of the
+five holdouts still make no trade and net exactly 0, EQ06 @ 10 s trades and
+nets −5.60 bps, and the gate t of the two EQ03 runs is 5.37 (1 s) and 5.46
+(5 s). No run is net-positive under any rule set on either dataset: ITERATE
+is not a finding of edge. The
 dataset version and the method bundle are part of the specification, so
 the same request on a regenerated dataset, or under the other bundle, is a
 new experiment id and new looks.
@@ -1500,12 +1611,13 @@ the default methods (EQ03 @ 5 s is `00ebeb2b537b5155`; under the v1.4.0
 rules it was `f0f6c49b553f6b59`). Its statistics are not the ones in
 `research/alpha_reports/EQ03.json`, and are not meant to be: the runner
 walks forward over the window before its declared holdout and reports the
-holdout separately (IC +0.0266, t 4.21), while `run_all.py` walks forward
-over both sessions and declares no holdout (gate IC 0.0189, t 5.16).
+holdout separately (IC +0.0328, t 5.46), while `run_all.py` walks forward
+over both sessions and declares no holdout (gate IC 0.0300, t 7.97).
 `python/tests/test_research_runner.py::test_eq03_report_reproduces_through_the_runner`
 pins both the difference and that the runner equals `validate_alpha` called
 on the runner's own window. Every new configuration adds
-84 looks to `research/experiments.json` under the default methods (83 for
+2 looks to `research/experiments.json` under the default methods (since
+v1.14 one per gate decision; 84 under the frozen `v2_v113` rules: 83 for
 the validation at four folds, one for the holdout backtest; 28 under
 `legacy_v1`; a rerun of an identical spec adds none), and since v1.3.0 a
 `--dry-run`
@@ -1513,11 +1625,12 @@ debits them too — it evaluates and prints every statistic, so it is a look
 (`check_headline_numbers.py` reports the docs stale until they follow the
 ledger). A run is judged against the PROMOTE t threshold at its own look
 count — the ledger before it plus its own looks — and the result prints
-it: `00ebeb2b537b5155` was judged at a count of 4,272, a threshold of
-4.383, so its t of 4.21 is not significant where the v1.4.0 run's 4.84
-cleared 3.0. Runs made since v1.3.0 also write `eligibility.json` beside
-the result (recipe 35); the ten current-dataset experiments have it, the
-five v1.3.0-dataset experiments predate it. To
+it: `00ebeb2b537b5155` was judged at a count of 5,428, a threshold of
+4.435, and its t of 5.46 clears it (the v1.4.0 run's 4.84 cleared 3.0); it is
+still ITERATE because the holdout makes no trade, and it is not gate evidence
+because it was run with `--no-prereg`. Runs made since v1.3.0 also write
+`eligibility.json` beside the result (recipe 35); the ten current-dataset
+experiments have it, the five v1.3.0-dataset experiments predate it. To
 experiment without moving the committed ledger, point `--ledger` and
 `--out-dir` at scratch files, as recipe 29 does. The golden
 `tests/golden/expected_experiment_golden_frame.json` pins one spec / result
@@ -1551,14 +1664,14 @@ tree) — the reference effect by number of sessions:
 
 ```
 | detector | sessions | at gate | at fixed 3.0 | at study | mean t | sd t | evidence | promote |
-| lead_lag:EQ10@1s | 1 | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | +1.87 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
-| lead_lag:EQ10@1s | 2 | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | +2.30 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
-| lead_lag:EQ10@5s | 1 | 0/1 [0.00, 0.79] | 1/1 [0.21, 1.00] | 1/1 [0.21, 1.00] | +3.34 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
-| lead_lag:EQ10@5s | 2 | 0/1 [0.00, 0.79] | 1/1 [0.21, 1.00] | 1/1 [0.21, 1.00] | +3.88 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
-| order_flow:EQ04@5s | 1 | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | +2.80 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
-| order_flow:EQ04@5s | 2 | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | +2.12 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
-| order_flow:EQ04@10s | 1 | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | +2.33 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
-| order_flow:EQ04@10s | 2 | 0/1 [0.00, 0.79] | 1/1 [0.21, 1.00] | 1/1 [0.21, 1.00] | +3.33 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
+| lead_lag:EQ10@1s | 1 | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | +1.77 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
+| lead_lag:EQ10@1s | 2 | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | 0/1 [0.00, 0.79] | +2.09 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
+| lead_lag:EQ10@5s | 1 | 0/1 [0.00, 0.79] | 1/1 [0.21, 1.00] | 1/1 [0.21, 1.00] | +3.77 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
+| lead_lag:EQ10@5s | 2 | 0/1 [0.00, 0.79] | 1/1 [0.21, 1.00] | 1/1 [0.21, 1.00] | +4.23 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
+| order_flow:EQ04@5s | 1 | 0/1 [0.00, 0.79] | 1/1 [0.21, 1.00] | 1/1 [0.21, 1.00] | +3.43 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
+| order_flow:EQ04@5s | 2 | 0/1 [0.00, 0.79] | 1/1 [0.21, 1.00] | 1/1 [0.21, 1.00] | +3.91 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
+| order_flow:EQ04@10s | 1 | 0/1 [0.00, 0.79] | 1/1 [0.21, 1.00] | 1/1 [0.21, 1.00] | +3.38 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
+| order_flow:EQ04@10s | 2 | 1/1 [0.21, 1.00] | 1/1 [0.21, 1.00] | 1/1 [0.21, 1.00] | +4.87 | n/a | 1/1 [0.21, 1.00] | 0/1 [0.00, 0.79] |
 ```
 
 A detector is `effect:alpha@label horizon`: each planted effect is scored
@@ -1566,23 +1679,26 @@ by its alpha at the declared horizon and at the horizon matched to the
 planted mechanism. Every rate is `detections/runs [Wilson 95 % interval]`;
 with one seed the interval is 0.00–0.79 or 0.21–1.00, which is the report
 telling you that one run settles nothing. `at gate` is the pooled-slope t
-against the PROMOTE threshold in force (4.365), `at fixed 3.0` the same t
+against the PROMOTE threshold in force (4.435, at the look count of 5,420 of the
+committed promotion report), `at fixed 3.0` the same t
 against 3, `at study` against the Bonferroni threshold of this study's own
 40 tests (3.227).
 
-On this seed nothing reaches the gate threshold on two sessions. The
-order-flow effect at its declared 5 s label has a pooled t of 2.12 — the
-number the previous report had for this seed — and 3.33 at the matched
-10 s label; the lead-lag has 2.30 at 1 s and 3.88 at 5 s. The report then
+On this seed only one detector reaches the gate threshold on two sessions:
+the order-flow effect at the matched 10 s label (pooled t 4.87). At its
+declared 5 s label the order-flow effect has a pooled t of 3.91 on two
+sessions; the lead-lag has 2.09 at 1 s and 4.23 at 5 s, and nothing is
+promoted. The report then
 prints the null rows (no detection; the order-flow t is negative with
 nothing planted), the break rows (no evidence from the chain; the break z
-of the order-flow detector at 5 s is +4.64, above the gate threshold), a
+of the order-flow detector at 5 s is +4.44, just above the gate threshold), a
 diagnosis table that accounts for the t, and a power model that a
 three-run grid cannot fit meaningfully. The committed reports say what
 more runs and more sessions do: at the reference size the order-flow
 effect is detected at the gate threshold in 2 of 20 runs on two sessions,
 10 of 20 on four and 20 of 20 on eight
-([research/power/extended/POWER_REPORT.md](research/power/extended/POWER_REPORT.md));
+([research/power/extended/POWER_REPORT.md](research/power/extended/POWER_REPORT.md),
+generated at the older threshold of 4.365, from a look count of 3,936, and not regenerated since);
 the lead-lag in none at its declared 1 s label and in 16 of 20 at 5 s on
 eight sessions; nothing is detected on the null and nothing is promoted
 anywhere.
@@ -1642,11 +1758,11 @@ for name, cost_model, cfg in (
           f"costs={res.total_costs:12.2f} net={res.total_pnl:12.2f}")
 EOF
 # cost_aware (default)  trades=     0 gross=        0.00 costs=        0.00 net=        0.00
-# sign (legacy)         trades= 38222 gross=     4695.00 costs=   831621.36 net=  -826926.36
+# sign (legacy)         trades= 37160 gross=     5015.00 costs=   811185.70 net=  -806170.70
 ```
 
-The honest reading: the legacy policy loses 826,926.36 because it pays
-831,621.36 of costs to collect 4,695.00 of gross; the cost-aware policy
+The honest reading: the legacy policy loses 806,170.70 because it pays
+811,185.70 of costs to collect 5,015.00 of gross; the cost-aware policy
 loses nothing because it never trades — EQ03's fitted expected return does
 not clear its own round-trip cost on a single row in two sessions (on the
 v1.3.0 dataset it did on four). That is not a profitable strategy found,
@@ -1656,7 +1772,9 @@ other side. It is also why the default changed: the six-figure loss was a
 property of trading every row, and the report now states the finding
 directly — in `REPORT.md` 18 of the 24 alphas make no trade at 1× costs,
 and their net P&L of exactly 0 fails `net P&L > 0` just as the loss did.
-The legacy line equals the v1.4.0 output of this recipe to the cent. Like
+The legacy line printed 38,222 trades, 4,695.00 gross, 831,621.36 costs and
+−826,926.36 net at v1.5.0; changes since then (not bisected) moved it to the
+figures above. Like
 recipe 11 this scores the full two-day frame, including the day the
 parameters were fitted on, so neither number is the report's OOS figure.
 `cost_aware` needs the label horizon (`for_horizon`, or `horizon_ns`); the
@@ -1682,7 +1800,7 @@ a scratch experiments folder, so nothing committed moves:
 mkdir -p data/store/scratch && cp research/experiments.json data/store/scratch/ledger.json
 cd python
 PYTHONPATH=src python3 -m iap.research --out-dir ../data/store/scratch/experiments run \
-  --alpha EQ03 --ledger ../data/store/scratch/ledger.json
+  --alpha EQ03 --no-prereg --ledger ../data/store/scratch/ledger.json
 PYTHONPATH=src python3 - <<'EOF'
 from iap.validation.ledger import ExperimentLedger
 from iap.validation.validate import effective_gates
@@ -1690,52 +1808,56 @@ from iap.validation.validate import effective_gates
 ledger = ExperimentLedger("../data/store/scratch/ledger.json")
 t = ledger.bonferroni_t_threshold()
 print("looks:", ledger.total_experiments, "bonferroni |t|:", round(t, 3))
-print("this run's count, 4272:", round(ledger.bonferroni_t_threshold_at(4272), 3))
+print("this run's count, 5428:", round(ledger.bonferroni_t_threshold_at(5428), 3))
 print("ledger min_nw_tstat:", round(effective_gates("ledger", t)["min_nw_tstat"], 3))
 print("fixed  min_nw_tstat:", effective_gates("fixed")["min_nw_tstat"])
 EOF
 PYTHONPATH=src python3 -m iap.research --out-dir ../data/store/scratch/experiments run \
-  --alpha EQ03 --methods legacy_v1 --ledger ../data/store/scratch/ledger.json
+  --alpha EQ03 --methods legacy_v1 --no-prereg --ledger ../data/store/scratch/ledger.json
 # experiment         00ebeb2b537b5155
-# ... t-stat (the gate's)             +4.2132 ... holdout net return (bps)        +0.0000 ...
+# ... t-stat (the gate's)             +5.4569 ... holdout net return (bps)        +0.0000 ...
 # VERDICT: ITERATE
-# PROMOTE t threshold: 4.3830 (ledger ...)
-# gate eligible: yes
-# looks: 5156 bonferroni |t|: 4.424
-# this run's count, 4272: 4.383
-# ledger min_nw_tstat: 4.424
+# PROMOTE t threshold: 4.4349 (ledger ...)
+# gate eligible: NO — recorded and ledgered, but not promotion evidence
+#   - not pre-registered (--no-prereg): exploratory, not gate evidence
+# looks: 6826 bonferroni |t|: 4.484
+# this run's count, 5428: 4.435
+# ledger min_nw_tstat: 4.484
 # fixed  min_nw_tstat: 3.0
 # experiment         47e6cdacc73e85fe
-# ... t-stat (the gate's)             +4.8405 ... holdout net return (bps)        -2174.7262 ...
+# ... t-stat (the gate's)             +4.1883 ... holdout net return (bps)        -2142.7754 ...
 # VERDICT: ITERATE
 # PROMOTE t threshold: 3.0000 (fixed)
 # gate eligible: NO — recorded and ledgered, but not promotion evidence
 #   - configuration.methods='legacy_v1' must be 'v2' for a gate-eligible result
 ```
 
-(Re-run on the v1.5.0 tree with a scratch ledger and folder; the quoted
+(Re-run on the v1.18.0 tree with a scratch ledger and folder; the quoted
 lines are excerpts of each run's output, and the parenthesis of the first
 threshold line is shortened — in full it names the look count the
 threshold was derived at.)
 
 EQ03 at its pinned horizon under the default methods is the committed
 experiment `00ebeb2b537b5155`, so the first run is a rerun: it adds no
-looks and is judged at the look count recorded the first time, 4,272, not
-at today's total — a result is not re-judged when the ledger grows. Its t
-of 4.21 is below the 4.383 that count implies. So this experiment is not
-significant under the default rule, where the same request cleared the
-fixed 3.0 under the v1.4.0 rules with a t of 4.84; part of that fall is
-the statistic (the gate now reads the pooled-slope t) and part is the
-threshold. The verdict is ITERATE either way, and under the defaults the
-holdout makes no trade. The promotion report's EQ03, walked forward over
-both sessions, has a gate t of 5.16 against its own threshold of 4.365 and
-does clear it (recipe 4).
+looks and is judged at the look count recorded the first time, 5,428, not
+at today's total (6,826) — a result is not re-judged when the ledger grows.
+Its t of 5.46 is above the 4.435 that count implies, so the significance
+leg of the gate is met (at v1.5.0 the same request printed a t of 4.21
+against 4.383 and did not clear it; the statistics and the look rule have
+moved since, and the committed experiment is re-run at each release). The
+verdict is still ITERATE: the holdout makes no trade, and a net return of 0
+does not pass the cost gate. The result is also marked not gate-eligible,
+because it was run with `--no-prereg`. The promotion report's EQ03, walked
+forward over both sessions, has a gate t of 7.97 against its own threshold
+of 4.435 and clears it too (recipe 4); neither is evidence of an edge.
 
 The second run is a new experiment in the scratch ledger: the bundle name
 is part of the configuration, so `--methods legacy_v1` is not a rerun of
 the committed `f0f6c49b553f6b59` (which predates the bundles and names
-none) although it reproduces every one of its statistics. It adds 28
-looks — re-running the python block afterwards prints 4424 and 4.391 — and
+none), and no longer reproduces its statistics (t 4.19 against 4.84, a
+holdout net of −2,142.78 bps against −2,174.73; the committed `f0f6c49b…`
+is the v1.4.0 result). It adds 28
+looks — re-running the python block afterwards prints 6854 and 4.485 — and
 its result is marked not gate-eligible: a legacy-rule result is history,
 not promotion evidence. From Python the default is
 `validate_alpha(..., ledger_t_threshold=t)` (recipe 4) and the legacy rule
@@ -1743,8 +1865,8 @@ not promotion evidence. From Python the default is
 is a key of the specification,
 `build_spec("EQ03", configuration={"methods": "legacy_v1"}, ...)`
 (recipe 35). A new configuration is
-judged against the threshold the ledger will have once its own 84 looks are
-in it.
+judged against the threshold the ledger will have once its own looks (2
+under the default bundle since v1.14; 84 up to v1.13) are in it.
 
 ## 30. Run the recompute leakage probe
 
@@ -1804,8 +1926,9 @@ decay and the regime split for every fold and puts a
 stationary-bootstrap interval (Politis & Romano; SplitMix64, seeded) around
 the pooled net P&L. Since v1.5.0 `validate_alpha` reports that block itself
 (`fold_diagnostics`, `net_pnl_bootstrap`; the "Every fold" table of
-`REPORT.md`), and its looks are counted — it is most of why a validation
-is 83 looks and not 27. The interval is also what the lifecycle gate
+`REPORT.md`), and its looks were counted — it was most of why a validation
+was 83 looks and not 27 under the v1.5.0 to v1.13 rules (since v1.14 the
+default prices one gate decision, not each report block). The interval is also what the lifecycle gate
 `net_pnl_bootstrap_ci` reads (docs/LIFECYCLE.md §3: its lower bound must be
 above zero, and an alpha that makes no trade fails); the per-fold rows stay
 report-only. The standalone form below is for a caller that wants the diagnostics
@@ -1852,19 +1975,19 @@ print(stationary_bootstrap_ci([1.0, -2.0, 0.5, 3.0, -1.0, 0.25, 2.0, -0.5, 1.5, 
                               seed=7, n_boot=200))
 EOF
 # default rules
-#   fold 1 pairs 32029 net@1x 0.0 survives 1x: False
-#   fold 2 pairs 31806 net@1x 0.0 survives 1x: False
-#   fold 3 pairs 31982 net@1x 0.0 survives 1x: False
-#   fold 4 pairs 31951 net@1x 0.0 survives 1x: False
+#   fold 1 pairs 32020 net@1x 0.0 survives 1x: False
+#   fold 2 pairs 31835 net@1x 0.0 survives 1x: False
+#   fold 3 pairs 31961 net@1x 0.0 survives 1x: False
+#   fold 4 pairs 31929 net@1x 0.0 survives 1x: False
 #   folds surviving 1x cost: 0 of 4
 #   pooled net P&L: 0.0 95% CI: [0.0, 0.0] mean block: 9.0 resamples: 300
 # legacy rules
-#   fold 1 pairs 31980 net@1x -174562.22 survives 1x: False
-#   fold 2 pairs 31735 net@1x -168827.42 survives 1x: False
-#   fold 3 pairs 31891 net@1x -165593.72 survives 1x: False
-#   fold 4 pairs 31887 net@1x -161585.48 survives 1x: False
+#   fold 1 pairs 31994 net@1x -165407.26 survives 1x: False
+#   fold 2 pairs 31796 net@1x -164792.92 survives 1x: False
+#   fold 3 pairs 31929 net@1x -159374.88 survives 1x: False
+#   fold 4 pairs 31918 net@1x -159339.13 survives 1x: False
 #   folds surviving 1x cost: 0 of 4
-#   pooled net P&L: -670568.83 95% CI: [-692392.14, -646896.44] mean block: 9.0 resamples: 300
+#   pooled net P&L: -648914.19 95% CI: [-671093.11, -628164.25] mean block: 9.0 resamples: 300
 # {'estimate': 4.0, 'ci_low': -2.75, 'ci_high': 10.75, 'level': 0.95, 'n': 10, 'n_boot': 200, 'mean_block': 2.0, 'seed': 7, 'frac_resamples_le_zero': 0.175}
 ```
 
@@ -1875,11 +1998,12 @@ bootstrap, not a narrow confidence interval, and it should be read as "no
 trade", never as "break-even". The pair counts are a little larger than
 under the legacy rules because the default IC row policy also scores the
 BLACKOUT rows at their reopen return. Under the legacy rules — the v1.4.0
-output of this recipe, reproduced — EQ03 loses money after costs in every
+rules by name; the v1.4.0 page printed other figures, as recipe 4 explains —
+EQ03 loses money after costs in every
 fold, not only the last, and the whole interval is below zero: the
 negative result was not one unlucky fold. For an alpha that does trade
 under the defaults, see the "Every fold" table of `REPORT.md` (EQ11:
-pooled −3,174, interval −5,142 to −1,497).
+pooled −3,351, interval −5,153 to −1,678).
 The interval is pinned by its seed — pass `ExperimentSpec.seed` and two
 runs agree to the last digit; `n_boot` defaults to 1,000 (300 here to keep
 the recipe quick).
@@ -1898,22 +2022,25 @@ PYTHONPATH=src python3 -m iap.research show 00ebeb2b537b5155 --json | python3 -c
 PYTHONPATH=src python3 -m iap.research --json-errors show 0000000000000000; echo "exit=$?"
 PYTHONPATH=src python3 -m iap.research --json-errors run --horizon 1s; echo "exit=$?"
 # 15 experiments, 0 skipped
-# [('00ebeb2b537b5155', 'EQ03', 'ITERATE', True), ('20f1b9093e7d0d04', 'EQ06', 'ITERATE', False), ('217fa0cb1d89a9c8', 'EQ03', 'ITERATE', False), ('4a2900e4a6705542', 'EQ06', 'ITERATE', False), ('695e7b1e2bd2253e', 'EQ01', 'REJECT', False), ('6e4a3431a3acf8a5', 'EQ01', 'REJECT', True), ('838e0c2d75de4db6', 'EQ03', 'ITERATE', True), ('852863faa44b7b07', 'EQ06', 'REJECT', False), ('876b08e20c46e6fd', 'EQ03', 'ITERATE', False), ('9d895cf7148c4a8d', 'EQ06', 'REJECT', True), ('c73bb6294d226163', 'EQ01', 'ITERATE', False), ('d0dd1ab0711d33a1', 'EQ06', 'ITERATE', False), ('d7b554d0a3fa3b26', 'EQ03', 'ITERATE', False), ('d87e34a9c67c1891', 'EQ06', 'ITERATE', True), ('f0f6c49b553f6b59', 'EQ03', 'ITERATE', False)]
+# [('00ebeb2b537b5155', 'EQ03', 'ITERATE', False), ('20f1b9093e7d0d04', 'EQ06', 'ITERATE', False), ('217fa0cb1d89a9c8', 'EQ03', 'ITERATE', False), ('4a2900e4a6705542', 'EQ06', 'ITERATE', False), ('695e7b1e2bd2253e', 'EQ01', 'REJECT', False), ('6e4a3431a3acf8a5', 'EQ01', 'ITERATE', False), ('838e0c2d75de4db6', 'EQ03', 'ITERATE', False), ('852863faa44b7b07', 'EQ06', 'REJECT', False), ('876b08e20c46e6fd', 'EQ03', 'ITERATE', False), ('9d895cf7148c4a8d', 'EQ06', 'ITERATE', False), ('c73bb6294d226163', 'EQ01', 'ITERATE', False), ('d0dd1ab0711d33a1', 'EQ06', 'ITERATE', False), ('d7b554d0a3fa3b26', 'EQ03', 'ITERATE', False), ('d87e34a9c67c1891', 'EQ06', 'ITERATE', False), ('f0f6c49b553f6b59', 'EQ03', 'ITERATE', False)]
 # ['experiment_id', 'gate_eligibility', 'result', 'spec']
-# {'gate_eligible': True, 'methods': 'v2', 'periods_verified': True, 'reasons': [], 'significance_threshold': 4.383027751177569, 'threshold_looks': 4272}
+# {'gate_eligible': False, 'methods': 'v2', 'periods_verified': True, 'reasons': ['not pre-registered (--no-prereg): exploratory, not gate evidence'], 'significance_threshold': 4.434900184571738, 'threshold_looks': 5428}
 # {"error": {"code": "experiment_not_found", "message": ".../research/experiments/0000000000000000: no such experiment"}}
 # exit=1
 # {"error": {"code": "usage_error", "message": "the following arguments are required: --alpha"}}
 # exit=2
 ```
 
-(Re-run on the v1.5.0 tree.) `list --json` is
+(Re-run on the v1.18.0 tree.) `list --json` is
 `{"experiments": [...], "skipped": [...]}`: a directory
 that cannot be loaded (half-written, corrupt) is named in `skipped` with
 the reason instead of failing the listing. The eligibility block gained
 three keys in v1.5.0: `methods`, and the `significance_threshold` the run
-was judged at with the look count it came from (`threshold_looks`). Only
-the five default-method experiments are gate-eligible. The other ten show
+was judged at with the look count it came from (`threshold_looks`). None of
+the fifteen is gate-eligible at v1.18.0: the five default-method experiments
+were run with `--no-prereg` and show `gate_eligible: False` with the reason
+"not pre-registered (--no-prereg): exploratory, not gate evidence" (they were
+eligible when v1.5.0 printed this page). The other ten show
 `gate_eligible: False` with the reason "the spec predates the v1.5.0
 method bundles (no configuration.methods): its result was computed under
 the legacy methods" — they were eligible when v1.4.0 was released; they
@@ -1939,9 +2066,10 @@ PYTHONPATH=src python3 -m iap.store sql "SELECT pipeline_verdict, COUNT(*) AS n 
 PYTHONPATH=src python3 -m iap.store sql "DELETE FROM alphas"; echo "exit=$?"
 PYTHONPATH=src python3 -m iap.store sql "SELECT 1; SELECT 2"; echo "exit=$?"
 PYTHONPATH=src python3 -m iap.store sql "SELECT * FROM no_such_table"; echo "exit=$?"
-# {"current_state":"CANDIDATE","n":24}
-# {"n":11,"pipeline_verdict":"ITERATE"}
-# {"n":13,"pipeline_verdict":"REJECT"}
+# {"current_state":"CANDIDATE","n":23}
+# {"current_state":"RESEARCH","n":1}
+# {"n":12,"pipeline_verdict":"ITERATE"}
+# {"n":12,"pipeline_verdict":"REJECT"}
 # error: attempt to write a readonly database (the store is opened read-only; use `build` to rebuild it)
 # exit=1
 # error: `sql` runs exactly one statement; several were given (You can only execute one statement at a time.)
@@ -1950,13 +2078,15 @@ PYTHONPATH=src python3 -m iap.store sql "SELECT * FROM no_such_table"; echo "exi
 # exit=1
 ```
 
-The first two rows are the platform's headline result as a query: every
-alpha at CANDIDATE, none promoted. (Re-run on the v1.5.0 tree against a
-scratch `--db`. The 11 / 13 split is the v1.5.0 promotion report's:
-`pipeline_verdict` is the alpha-report pipeline's verdict in the current
-scope — the current dataset under the default methods. The view's `verdict`
-column is the alpha's latest experiment result in that scope, which for
-EQ01, EQ03 and EQ06 is a runner experiment and reads 10 / 14 — recipe 20.)
+The first rows are the platform's headline result as a query: 23 alphas at
+CANDIDATE, FX11 held at RESEARCH, none promoted. (Re-run on the v1.18.0 tree
+against a scratch `--db`. The 12 / 12 split is the committed promotion
+report's: `pipeline_verdict` is the alpha-report pipeline's verdict in the
+current scope — the current dataset under the default methods. The view's
+`verdict` column is the alpha's latest experiment result in that scope, which
+for EQ01, EQ03 and EQ06 is a runner experiment; it also reads 12 / 12 now.
+The 10 / 14 of recipe 20 is the `legacy_v1` scope. At v1.5.0 these were 11 /
+13 and 10 / 14.)
 The three failures are the three ways a
 statement is refused: a write (with the rebuild hint, which is printed only
 for a write), several statements (refused rather than half-run), and a
@@ -1966,13 +2096,17 @@ query an MVP run's store (recipe 24).
 ## 34. Replay the risk edge golden in Python
 
 The main risk golden drives one engine through one script. The edge golden
-(`tests/golden/expected_risk_edge_decisions.json`, v1.3.0) is eight
-independent scenarios, each with its own engine, that reach what one script
+(`tests/golden/expected_risk_edge_decisions.json`, added in v1.3.0, now
+x-version 2) is twelve independent scenarios, eight of them from v1.3.0, each
+with its own engine, that reach what one script
 cannot: a venue kill and a venue-0 (SOR) order, kill commands that do not
 parse, every venue disconnected, a mark stamped in the future, timestamp
 and position overflow, unvaluable exposure, a missing config key, bootstrap
-and restore. Rust, Java and Python must reproduce every decision and the
-concatenated audit log byte for byte:
+and restore, and (added later) the SEC 15c3-5 pre-trade controls, the bounded
+two-party loss override, the reference-price gate and bounded state capacity.
+Rust and Python must reproduce every decision and the
+concatenated audit log byte for byte (the archived Java engine is frozen at
+v1.14.0 and is no longer a port target):
 
 ```bash
 cd python
@@ -1994,7 +2128,7 @@ for line in audit.splitlines():
         print(ev["rule_id"], "|", ev["reason"])
 EOF
 # 2 passed, 7 deselected
-# scenarios: 8 audit lines: 50 byte-identical: True
+# scenarios: 12 audit lines: 82 byte-identical: True
 # MALFORMED_KILL | kill scope id "AAPL" is not a valid INSTRUMENT id: escalated to GLOBAL (fail-closed): ops halt by ticker
 # MALFORMED_KILL | kill scope id "-0" is not a valid VENUE id: nothing cleared (fail-closed): ops clear
 # MALFORMED_ORDER | timestamp arithmetic overflows i64 (fail-closed)
@@ -2005,10 +2139,11 @@ EOF
 # CONFIG_MISSING | fail-closed: invalid argument: risk.json: missing/non-integer per_order.max_order_qty
 # CONFIG_MISSING | fail-closed: invalid argument: risk.json: missing/non-integer per_order.max_order_qty
 # NOT_BOOTSTRAPPED | positions not bootstrapped (fail-closed)
+# STATE_CAPACITY | risk state capacity 2 reached for seen order ids (fail-closed)
 ```
 
-The other two engines replay the same file: `cd rust && cargo test -p risk
---test golden_risk` and Java `RiskGoldenTest` (recipe 9). To add a scenario,
+The Rust engine replays the same file: `cd rust && cargo test -p risk
+--test golden_risk` (and the archived Java `RiskGoldenTest`, recipe 9). To add a scenario,
 edit `python/tools/make_golden_risk_edge.py` and regenerate
 (`PYTHONPATH=python/src python3 python/tools/make_golden_risk_edge.py` from
 the repo root) — a deliberate `golden:` commit with a MIGRATIONS entry,
@@ -2023,8 +2158,10 @@ promotion evidence: `cost_multiplier >= 1.0`, `latency_ns >= 1 s`,
 `embargo_ns >= 60 s`, `n_folds >= 4`, `max_decision_age_ns <= 60 s`,
 session flattening on, periods equal to the ones derived from the
 dataset's session calendar and, since v1.5.0, the default method bundle
-(`methods = "v2"`). Halving the costs, choosing the holdout by
-hand, or running the legacy rules, still runs — and is marked:
+(`methods = "v2"`); a persisted run must also have been pre-registered (a
+run made with `--no-prereg` is marked not eligible). Halving the costs,
+choosing the holdout by hand, or running the legacy rules, still runs — and
+is marked:
 
 ```bash
 PYTHONPATH=python/src python3 - <<'EOF'
@@ -2062,15 +2199,18 @@ EOF
 #   - configuration.cost_multiplier=0.5 is below the gate-eligible minimum 1.0
 # 47e6cdacc73e85fe eligible: False
 #   - configuration.methods='legacy_v1' must be 'v2' for a gate-eligible result
-# GateEligibility(eligible=True, reasons=(), periods_verified=True, methods='v2', significance_threshold=4.383027751177569, threshold_looks=4272)
+# GateEligibility(eligible=False, reasons=('not pre-registered (--no-prereg): exploratory, not gate evidence',), periods_verified=True, methods='v2', significance_threshold=4.434900184571738, threshold_looks=5428)
 # GateEligibility(eligible=False, reasons=('the spec predates the v1.5.0 method bundles (no configuration.methods): its result was computed under the legacy methods',), periods_verified=True, methods=None, significance_threshold=None, threshold_looks=None)
 ```
 
-(Re-run on the v1.5.0 tree.) A specification has no threshold until it is
+(Re-run on the v1.18.0 tree.) A specification has no threshold until it is
 run, which is why the first line says `significance_threshold=None`; the
 sidecar of the persisted run of the same specification (the fourth
 `GateEligibility`) carries the threshold it was judged at and the look
-count behind it. The last line is the same request as run under v1.4.0:
+count behind it, and says not eligible: the committed run was made with
+`--no-prereg`, which the sidecar records (the pinned specification of the
+first line passes the configuration checks; a run is evidence only when it
+was also pre-registered). The last line is the same request as run under v1.4.0:
 its sidecar said eligible then, and the reader now refuses it because the
 spec names no method bundle. Asked
 about a v1.3.0-dataset run (`217fa0cb1d89a9c8`), which has no sidecar, the
@@ -2110,16 +2250,16 @@ import sys
 sys.path.insert(0, "tests")                      # the test-only encoder lives beside the tests
 from itch50_encoder import build_session
 
-for seed, date in ((7, "2019-12-30"), (8, "2019-12-31")):
+for seed, date in ((7, "2019-12-30"), (8, "2020-01-30")):
     enc, _ = build_session(seed, symbols=("AAPL", "MSFT", "QQQ"), etp_symbols=("QQQ",),
                            n_actions=6000, spacing_ns=10**9)
     path = enc.write(f"../data/vendor/demo_{date}.itch.gz", compress=True)
     print(path, enc.messages, "messages")
 EOF
 # ../data/vendor/demo_2019-12-30.itch.gz 6082 messages
-# ../data/vendor/demo_2019-12-31.itch.gz 6082 messages
+# ../data/vendor/demo_2020-01-30.itch.gz 6082 messages
 
-for d in 2019-12-30 2019-12-31; do
+for d in 2019-12-30 2020-01-30; do
   PYTHONPATH=src python3 -m iap.marketdata ingest --format itch50 \
     --input ../data/vendor/demo_$d.itch.gz --date $d \
     --symbols AAPL,MSFT,QQQ --out ../data/real/demo > /dev/null
@@ -2133,7 +2273,7 @@ print(s["messages"]["by_type"])
 print("events", s["raw"]["events"], "book check clean:", s["book_check"]["clean"],
       "qc:", {k: v for k, v in m["normalized"]["qc_totals"].items() if v})
 EOF
-# 70ddb405e78c2356 ['2019-12-30', '2019-12-31'] ['AAPL', 'MSFT', 'QQQ']
+# 4e714109b10326b6 ['2019-12-30', '2020-01-30'] ['AAPL', 'MSFT', 'QQQ']
 # {'A': 3061, 'C': 220, 'D': 886, 'E': 820, 'F': 10, 'H': 4, 'I': 4, 'P': 164, 'Q': 8, 'R': 4, 'S': 6, 'U': 419, 'X': 472, 'Y': 4}
 # events 5576 book check clean: True qc: {'events_in': 11255, 'events_out': 11255, 'sequence_resets': 3}
 
@@ -2143,10 +2283,10 @@ PYTHONPATH=src python3 -m iap.features --data-dir ../data/real/demo/normalized \
 # --no-prereg: a demo, not a hypothesis (a real study registers it first, §26)
 PYTHONPATH=src python3 -m iap.research run --alpha EQ03 --dataset-dir ../data/real/demo \
   --no-prereg | sed -n '1,5p;/VERDICT/p'
-# experiment         240bdd3b53899e7f
+# experiment         ef931ae076696512
 # alpha              EQ03
 # horizon            5s
-# dataset_version    70ddb405e78c2356c2a6f15a85f8dfe520cc27bf427ec2532d4257c480e8e29e
+# dataset_version    4e714109b10326b64dca1562d45b961696aafb4515758fa7127fda2168449b9a
 # feature_version    585dd7b92b738f9da7df863dba1ac049ff10b75b60a8559baac1e49b6f3062ac
 # VERDICT: REJECT
 ```
@@ -2166,11 +2306,22 @@ entries of its looks carry it, and the ledger they went into is
 in the checkout did not move. Ingesting the same bytes again gives the
 same `dataset_version` and byte-identical files.
 
+Why the second date is 2020-01-30 and not a consecutive day. Since v1.18 REL-02
+every read of an ingested (`kind: real`) dataset goes through the fail-closed
+holdout registry (`research/holdout_registry.json`,
+[docs/REAL_DATA.md](docs/REAL_DATA.md) §3.7): a session date the registry does
+not classify is refused before any data file is opened (`features` stops with
+`HoldoutRefused: ... session 2019-12-31 / AAPL is not in
+research/holdout_registry.json`). 2019-12-30 and 2020-01-30 are registered
+`in_sample` dates, so this demo reads; the bytes are the test encoder's, not
+those sessions' data. Each read, allowed or refused, appends a line to
+`data/real/holdout_access.jsonl` (git-ignored).
+
 The REJECT means nothing: the encoder's order flow is uniform random, so
 there is nothing to find. With real files the verdict is about that
 dataset, under the reading rules of docs/REAL_DATA.md §8 — two sessions
 are two sessions. `rm -rf data/vendor/demo_* data/real/demo` removes
-everything this recipe wrote.
+everything this recipe wrote (except the access-log lines).
 
 ## 37. Work a parent order passively and read its markouts
 
@@ -2278,9 +2429,9 @@ EOF
 ```
 
 ```
-equal_weight  horizon 5s  weights: EQ02 +0.250 EQ03 +0.250 EQ06 +0.250 EQ12 +0.250  day-2 IC +0.0255
-ridge         horizon 5s  weights: EQ02 +0.418 EQ03 -0.228 EQ06 +0.265 EQ12 +0.090  day-2 IC +0.0338
-signal correlation EQ02/EQ03 0.95  EQ02/EQ12 1.00  EQ02/EQ06 -0.16
+equal_weight  horizon 5s  weights: EQ02 +0.250 EQ03 +0.250 EQ06 +0.250 EQ12 +0.250  day-2 IC +0.0286
+ridge         horizon 5s  weights: EQ02 +0.242 EQ03 -0.099 EQ06 +0.419 EQ12 +0.240  day-2 IC +0.0354
+signal correlation EQ02/EQ03 0.96  EQ02/EQ12 1.00  EQ02/EQ06 -0.16
 effective independent bets: 1.64 of 4
 ```
 
@@ -2292,14 +2443,16 @@ split, not a result — the judged version, through the whole validation
 chain and with its looks debited, is
 
 ```bash
-cd python && PYTHONPATH=src python3 -m iap.research combine     # writes research/combination/
+cd python && PYTHONPATH=src python3 -m iap.research combine --no-prereg    # writes research/combination/ (exploratory: without --no-prereg it refuses until COMB_<class>/<horizon> is pre-registered)
 ```
 
-which costs 95 looks per (asset class, method) experiment the first time
-and nothing on a rerun. `--dry-run` writes no report and still debits the
+which costs 13 looks per (asset class, method) experiment the first time
+(one for the validation, since v1.14, plus one per member: 12 members per asset
+class; it was 83 + 12 = 95 up to v1.13) and nothing on a rerun. `--dry-run` writes no report and still debits the
 looks; `--members` and `--method` narrow the run, and a narrower member
 list is a different experiment with its own identity. The committed
-verdict: 0 PROMOTE, 8 ITERATE — every combination fails the cost gate
+verdict: 0 PROMOTE, 10 ITERATE over 10 experiments (five methods on the
+equity and the FX members) — every combination fails the cost gate
 (`research/combination/REPORT.md`).
 
 ## 39. Calibrate the simulator and run a maker-side backtest (v1.9)
@@ -2376,9 +2529,9 @@ maker adverse selection    1s: +0.80 bp (se 0.21, n 233)
 maker adverse selection   10s: +1.36 bp (se 0.40, n 214)
 labels: bid filled 0.17, not run over 0.07
 taker    posted   0 filled   0 gated out 698
-passive  posted  83 filled  22 gated out  22 | spread +6.74 AS +7.98 exit +5.72 net -6.71 bp/trip, -35.70 USD | exit filled passively 0.32, timeout cross 0.68
-taker*   posted 101 filled  27 gated out  38 | spread +3.66 AS +4.50 exit +10.16 net -11.41 bp/trip, -74.70 USD
-passive* posted  83 filled  22 gated out  22 | spread +6.74 AS +7.98 exit +5.72 net -6.71 bp/trip, -35.70 USD | exit filled passively 0.32, timeout cross 0.68
+passive  posted  84 filled  22 gated out  22 | spread +6.93 AS +7.51 exit +4.88 net -5.12 bp/trip, -27.20 USD | exit filled passively 0.36, timeout cross 0.64
+taker*   posted 102 filled  29 gated out  38 | spread +4.26 AS +5.61 exit +10.31 net -12.08 bp/trip, -84.90 USD
+passive* posted  84 filled  22 gated out  22 | spread +6.93 AS +7.51 exit +4.88 net -5.12 bp/trip, -27.20 USD | exit filled passively 0.36, timeout cross 0.64
 ```
 
 How to read it.
@@ -2391,10 +2544,10 @@ cannot clear 1.4 bp of measured adverse selection.
 The passive exit changes the gate. It expects to earn the second
 half-spread and rebate with the calibrated touch fill probability (0.35
 here), and on these wide synthetic spreads it then admits nearly every row.
-The outcome does not support that: only 32% of exits fill passively, 68%
-time out and cross, and adverse selection on the trips (+8.0 bp) is far
+The outcome does not support that: only 36% of exits fill passively, 64%
+time out and cross, and adverse selection on the trips (+7.5 bp) is far
 above the calibrated +1.4 bp, because the trips that last are the ones the
-market ran over. Net is -6.7 bp per trip. That is better than the -11.4 bp
+market ran over. Net is -5.1 bp per trip. That is better than the -12.1 bp
 of the ungated taker exit, but still a loss.
 
 The decomposition `gross = spread earned - adverse selection - exit slippage`
@@ -2403,7 +2556,11 @@ holds for every row. (v1.13: the spread / AS columns moved — passive +5.90 /
 markout reference of a maker fill is now the mid before the FIRST event of
 its `exchange_ts`, the rule `tca/markout.py` and the calibration already
 used (X-P1-4). Fills, exits and net are unchanged: only the split between
-the two columns moved.) With a passive exit, a fully passive exit shows
+the two columns moved. The rows printed above are from the v1.18.0 re-run and
+differ from the v1.13 figures in these sentences; later changes, not bisected,
+moved fills and net as well. Python prints a `FeedLatencyAsOrderLegWarning` on
+stderr for this block: the latency table was estimated from feed timestamps
+and is used as the order-entry leg, a proxy.) With a passive exit, a fully passive exit shows
 negative slippage (the second half-spread earned) and a timeout pays it back.
 These are illustrations on a sparse synthetic stream (2,000 events in two
 hours), not results. To calibrate a real session, run
@@ -2458,16 +2615,19 @@ EOF
 ```
 
 ```
-skewed   fills  97 (bid 0.17 ask 0.19) max|q| 300 mean|q| 151 AS floor +0.80 bp (calibration:1s)
-         spread +223.00 markout -66.50 inventory -82.50 flatten -6.00 rebates +19.40 fees -0.90 = net +86.50 USD
-no-skew  fills 104 (bid 0.19 ask 0.19) max|q| 300 mean|q| 142 AS floor +0.80 bp (calibration:1s)
-         spread +236.50 markout -63.50 inventory -69.00 flatten -4.00 rebates +20.80 fees -0.60 = net +120.20 USD
+skewed   fills  99 (bid 0.17 ask 0.19) max|q| 300 mean|q| 147 AS floor +0.80 bp (calibration:1s)
+         spread +227.50 markout -66.50 inventory -77.00 flatten -6.00 rebates +19.80 fees -0.90 = net +96.90 USD
+no-skew  fills 110 (bid 0.19 ask 0.20) max|q| 300 mean|q| 132 AS floor +0.80 bp (calibration:1s)
+         spread +250.00 markout -63.50 inventory -51.50 flatten -4.00 rebates +22.00 fees -0.60 = net +152.40 USD
 ```
 
 v1.13: spread and markout moved (skewed +205.50 / -49.00 to +223.00 /
 -66.50; no-skew +218.50 / -45.50 to +236.50 / -63.50) for the X-P1-4
 markout-reference change described under recipe 39; their sum, the fills
-and the net are unchanged. The summary also carries
+and the net were unchanged then. The output above is the v1.18.0 re-run
+(fills, spread and net have moved since; the same `FeedLatencyAsOrderLegWarning`
+goes to stderr). The 'net +96.90 USD' of the skewed quoter is the net of a
+toy score on a 2,000-event stream, not a result. The summary also carries
 `ticks_behind_touch_{mean,median,max}` and
 `frac_decisions_skew_changed_quote`: a skew that never changes a quoted
 price is inert, and `QuotingConfig(skew_mode="ticks", h_min_ticks=...)`
@@ -2584,7 +2744,8 @@ the first line shows. The second line and the walk-forward use
 `enforce_entry_cutoff=False`, the pre-v1.13 rule, and reproduce the numbers
 this recipe printed before v1.13 (in-sample +6.98 bp, out of sample +6.94
 bp). On real data the closing NOII only starts at 15:55, so every closing
-decision is past the cutoff.
+decision is past the cutoff; the v1.18 REL-08c closing-cross screen was
+dropped for that reason (closing NOII starts at 15:55:00 in the 2019 data).
 
 Every fold learns to follow the imbalance (orientation `+1`), as planted.
 For real files, use the CLI: `python -m iap.auction extract`, then
@@ -2656,8 +2817,9 @@ Plan items R1-R3 and R6. The `v3` method bundle cuts folds at session
 starts, gates on the equal-weight mean of per-instrument ICs, and adds a
 `validity` block: per-day ICs with event tags, the gate statistics without
 FOMC and holiday-thin days, a HAC t with no lag product across a day
-boundary, a day-clustered t and a day-block bootstrap. It debits four more
-looks than `v2` (88 against 84 at four folds). The example uses the test
+boundary, a day-clustered t and a day-block bootstrap. Under the v1.13 rules
+it debited four more looks than `v2` (88 against 84 at four folds); since
+v1.14 both debit 2. The example uses the test
 fixture of `test_research_validity_v19.py`: five synthetic sessions from
 2019-01-28 with a planted backwards signal on two instruments, the second
 ten times noisier in label scale, and 2019-01-30 an FOMC day:
@@ -2687,29 +2849,42 @@ EOF
 ```
 
 ```
-v2: looks 84  gate IC (pooled) -0.1784  pooled -0.1784  gate t -8.56  verdict REJECT
-v3: looks 88  gate IC (instrument_mean) -0.2312  pooled -0.1784  gate t -8.56  verdict REJECT
-  2019-01-29 -      IC -0.153  n 1260
-  2019-01-30 fomc   IC -0.132  n 1260
-  2019-01-31 -      IC -0.201  n 1260
-  2019-02-01 -      IC -0.230  n 1260
-ex-event: 1 day dropped ['fomc', 'holiday_thin'], gate IC -0.2424, t -10.10
-t: HAC day-separated -9.22, day-clustered -8.19, day-block bootstrap -9.03 over 4 days
+v2: looks 2  gate IC (pooled) -0.2306  pooled -0.2306  gate t -18.80  verdict REJECT
+v3: looks 2  gate IC (instrument_mean) -0.2307  pooled -0.2306  gate t -18.80  verdict REJECT
+  2019-01-29 -      IC -0.228  n 1260
+  2019-01-30 fomc   IC -0.199  n 1260
+  2019-01-31 -      IC -0.251  n 1260
+  2019-02-01 -      IC -0.248  n 1260
+ex-event: 1 day dropped ['fomc', 'holiday_thin'], gate IC -0.2417, t -21.78
+t: HAC day-separated -18.80, day-clustered -19.63, day-block bootstrap -21.09 over 4 days
 ```
+
+That is the output at v1.18.0, where `v2` and `v3` are the v1.14 defaults: one
+look per gate decision (2 with the holdout), signal and label scaled per
+instrument before pooling, and the automatic HAC bandwidth. The v1.9 page of
+this recipe printed other figures, which the frozen v1.13 bundles still
+reproduce exactly: with `METHODS_V2_V113` and `METHODS_V3_V113` in place of
+`METHODS_V2` and `METHODS_V3` (`v2_v113`, `v3_v113`, recipe 72) the lines are
+`looks 84` / `looks 88` (`v3` debited four more looks than `v2`), gate IC
+−0.1784 pooled and −0.2312 as the instrument mean, gate t −8.56, per-day ICs
+−0.153, −0.132, −0.201 and −0.230, ex-event gate IC −0.2424 with t −10.10, and
+t-statistics of −9.22, −8.19 and −9.03.
 
 How to read it.
 
 - The verdict is REJECT under both bundles because the fixture is planted
   *backwards* (its hypothesis sign is wrong). That is the point of the
   fixture: the statistics are strong and the signal still fails.
-- The gate IC moves from the pooled −0.178 to the instrument mean −0.231.
-  Pooling lets the instrument with the larger label scale dominate; the
-  equal-weight mean asks whether the signal works on each instrument.
+- The pooled and instrument-mean gate ICs are now almost the same (−0.2306
+  and −0.2307), because the default scales each instrument before pooling.
+  Under the frozen v1.13 rules pooling let the instrument with the larger
+  label scale dominate (pooled −0.178 against an instrument mean of −0.231);
+  the equal-weight mean asks whether the signal works on each instrument.
 - The first session is the first fold's training data, so the block holds
   four days. The FOMC day carries the weakest IC; dropping it moves the
-  gate IC from −0.231 to −0.242. On the real 2019-20 sessions, two of seven
+  gate IC from −0.2307 to −0.2417. On the real 2019-20 sessions, two of seven
   days are FOMC days, which is why this block exists.
-- The three t-statistics agree here (−8.2 to −9.2). On real data they can
+- The three t-statistics agree here (−18.8 to −21.1). On real data they can
   disagree a lot: the day-clustered t has only (days − 1) degrees of
   freedom of information about a day-level shock, and with four or seven
   days it is the honest one. Read it before the row-level HAC t.
@@ -2740,8 +2915,10 @@ python3 -c "import json; d = json.load(open('$DS/calibration.json')); \
 print(d['fill_rates']['all']); print(d['markouts']['all']['1s']); print(d['impact'])"
 ```
 
-Not run for this release: the machine was running the maker study below.
-Three things to know before you run it.
+Not run for this page: it needs an ingested real session, and no vendor data
+is in the repository (when this recipe was written the machine was busy with
+the maker study of recipe 46, which has since finished). Three things to know
+before you run it.
 
 - **Memory.** The CLI reads the whole IAP1 file into Python event objects.
   A full ITCH day for three symbols is several million events and several GB.
@@ -2756,7 +2933,7 @@ Three things to know before you run it.
 - **Calibrate on an earlier day than you test.** A calibration estimated on
   the test day leaks that day's adverse selection into the gate.
 
-## 46. Run the maker backtest on a real session (how-to; results pending)
+## 46. Run the maker backtest on a real session (how-to; no maker edge found)
 
 This is the shape of one unit of the pre-registered maker study described
 in docs/ROADMAP.md §3.5: fit the alpha on an earlier session, calibrate on
@@ -2842,12 +3019,16 @@ PYTHONUTF8=1 PYTHONPATH=src python3 maker_day.py \
     ../data/real/ds3_20190327/normalized/events.parquet 1 EQ01 1s 0 1
 ```
 
-The real-data result is **not in this book yet**: the pre-registered study
-(`research/maker_real/prereg.json` on branch `research/maker-real`: EQ01,
-EQ02, EQ05 and EQ10, taker and passive exits, walk-forward over the seven
-sessions with session 1 as warm-up) is running. It is in-sample: those
+The pre-registered study (`research/maker_real/prereg.json`, merged from
+branch `research/maker-real` in v1.16 item 11: EQ01, EQ02, EQ05 and EQ10,
+taker and passive exits, walk-forward over the seven sessions with session 1
+as warm-up) finished with **no maker edge** (docs/ROADMAP.md, v1.9 section;
+this book does not reproduce its per-cell table). It is in-sample: those
 sessions were used to design every alpha, so even a positive result would
-only justify an out-of-sample test. The run above was checked on the
+only have justified an out-of-sample test. The later v1.18 REL-10 study found
+its maker cells underpowered (12 of 12; `research/v118/rel10/REPORT.md`,
+docs/release/v1.18.0_RELEASE_NOTES.md): no maker edge is claimed anywhere in
+this repository. The script above was checked on the
 two-session synthetic dataset of recipe 43, where it is plumbing only
 (`taker`: every row gated out; `passive`: 2,534 posts, no fill on that
 sparse tiny stream).
@@ -2877,6 +3058,10 @@ git clone https://github.com/AshJha0/intraday-alpha-platform /tmp/iap-gov && cd 
 export PYTHONPATH=$PWD/python/src
 KEYS=$HOME/.iap-keys && mkdir -p $KEYS        # private keys live OUTSIDE the repository
 python3 -m iap.agents.cli --root . agent-keygen --agent alpha-researcher --keyfile $KEYS/agent.key
+# since v1.14 a changed key registry counts only once a trust-root maintainer has signed it (recipe 74);
+# without these two lines `prereg` stops with "agent key registry not trusted". In a scratch clone use a throwaway maintainer:
+python3 -m iap.agents.cli --root . maintainer-keygen --maintainer demo --keyfile $KEYS/maintainer.key
+python3 -m iap.agents.cli --root . sign-registry --maintainer demo --keyfile $KEYS/maintainer.key
 python3 -m iap.agents.cli --root . prereg --agent alpha-researcher --alpha EQ02 --horizon 10s \
     --hypothesis "demo: EQ02 at 10s, positive sign" --expected-sign 1 --keyfile $KEYS/agent.key
 git add research && git commit -qm "prereg EQ02/10s"   # push it before touching any data
@@ -2886,30 +3071,33 @@ python3 -m iap.agents.cli --root . verify-board
 
 ```
 private key for 'alpha-researcher' written to <KEYS>/agent.key; public key added to <repo>/research/agents/agent_pubkeys.json
+private key for 'demo' written to <KEYS>/maintainer.key; public key added to <repo>/research/agents/trust_roots.json
+registry signed by 'demo' -> research/agents/agent_pubkeys.sig.json
 pre-registered EQ02/10s as a961739d6206a444 (one look debited)
-7 entries anchored in <repo>/research/agents/anchors.json
+24 entries anchored in <repo>/research/agents/anchors.json
 {
-  "anchored": 7,
-  "entries": 7,
+  "anchored": 24,
+  "entries": 24,
   "ok": true,
   "problems": [],
   "unanchored": 0
 }
 ```
 
-The id and the hash differ in your run (they cover a timestamp and a
-nonce). What the new entry holds:
+The entry hash differs in your run (it covers a timestamp and a nonce); the
+`prereg_id` came out the same in the v1.18.0 re-run, so it does not depend on
+either. What the new entry holds:
 
 ```
-"auth": {"key_id": "alpha-researcher", "op": "preregister", "scheme": "ed25519", "nonce": "...", "args_digest": "...", "sig": "..."}
-"body": {"alpha_id": "EQ02", "horizon": "10s", "expected_sign": 1, "format": 2, "ledger_total": 5157,
+"auth": {"key_id": "alpha-researcher", "op": "preregister", "scheme": "ed25519-v2", "board": "research/agents/blackboard.jsonl", "prev": "...", "nonce": "...", "args_digest": "...", "sig": "..."}
+"body": {"alpha_id": "EQ02", "horizon": "10s", "expected_sign": 1, "format": 2, "ledger_total": 6827,
          "code": {"scheme": 2, "code_hash": "...", "feature_hash": "...",
                   "modules": ["iap.alpha.base", "iap.alpha.equity"],
                   "features": ["depth_ask_l1_avg_w10s_v1", ..., "ofi_norm_l1_w1s_v1"],
                   "deps": {"numpy": "...", "pandas": "...", "scipy": "..."}}}
 ```
 
-`ledger_total` is 5157: the 5,156 committed when this output was captured (v1.5.0; 5,732 as of v1.17.0) plus this one. Now edit
+`ledger_total` is 6827: the 6,826 committed at v1.18.0 (5,156 when this page was first written at v1.5.0; 5,732 at v1.17.0) plus this one. Since v1.14 the signature scheme is `ed25519-v2`, which binds the board head (`prev`) and the board id. Now edit
 the hypothesis text of that last entry and verify again:
 
 ```bash
@@ -2925,7 +3113,7 @@ python3 -m iap.agents.cli --root . verify-board; echo "exit $?"
   "entries": 0,
   "ok": false,
   "problems": [
-    "chain broken at entry 7"
+    "chain broken at entry 24"
   ],
   "unanchored": 0
 }
@@ -3034,8 +3222,13 @@ print("max |d| microprice:", np.nanmax(np.abs(py.values[:, k] - rs.values[:, k])
 EOF
 ```
 
-Expected: `rust (2000, 45) bool`, `validity identical: True` and a
-microprice difference at or below 1e-9. Without the extension
+Expected: `rust (1591, 45) bool`, `validity identical: True` and a
+microprice difference at or below 1e-9. (An earlier version of this page
+printed `(2000, 45)`; at v1.18.0 the Python engine yields 1,591 native rows
+for the golden equity vector, so the Rust line is expected to match that. Only
+the Python fallback was re-run here: it prints `python (1591, 45) bool`,
+`validity identical: True` and a difference of 0.0. The Rust line needs the
+wheel, which was not built here.) Without the extension
 `resolve_engine` warns and returns `python`, so the snippet still runs.
 For the feature store, `python3 -m iap.features --engine rust` takes the
 45 native columns from Rust and records `"native_engine": "rust"` in
@@ -3100,7 +3293,7 @@ print("shadow pnl delta", cmp.pnl_delta, "agreement", round(cmp.agreement, 3))
 ```
 
 ```
-model 9e60a118146c9ef9 prereg f78d0118ad2f
+model 843967862c7a9cfa prereg f78d0118ad2f
 monitor ALERT ['feature_drift:f0', 'feature_drift:f1', 'feature_drift:f2']
 shadow pnl delta -27.0 agreement 0.878
 ```
@@ -3248,11 +3441,14 @@ faster, because 160 features still run in Python.
 
 ## 53. Change a frozen copy: the `POLYGLOT-OVERRIDE` workflow (v1.11)
 
-Plan item E3. `docs/POLYGLOT.md` freezes 24 paths (Rust codec, book,
-replay, alpha, contracts, lifecycle; C++ contracts; the Java ports, removed from the policy in v1.15 when Java was archived); new
+Plan item E3. `docs/POLYGLOT.md` freezes 8 paths at v1.18.0 (Rust codec, book,
+replay, alpha, contracts, lifecycle; C++ contracts; it was 24 until v1.15, when
+the 16 Java paths left the policy because Java was archived); new
 behaviour lands in the canonical copy. The gate is
 `tests/harness/check_polyglot_policy.py`. First its built-in known answers
-and the check of the v1.11.0 release branch against `main`:
+(8 FROZEN paths now) and the check of a branch against `main`; the second
+output block is as captured on the v1.11.0 release branch, when the policy
+was introduced and still listed 24 paths:
 
 ```bash
 python tests/harness/check_polyglot_policy.py --self-test
@@ -3260,7 +3456,7 @@ python tests/harness/check_polyglot_policy.py --base origin/main
 ```
 
 ```
-polyglot policy self-test: PASS (24 FROZEN paths)
+polyglot policy self-test: PASS (24 FROZEN paths)    <- v1.11.0; PASS (8 FROZEN paths) at v1.18.0
 polyglot policy: 44 changed file(s), 0 in FROZEN copies
   override: introduces tests/harness/polyglot_policy.json itself (E3)
 polyglot policy: PASS
@@ -3371,7 +3567,7 @@ done
 ```
 
 ```
-9e60a118146c9ef9  maker_filter/meta_gbm classifier synthetic-v1  exploratory
+843967862c7a9cfa  maker_filter/meta_gbm classifier synthetic-v1  exploratory
 verify-ok
 OK: no alerts
 exit 0
@@ -3391,7 +3587,7 @@ python -m iap.mlops --registry $M/reg verify $ID; echo "exit $?"
 ```
 
 ```
-error: model 9e60a118146c9ef99c940d9e14db41a25cbd19509765e986bcf0461cbad3f081/: artefact hash mismatch; identity does not hash to the model id
+error: model 843967862c7a9cfa6dc3066d9f3ad8fe7194e025db05decb255dfb8aa2d2ca57: artefact hash mismatch
 exit 2
 ```
 
@@ -3779,13 +3975,14 @@ On Kubernetes the same URLs go in the Secret `iap-alertmanager-webhook`
 
 ```promql
 job:order_path_latency_slo_errors:ratio_rate1h    # fraction of orders slower than 1.05 ms
-job:event_path_latency_slo_errors:ratio_rate1h    # same for the per-event path
 job:order_path_latency_slo_errors:ratio_rate1h / 0.01   # burn rate (1 = on budget)
 ```
 
 A burn rate of 14.4 sustained for an hour (with the 5-minute window agreeing)
 pages; 3 over a day tickets. After a finished paper session the ratios are
-empty (no traffic), and nothing fires.
+empty (no traffic), and nothing fires. (The per-event-path SLO that this recipe
+also listed was retired in v1.17 F9 with the Java image: `slo.yml` now holds
+the order-path SLO only.)
 
 **3. Run the rule tests yourself** (CI does this; needs `promtool` 2.53):
 
@@ -3919,7 +4116,7 @@ Output:
 ```text
 one config  {'sharpe_per_day': 0.121, 'psr': 0.783, 'dsr': 0.783, 'dsr_at_looks': 0.01, 'min_track_record_days': 172.895}
 12 configs  {'sharpe_per_day': 0.121, 'psr': 0.783, 'dsr': 0.172, 'dsr_at_looks': 0.01, 'min_track_record_days': 172.895}
-ledger N    {'sharpe_per_day': 0.121, 'psr': 0.783, 'dsr': 0.017, 'dsr_at_looks': 0.01, 'min_track_record_days': 172.895}
+ledger N    {'sharpe_per_day': 0.121, 'psr': 0.783, 'dsr': 0.007, 'dsr_at_looks': 0.01, 'min_track_record_days': 172.895}
 days needed at 95% (PSR vs 0): 172.9
 ```
 
@@ -3929,8 +4126,8 @@ DSR asks the question that matters after a search: is it above the best
 Sharpe that `N` worthless configurations would be expected to show? With
 one configuration DSR equals PSR; with twelve it falls to 0.172; with `N`
 from the ledger (the distinct configurations, `effective_trials`, plus one
-for the run being judged) it is 0.017. `dsr_at_looks` (0.01) uses the raw
-look count passed in (`n_looks=400`) and is the harshest reading; the headline is the
+for the run being judged: 641 at v1.18.0) it is 0.007. `dsr_at_looks` (0.01) uses the raw
+look count passed in (`n_looks=400`) and is a strict reading too; the headline is the
 conservative `effective_trials` figure, with the look count printed beside
 it. The minimum track record says 40 days are far too few: about 173
 sessions at this Sharpe would be needed for 95% confidence that the true
@@ -4070,7 +4267,8 @@ after its horizon has passed on the replay clock.
 
 **Goal:** know which SLO alert a given latency regression fires, before
 reading `deployment/prometheus/slo.yml` or a promtool test. The SLO is 99%
-of order-path (or event-path) samples under 1,048,575 ns over 30 days, so
+of order-path samples under 1,048,575 ns over 30 days (the event-path SLO was
+retired in v1.17 F9), so
 the error budget is 1% and the burn rate is the slow fraction divided by
 0.01. Save as `python/recipe65.py` and run `cd python && python recipe65.py`
 (no repository imports):
@@ -4114,7 +4312,7 @@ when several match, Alertmanager's inhibition mutes the same SLO's warning
 while its page fires. The promtool tests in
 `deployment/prometheus/tests/slo_test.yml` check the same arithmetic on
 series: a healthy 0.5% case fires nothing, a 50% case pages within 20
-minutes, and so on for 8 cases. They run in CI
+minutes, and so on for 4 cases (8 while the event-path SLO existed). They run in CI
 (`promtool test rules alerts_test.yml slo_test.yml`, recipe 60); this
 machine has no `promtool`, so this recipe reproduces only the thresholds.
 In Prometheus the same reading is
@@ -4123,8 +4321,11 @@ In Prometheus the same reading is
 ## 66. Plan the R7 data load: candidate days, a resumable ingest, a seeded draw (v1.13)
 
 **Goal:** see what an R7 load would cost and what the batch would do,
-without downloading or ingesting anything (docs/R7_DATA_PLAN.md). From
-`python/`:
+without downloading or ingesting anything (docs/R7_DATA_PLAN.md). This is the
+planner as written for v1.13; the R7 confirmatory test itself ran in v1.15
+(docs/research/R7_RESULTS.md: two IC hypotheses confirmed, no edge claimed),
+and a re-issue of that result under the v1.18 identity binding is an open,
+optional post-release item. From `python/`:
 
 ```bash
 PYTHONUTF8=1 PYTHONPATH=src python -m iap.marketdata plan-ingest     --manifest ../research/r7/r7_candidates.json --vendor-dir ../data/vendor     --out-root ../data/real/r7 --dry-run | head -9
@@ -4238,17 +4439,18 @@ python tests/harness/check_agent_keys.py
 python tests/harness/check_ledger_monotone.py --base origin/main
 ```
 
-Output (on the v1.13.0 release branch, 2026-10-11):
+Output (on main at v1.18.0, re-run 2026-10-24; the v1.13.0 branch printed 6
+entries):
 
 ```text
 {
-  "anchored": 6,
-  "entries": 6,
+  "anchored": 23,
+  "entries": 23,
   "ok": true,
   "problems": [],
   "unanchored": 0
 }
-board entries 6 (signed 0); registry keys 0
+board entries 23 (signed 0); registry keys 0
 ledgers and blackboard are monotone vs origin/main
 ```
 
@@ -4521,7 +4723,7 @@ ancestor of `origin/main`, and the board on `main` to be a prefix of the
 current board.
 
 When v1.14 shipped both files were empty. Since v1.15 (#92) the maintainer
-`ashjha0` is in `trust_roots.json`, the registry is signed and CI also runs
+`ashjha0` is in `trust_roots.json`; as of v1.18.0 the registry file is still empty (`{}`, no agent keys) and its signature file verifies (`tools/verify_signatures.py` reports OK), and CI also runs
 `python tests/harness/check_agent_keys.py --trust-ref origin/main --require-signed`;
 on main at v1.16 the last command reports `"ok": true` with 19 of 19 entries
 anchored (recipe 99). Two related v1.14
@@ -5682,7 +5884,7 @@ choose.
 
 ---
 
-**Recipes 102–140 cover v1.17 (the Unreleased section of the CHANGELOG).** Every
+**Recipes 102–140 cover v1.17 (v1.17.0 and v1.17.1 in the CHANGELOG; the platform is now at v1.18.0).** Every
 option they use is **opt-in or report-only**: off by default, so no golden,
 registered feature, pre-registration fingerprint or published number moves
 unless you turn it on. Items that are modelled (counterfactuals, proxies,
@@ -5722,7 +5924,7 @@ It writes the dataset directory of recipe 93 (`dataset.json`, the IAP1 file,
 compared/mismatched counts). `--slim` skips the 3x-larger `*.normalized.jsonl`
 twin and `--partition-instruments N` bounds memory (recipe 107). The codec is
 covered by synthetic captures; run it here with
-`python -m pytest python/tests/test_iex_codec.py -q` (10 passed).
+`python -m pytest python/tests/test_iex_codec.py -q` (12 passed).
 
 A real-capture conformance pass (first 250 MB of the 2026-10-13 TOPS file:
 7,619,846 messages, 0 unknown types, 0 sequence gaps, 0 crossed quotes) is
@@ -5768,8 +5970,8 @@ python -m iap.marketdata process-iex-day --manifest research/v117/iex_overlap_ma
 
 The wrapper `cd`s into `python/`, sets `PYTHONPATH=src` and logs to a `.log`
 beside itself. The nine approved overlap days and their sizes are in
-`docs/research/IEX_OVERLAP_SET.md`; its results table is empty until the
-detached chain has finished a day.
+`docs/research/IEX_OVERLAP_SET.md`; its results table has one row per finished
+day (six of the nine at v1.18.0).
 
 **Pitfall:** `--peak-gb N` replaces the disk guard's estimate with a measured
 value; nothing is ever deleted to make room, so a refused guard needs space,
@@ -5847,8 +6049,9 @@ shows the same flags for IEX days). The chain is covered end to end by
 `python -m pytest python/tests/test_process_delete.py -q` (12 passed).
 
 **Pitfall:** the download needs `--download --i-have-approval`, and the
-2019-01-30 file is not downloaded yet (CHANGELOG A3); the refusal above is the
-disk guard working, not a bug. The `delete` step runs only after `KEEP.json`
+2019-01-30 day was processed after this recipe was written (`breadth/ds_20190130`
+in `research/data_manifest.json`, used by the v1.18 REL-08 screen); the refusal above
+is the disk guard working on this machine's free space, not a bug. The `delete` step runs only after `KEEP.json`
 verifies; `--keep-raw` / `--keep-gz` skip their deletions. A `--dry-run`
 creates the empty out-root directory.
 
@@ -5895,7 +6098,7 @@ python -m iap.marketdata ingest --format itch50 --input data/vendor/01302019.NAS
 
 Without a 4 GB file, check the claim on the synthetic pipeline:
 `python -m pytest python/tests/test_process_delete.py -q` and
-`python -m pytest python/tests/test_process_iex.py -q` (12 and 8 passed). In
+`python -m pytest python/tests/test_process_iex.py -q` (12 and 9 passed). In
 Python the same switches are `normalize_run(partition_instruments=N,
 write_normalized_jsonl=False)`.
 
@@ -6468,7 +6671,7 @@ An anchor at the close is invalid (`AFTER_CLOSE`); one 60 s before it has a
 **Pitfall:** a truncated label is a return over a shorter horizon, not an `h`
 return: filter on `truncated` for full-horizon labels. The feature store CLI does
 not write v2 features and no port computes them (Python reference only,
-pending F7/F8), and `HORIZONS_NS` / `VALID_HORIZONS` still stop at 15 m / 5 m.
+not covered by the v1.17 F7/F8 ports as of v1.18.0), and `HORIZONS_NS` / `VALID_HORIZONS` still stop at 15 m / 5 m.
 
 ## 121. Condition an alpha on the volatility regime and gate by regime (v1.17 C5)
 
@@ -6875,7 +7078,7 @@ printed or logged). Options: `--model` (`claude-haiku-5-5`, `claude-opus-5-5`,
 `claude-sonnet-5-5`), `--max-usd` (default per-run budget USD 1), `--max-tool-calls`,
 `--max-tokens`, `--effort`, `--data-root`, `--runner {cli,planted}`. Roster, caps
 and refusals: `docs/AGENTS.md` §1, `API_AGENTS.md`. Tests:
-`python -m pytest python/tests/test_agents_wse.py -q` (16 passed).
+`python -m pytest python/tests/test_agents_wse.py -q` (17 passed).
 
 **Pitfall:** a draft is for a human: signing and registering are separate human
 commands (`python -m iap.agents.cli prereg`, `sign-registry`); an agent session never
@@ -6986,14 +7189,14 @@ except UnknownModelError as e:
 Output (run here): `30.0 1.0 0.8 {'research': 'claude-sonnet-5-5', 'ops':
 'claude-haiku-5-5', 'docs': 'claude-haiku-5-5', 'eval': 'claude-haiku-5-5'}` and
 `refused: no price for model 'some-unknown-model'`. Tests:
-`python -m pytest python/tests/test_llm_spend.py -q` (14 passed). Governance:
+`python -m pytest python/tests/test_llm_spend.py -q` (15 passed). Governance:
 `docs/governance/GOVERNANCE.md` §2c.
 
 **Pitfall:** a `--dry-run` writes no ledger row, so month-to-date does not move; only
 live calls are charged. The ledger lives outside the repo on purpose: the class refuses
 an in-repo path (`ValueError`) unless `allow_in_repo=True`, which is for tests.
 
-## 132. Check the documentation structure as CI does (v1.17 E4, advisory)
+## 132. Check the documentation structure as CI does (v1.17 E4)
 
 **Goal:** catch broken relative links, a diagram missing from the index, a stale
 `iap.*` name in an `API_*.md`, and status text older than the last tag, before a
@@ -7011,11 +7214,12 @@ PowerShell: `$env:PYTHONUTF8 = "1"; python tests/harness/check_docs.py`. The las
 reads `<n> failure(s), <m> stale status row(s)`; `--json` prints one machine-readable document, `--verbose` prints more detail and `--strict` makes stale status text fail. On the
 v1.17 worktree before the COOKBOOK block of this section was written the run printed
 `0 failure(s)` and a list of stale `status_freshness` rows in `docs/EPICS.md`,
-`docs/ROADMAP.md`  and a few others. CI runs the same
+`docs/ROADMAP.md`  and a few others (a historical run; before a tag use `--release`, which
+fails on any undated status phrase). CI runs the same
 script in the `docs` job, plus the external-link check (`lychee`, configured in
 `lychee.toml`: it excludes the GitHub API, loopback and private hosts). The `docs`
-job is **advisory** until the owner adds it to the ruleset
-(`docs/governance/GOVERNANCE.md` §0).
+job is a **required check** since 2026-10-18 (`docs/governance/GOVERNANCE.md` §0); the
+`lychee` link step inside it stays advisory.
 
 **Pitfall:** the relative-link check follows links that end in a `#anchor`; a heading rename
 breaks every anchor that pointed at it, and recipe headings with a slash or a comma
@@ -7066,8 +7270,8 @@ is a dry run (add `--execute` before the subcommand to rewrite
 one step of the release flow (recipe 87 prints the flow). Tests on a fixture manifest:
 `python -m pytest python/tests/test_release_tool.py -q` (28 passed).
 
-**Pitfall:** `reproducible-build` is not a required check until the owner adds it to
-the ruleset (`docs/governance/GOVERNANCE.md` §0). Hash-pinned installs apply to a
+**Pitfall:** `reproducible-build` has been a required check since 2026-10-18
+(`docs/governance/GOVERNANCE.md` §0). Hash-pinned installs apply to a
 whole `pip` command (`--require-hashes`), so do not mix a hashed lock with an unpinned
 package in one call. `--execute` goes **before** the subcommand (recipe 87).
 
@@ -7100,12 +7304,12 @@ cd python && python -m coverage combine .coverage.fast .coverage.slow && python 
 
 (PowerShell: `cd python; $env:PYTHONPATH = "src"; python -m pytest ...`; it needs `pytest-cov` and `pytest-xdist` from `python/requirements-ci.txt`. This machine's Python has no `pytest-cov`, so the command is shown, not run.)
 
-**Pitfall:** the floor is a **measured** figure rounded down, not a target: the CI
-comment records 55.90 % on the wave-2 integration PR (run 38794738398) and
-54.76 % on main after wave 3 (run 38805345163), which is why the floor is 54 and the
-CHANGELOG says so. The `slow` job does not count the modules the fast `python` job
-covers, so a new module under test only there lowers the percentage. Raise the floor
-when coverage rises; never lower it without a CHANGELOG line. mypy runs with
+**Pitfall:** the floor is a **measured** figure rounded down, not a target. In v1.17 it
+was 54 on the fast `python` job alone (55.90 % and 54.76 % in CI runs 38794738398 and
+38805345163); since v1.18 (REL-13) it is 92 on the combined suite (`COV_FLOOR` in
+`.github/workflows/ci.yml`), and the `coverage` job is not yet a required check
+(`docs/governance/GOVERNANCE.md` §0). Raise the floor when coverage rises; never lower
+it without a CHANGELOG line. mypy runs with
 Python 3.12 semantics (`python_version = "3.12"`).
 
 **What it is not:** a test-quality measure. 54 % of statements run under the slow
@@ -7390,7 +7594,6 @@ the prereg are assumptions until a calibration measures them.
 
 <!-- G5 placeholders: B10 dark model; C6 screen; F7 C++ ports; B9/F8 Rust -->
 
-Placeholder for the G5 truth pass: the dark midpoint model (B10), the cross-sectional
-screen (C6), the C++ ports of the v1.17 rules (F7) and the Rust ports (B9/F8) are not on
-main at this commit, so they have no recipe here; G5 adds each as it lands. Nothing is
-claimed for them.
+The dark midpoint model (B10), the cross-sectional screen (C6), the C++ ports of the
+v1.17 rules (F7) and the Rust ports (B9/F8) shipped in v1.17.0 but have no recipe here;
+see the v1.17.0 section of the CHANGELOG. B10 dark fills are modelled, not measured.

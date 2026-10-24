@@ -1,6 +1,7 @@
 # Agents — the roster, the models, the caps, and what the LLM may and may not do
 
-Status as of v1.17 WS-E (2026-10-15). The platform runs four LLM-backed agents
+Roster and model pins as of v1.17 WS-E (2026-10-15), unchanged in v1.18.0 (2026-10-24: the
+`configs/agents/llm.json` pins are still dated 2026-10-16; v1.18 added no LLM agent). The platform runs four LLM-backed agents
 and a set of non-LLM agent-layer controls. Every LLM call is paid from the
 owner's Anthropic key (`ANTHROPIC_API_KEY` or `--env-file`; never printed,
 logged or persisted), charged to the shared spend ledger
@@ -23,7 +24,12 @@ its single writer (`WriteBroker`), Ed25519 signing and the maintainer-signed key
 registry, the pre-registration gate and fingerprint, the human sign-off
 workflow, the reserve evaluator, the read-only MCP server. They are the
 governance the LLM agents act through; [API_AGENTS.md](../API_AGENTS.md) lists
-them.
+them. v1.18 added to them the analysis-identity binding of signed pre-declarations
+(`iap.agents.analysis_identity`, [governance/ANALYSIS_IDENTITY.md](governance/ANALYSIS_IDENTITY.md)): a runner
+must declare an actor that is not the signer and hold no signing key. REL-16 monitoring
+(`iap.monitoring`, [MONITORING_POLICY.md](MONITORING_POLICY.md)) lets an explainer
+use only code-computed facts and rejects text that names a different state; no LLM decides a
+monitoring state. No agent promoted a signal in v1.18.
 
 ## 2. Models and caps
 

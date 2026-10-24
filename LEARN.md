@@ -880,7 +880,7 @@ did the same thing along a different axis: the method bundle is part of
 the canonical config, so the same 24 pipelines run under the new default
 rules are new looks at the same sample, added beside the v1.4.0 ones
 (ledger `x-version` 3). At v1.5.0 the ledger held 216 distinct
-configurations and a look count of 5,156, broken down below. As of v1.17.0 it holds
+configurations and a look count of 5,156, broken down below. As of v1.18.0 it holds
 **640 distinct configurations / 6,826 looks** (`research/experiments.json`). v1.14.0 regenerated every statistic under its revised methods, and each one is a new look (`stats_revision`), adding 202 to the count over 77 configurations (the
 breakdown below is the v1.5.0 one, and every entry in it is still there):
 
@@ -906,7 +906,7 @@ and every one of them is a look.
 
 That translates into a selection yardstick: Bonferroni per-test threshold
 |t| ≥ **4.484**, and an expected **max |t| ≈ 4.202 under the global null**
-as of v1.17.0, source `research/experiments.json` (4.432 and 4.144 at v1.14.0, 4.424 and 4.135 at v1.5.0's count of 5,156, 4.206 and 3.888 at the v1.4.0 count of 1920, 4.071 and 3.735 before the
+as of v1.18.0, source `research/experiments.json` (4.447 and 4.160 at v1.17.1; 4.432 and 4.144 at v1.14.0, 4.424 and 4.135 at v1.5.0's count of 5,156, 4.206 and 3.888 at the v1.4.0 count of 1920, 4.071 and 3.735 before the
 dataset regeneration: looking again raised the bar each time). Up to
 v1.4.0 this yardstick was printed beside a fixed gate of t ≥ 3.0 and read
 by nothing. Since v1.5.0 the Bonferroni figure *is* the PROMOTE
@@ -1466,8 +1466,8 @@ match**.
   the portfolio golden is checked against an SLSQP optimum. Golden files are
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all three
-  suites and prints the table (the counts from main CI run 39043729536 (2026-10-17, v1.17.1 at 838e103): python 3208,
-  cpp 333, rust 376 tests passed; golden groups 217/74/75; all
+  suites and prints the table (the counts from main CI run 40015853764 (2026-10-23, v1.18.0 at 23b69fb2): python 3,666 on
+  3.11 (3,654 on 3.12), cpp 333, rust 376 tests passed; golden groups 217/74/75 as in the README table; all
   PASS, plus `integration` (35) and `replay` (6) rows for the repo-level
   pytest suites, a `deployment` row — 29 structural checks passed in CI,
   where promtool and kubeconform are installed — and a `numbers` row that re-derives every headline
@@ -5542,7 +5542,7 @@ gate decision ever recorded. The threshold is
 |t| >= Φ^{-1}(1 - α / (2N)),      α = 0.05 (PINNED_ALPHA)
 ```
 
-(`ExperimentLedger.bonferroni_t_threshold`). As of v1.17.0 the ledger holds
+(`ExperimentLedger.bonferroni_t_threshold`). As of v1.18.0 the ledger holds
 6,826 looks (`research/experiments.json`) and the threshold is `|t| = 4.484`. The threshold grows slowly,
 like `sqrt(2 ln N)`: doubling the looks adds about 0.15.
 
@@ -5678,8 +5678,23 @@ and a rerun of the same identity is free.
 **Merging research branches.** Branches that ran studies carry their own
 looks. `tools/merge_ledger.py` merges two ledgers by entry identity and
 reports conflicts; v1.16 merged the `step2` branch's 7 looks into main for
-a total of 5,368, and `docs/research/R7_POWER.md` was regenerated (the
-threshold moved from 4.432 to 4.433).
+a total of 5,368 at that time, and `docs/research/R7_POWER.md` was
+regenerated (the threshold moved from 4.432 to 4.433).
+
+**One real-data family (v1.18 REL-02).** Every entry now carries a
+`data_family` tag (real 256, synthetic 384). The per-dataset real ledgers
+(holdout2026, multi7, r7_holdout: 12 entries) were merged in as
+recorded entries, and the B7 multi7 and B8 two-venue execution studies were
+recorded retroactively with a deviation note
+(`tools/migrate_ledger_rel02.py`, `research/v118/REL02_LEDGER_MIGRATION.md`).
+The real-data N (distinct configurations on real data) went from 24 to 256; the central
+ledger at v1.18.0 holds 6,826 looks over 640 distinct configurations
+(Bonferroni |t| 4.484). The migration only appended: the chain head changed
+once and the old head stays on the chain. The gates still use the total look
+count. `tools/ledger_inventory.py` (`research/v118/LEDGER_INVENTORY.md`) lists
+every other ledger-shaped record and found one per-dataset ledger that is not
+merged (13 real entries), so the denominator is not claimed to
+be complete.
 
 **Check yourself.**
 
@@ -5712,6 +5727,24 @@ registration (`tstat_threshold="prereg"`) instead of rising with every
 later look. Once a confirmatory outcome is recorded by the owner, the
 registration is *closed*: later runs are labelled post-confirmation and
 can never count as evidence for that look.
+
+**Signed pre-declarations (v1.18 REL-02).** A signature that covers only a
+hypothesis lets the analysis change afterwards. A pre-declaration that
+carries an `analysis_identity` (`iap.agents.analysis_identity`, identity v2,
+`docs/governance/ANALYSIS_IDENTITY.md`) binds in its signed body the analysis
+scripts (sha256), the `python/src/iap` code tree, the `configs/` tree, the
+hashed dependency lock, the interpreter, the commit, the datasets by content
+hash, the hypothesis family, the metrics and the thresholds.
+`prereg_gate.require(..., identity_actual=)` and the signed-run entry points
+refuse on any mismatch and name every one; the runner must declare an actor
+other than the signer and hold no signing key. Signatures are Ed25519 under
+the maintainer key whose fingerprint is published in
+`docs/governance/TRUST_ROOT.md`, and `tools/verify_signatures.py` checks every
+signed document. The signed v1.18 runs (B8 v2, REL-05, REL-08, REL-09, REL-10,
+null v3) all ran under it and all came out negative, underpowered or failed;
+none promoted anything (`docs/release/v1.18.0_RELEASE_NOTES.md`). Code cannot
+prove who sits at the keyboard; the private key lives outside the repository
+and the owner signs on a machine that does not run the analysis.
 
 **What it is not.** It is not a promise that the result will be positive.
 R7 pre-registered a gate and recorded both passes (§78); AUC01 registered
@@ -5750,8 +5783,27 @@ deviation with no ledger debit and retried once (§76). The test is whether
 anyone saw a number that could influence a choice.
 
 **When a holdout is spent.** After R7, the 2026 data is confirmatory
-evidence for H4 and nothing else. New questions need new data, or an
-honest label: "in-sample on previously held-out data".
+evidence for H4 and nothing else for return-signal claims. New questions
+need new data, or an honest label: "in-sample on previously held-out data".
+The execution studies of v1.17.1 and v1.18 (B8, B8 v2, REL-09, REL-10, the
+REL-04 verification) did read the 2025/26 overlap days of AAPL, MSFT and QQQ
+as out-of-sample days; they test a router, a stale-quote rule and a feed
+timestamp, not a return signal, and the registry records every such read.
+
+**From a path string to a registry (v1.18 REL-02b).** Until v1.17 the guard
+was a substring test on a path. `research/holdout_registry.json` is now
+hash-locked (`body_sha256`, `python -m iap.research.holdout_registry seal`)
+and keyed by dataset *content* and by (session, symbol) scope, each marked
+`in_sample`, `spent` (with `spent_by`) or `unread` (with `reserved_for`).
+`iap.research.holdout_registry.guard` runs before a data file is opened,
+fails closed (a real dataset the registry does not know is refused), and
+appends every attempt, allowed or refused, to a hash-chained access log. A
+renamed or copied directory resolves to the same state; a dataset called
+`fresh` that holds 2026-05-15 is refused. Someone who edits and reseals the
+registry is stopped only by review and by CI pinning the sealed hash; the
+entry points are listed in `docs/governance/DATA_ACCESS_PATHS.md`, and the
+reviewer's memo on this part (c) was written from inspection, not from a
+full test run (`docs/release/v1.18.0_RELEASE_NOTES.md`, open gates).
 
 **Check yourself.**
 
@@ -6633,8 +6685,16 @@ two pipelines. Failures demote PAPER to CANDIDATE (on the configured
 number of consecutive failures), and a human can retire it.
 
 **Honest status.** No alpha here has reached PAPER on real data; the
-lifecycle has 23 CANDIDATE alphas and none beyond (v1.14). The gates exist
-and are tested (the LC01 golden, §17.4).
+lifecycle has 23 CANDIDATE alphas and none beyond (v1.14; unchanged at
+v1.18.0, with FX11 held in RESEARCH, `research/alpha_registry.json`). The
+gates exist and are tested (the LC01 golden, §17.4). v1.18 added the code
+that a paper stage would run under: a monitoring state machine whose missing
+or stale input is the explicit state UNKNOWN (`iap.monitoring`,
+`docs/MONITORING_POLICY.md`), enforced portfolio limits and a latched kill
+switch (`iap.risk.portfolio_limits`), and an idempotent paper order manager
+with a write-ahead journal and reconciliation (`iap.paper.oms`). Its 6-hour
+soak passed on a synthetic feed with injected faults, not a live venue
+(`research/v118/rel18_soak_6h/`).
 
 **Check yourself.**
 
@@ -6802,8 +6862,22 @@ minus native TWAP at 1 % ADV, -4.10 ± 2.19 bp (95 % CI -9.47 to 1.27, fill
 rate difference -0.19). The interval holds zero, and per-cell n is 9-21
 parents on 3-7 sessions: low-power. The honest reading in
 `docs/EXECUTION_QUALITY.md` is that the benchmark is a machine for the signed
-run, not a finding about the policies. The gate it prepares
-(`prereg_DRAFT.json`) is unsigned; the owner signs it.
+run, not a finding about the policies. The gate it prepared for B7
+(`prereg_DRAFT.json`) was never signed: the owner closed B7 on its in-sample
+result (`research/preregs/B7_CLOSED_v117.md`).
+
+**What v1.18 changed (REL-03, REL-04b).** The v1 headline, shortfall per
+parent in bps of parent notional, is dominated by the opportunity term on
+mostly unfilled parents. `iap.research.execution_metrics` makes the primary
+metric the cost per filled share, with fill rate, completion ratio and the
+completion charge beside it and the shortfall secondary, every interval
+printed with its cluster count, effective sample size and minimum detectable
+effect (`docs/EXECUTION_QUALITY.md` section 9). B8 v2 then ran under a signed
+pre-declaration on three evaluation sessions (G = 3): all six comparisons
+(`pin_iex`, `sor`, `sor_sweep` against pinned Nasdaq, on AAPL and MSFT) were
+`no_evidence` (underpowered), none better than pinned Nasdaq
+(`research/execution/b8v2/REPORT.md`). The reviewer inspected the committed
+report but did not rerun it (gate F7 open).
 
 **What it is not.** Not a market-impact measurement, not evidence that any
 policy wins, and not a promotion gate.
@@ -6828,7 +6902,8 @@ is a different bet (you paid latency and lost your place). A fill that
 landed after a cancel had already been sent lost a race. A taker fill never
 risked selection at all. Pooling them hides the mix.
 `iap.tca.markout_decomposition.fill_type` assigns one of `passive`,
-`aggressive`, `faded`, `cancelled_replaced` from new provenance on
+`aggressive`, `faded`, `cancelled_replaced` (and, since the B10 dark model,
+`dark`, a modelled midpoint fill, §108) from new provenance on
 `ChildOrder` (`cancel_rule`, `cancel_rule_ts`, `replaces_order_id`), and
 `regime_of` adds the B2 urgency regime (`agree`, `adverse`, `neutral`,
 `no_signal`, `stale`, or `plain`).
@@ -6841,9 +6916,10 @@ aggregates rows; `fill_rows` prices one timeline. With one day the SE is
 
 **Where it stands.** The machinery and its tests are committed
 (`python/tests/test_v117_fading_cancels_markout.py`). The changelog says the
-benchmark policies that exercise it were not run on multi7 in that PR, and
-`docs/EXECUTION_QUALITY.md` section 6.1 reserves the results for the truth
-pass. This entry therefore quotes no markout number.
+benchmark policies that exercise it were not run on multi7 in that PR. No
+signed v1.18 run tests the fill-type question as a hypothesis (the B8 v2
+comparisons are about venue routing, §101). This entry therefore quotes no
+markout number.
 
 **What it is not.** Not a claim that faded fills are worse than passive
 ones; that is the question the decomposition exists to ask.
@@ -6918,7 +6994,10 @@ touch-through is a proxy for a fill. The docstring says so; the report keeps
 `fades_saved_vs_fills_missed` as its own field, per policy.
 
 **What it is not.** Not a measured benefit. No committed run reports it
-(`docs/EXECUTION_QUALITY.md` section 6.1), and the C++ port is pending (F7).
+(`docs/EXECUTION_QUALITY.md` section 6.1). The fade and queue-cancel rules
+are ported to C++ with byte-parity goldens
+(`cpp/include/iap/execution/fading.hpp`, F7 part 1); the replay-scheduler
+wiring stays Python-only.
 
 **Check yourself.**
 
@@ -7047,21 +7126,31 @@ see, and a midpoint fill can be adversely selected if the mid is stale. A
 study would need a model of the dark fill probability and a markout of
 dark fills, compared with the passive and aggressive fill types (§102).
 
-**Where it stands.** This is an idea. The dark-midpoint model (plan item
-B10) is not on `main`: no code, no number and no result for it exists in
-this repository, and `docs/EXECUTION_QUALITY.md` section 6.3 reserves the
-heading as a placeholder for the truth pass. This entry makes no claim
-about a model, a venue or a benefit.
+**Where it stands.** The heading is older than the code: this began as an
+idea and B10 has since been built as a model. No free dark-pool data exists,
+so `iap.execution.dark` fits a logistic fill model on a proxy, the
+non-displayed Nasdaq `P` prints that land strictly inside the displayed
+spread (`research/execution/dark/dark_fill_model_multi7.json`), and a
+`VenueSpec` with `venue_type` dark or midpoint fills a dark-first child at the
+first event where the model's probability reaches a seeded draw. The
+`dark` fill type of §102 carries it into the markout decomposition. Every
+number from it is labelled modelled, not measured; the proxy is not a dark
+pool. It is ported to C++ with a byte-parity golden, and three pre-trade
+controls for dark posts are Rust-owned (F8). The multi7 dark benchmark was
+not run in the B10 PR, and no dark-midpoint result is quoted here or claimed
+anywhere in v1.18 (`docs/EXECUTION_QUALITY.md` section 7).
 
-**What it is not.** Not implemented, not tested, not a result.
+**What it is not.** Not a measurement of any venue, not a result, and not a
+benefit that has been shown.
 
 **Check yourself.**
 
 1. What would make a midpoint fill adversely selected? *(A stale quote:
    the mid is about to move and the contra order knows it.)*
 2. What evidence would have to exist before the router used it? *(A
-   committed fill-probability model and a markout of dark fills, signed
-   through the pre-registration process like any other gate.)*
+   fill-probability model checked against real dark fills, not a proxy, and
+   a markout of those fills, signed through the pre-registration process
+   like any other gate.)*
 
 ## 109. Breadth and the fundamental law
 
@@ -7085,9 +7174,15 @@ correlated names are barely more than one bet. The synthetic book
 (`BOOK_synthetic.md`, 11 names) has effective bets 10.33 of 11 and a rank IC
 of -0.0745, because the generator has no cross-sectional edge.
 
-**What it is not.** The law is a yardstick, not a forecast, and the
-platform's 100-name book has not been run in a committed result
-(`docs/PORTFOLIO_BREADTH.md`, placeholder). "A breadth of 3 is not breadth."
+**What it is not.** The law is a yardstick, not a forecast. The breadth book
+itself has only been run on three names in a committed result
+(`docs/PORTFOLIO_BREADTH.md`). v1.18 did run a one-session (2019-01-30)
+hypothesis screen, REL-08, on the 100-name universe (71 to 100 names per
+variant) with no edge claim: all 7 registered
+variants came out underpowered (`research/v118/rel08/SCORECARD_ds_20190130.md`),
+and the scorecard has known defects (a leading-gap criterion that fails by
+construction), so it is not a clean negative either. "A breadth of 3 is not
+breadth."
 
 **Check yourself.**
 
@@ -7196,8 +7291,10 @@ and a notional rule would be a new version and a new look.
 
 **Survivorship is explicit.** A symbol that later delists stays in the list
 and is reported as missing, not repaired. The 2025/26 days are the holdout
-for every name outside AAPL, MSFT and QQQ, and a `--dataset-dir` containing
-`holdout` is refused by the book driver.
+for every name outside AAPL, MSFT and QQQ. Until v1.17 the book driver
+refused a `--dataset-dir` whose path contained `holdout`; since v1.18 the
+holdout registry decides by dataset content and session scope (§73), and
+those sessions are marked reserved for the breadth-book pre-registration.
 
 **What it is not.** Not an index, not liquid-by-notional, not survivorship-free.
 
@@ -7223,7 +7320,7 @@ The right N is the repository ledger's distinct configurations plus the look.
 `--recompute-dsr` re-deflates the recorded per-session IC series without
 taking a new look.
 
-**What changed.** At N = 297 (the look) and 308 (today), EQ10 at 1 s moved
+**What changed.** At N = 297 (the look) and 308 (the repository ledger on 2026-10-15), EQ10 at 1 s moved
 from 0.99995 to 0.99886 and EQ05 from 0.9999998 to 0.99996
 (`research/r7/r7_confirm_result_dsr_recompute.{json,md}`; the note
 `research/r7/R7_DEVIATION_dsr_trials.md`). The gate is DSR > 0.95; both
@@ -7233,7 +7330,10 @@ from 0.988 to 0.956 at N = 297, still above 0.95 (`docs/SIGNAL_RESEARCH.md`).
 **What it teaches.** The correction was small because the evidence was
 strong, but the recording was wrong, and it was found by review and
 recorded as a deviation, not quietly fixed. Nothing in
-`r7_confirm_result.json` was rewritten.
+`r7_confirm_result.json` was rewritten. v1.18 left this partly open (gate F5,
+accepted open for the tag): the recompute exists at the registered N = 297 and
+the verdicts are unchanged, but the original result file was not re-issued with
+the new eligibility rule applied (`docs/release/FOUNDATION_COMPLETE_v1.18.md`).
 
 **What it is not.** Not a new look, and not a statement that the alphas are
 tradable (§78).
@@ -7250,8 +7350,9 @@ tradable (§78).
 **The question.** If the rules for computing a statistic change, what
 happens to the ledger of statistics computed under the old rules?
 
-**The mechanism.** `iap.validation.methods.STATS_REVISION` is `"v1.17"`; it
-is written into every new ledger identity as `stats_revision`. The v1.14
+**The mechanism.** `iap.validation.methods.STATS_REVISION` is `"v1.17"` (v1.18
+did not change it); it is written into every new ledger identity as
+`stats_revision`. The v1.14
 rules are frozen as `v2_v114`, `v3_v114`, `v4_v114`, and an entry at `"v1.14"`
 scopes to those bundles; an unknown revision raises. A rerun under new rules
 is therefore a new look with its own identity, not a silent overwrite of the
@@ -7303,6 +7404,21 @@ regime gate), so a day-clustered reading means the same thing everywhere.
 
 **What it is not.** Not a new test; a refactor that makes four readings one.
 
+**Does the one statistic have the size it claims? (v1.18 REL-06).** Agreement
+between copies says nothing about calibration, so v1.18 ran a known-null study:
+break the link between signal and label, run the inference step many times,
+and count false rejections. Null v1 passed but did not test size (a cost-dominated
+null, recorded as a vacuous pass); v2 failed (7 of 12 cells); v3, run on
+2026-10-23 under a signed protocol, **failed**: in the gross (S2) statistic the
+exhaustive conditional enumeration (A0) rejected 79 and 80 of 1,854
+transformations (about 4.3 %) at K = 3 and K = 6 against a 2.5 % target, while
+generator B sat at 2.50 % and 2.45 % (`research/v118/known_null_v3_RESULT.md`).
+No threshold was tuned afterwards. The outside reviewer rejected the method as
+the mandatory F3 gate in its current form, so gate F3 is open and **no
+real-data familywise error control is claimed**. Treat every gate t in this
+document as a descriptive statistic with the stated clustering, not as a
+calibrated test.
+
 **Check yourself.**
 
 1. Why is a duplicated statistic dangerous even if each copy is right?
@@ -7332,10 +7448,15 @@ deletes the capture, then verifies the DEEP+ book against the extract.
 tested on synthetic captures. A conformance pass on the first 250 MB of the
 2026-10-13 TOPS file found 7,619,846 messages, 0 unknown types, 0 sequence
 gaps and 0 crossed quotes
-(`research/v117/IEX_HIST_CONFORMANCE_20261013_TOPS.md`). A DEEP+ book is
-**unverified against real IEX data** until a day is ingested with both feeds.
+(`research/v117/IEX_HIST_CONFORMANCE_20261013_TOPS.md`). That pass was
+framing only. The oracle comparison itself has since run on real days: the
+overlap-day table in `docs/DATA_SOURCES.md` records six ingested days
+(2025-11-28, 12-08, 12-09, 12-10, 2026-05-15, 05-18), each with "0 mismatched"
+compares against TOPS.
 
-**What it is not.** Not proof of a correct book on real data yet.
+**What it is not.** Not proof that every message of every day is right: TOPS
+is the best bid and offer, so the oracle checks the top of the book, not the
+depth behind it.
 
 **Check yourself.**
 
@@ -7357,8 +7478,15 @@ host stamps in **TAI**, not UTC: capture stamp minus the IEX-TP send time was
 (`docs/DATA_SOURCES.md`).
 
 **The design response.** `exchange_ts` comes from the messages' own UTC
-nanosecond timestamps, so the offset never touches the data, and
-`receive_ts` is not derived from the capture stamp. Where a clock does enter
+nanosecond timestamps, so the offset never touches the data, and by default
+`receive_ts` is not derived from the capture stamp. (v1.18 REL-04 added an
+opt-in, `process-iex-day --capture-ts`, that writes the capture host's packet
+stamp as `receive_ts` into separate datasets. The signed verification on six
+overlap days found that only `receive_ts` differs from the default ingest,
+with no negative within-capture latency, and a constant offset of about 37 s;
+`research/v118/rel04_verify/REPORT.md`. The absolute IEX feed latency and the
+skew against Nasdaq are not claimed, because the capture clock's source and
+offset are unknown.) Where a clock does enter
 a model, it is named: `FillHazardModel(clock="America/New_York",
 capture_offset_s=IEX_TAI_OFFSET_S)` fits the time-of-day feature on the
 exchange clock, and `to_dict` records the clock (`"utc"` default, so
@@ -7401,13 +7529,16 @@ event-time window, and the output is byte-identical (tested).
 estimate overstated a 100-name day many times (830 GB estimated against
 about 50 GB expected), so `--peak-gb` takes a measured value. The disk guard
 never deletes to make room: it refuses, and the first 100-name day was
-refused on those terms.
+refused on those terms. With a measured `--peak-gb` of 60 GB the 2019-01-30
+100-name day then completed on this machine (`breadth/ds_20190130`); its
+Rust feature build took 21,878 s (about 6.1 h), from one run on one machine
+(`docs/DATA_SOURCES.md` section 4).
 
 **What is kept.** Features, manifests, the IAP1 file, Parquet and `KEEP.json`;
 what is deleted is regenerable.
 
-**What it is not.** Not a backup; no wall-clock figure for a completed 100-name
-day is committed yet.
+**What it is not.** Not a backup, and not a benchmark: the completed day's
+last run resumed from markers, so no end-to-end wall clock is quoted.
 
 **Check yourself.**
 
@@ -7567,9 +7698,13 @@ documents from linking to files that no longer exist?
 
 **The check.** `tests/harness/check_docs.py` verifies relative links, the
 diagram index, that every `iap.*` name in `API_*.md` resolves by import, and
-the freshness of status text against the last tag. It runs in the `docs` CI
-job (advisory, with a lychee external-link step configured in
-`lychee.toml`, which excludes the GitHub API and loopback and private
+the freshness of status text against the last tag. On a tagged release
+(`--release`) it also fails every undated status phrase and every ledger
+count that differs from `research/experiments.json` (`release_truth`), and
+since v1.18 it requires each latency or speed figure in the README, landing
+page and showcase to name its measurement environment (`latency_claims`). It
+runs in the `docs` CI job, with a lychee external-link step configured in
+`lychee.toml` (which excludes the GitHub API and loopback and private
 hosts). The docs-sync agent (§122) proposes fixes in the same spirit.
 
 **The API-name check is the useful one.** A link checker finds a moved file;
@@ -7577,9 +7712,10 @@ an import check finds an API document that names a function that was renamed.
 That is the failure readers actually hit. It is also why this document names
 only identifiers that exist: LEARN is held to the same check.
 
-**Advisory by design.** The job is not a required check, so an external
-site's outage cannot block a merge; the repository's required checks are
-listed in `docs/governance/GOVERNANCE.md`.
+**Advisory where it must be.** The `docs` job has been a required check
+since 2026-10-18, but the external-link step is `continue-on-error`, so an
+external site's outage annotates the run and cannot block a merge; the
+repository's 17 required checks are listed in `docs/governance/GOVERNANCE.md`.
 
 **What it is not.** Not a proof that prose is true. A document can link
 correctly and still be wrong, which is what the headline-number checks and
@@ -7589,8 +7725,8 @@ the truth pass (§139) are for.
 
 1. Why check names by import instead of by text search? *(A name can appear
    in text after it stopped existing; an import fails.)*
-2. Why keep external links advisory? *(They fail for reasons the repository
-   does not control.)*
+2. Why keep external links advisory while the job is required? *(They fail
+   for reasons the repository does not control.)*
 
 ## 124. Reproducible builds and SBOMs
 
@@ -7614,8 +7750,9 @@ manifests to `name:vX.Y.Z@sha256:<digest>` from `release-manifest.json`
 (dry-run by default), so a tag cannot silently change what a deployment runs.
 
 **What it is not.** The SBOM lists components; it does not say they are free
-of vulnerabilities. And `reproducible-build` is not yet a required check: the
-owner must add it to the ruleset (`docs/governance/GOVERNANCE.md`, section 0).
+of vulnerabilities. `reproducible-build` has been a required check since
+2026-10-18 (`docs/governance/GOVERNANCE.md`, section 0); its python-image
+half stays report-only.
 
 **Check yourself.**
 
@@ -7664,8 +7801,8 @@ the changelog entry is part of the control.
 Python MVP loop per event on a committed real slice (§127).
 `benchmarks/latency_budget.json` stores the measurement with its provenance
 (run id, CPU model, Python version, runner) and the limit:
-`limit = measured x margin`, rounded up, with margin 4. The CI-measured p50
-is 116,659 ns and p99 1,794,957 ns over 65,132 events; the limits are p50
+`limit = measured x margin`, rounded up, with margin 4. The CI-measured (shared GitHub-hosted runner, not colocation)
+p50 is 116,659 ns and p99 1,794,957 ns over 65,132 events; the limits are p50
 500,000 ns and p99 8,000,000 ns. `tests/harness/check_mvp_latency_budget.py`
 is blocking in the `python` job. Only p50 and p99 are guarded, never p99.9
 or the max, because a shared runner produces outlier spikes unrelated to the
@@ -7681,7 +7818,7 @@ and message mix.
 
 **What it is not.** Not a claim about production latency: the budget is for
 the Python reference loop in CI, and tick-to-trade for the C++ and Rust
-engines is §41.
+engines is §41. v1.18 claims no latency edge.
 
 **Check yourself.**
 
@@ -7952,8 +8089,12 @@ a study can drop or weight it.
 (`585dd7b9...`) and the fingerprinted alpha modules are unchanged; adding new
 horizons by edit would invalidate pre-registrations.
 
-**What it is not.** Opt-in: the store CLI does not write them yet, and no
-study has run.
+**What it is not.** Opt-in, and no study of these features has run. The
+store CLI does not write the `longwin` features. v1.18 REL-07 added the labels
+to it: `python -m iap.features --labels-v2 STEP` writes the 15 m / 30 m / 1 h
+session-close-truncated labels on a session-local grid
+(`labels_v2_<iid>.parquet`, `iap.labels.grid_v2`, a causal `anchor_ts` and a
+`truncated` flag; `docs/SIGNAL_RESEARCH.md` section 10).
 
 **Check yourself.**
 
@@ -7988,7 +8129,10 @@ identity; older identities reproduce byte for byte.
 
 **What it is not.** A draft, not a result:
 `research/preregs/linear_z_v2_prereg_DRAFT.json` is unsigned and no
-`linear_z_v2` study has run. `COMBINATION.json` is still the pre-v1.17 run.
+pre-registered `linear_z_v2` study has run. The `_z2` twins were candidates in
+the in-sample net-of-cost screen on multi7 (0 pass of 22, 1 not screened;
+`linear_z_v2` moves no verdict, `docs/SIGNAL_RESEARCH.md`). `COMBINATION.json`
+is still the pre-v1.17 run.
 
 **Check yourself.**
 
@@ -8044,7 +8188,10 @@ every execution golden and the X4 fingerprint unchanged; `drift=0.0` in
 `ac_holdings` is the v1.10 trajectory; `split_mode="legacy"` and
 `gate="literal"` remain the defaults; `ledger=None` keeps the v1.16 ML
 behaviour; a `portfolio.conformal` block absent from every pinned config keeps
-the MVP golden; `TRADE_BUST` is a no-op in the registered path.
+the MVP golden; `TRADE_BUST` is a no-op in the registered path. v1.18 kept
+the habit: the REL-04 capped child execution (`ParentOrder.child_exec`) and
+the REL-07 reference-ETF map and grid labels are opt-in with the default
+replay and registry hashes unchanged.
 
 **What it protects.** Goldens (§12), pre-registration fingerprints (§74) and
 published numbers. A default that moves is a retroactive change to a result
@@ -8130,13 +8277,27 @@ regenerated by a CI job under rules the owner flips deliberately, not by a
 laptop. The changelog marks which outputs follow it ("CI regenerate").
 
 **The truth pass.** `docs/EXECUTION_QUALITY.md`, `docs/PORTFOLIO_BREADTH.md`
-and `docs/SIGNAL_RESEARCH.md` reserve headings as placeholders for a final
-pass that replaces each with what is true at the tag. A document written
-before its results exist says so, and the pass replaces it.
+and `docs/SIGNAL_RESEARCH.md` reserved headings as placeholders at v1.17 for a
+final pass that replaces each with what is true at the tag. A document written
+before its results exist says so, and the pass replaces it. For v1.18 that pass
+is the item REL-14c, run after the tag, so that the prose describes what
+shipped and not what was planned.
 
-**What it is not.** Not done: the v1.17 headings above are written before the
-tag, and the standing conclusions (no promoted alpha, no tradable edge) are
-unchanged.
+**A release that promotes nothing (v1.18.0).** The v1.18.0 notes
+(`docs/release/v1.18.0_RELEASE_NOTES.md`) lead with the negative results and
+list what is not in the release. The release is a measurement instrument and
+recorded negative results: no signal is promoted, no edge is claimed, there is
+no latency edge, and the fill model is validated at Level 1 (deterministic
+replay) only, not at Level 2, because no real orders or fills exist. Three
+gates were accepted open for the tag and are named as open: F3 (the
+known-null method failed, §115), F7 (nobody independent has rerun the B8 v2
+JSON) and the reviewer's full findings memo; F5 (the R7 re-issue) is partly
+met. The foundation note is signed only in its truthful form
+(`docs/release/FOUNDATION_COMPLETE_v1.18.md`). A release is allowed to ship
+with gates open if, and only if, they are written down next to the version.
+
+**What it is not.** Not a statement that the open gates are closed, and the
+standing conclusions (no promoted alpha, no tradable edge) are unchanged.
 
 **Check yourself.**
 
@@ -8145,8 +8306,6 @@ unchanged.
 2. Why regenerate in CI and not locally? *(A number that every reader can
    reproduce from the repository's own pipeline is the only kind that
    counts.)*
-
-<!-- G5 placeholders: B10 dark model; C6 screen; F7 C++ ports; B9/F8 Rust -->
 
 ## 140. Further reading
 
@@ -8184,6 +8343,14 @@ Inside this repository, in suggested order:
     what each new default moved.
 11. `docs/ROADMAP.md` §3.8-3.10 and the v1.14.0 section of `CHANGELOG.md`
     — the 2026-10-11 review, what v1.14 fixed and every number it moved.
+12. `docs/release/v1.18.0_RELEASE_NOTES.md` — read the negative results first,
+    then the REL status table and the open gates;
+    `docs/release/REVIEWER_CLOSEOUT_2026-10-23.md` for the outside reviewer's
+    own words, and `research/v118/known_null_v3_RESULT.md` for the failed
+    calibration.
+13. `docs/governance/ANALYSIS_IDENTITY.md` and `docs/governance/TRUST_ROOT.md`
+    — what a signed pre-declaration binds and who can sign it;
+    `docs/MONITORING_POLICY.md` — the explicit UNKNOWN state of the paper path.
 
 Classic external literature these designs draw on (find current editions):
 
@@ -8235,21 +8402,25 @@ elsewhere, the entry gives the local one.
 | golden | a committed expected-output file that every language must reproduce, byte for byte or within a stated tolerance |
 | HAC | heteroskedasticity- and autocorrelation-consistent standard errors (Newey-West). Since v1.14 the bandwidth is chosen automatically and no lag product spans two session days |
 | holdout | data set aside and only scored against pre-registered hypotheses. Once looked at, it is spent |
+| holdout registry | `research/holdout_registry.json` (v1.18): a sealed, content-hash-keyed record of which sessions are `in_sample`, `spent` or `unread`; `iap.research.holdout_registry.guard` refuses a read the registry does not allow (§73) |
 | IC | information coefficient: the rank correlation between a signal and the next-horizon return |
-| ledger (look ledger) | `research/experiments.json`: every statistic the research has computed, counted as looks. A hash chain since v1.14 |
+| known-null study | a calibration that breaks the signal-label link and counts false rejections of the inference step. The v1.18 v3 study failed (about 4.3 % against a 2.5 % target in one arm), so gate F3 is open and no real-data familywise error control is claimed (§115) |
+| Level 1 / Level 2 (fill validation) | Level 1: deterministic replay validation; Level 2: the fill model compared with real orders and real fills on held-out days. Only Level 1 is validated; no real orders exist (v1.18, `docs/SIM_TO_REAL.md`) |
+| ledger (look ledger) | `research/experiments.json`: every statistic the research has computed, counted as looks. A hash chain since v1.14; since v1.18 each entry carries a `data_family` (real or synthetic) and the central ledger holds 6,826 looks over 640 distinct configurations, of which the real-data N is 256 |
 | look | one statistic computed and seen. Since v1.14 one look per gate decision |
 | implementation shortfall | the gap between a paper portfolio at the arrival price and the real one: spread, fees, impact and the cost of what did not fill (§101) |
 | markout | the mid some time after a fill, relative to the fill, as a measure of execution quality |
 | OFI | order-flow imbalance: signed changes in best bid and ask size (Cont, Kukanov and Stoikov) |
 | PBO | probability of backtest overfitting, from combinatorially symmetric cross-validation |
-| pre-registration | a signed blackboard entry naming alpha, horizon, sign and pass rule before the data is scored |
+| pre-registration | a signed blackboard entry naming alpha, horizon, sign and pass rule before the data is scored. Since v1.18 a signed pre-declaration (`research/preregs/*_prereg.json`) also binds the analysis identity: scripts, code tree, data, family and thresholds (§72) |
 | PROMOTE | the verdict that an alpha passed every gate. No alpha has received it |
 | queue position (`ahead_qty`) | the displayed size ahead of a resting simulated order at its price level; cancels and, since v1.14, size-reducing MODIFYs ahead of it reduce it |
 | row block | which feature rows the backtest is not allowed to trade on. Since v1.14 `causal`: decided from decision-time state only |
 | sharenorm | the v1.17 feature family dividing volumes and depths by the session ADV (as of the session, from earlier sessions) or the running session volume (§128) |
-| stats revision | the tag on a ledger identity (`v1.14`, now `v1.17`; `iap.validation.methods.STATS_REVISION`), so that a rerun under new rules is a new look |
+| stats revision | the tag on a ledger identity (`v1.14`, then `v1.17`, unchanged at v1.18.0; `iap.validation.methods.STATS_REVISION`), so that a rerun under new rules is a new look |
 | time-shift leakage test | v1.14 check: pair each label with the score from a quarter-horizon earlier. A causal signal keeps most of its IC; one that collapses is suspected of look-ahead and flagged for review. Too few pairs reports `null`, never a pass. In the #88 regeneration FX11 failed it (IC 0.108 to 0.027); the review has not found a leak |
 | TOPS | IEX's top-of-book feed; the oracle a DEEP+ book reconstruction must reproduce (§116) |
 | touch order | a resting simulated order at the best price, the unit of a v1.14 per-order markout |
 | TRADE_BUST | canonical event kind 10, a broken trade; a no-op for every book and registered feature, removed from the opt-in `sharenorm` volumes (§129) |
-| trust root | a maintainer key in `research/agents/trust_roots.json`, read from `main`, that must sign the agent key registry |
+| trust root | a maintainer key in `research/agents/trust_roots.json`, read from `main`, that must sign the agent key registry. Pinned, with its fingerprint, in `docs/governance/TRUST_ROOT.md` and checked by `tools/verify_signatures.py` |
+| UNKNOWN (monitoring state) | the state of `iap.monitoring` when any required input is missing, stale or too small a sample; it never allows new risk (`docs/MONITORING_POLICY.md`) |

@@ -8,18 +8,27 @@ pipeline — normalisation and QC, canonical events, order book, features,
 alphas, the research runner — consumes exactly as it consumes synthetic
 data.
 
-**Status, stated plainly.** The readers are written from the published
-message layouts and tested on bytes the tests synthesise
+**Status, stated plainly (v1.18.0, 2026-10-24).** The readers are written
+from the published message layouts and tested on bytes the tests synthesise
 (`python/tests/itch50_encoder.py`, `python/tests/lobster_fixture.py`); no
 vendor file is stored in this repository. The owner has run the ITCH path
-on one real Nasdaq file (2019-12-30: 268,744,780 messages, a 20-symbol
-universe, 15,323,126 events, no unknown order reference, no over-fill, no
-sequence gap, every book check clean). That run exposed a wrong tick-size
-rule and a slow second pass; both are fixed (§4.1, §10) and the fix was
-re-run on that file for AAPL, MSFT and QQQ. The LOBSTER path has not been
-run on a vendor file, and no study on real data has been recorded: backlog
-issue XD10 ([EPICS.md](EPICS.md), E25) stays open. §9 gives the two opt-in
-tests.
+on real Nasdaq files: the first was 2019-12-30 (268,744,780 messages, a
+20-symbol universe, 15,323,126 events, no unknown order reference, no
+over-fill, no sequence gap, every book check clean). That run exposed a
+wrong tick-size rule and a slow second pass; both are fixed (§4.1, §10).
+`research/data_manifest.json` (`tools/data_manifest.py`, [DATA_SOURCES.md](DATA_SOURCES.md) section 6) now lists 39
+datasets on the data root: ITCH sessions on AAPL, MSFT and QQQ (ten
+in-sample days 2019-2021, nine 2025/26 sessions that are spent as holdouts),
+the 100-name 2019-01-30 breadth day, the 20-name REL-04c set and IEX HIST
+DEEP+ datasets for the 2025/26 days (§3.6). The IEX path is checked against
+the TOPS oracle; the LOBSTER reconstruction rules were checked once, on one
+free sample file, through the REL-12 oracle
+([research/ITCH_ORACLE.md](research/ITCH_ORACLE.md)), which does not test the
+ITCH byte parser. **No signal is promoted and no edge is claimed from any of
+this data** (v1.18.0 release notes,
+[release/v1.18.0_RELEASE_NOTES.md](release/v1.18.0_RELEASE_NOTES.md)); the
+studies recorded so far are in §3. Backlog issue XD10 ([EPICS.md](EPICS.md),
+E25) is still listed as backlog there. §9 gives the two opt-in tests.
 
 Contents: [1 What is supported](#1-what-is-supported) ·
 [2 Obtaining data](#2-obtaining-data) ·
@@ -40,7 +49,7 @@ Contents: [1 What is supported](#1-what-is-supported) ·
 | Nasdaq TotalView-ITCH 5.0 historical file | `iap.marketdata.itch50` | the binary file format: `2-byte big-endian length` + message, plain or gzip (detected by magic). Decoded: `S` system event, `R` stock directory, `H` trading action, `Y` Reg SHO, `L` market participant position, `A` / `F` add order, `E` / `C` executed, `X` cancel, `D` delete, `U` replace, `P` non-cross trade, `Q` cross trade, `B` broken trade. `I` (NOII) is length-checked and counted. `J` (LULD auction collar) and `V` (MWCB decline levels) are decoded and counted only with the opt-in `Itch50Reader(circuit_breakers=True)` (v1.18). Every other type (`V W K J h N O …`, J and V included by default) is skipped by its length prefix and counted per type |
 | Databento DBN MBO, dataset `XNAS.ITCH` (v1.15) | `iap.marketdata.dbn_mbo` | a `.dbn` or zstd `.dbn.zst` file (detected by magic) decoded with the official `databento-dbn` codec (optional extra `pip install 'iap[dbn]'`). MBO actions `A C M T F R N` are translated into the ITCH 5.0 messages above and mapped by the unchanged ITCH mapper (§4.4); other record types are counted and skipped |
 | LOBSTER message file (+ orderbook file) | `iap.marketdata.lobster` | CSV without header, event types 1–7, one message file per symbol-day; the orderbook file is optional and, when present, verifies the reconstruction level by level (§6) |
-| IEX HIST captures: DEEP+ (orders), DEEP (price levels), TOPS (BBO oracle) (v1.17) | `iap.marketdata.iex` | the free daily pcap.gz of `https://iextrading.com/trading/market-data/` (T+1, no account): classic pcap (Ethernet / 802.1Q / raw IP, UDP/IPv4), IEX-TP v1 segments, the DEEP+ v1.06 / DEEP v1.08 / TOPS v1.66 messages, translated into the ITCH messages above and mapped by the unchanged ITCH mapper (section 4.5); venue `IEXG` (102) |
+| IEX HIST captures: DEEP+ (orders), DEEP (price levels), TOPS (BBO oracle) (v1.17) | `iap.marketdata.iex` | the free daily pcap.gz of `https://iextrading.com/trading/market-data/` (T+1, no account): pcapng as published (the reader also accepts classic pcap; Ethernet / 802.1Q / raw IP, UDP/IPv4), IEX-TP v1 segments, the DEEP+ v1.06 / DEEP v1.08 / TOPS v1.66 messages, translated into the ITCH messages above and mapped by the unchanged ITCH mapper (section 4.5); venue `IEXG` (102) |
 | Corporate actions | `iap.reference.corpactions` | a CSV table you write or export (§5); nothing is downloaded |
 
 One command ingests either source:
@@ -73,6 +82,9 @@ hosts. You obtain the files, under the provider's terms:
 - **LOBSTER** — reconstructed limit-order-book data built from Nasdaq
   ITCH; the provider publishes free sample files (a message file and an
   orderbook file per symbol, at several depth levels).
+- **IEX HIST** (v1.17) — IEX's free daily DEEP+ / DEEP / TOPS captures, T+1,
+  no account; see [DATA_SOURCES.md](DATA_SOURCES.md) for the sources, the
+  approval rule and the process-and-delete chain.
 
 Read the licence that comes with what you download. In particular, do not
 commit vendor files or anything derived from them. The repository ignores
@@ -88,9 +100,12 @@ are only the places that are safe by default.
 
 ### 2.1 Data source and terms (v1.13)
 
-- **Source.** Every real session used here is a Nasdaq TotalView-ITCH 5.0
-  sample file from the public directory at `emi.nasdaq.com`. The directory
-  showed no licence or terms text as of 2026-10-11.
+- **Source.** The Nasdaq sessions used here are TotalView-ITCH 5.0 sample
+  files from the public directory at `emi.nasdaq.com`. The directory
+  showed no licence or terms text as of 2026-10-11. Since v1.17 the IEX
+  overlap days are IEX HIST captures (`iextrading.com`); the IEX terms of use
+  are **not** recorded in this repository (an open owner item in
+  [DATA_SOURCES.md](DATA_SOURCES.md) section 7).
 - **Never redistributed.** Raw files, normalized datasets and feature stores
   stay under the git-ignored `data/vendor/` and `data/real/`; none of them is
   committed or published.
@@ -102,9 +117,9 @@ are only the places that are safe by default.
   Agreement. Historical TotalView-ITCH is listed as "Not Eligible" for
   delayed redistribution, so this repository does not redistribute it in
   any form.
-- **Stale dataset.** `data/real/ds_20191230` was ingested before the
-  tick-size fix (§4.1; tick 0.0001) and is being replaced by a correct
-  re-ingest. Do not use it; the examples below use the `ds3_*` datasets.
+- **Stale dataset (history).** `data/real/ds_20191230` was ingested before the
+  tick-size fix (§4.1; tick 0.0001) and was replaced by the `ds3_*` datasets,
+  which the examples below use; it is not on the data root of 2026-10-24.
 
 This is a description of what the repository does, not legal advice.
 
@@ -331,6 +346,24 @@ the next confirmatory test needs new, unseen sessions. Experiment ids,
 specs and results are under the git-ignored
 `data/real/holdout2026/research/experiments/`.
 
+*Status in v1.18.0.* The 2026-05-15 and 05-18 sessions have been read three
+times (this holdout, the AUC01 holdout of §3.3 and the B8 evaluation) and are
+`spent` in the hash-locked holdout registry `research/holdout_registry.json`
+(§3.7); the registry also lists them as spent by the signed v1.18 B8 v2, REL-09,
+REL-10 and REL-04 verification pre-declarations.
+`holdout2026` is a manifest x-version 1 dataset (pre-v1.14 ingest rules, §4):
+the v1.8 table above is a v1.8 / v1.13-rules result, not a current-rules one.
+The confirmatory round on unseen sessions that followed (R7-CONFIRM-1, seven
+2025/26 sessions, EQ10 and EQ05 at 1 s, both `confirmed` on the statistic) is
+in [research/R7_RESULTS.md](research/R7_RESULTS.md). The recorded result file
+carries `gate_eligible: false` (it was run under the `v4` bundle where `v2` is
+required) and its deflated Sharpe was recorded at the wrong trial count; the DSR
+was recomputed at the registered N = 297 with the verdicts unchanged
+(`research/r7/r7_confirm_result_dsr_recompute.md`), but the result file was not
+re-issued (gate F5, partly met). No net-of-cost edge followed from either
+holdout: confirmed information coefficients of 0.03-0.10 at 1-5 s do not clear
+the taker round trip (§3.2 above; `docs/SIGNAL_RESEARCH.md` section 8).
+
 **Multi-venue routing on real data (v1.12, X5).** Every real session in
 this repository is Nasdaq TotalView-ITCH (or LOBSTER built from it): one
 venue, `XNAS`. The cost-aware router (`iap.execution.sor_v2`, API_TRADING.md
@@ -339,16 +372,23 @@ its sweep, passive split, toxicity and tier logic is exercised only on
 synthetic multi-venue books. It is capability for multi-venue data later
 (e.g. a consolidated or second-venue feed), not a measured result.
 
-> **Superseded (v1.17 B8, pending data).** This rests on synthetic venues. The
-> real two-venue evaluation (Nasdaq + IEX books merged on the overlap days, per-venue
-> calibration, router vs pinned) replaces it: `research/execution/b8/README.md`,
-> docs/EXECUTION_QUALITY.md section 8. No real result exists yet; kept as history.
+> **Superseded (v1.17 B8, v1.18 REL-04b).** The paragraph above rests on synthetic
+> venues and is kept as history. The real two-venue evaluation (Nasdaq + IEX books
+> merged on the overlap days, per-venue calibration, router vs pinned) exists and is
+> negative: B8 out of sample (v1.17.1, `research/execution/b8/REPORT_oos6.md`) and the
+> signed B8 v2 run (`research/execution/b8v2/REPORT.md`, 3 evaluation sessions): all
+> six comparisons are `no_evidence` (underpowered) and none is better than pinned
+> Nasdaq. See docs/EXECUTION_QUALITY.md sections 8-10 and the v1.18.0 release notes.
 
-### 3.3 Auction imbalance (NOII) study (v1.10, plan item A1): in-sample result, holdout running
+### 3.3 Auction imbalance (NOII) study (v1.10, plan item A1): in-sample no demonstrated edge, holdout not confirmed
 
-**Status (v1.12.0, 2026-10-10).** The in-sample run of `AUC01` is
-finished and read; the 2026 holdout is running. Both are pre-registered
-(branch `research/step2`; prereg sha256 `9ea0915c…`).
+**Status (v1.18.0).** Both runs of `AUC01` are finished: the in-sample
+result below (v1.12.0, 2026-10-10) is NO DEMONSTRATED EDGE, and the 2026
+holdout verdict is **NOT CONFIRMED** (0 trades on 6 holdout decisions, frozen
+`C-300s` fit; `data/real/auction/AUC01_holdout2026.json`, which is git-ignored;
+summarised in [README_HISTORY.md](README_HISTORY.md)). Both are pre-registered
+(prereg sha256 `9ea0915c…`). The paragraphs below are kept as written on
+2026-10-10 where marked.
 
 **In-sample result: exploratory, in-sample, NO DEMONSTRATED EDGE.**
 Seven 2019-20 sessions, AAPL / MSFT / QQQ, true mids from the normalized
@@ -387,21 +427,22 @@ pre-v1.13 rule. From v1.13 `iap.auction` refuses a cross exit at
 `O-300s` cell (09:25 ET, before the 09:28 MOO cutoff) is not affected. The
 holdout verdict does not change: it made no trade.
 
-**2026 holdout: running.** Declared in the pre-registration before any 2026
-auction data was extracted, with the `C-300s` fit frozen from the in-sample
-run. Extraction of 2026-05-15 finished (1,592 two-sided mids); 2026-05-18 was
-being extracted when this was written. No holdout figure exists yet
-(`data/real/auction/AUC01_holdout2026.json` is not written); it will be
-reported here whatever it says.
+**2026 holdout: NOT CONFIRMED (0 trades).** Declared in the pre-registration
+before any 2026 auction data was extracted, with the `C-300s` fit frozen from
+the in-sample run. Extraction of 2026-05-15 gave 1,592 two-sided mids. The
+holdout record (`data/real/auction/AUC01_holdout2026.json`) reads 6 holdout
+decisions, 0 trades, verdict `NOT CONFIRMED`. (The paragraph that stood here on
+2026-10-10 said the extraction was still running.)
 
-**Maker and quoting studies: running, no result.** The pre-registered maker
-study (EQ01 / EQ02 / EQ05 / EQ10 with taker and passive exits) and the M5
-quoting study on the same seven sessions are still running as detached jobs.
-Nothing is reported from either. Their pre-registrations charged looks on
-branch `research/step2`; those looks are not on `main` yet, so the ledger
-numbers quoted elsewhere in these docs are unchanged. The step-2 quoting
-driver checkpoints per cell (`research/step2` commit `3d6efbd`), so an
-interrupted run resumes at the next unfinished cell.
+**Maker and quoting studies: finished, no edge.** The pre-registered maker
+study (EQ01 / EQ02 / EQ05 / EQ10 with taker and passive exits) on the seven
+in-sample sessions finished in v1.15 with no maker edge: every traded cell was
+negative ([README_HISTORY.md](README_HISTORY.md); its hypothesis was dropped from
+R7). The M5 quoting study v1 was aborted before any result was read
+(`data/real/quoting_real/ABORTED.md`); the v2 study, registered 2026-10-14 on
+the same seven sessions, reads **no quoting edge** (signal skew reduces the
+loss: `research/quoting_real/QUOTING_V2_RESULT.md`). Both were exploratory and
+in-sample.
 
 `iap.auction` extracts ITCH `I` (NOII, about 6.2M a day) and `Q` (cross)
 messages into a **separate** stream directory: one opt-in pass with
@@ -465,13 +506,17 @@ disk to say anything. Since v1.13 `--exit cross` at `--decision-s 300` on the cl
 cross falls back to taker pricing (the MOC cutoff caveat above); add
 `--no-entry-cutoff` to reproduce a pre-v1.13 report.
 
-### 3.4 More sessions and symbols: the R7 data plan (v1.13, DRAFT)
+### 3.4 More sessions and symbols: the R7 data plan (v1.13 draft, executed in v1.15)
 
 The free unseen ITCH days on Nasdaq's sample directory (10 sessions,
 88.75 GB, 2019-10-18 to 2026-06-12), a seeded tier-2 draw, the A2 symbol
-list, disk/time estimates and the files awaiting the owner's approval are in
-[R7_DATA_PLAN.md](R7_DATA_PLAN.md). `python -m iap.marketdata plan-ingest`
-writes a resumable batch ingest from that manifest; nothing downloads
+list and disk/time estimates are in [R7_DATA_PLAN.md](R7_DATA_PLAN.md),
+which is now a historical document: the owner approved tier 1, all ten
+sessions were ingested (three in-sample, seven holdout) and the seven holdout
+sessions were read once by R7-CONFIRM-1 (see §3.2 status and
+[research/R7_RESULTS.md](research/R7_RESULTS.md)). Paid tier 2 (Databento)
+was declined and nothing was bought. `python -m iap.marketdata plan-ingest`
+writes a resumable batch ingest from a manifest; nothing downloads
 without `tools/r7_download.py --i-have-approval` (COOKBOOK recipe 66).
 
 ### 3.5 Process-and-delete: the breadth universe one day at a time (v1.17, A2)
@@ -503,6 +548,42 @@ the manifest from the HIST index with the owner's approval sentence;
 days with TOPS and DEEP+) without one, so it is a list until approved. The
 per-day results are in docs/research/IEX_OVERLAP_SET.md.
 
+*v1.18 REL-04 capture timestamp.* `process-iex-day --capture-ts`
+(`ingest(capture_ts=True)`) writes the IEX capture host's packet timestamp as
+`receive_ts` (clamped to `exchange_ts` where the capture clock reads earlier,
+counted) and records the feed-latency summary in `dataset.json`; it refuses
+`data/real/iex`, so the A4 datasets above cannot be overwritten. The six
+capture-timestamp datasets (`iex_capts/`, 2025-11-28, 12-08, 12-09, 12-10,
+2026-05-15, 05-18) were verified under a signed pre-declaration on 2026-10-23
+(`research/v118/rel04_verify/REPORT.md`): identity pass on all six days
+(`receive_ts` differs on every row, nothing else in `events.parquet` does, 0
+negative within-capture latencies). The absolute IEX feed latency and the skew
+against any Nasdaq stamp are **not** claimed: the capture clock's offset to
+IEX's send clock is unknown.
+
+### 3.7 Holdout registry, spent sessions and the real-data ledger (v1.18 REL-02)
+
+Which sessions are in-sample, spent or unread is enforced state, not a table in
+prose: `research/holdout_registry.json` (hash-locked, fail-closed) classifies
+every dataset by content hash and every session by symbol scope, and a read of
+a spent or unread session without a matching signed pre-declaration is refused
+before any data is opened (`docs/governance/DATA_ACCESS_PATHS.md` lists every
+route and its guard). At v1.18.0 it holds 35 datasets: 14 `in_sample` (the
+2019-2021 sessions: the seven `ds3_*` days, `multi7`, the 2019-10-18 / 2021-07-13
+/ 2021-08-13 days, the 100-name 2019-01-30 day, and the smoke and REL-04c sets
+built from them) and 21 `spent` (the 2025/26
+sessions in their Nasdaq, IEX and merged forms). For AAPL, MSFT and QQQ the nine
+2025/26 sessions (2025-11-28, 12-08..12, 2026-05-15, 05-18, 2026-06-12) are all
+spent; for every other name they are `unread`, reserved for the breadth
+pre-registration ([PORTFOLIO_BREADTH.md](PORTFOLIO_BREADTH.md)). Signed
+pre-declarations bind script, commit, data versions and thresholds
+(`tools/verify_signatures.py` checks them). Looks on real data are counted in
+one ledger family: **256 distinct real-data configurations (24 before the
+migration) and 6,826 looks over 640 configurations in all**
+(`research/v118/REL02_LEDGER_MIGRATION.md`,
+`research/v118/LEDGER_INVENTORY.md`); the ledger is a lower bound on the
+search breadth, not a complete record (RESEARCH_VALIDITY.md section 4f).
+
 ## 4. Mapping to canonical events
 
 The canonical contract is the twelve-field `MarketEvent`
@@ -519,21 +600,24 @@ half-penny tick is recognised (D-P2-10) and ITCH `h` operational halts are
 decoded (D-P2-12). A dataset ingested before v1.14 (manifest x-version 1) is
 **refused** by every reader (`load_manifest`: ingest into it, merge, feature
 build, research runs) with a message naming the old rules; re-ingest it
-(D-P1-4). The real-data numbers quoted in §3 were produced under the old
-rules and are re-read by the release owner after the stores are rebuilt.
+(D-P1-4). On the data root of 2026-10-24 the seven `ds3_*` days, `multi7` and
+`holdout2026` are still manifest x-version 1; every dataset ingested since
+(the `r7_*` days, `iex*`, `breadth/`, `rel04c/`) is x-version 2. The real-data
+numbers quoted in §3.1-§3.3 were produced under the old rules and have not been
+regenerated: read them as v1.13-rules numbers (upper bounds).
 
 ### 4.1 Decisions common to both sources
 
 | Field | Decision |
 |---|---|
 | `instrument_id` | 1..N over the **sorted** `--symbols` universe; fixed for the dataset. A later session must have the same universe |
-| `venue_id` | 101, venue `XNAS`, for both sources (LOBSTER is built from Nasdaq ITCH). Every synthetic venue id is below 100; real venues start at 101 |
+| `venue_id` | 101, venue `XNAS`, for the ITCH, DBN and LOBSTER sources (LOBSTER is built from Nasdaq ITCH); IEX HIST is 102, `IEXG` (§4.5). Every synthetic venue id is below 100; real venues start at 101 |
 | `price_ticks` | the feed's integer 1/10000-dollar price divided by the instrument's tick. No float touches a price |
 | tick size | Reg NMS Rule 612 sets the quoting increment by the **price of the quotation**: one cent at or above $1.00, $0.0001 below. The platform has one tick per instrument, so `--tick-size auto` (default) takes the increment of the price range the instrument **trades** in: **0.0001** when more of its trade prints in the session are below $1.00 than at or above it, otherwise **0.01** — or **0.005** (v1.14 half-penny guard, D-P2-10) when at least 100 and more than 1 % of its displayed orders at or above $1.00 sit on the half-penny grid ($x.xx50, the amended Rule 612 increment of tick-constrained stocks; per symbol `displayed_orders_on_half_penny`), and a forced `--tick-size 0.01` on such an instrument is refused instead of rejecting those orders as off-tick; an instrument with no print is judged by its displayed orders the same way. It is *not* "0.0001 if any displayed price is sub-penny": a real file carries far-from-market bids priced under a dollar (`$0.0001`, `$0.0010`, `$0.8769` — legally sub-penny) for stocks trading at hundreds of dollars, about one displayed order in 100,000, and under that rule they turned every instrument of the first real run into a sub-penny instrument with spreads of hundreds of ticks. One tick size per instrument for the whole dataset (`configs/instruments/instruments.json` holds one value); a later session that disagrees is refused. `--tick-size 0.01` / `0.005` / `0.0001` force it |
 | prices off the tick grid | The canonical price is a whole number of ticks — there is no finer price unit — so an off-grid price cannot be carried exactly, and **a resting order's price is never rounded** (a rounded stub bid would rest at a price nobody quoted). A displayed order (`ADD`, including the new side of a replace) whose price is not a multiple of the tick is **rejected and counted** (`raw.off_tick_orders_rejected`, per symbol `off_tick_orders_rejected`; `displayed_orders_below_one_dollar` shows how many sub-dollar orders the symbol had), and every later cancel, delete or execution of that order is dropped and counted (`raw.events_on_rejected_orders`) instead of being reported as an unknown order. A `TRADE` print off the grid — a non-displayed midpoint execution, or the print of an execution against a rejected order — rests nowhere: it is rounded to the nearest tick, **half to even** (v1.14, D-P1-3; until v1.13 half up, which moved every midpoint print of a one-tick market up by half a tick — a +0.5 tick bias in the session's prints), counted (`raw.trade_prices_rounded_to_tick`) and its residue (price mod tick, in 1/10000 dollars) histogrammed in `raw.trade_price_residue_histogram`. Half to even, not toward the resting side: the resting side of a hidden print is itself inferred (quote / tick rule below), and rounding toward it would feed that guess into the price; half to even is unbiased over a session whatever the signs. On the real file, for AAPL, MSFT and QQQ: 30 displayed orders rejected, all of them sub-dollar bids, out of 5.4 million events; 4,423 midpoint prints rounded; spreads of 1–4 ticks through the regular session (median 2 for AAPL, 1 for MSFT and QQQ). A stock that really quotes below $1.00 gets tick 0.0001 and loses nothing |
 | `qty` | shares, as in the feed. `lot_size` is the round lot from the stock directory (100 for LOBSTER); odd lots are ordinary quantities |
 | `exchange_ts` | midnight of `--date` in `America/New_York` (through `zoneinfo`, so DST is honoured) plus the feed's nanoseconds since midnight. LOBSTER's decimal seconds are parsed as a string — `"34200.004241176"` → 34 200 004 241 176 ns — never through a binary float |
-| `receive_ts` | equal to `exchange_ts`: the feeds carry exchange time only |
+| `receive_ts` | equal to `exchange_ts`: the feeds carry exchange time only. One opt-in exception (v1.18 REL-04): an IEX ingest with `--capture-ts` writes the capture host's packet timestamp (§3.6); the default is unchanged |
 | `sequence` | 1, 2, 3… per instrument and session, over the events **emitted** for it (after the rejections above) — gap-free by construction, since a historical file is the complete stream. A second session restarts at 1, which the normaliser counts as one `sequence_resets` per stream; gaps, duplicates and out-of-order counts must be 0 |
 | `event_id` | 1..N in file order (reassigned in event-time order by the normaliser, as for synthetic data) |
 | `order_id` | the feed's order reference number |
@@ -864,10 +948,11 @@ experiment id and in every ledger entry. The ledger is dataset-scoped
 (v1.4.0), so looks on real data are never pooled with looks on synthetic
 data, and the default ledger for such a run is the dataset's own file.
 
-**What it does not.** `research/alpha_reports/run_all.py` (the 24-alpha promotion report),
-the lifecycle registry, the ML zoo and the adaptive study still read the
-checkout's `data/` tree; running them on an ingested dataset is not wired.
-Loop over `--alpha` with the runner instead. `python -m iap.research power`
+**What it does not.** The lifecycle registry, the ML zoo and the adaptive study
+still read the checkout's `data/` tree; running them on an ingested dataset is
+not wired. (`research/alpha_reports/run_all.py --dataset-dir D --out-dir O`
+does run the 24-alpha report on an ingested dataset, §3.1; its output is a
+report, not a promotion.) `python -m iap.research power`
 is a synthetic-generator study by construction. The FX alphas need FX data,
 which this path does not provide.
 
@@ -1102,12 +1187,15 @@ since v1.13.0 (above).
   under `AUCTION` status, so no feature row before 09:30 is tradable.
 - **Extended hours are dropped by default.** `--extended-hours` keeps them
   as `TRADING`; the session bounds in `instruments.json` stay 09:30–16:00.
-- **Timestamps are exchange time.** `receive_ts == exchange_ts`; there is
+- **Timestamps are exchange time.** `receive_ts == exchange_ts` by default; there is
   no capture latency, so latency features are zero and the backtester's
   `latency_ns` is the only delay. Since v1.14 the maker and quoting
   backtests can add an assumed feed leg (`feed_latency_ns`, off by
-  default); it is an assumption, not a measurement.
-- **Broken trades** are counted, not reversed.
+  default); it is an assumption, not a measurement. The one opt-in exception is the
+  IEX `--capture-ts` datasets of §3.6, whose `receive_ts` is the capture host's
+  stamp; its offset to IEX's send clock is unknown, so no absolute feed latency
+  is claimed.
+- **Broken trades** are mapped to `TRADE_BUST` events and counted (§4.2); the book applies them as a no-op, so a broken print is not reversed out of the book.
 - **One tick size and one universe per dataset** (§4.1); listings,
   delistings and symbol changes inside a dataset are backlog XD08.
 - **Survivorship** enters through `--symbols` (§8).
@@ -1120,10 +1208,14 @@ since v1.13.0 (above).
   does not corrupt rolling state; a split inside a multi-day dataset still
   shifts price LEVELS across sessions (`merge` refuses inputs carrying
   corporate-action tables rather than merge them wrongly).
-- **Seven in-sample ITCH sessions and two holdout sessions have been
-  ingested, all on AAPL / MSFT / QQQ, all before v1.14.** Their manifests
-  are x-version 1, so v1.14 refuses them until they are re-ingested (§4).
-  LOBSTER has not been run on a vendor file.
+- **Which sessions have been ingested** (data root of 2026-10-24, AAPL / MSFT /
+  QQQ unless stated): ten in-sample ITCH sessions (2019-01-30 to 2021-08-13),
+  nine 2025/26 sessions (all spent, §3.7), the 100-name 2019-01-30 day, the
+  20-name REL-04c set (2019-10-18, 2021-07-13, 2021-08-13) and the IEX HIST
+  overlap datasets. The seven `ds3_*` days, `multi7` and `holdout2026` are
+  x-version 1 (pre-v1.14 rules) and v1.14 refuses them until they are
+  re-ingested (§4). LOBSTER has been checked on one free sample through the
+  REL-12 oracle only (docs/research/ITCH_ORACLE.md), not on a licensed vendor file.
 - **Not supported:** CBOE PITCH, NYSE feeds, FX ECN feeds (backlog XD02,
   XD07); ITCH versions other than 5.0; the Rust, C++ and Java ports do not
   have these readers — they consume the canonical files the ingest writes.

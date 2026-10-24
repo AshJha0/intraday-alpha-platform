@@ -1,5 +1,12 @@
 # Signal research in v1.17: statistics revision, new models, and the gates around them
 
+Status at v1.18.0 (2026-10-24): sections 1-9 describe v1.17 code and stay as
+written; every piece in them is still opt-in (the v1.17.0 release notes ship them
+opt-in; the v1.18.0 notes and CHANGELOG record no default flipped). Section 10 is
+v1.18 REL-07. **No signal is promoted and no edge is claimed**: the registry holds
+23 CANDIDATE and 1 RESEARCH alphas, all held by the net-of-cost gate, and every
+signed v1.18 screen on real data is negative or underpowered (section 11).
+
 Status: Python research code, every new piece **opt-in**. This page is a map:
 what each v1.17 item is, how to switch it on, what stays unchanged, and where
 the precise text lives. **No registered result changes** in any section below
@@ -30,7 +37,10 @@ N = 297 (0.99885 at N = 308); EQ05@1s 0.9999998 -> 0.99996 at both. The gate
 (DSR > 0.95) passes at every N and both verdicts are unchanged. The
 descriptive sensitivity variant without two sessions moves EQ05 from 0.988 to
 0.956 at N = 297, still above 0.95. No new look was taken and nothing in
-`research/r7/r7_confirm_result.json` changed.
+`research/r7/r7_confirm_result.json` changed. That file was not re-issued with
+eligibility applied: it still carries `gate_eligible: false` (it ran under bundle
+`v4` where `v2` is required), which is why gate F5 reads "partly met" in the
+v1.18.0 release notes.
 
 No registered result changes. The one place a number moves is a `v4` `cpcv`
 block regenerated under the new embargo, which is a new look in the ledger with
@@ -193,18 +203,24 @@ is training only) and 1.46-2.31 million pairs. `linear_z_v2` moves no
 verdict. EQ11/15m (cross-sectional) scores no row on three names and is
 recorded as not screened. Read: at one round lot, no registered equity
 alpha clears spread + fee + impact on these seven days at its own horizon;
-the screen passes nothing to C8 from this dataset, so the C8 prereg needs
-either the 100-name breadth day screened first or a different registered
-size, both the owner's call.
+the screen passes nothing to C8 from this dataset. The owner chose option (a)
+on 2026-10-16: the C8 breadth-book pre-registration
+(`research/preregs/breadth_book_prereg.json`, signed, `registered_utc`
+2026-10-16T07:19:30Z) uses the screen as a hard gate: the screen refused the
+candidate at registration, so no confirmatory look is taken (a documented
+negative result; PORTFOLIO_BREADTH.md).
 
-No registered result changes. The screen reads no holdout; the C8
-pre-registration is the owner's document.
+No registered result changes. The screen reads no holdout.
 
-## 9. Placeholder for the G5 truth pass
+## 9. What was turned on, and what has been run (v1.18.0 truth pass)
 
-Placeholder: which of the opt-ins above the owner turned on for the v1.17.0 tag,
-the first `linear_z_v2` study (if run), and the C6 net-of-cost screen. This page
-claims none of them.
+Every opt-in of sections 1-7 shipped opt-in in v1.17.0 and none is recorded as a
+default in v1.18.0; `ALPHA_IDS`, `run_all.py` and the committed reports never see
+`ML01`, the `_z2` twins or the regime model. The only studies on real data that
+used these pieces are the C6 net-of-cost screen of section 8 (which includes the
+`linear_z_v2` twins among its 23 candidates: 0 pass, 22 fail, 1 not screened) and
+the synthetic ML01 dry run. No real-data GBM, regime-gate or `linear_z_v2`
+confirmatory result exists.
 
 ## 10. Data and feature foundations for the breadth day (v1.18 REL-07)
 
@@ -274,3 +290,30 @@ it would be a new label contract.
 
 No registered result changes: no default flipped, no golden, registry hash or
 fingerprint of an open pre-registration moved.
+
+## 11. What the v1.18 screens found (signed, negative or underpowered)
+
+Nothing in this page produced a candidate. The v1.18 programme ran its signal
+screens under signed pre-declarations and recorded the outcomes as found
+(`docs/release/v1.18.0_RELEASE_NOTES.md`, "Negative and inconclusive results");
+every interval rests on very few session clusters (G):
+
+- **REL-08** (residual reversion and ETF catch-up on the 100-name 2019-01-30 day,
+  one session, K = 7): all 7 variants `underpowered` (`inconclusive`); the data-gap
+  criterion fails (a probable counting bug found afterwards) and the net
+  criterion fails for every variant, so it is not a clean negative
+  (`research/v118/rel08/SCORECARD_ds_20190130.md`). The continuation rule v2 is an
+  unsigned draft; REL-08b was not run and REL-08c was dropped (the 2019 closing NOII
+  stream starts at 15:55:00, after the registered exit).
+- **REL-09** cross-venue stale-quote protection (G = 4): overall `underpowered`
+  (`research/v118/rel09/REPORT.md`).
+- **REL-10** volume-clock OFI and hidden-print imbalance (family K = 24, G = 4): one
+  taker cell rejected (hid_imb 1 min AAPL loses money), the other 11 taker cells and
+  all 12 maker cells `underpowered` (`research/v118/rel10/REPORT.md`).
+- **B7** (signal-aware execution) stays closed on its negative in-sample result; the
+  net-of-cost screen of section 8 passes 0 of 22.
+
+The EQ10 and EQ05 holdout confirmations (REAL_DATA.md section 3.2 status) are
+statistical (information coefficient) results; at the primary 1x cost the R7 net
+P&L block is 0 for both alphas (no trades), so neither is shown to be tradable
+(`docs/research/R7_RESULTS.md`).

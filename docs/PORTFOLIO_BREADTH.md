@@ -1,8 +1,14 @@
 # Portfolio breadth: the cross-sectional book (v1.17 WS-C)
 
-Status: in-sample, report-only, opt-in. Nothing here gates a promotion;
-the breadth pre-registration (plan C8) is the owner's, and the 2025/26
-Nasdaq days are its holdout for every name outside AAPL / MSFT / QQQ.
+Status at v1.18.0 (2026-10-24): in-sample, report-only, opt-in. Nothing here
+gates a promotion. The breadth pre-registration (plan C8) was signed and recorded
+on 2026-10-16 under option (a) with the C6 screen as a hard gate; the screen
+refused the candidate, so **no confirmatory look was taken and no breadth holdout
+dataset was built or downloaded**. The 2025/26 Nasdaq days remain its holdout
+for every name outside AAPL / MSFT / QQQ and are `unread` for those names in the
+holdout registry. The 100-name 2019-01-30 day has been read once, by the v1.18
+REL-08 screen (one session, all 7 variants underpowered, no edge claimed; see
+"The first 100-name day" below). No signal is promoted.
 
 ## The breadth universe (A3)
 
@@ -46,6 +52,11 @@ pre-registration (plan item C8) for every such name, and are not in the
 candidates manifest. A `--dataset-dir` whose path contains `holdout` is refused
 by the book driver, so an in-sample report cannot read it by accident. AAPL,
 MSFT and QQQ are already spent on the R7 holdout and do not count as unseen.
+Since v1.18 REL-02 this is enforced state: in `research/holdout_registry.json`
+each of the nine 2025/26 sessions is `spent` for AAPL / MSFT / QQQ and `unread`
+(reserved for `research/preregs/breadth_book_prereg.json`) for every other
+symbol, and a read of an `unread` session without a matching signed
+pre-declaration is refused.
 
 ## What the book does
 
@@ -102,7 +113,7 @@ Same driver, three datasets:
 |---|---|---|---|
 | bundled synthetic (`data/features`) | 11 | 2 | CI-reproducible plumbing check; EQ11 has no edge there |
 | `data/real/multi7` | 3 | 7 | a smoke test — a breadth of 3 is not breadth; sector neutrality is off (two sectors of one and two names pin the book at zero) |
-| `data/real/breadth/ds_20190130` (`--dataset-dir`, when its features exist) | 100 | 1 | the first real breadth day; sector neutrality from `sectors.json` |
+| `data/real/breadth/ds_20190130` (`--dataset-dir`) | 100 | 1 | the first real breadth day (features built for 100 names; `process_report.json`); sector neutrality from `sectors.json`. No `breadth_book` report for it is committed; REL-08 ran its own books on it (below) |
 
 Measured outputs committed so far (in-sample, report-only; every number is net
 of the cost model the optimizer saw):
@@ -196,15 +207,16 @@ is training only) and 1.46-2.31 million pairs. `linear_z_v2` moves no
 verdict. EQ11/15m (cross-sectional) scores no row on three names and is
 recorded as not screened. Read: at one round lot, no registered equity
 alpha clears spread + fee + impact on these seven days at its own horizon;
-the screen passes nothing to C8 from this dataset, so the C8 prereg needs
-either the 100-name breadth day screened first or a different registered
-size, both the owner's call.
+the screen passes nothing to C8 from this dataset (the owner's decision is in the
+next section).
 
-## The C8 pre-registration draft (option (a) chosen)
+## The C8 pre-registration (option (a) chosen and recorded)
 
 `research/preregs/breadth_book_prereg_DRAFT.json` (rendered in
-`research/preregs/BREADTH_BOOK_PREREG_DRAFT.md`) is the breadth-book
-pre-registration. It is a DRAFT: unsigned and not on the blackboard. Its holdout
+`research/preregs/BREADTH_BOOK_PREREG_DRAFT.md`) is the draft; the signed
+record is `research/preregs/breadth_book_prereg.json` (`signed: true`,
+`registered_utc` 2026-10-16T07:19:30Z, status "REGISTERED under option (a)",
+`on_blackboard: false`). Its holdout
 is the 2025/26 Nasdaq days for the breadth names outside AAPL / MSFT / QQQ:
 2025-11-28, 2025-12-08 to 12-12, 2026-05-15, 2026-05-18 and 2026-06-12. The
 list comes from the `dataset.json` manifests only, and no breadth dataset of
@@ -220,20 +232,27 @@ those days exists yet. The C6 screen it depends on reads **0 pass, 22 fail,
   of the candidates the book can run.
 - **(c)** Defer C8 to v1.18 until new candidates exist.
 
-The owner chose **(a)** on 2026-10-16. No breadth holdout dataset is built or
-downloaded under this registration; signing the draft is the owner's
-confirmation. `python/tests/test_v117_breadth_prereg_draft.py`
+The owner chose **(a)** on 2026-10-16 and signed. No breadth holdout dataset is
+built or downloaded under this registration, and the confirmatory run refuses
+every candidate. `python/tests/test_v117_breadth_prereg_draft.py`
 checks the draft and dry-runs the screen gate that the registration uses.
 
-## What C8 will add (placeholder for the G5 truth pass)
+## Where C8 and the first 100-name day stand (v1.18.0)
 
-- **C6** is above: the screen document a C8 prereg cites.
-- **C8**: the breadth-book pre-registration (the owner approves and signs; the
-  `linear_z_v2` draft feeds it, see [SIGNAL_RESEARCH.md](SIGNAL_RESEARCH.md)),
-  with the 2025/26 days as its holdout.
-- **The first 100-name day**: the 2019-01-30 dataset run through
-  `breadth_book --dataset-dir` and its report. Placeholder for the day's
-  numbers; none are claimed here.
+- **C6** is above: the screen document the C8 registration cites.
+- **C8**: signed and recorded under option (a), as above. Outcome: no confirmatory
+  look, a documented negative result. Nothing about breadth itself has been
+  confirmed or refuted by it.
+- **The first 100-name day**: the 2019-01-30 store has features for 100 names
+  (`breadth/ds_20190130`; its feature build took 21,878 s with the Rust engine on the
+  author's 16 GB machine, `process_report.json`). The v1.18 REL-08 screen read it
+  (REL-07 added the reference-ETF map and the 15 m / 30 m / 1 h session-grid labels
+  for it, SIGNAL_RESEARCH.md section 10): one session, K = 7 variants, **all
+  underpowered**, the data-gap criterion failing (a probable counting bug found afterwards) and the net
+  criterion failing for every variant; it is not a clean negative and claims no edge
+  (`research/v118/rel08/SCORECARD_ds_20190130.md`; the REL-08c closing-auction
+  imbalance arm was dropped). `breadth_book --dataset-dir` has no committed report
+  on this day: no breadth statistic beyond that screen is claimed.
 
 Tests: `python/tests/test_v117_breadth_book.py`, `python/tests/test_v117_screen.py`.
 API: `API_PORTFOLIO_TCA.md` sections 1.8 to 1.10.

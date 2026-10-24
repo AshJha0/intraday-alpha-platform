@@ -844,4 +844,38 @@ short of it, so a reader does not have to infer it from the changelog.
 - **§20 Promotion.** No alpha has been promoted. The gates work as
   specified; the alphas do not pay their costs.
 - **Not built:** a live venue gateway (Phase 2-3 items P1-P3), CBOE / NYSE /
-  FX ECN feeds, and multi-venue real data. See docs/ROADMAP.md §3.10.
+  FX ECN feeds, and a full multi-venue real-data set (v1.17 added IEX as a free daily second
+  venue; the v1.18 B8 v2 two-venue study found nothing better than the
+  pinned Nasdaq venue). See docs/ROADMAP.md §3.10.
+
+# Implementation notes (2026-10-24, v1.18.0)
+
+The v1.14.0 notes above stand unless amended here. v1.18.0 is a
+measurement-instrument release (docs/release/v1.18.0_RELEASE_NOTES.md):
+
+- **§13 Alpha Validation and §26 Reproducibility.** Analyses are bound by
+  signed pre-declarations that fix the script, commit, data and thresholds
+  (`tools/verify_signatures.py` checks every signed document against a
+  pinned trust root, docs/governance/TRUST_ROOT.md). A fail-closed holdout
+  registry guards the real-data holdout. The look ledger is one real-data
+  family: 6,826 looks over 640 distinct configurations, 256 of them real
+  (`research/v118/REL02_LEDGER_MIGRATION.md`); it is a lower bound
+  (`research/v118/LEDGER_INVENTORY.md`).
+- **§20 Promotion.** Still no alpha promoted; the bundled bootstrap leaves
+  23 at CANDIDATE and 1 at RESEARCH, each with an evidence status that
+  never exceeds `exploratory_signal` for unregistered reports
+  (docs/LIFECYCLE.md §8.3). Signed runs (B8 v2, REL-05, REL-08, REL-09,
+  REL-10) were negative or underpowered.
+- **§17-§19 Execution, backtester, TCA.** Execution-benchmark v2 metrics
+  (REL-03), capped child execution with an invariant suite and a replay
+  harness (REL-05). The simulator is validated at Level 1 (deterministic
+  replay) only; Level 2 (agreement with real fills) is NOT validated.
+- **§16 Risk and §25 Observability.** Factor risk, portfolio limits, a
+  kill switch and capacity curves (REL-17); a monitoring policy with an
+  explicit UNKNOWN state (REL-16, docs/MONITORING_POLICY.md); an
+  idempotent paper order manager with write-ahead log and reconciliation
+  (REL-18), soak-tested for 6 hours on a synthetic feed (not a live venue).
+- **Open at the tag:** gates F3 (the known-null study FAILED, so no
+  real-data false-positive control is claimed) and F7 (no independent rerun
+  of the B8 v2 result), and reviewer memo (c). See the release notes.
+

@@ -18,6 +18,18 @@
 > `java` image / `java-platform.yaml`" consumer named in the tables below no
 > longer exists; the platform is three languages: Python reference, C++
 > latency path, Rust risk and infrastructure.
+>
+> **Status at v1.18.0 (2026-10-24).** `tests/harness/polyglot_policy.json`
+> lists **8 FROZEN paths (7 copies)**: the Rust marketdata, orderbook,
+> replay, alpha, contracts and lifecycle crates and the C++ contracts (two
+> paths). The 16 Java paths of the original 24 left the file when the engine
+> was archived. The 18 CANONICAL copies are unchanged. v1.18 added no
+> duplicated component: everything it built (holdout registry, analysis
+> identity, ledger family, benchmark v2 metrics, capped child, REL-05
+> harness, monitoring, portfolio limits, order manager; ARCHITECTURE.md §22)
+> is Python only, and no golden moved. The tables in section 1 keep their
+> v1.10.0 line counts and v1.11.0 decisions as the historical record; the
+> Java rows (paths under `java/`, now `archive/java/`) are not live policy.
 
 IAP_Next_Releases_Plan item **E3** (v1.11.0). The platform implements several
 components in more than one language: the order book in four, features and
@@ -55,7 +67,7 @@ weakened by E3.
 ## 1. Inventory
 
 Lines are physical lines of the implementation sources (tests excluded), as of
-v1.10.0. "Golden" names the fixture(s) in `tests/golden/` that pin the copy.
+v1.10.0 and not refreshed since (they are history, not a current measurement). "Golden" names the fixture(s) in `tests/golden/` that pin the copy.
 "Consumers" are the things that would break if the copy disappeared, beyond
 its own unit tests.
 
@@ -184,20 +196,43 @@ rolling-IC rule set that `iap.lifecycle` composes (ACTIVE ⇄ WATCH → RETIRED)
 ### 1.11 Single-language components (not duplicated, not covered)
 
 Generator / normaliser / labels / validation / models / research / store /
-MVP / agents (Python only); `rust/eventbus`, `rust/telemetry`, `rust/venue`
-(Rust only); the Java platform vertical `com.iap.{platform,monitoring,api,config}`
-(since v1.13 E4 `PaperTrading` is a thin coordinator over package-private
+MVP / agents / metrics / paper / monitoring (Python only; the last three are
+the v1.17 producer and the v1.16-v1.18 paper path); `rust/eventbus`,
+`rust/telemetry`, `rust/venue` (Rust only; since v1.17 the venue simulator
+carries a Rust port of the Python queue rule 4 (B9), and the dark-venue
+pre-trade controls are Rust-owned (F8) and mirrored byte for byte by Python); the Java platform vertical
+`com.iap.{platform,monitoring,api,config}` (archived; since v1.13 E4 `PaperTrading` is a thin coordinator over package-private
 `PaperTradingSession` / `PaperTradingMetrics` / `PaperTradingSizer` /
 `PaperTradingReports` / `PaperTradingCli`; same behaviour and public API, and
 the FROZEN component copies it consumes are untouched).
 These have one copy and no drift risk of this kind; the policy does not
 touch them.
 
+### 1.12 C++ execution parity added in v1.17 (F7)
+
+After this inventory was written, v1.17 item F7 added hand-written C++ ports
+of the Python execution rules to the CANONICAL C++ `cpp/src/{execution,sor}`
+tree (among others pacing, urgency, Almgren-Chriss, fading, fill hazard, SOR
+passive and sweep, dark venue). Each is pinned by a Python-generated golden
+(`tests/golden/expected_f7_*.json`, produced by
+`python/tools/make_golden_f7.py`) that `cpp/tests/test_f7_*.cpp` reproduce
+byte for byte. They belong to the existing C++ execution row of section 1.7
+(CANONICAL) and add no FROZEN copy.
+
 ## 2. Totals
+
+As decided in v1.11.0:
 
 | | CANONICAL copies | FROZEN copies | of which RETIRE candidates | retired in v1.11.0 |
 |---|---:|---|---:|---:|
 | count | 18 | 20 (24 paths in `polyglot_policy.json`) | 2 (Rust alpha, Rust lifecycle) | 0 |
+
+In force at v1.18.0 (the Java engine archived in v1.15, its 13 FROZEN copies
+and 16 paths removed from the policy file):
+
+| | CANONICAL copies | FROZEN copies | of which RETIRE candidates | retired |
+|---|---:|---|---:|---:|
+| count | 18 | 7 (8 paths in `polyglot_policy.json`) | 2 (Rust alpha, Rust lifecycle) | 0 |
 
 ## 3. What was retired, and why nothing more
 
@@ -212,14 +247,15 @@ golden harness. Every duplicated copy fails that test:
 - the two RETIRE candidates (Rust `alpha`, Rust `lifecycle`) have no runtime
   consumer, but each is the only Rust proof of a golden contract
   (`golden_alpha.rs`, `golden_lifecycle.rs` — the registry byte-parity check)
-  and is counted in the README parity table (`rust 366`). Deleting them would
+  and is counted in the README parity table (`rust 366` at v1.11.0; 376 at v1.18.0). Deleting them would
   remove golden evidence and change the published counts, which the brief
   rules out;
 - the reserved C++ risk paths in `CODEOWNERS` (`cpp/include/iap/risk/`,
   `cpp/src/risk/`) contain no code.
 
-So the drift risk is reduced by **freezing** — 24 paths that can no longer
-grow silently — not by deletion.
+So the drift risk is reduced by **freezing** — 24 paths at v1.11.0 (8 live
+paths at v1.18.0, after the Java archive) that can no longer grow silently —
+not by deletion.
 
 ### 3.1 Overrides used in v1.14
 

@@ -691,7 +691,8 @@ need a signed approval (GOVERNANCE.md).
 
 ### 8.2 v1.15, v1.16 and the lifecycle
 
-No change. `python/src/iap/lifecycle` has no commit after v1.14, and the
+No change in those releases (history: `python/src/iap/lifecycle` had no
+commit between v1.14 and v1.18, see §8.3). The
 state machine still has 7 states, 17 edges and 20 gates
 (`tests/harness/check_headline_numbers.py` `lifecycle_numbers`). The bundled
 research still bootstraps to 23 CANDIDATE and 0 beyond. R7 confirmed EQ10@1s
@@ -700,6 +701,23 @@ unchanged and the v1.16 monetisation study found no tradable taker
 configuration (HOW_IT_WORKS.md §3.13), so nothing moves to VALIDATING. The
 v1.16 multiple-testing table in `REPORT.md` is report-only; the promotion
 gate is unchanged.
+
+### 8.3 v1.18 and the lifecycle
+
+The state machine is unchanged (7 states, 17 edges, 20 gates; no gate was
+added or loosened). v1.18.0 added one thing at the bootstrap boundary, from
+the outside review (finding 7): every bootstrapped alpha now carries an
+evidence status from `iap.research.claims`
+(`BootstrapRow.claim_status`, `report_claim_status`). An unregistered
+in-sample report never classifies above `exploratory_signal`, and the
+bootstrap refuses to place an alpha in PAPER or beyond (or WATCH) without
+a promotable claim (`require_promotable`). `python -m iap.lifecycle --root .
+bootstrap --dry-run` on the bundled tree prints
+`{'CANDIDATE': 23, 'RESEARCH': 1}` and the evidence status
+`{'exploratory_signal': 12, 'rejected': 12}` (docs/RESEARCH_VALIDITY.md
+§4g). No alpha was promoted in v1.18.0 and none is beyond CANDIDATE. The
+central ledger the gates read now holds 6,826 looks over 640 distinct
+configurations (HOW_IT_WORKS.md §2.7).
 
 ## 9. Where the pieces are pinned
 

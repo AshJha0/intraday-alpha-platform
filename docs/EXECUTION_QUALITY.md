@@ -1,12 +1,17 @@
-# Execution quality: the shortfall benchmark, signal-aware execution and the realism layer (v1.17 WS-B)
+# Execution quality: the shortfall benchmark, signal-aware execution and the realism layer (v1.17 WS-B; v1.18 sections 9-12)
 
 > **Level 2: not validated.** Every fill here is simulated (Level 1,
 > deterministic replay validation only); no real orders or fills exist
-> (D4(a)). Question-to-test map, assumptions and unsupported claims:
+> (D4(a)). Nothing on this page promotes an execution policy or claims an
+> edge, and no latency claim is made. Question-to-test map, assumptions and unsupported claims:
 > [review/SIMULATOR_CORRECTNESS.md](review/SIMULATOR_CORRECTNESS.md).
 
-Status: in-sample, report-only, opt-in. Nothing here gates a promotion and no
-registered result moves. Every number below is copied from a committed
+Status (v1.18.0, 2026-10-24): in-sample, report-only, opt-in, except the
+signed out-of-sample B8 v2 run of section 11, which is negative and
+underpowered. Nothing here gates a promotion and no registered result moves.
+Sections 1-8 are the v1.17 record and keep their v1.17 wording where a later
+section updates them; sections 9-12 are v1.18 (benchmark v2 metrics, the
+capped child, B8 v2, REL-05 and REL-04c). Every number below is copied from a committed
 artefact named next to it; the LLM computes none of them. The negative and
 inconclusive findings are stated as such. Companion pages:
 [HOW_IT_WORKS.md](HOW_IT_WORKS.md) section 3.5 (what a simulated cost is),
@@ -41,12 +46,12 @@ execution simulator on real recorded books?
   (`aggressive_walk`, `cross`, `exec_print`) outside `Fill.to_dict`, so no
   golden moved. `ExecutionReplay` visits only the parents an event can change
   (review finding X-6); the goldens are byte-identical.
-- **The gate it prepares.** `research/execution/benchmark/prereg_DRAFT.json` is
-  the unsigned draft of the B7 gate (30-minute windows, 2 bp minimum effect,
+- **The gate it prepared (closed).** `research/execution/benchmark/prereg_DRAFT.json`
+  was the draft of the B7 gate (30-minute windows, 2 bp minimum effect,
   2 pp fill-rate tolerance, Holm over the algos, cells whose depth-exhausted
   parent share exceeds 0.25 reported but not gate-eligible, gate sessions =
-  fresh IEX days plus overlap days, multi7 not padded). It is DRAFT: the owner
-  signs it, nobody else.
+  fresh IEX days plus overlap days, multi7 not padded). It was never signed:
+  it carries status CLOSED and B7 ended on its in-sample result (section 6.2).
 
 ## 2. The multi7 result
 
@@ -109,8 +114,9 @@ PR): `research/execution/benchmark/DEPTH_COMPARISON_multi7.md`,
 
 Recommendation recorded in `DEPTH_COMPARISON_multi7.md` for B7: run the gate
 with `--walk-depth 50` and the default child cap; the draft prereg should record
-`walk_depth_levels: 50` before signature. That is a recommendation; the
-signature is the owner's.
+`walk_depth_levels: 50` before signature. B7 was closed without a gate run
+(section 6.2); the v1.18 answer to the depth-exhausted cells is the capped
+child of section 10, used by the signed B8 v2 run (section 11).
 
 ## 4. Signal-aware urgency and pacing (B2 / B3)
 
@@ -126,11 +132,13 @@ unchanged). Signatures: [../API_TRADING.md](../API_TRADING.md) section 2.14.
 
 **What is established:** the machinery, its causality (a reading is the latest
 one at or before the decision, no older than `max_age_ns`) and its tests
-(`python/tests/test_v117_signal_aware.py`). **What is not:** there is no
-committed signal-aware benchmark result in `research/` yet. The v1.16 in-sample
-study found EQ10 and EQ05 never clear taker costs, and nothing in B2 / B3
-changes that claim: urgency can change the price a cost is paid at, not whether
-the alpha is worth trading.
+(`python/tests/test_v117_signal_aware.py`). **What is not:** a benefit. The
+only committed signal-aware benchmark result is the in-sample multi7 run of
+section 6.2 (`research/execution/benchmark/BENCHMARK_multi7_signal.md`), which
+found no cell cheaper than its plain control by the 2 bp minimum effect. The
+v1.16 in-sample study found EQ10 and EQ05 never clear taker costs, and nothing
+in B2 / B3 changes that claim: urgency can change the price a cost is paid at,
+not whether the alpha is worth trading.
 
 ## 5. The realism layer
 
@@ -159,18 +167,27 @@ net-of-cost prereg keys) are catalogued in
   labelled "replay + fitted adder", never a measurement (finding X-3).
 - **Depth.** `walk_depth_levels` and `depth_exhausted` (section 1).
 
-## 6. Placeholders for B4-B10 and the G5 truth pass
+## 6. B4-B10 as released (v1.17)
 
-The following are written by their own work items; this page only reserves the
-headings. G5 replaces each with what is true at the v1.17.0 tag.
+### 6.1 B4 / B5 / B6 (opt-in machinery; no committed benchmark result)
 
-### 6.1 B4 / B5 / B6 (execution studies on the IEX second venue)
-
-Placeholder for the G5 truth pass: quote fading, queue cancels, the markout
-decomposition, the dark midpoint model and the two-venue router as released.
-Nothing is claimed here.
-
-The two-venue router's evaluation and its first real results are section 8 (B8).
+All three are opt-in and byte-identical off (every execution golden unchanged).
+**B4 quote fading** (`iap.execution.fading.FadeParams`, `ParentOrder.fade`):
+a passive child is pulled when the signal turns adverse or the opposite side's
+share of the two L1 sizes reaches a threshold; the cancel goes through
+simulator rule 7 (it can lose the race to a fill), and every pull is a
+`PullRecord` priced by a labelled touch-through counterfactual (fades saved
+against fills missed). **B5 queue-aware cancels** (`QueueCancelParams`,
+`ParentOrder.queue_cancel`): cancel when the queue ahead or the hazard model's
+fill probability crosses a threshold, then cross or re-post; the calibration
+splits queue depletion into executions and cancels (review X-4), because the
+pooled rate overstated the fill probability. **B6 markout decomposition**
+(`iap.tca.markout_decomposition`): markouts by fill type (passive, aggressive,
+faded, cancelled-and-replaced, dark) and by B2 regime with day-clustered
+intervals. The benchmark driver exposes them as `passive+fade`,
+`passive+qcancel` and `passive+fade_qcancel`. `research/execution/benchmark/`
+holds no run of these arms, so no cost or benefit is claimed for them. The
+dark midpoint model is section 7, the two-venue router is section 8.
 
 ### 6.2 B7: closed on its in-sample result (2026-10-16)
 
@@ -191,7 +208,10 @@ dataset, one alpha, untuned thresholds, no refit or EQ05 arm) is listed in
 
 ### 6.3 B8-B10
 
-Placeholder for the G5 truth pass (B9). B10 is section 7, B8 section 8.
+B8 is section 8 (and, re-measured with the v1.18 instrument, section 11). B9
+(review row X-10) ported the simulator's deterministic queue-position rule to
+the Rust venue simulator, pinned by `tests/golden/expected_venue_queue.json`;
+no execution, SOR or dark-venue logic moved to Rust. B10 is section 7.
 
 ## 7. The dark-venue model (B10) — modelled, not measured
 
@@ -283,10 +303,11 @@ reports implementation shortfall and all-in cost, fill rate, the markouts of
 our fills by venue and horizon, and the venue split, all with day-clustered
 standard errors, and the paired differences router minus pinned.
 
-**Status.** Built and tested on synthetic two-venue books (the golden stream
-replayed as both venues, one tick apart). No real number exists: no overlap
-day has both venues' normalized events on disk yet, and the IEX
-process-and-delete chain removes them unless it is told to keep them. Three
+**Status when B8 was built (v1.17.0, before the first real run).** Built and
+tested on synthetic two-venue books (the golden stream replayed as both venues,
+one tick apart); no overlap day had both venues' normalized events on disk yet,
+and the IEX process-and-delete chain removes them unless it is told to keep
+them. The first real results follow below. Three
 things to settle before a result counts as evidence are in
 `research/execution/b8/README.md`: the calibration is in-sample unless it
 is done leave-one-day-out, the fees are list prices, and venue latency is zero
@@ -339,7 +360,8 @@ the IEX toxicity (1 s markout -3.5 bps against -18.7 for `sor` on MSFT) but
 does not turn it into a saving. Three evaluation days, two symbols, list-price
 fees and zero latency: treat it as unresolved, not as a measured cost.
 
-Next steps:
+Next steps listed at v1.17.1 (the v1.18 re-measurement is section 11; none of
+these is claimed done here):
 
 - a price collar on the sweep;
 - an order-protection rule in the replay;
@@ -500,10 +522,16 @@ interpretable; absolute feed latency and cross-venue skew against another
 host's Nasdaq stamps are NOT identified. `CAPTURE_TS_PROVENANCE` carries these
 statements; any figure derived from the field is reported with them and **never
 as a trading advantage or an order-entry latency**. Nothing consumes the field
-in the simulator yet, and the six overlap days must be re-ingested (after chain
-B) before a measured distribution exists; no value is quoted here.
+in the simulator. The six overlap days were
+re-ingested with the capture timestamp and checked under a signed verification
+run (2026-10-23, prereg PR #326, exit 0): identity pass on all six days (only
+`receive_ts` differs from the reference ingest and no within-capture latency is
+negative), features built, and the within-capture distribution recorded as a
+descriptive count summary in each `dataset.json`
+(`research/v118/rel04_verify/REPORT.md`). Its mean is a constant offset of
+about 37 s, so no absolute feed latency and no skew against Nasdaq is claimed.
 
-## B8 v2 (pre-declared, not yet run)
+## 11. B8 v2 (v1.18 REL-04b): signed, run, negative
 
 REL-04b re-measures the v1.17.1 B8 oos6 comparison (section 8) with the v1.18
 instrument, on the same split: the router calibration of 2025-11-28, 12-08 and
@@ -531,4 +559,57 @@ expected verdict for effects near 1 bps and is said so before the run.
 the headline. Declaration: `research/execution/b8v2/PREDECLARATION.md` and
 `predeclaration.json`; runner `research/execution/b8v2/run_b8v2.py` (refuses
 without a signed prereg whose analysis identity matches the checkout, or when
-the runner is the signer); no number is published until the prereg is signed.
+the runner is the signer).
+
+**Result.** The prereg (`research/preregs/b8v2_prereg.json`, bound to commit
+`4980fc1`) was signed on 2026-10-18 before any run; the run was made by a
+non-signing actor on 2026-10-19 and 2026-10-20 and is on `main` (#322):
+`research/execution/b8v2/REPORT.md`. With G = 3 evaluation sessions and 2 df,
+**all six comparisons are `no_evidence` (underpowered) and none is better than
+pinned Nasdaq.** Difference in trading cost per filled share against
+`pin_nasdaq`, bps, with the family interval (K = 6) and the MDE:
+
+| policy | symbol | difference | family CI | MDE |
+|---|---|---:|---|---:|
+| pin_iex | AAPL | -0.78 | [-2.25, 0.68] | 1.61 |
+| pin_iex | MSFT | -7.55 | [-57.46, 42.37] | 54.78 |
+| sor_sweep | AAPL | -0.18 | [-5.70, 5.34] | 6.06 |
+| sor_sweep | MSFT | +1.71 | [-18.50, 21.92] | 22.18 |
+| sor | AAPL | -0.57 | [-6.50, 5.37] | 6.51 |
+| sor | MSFT | -0.67 | [-12.49, 11.15] | 12.97 |
+
+Every interval includes zero and most are wide relative to any plausible
+effect, so the result is a size statement, not a power statement; it extends
+the v1.17.1 out-of-sample negative of section 8. Latency is the assumption L0
+(exchange timestamps, no measured order-entry latency). The outside reviewer
+inspected the committed report and JSON but did not rerun them (gate F7 stays
+open: no independent reproduction of the B8 v2 JSON).
+
+## 12. Single-venue universe and the real-tape fill test (v1.18 REL-04c, REL-05)
+
+**REL-04c** (secondary, in-sample): the benchmark v2 metrics on a pre-specified
+Nasdaq-only universe of about 20 names (`iap.research.rel04c_universe`,
+rule `rel04c_universe/v1`, selected on 2019-10-18; AAPL and MSFT anchors; three
+liquidity buckets L1-L3 by Nasdaq displayed volume), sessions 2019-10-18,
+2021-07-13 and 2021-08-13 (G = 3). The predeclaration is frozen
+(`research/execution/rel04c/predeclaration.json`) and the run (2026-10-23)
+exited 0; the artefacts are `research/execution/rel04c/benchmark/` (L1, L2,
+L3). The selection conditions on survival to 2021 and uses Nasdaq rather than
+consolidated volume (`research/execution/rel04c/README.md`), the volume check
+covered 14 of the 20 names (6 delisted), and nothing is claimed beyond the
+artefacts: no policy ranking, no edge.
+
+**REL-05** (Level 1 done, Level 2 NOT validated): `iap.paper.recorder`,
+`iap.paper.sim_to_real` and `iap.paper.fill_tape` ([SIM_TO_REAL.md](SIM_TO_REAL.md)).
+The record -> replay -> compare chain is deterministic. The real-tape test fits
+the fill hazard on four 2019 days and predicts, on three held-out 2019 days, the
+probability that a hypothetical resting order fills within its time to live,
+scored against what the tape shows under the simulator's own queue rules
+("tape-implied, not a measured real fill"). Result
+(`research/execution/rel05/REPORT.md`): AAPL inconclusive (pooled skill
+0.0218), MSFT inconclusive (0.0111), QQQ supports (0.0839, reliability gap
+0.0216); supported on all symbols: no. G = 3 evaluation days, so no p-value or
+interval is claimed. No real order or fill exists (D4(a)), so the live fill
+model is not validated; the simulator's assumptions and unsupported claims are
+in [review/SIMULATOR_CORRECTNESS.md](review/SIMULATOR_CORRECTNESS.md).
+

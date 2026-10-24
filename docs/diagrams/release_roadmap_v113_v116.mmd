@@ -1,5 +1,5 @@
 flowchart LR
-    %% Release roadmap v1.13 to v1.16. Source: CHANGELOG.md (v1.13.0 to v1.15.0, Unreleased). Sibling of release_roadmap_v19_v111.mmd.
+    %% Release roadmap v1.13 to v1.16. Source: CHANGELOG.md (v1.13.0 to v1.18.0). Sibling of release_roadmap_v19_v111.mmd.
     subgraph V113["v1.13.0, released"]
         H["quality-review hardening:<br/>CI layout, hashed locks, LF artefacts"]
     end
@@ -10,16 +10,22 @@ flowchart LR
         R7["R7 confirmed: EQ10@1s, EQ05@1s on 7 holdout sessions"]
         MR["MVP on a real ITCH day; Java archived"]
     end
-    subgraph V116["v1.16, Unreleased (on main)"]
+    subgraph V116["v1.16.0 (2026-10-15), released"]
         P0["P0-1..P0-5 cost realism:<br/>rule 6b, residual fit, prereg v3, SOR opt-ins, exact POV"]
         P6["P0-6 monetisation study: NO-GO (taker)"]
         QV2["M5 quoting v2 registered"]
         EOD["MVP end-of-day flatten (opt-in)"]
         GV["fork-board archive, prereg touch check,<br/>multiple-testing table, simulator heaps"]
     end
-    subgraph DEF["deferred, not on main"]
-        AI4["AI4 deep LOB on real data<br/>(new registration needed)"]
+    subgraph V117["v1.17.0 (2026-10-16) and v1.17.1 (2026-10-17), released"]
+        XQ["execution quality: shortfall benchmark, second venue (IEX HIST),<br/>breadth book, statistics revision; B8 two-venue router negative"]
     end
-    H --> C --> R7 --> P0 --> P6 --> QV2
+    subgraph V118["v1.18.0 (2026-10-24), released"]
+        INS["measurement instrument: signed pre-declarations, holdout registry,<br/>one real-data ledger family, execution benchmark v2, replay harness<br/>(Level 1 only), paper order manager; no signal promoted, no edge claimed"]
+    end
+    subgraph DEF["closed in v1.16"]
+        AI4["AI4 deep LOB on real data<br/>(in-sample failure, research/r7/AI4_CLOSED_v116.md)"]
+    end
+    H --> C --> R7 --> P0 --> P6 --> QV2 --> XQ --> INS
     MR --> EOD
-    R7 -. "deferred" .-> AI4
+    R7 -. "closed" .-> AI4
