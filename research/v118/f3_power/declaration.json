@@ -1,0 +1,114 @@
+{
+  "kind": "f3_power_declaration",
+  "version": 1,
+  "status": "UNSIGNED DRAFT: nothing here has been run for the study",
+  "protocol": "research/v118/f3_power/PROTOCOL.md",
+  "prereg": "research/preregs/f3_power_prereg.json",
+  "procedure": "P1: one-sided Student t(G-1) on the CR1 statistic, Holm over the first K hypotheses at alpha_op (reviewer-directed prospective selection, 2026-10-24); NON-GATING power diagnostic",
+  "alpha_op": 0.02,
+  "n_per_cell": 10000,
+  "chunk": 5000,
+  "families": [
+    3,
+    6,
+    16
+  ],
+  "regimes": [
+    "a0",
+    "b0",
+    "b1"
+  ],
+  "G": [
+    5,
+    7,
+    10
+  ],
+  "grid": [
+    0.5,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    10,
+    12,
+    16
+  ],
+  "planted_index": 0,
+  "power_target": 0.8,
+  "effect": {
+    "formula": "mu = d * sigma_RMS / sqrt(G); sigma_RMS = sqrt(mean_g sigma_g^2); constant across sessions; added after generation to hypothesis planted_index only; d is the noncentrality-scale effect (a0: the t statistic has noncentrality exactly d), not a raw per-session standardised shift"
+  },
+  "generators": {
+    "scale_ratio": 5.0,
+    "definition": "reused unchanged from research/v118/f3_accept/core.py (a0 iid N(0,1) G x 16; b0 z * s_g, s = exp(linspace(0, ln scale_ratio, G)); b1 session distribution cycling normal / t3 / centred lognormal by session index mod 3, times s_g); all null datasets are drawn in chunks of `chunk` from ONE SplitMix64 stream per (regime, G) cell and reused for every d (common random numbers: dataset i is the same null dataset for every d)"
+  },
+  "seeds": {
+    "base": 20301100,
+    "dry_run_base": 20301900,
+    "bootstrap_base": 20301500,
+    "formula": "base + 10 * regime_index + G",
+    "regime_index": {
+      "a0": 0,
+      "b0": 1,
+      "b1": 2
+    },
+    "disjoint_from": [
+      "20281100-20281199 (pilot)",
+      "20291100-20291199 and 20291900-20291999 (acceptance study and its dry run)",
+      "20271001-20271004 (F3 diagnostic)"
+    ]
+  },
+  "interval": {
+    "wilson_z": 1.959963984540054,
+    "note": "Wilson 95% two-sided, pointwise, for every power estimate; not simultaneous"
+  },
+  "mde": {
+    "rule": "first-crossing linear interpolation; '<= first grid value' if already reached at the first grid point; '> last grid value' if never reached; never extrapolated; reported to one decimal; non-monotone curves flagged, first crossing kept, flagged cells excluded from the MDE ratio",
+    "digits": 1
+  },
+  "bootstrap": {
+    "B": 1000,
+    "lo_q": 0.025,
+    "hi_q": 0.975,
+    "min_numeric_share": 0.9,
+    "note": "paired bootstrap over independent dataset replications: one index set per resample used for every d and every K; percentile indices floor(lo_q (B-1)) and ceil(hi_q (B-1)) of the ordered replicates, order '<= first' < numbers < '> last'; also used for adjacent-d power differences"
+  },
+  "ratio": {
+    "min_count": 100,
+    "note": "heterogeneous-to-homogeneous power ratio defined only when both counts are >= min_count; delta-method interval on log R from the two independent streams"
+  },
+  "integrity": {
+    "tau": 0.025,
+    "tau_dry": 0.25,
+    "regime": "a0",
+    "rule": "for every a0 (G, K, d): pi_ref - tau <= phat <= min(1, pi_ref + excess) + tau, pi_ref = noncentral-t P(T'(G-1, d) >= t_{1-alpha_op/K}(G-1)), excess = 1 - (1 - alpha_op/K)^(K-1); evaluated FIRST, before any power estimate, MDE80 or ratio is computed or shown",
+    "on_failure": "run declared VOID (programming integrity): DECISION.json status VOID_INTEGRITY with the offending (G, K, d); no power table, MDE80 or ratio is produced; no estimate from the run may be cited; a corrected package needs the full sign-off route with FRESH seeds"
+  },
+  "dry_run": {
+    "n": 200,
+    "output_discarded": true
+  },
+  "workers": 3,
+  "stop_rules": {
+    "min_free_ram_gb": 4.0,
+    "no_interim_looks": true,
+    "one_run_only": true,
+    "crash_policy": "an interrupted run may be resumed exactly as declared in `resume`; nothing else is permitted",
+    "final_policy": "a completed run (including VOID_INTEGRITY) is final under this prereg: no rerun, no new seeds, no changed grid, n, generators or definitions"
+  },
+  "non_gating": "this study has no pass/fail criterion and no power floor; its results cannot change the completed F3 acceptance result or any Type I criterion, set alpha_op, choose a procedure, close F3 or support any real-data, power-in-practice, alpha or trading claim",
+  "market_data_consumed": false,
+  "data_versions_sentinel": "synthetic-no-data: a declared sentinel only. NO market data are consumed (no data/real access, no holdout registry, no dataset reader); it is not a dataset identifier and not a holdout exemption",
+  "stream": {
+    "rule": "each (regime, G) cell creates ONE SplitMix64 stream from its seed and consumes it chunk after chunk; chunking never resets or reseeds the generator; chunk size, ordering of draws and the generator implementation are part of the frozen identity",
+    "evidence": "the cell record stores rng_final_state, chunk_counts_sha256 and indicators_sha256"
+  },
+  "resume": {
+    "permitted": "an interrupted run may be resumed at cell granularity only; every finished cell file is re-verified by recomputing the cell under the CURRENT verified signed identity and comparing identity_sha256, prereg_sha256, seed, chunk, n, rng_final_state, chunk_counts_sha256, indicators_sha256 and the counts; any difference refuses the run",
+    "failed_study": "a run holding a DECISION.json is refused (one run only)"
+  }
+}
