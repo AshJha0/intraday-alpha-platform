@@ -9,6 +9,7 @@ Models: a  iid N(0,1)                                          seed 20271001
         c  as b with sd(r), sd(c), s_i fitted to the real V0 matrix of one hypothesis  seed 20271003
   python d13_null_matrices.py MODEL N_MATRICES OUT_JSON [MATRICES_NPZ HYPOTHESIS_ID]
 """
+
 from __future__ import annotations
 
 import json
@@ -16,7 +17,6 @@ import sys
 from pathlib import Path
 
 import numpy as np
-
 from fmat import ALPHA, additive_fit, derangement_array, inference_over, kn
 
 SEEDS = {"a": 20271001, "b": 20271002, "c": 20271003}
@@ -42,8 +42,11 @@ def main(model: str, n: int, out: str, npz: str | None = None, hid: str | None =
         Z = np.load(npz, allow_pickle=False)
         a = [str(x) for x in Z["ids"]].index(hid)
         _, ai, bj, res = additive_fit(Z["V0"][a])
-        params = (float(np.std(ai, ddof=1)), float(np.std(bj, ddof=1)),
-                  np.array([np.nanstd(res[i], ddof=1) for i in range(7)]))
+        params = (
+            float(np.std(ai, ddof=1)),
+            float(np.std(bj, ddof=1)),
+            np.array([np.nanstd(res[i], ddof=1) for i in range(7)]),
+        )
     seed = SEEDS[model]
     rng = kn.SplitMix64(seed)
     rates = []
@@ -51,19 +54,40 @@ def main(model: str, n: int, out: str, npz: str | None = None, hid: str | None =
     for k in range(n):
         M = draw_matrix(model, rng, params)
         p, m, se = inference_over(M, perms)
-        rates.append([float((p <= ALPHA).mean()), float((p <= ALPHA / 3).mean()), float((p <= ALPHA / 6).mean())])
+        rates.append(
+            [
+                float((p <= ALPHA).mean()),
+                float((p <= ALPHA / 3).mean()),
+                float((p <= ALPHA / 6).mean()),
+            ]
+        )
         shifts.append(float(np.mean(m) / np.std(m, ddof=1)))
         if (k + 1) % 10 == 0:
             print(model, k + 1, "of", n, flush=True)
     R = np.array(rates)
-    q = lambda col: {str(x): float(np.quantile(R[:, col], x)) for x in (0.05, 0.25, 0.5, 0.75, 0.9, 0.95)}
-    doc = {"label": "EXPLORATORY synthetic matrix-level null", "model": model, "seed": seed, "n_matrices": n,
-           "hypothesis_fitted": hid, "params": None if params is None else [params[0], params[1], params[2].tolist()],
-           "thresholds": ["a", "a/3", "a/6"], "nominal": [ALPHA, ALPHA / 3, ALPHA / 6],
-           "mean_rate": R.mean(axis=0).tolist(), "sd_rate": R.std(axis=0, ddof=1).tolist(),
-           "quantiles": {t: q(i) for i, t in enumerate(["a", "a/3", "a/6"])},
-           "frac_matrices_rate_gt_2.97pct": [float((R[:, i] > 55 / 1854).mean()) for i in range(3)],
-           "mean_abs_E_m_over_sd": float(np.mean(np.abs(shifts))), "rates": R.tolist(), "shift_E_m_over_sd": shifts}
+
+    def q(col):
+        return {
+            str(x): float(np.quantile(R[:, col], x)) for x in (0.05, 0.25, 0.5, 0.75, 0.9, 0.95)
+        }
+
+    doc = {
+        "label": "EXPLORATORY synthetic matrix-level null",
+        "model": model,
+        "seed": seed,
+        "n_matrices": n,
+        "hypothesis_fitted": hid,
+        "params": None if params is None else [params[0], params[1], params[2].tolist()],
+        "thresholds": ["a", "a/3", "a/6"],
+        "nominal": [ALPHA, ALPHA / 3, ALPHA / 6],
+        "mean_rate": R.mean(axis=0).tolist(),
+        "sd_rate": R.std(axis=0, ddof=1).tolist(),
+        "quantiles": {t: q(i) for i, t in enumerate(["a", "a/3", "a/6"])},
+        "frac_matrices_rate_gt_2.97pct": [float((R[:, i] > 55 / 1854).mean()) for i in range(3)],
+        "mean_abs_E_m_over_sd": float(np.mean(np.abs(shifts))),
+        "rates": R.tolist(),
+        "shift_E_m_over_sd": shifts,
+    }
     Path(out).write_text(json.dumps(doc, indent=1))
     print("DONE", doc["mean_rate"], doc["sd_rate"])
 

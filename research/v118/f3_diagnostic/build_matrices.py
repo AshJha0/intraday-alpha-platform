@@ -8,9 +8,9 @@ V2 = V0 with the common intraday label profile removed (per name, horizon, time-
 mean over sessions).  Reads data/real/multi7 through the runner's own guarded builder.
   python build_matrices.py DATA_ROOT OUT_NPZ
 """
+
 from __future__ import annotations
 
-import json
 import sys
 import time
 from pathlib import Path
@@ -72,8 +72,13 @@ def main(data_root: str, out: str) -> None:
         for k in range(G):
             perm = [(s + k) % G for s in range(G)]
             labs = {
-                h: (kn.labels_a(panel, src.centred[h] if var == "V0" else study.real[h], perm, gr[h])
-                    if var in ("V0", "V1") else labels_from_grid(panel, gr[h], perm))
+                h: (
+                    kn.labels_a(
+                        panel, src.centred[h] if var == "V0" else study.real[h], perm, gr[h]
+                    )
+                    if var in ("V0", "V1")
+                    else labels_from_grid(panel, gr[h], perm)
+                )
                 for h in study.horizons
             }
             for a, hid in enumerate(ids):

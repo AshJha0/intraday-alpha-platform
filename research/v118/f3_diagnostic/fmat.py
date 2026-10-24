@@ -1,4 +1,5 @@
 """Helpers shared by the F3 matrix diagnostics (imports the code under test unmodified)."""
+
 from __future__ import annotations
 
 import sys
@@ -42,7 +43,9 @@ def family_rejections(P: np.ndarray, Mn: np.ndarray, alpha: float = ALPHA) -> np
     out = np.zeros(P.shape[0], dtype=bool)
     for d in range(P.shape[0]):
         adj = holm([float(x) for x in P[d]])
-        out[d] = any(a is not None and a <= alpha and mu > 0 for a, mu in zip(adj, Mn[d], strict=True))
+        out[d] = any(
+            a is not None and a <= alpha and mu > 0 for a, mu in zip(adj, Mn[d], strict=True)
+        )
     return out
 
 

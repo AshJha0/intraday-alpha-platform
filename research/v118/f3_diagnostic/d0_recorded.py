@@ -4,6 +4,7 @@ Exploratory.  Reads the stored v3 result (hash checked), recomputes nothing but 
 descriptive statistics from the stored per-trial records.  Usage:
   python d0_recorded.py RESULT_JSON OUT_JSON
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -39,9 +40,14 @@ def main(res_path: str, out_path: str) -> None:
         for k in ("K3", "K6", "K16"):
             for s in ("S1", "S2"):
                 recs = [tr[str(i)][k][s] for i in range(n)]
-                cnt = sum(1 for r in recs if any(
-                    p is not None and p <= ALPHA and m is not None and m > 0
-                    for p, m in zip(r["p_holm"], r["mean_bps"])))
+                cnt = sum(
+                    1
+                    for r in recs
+                    if any(
+                        p is not None and p <= ALPHA and m is not None and m > 0
+                        for p, m in zip(r["p_holm"], r["mean_bps"], strict=True)
+                    )
+                )
                 g["cells"][f"{s}/{k}"] = cnt
                 if s != "S2":
                     continue
@@ -53,21 +59,28 @@ def main(res_path: str, out_path: str) -> None:
                 rej = (H <= ALPHA) & (M > 0)
                 union = int(rej.any(axis=1).sum())
                 for j, hid in enumerate(ids[k]):
-                    e = {"holm_rejections": int(rej[:, j].sum()),
-                         "mean_m": float(M[:, j].mean()), "sd_m": float(M[:, j].std(ddof=1)),
-                         "mean_se": float(SE[:, j].mean()),
-                         "U": float(M[:, j].std(ddof=1) / math.sqrt((SE[:, j] ** 2).mean())),
-                         "mean_over_sd": float(M[:, j].mean() / M[:, j].std(ddof=1)),
-                         "t_quantiles": {str(q): float(np.quantile(T[:, j], q)) for q in t6},
-                         "raw_p_le": {f"alpha/{dv}": int((P[:, j] <= ALPHA / dv).sum()) for dv in DIV},
-                         "raw_p_min": float(np.nanmin(P[:, j]))}
+                    e = {
+                        "holm_rejections": int(rej[:, j].sum()),
+                        "mean_m": float(M[:, j].mean()),
+                        "sd_m": float(M[:, j].std(ddof=1)),
+                        "mean_se": float(SE[:, j].mean()),
+                        "U": float(M[:, j].std(ddof=1) / math.sqrt((SE[:, j] ** 2).mean())),
+                        "mean_over_sd": float(M[:, j].mean() / M[:, j].std(ddof=1)),
+                        "t_quantiles": {str(q): float(np.quantile(T[:, j], q)) for q in t6},
+                        "raw_p_le": {
+                            f"alpha/{dv}": int((P[:, j] <= ALPHA / dv).sum()) for dv in DIV
+                        },
+                        "raw_p_min": float(np.nanmin(P[:, j])),
+                    }
                     g["hyp"][f"{k}|{hid}"] = e
                 g["cells"][f"S2/{k}/sum_marginals"] = int(rej.sum())
                 g["cells"][f"S2/{k}/union"] = union
         out[gen] = g
     out["t6_quantiles"] = t6
-    out["nominal_counts"] = {gen: {f"alpha/{dv}": ALPHA / dv * len(d["size_trials"][gen]) for dv in DIV}
-                             for gen in ("A0", "B", "A_v2")}
+    out["nominal_counts"] = {
+        gen: {f"alpha/{dv}": ALPHA / dv * len(d["size_trials"][gen]) for dv in DIV}
+        for gen in ("A0", "B", "A_v2")
+    }
     Path(out_path).write_text(json.dumps(out, indent=1))
     for gen in ("A0", "B", "A_v2"):
         print(gen, out[gen]["n"], {k: v for k, v in out[gen]["cells"].items()})
