@@ -104,7 +104,10 @@ def test_declaration_is_an_unsigned_draft_with_the_reviewed_parameters():
     assert "UNSIGNED" in DECL["status"]
     assert DECL["alpha_op"] == 0.02 and DECL["fwer_target"] == 0.025 and DECL["n_per_cell"] == 50000
     assert len(fa.cells(DECL)) == 12 and sum(m for _, _, m in fa.cells(DECL)) == 9
-    assert not (REPO / PID).exists(), "the prereg must not exist before the owner signs"
+    # the draft declaration stays UNSIGNED text (it is hashed into the identity); once the owner signs,
+    # the prereg file exists and must carry a signature block
+    if (REPO / PID).exists():
+        assert json.loads((REPO / PID).read_text(encoding="utf-8")).get("signed") is True
 
 
 def test_refuses_when_the_prereg_does_not_exist(repo, monkeypatch):
