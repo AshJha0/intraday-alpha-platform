@@ -33,3 +33,8 @@ research/v118/rel04_verify/*.cmd text eol=crlf
 # REL-04c: cmd.exe needs CRLF (a LF .cmd mis-parses labels / goto).
 research/execution/rel04c/*.cmd text eol=crlf
 research/v118/f3_accept/*.cmd text eol=crlf
+
+# v2.0 stage 1 PR R0: the frozen confirmatory test specification is committed
+# byte for byte (CRLF, sha256 900d9e73...); python/tests/spec/test_r0_frozen.py
+# re-hashes it, so git must never normalise its line endings.
+python/tests/spec/CONFIRMATORY_TEST_SPEC.md -text
