@@ -40,8 +40,17 @@ MODELS = ("N1", "N2", "N3", "N4")
 SPREADS = {"S1": 1.0, "S4": 4.0}
 CELLS = [f"{m}{s}" for m in MODELS for s in SPREADS]  # N1S1, N1S4, N2S1, ... (plan order)
 BASE_SEED = 20261100
-POWER_BASE_SEED = 20268000
+POWER_BASE_SEED = (
+    20268500  # REV2: moved from 20268000, which overlapped the N4S4 cell range (20268100-20268299)
+)
 TIMING_BASE_SEED = 20269000
+GATING_CELLS = [c for c in CELLS if not c.startswith("N4")]  # N1-N3 x S1, S4
+R_FULL = (
+    200  # confirmatory replications per null cell (fixed sample; decided only from the full 200)
+)
+R_CHECKPOINT = 100  # NON-DECISIONAL checkpoint after the first 100 of each gating cell
+POWER_REPS = 30
+POWER_CASES = [("revert", 6.0), ("revert", 12.0), ("revert", 24.0), ("lead", 0.3), ("lead", 0.6)]
 BOOK = {"alpha_bps": 20.0, "risk_aversion": 100.0, "solver_iters": 20}
 DRAWS = 9999
 SESSIONS = 6
@@ -226,7 +235,8 @@ def _write(p: Path, recs: list[dict[str, Any]]) -> None:
     tmp.replace(p)
 
 
-def run_cells(out: Path, cells: list[str], reps: int, workers: int) -> None:
+def run_cells(out: Path, cells: list[str], r_from: int, r_to: int, workers: int) -> None:
+    """Replications r_from .. r_to - 1 of each cell (resumable by seed)."""
     out.mkdir(parents=True, exist_ok=True)
     for cell in cells:
         ci = CELLS.index(cell)
@@ -236,7 +246,7 @@ def run_cells(out: Path, cells: list[str], reps: int, workers: int) -> None:
         done = {r["seed"] for r in recs}
         jobs = [
             ("null", model, sp, BASE_SEED + 1000 * ci + r, 0.0, DRAWS)
-            for r in range(reps)
+            for r in range(r_from, r_to)
             if BASE_SEED + 1000 * ci + r not in done
         ]
         if workers <= 1:
@@ -253,7 +263,7 @@ def run_cells(out: Path, cells: list[str], reps: int, workers: int) -> None:
 
 def run_power(out: Path, reps: int, workers: int) -> None:
     out.mkdir(parents=True, exist_ok=True)
-    cases = [("revert", a) for a in (6.0, 12.0, 24.0)] + [("lead", a) for a in (0.3, 0.6)]
+    cases = POWER_CASES
     path = out / "power.json"
     recs = _load(path)
     done = {(r["kind"], r["amp"], r["seed"]) for r in recs}
@@ -284,13 +294,17 @@ def cp_upper(k: int, n: int, conf: float = 0.95) -> float:
     return hi
 
 
-def report(out: Path) -> str:
-    lines = [
-        "| cell | reps | family events | family rate | family CP upper | variant continue | variant C3 pass | pooled variant C3 upper |",
-        "|---|---|---|---|---|---|---|---|",
+def report(out: Path, upto: int | None = None, label: str = "") -> str:
+    """Per-cell table from the first ``upto`` replications (default all); ``label`` goes above it."""
+    lines = [label] if label else []
+    lines += [
+        "| cell | reps | family events | family rate | family CP upper | family CP upper (Bonferroni 1-0.05/6, info only) | variant continue | variant C3 pass | pooled variant C3 upper |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for cell in CELLS:
-        recs = _load(out / f"cell_{cell}.json")
+        recs = sorted(_load(out / f"cell_{cell}.json"), key=lambda r: r["seed"])
+        if upto is not None:
+            recs = recs[:upto]
         if not recs:
             continue
         n = len(recs)
@@ -304,28 +318,98 @@ def report(out: Path) -> str:
         c3 = sum(bool(v["criteria"]["C3"]) for r in recs for v in r["variants"])
         nv = sum(len(r["variants"]) for r in recs)
         lines.append(
-            f"| {cell} | {n} | {fam} | {fam / n:.4f} | {cp_upper(fam, n):.4f} | {vc} | {c3} | {cp_upper(c3, nv):.4f} |"
+            f"| {cell} | {n} | {fam} | {fam / n:.4f} | {cp_upper(fam, n):.4f} | {cp_upper(fam, n, 1 - 0.05 / 6):.4f} | {vc} | {c3} | {cp_upper(c3, nv):.4f} |"
         )
     return "\n".join(lines) + "\n"
+
+
+def manifest() -> dict[str, Any]:
+    """Machine-readable accounting of every cell, replication count and seed the runner executes."""
+    cells = []
+    for ci, cell in enumerate(CELLS):
+        gating = cell in GATING_CELLS
+        cells.append(
+            {
+                "cell": cell,
+                "model": cell[:2],
+                "spread_regime": cell[2:],
+                "spread_multiplier": SPREADS[cell[2:]],
+                "role": "gating" if gating else "non-gating (stress)",
+                "replications": R_FULL,
+                "seed_first": BASE_SEED + 1000 * ci,
+                "seed_last": BASE_SEED + 1000 * ci + R_FULL - 1,
+                "checkpoint_replications_non_decisional": R_CHECKPOINT if gating else None,
+            }
+        )
+    power = []
+    for ki, (kind, amp) in enumerate(POWER_CASES):
+        power.append(
+            {
+                "kind": kind,
+                "amp": amp,
+                "role": "non-gating (power-side sanity check)",
+                "spread_multiplier": 1.0,
+                "replications": POWER_REPS,
+                "seed_first": POWER_BASE_SEED + 100 * ki,
+                "seed_last": POWER_BASE_SEED + 100 * ki + POWER_REPS - 1,
+            }
+        )
+    n_gating = sum(c["replications"] for c in cells if c["role"] == "gating")
+    n_null = sum(c["replications"] for c in cells)
+    n_power = sum(c["replications"] for c in power)
+    return {
+        "x-version": 1,
+        "plan": "REL08_V2_CALIBRATION_PLAN_REV2.md",
+        "sessions_per_screen": SESSIONS,
+        "variants_per_screen": 7,
+        "bootstrap_draws": DRAWS,
+        "book": dict(BOOK),
+        "bootstrap_seed": 20261020,
+        "null_cells": cells,
+        "power_cells": power,
+        "sensitivity_cells": [],
+        "timing_seeds": [TIMING_BASE_SEED + i for i in range(4)],
+        "totals": {
+            "gating_screens": n_gating,
+            "null_screens": n_null,
+            "power_screens": n_power,
+            "all_screens": n_null + n_power,
+        },
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument("stage", choices=("cell", "power", "timing", "report"))
+    ap.add_argument("stage", choices=("cell", "power", "timing", "report", "all", "manifest"))
     ap.add_argument("--out", type=Path, default=HERE / "results")
     ap.add_argument("--cells", default=",".join(CELLS))
     ap.add_argument("--reps", type=int, default=None)
+    ap.add_argument("--r-from", type=int, default=0)
+    ap.add_argument("--upto", type=int, default=None)
     ap.add_argument("--workers", type=int, default=2)
     a = ap.parse_args(argv)
     if a.stage == "cell":
         cells = a.cells.split(",")
         if any(c not in CELLS for c in cells):
             raise SystemExit(f"cells must be among {CELLS}")
-        run_cells(a.out, cells, a.reps or 200, a.workers)
+        run_cells(a.out, cells, a.r_from, a.reps or R_FULL, a.workers)
+    elif a.stage == "all":
+        # The whole confirmatory plan, no decision points: gating cells 0-99, an automatic
+        # NON-DECISIONAL checkpoint report, gating cells 100-199 whatever it shows, then N4 and power.
+        run_cells(a.out, GATING_CELLS, 0, R_CHECKPOINT, a.workers)
+        note = "NON-DECISIONAL checkpoint (first 100 per gating cell); never used to stop, extend or tune.\n"
+        (a.out / "checkpoint_100_NONDECISIONAL.md").write_text(
+            report(a.out, R_CHECKPOINT, note), encoding="utf-8"
+        )
+        run_cells(a.out, GATING_CELLS, R_CHECKPOINT, R_FULL, a.workers)
+        run_cells(a.out, [c for c in CELLS if c not in GATING_CELLS], 0, R_FULL, a.workers)
+        run_power(a.out, POWER_REPS, a.workers)
+    elif a.stage == "manifest":
+        print(json.dumps(manifest(), indent=1))
     elif a.stage == "power":
-        run_power(a.out, a.reps or 30, a.workers)
+        run_power(a.out, a.reps or POWER_REPS, a.workers)
     elif a.stage == "timing":
         t0 = (
             time.time()
@@ -335,7 +419,7 @@ def main(argv: list[str] | None = None) -> int:
             secs = [round(r["sec"]) for r in ex.map(_job, jobs)]
         print(f"per-screen s {secs}; elapsed {time.time() - t0:.0f} s for 4 screens")
     else:
-        print(report(a.out))
+        print(report(a.out, a.upto))
     return 0
 
 

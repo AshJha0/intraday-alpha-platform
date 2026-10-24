@@ -1,5 +1,7 @@
 # REL-08 v2 prospective synthetic-null calibration plan (UNSIGNED, written before any calibration number exists)
 
+> **REVISION NOTICE (2026-10-24):** superseded for execution by `REL08_V2_CALIBRATION_PLAN_REV2.md` (staged fixed-sample design with a non-decisional checkpoint, power seeds moved, manifest, short-circuit evidence). The text below is kept unchanged for the record; where it differs from REV2, REV2 governs.
+
 **Status: plan only, 2026-10-24.** No calibration run, timing run or smoke run of the decision specified here has produced
 a number that was looked at when this file was written. It answers named change 3 of the outside reviewer's decision
 (`docs/release/REVIEWER_REL08_V2_DECISION_2026-10-24.md`). It reads **no real session**, tunes **no threshold**, and
