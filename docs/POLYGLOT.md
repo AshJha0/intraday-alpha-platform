@@ -19,7 +19,7 @@
 > longer exists; the platform is three languages: Python reference, C++
 > latency path, Rust risk and infrastructure.
 >
-> **Status at v1.18.0 (2026-10-24).** `tests/harness/polyglot_policy.json`
+> **Status at v1.18.0 (2026-10-23).** `tests/harness/polyglot_policy.json`
 > lists **8 FROZEN paths (7 copies)**: the Rust marketdata, orderbook,
 > replay, alpha, contracts and lifecycle crates and the C++ contracts (two
 > paths). The 16 Java paths of the original 24 left the file when the engine

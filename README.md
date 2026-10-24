@@ -60,7 +60,7 @@ the repository map, the real-world usage notes and the references) is in
 
 The full list with descriptions is the [Documentation index](#documentation-index).
 
-## Current status (v1.18.0, tag v1.18.0, dated 2026-10-24; the previous release v1.17.1 is dated 2026-10-17)
+## Current status (v1.18.0, tag v1.18.0, dated 2026-10-23; the previous release v1.17.1 is dated 2026-10-17)
 
 **v1.18.0: a measurement instrument and recorded negative results. No signal is promoted and no edge is claimed**
 ([CHANGELOG.md](CHANGELOG.md) v1.18.0, [docs/release/v1.18.0_RELEASE_NOTES.md](docs/release/v1.18.0_RELEASE_NOTES.md),

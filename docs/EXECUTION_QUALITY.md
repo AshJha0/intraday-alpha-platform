@@ -6,7 +6,7 @@
 > edge, and no latency claim is made. Question-to-test map, assumptions and unsupported claims:
 > [review/SIMULATOR_CORRECTNESS.md](review/SIMULATOR_CORRECTNESS.md).
 
-Status (v1.18.0, 2026-10-24): in-sample, report-only, opt-in, except the
+Status (v1.18.0, 2026-10-23): in-sample, report-only, opt-in, except the
 signed out-of-sample B8 v2 run of section 11, which is negative and
 underpowered. Nothing here gates a promotion and no registered result moves.
 Sections 1-8 are the v1.17 record and keep their v1.17 wording where a later

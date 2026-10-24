@@ -1683,7 +1683,7 @@ flowchart TD
 
 ## 41. Release roadmap, v1.13 to v1.18
 
-Successor of §25. All of these are released (v1.18.0 on 2026-10-24); AI4 on real data was closed in v1.16 on an in-sample failure. The boxes are one-line summaries; the per-release scope is in `CHANGELOG.md` and `docs/release/`.
+Successor of §25. All of these are released (v1.18.0 on 2026-10-23); AI4 on real data was closed in v1.16 on an in-sample failure. The boxes are one-line summaries; the per-release scope is in `CHANGELOG.md` and `docs/release/`.
 
 Source: [`diagrams/release_roadmap_v113_v116.mmd`](diagrams/release_roadmap_v113_v116.mmd).
 
@@ -1710,7 +1710,7 @@ flowchart LR
     subgraph V117["v1.17.0 (2026-10-16) and v1.17.1 (2026-10-17), released"]
         XQ["execution quality: shortfall benchmark, second venue (IEX HIST),<br/>breadth book, statistics revision; B8 two-venue router negative"]
     end
-    subgraph V118["v1.18.0 (2026-10-24), released"]
+    subgraph V118["v1.18.0 (2026-10-23), released"]
         INS["measurement instrument: signed pre-declarations, holdout registry,<br/>one real-data ledger family, execution benchmark v2, replay harness<br/>(Level 1 only), paper order manager; no signal promoted, no edge claimed"]
     end
     subgraph DEF["closed in v1.16"]

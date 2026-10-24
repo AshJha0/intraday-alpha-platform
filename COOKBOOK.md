@@ -165,7 +165,7 @@ breadth book, the new models and gates, the agents and the CI guards), all
 opt-in; the shell note before recipe 102 gives the PowerShell forms. Python
 blocks with no save-as line run from the repo root with `PYTHONPATH=python/src`.
 
-**v1.18.0 (2026-10-24).** This release added no recipe. It is a measurement
+**v1.18.0 (2026-10-23).** This release added no recipe. It is a measurement
 release with recorded negative results (no signal promoted, no edge claimed,
 the fill model validated only against deterministic replay), and it changed
 what several earlier recipes print and what they may read. Four things to

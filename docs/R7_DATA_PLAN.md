@@ -7,7 +7,7 @@
 > (Databento) was declined, and the v1.16 in-sample study did not trigger a
 > fresh-data purchase. The text below is kept as written.
 >
-> **Status at v1.18.0 (2026-10-24): what the "unseen" labels below became.** All ten
+> **Status at v1.18.0 (2026-10-23): what the "unseen" labels below became.** All ten
 > tier-1 sessions are ingested. The three in-sample days (2019-10-18, 2021-07-13,
 > 2021-08-13) are `in_sample` in the holdout registry
 > (`research/holdout_registry.json`); the seven holdout sessions (2025-11-28,

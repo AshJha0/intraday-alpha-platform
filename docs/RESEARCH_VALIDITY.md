@@ -1,6 +1,6 @@
 # Research validity: corrected methods and the safe research store
 
-**Status at v1.18.0 (2026-10-24).** Sections 1-4f are the corrections of
+**Status at v1.18.0 (2026-10-23).** Sections 1-4f are the corrections of
 v1.3-v1.17 and stay as written, each labelled with its release. v1.18 added the
 measurement-instrument layer around them (sections 4g and 4h): a claim taxonomy,
 signed pre-declarations, a holdout registry, one real-data ledger family and a

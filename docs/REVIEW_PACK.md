@@ -1,6 +1,6 @@
 # Review pack for the outside reviewer (v1.18)
 
-> Status at the v1.18.0 tag (2026-10-24): the reviewer's written close-out of 2026-10-23 is in
+> Status at the v1.18.0 tag (2026-10-23): the reviewer's written close-out of 2026-10-23 is in
 > [release/REVIEWER_CLOSEOUT_2026-10-23.md](release/REVIEWER_CLOSEOUT_2026-10-23.md). Gate F3 (known-null) failed and stays open,
 > F7 (independent rerun of the B8 v2 JSON) is open, and the findings memo (c) was written from inspection, not from running the
 > suites. The status column and the placeholders below are updated to that state; see

@@ -8,7 +8,7 @@ pipeline — normalisation and QC, canonical events, order book, features,
 alphas, the research runner — consumes exactly as it consumes synthetic
 data.
 
-**Status, stated plainly (v1.18.0, 2026-10-24).** The readers are written
+**Status, stated plainly (v1.18.0, 2026-10-23).** The readers are written
 from the published message layouts and tested on bytes the tests synthesise
 (`python/tests/itch50_encoder.py`, `python/tests/lobster_fixture.py`); no
 vendor file is stored in this repository. The owner has run the ITCH path

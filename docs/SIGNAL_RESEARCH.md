@@ -1,6 +1,6 @@
 # Signal research in v1.17: statistics revision, new models, and the gates around them
 
-Status at v1.18.0 (2026-10-24): sections 1-9 describe v1.17 code and stay as
+Status at v1.18.0 (2026-10-23): sections 1-9 describe v1.17 code and stay as
 written; every piece in them is still opt-in (the v1.17.0 release notes ship them
 opt-in; the v1.18.0 notes and CHANGELOG record no default flipped). Section 10 is
 v1.18 REL-07. **No signal is promoted and no edge is claimed**: the registry holds

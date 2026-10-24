@@ -27,7 +27,7 @@ signal-aware urgency and pacing, the realism layer),
 cross-sectional book), [SIGNAL_RESEARCH.md](SIGNAL_RESEARCH.md) (the statistics
 revision and the new models and gates) and [DATA_SOURCES.md](DATA_SOURCES.md)
 (free Nasdaq and IEX data, process-and-delete). Section 22 was added with
-v1.18.0 (2026-10-24): the measurement instrument and the paper-path safety
+v1.18.0 (2026-10-23): the measurement instrument and the paper-path safety
 code of that release (research authorisation, the holdout registry, the
 single real-data ledger family, benchmark v2 metrics, the capped child, the
 REL-05 replay harness, monitoring, portfolio limits, the order manager).
@@ -1432,7 +1432,7 @@ only, and the signed AI4 registration is deferred
 
 ## 22. v1.18: the measurement instrument and the paper-path safety code
 
-v1.18.0 (2026-10-24) builds machinery that makes a research or execution
+v1.18.0 (2026-10-23) builds machinery that makes a research or execution
 number trustworthy, and records what it found. **No signal is promoted, no
 edge is claimed and there is no latency edge.** Every signed run is negative
 or underpowered, the known-null calibration of the inference step failed, and

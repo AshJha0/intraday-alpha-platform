@@ -83,7 +83,7 @@ negative ones first, is written down with the artefact that produced it.
   one fails the net-P&L-after-costs gate.
   <!-- source: README.md "Headline numbers" (Promotion verdicts, Lifecycle registry rows) and docs/index.html "Results so far" -->
 
-**Released: v1.18.0 (2026-10-24), a measurement instrument and recorded negative results. No signal is promoted and no edge is claimed.**
+**Released: v1.18.0 (2026-10-23), a measurement instrument and recorded negative results. No signal is promoted and no edge is claimed.**
 - **The known-null calibration failed** (null v3, run 2026-10-23): A0 conditional rejection 79 and 80 of 1,854 (about 4.3 %) in two cells against a 2.5 % target; the outside reviewer rejected the method as the F3 gate, so no real-data error-rate control is claimed.
   <!-- source: research/v118/known_null_v3_RESULT.md; docs/release/REVIEWER_CLOSEOUT_2026-10-23.md -->
 - **Every signed run is negative or underpowered.** B8 v2: all 6 comparisons underpowered, none better than pinned Nasdaq (3 evaluation sessions). REL-05: AAPL and MSFT inconclusive, QQQ supports. REL-08 (one-session screen, 7 variants): all underpowered, with defects found afterwards. REL-09: underpowered. REL-10: one taker cell rejected (`hid_imb` 1 min AAPL loses money), the rest underpowered. REL-08c was dropped.

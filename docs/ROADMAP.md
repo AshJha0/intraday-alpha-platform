@@ -563,7 +563,7 @@ recorded (docs/research/IEX_OVERLAP_SET.md); and the release manifest /
 Python lock-file SBOM / k8s digest-pinning fix (#211), first carried by
 v1.17.1.
 
-## 3.14 v1.18.0 (2026-10-24): the measurement instrument and recorded negative results
+## 3.14 v1.18.0 (2026-10-23): the measurement instrument and recorded negative results
 
 Plan: `IAP_Release_Programme_2026-10-17.md` (outside the repository); what shipped is CHANGELOG.md "## v1.18.0" and
 docs/release/v1.18.0_RELEASE_NOTES.md (the REL item table, the consolidated

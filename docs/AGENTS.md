@@ -1,6 +1,6 @@
 # Agents — the roster, the models, the caps, and what the LLM may and may not do
 
-Roster and model pins as of v1.17 WS-E (2026-10-15), unchanged in v1.18.0 (2026-10-24: the
+Roster and model pins as of v1.17 WS-E (2026-10-15), unchanged in v1.18.0 (2026-10-23: the
 `configs/agents/llm.json` pins are still dated 2026-10-16; v1.18 added no LLM agent). The platform runs four LLM-backed agents
 and a set of non-LLM agent-layer controls. Every LLM call is paid from the
 owner's Anthropic key (`ANTHROPIC_API_KEY` or `--env-file`; never printed,

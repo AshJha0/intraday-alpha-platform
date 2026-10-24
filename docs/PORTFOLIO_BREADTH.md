@@ -1,6 +1,6 @@
 # Portfolio breadth: the cross-sectional book (v1.17 WS-C)
 
-Status at v1.18.0 (2026-10-24): in-sample, report-only, opt-in. Nothing here
+Status at v1.18.0 (2026-10-23): in-sample, report-only, opt-in. Nothing here
 gates a promotion. The breadth pre-registration (plan C8) was signed and recorded
 on 2026-10-16 under option (a) with the C6 screen as a hard gate; the screen
 refused the candidate, so **no confirmatory look was taken and no breadth holdout

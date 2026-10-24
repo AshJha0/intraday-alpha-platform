@@ -49,7 +49,7 @@ Five things to know before reading:
    freezes most duplicated language copies (§7.1). Nothing in this
    document claims a profitable strategy. Sections 1-5 describe the bundled
    synthetic dataset unless they say otherwise.
-5. **v1.18.0 (2026-10-24) built a measurement instrument and recorded
+5. **v1.18.0 (2026-10-23) built a measurement instrument and recorded
    negative results.** No signal was promoted, no edge is claimed (none in
    latency either), and the execution fill model is validated at Level 1
    (deterministic replay) only, not Level 2 (real fills). What shipped:
@@ -1171,7 +1171,7 @@ monetise the signal.
 
 ### 3.14 What v1.18 changed: a measurement instrument, not a strategy
 
-v1.18.0 (2026-10-24) changed how execution is measured and how far the
+v1.18.0 (2026-10-23) changed how execution is measured and how far the
 simulator can be trusted, and it promoted nothing.
 
 - **Fill model: Level 1 only.** The replay harness (REL-05) reproduces
