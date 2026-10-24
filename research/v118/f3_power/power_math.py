@@ -119,20 +119,26 @@ def excess(alpha_op: float, k: int) -> float:
     return 1.0 - (1.0 - alpha_op / k) ** (k - 1)
 
 
-def band(alpha_op: float, g: int, k: int, d: float, tau: float) -> tuple[float, float]:
+def band(
+    alpha_op: float, g: int, k: int, d: float, tau: float, excess_k: float | None = None
+) -> tuple[float, float]:
+    """Integrity band; ``excess_k`` is the value fixed in the declaration (``integrity.excess.value_by_K``), the analytic
+    :func:`excess` when omitted."""
     ref = pi_ref(alpha_op, g, k, d)
-    return ref - tau, min(1.0, ref + excess(alpha_op, k)) + tau
+    ex = excess(alpha_op, k) if excess_k is None else excess_k
+    return ref - tau, min(1.0, ref + ex) + tau
 
 
 def integrity_violations(
     alpha_op: float,
     phat: Mapping[tuple[int, int, float], float],
     tau: float,
+    excess_by_k: Mapping[int, float] | None = None,
 ) -> list[tuple[int, int, float]]:
     """(G, K, d) combinations whose a0 power estimate lies outside the analytic band."""
     bad = []
     for (g, k, d), v in sorted(phat.items()):
-        lo, hi = band(alpha_op, g, k, d, tau)
+        lo, hi = band(alpha_op, g, k, d, tau, None if excess_by_k is None else excess_by_k[k])
         if not (lo <= v <= hi):
             bad.append((g, k, d))
     return bad

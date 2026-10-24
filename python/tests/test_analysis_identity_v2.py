@@ -285,6 +285,8 @@ NOT_RUNNERS = {
     "tools/verify_signatures.py",
     # F3 acceptance: the pre-execution verification script (verifies the signed prereg, runs no analysis)
     "research/v118/f3_accept/execution_preflight.py",
+    # F3 power study: the freeze-consistency check reads the bound hashes of the signed acceptance prereg (runs no analysis)
+    "research/v118/f3_power/check_freeze.py",
 }
 
 

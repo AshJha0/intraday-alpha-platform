@@ -177,7 +177,8 @@ def integrity(
         for k in decl["families"]:
             for j, d in enumerate(grid):
                 phat[(g, k, d)] = rec["counts"][f"K{k}"][j] / n
-    bad = pm.integrity_violations(float(decl["alpha_op"]), phat, tau)
+    declared = {int(k): float(v) for k, v in decl["integrity"]["excess"]["value_by_K"].items()}
+    bad = pm.integrity_violations(float(decl["alpha_op"]), phat, tau, declared)
     return {
         "status": "PASS" if not bad else "VOID",
         "regime": decl["integrity"]["regime"],

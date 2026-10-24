@@ -31,7 +31,7 @@ First-crossing linear interpolation (`power_math.mde_point`); non-monotone curve
 
 ## 5. Programming-integrity diagnostic (evaluated first)
 
-For every a0 (G, K, d): `pi_ref - tau <= power <= min(1, pi_ref + excess) + tau`, tau = 0.025 (five times the worst-case Monte Carlo standard error). On any violation the
+For every a0 (G, K, d): `pi_ref - tau <= power <= min(1, pi_ref + excess) + tau`, tau = 0.025, a **heuristic tolerance** (numerically five times the worst-case binomial standard error 0.005 at n = 10,000), not a simultaneous confidence guarantee across the grid and not evidence of calibration. `excess_K = 1 - (1 - alpha_op/K)^(K-1)` is fully specified in `declaration.json` (`integrity.excess`: 0.0132889 for K = 3, 0.0165559 for K = 6, 0.0185868 for K = 16). On any violation the
 run is **VOID (programming integrity)**: DECISION.json records `VOID_INTEGRITY` and the offending combinations, no power table, MDE80 or ratio is produced, no estimate may
 be cited, and a corrected package needs the full sign-off route with fresh seeds. It is a code check, not a hypothesis test.
 
