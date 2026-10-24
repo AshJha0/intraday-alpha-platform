@@ -287,6 +287,8 @@ NOT_RUNNERS = {
     "research/v118/f3_accept/execution_preflight.py",
     # F3 power study: the freeze-consistency check reads the bound hashes of the signed acceptance prereg (runs no analysis)
     "research/v118/f3_power/check_freeze.py",
+    # F3 power study: the pre-execution verification script (verifies the signed prereg, runs no analysis)
+    "research/v118/f3_power/execution_preflight.py",
 }
 
 

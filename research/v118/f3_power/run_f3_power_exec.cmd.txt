@@ -1,0 +1,21 @@
+@echo off
+REM F3 power diagnostic: the single authorised execution (reviewer pre-execution decision 2026-10-24).
+REM Launcher kept outside the repository; a copy is filed with the results. Runs the signed protocol as the non-signing runner.
+setlocal
+set IAP_RUN_ACTOR=claude-queue-runner
+set IAP_MAINTAINER_KEY=
+set IAP_SIGNING_KEY=
+set IAP_AGENT_PRIVATE_KEY=
+set IAP_KEYFILE=
+set REPO=C:\Work\Claude\intraday-alpha-platform\wt-f3-power-exec
+set LOG=%REPO%\research\v118\f3_power\run_f3_power.log
+set PYTHONPATH=%REPO%\python\src
+set PYTHONUTF8=1
+set PY=%REPO%\.venv-ci\Scripts\python.exe
+cd /d "%REPO%"
+echo START %DATE% %TIME% actor %IAP_RUN_ACTOR% >> "%LOG%"
+git rev-parse HEAD >> "%LOG%" 2>&1
+"%PY%" research\v118\f3_power\run_f3_power.py run >> "%LOG%" 2>&1
+set RC=%ERRORLEVEL%
+echo EXIT %RC% %DATE% %TIME% >> "%LOG%"
+endlocal & exit /b %RC%
