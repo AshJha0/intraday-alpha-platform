@@ -1,5 +1,6 @@
 # Changelog
 
+- Post-release: REL-08 v2 evaluation path (unsigned, nothing run on real data): `python/src/iap/research/rel08_screen_v2.py` adds the within-session C1 gap, the >= 2 usable rebalances per qualifying session rule, five-of-six session coverage, within-session block resampling with the six sessions fixed, and a pure six-session driver; the v1 screen path is unchanged. Solver tests (convergence, turnover cap, never worse than hold, iteration-count monotonicity) in `python/tests/test_v118_rel08_v2_solver.py`; the real V1/V5 trade-size gap stays unexplained. No signer or real-data loader yet.
 Release notes for tagged versions, newest first. The v1.3.0 to v1.6.0
 entries are written in the repository; notes for v1.1.1 and v1.2.0 are copied from their GitHub
 releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
