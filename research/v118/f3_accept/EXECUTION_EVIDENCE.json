@@ -1,0 +1,50 @@
+{
+  "checkout_clean": false,
+  "checkout_head": "acf1015a1aa9b2ee05fa86e829d41f58014053ee",
+  "checks": {
+    "1_prereg_sha256": {
+      "actual": "abe85c3ad93ebdd7381a6a907b018f840dc626638b157c01f408a72f01af2607",
+      "expected": "abe85c3ad93ebdd7381a6a907b018f840dc626638b157c01f408a72f01af2607",
+      "ok": true
+    },
+    "2_signature": {
+      "maintainer": "ashjha0",
+      "ok": true,
+      "public_key": "02a3e278cda3efac7dcd266fb8a3821a1415f0725a73f8b255aac84083c2106c",
+      "trust_root": "research/agents/trust_roots.json"
+    },
+    "3_bound_commit_ancestor": {
+      "expected": "24eac89be177a357b6df54c4992142467c6351ff",
+      "ok": true,
+      "prereg_commit": "24eac89be177a357b6df54c4992142467c6351ff"
+    },
+    "4_bound_hashes": {
+      "code_tree_sha256": "f24dfab4f656cd2803b396924a0609bc0c07965f1acc696b6b0ee9af388fd7da",
+      "configs_tree_sha256": "290b38d8871961c28e81db59ca9cf95791a213acd33461d667de873b907ad7b0",
+      "deps_lock_sha256": "2f68340d1a5c28871356287b00f5af907dd94f429c2551dac5cee0a3a114c18e",
+      "identity_sha256": "3a34472f6554ffd42ecb1497cd44db36b6734f79ade1e9485f0c7fbaad652995",
+      "market_data_consumed": false,
+      "ok": true,
+      "protocol_sha256": "8be620e3d161d634c0e612f1f25369ac67a1212d0871246df5852d40b2a9e544",
+      "scripts": {
+        "research/v118/f3_accept/check_freeze.py": "36e68bf013773daa084e2665657b44172400295396eb411284c1a8493c565b0f",
+        "research/v118/f3_accept/core.py": "e17cf0719d9d26c6b714b824f065ab624ae0353c5d4f9358e1849b458a1368c2",
+        "research/v118/f3_accept/declaration.json": "41211a5060ac79b7d3828548c40f0397f7e907405777b9435301c573207e3a15",
+        "research/v118/f3_accept/joint_bound.py": "6e133384a6d520bc1ce56e01a8c7847a3e7ebfb7a98dc241f84baefba6507e0d",
+        "research/v118/f3_accept/run_f3_accept.py": "f66447f19432310db237e2a69f8bdbc0894aa4a0e8d0b84ab2c7a44cf23c1e53"
+      }
+    },
+    "5_runner_and_state": {
+      "actor": "claude-queue-runner",
+      "cell_files_present": [],
+      "decision_json_exists": false,
+      "note": "the runner process is given no key variable and no key path; the maintainer keyfile of the signer exists on the same machine under the owner's home directory and is not read by this runner",
+      "ok": true,
+      "signer": "ashjha0",
+      "signing_env_vars_set": []
+    }
+  },
+  "kind": "f3_accept_execution_evidence",
+  "ok": true,
+  "utc": "2026-10-24T15:31:18Z"
+}

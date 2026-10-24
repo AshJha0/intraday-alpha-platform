@@ -1,0 +1,12 @@
+{
+  "commit_bound": "24eac89be177a357b6df54c4992142467c6351ff",
+  "identity_sha256": "3a34472f6554ffd42ecb1497cd44db36b6734f79ade1e9485f0c7fbaad652995",
+  "market_data_consumed": false,
+  "pid": 18684,
+  "prereg": "research/preregs/f3_accept_prereg.json",
+  "prereg_sha256": "abe85c3ad93ebdd7381a6a907b018f840dc626638b157c01f408a72f01af2607",
+  "runner_actor": "claude-queue-runner",
+  "signer": "ashjha0",
+  "started_utc": "2026-10-24T15:31:21Z",
+  "workers": 3
+}
