@@ -1,0 +1,7 @@
+START built 57.1 s
+C:\Work\Claude\intraday-alpha-platform\wt-f3\research\v118\f3_diagnostic\build_matrices.py:66: RuntimeWarning: Mean of empty slice
+  p = np.nanmean(gr, axis=1, keepdims=True)  # (name, 1, cell)
+variant V0 done 62.7 s
+variant V1 done 67.0 s
+variant V2 done 71.2 s
+DONE research\v118\f3_diagnostic\matrices.npz
