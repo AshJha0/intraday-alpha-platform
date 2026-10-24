@@ -380,7 +380,13 @@ class ExperimentLedger:
         return PINNED_ALPHA / n
 
     def bonferroni_t_threshold(self) -> float:
-        """|t| needed for two-sided significance at the Bonferroni level."""
+        """|t| needed for two-sided significance at the Bonferroni level.
+
+        REPORT-ONLY since v1.19 R1 (defect D-01): the normal-Bonferroni
+        threshold still sets the walk-forward ITERATE/REJECT gate t and the
+        deflated-Sharpe yardstick, but no path can turn it into PROMOTE; the
+        confirmatory verdict is :func:`iap.validation.confirmatory.decide`
+        (Student t on session values, Holm at alpha_op)."""
         p = self.bonferroni_threshold() / 2.0
         return abs(_norm_ppf(p))
 

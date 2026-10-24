@@ -130,7 +130,18 @@ def test_gate_requires_t_threshold_dsr_and_positive_ic():
     assert not rc.gate(0.05, 6.0, 5.0, None)["passed"]
     assert not rc.gate(-0.05, 6.0, 5.0, 0.99)["passed"]
     ok = {"gate_eligible": True}
-    assert rc.verdict(True, rc.gate(0.05, 6.0, 5.0, 0.99), ok) == "confirmed"
+    # v1.19 R1: the legacy HAC-t gate alone is at most `ineligible`; `confirmed`
+    # needs the canonical gate's PROMOTE (a Verdict whose token decide() minted)
+    assert rc.verdict(True, rc.gate(0.05, 6.0, 5.0, 0.99), ok) == "ineligible"
+
+    class _Promote:
+        is_promote = True
+
+    class _Reject:
+        is_promote = False
+
+    assert rc.verdict(True, rc.gate(0.05, 6.0, 5.0, 0.99), ok, _Promote()) == "confirmed"
+    assert rc.verdict(True, rc.gate(0.05, 6.0, 5.0, 0.99), ok, _Reject()) == "ineligible"
     assert rc.verdict(True, rc.gate(0.05, 1.0, 5.0, 0.99), ok) == "rejected"
     assert rc.verdict(False, rc.gate(0.05, 6.0, 5.0, 0.99), ok) == "no_result"
 
