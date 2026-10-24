@@ -175,9 +175,19 @@ def series_stats_within(
 
 
 def evaluate_variant_v2(
-    data: rs.ScreenData, rule: Rule, variant: Mapping[str, Any]
+    data: rs.ScreenData,
+    rule: Rule,
+    variant: Mapping[str, Any],
+    short_circuit: bool = False,
 ) -> dict[str, Any]:
-    """Every statistic of one variant under the v2 definitions (raw; :func:`criteria_v2` judges it)."""
+    """Every statistic of one variant under the v2 definitions (raw; :func:`criteria_v2` judges it).
+
+    ``short_circuit`` (pure speed, decision unchanged): when C1, C2, C4 or C3 already settles the
+    outcome (``underpowered`` or ``stop`` before C5-C8 are consulted by the decision map), the two
+    extra books behind C6 and C7 are not run; ``influential_removed_net_bps`` and
+    ``alt_normalisation_net_bps`` are then NaN and ``robustness_books_computed`` is False.  Every
+    other field is bit-identical to the full evaluation.
+    """
     suff = rule.section("sufficiency")
     costs = rule.section("costs")
     th = rule.thresholds
@@ -260,6 +270,12 @@ def evaluate_variant_v2(
     ]
     keep_ids = [i for i in ids if i not in top]
     out["influential_removed_net_bps"] = float("nan")
+    out["alt_normalisation_net_bps"] = float("nan")
+    early = criteria_v2(out, rule)
+    if short_circuit and not (early["C1"] and early["C2"] and early["C4"] and early["C3"]):
+        out["robustness_books_computed"] = False
+        return out
+    out["robustness_books_computed"] = True
     if len(keep_ids) >= names_min:
         cfg6 = rs.book_config(rule, variant, names_min)
         g6 = rs._grid(data, keep_ids, cfg6)
@@ -335,6 +351,7 @@ def run_screen_v2(
     rule: Rule,
     expected_days: Sequence[int],
     variant_ids: Sequence[str] | None = None,
+    short_circuit: bool = False,
 ) -> dict[str, Any]:
     """Evaluate the registered variants over the fixed sessions and decide (no ledger, no I/O).
 
@@ -343,7 +360,7 @@ def run_screen_v2(
     """
     check_sessions(data, expected_days)
     results = [
-        evaluate_variant_v2(data, rule, v)
+        evaluate_variant_v2(data, rule, v, short_circuit)
         for v in rule.variants
         if variant_ids is None or v["id"] in variant_ids
     ]
