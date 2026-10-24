@@ -5,7 +5,7 @@ Run only after the plan PR and the implementation (iap.research.rel08_screen_v2)
 
     python run_calibration.py cell   --out DIR [--cells N1S1,...] [--reps 200] [--workers 2]
     python run_calibration.py power  --out DIR [--reps 30]
-    python run_calibration.py timing                      # 3 replications of N1S1, prints elapsed only
+    python run_calibration.py timing                      # 4 screens (seeds 20269000+i), prints seconds only
     python run_calibration.py report --out DIR            # tables from the per-cell JSON
 
 Seeds (plan section 3): dataset seed = 20261100 + 1000 * cell_index + r; bootstrap seed = the rule's.
@@ -172,9 +172,9 @@ def screen(data: rs.ScreenData, rule, model: str, seed: int) -> dict[str, Any]:
     days = sorted(int(d) for d in data.session_close())
     if model == "N3":
         with _SignedScores(seed):
-            out = v2.run_screen_v2(data, rule, days)
+            out = v2.run_screen_v2(data, rule, days, short_circuit=True)
     else:
-        out = v2.run_screen_v2(data, rule, days)
+        out = v2.run_screen_v2(data, rule, days, short_circuit=True)
     rows = []
     for st, dec in zip(out["variants"], out["decisions"], strict=True):
         net = st.get("net_bps") or {}
@@ -327,10 +327,13 @@ def main(argv: list[str] | None = None) -> int:
     elif a.stage == "power":
         run_power(a.out, a.reps or 30, a.workers)
     elif a.stage == "timing":
-        t0 = time.time()
-        for i in range(3):  # outputs discarded unread; only the elapsed time is printed
-            _job(("null", "N1", 1.0, TIMING_BASE_SEED + i, 0.0, DRAWS))
-        print(f"elapsed {time.time() - t0:.0f} s for 3 replications")
+        t0 = (
+            time.time()
+        )  # 4 screens on the workers; outputs discarded unread, only seconds are printed
+        jobs = [("null", "N1", 1.0, TIMING_BASE_SEED + i, 0.0, DRAWS) for i in range(4)]
+        with ProcessPoolExecutor(max_workers=max(1, a.workers)) as ex:
+            secs = [round(r["sec"]) for r in ex.map(_job, jobs)]
+        print(f"per-screen s {secs}; elapsed {time.time() - t0:.0f} s for 4 screens")
     else:
         print(report(a.out))
     return 0
