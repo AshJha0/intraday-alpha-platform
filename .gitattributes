@@ -32,3 +32,4 @@ research/v118/rel04_verify/*.cmd text eol=crlf
 
 # REL-04c: cmd.exe needs CRLF (a LF .cmd mis-parses labels / goto).
 research/execution/rel04c/*.cmd text eol=crlf
+research/v118/f3_accept/*.cmd text eol=crlf
