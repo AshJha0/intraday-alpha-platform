@@ -1,5 +1,7 @@
 # REL-08 v2 prospective synthetic-null calibration plan, REVISION 2 (UNSIGNED, freeze-ready for review; nothing has been run)
 
+> **Amended 2026-10-24 by the reviewer's revision-3 decision** (`docs/release/REVIEWER_REL08_V2_REV3_DECISION_2026-10-24.md`): the checkpoint at 100 is **operational only** (progress, integrity, resources; no counts, bounds or PASS/FAIL), and execution integrity (frozen identity, seeds, resume/void/completed, result schema, audit trail) is governed by `REL08_V2_EXECUTION_PROTOCOL.md`. Sections 0.1, 2, 5 and 9 below are corrected accordingly; where they differ from earlier wording, the protocol governs.
+
 **Status: revision 2 of `REL08_V2_CALIBRATION_PLAN.md` (which stays in the repo, unchanged below its revision header), 2026-10-24. Calibration execution is NOT
 authorised until the outside reviewer authorises it.** No calibration number exists. It answers the reviewer's decision on the amendment
 (`docs/release/REVIEWER_REL08_V2_AMENDMENT_DECISION_2026-10-24.md`). It reads no real session, tunes no threshold, changes no parameter, and
@@ -9,7 +11,7 @@ changes neither the v1 rule nor its recorded result. The amendment proposal (`RE
 ## 0. What this revision changes relative to the original plan
 
 1. **One confirmatory policy: Option B, executed as a staged run with a NON-DECISIONAL checkpoint.** Fixed sample: **R = 200 per mandatory
-   cell**. After the first 100 replications of every gating cell a checkpoint report is written, labelled non-decisional; the run then
+   cell**. After the first 100 replications of every gating cell an OPERATIONAL checkpoint is written (progress, integrity status, resource usage; no outcome, count, bound or PASS/FAIL); the run then
    continues **automatically to 200 whatever the checkpoint shows**. The confirmatory decision is made **only** from the completed 200 per cell. The checkpoint is
    never used to stop, extend, shorten, re-seed or tune, and it is not a second look at the gate (no PASS or FAIL is declared from it). The early-stop rule of the
    amendment proposal is withdrawn.
@@ -39,19 +41,17 @@ reported, what a result can and cannot mean) is the original plan's text and is 
 | dataset seeds | null cell *i* (order N1S1, N1S4, N2S1, N2S4, N3S1, N3S4, N4S1, N4S4): 20261100 + 1000 *i* + *r*, *r* = 0..199; power: 20268500 + 100 *k* + *r*, *r* = 0..29 |
 | bootstrap | the rule's seed (20261020) and 9,999 draws, within-session resampling with the six sessions fixed |
 | code under test | the implementation in main; the commit is recorded in the results file |
-| execution | `python run_calibration.py all --out DIR --workers 2` (resumable by seed); order: gating cells r 0-99, checkpoint report, gating cells r 100-199, N4, power |
+| execution | `python run_calibration.py all --freeze execution_manifest.json --out DIR --workers 2` (resumable, verified); order: gating cells r 0-99, operational checkpoint, gating cells r 100-199, N4, power, finalize |
 | cost | measured 272 s per screen (4 timing screens, seeds 20269000-20269003, outside the plan); about 60 h for the null screens on 2 workers (3 workers only if free RAM allows), plus the power check |
 
 Stop rules are the original plan's: one execution; a crash or environment failure is repaired and the **identical** cells re-run with the same seeds, recorded;
 no cell is re-run because of its result, no seed is changed, no cell dropped or added, R not changed after a result is seen. If a gating cell has already exceeded
 the criterion-A limit (more than 4 family events in 200) the run still completes. Resource rules: free RAM >= 4 GB, jobs over about 10 minutes launched detached.
 
-## 2. Checkpoint (non-decisional)
+## 2. Checkpoint (operational only)
 
-`checkpoint_100_NONDECISIONAL.md` is written after the first 100 replications of each gating cell (the same table as the final report, restricted to r = 0..99). It carries the
-label "NON-DECISIONAL checkpoint; never used to stop, extend or tune". It exists to give the reviewer and the coordinator early engineering information (does the run behave
-as designed, are rates anywhere near the bounds). Nothing in the run reads it. The final report contains the 200-replication tables and may display the first-100 tables as a
-separately labelled section; the verdict uses only the 200.
+`checkpoint_100_operational.json` is written after the first 100 replications of each gating cell. It records only progress counts per unit, the integrity status (number of verification problems) and resource usage (elapsed time, free RAM). It computes and shows **no
+false-continuation count, confidence bound, rate or PASS/FAIL**, and nothing in the run reads it. The earlier wording of this section (interim tables of the first 100) is withdrawn: the final report has the 200-replication tables only.
 
 ## 3. Acceptance criterion for the confirmatory decision (unchanged from the original plan, fixed sample R = 200)
 
@@ -83,7 +83,7 @@ protocol). The power-side check, if it shows low power, is reported as low power
 
 The decision depends only on the completed 200 per gating cell; the run does not branch on any interim number (`run_calibration.py all` contains no conditional on results,
 which a reader can verify). The reviewer's cautions about optional continuation (stopping at 100 on a favourable result, extending on an unfavourable one) therefore do not
-apply: there is no stopping and no optional extension. The first-100 outputs are a subset of the 200 and are labelled accordingly.
+apply: there is no stopping and no optional extension. The first 100 replications of each cell are simply the first half of the 200; no interim statistic of them is computed.
 
 ## 6. Short-circuit evidence (decision-equivalence)
 
@@ -115,5 +115,5 @@ unexplained and is not interpreted.
 
 ## 9. What would be filed
 
-`research/v118/rel08/calibration/results/`: per-cell JSON (one record per replication x variant: outcome, criteria flags, lower bound, SE, seed), `checkpoint_100_NONDECISIONAL.md`, the final
+the execution output directory: per-cell JSON (one stamped record per replication with the seven variants' outcome, criteria flags, lower bound, SE, seed), `checkpoint_100_operational.json`, `result.json` (gate separated from information-only material), `COMPLETED.json`, `audit_log.jsonl`, the final
 report tables per section 4, the verdict per section 3, the code commit, the plan and manifest hashes, and any deviation (the stopped first launch is listed as one). Small files only.

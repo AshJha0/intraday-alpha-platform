@@ -289,6 +289,8 @@ NOT_RUNNERS = {
     "research/v118/f3_power/check_freeze.py",
     # F3 power study: the pre-execution verification script (verifies the signed prereg, runs no analysis)
     "research/v118/f3_power/execution_preflight.py",
+    # REL-08 v2 calibration freeze: reads the analysis-identity environment block to bind an UNSIGNED execution manifest (no signed prereg, no analysis)
+    "research/v118/rel08/calibration/freeze.py",
 }
 
 

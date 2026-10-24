@@ -1,15 +1,20 @@
-"""REL-08 v2 synthetic-null calibration runner (plan: ../REL08_V2_CALIBRATION_PLAN.md).
+"""REL-08 v2 synthetic-null calibration runner (plan: ../REL08_V2_CALIBRATION_PLAN_REV2.md; execution protocol:
+../REL08_V2_EXECUTION_PROTOCOL.md).
 
-PREPARED, NOT RUN.  Reads no real data (every frame is generated in memory), writes only under --out.
-Run only after the plan PR and the implementation (iap.research.rel08_screen_v2) are in main.
+Reads no real data (every frame is generated in memory), writes only under --out.  Launch only after the reviewer authorises it.
 
-    python run_calibration.py cell   --out DIR [--cells N1S1,...] [--reps 200] [--workers 2]
-    python run_calibration.py power  --out DIR [--reps 30]
-    python run_calibration.py timing                      # 4 screens (seeds 20269000+i), prints seconds only
-    python run_calibration.py report --out DIR            # tables from the per-cell JSON
+    python run_calibration.py all      --freeze execution_manifest.json --out DIR [--workers 2]
+    python run_calibration.py cell     --freeze ... --out DIR [--cells N1S1,...] [--r-from 0] [--reps 200]   (partial; same guards)
+    python run_calibration.py power    --freeze ... --out DIR
+    python run_calibration.py finalize --freeze ... --out DIR       # result.json + COMPLETED.json iff every unit is complete
+    python run_calibration.py verify   --freeze ... --out DIR       # verify stored replications (resume policy)
+    python run_calibration.py manifest                               # the machine-readable accounting (JSON)
+    python run_calibration.py timing                                 # 4 screens (seeds 20269000+i), prints seconds only
 
-Seeds (plan section 3): dataset seed = 20261100 + 1000 * cell_index + r; bootstrap seed = the rule's.
-Resumable: a finished (cell, r) record is never recomputed; the cells and seeds are fixed in this file.
+Every run stage first recomputes the frozen identity in this checkout and refuses on any difference; every stored replication is stamped with
+the identity, its unit and a content hash; resume verifies them and refuses (study VOID) on any invalid, duplicate or foreign record; a
+COMPLETED study is never rerun.  The checkpoint at 100 per gating cell is OPERATIONAL ONLY (progress, integrity, resources).
+Seeds: dataset seed = 20261100 + 1000 * cell_index + r; bootstrap seed = the rule's.
 """
 
 from __future__ import annotations
@@ -35,6 +40,19 @@ _spec = importlib.util.spec_from_file_location(
 )
 dr = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(dr)
+
+
+def _load_sibling(name: str):
+    spec = importlib.util.spec_from_file_location(f"rel08_v2_{name}", HERE / f"{name}.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[f"rel08_v2_{name}"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+ig = _load_sibling("integrity")
+fz = _load_sibling("freeze")
+REPO = HERE.parents[3]
 
 MODELS = ("N1", "N2", "N3", "N4")
 SPREADS = {"S1": 1.0, "S4": 4.0}
@@ -235,92 +253,53 @@ def _write(p: Path, recs: list[dict[str, Any]]) -> None:
     tmp.replace(p)
 
 
-def run_cells(out: Path, cells: list[str], r_from: int, r_to: int, workers: int) -> None:
-    """Replications r_from .. r_to - 1 of each cell (resumable by seed)."""
-    out.mkdir(parents=True, exist_ok=True)
+def frozen_identity(root: Path, manifest_path: Path) -> str:
+    """The frozen identity, after recomputing it in this checkout; refuses on any difference."""
+    ok, now, frozen = fz.identity_matches(root, manifest_path)
+    if not ok:
+        raise SystemExit(
+            f"REFUSED: this checkout's identity {now[:16]} differs from the frozen {frozen[:16]} (run freeze.py verify)"
+        )
+    return frozen
+
+
+def _run_unit(
+    out: Path, unit: str, file: str, jobs: list[tuple], workers: int, identity: str
+) -> None:
+    path = out / file
+    recs = _load(path)
+    done = {r["seed"] for r in recs if r.get("unit") == unit}
+    jobs = [j for j in jobs if j[3] not in done]
+    if not jobs:
+        return
+    if workers <= 1:
+        it = map(_job, jobs)
+    else:
+        ex = ProcessPoolExecutor(max_workers=workers)
+        it = ex.map(_job, jobs)
+    for rec in it:
+        recs.append(ig.stamp(rec, identity, unit))
+        _write(path, recs)
+        print(unit, sum(r.get("unit") == unit for r in recs), flush=True)
+
+
+def run_cells(
+    out: Path, cells: list[str], r_from: int, r_to: int, workers: int, identity: str
+) -> None:
+    """Replications r_from .. r_to - 1 of each cell (resumable by seed; stamped and verified)."""
     for cell in cells:
         ci = CELLS.index(cell)
         model, sp = cell[:2], SPREADS[cell[2:]]
-        path = out / f"cell_{cell}.json"
-        recs = _load(path)
-        done = {r["seed"] for r in recs}
         jobs = [
-            ("null", model, sp, BASE_SEED + 1000 * ci + r, 0.0, DRAWS)
-            for r in range(r_from, r_to)
-            if BASE_SEED + 1000 * ci + r not in done
+            ("null", model, sp, BASE_SEED + 1000 * ci + r, 0.0, DRAWS) for r in range(r_from, r_to)
         ]
-        if workers <= 1:
-            it = map(_job, jobs)
-        else:
-            ex = ProcessPoolExecutor(max_workers=workers)
-            it = ex.map(_job, jobs)
-        for rec in it:
-            rec["cell"] = cell
-            recs.append(rec)
-            _write(path, recs)
-            print(cell, len(recs), flush=True)
+        _run_unit(out, cell, f"cell_{cell}.json", jobs, workers, identity)
 
 
-def run_power(out: Path, reps: int, workers: int) -> None:
-    out.mkdir(parents=True, exist_ok=True)
-    cases = POWER_CASES
-    path = out / "power.json"
-    recs = _load(path)
-    done = {(r["kind"], r["amp"], r["seed"]) for r in recs}
-    for ki, (kind, amp) in enumerate(cases):
-        jobs = [
-            (kind, "N1", 1.0, POWER_BASE_SEED + 100 * ki + r, amp, DRAWS)
-            for r in range(reps)
-            if (kind, amp, POWER_BASE_SEED + 100 * ki + r) not in done
-        ]
-        with ProcessPoolExecutor(max_workers=max(1, workers)) as ex:
-            for rec in ex.map(_job, jobs):
-                recs.append(rec)
-                _write(path, recs)
-                print("power", kind, amp, len(recs), flush=True)
-
-
-def cp_upper(k: int, n: int, conf: float = 0.95) -> float:
-    """One-sided Clopper-Pearson upper bound (bisection on the binomial CDF)."""
-    if n == 0:
-        return float("nan")
-    if k >= n:
-        return 1.0
-    lo, hi = 0.0, 1.0
-    for _ in range(80):
-        mid = (lo + hi) / 2
-        cdf = sum(math.comb(n, i) * mid**i * (1 - mid) ** (n - i) for i in range(k + 1))
-        lo, hi = (mid, hi) if cdf > 1 - conf else (lo, mid)
-    return hi
-
-
-def report(out: Path, upto: int | None = None, label: str = "") -> str:
-    """Per-cell table from the first ``upto`` replications (default all); ``label`` goes above it."""
-    lines = [label] if label else []
-    lines += [
-        "| cell | reps | family events | family rate | family CP upper | family CP upper (Bonferroni 1-0.05/6, info only) | variant continue | variant C3 pass | pooled variant C3 upper |",
-        "|---|---|---|---|---|---|---|---|---|",
-    ]
-    for cell in CELLS:
-        recs = sorted(_load(out / f"cell_{cell}.json"), key=lambda r: r["seed"])
-        if upto is not None:
-            recs = recs[:upto]
-        if not recs:
-            continue
-        n = len(recs)
-        fam = sum(
-            any(v["outcome"] in ("continue", "passed_not_expanded") for v in r["variants"])
-            for r in recs
-        )
-        vc = sum(
-            v["outcome"] in ("continue", "passed_not_expanded") for r in recs for v in r["variants"]
-        )
-        c3 = sum(bool(v["criteria"]["C3"]) for r in recs for v in r["variants"])
-        nv = sum(len(r["variants"]) for r in recs)
-        lines.append(
-            f"| {cell} | {n} | {fam} | {fam / n:.4f} | {cp_upper(fam, n):.4f} | {cp_upper(fam, n, 1 - 0.05 / 6):.4f} | {vc} | {c3} | {cp_upper(c3, nv):.4f} |"
-        )
-    return "\n".join(lines) + "\n"
+def run_power(out: Path, reps: int, workers: int, identity: str) -> None:
+    for ki, (kind, amp) in enumerate(POWER_CASES):
+        jobs = [(kind, "N1", 1.0, POWER_BASE_SEED + 100 * ki + r, amp, DRAWS) for r in range(reps)]
+        _run_unit(out, f"power_{kind}_{amp}", "power.json", jobs, workers, identity)
 
 
 def manifest() -> dict[str, Any]:
@@ -382,44 +361,66 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument("stage", choices=("cell", "power", "timing", "report", "all", "manifest"))
-    ap.add_argument("--out", type=Path, default=HERE / "results")
+    ap.add_argument(
+        "stage", choices=("all", "cell", "power", "finalize", "verify", "timing", "manifest")
+    )
+    ap.add_argument("--out", type=Path, default=HERE / "results_exec")
+    ap.add_argument("--freeze", type=Path, default=None, help="execution_manifest.json")
+    ap.add_argument("--root", type=Path, default=REPO)
     ap.add_argument("--cells", default=",".join(CELLS))
     ap.add_argument("--reps", type=int, default=None)
     ap.add_argument("--r-from", type=int, default=0)
-    ap.add_argument("--upto", type=int, default=None)
     ap.add_argument("--workers", type=int, default=2)
     a = ap.parse_args(argv)
-    if a.stage == "cell":
-        cells = a.cells.split(",")
-        if any(c not in CELLS for c in cells):
-            raise SystemExit(f"cells must be among {CELLS}")
-        run_cells(a.out, cells, a.r_from, a.reps or R_FULL, a.workers)
-    elif a.stage == "all":
-        # The whole confirmatory plan, no decision points: gating cells 0-99, an automatic
-        # NON-DECISIONAL checkpoint report, gating cells 100-199 whatever it shows, then N4 and power.
-        run_cells(a.out, GATING_CELLS, 0, R_CHECKPOINT, a.workers)
-        note = "NON-DECISIONAL checkpoint (first 100 per gating cell); never used to stop, extend or tune.\n"
-        (a.out / "checkpoint_100_NONDECISIONAL.md").write_text(
-            report(a.out, R_CHECKPOINT, note), encoding="utf-8"
-        )
-        run_cells(a.out, GATING_CELLS, R_CHECKPOINT, R_FULL, a.workers)
-        run_cells(a.out, [c for c in CELLS if c not in GATING_CELLS], 0, R_FULL, a.workers)
-        run_power(a.out, POWER_REPS, a.workers)
-    elif a.stage == "manifest":
+    if a.stage == "manifest":
         print(json.dumps(manifest(), indent=1))
-    elif a.stage == "power":
-        run_power(a.out, a.reps or POWER_REPS, a.workers)
-    elif a.stage == "timing":
-        t0 = (
-            time.time()
-        )  # 4 screens on the workers; outputs discarded unread, only seconds are printed
+        return 0
+    if a.stage == "timing":
+        t0 = time.time()  # 4 screens; outputs discarded unread, only seconds are printed
         jobs = [("null", "N1", 1.0, TIMING_BASE_SEED + i, 0.0, DRAWS) for i in range(4)]
         with ProcessPoolExecutor(max_workers=max(1, a.workers)) as ex:
             secs = [round(r["sec"]) for r in ex.map(_job, jobs)]
         print(f"per-screen s {secs}; elapsed {time.time() - t0:.0f} s for 4 screens")
-    else:
-        print(report(a.out, a.upto))
+        return 0
+    if a.freeze is None:
+        raise SystemExit("REFUSED: --freeze execution_manifest.json is required")
+    m = manifest()
+    identity = frozen_identity(a.root, a.freeze)
+    out = a.out
+    if a.stage == "verify":
+        v = ig.verify_outputs(out, m, identity)
+        print(json.dumps(v, indent=1))
+        return 0 if not v["problems"] else 1
+    if a.stage == "finalize":
+        res = ig.finalize(out, m, identity)
+        print(res["gate"]["verdict"])
+        return 0
+    ram = fz.available_ram_gb()
+    if ram is not None and ram < fz.MIN_FREE_RAM_GB:
+        raise SystemExit(f"REFUSED: free RAM {ram:.1f} GB < {fz.MIN_FREE_RAM_GB} GB")
+    started = time.time()
+    counts = ig.guard_start(out, m, identity)
+    ig.audit(
+        out,
+        "start",
+        identity,
+        {"stage": a.stage, "workers": a.workers, "valid_counts_at_start": counts},
+    )
+    if a.stage == "cell":
+        cells = a.cells.split(",")
+        if any(c not in CELLS for c in cells):
+            raise SystemExit(f"cells must be among {CELLS}")
+        run_cells(out, cells, a.r_from, a.reps or R_FULL, a.workers, identity)
+    elif a.stage == "power":
+        run_power(out, POWER_REPS, a.workers, identity)
+    else:  # all: the whole fixed-sample plan; no step depends on any outcome
+        run_cells(out, GATING_CELLS, 0, R_CHECKPOINT, a.workers, identity)
+        if not (out / "checkpoint_100_operational.json").is_file():
+            ig.checkpoint_operational(out, m, identity, fz.available_ram_gb(), started)
+        run_cells(out, GATING_CELLS, R_CHECKPOINT, R_FULL, a.workers, identity)
+        run_cells(out, [c for c in CELLS if c not in GATING_CELLS], 0, R_FULL, a.workers, identity)
+        run_power(out, POWER_REPS, a.workers, identity)
+        ig.finalize(out, m, identity)
     return 0
 
 
