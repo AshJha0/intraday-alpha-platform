@@ -282,6 +282,8 @@ NOT_RUNNERS = {
     "tools/prereg_bind_identity.py",
     "tools/rel08_rule_sign.py",
     "tools/verify_signatures.py",
+    # F3 acceptance: the pre-execution verification script (verifies the signed prereg, runs no analysis)
+    "research/v118/f3_accept/execution_preflight.py",
 }
 
 

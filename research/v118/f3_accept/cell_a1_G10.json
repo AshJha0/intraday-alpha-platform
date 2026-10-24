@@ -1,0 +1,19 @@
+{
+  "G": 10,
+  "chunk": 10000,
+  "chunk_counts_sha256": "f44df9935b59ead126cc53171ff52bfe10d22a0a7e1b3c493daaa121c692c64e",
+  "cpu_wall_s": 1.1626956000109203,
+  "identity_sha256": "3a34472f6554ffd42ecb1497cd44db36b6734f79ade1e9485f0c7fbaad652995",
+  "n": 50000,
+  "n_chunks": 5,
+  "nan_p": 0,
+  "prereg_sha256": "abe85c3ad93ebdd7381a6a907b018f840dc626638b157c01f408a72f01af2607",
+  "regime": "a1",
+  "rejections": {
+    "K16": 772,
+    "K3": 894,
+    "K6": 839
+  },
+  "rng_final_state": 14918771294576312708,
+  "seed": 20291140
+}
