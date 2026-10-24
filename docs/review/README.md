@@ -13,6 +13,12 @@
 | baseline identities and document states | [BASELINE_v1_19.md](BASELINE_v1_19.md) |
 | data-route priced proposal (stage 0-A, B2a) | [DATA_ROUTE_PROPOSAL_v1.19.md](DATA_ROUTE_PROPOSAL_v1.19.md) |
 
+## v2.0 stage 1, session A (R0-R5)
+
+| item | file |
+|---|---|
+| R0 confirmatory test specification, frozen (reviewer freeze decision 2026-10-24, sha256 `900d9e73...` of the text behind the path header; `python/tests/spec/test_r0_frozen.py` re-hashes it) | [../../python/tests/spec/CONFIRMATORY_TEST_SPEC.md](../../python/tests/spec/CONFIRMATORY_TEST_SPEC.md) |
+
 ## Reproduction result (2026-10-18, `tools/reproduce_baseline.py`)
 
 - **At the bound commit `8fb189b` (REL-01): REPRODUCED.** Fresh clone from GitHub, venv from the
