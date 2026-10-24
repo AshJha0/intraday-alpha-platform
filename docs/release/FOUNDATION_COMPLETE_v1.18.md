@@ -56,3 +56,5 @@ the owner's written delegation of 2026-10-23 (session chat), date 2026-10-23. Th
 all gates hold, and it does not assert real-data error-rate control or Level 2 fill validation.
 
 **Post-tag update (2026-10-24):** F5 is now met by the R7 re-issue (`research/r7/r7_confirm_result_reissue.json`, PR #332). Open gates: F3 and F7 only. The sign-off above is unchanged and refers to the state at the tag.
+
+**Post-tag update (2026-10-24, F3):** the outside reviewer accepted the F3 diagnostic review, retired the A0 count criterion as a pass/fail gate and kept F3 OPEN (`docs/release/REVIEWER_F3_DECISION_2026-10-24.md`). No real-data error-rate control is claimed.
