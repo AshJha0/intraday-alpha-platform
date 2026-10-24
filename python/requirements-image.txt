@@ -196,9 +196,9 @@ jsonschema-specifications==2025.9.1 \
     # via
     #   -c requirements-ci.in
     #   jsonschema
-narwhals==2.26.0 \
-    --hash=sha256:29326d74f107c347fd1009bd58e38d9f7c7c5b51e6de97bc93dbc325d9038b54 \
-    --hash=sha256:6b9cadca82f375c7e4cf584fdc86ca25da54827307a9c58f94547ee6104b82dd
+narwhals==2.27.1 \
+    --hash=sha256:aed93076a3ea42d9c32c88e4eb5ea422a21937011cbe1f480f9572a523c82094 \
+    --hash=sha256:d057df13f5852b8e157596e82eb5e955fad267425df5e420e0ee9863da483b31
     # via
     #   -c requirements-ci.in
     #   scikit-learn
@@ -684,6 +684,6 @@ typing-extensions==4.16.0 \
 
 # The following packages are considered to be unsafe in a requirements file:
 setuptools==84.1.0 \
-    --hash=sha256:5231689c6ac8156cd155cfb98c3fd6fb252c3e7e9bd3d78b64d3c55f132624c9 \
-    --hash=sha256:23657205b63d4d31395ab917815247f694aafad28cd21316bf5fd45a51048ea0
+    --hash=sha256:23657205b63d4d31395ab917815247f694aafad28cd21316bf5fd45a51048ea0 \
+    --hash=sha256:5231689c6ac8156cd155cfb98c3fd6fb252c3e7e9bd3d78b64d3c55f132624c9
     # via -r requirements-image.in
