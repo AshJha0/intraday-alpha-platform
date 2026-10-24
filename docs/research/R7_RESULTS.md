@@ -33,6 +33,28 @@ Every number below is copied from `research/r7/r7_confirm_result.json` /
 EQ10's holdout IC is above its in-sample IC; EQ05's is about two thirds of
 its in-sample IC. Both clear the gate by a wide margin.
 
+## v1.18 re-issue (2026-10-24, gate F5)
+
+`research/r7/r7_confirm_result_reissue.json` re-issues the result at the registered
+N = 297 with the v1.18 verdict-eligibility rule applied (`tools/r7_confirm.py verdict()`,
+REL-02d). It is computed only from recorded outputs (the per-session IC series and
+`r7_confirm_result_dsr_recompute.json`; source sha256 in its `reissue` block). No data
+was read, no ledger entry was appended, and `r7_confirm_result.json` is unchanged.
+
+| alpha | DSR before (N) | DSR after (N = 297) | gate | verdict before | verdict after |
+|---|---|---|---|---|---|
+| EQ10@1s | 0.99995 (1) | 0.99886 | passed | confirmed | **ineligible** |
+| EQ05@1s | 0.9999998 (2) | 0.99996 | passed | confirmed | **ineligible** |
+
+What changed: the DSR trial count, and the verdict label. The recorded eligibility
+(`gate_eligible = false`, because `configuration.methods = v4` must be `v2`) was already
+in the original file, but its verdict predates REL-02d; under that rule a pass by a method
+that is not gate-eligible is `ineligible`, never `confirmed`. What did not change: IC,
+HAC t, thresholds, per-session IC, the eligibility records, and the fact that the numeric
+gate (HAC t and DSR > 0.95) passes at N = 297. The tables above are the original
+recorded values; read the verdict column as superseded by this note. No outcome is
+recorded on the blackboard by the re-issue, and its `record_commands` are removed.
+
 ## Per-session IC
 
 | session | EQ10@1s | EQ05@1s |
