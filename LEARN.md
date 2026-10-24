@@ -9155,6 +9155,8 @@ scope statement says that neither an A nor a B pass proves it.
    boundary where size is defined, so a test that over-rejects at the boundary
    still shows zero rejections.)*
 
+See also the F3 diagnostic review of 2026-10-24 (`research/v118/F3_DIAGNOSTIC_REVIEW.md`), which measures the sampling spread of the A0 count under null models.
+
 ## 158. Three attempts at one gate: v1 passed, v2 and v3 failed (v1.18, REL-06)
 
 **The question.** The known-null study was run three times. What does each result
@@ -9212,6 +9214,8 @@ named mechanisms causes A0's 4.3 %, and this entry does not either.
    nominal level from a failing one; the v3 rule is tied to 2.5 %.)*
 2. What would count as a legitimate next step? *(A new protocol, reviewed and
    signed before running; not editing the v3 threshold.)*
+
+**Update 2026-10-24.** The F3 diagnostic review that followed (`research/v118/F3_DIAGNOSTIC_REVIEW.md`) found that the A0 acceptance line (a count of at most 55 of 1,854) fails a correctly sized test about a third of the time on a single dataset, so the A0 FAIL does not by itself show the test is mis-sized; the review is exploratory, changes nothing in the v3 record and recommends no v4.
 
 ## 159. Signing the analysis, not only the hypothesis (v1.18, REL-02a)
 
