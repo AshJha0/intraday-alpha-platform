@@ -581,7 +581,7 @@ jobs:
       # PLATFORM_CONVENTIONS.md §11.1). Report-only, uploaded as an artifact;
       # no threshold gate (no existing baseline).
       - name: install cargo-llvm-cov
-        uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2.87.30
         with:
           tool: cargo-llvm-cov
       - name: rust/risk coverage (cargo-llvm-cov)
@@ -748,7 +748,7 @@ jobs:
         with:
           toolchain: "1.99.0"      # == rust/rust-toolchain.toml (check_deployment.py enforces)
       - name: install cargo-audit + cargo-deny
-        uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2.87.30
         with:
           tool: cargo-audit@0.22.2,cargo-deny@0.19.9
       - name: lockfile for rust/features_py (standalone package, not committed)
