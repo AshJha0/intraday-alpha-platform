@@ -53,9 +53,10 @@ the specification package revision 4; the frozen R0 specification) live outside 
 ## 5. Machine and sessions at recording
 
 16 GB laptop, about 125 GB free on C:. Two Claude sessions from the v1.18 post-release track were running at 17:06 UTC
-(`f3-spec`, `rel08-v2-prep`) with open PRs #349, #350, #351; by the owner's instruction that track continues to
+(`f3-spec`, `rel08-v2-prep`) with three post-release pull requests of their own (REL-08 v2 reviewer decision, F3
+power and domain revision 2, REL-08 v2 calibration plan); by the owner's instruction that track continues to
 completion and v1.19 work stays independent of it: this stage's PR touches only `docs/review/` and one CHANGELOG
-bullet and is merged after those PRs have landed.
+bullet and is merged after that track's pull requests have landed.
 
 ## 6. What this baseline is not
 

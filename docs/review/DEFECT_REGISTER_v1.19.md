@@ -5,7 +5,7 @@ Status is updated by later PRs in place; identifiers D-01 to D-27 are stable. Ba
 Class: A = hard blocker; B = disclosed limitation; C = maintenance debt. **Blocks** (reviewer, revision 6 review): what an
 open Class A item blocks: `claim: <which>` (the named claim cannot be made while it is open) or `release` (the tag
 itself); an infrastructure-only release may proceed with claim-blockers open provided the blocked claim is not made.
-Status values: open / in progress (PR) / closed (evidence) / accepted-open (Class B or C, named in the release).
+Status values: open / active (PR named) / closed (evidence) / accepted-open (Class B or C, named in the release).
 Evidence column cites the plan section and the file:line the audits verified.
 
 | id | finding | class | blocks | evidence | stage / PR | owner | status |
@@ -21,7 +21,7 @@ Evidence column cites the plan section and the file:line the audits verified.
 | D-09 | rules signed without a planted dry run | A (new signatures) | claim: any newly signed rule | `ANOMALY_REL08_INVESTIGATION_2026-10-20.md`, `F3_DIAGNOSTIC_REVIEW.md:25-40` | 1 / R4 | A | open |
 | D-10 | independence control is an environment variable; "signer != runner" overstated | A (the claim) | claim: independence of signer and runner | `analysis_identity.py:367-384`, `TRUST_ROOTS.md` | 2, 7 / D2, G1 | B | open |
 | D-11 | `core -> research` import; 12 subpackage cycles; no import contract | B (A for the guard path) | claim: fail-closed guard (for the guard path) | `core/codec.py:353,375` | 2, 7 / D1, S3 | B | open |
-| D-12 | F3 open; acceptance study certifies a synthetic domain only | B | - | plan 2.1, 3.1; `research/v118/f3_accept/REPORT.md`; `docs/release/REVIEWER_F3_POSTEXEC_DECISION_2026-10-24.md` | 4 / F1 done, F2 | A | in progress: F1 (synthetic study) executed 2026-10-24 and accepted for the synthetic domain only (#345-#347); gate OPEN; F2 (real-data transfer) pending R5 and X0 |
+| D-12 | F3 open; acceptance study certifies a synthetic domain only | B | - | plan 2.1, 3.1; `research/v118/f3_accept/REPORT.md`; `docs/release/REVIEWER_F3_POSTEXEC_DECISION_2026-10-24.md` | 4 / F1 done, F2 | A | active: F1 (synthetic study) executed 2026-10-24 and accepted for the synthetic domain only (#345-#347); gate OPEN; F2 (real-data transfer) needs R5 and X0 |
 | D-13 | real session exchangeability never measured | A (any independence assumption) | claim: any independence assumption | `F3_DIAGNOSTIC_REVIEW.md:103-104` | 1 / R5 | A | open |
 | D-14 | fill model Level 1 only; no order path | B | - | `SIM_TO_REAL.md`, `paper/venue_sim.py:1-4` | 5 / E1 | A | open |
 | D-15 | cost model uncalibrated; no observed / estimated / assumed decomposition | A (net-of-cost verdicts) | claim: any net-of-cost verdict | `screen.py:285-311`, `costs.py:31-37` | 5 / E2 | A | open |
