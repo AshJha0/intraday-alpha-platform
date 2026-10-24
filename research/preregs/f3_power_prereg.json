@@ -1,0 +1,215 @@
+{
+  "analysis_identity": {
+    "code_tree_sha256": "3a8d86779d5fffed738e677f4ce8da5b2492f2361dd58f9ab412097ad975447b",
+    "commit": "4f39f3a8a5905207ac0ac2c49c2c54b3bd6f04e8",
+    "configs_tree_sha256": "290b38d8871961c28e81db59ca9cf95791a213acd33461d667de873b907ad7b0",
+    "data_versions": [
+      "synthetic-no-data"
+    ],
+    "deps_lock_sha256": "2f68340d1a5c28871356287b00f5af907dd94f429c2551dac5cee0a3a114c18e",
+    "environment": {
+      "attrs": "26.1.0",
+      "cffi": "2.1.1",
+      "cloudpickle": "3.1.2",
+      "coverage[toml]": "absent",
+      "cryptography": "50.0.2",
+      "databento-dbn": "0.71.0",
+      "execnet": "2.1.2",
+      "hypothesis": "absent",
+      "iniconfig": "2.3.1",
+      "joblib": "1.6.0",
+      "jsonschema": "4.26.0",
+      "jsonschema-specifications": "2025.9.1",
+      "narwhals": "2.26.0",
+      "numpy": "2.4.6",
+      "packaging": "26.3",
+      "pandas": "3.0.6",
+      "pluggy": "1.6.0",
+      "pyarrow": "25.0.1",
+      "pycparser": "3.0",
+      "pygments": "2.21.0",
+      "pytest": "9.1.1",
+      "pytest-cov": "7.1.0",
+      "pytest-xdist": "3.8.0",
+      "python-dateutil": "2.9.0.post0",
+      "pyyaml": "6.0.3",
+      "referencing": "0.37.0",
+      "rpds-py": "2026.9.1",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.17.1",
+      "six": "1.17.0",
+      "sortedcontainers": "absent",
+      "threadpoolctl": "3.7.0",
+      "typing-extensions": "4.16.0"
+    },
+    "family": "F3 power diagnostic (NON-GATING): P1 Student t(G-1) + Holm at alpha_op 0.020, planted shift on one of 16 hypotheses, synthetic regimes a0 b0 b1, G 5 7 10, K 3 6 16; NO market data consumed",
+    "identity_version": 2,
+    "inputs": {
+      "docs/release/REVIEWER_F3_POSTEXEC_DECISION_2026-10-24.md": "ad60a724627e66395469fe737f86a6d3e0e88ffeba7b6e8860e290f184e69c3b",
+      "docs/release/REVIEWER_F3_POWER_DOMAIN_DECISION_2026-10-24.md": "80d909378d253f0ff803e39ce6a1985d00bdc571a15d04d526bc40b10e49e363",
+      "docs/release/REVIEWER_F3_SPEC_DECISION_2026-10-24.md": "8cf9f286e33afbc5e20b6dcc192f52691b4a222ff237293dc22098166934c745",
+      "research/v118/F3_POWER_DIAGNOSTIC_SPEC.md": "e984327d49a3fe55460a8dadaecf3c4a6241e8f3aa998b60e0434e6b267db1ae",
+      "research/v118/f3_accept/DECISION.json": "f7991c695e880b213a53d3351539d308af26d1c7186a6bf7e9983d45c945cb90"
+    },
+    "interpreter": "cpython-3.12.10",
+    "metrics": [
+      "het_hom_ratio",
+      "integrity_band",
+      "mde80_bootstrap_interval",
+      "mde80_first_crossing",
+      "power_wilson95"
+    ],
+    "reference_tree_sha256": "9020e008efdb1ac41015cea4c31f8b9e4cb65a1324db0a42224cb2a22f18fa88",
+    "scripts": {
+      "research/v118/f3_accept/core.py": "e17cf0719d9d26c6b714b824f065ab624ae0353c5d4f9358e1849b458a1368c2",
+      "research/v118/f3_power/check_freeze.py": "53d366b0bd121cdeed6f57712b36129c3340ec39877ba138d2cda5684df99976",
+      "research/v118/f3_power/declaration.json": "4a63cb5606146b9ab8ef838867dcd730104c4dfeb80757ac8fae7fd77897e303",
+      "research/v118/f3_power/power_core.py": "1612bcecb97896524f62278b7fd2f97776c424b19225a43e41209cb536292871",
+      "research/v118/f3_power/power_math.py": "6af3511cf6afa3682c7bb3fb2c227febb01aae7b3cdacb4b52c44c0cdbece8b1",
+      "research/v118/f3_power/run_f3_power.py": "601c8befd4074b552313688535c4b73a86b61c143c4f7de6fe9eea85b5de3d6b"
+    },
+    "thresholds": {
+      "G": [
+        5,
+        7,
+        10
+      ],
+      "alpha_op": 0.02,
+      "bootstrap": {
+        "B": 1000,
+        "hi_q": 0.975,
+        "lo_q": 0.025,
+        "min_numeric_share": 0.9,
+        "note": "paired bootstrap over independent dataset replications: one index set per resample used for every d and every K; percentile indices floor(lo_q (B-1)) and ceil(hi_q (B-1)) of the ordered replicates, order '<= first' < numbers < '> last'; also used for adjacent-d power differences"
+      },
+      "chunk": 5000,
+      "data_versions_sentinel": "synthetic-no-data: a declared sentinel only. NO market data are consumed (no data/real access, no holdout registry, no dataset reader); it is not a dataset identifier and not a holdout exemption",
+      "dry_run": {
+        "n": 200,
+        "output_discarded": true
+      },
+      "effect": {
+        "formula": "mu = d * sigma_RMS / sqrt(G); sigma_RMS = sqrt(mean_g sigma_g^2); constant across sessions; added after generation to hypothesis planted_index only; d is the noncentrality-scale effect (a0: the t statistic has noncentrality exactly d), not a raw per-session standardised shift"
+      },
+      "families": [
+        3,
+        6,
+        16
+      ],
+      "generators": {
+        "definition": "reused unchanged from research/v118/f3_accept/core.py (a0 iid N(0,1) G x 16; b0 z * s_g, s = exp(linspace(0, ln scale_ratio, G)); b1 session distribution cycling normal / t3 / centred lognormal by session index mod 3, times s_g); all null datasets are drawn in chunks of `chunk` from ONE SplitMix64 stream per (regime, G) cell and reused for every d (common random numbers: dataset i is the same null dataset for every d)",
+        "scale_ratio": 5.0
+      },
+      "grid": [
+        0.5,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        10,
+        12,
+        16
+      ],
+      "integrity": {
+        "excess": {
+          "comparison": "under a0 the K-1 null p-values are exact (Student t on independent normal sessions) and independent of the planted hypothesis; P(at least one null p <= alpha_op/K) is the probability that the first Holm step rejects a null, which is the only way the planted hypothesis can be rejected with its own p above alpha_op/K; so power lies in [pi_ref, pi_ref + excess_K]",
+          "formula": "excess_K = 1 - (1 - alpha_op/K)^(K-1)",
+          "value_by_K": {
+            "16": 0.01858682284850044,
+            "3": 0.013288888888889017,
+            "6": 0.016555925309053365
+          },
+          "why": "it is the exact value of that probability at alpha_op = 0.020, evaluated once per K and frozen here; power_math.excess must reproduce these values to 1e-12 (checked by check_freeze and a test)"
+        },
+        "on_failure": "run declared VOID (programming integrity): DECISION.json status VOID_INTEGRITY with the offending (G, K, d); no power table, MDE80 or ratio is produced; no estimate from the run may be cited; a corrected package needs the full sign-off route with FRESH seeds",
+        "regime": "a0",
+        "rule": "for every a0 (G, K, d): pi_ref - tau <= phat <= min(1, pi_ref + excess) + tau, pi_ref = noncentral-t P(T'(G-1, d) >= t_{1-alpha_op/K}(G-1)), excess = 1 - (1 - alpha_op/K)^(K-1); evaluated FIRST, before any power estimate, MDE80 or ratio is computed or shown",
+        "tau": 0.025,
+        "tau_dry": 0.25,
+        "tau_note": "tau is a heuristic tolerance: numerically five times the worst-case binomial standard error (0.005 at n = 10,000); it is NOT a simultaneous confidence guarantee across the grid and the band is a programming-integrity check, not evidence of calibration"
+      },
+      "interval": {
+        "note": "Wilson 95% two-sided, pointwise, for every power estimate; not simultaneous",
+        "wilson_z": 1.959963984540054
+      },
+      "kind": "f3_power_declaration",
+      "market_data_consumed": false,
+      "mde": {
+        "digits": 1,
+        "rule": "first-crossing linear interpolation; '<= first grid value' if already reached at the first grid point; '> last grid value' if never reached; never extrapolated; reported to one decimal; non-monotone curves flagged, first crossing kept, flagged cells excluded from the MDE ratio"
+      },
+      "n_per_cell": 10000,
+      "non_gating": "this study has no pass/fail criterion and no power floor; its results cannot change the completed F3 acceptance result or any Type I criterion, set alpha_op, choose a procedure, close F3 or support any real-data, power-in-practice, alpha or trading claim",
+      "planted_index": 0,
+      "power_target": 0.8,
+      "prereg": "research/preregs/f3_power_prereg.json",
+      "procedure": "P1: one-sided Student t(G-1) on the CR1 statistic, Holm over the first K hypotheses at alpha_op (reviewer-directed prospective selection, 2026-10-24); NON-GATING power diagnostic",
+      "protocol": "research/v118/f3_power/PROTOCOL.md",
+      "ratio": {
+        "min_count": 100,
+        "note": "heterogeneous-to-homogeneous power ratio defined only when both counts are >= min_count; delta-method interval on log R from the two independent streams"
+      },
+      "regimes": [
+        "a0",
+        "b0",
+        "b1"
+      ],
+      "resume": {
+        "failed_study": "a run holding a DECISION.json is refused (one run only)",
+        "permitted": "an interrupted run may be resumed at cell granularity only; every finished cell file is re-verified by recomputing the cell under the CURRENT verified signed identity and comparing identity_sha256, prereg_sha256, seed, chunk, n, rng_final_state, chunk_counts_sha256, indicators_sha256 and the counts; any difference refuses the run"
+      },
+      "seeds": {
+        "base": 20301100,
+        "bootstrap_base": 20301500,
+        "disjoint_from": [
+          "20281100-20281199 (pilot)",
+          "20291100-20291199 and 20291900-20291999 (acceptance study and its dry run)",
+          "20271001-20271004 (F3 diagnostic)"
+        ],
+        "dry_run_base": 20301900,
+        "formula": "base + 10 * regime_index + G",
+        "regime_index": {
+          "a0": 0,
+          "b0": 1,
+          "b1": 2
+        }
+      },
+      "status": "UNSIGNED DRAFT: nothing here has been run for the study",
+      "stop_rules": {
+        "crash_policy": "an interrupted run may be resumed exactly as declared in `resume`; nothing else is permitted",
+        "final_policy": "a completed run (including VOID_INTEGRITY) is final under this prereg: no rerun, no new seeds, no changed grid, n, generators or definitions",
+        "min_free_ram_gb": 4.0,
+        "no_interim_looks": true,
+        "one_run_only": true
+      },
+      "stream": {
+        "evidence": "the cell record stores rng_final_state, chunk_counts_sha256 and indicators_sha256",
+        "rule": "each (regime, G) cell creates ONE SplitMix64 stream from its seed and consumes it chunk after chunk; chunking never resets or reseeds the generator; chunk size, ordering of draws and the generator implementation are part of the frozen identity"
+      },
+      "version": 1,
+      "workers": 3
+    }
+  },
+  "bound_utc": "2026-10-24T19:07:20+00:00",
+  "kind": "analysis_prereg",
+  "prereg_id": "research/preregs/f3_power_prereg.json",
+  "protocol": "research/v118/f3_power/PROTOCOL.md",
+  "protocol_sha256": "645d275b2e798e70d7ea45e55d863641f37716b1640b5984176a640a1d647492",
+  "signature": {
+    "maintainer": "ashjha0",
+    "message": "iap.agents.blackboard.canonical(this document without 'signature')",
+    "message_sha256": "0501029adf9f61bcc71e847b098f8eec335e9333af8877f1c31b8e97d639b707",
+    "public_key": "02a3e278cda3efac7dcd266fb8a3821a1415f0725a73f8b255aac84083c2106c",
+    "scheme": "ed25519",
+    "sig": "f65fb18a3c869a5bf8b4b37c84d1f29a70e7f2f39b4b26b81d044a10dd579193fdda4d9d13fef27c5a28b188587c133ca6085c97047832814c181953106d0c0a",
+    "trust_root": "research/agents/trust_roots.json"
+  },
+  "signed": true,
+  "signed_utc": "2026-10-24T19:07:31+00:00",
+  "status": "SIGNED: the analysis identity is bound; edits void the signature",
+  "x-version": 1
+}
