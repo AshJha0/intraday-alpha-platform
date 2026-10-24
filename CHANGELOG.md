@@ -8,6 +8,7 @@ that tag.
 
 ## Unreleased
 
+- Post-release: F3 diagnostic review findings merged (exploratory; `research/v118/F3_DIAGNOSTIC_REVIEW.md`, scripts in `research/v118/f3_diagnostic/`, #335): the A0 acceptance line was ill-posed (a correct test fails it about a third of the time on one dataset), the estimator is not shown to be mis-sized, no v4 recommended, F3 stays open.
 - Post-release (after v1.18.0): R7 result re-issued at the registered N = 297 with the v1.18 verdict-eligibility rule applied (gate F5 now met): EQ10@1s and EQ05@1s are `ineligible` (numeric gate passes; method bundle `v4` instead of the required `v2`); no data read, no ledger entry (`research/r7/r7_confirm_result_reissue.json`, `docs/research/R7_RESULTS.md`, #332). F3 diagnostic review plan committed (`research/v118/F3_DIAGNOSTIC_REVIEW_PLAN.md`, #333); documentation truth pass and LEARN/COOKBOOK 141-200 (#331).
 
 ## v1.18.0 — 2026-10-23

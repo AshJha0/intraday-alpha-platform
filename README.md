@@ -84,6 +84,7 @@ The full list with descriptions is the [Documentation index](#documentation-inde
   feed, not a live venue); a data manifest (`tools/data_manifest.py`).
 - **Open gates, accepted open for this tag:** F3, F7 (no independent rerun of the B8 v2 JSON), the reviewer's full findings memo; F5 was partly met at the tag and is met by the 2026-10-24 R7 re-issue
   ([docs/release/FOUNDATION_COMPLETE_v1.18.md](docs/release/FOUNDATION_COMPLETE_v1.18.md)).
+- **F3 diagnostic review (2026-10-24, exploratory; [findings](research/v118/F3_DIAGNOSTIC_REVIEW.md), plan [F3_DIAGNOSTIC_REVIEW_PLAN.md](research/v118/F3_DIAGNOSTIC_REVIEW_PLAN.md)): the A0 acceptance criterion was ill-posed -- a correctly sized test fails a count <= 55 of 1,854 line about a third of the time on one dataset; the estimator is not shown to be mis-sized; no v4 is recommended; F3 stays open and no real-data error-rate control is claimed.**
 
 **v1.17.1 (released 2026-10-17):**
 
@@ -138,8 +139,8 @@ quoting or DeepLOB edge; v1.17 adds the screen and breadth results above;
 v1.18 adds only negative or underpowered results (the status block at the top)
 ([docs/REAL_DATA.md](docs/REAL_DATA.md) §3, [LEARN.md](LEARN.md) §31-§44).
 
-**Next (after v1.18.0, not part of it):** the post-release documentation pass (REL-14c, this one), a diagnostic review of the failed
-known-null method (F3; not an automatic v4), a REL-08 rule v2 (an unsigned draft) with a multi-session screen, the R7 re-issue (F5, done 2026-10-24), and v1.19 planning. C++ is parity-only since decision D5(a) (2026-10-18); the C++ ports still listed as pending in
+**Next (after v1.18.0, not part of it):** the post-release documentation pass (REL-14c, done), a diagnostic review of the failed
+known-null method (F3, done 2026-10-24: see the findings; not an automatic v4), a REL-08 rule v2 (an unsigned draft) with a multi-session screen, the R7 re-issue (F5, done 2026-10-24), and v1.19 planning. C++ is parity-only since decision D5(a) (2026-10-18); the C++ ports still listed as pending in
 PLATFORM_CONVENTIONS.md §11.3 are the B2-regime arm of dark eligibility, the exchange-local (IANA zone) hazard
 clock, and the B8 two-venue merge and router hook (the B10 proxy sampler and fit are Python by design). Plan:
 [docs/ROADMAP.md](docs/ROADMAP.md) §3.14.

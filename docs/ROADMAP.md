@@ -599,8 +599,8 @@ N = 297 with verdicts unchanged, but the R7 result file was not re-issued with
 eligibility applied).
 
 **Moved out of v1.18.0 (post-release backlog; v1.19 is not yet planned or
-approved):** this documentation truth pass (REL-14c); a diagnostic review of
-the failed known-null method (not an automatic v4); a REL-08 rule v2 (an
+approved):** this documentation truth pass (REL-14c, done 2026-10-24); a diagnostic review of
+the failed known-null method (done 2026-10-24, `research/v118/F3_DIAGNOSTIC_REVIEW.md`: the A0 acceptance line was ill-posed, no v4 recommended, F3 still open; the outside reviewer's view is awaited); a REL-08 rule v2 (an
 unsigned draft, `research/v118/rel08/`) and a multi-session screen, which
 needs a synthetic book-parameter dry run, reviewer review and signing before
 any new session is read; an optional re-issue of the R7 result; independent
