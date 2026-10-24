@@ -5981,7 +5981,7 @@ sessions against 0.0386 for the HAC leg. The data's unit is the session.
 
 ## 78. Predictive but not tradable: the R7 result
 
-**The question.** R7 confirmed EQ10 and EQ05 on seven unseen sessions,
+**The question.** R7 confirmed EQ10 and EQ05 on seven unseen sessions (v1.15 rules; the v1.18 re-issue of 2026-10-24 labels both `ineligible`),
 2025-11 to 2026-06, six years after the in-sample data. Why is v1.16 about
 monetisation rather than deployment?
 

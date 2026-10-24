@@ -54,3 +54,5 @@ Signed in this limited form only: **foundation complete except gates F3 and F7 (
 accepted open by the owner for the v1.18.0 release.** Signed by Claude Code on behalf of the owner under
 the owner's written delegation of 2026-10-23 (session chat), date 2026-10-23. This is not a statement that
 all gates hold, and it does not assert real-data error-rate control or Level 2 fill validation.
+
+**Post-tag update (2026-10-24):** F5 is now met by the R7 re-issue (`research/r7/r7_confirm_result_reissue.json`, PR #332). Open gates: F3 and F7 only. The sign-off above is unchanged and refers to the state at the tag.
