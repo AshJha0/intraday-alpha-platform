@@ -1,5 +1,14 @@
 # Research validity: corrected methods and the safe research store
 
+**Status at v1.18.0 (2026-10-23).** Sections 1-4f are the corrections of
+v1.3-v1.17 and stay as written, each labelled with its release. v1.18 added the
+measurement-instrument layer around them (sections 4g and 4h): a claim taxonomy,
+signed pre-declarations, a holdout registry, one real-data ledger family and a
+known-null calibration of the inference step. The known-null calibration
+**failed** (gate F3 is open) and no real-data FWER control is claimed; no signal
+is promoted and no edge is claimed. The registry still reads 23 CANDIDATE and 1
+RESEARCH alphas, every CANDIDATE held by the net-of-cost gate.
+
 This page lists the research-validity corrections added in October 2026, what
 each one fixes, and how it is selected. **Since v1.5.0 the corrected methods
 are the defaults**: they are what runs when nothing is named, every committed
@@ -344,7 +353,12 @@ for the lead-lag.
   expected largest |t| under the null 4.135. v1.14.0 added 202 looks over
   77 configurations under the revised statistics: 5,358 looks over 293
   entries, Bonferroni |t| 4.432, expected largest |t| 4.144. The thresholds
-  derived from it only tighten.
+  derived from it only tighten. At v1.18.0 (after the REL-02 migration and the
+  retroactive B7/B8 entries) the ledger holds 6,826 looks over 640 distinct
+  configurations, Bonferroni |t| 4.484, expected largest |t| under the null 4.202
+  (`research/experiments.json`, pinned by `tests/harness/check_headline_numbers.py`);
+  of those, 256 configurations and 1,132 looks are real-data
+  (`research/v118/LEDGER_INVENTORY.md`).
 
 ## 4. Gate eligibility
 
@@ -425,14 +439,17 @@ No headline verdict flipped (0 PROMOTE, no trade at 1x). Real-data
 t-statistics published before the stores are re-ingested under v1.14 are
 still v1.13 numbers: read them as upper bounds.
 
-**Studies under these rules (2026-10-11).** The maker study runs as
-registered and will be reported with `summarise_study` and the fee,
-markout-convention and power caveats. The M5 quoting study was aborted
-before any result was read, because its registered parameters could not
-move a quote (`data/real/quoting_real/ABORTED.md`); its v2 protocol will be
-registered in ticks. AUC01's holdout verdict (0 trades, not confirmed)
-stands. The R7 confirmatory round will use `frozen_params` and a
-`prereg` threshold and runs on v1.14.
+**Studies under these rules (2026-10-11; outcomes added at v1.18.0).** As
+written on 2026-10-11: the maker study runs as registered and will be reported
+with `summarise_study` and the fee, markout-convention and power caveats; the M5
+quoting study was aborted before any result was read, because its registered
+parameters could not move a quote (`data/real/quoting_real/ABORTED.md`), and its
+v2 protocol will be registered in ticks; AUC01's holdout verdict (0 trades, not
+confirmed) stands; the R7 confirmatory round will use `frozen_params` and a
+`prereg` threshold and runs on v1.14. What happened: the maker study finished
+with no maker edge (v1.15, every traded cell negative); the quoting v2 study
+reads no quoting edge (`research/quoting_real/QUOTING_V2_RESULT.md`); R7-CONFIRM-1
+ran once on seven unseen sessions (`docs/research/R7_RESULTS.md`).
 
 ## 4b. The v1.14 statistics revision
 
@@ -511,7 +528,47 @@ Rules (pinned by `python/tests/test_claims.py`):
   `claims.from_screen_verdict`.
 - Unknown verdicts map to `inconclusive`.
 
-No result in this repository is `confirmed_untouched_oos` today, so nothing may be promoted.
+No alpha is recorded above `exploratory_signal` by this ladder, and nothing may be promoted:
+the registry holds 23 CANDIDATE and 1 RESEARCH alphas at v1.18.0, all held by `net_pnl_after_costs`. R7-CONFIRM-1
+was `confirmed` on its statistic on sessions untouched at the time, but its recorded result is not gate-eligible
+and was not re-issued (gate F5, partly met), those sessions are now spent, and no net-of-cost result followed.
+The v1.18.0 release notes state that the programme has no untouched confirmation sample.
+
+## 4h. Research authorisation and the known-null calibration (v1.18 REL-02, REL-06)
+
+What v1.18 added around the statistics above. None of it changes a bundle, a
+default threshold or a recorded verdict; it constrains which analyses may read
+which data and records how well the inference step behaves on data with no signal.
+
+- **Signed pre-declarations bind the analysis identity (REL-02).** A signed
+  pre-registration can bind script fingerprints, the `python/src/iap` code-tree
+  hash, the commit, data versions, family, metrics and thresholds (identity v2 also
+  binds `configs/`, the hashed lock and the interpreter). The gate and the runners
+  refuse on any mismatch, the runner must not hold a signing key, and
+  `tools/verify_signatures.py` verifies every tracked signed document against a
+  pinned trust root (fingerprint published outside the repository, PR #315).
+- **Fail-closed holdout registry (REL-02b).** `research/holdout_registry.json`
+  classifies each dataset `in_sample`, `spent` or `unread`; a read of anything not
+  in-sample without a matching signed pre-declaration is refused before data is
+  opened. The nine 2025/26 sessions are spent for AAPL, MSFT and QQQ
+  (REAL_DATA.md section 3.7).
+- **One real-data ledger family (REL-02).** Real-data N went from 24 to 256
+  distinct configurations (section 1b); the gates still read the all-family
+  `total_experiments`.
+- **Known-null calibration (REL-06): failed, gate F3 open.** The study feeds data
+  with no signal (generator A: session derangements; generator B: AR(1) per name)
+  through the inference step and counts false confirmations. v1 passed but did not
+  test size (a cost-dominated null); v2 FAILED (7 of 12 cells,
+  `research/v118/KNOWN_NULL_V2_RESULT.md`); the signed v3 study, run 2026-10-23,
+  FAILED: the conditional randomisation diagnostic A0 rejected 79 and 80 of 1,854
+  (about 4.3 %) at K3 and K6 against a 2.5 % target, generator B 2.50 % and 2.45 %
+  (`research/v118/known_null_v3_RESULT.md`). The outside reviewer rejected the
+  method as the mandatory F3 gate in its current form. **No real-data
+  family-wise error control is claimed**, and no replacement protocol exists
+  until the failure mechanism has been investigated (post-release item).
+- **Reproduction (F7, open).** The reviewer inspected the committed B8 v2 report
+  and JSON and the REL-08 scorecard but did not rerun them; independent
+  reproduction is open (`docs/release/v1.18.0_RELEASE_NOTES.md`, "Open gates").
 
 ## 4e. v1.17 WS-D: meta-label calibrate/select split, sizing hook, conformal sizing (opt-in)
 

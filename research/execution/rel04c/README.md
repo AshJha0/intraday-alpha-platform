@@ -1,8 +1,10 @@
 # REL-04c: single-venue execution universe (v1.18)
 
-Status: **prepared, not run.** No byte of the three ITCH files has been read
-for this item. The universe rule below was committed before the scan that
-applies it; the scan is the job's `select` stage.
+Status: **run 2026-10-20 to 2026-10-23, secondary result.** The universe rule below was committed
+before the scan that applies it (the job's `select` stage); the ingest, registration, Yahoo volume check
+(14 of 20 names; 6 delisted) and the L1, L2 and L3 benchmark stages completed (exit 0, 2026-10-23), with
+artefacts in `research/execution/rel04c/benchmark/` (PR #328). The three days are in-sample, so the
+result is secondary and is not interpreted in the v1.18.0 release notes.
 
 Code: `python/src/iap/research/rel04c_universe.py` (rule),
 `python/src/iap/research/rel04c_job.py` (stages), `run_rel04c.cmd` (launcher).

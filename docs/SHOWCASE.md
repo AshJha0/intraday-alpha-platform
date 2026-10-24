@@ -83,7 +83,19 @@ negative ones first, is written down with the artefact that produced it.
   one fails the net-P&L-after-costs gate.
   <!-- source: README.md "Headline numbers" (Promotion verdicts, Lifecycle registry rows) and docs/index.html "Results so far" -->
 
-**Prepared: v1.17.1 (2026-10-17), a patch release; v1.17.0 released 2026-10-16.**
+**Released: v1.18.0 (2026-10-23), a measurement instrument and recorded negative results. No signal is promoted and no edge is claimed.**
+- **The known-null calibration failed** (null v3, run 2026-10-23): A0 conditional rejection 79 and 80 of 1,854 (about 4.3 %) in two cells against a 2.5 % target; the outside reviewer rejected the method as the F3 gate, so no real-data error-rate control is claimed.
+  <!-- source: research/v118/known_null_v3_RESULT.md; docs/release/REVIEWER_CLOSEOUT_2026-10-23.md -->
+- **Every signed run is negative or underpowered.** B8 v2: all 6 comparisons underpowered, none better than pinned Nasdaq (3 evaluation sessions). REL-05: AAPL and MSFT inconclusive, QQQ supports. REL-08 (one-session screen, 7 variants): all underpowered, with defects found afterwards. REL-09: underpowered. REL-10: one taker cell rejected (`hid_imb` 1 min AAPL loses money), the rest underpowered. REL-08c was dropped.
+  <!-- source: docs/release/v1.18.0_RELEASE_NOTES.md, "Negative and inconclusive results, first" -->
+- **The fill model is validated at Level 1 (deterministic replay) only, not at Level 2**; there is no latency edge. No real orders or fills exist (decision D4(a)).
+  <!-- source: docs/SIM_TO_REAL.md; docs/release/v1.18.0_RELEASE_NOTES.md -->
+- **Built:** signed pre-declarations that bind script, commit, data and thresholds, a fail-closed holdout registry, one real-data ledger family, execution benchmark v2 metrics, a capped child simulator with an invariant suite, monitoring with an UNKNOWN state, factor risk and portfolio limits with a kill switch, and a paper-path order manager (60-minute and 6-hour soaks PASS on a synthetic feed, not a live venue).
+  <!-- source: CHANGELOG.md "## v1.18.0"; research/v118/rel18_soak_6h/ -->
+- **Open gates, accepted open for this tag:** F3, F7 (no independent rerun of the B8 v2 JSON), the reviewer's full findings memo; F5 partly met.
+  <!-- source: docs/release/v1.18.0_RELEASE_NOTES.md, "Open gates"; docs/release/FOUNDATION_COMPLETE_v1.18.md -->
+
+**Released: v1.17.1 (2026-10-17), a patch release; v1.17.0 released 2026-10-16.**
 - **B7 closed** on its negative in-sample result; **B8 negative on 2 overlap days** (`sor` +5.1 ± 1.3 bps, `sor_sweep` +3.8 ± 2.1; provisional); pre-declared six-day out-of-sample run also negative (`sor` +2.2 / +1.1, `sor_sweep` +0.6 / +1.2 bps; AAPL / MSFT; no interval excludes zero); 6 of 9 IEX days recorded; #211 fixes the missing manifest, SBOMs and digest pins.
   <!-- source: CHANGELOG.md "## v1.17.1"; research/execution/b8/REPORT_sweep.md -->
 
@@ -95,14 +107,14 @@ negative ones first, is written down with the artefact that produced it.
   the screen refused every candidate and the holdout is unread.
   <!-- source: research/preregs/breadth_book_prereg.json -->
 - **Dark venue (B10): modelled, not measured** (no free dark-pool data).
-- **IEX second venue:** day 1 (2025-11-28) processed, TOPS oracle 0
-  mismatches for AAPL, MSFT and QQQ; 8 overlap days remain.
+- **IEX second venue (as of v1.17.0):** day 1 (2025-11-28) processed, TOPS oracle 0
+  mismatches for AAPL, MSFT and QQQ; 6 of the 9 overlap days were recorded by v1.17.1.
   <!-- source: docs/research/IEX_OVERLAP_SET.md -->
 - **Known gap:** v1.17.0 ships no release manifest, no lock-file SBOMs and
   no digest-pinned k8s manifests; fixed by PR #211, ships with v1.17.1.
 <!-- source: CHANGELOG.md "## v1.17.0"; docs/release/v1.17.0_RELEASE_NOTES.md -->
 
-**Next: v1.17.1 release, then v1.18.** The release PR waits for the B8 six-day results and the remaining IEX rows.
+**Next (not part of v1.18.0):** this documentation pass, a diagnostic review of the failed known-null method, a REL-08 rule v2 with a multi-session screen, and v1.19 planning (nothing planned or approved yet). See [docs/ROADMAP.md](ROADMAP.md) §3.14.
 
 ## Numbers a CI check re-derives
 
@@ -113,7 +125,7 @@ reported as stale rather than failing).
 
 | what | number | artefact |
 |---|---|---|
-| Cross-language parity (CI counts) | tests python 3208 / cpp 333 / rust 376; golden 217 / 74 / 75; integration 35, replay 6 | `tests/harness/run_all.sh` table in README.md |
+| Cross-language parity (CI counts, main CI run 40015853764, 2026-10-23, v1.18.0) | tests python 4062 / cpp 333 / rust 376; golden 217 / 74 / 75; integration 35, replay 6 | `tests/harness/run_all.sh` table in README.md |
 | MVP golden run (`python -m iap.mvp run`, seed 12345) | 15,805 events · 800 decisions · 231 parent orders · 163 fills · P&L −82.84 USD · digest `a7f1ee60…` | `tests/golden/expected_mvp.json` |
 | Registered features | 205 in 10 families | `data/reference/feature_registry.json` |
 | Flagship alphas | 24 (EQ01-EQ12, FX01-FX12); verdicts 0 PROMOTE / 12 ITERATE / 12 REJECT | `research/alpha_reports/REPORT.md` |
@@ -205,11 +217,12 @@ in, 308,975 out, from the QC report).
 - [docs/HOW_IT_WORKS.md](HOW_IT_WORKS.md) and [LEARN.md](../LEARN.md): how the
   quant, algo and AI sides work, and the case studies behind each negative
   result.
-- [COOKBOOK.md](../COOKBOOK.md): 140 task-oriented recipes with runnable
+- [COOKBOOK.md](../COOKBOOK.md): 200 task-oriented recipes with runnable
   commands.
-- [docs/release/v1.16.0_RELEASE_NOTES.md](release/v1.16.0_RELEASE_NOTES.md)
-  and [docs/research/R7_RESULTS.md](research/R7_RESULTS.md): the two
-  documents the negative and positive results above are copied from.
+- [docs/release/v1.18.0_RELEASE_NOTES.md](release/v1.18.0_RELEASE_NOTES.md),
+  [docs/release/v1.16.0_RELEASE_NOTES.md](release/v1.16.0_RELEASE_NOTES.md)
+  and [docs/research/R7_RESULTS.md](research/R7_RESULTS.md): the documents
+  the negative and positive results above are copied from.
 - [docs/REAL_DATA.md](REAL_DATA.md): how to obtain and ingest real files
   yourself (nothing real is bundled).
 - [docs/index.html](index.html): the GitHub Pages landing page.

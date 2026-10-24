@@ -5,19 +5,21 @@ test run < 120 s.
 
 **CI** is `.github/workflows/ci.yml`, and it is the local
 `tests/harness/run_all.sh` split into parallel jobs: one per language, plus
-`tests/harness/run_golden.sh` (the GOVERNANCE promotion-gate-10 artefact: every
-language's golden group, including ALL fifteen Java `*GoldenTest` classes),
+`tests/harness/run_golden.sh` (the GOVERNANCE promotion-gate-10 artefact: the
+Python, C++ and Rust golden groups; the fifteen Java `*GoldenTest` classes left
+with the v1.15 archive),
 `tests/harness/check_deployment.py` (promtool rules/config/unit tests, compose
 and Dockerfile checks, k8s manifests, ConfigMap sync, dashboard metric
-provenance) and an `images` job that builds the four container images and is
-gated on all of them. Run the whole thing locally with
+provenance) and an `images` job that builds the three container images (python, cpp, rust)
+and is gated on all of them. Since v1.18 a `coverage` job combines the fast and
+slow Python coverage data and enforces one floor (92 %) on the whole suite. Run the whole thing locally with
 `bash tests/harness/run_all.sh`; it prints the parity table plus a
 `deployment` row and reports a suite that did not run as `-`, never as 0.
 
 ## Python (reference implementation)
 
 ```bash
-cd python && PYTHONPATH=src python3 -m pytest -q          # full suite (current count: README parity table / latest CI run; CI runs it as `-n auto --dist loadfile` with coverage, 306-359 s on a 4-vCPU runner)
+cd python && PYTHONPATH=src python3 -m pytest -q          # full suite (current count: README parity table / latest CI run; CI splits it into `python` (`-m "not slow"`) and `python-slow` (`-m slow`), both `-n auto --dist loadfile`, CONTRIBUTING.md §2.1; the timings below are historical, v1.5.0)
 cd python && PYTHONPATH=src python3 -m pytest -q -k golden # the golden group (count: README parity table)
 cd python && PYTHONPATH=src python3 -m iap.marketdata      # end-to-end pipeline
 cd python && PYTHONPATH=src python3 -m iap.mvp run         # the traced MVP loop (under a minute)
@@ -26,7 +28,7 @@ cd python && PYTHONPATH=src python3 tools/make_golden.py   # regen goldens (deli
 ```
 
 - **Test counts.** The current per-language counts live in one place, the README parity
-  table (3208 python / 333 cpp / 376 rust, 217 / 74 / 75 golden, main CI run 39043729536 (2026-10-17, v1.17.1 at 838e103); the same
+  table (4062 python / 333 cpp / 376 rust, 217 / 74 / 75 golden, main CI run 40015853764 (2026-10-23, v1.18.0 at 23b69fb2); python is the fast job's 3,666 plus the slow job's 396 passed; at v1.17.1 it read 3208 python, run 39043729536; the same
   numbers as docs/ARCHITECTURE.md §6; since v1.18 the deployment job derives them from the
   CI jobs' own artefacts, `tests/harness/parity_counts.py`, and warns when the table drifts); for anything newer see the latest `ci` run on main.
   Every other count in this file is **historical**, recorded with the release it was measured on.
@@ -60,14 +62,18 @@ cd python && PYTHONPATH=src python3 tools/make_golden.py   # regen goldens (deli
   a number fit; the parallel run collected the same 1672 tests and reported the same
   outcome for every one of them as the serial run.
 - Python 3.11, src layout (`python/src/iap`), packaging via `python/pyproject.toml`
-  (1.4.0; installable with `pip install -e python` if preferred over PYTHONPATH;
+  (1.18.0; installable with `pip install -e python` if preferred over PYTHONPATH;
   console scripts `iap-marketdata`, `iap-features`, `iap-tca`, `iap-research`,
-  `iap-lifecycle`, `iap-store`, `iap-mvp`).
+  `iap-lifecycle`, `iap-store`, `iap-mvp`, `iap-mcp`, `iap-mcp-agent`, `iap-agents`).
 - Dependencies (declared in `pyproject.toml`): numpy, pandas, scipy, scikit-learn,
-  **pyarrow** (Parquet research dataset), **jsonschema ≥ 4.18 + referencing**
-  (offline JSON-schema validation of every contract — `iap.contracts.validate`);
-  extras `ml` (xgboost, lightgbm) and `dev` (pytest, pyyaml — the latter for
-  `tools/github/create_issues.py` and its integration test). If missing:
+  **pyarrow** (Parquet research dataset), **jsonschema + referencing**
+  (offline JSON-schema validation of every contract — `iap.contracts.validate`),
+  **cryptography** (Ed25519 signatures of the agent layer and the signed
+  pre-declarations); extras `ml` (xgboost, lightgbm), `llm` (the Anthropic SDK;
+  tests and CI use the scripted client), `dbn` (the Databento MBO codec),
+  `databento` (the network client of `tools/r7_databento_fetch.py` only), `deep`
+  (torch, for the AI4 models) and `dev` (pytest, pytest-cov, pytest-xdist, pyyaml —
+  the latter for `tools/github/create_issues.py` and its integration test). If missing:
   `pip install jsonschema referencing pyarrow --break-system-packages`; CI installs
   the same set in every Python job (`.github/workflows/ci.yml`).
 - The pipeline writes `data/raw/*.jsonl`, `data/normalized/*.normalized.{jsonl,iap1}`,
@@ -81,7 +87,7 @@ cd cpp && bash build.sh && ctest --test-dir build --output-on-failure
 ```
 
 C++17, g++13/CMake/GoogleTest/Eigen available; `-Wall -Wextra -Werror` clean; build
-with `-j2` (2-CPU environment); 333 tests, 74 in the golden group (main CI run 39043729536 (2026-10-17, v1.17.1 at 838e103)). Layout: `include/iap/{marketdata,orderbook,features,
+with `-j2` (2-CPU environment); 333 tests, 74 in the golden group (main CI run 40015853764 (2026-10-23, v1.18.0 at 23b69fb2); C++ is parity-only since decision D5(a), 2026-10-18: `cpp` stays a required check, `cpp-sanitizers` is not required). Layout: `include/iap/{marketdata,orderbook,features,
 alpha,execution,sor,replay,contracts,util}` + `src/` mirrors; `contracts/` is the
 canonical-JSON / decision-trace contract (`canonical_json.hpp`, `trace.hpp`),
 `util/sha256.hpp` the SHA-256 the codec goldens and the trace digest share. The
@@ -91,7 +97,7 @@ golden group is `ctest --test-dir build -R Golden` (suites `*Golden`, including
 ## Rust
 
 ```bash
-cd rust && cargo test        # workspace (eleven crates, 366 tests, ~55 s after a full rebuild)
+cd rust && cargo test        # workspace (eleven crates, 376 `#[test]` functions of which 75 are in the golden targets; ~55 s after a full rebuild, a timing from an earlier release, not re-measured)
 ```
 
 Crates: `marketdata`, `orderbook`, `replay`, `eventbus`, `telemetry`, `features`,
@@ -101,8 +107,9 @@ trace sink + digest, `explain()`) and `lifecycle` (alpha promotion state
 machine: gate table, 17-edge transition table, live rolling-IC rules,
 byte-identical `research/alpha_registry.json`). Golden targets run by
 `tests/harness/run_all.sh`: `golden_marketdata`, `golden_book`, `golden_features`,
-`golden_alpha`, `golden_risk`, `golden_replay`, `golden_canonical_json`,
-`golden_trace`, `golden_lifecycle`. The lifecycle golden reads
+`golden_alpha`, `golden_risk`, `golden_risk_fuzz`, `golden_dark_controls`,
+`golden_venue_queue`, `golden_replay`, `golden_canonical_json`,
+`golden_trace`, `golden_lifecycle` (12 targets). The lifecycle golden reads
 `configs/strategies/{lifecycle,strategies}.json` and
 `research/alpha_registry.json` relative to the crate (the Docker image copies
 them).
@@ -172,6 +179,22 @@ normalized.jsonl` by default), which is omitted with a printed note when
 `data/` has not been generated. Regenerate only on an **idle** box —
 `cat /proc/loadavg` first; the other agent's build will otherwise show up
 as a hot-path regression.
+
+## Provenance checks (v1.18)
+
+Two repository-level checks cover the research record, not the code; both read
+only committed files and no private key:
+
+```bash
+PYTHONPATH=python/src python3 tools/verify_signatures.py   # every signed document vs the pinned trust root (docs/governance/TRUST_ROOT.md)
+python3 tools/data_manifest.py check                       # every dataset version cited by a prereg or ledger is listed in research/data_manifest.json
+```
+
+`verify_signatures.py --strict` (the reviewer and release run it on a
+full-history clone) also fails on a blackboard anchor whose commit is not in
+the clone; without `--strict` that item reads `UNVERIFIABLE-HERE`.
+`data_manifest.py generate --data-root data/real` rebuilds the manifest from a
+local data root (the real data is git-ignored).
 
 ## Supply-chain checks (v1.14)
 

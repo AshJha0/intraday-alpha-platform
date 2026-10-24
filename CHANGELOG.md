@@ -6,7 +6,7 @@ releases; v1.1.0 has a git tag but no GitHub release, so its entry comes from
 the annotated tag message and the changes recorded in the repository for
 that tag.
 
-## v1.18.0 — 2026-10-24
+## v1.18.0 — 2026-10-23
 
 **Theme: a measurement instrument and recorded negative results. No signal is promoted and no edge is claimed.**
 v1.18 builds the machinery that makes a research or execution number trustworthy (signed pre-declarations that

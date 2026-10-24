@@ -45,11 +45,14 @@ the order would have done under the simulator's queue rules. Reports Brier score
 baseline (the fit set's pooled fill rate, constant), the skill, reliability bins, and per-venue and per-queue-tercile
 cells (tercile edges from the fit set only). A day in both sets is refused. The label is tape-implied, not a measured
 fill; this checks the hazard against its own label generator out of sample, not the queue rules against real fills.
-The real-data run is a later job (`tests/test_paper_sim_to_real.py` uses synthetic data only). Its runner, wrapper and
-unsigned draft pre-declaration (proposed fit/score split, K, stop rules) are in `research/execution/rel05/`; nothing has
-been signed or run.
+`tests/test_paper_sim_to_real.py` uses synthetic data only. The real-tape run is in `research/execution/rel05/` (runner,
+wrapper, pre-declaration, report); the pre-declaration was signed (`research/preregs/rel05_prereg.json`) and the run is
+on main with its result in `research/execution/rel05/REPORT.md`: AAPL inconclusive (pooled skill 0.0218), MSFT inconclusive
+(0.0111), QQQ supports (0.0839); supported on all symbols: no. Evaluation rests on G = 3 days, so no p-value or interval is
+claimed, and **Level 2 remains not validated**.
 
 ## Not done here
 
-A recorded real day replayed through the TOPS oracle with 0 mismatches (needs real data, not run); Level 2; any
-live or broker path.
+A recorded real-order day replayed through the harness (no real orders or fills exist, decision D4(a)); Level 2; any
+live or broker path. The REL-04 capture-timestamp verification (`research/v118/rel04_verify/REPORT.md`) is a data identity check on
+six IEX days, not a fill validation.

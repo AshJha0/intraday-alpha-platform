@@ -275,7 +275,8 @@ Run id `58a10f2194a3c81c`, 15,805 events, 800 decisions, 231 parent orders,
 496 children generated / 347 submitted, 163 fills, fill rate 15.4 %
 (v1.14.0). Trace digest
 `a7f1ee6066f6eba9398f93efd0e6ce16dba63f846fba65537a248e08c5fd37d1`
-(`config_version` `62d78a3b…`).
+(`config_version` `cf04592c…` since the v1.17.0 regenerate bundle; `62d78a3b…` at v1.14.0).
+The golden is unchanged in v1.18.0: `test_mvp_golden.py` passes on main.
 Wall time: about 2.2× the v1.3.0 session on the same machine (27 s → 59 s on
 the laptop this was measured on; 0.8 s of that is feed generation and
 normalisation) — there are 800 decisions to make instead of 355.
@@ -463,7 +464,7 @@ were flat (target == position + in-flight).
 | Lifecycle: paper evidence for the CANDIDATE alphas, registry untouched | done | `paper_evidence.json`; `test_mvp.py::test_paper_evidence_and_report_are_consistent` |
 | Golden pinned for ports | done | `tests/golden/expected_mvp.json`; `python/tools/make_golden_mvp.py` |
 | Deployment consistency | done | `configs/mvp/*` in `deployment/k8s/configmap-configs.yaml` and the `items[]` of `platform-metrics.yaml` (was `java-platform.yaml`) / `cronjob-data-pipeline.yaml`; `tests/harness/check_deployment.py` 16 passed / 0 failed / 2 skipped (promtool, kubeconform absent); `Dockerfile.python` documents `python3 -m iap.mvp ... --repo-root /app`, sets `IAP_SCHEMA_DIR=/app/schemas` and bakes `research/alpha_registry.json` (the wheel also carries `schemas/` as `iap/_schemas`; `tests/integration/test_installed_package.py` runs the tiny MVP from a non-editable install outside the checkout); `data/mvp/` git-ignored |
-| Testing: unit / golden / replay / integration levels | done | `python/tests/test_mvp.py` (38), `python/tests/test_mvp_golden.py` (5), `tests/replay/test_mvp_replay_determinism.py` (2), `tests/integration/test_mvp_end_to_end.py` (2); full Python suite 1,360 passed in 71 s |
+| Testing: unit / golden / replay / integration levels | done | `python/tests/test_mvp.py` (40), `python/tests/test_mvp_golden.py` (5), `tests/replay/test_mvp_replay_determinism.py` (2), `tests/integration/test_mvp_end_to_end.py` (2); these 49 tests collect on main at v1.18.0; the full suite counts are in the v1.18.0 release notes (CI run 40015853764: 3,666 passed on Python 3.11). The 1,360-passed figure of the original build is history |
 | Documentation | done | this file; COOKBOOK recipes 22–24; `python/src/iap/README.md`; `schemas/MIGRATIONS.md` 2026-09-20 |
 | Honest reporting: cost-negative result stated, IC audited and stated with its definition | done | `report.md` (`alpha.ic_definition`), §7 above |
 
@@ -616,3 +617,13 @@ conformal run can never be mistaken for the pinned one.
                                              "gamma": 0.005, "window": 500,
                                              "warmup": 30, "ref_width": null } }
 ```
+
+## 12. v1.18.0 status
+
+The MVP loop, its configuration and its golden did not change in v1.18.0
+(`iap.mvp`, `configs/mvp/` and `tests/golden/expected_mvp.json` have no
+v1.18 commit). It remains a deterministic plumbing demonstration: the
+cost-negative result of section 7 stands, no alpha was promoted in v1.18.0,
+and the simulator it uses is validated at Level 1 (deterministic replay)
+only, not against real fills (`research/execution/rel05/REPORT.md`).
+
