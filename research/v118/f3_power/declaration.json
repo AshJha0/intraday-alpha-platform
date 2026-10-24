@@ -86,7 +86,18 @@
     "tau_dry": 0.25,
     "regime": "a0",
     "rule": "for every a0 (G, K, d): pi_ref - tau <= phat <= min(1, pi_ref + excess) + tau, pi_ref = noncentral-t P(T'(G-1, d) >= t_{1-alpha_op/K}(G-1)), excess = 1 - (1 - alpha_op/K)^(K-1); evaluated FIRST, before any power estimate, MDE80 or ratio is computed or shown",
-    "on_failure": "run declared VOID (programming integrity): DECISION.json status VOID_INTEGRITY with the offending (G, K, d); no power table, MDE80 or ratio is produced; no estimate from the run may be cited; a corrected package needs the full sign-off route with FRESH seeds"
+    "on_failure": "run declared VOID (programming integrity): DECISION.json status VOID_INTEGRITY with the offending (G, K, d); no power table, MDE80 or ratio is produced; no estimate from the run may be cited; a corrected package needs the full sign-off route with FRESH seeds",
+    "tau_note": "tau is a heuristic tolerance: numerically five times the worst-case binomial standard error (0.005 at n = 10,000); it is NOT a simultaneous confidence guarantee across the grid and the band is a programming-integrity check, not evidence of calibration",
+    "excess": {
+      "formula": "excess_K = 1 - (1 - alpha_op/K)^(K-1)",
+      "value_by_K": {
+        "3": 0.013288888888889017,
+        "6": 0.016555925309053365,
+        "16": 0.01858682284850044
+      },
+      "comparison": "under a0 the K-1 null p-values are exact (Student t on independent normal sessions) and independent of the planted hypothesis; P(at least one null p <= alpha_op/K) is the probability that the first Holm step rejects a null, which is the only way the planted hypothesis can be rejected with its own p above alpha_op/K; so power lies in [pi_ref, pi_ref + excess_K]",
+      "why": "it is the exact value of that probability at alpha_op = 0.020, evaluated once per K and frozen here; power_math.excess must reproduce these values to 1e-12 (checked by check_freeze and a test)"
+    }
   },
   "dry_run": {
     "n": 200,

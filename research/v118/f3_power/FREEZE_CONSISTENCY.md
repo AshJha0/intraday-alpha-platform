@@ -24,5 +24,13 @@
 | integrity band sanity: at d = 0 the reference equals alpha_op / K | OK |
 | analytic reference reaches 80 % at d = 16 for every a0 (G, K): the grid can contain every homogeneous MDE80 | OK |
 | effect formula in the declaration is mu = d * sigma_RMS / sqrt(G) | OK |
+| mu = d * sigma_RMS / sqrt(G) is the only effect expression in the declaration, protocol, code and this check | OK |
+| the shift code computes d * sigma_rms / sqrt(g) | OK |
+| integrity.excess is specified in the declaration (formula, comparison, why) for exactly the K set | OK |
+| declared excess values equal the analytic 1 - (1 - alpha_op/K)^(K-1) to 1e-12 | OK |
+| the declaration states that tau is a heuristic tolerance, not a simultaneous guarantee | OK |
+| no document says tau is five times the standard error without the heuristic qualification | OK |
+| bind: the imported acceptance core.py is in the bound script list (identity records its LF-normalised sha256) | OK |
+| the acceptance core.py hash e17cf0719d9d26c6... equals the hash bound by the signed acceptance prereg | OK |
 
-22/22 checks OK.
+30/30 checks OK.

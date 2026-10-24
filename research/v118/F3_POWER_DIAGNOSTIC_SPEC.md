@@ -40,12 +40,9 @@ values have unit variance before scaling, so sigma_g is the session standard dev
 scaled per session. **d is the noncentrality-scale effect, not a raw per-session standardised shift**: for a0 the t statistic has noncentrality
 exactly d (the mean of G values has standard error sigma_RMS/sqrt(G) = 1/sqrt(G)).
 
-*Consistency note (a flagged inconsistency in the decision's own wording).* Part 1 item 2 of the decision writes
-Delta = d * sqrt((1/G) * sum sigma_g^2), which has no 1/sqrt(G); part 3 item 1 states mu = d * sigma_RMS / sqrt(G) "as specified in the actual
-document" and calls d the noncentrality-scale effect. The two agree when Delta is read as the *RMS-scale-times-d* quantity and mu = Delta/sqrt(G) is the shift
-actually added to each session value; if Delta were read as the added shift, d would be a raw per-session effect, which part 3 item 1 rules out.
-This specification follows part 3 item 1 (and the revision 1 text); the freeze package states mu, not Delta, and a unit test checks that the added shift
-equals d * sigma_RMS / sqrt(G). The reviewer's confirmation of this reading is requested in the cover note.
+*Resolved wording issue.* The decision's earlier part 1 item 2 wrote Delta = d * sqrt((1/G) * sum sigma_g^2), without 1/sqrt(G). The reviewer's freeze decision
+(`docs/release/REVIEWER_F3_POWER_FREEZE_DECISION_2026-10-24.md`, item 1) confirms that the earlier wording was inconsistent and that the authoritative definition is the
+one above: **mu = d * sigma_RMS / sqrt(G)**, d the noncentrality-scale effect; the expression without 1/sqrt(G) is not used anywhere in the package (a test checks it).
 
 ## 4. Design
 
@@ -110,8 +107,9 @@ Not a hypothesis test and not a power result. For **a0** (analytic reference exi
 
 Rationale: Holm rejects the planted hypothesis whenever its p <= alpha_op/K, which gives pi_ref (a lower bound for power); it can also be rejected after
 a null is rejected, which needs some null p <= alpha_op/K (a0 nulls are exact, independent of the planted one), which bounds the extra by `excess`.
-tau = 0.025 is five times the worst-case Monte Carlo standard error (0.005 at n = 10,000), so a chance violation over the 108 combinations has
-probability < 1e-4.
+tau = 0.025 is a **heuristic tolerance**: numerically five times the worst-case binomial standard error (0.005 at n = 10,000), but not a simultaneous confidence
+guarantee across the 108 combinations and not evidence of calibration (reviewer clarification, 2026-10-24). `excess` is fixed per K in `declaration.json`
+(`integrity.excess`: 0.0132889, 0.0165559, 0.0185868 for K = 3, 6, 16).
 
 * **Failure handling (frozen).** The check is evaluated first, on the finished a0 cells, **before any power estimate, MDE80, ratio or table is
   computed or displayed**. If any combination is outside its band, the run is declared **VOID (programming integrity)**: DECISION.json records

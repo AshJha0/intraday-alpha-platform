@@ -58,7 +58,7 @@ def test_freeze_check_detects_a_drifted_protocol(tmp_path, monkeypatch):
     (tmp_path / "PROTOCOL.md").write_text(drift, encoding="utf-8")
     monkeypatch.setattr(cf_, "HERE", tmp_path)
     shutil.copy(D / "declaration.json", tmp_path / "declaration.json")
-    for name in ("power_core.py", "power_math.py", "run_f3_power.py"):
+    for name in ("power_core.py", "power_math.py", "run_f3_power.py", "check_freeze.py"):
         shutil.copy(D / name, tmp_path / name)
     names = {n for n, ok, _ in cf_.run_checks() if not ok}
     assert any("freeze-params" in n for n in names)
@@ -72,6 +72,7 @@ def test_freeze_check_detects_a_hard_coded_parameter(tmp_path, monkeypatch):
         "power_core.py",
         "power_math.py",
         "run_f3_power.py",
+        "check_freeze.py",
     ):
         shutil.copy(D / name, tmp_path / name)
     p = tmp_path / "power_math.py"
@@ -121,6 +122,9 @@ def signed(tmp_path, monkeypatch):
     for rel in [*fp.BOUND, *fp.INPUTS, DECL["protocol"]]:
         (r / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(REPO / rel, r / rel)
+    shutil.copy(
+        REPO / "python" / "requirements-ci.txt", r / "python" / "requirements-ci.txt"
+    )  # the bound lock
     priv, pub = signing.generate_keypair()
     (r / "research" / "agents").mkdir(parents=True)
     (r / "research" / "agents" / "trust_roots.json").write_text(
@@ -329,3 +333,92 @@ def test_effect_size_quantities_are_distinguished_and_boundaries_are_never_inven
         if isinstance(v, float):
             assert DECL["grid"][0] <= v <= DECL["grid"][-1]
     assert np.isinf(pm.HIGH) and pm.LOW < 0
+
+
+# ------------------------- reviewer documentation checks (freeze decision, item 4) --
+def test_mu_is_defined_one_way_everywhere():
+    """Documentation check 1a: no file of the package writes the shift without the 1/sqrt(G) factor."""
+    rx = cf_.UNDIVIDED_MU
+    assert rx.findall("mu = d * sigma_RMS / sqrt(G)") == []
+    assert rx.findall("d * sigma_rms(decl, regime, g) / math.sqrt(g)") == []
+    assert (
+        rx.findall("the shift is d * sigma_RMS") != []
+    )  # the detector does fire on the wrong form
+    assert rx.findall("Delta = d * sigma_RMS") != []
+    for name in cf_.PACKAGE_FILES:
+        assert rx.findall((D / name).read_text(encoding="utf-8")) == [], name
+    assert "Delta" not in DECL["effect"]["formula"]
+    assert "mu = d * sigma_RMS / sqrt(G)" in (D / "PROTOCOL.md").read_text(encoding="utf-8")
+
+
+def test_excess_is_fully_specified_declared_and_bound(signed):
+    """Documentation check 1b: value, analytic comparison and justification are in the bound declaration, and the
+    band the runner applies uses the declared values."""
+    ex = DECL["integrity"]["excess"]
+    declared = {int(k): v for k, v in ex["value_by_K"].items()}
+    assert sorted(declared) == DECL["families"]
+    for k, v in declared.items():
+        assert abs(v - (1 - (1 - DECL["alpha_op"] / k) ** (k - 1))) < 1e-12
+        assert abs(v - pm.excess(DECL["alpha_op"], k)) < 1e-12
+    assert "exact" in ex["comparison"] and "why" in ex and ex["formula"].startswith("excess_K")
+    r, _ = signed
+    block = json.loads((r / DECL["prereg"]).read_text())["analysis_identity"]
+    assert block["thresholds"]["integrity"]["excess"] == ex  # bound in the signed identity
+    # the band uses the declared value: a declared excess of 0 narrows the upper edge to pi_ref + tau
+    lo, hi = pm.band(DECL["alpha_op"], 7, 3, 4.0, DECL["integrity"]["tau"], declared[3])
+    lo0, hi0 = pm.band(DECL["alpha_op"], 7, 3, 4.0, DECL["integrity"]["tau"], 0.0)
+    assert hi - hi0 == pytest.approx(declared[3]) and lo == lo0
+    bad = {(7, 3, 4.0): pm.pi_ref(DECL["alpha_op"], 7, 3, 4.0) + 0.02}
+    assert pm.integrity_violations(DECL["alpha_op"], bad, DECL["integrity"]["tau"], {3: 0.0}) == []
+    assert pm.integrity_violations(DECL["alpha_op"], bad, 0.001, {3: 0.0}) == [(7, 3, 4.0)]
+
+
+def test_tau_is_described_as_a_heuristic_tolerance_everywhere():
+    """Named clarification: never 'five times the standard error' without the heuristic qualification."""
+    note = DECL["integrity"]["tau_note"]
+    assert "heuristic tolerance" in note and "NOT a simultaneous confidence guarantee" in note
+    for path in (D / "PROTOCOL.md", REPO / "research/v118/F3_POWER_DIAGNOSTIC_SPEC.md"):
+        text = path.read_text(encoding="utf-8")
+        assert "heuristic tolerance" in text and "simultaneous confidence" in text, path.name
+        for m in re.finditer(r"five times", text):
+            assert "heuristic tolerance" in text[max(0, m.start() - 250) : m.end() + 250], path.name
+
+
+def test_the_imported_acceptance_core_is_bound_by_its_exact_sha256(signed):
+    """Documentation check 2: the signed identity binds f3_accept/core.py by its LF-normalised sha256, together with the
+    power-study code, declaration, protocol, dependency lock and installed environment; the hash equals the one bound
+    by the signed acceptance prereg; a stale copy is refused."""
+    import hashlib
+
+    from iap.agents import analysis_identity as ai
+
+    r, rec = signed
+    block = json.loads((r / DECL["prereg"]).read_text())["analysis_identity"]
+    rel = "research/v118/f3_accept/core.py"
+    text = (REPO / rel).read_bytes().decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+    want = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    assert block["scripts"][rel] == want == ai._norm_sha(REPO / rel)
+    acc = json.loads((REPO / "research/preregs/f3_accept_prereg.json").read_text())
+    assert (
+        acc["analysis_identity"]["scripts"][rel] == want
+    )  # the very code behind the accepted result
+    for s in fp.BOUND:
+        assert s in block["scripts"], s
+    assert block["thresholds"] == DECL and block["data_versions"] == ["synthetic-no-data"]
+    assert (
+        block["deps_lock_sha256"]
+        and block["environment"]
+        and block["interpreter"]
+        and block["code_tree_sha256"]
+    )
+    for i in fp.INPUTS:
+        assert i in block["inputs"], i
+    assert (r / DECL["protocol"]).is_file() and DECL[
+        "protocol"
+    ] == "research/v118/f3_power/PROTOCOL.md"
+    # a stale core.py in the execution checkout is refused
+    p = r / rel
+    p.write_text(p.read_text() + "\n# stale\n")
+    with pytest.raises(SystemExit) as e:
+        fp.verify(r / DECL["prereg"], DECL, r)
+    assert e.value.code == 2

@@ -9,6 +9,7 @@ required file and parameter is bound in the prereg identity.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -65,6 +66,19 @@ SPEC_PHRASES = (
     "frozen mapping",
     "first** index",
 )
+ACC_PREREG = "research/preregs/f3_accept_prereg.json"
+ACC_CORE_REL = "research/v118/f3_accept/core.py"
+PACKAGE_FILES = (
+    "PROTOCOL.md",
+    "declaration.json",
+    "power_core.py",
+    "power_math.py",
+    "run_f3_power.py",
+    "check_freeze.py",
+)
+# a shift expression built from the effect and the RMS scale must always be divided by sqrt(G)
+_SQ = r"(?:math\.)?sqrt\(\s*g\s*\)"
+UNDIVIDED_MU = re.compile(rf"d\s*\*?\s*sigma_rms(?!\s*/\s*{_SQ})(?!\([^)]*\)\s*/\s*{_SQ})", re.I)
 LITERALS = ("20301100", "20301900", "20301500", "10000", "5000", "0.025", "1000")
 
 
@@ -193,6 +207,57 @@ def run_checks() -> list[tuple[str, bool, str]]:
     chk(
         "effect formula in the declaration is mu = d * sigma_RMS / sqrt(G)",
         "mu = d * sigma_RMS / sqrt(G)" in decl["effect"]["formula"],
+    )
+    # --- documentation check 1: one definition of mu everywhere; excess fully specified and bound
+    undivided = {
+        n: UNDIVIDED_MU.findall((HERE / n).read_text(encoding="utf-8")) for n in PACKAGE_FILES
+    }
+    chk(
+        "mu = d * sigma_RMS / sqrt(G) is the only effect expression in the declaration, protocol, code and this check",
+        not any(undivided.values()),
+        str({n: v for n, v in undivided.items() if v}),
+    )
+    chk(
+        "the shift code computes d * sigma_rms / sqrt(g)",
+        "d * sigma_rms(decl, regime, g) / math.sqrt(g)"
+        in (HERE / "power_core.py").read_text(encoding="utf-8"),
+    )
+    ex = decl["integrity"]["excess"]
+    declared = {int(k): v for k, v in ex["value_by_K"].items()}
+    chk(
+        "integrity.excess is specified in the declaration (formula, comparison, why) for exactly the K set",
+        sorted(declared) == sorted(decl["families"])
+        and all(ex.get(k) for k in ("formula", "comparison", "why")),
+    )
+    chk(
+        "declared excess values equal the analytic 1 - (1 - alpha_op/K)^(K-1) to 1e-12",
+        all(abs(declared[k] - pm.excess(decl["alpha_op"], k)) < 1e-12 for k in declared),
+    )
+    chk(
+        "the declaration states that tau is a heuristic tolerance, not a simultaneous guarantee",
+        "heuristic tolerance" in decl["integrity"]["tau_note"]
+        and "NOT a simultaneous" in decl["integrity"]["tau_note"],
+    )
+    chk(
+        "no document says tau is five times the standard error without the heuristic qualification",
+        all(
+            "five times" not in t or "heuristic tolerance" in t
+            for t in (proto, spec, json.dumps(decl))
+        ),
+    )
+    # --- documentation check 2: the imported acceptance core is bound by its exact fingerprint
+    core_text = (ROOT / ACC_CORE_REL).read_bytes().decode("utf-8")
+    core_text = core_text.replace(chr(13) + chr(10), chr(10)).replace(chr(13), chr(10))
+    core_sha = hashlib.sha256(core_text.encode("utf-8")).hexdigest()
+    chk(
+        "bind: the imported acceptance core.py is in the bound script list (identity records its LF-normalised sha256)",
+        ACC_CORE_REL in args["scripts"]
+        and ACC_CORE_REL == str(pc.ACC_CORE.relative_to(ROOT).as_posix()),
+    )
+    acc_doc = json.loads((ROOT / ACC_PREREG).read_text(encoding="utf-8"))
+    chk(
+        f"the acceptance core.py hash {core_sha[:16]}... equals the hash bound by the signed acceptance prereg",
+        acc_doc["analysis_identity"]["scripts"].get(ACC_CORE_REL) == core_sha,
     )
     return out
 
