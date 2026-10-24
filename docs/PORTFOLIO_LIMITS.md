@@ -52,5 +52,6 @@ reverse direction (monitor says HALT, book stops) is `guard.halt(reason)`.
 ## Paper and live order paths
 
 Any paper or live order path calls `guard.check_order(...)` before it sends and treats
-`LimitRefused` as a reject. Wiring into the REL-05 recorder and the REL-18 order state is left to
-REL-18, which owns those files.
+`LimitRefused` as a reject. The REL-18 order manager's `pre_trade` gate does this through
+`iap.paper.supervisor.PaperSupervisor` (`python/src/iap/paper/supervisor.py`), together with the REL-16
+monitoring refusal. Paper path only; no broker (D4(a)).

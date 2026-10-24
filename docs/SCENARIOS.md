@@ -293,3 +293,15 @@ and fuzz corpus that the Rust and Java engines replay.
 | A leak the row-shift test cannot see | Rows are sparser than the horizon, so a one-row shift already spans it | A time-shift test lags the score by a quarter horizon; too few pairs reports not applicable, never a pass | RESEARCH_VALIDITY.md §4b | `test_time_shift_detector_fails_a_row_specific_leak_and_passes_a_signal`, `test_time_shift_detector_says_not_applicable_on_sparse_rows` |
 | An edited look ledger | A ledger entry is deleted to lower the Bonferroni bar | The ledger is a hash chain; loading fails; a branch's chain must extend the base's | GOVERNANCE.md §2c | `test_ledger_chain_detects_edits_and_is_recorded_on_prereg`, `test_monotone_check_requires_descent` |
 | A branch vouches for its own key | A PR adds a maintainer and signs the agent registry with that key | Trust roots are read from `origin/main`, so the new root counts only after it is merged | GOVERNANCE.md | `test_registry_must_be_signed_by_a_trust_root`, `test_anchors_verified_against_a_ref` |
+
+## v1.18 — measurement-instrument scenarios
+
+Python tests. These rows describe guards on research and the paper path, not trading results: v1.18.0 promoted no
+signal and claims no edge.
+
+| Scenario | Real-world example | Pinned behaviour | Contract | Tests (py) |
+|---|---|---|---|---|
+| A spent holdout is renamed or copied | A directory is renamed, symlinked or copied to dodge the path-string check | The holdout registry is keyed by content hash with per-session and per-symbol scope, so the new path is still refused; an unregistered real dataset fails closed | docs/REVIEW_PACK.md §2 (gate F4) | `test_bypass_renamed_directory`, `test_bypass_symlink`, `test_bypass_copied_directory`, `test_unregistered_real_dataset_fails_closed_synthetic_passes` (`test_holdout_registry.py`) |
+| Monitoring input goes missing or stale | A paper process stops sending heartbeats | The state is UNKNOWN, never ACTIVE, and UNKNOWN does not allow new risk; persisting reconciliation exceptions escalate to HALT | docs/MONITORING_POLICY.md §1, §4 | `test_missing_input_is_unknown`, `test_stale_input_is_unknown`, `test_reconciliation_exceptions_halt_when_persisting` (`test_monitoring.py`) |
+| A loss limit trips the kill switch, then a new day starts | Daily loss breached at 11:00; the next session opens | The kill switch latches; only a named operator `reset` clears it, and a reset is refused while a loss limit is still breached | docs/PORTFOLIO_LIMITS.md | `test_daily_loss_trips_latches_and_needs_explicit_reset`, `test_reset_refused_while_loss_still_breached` (`test_v118_portfolio_limits.py`) |
+| A risk-reducing order meets a breached book | A limit is already breached and the desk wants to cut the position | The pre-trade check refuses an order that makes the breach worse and lets a reducing order through | docs/PORTFOLIO_LIMITS.md | `test_order_path_refuses_and_allows_risk_reducing` (`test_v118_portfolio_limits.py`) |

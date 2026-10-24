@@ -26,7 +26,7 @@ def _junit(path, tests, skipped=0, failures=0):
     )
 
 
-def _artifacts(tmp_path, py_fast=2884, py_skip=17, slow=343, cpp=333, rust=(300, 76)):
+def _artifacts(tmp_path, py_fast=3687, py_skip=21, slow=398, cpp=333, rust=(300, 76)):
     d = tmp_path / "parity"
     _junit(d / "parity-python" / "junit.xml", py_fast, skipped=py_skip)
     _junit(d / "parity-python-slow" / "junit.xml", slow, skipped=2)
@@ -54,7 +54,7 @@ def _artifacts(tmp_path, py_fast=2884, py_skip=17, slow=343, cpp=333, rust=(300,
 def test_derive_matches_the_run_all_definitions(tmp_path):
     counts = pc.derive(_artifacts(tmp_path))
     assert counts["tests"] == {
-        "python": 2867 + 341,  # passed = tests - skipped, fast + slow
+        "python": 3666 + 396,  # passed = tests - skipped, fast + slow
         "cpp": 333,
         "rust": 376,
         "integration": 35,
