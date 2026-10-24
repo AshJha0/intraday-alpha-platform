@@ -582,3 +582,10 @@ message (`estimate_calibration(markout_unit="touch_order")`, CLI
 nearly identical observations; on the golden vector the 1 s sample halves
 and the standard error barely moves (COOKBOOK recipe 73). The default is
 still `message`, so no TCA report or golden changed.
+
+### 1.12 v1.18 portfolio risk layer (REL-17; Python only, not a port contract)
+
+`iap.portfolio.factor_risk` (factor risk model, Euler contributions, VaR / ES, stress scenarios;
+[docs/FACTOR_RISK.md](docs/FACTOR_RISK.md)), `iap.risk.portfolio_limits` (`PortfolioGuard`, `LimitRefused`, kill switch)
+and `iap.portfolio.enforced` (`solve_enforced`, the optimizer under the limits; [docs/PORTFOLIO_LIMITS.md](docs/PORTFOLIO_LIMITS.md)).
+The order-level hard risk engine (`iap.risk.engine`, Rust parity) is unchanged.

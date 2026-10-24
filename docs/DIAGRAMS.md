@@ -43,7 +43,7 @@ flowchart TD
 ## 2. Cross-language golden-test topology
 
 How one validated Python reference pins three implementations. The parity table is
-printed by `tests/harness/run_all.sh` (python 3208 · cpp 333 · rust 376
+printed by `tests/harness/run_all.sh` (python 4062 · cpp 333 · rust 376
 tests; 217/74/75 in the golden groups — the Rust gate runs twelve golden
 targets; the Java engine is archived in v1.15, `archive/java/`). Two goldens are
 owned by a port language and consumed by Python as well: the fills golden
@@ -1233,10 +1233,11 @@ flowchart TD
 ## 25. Release roadmap, v1.9 to v1.11
 
 Plan items by release (docs/ROADMAP.md §3.4-3.6). v1.9.0 and v1.10.0 are
-released; v1.11.0 is this release. The real-data studies are running on
-their own branches, are exploratory and in-sample, and have no result
-reported here. Deferred items wait on data (A2, A3) or on evidence that a
-richer model is warranted (AI4).
+released, and so is v1.11.0 (2026-10-10). This is the history as of v1.11.0;
+the current release is v1.18.0 (§41). The real-data studies were running on
+their own branches at that point, exploratory and in-sample, with no result
+reported here. Deferred items waited on data (A2, A3) or on evidence that a
+richer model is warranted (AI4, closed in v1.16 on an in-sample failure).
 
 Source: [`diagrams/release_roadmap_v19_v111.mmd`](diagrams/release_roadmap_v19_v111.mmd).
 
@@ -1253,13 +1254,13 @@ flowchart LR
         X["X1-X3 Almgren-Chriss,<br/>urgency, volume curve"]
         G["G1-G4 costed, code-bound, anchored,<br/>Ed25519-signed preregs"]
     end
-    subgraph V111["v1.11.0, this release"]
+    subgraph V111["v1.11.0 (2026-10-10), released"]
         E2["E2 Rust features via pyo3<br/>(opt-in --engine rust)"]
         E3["E3 polyglot policy:<br/>18 canonical / 20 frozen, nothing deleted"]
         AI3["AI3 model registry, drift,<br/>calibration, shadow mode"]
         AI12["AI1-AI2 LLM research agent<br/>through the signed broker + evals"]
     end
-    subgraph RUN["running (exploratory, in-sample, pre-registered)"]
+    subgraph RUN["running at v1.11.0 (exploratory, in-sample, pre-registered)"]
         MS["maker study, 7 real sessions<br/>(research/maker-real)"]
         AUC["AUC01 auction + M5 quoting on real files<br/>(research/step2; AUC01 has a 2026 holdout)"]
     end
@@ -1611,7 +1612,7 @@ Source: [`diagrams/v116_monetisation_decision.mmd`](diagrams/v116_monetisation_d
 ```mermaid
 flowchart TD
     %% v1.16 monetisation path. Sources: docs/research/R7_RESULTS.md, research/v116/MONETISATION_P0-6.md,
-    %% research/quoting_real/prereg_v2*.json, research/r7/AI4_DEFERRED.md.
+    %% research/quoting_real/prereg_v2*.json, research/r7/AI4_CLOSED_v116.md (supersedes AI4_DEFERRED.md).
     R7["R7 confirmed (v1.15): EQ10@1s, EQ05@1s<br/>predictive on 7 holdout sessions; net P&L at 1x cost 0"] --> P0["v1.16 P0-1..P0-5 cost realism<br/>(parent impact, residual fit, v3 prereg keys, SOR opt-ins, exact POV)"]
     P0 --> STUDY["P0-6 in-sample monetisation study<br/>tools/v116_monetisation_study.py<br/>480 cells: hold x band x signal x sizing x cost x latency<br/>10 in-sample sessions, R7 holdout refused"]
     STUDY --> RES["zero trades in every cell:<br/>expected return ~0.1-0.2 bp vs round trip ~0.8-1.2 bp"]
@@ -1621,7 +1622,7 @@ flowchart TD
     Q2 --> QV{"validity gate, then verdict"}
     QV -- "EXISTS (in-sample)" --> OOS["worth an out-of-sample test<br/>(needs its own registration)"]
     QV -- "NO DEMONSTRATED QUOTING EDGE<br/>or SKEW INERT" --> STOP["record the outcome; no monetisation claim"]
-    AI4["AI4 deep LOB (deferred from v1.15):<br/>registration cannot be honoured as written;<br/>no real-data path on main"] -. "separate track; a new registration<br/>would supersede the signed one" .-> GO
+    AI4["AI4 deep LOB (deferred from v1.15):<br/>closed in v1.16, in-sample failure,<br/>no holdout look (AI4_CLOSED_v116.md)"] -. "closed; reopening needs<br/>a new registration" .-> GO
 ```
 
 ## 39. Quoting study v2: registration and the validity gate (v1.16)
@@ -1680,15 +1681,15 @@ flowchart TD
     end
 ```
 
-## 41. Release roadmap, v1.13 to v1.16
+## 41. Release roadmap, v1.13 to v1.18
 
-Successor of §25. v1.16 is Unreleased on main; AI4 on real data is deferred and not on main.
+Successor of §25. All of these are released (v1.18.0 on 2026-10-23); AI4 on real data was closed in v1.16 on an in-sample failure. The boxes are one-line summaries; the per-release scope is in `CHANGELOG.md` and `docs/release/`.
 
 Source: [`diagrams/release_roadmap_v113_v116.mmd`](diagrams/release_roadmap_v113_v116.mmd).
 
 ```mermaid
 flowchart LR
-    %% Release roadmap v1.13 to v1.16. Source: CHANGELOG.md (v1.13.0 to v1.15.0, Unreleased). Sibling of release_roadmap_v19_v111.mmd.
+    %% Release roadmap v1.13 to v1.16. Source: CHANGELOG.md (v1.13.0 to v1.18.0). Sibling of release_roadmap_v19_v111.mmd.
     subgraph V113["v1.13.0, released"]
         H["quality-review hardening:<br/>CI layout, hashed locks, LF artefacts"]
     end
@@ -1699,19 +1700,25 @@ flowchart LR
         R7["R7 confirmed: EQ10@1s, EQ05@1s on 7 holdout sessions"]
         MR["MVP on a real ITCH day; Java archived"]
     end
-    subgraph V116["v1.16, Unreleased (on main)"]
+    subgraph V116["v1.16.0 (2026-10-15), released"]
         P0["P0-1..P0-5 cost realism:<br/>rule 6b, residual fit, prereg v3, SOR opt-ins, exact POV"]
         P6["P0-6 monetisation study: NO-GO (taker)"]
         QV2["M5 quoting v2 registered"]
         EOD["MVP end-of-day flatten (opt-in)"]
         GV["fork-board archive, prereg touch check,<br/>multiple-testing table, simulator heaps"]
     end
-    subgraph DEF["deferred, not on main"]
-        AI4["AI4 deep LOB on real data<br/>(new registration needed)"]
+    subgraph V117["v1.17.0 (2026-10-16) and v1.17.1 (2026-10-17), released"]
+        XQ["execution quality: shortfall benchmark, second venue (IEX HIST),<br/>breadth book, statistics revision; B8 two-venue router negative"]
     end
-    H --> C --> R7 --> P0 --> P6 --> QV2
+    subgraph V118["v1.18.0 (2026-10-23), released"]
+        INS["measurement instrument: signed pre-declarations, holdout registry,<br/>one real-data ledger family, execution benchmark v2, replay harness<br/>(Level 1 only), paper order manager; no signal promoted, no edge claimed"]
+    end
+    subgraph DEF["closed in v1.16"]
+        AI4["AI4 deep LOB on real data<br/>(in-sample failure, research/r7/AI4_CLOSED_v116.md)"]
+    end
+    H --> C --> R7 --> P0 --> P6 --> QV2 --> XQ --> INS
     MR --> EOD
-    R7 -. "deferred" .-> AI4
+    R7 -. "closed" .-> AI4
 ```
 
 ## 42. Where to go deeper
@@ -1722,7 +1729,7 @@ flowchart LR
 | Governing institutional specification (verbatim) | [SPECIFICATION.md](SPECIFICATION.md) |
 | Teaching walkthrough of every subsystem | [../LEARN.md](../LEARN.md) |
 | How the quant, algo and AI sides work, top-down | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) |
-| 140 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
+| 200 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
 | Data model, views, SQLite/PostgreSQL portability, query cookbook | [DATA_MODEL.md](DATA_MODEL.md) |
 | The 7-state promotion lifecycle: gates, evidence, registry, bootstrap result | [LIFECYCLE.md](LIFECYCLE.md) |
 | The decision trace: record, ids, canonical JSON, digest, sinks, replay | [DECISION_TRACE.md](DECISION_TRACE.md) |
@@ -1734,6 +1741,8 @@ flowchart LR
 | v1.17 breadth: the universe rule and the cross-sectional book | [PORTFOLIO_BREADTH.md](PORTFOLIO_BREADTH.md) |
 | v1.17 signal research: the statistics revision, new models and gates | [SIGNAL_RESEARCH.md](SIGNAL_RESEARCH.md) |
 | v1.17 data sources: free Nasdaq and IEX days, process-and-delete | [DATA_SOURCES.md](DATA_SOURCES.md) |
+| v1.18 monitoring policy, factor risk, portfolio limits and kill switch, sim-to-real levels | [MONITORING_POLICY.md](MONITORING_POLICY.md), [FACTOR_RISK.md](FACTOR_RISK.md), [PORTFOLIO_LIMITS.md](PORTFOLIO_LIMITS.md), [SIM_TO_REAL.md](SIM_TO_REAL.md) |
+| v1.18 outside-reviewer pack | [REVIEW_PACK.md](REVIEW_PACK.md) |
 | Which language copy is canonical, which frozen; the `POLYGLOT-OVERRIDE` rule | [POLYGLOT.md](POLYGLOT.md) |
 | Research governance and the LLM agent's controls | [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2a-§2b |
 | The research methods (defaults since v1.5.0, with their legacy rules), the safe research store, gate eligibility | [RESEARCH_VALIDITY.md](RESEARCH_VALIDITY.md) |

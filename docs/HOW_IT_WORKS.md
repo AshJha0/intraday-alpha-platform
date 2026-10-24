@@ -6,7 +6,7 @@ research, execution algorithms, hard risk, machine learning, the AI / agent
 boundary, determinism. Every section ends with **where to look** (file
 paths) and **how to run it** (a command that works from a checkout).
 
-Three things to know before reading:
+Five things to know before reading:
 
 1. **All market data is synthetic.** A seeded generator produces every
    event. Every number below is a statement about that generator and this
@@ -49,6 +49,19 @@ Three things to know before reading:
    freezes most duplicated language copies (§7.1). Nothing in this
    document claims a profitable strategy. Sections 1-5 describe the bundled
    synthetic dataset unless they say otherwise.
+5. **v1.18.0 (2026-10-23) built a measurement instrument and recorded
+   negative results.** No signal was promoted, no edge is claimed (none in
+   latency either), and the execution fill model is validated at Level 1
+   (deterministic replay) only, not Level 2 (real fills). What shipped:
+   signed pre-declarations that bind the analysis identity, a fail-closed
+   holdout registry, one real-data ledger family (§2.7), execution
+   benchmark metrics and a replay harness, a known-null protocol whose
+   third version FAILED (conditional rejection about 4.3 % against
+   alpha 0.025, so no real-data false-positive control is claimed), a
+   paper order manager with write-ahead log and reconciliation, factor
+   risk and a kill switch, and a monitoring policy with an explicit UNKNOWN
+   state. Details and the open gates are in
+   `docs/release/v1.18.0_RELEASE_NOTES.md`.
 
 The commands assume the seeded dataset exists. If `data/features/` is
 empty, build it once (about two minutes):
@@ -292,6 +305,17 @@ denominator only grows: regenerating the data or changing the rules does
 not reset it. From that count come two yardsticks: the largest t expected
 from pure noise over that many trials (4.160 as of v1.17.0) and the Bonferroni
 threshold (4.447).
+
+*As of v1.18.0 (REL-02 ledger migration, `research/v118/REL02_LEDGER_MIGRATION.md`)
+the central ledger holds 6,826 looks over 640 distinct configurations, of
+which 256 entries (1,132 looks) are on real data (real-data N 24 -> 256) and 384
+are synthetic; the per-dataset real ledgers and the B7 and B8 execution studies
+were merged in as recorded entries, and every entry now carries `data_family`.
+The yardsticks at that count are an expected maximum null |t| of 4.20 and a
+Bonferroni |t| of 4.48. The figures in the paragraph above are the v1.17.0
+history; the gates still use the total look count. The count is still a lower
+bound, and one external ledger (13 real entries, 1,224 looks) is not merged
+(`research/v118/LEDGER_INVENTORY.md`).*
 
 Up to v1.4.0 the PROMOTE gate asked for t ≥ 3.0 whatever the count, and
 the report printed the yardsticks beside it. Since v1.5.0 the gate follows
@@ -1145,6 +1169,35 @@ monetise the signal.
   signed file and the registered draft verify. It is in-sample and
   exploratory; no result is reported here. DIAGRAMS.md §39.
 
+### 3.14 What v1.18 changed: a measurement instrument, not a strategy
+
+v1.18.0 (2026-10-23) changed how execution is measured and how far the
+simulator can be trusted, and it promoted nothing.
+
+- **Fill model: Level 1 only.** The replay harness (REL-05) reproduces
+  recorded fills deterministically (Level 1). The real-tape test of whether
+  the simulator predicts real fills (Level 2) gave AAPL and MSFT
+  inconclusive and QQQ supportive, so **Level 2 is not validated**
+  (`research/execution/rel05/REPORT.md`).
+- **Benchmark metrics (REL-03)** and **capped child execution with an
+  invariant suite** (`iap.execution.child_exec`) make the cost numbers
+  comparable across runs.
+- **Signed, run-once studies.** The B8 v2 two-venue study (6 comparisons,
+  none better than the pinned Nasdaq venue), REL-09, and REL-10 (one taker
+  cell loses money; the rest underpowered) are negative or underpowered.
+  The REL-08 one-session screen (7 variants) is underpowered. No latency
+  edge is claimed; the REL-04 verification supports an identity match on six
+  IEX overlap days only, not absolute IEX latency.
+- **Paper path (REL-16, REL-17, REL-18).** A monitoring policy with an
+  explicit UNKNOWN state (`docs/MONITORING_POLICY.md`), factor risk, limits,
+  a kill switch and capacity curves, and an idempotent paper order manager
+  with a write-ahead log and reconciliation (`iap.paper`). A 6-hour soak
+  passed on a synthetic feed with injected faults (15,037,543 messages,
+  2,931 process kills, 0 reconciliation exceptions); it is not a live-venue
+  test.
+
+Where to look: `docs/release/v1.18.0_RELEASE_NOTES.md`, `docs/EXECUTION_QUALITY.md`.
+
 ## 4. Risk: the engine that says no
 
 ### 4.1 The rule order
@@ -1573,8 +1626,8 @@ reason for each:
   trading path in any case.
 - **Agent debate.** Several agents arguing about 24 alphas on the same two
   sessions add no data. Evidence comes from sessions, and the ledger
-  already holds 5,732 looks as of v1.17.0 (`research/experiments.json`),
-  1,068 on the v1.3.0 dataset and 4,626 on the regenerated one. Debate multiplies looks; it does not add a
+  already holds 6,826 looks as of v1.18.0 (`research/experiments.json`; 5,732
+  as of v1.17.0), 1,068 on the v1.3.0 dataset and 4,626 on the regenerated one. Debate multiplies looks; it does not add a
   holdout. Pre-registration and a hidden reserve seed (built since v1.7)
   are what would score who was right, and they score one registered
   hypothesis at a time, which is what the v1.11 agent is limited to.
@@ -1738,7 +1791,7 @@ COOKBOOK recipes 60 and 65.
 | every pinned rule | [../PLATFORM_CONVENTIONS.md](../PLATFORM_CONVENTIONS.md) |
 | what is done and what is backlog | [ROADMAP.md](ROADMAP.md), [EPICS.md](EPICS.md) |
 | to run the pipeline on real historical files you obtained (ITCH 5.0, LOBSTER) | [REAL_DATA.md](REAL_DATA.md) |
-| what changed in each release, v1.1.0 to v1.13.0 | [../CHANGELOG.md](../CHANGELOG.md) |
+| what changed in each release, v1.1.0 to v1.18.0 | [../CHANGELOG.md](../CHANGELOG.md) |
 | the real-data studies: 7 sessions, power, the 2026 holdout, auctions | [REAL_DATA.md](REAL_DATA.md) §3 |
 | the governance controls, one table | [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2a |
 | the LLM agent's controls and evals | [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2b |

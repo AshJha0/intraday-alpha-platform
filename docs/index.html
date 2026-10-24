@@ -115,7 +115,8 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     <div class="card"><h3>It is not</h3>
       <p>A profitable strategy: no alpha has been promoted. Not connected to a venue: there is no
          live order gateway, so the risk checks guard a simulator. Not a large-sample study: the
-         real data is nine Nasdaq sessions on AAPL, MSFT and QQQ, enough to show a signal exists and
+         real data is nine Nasdaq sessions on AAPL, MSFT and QQQ (plus, in-sample only, six Nasdaq / IEX overlap days
+         and a single-venue universe of about 20 Nasdaq names added by v1.18), enough to show a signal exists and
          too little to size it. Not four production services: the Java tree is an archived copy
          frozen at v1.14.0, not built and not a port target; only its risk engine is kept as the
          byte-identical mirror of the Rust one.</p></div>
@@ -135,17 +136,19 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     <tr><td>Do they pay?</td><td>No. A 1 s edge of ~0.07 bp against a ~0.7 bp taker round trip.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">LEARN §31</a></td></tr>
     <tr><td>Do they hold out of time?</td><td>4 of 4 confirmatory signals confirmed on two 2026 sessions, pre-registered first. Their size is not established, and those two days are spent.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/REAL_DATA.md">REAL_DATA §3.2</a></td></tr>
     <tr><td>Does the closing-cross strategy work?</td><td>No demonstrated edge: +19.4 bp, 95% CI −254 to +293 bp, from 3 trades. Underpowered, not negative. Holdout not confirmed, 0 trades.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">LEARN §42</a></td></tr>
-    <tr><td>Can a maker do better than a taker?</td><td>No, not on real data (v1.16). Taker capacity: 0 of 45 cells break even. Two-sided quoting v2 (in-sample, 6 test sessions): every cell loses $5&ndash;7k per session, adverse selection about 4x the spread captured; skewing with EQ01/EQ05 cuts the loss by about $750&ndash;920 per session, so the signals help execution, not a standalone maker. Synthetic maker backtest: −6.7 bp per trip.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/ROADMAP.md">ROADMAP §3.8</a></td></tr>
+    <tr><td>Can a maker do better than a taker?</td><td>No, not on real data (v1.16). Taker capacity: 0 of 45 cells break even. Two-sided quoting v2 (in-sample, 6 test sessions): every cell loses $5&ndash;7k per session, adverse selection about 4x the spread captured; skewing with EQ01/EQ05 cuts the loss by about $750&ndash;920 per session, so the signals help execution, not a standalone maker. Synthetic maker backtest: −6.7 bp per trip.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/ROADMAP.md">ROADMAP §3.11</a></td></tr>
+    <tr><td>Is the fill model validated against real fills?</td><td>No. Level 1 (deterministic replay) only; Level 2 is not validated, because no real orders or fills exist. The v1.18 real-tape test: AAPL and MSFT inconclusive, QQQ supports; no latency edge is claimed.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/SIM_TO_REAL.md">SIM_TO_REAL</a></td></tr>
+    <tr><td>Does the statistical gate control false rejections on real data?</td><td>Not shown. The known-null calibration (null v3) failed: 4.3&nbsp;% conditional rejection against a 2.5&nbsp;% target in two cells, and the outside reviewer rejected the method as the gate.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/v118/known_null_v3_RESULT.md">known_null_v3_RESULT</a></td></tr>
     <tr><td>What does the full loop do?</td><td>Loses 82.84 USD on its golden session.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/MVP.md">MVP</a></td></tr>
   </table></div>
 
     <div class="honest new">
-    <strong>v1.18.0 (prepared 2026-10-24): a measurement instrument and recorded negative results. No signal promoted, no edge claimed.</strong>
+    <strong>v1.18.0 (released 2026-10-23): a measurement instrument and recorded negative results. No signal promoted, no edge claimed.</strong>
     <ul>
       <li><strong>Known-null calibration failed</strong> (null v3, 2026-10-23): 4.3&nbsp;% conditional rejection against a 2.5&nbsp;% target in two cells; the outside reviewer rejected the method as the gate. No real-data error-rate control is claimed.</li>
-      <li><strong>Every signed run is negative or underpowered</strong> (B8 v2, REL-05, REL-08, REL-09, REL-10). The fill model is validated at Level 1 (replay) only; no latency edge.</li>
-      <li><strong>Built:</strong> signed pre-declarations, a fail-closed holdout registry, an execution-correctness suite, monitoring with an UNKNOWN state, enforced portfolio limits, a resilient paper path (6-hour soak PASS).</li>
-      <li><strong>Open gates accepted for this tag:</strong> F3, F7, the reviewer's full findings memo; F5 partly met.</li>
+      <li><strong>Every signed run is negative or underpowered</strong>: B8 v2 (6 comparisons, none better than pinned Nasdaq), REL-05 (AAPL, MSFT inconclusive, QQQ supports), REL-08 (7 variants, all underpowered, defects found afterwards), REL-09 (underpowered), REL-10 (one taker cell rejected: <code>hid_imb</code> 1 min AAPL loses money; the rest underpowered). REL-08c was dropped. The fill model is validated at Level 1 (replay) only; no latency edge.</li>
+      <li><strong>Built:</strong> signed pre-declarations, a fail-closed holdout registry, one real-data ledger family, an execution-correctness suite, monitoring with an UNKNOWN state, enforced portfolio limits and a kill switch, a resilient paper path (60-minute and 6-hour soaks PASS on a synthetic feed, not a live venue).</li>
+      <li><strong>Open gates accepted for this tag:</strong> F3, F7, the reviewer's full findings memo; F5 was partly met at the tag and is met by the 2026-10-24 R7 re-issue (both R7 verdicts are now `ineligible` under the v1.18 rule).</li>
     </ul>
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/v1.18.0_RELEASE_NOTES.md">Release notes (v1.18.0)</a>,
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/CHANGELOG.md">CHANGELOG</a>.
@@ -176,13 +179,13 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
       <li><strong>B7 (signal-aware execution): closed 2026-10-16 on its in-sample result, no fresh test</strong>
           &mdash; no cell cheaper by the 2 bp minimum, the urgency arm dearer on TWAP/VWAP at 1&ndash;2 % ADV
           (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/preregs/B7_CLOSED_v117.md">B7_CLOSED_v117.md</a>).
-          B8 (two-venue router) real-data results ship in v1.17.1.</li>
+          B8 (two-venue router) real-data results shipped in v1.17.1.</li>
       <li><strong>Known gap:</strong> v1.17.0 has no release manifest, no lock-file SBOMs and no digest-pinned k8s
-          manifests (images were built, pushed and attested). Fixed by PR #211, ships with v1.17.1.</li>
+          manifests (images were built, pushed and attested). Fixed by PR #211, shipped with v1.17.1.</li>
     </ul>
     Also shipped: a real second venue (IEX HIST), an implementation-shortfall benchmark, quote fading,
     queue-aware cancels, budgeted LLM agents, and C++/Rust parity for the new rules.
-    Next: v1.17.1 (B8 real-data results, the remaining 8 IEX overlap days, the #211 manifest fix; B7 closed 2026-10-16).
+    Followed by v1.17.1 (B8 real-data results, more IEX overlap days, the #211 manifest fix) and v1.18.0 (above).
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/v1.17.0_RELEASE_NOTES.md">Release notes</a>,
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/CHANGELOG.md">CHANGELOG</a>,
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/SHOWCASE.md">Showcase</a>.
@@ -256,7 +259,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
      net-of-cost screen passes 0 of 22, and the v1.16 monetisation study found no taker, capacity,
      quoting or DeepLOB edge. Real-data and synthetic-data looks are counted separately below.</p>
   <div class="numbers">
-    Cross-language parity&nbsp;&nbsp;&nbsp; python 3208&nbsp; · cpp 333&nbsp; · rust 376 tests — 3,917 green, one command; golden groups 217/74/75 (Java archived in v1.15)<br>
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 4062&nbsp; · cpp 333&nbsp; · rust 376 tests — 4,771 green (main CI run 40015853764, 2026-10-23, v1.18.0); golden groups 217/74/75 (Java archived in v1.15)<br>
     Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in python, cpp and rust (Java archived in v1.15)<br>
     C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 2-CPU container (Intel Xeon 2.10 GHz, no pinning, steady_clock, cache-resident means; not colocation): IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
     Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly; the MVP run twice and replayed from its capture reproduces its trace digest<br>
@@ -469,12 +472,48 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     <div class="card"><h3>IEX second venue</h3>
       <p>IEX HIST is a free, daily second venue. 9 overlap days approved; day 1 (2025-11-28) is processed:
          148,115,121 IEX-TP messages, 0 sequence gaps, and the TOPS oracle shows 0 mismatches for AAPL, MSFT and
-         QQQ. The other 8 days are for v1.17.1.
+         QQQ (as of v1.17.0). 6 of the 9 days were recorded by v1.17.1; the v1.18 verification run found an identity pass on all six, and absolute IEX latency and Nasdaq skew are not claimed.
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/research/IEX_OVERLAP_SET.md">IEX_OVERLAP_SET</a></p></div>
     <div class="card"><h3>Agents</h3>
       <p>E1 spend ledger with a monthly cap of USD 30; E2 research assistant; E3 morning ops and E4 docs sync on a
          smaller model. The LLM never computes a number, signs, registers or merges.
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/AGENTS.md">AGENTS</a></p></div>
+  </div>
+
+  <h2>v1.18 results</h2>
+  <div class="grid">
+    <div class="card"><h3>Research authorisation</h3>
+      <p>A signed pre-declaration binds the script, the commit, the code, configs and lock, the dataset content
+         hashes and the thresholds; every runner re-checks it. Real data is read only through a fail-closed
+         holdout registry that decides by content, not path. One real-data ledger family: real-data N went from 24
+         to 256 configurations (6,826 recorded looks over 640 distinct configurations in all).
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/governance/ANALYSIS_IDENTITY.md">ANALYSIS_IDENTITY</a>,
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/governance/DATA_ACCESS_PATHS.md">DATA_ACCESS_PATHS</a>,
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/governance/TRUST_ROOT.md">TRUST_ROOT</a></p></div>
+    <div class="card"><h3>Known-null calibration: failed</h3>
+      <p>Null v1 passed vacuously, v2 failed, and v3 (run 2026-10-23) failed: 79 and 80 of 1,854 conditional
+         rejections (about 4.3&nbsp;%) against a 2.5&nbsp;% target. The outside reviewer rejected the method as the F3 gate,
+         so no real-data error-rate control is claimed. F3, F7 and the reviewer's findings memo are open, accepted
+         open for the tag.
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/v118/known_null_v3_RESULT.md">known_null_v3_RESULT</a>,
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/REVIEWER_CLOSEOUT_2026-10-23.md">reviewer close-out</a></p></div>
+    <div class="card"><h3>Execution measurement</h3>
+      <p>B8 v2 on real Nasdaq and IEX books: none of 6 comparisons better than pinned Nasdaq (3 sessions,
+         underpowered). The fill model passes Level 1 (replay); the real-tape test is inconclusive on AAPL and MSFT,
+         supports QQQ, and Level 2 is not validated. No latency edge.
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/execution/b8v2/REPORT.md">B8 v2</a>,
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/SIM_TO_REAL.md">SIM_TO_REAL</a></p></div>
+    <div class="card"><h3>Screens and signal studies</h3>
+      <p>REL-08 (one session, 7 variants) and REL-09 are underpowered; REL-10 rejects one taker cell
+         (<code>hid_imb</code> 1 min AAPL loses money) and leaves the rest underpowered; REL-08c was dropped
+         because the closing imbalance stream starts after the registered exit. Nothing is promoted.
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/v1.18.0_RELEASE_NOTES.md">Release notes</a></p></div>
+    <div class="card"><h3>Paper-path resilience</h3>
+      <p>Monitoring with an explicit UNKNOWN state, a factor risk model, enforced limits and a kill switch, and an
+         idempotent paper order manager with a write-ahead journal and reconciliation. 60-minute and 6-hour
+         fault-injection soaks pass on a synthetic feed (15,037,543 messages, 2,931 process kills, 0
+         reconciliation exceptions); not a live-venue soak.
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/MONITORING_POLICY.md">MONITORING_POLICY</a></p></div>
   </div>
 
   <h2>Start here</h2>
@@ -545,13 +584,13 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     <div class="card"><h3>Order books</h3>
       <p>L1/L2/MBO reconstruction with FIFO queues, pinned modify semantics, marketable
          crossing ADDs, snapshot recovery (incl. broken-burst rule), per-venue + consolidated
-         views, deterministic checkpoints — identical state in Python, C++, Rust and Java
-         after every event.</p></div>
+         views, deterministic checkpoints — identical state in Python, C++ and Rust (and Java, until
+         its archive at v1.14.0) after every event.</p></div>
     <div class="card"><h3>Feature factory</h3>
       <p>205 registered features across price, microstructure, order flow (OFI L1–L10),
          liquidity, volatility, time-of-day, cross-asset, venue, regime and execution
-         families; event-driven incremental engines in all four languages validated to 1e-9
-         against golden checkpoints. Since v1.11 the Rust engine is callable from Python
+         families; event-driven incremental engines in Python, C++ and Rust (Java until its archive)
+         validated to 1e-9 against golden checkpoints. Since v1.11 the Rust engine is callable from Python
          (pyo3, one abi3 wheel, opt-in <code>--engine rust</code>) for the 45 native slots;
          its row-by-row comparison with Python found and fixed a snapshot-burst bug the
          checkpoints could not see.</p></div>
@@ -578,13 +617,14 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     <div class="card"><h3>Portfolio construction</h3>
       <p>alpha'w − λ·w'Σw − tc(Δw) under position/gross/net/participation/turnover/
          vol-target and FX currency-exposure constraints; deterministic projected-gradient
-         production optimizer (Java) matching the Python reference to 1e-9, with a
-         constraint-audit report.</p></div>
+         optimizer (Python reference; the Java production port is archived at v1.14.0), with a
+         constraint-audit report. Since v1.18 a factor risk model and enforced limits with a kill switch
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/PORTFOLIO_LIMITS.md">PORTFOLIO_LIMITS</a>, <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/FACTOR_RISK.md">FACTOR_RISK</a>).</p></div>
     <div class="card"><h3>Fail-closed risk</h3>
       <p>Fat-finger, price-band, stale-price, position/notional/gross/net, loss limits,
          rate throttle, duplicate-order and self-match prevention, sequence-gap gating,
-         venue-disconnect handling and four-scope kill switches — Rust reference with Java
-         and Python ports, byte-identical audit logs, replayable. Since v1.3.0 also closed
+         venue-disconnect handling and four-scope kill switches — Rust reference with a Python
+         port (and the archived Java mirror), byte-identical audit logs, replayable. Since v1.3.0 also closed
          against future-stamped marks, NaN, integer overflow and router-bound orders under a
          venue kill, with an edge golden all three engines replay. Since v1.14 the audit log is a
          SHA-256 hash chain that survives restores, and SEC 15c3-5 pre-trade checks 23-29 run
@@ -593,7 +633,8 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
       <p>Market/limit/IOC/FOK, VWAP/TWAP/POV/IS parent algos, deterministic queue-position
          modeling for passive orders (pinned depletion rules), fees/rebates/impact,
          venue latency with seeded jitter, and fee-aware smart order routing — C++ reference
-         fills reproduced exactly by Java and Python. The simulator never fills more than the
+         fills reproduced exactly by Python (and the archived Java port). Since v1.18 a venue-aware capped child
+         simulator with an invariant suite (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/EXECUTION_QUALITY.md">EXECUTION_QUALITY</a>). The simulator never fills more than the
          market displayed or traded. Opt-in since v1.10 (Python only): an Almgren–Chriss IS
          trajectory and efficient frontier, alpha-driven urgency, and a VWAP on a forecast
          volume curve. Since v1.13, opt-in SEC Section 31 and FINRA TAF fees (default 0).</p></div>
@@ -637,7 +678,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     <div class="card"><h3>Alerting &amp; latency SLOs</h3>
       <p>Alertmanager routes <code>page</code>, <code>ticket</code> and a <code>Watchdog</code>
          heartbeat, with receiver URLs read from Secret files (nothing secret committed) and a local
-         echo sink for compose. Multi-window burn-rate SLOs on the existing JVM latency histograms
+         echo sink for compose. Multi-window burn-rate SLOs on the order-path and event-path latency histograms
          (99% under ~1.05 ms over 30 days) with promtool tests, and a state-backup CronJob. HA is
          one pod restarting and resuming from its checkpoint, not active-active
          (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/runbooks/RUNBOOK_alerting.md">RUNBOOK_alerting</a>).</p></div>
@@ -674,25 +715,25 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
          rolling-IC and lifecycle gauges are scraped in paper trading.</p></div>
     <div class="card"><h3>Cross-language golden parity</h3>
       <p>The Python reference generates validated golden vectors (events, book states,
-         codec SHA-256, features, alphas, risk decisions, fills, portfolio); C++, Rust and
-         Java must reproduce every one. <code>tests/harness/run_all.sh</code> prints the
+         codec SHA-256, features, alphas, risk decisions, fills, portfolio); C++ and Rust (and Java,
+         until its archive at v1.14.0) must reproduce every one. <code>tests/harness/run_all.sh</code> prints the
          parity table in one command. Agreement is not correctness: four engines can agree on
          a wrong rule, and engines that agree at every checkpoint can differ between them.</p></div>
     <div class="card"><h3>Contracts &amp; the Python reference ports</h3>
       <p>17 JSON Schemas mirrored by 22 frozen, validated Python contracts and 18 runtime-checkable
-         Protocols; canonical JSON reproduced byte for byte in four languages. Python ports of the
-         hard risk engine and the execution stack proven by the same goldens the Java ports use
+         Protocols; canonical JSON reproduced byte for byte in Python, C++ and Rust (Java until its archive). Python ports of the
+         hard risk engine and the execution stack proven by the same goldens the archived Java ports used
          (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/API_CONTRACTS.md">API_CONTRACTS</a>,
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/API_TRADING.md">API_TRADING</a>).</p></div>
     <div class="card"><h3>Promotion lifecycle</h3>
       <p>RESEARCH → CANDIDATE → VALIDATING → PAPER → ACTIVE ⇄ WATCH → RETIRED: 17 pinned edges, 20 gates
-         reading typed evidence, a byte-deterministic registry and transition log, ports in Java and
-         Rust from one golden. Bootstrapped on the bundled research: 23 CANDIDATE, 0 beyond.</p></div>
+         reading typed evidence, a byte-deterministic registry and transition log, a Rust port (and the archived Java one)
+         from one golden. Bootstrapped on the bundled research: 23 CANDIDATE, 0 beyond.</p></div>
     <div class="card"><h3>Decision trace &amp; data model</h3>
       <p>One validated record per decision — signal, portfolio, risk, orders, routing, fills, TCA,
          attribution — as canonical JSONL with a stream digest that an incident replay must
          reproduce, indexed by a SQLite/PostgreSQL-portable store (24 tables, 3 views) and rendered
-         by <code>explain()</code> identically in Python, Java, Rust and C++.</p></div>
+         by <code>explain()</code> identically in Python, Rust and C++ (and Java, until its archive).</p></div>
     <div class="card"><h3>The executable MVP</h3>
       <p><code>python -m iap.mvp run</code>: seeded feed → books → features → EQ01/EQ03/EQ06 →
          portfolio → hard risk → TWAP/POV/IS → SOR over three venues → simulator → TCA → trace →

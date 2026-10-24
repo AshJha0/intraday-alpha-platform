@@ -6,6 +6,23 @@
 > confirmed ([research/R7_RESULTS.md](research/R7_RESULTS.md)). Paid data
 > (Databento) was declined, and the v1.16 in-sample study did not trigger a
 > fresh-data purchase. The text below is kept as written.
+>
+> **Status at v1.18.0 (2026-10-23): what the "unseen" labels below became.** All ten
+> tier-1 sessions are ingested. The three in-sample days (2019-10-18, 2021-07-13,
+> 2021-08-13) are `in_sample` in the holdout registry
+> (`research/holdout_registry.json`); the seven holdout sessions (2025-11-28,
+> 2025-12-08..12, 2026-06-12) are **spent** for AAPL, MSFT and QQQ (R7-CONFIRM-1 read
+> them once; later signed v1.18 runs read several of them again) and are no longer a
+> holdout. R7-CONFIRM-1 is `confirmed` on its statistic for EQ10 and EQ05 at 1 s, but
+> the recorded result file is `gate_eligible: false` (run under bundle `v4` where `v2`
+> is required; DSR recorded at the wrong trial count); it was re-issued on 2026-10-24 at the registered N with the v1.18 rule applied (`ineligible`, see `docs/research/R7_RESULTS.md`). The DSR
+> recompute at N = 297 leaves both verdicts unchanged (gate F5, partly met in
+> v1.18.0). No signal is promoted and no net-of-cost edge followed. Tier 2 was never
+> bought. The A2 QQQ-basis study (section 7) has synthetic tests only: nothing in the
+> repository records an A2 run, and the 2025/26 datasets on the data root hold AAPL,
+> MSFT and QQQ only. The capacity figures of section 3 describe the machine of
+> 2026-10-11; the data root of 2026-10-24 is described in
+> [DATA_SOURCES.md](DATA_SOURCES.md).
 
 Plan item **R7** (IAP_Next_Releases_Plan): two to seven sessions are the
 power bottleneck of every real-data study. This document is the survey,

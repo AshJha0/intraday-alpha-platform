@@ -1,4 +1,4 @@
-# Data sources: free Nasdaq sample days, IEX HIST, and process-and-delete (v1.17 WS-A)
+# Data sources: free Nasdaq sample days, IEX HIST, and process-and-delete (v1.17 WS-A; status as of v1.18.0)
 
 The platform's real-data rule is **free data only, nothing downloaded without
 the owner's approval**. This page says which free sources exist, what the
@@ -21,9 +21,14 @@ The 2019-2020 Nasdaq days are the in-sample set; `research/breadth/candidates.js
 lists ten in-sample days (2019-01-30, 2019-03-27, 2019-07-30, 2019-08-30,
 2019-10-18, 2019-10-30, 2019-12-30, 2020-01-30, 2021-07-13, 2021-08-13) with the
 source URL, the file name and a note that the sha256 is recorded after download
-(Nasdaq publishes no checksum). Three are on disk; the other seven are
-re-downloads that wait for approval. The 2025/26 days are the holdout and are
-not in that manifest (see [PORTFOLIO_BREADTH.md](PORTFOLIO_BREADTH.md)).
+(Nasdaq publishes no checksum). All ten are ingested (`research/data_manifest.json`,
+section 6). On the data root of 2026-10-24 the vendor file was still on disk for
+four of them (2019-01-30, 2019-10-18, 2021-07-13, 2021-08-13); the other six were
+removed after ingest and are re-downloads that wait for approval
+(`data/real/itch/ARCHIVED_GZ_MANIFEST.txt`). The 2025/26 days are the holdout and
+are not in that manifest; for AAPL, MSFT and QQQ they are spent in the holdout
+registry, for every other name unread (see
+[PORTFOLIO_BREADTH.md](PORTFOLIO_BREADTH.md) and REAL_DATA.md section 3.7).
 
 Examples of size, from the committed record: the 2019-01-30 full-market file is
 368,366,634 messages (`research/breadth/UNIVERSE_2019-01-30.md`, with its
@@ -118,13 +123,23 @@ event file, the Parquet and the features.
 `breadth-universe` records the universe's share of the day's displayed volume
 for future estimates. `process_report.json` in each dataset directory holds the
 timings, the estimate, the guard reading and what was deleted; those files live
-under `data/real`, which is not committed, so **no wall-clock or peak-disk
-figure for a completed 100-name day is quoted here** (placeholder for the G5
-truth pass, from the first completed day's `process_report.json`).
+under `data/real`, which is not committed.
+
+**The completed 100-name day (2019-01-30, `breadth/ds_20190130`; this
+machine, 16 GB; `process_report.json`).** The report's last run resumed from
+markers (download, ingest and delete_raw were skipped), so it carries no
+end-to-end wall clock and none is quoted. Its recorded facts: the disk guard
+ran with a measured `peak_gb` override of 60 GB against the 829.95 GB
+symbol-scaled estimate and passed with 153.23 GB free; the Rust feature build
+of 100 feature files took 21,878 s (about 6.1 h); `KEEP.json` covers 207 kept
+files; the normalized IAP1 and Parquet were then deleted, freeing 7.24 GB.
+These figures come from one run on one machine and are not a benchmark.
 
 ## 5. The A4 IEX overlap set
 
-The nine Nasdaq 2025/26 sessions on disk are also on IEX HIST. `python -m
+The nine Nasdaq 2025/26 sessions on disk are also on IEX HIST. At v1.18.0 all
+nine are processed (the table's "state" column was last updated for the first
+six on 2026-10-17 and is completed below from the data manifest). `python -m
 iap.marketdata process-iex-day` (RUNBOOK_process_and_delete.md, IEX section)
 pairs each with the same day's IEX book for AAPL, MSFT, QQQ: DEEP+ is the
 book feed, TOPS its oracle (`book_verification`); the TOPS capture is read
@@ -133,8 +148,8 @@ vendor file on disk at a time), and after the feature build only features,
 manifests and `KEEP.json` stay. Approval (owner, 2026-10-15, verbatim in
 `research/v117/iex_overlap_manifest.json`): "A4 (IEX overlap days, needs your
 download approvals), = approved". Sizes are the HIST index of 2026-10-15; the
-sha256 of each capture is recorded in the day's `process_report.json` and in
-docs/research/IEX_OVERLAP_SET.md as the detached chain finishes the day.
+sha256 of each capture is recorded in the day's `process_report.json` and, for
+the first six days, in docs/research/IEX_OVERLAP_SET.md.
 
 | date | Nasdaq dataset | TOPS gz | DEEP+ gz | DEEP gz (not downloaded) | state |
 |---|---|---|---|---|---|
@@ -142,11 +157,21 @@ docs/research/IEX_OVERLAP_SET.md as the detached chain finishes the day.
 | 2025-12-08 | r7_20251208 | 9.30 GB | 8.99 GB | 9.43 GB | done 2026-10-16: oracle match 832,770 / 152,908 / 3,496,249 compared, 0 mismatched; 0.671 GB kept; captures deleted |
 | 2025-12-09 | r7_20251209 | 8.61 GB | 8.43 GB | 8.89 GB | done 2026-10-16: oracle match 711,762 / 101,120 / 3,045,150 compared, 0 mismatched; 0.706 GB kept; captures deleted |
 | 2025-12-10 | r7_20251210 | 12.29 GB | 11.45 GB | 11.74 GB | done 2026-10-16: oracle match 580,122 / 257,034 / 3,763,770 compared, 0 mismatched; 0.678 GB kept; captures deleted |
-| 2025-12-11 | r7_20251211 | 11.15 GB | 10.55 GB | 11.00 GB | queued |
-| 2025-12-12 | r7_20251212 | 13.67 GB | 12.71 GB | 12.98 GB | queued |
+| 2025-12-11 | r7_20251211 | 11.15 GB | 10.55 GB | 11.00 GB | processed (dataset `iex/iex_20251211` with `KEEP.json` in `research/data_manifest.json`); oracle counts are in its `process_report.json`, not copied here |
+| 2025-12-12 | r7_20251212 | 13.67 GB | 12.71 GB | 12.98 GB | processed (`iex/iex_20251212`, same record) |
 | 2026-05-15 | holdout2026 | 12.15 GB | 11.91 GB | 12.60 GB | done 2026-10-16: oracle match 706,497 / 131,039 / 4,554,801 compared, 0 mismatched; 1.001 GB kept; captures deleted |
 | 2026-05-18 | holdout2026 | 14.87 GB | 14.21 GB | 14.90 GB | done 2026-10-17: oracle match 1,262,241 / 80,378 / 2,403,225 compared, 0 mismatched; 0.765 GB kept; captures deleted |
-| 2026-06-12 | r7_20260612 | 15.62 GB | 14.69 GB | 15.33 GB | chain B: running |
+| 2026-06-12 | r7_20260612 | 15.62 GB | 14.69 GB | 15.33 GB | processed (`iex/iex_20260612`, same record) |
+
+**Capture-timestamp re-ingest (v1.18 REL-04).** Six of these days (2025-11-28,
+12-08, 12-09, 12-10, 2026-05-15, 05-18) were ingested a second time with
+`--capture-ts` into `iex_capts/`, so `receive_ts` is the capture host's packet
+stamp. The signed verification of 2026-10-23
+(`research/v118/rel04_verify/REPORT.md`) found the identity test passed on all
+six days: only `receive_ts` differs from the A4 datasets, and no within-capture
+latency is negative. The offset between the capture clock and IEX's send clock
+is unknown, so an absolute IEX feed latency and the skew against a Nasdaq stamp
+are not claimed.
 
 The rolling "recent IEX days" list (`tools/iex_hist.py recent --n 5`: the
 latest five HIST days with TOPS and DEEP+, `research/v117/iex_recent_manifest.json`)
@@ -176,6 +201,8 @@ refuses it.
   docs/research/IEX_OVERLAP_SET.md but in no small file on disk, so the
   manifest reproduces 8 of that document's 10 hashes
   (`python/tests/test_data_manifest.py` pins the two missing).
+- **State at v1.18.0.** The committed manifest lists 39 datasets
+  (`research/data_manifest.json`, regenerated from the data root).
 
 ## 7. IEX HIST terms of use
 
