@@ -1,0 +1,163 @@
+{
+ "x-version": 1,
+ "plan": "REL08_V2_CALIBRATION_PLAN_REV2.md",
+ "sessions_per_screen": 6,
+ "variants_per_screen": 7,
+ "bootstrap_draws": 9999,
+ "book": {
+  "alpha_bps": 20.0,
+  "risk_aversion": 100.0,
+  "solver_iters": 20
+ },
+ "bootstrap_seed": 20261020,
+ "null_cells": [
+  {
+   "cell": "N1S1",
+   "model": "N1",
+   "spread_regime": "S1",
+   "spread_multiplier": 1.0,
+   "role": "gating",
+   "replications": 200,
+   "seed_first": 20261100,
+   "seed_last": 20261299,
+   "checkpoint_replications_non_decisional": 100
+  },
+  {
+   "cell": "N1S4",
+   "model": "N1",
+   "spread_regime": "S4",
+   "spread_multiplier": 4.0,
+   "role": "gating",
+   "replications": 200,
+   "seed_first": 20262100,
+   "seed_last": 20262299,
+   "checkpoint_replications_non_decisional": 100
+  },
+  {
+   "cell": "N2S1",
+   "model": "N2",
+   "spread_regime": "S1",
+   "spread_multiplier": 1.0,
+   "role": "gating",
+   "replications": 200,
+   "seed_first": 20263100,
+   "seed_last": 20263299,
+   "checkpoint_replications_non_decisional": 100
+  },
+  {
+   "cell": "N2S4",
+   "model": "N2",
+   "spread_regime": "S4",
+   "spread_multiplier": 4.0,
+   "role": "gating",
+   "replications": 200,
+   "seed_first": 20264100,
+   "seed_last": 20264299,
+   "checkpoint_replications_non_decisional": 100
+  },
+  {
+   "cell": "N3S1",
+   "model": "N3",
+   "spread_regime": "S1",
+   "spread_multiplier": 1.0,
+   "role": "gating",
+   "replications": 200,
+   "seed_first": 20265100,
+   "seed_last": 20265299,
+   "checkpoint_replications_non_decisional": 100
+  },
+  {
+   "cell": "N3S4",
+   "model": "N3",
+   "spread_regime": "S4",
+   "spread_multiplier": 4.0,
+   "role": "gating",
+   "replications": 200,
+   "seed_first": 20266100,
+   "seed_last": 20266299,
+   "checkpoint_replications_non_decisional": 100
+  },
+  {
+   "cell": "N4S1",
+   "model": "N4",
+   "spread_regime": "S1",
+   "spread_multiplier": 1.0,
+   "role": "non-gating (stress)",
+   "replications": 200,
+   "seed_first": 20267100,
+   "seed_last": 20267299,
+   "checkpoint_replications_non_decisional": null
+  },
+  {
+   "cell": "N4S4",
+   "model": "N4",
+   "spread_regime": "S4",
+   "spread_multiplier": 4.0,
+   "role": "non-gating (stress)",
+   "replications": 200,
+   "seed_first": 20268100,
+   "seed_last": 20268299,
+   "checkpoint_replications_non_decisional": null
+  }
+ ],
+ "power_cells": [
+  {
+   "kind": "revert",
+   "amp": 6.0,
+   "role": "non-gating (power-side sanity check)",
+   "spread_multiplier": 1.0,
+   "replications": 30,
+   "seed_first": 20268500,
+   "seed_last": 20268529
+  },
+  {
+   "kind": "revert",
+   "amp": 12.0,
+   "role": "non-gating (power-side sanity check)",
+   "spread_multiplier": 1.0,
+   "replications": 30,
+   "seed_first": 20268600,
+   "seed_last": 20268629
+  },
+  {
+   "kind": "revert",
+   "amp": 24.0,
+   "role": "non-gating (power-side sanity check)",
+   "spread_multiplier": 1.0,
+   "replications": 30,
+   "seed_first": 20268700,
+   "seed_last": 20268729
+  },
+  {
+   "kind": "lead",
+   "amp": 0.3,
+   "role": "non-gating (power-side sanity check)",
+   "spread_multiplier": 1.0,
+   "replications": 30,
+   "seed_first": 20268800,
+   "seed_last": 20268829
+  },
+  {
+   "kind": "lead",
+   "amp": 0.6,
+   "role": "non-gating (power-side sanity check)",
+   "spread_multiplier": 1.0,
+   "replications": 30,
+   "seed_first": 20268900,
+   "seed_last": 20268929
+  }
+ ],
+ "sensitivity_cells": [],
+ "timing_seeds": [
+  20269000,
+  20269001,
+  20269002,
+  20269003
+ ],
+ "totals": {
+  "gating_screens": 1200,
+  "null_screens": 1600,
+  "power_screens": 150,
+  "all_screens": 1750
+ }
+}
