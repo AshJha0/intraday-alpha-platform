@@ -12,8 +12,10 @@ the working procedure.
 ## 1. Branching
 
 - `main` is protected by the `protect-main` ruleset: pull requests only,
-  the required CI checks green (`.github/workflows/ci.yml`; the list is in
-  `docs/governance/REPO_SETTINGS.md`), and the reviewers `CODEOWNERS` names
+  the required CI checks green (`.github/workflows/ci.yml`; 17 checks are
+  required since the v1.18 D5(a) change, `cpp-sanitizers` is not one of them;
+  the ruleset is described in `docs/governance/REPO_SETTINGS.md` and
+  `docs/governance/GOVERNANCE.md` §0), and the reviewers `CODEOWNERS` names
   for the paths touched. The owner merges in the GitHub UI.
 - Branch names carry the area and the plan key or issue number:
   `feat/execution-X07-python-port`, `fix/orderbook-B03-reorder-window`,
@@ -63,7 +65,9 @@ COOKBOOK recipe 52). The policy gate runs with
 
 Each language's full run must stay under 120 s; the repo-level suites well
 under a minute. (The Python run is the exception under CI's coverage
-instrumentation: 306-359 s with `-n auto` for the 1988 tests of v1.5.0; see
+instrumentation: 306-359 s with `-n auto` for the 1988 tests of v1.5.0, a
+historical figure; since v1.13 CI splits the suite, §2.1, and since v1.18 a
+`coverage` job enforces a 92 % floor on the whole suite. See
 `docs/BUILD_NOTES.md`.)
 
 ### 2.1 The `slow` marker and the two Python CI jobs (v1.13)
@@ -81,7 +85,8 @@ seconds; a new marked file must still be green in `python-slow`.
 
 `cd python && python -m mypy` (config: `[tool.mypy]` in `python/pyproject.toml`,
 pinned `mypy==2.3.1`) checks `iap.core`, `iap.orderbook`, `iap.execution`,
-`iap.backtest` and `iap.features`. The count reached 0 in v1.16 (from 87 at
+`iap.backtest` and `iap.features` (since v1.17 F3 also `iap.agents`, `iap.llm`,
+`iap.mvp` and `iap.paper`). The count reached 0 in v1.16 (from 87 at
 introduction in v1.13, 102 just before the burn-down), and the `mypy` step of
 the `python` job (3.12) is now blocking: a new error fails CI. Fix the type,
 don't silence it; a targeted `# type: ignore[code]` with a reason on the same
@@ -119,8 +124,10 @@ abs and rel 1e-9; adaptive PSI/KS at 1e-10 with exact refit booleans and
 lifecycle state sequences; canonical-JSON lines, trace digests, the risk
 audit / snapshot and the lifecycle registry are byte-identical; the 7-state
 lifecycle golden is compared exactly, field by field. The README's table
-(from main CI run 39043729536 (2026-10-17, v1.17.1 at 838e103)) reads python 3208 / cpp 333 / rust 376
-(golden 217/74/75; Java archived in v1.15), `integration` 35, `replay` 6.
+(from main CI run 40015853764 (2026-10-23, v1.18.0 at 23b69fb2)) reads python 4062 / cpp 333 / rust 376
+(golden 217/74/75; Java archived in v1.15), `integration` 35, `replay` 6; the
+deployment job derives the counts from the CI jobs' artefacts
+(`tests/harness/parity_counts.py`) and warns when the table drifts.
 
 ## 4. Golden regeneration protocol
 
@@ -130,7 +137,7 @@ it (`docs/ARCHITECTURE.md` §6):
 
 | golden | owner / tool | consumed by |
 |---|---|---|
-| codec SHA-256, book states, anomaly states, checkpoint, features, alpha, portfolio, TCA, backtest, adaptive | Python — `python/tools/make_golden.py`, `make_golden_features.py`, `make_golden_alpha.py`, `make_golden_anomalies.py`, `make_golden_tca.py`, `make_golden_adaptive.py` | C++, Rust, Java (each its own subset) |
+| codec SHA-256, book states, anomaly states, checkpoint, features, alpha, portfolio, TCA, backtest, adaptive | Python — `python/tools/make_golden.py`, `make_golden_features.py`, `make_golden_alpha.py`, `make_golden_anomalies.py`, `make_golden_tca.py`, `make_golden_adaptive.py` | C++, Rust (each its own subset); Java only in the archive at v1.14.0 |
 | replay fills (`expected_replay_fills.json`) | C++ — `cpp/tools/make_replay_fills_golden.cpp` (refuses to overwrite) | Java `ReplayFillsGoldenTest`, Python `test_execution_golden.py` (`iap.execution`) |
 | risk decisions, snapshot, audit (`expected_risk_*.json`, `expected_risk_audit.jsonl`) | Rust — `rust/risk/src/bin/make_risk_golden.rs` | Java `RiskGoldenTest`, Python `test_risk_golden.py` (`iap.risk`) |
 | risk differential-fuzz corpus (`tests/golden/risk_fuzz/`: step scripts, audit logs, snapshots, `COVERAGE.txt`) | Python — `python/tools/make_risk_fuzz_corpus.py` (`--force`; `--check` runs in CI), the Python engine as the oracle | Rust `golden_risk_fuzz.rs`, Java `RiskFuzzGoldenTest`, Python `test_risk_fuzz_golden.py` |
@@ -139,6 +146,10 @@ it (`docs/ARCHITECTURE.md` §6):
 | 7-state lifecycle scenarios + transition table (`expected_lifecycle.json`) | Python — `python/tools/make_golden_lifecycle.py` (`--force`) | Java `LifecycleGoldenTest`, Rust `golden_lifecycle.rs` |
 | experiment golden frame (`expected_experiment_golden_frame.json`) | Python — `python/tools/make_golden_research.py` (`--force`) | Python only (research documents; no port) |
 | MVP session (`expected_mvp.json`) | Python — `python/tools/make_golden_mvp.py` (`--force`) | Python (`test_mvp_golden.py`, from scratch and from the capture); the pin for a future port of the loop |
+
+The Java consumers named in the table are the archived copies (frozen at
+v1.14.0, not built or tested in CI); a regeneration today re-matches Python,
+C++ and Rust.
 
 Steps, in order:
 
@@ -270,6 +281,33 @@ Research truth is the product (spec §32). Two rules are mechanical:
    Reviewers reject a verdict change with no id; a CI check for it is
    tracked in the plan (issue `L05`).
 
+3. **Research authorisation (v1.18).** A confirmatory or signed run is bound
+   to what it runs, and the binding is checked by code:
+   - a signed pre-declaration binds the analysis identity (v2: the scripts,
+     `python/src/iap/**`, `configs/**`, `data/reference/**`, the hashed lock,
+     the environment, the interpreter, dataset content hashes, family,
+     metrics, thresholds and the commit) and every runner that consumes one
+     calls `verify_identity` (`docs/governance/ANALYSIS_IDENTITY.md`); a
+     signed document is never edited afterwards, because that voids the
+     signature (the REL-08 rule's stale `status` text is left as it is for
+     that reason);
+   - every read of `data/real` goes through the fail-closed holdout registry
+     (`research/holdout_registry.json`, `iap.research.holdout_registry`):
+     a dataset is `in_sample`, `spent` or `unread`, identity is content and not
+     a path, and every decision is appended to a hash-chained access log
+     (`docs/governance/DATA_ACCESS_PATHS.md`). Do not add a data-reading entry
+     point without the guard; the coverage test fails closed;
+   - run `PYTHONPATH=python/src python tools/verify_signatures.py` after any
+     change to a signed document, the trust root or a blackboard, and
+     `python tools/data_manifest.py check` after a change to a dataset
+     version cited by a prereg or ledger;
+   - real-data and synthetic-data looks are separate ledger families (the
+     real-data N is the denominator of a real-data claim), and a result that is
+     underpowered is reported as underpowered with its minimum detectable
+     effect and the number of session clusters G, never as a negative or a
+     positive (`docs/release/v1.18.0_RELEASE_NOTES.md`, consolidated MDE
+     table).
+
 Promotion requests use the **Alpha promotion request** issue form, one
 transition per request, with evidence per gate
 (`docs/governance/GOVERNANCE.md` §2). An alpha whose fitted sign contradicts
@@ -318,7 +356,7 @@ milestones, epics and issues; `docs/EPICS.md` is generated from it and
 | Python 3.11 | `ValueError` / `RuntimeError` with messages; type hints and docstrings everywhere; the reference must be readable before it is fast |
 | C++17 | `std::invalid_argument` / `std::runtime_error`; `-Wall -Wextra -Werror` clean; no allocation in book/feature hot loops after warmup (reserve), enforced by tests |
 | Rust (edition 2021) | `Result<_, IapError>`, no panics on input, zero warnings; workspace dependencies are `serde` and `serde_json` only (`docs/governance/SECURITY.md` §1) |
-| Java 21 | `IllegalArgumentException` / `IllegalStateException`; `-Xlint:all` clean; hot paths allocation-conscious (primitive arrays, no boxing) |
+| Java 21 (archived, frozen at v1.14.0; not accepted as a port target) | `IllegalArgumentException` / `IllegalStateException`; `-Xlint:all` clean; hot paths allocation-conscious (primitive arrays, no boxing) |
 | all | no dead code, no TODOs, no new dependency without a SECURITY.md entry; names follow the repo (`price_ticks`, `exchange_ts`, `feature_version`, `x-version`, `EQ01..FX12`) |
 
 ## 9. Documentation that moves with the code
@@ -328,7 +366,8 @@ duplicated component, `docs/POLYGLOT.md` if a copy's decision changes): `API_COR
 `API_FEATURES.md`, `API_ALPHA.md`, `API_PORTFOLIO_TCA.md`, `API_ADAPTIVE.md`,
 `API_CONTRACTS.md`, `API_TRADING.md`, `PLATFORM_CONVENTIONS.md` §11–§13,
 `docs/LIFECYCLE.md` / `docs/DECISION_TRACE.md` / `docs/DATA_MODEL.md` /
-`docs/MVP.md` for their subsystems, `docs/SCENARIOS.md` for a new pinned
+`docs/MVP.md` / `docs/MONITORING_POLICY.md` / `docs/PORTFOLIO_LIMITS.md` /
+`docs/FACTOR_RISK.md` / `docs/SIM_TO_REAL.md` for their subsystems, `docs/SCENARIOS.md` for a new pinned
 behaviour, the runbooks for anything an operator sees, `docs/EPICS.md`
 (via the YAML) for the plan, and `README.md` for any headline number. A
 diagram change edits the `.mmd` source and its embedded copy together

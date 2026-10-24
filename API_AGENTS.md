@@ -185,3 +185,22 @@ removed (leak probe, P&L bug, null rejection, fabrication flag).
 `iap.llm.evals.run_all` / `run_scenario` — the LLM research agent's four
 scenarios (`SCENARIOS`), mocked in CI, `--live` by the owner
 ([API_LLM.md §5](API_LLM.md)).
+
+## 4. v1.18 research authorisation (REL-02; Python only)
+
+Signed pre-declarations can bind the analysis they authorise, and a fail-closed registry guards the datasets they
+may read. Documented in [docs/governance/ANALYSIS_IDENTITY.md](docs/governance/ANALYSIS_IDENTITY.md) and
+[docs/REVIEW_PACK.md §2](docs/REVIEW_PACK.md); names are taken from the modules' definitions.
+
+```python
+from iap.agents.analysis_identity import (build_identity, verify_identity, verify_signed_document, require_independent_runner,
+                                          script_fingerprints, code_tree_sha256, IdentityError, SignatureError)
+from iap.research.holdout_registry import guard, load_registry, dataset_identity, verify_access_log, HoldoutRefused
+```
+
+- `build_identity(...)` / `verify_identity(...)` bind script fingerprints, the `python/src/iap` code-tree hash, commit,
+  dataset versions, inputs, environment, metrics and thresholds; a mismatch raises `IdentityError`.
+  `require_independent_runner(doc)` refuses a runner that is the signer or holds a signing key.
+- `holdout_registry.guard(...)` is checked by every supported research path against `research/holdout_registry.json`
+  (content-hash keyed, per-session and per-symbol scope; access attempts are logged, `verify_access_log` checks the log);
+  a refusal raises `HoldoutRefused`.

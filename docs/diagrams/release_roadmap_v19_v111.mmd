@@ -10,13 +10,13 @@ flowchart LR
         X["X1-X3 Almgren-Chriss,<br/>urgency, volume curve"]
         G["G1-G4 costed, code-bound, anchored,<br/>Ed25519-signed preregs"]
     end
-    subgraph V111["v1.11.0, this release"]
+    subgraph V111["v1.11.0 (2026-10-10), released"]
         E2["E2 Rust features via pyo3<br/>(opt-in --engine rust)"]
         E3["E3 polyglot policy:<br/>18 canonical / 20 frozen, nothing deleted"]
         AI3["AI3 model registry, drift,<br/>calibration, shadow mode"]
         AI12["AI1-AI2 LLM research agent<br/>through the signed broker + evals"]
     end
-    subgraph RUN["running (exploratory, in-sample, pre-registered)"]
+    subgraph RUN["running at v1.11.0 (exploratory, in-sample, pre-registered)"]
         MS["maker study, 7 real sessions<br/>(research/maker-real)"]
         AUC["AUC01 auction + M5 quoting on real files<br/>(research/step2; AUC01 has a 2026 holdout)"]
     end

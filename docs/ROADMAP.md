@@ -2,7 +2,7 @@
 
 The plan behind `tools/github/issues.yaml` (rendered as
 [EPICS.md](EPICS.md): 36 epics, 215 issues — 157 done, 0 in-progress, 58
-backlog as of 2026-10-16, after the v1.16.0 and v1.17.0 releases), mapped phase by phase to the code, the tests and
+backlog as of 2026-10-16, after the v1.16.0 and v1.17.0 releases; the v1.18 programme (REL items) was tracked in docs/release/v1.18.0_RELEASE_NOTES.md and added no epic, so these counts did not change in v1.17.1 or v1.18.0), mapped phase by phase to the code, the tests and
 the artefacts that prove each step, and stated the same way the research
 is: what is done cites evidence; what is not done says what would prove it.
 Every count in this file is re-derived by `tests/harness/check_headline_numbers.py`
@@ -16,10 +16,10 @@ the YAML, every `done` evidence path on disk).
 | **Phase 0** — architecture and contracts | E01 contracts (canonical types, 17 schemas with `x-version`, JSONL + IAP1, determinism rules, `iap.contracts` types + Protocols), E02 repository engineering (CI, governance, CODEOWNERS, issue tooling) | done (2 of 9 issues sit in Backlog: C07 schema validation of every golden/config in CI, R04 the CI half of the pyproject install) | `schemas/` (17 files), `PLATFORM_CONVENTIONS.md` §1–§3, §13; `python/src/iap/contracts/`, `tests/golden/expected_contracts_examples.json`, `expected_canonical_json.json`; `.github/workflows/ci.yml`, `tools/github/`, `tests/integration/test_github_issue_plan.py`; [../API_CONTRACTS.md](../API_CONTRACTS.md) |
 | **Week 1** — market data + deterministic replay | E03 seeded generator + normalisation/QC, E04 replay as a flagship feature | done (RP05 incident capture bundle: backlog; M08 equity flow that reaches the close in the bundled dataset: done in v1.4.0 — the default `equities.flow.calibration = "session"` carries each equity stream to the close, `"legacy_budget"` reproduces the v1.3.0 dataset, §3.2) | `python/src/iap/marketdata/`, `data/normalized/qc_report.json` (308,975 events), `tests/replay/test_generator_determinism.py` (pins the raw-file hashes of the current and the v1.3.0 dataset), four replay engines + `expected_checkpoint_eq_1000.json`; `docs/runbooks/RUNBOOK_incident_replay.md` (the MVP capture → replay flow exists; a Java-side capture bundle tool does not) |
 | **Week 2** — order book + feature engine | E05 integer-tick L1/L2/MBO book (four languages, anomaly goldens), E06 205-feature registry / native 40 | done (F06 further native ports: backlog, on demand) | `expected_book_states.json`, `expected_anomaly_states.json`, `expected_features.json`; `data/reference/feature_registry.json` (205) |
-| **Week 3** — alphas + research framework | E07 24 flagship alphas, E08 validation (purged/embargoed walk-forward, leakage, NW t, ledger, hypothesis sign, costs, capacity) + `ExperimentRunner` | done (A07 EQ03 cost-aware iteration and A08 porting the other 18 alphas: backlog — the 6 golden alphas are ported, the rest wait for a CANDIDATE that clears the cost gate; V09 full deflated Sharpe: backlog) | `research/alpha_reports/REPORT.md` (0 PROMOTE / 11 ITERATE / 13 REJECT under the v1.5.0 default methods), `research/experiments.json` (6,826 looks / 640 configurations as of the v1.18 REL-02 migration, per-dataset breakdown in its `datasets` block, hash-chained), `python/src/iap/research/`, `research/experiments/<id>/` (15 runs: 5 on the v1.3.0 dataset, 5 on the current one under the rules up to v1.4.0, 5 under the default methods), `tests/golden/expected_experiment_golden_frame.json` |
+| **Week 3** — alphas + research framework | E07 24 flagship alphas, E08 validation (purged/embargoed walk-forward, leakage, NW t, ledger, hypothesis sign, costs, capacity) + `ExperimentRunner` | done (A07 EQ03 cost-aware iteration and A08 porting the other 18 alphas: backlog — the 6 golden alphas are ported, the rest wait for a CANDIDATE that clears the cost gate; V09 full deflated Sharpe: backlog) | `research/alpha_reports/REPORT.md` (0 PROMOTE / 12 ITERATE / 12 REJECT under the v1.14.0 methods; it was 11 / 13 under the v1.5.0 default methods, §3.3), `research/experiments.json` (6,826 looks / 640 configurations as of the v1.18 REL-02 migration, per-dataset breakdown in its `datasets` block, hash-chained), `python/src/iap/research/`, `research/experiments/<id>/` (15 runs: 5 on the v1.3.0 dataset, 5 on the current one under the rules up to v1.4.0, 5 under the default methods), `tests/golden/expected_experiment_golden_frame.json` |
 | **Week 4** — portfolio + hard risk | E09 PGD optimizer under 7 constraint families, E10 fail-closed risk engine (Rust reference, Java port, **Python reference port `iap.risk`**) | done; v1.3.0 closed four fail-open defects in all three engines (future-stamped marks, NaN, i64 overflow, venue-0 orders — §3) | `expected_portfolio.json`; `expected_risk_{decisions,snapshot}.json` + `expected_risk_audit.jsonl` matched by Rust, Java and Python; the edge golden `expected_risk_edge_decisions.json` + `expected_risk_edge_audit.jsonl` (v1.3.0); [../API_TRADING.md](../API_TRADING.md) §1 |
 | **Week 5** — execution + performance | E11 TWAP/VWAP/POV/IS, SOR, event-driven simulator (C++ reference, Java port, **Python reference port `iap.execution`**), E12 performance architecture | done (X08 PEG/MID order types, X09 closed-form Almgren–Chriss, H05 Rust/Java benchmark harnesses with percentiles: backlog); v1.3.0 corrected the simulator's crossing pool, applied-only queue tracking, execute cap and cancel rule in all three languages (§3) | `expected_replay_fills.json` matched by C++, Java and Python (reproduced unchanged by the v1.3.0 rules); `benchmarks/results_cpp.md` (generated); [../API_TRADING.md](../API_TRADING.md) §2 |
-| **Week 6** — TCA, parity, lifecycle, trace, store, MVP, testing | E13 TCA, E14 cross-language parity, E15 7-state lifecycle, E16 decision trace, E17 SQL data model + store, E18 end-to-end MVP, E19 six-level testing | done (T05 venue/algo TCA attribution, L04 RETIRED as a live allocation gate, L05 ledger-id CI check, O06 trace on the Java dashboards, D03 Postgres backend, Q04 more integration verticals: backlog) | `expected_tca.json`; the parity table (README, `run_all.sh`: python 3208 / cpp 333 / rust 376; 217/74/75 golden, main CI 2026-10-17; Java archived in v1.15); `expected_lifecycle.json` + `research/alpha_registry.json` (23 CANDIDATE / 0 beyond); `expected_canonical_json.json`, Java `decision_traces.jsonl`; `schemas/sql/iap_v1.sql` + `iap.store`; `expected_mvp.json` (15,805 events, 800 decisions, 231 parents, 163 fills, −82.84 USD, digest `a7f1ee60…`); `tests/README.md` |
+| **Week 6** — TCA, parity, lifecycle, trace, store, MVP, testing | E13 TCA, E14 cross-language parity, E15 7-state lifecycle, E16 decision trace, E17 SQL data model + store, E18 end-to-end MVP, E19 six-level testing | done (T05 venue/algo TCA attribution, L04 RETIRED as a live allocation gate, L05 ledger-id CI check, O06 trace on the Java dashboards, D03 Postgres backend, Q04 more integration verticals: backlog) | `expected_tca.json`; the parity table (README, `run_all.sh`: python 4062 / cpp 333 / rust 376; 217/74/75 golden, main CI run 40015853764, 2026-10-23, v1.18.0; python was 3208 at v1.17.1; Java archived in v1.15); `expected_lifecycle.json` + `research/alpha_registry.json` (23 CANDIDATE / 0 beyond); `expected_canonical_json.json`, Java `decision_traces.jsonl`; `schemas/sql/iap_v1.sql` + `iap.store`; `expected_mvp.json` (15,805 events, 800 decisions, 231 parents, 163 fills, −82.84 USD, digest `a7f1ee60…`); `tests/README.md` |
 
 ## 2. Phase 2 and Phase 3
 
@@ -28,7 +28,7 @@ the YAML, every `done` evidence path on disk).
 | **Phase 2** — research platform | E20 gated ML zoo + meta-labeling, E21 adaptive drift / refit / lifecycle sub-machine, E22 alpha factory on the `ExperimentRunner` | partial: E20 and E21 delivered with honest negative results (since the v1.4.0 dataset the ML gate **passes** — best linear +0.0081 mid-to-mid IC, so xgboost, lightgbm and the MLP are fitted — and no model earns its costs, with the meta-label gate still degenerate; no refit policy demonstrably beats static on two sessions); E22 has the runner and the registry, not the batch driver | `research/ml_reports/ML_REPORT.md`, `research/adaptive_reports/ADAPTIVE_REPORT.md`, `expected_adaptive.json`; backlog: AF02 spec-driven batches (`python -m iap.research run` is the per-spec building block), AF03 gate 8 cross-alpha correlation, AF04 scheduled report regeneration with a stale-number diff, ML04 non-linear model_versions in the production languages, AD05 a multi-week synthetic dataset with power to rank refit policies |
 | **Phase 3** — production engineering | E23: real feed handlers and venue protocols, HA / failover / kernel bypass, regulatory pre-trade controls and best-execution reporting, authenticated read endpoints and external secrets | documented out of scope (docs/README_HISTORY.md "Real-world usage notes", moved from the README in v1.17); PR01 (the container / k8s stack with a singleton trading vertical and durable state) done, PR02–PR05 backlog | `docs/README_HISTORY.md` out-of-scope list, `docs/governance/SECURITY.md` §3–§4, `deployment/` (singleton, NetworkPolicy, token-authenticated admin API only) |
 | **Backlog** — agentic AI / MCP (E24, E30) | E24: AG01 a read-only MCP server over the ledger, reports, lifecycle log and decision traces; AG03 a policy test that no trading-path module imports a network or LLM client. E30: write broker and blackboard, pre-registration, reserve sessions on a hidden seed, authenticated human approvals, agent evaluations, untrusted-text handling (AL01–AL07) | **built since v1.3.0 (this row is the v1.3.0 statement, updated):** the read-only MCP server (AG01) and the whole of E30 were built in v1.7.0 and hardened in v1.10.0 (signed, costed, code-bound, anchored pre-registrations); v1.11.0 added the LLM research agent on top of them (§3.6). At v1.3.0 no LLM, agent or MCP code existed. AG03 is done since v1.3.0 (`python/tests/test_import_policy.py`, Python packages only — its gaps are recorded in the issue); AG01 and all of E30 are backlog. The design rule is pinned (ARCHITECTURE.md §11, PLATFORM_CONVENTIONS.md §13.7): LLM reasoning is never on the critical path, can only read the store / ledger / TCA / drift, cannot override risk or send orders | what exists to read today: `python -m iap.store sql` (read-only, one statement) and `v_order_chain` / `v_alpha_scorecard`, `python -m iap.store explain`, `python -m iap.lifecycle status`, `python -m iap.research list/show --json`; and the foundation an agent layer would need — a research store safe for parallel writers, gate eligibility, looks that a dry run cannot avoid (ARCHITECTURE.md §11.2) |
-| **Backlog** — the distance to production (E25–E29, E31) | E25 real historical exchange data with a point-in-time master; E26 measured, gated latency; E27 simulator calibration to live fills; E28 book-level risk; E29 research throughput; E31 differential fuzzing, property tests, crash injection and risk golden coverage | backlog — every issue of E26–E29. E25 is partial: the Python ingestion path is done (XD01, XD03–XD06: ITCH 5.0 and LOBSTER readers, point-in-time master, corporate-actions API, ingest CLI — [REAL_DATA.md](REAL_DATA.md); run on 7 real Nasdaq ITCH days in v1.6.0 with the 24-alpha batch, multi-day merge and a real-data power study command; LOBSTER not yet run on a vendor file). E31 is partial since 2026-10-04: FZ01 (differential fuzzing of the three risk engines), FZ03 (snapshot/restore fuzzing) and FZ05 (risk golden coverage) are done, FZ02 (simulator properties) and FZ04 (crash injection on the Java paper path) stay backlog. Added 2026-10-03 with the v1.3.0 review, which is where the gaps were written down | ARCHITECTURE.md §14 states each gap against what exists; for E31: `tests/golden/risk_fuzz/` (89 scripts; `COVERAGE.txt` names the script reaching each of the 63 reachable reason branches), `.github/workflows/risk-fuzz.yml`, `tests/README.md` |
+| **Backlog** — the distance to production (E25–E29, E31) | E25 real historical exchange data with a point-in-time master; E26 measured, gated latency; E27 simulator calibration to live fills; E28 book-level risk; E29 research throughput; E31 differential fuzzing, property tests, crash injection and risk golden coverage | backlog — every issue of E26–E29. E25 is partial: the Python ingestion path is done (XD01, XD03–XD06: ITCH 5.0 and LOBSTER readers, point-in-time master, corporate-actions API, ingest CLI — [REAL_DATA.md](REAL_DATA.md); run on 7 real Nasdaq ITCH days in v1.6.0 with the 24-alpha batch, multi-day merge and a real-data power study command; LOBSTER not yet run on a vendor file). E31 is partial since 2026-10-04: FZ01 (differential fuzzing of the three risk engines), FZ03 (snapshot/restore fuzzing) and FZ05 (risk golden coverage) are done, FZ02 (simulator properties) and FZ04 (crash injection on the Java paper path) stay backlog. Added 2026-10-03 with the v1.3.0 review, which is where the gaps were written down. v1.18 (§3.14) added paper-path code near E27 / E28 (a factor risk model, enforced portfolio limits and kill switch, a recorded-fill replay harness, REL-18 resilience) without changing these issue statuses in the YAML; E27's own definition, a simulator calibrated to live fills, is **not** met: Level 2 is not validated | ARCHITECTURE.md §14 states each gap against what exists; for E31: `tests/golden/risk_fuzz/` (89 scripts; `COVERAGE.txt` names the script reaching each of the 63 reachable reason branches), `.github/workflows/risk-fuzz.yml`, `tests/README.md` |
 
 ## 3. v1.3.0 (2026-10-03): what the review moved to done, and what it added to the backlog
 
@@ -72,7 +72,7 @@ takes 306-359 s in CI under coverage and xdist for the 1988 tests of the merged 
 
 ## 3.1 Open work as of 2026-10-04 (history)
 
-(Dated 2026-10-04; the current state is §3.11-§3.13.) Nothing was running on 2026-10-04. The next work is chosen from the backlog above.
+(Dated 2026-10-04; the current state is §3.11-§3.14.) Nothing was running on 2026-10-04. The next work is chosen from the backlog above.
 The research-side candidates with the highest information value are still
 A07 (can a cost-aware horizon / threshold make EQ03 net-positive? — the
 cost-aware position policy, opt-in in v1.3.0 and the default since v1.5.0,
@@ -491,14 +491,6 @@ change: still 0 alphas promoted, no strategy that trades at 1x costs.
 
 ## 3.10 v1.15.0 (2026-10-13): the confirmatory release
 
-**v1.17.1 (prepared 2026-10-17): patch release.** B7 closed on its in-sample result; B8 negative on the first 2 overlap days and on the pre-declared six-day out-of-sample run (`sor` +2.2 / +1.1 bps, `sor_sweep` +0.6 / +1.2 bps vs pinned Nasdaq; AAPL / MSFT; no interval excludes zero); `sor_sweep`; 6 of 9 IEX overlap days; the #211 release-workflow fix (v1.17.0's missing manifest, lock-file SBOMs and digest pins). Notes: docs/release/v1.17.1_RELEASE_NOTES.md.
-
-**v1.17.0 (2026-10-16): execution quality and breadth.** Shipped: WS0, A1-A5, B1-B6, B8-B10 (B8 results in v1.17.1), C1-C8 (C6 screen 0 of 22 pass; C8 registered under option (a), no confirmatory look), D1-D4, E1-E5, F1-F9, G1-G4. B8 real-book results: v1.17.1; B7 closed 2026-10-16 on its in-sample result, no fresh test (research/preregs/B7_CLOSED_v117.md). Notes: docs/release/v1.17.0_RELEASE_NOTES.md.
-
-**v1.16.0 (2026-10-15): monetisation.** P0 execution items 1-5 done. P0-6 taker study: no-go
-(0 trades in 480 cells). Item 7: no taker capacity (0/45 cells). Item 8 (paid data): closed by
-owner decision 2026-10-14. Quoting v2: no edge (every cell loses $5-7k per session; skewing with EQ01/EQ05 cuts the loss by about $750-920 per session). AI4 DeepLOB: closed after an in-sample failure (net -0.69 bp per trade; holdout not used).
-
 | Item | State |
 |---|---|
 | R7 confirmatory round (R7-CONFIRM-1, 7 unseen holdout sessions) | done: EQ10@1s and EQ05@1s both confirmed; net P&L at 1x cost 0 (docs/research/R7_RESULTS.md) |
@@ -559,18 +551,62 @@ and stated as such:
 Still standing from v1.16: taker no-go, no capacity (0 of 45 cells), no
 quoting edge, AI4 closed.
 
-## 3.13 Next: v1.17.1, then v1.18
+## 3.13 v1.17.1 (2026-10-17): the patch release
 
-v1.17.1 (release PR prepared 2026-10-17, draft until the B8 six-day results and the IEX 2026-05-18 rows are merged):
+Notes: docs/release/v1.17.1_RELEASE_NOTES.md. B7 closed 2026-10-16 on its
+in-sample result, no fresh test; the B8 two-venue router is negative on the
+first 2 overlap days and on the pre-declared six-day out-of-sample run
+(`sor` +2.2 / +1.1 bps, `sor_sweep` +0.6 / +1.2 bps vs pinned Nasdaq, AAPL /
+MSFT, no interval excludes zero; research/execution/b8/REPORT_oos6.md,
+pre-declared in PREDECLARATION_oos6.md); 6 of the 9 approved IEX overlap days
+recorded (docs/research/IEX_OVERLAP_SET.md); and the release manifest /
+Python lock-file SBOM / k8s digest-pinning fix (#211), first carried by
+v1.17.1.
 
-- B8 six-day out-of-sample result: negative (research/execution/b8/REPORT_oos6.md; pre-declared in PREDECLARATION_oos6.md);
-- B7 closed 2026-10-16, no fresh test;
-- 5 of the 9 approved IEX overlap days recorded (docs/research/IEX_OVERLAP_SET.md), the rest as they finish;
-- the release manifest / Python lock-file SBOM / k8s digest-pinning fix (#211), first carried by v1.17.1.
+## 3.14 v1.18.0 (2026-10-23): the measurement instrument and recorded negative results
 
-v1.18: the C++ ports v1.17 left out (B2-regime arm of the dark eligibility,
-the B10 proxy sampler / fit, the exchange-local hazard clock;
-PLATFORM_CONVENTIONS §11.3).
+Plan: `IAP_Release_Programme_2026-10-17.md` (outside the repository); what shipped is CHANGELOG.md "## v1.18.0" and
+docs/release/v1.18.0_RELEASE_NOTES.md (the REL item table, the consolidated
+minimum detectable effects, the open gates). The programme's items are not
+epics in `tools/github/issues.yaml`, so EPICS.md did not change. **No signal
+is promoted and no edge is claimed**; the fill model is validated at Level 1
+(deterministic replay) only; there is no latency edge. Every interval below
+rests on very few session clusters.
+
+| Item | State at the v1.18.0 tag |
+|---|---|
+| REL-01 baseline freeze | done (research/v118/BASELINE_v1_18.md) |
+| REL-02 research authorisation: signed pre-declarations binding script, commit, data and thresholds; fail-closed holdout registry; one real-data ledger family | done; reviewer findings memo (c) open. Real data 256 configurations, total 6,826 looks over 640 distinct configurations (research/v118/REL02_LEDGER_MIGRATION.md) |
+| REL-03 execution benchmark v2 metrics; REL-04 venue-aware capped child execution with an invariant suite | done. REL-04 verification run: identity pass on the 6 IEX overlap days; absolute IEX latency and Nasdaq skew **not** claimed (research/v118/rel04_verify/REPORT.md) |
+| REL-04b B8 v2 run (signed) | done, negative: all 6 comparisons underpowered, none better than pinned Nasdaq, G = 3 (research/execution/b8v2/REPORT.md); F7 open (not independently rerun) |
+| REL-04c single-venue execution universe, about 20 Nasdaq names | done as run; in-sample, so a secondary result (research/execution/rel04c/benchmark/) |
+| REL-05 recorded-fill replay harness | partial: Level 1 done; real-tape test AAPL, MSFT inconclusive, QQQ supports; **Level 2 not validated** (research/execution/rel05/REPORT.md, docs/SIM_TO_REAL.md) |
+| REL-06 statistical gate, known-null calibration | **partial; gate F3 open.** v1 vacuous pass, v2 FAIL, v3 FAIL (A0 conditional rejection 79 and 80 of 1,854, about 4.3 %, against 2.5 %); the outside reviewer rejected the method as the F3 gate; no real-data error-rate control claimed (research/v118/known_null_v3_RESULT.md) |
+| REL-07 data and feature foundations; REL-12 parser fuzzing, data oracle and manifest; REL-13 runtime footprint (92 % whole-suite coverage floor; C++ parity-only, D5(a)) | done; REL-12 partial: the 24 h zero-crash fuzz run is not recorded |
+| REL-08 residual-reversion and ETF catch-up screen (one session, K = 7) | done as run: all 7 variants underpowered, with defects found afterwards (a max-gap bug, near-flat V1/V2 books, a cross-price bug) |
+| REL-08b four more in-sample days | not run (the rule returned no `continue`) |
+| REL-08c closing-auction imbalance | **dropped**: the closing NOII stream starts at 15:55:00 in the 2019 data, after the registered 15:54:55 exit (research/v118/rel08c/DROPPED.md) |
+| REL-09 cross-venue stale-quote protection | done as run, underpowered (G = 4) |
+| REL-10 volume-clock OFI / hidden-print imbalance | done as run: one taker cell rejected (`hid_imb` 1 min AAPL loses money), the rest underpowered |
+| REL-11 portfolio-level evaluation | not run (no candidate exists); the enforced walk-forward path is merged (`iap.portfolio.rel11_enforced`) |
+| REL-14a foundation note | complete except F3, F5 (partly met) and F7, signed only in that truthful form (docs/release/FOUNDATION_COMPLETE_v1.18.md) |
+| REL-16 monitoring policy with an explicit UNKNOWN state; REL-17 factor risk, enforced limits, kill switch, capacity curves | done (code; docs/MONITORING_POLICY.md, FACTOR_RISK.md, PORTFOLIO_LIMITS.md) |
+| REL-18 live-path resilience (paper only) | done: 60-minute and 6-hour soaks PASS on a synthetic feed with injected faults (15,037,543 messages, 369,878 orders, 2,931 process kills, 0 reconciliation exceptions); not a live-venue soak |
+
+**Open gates, accepted open by the owner for this tag (2026-10-23):** F3, F7
+and the reviewer's findings memo (c); F5 partly met (the DSR was recomputed at
+N = 297 with verdicts unchanged, but the R7 result file was not re-issued with
+eligibility applied).
+
+**Moved out of v1.18.0 (post-release backlog; v1.19 is not yet planned or
+approved):** this documentation truth pass (REL-14c); a diagnostic review of
+the failed known-null method (not an automatic v4); a REL-08 rule v2 (an
+unsigned draft, `research/v118/rel08/`) and a multi-session screen, which
+needs a synthetic book-parameter dry run, reviewer review and signing before
+any new session is read; an optional re-issue of the R7 result; independent
+reproduction of the B8 v2 JSON (F7); REL-08b and REL-11 if a rule ever
+authorises them; and the C++ ports listed as pending in
+PLATFORM_CONVENTIONS.md §11.3 (C++ is parity-only since D5(a)).
 
 Every result still goes through the same gate and ledger; a deep model gets
 no exemption for being deep.

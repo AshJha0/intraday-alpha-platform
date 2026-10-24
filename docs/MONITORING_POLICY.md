@@ -153,10 +153,13 @@ least once. WATCH asks only for attention and never stops trading.
 
 ## 9. Open hooks
 
-- **REL-17** will supply `PositionsSnapshot` limits and act on HALT through
-  the kill switch.
-- **REL-18** will supply `OrdersSnapshot.reconciliation_exceptions` from
-  fill and position reconciliation.
-- Paper-trading wiring (`iap.paper.daily` sessions into `SessionObs`) is a
-  follow-up. Until it lands, no paper signal is monitored, and its state is
-  UNKNOWN by construction.
+- **REL-17** supplies `PositionsSnapshot` limits and acts on HALT through the
+  kill switch (`iap.risk.portfolio_limits`, `docs/PORTFOLIO_LIMITS.md`).
+- **REL-18** supplies `OrdersSnapshot.reconciliation_exceptions` from fill and
+  position reconciliation (`iap.paper.reconcile`).
+- `iap.paper.supervisor.PaperSupervisor` wires the three together for a paper
+  run (merged in #296; synthetic and paper path only, no broker). It takes the
+  `SessionObs` list as an input: feeding `iap.paper.daily` sessions into
+  `SessionObs` is not wired. A paper signal with no `SessionObs` and no
+  registered expectation is UNKNOWN by construction, and nothing in v1.18.0
+  monitors a live signal (none is promoted).
