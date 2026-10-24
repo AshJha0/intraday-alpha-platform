@@ -58,3 +58,5 @@ all gates hold, and it does not assert real-data error-rate control or Level 2 f
 **Post-tag update (2026-10-24):** F5 is now met by the R7 re-issue (`research/r7/r7_confirm_result_reissue.json`, PR #332). Open gates: F3 and F7 only. The sign-off above is unchanged and refers to the state at the tag.
 
 **Post-tag update (2026-10-24, F3):** the outside reviewer accepted the F3 diagnostic review, retired the A0 count criterion as a pass/fail gate and kept F3 OPEN (`docs/release/REVIEWER_F3_DECISION_2026-10-24.md`). No real-data error-rate control is claimed.
+
+**Post-tag update (2026-10-24, F3 acceptance):** the signed synthetic-null acceptance study for P1 passed (27 of 27 mandatory evaluations; `research/v118/f3_accept/REPORT.md`) and the reviewer accepted it (`docs/release/REVIEWER_F3_POSTEXEC_DECISION_2026-10-24.md`). The F3 gate stays OPEN: no real-data FWER-control claim; power and operating-domain assessments pending.
