@@ -1,0 +1,236 @@
+{
+  "schema": "iap.rel08_rule/v1",
+  "kind": "rel08_continuation_rule",
+  "status": "UNSIGNED DRAFT v2 (2026-10-24). Do not sign before (a) the outside reviewer's written view and (b) the F3 diagnostic findings; the inference in 'statistics' is the v1 inference and F3 may change it. Amends the max_gap_min definition (C1), adds a 5-of-6 session-coverage check, and freezes book alpha_bps/risk_aversion chosen on synthetic data only. No threshold changed. Does not touch rel08_rule_signed.json (v1).",
+  "rule_document": "research/v118/rel08/REL08_CONTINUATION_RULE_v2.md",
+  "rule_document_sha256": "TO_BE_SET_AT_SIGNING",
+  "label": "hypothesis screen, six sessions, no edge claim",
+  "dataset": {
+    "label": "multi7",
+    "dataset_version": "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4",
+    "selected_sessions": [
+      "2019-03-27",
+      "2019-07-30",
+      "2019-08-30",
+      "2019-10-30",
+      "2019-12-30",
+      "2020-01-30"
+    ],
+    "feature_identity": "xasset_v2",
+    "feature_store_status": "NOT BUILT for these sessions (only ds_20190130_rel07 exists); building it reads market data and must pass holdout_registry.guard_or_exit(sessions=selected_sessions)",
+    "reference_map": "configs/reference/reference_etf_map_v1.json",
+    "universe": "research/breadth/universe.json"
+  },
+  "family": {
+    "name": "rel08_screen",
+    "K": 7,
+    "alpha": 0.05
+  },
+  "variants": [
+    {
+      "id": "V1",
+      "score": "vwap_deviation",
+      "horizon_min": 15,
+      "rebalance_min": 15,
+      "book": "market_neutral"
+    },
+    {
+      "id": "V2",
+      "score": "vwap_deviation",
+      "horizon_min": 15,
+      "rebalance_min": 15,
+      "book": "sector_neutral"
+    },
+    {
+      "id": "V5",
+      "score": "residual_reversion",
+      "horizon_min": 15,
+      "rebalance_min": 15,
+      "book": "market_neutral"
+    },
+    {
+      "id": "V6",
+      "score": "residual_reversion",
+      "horizon_min": 15,
+      "rebalance_min": 15,
+      "book": "sector_neutral"
+    },
+    {
+      "id": "V9",
+      "score": "etf_catch_up",
+      "horizon_min": 1,
+      "rebalance_min": 5,
+      "book": "market_neutral"
+    },
+    {
+      "id": "V10",
+      "score": "etf_catch_up",
+      "horizon_min": 3,
+      "rebalance_min": 5,
+      "book": "market_neutral"
+    },
+    {
+      "id": "V11",
+      "score": "etf_catch_up",
+      "horizon_min": 5,
+      "rebalance_min": 5,
+      "book": "market_neutral"
+    }
+  ],
+  "deferred_variants": [
+    {
+      "id": "V3",
+      "score": "vwap_deviation",
+      "horizon_min": 30,
+      "rebalance_min": 30,
+      "book": "market_neutral",
+      "deferred_to": "REL-08b (five sessions, ~65 rebalances at 30 m)",
+      "reason": "removed from the one-day screen because ESS <= 13 cannot reach the C4 floor of 20"
+    },
+    {
+      "id": "V4",
+      "score": "vwap_deviation",
+      "horizon_min": 30,
+      "rebalance_min": 30,
+      "book": "sector_neutral",
+      "deferred_to": "REL-08b (five sessions, ~65 rebalances at 30 m)",
+      "reason": "removed from the one-day screen because ESS <= 13 cannot reach the C4 floor of 20"
+    },
+    {
+      "id": "V7",
+      "score": "residual_reversion",
+      "horizon_min": 30,
+      "rebalance_min": 30,
+      "book": "market_neutral",
+      "deferred_to": "REL-08b (five sessions, ~65 rebalances at 30 m)",
+      "reason": "removed from the one-day screen because ESS <= 13 cannot reach the C4 floor of 20"
+    },
+    {
+      "id": "V8",
+      "score": "residual_reversion",
+      "horizon_min": 30,
+      "rebalance_min": 30,
+      "book": "sector_neutral",
+      "deferred_to": "REL-08b (five sessions, ~65 rebalances at 30 m)",
+      "reason": "removed from the one-day screen because ESS <= 13 cannot reach the C4 floor of 20"
+    }
+  ],
+  "book": {
+    "notional": 1000000.0,
+    "gross_cap": 1.0,
+    "participation_cap": 0.01,
+    "w_max": 0.1,
+    "turnover_cap": 0.5,
+    "impact": "cost_model",
+    "exec_delay_s": 1.0,
+    "max_age_s": 60.0,
+    "flatten_at_session_end": true,
+    "weights": "linear",
+    "alpha_bps": 20.0,
+    "risk_aversion": 100.0,
+    "cov_lam": 0.94,
+    "cov_warmup_min": 100,
+    "solver_iters": 20,
+    "dollar_neutral": true,
+    "beta_neutral": true
+  },
+  "costs": {
+    "conservative_spread_mult": 1.5,
+    "conservative_fee_mult": 1.0,
+    "conservative_impact_mult": 2.0
+  },
+  "sufficiency": {
+    "names_per_rebalance_min": 60,
+    "score_max_age_s": 60.0,
+    "usable_rebalances_min": {
+      "5": 50,
+      "15": 20,
+      "30": 10
+    },
+    "names_usable_min": 70,
+    "names_usable_frac": 0.8,
+    "max_gap_min": 30,
+    "max_gap_definition": {
+      "unit": "minutes",
+      "meaning": "largest gap between consecutive usable rebalances inside the same session day",
+      "excluded": [
+        "leading gap from the grid origin to the first usable rebalance",
+        "gaps spanning a session boundary (between days)"
+      ],
+      "single_usable_rebalance_in_a_day": "no within-day gap; day contributes 0",
+      "no_usable_rebalance_in_whole_run": "inf (C1 fails)"
+    },
+    "sessions_contributing_min": {
+      "of": 6,
+      "min": 5,
+      "else": "every variant underpowered"
+    }
+  },
+  "statistics": {
+    "bootstrap": "moving_block",
+    "block_minutes": 30,
+    "draws": 9999,
+    "seed": 20261020,
+    "mde_z_sum": 2.49,
+    "ess_inflation_floor": 1.0
+  },
+  "thresholds": {
+    "C2_mde_max_bps": 2.0,
+    "C3_net_min_bps": 1.0,
+    "C3_lower_min_bps": 0.0,
+    "C4_ess_min": 20,
+    "C5_retention": 0.5,
+    "C6_retention": 0.5,
+    "C6_names_removed": 5,
+    "C7_retention": 0.5,
+    "C8_ic_min": 0.02,
+    "C8_lower_min": 0.0
+  },
+  "decision": {
+    "max_continue": 3,
+    "rank_by": "net_bps_lower"
+  },
+  "implementation": {
+    "label": "spread-netted forward mid log return over the variant horizon: sign(r) * max(|r| - (half-spread at t + half-spread at t+h) / mid, 0); a label whose horizon crosses the session close (the last row of the session) is incomplete (the labels_v2 session rule)",
+    "alt_normalisation": "raw score divided by the name's trailing 30-minute realised volatility of 1-minute mid log returns, then demeaned and studentised",
+    "beta": "beta_w5m_v1 of the xasset_v2 store: last finite value at or before t, at most 30 minutes old; a missing beta reads as 1 and is counted",
+    "cov_warmup": "the book_multi7 warm-up of 20 five-minute returns kept as 100 minutes of the variant's rebalance clock: cov_init = max(2, cov_warmup_min / rebalance_min)",
+    "net_series": "per decision k: the gross P&L over (t_k, t_k+1] minus the costs of the trade at t_k; the session-end flatten cost is added to the last decision; bps of the notional; mean over usable decisions",
+    "conservative_costs": "the same trades re-charged at spread_mult x spread + fee_mult x fee + impact_mult x impact",
+    "influential_names": "per-name net contribution = gross minus the name's traded-notional share of each rebalance's costs; the book is re-run without the C6_names_removed names of largest |contribution|",
+    "universe": "vwap_deviation: every EQUITY / ETF name of the dataset; residual_reversion and etf_catch_up: the EQUITY names whose reference ETF (the map) is another instrument of the dataset",
+    "ess": "n / max(Newey-West variance inflation with lag = block length (Bartlett weights), ess_inflation_floor)",
+    "lower_bound": "the (alpha / K) quantile of the moving-block bootstrap means (one-sided); block length = block_minutes / rebalance_min rebalances"
+  },
+  "supersedes": "research/v118/rel08_rule_signed.json (v1; its recorded results stay valid as recorded) and research/v118/rel08/rel08_rule_v2_DRAFT.json (gap-only draft)",
+  "sessions": [
+    "2019-03-27",
+    "2019-07-30",
+    "2019-08-30",
+    "2019-10-30",
+    "2019-12-30",
+    "2020-01-30"
+  ],
+  "sessions_note": "named from research/holdout_registry.json (state in_sample); not read by this work; 2019-01-30 (read by the v1 screen) is excluded from the v2 pool",
+  "book_frozen_from": {
+    "v1_alpha_bps": 5.0,
+    "v1_risk_aversion": 1000.0,
+    "evidence": "research/v118/rel08/dryrun/REL08_V2_DRYRUN_REPORT.md",
+    "note": "chosen on synthetic data and economic reasoning only; frozen before any new real session is read; never retuned after a real read"
+  },
+  "stop_rules": [
+    "one execution over the six sessions, all variants, frozen parameters; no second run and no retuning",
+    "stop if any named session is not in_sample in the registry at run time or its dataset_version differs",
+    "nothing is read before this rule is signed; runner is not the signer",
+    "a crash is repaired and re-run with identical inputs and recorded"
+  ],
+  "cannot_claim": [
+    "no edge claim and no promotion (needs an untouched confirmation sample)",
+    "one screen is not confirmation; continue permits REL-08b machine time only",
+    "six sessions are six clusters: no day-level, regime or family-wise real-data claim",
+    "synthetic dry-run figures describe the synthetic generator only and are not a ledger look",
+    "stop or underpowered does not prove absence of an effect",
+    "no capacity, executability or live profitability claim"
+  ],
+  "inference_note": "v1 moving-block bootstrap (Bonferroni K=7, NW ESS); NOT the CR1+Webb day-clustered procedure, which the reviewer's 2026-10-24 F3 decision does not approve for strict control (F3 open). Inference unchanged here; status only. Signing waits on the reviewer's written view."
+}

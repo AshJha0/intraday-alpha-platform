@@ -1,0 +1,170 @@
+[
+ {
+  "mode": "revert",
+  "amp": 30.0,
+  "seed": 7001,
+  "spread": 2.5,
+  "book": {
+   "alpha_bps": 20.0,
+   "risk_aversion": 100.0,
+   "solver_iters": 20
+  },
+  "variants": [
+   {
+    "id": "V1",
+    "crit": {
+     "C1": true,
+     "C2": false,
+     "C3": true,
+     "C4": true,
+     "C5": true,
+     "C6": true,
+     "C7": true,
+     "C8": true
+    },
+    "outcome": "underpowered",
+    "reason": "failed C2",
+    "n_usable": 74,
+    "max_gap_min": 15.0,
+    "net_mean": 3.3177126944322106,
+    "net_lower": 1.377128050023016,
+    "net_se": 0.8067618515806623,
+    "mde": 2.0088370104358493,
+    "ess": 57.34140405504135,
+    "ic_mean": 0.24467188657720979,
+    "mean_turnover": 0.2677838081699607,
+    "gross_pnl": 34316.93591849392,
+    "cost": 9958.833565325549,
+    "n_infeasible": 0,
+    "n_decisions_per_day": 72.66666666666667
+   }
+  ],
+  "sec": 13.199281692504883
+ },
+ {
+  "mode": "revert",
+  "amp": 30.0,
+  "seed": 7001,
+  "spread": 2.5,
+  "book": {
+   "alpha_bps": 20.0,
+   "risk_aversion": 100.0,
+   "solver_iters": 20
+  },
+  "variants": [
+   {
+    "id": "V5",
+    "crit": {
+     "C1": true,
+     "C2": true,
+     "C3": true,
+     "C4": true,
+     "C5": true,
+     "C6": true,
+     "C7": true,
+     "C8": true
+    },
+    "outcome": "continue",
+    "reason": "C1-C8 hold",
+    "n_usable": 72,
+    "max_gap_min": 15.0,
+    "net_mean": 7.028116225506873,
+    "net_lower": 5.422919330896317,
+    "net_se": 0.6942795202941994,
+    "mde": 1.7287560055325566,
+    "ess": 72.0,
+    "ic_mean": 0.27751403794567003,
+    "mean_turnover": 0.4558535116729104,
+    "gross_pnl": 68619.90207135428,
+    "cost": 17098.407349805253,
+    "n_infeasible": 0,
+    "n_decisions_per_day": 72.66666666666667
+   }
+  ],
+  "sec": 13.199281692504883
+ },
+ {
+  "mode": "revert",
+  "amp": 60.0,
+  "seed": 7001,
+  "spread": 2.5,
+  "book": {
+   "alpha_bps": 20.0,
+   "risk_aversion": 100.0,
+   "solver_iters": 20
+  },
+  "variants": [
+   {
+    "id": "V1",
+    "crit": {
+     "C1": true,
+     "C2": false,
+     "C3": true,
+     "C4": true,
+     "C5": true,
+     "C6": true,
+     "C7": true,
+     "C8": true
+    },
+    "outcome": "underpowered",
+    "reason": "failed C2",
+    "n_usable": 74,
+    "max_gap_min": 15.0,
+    "net_mean": 14.106180627766493,
+    "net_lower": 11.54223899162522,
+    "net_se": 1.3402672692171163,
+    "mde": 3.33726550035062,
+    "ess": 74.0,
+    "ic_mean": 0.2809699479929256,
+    "mean_turnover": 0.47510476755031694,
+    "gross_pnl": 126441.87525647314,
+    "cost": 17835.21976805869,
+    "n_infeasible": 0,
+    "n_decisions_per_day": 72.66666666666667
+   }
+  ],
+  "sec": 10.06695818901062
+ },
+ {
+  "mode": "revert",
+  "amp": 60.0,
+  "seed": 7001,
+  "spread": 2.5,
+  "book": {
+   "alpha_bps": 20.0,
+   "risk_aversion": 100.0,
+   "solver_iters": 20
+  },
+  "variants": [
+   {
+    "id": "V5",
+    "crit": {
+     "C1": true,
+     "C2": false,
+     "C3": true,
+     "C4": true,
+     "C5": true,
+     "C6": true,
+     "C7": true,
+     "C8": true
+    },
+    "outcome": "underpowered",
+    "reason": "failed C2",
+    "n_usable": 72,
+    "max_gap_min": 15.0,
+    "net_mean": 16.30505098292702,
+    "net_lower": 13.96195852504821,
+    "net_se": 1.195465234150431,
+    "mde": 2.9767084330345734,
+    "ess": 69.67785874462261,
+    "ic_mean": 0.3121014317588112,
+    "mean_turnover": 0.46166853204543434,
+    "gross_pnl": 136874.00062453057,
+    "cost": 17098.42149738712,
+    "n_infeasible": 0,
+    "n_decisions_per_day": 72.66666666666667
+   }
+  ],
+  "sec": 10.06695818901062
+ }
+]
