@@ -8889,6 +8889,8 @@ record.
 **What it is not:** a re-run or a rescue of the v3 result. The record stands: FAIL,
 no tuning, gate F3 open, no real-data FWER control claimed.
 
+**See also (2026-10-24).** `research/v118/F3_DIAGNOSTIC_REVIEW.md` and the scripts in `research/v118/f3_diagnostic/` (for example `d13_null_matrices.py`) measure how often a correctly sized test would fail the A0 line on one dataset; the findings are exploratory.
+
 ## 159. Verify the signed documents and read an analysis identity (v1.18, REL-02a)
 
 **Goal:** verify every signed document in the repository against the pinned trust
