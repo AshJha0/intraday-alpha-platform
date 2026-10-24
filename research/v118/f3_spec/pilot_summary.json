@@ -1,0 +1,90 @@
+{
+ "chosen": null,
+ "eligibility": {
+  "P0": {
+   "calibrated": false,
+   "too_conservative": false,
+   "mean_a0_ratio_k136": 0.924351851851852,
+   "max_abs_log_ratio": 5.0106352940962555,
+   "reasons": [
+    "a0 G5 k1 ratio 1.19>1.1",
+    "a0 G7 k1 ratio 1.11>1.1",
+    "a0 G7 k3 ratio 1.19>1.1",
+    "a0 G7 k6 ratio 1.35>1.1",
+    "a0 G7 FWER K6 0.0347>0.0275",
+    "a0 G10 FWER K3 0.0280>0.0275"
+   ]
+  },
+  "P1": {
+   "calibrated": false,
+   "too_conservative": false,
+   "mean_a0_ratio_k136": 1.0075462962962964,
+   "max_abs_log_ratio": 3.2188758248682006,
+   "reasons": [
+    "a0 G10 FWER K3 0.0280>0.0275"
+   ]
+  },
+  "P2": {
+   "calibrated": true,
+   "too_conservative": true,
+   "mean_a0_ratio_k136": 0.28574074074074074,
+   "max_abs_log_ratio": 5.298317366548036,
+   "reasons": []
+  },
+  "P3": {
+   "calibrated": true,
+   "too_conservative": true,
+   "mean_a0_ratio_k136": 0.5330555555555556,
+   "max_abs_log_ratio": 2.302585092994046,
+   "reasons": []
+  }
+ },
+ "pass_table": [
+  {
+   "n": 50000,
+   "kmax": 1192,
+   "max_empirical_rate": 0.02384,
+   "fwer_certifiable_at_95pct_pass": 0.0227478640404194
+  },
+  {
+   "true_fwer": 0.015,
+   "pass_prob": 1.0
+  },
+  {
+   "true_fwer": 0.018,
+   "pass_prob": 1.0
+  },
+  {
+   "true_fwer": 0.02,
+   "pass_prob": 0.999999998849356
+  },
+  {
+   "true_fwer": 0.021,
+   "pass_prob": 0.9999933847602642
+  },
+  {
+   "true_fwer": 0.022,
+   "pass_prob": 0.9973452292290164
+  },
+  {
+   "true_fwer": 0.023,
+   "pass_prob": 0.8970869673387913
+  },
+  {
+   "true_fwer": 0.0235,
+   "pass_prob": 0.6984917673701256
+  },
+  {
+   "true_fwer": 0.024,
+   "pass_prob": 0.41498752897216606
+  },
+  {
+   "true_fwer": 0.0245,
+   "pass_prob": 0.173698261691626
+  },
+  {
+   "true_fwer": 0.025,
+   "pass_prob": 0.048958381611976916
+  }
+ ]
+}
