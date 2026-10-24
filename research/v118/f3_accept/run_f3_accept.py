@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures as cf
+import ctypes
 import hashlib
 import json
 import os
@@ -42,11 +43,13 @@ BOUND = [
     SELF_REL,
     "research/v118/f3_accept/core.py",
     "research/v118/f3_accept/joint_bound.py",
+    "research/v118/f3_accept/check_freeze.py",
     "research/v118/f3_accept/declaration.json",
 ]
 INPUTS = [
     "research/v118/F3_SPEC_DRAFT.md",
     "docs/release/REVIEWER_F3_SPEC_DECISION_2026-10-24.md",
+    "docs/release/REVIEWER_F3_FREEZE_DECISION_2026-10-24.md",
     "research/v118/f3_accept/JOINT_BOUND.md",
     "research/v118/f3_spec/generators.py",
     "research/v118/f3_spec/procedures.py",
@@ -77,12 +80,47 @@ def cells(decl: Mapping[str, Any]) -> list[tuple[str, int, bool]]:
     return out
 
 
+def available_ram_gb() -> float | None:
+    """Available physical memory (Windows GlobalMemoryStatusEx, else /proc); a local copy so that the runner
+    imports nothing from the market-data packages."""
+    try:
+        if sys.platform == "win32":
+
+            class MS(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", ctypes.c_ulong),
+                    ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong),
+                    ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong),
+                    ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong),
+                    ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+
+            ms = MS()
+            ms.dwLength = ctypes.sizeof(MS)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(ms))  # type: ignore[attr-defined]
+            return ms.ullAvailPhys / 2**30
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            if line.startswith("MemAvailable:"):
+                return int(line.split()[1]) / 2**20
+    except Exception:  # pragma: no cover - diagnostics only
+        return None
+    return None
+
+
+def cell_n(decl: Mapping[str, Any], mandatory: bool) -> int:
+    return int(decl["n_per_cell"] if mandatory else decl["sensitivity"]["n_per_cell"])
+
+
 def identity_args(decl: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "scripts": list(BOUND),
         "inputs": list(INPUTS),
         "data_versions": ["synthetic-no-data"],
-        "family": "F3 acceptance study: P1 Student t(G-1) + Holm, FWER calibration, synthetic regimes a0 b0 b1 (a1 sensitivity), G 5 7 10, K 3 6 16",
+        "family": "F3 acceptance study: P1 Student t(G-1) + Holm, FWER calibration, synthetic regimes a0 b0 b1 (a1 sensitivity), G 5 7 10, K 3 6 16; NO market data consumed",
         "metrics": list(METRICS),
         "thresholds": dict(decl),
     }
@@ -186,21 +224,60 @@ def verify(prereg: Path, decl: Mapping[str, Any], root: Path = ROOT) -> dict[str
         "runner_actor": actor,
         "signer": doc["signature"]["maintainer"],
         "commit_bound": doc["analysis_identity"]["commit"],
+        "identity_sha256": identity_sha256(doc["analysis_identity"]),
+        "market_data_consumed": False,
     }
+
+
+def identity_sha256(block: Mapping[str, Any]) -> str:
+    """Digest of the COMPLETE signed analysis_identity block (scripts, inputs, environment, commit, thresholds)."""
+    blob = json.dumps(block, sort_keys=True, ensure_ascii=True).encode("ascii")
+    return hashlib.sha256(blob).hexdigest()
+
+
+STREAM_FIELDS = (
+    "regime",
+    "G",
+    "n",
+    "seed",
+    "chunk",
+    "n_chunks",
+    "nan_p",
+    "rejections",
+    "rng_final_state",
+    "chunk_counts_sha256",
+)
+
+
+def validate_cell(
+    decl: Mapping[str, Any], rec: Mapping[str, Any], path: Path, mandatory: bool
+) -> None:
+    """Resume check for a finished cell: same prereg, same COMPLETE signed identity, and the same deterministic
+    stream, established by recomputing the cell and comparing counts, final RNG state and the chunk digest."""
+    old = json.loads(path.read_text(encoding="utf-8"))
+    for key in ("prereg_sha256", "identity_sha256"):
+        if old.get(key) != rec[key]:
+            raise Refused(
+                f"{path.name}: {key} differs from the verified signed prereg; refusing to resume"
+            )
+    new = core.run_cell(decl, old.get("regime"), old.get("G"), cell_n(decl, mandatory))
+    bad = [k for k in STREAM_FIELDS if old.get(k) != new[k]]
+    if bad:
+        raise Refused(f"{path.name}: the recomputed stream differs in {bad}; refusing to resume")
 
 
 def _cell_job(decl: dict, reg: str, g: int, out: str, rec: dict) -> str:
     t0 = time.perf_counter()
-    r = core.run_cell(decl, reg, g, int(decl["n_per_cell"]))
+    mand = reg in decl["mandatory"]["regimes"]
+    r = core.run_cell(decl, reg, g, cell_n(decl, mand))
     r["cpu_wall_s"] = time.perf_counter() - t0
     r["prereg_sha256"] = rec["prereg_sha256"]
+    r["identity_sha256"] = rec["identity_sha256"]
     write_json(Path(out) / f"cell_{reg}_G{g}.json", r)
     return f"{reg}_G{g}"
 
 
 def cmd_run(a: argparse.Namespace) -> int:
-    from iap.marketdata.runmem import available_ram_gb
-
     decl = load_decl(a.decl)
     root = Path(a.root)
     prereg = (root / decl["prereg"]) if a.prereg is None else Path(a.prereg)
@@ -215,15 +292,11 @@ def cmd_run(a: argparse.Namespace) -> int:
             f"{out} holds a DECISION.json: one run only; a parameter change is a new declaration"
         )
     todo = []
-    for reg, g, _ in cells(decl):
+    for reg, g, mand in cells(decl):
         f = out / f"cell_{reg}_G{g}.json"
         if f.exists():
-            if (
-                json.loads(f.read_text(encoding="utf-8")).get("prereg_sha256")
-                != rec["prereg_sha256"]
-            ):
-                raise Refused(f"{f.name} was produced under a different prereg")
-            print(f"[f3acc] resume: {f.name} complete", flush=True)
+            validate_cell(decl, rec, f, mand)
+            print(f"[f3acc] resume: {f.name} complete and re-verified", flush=True)
         else:
             todo.append((reg, g))
     write_json(out / "run_record.json", {**rec, "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -240,34 +313,64 @@ def cmd_run(a: argparse.Namespace) -> int:
 def decide(
     decl: Mapping[str, Any], res: Mapping[tuple[str, int], Mapping[str, Any]]
 ) -> dict[str, Any]:
-    n, tgt, conf = int(decl["n_per_cell"]), float(decl["fwer_target"]), float(decl["ucb_conf"])
-    km = core.k_max(n, tgt, conf)
-    evals, all_pass = [], True
+    tgt, conf = float(decl["fwer_target"]), float(decl["ucb_conf"])
+    mand_rows: list[dict[str, Any]] = []
+    sens_rows: list[dict[str, Any]] = []
     for reg, g, mand in cells(decl):
         r = res.get((reg, g))
         if r is None:
             raise Refused(f"missing cell {reg} G{g}")
+        n = cell_n(decl, mand)
         for k in decl["families"]:
             c = int(r["rejections"][f"K{k}"])
             ucb = core.cp_upper(c, n, conf)
-            ok = ucb <= tgt
-            if mand and not ok:
-                all_pass = False
-            evals.append({"regime": reg, "G": g, "K": k, "mandatory": mand, "count": c, "n": n,
-                          "fwer_observed": c / n, "ucb95": ucb, "pass": ok, "nan_p": r["nan_p"]})  # fmt: skip
-    return {"overall_pass_all_27_mandatory": all_pass, "k_max": km, "alpha_op": decl["alpha_op"],
-            "fwer_target": tgt, "evaluations": evals,
-            "scope": "calibration under the declared synthetic regimes only; no real-data claim"}  # fmt: skip
+            row = {"regime": reg, "G": g, "K": k, "count": c, "n": n, "fwer_observed": c / n,
+                   "ucb95": ucb, "meets_ucb_rule": ucb <= tgt, "nan_p": r["nan_p"]}  # fmt: skip
+            (mand_rows if mand else sens_rows).append(row)
+    return {
+        "overall_pass_all_27_mandatory": all(e["meets_ucb_rule"] for e in mand_rows),
+        "k_max": core.k_max(int(decl["n_per_cell"]), tgt, conf),
+        "alpha_op": decl["alpha_op"],
+        "fwer_target": tgt,
+        "mandatory_evaluations": mand_rows,
+        "sensitivity_evaluations": sens_rows,
+        "scope": "calibration under the declared synthetic regimes only; no real-data claim; no market data consumed",
+        "closure_note": "a statistical pass does NOT automatically close F3 or authorise real-data claims; the outside reviewer decides",
+    }
+
+
+def _table(rows: Sequence[Mapping[str, Any]]) -> list[str]:
+    head = "| regime | G | K | count | n | FWER observed | UCB95 | meets UCB rule |"
+    out = [head, "|---|---|---|---|---|---|---|---|"]
+    for e in rows:
+        out.append(
+            f"| {e['regime']} | {e['G']} | {e['K']} | {e['count']} | {e['n']} | "
+            f"{e['fwer_observed']:.5f} | {e['ucb95']:.5f} | {e['meets_ucb_rule']} |"
+        )
+    return out
 
 
 def report(dec: Mapping[str, Any]) -> str:
-    L = [f"# F3 acceptance study result\n\nOverall (27 mandatory evaluations): **{'PASS' if dec['overall_pass_all_27_mandatory'] else 'FAIL'}**. "
-         f"alpha_op {dec['alpha_op']}, FWER target {dec['fwer_target']}, pass iff count <= {dec['k_max']}. {dec['scope']}.\n",
-         "| regime | G | K | mandatory | count | FWER observed | UCB95 | pass |", "|---|---|---|---|---|---|---|---|"]  # fmt: skip
-    for e in dec["evaluations"]:
-        L.append(f"| {e['regime']} | {e['G']} | {e['K']} | {e['mandatory']} | {e['count']} | {e['fwer_observed']:.5f} | "
-                 f"{e['ucb95']:.5f} | {e['pass']} |")  # fmt: skip
-    return "\n".join(L) + "\n"
+    verdict = "PASS" if dec["overall_pass_all_27_mandatory"] else "FAIL (final for this prereg)"
+    lines = [
+        "# F3 acceptance study result",
+        "",
+        f"Mandatory verdict (27 evaluations: a0, b0, b1 x G 5, 7, 10 x K 3, 6, 16): **{verdict}**. "
+        f"alpha_op {dec['alpha_op']}, FWER target {dec['fwer_target']}, "
+        f"an evaluation meets the rule iff count <= {dec['k_max']}.",
+        "",
+        f"Scope: {dec['scope']}.",
+        f"**{dec['closure_note']}.**",
+        "",
+        "## Mandatory results (27)",
+        "",
+        *_table(dec["mandatory_evaluations"]),
+        "",
+        "## Sensitivity results, a1 rho 0.6 (9; reported, NOT part of the verdict, never used to redefine the operating domain)",
+        "",
+        *_table(dec["sensitivity_evaluations"]),
+    ]
+    return "\n".join(lines) + "\n"
 
 
 def cmd_analyse(a: argparse.Namespace) -> int:

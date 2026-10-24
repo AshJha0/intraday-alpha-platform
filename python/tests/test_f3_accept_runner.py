@@ -96,10 +96,8 @@ def _sign(r: Path, key: Path) -> None:
 
 
 def _ok(monkeypatch):
-    import iap.marketdata.runmem as rm
-
     monkeypatch.setenv("IAP_RUN_ACTOR", "claude-queue-runner")
-    monkeypatch.setattr(rm, "available_ram_gb", lambda: 64.0)
+    monkeypatch.setattr(fa, "available_ram_gb", lambda: 64.0)
 
 
 def test_declaration_is_an_unsigned_draft_with_the_reviewed_parameters():
@@ -183,7 +181,11 @@ def test_decide_applies_the_clopper_pearson_rule_to_all_27_mandatory_evaluations
         }
 
     ok = fa.decide(DECL, res(1000))
-    assert ok["overall_pass_all_27_mandatory"] and len(ok["evaluations"]) == 36
+    assert (
+        ok["overall_pass_all_27_mandatory"]
+        and len(ok["mandatory_evaluations"]) == 27
+        and len(ok["sensitivity_evaluations"]) == 9
+    )
     bad = res(1000)
     bad[("b1", 7)]["rejections"]["K6"] = km + 1
     assert not fa.decide(DECL, bad)["overall_pass_all_27_mandatory"]

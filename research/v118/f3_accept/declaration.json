@@ -12,9 +12,36 @@
   "joint_false_fail_budget": 0.05,
   "n_per_cell": 50000,
   "chunk": 10000,
-  "families": [3, 6, 16],
-  "mandatory": {"regimes": ["a0", "b0", "b1"], "G": [5, 7, 10]},
-  "sensitivity": {"regimes": ["a1"], "G": [5, 7, 10]},
+  "families": [
+    3,
+    6,
+    16
+  ],
+  "mandatory": {
+    "regimes": [
+      "a0",
+      "b0",
+      "b1"
+    ],
+    "G": [
+      5,
+      7,
+      10
+    ]
+  },
+  "sensitivity": {
+    "regimes": [
+      "a1"
+    ],
+    "G": [
+      5,
+      7,
+      10
+    ],
+    "n_per_cell": 50000,
+    "in_verdict": false,
+    "note": "a1 (rho 0.6) is run at 50,000 datasets per G, all K3/K6/K16 outcomes reported, excluded from the mandatory verdict, never used to redefine the operating domain"
+  },
   "generators": {
     "rho_a1": 0.6,
     "scale_ratio": 5.0,
@@ -24,17 +51,46 @@
     "base": 20291100,
     "dry_run_base": 20291900,
     "formula": "base + 10 * regime_index + G",
-    "regime_index": {"a0": 0, "b0": 1, "b1": 2, "a1": 3},
-    "disjoint_from": ["20281100-20281199 (pilot)", "20271001-20271004 (F3 diagnostic)"]
+    "regime_index": {
+      "a0": 0,
+      "b0": 1,
+      "b1": 2,
+      "a1": 3
+    },
+    "disjoint_from": [
+      "20281100-20281199 (pilot)",
+      "20271001-20271004 (F3 diagnostic)"
+    ]
   },
-  "dry_run": {"n": 200, "output_discarded": true},
+  "dry_run": {
+    "n": 200,
+    "output_discarded": true
+  },
   "workers": 3,
   "stop_rules": {
     "min_free_ram_gb": 4.0,
     "no_interim_looks": true,
     "one_run_only": true,
-    "crash_policy": "completed cell files with the same prereg sha256 are kept and skipped on resume; a parameter change is a new declaration",
+    "crash_policy": "an interrupted run may be resumed exactly as declared in `resume`; nothing else is permitted",
     "fail_policy": "a failed evaluation is recorded; no tuning, no rerun with new seeds under this prereg"
   },
-  "decision_rule": "overall PASS iff every one of the 27 mandatory evaluations (a0, b0, b1 x G 5, 7, 10 x K 3, 6, 16) has UCB95 <= fwer_target, i.e. count <= k_max(n_per_cell); a1 is reported and is not a criterion; a NaN p counts as p = 1 and any NaN is reported; pass supports calibration under the synthetic regimes only, never a real-data claim; serial dependence is outside the validated domain"
+  "decision_rule": "overall PASS iff every one of the 27 mandatory evaluations (a0, b0, b1 x G 5, 7, 10 x K 3, 6, 16) has UCB95 <= fwer_target, i.e. count <= k_max(n_per_cell); a1 is reported and is not a criterion; a NaN p counts as p = 1 and any NaN is reported; pass supports calibration under the synthetic regimes only, never a real-data claim; serial dependence is outside the validated domain; the report lists the 27 mandatory and the 9 sensitivity results separately; a statistical pass does NOT automatically close F3 or authorise real-data claims (the outside reviewer decides)",
+  "market_data_consumed": false,
+  "data_versions_sentinel": "synthetic-no-data: a declared sentinel only. NO market data are consumed (no data/real access, no holdout registry, no dataset reader); it is not a dataset identifier and not a holdout exemption",
+  "stream": {
+    "single_stream_per_cell": true,
+    "reseed_between_chunks": false,
+    "frozen_in_identity": [
+      "chunk",
+      "ordering of draws within a chunk",
+      "core.py generator implementation",
+      "seeds"
+    ]
+  },
+  "resume": {
+    "permitted": true,
+    "granularity": "cell",
+    "validation": "every finished cell file is re-verified by deterministic recomputation under the CURRENT verified signed identity: identity_sha256 of the full analysis_identity block, prereg sha256, seed, chunk, n, final RNG state and chunk-count digest must all match; any mismatch refuses",
+    "failed_study": "a completed run whose DECISION.json says FAIL is final: no resume, no rerun, no new seeds under this prereg (a new prereg and independent approval are required)"
+  }
 }
