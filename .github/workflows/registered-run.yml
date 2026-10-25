@@ -28,7 +28,10 @@
 #     endpoint (docs/governance/DD1_INGESTION_RUNBOOK.md). `prereg` is
 #     ignored in that mode; TIINGO_API_KEY, if the owner set it in the
 #     runner service's own environment, selects Tiingo over Stooq (never a
-#     secret of this workflow).
+#     secret of this workflow). `stooq_sha256` (DR-16): Stooq now serves
+#     scripts a browser check, so the owner downloads the bulk archive to
+#     C:\iap\inbox\d_us_txt.zip and passes its sha256; the job verifies it
+#     before the first request.
 #
 # Changing this file or tools/runner/ needs the owner's review (CODEOWNERS +
 # the branch ruleset's code-owner requirement). The evidence class of what
@@ -58,6 +61,11 @@ on:
           - dd1
       year:
         description: "dd1 only: the purchase year Y that cuts the partitions (default: this year)"
+        required: false
+        default: ""
+        type: string
+      stooq_sha256:
+        description: "dd1 only: sha256 of the owner's browser download C:\\iap\\inbox\\d_us_txt.zip (DR-16); empty = network Stooq or Tiingo"
         required: false
         default: ""
         type: string
@@ -136,7 +144,9 @@ jobs:
         shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
           $year = if ("${{ inputs.year }}" -ne "") { "${{ inputs.year }}" } else { (Get-Date).Year }
-          python tools/ingest/dd1_daily.py run --year $year --dev-root C:\iap\daily --log results-log.redacted.txt
+          $zip = @()
+          if ("${{ inputs.stooq_sha256 }}" -ne "") { $zip = @("--stooq-zip", "C:\iap\inbox\d_us_txt.zip", "--stooq-sha256", "${{ inputs.stooq_sha256 }}") }
+          python tools/ingest/dd1_daily.py run --year $year --dev-root C:\iap\daily --log results-log.redacted.txt @zip
           if ($LASTEXITCODE -ne 0) { throw "dd1 ingestion exit $LASTEXITCODE (see the redacted log)" }
 
       - name: Upload the redacted log (the only artifact)

@@ -16,7 +16,10 @@ What one run does, in order (each step refusing before the next):
    in ``--dry-run``, which also answers every request from synthetic fixtures
    and writes only under temp directories);
 2. **pull** (``https`` to the allow-listed hosts only): daily prices from
-   **Stooq's bulk archive** unless ``TIINGO_API_KEY`` is present in the
+   **Stooq's bulk archive** (since October 2026 Stooq answers scripts with a
+   browser check, so the archive is the owner's browser download passed as
+   ``--stooq-zip`` with its recorded ``--stooq-sha256``, verified before the
+   first request; DR-15) unless ``TIINGO_API_KEY`` is present in the
    environment, in which case **Tiingo** per-ticker CSVs (DR-7; the owner
    creates no account that asks for a card); the S&P 500 and Nasdaq-100
    constituent tables from **every Wikipedia revision** (last revision of each
@@ -311,13 +314,47 @@ def _stooq_name(symbol: str) -> str:
     return symbol.lower().replace(".", "-") + ".us"
 
 
+def read_local_archive(path: Path, expected_sha256: str) -> tuple[bytes, str]:
+    """The owner's browser download of the bulk archive (DR-15): Stooq answers
+    scripted requests with a JavaScript browser check, which the job does not
+    try to pass.  Refuses (exit 3, before any request) unless the file is a zip
+    whose sha256 equals the one the owner recorded when downloading it."""
+    p = Path(path)
+    if not p.is_file():
+        raise IngestRefused(3, "the local Stooq archive is missing")
+    want = (expected_sha256 or "").strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", want):
+        raise IngestRefused(3, "the local Stooq archive needs the owner's recorded sha256")
+    blob = p.read_bytes()
+    got = hashlib.sha256(blob).hexdigest()
+    if got != want:
+        raise IngestRefused(3, "the local Stooq archive does not match the recorded sha256")
+    if not zipfile.is_zipfile(io.BytesIO(blob)):
+        raise IngestRefused(3, "the local Stooq archive is not a zip file")
+    return blob, got
+
+
 def pull_prices_stooq(
-    transport, universe: set[str], *, adapter_kw: Mapping[str, Any] | None = None, log=None
+    transport,
+    universe: set[str],
+    *,
+    adapter_kw: Mapping[str, Any] | None = None,
+    log=None,
+    local_blob: bytes | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """The bulk daily archive, one file per symbol; only universe symbols are kept."""
-    src = stooq.StooqSource(transport, **(adapter_kw or {}))
-    listing = stooq.parse_listing(src._get_text(stooq.LISTING_URL))
-    blob = src._get(STOOQ_BULK_URL)
+    """The bulk daily archive, one file per symbol; only universe symbols are kept.
+    ``local_blob`` (already verified by :func:`read_local_archive`) replaces both
+    requests; the listing page is then not read."""
+    if local_blob is None:
+        src = stooq.StooqSource(transport, **(adapter_kw or {}))
+        listing = stooq.parse_listing(src._get_text(stooq.LISTING_URL))
+        blob = src._get(STOOQ_BULK_URL)
+        if not zipfile.is_zipfile(io.BytesIO(blob)):
+            raise IngestRefused(
+                2, "Stooq did not serve a zip (browser check?): use --stooq-zip (DR-15)"
+            )
+    else:
+        listing, blob = {}, local_blob
     wanted = {_stooq_name(s): s for s in universe}
     rows: list[dict[str, Any]] = []
     files_seen = 0
@@ -360,6 +397,7 @@ def pull_prices_stooq(
         "archive": stooq.BULK_DAILY_US,
         "archive_bytes": len(blob),
         "archive_sha256": hashlib.sha256(blob).hexdigest(),
+        "archive_origin": "network" if local_blob is None else "owner_browser_download",
         "listing": listing.get(stooq.BULK_DAILY_US),
         "files_in_archive": files_seen,
         "universe_symbols": len(universe),
@@ -920,10 +958,14 @@ def ingest(
     plausible: Mapping[str, tuple[int, int]] | None = None,
     adapter_kw: Mapping[str, Any] | None = None,
     log: redact.RedactingLog | None = None,
+    stooq_zip: Path | None = None,
+    stooq_sha256: str = "",
 ) -> dict[str, Any]:
     """The whole job (module docstring).  Returns the record written to
     ``dev_root/dd1_<year>/dataset.json``; raises :class:`IngestRefused`.
-    ``plausible`` and ``adapter_kw`` (injected clock) are for the dry run."""
+    ``plausible`` and ``adapter_kw`` (injected clock) are for the dry run.
+    ``stooq_zip`` + ``stooq_sha256``: the owner's downloaded archive (DR-15),
+    verified before the first request."""
     env = os.environ if environ is None else environ
     log = log or redact.RedactingLog([str(dev_root)])
     today = today or _dt.date.today()
@@ -937,6 +979,10 @@ def ingest(
         raise IngestRefused(
             3, "a record for this purchase year exists; a re-ingestion is a new year"
         )
+    local_blob = None
+    if stooq_zip is not None:
+        local_blob, digest = read_local_archive(stooq_zip, stooq_sha256)
+        log(f"local Stooq archive verified: sha256 {digest[:16]}")
 
     # -- pull
     tables = Tables()
@@ -953,7 +999,7 @@ def ingest(
         )
     else:
         tables.prices, price_meta = pull_prices_stooq(
-            transport, universe, adapter_kw=adapter_kw, log=log
+            transport, universe, adapter_kw=adapter_kw, log=log, local_blob=local_blob
         )
     first_year = min((r["date"][:4] for r in tables.prices), default=str(year))
     tables.filings, edgar_meta = pull_filings(
@@ -1086,7 +1132,17 @@ def dry_run(year: int, dev_root: Path, sealed_root: Path, **knobs: Any) -> dict[
     from ingest import dd1_fixture
 
     ss = _sealed_service_module()
+    local_zip = knobs.pop("local_zip", False)
+    sha256_override = knobs.pop("sha256_override", "")
     fx = dd1_fixture.build(year, **knobs)
+    zip_kw: dict[str, Any] = {}
+    if local_zip:  # the owner's download (DR-15): the fixture archive, served from disk
+        zpath = Path(sealed_root).parent / "d_us_txt.zip"
+        zpath.parent.mkdir(parents=True, exist_ok=True)
+        zpath.write_bytes(fx.urls.pop(STOOQ_BULK_URL))
+        fx.urls.pop(stooq.LISTING_URL, None)
+        digest = hashlib.sha256(zpath.read_bytes()).hexdigest()
+        zip_kw = {"stooq_zip": zpath, "stooq_sha256": sha256_override or digest}
     services: dict[str, Any] = {}
     for part in SEALED.values():
         root = Path(sealed_root) / part
@@ -1123,6 +1179,7 @@ def dry_run(year: int, dev_root: Path, sealed_root: Path, **knobs: Any) -> dict[
             plausible=DRY_RUN_PLAUSIBLE,
             adapter_kw={"clock": clock, "sleep": lambda _s: None},
             log=log,
+            **zip_kw,
         )
     except IngestRefused as exc:
         rec_path = Path(dev_root) / f"dd1_{year}" / "dataset.json"
@@ -1150,6 +1207,10 @@ def main(argv: list[str] | None = None) -> int:
         "--sealed-root", type=Path, default=None, help="dry run: in-process services here"
     )
     r.add_argument("--log", type=Path, default=None, help="write the redacted log here")
+    r.add_argument(
+        "--stooq-zip", type=Path, default=None, help="the owner's downloaded d_us_txt.zip (DR-15)"
+    )
+    r.add_argument("--stooq-sha256", default="", help="sha256 the owner recorded for --stooq-zip")
     a = ap.parse_args(argv)
     if a.dry_run:
         sealed_root = a.sealed_root or Path(tempfile.mkdtemp(prefix="dd1-sealed-"))
@@ -1163,7 +1224,13 @@ def main(argv: list[str] | None = None) -> int:
     log = redact.RedactingLog([str(a.dev_root)])
     code = 0
     try:
-        rec = ingest(year=a.year, dev_root=a.dev_root, log=log)
+        rec = ingest(
+            year=a.year,
+            dev_root=a.dev_root,
+            log=log,
+            stooq_zip=a.stooq_zip,
+            stooq_sha256=a.stooq_sha256,
+        )
         log(f"done: {rec['status']}")
     except IngestRefused as exc:
         code = exc.code

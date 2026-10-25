@@ -205,6 +205,66 @@ def test_stooq_is_the_default_without_a_key(clean_run):
     assert rec["requests"] > 100  # every revision parsed, every quarter index read
 
 
+# ------------------------------------------- the owner's Stooq download (DR-15) --
+def test_local_stooq_archive_replaces_both_stooq_requests(tmp_path):
+    rec = job.dry_run(2026, tmp_path / "dev", tmp_path / "sealed", local_zip=True)
+    assert rec["status"] == "complete"
+    assert rec["sources"]["prices"] == "stooq"
+    assert "local Stooq archive verified" in rec["log"]
+    assert rec["requests"] > 100
+
+
+def test_local_stooq_archive_with_the_wrong_sha256_refuses_before_any_request(tmp_path):
+    rec = job.dry_run(
+        2026, tmp_path / "dev", tmp_path / "sealed", local_zip=True, sha256_override="0" * 64
+    )
+    assert rec["status"] == "refused" and rec["exit"] == 3
+    assert rec["requests"] == 0
+    assert not (tmp_path / "dev").exists()
+
+
+@pytest.mark.parametrize("digest", ["", "abc", "g" * 64])
+def test_local_stooq_archive_needs_a_recorded_sha256(tmp_path, digest):
+    z = tmp_path / "d_us_txt.zip"
+    z.write_bytes(b"PK\x05\x06" + b"\0" * 18)  # an empty zip
+    with pytest.raises(job.IngestRefused) as exc:
+        job.read_local_archive(z, digest)
+    assert exc.value.code == 3
+
+
+def test_local_stooq_archive_that_is_not_a_zip_refuses(tmp_path):
+    import hashlib
+
+    z = tmp_path / "d_us_txt.zip"
+    z.write_bytes(b"<!DOCTYPE html><html>browser check</html>")
+    with pytest.raises(job.IngestRefused, match="not a zip"):
+        job.read_local_archive(z, hashlib.sha256(z.read_bytes()).hexdigest())
+    with pytest.raises(job.IngestRefused, match="missing"):
+        job.read_local_archive(tmp_path / "absent.zip", "0" * 64)
+
+
+def test_a_browser_check_page_from_stooq_is_a_named_refusal():
+    pages = {
+        job.stooq.LISTING_URL: b"<html></html>",
+        job.STOOQ_BULK_URL: b"<!DOCTYPE html><html>This site requires JavaScript</html>",
+    }
+
+    def transport(url, headers):
+        return pages[url]
+
+    tick = [0.0]
+
+    def clock() -> float:  # advances, so the rate limiter never waits
+        tick[0] += 10.0
+        return tick[0]
+
+    with pytest.raises(job.IngestRefused, match="--stooq-zip") as exc:
+        job.pull_prices_stooq(
+            transport, {"AAPL"}, adapter_kw={"clock": clock, "sleep": lambda _s: None}
+        )
+    assert exc.value.code == 2
+
+
 def test_sealed_refusal_leaves_the_record_incomplete(tmp_path):
     def refusing(part, request, files):
         return {"ok": False, "error": "caller_account"}
