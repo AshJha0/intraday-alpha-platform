@@ -28,6 +28,7 @@ from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
 from typing import NamedTuple
 
+from iap.core import guard
 from iap.core.events import (
     FIELDS,
     I64_MAX,
@@ -350,9 +351,7 @@ def write_iap1(path: str | Path, events: Sequence[MarketEvent]) -> int:
 
 def read_iap1(path: str | Path) -> list[MarketEvent]:
     """Read an IAP1 file."""
-    from iap.research.holdout_registry import reader_guard
-
-    reader_guard(path)  # holdout backstop: refuses before the file is opened
+    guard.check(path, "read_iap1")  # D1 choke point: refuses before the file is opened
     with open(path, "rb") as f:
         return decode_iap1(f.read())
 
@@ -372,9 +371,7 @@ def iter_iap1(path: str | Path, chunk_records: int = _ITER_CHUNK_RECORDS) -> Ite
     """
     if chunk_records < 1:
         raise ValueError("chunk_records must be >= 1")
-    from iap.research.holdout_registry import reader_guard
-
-    reader_guard(path)  # holdout backstop: refuses before the file is opened
+    guard.check(path, "iter_iap1")  # D1 choke point: refuses before the file is opened
     with open(path, "rb") as f:
         head = f.read(IAP1_HEADER_SIZE)
         if len(head) < IAP1_HEADER_SIZE:

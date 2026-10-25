@@ -179,3 +179,118 @@ against a given commit:
 | StorageClass | cluster specific | `storageClassName: standard` in `deployment/k8s/pvc.yaml` is a placeholder: replace it with a class that exists (`kubectl get storageclass`). |
 | NetworkPolicy enforcement | needs a CNI that implements it | Policies are in `deployment/k8s/networkpolicy.yaml`; a CNI without NetworkPolicy support ignores them. |
 | Image vulnerability scan (`trivy image`) | SECURITY.md asks for it before digest pinning | Not wired into any workflow. |
+
+## 7. v2.0 stage 2: the sealed environment, the registered runner and the results branch
+
+Required by U0 section 2 (properties 1, 2 and 5) and documented in
+[RUNNER_THREAT_MODEL.md](RUNNER_THREAT_MODEL.md). None of this is applied by a file in the repository; the owner
+sets it once with an admin `gh`. Each block ends with the `gh api` read that reproduces the check (CR1
+acceptance: "a passing test or a documented settings check reproduced by `gh api`"). Status as of 2026-10-25:
+**not yet set** (the owner has not run these; the branch `results` and the environment `sealed` did not exist
+on GitHub as of 2026-10-25).
+
+### 7.1 Code-owner review for the runner paths (property 2)
+
+The development identity must not be able to change `.github/workflows/registered-run.yml`, `tools/runner/`,
+`tools/sealed_service.py`, `tools/admin/` or `research/audit/` without a review it does not hold. `CODEOWNERS`
+names `@AshJha0` for these paths; the `main` ruleset must require code-owner review for them to bind. Because a
+pull-request author cannot approve their own pull request, this requires a second maintainer (D-25) or a
+narrower ruleset that applies the requirement only when those paths change:
+
+```bash
+# a second ruleset on main, scoped by file path to the runner surfaces
+gh api -X POST repos/AshJha0/intraday-alpha-platform/rulesets --input - <<'JSON'
+{
+  "name": "registered-runner surfaces",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] }
+  },
+  "rules": [
+    { "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 1,
+        "dismiss_stale_reviews_on_push": true,
+        "require_code_owner_review": true,
+        "require_last_push_approval": true,
+        "required_review_thread_resolution": true
+      } },
+    { "type": "file_path_restriction",
+      "parameters": { "restricted_file_paths": [".github/workflows/registered-run.yml", "tools/runner/**", "tools/sealed_service.py", "tools/admin/**", "research/audit/**"] } }
+  ]
+}
+JSON
+# check
+gh api repos/AshJha0/intraday-alpha-platform/rulesets --jq '.[] | {name, enforcement}'
+```
+
+Until a second maintainer exists, `require_code_owner_review` on a single-maintainer repository blocks every
+merge touching these paths (including this PR's follow-ups); the owner decides between the second maintainer
+(O-3, which also upgrades the evidence class) and the file-path restriction above, which stops a push that
+changes these paths outside a pull request. Record the choice as a decision record.
+
+### 7.2 The `sealed` environment (properties 1 and 2)
+
+```bash
+# create / update the environment: the owner is the required reviewer, no self-review bypass
+gh api -X PUT repos/AshJha0/intraday-alpha-platform/environments/sealed --input - <<'JSON'
+{ "wait_timer": 0,
+  "prevent_self_review": false,
+  "reviewers": [ { "type": "User", "id": OWNER_USER_ID } ],
+  "deployment_branch_policy": { "protected_branches": true, "custom_branch_policies": false } }
+JSON
+# OWNER_USER_ID: gh api users/AshJha0 --jq .id
+# check: required reviewer present, no secrets, no debug variables
+gh api repos/AshJha0/intraday-alpha-platform/environments/sealed --jq '.protection_rules'
+gh api repos/AshJha0/intraday-alpha-platform/environments/sealed/secrets --jq '.total_count'      # must be 0
+gh api repos/AshJha0/intraday-alpha-platform/environments/sealed/variables --jq '.variables[].name' # must not list ACTIONS_STEP_DEBUG / ACTIONS_RUNNER_DEBUG
+gh api repos/AshJha0/intraday-alpha-platform/actions/variables --jq '.variables[].name'            # same at repository level
+gh api repos/AshJha0/intraday-alpha-platform/actions/secrets --jq '.secrets[].name'                # no ACTIONS_STEP_DEBUG
+```
+
+`prevent_self_review` is `false` because the owner both starts and approves runs while there is one
+maintainer (custody: the class stays "mechanically isolated"); set it `true` when a second reviewer exists.
+
+### 7.3 The `results` branch (property 5)
+
+Created by the first registered run (orphan branch, committed by `iap-runner`). Protect it before that:
+
+```bash
+gh api -X POST repos/AshJha0/intraday-alpha-platform/rulesets --input - <<'JSON'
+{
+  "name": "results append-only",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": { "ref_name": { "include": ["refs/heads/results"], "exclude": [] } },
+  "bypass_actors": [],
+  "rules": [ { "type": "deletion" }, { "type": "non_fast_forward" } ]
+}
+JSON
+# check
+gh api repos/AshJha0/intraday-alpha-platform/rulesets --jq '.[] | select(.name=="results append-only") | .enforcement'
+gh api repos/AshJha0/intraday-alpha-platform/branches/results --jq '.protected'
+```
+
+No pull-request requirement on `results`: the runner pushes one fast-forward commit per run with the job
+token. A repository administrator can still bypass or delete a ruleset (D-51); the service's copy of each
+result hash and the published checkpoints make that detectable.
+
+### 7.4 Actions policy for the self-hosted runner (public repository)
+
+```bash
+# the default token stays read-only (section 4); fork pull requests need approval before any workflow runs
+gh api repos/AshJha0/intraday-alpha-platform/actions/permissions --jq '{enabled, allowed_actions}'
+# the registered runner and its labels (repository-level runner)
+gh api repos/AshJha0/intraday-alpha-platform/actions/runners --jq '.runners[] | {name, status, labels: [.labels[].name]}'
+```
+
+The registered runner must show the labels `self-hosted`, `windows`, `iap-runner` and no other workflow may
+target them (grep `.github/workflows/` for `iap-runner`: only `registered-run.yml`). "Require approval for all
+outside collaborators" is set in the Actions settings page (no API field).
+
+### 7.5 What stays unenforced
+
+A ruleset binds everyone except whoever the ruleset's bypass list names and, in practice, the repository
+administrator who can edit the ruleset. On a single-maintainer repository that administrator is the developer.
+The register's D-25, D-50 and D-51 record this; the custody label (property 6) is the honest description.

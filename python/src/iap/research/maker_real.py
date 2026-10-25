@@ -41,6 +41,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from iap import io as iap_io
 from iap.marketdata.runmem import available_ram_gb  # REL-13: moved; re-exported
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -208,9 +209,8 @@ def _read_filtered(path: Path, cols: list[str], iid: int, end_ns: int | None):
     """``pq.read_table(path, columns=cols, filters=...)`` without pyarrow.dataset."""
     import pyarrow as pa
     import pyarrow.compute as pc
-    import pyarrow.parquet as pq
 
-    pf = pq.ParquetFile(path)
+    pf = iap_io.parquet_file(path, purpose="maker_real events")
     parts = []
     for rg in range(pf.num_row_groups):
         t = pf.read_row_group(rg, columns=cols)
@@ -226,8 +226,6 @@ def _read_filtered(path: Path, cols: list[str], iid: int, end_ns: int | None):
 
 
 def load_events(session_dir: Path, iid: int, end_ns: int | None = None) -> list:
-    import pyarrow.parquet as pq
-
     from iap.core.events import MarketEvent
 
     cols = [
@@ -249,7 +247,7 @@ def load_events(session_dir: Path, iid: int, end_ns: int | None = None) -> list:
         filt.append(("exchange_ts", "<=", end_ns))
     path = session_dir / "normalized" / "events.parquet"
     try:
-        t = pq.read_table(path, columns=cols, filters=filt)
+        t = iap_io.read_table(path, columns=cols, filters=filt, purpose="maker_real events")
     except (ImportError, ValueError):
         # pyarrow.dataset can be unavailable (a Windows Application Control
         # policy blocked its DLL on 2026-10-11); filter row group by row group
@@ -263,9 +261,9 @@ def load_events(session_dir: Path, iid: int, end_ns: int | None = None) -> list:
 def load_feature_day(
     features_dir: Path, iid: int, day: int, columns: Sequence[str]
 ) -> pd.DataFrame:
-    import pyarrow.parquet as pq
-
-    pf = pq.ParquetFile(features_dir / f"features_{iid}.parquet")
+    pf = iap_io.parquet_file(
+        features_dir / f"features_{iid}.parquet", purpose="maker_real features"
+    )
     names = set(pf.schema_arrow.names)
     cols = ["instrument_id", "exchange_ts", *[c for c in dict.fromkeys(columns) if c in names]]
     df = pf.read_row_group(day, columns=cols).to_pandas()
@@ -437,7 +435,7 @@ class Study:
                 p = self.label_path(d, sym, horizon)
                 if not p.is_file():
                     continue
-                lab = pd.read_parquet(p)
+                lab = iap_io.read_parquet(p, purpose="maker_real labels")
                 if lab.empty:
                     continue
                 if horizon is not None and "ttl_ns" in lab.columns:

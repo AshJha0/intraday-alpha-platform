@@ -33,9 +33,11 @@ differs from the manifest).  The access log is append-only and hash-chained:
 every line carries ``prev_sha256`` (the sha256 of the line before it), so an
 edited, removed or reordered line shows in :func:`verify_access_log`
 (``python -m iap.research.holdout_registry verify-log``).  Refusals are
-logged too.  The low-level readers (IAP1 events, feature parquet) call
-:func:`reader_guard`, a backstop for entry points that forgot their own
-guard.  The supported routes and the unsupported ones are listed in
+logged too.  The low-level readers (IAP1 events, feature parquet, numpy caches)
+reach :func:`reader_guard` through the one choke point
+:func:`iap.core.guard.check` (v2.0 D1; this module registers itself as the
+hook when imported), so an entry point that forgot its own guard is still
+refused.  The supported routes and the unsupported ones are listed in
 ``docs/governance/DATA_ACCESS_PATHS.md``.
 
 The registry body carries ``body_sha256``; :func:`load_registry` refuses a
@@ -57,6 +59,8 @@ import sys
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
+
+from iap.core import guard as _core_guard
 
 REPO = Path(__file__).resolve().parents[4]
 REGISTRY_REL = "research/holdout_registry.json"
@@ -393,27 +397,28 @@ def guard(
 
 
 # ----------------------------------------------------- reader backstop --
-#: dataset roots ``guard`` allowed in this process (and, via the environment,
-#: in its child processes): the low-level readers accept these without a
-#: second decision.  Setting the variable by hand is an ad-hoc route
-#: (unsupported, docs/governance/DATA_ACCESS_PATHS.md).
-AUTH_ENV = "IAP_HOLDOUT_AUTHORISED"
+#: dataset roots ``guard`` allowed in THIS process: the low-level readers accept
+#: these without a second decision.  v2.0 D1 removed the environment variable
+#: (``IAP_HOLDOUT_AUTHORISED``) that used to carry this set to child processes:
+#: a child re-decides (without a prereg id only in-sample scope passes), and
+#: nothing outside this module can add to the set.
+_AUTHORISED_ROOTS: set[str] = set()
 _REAL_ROOT = REPO / "data" / "real"
 
 
-def _authorised() -> set[str]:
-    return {x for x in os.environ.get(AUTH_ENV, "").split(os.pathsep) if x}
+def _authorised() -> frozenset[str]:
+    return frozenset(_AUTHORISED_ROOTS)
 
 
 def _authorise(dataset_dir, rec: Mapping[str, Any]) -> None:
     if rec.get("state") == "synthetic":
         return
-    roots = _authorised() | {str(dataset_root(dataset_dir))}
-    os.environ[AUTH_ENV] = os.pathsep.join(sorted(roots))
+    _AUTHORISED_ROOTS.add(str(dataset_root(dataset_dir)))
 
 
-def reader_guard(path: Path | str) -> None:
-    """Backstop the low-level readers call before they open a data file.
+def reader_guard(path: Path | str, purpose: str = "reader_guard") -> None:
+    """The data-access hook (:func:`iap.core.guard.register`): every reader calls
+    it through :func:`iap.core.guard.check` before opening a data file.
 
     * the file belongs to a dataset (``dataset.json`` up to three levels up):
       a synthetic dataset passes; a real one passes when :func:`guard` already
@@ -429,17 +434,21 @@ def reader_guard(path: Path | str) -> None:
     root = dataset_root(p.parent if p.is_file() else p)
     man = root / "dataset.json"
     if man.is_file():
-        if str(root) in _authorised():
+        if str(root) in _AUTHORISED_ROOTS:
             return
         if json.loads(man.read_text(encoding="utf-8")).get("kind") != "real":
             return
-        guard(root, purpose=f"reader_guard {p.name}")
+        guard(root, purpose=f"{purpose} {p.name}")
         return
     try:
         rel = p.resolve().relative_to(_REAL_ROOT.resolve())
     except ValueError:
         return
     refuse_unit_name(rel.as_posix())
+
+
+# install this module as THE choke-point hook (iap.core.guard fails closed until then)
+_core_guard.register(reader_guard)
 
 
 def _decide(

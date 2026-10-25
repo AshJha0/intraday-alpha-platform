@@ -27,6 +27,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from iap import io as iap_io
+
 _REPO = Path(__file__).resolve().parents[4]
 
 #: Prediction target: 5s cost-adjusted forward return (spec §14 primary).
@@ -162,10 +164,7 @@ def load_dataset(
 
     frames = []
     for path in files:
-        from iap.research.holdout_registry import reader_guard
-
-        reader_guard(path)  # holdout backstop: refuses before the parquet is read
-        df = pd.read_parquet(path, columns=cols)
+        df = iap_io.read_parquet(path, columns=cols, purpose="load_dataset")  # D1 choke point
         df = df[df[TARGET_VALID_COLUMN].astype(bool)]
         df = df[np.isfinite(df[TARGET_COLUMN].to_numpy())]
         frames.append(df)

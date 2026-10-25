@@ -35,6 +35,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
+from iap import io as iap_io
+
 #: Why a child was given the urgency it got (``ChildOrder.urgency_regime``).
 URGENCY_REGIMES: tuple[str, ...] = (
     "agree",  #: the signal favours waiting: posted passively
@@ -222,7 +224,7 @@ class AlphaUrgencySource(ArraySignalSource):
             cols += [f"label_mid_{alpha.horizon}", f"label_valid_{alpha.horizon}"]
         frames: dict[int, pd.DataFrame] = {}
         for f in files:
-            df = pd.read_parquet(f, columns=cols)
+            df = iap_io.read_parquet(f, columns=cols, purpose="execution.signal")
             for iid, part in df.groupby("instrument_id", sort=True):
                 iid = int(iid)
                 if instrument_ids is not None and iid not in instrument_ids:
