@@ -81,10 +81,27 @@ jobs:
       PYTHONUTF8: "1"
       PYTHONDONTWRITEBYTECODE: "1"
     steps:
+      - name: Resolve the bound commit to its full SHA
+        # actions/checkout treats a short SHA as a branch or tag name and fails
+        # ("could not be found", observed 2026-10-25 run 40215808482); resolve through
+        # the API so the owner may type either form. The identity check later
+        # compares the checked-out HEAD with the prereg's bound commit anyway.
+        id: resolve
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BOUND: ${{ inputs.commit }}
+        run: |
+          if ($env:BOUND -notmatch '^[0-9a-fA-F]{7,40}$') { throw "commit must be a hex SHA (7 to 40 characters), got '$env:BOUND'" }
+          $sha = gh api "repos/${{ github.repository }}/commits/$env:BOUND" --jq .sha
+          if ($LASTEXITCODE -ne 0 -or $sha -notmatch '^[0-9a-f]{40}$') { throw "commit '$env:BOUND' not found in this repository" }
+          "sha=$sha" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding ascii
+          Write-Host "bound commit $env:BOUND -> $sha"
+
       - name: Check out the bound commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.commit }}
+          ref: ${{ steps.resolve.outputs.sha }}
           fetch-depth: 0 # the results branch and the trust root history are needed
           persist-credentials: true # the push to results/ uses the job token
 
@@ -98,7 +115,11 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          pip install --require-hashes -r python/requirements-ci.txt
+          # --no-deps: the lock is complete for Linux CI but omits tzdata, which pandas
+          # needs on Windows (defect D-83); until the lock carries it, install the lock
+          # without resolution and add tzdata pinned by version.
+          pip install --require-hashes --no-deps -r python/requirements-ci.txt
+          pip install --no-deps tzdata==2026.5
 
       - name: Registered run (verify, sealed read, run once, commit, publish)
         if: ${{ inputs.mode != 'dd1' }}
