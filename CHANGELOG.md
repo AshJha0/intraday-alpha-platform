@@ -19,6 +19,7 @@ that tag.
 
 ## Unreleased
 
+- registered-run workflow: steps call `powershell -NoProfile -ExecutionPolicy Bypass` explicitly, so a runner account with the default Restricted policy can run them (owner run 40226274618, 2026-10-25).
 - registered-run workflow: steps run under Windows PowerShell 5.1 (`shell: powershell`) and the commit is resolved with `Invoke-RestMethod`; the self-hosted runner has neither `pwsh` nor necessarily `gh` (owner run 40222182056, 2026-10-25).
 - tools/admin: `install_sealed_services.ps1` no longer stops after partition a when the owner's ping is refused by the pipe (a refusal means the service is up); found during the owner's DD1 install 2026-10-25.
 - registered-run workflow: the bound commit may be given as a short or full SHA (resolved through the API before checkout; a short SHA failed the owner's first `dd1` run on 2026-10-25); the Windows runner installs the lock with `--no-deps` plus `tzdata` until the lock carries it (D-83).

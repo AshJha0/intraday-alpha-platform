@@ -9,7 +9,9 @@ the `registered-run` workflow. Settings on GitHub are in [REPO_SETTINGS.md](REPO
 
 The workflow's steps run under Windows PowerShell 5.1 (`shell: powershell`), which every Windows installation has;
 PowerShell 7 (`pwsh`) is not required and the owner's workstation does not have it (run 40222182056 failed on
-`pwsh: command not found`). `gh` is not required on the runner; the API is called with `Invoke-RestMethod`.
+`pwsh: command not found`). `gh` is not required on the runner; the API is called with `Invoke-RestMethod`. Each step invokes
+`powershell -NoProfile -ExecutionPolicy Bypass` for its own generated script, so the account's execution policy
+(default Restricted, which failed run 40226274618) does not matter; no machine-wide policy change is needed.
 
 ## 1. An interpreter the service accounts can run
 
