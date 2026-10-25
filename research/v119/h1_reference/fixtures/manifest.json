@@ -1,0 +1,12 @@
+{
+  "no_reversal": {
+    "arrival_drift": "f1434f6024d5573e2fd0c7f9eb9ae6d443cc7bebb6bfa86154f02349d11b3d03",
+    "mids": "01e0046255d05d16311ac9a24b519e33d5ccb545454cf18edb877f97fd8fa215",
+    "tables": "3099527d3f044085fc07efe4036353734f54c11a73894f6e6d1ae746ea801240"
+  },
+  "reversal": {
+    "arrival_drift": "f1434f6024d5573e2fd0c7f9eb9ae6d443cc7bebb6bfa86154f02349d11b3d03",
+    "mids": "e849b70f21f39a9c500e67b0ee719b6ac442c4859856bdb150d4df049dfb4f86",
+    "tables": "2b6c8952d99bcd17d94b450ab36fc5709506568ed9ce64ebb98228617ffc30ce"
+  }
+}

@@ -610,3 +610,62 @@ requires a `iap.portfolio.ledger.Valuation` for every held name (a flat-at-close
 half-spread, impact, fees, execution residual, financing) reconciled to it within 1e-9 or refused.
 `apply_corporate_action` adjusts carried inventory between sessions, notional preserved, fractional shares refused.
 Every event is logged (`events`) so E2's reconstruction reads the log, not the accumulators.
+
+## 7. v2.0 EN3 projection and risk — `iap.portfolio.project` (Python research; family-agnostic; not a port contract)
+
+`iap.portfolio.project.project(w_raw, betas, sectors, spec=, liquidity_caps=, solver=)` is E0 section 6 item 4: the one
+constrained least-squares repair `w* = argmin ||w - w_raw||^2` under dollar neutrality, `|beta . w| <= beta_tol`,
+per-sector net caps, the single-name cap, sign preservation (a long never becomes a short; `|w_i| = s_i w_i` is then
+linear), the cohort gross cap and the liquidity caps of item 5. The objective is strictly convex over a polytope, so
+the solution is unique. The solver is fixed by `iap.portfolio.project.SolverIdentity` (SciPy `minimize`, SLSQP,
+constraint tolerance 1e-9 in weight units, `ftol` 1e-15, iteration cap 1000) and recorded on every
+`iap.portfolio.project.ProjectionResult` together with the active constraint set, the worst violation, the iteration
+count and the distance to the raw book. A solve that does not converge or violates a constraint beyond the tolerance
+is a refusal (`refused=True`, empty weights, the active set recorded); there is no sequential repair pass and no
+forecast, covariance or risk-aversion input. Note: `w = 0` always satisfies the constraint set, so a refusal arises from
+convergence or tolerance, never from infeasibility; the economic refusals are item 7's (defect D-35).
+`iap.portfolio.project.feasibility(weights, gross_target=, spec=)` applies E0 item 7 in order (fewer than 10 names per
+leg; deployed gross below 50 % of the target; one name above 15 % of cohort gross); nothing is re-scaled up.
+`iap.portfolio.project.check_book(weights, betas, sectors, spec=, book_gross_cap=, tol=)` is the joint combined-book
+re-check after each horizon's solve. `iap.portfolio.project.choose_band(turnover_by_band)` picks the no-trade band
+from the grid {2, 5, 10} bps of C by the outcome-blind rule (smallest threshold whose turnover reduction exceeds 10 %,
+tie to the smaller, else 0); `iap.portfolio.project.apply_band(net_orders_bps, mandatory, band_bps, ...)` withholds a
+discretionary aggregate order below the band unless withholding would leave the book outside a hard constraint, and
+never a mandatory order. `iap.portfolio.project.construction_stages` produces section 11's cost-of-neutrality stage
+books; `iap.portfolio.project.diagnostic_covariance` and `iap.portfolio.project.variance_contribution_table` give the
+20-session residual covariance (diagnostic only) and the variance shares by name (top 10, Herfindahl), sector,
+principal component and factor. Tests: `python/tests/portfolio/test_projection.py`.
+
+## 8. v2.0 EN4 execution and cost simulation — `iap.execution.sim` (Python research; family-agnostic; not a port contract)
+
+`iap.execution.sim.simulate(ts_decision=, name=, qty=, mid_decision=, market=, column=, ...)` prices the aggregate net
+order under E0 section 9's one convention `P_fill = M_arrival + side x (spread_arrival / 2 + impact)` at
+`t_arrival = t_decision + 500 ms` (`iap.execution.sim.LATENCY_NS`) and returns an `iap.execution.sim.FillOutcome`
+whose `fill` is an `iap.portfolio.ledger.Fill` (so the ledger re-checks the convention) and whose `reason` names the
+failure case: quote disappeared, stale, crossed or locked quote, halt, participation breach (scaled to the cap of the
+trailing 5-minute volume, dropped below the minimum ticket), insufficient displayed depth (partial, remainder refused,
+never filled at a worse price), price through the entry threshold (discretionary orders only). The three columns
+(`iap.execution.sim.COLUMNS`: base 1x / 100 %, conservative 1.5x / 75 %, stress 2x / 50 %) differ only by the impact
+multiplier and the displayed-depth haircut; `iap.execution.sim.simulate_columns` runs the same order under all three.
+Impact is `iap.execution.sim.impact_per_share` with fixed `iap.execution.sim.ImpactCoefficients` labelled estimated;
+the decision-to-arrival mid movement is never a cost (the ledger reports it as latency drift).
+`iap.execution.sim.expected_cost_bps` is the hurdle's one-way cost; `iap.execution.sim.closeout_valuation` is the
+flagged stress valuation of an unliquidated position; `iap.execution.sim.simulate_daily` executes a daily-horizon order
+at the close or open auction with the participation limit and a square-root impact model
+(`iap.execution.sim.DailyImpactModel`, coefficient labelled estimated). Tests: `python/tests/execution/test_sim_waterfall.py`
+(the waterfall reconciles to the cash identity to zero on partial fills, netting across two families and a failed
+closeout with overnight carry).
+
+## 9. v2.0 EN5 reports — `iap.reports.e5` (Python research; not a port contract)
+
+`iap.reports.e5.session_series(family_id, horizon, rows, capital)` builds R_d = NetPnL_d / C from `iap.reports.e5.SessionRow`
+records of the three kinds (E0 section 10, C11): a usable session with no trades enters as zero and is counted, a
+coverage failure is dropped and listed, an unpriced-at-close session carries its flag. `iap.reports.e5.retention` and
+`iap.reports.e5.economic_screen` implement C7 and the +1.0 bps / 50 % screen (undefined retention fails the screen).
+The builders `iap.reports.e5.block_a_signal`, `iap.reports.e5.block_b_portfolio`, `iap.reports.e5.block_c_execution`,
+`iap.reports.e5.block_d_risk_adjusted` and `iap.reports.e5.block_e_sensitivity` return `iap.reports.e5.Table` rows with
+units, counts and an uncertainty field (block D's Sharpe interval is a seeded block bootstrap; nothing is annualised).
+`iap.reports.e5.decision_tree` records the six-branch verdict; `iap.reports.e5.check_no_inflation` raises
+`iap.reports.e5.InflationError` on any prohibited practice of section 11 (omitted sessions, no-trade sessions not
+present as zero, refused orders credited, more than one denominator, annualisation over active periods). Tests:
+`python/tests/reports/test_e5_reports.py`.

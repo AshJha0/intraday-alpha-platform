@@ -623,3 +623,17 @@ available, duplicate `(family, horizon, name)` keys and registry ids the registr
 (family, horizon, model class, parameters, feature-set hash, training window, dataset identity, software version,
 selection history, approval) hashes to its id; `save` writes canonical bytes; `load` recomputes every hash and the
 digest and refuses a tampered file. H1 is the first client; nothing here knows a family's rules.
+
+## 13. v2.0 H1 client and the equivalence test — `iap.alpha.h1` (Python research; not a port contract)
+
+`iap.alpha.h1.H1Signal` is E0 section 3 (two-factor model on the previous 20 sessions' 5-minute returns, sector return
+orthogonalised against the market, shrinkage 0.3 toward (1, 0), minimum 15 valid sessions, condition-number bound,
+residual standardised by the trailing F-minute residual deviation floored at the 5th percentile; `S = -z`; a failed
+input is no signal). `iap.alpha.h1.fit_rho` is section 4 (one pooled reversal coefficient per horizon on the
+development subset, James-Stein-type shrinkage, fail closed under the quality rule). `iap.alpha.h1.run(panel)` drives
+every registered horizon through the engine: EN1 forecast records consumed at the decision time, EN3 repair / skip
+rules / book re-check / band, EN2 ledgers, EN4 fills under the conservative column, EN5 session series. The frozen E0
+text is `research/v119/H1_ALPHA_IMPROVEMENT_SPEC.md` (hash test `python/tests/equivalence/test_e0_frozen.py`); the
+direct reference implementation and its committed synthetic fixtures are `research/v119/h1_reference/`;
+`python/tests/equivalence/test_h1_equivalence.py` asserts byte-for-byte reproduction of the research ledger, the
+executable ledger, the orders, the fills and R_d on both fixture scenarios and stays in CI forever (plan V2-C1).
