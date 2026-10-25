@@ -36,6 +36,7 @@ GUARDED_PACKAGES = (
     "trace",
     "monitoring",
     "data",  # v2.0 U2: contracts, PIT universe, leakage canaries (vendor SDKs stay in tools/)
+    "ml",  # v2.0 U6: the ML framework (fits, admission, trial ledger); no client, no clock
 )
 
 #: Top-level module names that are network clients / servers or transports.

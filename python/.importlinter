@@ -6,7 +6,7 @@
 # on the same violation the linter would report.
 #
 # allow_indirect_imports = True on a contract means it binds DIRECT imports only.  The transitive
-# reach is honest and recorded: every package except core, contracts, ml, risk, reference, io,
+# reach is honest and recorded: every package except core, contracts, risk, reference, io,
 # orderbook, experiment and reports reaches iap.research / iap.agents / iap.llm through
 # mlops -> agents, models -> research and validation.  Tightening a contract to indirect imports is
 # a later step that needs those three edges broken (docs/ARCHITECTURE.md, "Layering").
@@ -93,10 +93,10 @@ forbidden_modules =
     iap.research
 allow_indirect_imports = True
 
-# iap.ml (stage 7-8, PR #389) is not in this tree yet; import-linter refuses a contract on a missing
-# package.  Add, when it lands (the architecture test asserts the pairing):
-#   [importlinter:contract:ml-no-research]  type = forbidden  source_modules = iap.ml
-#   forbidden_modules = iap.research  allow_indirect_imports = True
+# iap.ml (stage 7-8, PR #389) has no ml-no-research contract: it sits beside iap.research, not below
+# it (iap.ml.pipeline runs every candidate and the incumbent through iap.research.loop.run_engine on
+# identical sessions, capital, cost column and constraints, plan V2-C3), so the pairing anticipated
+# here was withdrawn when the package landed (D-80; tests/architecture/test_layering.py asserts it).
 
 # ---- the two cycles the carried text names, broken in this stage and kept broken ------------------
 
