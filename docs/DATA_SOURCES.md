@@ -190,6 +190,28 @@ refuses it.
   status the v1.18 baseline records. It reads `dataset.json`, `KEEP.json` and
   `process_report.json` only, never the raw or normalized files. The cited
   synthetic and legacy versions are listed with their provenance (`non_disk`).
+- **Integrity evidence (v2.0 stage 2 D3, defect D-05).** Schema
+  `iap.data_manifest/v2`: every entry carries `evidence`, copied from
+  `dataset.json`: the decode check (`ingest_rules_version`, QC totals,
+  message and normalized-event counts per session), the content hash
+  (`dataset_version` over the normalized IAP1 files), the ingest's own
+  `book_check` (clean when no displayed order crossed the rebuilt book and
+  nothing was dropped) and, where the source publishes an independent answer,
+  the `book_verification` against it (the IEX TOPS oracle per symbol). One
+  verdict per session and per dataset: `clean, match` (11 IEX datasets),
+  `clean` (24 ITCH datasets: Nasdaq publishes no book oracle, so the ingest's
+  own check is the only evidence), `not clean` (4: the IEX days 2025-12-10 and
+  2026-05-18 and their capture-timestamp twins, one and three `crossing_adds`
+  with every TOPS quote matched; acknowledged in `NOT_CLEAN_ACKNOWLEDGED`
+  bound to those counters, defect D-45), `mismatch`, `none`. The two non-disk
+  versions carry their own verdict (synthetic regenerable; legacy placeholder).
+  The manifest was regenerated on 2026-10-25 from the data root's metadata
+  files alone (no session's data was read).
+- **The verdict gate.** `check` fails a preregistration or ledger that cites a
+  dataset whose verdict is `none` or `mismatch`, and a `not clean` one that is
+  not acknowledged or whose counters changed (`python/tests/test_data_manifest.py`
+  refuses a dirty fixture, an evidence-less fixture and a changed
+  acknowledgement).
 - **CI.** The governance job runs `tools/data_manifest.py check`: every dataset
   version a committed preregistration or ledger cites must be listed. The data
   is git-ignored, so the committed manifest is the list; regenerate and commit
@@ -204,7 +226,9 @@ refuses it.
   manifest reproduces 8 of that document's 10 hashes
   (`python/tests/test_data_manifest.py` pins the two missing).
 - **State at v1.18.0.** The committed manifest lists 39 datasets
-  (`research/data_manifest.json`, regenerated from the data root).
+  (`research/data_manifest.json`, regenerated from the data root). At v2.0
+  stage 2 D3 (2026-10-25) the same 39 carry evidence and a verdict; the 29
+  cited by a committed preregistration or ledger all pass the gate.
 
 ## 7. IEX HIST terms of use
 

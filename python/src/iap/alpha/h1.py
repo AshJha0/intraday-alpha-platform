@@ -59,6 +59,20 @@ from iap.reports.e5 import SessionRow, session_series
 
 __all__ = ["H1Signal", "fit_rho", "run"]
 
+
+def _fees(cfg: dict[str, Any]) -> FeeSchedule:
+    """The fixture's per-share fee, dated (D4: an undated fee cannot be used): the
+    fixture may name ``fee_as_of``; otherwise the engine_default schedule's date applies
+    (the fixture's 0.0005 IS that planning value)."""
+    base = FeeSchedule.default()
+    return FeeSchedule(
+        per_share=cfg["fee_per_share"],
+        dated=cfg.get("fee_as_of", base.dated),
+        label=cfg.get("fee_label", base.label),
+        source=cfg.get("fee_source", base.source),
+    )
+
+
 FAMILY = "h1"
 
 
@@ -299,7 +313,7 @@ def _construct(
     if n_leg0 < cfg["min_names_per_leg"]:
         return f"fewer than {cfg['min_names_per_leg']} names per leg ({len(valid)} valid signals)"
     w0 = G / 2.0 / n_leg0
-    fees = FeeSchedule(per_share=cfg["fee_per_share"])
+    fees = _fees(cfg)
     coeffs = ImpactCoefficients(c_depth=cfg["impact_c_depth"], c_volume=cfg["impact_c_volume"])
     records = [
         ForecastRecord(
@@ -459,7 +473,7 @@ def run(panel: dict[str, Any]) -> dict[str, Any]:
         led.deposit(C)
     next_id = {h: 1 for h in cfg["horizons"]}
     orders: dict[str, list[dict[str, Any]]] = {h: [] for h in cfg["horizons"]}
-    fees = FeeSchedule(per_share=cfg["fee_per_share"])
+    fees = _fees(cfg)
     coeffs = ImpactCoefficients(c_depth=cfg["impact_c_depth"], c_volume=cfg["impact_c_volume"])
     session_rows: dict[str, list[SessionRow]] = {h: [] for h in cfg["horizons"]}
     for d in range(E, E + cfg["n_trading"]):

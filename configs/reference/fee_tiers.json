@@ -1,9 +1,20 @@
 {
-  "x-version": 1,
-  "description": "v1.16 P0-3: ASSUMED equity per-share fee tiers for prereg fee_tier / fee_tier_sensitivity (iap.execution.realism.load_fee_tiers). Not a quoted exchange price list: taker fee at the Reg NMS access-fee cap, maker rebate falling with the volume tier. 'top' equals the synthetic venue default (configs/venues/venues.json XV1).",
+  "x-version": 2,
+  "as_of": "2026-10-25",
+  "label": "indicative",
+  "description": "v1.16 P0-3: ASSUMED equity per-share fee tiers for prereg fee_tier / fee_tier_sensitivity (iap.execution.realism.load_fee_tiers). Not a quoted exchange price list: taker fee at the Reg NMS access-fee cap, maker rebate falling with the volume tier. 'top' equals the synthetic venue default (configs/venues/venues.json XV1). v2.0 stage 2 D4 (D-07): dated; iap.execution.realism.load_fee_tiers refuses a table without as_of. The same rows are schedules xnas_* of research/execution/fees/fee_schedules.json.",
   "tiers": {
-    "top": {"taker_fee_per_share": 0.003, "maker_rebate_per_share": 0.002},
-    "mid": {"taker_fee_per_share": 0.003, "maker_rebate_per_share": 0.0015},
-    "base": {"taker_fee_per_share": 0.003, "maker_rebate_per_share": 0.001}
+    "top": {
+      "taker_fee_per_share": 0.003,
+      "maker_rebate_per_share": 0.002
+    },
+    "mid": {
+      "taker_fee_per_share": 0.003,
+      "maker_rebate_per_share": 0.0015
+    },
+    "base": {
+      "taker_fee_per_share": 0.003,
+      "maker_rebate_per_share": 0.001
+    }
   }
 }

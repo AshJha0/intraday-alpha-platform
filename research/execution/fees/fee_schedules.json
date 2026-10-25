@@ -1,0 +1,41 @@
+{
+  "schema": "iap.fee_schedules/v1",
+  "description": "v2.0 stage 2 D4 (defect D-07): every fee a simulation charges comes from a schedule here with an as_of date, a label (quoted = copied from a published price list on that date with its URL; indicative = a representative figure not quoted from a list; assumed = a planning value) and a source. iap.execution.fees.load_fee_schedule refuses a schedule without a valid as_of, label or source. The engine's three cost columns (iap.execution.sim) read engine_default. Regulatory fees (SEC Section 31, FINRA TAF) are in configs/reference/regulatory_fee_schedule.json, dated per period.",
+  "schedules": {
+    "engine_default": {
+      "as_of": "2026-10-24",
+      "label": "assumed",
+      "per_share": 0.0005,
+      "notional_rate": 0.0,
+      "source": "E0 section 9 planning value (EN4, PR #385): one all-in per-share fee for the executable ledger; to be replaced by a quoted schedule before any economic verdict (D-15)"
+    },
+    "xnas_access_fee_cap": {
+      "as_of": "2026-10-25",
+      "label": "indicative",
+      "taker_fee_per_share": 0.003,
+      "maker_rebate_per_share": 0.002,
+      "source": "configs/reference/fee_tiers.json 'top' (v1.16 P0-3): taker at the Reg NMS Rule 610(c) access-fee cap of $0.0030 per share, rebate a representative top-tier figure; not a quoted Nasdaq price list"
+    },
+    "xnas_mid_tier": {
+      "as_of": "2026-10-25",
+      "label": "indicative",
+      "taker_fee_per_share": 0.003,
+      "maker_rebate_per_share": 0.0015,
+      "source": "configs/reference/fee_tiers.json 'mid' (v1.16 P0-3)"
+    },
+    "xnas_base_tier": {
+      "as_of": "2026-10-25",
+      "label": "indicative",
+      "taker_fee_per_share": 0.003,
+      "maker_rebate_per_share": 0.001,
+      "source": "configs/reference/fee_tiers.json 'base' (v1.16 P0-3)"
+    },
+    "synthetic_venue_xv1": {
+      "as_of": "2026-10-25",
+      "label": "assumed",
+      "taker_fee_per_share": 0.003,
+      "maker_rebate_per_share": 0.002,
+      "source": "configs/venues/venues.json XV1 (the synthetic venue default; research/execution/venue_model.json first tier)"
+    }
+  }
+}

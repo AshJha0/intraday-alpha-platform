@@ -1,6 +1,6 @@
 {
-  "x-version": 1,
-  "description": "v1.17 (review X-2): ASSUMED order-entry latency per source venue, written into an ingested real dataset's configs/venues/venues.json by iap.marketdata.ingest (real feeds carry exchange timestamps only, so nothing here is measured). mean_ns is the MEAN of the simulator's base + U[0, jitter_ns] draw (iap.execution.realism.simulator_latency_base_ns converts). The values equal configs/prereg/v3.json venue_latency; a pre-registration's venue_latency overrides them.",
+  "x-version": 2,
+  "description": "v1.17 (review X-2): ASSUMED order-entry latency per source venue, written into an ingested real dataset's configs/venues/venues.json by iap.marketdata.ingest (real feeds carry exchange timestamps only, so nothing here is measured). mean_ns is the MEAN of the simulator's base + U[0, jitter_ns] draw (iap.execution.realism.simulator_latency_base_ns converts). The values equal configs/prereg/v3.json venue_latency; a pre-registration's venue_latency overrides them. v2.0 stage 2 D4 (D-06): feed_delay is the DECLARED market-data delay the execution replay applies when a caller does not pass md_delay_ns (iap.execution.latency.declared_feed_delay): the replayed event stamped exchange_ts at t is seen at t + default_ns. It is an assumption (real ITCH and IEX HIST carry exchange time only; the IEX capture offset is unknown), never a measurement, and never zero by default. engine_decision_to_arrival_ns is the engine's one fill-price convention (E0 section 9 / C8; iap.execution.sim.LATENCY_NS asserts equality); sensitivity_steps_ns is the plan 5.9 grid every execution number is reported at.",
   "default": {
     "mean_ns": 250000,
     "jitter_ns": 100000
@@ -10,5 +10,38 @@
       "mean_ns": 250000,
       "jitter_ns": 100000
     }
-  }
+  },
+  "feed_delay": {
+    "default_ns": 100000,
+    "label": "assumed",
+    "default_route": "default",
+    "provenance": "configs/prereg/v2.json and v3.json feed_latency_ns (100 us, the primary assumed feed leg of the maker and quoting backtests since v1.14); chosen as the one declared value so every route states the same assumption unless it declares its own",
+    "routes": {
+      "default": {
+        "receive_ts": "receive_ts == exchange_ts in the data (the feed carries exchange time only); the replay sees the event at exchange_ts + md_delay_ns"
+      },
+      "itch50": {
+        "receive_ts": "receive_ts == exchange_ts (Nasdaq TotalView-ITCH 5.0 sample files carry the exchange timestamp only; no capture stamp exists); seen at exchange_ts + md_delay_ns"
+      },
+      "iex-deep-plus": {
+        "receive_ts": "receive_ts == exchange_ts (IEX HIST messages carry IEX's UTC send timestamp; the pcap capture stamp is NOT used on this route); seen at exchange_ts + md_delay_ns"
+      },
+      "iex-deep": {
+        "receive_ts": "receive_ts == exchange_ts (as iex-deep-plus; price levels, synthetic orders); seen at exchange_ts + md_delay_ns"
+      },
+      "iex-capture": {
+        "receive_ts": "receive_ts = the capture host's packet stamp (ingest --capture-ts, datasets iex_capts/*): receive_ts - exchange_ts contains an unidentified constant offset (about 37 s, TAI-stamped host), so only within-capture differences are interpretable and no absolute feed latency is claimed; the replay still applies md_delay_ns to exchange_ts, it does not read the capture stamp"
+      },
+      "synthetic": {
+        "receive_ts": "receive_ts = exchange_ts + the generator's drawn latency (iap.marketdata generate); the replay applies md_delay_ns on top, as for a real route"
+      }
+    }
+  },
+  "engine_decision_to_arrival_ns": 500000000,
+  "sensitivity_steps_ns": [
+    500000000,
+    1000000000,
+    2000000000,
+    5000000000
+  ]
 }

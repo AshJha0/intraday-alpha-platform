@@ -187,7 +187,7 @@ only committed files and no private key:
 
 ```bash
 PYTHONPATH=python/src python3 tools/verify_signatures.py   # every signed document vs the pinned trust root (docs/governance/TRUST_ROOT.md)
-python3 tools/data_manifest.py check                       # every dataset version cited by a prereg or ledger is listed in research/data_manifest.json
+python3 tools/data_manifest.py check                       # every dataset version cited by a prereg or ledger is listed in research/data_manifest.json with a clean/match verdict (D3)
 ```
 
 `verify_signatures.py --strict` (the reviewer and release run it on a

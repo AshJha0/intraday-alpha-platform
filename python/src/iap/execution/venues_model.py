@@ -205,6 +205,9 @@ def load_venue_model_config(path: str | Path) -> dict:
     doc = json.loads(Path(path).read_text(encoding="utf-8"))
     if doc.get("schema") != SCHEMA or doc.get("version") != VERSION:
         raise ValueError(f"{path}: not an {SCHEMA} v{VERSION} document")
+    from iap.execution.fees import require_as_of  # D4 (D-07): fee tiers need a date
+
+    require_as_of(doc, f"venue model {Path(path).name}")
     return doc
 
 

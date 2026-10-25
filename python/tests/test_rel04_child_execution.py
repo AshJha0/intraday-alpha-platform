@@ -70,6 +70,9 @@ def _beats(f, *offsets_ms):
 
 
 def _run(parent, events, **kw):
+    # the REL-04 fixtures pin the zero-delay timing legs explicitly: since v2.0 D4
+    # the replay's default is the DECLARED feed delay (test_latency_fees.py)
+    kw.setdefault("md_delay_ns", 0)
     return ExecutionReplay(make_config(), [parent], **kw).run(events)
 
 

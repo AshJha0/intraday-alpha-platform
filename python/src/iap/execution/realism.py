@@ -121,6 +121,9 @@ FEE_TIERS_PATH = Path(__file__).resolve().parents[4] / "configs" / "reference" /
 def load_fee_tiers(path=None) -> dict[str, dict[str, float]]:
     """``{tier: {"taker_fee_per_share", "maker_rebate_per_share"}}``."""
     doc = json.loads(Path(path or FEE_TIERS_PATH).read_text(encoding="utf-8"))
+    from iap.execution.fees import require_as_of  # D4 (D-07): an undated table is refused
+
+    require_as_of(doc, f"fee-tier table {Path(path or FEE_TIERS_PATH).name}")
     tiers = doc.get("tiers")
     if not isinstance(tiers, dict) or not tiers:
         raise ValueError("fee-tier table must have a non-empty 'tiers' object")

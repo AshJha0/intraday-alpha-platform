@@ -175,7 +175,7 @@ def run_fixture(C=1_000_000.0):
     led.register_family(FamilyConfig("h1", flat_at_close=True))
     led.register_family(FamilyConfig("d1", flat_at_close=False))
     led.deposit(C)
-    fees = FeeSchedule(per_share=0.001)
+    fees = FeeSchedule(per_share=0.001, dated="2026-10-25")  # D4: fees are dated
     log = []
 
     def execute(d, mids, markets, **kw):

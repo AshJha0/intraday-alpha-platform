@@ -75,6 +75,8 @@ The full list with descriptions is the [Documentation index](#documentation-inde
   ([research/v118/rel08c/DROPPED.md](research/v118/rel08c/DROPPED.md)); REL-08b and REL-11 were not run.
 - **The fill model is validated at Level 1 (deterministic replay) only, not at Level 2** ([docs/SIM_TO_REAL.md](docs/SIM_TO_REAL.md)); there is no latency edge.
   The REL-04 verification run found an identity pass on the six IEX overlap days; absolute IEX latency and skew against Nasdaq are not claimed.
+  The replay's feed delay is a declared assumption, never zero by default and never a measurement (`configs/reference/venue_latency.json`;
+  [API_TRADING.md](API_TRADING.md) section 2.20), and every execution number can be reported at the plan's 0.5 s to 5 s latency grid.
 - **Built:** signed pre-declarations that bind script, commit, data and thresholds (`python tools/verify_signatures.py`, [docs/governance/TRUST_ROOT.md](docs/governance/TRUST_ROOT.md));
   a fail-closed holdout registry (`research/holdout_registry.json`); one real-data ledger family (real data: 256 configurations; see the
   headline table); the execution benchmark v2 metrics; a venue-aware capped child simulator with an invariant suite; a known-null
