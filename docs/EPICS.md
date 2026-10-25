@@ -968,7 +968,7 @@ Release v1.15 per IAP_v1.15_Plan.md: run the R7 confirmatory round on unseen ses
 | X-P1-3 | v1.15 X-P1-3: market-trade prints feed the risk participation cap | done | 2 | v1.15 | `tests/golden/expected_risk_participation_prints.json` |
 | G-P0-1 | v1.15 G-P0-1: registry content hash and model card enforced at promotion | done | 2 | v1.15 | `python/src/iap/mlops/registry.py; python/src/iap/mlops/model_card.py` |
 | G-P1-2 | v1.15 G-P1-2: trust roots enabled, registry signed, verification blocking | done | 2 | v1.15 | `python/src/iap/agents/signing.py; python/src/iap/agents/trust.py` |
-| G-P1-3 | v1.15 G-P1-3: archive the Java engine | done | 2 | v1.15 | `archive/java` |
+| G-P1-3 | v1.15 G-P1-3: archive the Java engine | done | 2 | v1.15 | the git tag `archive/java-v1.14.0` |
 | A-P0-1 | v1.15 A-P0-1: narrower agent job (propose, prereg, human sign-off) | done | 3 | v1.15 | `python/src/iap/agents/cli.py` |
 | A-P1-2 | v1.15 A-P1-2: agent proposals debit the chained ledger | done | 2 | v1.15 | `python/src/iap/validation/ledger.py` |
 | A-P1-3 | v1.15 A-P1-3: agent eval harness | done | 2 | v1.15 | `python/src/iap/agents/eval_harness.py` |

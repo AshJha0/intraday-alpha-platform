@@ -1,8 +1,12 @@
 # COOKBOOK — task-oriented recipes
 
+> **Frozen (v2.0 stage 11, G2).** 200 recipes and no more: a new recipe replaces an old one. Java
+> recipes refer to the git tag `archive/java-v1.14.0` (the tree left the checkout in stage 11); the
+> operator's current procedures are [docs/RUNBOOK_v2.md](docs/RUNBOOK_v2.md).
+
 Every recipe below is runnable from a fresh checkout of this repository in
 the standard environment (Python 3.11 + pyarrow, g++ 13/CMake, Rust 1.99.0,
-Java 21 only for the archived engine in `archive/java/`; see [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)). Paths are relative
+Java 21 only for the archived engine in the git tag `archive/java-v1.14.0`; see [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)). Paths are relative
 to the repo root unless a recipe says otherwise. Recipes that read
 `data/features/` need recipes 1 and 3 to have run first: generated data is
 git-ignored and never committed, so a fresh checkout has no `data/raw/`,
@@ -275,7 +279,7 @@ outputs are as captured at the release they name. The runnable blocks of the
 other recipes that print numbers were re-run at v1.18.0 on a Windows machine
 (except 41 and 43).
 
-The Java engine was archived in v1.15 (`archive/java/`, frozen at
+The Java engine was archived in v1.15 (the git tag `archive/java-v1.14.0`, frozen at
 v1.14.0, no longer in CI). Recipes that still show a Java command run the
 frozen copy; the live engines are Python, C++ and Rust.
 
@@ -455,10 +459,10 @@ print(json.dumps(cp)[:200])
 PY
 ```
 
-**Java (archived in `archive/java/`, frozen at v1.14)** — the replay demo (golden vectors, codec SHA-256s, throughput):
+**Java (archived in the git tag `archive/java-v1.14.0`, frozen at v1.14)** — the replay demo (golden vectors, codec SHA-256s, throughput):
 
 ```bash
-bash archive/java/demo.sh
+# removed from the tree in v2.0 stage 11 (git tag archive/java-v1.14.0): bash archive/java/demo.sh
 ```
 
 **C++** — book/replay correctness runs as tests; throughput via the bench:
@@ -729,7 +733,7 @@ Cross-language versions of the same check:
 
 ```bash
 cd python && PYTHONPATH=src python3 -m pytest -q tests/test_portfolio_golden.py
-cd archive/java && bash build.sh && bash test.sh          # includes PortfolioGoldenTest
+# removed from the tree in v2.0 stage 11 (git tag archive/java-v1.14.0): cd git tag archive/java-v1.14.0 && bash build.sh && bash test.sh          # includes PortfolioGoldenTest
 ```
 
 ## 9. Run risk checks against the golden decisions
@@ -745,7 +749,7 @@ snapshot (`expected_risk_snapshot.json`, restored by Java):
 ```bash
 cd rust && cargo test -p risk --test golden_risk     # reference
 cd rust && cargo test -p risk --test rules           # per-rule unit tests
-cd archive/java && bash build.sh && rm -rf out/test && mkdir -p out/test && \
+# removed from the tree in v2.0 stage 11 (git tag archive/java-v1.14.0): cd git tag archive/java-v1.14.0 && bash build.sh && rm -rf out/test && mkdir -p out/test && \
   find src/test/java -name '*.java' | sort > out/test-sources.txt && \
   javac -cp "out/main:/usr/share/java/junit4.jar:/usr/share/java/hamcrest-core.jar" \
         -d out/test @out/test-sources.txt && \
@@ -790,7 +794,7 @@ test additionally asserts every money field bit-identical —
 [API_TRADING.md](API_TRADING.md) §2):
 
 ```bash
-cd archive/java && bash build.sh && bash test.sh    # includes ReplayFillsGoldenTest, ExecutionSimTest, AlgosTest
+# removed from the tree in v2.0 stage 11 (git tag archive/java-v1.14.0): cd git tag archive/java-v1.14.0 && bash build.sh && bash test.sh    # includes ReplayFillsGoldenTest, ExecutionSimTest, AlgosTest
 cd python && PYTHONPATH=src python3 -m pytest -q tests/test_execution_golden.py tests/test_execution_rules.py tests/test_exec_algos.py tests/test_sor.py
 ```
 
@@ -876,8 +880,8 @@ procedure and troubleshooting: `docs/runbooks/RUNBOOK_backtest.md`.
 ## 12. Run paper trading and scrape /metrics
 
 **Archived path.** This recipe and recipe 19 drive the Java paper-trading
-vertical, which is frozen at v1.14.0 under `archive/java/` and retired from
-CI, the images and the deployment (v1.15, v1.17; `archive/java/README.md`).
+vertical, which is frozen at v1.14.0 under the git tag `archive/java-v1.14.0` and retired from
+CI, the images and the deployment (v1.15, v1.17; `the git tag `archive/java-v1.14.0``).
 It needs a JDK 21 and is kept as the record of how that engine behaved. The
 maintained equivalents are the MVP loop (recipe 22), the Python `/metrics`
 process (recipe 136) and, since v1.18, the paper-path code in `iap.paper`
@@ -889,7 +893,7 @@ The Java platform streams events through book → features → alphas →
 portfolio → risk → execution with the monitoring endpoints live:
 
 ```bash
-bash archive/java/paper.sh                              # asap replay of the golden EQ vector
+# removed from the tree in v2.0 stage 11 (git tag archive/java-v1.14.0): bash archive/java/paper.sh                              # asap replay of the golden EQ vector
 # prints e.g.:
 # paper session: events=2000 orders=420 fills=421 pnl=-100.801250 \
 #   risk[allowed=420 rejected=5] status=FINISHED port=8080 \
@@ -914,16 +918,16 @@ event (PLATFORM_CONVENTIONS.md §12.3). It leaves its durable state behind in
 report), `config_audit.jsonl`, `admin_audit.jsonl`:
 
 ```bash
-sha256sum archive/java/out/state/risk_audit.jsonl
-python3 -c "import json;print(json.load(open('archive/java/out/paper_session_report.json'))['risk']['audit_sha256'])"
-bash archive/java/paper.sh --resume     # continue from the checkpoint (positions,
+# removed from the tree in v2.0 stage 11 (git tag archive/java-v1.14.0): sha256sum archive/java/out/state/risk_audit.jsonl
+# removed from the tree in v2.0 stage 11 (git tag archive/java-v1.14.0): python3 -c "import json;print(json.load(open('archive/java/out/paper_session_report.json'))['risk']['audit_sha256'])"
+# removed from the tree in v2.0 stage 11 (git tag archive/java-v1.14.0): bash archive/java/paper.sh --resume     # continue from the checkpoint (positions,
                                 # realized P&L and any latched kill switch)
 ```
 
 For a session you can scrape while it runs, pace it in real time (60×):
 
 ```bash
-bash archive/java/paper.sh --mode realtime --speed 60 &
+# removed from the tree in v2.0 stage 11 (git tag archive/java-v1.14.0): bash archive/java/paper.sh --mode realtime --speed 60 &
 sleep 5
 curl -s localhost:8080/health              # {"status":"ok"}
 curl -s localhost:8080/status | python3 -m json.tool
@@ -946,19 +950,19 @@ curl -s localhost:8080/metrics | grep -E '^(platform_|md_event_time_gap|risk_lim
 Halt it the way the runbook does (needs a token, else the routes are 404):
 
 ```bash
-IAP_ADMIN_TOKEN=dev-token bash archive/java/paper.sh --mode realtime --speed 60 &
+# removed from the tree in v2.0 stage 11 (git tag archive/java-v1.14.0): IAP_ADMIN_TOKEN=dev-token bash archive/java/paper.sh --mode realtime --speed 60 &
 sleep 5
 curl -sS -X POST localhost:8080/admin/kill \
   -H "Authorization: Bearer dev-token" \
   -d 'scope=global' --data-urlencode 'reason=COOKBOOK demo'
 curl -s localhost:8080/metrics | grep '^risk_kill_switch_engaged'   # 1
-tail -1 archive/java/out/state/admin_audit.jsonl                            # audited
+# removed from the tree in v2.0 stage 11 (git tag archive/java-v1.14.0): tail -1 archive/java/out/state/admin_audit.jsonl                            # audited
 ```
 
 The port comes from `configs/execution/execution.json` `monitoring.port` (default
 8080 — the Grafana/Prometheus contract; `deployment/prometheus/` scrapes it
 in the docker-compose stack). The session report lands in
-`archive/java/out/paper_session_report.json`. Full ops procedure:
+`archive/java/out/paper_session_report.json (at git tag archive/java-v1.14.0)`. Full ops procedure:
 `docs/runbooks/RUNBOOK_shadow_deployment.md`. Note the honest P&L: paper
 trading the golden vector *loses* money — consistent with the promotion
 report, not an embarrassment to be tuned away.
@@ -969,7 +973,7 @@ report, not an embarrassment to be tuned away.
 cd cpp && bash build.sh && ./build/bench_all                       # full C++ pass
 ./build/bench_all ../benchmarks/results_cpp.md                  # persist the table
 cd rust && cargo run --release --bin demo                       # replay throughput
-bash archive/java/demo.sh                                                    # Java replay throughput
+# removed from the tree in v2.0 stage 11 (git tag archive/java-v1.14.0): bash archive/java/demo.sh                                                    # Java replay throughput
 ```
 
 Methodology matters more than the numbers (spec §22): the committed
@@ -1192,7 +1196,7 @@ three per-alpha gauges alongside the usual metrics. Run a paced session
 and scrape them:
 
 ```bash
-bash archive/java/paper.sh --mode realtime --speed 60 &
+# removed from the tree in v2.0 stage 11 (git tag archive/java-v1.14.0): bash archive/java/paper.sh --mode realtime --speed 60 &
 sleep 25                # drift PSI appears once its 256-signal window fills;
                         # rolling IC once >= 4 matured event-time buckets exist
 curl -s localhost:8080/health               # {"status":"ok"}
@@ -7431,7 +7435,7 @@ is a stdlib Prometheus exposition: a file-backed exporter over the live risk lim
 the `session_exit.json` marker and the newest MVP run's `report.json` / `traces.jsonl`,
 served at `/metrics`, `/health`, `/ready` and `/status` (default port 8080, bind address
 `$IAP_BIND_ADDR`, default `127.0.0.1`). The Java engine is frozen at v1.14.0 under
-`archive/java/` (not built, not a port target); the three live engines are Python,
+the git tag `archive/java-v1.14.0` (not built, not a port target); the three live engines are Python,
 C++ and Rust, and `java` is out of `release.yml`, the CI `images` job and
 `check_docker_build.py`.
 

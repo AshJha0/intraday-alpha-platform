@@ -6,73 +6,111 @@ by a file in this repository (CI, `CODEOWNERS`, the structural checks in
 operations settings that live outside the tree**. Until one is configured, the
 corresponding sentence in the governance documents is a requirement, not a fact.
 
-Verified on 2026-10-14 with `gh api`: the ruleset `protect-main` is active on
-`main` and requires the checks `python`, `integration`, `cpp`, `rust`,
-`golden`, `deployment`, `CodeQL`, `governance`, `advisory`, `rust-pyo3`,
-`python-slow`, `supply-chain` and `analyze (rust)` (`java` was dropped on
-2026-10-11). The rest of this page (secret scanning, Dependabot and the
-operational settings) was last checked on 2026-10-03. Re-check before relying
-on any of this.
+**How this page stays true (v2.0 stage 11, S4).** Section 1 is generated from the live settings:
+`python tools/repo_settings_snapshot.py write` reads them with `gh api` (branch rules, rulesets,
+Actions permissions, secret scanning, vulnerability reporting) into
+[repo_settings_live.json](repo_settings_live.json); `python/tests/test_repo_settings_doc.py` fails
+when the matrix below and that snapshot disagree, and the CI `governance` job warns when the live
+settings drift from the snapshot. The snapshot was taken on **2026-10-25**; the v1.19 audit
+(plan section 2.3) had found 13 contexts documented, 6 in the JSON block and 17 live. Everything
+below is run by the repository owner (`AshJha0`), once, with an authenticated `gh` that has admin
+rights on the repository. Nothing in this repository applies these settings for you, by design.
 
-Everything below is run by the repository owner (`AshJha0`), once, with an
-authenticated `gh` that has admin rights on the repository. Nothing in this
-repository applies these settings for you, by design.
+## 1. Branch ruleset for `main`: the required-check matrix
 
-## 1. Branch ruleset for `main`
+Live on 2026-10-25: one ruleset, `protect-main` (active, last edited 2026-10-18), rules `deletion`,
+`non_fast_forward`, `pull_request` (0 approving reviews, no code-owner review, no thread-resolution
+requirement, merge / squash / rebase allowed) and `required_status_checks` with the **strict**
+policy (the branch must be up to date with `main`) over **17 required** contexts. The context name
+is the job's `name:` if set, else its id. Each row says which change class the check guards
+(research correctness, data integrity, execution, infrastructure) and the risk it catches; the
+per-PR cost is the job's wall time on the stage 11 CI run (filled from that run's job table).
 
-Requires a pull request, the six CI jobs as status checks, and blocks force
-pushes and branch deletion. The required check names are the job ids of
-`.github/workflows/ci.yml`: `python`, `integration`, `cpp`, `rust`,
-`golden`, `deployment`. (v1.15: the `java` job was removed when the Java
-engine was archived to `archive/java/`; drop `java` from an existing ruleset.) Do **not** add `images` (it is skipped on pull requests
-that do not touch image inputs, and a skipped required check blocks the merge)
-or, without a decision, the `advisory` job (ruff + gitleaks, both blocking). Since v1.14 the dependency audits run in the blocking `supply-chain` job, and CodeQL also analyses Rust (check `analyze (rust)`); both may be added to the required list. `cpp-sanitizers` is blocking in CI and may be added to the required list. Since v1.16 `agent-evals` is blocking in CI (no `continue-on-error`) and may be added to the required list.
+<!-- required-check matrix: generated contexts -->
+| context | job (workflow) | change class | risk the check catches | per-PR cost |
+|---|---|---|---|---|
+| `python` | `python` matrix 3.11 (ci.yml) | research correctness, execution, data integrity | the Python reference semantics, the confirmatory gate (R1), the data contracts and leakage canaries, the guard-hook AST test, mypy; the fast suite must RUN on the seeded dataset, not skip | ~10 min |
+| `python-312` | `python` matrix 3.12 (ci.yml) | infrastructure | interpreter drift between CI (3.11) and the pinned reproduction image (CPython 3.12.10): a hash or float that moves with the interpreter | ~10 min |
+| `python-slow` | `python-slow` (ci.yml) | research correctness | the study-length tests (replays, dependence audits, equivalence runs) that the fast suite excludes | ~12 min |
+| `integration` | `integration` (ci.yml) | execution, infrastructure | cross-component runs and same-seed byte determinism of the replay | ~5 min |
+| `cpp` | `cpp` (ci.yml): build + ctest since stage 11 | execution (parity-only port, D5(a)) | a Python execution-rule change not ported, or a C++ change that breaks its own tests; benchmark guards, sanitizers and coverage moved weekly (S2) | ~6 min |
+| `rust` | `rust` (ci.yml): `risk` + `features` since stage 11 | data integrity, risk | the normative risk engine (PLATFORM_CONVENTIONS section 11.1) and the pyo3 feature engine; the nine frozen crates run weekly, their goldens per PR in `golden` | ~6 min |
+| `golden` | `golden` (ci.yml) | execution, data integrity | promotion gate 10: byte-for-byte parity of every language's golden group, including every Rust crate's golden target | ~12 min |
+| `deployment` | `deployment` (ci.yml) | infrastructure, documentation truth | structural validation of deployment/, the polyglot FROZEN policy, the headline numbers re-derived from the CI artefacts | ~4 min |
+| `CodeQL` | codeql.yml summary check | infrastructure (security) | static analysis findings on Python, C++ and Rust | ~15 min |
+| `analyze (rust)` | `analyze` matrix entry rust (codeql.yml) | infrastructure (security) | the Rust extractor must see the real build (D5(a) note in codeql.yml) | ~15 min |
+| `governance` | `governance` (ci.yml) | research integrity | an unsigned or stale-signed key registry, a broken blackboard chain, a promoted model without its content hash, a prereg citing an unlisted dataset, a ledger that shrank; the live-settings drift warning (S4) | ~3 min |
+| `advisory` | alias of `lint-and-secrets` (ci.yml) | infrastructure, architecture | gitleaks over the whole history, ruff, the import-linter architecture contracts (S3): all blocking. The job was renamed in stage 11; the alias reports under the old context until owner action 1 below | ~3 min |
+| `rust-pyo3` | `rust-pyo3` (ci.yml) | data integrity | the Rust feature engine's wheel builds and its parity tests RUN (a skip fails) | ~8 min |
+| `supply-chain` | `supply-chain` (ci.yml) | infrastructure (security) | pip-audit of both hashed locks, cargo audit and deny, trivy on lockfiles and Dockerfiles; ignores only with reason and expiry | ~5 min |
+| `agent-evals` | `agent-evals` (ci.yml) | research integrity (agents) | a stub-model agent evaluation that regressed against its committed baseline | ~3 min |
+| `docs` | `docs` (ci.yml): `check_docs.py --strict` since stage 11 | documentation truth | a dead relative link, an `iap.*` API name that no longer imports, a status phrase older than the last tag | ~3 min |
+| `reproducible-build` | `reproducible-build` (ci.yml) | reproduction | the wheel built twice must match (the image compare is report-only) | ~10 min |
+<!-- end required-check matrix -->
 
-`required_approving_review_count` is 0 below because GitHub does not let an
-author approve their own pull request, and this repository currently has one
-maintainer: a count of 1 would make every merge impossible. The documented
-policy (GOVERNANCE.md section 1: 1 to 2 reviewers by change class) needs a
-second maintainer; when there is one, change the count to 1 (or 2 for the
-risk-engine and contracts classes), set `require_code_owner_review` to true and
-give the second maintainer a line in `CODEOWNERS`.
+Not required, by design: `images` (skipped on most PRs; a skipped required check blocks the merge),
+`coverage` (the whole-suite floor; to be required once it has a run history), the weekly
+`cpp-full`, `cpp-sanitizers` and `rust-workspace` jobs of `weekly-structural.yml` (not on the PR
+path), `regenerate` and `risk-fuzz` (dispatch and nightly). Wall time: the v1.19 audit measured
+about 14 minutes and about 52 job-minutes per run before stage 11; the stage 11 run's figures are
+in the CHANGELOG entry of this stage.
 
-```bash
-gh api -X POST repos/AshJha0/intraday-alpha-platform/rulesets --input - <<'JSON'
-{
-  "name": "main",
-  "target": "branch",
-  "enforcement": "active",
-  "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
-  "rules": [
-    { "type": "deletion" },
-    { "type": "non_fast_forward" },
-    { "type": "pull_request",
-      "parameters": {
-        "required_approving_review_count": 0,
-        "dismiss_stale_reviews_on_push": true,
-        "require_code_owner_review": false,
-        "require_last_push_approval": false,
-        "required_review_thread_resolution": true
-      } },
-    { "type": "required_status_checks",
-      "parameters": {
-        "strict_required_status_checks_policy": true,
-        "required_status_checks": [
-          { "context": "python" },
-          { "context": "integration" },
-          { "context": "cpp" },
-          { "context": "rust" },
-          { "context": "golden" },
-          { "context": "deployment" }
-        ]
-      } }
-  ]
-}
-JSON
-```
+`required_approving_review_count` is 0 because GitHub does not let an author approve their own
+pull request and this repository has one maintainer: a count of 1 would make every merge
+impossible. The documented policy (GOVERNANCE.md section 1: 1 to 2 reviewers by change class)
+needs a second maintainer; when there is one, change the count to 1 (or 2 for the risk-engine and
+contracts classes), set `require_code_owner_review` to true and give the second maintainer a line
+in `CODEOWNERS`.
 
-Check it: `gh api repos/AshJha0/intraday-alpha-platform/rulesets --jq '.[].name'`.
-To change it later, `gh api -X PUT repos/AshJha0/intraday-alpha-platform/rulesets/<id> --input ...`.
+### Owner actions on the ruleset (proposed in stage 11, none applied)
+
+1. **Rename the context `advisory` to `lint-and-secrets`** (then delete the alias job in
+   `ci.yml`). The rename is the one change; every other context stays as live. `PUT` replaces the
+   whole ruleset, so the payload carries all 17 contexts:
+
+   ```bash
+   gh api -X PUT repos/AshJha0/intraday-alpha-platform/rulesets/24455225 --input - <<'JSON'
+   {
+     "name": "protect-main", "target": "branch", "enforcement": "active",
+     "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
+     "rules": [
+       { "type": "deletion" }, { "type": "non_fast_forward" },
+       { "type": "pull_request", "parameters": {
+           "required_approving_review_count": 0, "dismiss_stale_reviews_on_push": false,
+           "require_code_owner_review": false, "require_last_push_approval": false,
+           "required_review_thread_resolution": false,
+           "require_extra_approval_for_unattributed_changes": false,
+           "allowed_merge_methods": ["merge", "squash", "rebase"] } },
+       { "type": "required_status_checks", "parameters": {
+           "strict_required_status_checks_policy": true, "do_not_enforce_on_create": false,
+           "required_status_checks": [
+             { "context": "python", "integration_id": 15368 }, { "context": "python-312", "integration_id": 15368 },
+             { "context": "python-slow" }, { "context": "integration", "integration_id": 15368 },
+             { "context": "cpp", "integration_id": 15368 }, { "context": "rust", "integration_id": 15368 },
+             { "context": "golden", "integration_id": 15368 }, { "context": "deployment", "integration_id": 15368 },
+             { "context": "CodeQL", "integration_id": 57789 }, { "context": "analyze (rust)", "integration_id": 15368 },
+             { "context": "governance", "integration_id": 15368 }, { "context": "lint-and-secrets", "integration_id": 15368 },
+             { "context": "rust-pyo3", "integration_id": 15368 }, { "context": "supply-chain", "integration_id": 15368 },
+             { "context": "agent-evals" }, { "context": "docs" }, { "context": "reproducible-build" } ] } } ] }
+   JSON
+   # check, then refresh the snapshot and the matrix row:
+   gh api repos/AshJha0/intraday-alpha-platform/rules/branches/main --jq '.[] | select(.type=="required_status_checks") | .parameters.required_status_checks[].context'
+   python tools/repo_settings_snapshot.py write
+   ```
+
+2. **`cpp` as a required context: keep.** S2 asked for C++ out of the PR path; the job now costs
+   build + ctest only, and dropping the context would leave the C++ port's own tests unrun until
+   the weekly job while the port is still the measured hot path in the documentation. Decide
+   again when C++ is retired or the golden gate alone is judged enough; the ruleset edit is the
+   owner's either way.
+3. **The "release tags" ruleset of section 2 does not exist live** (only `protect-main` does):
+   apply it or delete section 2's claim.
+4. Consider `coverage` as a required context once it has a run history (unchanged recommendation).
+5. Actions settings read on 2026-10-25: `allowed_actions: all` and `sha_pinning_required: false`
+   (every workflow pins actions by SHA and `check_deployment.py` enforces it, so turning
+   `sha_pinning_required` on costs nothing); private vulnerability reporting is **disabled**
+   although section 3 asks for it; Dependabot security updates, secret scanning and push
+   protection are enabled.
 
 ## 2. Release tags
 

@@ -13,6 +13,8 @@
     {"path": "rust/alpha/src/", "component": "alpha scoring", "language": "rust"},
     {"path": "rust/contracts/src/", "component": "contracts / canonical JSON / trace", "language": "rust"},
     {"path": "rust/lifecycle/src/", "component": "lifecycle", "language": "rust"},
+    {"path": "rust/eventbus/src/", "component": "event bus", "language": "rust"},
+    {"path": "rust/telemetry/src/", "component": "telemetry / trace", "language": "rust"},
     {"path": "cpp/src/contracts/", "component": "contracts / canonical JSON / trace", "language": "cpp"},
     {"path": "cpp/include/iap/contracts/", "component": "contracts / canonical JSON / trace", "language": "cpp"}
   ]

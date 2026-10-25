@@ -45,7 +45,7 @@ flowchart TD
 How one validated Python reference pins three implementations. The parity table is
 printed by `tests/harness/run_all.sh` (python 4062 · cpp 333 · rust 376
 tests; 217/74/75 in the golden groups — the Rust gate runs twelve golden
-targets; the Java engine is archived in v1.15, `archive/java/`). Two goldens are
+targets; the Java engine is archived in v1.15, the git tag `archive/java-v1.14.0`). Two goldens are
 owned by a port language and consumed by Python as well: the fills golden
 (C++) by `iap.execution`, the risk goldens (Rust) by `iap.risk`.
 
@@ -952,8 +952,8 @@ flowchart LR
         JV["java<br/>javac -Xlint:all -Werror, JUnit4"]
         GOLD["golden<br/>run_golden.sh — promotion gate 10"]
         DEP["deployment<br/>check_deployment.py<br/>check_headline_numbers.py"]
-        ASAN["cpp-sanitizers<br/>ASan + UBSan over ctest — blocking"]
-        ADV["advisory<br/>ruff check (blocking)<br/>pip-audit, cargo audit (non-blocking)"]
+        ASAN["cpp-sanitizers<br/>ASan + UBSan over ctest — weekly (weekly-structural.yml, v2.0 stage 11)"]
+        ADV["lint-and-secrets (alias: advisory)<br/>gitleaks, ruff, import-linter (all blocking)<br/>lychee (advisory step)"]
         CHG["changes<br/>does the change touch image inputs?"]
         IMG["images<br/>build the four images, run the C++ and Rust containers<br/>on push to main, and on PRs that touch image inputs"]
     end

@@ -59,9 +59,9 @@ import pandas as pd
 from iap.core.events import MarketEvent
 from iap.execution.calibration import CALIBRATION_HORIZONS_NS, ExecCalibration
 from iap.execution.config import ExecConfig
+from iap.execution.markout import build_gated_timeline, markout_mid
 from iap.execution.simulator import ExecutionSimulator
 from iap.execution.types import ChildOrder, Liquidity, OrderType
-from iap.tca.markout import build_gated_timeline, markout_mid
 
 SIDES = ("bid", "ask")
 

@@ -496,7 +496,7 @@ change: still 0 alphas promoted, no strategy that trades at 1x costs.
 | R7 confirmatory round (R7-CONFIRM-1, 7 unseen holdout sessions) | done: EQ10@1s and EQ05@1s both confirmed; net P&L at 1x cost 0 (docs/research/R7_RESULTS.md) |
 | MVP on a real ITCH day (2019-10-18, AAPL/MSFT/QQQ) | done: gross +801 USD, net -9,226 USD (docs/research/MVP_REAL_20191018.md) |
 | AI4 deep order-book baselines | signed, deferred to v1.16 and not run (research/r7/AI4_DEFERRED.md) |
-| Java engine | archived in `archive/java/`, frozen at v1.14.0 |
+| Java engine | archived in the git tag `archive/java-v1.14.0`, frozen at v1.14.0 |
 | A2 QQQ against its constituents (basis study) | code merged (#85); no real-data run |
 | A3 futures lead-lag | on hold (data cost) |
 | P1-P3 live gateway | not started |

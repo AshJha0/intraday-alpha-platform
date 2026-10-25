@@ -1,0 +1,205 @@
+# =============================================================================
+# weekly-structural — the structural checks that left the pull-request path in
+# v2.0 stage 11 (S2; v1.19 plan section 2.3: C++ is a parity-only port, nine of
+# the eleven Rust crates are FROZEN and exercised by no research run).
+#
+# What runs here and why it is weekly, not per PR (docs/governance/REPO_SETTINGS.md
+# section 1 has the required-check matrix and the risk each check covers):
+#   cpp-full          Release build + ctest + the benchmark guards (bench_all,
+#                     tick-to-trade, execution rules) + the gcov/lcov coverage build.
+#                     Per PR the `cpp` job keeps build + ctest and the golden job
+#                     keeps the parity gate; benchmark timing on a shared runner
+#                     catches algorithmic regressions only (results_cpp.md header).
+#   cpp-sanitizers    ASan + UBSan over the full C++ ctest suite (40 min budget).
+#   rust-workspace    cargo test / bench --no-run / clippy over the WHOLE workspace
+#                     (the frozen crates: marketdata, orderbook, replay, eventbus,
+#                     telemetry, alpha, venue, contracts, lifecycle) and the
+#                     cargo-llvm-cov report of rust/risk. Per PR the `rust` job
+#                     tests risk + features; every crate's golden target still runs
+#                     per PR in the golden job (tests/harness/run_all.sh).
+#
+# A failure here is a real defect in a frozen copy or a timing regression: file it
+# in docs/review/DEFECT_REGISTER_v1.19.md and fix it under a POLYGLOT-OVERRIDE if
+# the copy is frozen (docs/POLYGLOT.md). Nothing here publishes anything.
+# =============================================================================
+name: weekly-structural
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"   # Mondays 04:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cpp-full:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            g++ cmake make libgtest-dev libeigen3-dev
+      - name: build
+        working-directory: cpp
+        run: bash build.sh
+      - name: ctest
+        working-directory: cpp
+        run: ctest --test-dir build --output-on-failure
+      # Coarse latency guard: run the Release bench_all (about 20 s) and fail
+      # only when a hot row is more than 5x slower than the committed table
+      # (benchmarks/results_cpp.md). A shared runner is not the 2-CPU Xeon the
+      # table was measured on, so this catches algorithmic regressions, not
+      # few-percent drift; see the header of the script. The table of ratios
+      # goes to the job summary and the raw output is uploaded.
+      - name: benchmark regression guard (coarse)
+        # D5(a), v1.18 REL-13: C++ is parity-only; the guard still runs and uploads its artifact
+        # but no longer gates a merge (a noisy shared runner must not block through C++ timing).
+        continue-on-error: true
+        run: |
+          cpp/build/bench_all "$RUNNER_TEMP/bench_ci.md" > /dev/null
+          python3 tests/harness/check_bench_regression.py \
+            --current "$RUNNER_TEMP/bench_ci.md" --factor 5
+      - name: upload bench_all output
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bench-cpp
+          path: ${{ runner.temp }}/bench_ci.md
+          if-no-files-found: ignore
+      # v1.12 (X6): per-event tick-to-trade percentiles (decode -> book ->
+      # features -> alpha -> order decision; about 5 s). The full table goes to
+      # the job summary and an artifact. The guard compares only the p50/p99
+      # end-to-end rows with benchmarks/results_tick_to_trade.md (a CI-runner
+      # baseline) at factor 8: shared-runner percentiles move with neighbour
+      # load, so the guard catches algorithmic regressions only, never p99.9
+      # or max (see benchmarks/RESULTS.md).
+      - name: tick-to-trade benchmark (percentiles) + coarse guard
+        run: |
+          cpp/build/bench_tick_to_trade "$RUNNER_TEMP/tick_to_trade_ci.md" > /dev/null
+          cat "$RUNNER_TEMP/tick_to_trade_ci.md" >> "$GITHUB_STEP_SUMMARY"
+          python3 tests/harness/check_bench_regression.py \
+            --current "$RUNNER_TEMP/tick_to_trade_ci.md" \
+            --baseline benchmarks/results_tick_to_trade.md \
+            --rows '^t2t .* p(50|99)$' --factor 8 \
+            --title "C++ tick-to-trade guard (p50/p99, coarse)"
+      - name: upload tick-to-trade output
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bench-tick-to-trade
+          path: ${{ runner.temp }}/tick_to_trade_ci.md
+          if-no-files-found: ignore
+      # v1.17 (F7): per-event latency of the ported execution rules on the
+      # golden stream and the real slice (about 10 s). Report-only: the rows
+      # are copied into benchmarks/results_exec_rules.md by hand; no guard.
+      - name: execution-rule benchmark (F7 ports, percentiles)
+        run: |
+          cpp/build/bench_exec_rules "$RUNNER_TEMP/exec_rules_ci.md" > /dev/null
+          cat "$RUNNER_TEMP/exec_rules_ci.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: upload execution-rule benchmark output
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bench-exec-rules
+          path: ${{ runner.temp }}/exec_rules_ci.md
+          if-no-files-found: ignore
+      # Coverage: rebuild with --coverage (gcov instrumentation) in a
+      # separate build dir so the timed Release build above is unaffected,
+      # then summarize with lcov. Report-only — no threshold enforced (no
+      # existing baseline), uploaded as a CI artifact.
+      - name: coverage build (gcov)
+        working-directory: cpp
+        run: |
+          sudo apt-get install -y --no-install-recommends lcov
+          cmake -S . -B build-cov -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="--coverage" -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+          cmake --build build-cov -j2
+          ctest --test-dir build-cov --output-on-failure
+      - name: lcov summary
+        working-directory: cpp
+        run: |
+          lcov --capture --directory build-cov --output-file ../coverage-cpp.info \
+            --ignore-errors mismatch,gcov,negative --rc branch_coverage=0 || true
+          lcov --remove ../coverage-cpp.info '/usr/*' '*/tests/*' \
+            --output-file ../coverage-cpp.info --ignore-errors unused || true
+          lcov --list ../coverage-cpp.info || true
+      - name: upload cpp coverage report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-cpp
+          path: coverage-cpp.info
+          if-no-files-found: ignore
+
+
+  # Memory/UB sanitizers over the full C++ ctest suite, in a separate build
+  # dir so the timed Release build and the coverage build are unaffected.
+  # Blocking: it passed on the first CI run (285 of 285 tests, no sanitizer
+  # report), so a new ASan/UBSan finding now fails the workflow.
+  cpp-sanitizers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            g++ cmake make libgtest-dev libeigen3-dev
+      - name: build (ASan + UBSan)
+        working-directory: cpp
+        run: |
+          cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -O1" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+          cmake --build build-asan -j2
+      - name: ctest under sanitizers
+        working-directory: cpp
+        env:
+          ASAN_OPTIONS: detect_leaks=1:strict_string_checks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --test-dir build-asan --output-on-failure
+
+  rust-workspace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1 (toolchain pinned by input)
+        with:
+          toolchain: "1.99.0"      # == rust/rust-toolchain.toml (check_deployment.py enforces)
+          components: clippy, llvm-tools-preview
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: rust
+      - name: cargo test (workspace, every crate including the frozen ones)
+        working-directory: rust
+        run: cargo test --workspace --locked
+      - name: cargo bench --no-run (workspace)
+        working-directory: rust
+        run: cargo bench --workspace --locked --no-run
+      - name: cargo clippy (workspace, blocking)
+        working-directory: rust
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      # Coverage for the risk crate at minimum (the normative risk engine,
+      # PLATFORM_CONVENTIONS.md §11.1). Report-only, uploaded as an artifact;
+      # no threshold gate (no existing baseline).
+      - name: install cargo-llvm-cov
+        uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2.87.30
+        with:
+          tool: cargo-llvm-cov
+      - name: rust/risk coverage (cargo-llvm-cov)
+        working-directory: rust
+        run: |
+          cargo llvm-cov --locked -p risk --summary-only --cobertura --output-path ../coverage-rust-risk.xml
+      - name: upload rust risk coverage report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-rust-risk
+          path: coverage-rust-risk.xml
+          if-no-files-found: ignore

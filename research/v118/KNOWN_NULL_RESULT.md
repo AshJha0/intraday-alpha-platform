@@ -4,7 +4,7 @@ Run 2026-10-18 13:27-14:16 BST (49 min, `--workers 2`, the IEX ingest running be
 `origin/main` at `b3be34f`, under the signed prereg `research/v118/null_protocol_prereg.json` (identity bound at
 `4a6f473`; verified by the runner: signature, scripts, code tree, commit ancestry, data version, family, metrics,
 thresholds), runner actor `claude-rel06-runner` (not the signer). Dataset `data/real/multi7`
-(`ee4c2187...`, `in_sample`). Canonical output: `research/v118/known_null_result.json` (1,000 trials per generator,
+(`ee4c2187...`, `in_sample`). Canonical output: `research/v118/known_null_result.json` (sha256 `5731a1ab...605081`; since v2.0 stage 11 a release asset of v1.18.0, not a tree file: `python tools/result_artefacts.py fetch research/v118/known_null_result.json`; 1,000 trials per generator,
 every seed, permutation and AR(1) parameter recorded). No trial outcome was examined before the run completed.
 
 > This inference rests on G = 7 session clusters. For G <= 5 the known-null protocol reports size, not power.

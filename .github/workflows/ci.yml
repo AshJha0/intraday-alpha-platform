@@ -26,7 +26,7 @@
 #                                `replay` rows of run_all.sh's parity table
 #   golden                       tests/harness/run_golden.sh — the promotion
 #                                gate 10 artefact (every language's golden
-#                                group; Java archived in v1.15, archive/java/)
+#                                group; Java archived in v1.15, removed in v2.0 stage 11: git tag archive/java-v1.14.0)
 #   deployment                   tests/harness/check_deployment.py: promtool
 #                                check rules/config, promtool test rules, the
 #                                Dockerfile/compose/k8s/ConfigMap/dashboard
@@ -34,10 +34,15 @@
 #   rust-pyo3                    maturin wheel of rust/features_py (pyo3),
 #                                Rust-vs-Python native-feature parity tests
 #                                and the events/s benchmark (job summary)
-#   cpp-sanitizers               ASan+UBSan ctest (blocking; green on first run)
-#   advisory                     ruff (blocking), gitleaks (blocking);
+#   lint-and-secrets             ruff (blocking), gitleaks (blocking), import-linter
+#                                architecture contracts (blocking, v2.0 stage 11);
 #                                clippy is a blocking step of the rust job;
-#                                lychee link check (ADVISORY step, v1.17 F1)
+#                                lychee link check (ADVISORY step, v1.17 F1).
+#                                Called `advisory` until v2.0 stage 11; the `advisory`
+#                                job below is a transitional alias for the ruleset
+#   (weekly-structural.yml)      v2.0 stage 11 (S2): cpp-sanitizers, the C++ benchmark
+#                                guards and coverage build, and the Rust workspace-wide
+#                                tests / clippy / coverage run weekly, not per PR
 #   supply-chain                 v1.14 (G-P1-7), all BLOCKING: pip-audit of
 #                                both pinned requirement files, cargo audit
 #                                and cargo deny (bans/licenses/sources) of the
@@ -60,9 +65,10 @@
 #                                from it — and uploads the changed files, so
 #                                the artefacts are produced in the environment
 #                                that verifies them
-#   docs                         v1.17 (E4), advisory until added to the
-#                                ruleset: tests/harness/check_docs.py (links,
-#                                diagram index, API names, status freshness)
+#   docs                         v1.17 (E4), required since 2026-10-18:
+#                                tests/harness/check_docs.py --strict (links,
+#                                diagram index, API names, status freshness;
+#                                stale status text fails since v2.0 stage 11)
 #                                plus lychee on external links
 #   risk-fuzz                    manual only (workflow_dispatch with
 #                                risk_fuzz=true): the large differential-fuzz
@@ -458,91 +464,11 @@ jobs:
           name: parity-cpp
           path: /tmp/parity/ctest.txt
           if-no-files-found: ignore
-      # Coarse latency guard: run the Release bench_all (about 20 s) and fail
-      # only when a hot row is more than 5x slower than the committed table
-      # (benchmarks/results_cpp.md). A shared runner is not the 2-CPU Xeon the
-      # table was measured on, so this catches algorithmic regressions, not
-      # few-percent drift; see the header of the script. The table of ratios
-      # goes to the job summary and the raw output is uploaded.
-      - name: benchmark regression guard (coarse)
-        # D5(a), v1.18 REL-13: C++ is parity-only; the guard still runs and uploads its artifact
-        # but no longer gates a merge (a noisy shared runner must not block through C++ timing).
-        continue-on-error: true
-        run: |
-          cpp/build/bench_all "$RUNNER_TEMP/bench_ci.md" > /dev/null
-          python3 tests/harness/check_bench_regression.py \
-            --current "$RUNNER_TEMP/bench_ci.md" --factor 5
-      - name: upload bench_all output
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: bench-cpp
-          path: ${{ runner.temp }}/bench_ci.md
-          if-no-files-found: ignore
-      # v1.12 (X6): per-event tick-to-trade percentiles (decode -> book ->
-      # features -> alpha -> order decision; about 5 s). The full table goes to
-      # the job summary and an artifact. The guard compares only the p50/p99
-      # end-to-end rows with benchmarks/results_tick_to_trade.md (a CI-runner
-      # baseline) at factor 8: shared-runner percentiles move with neighbour
-      # load, so the guard catches algorithmic regressions only, never p99.9
-      # or max (see benchmarks/RESULTS.md).
-      - name: tick-to-trade benchmark (percentiles) + coarse guard
-        run: |
-          cpp/build/bench_tick_to_trade "$RUNNER_TEMP/tick_to_trade_ci.md" > /dev/null
-          cat "$RUNNER_TEMP/tick_to_trade_ci.md" >> "$GITHUB_STEP_SUMMARY"
-          python3 tests/harness/check_bench_regression.py \
-            --current "$RUNNER_TEMP/tick_to_trade_ci.md" \
-            --baseline benchmarks/results_tick_to_trade.md \
-            --rows '^t2t .* p(50|99)$' --factor 8 \
-            --title "C++ tick-to-trade guard (p50/p99, coarse)"
-      - name: upload tick-to-trade output
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: bench-tick-to-trade
-          path: ${{ runner.temp }}/tick_to_trade_ci.md
-          if-no-files-found: ignore
-      # v1.17 (F7): per-event latency of the ported execution rules on the
-      # golden stream and the real slice (about 10 s). Report-only: the rows
-      # are copied into benchmarks/results_exec_rules.md by hand; no guard.
-      - name: execution-rule benchmark (F7 ports, percentiles)
-        run: |
-          cpp/build/bench_exec_rules "$RUNNER_TEMP/exec_rules_ci.md" > /dev/null
-          cat "$RUNNER_TEMP/exec_rules_ci.md" >> "$GITHUB_STEP_SUMMARY"
-      - name: upload execution-rule benchmark output
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: bench-exec-rules
-          path: ${{ runner.temp }}/exec_rules_ci.md
-          if-no-files-found: ignore
-      # Coverage: rebuild with --coverage (gcov instrumentation) in a
-      # separate build dir so the timed Release build above is unaffected,
-      # then summarize with lcov. Report-only — no threshold enforced (no
-      # existing baseline), uploaded as a CI artifact.
-      - name: coverage build (gcov)
-        working-directory: cpp
-        run: |
-          sudo apt-get install -y --no-install-recommends lcov
-          cmake -S . -B build-cov -DCMAKE_BUILD_TYPE=Debug \
-            -DCMAKE_CXX_FLAGS="--coverage" -DCMAKE_EXE_LINKER_FLAGS="--coverage"
-          cmake --build build-cov -j2
-          ctest --test-dir build-cov --output-on-failure
-      - name: lcov summary
-        working-directory: cpp
-        run: |
-          lcov --capture --directory build-cov --output-file ../coverage-cpp.info \
-            --ignore-errors mismatch,gcov,negative --rc branch_coverage=0 || true
-          lcov --remove ../coverage-cpp.info '/usr/*' '*/tests/*' \
-            --output-file ../coverage-cpp.info --ignore-errors unused || true
-          lcov --list ../coverage-cpp.info || true
-      - name: upload cpp coverage report
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage-cpp
-          path: coverage-cpp.info
-          if-no-files-found: ignore
+      # v2.0 stage 11 (S2): the benchmark guards, the tick-to-trade and execution-rule
+      # benchmarks and the gcov coverage build left the pull-request path. They run
+      # weekly (and on demand) in .github/workflows/weekly-structural.yml. This job
+      # keeps build + ctest only: `cpp` is a required context (REPO_SETTINGS.md
+      # section 1) and the golden job builds C++ for the parity gate regardless.
 
   rust:
     runs-on: ubuntu-24.04
@@ -556,12 +482,12 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: rust
-      - name: cargo test (workspace)
+      - name: cargo test (risk + features; the frozen crates run weekly, their goldens in the golden job)
         working-directory: rust
         shell: bash
         run: |
           mkdir -p /tmp/parity
-          cargo test --workspace --locked 2>&1 | tee /tmp/parity/cargo_test.txt
+          cargo test --locked -p risk -p features 2>&1 | tee /tmp/parity/cargo_test.txt
       - name: upload parity counts input (v1.18 REL-14a)
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -569,32 +495,21 @@ jobs:
           name: parity-rust
           path: /tmp/parity/cargo_test.txt
           if-no-files-found: ignore
-      # v1.16 item 13: benches (risk check_order) must keep compiling.
-      - name: cargo bench --no-run (workspace)
+      # v1.16 item 13: benches (risk check_order) must keep compiling (risk only per PR; workspace weekly).
+      - name: cargo bench --no-run (risk; workspace weekly)
         working-directory: rust
-        run: cargo bench --workspace --locked --no-run
-      # BLOCKING: the workspace is clippy-clean; any new finding fails the job.
+        run: cargo bench --locked -p risk --no-run
+      # BLOCKING: the live crates are clippy-clean; any new finding fails the job (workspace clippy weekly).
       - name: cargo clippy
         working-directory: rust
-        run: cargo clippy --locked --workspace --all-targets -- -D warnings
-      # Coverage for the risk crate at minimum (the normative risk engine,
-      # PLATFORM_CONVENTIONS.md §11.1). Report-only, uploaded as an artifact;
-      # no threshold gate (no existing baseline).
-      - name: install cargo-llvm-cov
-        uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2.87.30
-        with:
-          tool: cargo-llvm-cov
-      - name: rust/risk coverage (cargo-llvm-cov)
-        working-directory: rust
-        run: |
-          cargo llvm-cov --locked -p risk --summary-only --cobertura --output-path ../coverage-rust-risk.xml
-      - name: upload rust risk coverage report
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage-rust-risk
-          path: coverage-rust-risk.xml
-          if-no-files-found: ignore
+        run: cargo clippy --locked -p risk -p features --all-targets -- -D warnings
+      # v2.0 stage 11 (S2): the cargo-llvm-cov report of rust/risk and the workspace-wide
+      # test / clippy / bench runs are weekly (.github/workflows/weekly-structural.yml).
+      # Per pull request this job builds and tests the two crates research and the
+      # Python wheel consume (risk: the normative risk engine; features: the pyo3 engine);
+      # the nine other crates are FROZEN (docs/POLYGLOT.md) and their golden parity
+      # targets still run on every pull request in the golden job (run_all.sh
+      # RUST_GOLDEN_TARGETS).
 
   # v1.11 E2: the native feature engine exposed to Python through pyo3
   # (rust/features_py, a standalone package outside the workspace). Builds
@@ -652,37 +567,15 @@ jobs:
           f=$(ls ../data/normalized/*.normalized.iap1 | head -n 1)
           python tools/bench_native_features.py "$f" --max-events 200000 --cadence-ms 100             --repeat 1 --summary "$GITHUB_STEP_SUMMARY"
 
-  # Memory/UB sanitizers over the full C++ ctest suite, in a separate build
-  # dir so the timed Release build and the coverage build are unaffected.
-  # Blocking: it passed on the first CI run (285 of 285 tests, no sanitizer
-  # report), so a new ASan/UBSan finding now fails the workflow.
-  cpp-sanitizers:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Toolchain
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            g++ cmake make libgtest-dev libeigen3-dev
-      - name: build (ASan + UBSan)
-        working-directory: cpp
-        run: |
-          cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug \
-            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -O1" \
-            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
-          cmake --build build-asan -j2
-      - name: ctest under sanitizers
-        working-directory: cpp
-        env:
-          ASAN_OPTIONS: detect_leaks=1:strict_string_checks=1:halt_on_error=1
-          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
-        run: ctest --test-dir build-asan --output-on-failure
+  # v2.0 stage 11 (S2): cpp-sanitizers (ASan + UBSan over the full C++ ctest suite) moved
+  # to .github/workflows/weekly-structural.yml. It was not a required context (dropped
+  # 2026-10-18, D5(a)); C++ is a parity-only port and the golden job keeps its parity gate
+  # on every pull request.
 
-  # Lint and secrets signals (both blocking since v1.13). The dependency
-  # audits moved to the blocking `supply-chain` job in v1.14 (G-P1-7).
-  advisory:
+  # Lint and secrets: BOTH BLOCKING since v1.13 (the job was called `advisory` until v2.0
+  # stage 11, S4; the name hid that it fails pull requests). The dependency
+  lint-and-secrets:
+    name: lint-and-secrets
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -706,6 +599,17 @@ jobs:
           python -m pip install ruff==0.16.10
           ruff check python tests tools research deployment --output-format=concise
           ruff format --check python tests tools research deployment
+      # v2.0 stage 11 (S3): the architecture contracts of python/.importlinter (import-linter,
+      # version-pinned like ruff above; not in the hashed CI lock so the reproduction image's
+      # inputs do not move). tests/architecture/test_layering.py enforces the same file in
+      # the python job without the dependency.
+      - name: import-linter (architecture contracts, blocking)
+        working-directory: python
+        env:
+          PYTHONPATH: src
+        run: |
+          python -m pip install import-linter==2.15
+          lint-imports
       # v1.17 (F1): link check over every tracked Markdown file and the docs
       # HTML. ADVISORY: `continue-on-error`, so a dead or rate-limited link
       # annotates the run and never fails this (required) job. The config
@@ -719,6 +623,19 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fail: true
           failIfEmpty: false
+
+  # Transitional alias (v2.0 stage 11, S4). The protect-main ruleset requires a context
+  # named `advisory`; the job is now `lint-and-secrets`. This job reports under the old
+  # name and runs only when lint-and-secrets succeeded (a lint or secrets failure leaves
+  # it skipped, and a skipped required check blocks the merge, as before). Delete it once
+  # the owner has replaced `advisory` by `lint-and-secrets` in the ruleset
+  # (docs/governance/REPO_SETTINGS.md section 1, owner action 1).
+  advisory:
+    needs: lint-and-secrets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - run: echo "lint-and-secrets passed; this job exists only for the required context name 'advisory'"
 
   # v1.14 (G-P1-7): BLOCKING dependency and configuration audits. A finding
   # fails the job; the only way past one is a bumped dependency or a reviewed,
@@ -967,6 +884,18 @@ jobs:
           else
             python tests/harness/check_ledger_monotone.py --base origin/main
           fi
+      # v2.0 stage 11 (S4): the required-check matrix in REPO_SETTINGS.md is generated from
+      # the live ruleset (tools/repo_settings_snapshot.py). A drift between the live settings
+      # and the committed snapshot is a WARNING here (the default token may be refused on
+      # some endpoints; the settings are the owner's), and a failing test
+      # (tests/test_repo_settings_doc.py) when the document and the snapshot disagree.
+      - name: live repository settings vs the committed snapshot (warning only)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/repo_settings_snapshot.py check || {
+            echo "::warning::live repository settings differ from docs/governance/repo_settings_live.json (see the step log)"; exit 1; }
 
   # Manual: regenerate every committed artefact that derives from the seeded
   # dataset (tools/regenerate_dataset_artifacts.py has the chain and its
@@ -1037,11 +966,11 @@ jobs:
           PYTHONUTF8: "1"
         run: |
           set +e
-          python tests/harness/check_docs.py | tee /tmp/check_docs.txt
+          python tests/harness/check_docs.py --strict | tee /tmp/check_docs.txt
           rc=${PIPESTATUS[0]}
           set -e
           {
-            echo "### docs checks (exit $rc; 2 = stale status text only)"
+            echo "### docs checks (exit $rc; --strict since v2.0 stage 11: stale status text fails)"
             echo '```'
             tail -n 40 /tmp/check_docs.txt
             echo '```'

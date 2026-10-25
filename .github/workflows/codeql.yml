@@ -5,7 +5,7 @@
 # alerts; the workflow has no secrets and reads the repository only.
 # C++ is compiled with the repository's own build script (cpp/build.sh) so
 # the extractor sees the real build. java-kotlin was dropped in v1.15 when the
-# Java engine was archived (archive/java/, frozen at v1.14.0).
+# Java engine was archived (frozen at v1.14.0; git tag archive/java-v1.14.0 since v2.0 stage 11).
 # =============================================================================
 name: codeql
 

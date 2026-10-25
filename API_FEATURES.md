@@ -3,7 +3,7 @@
 Scope: the feature factory (conventions §6, spec §10). The Python package
 `iap.features` (`python/src/iap/features/`) is the reference; the C++
 (`cpp/features/`), Rust (`rust/` features crate) and Java
-(`archive/java/` com.iap.features, archived and frozen at v1.14.0) engines implement the **native core set of 40
+(the git tag `archive/java-v1.14.0` com.iap.features, archived and frozen at v1.14.0) engines implement the **native core set of 40
 features** below with identical semantics and must reproduce the golden
 checkpoints in `tests/golden/expected_features.json` at abs 1e-9 / rel 1e-9.
 

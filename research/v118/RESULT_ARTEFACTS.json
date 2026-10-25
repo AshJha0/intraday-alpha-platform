@@ -1,0 +1,29 @@
+{
+  "x-version": 1,
+  "doc": "Result files over 1 MB are not kept in the tree (v2.0 stage 11, S1). They are release assets of the tag named per entry; `python tools/result_artefacts.py check` verifies any local copy against the sha256 here, `fetch` downloads one by name and refuses a hash mismatch. The hashes are the ones the result documents quote. The files' history in git is untouched (no rewrite): their last tree commit is recorded.",
+  "location": "https://github.com/AshJha0/intraday-alpha-platform/releases/tag/v1.18.0",
+  "artefacts": [
+    {
+      "path": "research/v118/known_null_result.json",
+      "sha256": "5731a1abe99a244cc63d8e3d8f8f5c7be825c3ee982c9af3ea7b1af077605081",
+      "bytes": 11410414,
+      "release": "v1.18.0",
+      "asset": "known_null_result.json",
+      "produced_by": "tools/rel06_known_null.py (REL-06 known-null study v1, signed prereg research/v118/null_protocol_prereg.json)",
+      "result_document": "research/v118/KNOWN_NULL_RESULT.md",
+      "last_tree_commit": "e79acf98",
+      "removed_in": "v2.0 stage 11 (S1)"
+    },
+    {
+      "path": "research/v118/known_null_v2_result.json",
+      "sha256": "70f86a06c3f3e6b76b09e841fd88f6cc12e628f70d14f71ed6c77d53a3a0768f",
+      "bytes": 49653053,
+      "release": "v1.18.0",
+      "asset": "known_null_v2_result.json",
+      "produced_by": "tools/rel06_known_null.py --config research/v118/known_null_v2_config.json (REL-06 known-null study v2, signed prereg research/v118/null_protocol_v2_prereg.json)",
+      "result_document": "research/v118/KNOWN_NULL_V2_RESULT.md",
+      "last_tree_commit": "e79acf98",
+      "removed_in": "v2.0 stage 11 (S1)"
+    }
+  ]
+}

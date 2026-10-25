@@ -270,7 +270,7 @@ enforced state.
 | simulator, replay, router, TCA, all studies | Python | no call from Python into C++ or Rust binaries |
 | Rust risk engine | parity reference and nightly differential fuzz | Python `iap.risk.engine` is what runs |
 | C++ (about 25k lines) | parity goldens, benchmarks, image | nothing in the research path calls it |
-| Java | retired in v1.17; `archive/java/` frozen at v1.14.0 | not built |
+| Java | retired in v1.17; frozen at v1.14.0 (git tag `archive/java-v1.14.0`, removed from the tree in v2.0 stage 11) | not built |
 
 ## 4. Acceptance (REL-01)
 
