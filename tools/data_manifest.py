@@ -27,6 +27,18 @@ them to one word per session and :func:`dataset_verdict` to one per dataset
 (``clean, match`` / ``clean`` / ``not clean`` / ``mismatch`` / ``none``).
 Nothing here reads a session's data: ``dataset.json`` is metadata.
 
+v2.0 stage 2 DD1: a daily-route ingestion record (``kind: daily_pit``, written
+by ``tools/ingest/dd1_daily.py`` as ``iap-runner`` under the development-readable
+root) is listed as one entry with its four partitions: per partition the
+``dataset_hash_id`` (the sealed service's content hash over the file set), the
+file hashes and the row counts.  For the sealed partitions (Track B, Track C)
+those come from the sealed service's ``ingest`` response, which recorded the
+ingestion job's own counts; the development identity never recomputes them
+(U0 section 2: no summary statistic of a sealed partition).  The entry's
+``evidence`` is the DD1 test block (pass/fail counts) and its verdict is the
+record's ``status`` (``complete`` / ``incomplete``); a cited partition of an
+incomplete ingestion fails ``check``.
+
 ``check`` is the CI gate: the real data is not in git, so the committed
 manifest is the list.  Every 64-hex value under a key naming a dataset
 (``dataset_version``, ``nasdaq_dataset_version``, ``dataset_versions`` …,
@@ -280,9 +292,51 @@ def _evidence(doc: dict, sessions: dict[str, dict]) -> dict:
     }
 
 
+def _daily_entry(rel: str, ds_json: Path, doc: dict) -> dict:
+    """A DD1 ingestion record (``kind: daily_pit``): partitions, hashes, counts,
+    the test block; nothing read beyond ``dataset.json``."""
+    parts = {}
+    for name, p in sorted((doc.get("partitions") or {}).items()):
+        parts[name] = {
+            "location": p.get("location"),
+            "dataset_hash_id": p.get("dataset_hash_id"),
+            "files": p.get("files") or {},
+            "row_counts": p.get("row_counts") or {},
+            "chain_head": p.get("chain_head"),
+            "refused": p.get("refused"),
+        }
+    tests = doc.get("dd1_tests") or {}
+    status = doc.get("status") or "incomplete"
+    return {
+        "path": rel,
+        "dataset_version": None,
+        "kind": "daily_pit",
+        "purchase_year": doc.get("purchase_year"),
+        "sources": doc.get("sources"),
+        "windows": doc.get("windows"),
+        "dataset_json_sha256": _sha256_small(ds_json),
+        "partitions": parts,
+        "evidence": {
+            "kind": "dd1_tests",
+            "tests": {
+                k: {kk: vv for kk, vv in v.items() if kk != "convention"}
+                for k, v in (tests.get("results") or {}).items()
+            },
+            "open_close_convention": (tests.get("results") or {})
+            .get("open_close_convention", {})
+            .get("convention"),
+            "thresholds": tests.get("thresholds"),
+            "evidence_class": doc.get("evidence_class"),
+            "verdict": status,
+        },
+    }
+
+
 def _entry(root: Path, ds_json: Path) -> dict:
     doc = json.loads(ds_json.read_text(encoding="utf-8"))
     rel = ds_json.parent.relative_to(root).as_posix()
+    if doc.get("kind") == "daily_pit":
+        return _daily_entry(rel, ds_json, doc)
     own_status = SPEND_BY_PATH.get(rel)
     sessions = {}
     evidence_sessions = {}
@@ -357,6 +411,20 @@ def generate(data_root: Path) -> dict:
 def listed_versions(manifest: dict) -> set[str]:
     out = {d["dataset_version"] for d in manifest.get("datasets", []) if d.get("dataset_version")}
     out |= {d["dataset_version"] for d in manifest.get("non_disk", [])}
+    out |= set(partition_ids(manifest))
+    return out
+
+
+def partition_ids(manifest: dict) -> dict[str, tuple[str, str]]:
+    """``dataset_hash_id -> (verdict, where)`` of every DD1 partition listed."""
+    out: dict[str, tuple[str, str]] = {}
+    for d in manifest.get("datasets", []):
+        if d.get("kind") != "daily_pit":
+            continue
+        verdict = (d.get("evidence") or {}).get("verdict") or "incomplete"
+        for name, p in (d.get("partitions") or {}).items():
+            if p.get("dataset_hash_id"):
+                out[p["dataset_hash_id"]] = (verdict, f"{d.get('path')}/{name}")
     return out
 
 
@@ -420,6 +488,7 @@ def verdicts(manifest: dict) -> dict[str, tuple[str, str]]:
     for d in manifest.get("non_disk", []):
         verdict = (d.get("evidence") or {}).get("verdict") or "none"
         out[d["dataset_version"]] = (verdict, d.get("kind") or "non-disk")
+    out.update(partition_ids(manifest))
     return out
 
 
@@ -444,7 +513,7 @@ def evidence_problems(manifest: dict, cited: set[str]) -> list[str]:
         if v not in by:
             continue  # an unlisted citation is reported by check() itself
         verdict, where = by[v]
-        if verdict in ("none", "mismatch"):
+        if verdict in ("none", "mismatch", "incomplete"):
             problems.append(
                 f"cited dataset {v} ({where}) has verdict {verdict!r}: no clean/match evidence"
             )

@@ -42,6 +42,19 @@ anchor) and tells the service the commit through ``publish``.  ``verify``
 checks the local audit chain, and ``verify-checkpoints`` checks a committed
 checkpoint file against the content rule and the chain order (anyone, CI).
 
+Ingestion (v2.0 stage 2 DD1): ``ingest`` is the only way bytes ENTER a
+partition from another identity.  The caller (``iap-runner`` only, the same
+account rule as every op) names a ``dataset_hash_id`` and streams the files
+after the request frame; the service writes them under
+``<root>/datasets/<hash_id>/``, re-hashes every file, checks the content hash
+over the sorted ``name`` + sha256 lines equals the claimed id, records the
+dataset exactly as ``add-dataset`` does (so a later ``read`` serves it), keeps
+the caller's own row counts as metadata, and answers with hashes and counts
+only.  A second ingest of a known id is refused (``dataset_exists``); a hash
+mismatch removes the written files and is refused.  Nothing ingested is ever
+returned by ``ingest``: the development identity learns the hashes and the
+counts the ingestion job itself produced, never a value.
+
 Results: ``store_result`` records the sha256 of the result file under the
 registration; ``verify-result`` compares a result commit's hash with the
 service's copy (property 5: a result commit that does not match is a
@@ -69,7 +82,14 @@ from pathlib import Path
 from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO / "python" / "src"))
+#: The service may run from an all-users interpreter and a checkout outside the
+#: owner's profile (``docs/governance/SEALED_DATA.md`` section 5, e.g. ``C:\\iap\\repo``):
+#: the package root is this checkout's ``python/src``, or ``IAP_REPO`` when the
+#: script was copied elsewhere.
+_SRC = REPO / "python" / "src"
+if not _SRC.is_dir() and os.environ.get("IAP_REPO"):
+    _SRC = Path(os.environ["IAP_REPO"]) / "python" / "src"
+sys.path.insert(0, str(_SRC))
 
 SCHEMA = "iap.sealed_service/v1"
 GENESIS = "0" * 64
@@ -107,6 +127,14 @@ def sha256_file(p: Path) -> str:
 def prereg_hash(doc: Mapping[str, Any]) -> str:
     """The registration key: sha256 of the canonical signed document."""
     return sha256_bytes(canonical(doc).encode("ascii"))
+
+
+def content_hash(files: Mapping[str, str]) -> str:
+    """The dataset id of a file set: sha256 over ``name\\nsha256\\n`` lines, names sorted."""
+    h = hashlib.sha256()
+    for name in sorted(files):
+        h.update(name.encode("utf-8") + b"\n" + files[name].encode("ascii") + b"\n")
+    return h.hexdigest()
 
 
 class Refused(PermissionError):
@@ -315,7 +343,10 @@ class SealedService:
             raise Refused("checkpoint_pending", "publish the pending checkpoint first")
 
     def handle(
-        self, request: Mapping[str, Any], caller: Caller
+        self,
+        request: Mapping[str, Any],
+        caller: Caller,
+        incoming: Iterable[tuple[Mapping[str, Any], bytes]] | None = None,
     ) -> tuple[dict[str, Any], Iterator[tuple[dict[str, Any], bytes]] | None]:
         op = str(request.get("op", ""))
         base = {"event": "request", "op": op, "account": caller.account, "pid": caller.pid}
@@ -325,6 +356,8 @@ class SealedService:
                 return self._status(), None
             if op == "read":
                 return self._read(request, base)
+            if op == "ingest":
+                return self._ingest(request, base, incoming or ()), None
             if op == "publish":
                 return self._publish(request, base), None
             if op == "store_result":
@@ -435,6 +468,76 @@ class SealedService:
         for name in sorted(files):
             data = (ddir / name).read_bytes()
             yield {"file": name, "size": len(data), "sha256": files[name]}, data
+
+    def _ingest(
+        self,
+        request: Mapping[str, Any],
+        base: dict[str, Any],
+        incoming: Iterable[tuple[Mapping[str, Any], bytes]],
+    ) -> dict[str, Any]:
+        """DD1: write a dataset INTO this partition (runner identity only; module docstring)."""
+        want = str(request.get("dataset_hash_id") or "")
+        base = {**base, "dataset_hash_id": want}
+        if len(want) != 64 or any(c not in "0123456789abcdef" for c in want):
+            raise Refused("dataset_hash_id_invalid", "need the 64-hex content hash")
+        declared = request.get("files")
+        if not isinstance(declared, Mapping) or not declared:
+            raise Refused("files_missing", "the request must declare {name: sha256}")
+        declared = {str(k): str(v) for k, v in declared.items()}
+        if content_hash(declared) != want:
+            raise Refused("dataset_hash_mismatch", "declared files do not hash to dataset_hash_id")
+        if want in self.datasets():
+            raise Refused("dataset_exists", "a dataset with this id is already recorded")
+        counts = request.get("row_counts") or {}
+        if not isinstance(counts, Mapping) or not all(
+            isinstance(v, int) and not isinstance(v, bool) and v >= 0 for v in counts.values()
+        ):
+            raise Refused("row_counts_invalid", "row_counts must map file name to a count")
+        ddir = self.cfg.root / "datasets" / want
+        if ddir.exists():
+            raise Refused("dataset_exists", "the dataset directory already exists")
+        ddir.mkdir(parents=True)
+        written: dict[str, str] = {}
+        try:
+            for header, data in incoming:
+                name = str(header.get("file") or "")
+                if not name or name in written or name not in declared:
+                    raise Refused("file_unexpected", f"{name!r} is not a declared file")
+                rel = Path(name)
+                if rel.is_absolute() or ".." in rel.parts or not rel.parts:
+                    raise Refused("file_name_invalid", name)
+                sha = sha256_bytes(data)
+                if sha != declared[name] or sha != header.get("sha256"):
+                    raise Refused("file_hash_mismatch", name)
+                dest = ddir / rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(data)
+                written[name] = sha
+            if set(written) != set(declared):
+                raise Refused(
+                    "files_incomplete", f"{len(written)} of {len(declared)} declared files arrived"
+                )
+            rec = _add_dataset(self.cfg.root, want, ddir)
+            if rec["files"] != declared:
+                raise Refused("dataset_hash_mismatch", "re-hash of the written files differs")
+        except Refused:
+            import shutil
+
+            shutil.rmtree(ddir, ignore_errors=True)
+            raise
+        doc = json.loads(self.datasets_path.read_text(encoding="utf-8"))
+        doc[want]["row_counts"] = {str(k): int(v) for k, v in counts.items()}
+        doc[want]["ingested_utc"] = utc_now()
+        self.datasets_path.write_text(json.dumps(doc, indent=1, sort_keys=True), encoding="utf-8")
+        head = self.audit.append({**base, "decision": "ingested", "files": len(written)})
+        return {
+            "ok": True,
+            "dataset_hash_id": want,
+            "partition": self.cfg.partition,
+            "files": dict(written),
+            "row_counts": doc[want]["row_counts"],
+            "chain_head": head,
+        }
 
     def _publish(self, request: Mapping[str, Any], base: dict[str, Any]) -> dict[str, Any]:
         cp = self.pending()
@@ -557,7 +660,8 @@ def serve_connection(service: SealedService, caller: Caller, rfile: Any, wfile: 
     """One request per connection: read the request frame, write the response
     frame, then (for an allowed read) header/bytes frame pairs and an end frame."""
     request = json.loads(read_frame(rfile).decode("utf-8"))
-    response, stream = service.handle(request, caller)
+    incoming = list(_receive_files(rfile)) if request.get("op") == "ingest" else None
+    response, stream = service.handle(request, caller, incoming)
     write_frame(wfile, json.dumps(response, sort_keys=True).encode("utf-8"))
     if stream is not None:
         for header, data in stream:
@@ -567,11 +671,35 @@ def serve_connection(service: SealedService, caller: Caller, rfile: Any, wfile: 
     wfile.flush()
 
 
+def _receive_files(rfile: Any) -> Iterator[tuple[dict[str, Any], bytes]]:
+    """Header/bytes frame pairs up to the end frame (the ingest request's payload)."""
+    while True:
+        header = json.loads(read_frame(rfile).decode("utf-8"))
+        if header.get("end"):
+            return
+        data = read_frame(rfile)
+        if len(data) != int(header.get("size", -1)):
+            raise ValueError(f"{header.get('file')}: size differs from the header")
+        yield header, data
+
+
+def send_files(wfile: Any, files: Iterable[tuple[str, bytes]]) -> None:
+    """Client side of an ``ingest``: header/bytes frame pairs and the end frame,
+    written right after the request frame."""
+    for name, data in files:
+        header = {"file": name, "size": len(data), "sha256": sha256_bytes(data)}
+        write_frame(wfile, json.dumps(header, sort_keys=True).encode("utf-8"))
+        write_frame(wfile, data)
+    write_frame(wfile, b'{"end": true}')
+
+
 def receive(rfile: Any) -> tuple[dict[str, Any], list[tuple[dict[str, Any], bytes]]]:
     """Client side of :func:`serve_connection`."""
     response = json.loads(read_frame(rfile).decode("utf-8"))
     files: list[tuple[dict[str, Any], bytes]] = []
-    if response.get("ok") and "files" in response:
+    # a served read streams files after the response; an ingest response (which
+    # carries "partition") lists hashes only and streams nothing
+    if response.get("ok") and "files" in response and "partition" not in response:
         while True:
             header = json.loads(read_frame(rfile).decode("utf-8"))
             if header.get("end"):
@@ -663,11 +791,16 @@ def serve_pipe(service: SealedService, name: str, once: bool = False) -> None:  
             return
 
 
-def request_over_pipe(name: str, request: Mapping[str, Any]):  # pragma: no cover - Windows
+def request_over_pipe(
+    name: str, request: Mapping[str, Any], files: Iterable[tuple[str, bytes]] | None = None
+):  # pragma: no cover - Windows
     """Client: one request over the named pipe (``open`` on ``\\\\.\\pipe\\...`` is
-    ``CreateFile``; the server reads our identity from the kernel)."""
+    ``CreateFile``; the server reads our identity from the kernel).  ``files``
+    are streamed after an ``ingest`` request."""
     with open(name, "r+b", buffering=0) as f:
         write_frame(f, json.dumps(request, sort_keys=True).encode("utf-8"))
+        if request.get("op") == "ingest":
+            send_files(f, files or ())
         return receive(f)
 
 
@@ -689,6 +822,55 @@ def _add_dataset(root: Path, hash_id: str, directory: Path) -> dict[str, Any]:
     return doc[hash_id]
 
 
+def install_state(root: Path, trust_roots: Path, *, allowed_accounts=(DEFAULT_ACCOUNT,)) -> Path:
+    """Create ``<root>/service``, copy the trust roots and write ``config.json``
+    (run AS the sealed identity: the partition ACL admits nobody else).  Existing
+    files are kept; ``trust_roots.json`` is replaced only when its content differs."""
+    state = root / "service"
+    state.mkdir(parents=True, exist_ok=True)
+    roots = json.loads(trust_roots.read_text(encoding="utf-8"))
+    if not (roots.get("maintainers") if isinstance(roots, Mapping) else None):
+        raise SystemExit(f"{trust_roots}: no maintainer key; refusing to install")
+    dest = state / "trust_roots.json"
+    data = trust_roots.read_bytes()
+    if not dest.is_file() or dest.read_bytes() != data:
+        dest.write_bytes(data)
+    cfg = state / "config.json"
+    if not cfg.is_file():
+        cfg.write_text(
+            json.dumps(
+                {"allowed_accounts": list(allowed_accounts), "registered_images": []}, indent=1
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+    return state
+
+
+def check_install(root: Path, partition: str) -> list[str]:
+    """Problems with a partition's service state as THIS process sees it (run as the
+    sealed identity): config, trust roots, the signing module import, audit chain."""
+    problems: list[str] = []
+    try:
+        cfg = ServiceConfig.load(root, partition)
+    except (OSError, ValueError, SystemExit) as exc:
+        return [f"config: {exc}"]
+    if DEFAULT_ACCOUNT not in cfg.allowed_accounts:
+        problems.append(f"allowed_accounts {sorted(cfg.allowed_accounts)} lacks {DEFAULT_ACCOUNT}")
+    try:
+        import iap.agents.signing  # noqa: F401
+    except Exception as exc:  # pragma: no cover - environment
+        problems.append(f"iap.agents.signing not importable from {_SRC}: {exc}")
+    problems += [f"audit: {p}" for p in Audit(cfg.state_dir / "audit.jsonl").verify()]
+    try:
+        probe = cfg.state_dir / ".write_probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+    except OSError as exc:
+        problems.append(f"state dir not writable by this identity: {exc}")
+    return problems
+
+
 def main(argv: Iterable[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -708,12 +890,49 @@ def main(argv: Iterable[str] | None = None) -> int:
     d.add_argument("--root", type=Path, required=True)
     d.add_argument("--hash-id", required=True)
     d.add_argument("--dir", type=Path, required=True)
+    i = sub.add_parser(
+        "install",
+        help="create <root>/service, copy trust roots, write config.json (sealed identity)",
+    )
+    i.add_argument("--root", type=Path, required=True)
+    i.add_argument(
+        "--trust-roots", type=Path, default=REPO / "research" / "agents" / "trust_roots.json"
+    )
+    k = sub.add_parser("check", help="verify a partition's service state as this identity")
+    k.add_argument("--partition", required=True, choices=("a", "b", "c"))
+    k.add_argument("--root", type=Path, required=True)
+    g = sub.add_parser(
+        "ping", help="send one status request over the pipe; exit 0 if the service answered at all"
+    )
+    g.add_argument("--partition", required=True, choices=("a", "b", "c"))
     a = ap.parse_args(list(argv) if argv is not None else None)
     if a.cmd == "serve":
         if sys.platform != "win32":
             raise SystemExit("the named-pipe transport is Windows only (single-machine design)")
         cfg = ServiceConfig.load(a.root, a.partition)
         serve_pipe(SealedService(cfg), pipe_name(a.partition), once=a.once)
+        return 0
+    if a.cmd == "install":
+        state = install_state(a.root, a.trust_roots)
+        print(f"installed: {state}")
+        return 0
+    if a.cmd == "check":
+        problems = check_install(a.root, a.partition)
+        for p in problems:
+            print(f"PROBLEM: {p}", file=sys.stderr)
+        if problems:
+            return 1
+        print(f"partition {a.partition}: service state readable and writable by this identity")
+        return 0
+    if a.cmd == "ping":
+        # Any answer proves the pipe is served: a caller other than iap-runner gets
+        # the audited refusal `caller_account`, which is the expected reply for the owner.
+        try:
+            resp, _ = request_over_pipe(pipe_name(a.partition), {"op": "status"})
+        except OSError as exc:
+            print(f"no service on {pipe_name(a.partition)}: {exc}", file=sys.stderr)
+            return 1
+        print(json.dumps({"answered": True, "ok": resp.get("ok"), "error": resp.get("error")}))
         return 0
     if a.cmd == "verify":
         problems = Audit(a.root / "service" / "audit.jsonl").verify()

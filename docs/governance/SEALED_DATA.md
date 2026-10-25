@@ -87,14 +87,27 @@ Nothing in this repository claims otherwise. Consequences, stated plainly:
 ## 5. Install (owner)
 
 1. Accounts and partitions: `tools/admin/create_sealed_accounts.ps1` (done, DR-5).
-2. For each partition `x` in `a`, `b`, `c`, as `iap-sealed-x`: create `C:\iap-sealed\x\service\`, copy the
-   repository's `research/agents/trust_roots.json` there, write `config.json` =
-   `{"allowed_accounts": ["iap-runner"], "registered_images": []}` (add the sha256 of the runner's
-   `python.exe` to enable the image check), record each ingested dataset with
-   `python tools/sealed_service.py add-dataset --root C:\iap-sealed\x --hash-id <id> --dir <dataset dir>`.
-3. Start the service as the sealed identity (a scheduled task "at log on" for that account, or a service
-   wrapper): `python tools/sealed_service.py serve --partition x --root C:\iap-sealed\x`. The interpreter and
-   the repository checkout must be readable by the sealed accounts (an installation outside the owner's profile).
-4. `iap-runner` reaches the service only through the pipe; it has no entry in any partition ACL except its own.
+2. An interpreter and a checkout the service accounts can read: CPython 3.12.10 for all users at `C:\Python312`
+   with the pinned stack, and the repository cloned at `C:\iap\repo` (read-only to everyone but the owner):
+   [`tools/admin/install_all_users_python.md`](../../tools/admin/install_all_users_python.md). The service resolves
+   `python/src` from its own checkout (or `IAP_REPO` when run from a copy), so it runs from any location.
+3. The services: [`tools/admin/install_sealed_services.ps1`](../../tools/admin/install_sealed_services.ps1)
+   (elevated; asks for each sealed account's password). Per partition it runs `sealed_service.py install` **as the
+   sealed identity** (a transient scheduled task: the administrator has no access to the partition by design), which
+   creates `C:\iap-sealed\x\service\`, copies `research/agents/trust_roots.json` and writes `config.json` =
+   `{"allowed_accounts": ["iap-runner"], "registered_images": []}` (add the sha256 of the runner's `python.exe` to
+   enable the image check); runs `sealed_service.py check` the same way; registers the task "IAP sealed service x"
+   = `python tools/sealed_service.py serve --partition x --root C:\iap-sealed\x` as that account, "run whether user
+   is logged on or not", at system start-up (a service account never logs on, D-64), no time limit; starts it; and
+   pings the pipe (`sealed_service.py ping`: the owner's own call gets the audited `caller_account` refusal, which is
+   the proof the service is up). It also creates the development-readable `C:\iap\daily` (iap-runner writes, Users
+   read) for the DD1 development and validation partitions.
+4. Datasets enter a partition in one of two ways, both recorded in `service/datasets.json` with every file's sha256:
+   the `ingest` endpoint (DD1: `iap-runner` streams the files, the service writes, re-hashes, checks the content hash
+   and keeps the job's row counts; nothing is returned but hashes and those counts), or
+   `python tools/sealed_service.py add-dataset --root C:\iap-sealed\x --hash-id <id> --dir <dataset dir>` run by the
+   sealed identity for a dataset placed by other means.
+5. `iap-runner` reaches the service only through the pipe; it has no entry in any partition ACL except its own.
 
-Ingestion of the free-route daily set into the partitions (DD1) is a separate PR and runs as `iap-runner`.
+The DD1 ingestion itself (the free daily route into the four partitions) is the owner's run of the `registered-run`
+workflow in mode `dd1`: [DD1_INGESTION_RUNBOOK.md](DD1_INGESTION_RUNBOOK.md).

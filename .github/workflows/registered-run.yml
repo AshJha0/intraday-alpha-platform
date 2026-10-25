@@ -21,7 +21,14 @@
 #     ONLY the redacted log (tools/runner/run.py);
 #   * debug modes: ACTIONS_STEP_DEBUG / ACTIONS_RUNNER_DEBUG are forced off
 #     here and must not be set as environment variables or secrets of
-#     `sealed` (REPO_SETTINGS.md); the runner never prints data.
+#     `sealed` (REPO_SETTINGS.md); the runner never prints data;
+#   * mode `dd1` (v2.0 stage 2 DD1): the same approval, runner identity and
+#     redacted-log rules, no prereg: tools/ingest/dd1_daily.py pulls the free
+#     daily route and seals Track B and Track C through the services' ingest
+#     endpoint (docs/governance/DD1_INGESTION_RUNBOOK.md). `prereg` is
+#     ignored in that mode; TIINGO_API_KEY, if the owner set it in the
+#     runner service's own environment, selects Tiingo over Stooq (never a
+#     secret of this workflow).
 #
 # Changing this file or tools/runner/ needs the owner's review (CODEOWNERS +
 # the branch ruleset's code-owner requirement). The evidence class of what
@@ -40,6 +47,19 @@ on:
       commit:
         description: "The bound commit (analysis_identity.commit); the job checks out exactly this"
         required: true
+        type: string
+      mode:
+        description: "registered: one signed analysis on sealed data. dd1: the DD1 ingestion of the free daily route (no prereg)"
+        required: false
+        default: registered
+        type: choice
+        options:
+          - registered
+          - dd1
+      year:
+        description: "dd1 only: the purchase year Y that cuts the partitions (default: this year)"
+        required: false
+        default: ""
         type: string
 
 permissions:
@@ -81,10 +101,19 @@ jobs:
           pip install --require-hashes -r python/requirements-ci.txt
 
       - name: Registered run (verify, sealed read, run once, commit, publish)
+        if: ${{ inputs.mode != 'dd1' }}
         shell: pwsh
         run: |
           python tools/runner/run.py run --prereg "${{ inputs.prereg }}" --push --log results-log.redacted.txt
           if ($LASTEXITCODE -ne 0) { throw "registered run exit $LASTEXITCODE (see the redacted log)" }
+
+      - name: DD1 ingestion (pull, cut, test, seal Track B and C, record)
+        if: ${{ inputs.mode == 'dd1' }}
+        shell: pwsh
+        run: |
+          $year = if ("${{ inputs.year }}" -ne "") { "${{ inputs.year }}" } else { (Get-Date).Year }
+          python tools/ingest/dd1_daily.py run --year $year --dev-root C:\iap\daily --log results-log.redacted.txt
+          if ($LASTEXITCODE -ne 0) { throw "dd1 ingestion exit $LASTEXITCODE (see the redacted log)" }
 
       - name: Upload the redacted log (the only artifact)
         if: always()
