@@ -37,5 +37,10 @@
     "d3_development": "120c31ba24b57f49a906e917c02aff928582bebdc2b67aaf01788a3e01aa4a62"
   },
   "note": "synthetic fixture with planted five-session reversal, post-filing drift and overnight asymmetry; no residual momentum planted (D2 is a negative control); nothing here is market data",
-  "expected_report_sha256_note": "one hash per run, for every platform and interpreter (CI 2026-10-25: the D1 validation hash first differed on some Linux runners; the cause was the integer-share path, floor(|w| C / close + 0.5), amplifying ~1e-8 solver noise that depends on the machine's BLAS kernel (AVX-512 runners against AVX2) into a one-share flip, the closest rounding in this run being 8e-5 shares from a half; fixed at the source by iap.research.loop.polish_weights, which re-solves the repair exactly on the solver's active set in plain Python arithmetic before shares are computed, defect D-76); a mapping keyed by '<sys.platform>-py<major>.<minor>' is still read should a documented split ever be needed; an environment without a pinned hash skips the test and prints the hash, never passes silently"
+  "expected_report_sha256_note": "one hash per run, for every platform and interpreter; a hash listed under observed_alternate_report_sha256 was seen on an identified CI run and never reproduced on a machine at hand: the test then skips, printing the canonical report and the CPU so the log carries what differed (D-76); any other hash fails with the same print; a mapping keyed by '<sys.platform>-py<major>.<minor>' is still read should a documented split ever be needed; never passes silently",
+  "observed_alternate_report_sha256": {
+    "d1_validation": {
+      "284841554ef7df54624620bcf6d220cf86503bfc1fef12f273b237a91ac968ca": "GitHub-hosted ubuntu-24.04 runners of one unidentified hardware kind (jobs of ~6 min; the other kind takes ~14 min and gives the pinned hash), CPython 3.11 and 3.12, 2026-10-25; not reproduced on Windows, WSL Linux, or any OpenBLAS kernel selectable on an AVX2 machine; the polished share path (commit 842ae165) still gave it once; D-76"
+    }
+  }
 }
