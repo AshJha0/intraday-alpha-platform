@@ -1,4 +1,4 @@
-# Data sources: free Nasdaq sample days, IEX HIST, and process-and-delete (v1.17 WS-A; status as of v1.18.0)
+# Data sources: free Nasdaq sample days, IEX HIST, process-and-delete, and the v2.0 free data route (v1.17 WS-A; status as of 2026-10-25)
 
 The platform's real-data rule is **free data only, nothing downloaded without
 the owner's approval**. This page says which free sources exist, what the
@@ -6,7 +6,9 @@ reader does with each, how a full-market day is processed on a machine that
 cannot hold two of them, and which numbers are measured. The mapping rules are
 in [REAL_DATA.md](REAL_DATA.md) (sections 3.5 and 4.5); the commands are in
 [runbooks/RUNBOOK_process_and_delete.md](runbooks/RUNBOOK_process_and_delete.md).
-Every number below names the committed artefact it comes from.
+Every number below names the committed artefact it comes from. Sections 8 to 13 (v2.0 stage 2 DD1, decision DR-6 of
+the unified specification) record, per free-route source, the public terms read, the use intended and whether that use
+is permitted for this non-commercial research; section 14 lists the licence questions for the owner.
 
 ## 1. The sources
 
@@ -213,3 +215,136 @@ refuses it.
 > a Claude session cannot read them without a download. Until this is filled
 > in, nothing derived from IEX data beyond aggregate results is committed
 > (docs/REAL_DATA.md, "Never redistributed").
+
+## 8. Tiingo end-of-day (v2.0 free route; licence id `tiingo`)
+
+Adapter `python/src/iap/data/sources/tiingo.py` (contract `tiingo.daily`). Pages read on 2026-10-25: the pricing page
+(`tiingo.com/about/pricing`), the end-of-day documentation (`tiingo.com/documentation/end-of-day`) and the product page.
+The terms-of-service document itself was not reachable by URL (`/about/terms`, `/about/terms-of-service`,
+`/about/terms-of-use` return 404); what follows is the pricing page's licence row and its footnote.
+
+| fact | public text (quoted) | source |
+|---|---|---|
+| free tier | "$0/month"; "Max requests per hour: 50"; "Max requests per day: 1,000"; "Unique symbols per month: 500"; "Max bandwidth per month: 1 GB" | pricing page |
+| licence row | Starter and Power tiers: "Internal Use Only" | pricing page |
+| footnote | "Internal use means you may only use the data for your own personal use" and "you may not display or share the data with another person or organization" | pricing page |
+| commercial | "$50/month (or $499/year) for internal commercial use"; "For redistribution use, our pricing is explicit and predictable on our Product pages" | pricing page |
+| adjustments | "This methodology incorporates both split and dividend adjustments" (raw and adjusted columns both served: `adjClose`, `divCash`, `splitFactor`) | end-of-day documentation |
+| coverage | "Data going back from 1962"; the supported-tickers list (`apimedia.tiingo.com/docs/tiingo/daily/supported_tickers.zip`) is public and lists inactive names with their last date | product page, documentation |
+| card | the page makes no statement; sign-up is "Sign-Up for Free" (DR-6: the owner will not place a card; an account without one is the condition for this source) | pricing page |
+
+**Use intended**: ingestion by `iap-runner` into the sealed partitions of U0 section 2; development and validation
+reads by the owner's identity; aggregate research results (ledgers, reports) committed; no price row, no quote, no
+derived series redistributed. **Permitted?** Personal internal use of the free tier is what the page grants; this
+repository is one person's non-commercial research, which fits "your own personal use". Two points are not settled by
+the public page and are questions for the owner (section 14): whether committing aggregate statistics computed from the
+data is "sharing the data" (the repository's standing rule already commits aggregates only), and whether the free tier's
+500 unique symbols per month allows a 500-plus-name universe plus delisted names (it does not in one month; ingestion
+would be spread over months or use Stooq for breadth). The key lives in `TIINGO_API_KEY`, is read by the adapter and
+never printed.
+
+## 9. Stooq bulk daily files (v2.0 free route; licence id `stooq`)
+
+Adapter `python/src/iap/data/sources/stooq.py` (contract `stooq.daily`). Pages tried on 2026-10-25: the bulk database
+listing (`stooq.com/db/h/`) and the help pages (`stooq.com/pomoc/?q=11`, `?q=29`, `?q=1`). **None was readable from this
+session**: the site answers a scripted request with a JavaScript proof-of-work verification page ("This site requires
+JavaScript to verify your browser") and a browser with a consent dialog whose manage-options control did not open; the
+help pages returned empty bodies. No terms text is therefore quoted here.
+
+| fact | status | source |
+|---|---|---|
+| what the archive is | `d_us_txt.zip`, daily ASCII files for US listings, one file per symbol, documented layout `data/daily/us/<market>/` | Stooq's documentation as known to the adapter; not re-read on 2026-10-25 |
+| terms of use | **not read** | the pages above were not readable |
+| adjustment | the contract declares `split_dividend`; DD1's corporate-action test verifies it on sample days before any fit | contract default, not a vendor statement |
+
+**Use intended**: the same as Tiingo (sealed ingestion of the bulk archive, aggregates only committed). **Permitted?**
+Unknown until the owner reads the terms in a browser session and records them here (question in section 14). Until
+then Stooq is the listed fallback for breadth, not the primary source, and `fetch()` stays refused for everyone.
+
+## 10. Wikipedia constituent tables (v2.0 free route; licence id `wikimedia`; a labelled proxy)
+
+Adapter `python/src/iap/data/sources/wiki_membership.py` (contract `wikipedia.index_membership`, every interval
+labelled `wikipedia-proxy`). Pages read on 2026-10-25: the Wikimedia Foundation Terms of Use (sections 4, 7 and 12),
+`Wikipedia:Reusing Wikipedia content`, and `API:Etiquette` on mediawiki.org.
+
+| fact | public text (quoted) | source |
+|---|---|---|
+| licence | text is licensed under the "Creative Commons Attribution-ShareAlike 4.0 International License" ("CC BY-SA 4.0") | Terms of Use section 7.1 |
+| attribution | credit "Through hyperlink (where possible) or URL to the page or pages that you are reusing" | Terms of Use section 7.7 |
+| share-alike | modified or added text must be licensed "under CC BY-SA 4.0 or later" and the change indicated | Terms of Use section 7.8 |
+| automated use | prohibited when "abusive or disruptive of the services"; "By using our APIs, you agree to abide by all applicable policies governing the use of the APIs" | Terms of Use sections 4 and 12 |
+| etiquette | "Set an informative User-Agent string with contact information, or you may be IP-blocked without notice"; make requests "in series rather than in parallel"; use `maxlag` for non-interactive tasks | API:Etiquette |
+| reuse | "To re-distribute a text page in any form, provide credit to the authors" | Reusing Wikipedia content |
+
+**Use intended**: read past revisions of two list pages through the public API, serially, with the repository's
+User-Agent (adapter declaration); derive dated membership intervals (ticker, start, end, revision id) as an input of the
+point-in-time universe; store the intervals in the sealed partitions and the development set; commit counts and the
+proxy label, never the page text. **Permitted?** Yes for reading and for deriving facts: the API is public and the use
+is serial and small (about 500 requests for a coverage run). The derived interval table is a database of facts rather
+than a copy of the text; if any such table is ever committed or published, it will carry the CC BY-SA 4.0 attribution
+(page URL and revision ids) and the proxy label, and the share-alike clause then applies to that table (question in
+section 14 on whether the owner accepts CC BY-SA for a published membership table).
+
+## 11. SEC EDGAR filing indexes (v2.0 free route; licence id `sec_edgar`)
+
+Adapter `python/src/iap/data/sources/edgar.py` (contract `edgar.filings`). Pages read on 2026-10-25: "Accessing EDGAR
+data" (`sec.gov/os/accessing-edgar-data`), the SEC privacy and security policy (`sec.gov/about/privacy-information`),
+the developer page (`sec.gov/developer`) and the EDGAR APIs page.
+
+| fact | public text (quoted) | source |
+|---|---|---|
+| reuse | SEC.gov content "may be copied or further distributed by users of the web site without the SEC's permission"; "consider appropriate citation to the SEC as the source" | privacy and security policy |
+| rate | "Current max request rate: 10 requests/second"; the SEC "reserves the right to limit request rates to preserve fair access for all users" | accessing EDGAR data |
+| user agent | declare one in the form "Sample Company Name AdminContact@<sample company domain>.com" | accessing EDGAR data |
+| automation | "unclassified" bots or automated tools are not allowed to crawl the site; "We reserve the right to block IP addresses that submit excessive requests" | developer page, privacy policy |
+| APIs | "These APIs do not require any authentication or API keys to access"; the submissions object holds "at least one year's of filing or to 1,000 (whichever is more) of the most recent filings"; "data.sec.gov does not support Cross Origin Resource Scripting (CORS)" | EDGAR APIs page |
+| trademarks | the SEC seal, logos and the EDGAR name are not to be used in a trade name or to imply affiliation | privacy and security policy |
+
+**Use intended**: filing form types, filing dates and acceptance timestamps of 8-K, 10-Q and 10-K filings by CIK, from
+the full index and the submissions API, at most eight requests per second (adapter limiter), with a declarative
+User-Agent; no filing body is read. **Permitted?** Yes: public government data with a stated access rule that the
+adapter enforces. One operational point: the contact in the User-Agent is read from `IAP_SEC_CONTACT` and defaults to
+the repository URL; the SEC's example uses an e-mail address, and the owner decides which contact to declare (section
+14). Scripted requests from the session's environment were answered 403 by the SEC's CDN on 2026-10-25 whatever the
+User-Agent, so the live coverage call runs from the owner's workstation (coverage report, section 2).
+
+## 12. Kenneth French data library (v2.0 free route; licence id `kenneth_french`)
+
+Adapter `python/src/iap/data/sources/french.py` (contract `french.factors_daily`). Pages read on 2026-10-25: the data
+library index and the Fama/French factors description page.
+
+| fact | public text (quoted) | source |
+|---|---|---|
+| copyright | the only statement on the page: "Copyright Eugene F. Fama and Kenneth R. French" | data library index |
+| coverage | daily factors "July 1, 1926 - August 31, 2026"; the market factor is the "value-weight return of all CRSP firms incorporated in the US and listed on the NYSE, AMEX, or NASDAQ" | factors description page |
+| update | "We reconstruct the full history of returns each month when we update the portfolios" (no posted schedule for the daily files) | data library index |
+
+**Use intended**: three zipped CSVs of daily factor returns downloaded by `iap-runner`, used as the factor model's
+inputs for D2 and the residual step, cited as "Kenneth R. French data library" in every report; never redistributed.
+**Permitted?** The library is published for free download with no terms page; academic practice is use with citation.
+The absence of an explicit licence is recorded as a question for the owner (section 14), not a blocker: the files are
+inputs, nothing derived from them is republished, and the citation is given.
+
+## 13. IEX HIST (v2.0 free route for intraday breadth; licence id `iex_hist`)
+
+Section 7 above holds the owner's open note D-22: the IEX HIST terms are not yet recorded in this repository. The free
+route keeps IEX HIST as the intraday source (DR-6; adapter and parser work are B2b's, not this PR's). Read on
+2026-10-25 from the IEX product page: HIST is described as "Free historical data downloads from IEX equities available
+on a T+1 basis" and the fees table lists Equities HIST as "Free"; the page links "Terms", "Web Portal Terms &
+Conditions" and "View Market Data Documentation and Agreements" without naming a licence for HIST. The owner's note
+(D-22) stays the record of the terms; this section is its placeholder, so that every source of the route has a licence
+id.
+
+## 14. Licence questions for the owner (not blockers; defaults in brackets)
+
+1. **Tiingo**: does committing aggregate statistics computed from Tiingo data count as "display or share the data"?
+   [default: no; the repository commits aggregates only, as for every vendor]. Is the 500-unique-symbols-per-month
+   free-tier limit acceptable for a universe above that size? [default: ingestion spread over months; Stooq for breadth
+   once its terms are read].
+2. **Stooq**: read the terms of use in a browser session and record them in section 9 [default until then: Stooq is
+   the fallback, `fetch()` refused].
+3. **Wikipedia**: is a CC BY-SA 4.0 attribution and share-alike acceptable on any published membership table derived
+   from the revisions? [default: yes, with page URL and revision ids; nothing published yet].
+4. **SEC EDGAR**: which contact goes into the User-Agent (`IAP_SEC_CONTACT`)? [default: the repository URL].
+5. **Kenneth French**: accept use with citation in the absence of a terms page? [default: yes].
+6. **IEX HIST**: D-22 stands (record the terms).

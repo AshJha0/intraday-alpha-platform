@@ -293,6 +293,12 @@ iap/
                    edits, survivorship, delisting retention), leakage.py
                    (future-shift, shuffled-label, planted-leak canaries),
                    synthetic.py (the seeded canary panel). docs/DATA_CONTRACTS.md.
+    sources/       v2.0 DD1 free data route (U0 DR-6): tiingo.py, stooq.py,
+                   wiki_membership.py, edgar.py, french.py; each declares a
+                   dataset contract and a licence id, coverage() returns counts
+                   and date ranges only, fetch() refuses outside the iap-runner
+                   identity and a sealed partition. Transport injected
+                   (tools/free_data_coverage.py); no network module imported.
   reference/
     refdata.py     ReferenceData service over configs/instruments/instruments.json +
                    configs/venues/venues.json: tick/lot sizes, price<->ticks, venues,

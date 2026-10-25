@@ -1,7 +1,15 @@
 # DP1 data pricing (v2.0 U0 stage 0; read-only; nothing bought, nothing downloaded)
 
-Status as of 2026-10-24: method and script committed; **every vendor cost column reads `awaiting key`** because
-no vendor key had been supplied when this document was written (owner action O-2). When the owner names the
+> **DR-6 (2026-10-25): no purchase; the free route is chosen.** The owner will not place a payment card with any vendor,
+> so none of the products priced here will be bought. The cost columns below are filled **from the vendors' public price
+> pages on 2026-10-25, not from an account quote** (no key exists; `tools/data_pricing.py` keeps working if one ever does),
+> for the record that section 6 asks for. The route of record is the free one: Tiingo or Stooq daily prices, Wikipedia
+> revision history for index membership (a labelled proxy), SEC EDGAR filing timestamps, Kenneth French daily factors,
+> IEX HIST for intraday breadth, no order-level data. Its adapters are `python/src/iap/data/sources/`, its coverage is
+> `DATA_COVERAGE_FREE_ROUTE.md`, its licences are `docs/DATA_SOURCES.md` sections 8 to 14.
+
+Status as of 2026-10-25: method and script committed; the cost columns carry **public list prices read on 2026-10-25**
+(DR-6: no key will be supplied and nothing will be bought; the columns are for the record). When the owner names the
 environment variables that hold the keys, one command fills the columns without a purchase or a download
 (section 2). Plan of record: `IAP_v2.0_Unified_Programme_Plan_2026-10-24.md` revision 3 section 3; specification
 `v2_spec/IAP_v2.0_U0_Unified_Specification.md` stage 0 and section 9 (G4). Predecessor: `DATA_ROUTE_PROPOSAL_v1.19.md`
@@ -46,19 +54,19 @@ python tools/data_pricing.py --as-of 2026-10-24
 python tools/data_pricing.py --as-of 2026-10-24 --probe --json research/v2/data_pricing_2026-10-24.json
 ```
 
-## 3. Cost and coverage table (run 2026-10-24 without keys; `--as-of 2026-10-24`)
+## 3. Cost and coverage table (public price lists read 2026-10-25; no account quote; `--as-of 2026-10-24` windows)
 
 | vendor | item | product | window | symbols | coverage | cost_usd | unit_price_usd_per_gb | notes |
 |---|---|---|---|---|---|---|---|---|
-| databento | i | daily OHLCV, consolidated (EQUS.SUMMARY ohlcv-1d) | 2006-01-01..2026-10-01 | ALL_SYMBOLS | awaiting key | awaiting key | awaiting key | prices only: constituents, delistings, actions and announcements are separate products (section 4) |
-| databento | i | daily OHLCV, Nasdaq venue (XNAS.ITCH ohlcv-1d) | 2006-01-01..2026-10-01 | ALL_SYMBOLS | awaiting key | awaiting key | awaiting key | venue-only daily bars; alternative to the consolidated summary |
-| databento | ii | 1-minute bars, Nasdaq venue (XNAS.ITCH ohlcv-1m) | 2023-10-01..2026-10-01 | ALL_SYMBOLS | awaiting key | awaiting key | awaiting key | pair with bbo-1m for quotes |
-| databento | ii | 1-minute BBO snapshots, Nasdaq venue (XNAS.ITCH bbo-1m) | 2023-10-01..2026-10-01 | ALL_SYMBOLS | awaiting key | awaiting key | awaiting key | quotes synchronised to the bar grid |
-| databento | ii | 1-minute bars, consolidated (EQUS.MINI ohlcv-1m) | 2023-10-01..2026-10-01 | ALL_SYMBOLS | awaiting key | awaiting key | awaiting key | consolidated across US venues |
-| databento | ii | 1-minute BBO snapshots, consolidated (EQUS.MINI bbo-1m) | 2023-10-01..2026-10-01 | ALL_SYMBOLS | awaiting key | awaiting key | awaiting key | consolidated NBBO-like quotes on the bar grid |
-| databento | iii | XNAS.ITCH mbo, tier-2 list (40 sessions, AAPL/MSFT/QQQ) | 2025-01-15..2026-09-22 | AAPL,MSFT,QQQ | awaiting key | awaiting key | awaiting key | the approved bounded order-level set; H4 only |
-| polygon (massive) | i+ii | Stocks plan (minute aggregates, quotes, trades, reference, corporate actions, financials) | 20+ years on the Advanced tier | all US listings | subscription | list price: Massive Stocks Advanced $199/month, individual use (read 2026-10-24); entitlement awaiting key | n/a (subscription) | no cost endpoint |
-| nasdaq data link (sharadar) | i | Sharadar SEP + TICKERS + ACTIONS + EVENTS + SP500 + DAILY | 1990s onward (vendor statement) | all US listings incl. delisted | subscription | price page not readable without login; awaiting key | n/a (subscription) | no cost endpoint |
+| databento | i | daily OHLCV, consolidated (EQUS.SUMMARY ohlcv-1d) | 2006-01-01..2026-10-01 | ALL_SYMBOLS | not read without a key | usage-based $/GB (page gives no per-dataset figure); Standard plan $199/month; $125 free credit at sign-up (public price list on 2026-10-25, not an account quote) | not published | prices only: constituents, delistings, actions and announcements are separate products (section 4) |
+| databento | i | daily OHLCV, Nasdaq venue (XNAS.ITCH ohlcv-1d) | 2006-01-01..2026-10-01 | ALL_SYMBOLS | not read without a key | usage-based $/GB; Standard $199/month (public price list on 2026-10-25, not an account quote) | not published | venue-only daily bars; alternative to the consolidated summary |
+| databento | ii | 1-minute bars, Nasdaq venue (XNAS.ITCH ohlcv-1m) | 2023-10-01..2026-10-01 | ALL_SYMBOLS | not read without a key | usage-based $/GB; Standard $199/month (public price list on 2026-10-25, not an account quote) | not published | pair with bbo-1m for quotes |
+| databento | ii | 1-minute BBO snapshots, Nasdaq venue (XNAS.ITCH bbo-1m) | 2023-10-01..2026-10-01 | ALL_SYMBOLS | not read without a key | usage-based $/GB; Standard $199/month (public price list on 2026-10-25, not an account quote) | not published | quotes synchronised to the bar grid |
+| databento | ii | 1-minute bars, consolidated (EQUS.MINI ohlcv-1m) | 2023-10-01..2026-10-01 | ALL_SYMBOLS | not read without a key | usage-based $/GB; Standard $199/month (public price list on 2026-10-25, not an account quote) | not published | consolidated across US venues |
+| databento | ii | 1-minute BBO snapshots, consolidated (EQUS.MINI bbo-1m) | 2023-10-01..2026-10-01 | ALL_SYMBOLS | not read without a key | usage-based $/GB; Standard $199/month (public price list on 2026-10-25, not an account quote) | not published | consolidated NBBO-like quotes on the bar grid |
+| databento | iii | XNAS.ITCH mbo, tier-2 list (40 sessions, AAPL/MSFT/QQQ) | 2025-01-15..2026-09-22 | AAPL,MSFT,QQQ | not read without a key | usage-based $/GB; the v1.15 estimate stands (public price list on 2026-10-25, not an account quote) | not published | the approved bounded order-level set; H4 only |
+| polygon (massive) | i+ii | Stocks plan (minute aggregates, quotes, trades, reference, corporate actions, financials) | 20+ years on the Advanced tier | all US listings | subscription | Stocks Basic $0 (2 years, end of day, 5 calls/minute); Starter $29/month (5 years, 15-minute delayed); Developer $79/month (10 years, adds trades); Advanced $199/month (20+ years, real-time, quotes, financials); every tier "Individual use"; annual billing saves 20 % (public price list on 2026-10-25, not an account quote) | n/a (subscription) | no cost endpoint; no purchase (DR-6) |
+| nasdaq data link (sharadar) | i | Sharadar SEP + TICKERS + ACTIONS + EVENTS + SP500 + DAILY | 1990s onward (vendor statement) | all US listings incl. delisted | subscription | not readable: `data.nasdaq.com/databases/SEP/pricing` and `/databases/SFA` render only after login and consent (2026-10-25 by URL fetch and by browser); no list price recorded (public price list on 2026-10-25, not an account quote attempted) | n/a (subscription) | no cost endpoint; no purchase (DR-6) |
 
 Public figures read on 2026-10-24 (list prices and plan descriptions, not quotes; the owner verifies before any
 purchase):
@@ -121,6 +129,13 @@ Sharadar's SP500 table or an owner-supplied constituent file; Databento prices i
 filled table, not this draft.
 
 ## 7. Record
+
+- 2026-10-25: DR-6 recorded (no purchase; free route). Cost columns filled from the public price pages read again on
+  2026-10-25 (Databento pricing page: Standard $199/month, Plus $1,750 and Unlimited $4,500 licence fees per month on
+  annual contracts, usage-based historical data in $/GB with no per-dataset figure on the page, $125 sign-up credit;
+  Massive Stocks tiers $0/$29/$79/$199 per month, individual use; Nasdaq Data Link Sharadar pages not readable without
+  login). Each is a public price list, not an account quote. The free-route adapters, coverage and licences are this
+  PR's other files.
 
 - 2026-10-24: script and document committed (session B, stage 1); no key supplied; no request made to any vendor API;
   web pages read: Databento pricing, venues-and-datasets, API reference (`get_cost`, `list_unit_prices`, reference
