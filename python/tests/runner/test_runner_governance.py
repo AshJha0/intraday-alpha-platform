@@ -25,7 +25,7 @@ def test_workflow_is_manual_only_in_the_sealed_environment_on_the_runner_identit
     on = wf[True] if True in wf else wf["on"]  # PyYAML reads the bare `on:` key as True
     assert list(on) == ["workflow_dispatch"], "only workflow_dispatch may start a registered run"
     inputs = on["workflow_dispatch"]["inputs"]
-    assert set(inputs) == {"prereg", "commit", "mode", "year"}
+    assert set(inputs) == {"prereg", "commit", "mode", "year", "stooq_sha256"}  # DR-16
     assert inputs["mode"]["options"] == ["registered", "dd1"]
     assert inputs["mode"]["default"] == "registered"
     assert wf["permissions"] == {"contents": "write"}
