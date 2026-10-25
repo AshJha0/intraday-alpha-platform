@@ -1,0 +1,26 @@
+{{Short description|synthetic fixture}}
+This hand-written fixture imitates the structure of the constituent table only. Symbols are invented.
+
+==Components==
+{| class="wikitable sortable" id="constituents"
+! Symbol !! Security !! GICS Sector !! Date added
+|-
+| {{NYSE|AAA}} || Alpha Corp || Industrials || 1957-03-04
+|-
+| {{NASDAQ|BBB}} || Beta Inc || Information Technology || 1982-11-30
+|-
+| [[NYSE:CCC]] || Gamma plc || Health Care || 1999-01-01
+|-
+| [https://www.nyse.com/quote/XNYS:DDD DDD] || Delta Co || Financials || 2005-06-10
+|-
+| EEE || Epsilon Ltd || Energy || 2010-02-02
+|-
+| {{NYSE|FFF.B}} || Zeta Holdings || Consumer Staples || 2012-09-09
+|}
+
+==Selected changes==
+{| class="wikitable sortable"
+! Date !! Added !! Removed
+|-
+| 2026-10-01 || {{NYSE|AAA}} || {{NYSE|ZZZ}}
+|}

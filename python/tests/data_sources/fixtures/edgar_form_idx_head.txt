@@ -1,0 +1,16 @@
+Description:           Master Index of EDGAR Dissemination Feed by Form Type
+Last Data Received:    September 30, 2026
+Comments:              webmaster@sec.gov
+Anonymous FTP:         ftp://ftp.sec.gov/edgar/
+
+
+
+Form Type   Company Name                                                  CIK         Date Filed  File Name
+---------------------------------------------------------------------------------------------------------------------------------------------
+10-K        SYNTHETIC ALPHA CORP                                          1000001     2026-07-15  edgar/data/1000001/0000000000-26-000001.txt
+10-Q        SYNTHETIC ALPHA CORP                                          1000001     2026-08-05  edgar/data/1000001/0000000000-26-000002.txt
+10-Q        SYNTHETIC BETA INC                                            1000002     2026-08-06  edgar/data/1000002/0000000000-26-000003.txt
+8-K         SYNTHETIC ALPHA CORP                                          1000001     2026-09-01  edgar/data/1000001/0000000000-26-000004.txt
+8-K         SYNTHETIC BETA INC                                            1000002     2026-09-02  edgar/data/1000002/0000000000-26-000005.txt
+8-K         SYNTHETIC GAMMA PLC                                           1000003     2026-09-03  edgar/data/1000003/0000000000-26-000006.txt
+4           SYNTHETIC GAMMA PLC                                           1000003     2026-09-03  edgar/data/1000003/0000000000-26-000007.txt
