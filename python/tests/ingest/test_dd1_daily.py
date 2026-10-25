@@ -252,9 +252,15 @@ def test_a_browser_check_page_from_stooq_is_a_named_refusal():
     def transport(url, headers):
         return pages[url]
 
+    tick = [0.0]
+
+    def clock() -> float:  # advances, so the rate limiter never waits
+        tick[0] += 10.0
+        return tick[0]
+
     with pytest.raises(job.IngestRefused, match="--stooq-zip") as exc:
         job.pull_prices_stooq(
-            transport, {"AAPL"}, adapter_kw={"clock": lambda: 0.0, "sleep": lambda _s: None}
+            transport, {"AAPL"}, adapter_kw={"clock": clock, "sleep": lambda _s: None}
         )
     assert exc.value.code == 2
 
