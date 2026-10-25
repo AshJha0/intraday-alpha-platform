@@ -62,6 +62,10 @@ run b8v2 research/preregs/b8v2_prereg.json -- analyse --out /out/b8v2
 #    scorecard (the renderer's units and precision changed in a later commit, so
 #    HEAD's renderer presents the same numbers differently: that render is made
 #    too, as information, and listed in the report without deciding the status).
+if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+  echo "shallow clone: the commit that wrote the scorecard cannot be found; clone with full history (fetch-depth 0)" >&2
+  exit 2
+fi
 SCORECARD_COMMIT="$(git log -1 --format=%H -- research/v118/rel08/SCORECARD_ds_20190130.md)"
 echo "scorecard commit: $SCORECARD_COMMIT"
 run rel08 --code-at "$SCORECARD_COMMIT" --runner tools/repro/render_rel08_scorecard.py \

@@ -202,9 +202,10 @@ def test_rel08_scorecard_rerenders_byte_for_byte_at_its_own_commit(tmp_path):
     (iap-repro --code-at), which must be byte-identical."""
     rel08 = REPO_ROOT / "research" / "v118" / "rel08"
     md = rel08 / "SCORECARD_ds_20190130.md"
-    commit = _git(REPO_ROOT, "log", "-1", "--format=%H", "--", str(md.relative_to(REPO_ROOT)))
-    if not commit:
+    if _git(REPO_ROOT, "rev-parse", "--is-shallow-repository") == "true":
+        # the CI python job clones depth 1: "the commit that wrote the file" would be HEAD
         pytest.skip("shallow checkout: the scorecard's commit is not available")
+    commit = _git(REPO_ROOT, "log", "-1", "--format=%H", "--", str(md.relative_to(REPO_ROOT)))
     export = tmp_path / "at"
     export.mkdir()
     tar = tmp_path / "code.tar"
