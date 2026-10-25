@@ -196,7 +196,10 @@ def test_contracts_file_is_the_expected_shape():
     ):
         assert required in ids, required
     # iap.ml (stage 7-8) gets its contract the moment the package is in the tree
-    assert ("ml-no-research" in ids) == (IAP / "ml").is_dir()
+    # iap.ml sits beside iap.research, not below it: its pipeline runs every candidate and the
+    # incumbent through loop.run_engine on identical sessions, so the ml-no-research contract stage 11
+    # anticipated was withdrawn when iap.ml landed (D-80); the engine packages above stay bound.
+    assert (IAP / "ml").is_dir() and "ml-no-research" not in ids
     for c in CONTRACTS:
         assert c["type"] == "forbidden", c["id"]
         assert c["source_modules"] and c["forbidden_modules"], c["id"]

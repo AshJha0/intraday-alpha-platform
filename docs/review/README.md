@@ -15,6 +15,15 @@
 | v2.0 DP1 data pricing (stage 0; method, G4 checklist, licence summaries, cost columns from public price lists, DR-6 no purchase) | [DATA_PRICING_v2.md](DATA_PRICING_v2.md) |
 | v2.0 DD1 free data route coverage (stage 2; counts and ranges only, G4 checklist per family, survivorship test design) | [DATA_COVERAGE_FREE_ROUTE.md](DATA_COVERAGE_FREE_ROUTE.md) |
 
+## v2.0 stage 7-8, session B (U3, RL1, U6)
+
+| item | file |
+|---|---|
+| U3 family specifications (D1-D5, H2-H4), one file each, complete before any fit; README index with the evidence-class column; D5 data-ineligible on daily data, H3 / H4 feasibility notes | [../../research/v2/families/README.md](../../research/v2/families/README.md) |
+| RL1 research loop: development / validation partitions only (identity and path checks), features through the contracts, M0 registered, engine, E5 report with hash, analysis event with outcome exposure in the selection ledger; synthetic fixture with pinned report hashes | [../../python/src/iap/research/loop.py](../../python/src/iap/research/loop.py), [../../tools/research/run_family.py](../../tools/research/run_family.py), [../../python/tests/research/fixtures/manifest.json](../../python/tests/research/fixtures/manifest.json) |
+| U6 ML protocol, revision 1, frozen (sha256 `b37cc588...`, re-hashed by `python/tests/ml/test_protocol_frozen.py`; delta placeholders synthetic, D-58) | [../../research/v2/ML_PROTOCOL.md](../../research/v2/ML_PROTOCOL.md) |
+| U6 framework `iap.ml` (splits with purge and embargo, trial ledger, M1 ridge and elastic net, admission test, Holm within tier, lexicographic choice, M1 demonstration on the fixture: no candidate admitted, M0 carried) | [../../python/src/iap/ml/](../../python/src/iap/ml/) |
+
 ## v2.0 stage 1, session A (R0-R5)
 
 | item | file |
