@@ -87,14 +87,17 @@ jobs:
         # the API so the owner may type either form. The identity check later
         # compares the checked-out HEAD with the prereg's bound commit anyway.
         id: resolve
-        shell: pwsh
+        shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
           BOUND: ${{ inputs.commit }}
         run: |
           if ($env:BOUND -notmatch '^[0-9a-fA-F]{7,40}$') { throw "commit must be a hex SHA (7 to 40 characters), got '$env:BOUND'" }
-          $sha = gh api "repos/${{ github.repository }}/commits/$env:BOUND" --jq .sha
-          if ($LASTEXITCODE -ne 0 -or $sha -notmatch '^[0-9a-f]{40}$') { throw "commit '$env:BOUND' not found in this repository" }
+          # plain web request: the self-hosted runner has only Windows PowerShell 5.1 and need not have gh on its path
+          try { $r = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/commits/$env:BOUND" -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = "application/vnd.github+json"; "User-Agent" = "iap-registered-run" } }
+          catch { throw "commit '$env:BOUND' not found in this repository ($($_.Exception.Message))" }
+          $sha = [string]$r.sha
+          if ($sha -notmatch '^[0-9a-f]{40}$') { throw "unexpected API answer for '$env:BOUND'" }
           "sha=$sha" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding ascii
           Write-Host "bound commit $env:BOUND -> $sha"
 
@@ -106,13 +109,13 @@ jobs:
           persist-credentials: true # the push to results/ uses the job token
 
       - name: The process is the runner identity
-        shell: pwsh
+        shell: powershell
         run: |
           python tools/runner/run.py whoami
           if ($LASTEXITCODE -ne 0) { throw "not running as iap-runner" }
 
       - name: Install the pinned research stack
-        shell: pwsh
+        shell: powershell
         run: |
           python -m pip install --upgrade pip
           # --no-deps: the lock is complete for Linux CI but omits tzdata, which pandas
@@ -123,14 +126,14 @@ jobs:
 
       - name: Registered run (verify, sealed read, run once, commit, publish)
         if: ${{ inputs.mode != 'dd1' }}
-        shell: pwsh
+        shell: powershell
         run: |
           python tools/runner/run.py run --prereg "${{ inputs.prereg }}" --push --log results-log.redacted.txt
           if ($LASTEXITCODE -ne 0) { throw "registered run exit $LASTEXITCODE (see the redacted log)" }
 
       - name: DD1 ingestion (pull, cut, test, seal Track B and C, record)
         if: ${{ inputs.mode == 'dd1' }}
-        shell: pwsh
+        shell: powershell
         run: |
           $year = if ("${{ inputs.year }}" -ne "") { "${{ inputs.year }}" } else { (Get-Date).Year }
           python tools/ingest/dd1_daily.py run --year $year --dev-root C:\iap\daily --log results-log.redacted.txt
