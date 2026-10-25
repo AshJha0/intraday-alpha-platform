@@ -256,11 +256,12 @@ def _evidence(
         procs = {}
         for name in prof.procedures:
             ok = key in passing and name != "P-CBB"
-            k = 400 if ok else 900
-            procs[name] = {
-                "k": k,
-                "result": ("pass" if ok else "fail") if cell.kind == "size" else "reported",
-            }
+            if cell.kind == "size":
+                procs[name] = {"k": 400 if ok else 900, "result": "pass" if ok else "fail"}
+            elif cell.generator == "iid_normal":
+                procs[name] = {"k": 4400 if ok else 3000, "result": "pass" if ok else "fail"}
+            else:
+                procs[name] = {"k": 4000, "result": "reported"}
         cells.append(
             {
                 "kind": cell.kind,
@@ -376,8 +377,9 @@ def test_cbb_registration_decides_and_the_rule_is_recomputed(root):
     # the fabricated file never passes P-CBB; make one that does (iid normal and GARCH)
     doc = json.loads(pf.evidence_path("PF-1", root).read_text())
     for cell in doc["cells"]:
-        if cell["generator"] in ("iid_normal", "garch11") and cell["kind"] == "size":
-            cell["procedures"]["P-CBB"] = {"k": 400, "result": "pass"}
+        if cell["generator"] in ("iid_normal", "garch11"):
+            k = 400 if cell["kind"] == "size" else 4400
+            cell["procedures"]["P-CBB"] = {"k": k, "result": "pass"}
     pf.evidence_path("PF-1", root).write_text(json.dumps(doc))
     v = pf.decide("PF-1", _series(effect=0.6), reg, root=root)
     assert v.is_promote and v.statistics[0]["block_length"] == reg["block_length"]["block_length"]

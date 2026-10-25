@@ -1,0 +1,2298 @@
+{
+ "profile": "PF-2",
+ "title": "daily marked-to-market portfolio return of a 20-60 session horizon book with overlapping positions",
+ "specification": "python/tests/spec/CONFIRMATION_PROFILES.md",
+ "generated_utc": "2026-10-25T16:31:16Z",
+ "versions": {
+  "python": "3.12.10",
+  "numpy": "2.4.6",
+  "scipy": "1.17.1"
+ },
+ "alpha_op": 0.02,
+ "fwer_claim": 0.025,
+ "n_size": 20000,
+ "size_pass_k": 463,
+ "n_power": 5000,
+ "power_pass_detections": 4047,
+ "K": 4,
+ "seed_rule": "20320000 + 10000 * profile_index + 100 * kind + cell_index; development series at + 5000; bootstrap resample indices numpy PCG64 default_rng(cell seed)",
+ "procedures": {
+  "P-HAC-L20": {
+   "kind": "hac",
+   "lag": 20,
+   "reference": "student_t_df_min(T-1,3T/2lag)"
+  },
+  "P-HAC-L60": {
+   "kind": "hac",
+   "lag": 60,
+   "reference": "student_t_df_min(T-1,3T/2lag)"
+  },
+  "P-CBB": {
+   "kind": "cbb",
+   "floor": 10,
+   "cap": 60,
+   "multiplier": 2,
+   "max_lag": 60,
+   "resamples": 999
+  }
+ },
+ "T_grid": [
+  250,
+  500
+ ],
+ "seconds_total": 1727.7,
+ "seconds_wall_this_invocation": 0.0,
+ "cells": [
+  {
+   "id": "PF-2/size/00/iid_normal_T250",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 0,
+   "generator": "iid_normal",
+   "params": {},
+   "T": 250,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340000,
+   "dev_seed": 20345000,
+   "delta": 0.0,
+   "acf1_theoretical": 0.0,
+   "seconds": 64.82,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 363,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.01815,
+     "upper": 0.019780630806745414,
+     "lower": 0.016624425987818266,
+     "half_width": 0.0018501287863821807
+    },
+    "P-HAC-L60": {
+     "k": 220,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.011,
+     "upper": 0.012292368700145904,
+     "lower": 0.009814836912773682,
+     "half_width": 0.001445558134424209
+    },
+    "P-CBB": {
+     "k": 553,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.02765,
+     "upper": 0.02963371542135747,
+     "lower": 0.025768890792401546,
+     "half_width": 0.002272479376848115,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 0,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/01/iid_normal_T500",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 1,
+   "generator": "iid_normal",
+   "params": {},
+   "T": 500,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340001,
+   "dev_seed": 20345001,
+   "delta": 0.0,
+   "acf1_theoretical": 0.0,
+   "seconds": 130.18,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 376,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.0188,
+     "upper": 0.02045756502308848,
+     "lower": 0.017247314500845257,
+     "half_width": 0.0018823430199620896
+    },
+    "P-HAC-L60": {
+     "k": 331,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.01655,
+     "upper": 0.018112077572951846,
+     "lower": 0.015093424816841824,
+     "half_width": 0.001768138232096122
+    },
+    "P-CBB": {
+     "k": 466,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.0233,
+     "upper": 0.025131792806436647,
+     "lower": 0.02157190418810267,
+     "half_width": 0.002090738072738907,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 0,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/02/ar1_rho0.1_T250",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 2,
+   "generator": "ar1",
+   "params": {
+    "rho": 0.1
+   },
+   "T": 250,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340002,
+   "dev_seed": 20345002,
+   "delta": 0.0,
+   "acf1_theoretical": 0.1,
+   "seconds": 65.55,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 391,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.01955,
+     "upper": 0.021238036814023514,
+     "lower": 0.017966640514519034,
+     "half_width": 0.0019187888220958556
+    },
+    "P-HAC-L60": {
+     "k": 237,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.01185,
+     "upper": 0.013187654991439939,
+     "lower": 0.010619267125176387,
+     "half_width": 0.0014997251902265293
+    },
+    "P-CBB": {
+     "k": 589,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.02945,
+     "upper": 0.03149275069970066,
+     "lower": 0.02750941456056049,
+     "half_width": 0.002343110013593045,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 0,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/03/ar1_rho0.1_T500",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 3,
+   "generator": "ar1",
+   "params": {
+    "rho": 0.1
+   },
+   "T": 500,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340003,
+   "dev_seed": 20345003,
+   "delta": 0.0,
+   "acf1_theoretical": 0.1,
+   "seconds": 137.84,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 376,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.0188,
+     "upper": 0.02045756502308848,
+     "lower": 0.017247314500845257,
+     "half_width": 0.0018823430199620896
+    },
+    "P-HAC-L60": {
+     "k": 349,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.01745,
+     "upper": 0.019051047982948564,
+     "lower": 0.01595420203979988,
+     "half_width": 0.0018147471338453743
+    },
+    "P-CBB": {
+     "k": 469,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.02345,
+     "upper": 0.02528727519797927,
+     "lower": 0.021716383468074647,
+     "half_width": 0.0020972960515387423,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 0,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/04/ar1_rho0.2_T250",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 4,
+   "generator": "ar1",
+   "params": {
+    "rho": 0.2
+   },
+   "T": 250,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340004,
+   "dev_seed": 20345004,
+   "delta": 0.0,
+   "acf1_theoretical": 0.2,
+   "seconds": 65.29,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 425,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.02125,
+     "upper": 0.023004881342649334,
+     "lower": 0.019599345846609273,
+     "half_width": 0.0019987405722104107
+    },
+    "P-HAC-L60": {
+     "k": 252,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.0126,
+     "upper": 0.01397623552418586,
+     "lower": 0.011330445011550219,
+     "half_width": 0.0015458697808030273
+    },
+    "P-CBB": {
+     "k": 690,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.0345,
+     "upper": 0.03669848127239517,
+     "lower": 0.03240247037064599,
+     "half_width": 0.0025294538501423585,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 0,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/05/ar1_rho0.2_T500",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 5,
+   "generator": "ar1",
+   "params": {
+    "rho": 0.2
+   },
+   "T": 500,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340005,
+   "dev_seed": 20345005,
+   "delta": 0.0,
+   "acf1_theoretical": 0.2,
+   "seconds": 124.07,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 420,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.021,
+     "upper": 0.022745234773944942,
+     "lower": 0.01935905796330011,
+     "half_width": 0.001987202234298261
+    },
+    "P-HAC-L60": {
+     "k": 365,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.01825,
+     "upper": 0.019884807377004633,
+     "lower": 0.016720222014958083,
+     "half_width": 0.001855124080755786
+    },
+    "P-CBB": {
+     "k": 553,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.02765,
+     "upper": 0.02963371542135747,
+     "lower": 0.025768890792401546,
+     "half_width": 0.002272479376848115,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 1,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/06/ar1_rho0.3_T250",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 6,
+   "generator": "ar1",
+   "params": {
+    "rho": 0.3
+   },
+   "T": 250,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340006,
+   "dev_seed": 20345006,
+   "delta": 0.0,
+   "acf1_theoretical": 0.3,
+   "seconds": 53.28,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 398,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.0199,
+     "upper": 0.021602044494324794,
+     "lower": 0.018302539274044023,
+     "half_width": 0.0019355429210430855
+    },
+    "P-HAC-L60": {
+     "k": 229,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.01145,
+     "upper": 0.01276656059629127,
+     "lower": 0.010240493539464782,
+     "half_width": 0.001474494432610717
+    },
+    "P-CBB": {
+     "k": 641,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.03205,
+     "upper": 0.03417462770701927,
+     "lower": 0.030026908887609297,
+     "half_width": 0.002441077414544651,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 0,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/07/ar1_rho0.3_T500",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 7,
+   "generator": "ar1",
+   "params": {
+    "rho": 0.3
+   },
+   "T": 500,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340007,
+   "dev_seed": 20345007,
+   "delta": 0.0,
+   "acf1_theoretical": 0.3,
+   "seconds": 107.99,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 459,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.02295,
+     "upper": 0.02476892631552393,
+     "lower": 0.021234860344214453,
+     "half_width": 0.0020753474368885804
+    },
+    "P-HAC-L60": {
+     "k": 364,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.0182,
+     "upper": 0.019832720608813185,
+     "lower": 0.016672322478370666,
+     "half_width": 0.0018526282467888695
+    },
+    "P-CBB": {
+     "k": 617,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.03085,
+     "upper": 0.032937311642566344,
+     "lower": 0.02886451399606019,
+     "half_width": 0.002396426744592874,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 1,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/08/ar1_rho0.5_T250",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 8,
+   "generator": "ar1",
+   "params": {
+    "rho": 0.5
+   },
+   "T": 250,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340008,
+   "dev_seed": 20345008,
+   "delta": 0.0,
+   "acf1_theoretical": 0.5,
+   "seconds": 44.69,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 504,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.0252,
+     "upper": 0.0270998890613182,
+     "lower": 0.02340332651912542,
+     "half_width": 0.0021721964728817693
+    },
+    "P-HAC-L60": {
+     "k": 295,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.01475,
+     "upper": 0.016230645365099935,
+     "lower": 0.01337537750290576,
+     "half_width": 0.0016707455207182209
+    },
+    "P-CBB": {
+     "k": 885,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.04425,
+     "upper": 0.04671642008288689,
+     "lower": 0.04188225469104984,
+     "half_width": 0.002850164092644492,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 1,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/09/ar1_rho0.5_T500",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 9,
+   "generator": "ar1",
+   "params": {
+    "rho": 0.5
+   },
+   "T": 500,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340009,
+   "dev_seed": 20345009,
+   "delta": 0.0,
+   "acf1_theoretical": 0.5,
+   "seconds": 66.63,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 531,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.02655,
+     "upper": 0.02849660031957515,
+     "lower": 0.024706278060313443,
+     "half_width": 0.0022280768226881223
+    },
+    "P-HAC-L60": {
+     "k": 407,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.02035,
+     "upper": 0.022069863212859392,
+     "lower": 0.018734600962411505,
+     "half_width": 0.001956855475041527
+    },
+    "P-CBB": {
+     "k": 1036,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.0518,
+     "upper": 0.05445129688792053,
+     "lower": 0.0492456523809781,
+     "half_width": 0.003071538256444155,
+     "block_length": 56,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 28,
+      "block_length": 56
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/10/garch11_alpha0.08_beta0.9_T250",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 10,
+   "generator": "garch11",
+   "params": {
+    "alpha": 0.08,
+    "beta": 0.9
+   },
+   "T": 250,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340010,
+   "dev_seed": 20345010,
+   "delta": 0.0,
+   "acf1_theoretical": 0.0,
+   "seconds": 57.6,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 346,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.0173,
+     "upper": 0.01889462774571721,
+     "lower": 0.015810664018621717,
+     "half_width": 0.0018070684482885532
+    },
+    "P-HAC-L60": {
+     "k": 189,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.00945,
+     "upper": 0.010654873702079518,
+     "lower": 0.008352882530723289,
+     "half_width": 0.0013408962584033116
+    },
+    "P-CBB": {
+     "k": 476,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.0238,
+     "upper": 0.025649994504843353,
+     "lower": 0.022053574953263065,
+     "half_width": 0.0021125108768477383,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 0,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/11/garch11_alpha0.08_beta0.9_T500",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 11,
+   "generator": "garch11",
+   "params": {
+    "alpha": 0.08,
+    "beta": 0.9
+   },
+   "T": 500,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340011,
+   "dev_seed": 20345011,
+   "delta": 0.0,
+   "acf1_theoretical": 0.0,
+   "seconds": 160.31,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 350,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.0175,
+     "upper": 0.019103181588945754,
+     "lower": 0.01600205454706566,
+     "half_width": 0.0018172989572439644
+    },
+    "P-HAC-L60": {
+     "k": 276,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.0138,
+     "upper": 0.01523556173462657,
+     "lower": 0.012470746108076011,
+     "half_width": 0.0016168253723887437
+    },
+    "P-CBB": {
+     "k": 388,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.0194,
+     "upper": 0.02108199275460375,
+     "lower": 0.017822724822568307,
+     "half_width": 0.0019115597744250635,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 0,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/12/t3_T250",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 12,
+   "generator": "t3",
+   "params": {},
+   "T": 250,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340012,
+   "dev_seed": 20345012,
+   "delta": 0.0,
+   "acf1_theoretical": 0.0,
+   "seconds": 78.95,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 351,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.01755,
+     "upper": 0.019155311981062136,
+     "lower": 0.016049910281615332,
+     "half_width": 0.0018198469385637902
+    },
+    "P-HAC-L60": {
+     "k": 223,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.01115,
+     "upper": 0.012450488526187372,
+     "lower": 0.009956666228598638,
+     "half_width": 0.00145527046771382
+    },
+    "P-CBB": {
+     "k": 463,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.02315,
+     "upper": 0.02497629140384926,
+     "lower": 0.021427443978423166,
+     "half_width": 0.0020841573851799193,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 0,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/13/t3_T500",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 13,
+   "generator": "t3",
+   "params": {},
+   "T": 500,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340013,
+   "dev_seed": 20345013,
+   "delta": 0.0,
+   "acf1_theoretical": 0.0,
+   "seconds": 122.38,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 368,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.0184,
+     "upper": 0.02004104959993742,
+     "lower": 0.016863938778492158,
+     "half_width": 0.0018625899696927395
+    },
+    "P-HAC-L60": {
+     "k": 319,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.01595,
+     "upper": 0.01748547446414572,
+     "lower": 0.014520198904608215,
+     "half_width": 0.0017363209288031977
+    },
+    "P-CBB": {
+     "k": 477,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.02385,
+     "upper": 0.02570180330682245,
+     "lower": 0.022101753432534798,
+     "half_width": 0.0021146745787945717,
+     "block_length": 16,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 8,
+      "block_length": 16
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/14/overlap_ma_h20_T250",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 14,
+   "generator": "overlap_ma",
+   "params": {
+    "h": 20
+   },
+   "T": 250,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340014,
+   "dev_seed": 20345014,
+   "delta": 0.0,
+   "acf1_theoretical": 0.95,
+   "seconds": 33.29,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 1511,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.07555,
+     "upper": 0.07869464757194736,
+     "lower": 0.07249698548310646,
+     "half_width": 0.003662688806846686
+    },
+    "P-HAC-L60": {
+     "k": 573,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.02865,
+     "upper": 0.030666763756403058,
+     "lower": 0.026735596848567644,
+     "half_width": 0.0023120182555940163
+    },
+    "P-CBB": {
+     "k": 2244,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.1122,
+     "upper": 0.11593761021801267,
+     "lower": 0.10854597234521497,
+     "half_width": 0.004374164104466133,
+     "block_length": 32,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 16,
+      "block_length": 32
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/15/overlap_ma_h20_T500",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 15,
+   "generator": "overlap_ma",
+   "params": {
+    "h": 20
+   },
+   "T": 500,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340015,
+   "dev_seed": 20345015,
+   "delta": 0.0,
+   "acf1_theoretical": 0.95,
+   "seconds": 60.58,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 1412,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.0706,
+     "upper": 0.07365075561103149,
+     "lower": 0.06764197590739061,
+     "half_width": 0.0035501341004531084
+    },
+    "P-HAC-L60": {
+     "k": 624,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.0312,
+     "upper": 0.033298277027164556,
+     "lower": 0.029203464119640955,
+     "half_width": 0.0024095471866722178
+    },
+    "P-CBB": {
+     "k": 1716,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.0858,
+     "upper": 0.08912715783235309,
+     "lower": 0.08256221121000579,
+     "half_width": 0.003881551260617332,
+     "block_length": 60,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 60,
+      "block_length": 60
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/16/overlap_ma_h40_T250",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 16,
+   "generator": "overlap_ma",
+   "params": {
+    "h": 40
+   },
+   "T": 250,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340016,
+   "dev_seed": 20345016,
+   "delta": 0.0,
+   "acf1_theoretical": 0.975,
+   "seconds": 35.03,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 4175,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.20875,
+     "upper": 0.21353313338171112,
+     "lower": 0.20402952023546816,
+     "half_width": 0.005632629392654908
+    },
+    "P-HAC-L60": {
+     "k": 1123,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.05615,
+     "upper": 0.05890067239420949,
+     "lower": 0.05349529270917932,
+     "half_width": 0.0031905638771540052
+    },
+    "P-CBB": {
+     "k": 4707,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.23535,
+     "upper": 0.24033729451905292,
+     "lower": 0.23041962106561747,
+     "half_width": 0.005879352796881644,
+     "block_length": 60,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 60,
+      "block_length": 60
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/17/overlap_ma_h40_T500",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 17,
+   "generator": "overlap_ma",
+   "params": {
+    "h": 40
+   },
+   "T": 500,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340017,
+   "dev_seed": 20345017,
+   "delta": 0.0,
+   "acf1_theoretical": 0.975,
+   "seconds": 52.47,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 3735,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.18675,
+     "upper": 0.19134124183772572,
+     "lower": 0.18222616357150742,
+     "half_width": 0.0054011148807445305
+    },
+    "P-HAC-L60": {
+     "k": 1075,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.05375,
+     "upper": 0.05644643503868451,
+     "lower": 0.05115007228146035,
+     "half_width": 0.0031255989625990086
+    },
+    "P-CBB": {
+     "k": 2461,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.12305,
+     "upper": 0.12693623872603885,
+     "lower": 0.11924497819444806,
+     "half_width": 0.004552702781403592,
+     "block_length": 60,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 60,
+      "block_length": 60
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/18/overlap_ma_h60_T250",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 18,
+   "generator": "overlap_ma",
+   "params": {
+    "h": 60
+   },
+   "T": 250,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340018,
+   "dev_seed": 20345018,
+   "delta": 0.0,
+   "acf1_theoretical": 0.9833333333333333,
+   "seconds": 26.43,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 6689,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.33445,
+     "upper": 0.3399799709984977,
+     "lower": 0.3289556093274764,
+     "half_width": 0.006538784395879712
+    },
+    "P-HAC-L60": {
+     "k": 1785,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.08925,
+     "upper": 0.09263533944666028,
+     "lower": 0.0859532702098369,
+     "half_width": 0.003951343411423512
+    },
+    "P-CBB": {
+     "k": 5941,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.29705,
+     "upper": 0.30241142030925355,
+     "lower": 0.2917322062007268,
+     "half_width": 0.0063331251388078534,
+     "block_length": 60,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 60,
+      "block_length": 60
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/size/19/overlap_ma_h60_T500",
+   "profile": "PF-2",
+   "kind": "size",
+   "index": 19,
+   "generator": "overlap_ma",
+   "params": {
+    "h": 60
+   },
+   "T": 500,
+   "K": 4,
+   "n": 20000,
+   "seed": 20340019,
+   "dev_seed": 20345019,
+   "delta": 0.0,
+   "acf1_theoretical": 0.9833333333333333,
+   "seconds": 32.0,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 6112,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.3056,
+     "upper": 0.3110035573633551,
+     "lower": 0.3002382292392452,
+     "half_width": 0.0063844369815356464
+    },
+    "P-HAC-L60": {
+     "k": 1656,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.0828,
+     "upper": 0.08607528791307856,
+     "lower": 0.07961474247067278,
+     "half_width": 0.003819339504783517
+    },
+    "P-CBB": {
+     "k": 3381,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.16905,
+     "upper": 0.17346970610565365,
+     "lower": 0.16470152759923873,
+     "half_width": 0.0051944085792128445,
+     "block_length": 60,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 60,
+      "block_length": 60
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/00/iid_normal_T250",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 0,
+   "generator": "iid_normal",
+   "params": {},
+   "T": 250,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340100,
+   "dev_seed": 20345100,
+   "delta": 0.24560168545201955,
+   "acf1_theoretical": 0.0,
+   "seconds": 7.35,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 4136,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.8272,
+     "upper": 0.8359518608584705,
+     "lower": 0.8181644948072776,
+     "half_width": 0.01047968433356654
+    },
+    "P-HAC-L60": {
+     "k": 3001,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.6002,
+     "upper": 0.6116495346207598,
+     "lower": 0.5886638834032323,
+     "half_width": 0.013578145545957297
+    },
+    "P-CBB": {
+     "k": 4445,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.889,
+     "upper": 0.8962379428451601,
+     "lower": 0.8814238719847061,
+     "half_width": 0.008707298621271698,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 0,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/01/iid_normal_T500",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 1,
+   "generator": "iid_normal",
+   "params": {},
+   "T": 500,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340101,
+   "dev_seed": 20345101,
+   "delta": 0.17308326357217446,
+   "acf1_theoretical": 0.0,
+   "seconds": 14.37,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 4318,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.8636,
+     "upper": 0.8715253177981188,
+     "lower": 0.8553590319137063,
+     "half_width": 0.009513374014133996
+    },
+    "P-HAC-L60": {
+     "k": 3862,
+     "nan_p": 0,
+     "result": "fail",
+     "estimate": 0.7724,
+     "upper": 0.7821339283224168,
+     "lower": 0.7624302600035348,
+     "half_width": 0.011621932014807178
+    },
+    "P-CBB": {
+     "k": 4439,
+     "nan_p": 0,
+     "result": "pass",
+     "estimate": 0.8878,
+     "upper": 0.8950728912684129,
+     "lower": 0.8801899935326929,
+     "half_width": 0.008748328208932264,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 0,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/02/ar1_rho0.1_T250",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 2,
+   "generator": "ar1",
+   "params": {
+    "rho": 0.1
+   },
+   "T": 250,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340102,
+   "dev_seed": 20345102,
+   "delta": 0.24560168545201955,
+   "acf1_theoretical": 0.1,
+   "seconds": 7.34,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 3667,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.7334,
+     "upper": 0.7436833042260486,
+     "lower": 0.7229147790420569,
+     "half_width": 0.012256644636310541
+    },
+    "P-HAC-L60": {
+     "k": 2466,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.4932,
+     "upper": 0.5049305360547571,
+     "lower": 0.4814753384700847,
+     "half_width": 0.013858011144576266
+    },
+    "P-CBB": {
+     "k": 4102,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.8204,
+     "upper": 0.8292892193839589,
+     "lower": 0.8112330900760364,
+     "half_width": 0.010639888117306495,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 0,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/03/ar1_rho0.1_T500",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 3,
+   "generator": "ar1",
+   "params": {
+    "rho": 0.1
+   },
+   "T": 500,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340103,
+   "dev_seed": 20345103,
+   "delta": 0.17308326357217446,
+   "acf1_theoretical": 0.1,
+   "seconds": 30.84,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 3950,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.79,
+     "upper": 0.7994478326020931,
+     "lower": 0.7803010256786767,
+     "half_width": 0.011290008325949098
+    },
+    "P-HAC-L60": {
+     "k": 3356,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.6712,
+     "upper": 0.6821519187138616,
+     "lower": 0.6601000796595526,
+     "half_width": 0.013021557935178108
+    },
+    "P-CBB": {
+     "k": 4099,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.8198,
+     "upper": 0.828701107827328,
+     "lower": 0.8106217266629638,
+     "half_width": 0.010653747989660728,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 0,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/04/ar1_rho0.2_T250",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 4,
+   "generator": "ar1",
+   "params": {
+    "rho": 0.2
+   },
+   "T": 250,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340104,
+   "dev_seed": 20345104,
+   "delta": 0.24560168545201955,
+   "acf1_theoretical": 0.2,
+   "seconds": 7.78,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 3208,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.6416,
+     "upper": 0.6527915140990954,
+     "lower": 0.6302861017172937,
+     "half_width": 0.013291905572219508
+    },
+    "P-HAC-L60": {
+     "k": 2019,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.4038,
+     "upper": 0.41535301781612294,
+     "lower": 0.39233010630900844,
+     "half_width": 0.01360035399021658
+    },
+    "P-CBB": {
+     "k": 3701,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.7402,
+     "upper": 0.7503953272223771,
+     "lower": 0.7297968523381673,
+     "half_width": 0.012155286033129787,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 1,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/05/ar1_rho0.2_T500",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 5,
+   "generator": "ar1",
+   "params": {
+    "rho": 0.2
+   },
+   "T": 500,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340105,
+   "dev_seed": 20345105,
+   "delta": 0.17308326357217446,
+   "acf1_theoretical": 0.2,
+   "seconds": 17.62,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 3410,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.682,
+     "upper": 0.6928524278120205,
+     "lower": 0.6709902183099061,
+     "half_width": 0.01290853083507182
+    },
+    "P-HAC-L60": {
+     "k": 2858,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.5716,
+     "upper": 0.5831779199401719,
+     "lower": 0.5599602179261844,
+     "half_width": 0.013716455862240799
+    },
+    "P-CBB": {
+     "k": 3620,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.724,
+     "upper": 0.7343998134860801,
+     "lower": 0.7134064271726646,
+     "half_width": 0.01239067293087829,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 1,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/06/ar1_rho0.3_T250",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 6,
+   "generator": "ar1",
+   "params": {
+    "rho": 0.3
+   },
+   "T": 250,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340106,
+   "dev_seed": 20345106,
+   "delta": 0.24560168545201955,
+   "acf1_theoretical": 0.3,
+   "seconds": 8.66,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 2671,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.5342,
+     "upper": 0.5458866719654165,
+     "lower": 0.5224837819161069,
+     "half_width": 0.013826834134942099
+    },
+    "P-HAC-L60": {
+     "k": 1552,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.3104,
+     "upper": 0.32134233769165343,
+     "lower": 0.29962159939715144,
+     "half_width": 0.012824207956392473
+    },
+    "P-CBB": {
+     "k": 3183,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.6366,
+     "upper": 0.6478273506769909,
+     "lower": 0.6252545905850407,
+     "half_width": 0.013332047361932074,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 0,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/07/ar1_rho0.3_T500",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 7,
+   "generator": "ar1",
+   "params": {
+    "rho": 0.3
+   },
+   "T": 500,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340107,
+   "dev_seed": 20345107,
+   "delta": 0.17308326357217446,
+   "acf1_theoretical": 0.3,
+   "seconds": 7.46,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 2925,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.585,
+     "upper": 0.596522721256525,
+     "lower": 0.5734038356302857,
+     "half_width": 0.013657557907620235
+    },
+    "P-HAC-L60": {
+     "k": 2358,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.4716,
+     "upper": 0.4833221718896348,
+     "lower": 0.4599023632915039,
+     "half_width": 0.01383691814750669
+    },
+    "P-CBB": {
+     "k": 3304,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.6608,
+     "upper": 0.671841539135043,
+     "lower": 0.649619462241295,
+     "half_width": 0.013123026569934238,
+     "block_length": 60,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 56,
+      "block_length": 60
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/08/ar1_rho0.5_T250",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 8,
+   "generator": "ar1",
+   "params": {
+    "rho": 0.5
+   },
+   "T": 250,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340108,
+   "dev_seed": 20345108,
+   "delta": 0.24560168545201955,
+   "acf1_theoretical": 0.5,
+   "seconds": 8.22,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 1664,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.3328,
+     "upper": 0.3439316367599788,
+     "lower": 0.32181290185587846,
+     "half_width": 0.013061430588231903
+    },
+    "P-HAC-L60": {
+     "k": 924,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.1848,
+     "upper": 0.1940641798348955,
+     "lower": 0.1758089619934248,
+     "half_width": 0.010758559798932197
+    },
+    "P-CBB": {
+     "k": 2240,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.448,
+     "upper": 0.4596880908934219,
+     "lower": 0.43635683452433627,
+     "half_width": 0.013784138084044283,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 1,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/09/ar1_rho0.5_T500",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 9,
+   "generator": "ar1",
+   "params": {
+    "rho": 0.5
+   },
+   "T": 500,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340109,
+   "dev_seed": 20345109,
+   "delta": 0.17308326357217446,
+   "acf1_theoretical": 0.5,
+   "seconds": 9.31,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 1774,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.3548,
+     "upper": 0.36609039503590657,
+     "lower": 0.34363510376726386,
+     "half_width": 0.013262031469846539
+    },
+    "P-HAC-L60": {
+     "k": 1314,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.2628,
+     "upper": 0.27323974449678373,
+     "lower": 0.2525654710826823,
+     "half_width": 0.012200465829270618
+    },
+    "P-CBB": {
+     "k": 2213,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.4426,
+     "upper": 0.4542766040530537,
+     "lower": 0.4309729873359924,
+     "half_width": 0.01376766392663621,
+     "block_length": 60,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 38,
+      "block_length": 60
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/10/garch11_alpha0.08_beta0.9_T250",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 10,
+   "generator": "garch11",
+   "params": {
+    "alpha": 0.08,
+    "beta": 0.9
+   },
+   "T": 250,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340110,
+   "dev_seed": 20345110,
+   "delta": 0.24560168545201955,
+   "acf1_theoretical": 0.0,
+   "seconds": 8.62,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 4154,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.8308,
+     "upper": 0.8394771412755355,
+     "lower": 0.8218360596753793,
+     "half_width": 0.010392487061103324
+    },
+    "P-HAC-L60": {
+     "k": 3200,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.64,
+     "upper": 0.6512031246452727,
+     "lower": 0.628675875365285,
+     "half_width": 0.013304921194806077
+    },
+    "P-CBB": {
+     "k": 4406,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.8812,
+     "upper": 0.8886604414103733,
+     "lower": 0.8734083176297591,
+     "half_width": 0.008968432292167901,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 0,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/11/garch11_alpha0.08_beta0.9_T500",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 11,
+   "generator": "garch11",
+   "params": {
+    "alpha": 0.08,
+    "beta": 0.9
+   },
+   "T": 500,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340111,
+   "dev_seed": 20345111,
+   "delta": 0.17308326357217446,
+   "acf1_theoretical": 0.0,
+   "seconds": 15.77,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 4314,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.8628,
+     "upper": 0.8707453298931044,
+     "lower": 0.8545397263189103,
+     "half_width": 0.009536811377562208
+    },
+    "P-HAC-L60": {
+     "k": 3931,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.7862,
+     "upper": 0.795711779755096,
+     "lower": 0.7764403905827026,
+     "half_width": 0.011364267276828717
+    },
+    "P-CBB": {
+     "k": 4419,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.8838,
+     "upper": 0.8911874821595126,
+     "lower": 0.8760789648493624,
+     "half_width": 0.008882825524527653,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 0,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/12/t3_T250",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 12,
+   "generator": "t3",
+   "params": {},
+   "T": 250,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340112,
+   "dev_seed": 20345112,
+   "delta": 0.24560168545201955,
+   "acf1_theoretical": 0.0,
+   "seconds": 8.65,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 4234,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.8468,
+     "upper": 0.8551272125537646,
+     "lower": 0.8381719415767127,
+     "half_width": 0.009983685151445832
+    },
+    "P-HAC-L60": {
+     "k": 3172,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.6344,
+     "upper": 0.6456427042424042,
+     "lower": 0.6230411400684001,
+     "half_width": 0.013349215679012757
+    },
+    "P-CBB": {
+     "k": 4485,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.897,
+     "upper": 0.9039978532939379,
+     "lower": 0.8896568113491446,
+     "half_width": 0.008425310268470829,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 0,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/13/t3_T500",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 13,
+   "generator": "t3",
+   "params": {},
+   "T": 500,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340113,
+   "dev_seed": 20345113,
+   "delta": 0.17308326357217446,
+   "acf1_theoretical": 0.0,
+   "seconds": 18.15,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 4366,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.8732,
+     "upper": 0.8808777865321653,
+     "lower": 0.8651980712428511,
+     "half_width": 0.009223326007639544
+    },
+    "P-HAC-L60": {
+     "k": 3946,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.7892,
+     "upper": 0.7986613976111339,
+     "lower": 0.7794881580504212,
+     "half_width": 0.011305763873140107
+    },
+    "P-CBB": {
+     "k": 4470,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.894,
+     "upper": 0.9010893707255986,
+     "lower": 0.8865679788779676,
+     "half_width": 0.008532823476434982,
+     "block_length": 10,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 0,
+      "block_length": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/14/overlap_ma_h20_T250",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 14,
+   "generator": "overlap_ma",
+   "params": {
+    "h": 20
+   },
+   "T": 250,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340114,
+   "dev_seed": 20345114,
+   "delta": 0.24560168545201955,
+   "acf1_theoretical": 0.95,
+   "seconds": 3.94,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 538,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.1076,
+     "upper": 0.11507866202624423,
+     "lower": 0.100462558223981,
+     "half_width": 0.008589284454295364
+    },
+    "P-HAC-L60": {
+     "k": 212,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.0424,
+     "upper": 0.04738964084284609,
+     "lower": 0.03781193265064598,
+     "half_width": 0.0055852943554301595
+    },
+    "P-CBB": {
+     "k": 914,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.1828,
+     "upper": 0.19202709108091368,
+     "lower": 0.1738477998418941,
+     "half_width": 0.010713301909831533,
+     "block_length": 60,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 60,
+      "block_length": 60
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/15/overlap_ma_h20_T500",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 15,
+   "generator": "overlap_ma",
+   "params": {
+    "h": 20
+   },
+   "T": 500,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340115,
+   "dev_seed": 20345115,
+   "delta": 0.17308326357217446,
+   "acf1_theoretical": 0.95,
+   "seconds": 9.75,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 547,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.1094,
+     "upper": 0.1169305366902442,
+     "lower": 0.10220907609577547,
+     "half_width": 0.008652090940622388
+    },
+    "P-HAC-L60": {
+     "k": 274,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.0548,
+     "upper": 0.06038998363559155,
+     "lower": 0.04959954374333054,
+     "half_width": 0.006308457839060194
+    },
+    "P-CBB": {
+     "k": 575,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.115,
+     "upper": 0.12268802870835233,
+     "lower": 0.10764659226051942,
+     "half_width": 0.008842837101292774,
+     "block_length": 60,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 39,
+      "block_length": 60
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/16/overlap_ma_h40_T250",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 16,
+   "generator": "overlap_ma",
+   "params": {
+    "h": 40
+   },
+   "T": 250,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340116,
+   "dev_seed": 20345116,
+   "delta": 0.24560168545201955,
+   "acf1_theoretical": 0.975,
+   "seconds": 3.96,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 815,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.163,
+     "upper": 0.17183732072513608,
+     "lower": 0.15445491620527974,
+     "half_width": 0.01023829409227924
+    },
+    "P-HAC-L60": {
+     "k": 211,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.0422,
+     "upper": 0.04717917069280137,
+     "lower": 0.03762260192087496,
+     "half_width": 0.005572687772628214
+    },
+    "P-CBB": {
+     "k": 862,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.1724,
+     "upper": 0.18142762295805295,
+     "lower": 0.16365637180433276,
+     "half_width": 0.010470078574528464,
+     "block_length": 60,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 55,
+      "block_length": 60
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/17/overlap_ma_h40_T500",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 17,
+   "generator": "overlap_ma",
+   "params": {
+    "h": 40
+   },
+   "T": 500,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340117,
+   "dev_seed": 20345117,
+   "delta": 0.17308326357217446,
+   "acf1_theoretical": 0.975,
+   "seconds": 8.06,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 748,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.1496,
+     "upper": 0.15814823639354633,
+     "lower": 0.14135577657034246,
+     "half_width": 0.009886634789896915
+    },
+    "P-HAC-L60": {
+     "k": 225,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.045,
+     "upper": 0.05012324602683981,
+     "lower": 0.040275755346741784,
+     "half_width": 0.005746177163993467
+    },
+    "P-CBB": {
+     "k": 481,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.0962,
+     "upper": 0.10333483170235312,
+     "lower": 0.08941660775559754,
+     "half_width": 0.008173249822390113,
+     "block_length": 60,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 60,
+      "block_length": 60
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/18/overlap_ma_h60_T250",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 18,
+   "generator": "overlap_ma",
+   "params": {
+    "h": 60
+   },
+   "T": 250,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340118,
+   "dev_seed": 20345118,
+   "delta": 0.24560168545201955,
+   "acf1_theoretical": 0.9833333333333333,
+   "seconds": 4.64,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 1030,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.206,
+     "upper": 0.21563380619812705,
+     "lower": 0.19662082329718022,
+     "half_width": 0.01121024051838318
+    },
+    "P-HAC-L60": {
+     "k": 279,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.0558,
+     "upper": 0.06143473137695121,
+     "lower": 0.05055384493373898,
+     "half_width": 0.006362388239898599
+    },
+    "P-CBB": {
+     "k": 898,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.1796,
+     "upper": 0.18876690992396358,
+     "lower": 0.17071078061604106,
+     "half_width": 0.010639888117306496,
+     "block_length": 60,
+     "block_diagnostic": {
+      "band": 0.12649110640673517,
+      "T_dev": 250,
+      "max_lag": 60,
+      "L_dep": 47,
+      "block_length": 60
+     }
+    }
+   }
+  },
+  {
+   "id": "PF-2/power/19/overlap_ma_h60_T500",
+   "profile": "PF-2",
+   "kind": "power",
+   "index": 19,
+   "generator": "overlap_ma",
+   "params": {
+    "h": 60
+   },
+   "T": 500,
+   "K": 4,
+   "n": 5000,
+   "seed": 20340119,
+   "dev_seed": 20345119,
+   "delta": 0.17308326357217446,
+   "acf1_theoretical": 0.9833333333333333,
+   "seconds": 7.78,
+   "procedures": {
+    "P-HAC-L20": {
+     "k": 999,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.1998,
+     "upper": 0.2093300074256902,
+     "lower": 0.19053003112891265,
+     "half_width": 0.011083274374804587
+    },
+    "P-HAC-L60": {
+     "k": 304,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.0608,
+     "upper": 0.06665151453070227,
+     "lower": 0.055332340448148,
+     "half_width": 0.006623719012397793
+    },
+    "P-CBB": {
+     "k": 566,
+     "nan_p": 0,
+     "result": "reported",
+     "estimate": 0.1132,
+     "upper": 0.12083803528328885,
+     "lower": 0.10589818874444241,
+     "half_width": 0.00878227687579935,
+     "block_length": 60,
+     "block_diagnostic": {
+      "band": 0.08944271909999159,
+      "T_dev": 500,
+      "max_lag": 60,
+      "L_dep": 60,
+      "block_length": 60
+     }
+    }
+   }
+  }
+ ],
+ "operating_domain": {
+  "P-HAC-L20": {
+   "generators": [
+    [
+     "iid_normal",
+     {}
+    ],
+    [
+     "ar1",
+     {
+      "rho": 0.1
+     }
+    ],
+    [
+     "ar1",
+     {
+      "rho": 0.2
+     }
+    ],
+    [
+     "ar1",
+     {
+      "rho": 0.3
+     }
+    ],
+    [
+     "garch11",
+     {
+      "alpha": 0.08,
+      "beta": 0.9
+     }
+    ],
+    [
+     "t3",
+     {}
+    ]
+   ],
+   "T_min": 250,
+   "reference_passes": true,
+   "reference_power_passes": true,
+   "acf1_max": 0.3,
+   "garch_in_domain": true,
+   "t3_in_domain": true
+  },
+  "P-HAC-L60": {
+   "generators": [],
+   "T_min": 250,
+   "reference_passes": false,
+   "reference_power_passes": false,
+   "acf1_max": 0.0,
+   "garch_in_domain": false,
+   "t3_in_domain": false
+  },
+  "P-CBB": {
+   "generators": [],
+   "T_min": 250,
+   "reference_passes": false,
+   "reference_power_passes": true,
+   "acf1_max": 0.0,
+   "garch_in_domain": false,
+   "t3_in_domain": false
+  }
+ }
+}

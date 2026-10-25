@@ -71,8 +71,8 @@ cell's panel.
 ## 6. Operating domain and the gate's screens
 
 A procedure's operating domain is the set of generator cells (name and parameters) whose size cells pass at EVERY `T`
-of the grid; a procedure whose `iid_normal` cells do not all pass has no domain and every registration naming it is
-refused. The gate reads the committed evidence file and nothing else.
+of the grid; a procedure whose `iid_normal` size cells do not all pass, or whose `iid_normal` power cells do not all
+pass the power acceptance, has no domain and every registration naming it is refused. The gate reads the committed evidence file and nothing else.
 
 Real series are mapped to the domain by three declared diagnostics computed on each hypothesis's confirmation series
 (they establish only that no known disqualifying condition was detected, R0-2):
@@ -128,5 +128,21 @@ D-73 record these as reviewer-freeze-pending defaults.
 
 ## 10. Results (filled from the evidence files after the run; the JSONs are authoritative)
 
-See `research/v2/confirmation_evidence/CONFIRMATION_EVIDENCE.md` for every cell. Summary per profile: the operating
-domain per procedure, the largest `k` among in-domain cells, the reference power cells, and the measured budget.
+Run 2026-10-25 (`pf_suite.py --write`, CPython 3.12.10, numpy 2.4.6, SciPy 1.17.1); every cell in
+`research/v2/confirmation_evidence/CONFIRMATION_EVIDENCE.md`; the JSONs are what the gate reads.
+
+| profile | procedure | operating domain (size passes at every T) | largest in-domain k | reference power (T grid) | verdict |
+|---|---|---|---:|---|---|
+| PF-1 | `P-HAC-L5` | `iid_normal`, `garch11`, `t3` | 428 | 4,387 / 4,402 pass | validated for series with no detectable serial dependence (`acf1` bound `0 + 2 / sqrt(T)`); every AR(1) cell fails (rho 0.1 at T = 250: 477; rho 0.2: 534-589; rho 0.5: 938-1,049) and every overlapping-position cell fails (h = 2: 574-581; h = 5: 1,115-1,228) |
+| PF-1 | `P-CBB` | none (iid normal 504-576) | - | 4,473 / 4,438 | no domain: the percentile bootstrap's own resampling variability (D-73) |
+| PF-2 | `P-HAC-L20` | `iid_normal`, `ar1` rho 0.1-0.3, `garch11`, `t3` | 459 | 4,136 / 4,318 pass | validated up to `acf1` 0.3 + `2 / sqrt(T)`; rho 0.5 fails (504, 531); every overlapping-position cell fails (h = 20: 1,412-1,511; h = 60: 6,112-6,689) |
+| PF-2 | `P-HAC-L60` | none (size passes on every non-overlap cell incl. rho 0.5, 220-407, but the reference power cells fail: 3,001 / 3,862 < 4,047) | - | fail | no domain: underpowered (12-18 reference df); overlap cells 573-1,785 |
+| PF-2 | `P-CBB` | none (iid normal 466-553) | - | 4,445 / 4,439 | no domain (D-73) |
+
+Budget, measured with the two profiles running at once on a shared machine: PF-1 1,398 s, PF-2 1,728 s of cell time
+(about 23 and 29 minutes); the smoke subset in CI is 4 cells at n = 200 per profile (seconds).
+
+Consequence for registrations: PF-1 admits a 1-5 session book only when its daily series shows no detectable serial
+dependence; PF-2 admits a 20-60 session book only up to AR(1)-like dependence 0.3 and never the MA dependence that
+overlapping holding-period returns carry. A family whose series fails these screens is refused and needs a profile
+revision (D-73), not a longer lag chosen after the fact.

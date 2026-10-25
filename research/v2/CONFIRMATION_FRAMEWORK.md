@@ -38,7 +38,7 @@ the domain.
 | random streams | synthetic study: SplitMix64 as `python/tests/spec/r3_generators.py`, cell seed `20320000 + 10000 * profile_index + 100 * kind + cell_index` (kind 0 size, 1 power), development series at `+ 5000`; bootstrap resample indices from numpy PCG64 `default_rng(cell seed)`; a registration under a bootstrap procedure names its own `bootstrap_seed`; disjoint from R0's 20301000-20301500 |
 | size acceptance | per cell `n = 20,000`; pass iff `k <= 463` (`scipy.stats.beta.ppf(0.95, 464, 19537) = 0.02498`); P(pass) 0.999 at true 0.020, 0.048 at 0.025 |
 | power acceptance | per reference cell `n = 5,000`; pass iff detections `>= 4,047` (one-sided 95 % lower bound 0.800) at the planted effect with theoretical power 0.90 under the profile's reference model; every other cell's power is reported with its lower bound and no acceptance |
-| operating domain | per procedure: the generator cells whose size cells pass at EVERY `T` of the profile's grid; a procedure whose reference (iid normal) cells do not all pass has no domain |
+| operating domain | per procedure: the generator cells whose size cells pass at EVERY `T` of the profile's grid; a procedure whose reference (iid normal) cells do not all pass the size acceptance, or whose reference power cells do not all pass the power acceptance (an underpowered procedure passes size trivially), has no domain |
 | evidence | `research/v2/confirmation_evidence/<profile>_RESULTS.json` and `CONFIRMATION_EVIDENCE.md`, written once by `python/tests/spec/pf_suite.py --write`; the gate reads the JSON; a re-run with other seeds is a new profile revision, never a retry |
 
 ## 3. The five ruled-out practices (V2-C6; each is refused or impossible by construction)

@@ -480,7 +480,8 @@ def operating_domain(profile_id: str, root: Path | str | None = None) -> dict[st
     """The committed operating domain of a profile, read from its evidence file: per
     procedure the generator cells (name, params) whose size cells pass at EVERY T of the
     profile's grid, the smallest validated T, and whether the reference (iid normal) cells
-    pass.  ``None`` when there is no evidence (then every decision is refused)."""
+    pass both size and power acceptance (a procedure whose reference power cells fail is
+    underpowered and has no operating domain).  ``None`` when there is no evidence (then every decision is refused)."""
     path = evidence_path(profile_id, root)
     try:
         doc = json.loads(path.read_text(encoding="utf-8"))
@@ -496,8 +497,16 @@ def operating_domain(profile_id: str, root: Path | str | None = None) -> dict[st
     if prof is None or prof.deferred:
         return None
     cells = [c for c in doc.get("cells", []) if c.get("kind") == "size"]
+    power_ref = [
+        c
+        for c in doc.get("cells", [])
+        if c.get("kind") == "power" and c.get("generator") == "iid_normal"
+    ]
     out: dict[str, Any] = {}
     for proc in prof.procedures:
+        power_ok = bool(power_ref) and all(
+            c.get("procedures", {}).get(proc, {}).get("result") == "pass" for c in power_ref
+        )
         passed: dict[str, set[int]] = {}
         failed: set[str] = set()
         for cell in cells:
@@ -522,10 +531,13 @@ def operating_domain(profile_id: str, root: Path | str | None = None) -> dict[st
             if _gen_key(g, p) not in seen:
                 seen.add(_gen_key(g, p))
                 uniq.append((g, p))
+        if not power_ok:
+            uniq = []  # an underpowered procedure has no operating domain (framework section 2)
         out[proc] = {
             "generators": uniq,
             "T_min": min(prof.T_grid),
-            "reference_passes": ("iid_normal", {}) in uniq,
+            "reference_passes": ("iid_normal", {}) in uniq and power_ok,
+            "reference_power_passes": power_ok,
             "acf1_max": max([generator_acf1(g, p) for g, p in uniq], default=0.0),
             "garch_in_domain": any(g == "garch11" for g, _ in uniq),
             "t3_in_domain": any(g == "t3" for g, _ in uniq),
