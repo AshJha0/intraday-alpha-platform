@@ -42,7 +42,10 @@ def test_workflow_is_manual_only_in_the_sealed_environment_on_the_runner_identit
     # actions/checkout; owner run 40215808482), then checked out from that output and
     # nothing else runs before the checkout
     resolve = steps[0]
-    assert resolve.get("id") == "resolve" and "repos/${{ github.repository }}/commits/" in resolve["run"]
+    assert (
+        resolve.get("id") == "resolve"
+        and "repos/${{ github.repository }}/commits/" in resolve["run"]
+    )
     checkout = steps[1]
     assert checkout["uses"].startswith("actions/checkout@")
     assert checkout["with"]["ref"] == "${{ steps.resolve.outputs.sha }}"
