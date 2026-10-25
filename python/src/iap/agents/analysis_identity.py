@@ -46,7 +46,20 @@ every other input that can change a result
 * ``deps_lock_sha256``: the hashed lock ``python/requirements-ci.txt``, and
   ``environment``: the installed version of every package the lock pins (a
   matching lock with a drifted environment is refused);
-* ``interpreter``: implementation and exact ``major.minor.micro``.
+* ``interpreter``: implementation and exact ``major.minor.micro``;
+* ``image_digest`` (v2.0 stage 3 P1, optional): the digest of the pinned
+  reproduction image (``deployment/docker/IMAGE_DIGEST``, the image
+  ``deployment/docker/Dockerfile.repro`` builds).  A block that carries it can
+  only run inside that image: the runner declares the image it was started
+  from in ``IAP_IMAGE_DIGEST`` (the registered-run workflow sets it from the
+  same digest it pulls) and a missing or different value is a mismatch.  A
+  block without it is verified as before, so earlier v2 preregs stay valid.
+
+Paths.  Every path in a block is repo-relative with ``/`` separators, and
+every check takes the checkout root as an argument, so the same block
+verifies at ``C:\\Work\\...`` on the laptop and at ``/work`` inside the
+container (:func:`verify_identity` and :func:`environment_mismatches` take
+``root``; nothing reads the working directory).
 
 Datasets are bound by ``data_versions``, which are content hashes
 (``iap.marketdata.ingest.real_dataset_version``): a changed byte is a
@@ -58,6 +71,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -77,6 +91,10 @@ REFERENCE_REL = "data/reference"
 #: environment variables whose presence means this process can sign
 SIGNING_ENV = ("IAP_MAINTAINER_KEY", "IAP_SIGNING_KEY", "IAP_AGENT_PRIVATE_KEY", "IAP_KEYFILE")
 ACTOR_ENV = "IAP_RUN_ACTOR"
+#: the digest of the reproduction image the running process was started from
+IMAGE_DIGEST_ENV = "IAP_IMAGE_DIGEST"
+IMAGE_DIGEST_REL = "deployment/docker/IMAGE_DIGEST"
+_DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 
 class SignatureError(ValueError):
@@ -189,6 +207,18 @@ def interpreter() -> str:
     return f"{sys.implementation.name}-{v.major}.{v.minor}.{v.micro}"
 
 
+def read_image_digest(root: Path) -> str | None:
+    """The one-line ``deployment/docker/IMAGE_DIGEST`` (``sha256:<64 hex>``), or
+    ``None`` when the checkout has none; a malformed file is an error."""
+    p = Path(root) / IMAGE_DIGEST_REL
+    if not p.is_file():
+        return None
+    text = p.read_text(encoding="utf-8").strip()
+    if not _DIGEST.match(text):
+        raise IdentityError(f"{IMAGE_DIGEST_REL} is not one line sha256:<64 hex>: {text[:80]!r}")
+    return text
+
+
 def input_fingerprints(root: Path, inputs: Sequence[str]) -> dict[str, str]:
     out = {}
     for rel in sorted(inputs):
@@ -254,12 +284,18 @@ def build_identity(
     thresholds: Mapping[str, Any],
     commit: str | None = None,
     inputs: Sequence[str] = (),
+    image_digest: str | None = None,
 ) -> dict[str, Any]:
-    """The (version 2) block to embed in a prereg draft before the owner signs it."""
+    """The (version 2) block to embed in a prereg draft before the owner signs it.
+
+    ``image_digest`` pins the reproduction image the analysis must run in
+    (``sha256:<64 hex>``); ``None`` binds no image."""
     c = commit or head_commit(root)
     if not c:
         raise IdentityError("not a git checkout: the identity needs an exact commit")
-    return {
+    if image_digest is not None and not _DIGEST.match(image_digest):
+        raise IdentityError(f"image digest must be sha256:<64 hex>, got {image_digest!r}")
+    block = {
         "identity_version": IDENTITY_VERSION,
         "scripts": script_fingerprints(root, scripts),
         "inputs": input_fingerprints(root, inputs),
@@ -270,6 +306,9 @@ def build_identity(
         "metrics": sorted(metrics),
         "thresholds": dict(thresholds),
     }
+    if image_digest is not None:
+        block["image_digest"] = image_digest
+    return block
 
 
 def verify_identity(
@@ -281,15 +320,23 @@ def verify_identity(
     metrics: Sequence[str],
     thresholds: Mapping[str, Any],
     legacy_ok: bool = False,
+    env: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Compare what is about to run (arguments, plus the files on disk) with the
-    signed block; raise :class:`IdentityError` listing every mismatch."""
+    """Compare what is about to run (arguments, plus the files on disk and the
+    process environment) with the signed block; raise :class:`IdentityError`
+    listing every mismatch.  ``env`` defaults to ``os.environ``."""
     if not bound:
         if legacy_ok:
             return {"legacy": True}
         raise IdentityError("the signed prereg binds no analysis_identity; refusing to run")
     version = identity_version(bound)
-    bad = environment_mismatches(root, bound)
+    # the two-argument call is kept when no env is given: runner tests replace
+    # environment_mismatches with a two-argument double
+    bad = (
+        environment_mismatches(root, bound)
+        if env is None
+        else environment_mismatches(root, bound, env=env)
+    )
     commit = bound.get("commit")
     head = head_commit(root)
     if not commit or head is None:
@@ -314,10 +361,14 @@ def verify_identity(
     }
 
 
-def environment_mismatches(root: Path, bound: Mapping[str, Any]) -> list[str]:
+def environment_mismatches(
+    root: Path, bound: Mapping[str, Any], env: Mapping[str, str] | None = None
+) -> list[str]:
     """Every difference between the checkout / process and ``bound`` that needs
     no runner declaration: scripts and code tree and, for v2, inputs,
-    configs, reference data, lock, installed packages and interpreter.
+    configs, reference data, lock, installed packages, interpreter and (when
+    bound) the reproduction image digest declared in ``env``
+    (:data:`IMAGE_DIGEST_ENV`; ``env`` defaults to ``os.environ``).
     :func:`verify_identity` and the holdout guard both use it (a prereg
     cannot authorise a holdout read from code it did not bind)."""
     version = identity_version(bound)
@@ -361,6 +412,17 @@ def environment_mismatches(root: Path, bound: Mapping[str, Any]) -> list[str]:
     )
     if drift:
         bad.append(f"installed packages differ from the bound environment: {drift}")
+    want_image = bound.get("image_digest")
+    if want_image:
+        e = os.environ if env is None else env
+        got = e.get(IMAGE_DIGEST_ENV)
+        if not got:
+            bad.append(
+                f"the prereg binds reproduction image {want_image[:19]}... but {IMAGE_DIGEST_ENV} "
+                "is not set: not running inside the pinned image"
+            )
+        elif got != want_image:
+            bad.append(f"reproduction image {got} is not the bound {want_image}")
     return bad
 
 

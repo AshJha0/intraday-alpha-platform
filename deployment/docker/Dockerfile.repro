@@ -1,0 +1,95 @@
+# =============================================================================
+# Dockerfile.repro — IAP v2.0 stage 3 (P1): the pinned reproduction and
+# registered-runner image.
+#
+# What it is: the CI-locked Python environment and nothing else. CPython
+# 3.12.10 (the interpreter every v1.18 identity-v2 prereg binds, section 1 of
+# docs/release/F7_REPRODUCTION_GUIDE.md) plus every package of the hashed CI
+# lock python/requirements-ci.txt, installed with --require-hashes. The
+# repository is NOT baked in: the runner (and the reproduction job) mounts a
+# checkout of the bound commit at /work, so one image serves every commit and
+# the image digest in deployment/docker/IMAGE_DIGEST is what a prereg pins
+# (v2.0 U0 section 2: "the image digest is in the prereg").
+#
+# No Rust or C++ toolchain, deliberately. The two reproduction targets of
+# docs/REPRODUCTION.md are Python: B8 v2 `analyse` (research/execution/b8v2/
+# run_b8v2.py, re-derives DECISION.json and REPORT.md from the committed
+# benchmark JSONs) and the REL-08 scorecard render (tools/repro/
+# render_rel08_scorecard.py over the committed screen JSON). The full REL-08
+# screen needs a feature store built with the Rust feature engine
+# (F7 guide section 4.4); that store is market data, not a public file, so it
+# is outside this image on purpose. Add a toolchain only when a reproduction
+# target needs one, and say which.
+#
+# Build (from the REPO ROOT; CI does this in .github/workflows/repro-image.yml):
+#   docker build -f deployment/docker/Dockerfile.repro \
+#       --label org.iap.repro.inputs_sha256=$(python3 tools/repro/image_inputs.py --hash) .
+#
+# Run (no network at run time: nothing in a reproduction fetches anything, and
+# --network none makes that a property of the run, not a promise):
+#   docker run --rm --network none \
+#       -v "$PWD:/work:ro" -v "$PWD/repro_out:/out" \
+#       -e IAP_IMAGE_DIGEST="$(cat deployment/docker/IMAGE_DIGEST)" \
+#       ghcr.io/ashjha0/intraday-alpha-platform-repro@$(cat deployment/docker/IMAGE_DIGEST) \
+#       research/preregs/b8v2_prereg.json -- analyse --out /out/b8v2
+#
+# The ENTRYPOINT (deployment/docker/repro_entrypoint.py, installed as
+# iap-repro) takes a signed prereg or rule, reads its analysis_identity, checks
+# what is about to run against it (scripts, code tree, commit, lock, packages,
+# interpreter, image digest) and runs the bound runner script with the
+# arguments after `--`. `--require-identity` makes any mismatch a refusal (the
+# registered runner's mode); without it the mismatches are printed and
+# recorded, which is the re-derivation mode of docs/REPRODUCTION.md.
+#
+# Image pinning policy (docs/governance/SECURITY.md): the base is pinned by
+# digest (tag kept for readability); Dependabot's docker ecosystem proposes
+# bumps, and tests/harness/check_deployment.py refuses an unpinned FROM.
+# =============================================================================
+FROM python:3.12.10-slim-bookworm@sha256:fd95fa221297a88e1cf49c55ec1828edd7c5a428187e67b5d1805692d11588db
+
+# git: iap.agents.analysis_identity.head_commit and the commit-ancestry check
+# read the mounted checkout's history. The Debian security fixes the pinned
+# base does not carry yet are taken here (as Dockerfile.cpp does).
+RUN apt-get update && \
+    apt-get upgrade -y --no-install-recommends && \
+    apt-get install -y --no-install-recommends git ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# Never run as root. uid/gid 10001, as the other iap images.
+RUN groupadd --gid 10001 iap && \
+    useradd --uid 10001 --gid iap --create-home --shell /usr/sbin/nologin iap
+
+# The hashed CI lock, exactly as the python/integration/golden jobs install it.
+# Nothing un-hashed is fetched; the iap package itself is NOT installed (the
+# mounted checkout's python/src is put on PYTHONPATH by the entrypoint, so the
+# code that runs is the bound commit's, not a copy frozen into the image).
+COPY python/requirements-ci.txt /opt/iap/requirements-ci.txt
+RUN pip install --no-cache-dir --require-hashes -r /opt/iap/requirements-ci.txt
+
+COPY deployment/docker/repro_entrypoint.py /usr/local/bin/iap-repro
+RUN chmod 0755 /usr/local/bin/iap-repro
+
+# /work: the checkout of the bound commit (mounted, read-only is fine).
+# /out:  where a runner writes (mounted, writable by uid 10001 or world-writable).
+RUN mkdir -p /work /out && chown iap:iap /work /out
+VOLUME ["/work", "/out"]
+
+USER iap
+WORKDIR /work
+
+# The mounted checkout is owned by another uid: without safe.directory git
+# refuses to read it and the identity check would report "exact commit
+# unavailable". Byte-code is never written (the checkout may be read-only and
+# a stray __pycache__ must not appear in a tree hash). UTF-8 everywhere.
+ENV GIT_CONFIG_COUNT=1 \
+    GIT_CONFIG_KEY_0=safe.directory \
+    GIT_CONFIG_VALUE_0=* \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONUTF8=1 \
+    IAP_REPO_ROOT=/work
+
+# No HEALTHCHECK: a reproduction is a finite batch run; its exit code is its
+# status (0 ran, 2 refused by the identity or runner, anything else an error).
+ENTRYPOINT ["python3", "/usr/local/bin/iap-repro"]
+CMD ["--help"]

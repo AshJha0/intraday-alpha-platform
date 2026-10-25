@@ -5,7 +5,9 @@ v1.18 REL-02a lets a signed prereg bind the analysis it authorises
 ``python/src/iap`` tree hash, the exact commit, data versions, family,
 metrics and thresholds; identity v2 also binds ``configs/``,
 ``data/reference/``, declared ``--inputs``, the dependency lock, the
-installed packages and the interpreter.  This tool builds that block for one protocol
+installed packages, the interpreter and (v2.0 stage 3 P1) the digest of the
+pinned reproduction image, taken from ``deployment/docker/IMAGE_DIGEST``
+unless ``--image-digest`` / ``--no-image-digest`` says otherwise.  This tool builds that block for one protocol
 document and writes the unsigned prereg JSON; ``sign`` is the separate step
 the coordinator (owner delegation) runs on a machine holding the maintainer
 key.  Neither step reads data or touches the ledger.
@@ -55,6 +57,7 @@ from iap.agents.analysis_identity import (  # noqa: E402
     IdentityError,
     build_identity,
     head_commit,
+    read_image_digest,
     verify_identity,
 )
 from iap.agents.planted_dry_run import (  # noqa: E402
@@ -170,7 +173,8 @@ def cmd_bind(a: argparse.Namespace) -> int:
     check_committed(root, committed)
     commit = head_commit(root)
     try:
-        block = build_identity(root, commit=commit, **inputs)
+        image = None if a.no_image_digest else (a.image_digest or read_image_digest(root))
+        block = build_identity(root, commit=commit, image_digest=image, **inputs)
     except IdentityError as exc:
         raise Refused(str(exc)) from exc
     doc = {
@@ -199,7 +203,8 @@ def cmd_bind(a: argparse.Namespace) -> int:
         fh.write(json.dumps(doc, indent=2, sort_keys=True, ensure_ascii=True) + "\n")
     print(
         f"wrote {out_rel}: commit {commit}, {len(block['scripts'])} scripts, "
-        f"code tree {block['code_tree_sha256'][:12]}; NOT signed"
+        f"code tree {block['code_tree_sha256'][:12]}, image "
+        f"{block.get('image_digest') or 'NOT bound'}; NOT signed"
     )
     return 0
 
@@ -293,6 +298,16 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="committed planted dry-run report (iap.agents.planted_dry_run) to bind as the "
         "dry_run block; without it, sign refuses",
+    )
+    b.add_argument(
+        "--image-digest",
+        help="reproduction image to bind (sha256:<64 hex>); default: the one line of "
+        "deployment/docker/IMAGE_DIGEST when the checkout has it (v2.0 stage 3 P1)",
+    )
+    b.add_argument(
+        "--no-image-digest",
+        action="store_true",
+        help="bind no image (the analysis may run outside the pinned image)",
     )
     b.add_argument("--dry-run", action="store_true", help="print the document, write nothing")
     s = sub.add_parser("sign", help="(coordinator only) verify the identity, then sign")

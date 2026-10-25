@@ -398,6 +398,7 @@ figure in this README from the artefact that produces it.
 | [tests/README.md](tests/README.md) | the six-level testing strategy with exact commands and the golden inventory |
 | [deployment/grafana/README.md](deployment/grafana/README.md) | dashboards and observability stack (incl. the trace metrics) |
 | [python/src/iap/README.md](python/src/iap/README.md) | the Python package map, module by module |
+| [docs/REPRODUCTION.md](docs/REPRODUCTION.md) | v2.0 stage 3 P1: the pinned reproduction image (`Dockerfile.repro`, digest in `deployment/docker/IMAGE_DIGEST`), the in-image reproduction of B8 v2 and the REL-08 scorecard with its exact commands, the status vocabulary ("reproduced in the pinned image by CI" is not "reproduced independently") and the P2 hand-over |
 | [docs/SHOWCASE.md](docs/SHOWCASE.md) | the three-minute read for a newcomer: what is proven, what is not, the re-derived numbers, one diagram, a ten-minute quick start |
 | [docs/EXECUTION_QUALITY.md](docs/EXECUTION_QUALITY.md) | v1.17 execution quality: the implementation-shortfall benchmark and its depth-cap finding, signal-aware urgency and pacing, the realism layer |
 | [docs/PORTFOLIO_BREADTH.md](docs/PORTFOLIO_BREADTH.md) | v1.17 breadth: the universe rule, the cross-sectional book through the optimiser, the breadth report and the breadth holdout rule |
