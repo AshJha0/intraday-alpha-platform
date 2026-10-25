@@ -351,7 +351,11 @@ def test_calibrated_router_is_recorded(pair, tmp_path):
     doc = _run(pair, tmp_path / "o", ["--venue-calibration", str(cal)])
     rm = doc["two_venue"]["router_models"]
     assert sorted(rm) == ["101", "102"]
-    assert doc["two_venue"]["calibration"] == str(cal)
+    # v2.0 stage 3 P1: runners write relative paths (execution_benchmark.portable_path)
+    from iap.research.execution_benchmark import portable_path
+
+    assert doc["two_venue"]["calibration"] == portable_path(cal)
+    assert "\\" not in doc["two_venue"]["calibration"]
 
 
 def test_pinning_to_an_absent_venue_is_refused(pair, tmp_path):

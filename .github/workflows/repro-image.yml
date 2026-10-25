@@ -1,0 +1,242 @@
+# =============================================================================
+# repro-image — v2.0 stage 3 (P1): the pinned reproduction and runner image,
+# and the in-image reproduction of B8 v2 and the REL-08 scorecard.
+#
+# One job, every pull request and every push to main:
+#
+#   1. inputs hash   tools/repro/image_inputs.py --hash: one sha256 over
+#                    deployment/docker/Dockerfile.repro and every file it COPYs
+#                    (python/requirements-ci.txt, repro_entrypoint.py).
+#   2. up to date?   deployment/docker/IMAGE_DIGEST names an image in GHCR whose
+#                    label org.iap.repro.inputs_sha256 equals that hash -> the
+#                    image is current; nothing is built. (An image build is not
+#                    bit-reproducible: apt and timestamps. "Same inputs" is
+#                    decided by the label, never by rebuilding.)
+#   3. build+push    otherwise the image is built and pushed to
+#                    ghcr.io/ashjha0/intraday-alpha-platform-repro (tags
+#                    inputs-<hash12> and sha-<commit12>; the DIGEST is the
+#                    identity), and the digest is written to IMAGE_DIGEST:
+#                      - on a pull request from this repository: committed to
+#                        the PR branch by github-actions[bot]. A push made with
+#                        GITHUB_TOKEN starts no workflow, so ci.yml and this
+#                        workflow are then dispatched on the branch
+#                        (workflow_dispatch IS allowed for GITHUB_TOKEN) and the
+#                        new head gets its checks; if a required check still
+#                        shows as missing, an empty commit pushed by a person
+#                        re-triggers everything.
+#                      - on a push to main (the lock changed under a PR that did
+#                        not carry it): a branch repro-image/digest-<sha12> with
+#                        the digest and a pull request for it.
+#                      - from a fork or without push rights: the image is built
+#                        locally, not pushed; the digest of record is NOT
+#                        updated and the job summary says what to run
+#                        (gh workflow run repro-image.yml --ref <branch>).
+#   4. reproduce     tools/repro/reproduce.sh inside the image by digest:
+#                    --network none, checkout mounted read-only, uid 10001;
+#                    B8 v2 `analyse` and the REL-08 scorecard render compared
+#                    byte for byte with the committed files (docs/REPRODUCTION.md).
+#                    The report is an artefact and the job summary; the job
+#                    fails when a file of record is not reproduced.
+#   5. trivy         the published image scanned for fixable HIGH/CRITICAL
+#                    vulnerabilities, report-only (the Python lock is owned by
+#                    Dependabot; a finding here is a lock bump, not a failed
+#                    reproduction).
+#
+# The digest file is what tools/runner (registered-run.yml) pulls and what
+# tools/prereg_bind_identity.py binds into every new prereg.
+# =============================================================================
+name: repro-image
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: repro-image-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/ashjha0/intraday-alpha-platform-repro
+  LABEL: org.iap.repro.inputs_sha256
+  DIGEST_FILE: deployment/docker/IMAGE_DIGEST
+
+jobs:
+  repro:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: write        # commit the digest to the PR branch / the follow-up branch
+      packages: write        # push the image to GHCR
+      actions: write         # dispatch ci.yml and this workflow on the digest commit
+      pull-requests: write   # the follow-up pull request on main
+    env:
+      # push rights: a branch of this repository (not a fork), or a push / dispatch
+      CAN_PUSH: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+      HEAD_BRANCH: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # the PR's head branch (not the merge ref): the digest commit goes there
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref || '' }}
+          fetch-depth: 0   # git log / git archive: the scorecard's commit, --code-at
+
+      - name: inputs hash and the digest of record
+        id: inputs
+        run: |
+          hash=$(python3 tools/repro/image_inputs.py --hash)
+          digest=$(tr -d '[:space:]' < "$DIGEST_FILE" 2>/dev/null || true)
+          echo "hash=$hash" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "inputs sha256 $hash; digest of record '${digest:-none}'"
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        if: env.CAN_PUSH == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: is the image of record built from these inputs?
+        id: check
+        env:
+          DIGEST: ${{ steps.inputs.outputs.digest }}
+          HASH: ${{ steps.inputs.outputs.hash }}
+        run: |
+          up=false
+          if [ -n "$DIGEST" ]; then
+            if docker pull -q "$IMAGE@$DIGEST" >/dev/null 2>&1; then
+              label=$(docker image inspect --format "{{ index .Config.Labels \"$LABEL\" }}" "$IMAGE@$DIGEST")
+              echo "image of record carries $LABEL=$label"
+              [ "$label" = "$HASH" ] && up=true
+            else
+              echo "::warning::$IMAGE@$DIGEST cannot be pulled (not published, or GHCR not reachable)"
+            fi
+          fi
+          echo "up_to_date=$up" >> "$GITHUB_OUTPUT"
+          echo "up to date: $up"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        if: steps.check.outputs.up_to_date != 'true'
+
+      - name: build (and push) the reproduction image
+        id: build
+        if: steps.check.outputs.up_to_date != 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deployment/docker/Dockerfile.repro
+          push: ${{ env.CAN_PUSH == 'true' }}
+          load: ${{ env.CAN_PUSH != 'true' }}
+          provenance: false
+          sbom: false
+          tags: |
+            ${{ env.IMAGE }}:inputs-${{ steps.inputs.outputs.hash }}
+            ${{ env.IMAGE }}:sha-${{ github.sha }}
+          labels: |
+            ${{ env.LABEL }}=${{ steps.inputs.outputs.hash }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.description=IAP v2.0 pinned reproduction and runner image (deployment/docker/Dockerfile.repro)
+
+      - name: the digest this run reproduces with
+        id: digest
+        env:
+          UP: ${{ steps.check.outputs.up_to_date }}
+          RECORD: ${{ steps.inputs.outputs.digest }}
+          BUILT: ${{ steps.build.outputs.digest }}
+        run: |
+          if [ "$UP" = "true" ]; then
+            echo "ref=$IMAGE@$RECORD" >> "$GITHUB_OUTPUT"; echo "digest=$RECORD" >> "$GITHUB_OUTPUT"
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          elif [ "$CAN_PUSH" = "true" ] && [ -n "$BUILT" ]; then
+            echo "ref=$IMAGE@$BUILT" >> "$GITHUB_OUTPUT"; echo "digest=$BUILT" >> "$GITHUB_OUTPUT"
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "$BUILT" > "$DIGEST_FILE"
+            echo "published $IMAGE@$BUILT; $DIGEST_FILE updated"
+          else
+            echo "ref=$IMAGE:inputs-${{ steps.inputs.outputs.hash }}" >> "$GITHUB_OUTPUT"
+            echo "digest=" >> "$GITHUB_OUTPUT"; echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::image built locally and NOT pushed (no push rights from this event); the digest of record is unchanged. A maintainer runs: gh workflow run repro-image.yml --ref $HEAD_BRANCH"
+          fi
+
+      - name: record the digest on the pull request branch
+        if: steps.digest.outputs.published == 'true' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DIGEST: ${{ steps.digest.outputs.digest }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$DIGEST_FILE"
+          git commit -m "repro image: record digest $DIGEST (inputs ${{ steps.inputs.outputs.hash }})" \
+                     -m "Built and pushed by .github/workflows/repro-image.yml run ${{ github.run_id }}."
+          git push origin "HEAD:$HEAD_BRANCH"
+          echo "::notice::digest committed to $HEAD_BRANCH; dispatching ci.yml and repro-image.yml on it"
+          gh workflow run ci.yml --ref "$HEAD_BRANCH" || echo "::warning::could not dispatch ci.yml; push an empty commit to re-trigger the checks"
+          gh workflow run repro-image.yml --ref "$HEAD_BRANCH" || true
+
+      - name: open the follow-up pull request (main)
+        if: steps.digest.outputs.published == 'true' && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DIGEST: ${{ steps.digest.outputs.digest }}
+        run: |
+          branch="repro-image/digest-${GITHUB_SHA::12}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add "$DIGEST_FILE"
+          git commit -m "repro image: record digest $DIGEST (inputs ${{ steps.inputs.outputs.hash }})"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "repro image: record digest for inputs ${{ steps.inputs.outputs.hash }}" \
+            --body "The image inputs changed on main at ${GITHUB_SHA} without a digest update. Built and pushed \`$IMAGE@$DIGEST\` (run ${{ github.run_id }}). This PR records it in \`$DIGEST_FILE\`. A PR opened by GITHUB_TOKEN gets no automatic checks: run \`gh workflow run ci.yml --ref $branch\` or push an empty commit."
+          gh workflow run ci.yml --ref "$branch" || true
+
+      - name: reproduce B8 v2 and the REL-08 scorecard inside the image
+        env:
+          REF: ${{ steps.digest.outputs.ref }}
+        run: |
+          # the just-written digest file (or the one of record) is what the
+          # script passes as IAP_IMAGE_DIGEST; a locally built image has none.
+          bash tools/repro/reproduce.sh --image "$REF" --out repro_out
+
+      - name: reproduction report
+        if: always()
+        run: |
+          if [ -f repro_out/reproduction_report.md ]; then
+            cat repro_out/reproduction_report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "no reproduction report (the run did not reach the comparison)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          {
+            echo ""
+            echo "image ref: \`${{ steps.digest.outputs.ref }}\` (published this run: ${{ steps.digest.outputs.published }}; of record before: \`${{ steps.inputs.outputs.digest }}\`)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: reproduction-${{ github.sha }}
+          path: repro_out
+          if-no-files-found: ignore
+
+      - name: trivy image scan (HIGH/CRITICAL, fixable; report-only)
+        if: steps.digest.outputs.published == 'true'
+        continue-on-error: true
+        env:
+          REF: ${{ steps.digest.outputs.ref }}
+        run: |
+          curl -fsSL -o /tmp/trivy.tar.gz \
+            https://github.com/aquasecurity/trivy/releases/download/v0.74.0/trivy_0.74.0_Linux-64bit.tar.gz
+          echo "2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a  /tmp/trivy.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/trivy.tar.gz -C /tmp trivy
+          python3 tools/audit_ignores.py --tool trivy > /tmp/.trivyignore
+          /tmp/trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed \
+            --exit-code 1 --ignorefile /tmp/.trivyignore "$REF" \
+            || echo "::warning::trivy found fixable HIGH/CRITICAL vulnerabilities in the reproduction image (report-only; a lock or base bump fixes them)"

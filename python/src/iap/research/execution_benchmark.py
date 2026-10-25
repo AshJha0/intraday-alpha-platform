@@ -194,6 +194,31 @@ SYNTHETIC_SIGNAL = "synthetic"
 SYNTHETIC_PERIOD_S = 300.0
 SYNTHETIC_AMPLITUDE_Z = 1.5
 #: costs reported per cell, in bps of the arrival notional
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+
+
+def portable_path(p: object) -> str:
+    """A path as a result document records it (v2.0 stage 3 P1: runners write
+    relative paths).  Repo-relative with ``/`` separators when the path lies
+    under the checkout (``data/real/...``, ``research/...``), else relative to
+    the working directory when it lies under that, else the absolute path in
+    POSIX form.  A result produced on the laptop and one produced at ``/work``
+    in the reproduction image then record the same string, so a reproduction
+    compares the files byte for byte instead of masking five fields (F7 guide
+    section 3.4)."""
+    path = Path(str(p))
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return path.as_posix()
+    for base in (_REPO_ROOT, Path.cwd()):
+        try:
+            return resolved.relative_to(base.resolve()).as_posix()
+        except (ValueError, OSError):
+            continue
+    return resolved.as_posix()
+
+
 REPORT_COSTS = (
     "all_in",
     "shortfall",
@@ -915,7 +940,9 @@ def run_benchmark(
             "depletion_rate": (
                 "none (0)" if qcancel_params.depletion_per_s is None else "exec_hazard_per_s (X-4)"
             ),
-            "calibration": None if qcancel_calibration is None else str(qcancel_calibration),
+            "calibration": None
+            if qcancel_calibration is None
+            else portable_path(qcancel_calibration),
         },
         "rules": list(CANCEL_RULES),
     }
@@ -1536,8 +1563,8 @@ def run_benchmark(
         "schema": "iap.execution_benchmark/v1",
         "metrics_schema": "iap.execution_metrics/v2",
         "item": "v1.17 WS-B B1",
-        "data_dir": str(data_dir),
-        "config_dir": str(config_dir),
+        "data_dir": portable_path(data_dir),
+        "config_dir": portable_path(config_dir),
         "sessions": session_labels,
         "n_events": n_events,
         "grid": {
@@ -1557,7 +1584,7 @@ def run_benchmark(
             "size_basis": (
                 "% of the venue ADV in instruments.json (one venue, NOT consolidated); "
                 "size_pct_consolidated_adv is on each parent row"
-                + ("" if not consolidated else f" from {consolidated_adv}")
+                + ("" if not consolidated else f" from {portable_path(consolidated_adv)}")
                 + (
                     ""
                     if not no_consolidated
@@ -1612,11 +1639,11 @@ def run_benchmark(
             policies,
             list(mk_horizons),
             routes={r: (cfg.venues[pin_of[r]].name if r in pin_of else None) for r in routes_used},
-            second_data_dir=None if second_data_dir is None else str(second_data_dir),
+            second_data_dir=None if second_data_dir is None else portable_path(second_data_dir),
             iex_clock=iex_clock,
             unmatched=unmatched,
             merge_counts=merge_counts,
-            calibration=None if venue_calibration is None else str(venue_calibration),
+            calibration=None if venue_calibration is None else portable_path(venue_calibration),
             router_models={
                 str(v): {"p_fill_touch": m.p_fill_touch, "toxicity_bps": dict(m.toxicity_bps)}
                 for v, m in (router.models.items() if router is not None else ())

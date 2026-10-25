@@ -1,5 +1,9 @@
 # F7 reproduction guide for the outside reviewer (DRAFT)
 
+> Since v2.0 stage 3 P1 (2026-10-25) tiers A and B run inside the pinned reproduction image: see
+> [../REPRODUCTION.md](../REPRODUCTION.md) for the image, its digest, the exact commands and the status
+> vocabulary. This guide remains the reference for tier C (the market data).
+
 Status: **draft from a desk check, 2026-10-22. Nothing in this file was run.** Every command is
 copied from a runner or a committed document; every hash below was computed from the result
 files in the owner's run worktrees, not from `main` (the results are not committed yet, see
