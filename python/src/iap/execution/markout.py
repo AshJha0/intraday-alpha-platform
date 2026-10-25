@@ -413,6 +413,6 @@ def build_gated_timeline(
         if quoted and not two_sided:
             tl.add_halt(t)
         quoted = two_sided
-        if two_sided and not gated:
+        if bb is not None and ba is not None and not gated:  # (two_sided, narrowed for mypy)
             tl.append_state_pinned(t, bb[0] * tick_size, ba[0] * tick_size, bb[1], ba[1])
     return tl
