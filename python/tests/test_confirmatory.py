@@ -214,16 +214,18 @@ def test_r1c_legacy_paths_are_at_most_iterate_or_ineligible():
 
 
 def test_r1c_only_confirmatory_decide_constructs_promote():
-    """Enumeration: outside confirmatory.py, no module in python/src constructs a
-    PROMOTE verdict string or token (the contracts enum member and comparisons
-    against it are reads, not constructions)."""
+    """Enumeration: outside the two gates (confirmatory.py for H1 under R0;
+    profiles.py for every other registration under U13, D-74), no module in
+    python/src constructs a PROMOTE verdict string or token (the contracts enum
+    member and comparisons against it are reads, not constructions)."""
     constructors = []
     pattern = re.compile(
-        r"""(verdict\s*=\s*["']PROMOTE["']|PromoteToken\(|return\s+["']PROMOTE["'])"""
+        r"""(verdict\s*=\s*["']PROMOTE["']|PromoteToken\(|ProfileToken\(|outcome\s*=\s*["']PROMOTE["']|return\s+["']PROMOTE["'])"""
     )
+    gates = {"iap/validation/confirmatory.py", "iap/validation/profiles.py"}
     for p in SRC.rglob("*.py"):
         rel = p.relative_to(SRC).as_posix()
-        if rel == "iap/validation/confirmatory.py":
+        if rel in gates:
             continue
         for i, line in enumerate(p.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
             if pattern.search(line) and not line.lstrip().startswith("#"):
