@@ -24,7 +24,10 @@ def test_workflow_is_manual_only_in_the_sealed_environment_on_the_runner_identit
     wf = _workflow()
     on = wf[True] if True in wf else wf["on"]  # PyYAML reads the bare `on:` key as True
     assert list(on) == ["workflow_dispatch"], "only workflow_dispatch may start a registered run"
-    assert set(on["workflow_dispatch"]["inputs"]) == {"prereg", "commit"}
+    inputs = on["workflow_dispatch"]["inputs"]
+    assert set(inputs) == {"prereg", "commit", "mode", "year"}
+    assert inputs["mode"]["options"] == ["registered", "dd1"]
+    assert inputs["mode"]["default"] == "registered"
     assert wf["permissions"] == {"contents": "write"}
     assert wf["concurrency"] == {"group": "registered-run", "cancel-in-progress": False}
     jobs = wf["jobs"]
@@ -40,6 +43,13 @@ def test_workflow_is_manual_only_in_the_sealed_environment_on_the_runner_identit
     assert checkout["with"]["ref"] == "${{ inputs.commit }}"
     assert any("whoami" in (s.get("run") or "") for s in steps)
     assert any("tools/runner/run.py run" in (s.get("run") or "") for s in steps)
+    # DD1 (stage 2): the ingestion step runs only in mode dd1, the analysis only otherwise,
+    # under the same environment approval and runner identity, with the same single artifact
+    dd1 = [s for s in steps if "tools/ingest/dd1_daily.py run" in (s.get("run") or "")]
+    assert len(dd1) == 1 and dd1[0]["if"] == "${{ inputs.mode == 'dd1' }}"
+    analysis = [s for s in steps if "tools/runner/run.py run" in (s.get("run") or "")]
+    assert analysis[0]["if"] == "${{ inputs.mode != 'dd1' }}"
+    assert "--log results-log.redacted.txt" in dd1[0]["run"]
     uploads = [s for s in steps if (s.get("uses") or "").startswith("actions/upload-artifact@")]
     assert len(uploads) == 1 and uploads[0]["with"]["path"] == "results-log.redacted.txt"
     text = WORKFLOW.read_text(encoding="utf-8")

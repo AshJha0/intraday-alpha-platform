@@ -8,10 +8,11 @@ the `registered-run` workflow. Settings on GitHub are in [REPO_SETTINGS.md](REPO
 ## 1. An interpreter the service accounts can run
 
 The sealed accounts and `iap-runner` cannot read the owner's profile (`C:\Users\<owner>\...`), so a Python that
-lives there is unusable for them. Install CPython 3.12 for all users (for example `C:\Python312`), or copy the
-repository's CI virtual environment to a readable location, and keep the repository checkout used by the runner
-outside the owner's profile (the runner's own work directory below is fine). The pinned stack is installed by the
-workflow itself from `python/requirements-ci.txt` (`--require-hashes`).
+lives there is unusable for them. Install CPython 3.12.10 for all users at `C:\Python312` and clone the repository at
+`C:\iap\repo`, exactly as [`tools/admin/install_all_users_python.md`](../../tools/admin/install_all_users_python.md)
+describes (interpreter, pinned stack, checkout ACL, how the runner finds the interpreter, the optional
+`TIINGO_API_KEY` in `C:\actions-runner\.env`). The runner's own work directory below holds its checkout. The pinned
+stack is also installed by the workflow itself from `python/requirements-ci.txt` (`--require-hashes`).
 
 ## 2. The runner work directory
 
@@ -52,8 +53,8 @@ cd C:\actions-runner
 
 ## 5. The services the runner talks to
 
-One `tools/sealed_service.py serve` per partition, running as the partition's identity (SEALED_DATA.md
-section 5). The runner reaches them through `\\.\pipe\iap-sealed-<partition>`; no configuration on the runner
+One `tools/sealed_service.py serve` per partition, running as the partition's identity, installed by
+`tools/admin/install_sealed_services.ps1` (SEALED_DATA.md section 5). The runner reaches them through `\\.\pipe\iap-sealed-<partition>`; no configuration on the runner
 side. The runner's private cache is `C:\iap-sealed\runner\cache` (owned by `iap-runner`), created and emptied by
 `tools/runner/run.py` on every run.
 
@@ -69,6 +70,8 @@ side. The runner's private cache is `C:\iap-sealed\runner\cache` (owned by `iap-
 3. With the dry-registration fixture of `python/tests/runner/` the full procedure is exercised in CI on
    synthetic data; a real registration waits for a signed prereg with a `registered_run` block, the pinned
    image digest in `deployment/docker/IMAGE_DIGEST` (P1), and the owner's words.
+4. The first real run of the workflow is the DD1 ingestion in mode `dd1` (no prereg; the same approval and
+   identity): [DD1_INGESTION_RUNBOOK.md](DD1_INGESTION_RUNBOOK.md).
 
 ## 7. What the owner keeps
 
