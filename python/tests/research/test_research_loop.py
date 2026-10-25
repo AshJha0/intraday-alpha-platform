@@ -30,20 +30,24 @@ def environment_key() -> str:
 
 
 def expected_hash(manifest, name):
-    """The pinned hash: a string applies to every environment (the D-60 polish makes the share path CPU-independent); a mapping keyed by platform and Python version remains readable should a documented split ever be needed."""
+    """The pinned hash: a string applies to every environment (the D-69 polish makes the share path CPU-independent); a mapping keyed by platform and Python version remains readable should a documented split ever be needed."""
     pinned = manifest["expected_report_sha256"][name]
     if isinstance(pinned, str):
         return pinned
     return pinned.get(environment_key())
 
 
-def assert_pinned(manifest, name, sha):
+def assert_pinned(manifest, name, sha, report=None):
+    """The run's hash equals the pinned one; on a mismatch the canonical report is printed so a
+    CI log carries what differed (D-69: the cause is located by diffing reports, never by re-pinning)."""
     pinned = expected_hash(manifest, name)
     if pinned is None:
         pytest.skip(
             f"{name}: no pinned report hash for {environment_key()}; this environment produced {sha} "
-            "(record it in the fixture manifest, D-60)"
+            "(record it in the fixture manifest, D-69)"
         )
+    if sha != pinned and report is not None:
+        print(f"REPORT-{name}-BEGIN " + canonical_json(report) + f" REPORT-{name}-END")
     assert sha == pinned, (
         f"{name} on {environment_key()}: report hash {sha} differs from the pinned {pinned}"
     )
@@ -167,7 +171,7 @@ def d1_development(panel_path, manifest_path, tmp_path_factory):
 
 
 def test_d1_development_run_reproduces_the_committed_report_hash(d1_development, manifest) -> None:
-    assert_pinned(manifest, "d1_development", d1_development["sha256"])
+    assert_pinned(manifest, "d1_development", d1_development["sha256"], d1_development["report"])
     rep = d1_development["report"]
     assert report_hash(rep) == d1_development["sha256"]
     # the written report is the canonical JSON whose hash is recorded
@@ -249,7 +253,7 @@ def test_validation_run_is_a_different_look_with_its_own_hash(
         ledger_path=tmp_path / "l.json",
         identity="iap-dev",
     )
-    assert_pinned(manifest, "d1_validation", r["sha256"])
+    assert_pinned(manifest, "d1_validation", r["sha256"], r["report"])
     assert r["report"]["identity"]["partition"] == "validation"
     assert (
         r["report"]["identity"]["estimation_window"][1] <= manifest["partitions"]["development"][1]
@@ -270,7 +274,7 @@ def test_d3_exits_at_the_next_open_and_reproduces_its_hash(
         ledger_path=tmp_path / "l.json",
         identity="iap-dev",
     )
-    assert_pinned(manifest, "d3_development", r["sha256"])
+    assert_pinned(manifest, "d3_development", r["sha256"], r["report"])
     rows = r["run"].research_ledger
     assert rows and all(row["horizon"] == "c2o" for row in rows)
     # every cohort expires at an open (09:30) of the following session, not at a close
