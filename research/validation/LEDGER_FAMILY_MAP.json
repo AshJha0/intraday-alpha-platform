@@ -1,6 +1,6 @@
 {
  "schema": "ledger_family_map/1",
- "generated_utc": "2026-10-25T07:38:54Z",
+ "generated_utc": "2026-10-25T08:17:55Z",
  "sources": {
   "central_ledger": {
    "path": "research/experiments.json",
@@ -190,7 +190,7 @@
     "ledgers": [
      {
       "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
-      "key": "3dffca3b2f76413356ed6fe485283deaf266136c22f0c81412c7b4c2cd2e10c3",
+      "ledger_entry_key": "3dffca3b2f76413356ed6fe485283deaf266136c22f0c81412c7b4c2cd2e10c3",
       "kind": "design_horizon_scan",
       "looks": 216,
       "family": "real"
@@ -462,7 +462,7 @@
     "ledgers": [
      {
       "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
-      "key": "c5edd2e031597db7028acbeb8bbe17cc907858a254192d40a1c697be700ef852",
+      "ledger_entry_key": "c5edd2e031597db7028acbeb8bbe17cc907858a254192d40a1c697be700ef852",
       "kind": "promotion_pipeline",
       "looks": 84,
       "family": "real"
@@ -527,7 +527,7 @@
     "ledgers": [
      {
       "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
-      "key": "07ec64347e14b657234393a70aeca6045a18a99b72407adfcfd89df90d819615",
+      "ledger_entry_key": "07ec64347e14b657234393a70aeca6045a18a99b72407adfcfd89df90d819615",
       "kind": "promotion_pipeline",
       "looks": 84,
       "family": "real"
@@ -596,7 +596,7 @@
     "ledgers": [
      {
       "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
-      "key": "1b5113f6b719f27192744868979652f3704393087afabd572a275568a1846b2b",
+      "ledger_entry_key": "1b5113f6b719f27192744868979652f3704393087afabd572a275568a1846b2b",
       "kind": "promotion_pipeline",
       "looks": 84,
       "family": "real"
@@ -660,7 +660,7 @@
     "ledgers": [
      {
       "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
-      "key": "9cfeb67b8bcdc670e95f5c01cd3992bd6a307664cd532f75024b4329bc7207fd",
+      "ledger_entry_key": "9cfeb67b8bcdc670e95f5c01cd3992bd6a307664cd532f75024b4329bc7207fd",
       "kind": "promotion_pipeline",
       "looks": 84,
       "family": "real"
@@ -729,7 +729,7 @@
     "ledgers": [
      {
       "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
-      "key": "4b37907dd1f76da98f81083fdcc458a0e782847484aebff992b0f030f8f0d242",
+      "ledger_entry_key": "4b37907dd1f76da98f81083fdcc458a0e782847484aebff992b0f030f8f0d242",
       "kind": "promotion_pipeline",
       "looks": 84,
       "family": "real"
@@ -799,7 +799,7 @@
     "ledgers": [
      {
       "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
-      "key": "9c91a09b2eacc2af18635314d9f0c734e8c24ff0e30848f3dbd99728936e5e02",
+      "ledger_entry_key": "9c91a09b2eacc2af18635314d9f0c734e8c24ff0e30848f3dbd99728936e5e02",
       "kind": "promotion_pipeline",
       "looks": 84,
       "family": "real"
@@ -863,7 +863,7 @@
     "ledgers": [
      {
       "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
-      "key": "1f1ee9462970e70e78ad0cacbeb4b17d752030a8e2db0d32dd04070bfcc07d5a",
+      "ledger_entry_key": "1f1ee9462970e70e78ad0cacbeb4b17d752030a8e2db0d32dd04070bfcc07d5a",
       "kind": "promotion_pipeline",
       "looks": 84,
       "family": "real"
@@ -924,7 +924,7 @@
     "ledgers": [
      {
       "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
-      "key": "e80d36aff2881a22f8e64cca2d41c8cdaba7fbe01979a4ede4baeb7ea9cf56ad",
+      "ledger_entry_key": "e80d36aff2881a22f8e64cca2d41c8cdaba7fbe01979a4ede4baeb7ea9cf56ad",
       "kind": "promotion_pipeline",
       "looks": 84,
       "family": "real"
@@ -984,7 +984,7 @@
     "ledgers": [
      {
       "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
-      "key": "ebe5334991f67a97bc4dfe690f70f67fc150f8a761bafbcee5e1f049344df769",
+      "ledger_entry_key": "ebe5334991f67a97bc4dfe690f70f67fc150f8a761bafbcee5e1f049344df769",
       "kind": "promotion_pipeline",
       "looks": 84,
       "family": "real"
@@ -1052,7 +1052,7 @@
     "ledgers": [
      {
       "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
-      "key": "bb022177acddcc4727dcc06235c3635aa07a3e4c89e151cfc2566f8ac5edc9c4",
+      "ledger_entry_key": "bb022177acddcc4727dcc06235c3635aa07a3e4c89e151cfc2566f8ac5edc9c4",
       "kind": "promotion_pipeline",
       "looks": 84,
       "family": "real"
@@ -1122,7 +1122,7 @@
     "ledgers": [
      {
       "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
-      "key": "c610401afeed5002730404a318af75d535195c139e1da6e4f9cc2afde866c65f",
+      "ledger_entry_key": "c610401afeed5002730404a318af75d535195c139e1da6e4f9cc2afde866c65f",
       "kind": "promotion_pipeline",
       "looks": 84,
       "family": "real"
@@ -1182,7 +1182,7 @@
     "ledgers": [
      {
       "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
-      "key": "071b7502b1d84df6b1332385755885a93fc497452d1cb0751f7c806620d22936",
+      "ledger_entry_key": "071b7502b1d84df6b1332385755885a93fc497452d1cb0751f7c806620d22936",
       "kind": "promotion_pipeline",
       "looks": 84,
       "family": "real"

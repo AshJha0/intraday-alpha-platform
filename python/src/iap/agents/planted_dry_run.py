@@ -197,7 +197,7 @@ def _check_report(report: Mapping[str, Any], rel: str) -> None:
     missing = undemonstrated_values(report)
     if missing:
         empty = [
-            dem.get("observed")
+            str(dem.get("observed"))
             for dem in dems
             if isinstance(dem, Mapping) and not _usable(dem) and dem.get("observed") in missing
         ]

@@ -63,7 +63,7 @@ def test_the_1224_unmerged_external_looks_are_enumerated_not_merged(committed):
     assert u["total"] == 1224 and u["entries"] == 13 and "not merged" in u["status"]
     ext = [row for f in committed["families"].values() for row in f["external_unmerged"]["ledgers"]]
     assert len(ext) == 13 and sum(r["looks"] for r in ext) == 1224
-    assert len({r["key"] for r in ext}) == 13
+    assert len({r["ledger_entry_key"] for r in ext}) == 13
     assert all(r["path"].endswith("multi7/research/alpha_reports/experiments.json") for r in ext)
     # the central ledger is untouched: the chain head of the committed file is the one recorded
     central = json.loads((REPO / "research" / "experiments.json").read_text(encoding="utf-8"))

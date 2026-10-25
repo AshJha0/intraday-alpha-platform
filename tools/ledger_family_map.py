@@ -136,7 +136,7 @@ def build(
             row["external_unmerged"]["ledgers"].append(
                 {
                     "path": led["path"],
-                    "key": m["key"],
+                    "ledger_entry_key": m["key"],
                     "kind": m["kind"],
                     "looks": looks,
                     "family": m.get("family", "real"),
