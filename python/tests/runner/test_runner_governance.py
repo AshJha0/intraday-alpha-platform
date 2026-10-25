@@ -38,9 +38,14 @@ def test_workflow_is_manual_only_in_the_sealed_environment_on_the_runner_identit
     assert job["env"]["ACTIONS_STEP_DEBUG"] == "false"
     assert job["env"]["ACTIONS_RUNNER_DEBUG"] == "false"
     steps = job["steps"]
-    checkout = steps[0]
+    # the bound commit is resolved to its full SHA first (a short SHA is a branch name to
+    # actions/checkout; owner run 40215808482), then checked out from that output and
+    # nothing else runs before the checkout
+    resolve = steps[0]
+    assert resolve.get("id") == "resolve" and "repos/${{ github.repository }}/commits/" in resolve["run"]
+    checkout = steps[1]
     assert checkout["uses"].startswith("actions/checkout@")
-    assert checkout["with"]["ref"] == "${{ inputs.commit }}"
+    assert checkout["with"]["ref"] == "${{ steps.resolve.outputs.sha }}"
     assert any("whoami" in (s.get("run") or "") for s in steps)
     assert any("tools/runner/run.py run" in (s.get("run") or "") for s in steps)
     # DD1 (stage 2): the ingestion step runs only in mode dd1, the analysis only otherwise,
