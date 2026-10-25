@@ -15,7 +15,10 @@ finally:
 
 def test_slug_matches_github_rules():
     assert check_docs._slug("Quick start") == "quick-start"
-    assert check_docs._slug("3. The confirmatory gate, in plain words") == "3-the-confirmatory-gate-in-plain-words"
+    assert (
+        check_docs._slug("3. The confirmatory gate, in plain words")
+        == "3-the-confirmatory-gate-in-plain-words"
+    )
     assert check_docs._slug("`iap.core` and friends (v2.0)") == "iapcore-and-friends-v20"
     assert check_docs._slug("[LEARN](LEARN.md) section") == "learn-section"
 
