@@ -92,7 +92,7 @@ element is a missing element and leads to refusal, never to a pass.
 The numbers are the proposed bands of R0 section 4; the H1 prereg fixes them before T0, and a change there
 is applied to this plan as a new revision before the audit runs.
 
-**Multiplicity of the proposed screen (recorded, not resolved here; defect D-35).** The R0 band is stated per
+**Multiplicity of the proposed screen (recorded, not resolved here; defect D-39).** The R0 band is stated per
 hypothesis and per lag. Applied to K = 16 hypotheses and 5 lags it flags *independent* data often: at the
 nominal 5 % per test about 16 x (1 - 0.95^5) = 3.6 hypotheses are expected to show a lag interval excluding 0
 when nothing is wrong, and the family-level false-alarm rate of "any hypothesis disqualified" is about 98 %. The

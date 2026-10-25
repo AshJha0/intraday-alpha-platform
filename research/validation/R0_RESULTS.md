@@ -94,6 +94,6 @@ A pass means: under the predeclared synthetic data-generating processes of the c
 - R3-C/18/power_normal_homoskedastic_G10: P-IND, G = 10, K = 16, planted H00 at 1.8419 sd (theoretical power 0.9, one-sided Student t at alpha_op / K (the Holm floor), G - 1 df), generator normal_homoskedastic, n = 5000, detections 4487, lower bound 0.8901. Not carried over to P-BLK, tier 2 or the real-data H1 experiment (E4).
 - R3-C/19/power_normal_homoskedastic_G30: P-IND, G = 30, K = 16, planted H00 at 0.8543 sd (theoretical power 0.9, one-sided Student t at alpha_op / K (the Holm floor), G - 1 df), generator normal_homoskedastic, n = 5000, detections 4486, lower bound 0.8899. Not carried over to P-BLK, tier 2 or the real-data H1 experiment (E4).
 
-## References (defect D-36)
+## References (defect D-40)
 
 SciPy and the textbook implementations in `python/tests/test_confirmatory.py` agree with the gate at the R0 tolerances. The statsmodels comparison was not obtained locally (the cp312 statsmodels 0.15.0 wheel's compiled extension failed to import in the scratch environment); CI skips it with a reason. It stays owed.

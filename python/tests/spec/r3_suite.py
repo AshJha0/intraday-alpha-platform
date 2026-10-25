@@ -316,7 +316,7 @@ def write(doc: dict[str, Any], path: Path = RESULTS) -> None:
     existing = {}
     if path.is_file():
         existing = json.loads(path.read_text(encoding="utf-8"))
-    if "references" in existing:  # the D-36 statsmodels record is kept across re-runs
+    if "references" in existing:  # the D-40 statsmodels record is kept across re-runs
         doc["references"] = existing["references"]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
