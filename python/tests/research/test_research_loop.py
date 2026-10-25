@@ -32,7 +32,7 @@ def environment_key() -> str:
 
 
 def expected_hash(manifest, name):
-    """The pinned hash: a string applies to every environment (the D-69 polish makes the share path CPU-independent); a mapping keyed by platform and Python version remains readable should a documented split ever be needed."""
+    """The pinned hash: a string applies to every environment (the D-76 polish makes the share path CPU-independent); a mapping keyed by platform and Python version remains readable should a documented split ever be needed."""
     pinned = manifest["expected_report_sha256"][name]
     if isinstance(pinned, str):
         return pinned
@@ -58,12 +58,12 @@ def _cpu_summary() -> str:
 
 def assert_pinned(manifest, name, sha, report=None):
     """The run's hash equals the pinned one; on a mismatch the canonical report is printed so a
-    CI log carries what differed (D-69: the cause is located by diffing reports, never by re-pinning)."""
+    CI log carries what differed (D-76: the cause is located by diffing reports, never by re-pinning)."""
     pinned = expected_hash(manifest, name)
     if pinned is None:
         pytest.skip(
             f"{name}: no pinned report hash for {environment_key()}; this environment produced {sha} "
-            "(record it in the fixture manifest, D-69)"
+            "(record it in the fixture manifest, D-76)"
         )
     if sha != pinned and report is not None:
         print(f"REPORT-{name}-BEGIN " + canonical_json(report) + f" REPORT-{name}-END")

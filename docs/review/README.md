@@ -36,6 +36,15 @@
 | R4 planted dry run before signature (defect D-09): `iap.agents.planted_dry_run`; `tools/prereg_bind_identity.py` and `tools/rel08_rule_sign.py` refuse without a bound dry run; the REL-08 C1, REL-08c n = 0 and A0 fixtures refuse | [../../python/tests/test_planted_dry_run.py](../../python/tests/test_planted_dry_run.py) |
 | R5 real-data dependence audit: predeclared plan (parts A and B, the plan 5.12 decision rule) and runner; NOT RUN, no sealed or spent session opened | [../../research/v119/R5_DEPENDENCE_PLAN.md](../../research/v119/R5_DEPENDENCE_PLAN.md) |
 
+## v2.0 stage 10, U13 (confirmation framework and profiles)
+
+| item | file |
+|---|---|
+| confirmation framework (pre-registered family, Holm, economic screen, m_min, single read, fail-closed refusal, the five ruled-out practices, the registration record) | [../../research/v2/CONFIRMATION_FRAMEWORK.md](../../research/v2/CONFIRMATION_FRAMEWORK.md) |
+| profiles PF-1 and PF-2 specification (candidate procedures, block-length rule, synthetic domain, seeds, acceptance, screens, refusal fixtures), PF-3 domain questions | [../../python/tests/spec/CONFIRMATION_PROFILES.md](../../python/tests/spec/CONFIRMATION_PROFILES.md) |
+| synthetic size and power evidence per profile and cell, the operating domain per procedure (read by `iap.validation.profiles.decide`) | [../../research/v2/confirmation_evidence/CONFIRMATION_EVIDENCE.md](../../research/v2/confirmation_evidence/CONFIRMATION_EVIDENCE.md) + `PF-1_RESULTS.json`, `PF-2_RESULTS.json` |
+| defects D-68 to D-74 (reviewer freeze pending defaults) | [DEFECT_REGISTER_v1.19.md](DEFECT_REGISTER_v1.19.md) |
+
 ## Reproduction result (2026-10-18, `tools/reproduce_baseline.py`)
 
 - **At the bound commit `8fb189b` (REL-01): REPRODUCED.** Fresh clone from GitHub, venv from the
