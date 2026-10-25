@@ -93,7 +93,7 @@ research loop on a family specification, once pull request #389 lands, is
 | understand the method: point-in-time data, selection accounting, the gate, the economic chain, evidence classes | [docs/LEARN.md](docs/LEARN.md) |
 | run something that exists today | [docs/COOKBOOK.md](docs/COOKBOOK.md) |
 | find a package, an import rule, an identity or the runner flow | [docs/ARCHITECTURE_v2.md](docs/ARCHITECTURE_v2.md), [python/src/iap/README.md](python/src/iap/README.md) |
-| operate it day to day | [docs/RUNBOOK_v2.md](docs/RUNBOOK_v2.md), [docs/runbooks/](docs/runbooks/) |
+| operate it day to day | `docs/RUNBOOK_v2.md` (the stage 11 operator runbook, pull request #391, open as of 2026-10-25), [docs/runbooks/](docs/runbooks/) |
 | check what is enforced and by whom | [docs/governance/GOVERNANCE.md](docs/governance/GOVERNANCE.md), [docs/governance/TRUST_ROOTS.md](docs/governance/TRUST_ROOTS.md), [docs/governance/SEALED_DATA.md](docs/governance/SEALED_DATA.md), [docs/governance/RUNNER_THREAT_MODEL.md](docs/governance/RUNNER_THREAT_MODEL.md) |
 | reproduce a committed result | [docs/REPRODUCTION.md](docs/REPRODUCTION.md) |
 | know what data is used and under which licence | [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md), [docs/review/DATA_COVERAGE_FREE_ROUTE.md](docs/review/DATA_COVERAGE_FREE_ROUTE.md) |
