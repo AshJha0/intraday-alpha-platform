@@ -13,11 +13,16 @@ only - the runner never writes the blackboard.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from iap.agents.blackboard import Blackboard, BlackboardError, digest
+
+#: v1.19 R3 (defect D-08): the ledger family dependency map, ``tools/ledger_family_map.py``
+FAMILY_MAP_REL = "research/validation/LEDGER_FAMILY_MAP.json"
 
 
 class PreregistrationError(ValueError):
@@ -26,6 +31,58 @@ class PreregistrationError(ValueError):
 
 def board_path(repo_root: Path) -> Path:
     return Path(repo_root) / "research" / "agents" / "blackboard.jsonl"
+
+
+def family_map_path(repo_root: Path) -> Path:
+    return Path(repo_root) / FAMILY_MAP_REL
+
+
+def selection_history(
+    repo_root: Path, alpha_id: str, map_path: Path | None = None
+) -> dict[str, Any]:
+    """The selection-history fields of ``alpha_id``'s family from the committed ledger
+    family dependency map (v1.19 R3, defect D-08): the real-data looks the central
+    ledger records, the real looks external ledgers hold unmerged, their sum as the
+    lower bound on the family's search breadth, the families dependent on it through
+    looks on the same real dataset version and their looks, and the map's sha256.  A
+    family the map does not know (a new hypothesis) returns ``known: False`` and zero
+    counts.  :class:`PreregistrationError` when the map is missing or unreadable: the
+    gate never guesses a selection history."""
+    p = Path(map_path) if map_path else family_map_path(repo_root)
+    try:
+        raw = p.read_bytes()
+        doc = json.loads(raw.decode("utf-8"))
+        fams = doc["families"]
+    except (OSError, ValueError, KeyError) as exc:
+        raise PreregistrationError(f"{p}: ledger family map missing or unreadable ({exc})") from exc
+    fam = fams.get(alpha_id)
+    sha = hashlib.sha256(raw).hexdigest()
+    if fam is None:
+        return {
+            "family_id": alpha_id,
+            "known": False,
+            "central_real_looks": 0,
+            "central_synthetic_looks": 0,
+            "external_unmerged_looks": 0,
+            "real_looks_lower_bound": 0,
+            "dependent_families": [],
+            "dependent_real_looks_lower_bound": 0,
+            "map_sha256": sha,
+        }
+    dependent = list(fam.get("dependent_families", []))
+    return {
+        "family_id": alpha_id,
+        "known": True,
+        "central_real_looks": int(fam["central"]["real"]["looks"]),
+        "central_synthetic_looks": int(fam["central"]["synthetic"]["looks"]),
+        "external_unmerged_looks": int(fam["external_unmerged"]["looks"]),
+        "real_looks_lower_bound": int(fam["real_looks_lower_bound"]),
+        "dependent_families": dependent,
+        "dependent_real_looks_lower_bound": sum(
+            int(fams[b]["real_looks_lower_bound"]) for b in dependent if b in fams
+        ),
+        "map_sha256": sha,
+    }
 
 
 def _current(alpha_id: str) -> dict[str, Any] | None:
@@ -135,6 +192,20 @@ def require(
             )
         except IdentityError as exc:
             raise PreregistrationError(f"{alpha_id}/{horizon}: {exc}") from exc
+    # v1.19 R3 (defect D-08): the selection history of the family is attached from the
+    # ledger family dependency map when the repository carries one; a prereg that binds
+    # the map by hash (``ledger_family_map_sha256``) is refused when the committed map
+    # differs (the denominator it was registered against has changed).
+    bound_map = found["body"].get("ledger_family_map_sha256")
+    if bound_map is not None or family_map_path(repo_root).is_file():
+        history = selection_history(repo_root, alpha_id)
+        if bound_map is not None and bound_map != history["map_sha256"]:
+            raise PreregistrationError(
+                f"{alpha_id}/{horizon}: the pre-registration binds ledger family map "
+                f"{str(bound_map)[:12]} but the committed map is {history['map_sha256'][:12]}; "
+                "the selection history it was registered against has changed"
+            )
+        found = {**found, "selection_history": history}
     registered = found["body"].get("code")
     if registered is not None:
         now = (fingerprinter or _current)(alpha_id)

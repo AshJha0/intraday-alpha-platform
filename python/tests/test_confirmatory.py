@@ -1,6 +1,6 @@
 """R1 deterministic cases of the frozen R0 specification (section 6) and R2's R1-D.
 
-R1-A Student t against SciPy (and statsmodels when importable; defect D-29), P-BLK,
+R1-A Student t against SciPy (and statsmodels when importable; defect D-36), P-BLK,
 HAC and CR1 diagnostics; R1-B Holm against statsmodels / a textbook step-down with
 ties and all-equal p-values, the family check and the selection history; R1-C
 low-cluster promotion prevention and the enumeration test (only
@@ -25,16 +25,16 @@ from iap.validation import confirmatory as c
 REPO = Path(__file__).resolve().parents[2]
 SRC = REPO / "python" / "src"
 statsmodels = (
-    pytest.importorskip("statsmodels", reason="D-29: statsmodels is not in the CI lock")
+    pytest.importorskip("statsmodels", reason="D-36: statsmodels is not in the CI lock")
     if False
     else None
 )
 try:  # the comparison runs when statsmodels is importable (locally); CI skips it with a reason
     import statsmodels.api as sm
     import statsmodels.stats.multitest as smm
-except ImportError:  # pragma: no cover - CI lock has no statsmodels (D-29)
+except ImportError:  # pragma: no cover - CI lock has no statsmodels (D-36)
     sm = smm = None
-needs_statsmodels = pytest.mark.skipif(sm is None, reason="D-29: statsmodels is not in the CI lock")
+needs_statsmodels = pytest.mark.skipif(sm is None, reason="D-36: statsmodels is not in the CI lock")
 
 REL = 1e-10
 ABS_P = 1e-12

@@ -1,0 +1,1711 @@
+{
+ "schema": "ledger_family_map/1",
+ "generated_utc": "2026-10-25T07:38:54Z",
+ "sources": {
+  "central_ledger": {
+   "path": "research/experiments.json",
+   "sha256": "e1f15f6889a3d2b504aa8a5dd66c2b78497f15b6697f00e6beb635a32197994e",
+   "entries": 640,
+   "looks": 6826,
+   "chain_head": "5dc957df3bf2674307ebe8da14a3cd037a54c3fc013b8b049a353817a752e669"
+  },
+  "inventory": {
+   "path": "research/v118/LEDGER_INVENTORY.json",
+   "sha256": "2a2c7d09a36ece13930ecae60103d27436cae40186ef9185d46182a98a62375a"
+  },
+  "holdout_registry": {
+   "path": "research/holdout_registry.json",
+   "sha256": "f4cb10d37e834cb5b1f819c14a1830b555ab85e70f4962002d0f144f398d4d71"
+  },
+  "external_ledgers": [
+   {
+    "path": "<data-root>/holdout2026/research/experiments.json",
+    "sha256": "22f99d84f2c6891a486af949e52b5efbf728ac12a3cd5c10233b0dc9e24eb188",
+    "relation": "fully merged",
+    "dataset_versions": [
+     "d7f7ffd14fbc363550a5bc9afd886e36df0d851511f840615f1f089b22f5f237"
+    ],
+    "entries_missing": 0,
+    "looks_missing": 0,
+    "re_read": {
+     "sha256_matches_inventory": true,
+     "entries": 6
+    }
+   },
+   {
+    "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
+    "sha256": "31a4a707e5aa38c670d66e8d71f099dc867f82385d6511a5bc114779069071be",
+    "relation": "not merged",
+    "dataset_versions": [
+     "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+    ],
+    "entries_missing": 13,
+    "looks_missing": 1224,
+    "re_read": {
+     "sha256_matches_inventory": true,
+     "entries": 13
+    }
+   },
+   {
+    "path": "<data-root>/multi7/research/experiments.json",
+    "sha256": "fdde1533b6afa0c36969b09b3f0409b7c265245a329f04ecbaf65fee5bd6b857",
+    "relation": "fully merged",
+    "dataset_versions": [
+     "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+    ],
+    "entries_missing": 0,
+    "looks_missing": 0,
+    "re_read": {
+     "sha256_matches_inventory": true,
+     "entries": 4
+    }
+   },
+   {
+    "path": "<data-root>/r7_holdout/research/experiments.json",
+    "sha256": "7512f82108c2a4cf6e28faccf3783662819a6cc488f70d5996b799bc55ac69e6",
+    "relation": "fully merged",
+    "dataset_versions": [
+     "ca5d079831be4e63aa76e350bb840a29a6964c0152f4bbbcce5010269a193854"
+    ],
+    "entries_missing": 0,
+    "looks_missing": 0,
+    "re_read": {
+     "sha256_matches_inventory": true,
+     "entries": 2
+    }
+   }
+  ]
+ },
+ "unmerged_external_looks": {
+  "total": 1224,
+  "entries": 13,
+  "status": "enumerated, not merged (merging is the owner-approved ledger regenerate; research/v118/REL02_LEDGER_MIGRATION.md)"
+ },
+ "dependency_rule": "two families are dependent when they hold real-data looks on the same dataset version (central or external): a selection among them was made on shared data, so each one's looks count toward the other's selection history",
+ "groups_by_real_dataset_version": {
+  "535f4868b0a5f6d14305018142221bea100b615dcc3a212de4eb7a715aecd8fb": [
+   "B8"
+  ],
+  "ca5d079831be4e63aa76e350bb840a29a6964c0152f4bbbcce5010269a193854": [
+   "EQ05",
+   "EQ10"
+  ],
+  "d7f7ffd14fbc363550a5bc9afd886e36df0d851511f840615f1f089b22f5f237": [
+   "EQ01",
+   "EQ02",
+   "EQ04",
+   "EQ05",
+   "EQ07",
+   "EQ10"
+  ],
+  "dea2a6b03ae35df24e5c8751bea8ddcc0f9ca8b93e02c9e2fdb656b6ab62fd80": [
+   "B8"
+  ],
+  "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4": [
+   "ALL",
+   "B7",
+   "COMB_EQ",
+   "EQ01",
+   "EQ02",
+   "EQ03",
+   "EQ04",
+   "EQ05",
+   "EQ06",
+   "EQ07",
+   "EQ08",
+   "EQ09",
+   "EQ10",
+   "EQ11",
+   "EQ12"
+  ]
+ },
+ "selection_history_fields": {
+  "family_id": "the ledger alpha_id",
+  "central_real_looks": "real-data looks the central ledger records for the family",
+  "central_synthetic_looks": "synthetic looks (recorded, excluded from the real-data N)",
+  "external_unmerged_looks": "real looks in external ledgers not in the central ledger",
+  "real_looks_lower_bound": "central_real_looks + external_unmerged_looks (a lower bound: LEDGER_INVENTORY.md coverage statement)",
+  "dependent_families": "families with looks on the same real dataset version",
+  "dependent_real_looks_lower_bound": "the sum of real_looks_lower_bound over the dependent families",
+  "map_sha256": "sha256 of this file as read",
+  "known": "False when the family has no entry in the map (a new hypothesis): every count is 0"
+ },
+ "families": {
+  "AI4-deeplob": {
+   "central": {
+    "real": {
+     "entries": 1,
+     "looks": 1
+    },
+    "synthetic": {
+     "entries": 0,
+     "looks": 0
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "prereg|real": {
+     "entries": 1,
+     "looks": 1
+    }
+   },
+   "preregs": 1,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 1,
+   "real_dataset_versions": [],
+   "dependent_families": []
+  },
+  "ALL": {
+   "central": {
+    "real": {
+     "entries": 0,
+     "looks": 0
+    },
+    "synthetic": {
+     "entries": 1,
+     "looks": 216
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "design_horizon_scan|synthetic": {
+     "entries": 1,
+     "looks": 216
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 1,
+    "looks": 216,
+    "ledgers": [
+     {
+      "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
+      "key": "3dffca3b2f76413356ed6fe485283deaf266136c22f0c81412c7b4c2cd2e10c3",
+      "kind": "design_horizon_scan",
+      "looks": 216,
+      "family": "real"
+     }
+    ]
+   },
+   "real_looks_lower_bound": 216,
+   "real_dataset_versions": [
+    "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+   ],
+   "dependent_families": [
+    "B7",
+    "COMB_EQ",
+    "EQ01",
+    "EQ02",
+    "EQ03",
+    "EQ04",
+    "EQ05",
+    "EQ06",
+    "EQ07",
+    "EQ08",
+    "EQ09",
+    "EQ10",
+    "EQ11",
+    "EQ12"
+   ]
+  },
+  "AUC01": {
+   "central": {
+    "real": {
+     "entries": 3,
+     "looks": 3
+    },
+    "synthetic": {
+     "entries": 0,
+     "looks": 0
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "prereg|real": {
+     "entries": 3,
+     "looks": 3
+    }
+   },
+   "preregs": 3,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 3,
+   "real_dataset_versions": [],
+   "dependent_families": []
+  },
+  "B7": {
+   "central": {
+    "real": {
+     "entries": 44,
+     "looks": 44
+    },
+    "synthetic": {
+     "entries": 0,
+     "looks": 0
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "execution_study|real": {
+     "entries": 44,
+     "looks": 44
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 44,
+   "real_dataset_versions": [
+    "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+   ],
+   "dependent_families": [
+    "ALL",
+    "COMB_EQ",
+    "EQ01",
+    "EQ02",
+    "EQ03",
+    "EQ04",
+    "EQ05",
+    "EQ06",
+    "EQ07",
+    "EQ08",
+    "EQ09",
+    "EQ10",
+    "EQ11",
+    "EQ12"
+   ]
+  },
+  "B8": {
+   "central": {
+    "real": {
+     "entries": 162,
+     "looks": 162
+    },
+    "synthetic": {
+     "entries": 0,
+     "looks": 0
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "execution_study|real": {
+     "entries": 162,
+     "looks": 162
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 162,
+   "real_dataset_versions": [
+    "535f4868b0a5f6d14305018142221bea100b615dcc3a212de4eb7a715aecd8fb",
+    "dea2a6b03ae35df24e5c8751bea8ddcc0f9ca8b93e02c9e2fdb656b6ab62fd80"
+   ],
+   "dependent_families": []
+  },
+  "COMB_EQ": {
+   "central": {
+    "real": {
+     "entries": 4,
+     "looks": 380
+    },
+    "synthetic": {
+     "entries": 17,
+     "looks": 549
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "combination|real": {
+     "entries": 4,
+     "looks": 380
+    },
+    "combination|synthetic": {
+     "entries": 17,
+     "looks": 549
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 380,
+   "real_dataset_versions": [
+    "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+   ],
+   "dependent_families": [
+    "ALL",
+    "B7",
+    "EQ01",
+    "EQ02",
+    "EQ03",
+    "EQ04",
+    "EQ05",
+    "EQ06",
+    "EQ07",
+    "EQ08",
+    "EQ09",
+    "EQ10",
+    "EQ11",
+    "EQ12"
+   ]
+  },
+  "COMB_FX": {
+   "central": {
+    "real": {
+     "entries": 0,
+     "looks": 0
+    },
+    "synthetic": {
+     "entries": 17,
+     "looks": 549
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "combination|synthetic": {
+     "entries": 17,
+     "looks": 549
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 0,
+   "real_dataset_versions": [],
+   "dependent_families": []
+  },
+  "EQ01": {
+   "central": {
+    "real": {
+     "entries": 5,
+     "looks": 88
+    },
+    "synthetic": {
+     "entries": 30,
+     "looks": 308
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "adaptive_deployment|synthetic": {
+     "entries": 20,
+     "looks": 20
+    },
+    "experiment_runner|real": {
+     "entries": 1,
+     "looks": 84
+    },
+    "experiment_runner|synthetic": {
+     "entries": 5,
+     "looks": 144
+    },
+    "net_of_cost_screen|real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "prereg|real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 2,
+   "external_unmerged": {
+    "entries": 1,
+    "looks": 84,
+    "ledgers": [
+     {
+      "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
+      "key": "c5edd2e031597db7028acbeb8bbe17cc907858a254192d40a1c697be700ef852",
+      "kind": "promotion_pipeline",
+      "looks": 84,
+      "family": "real"
+     }
+    ]
+   },
+   "real_looks_lower_bound": 172,
+   "real_dataset_versions": [
+    "d7f7ffd14fbc363550a5bc9afd886e36df0d851511f840615f1f089b22f5f237",
+    "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+   ],
+   "dependent_families": [
+    "ALL",
+    "B7",
+    "COMB_EQ",
+    "EQ02",
+    "EQ03",
+    "EQ04",
+    "EQ05",
+    "EQ06",
+    "EQ07",
+    "EQ08",
+    "EQ09",
+    "EQ10",
+    "EQ11",
+    "EQ12"
+   ]
+  },
+  "EQ02": {
+   "central": {
+    "real": {
+     "entries": 3,
+     "looks": 86
+    },
+    "synthetic": {
+     "entries": 5,
+     "looks": 144
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "experiment_runner|real": {
+     "entries": 1,
+     "looks": 84
+    },
+    "net_of_cost_screen|real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 1,
+    "looks": 84,
+    "ledgers": [
+     {
+      "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
+      "key": "07ec64347e14b657234393a70aeca6045a18a99b72407adfcfd89df90d819615",
+      "kind": "promotion_pipeline",
+      "looks": 84,
+      "family": "real"
+     }
+    ]
+   },
+   "real_looks_lower_bound": 170,
+   "real_dataset_versions": [
+    "d7f7ffd14fbc363550a5bc9afd886e36df0d851511f840615f1f089b22f5f237",
+    "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+   ],
+   "dependent_families": [
+    "ALL",
+    "B7",
+    "COMB_EQ",
+    "EQ01",
+    "EQ03",
+    "EQ04",
+    "EQ05",
+    "EQ06",
+    "EQ07",
+    "EQ08",
+    "EQ09",
+    "EQ10",
+    "EQ11",
+    "EQ12"
+   ]
+  },
+  "EQ03": {
+   "central": {
+    "real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "synthetic": {
+     "entries": 35,
+     "looks": 452
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "adaptive_deployment|synthetic": {
+     "entries": 20,
+     "looks": 20
+    },
+    "experiment_runner|synthetic": {
+     "entries": 10,
+     "looks": 288
+    },
+    "net_of_cost_screen|real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 1,
+    "looks": 84,
+    "ledgers": [
+     {
+      "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
+      "key": "1b5113f6b719f27192744868979652f3704393087afabd572a275568a1846b2b",
+      "kind": "promotion_pipeline",
+      "looks": 84,
+      "family": "real"
+     }
+    ]
+   },
+   "real_looks_lower_bound": 86,
+   "real_dataset_versions": [
+    "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+   ],
+   "dependent_families": [
+    "ALL",
+    "B7",
+    "COMB_EQ",
+    "EQ01",
+    "EQ02",
+    "EQ04",
+    "EQ05",
+    "EQ06",
+    "EQ07",
+    "EQ08",
+    "EQ09",
+    "EQ10",
+    "EQ11",
+    "EQ12"
+   ]
+  },
+  "EQ04": {
+   "central": {
+    "real": {
+     "entries": 3,
+     "looks": 86
+    },
+    "synthetic": {
+     "entries": 5,
+     "looks": 144
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "experiment_runner|real": {
+     "entries": 1,
+     "looks": 84
+    },
+    "net_of_cost_screen|real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 1,
+    "looks": 84,
+    "ledgers": [
+     {
+      "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
+      "key": "9cfeb67b8bcdc670e95f5c01cd3992bd6a307664cd532f75024b4329bc7207fd",
+      "kind": "promotion_pipeline",
+      "looks": 84,
+      "family": "real"
+     }
+    ]
+   },
+   "real_looks_lower_bound": 170,
+   "real_dataset_versions": [
+    "d7f7ffd14fbc363550a5bc9afd886e36df0d851511f840615f1f089b22f5f237",
+    "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+   ],
+   "dependent_families": [
+    "ALL",
+    "B7",
+    "COMB_EQ",
+    "EQ01",
+    "EQ02",
+    "EQ03",
+    "EQ05",
+    "EQ06",
+    "EQ07",
+    "EQ08",
+    "EQ09",
+    "EQ10",
+    "EQ11",
+    "EQ12"
+   ]
+  },
+  "EQ05": {
+   "central": {
+    "real": {
+     "entries": 7,
+     "looks": 91
+    },
+    "synthetic": {
+     "entries": 5,
+     "looks": 144
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "experiment_runner|real": {
+     "entries": 2,
+     "looks": 86
+    },
+    "net_of_cost_screen|real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "prereg|real": {
+     "entries": 3,
+     "looks": 3
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 3,
+   "external_unmerged": {
+    "entries": 1,
+    "looks": 84,
+    "ledgers": [
+     {
+      "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
+      "key": "4b37907dd1f76da98f81083fdcc458a0e782847484aebff992b0f030f8f0d242",
+      "kind": "promotion_pipeline",
+      "looks": 84,
+      "family": "real"
+     }
+    ]
+   },
+   "real_looks_lower_bound": 175,
+   "real_dataset_versions": [
+    "ca5d079831be4e63aa76e350bb840a29a6964c0152f4bbbcce5010269a193854",
+    "d7f7ffd14fbc363550a5bc9afd886e36df0d851511f840615f1f089b22f5f237",
+    "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+   ],
+   "dependent_families": [
+    "ALL",
+    "B7",
+    "COMB_EQ",
+    "EQ01",
+    "EQ02",
+    "EQ03",
+    "EQ04",
+    "EQ06",
+    "EQ07",
+    "EQ08",
+    "EQ09",
+    "EQ10",
+    "EQ11",
+    "EQ12"
+   ]
+  },
+  "EQ06": {
+   "central": {
+    "real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "synthetic": {
+     "entries": 35,
+     "looks": 452
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "adaptive_deployment|synthetic": {
+     "entries": 20,
+     "looks": 20
+    },
+    "experiment_runner|synthetic": {
+     "entries": 10,
+     "looks": 288
+    },
+    "net_of_cost_screen|real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 1,
+    "looks": 84,
+    "ledgers": [
+     {
+      "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
+      "key": "9c91a09b2eacc2af18635314d9f0c734e8c24ff0e30848f3dbd99728936e5e02",
+      "kind": "promotion_pipeline",
+      "looks": 84,
+      "family": "real"
+     }
+    ]
+   },
+   "real_looks_lower_bound": 86,
+   "real_dataset_versions": [
+    "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+   ],
+   "dependent_families": [
+    "ALL",
+    "B7",
+    "COMB_EQ",
+    "EQ01",
+    "EQ02",
+    "EQ03",
+    "EQ04",
+    "EQ05",
+    "EQ07",
+    "EQ08",
+    "EQ09",
+    "EQ10",
+    "EQ11",
+    "EQ12"
+   ]
+  },
+  "EQ07": {
+   "central": {
+    "real": {
+     "entries": 3,
+     "looks": 86
+    },
+    "synthetic": {
+     "entries": 5,
+     "looks": 144
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "experiment_runner|real": {
+     "entries": 1,
+     "looks": 84
+    },
+    "net_of_cost_screen|real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 1,
+    "looks": 84,
+    "ledgers": [
+     {
+      "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
+      "key": "1f1ee9462970e70e78ad0cacbeb4b17d752030a8e2db0d32dd04070bfcc07d5a",
+      "kind": "promotion_pipeline",
+      "looks": 84,
+      "family": "real"
+     }
+    ]
+   },
+   "real_looks_lower_bound": 170,
+   "real_dataset_versions": [
+    "d7f7ffd14fbc363550a5bc9afd886e36df0d851511f840615f1f089b22f5f237",
+    "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+   ],
+   "dependent_families": [
+    "ALL",
+    "B7",
+    "COMB_EQ",
+    "EQ01",
+    "EQ02",
+    "EQ03",
+    "EQ04",
+    "EQ05",
+    "EQ06",
+    "EQ08",
+    "EQ09",
+    "EQ10",
+    "EQ11",
+    "EQ12"
+   ]
+  },
+  "EQ08": {
+   "central": {
+    "real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "synthetic": {
+     "entries": 5,
+     "looks": 144
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "net_of_cost_screen|real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 1,
+    "looks": 84,
+    "ledgers": [
+     {
+      "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
+      "key": "e80d36aff2881a22f8e64cca2d41c8cdaba7fbe01979a4ede4baeb7ea9cf56ad",
+      "kind": "promotion_pipeline",
+      "looks": 84,
+      "family": "real"
+     }
+    ]
+   },
+   "real_looks_lower_bound": 86,
+   "real_dataset_versions": [
+    "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+   ],
+   "dependent_families": [
+    "ALL",
+    "B7",
+    "COMB_EQ",
+    "EQ01",
+    "EQ02",
+    "EQ03",
+    "EQ04",
+    "EQ05",
+    "EQ06",
+    "EQ07",
+    "EQ09",
+    "EQ10",
+    "EQ11",
+    "EQ12"
+   ]
+  },
+  "EQ09": {
+   "central": {
+    "real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "synthetic": {
+     "entries": 5,
+     "looks": 144
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "net_of_cost_screen|real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 1,
+    "looks": 84,
+    "ledgers": [
+     {
+      "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
+      "key": "ebe5334991f67a97bc4dfe690f70f67fc150f8a761bafbcee5e1f049344df769",
+      "kind": "promotion_pipeline",
+      "looks": 84,
+      "family": "real"
+     }
+    ]
+   },
+   "real_looks_lower_bound": 86,
+   "real_dataset_versions": [
+    "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+   ],
+   "dependent_families": [
+    "ALL",
+    "B7",
+    "COMB_EQ",
+    "EQ01",
+    "EQ02",
+    "EQ03",
+    "EQ04",
+    "EQ05",
+    "EQ06",
+    "EQ07",
+    "EQ08",
+    "EQ10",
+    "EQ11",
+    "EQ12"
+   ]
+  },
+  "EQ10": {
+   "central": {
+    "real": {
+     "entries": 7,
+     "looks": 91
+    },
+    "synthetic": {
+     "entries": 5,
+     "looks": 144
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "experiment_runner|real": {
+     "entries": 2,
+     "looks": 86
+    },
+    "net_of_cost_screen|real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "prereg|real": {
+     "entries": 3,
+     "looks": 3
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 3,
+   "external_unmerged": {
+    "entries": 1,
+    "looks": 84,
+    "ledgers": [
+     {
+      "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
+      "key": "bb022177acddcc4727dcc06235c3635aa07a3e4c89e151cfc2566f8ac5edc9c4",
+      "kind": "promotion_pipeline",
+      "looks": 84,
+      "family": "real"
+     }
+    ]
+   },
+   "real_looks_lower_bound": 175,
+   "real_dataset_versions": [
+    "ca5d079831be4e63aa76e350bb840a29a6964c0152f4bbbcce5010269a193854",
+    "d7f7ffd14fbc363550a5bc9afd886e36df0d851511f840615f1f089b22f5f237",
+    "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+   ],
+   "dependent_families": [
+    "ALL",
+    "B7",
+    "COMB_EQ",
+    "EQ01",
+    "EQ02",
+    "EQ03",
+    "EQ04",
+    "EQ05",
+    "EQ06",
+    "EQ07",
+    "EQ08",
+    "EQ09",
+    "EQ11",
+    "EQ12"
+   ]
+  },
+  "EQ11": {
+   "central": {
+    "real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "synthetic": {
+     "entries": 6,
+     "looks": 145
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "breadth_book|real": {
+     "entries": 1,
+     "looks": 1
+    },
+    "breadth_book|synthetic": {
+     "entries": 1,
+     "looks": 1
+    },
+    "net_of_cost_screen|real": {
+     "entries": 1,
+     "looks": 1
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 1,
+    "looks": 84,
+    "ledgers": [
+     {
+      "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
+      "key": "c610401afeed5002730404a318af75d535195c139e1da6e4f9cc2afde866c65f",
+      "kind": "promotion_pipeline",
+      "looks": 84,
+      "family": "real"
+     }
+    ]
+   },
+   "real_looks_lower_bound": 86,
+   "real_dataset_versions": [
+    "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+   ],
+   "dependent_families": [
+    "ALL",
+    "B7",
+    "COMB_EQ",
+    "EQ01",
+    "EQ02",
+    "EQ03",
+    "EQ04",
+    "EQ05",
+    "EQ06",
+    "EQ07",
+    "EQ08",
+    "EQ09",
+    "EQ10",
+    "EQ12"
+   ]
+  },
+  "EQ12": {
+   "central": {
+    "real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "synthetic": {
+     "entries": 5,
+     "looks": 144
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "net_of_cost_screen|real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 1,
+    "looks": 84,
+    "ledgers": [
+     {
+      "path": "<data-root>/multi7/research/alpha_reports/experiments.json",
+      "key": "071b7502b1d84df6b1332385755885a93fc497452d1cb0751f7c806620d22936",
+      "kind": "promotion_pipeline",
+      "looks": 84,
+      "family": "real"
+     }
+    ]
+   },
+   "real_looks_lower_bound": 86,
+   "real_dataset_versions": [
+    "ee4c218738683e5bc4249aa4a9e7302f32261c5855e97b3d337862b334333fb4"
+   ],
+   "dependent_families": [
+    "ALL",
+    "B7",
+    "COMB_EQ",
+    "EQ01",
+    "EQ02",
+    "EQ03",
+    "EQ04",
+    "EQ05",
+    "EQ06",
+    "EQ07",
+    "EQ08",
+    "EQ09",
+    "EQ10",
+    "EQ11"
+   ]
+  },
+  "FX01": {
+   "central": {
+    "real": {
+     "entries": 0,
+     "looks": 0
+    },
+    "synthetic": {
+     "entries": 25,
+     "looks": 164
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "adaptive_deployment|synthetic": {
+     "entries": 20,
+     "looks": 20
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 0,
+   "real_dataset_versions": [],
+   "dependent_families": []
+  },
+  "FX02": {
+   "central": {
+    "real": {
+     "entries": 0,
+     "looks": 0
+    },
+    "synthetic": {
+     "entries": 5,
+     "looks": 144
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 0,
+   "real_dataset_versions": [],
+   "dependent_families": []
+  },
+  "FX03": {
+   "central": {
+    "real": {
+     "entries": 0,
+     "looks": 0
+    },
+    "synthetic": {
+     "entries": 5,
+     "looks": 144
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 0,
+   "real_dataset_versions": [],
+   "dependent_families": []
+  },
+  "FX04": {
+   "central": {
+    "real": {
+     "entries": 0,
+     "looks": 0
+    },
+    "synthetic": {
+     "entries": 5,
+     "looks": 144
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 0,
+   "real_dataset_versions": [],
+   "dependent_families": []
+  },
+  "FX05": {
+   "central": {
+    "real": {
+     "entries": 0,
+     "looks": 0
+    },
+    "synthetic": {
+     "entries": 25,
+     "looks": 164
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "adaptive_deployment|synthetic": {
+     "entries": 20,
+     "looks": 20
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 0,
+   "real_dataset_versions": [],
+   "dependent_families": []
+  },
+  "FX06": {
+   "central": {
+    "real": {
+     "entries": 0,
+     "looks": 0
+    },
+    "synthetic": {
+     "entries": 25,
+     "looks": 164
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "adaptive_deployment|synthetic": {
+     "entries": 20,
+     "looks": 20
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 0,
+   "real_dataset_versions": [],
+   "dependent_families": []
+  },
+  "FX07": {
+   "central": {
+    "real": {
+     "entries": 0,
+     "looks": 0
+    },
+    "synthetic": {
+     "entries": 5,
+     "looks": 144
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 0,
+   "real_dataset_versions": [],
+   "dependent_families": []
+  },
+  "FX08": {
+   "central": {
+    "real": {
+     "entries": 0,
+     "looks": 0
+    },
+    "synthetic": {
+     "entries": 25,
+     "looks": 164
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "adaptive_deployment|synthetic": {
+     "entries": 20,
+     "looks": 20
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 0,
+   "real_dataset_versions": [],
+   "dependent_families": []
+  },
+  "FX09": {
+   "central": {
+    "real": {
+     "entries": 0,
+     "looks": 0
+    },
+    "synthetic": {
+     "entries": 25,
+     "looks": 164
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "adaptive_deployment|synthetic": {
+     "entries": 20,
+     "looks": 20
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 0,
+   "real_dataset_versions": [],
+   "dependent_families": []
+  },
+  "FX10": {
+   "central": {
+    "real": {
+     "entries": 0,
+     "looks": 0
+    },
+    "synthetic": {
+     "entries": 25,
+     "looks": 164
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "adaptive_deployment|synthetic": {
+     "entries": 20,
+     "looks": 20
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 0,
+   "real_dataset_versions": [],
+   "dependent_families": []
+  },
+  "FX11": {
+   "central": {
+    "real": {
+     "entries": 0,
+     "looks": 0
+    },
+    "synthetic": {
+     "entries": 25,
+     "looks": 164
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "adaptive_deployment|synthetic": {
+     "entries": 20,
+     "looks": 20
+    },
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 0,
+   "real_dataset_versions": [],
+   "dependent_families": []
+  },
+  "FX12": {
+   "central": {
+    "real": {
+     "entries": 0,
+     "looks": 0
+    },
+    "synthetic": {
+     "entries": 5,
+     "looks": 144
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "promotion_pipeline|synthetic": {
+     "entries": 5,
+     "looks": 144
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 0,
+   "real_dataset_versions": [],
+   "dependent_families": []
+  },
+  "META_ridge": {
+   "central": {
+    "real": {
+     "entries": 0,
+     "looks": 0
+    },
+    "synthetic": {
+     "entries": 1,
+     "looks": 1
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "metalabel_tau|synthetic": {
+     "entries": 1,
+     "looks": 1
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 0,
+   "real_dataset_versions": [],
+   "dependent_families": []
+  },
+  "ML_ZOO": {
+   "central": {
+    "real": {
+     "entries": 0,
+     "looks": 0
+    },
+    "synthetic": {
+     "entries": 2,
+     "looks": 2
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "model_zoo_gate|synthetic": {
+     "entries": 1,
+     "looks": 1
+    },
+    "primary_model_choice|synthetic": {
+     "entries": 1,
+     "looks": 1
+    }
+   },
+   "preregs": 0,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 0,
+   "real_dataset_versions": [],
+   "dependent_families": []
+  },
+  "QNOSKEW": {
+   "central": {
+    "real": {
+     "entries": 2,
+     "looks": 2
+    },
+    "synthetic": {
+     "entries": 0,
+     "looks": 0
+    },
+    "unknown": {
+     "entries": 0,
+     "looks": 0
+    }
+   },
+   "central_by_kind": {
+    "prereg|real": {
+     "entries": 2,
+     "looks": 2
+    }
+   },
+   "preregs": 2,
+   "external_unmerged": {
+    "entries": 0,
+    "looks": 0,
+    "ledgers": []
+   },
+   "real_looks_lower_bound": 2,
+   "real_dataset_versions": [],
+   "dependent_families": []
+  }
+ }
+}

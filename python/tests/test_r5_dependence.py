@@ -162,7 +162,7 @@ def test_independent_single_hypothesis_small_g_is_row_3_never_row_4():
 
 
 def test_independent_k16_panel_shows_the_multiplicity_of_the_r0_screen():
-    """Plan section 4 (defect D-28): the per-hypothesis R0 screen flags independent
+    """Plan section 4 (defect D-35): the per-hypothesis R0 screen flags independent
     data often at K = 16; the family-adjusted companion does not; the row follows the
     R0 screen as written (fail-closed)."""
     from scipy import stats
