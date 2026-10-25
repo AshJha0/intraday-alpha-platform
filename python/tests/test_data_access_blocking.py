@@ -24,7 +24,7 @@ IN_DAY = "2019-01-30"
 @pytest.fixture(autouse=True)
 def _env(tmp_path, monkeypatch):
     monkeypatch.setenv(hr.LOG_ENV, str(tmp_path / "access.jsonl"))
-    monkeypatch.delenv(hr.AUTH_ENV, raising=False)
+    monkeypatch.setattr(hr, "_AUTHORISED_ROOTS", set())  # D1: in-process, no env override
     return tmp_path / "access.jsonl"
 
 

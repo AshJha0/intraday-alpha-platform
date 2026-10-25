@@ -109,14 +109,14 @@ def feature_columns(names: Iterable[str]) -> list[str]:
 def iter_store(dirs: Iterable[str | Path], batch_rows: int = 65_536) -> Iterator[Chunk]:
     """Stream ``{column: ndarray}`` record batches from feature-store dirs."""
     import pyarrow as pa
-    import pyarrow.parquet as pq
+    from iap import io as iap_io
 
     for d in dirs:
         files = sorted(Path(d).glob("features_*.parquet"))
         if not files:
             raise FileNotFoundError(f"no features_*.parquet in {d}")
         for f in files:
-            pf = pq.ParquetFile(f)
+            pf = iap_io.parquet_file(f, purpose="drift")
             names = [
                 fld.name
                 for fld in pf.schema_arrow

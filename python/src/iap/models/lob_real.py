@@ -38,6 +38,7 @@ from pathlib import Path
 
 import numpy as np
 
+from iap import io as iap_io
 from iap.models.deeplob import smoothed_labels
 
 __all__ = [
@@ -74,11 +75,11 @@ def iter_events(session_dir: Path, iid: int, end_ns: int | None = None) -> Itera
     """``MarketEvent``s of one instrument, streamed row group by row group
     (never the whole session in memory; file order = event order)."""
     import pyarrow.compute as pc
-    import pyarrow.parquet as pq
 
+    from iap import io as iap_io
     from iap.core.events import MarketEvent
 
-    pf = pq.ParquetFile(Path(session_dir) / "normalized" / "events.parquet")
+    pf = iap_io.parquet_file(Path(session_dir) / "normalized" / "events.parquet", purpose="lob_real")
     for rg in range(pf.num_row_groups):
         t = pf.read_row_group(rg, columns=list(EVENT_COLS))
         mask = pc.equal(t.column("instrument_id"), iid)
@@ -279,9 +280,9 @@ def load_unit(path: Path, mmap: bool = True) -> tuple[np.ndarray, np.ndarray, np
     ``X`` is a read-only float16 memory map unless ``mmap`` is False."""
     path = Path(path)
     stem = path.name.removesuffix(".meta.npz").removesuffix(".X.npy")
-    with np.load(path.parent / f"{stem}.meta.npz") as z:
+    with iap_io.np_load(path.parent / f"{stem}.meta.npz", purpose="lob unit") as z:
         ts, mid = z["ts"], z["mid"]
-    x = np.load(path.parent / f"{stem}.X.npy", mmap_mode="r" if mmap else None)
+    x = iap_io.np_load(path.parent / f"{stem}.X.npy", mmap_mode="r" if mmap else None, purpose="lob unit")
     return ts, mid, x
 
 

@@ -160,9 +160,10 @@ def read_event_columns(
 ) -> EventColumns:
     """One instrument's events of an events parquet, file order, no ``pyarrow.dataset``."""
     import pyarrow.compute as pc
-    import pyarrow.parquet as pq
 
-    pf = pq.ParquetFile(path)
+    from iap import io as iap_io
+
+    pf = iap_io.parquet_file(path, purpose="research.events")
     cols = list(EVENT_COLUMNS)
     parts: dict[str, list[np.ndarray]] = {c: [] for c in cols}
     for rg in range(pf.num_row_groups):

@@ -42,6 +42,7 @@ from typing import Any
 
 import numpy as np
 
+from iap import io as iap_io
 from iap.models.deeplob import N_CLASSES
 from iap.models.deeplob_baselines import (
     BASELINES,
@@ -284,7 +285,7 @@ def train_eval(
                     continue
                 m = vu == u
                 ts, mid, x = va_units[u]
-                tick = float(np.load(p)["tick"])
+                tick = float(iap_io.np_load(p, purpose="lob_train tick")["tick"])
                 spread_px = (
                     np.asarray(x[:, 0], dtype=np.float64) - np.asarray(x[:, 2], dtype=np.float64)
                 ) * tick

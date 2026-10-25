@@ -22,6 +22,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from iap import io as iap_io
 NS_DAY = 86_400_000_000_000
 
 LABEL_PREFIXES = (
@@ -69,9 +70,9 @@ def load_features(
     ``columns``, when given, maps a file's column names to the subset to read
     (keeps memory bounded on multi-day real datasets)."""
     features_dir = Path(features_dir)
-    from iap.research.holdout_registry import reader_guard
+    from iap.core import guard
 
-    reader_guard(features_dir)  # holdout backstop: refuses before any parquet is read
+    guard.check(features_dir, "load_features")  # D1 choke point: refuses before any parquet is read
     paths = sorted(features_dir.glob("features_*.parquet"))
     if not paths:
         raise ValueError(f"no feature parquet files in {features_dir}")
@@ -88,7 +89,7 @@ def load_features(
             import pyarrow.parquet as pq
 
             wanted = list(columns(pq.read_schema(p).names))
-        df = pd.read_parquet(p, columns=wanted)
+        df = iap_io.read_parquet(p, columns=wanted, purpose="load_features")
         if not df["exchange_ts"].is_monotonic_increasing:
             df = df.sort_values("exchange_ts", kind="mergesort")
         out[iid] = df.reset_index(drop=True)

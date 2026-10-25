@@ -21,6 +21,7 @@ from pathlib import Path
 
 import numpy as np
 
+from iap import io as iap_io
 from iap.mlops.monitoring import MonitorThresholds, monitor
 from iap.mlops.registry import ModelRegistry, RegistryError
 
@@ -28,7 +29,7 @@ RESERVED = ("__pred__", "__y__")
 
 
 def _split(path: str) -> tuple[dict, np.ndarray | None, np.ndarray | None]:
-    with np.load(path) as z:
+    with iap_io.np_load(path, purpose="mlops monitor") as z:
         feats = {k: z[k] for k in z.files if k not in RESERVED}
         pred = z["__pred__"] if "__pred__" in z.files else None
         y = z["__y__"] if "__y__" in z.files else None

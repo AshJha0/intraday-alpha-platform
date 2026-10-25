@@ -24,6 +24,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from iap import io as iap_io
 from iap.models.conformal import AdaptiveConformal, SplitConformal, calibration_report
 
 
@@ -105,7 +106,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if a.synthetic is not None:
         df = synthetic_frame(a.synthetic, seed=a.seed)
     elif a.input.suffix == ".parquet":
-        df = pd.read_parquet(a.input)
+        df = iap_io.read_parquet(a.input, purpose="conformal_report")
     else:
         df = pd.read_csv(a.input)
     try:

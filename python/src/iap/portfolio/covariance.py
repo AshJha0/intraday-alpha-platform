@@ -42,6 +42,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from iap import io as iap_io
 from iap.core.shrinkage import ledoit_wolf
 
 _REPO = Path(__file__).resolve().parents[4]
@@ -72,7 +73,7 @@ def bars_from_features(
     series = {}
     for path in files:
         iid = int(path.stem.split("_")[1])
-        df = pd.read_parquet(path, columns=["exchange_ts", "mid_price_v1"])
+        df = iap_io.read_parquet(path, columns=["exchange_ts", "mid_price_v1"], purpose="covariance")
         df = df[np.isfinite(df["mid_price_v1"].to_numpy())]
         bucket = (df["exchange_ts"].to_numpy(dtype=np.int64) // bar_ns) * bar_ns
         # last observation per bucket (rows are time-ordered)
