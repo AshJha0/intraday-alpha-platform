@@ -12,6 +12,7 @@
 | defect register (D-01 to D-27, Class A/B/C, blocks column) | [DEFECT_REGISTER_v1.19.md](DEFECT_REGISTER_v1.19.md) |
 | baseline identities and document states | [BASELINE_v1_19.md](BASELINE_v1_19.md) |
 | data-route priced proposal (stage 0-A, B2a) | [DATA_ROUTE_PROPOSAL_v1.19.md](DATA_ROUTE_PROPOSAL_v1.19.md) |
+| v2.0 DP1 data pricing (stage 0; method, G4 checklist, licence summaries, cost columns awaiting key) | [DATA_PRICING_v2.md](DATA_PRICING_v2.md) |
 
 ## v2.0 stage 1, session A (R0-R5)
 

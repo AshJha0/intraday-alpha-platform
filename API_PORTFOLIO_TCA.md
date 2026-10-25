@@ -589,3 +589,24 @@ still `message`, so no TCA report or golden changed.
 [docs/FACTOR_RISK.md](docs/FACTOR_RISK.md)), `iap.risk.portfolio_limits` (`PortfolioGuard`, `LimitRefused`, kill switch)
 and `iap.portfolio.enforced` (`solve_enforced`, the optimizer under the limits; [docs/PORTFOLIO_LIMITS.md](docs/PORTFOLIO_LIMITS.md)).
 The order-level hard risk engine (`iap.risk.engine`, Rust parity) is unchanged.
+
+## 6. v2.0 EN2 ledgers and the cash identity — `iap.portfolio.ledger` (Python research; family-agnostic; not a port contract)
+
+`iap.portfolio.ledger.Ledger` holds the research cohort ledger (`iap.portfolio.ledger.CohortRecord` per
+`(family_id, horizon, cohort_id)`: intents, forecasts, optional `iap.portfolio.ledger.TradeDecision` rows, states
+`pending / live / closing / closed / unfilled / refused`, signal P&L and execution residual) and the executable ledger
+(aggregate positions, cash, fills). Per decision time: `decide(ts, mids, withhold=, pre_close=)` nets every cohort's
+intent per name into one order with the quantity states intended / mandatory / submitted / withheld; `fill(Fill)`
+records the one external fill under the convention `P = M_arrival + side * (half_spread + impact)` (refused
+otherwise); `settle()` crosses opposite intents at the decision mid, allocates (mandatory first in expiry order, then
+pro rata by largest remainder, ties to the lower cohort id), carries mandatory remainders as `outstanding` (the cohort
+enters `closing`), cancels discretionary ones, and checks the invariants (allocated cohort quantities equal aggregate
+holdings; intended = submitted + withheld; submitted = filled + outstanding + cancelled; no live cohort after expiry;
+gross under the cap). Per session: `open_session` sets `Equity_open = Cash_open + sum q_open V_open` (V_open the
+previous close's valuation) and charges the declared financing and borrow on carries; `close_session(valuations)`
+requires a `iap.portfolio.ledger.Valuation` for every held name (a flat-at-close family's residual needs a
+`closeout_failure` cause), marks every cohort, and returns `iap.portfolio.ledger.SessionResult` with
+`NetPnL = Cash_close + sum q_close V_close - Equity_open` and the waterfall (midpoint-reference P&L, latency drift,
+half-spread, impact, fees, execution residual, financing) reconciled to it within 1e-9 or refused.
+`apply_corporate_action` adjusts carried inventory between sessions, notional preserved, fractional shares refused.
+Every event is logged (`events`) so E2's reconstruction reads the log, not the accumulators.
