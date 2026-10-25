@@ -17,7 +17,7 @@ returns themselves are ingested only by ``fetch``.
 
 Availability: the library posts a month's daily rows some weeks after month
 end.  The contract declares ``publication_date`` with a 25-session lag (about
-five weeks) as the conservative default; D-39 in the defect register records
+five weeks) as the conservative default; D-41 in the defect register records
 it, and DD1 can tighten it per file from the library's observed posting dates.
 """
 
