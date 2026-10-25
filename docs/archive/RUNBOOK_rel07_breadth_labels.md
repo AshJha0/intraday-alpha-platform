@@ -1,3 +1,5 @@
+> **Retired 2026-10-25 (v2.0 docs audit):** a v1.18 REL-07 job that was never run and has no place on the v2.0 free daily route; kept for the record, not maintained (docs/DOC_AUDIT_v2.md).
+
 # Runbook: the 100-name 2019-01-30 rebuild for REL-07 (xasset_v2 + 15/30 m labels, volume clock)
 
 Status: NOT RUN. A machine job for after the IEX ingest chain on this 16 GB

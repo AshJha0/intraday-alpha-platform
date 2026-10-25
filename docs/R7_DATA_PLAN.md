@@ -2,8 +2,9 @@
 
 > **Status (2026-10-14): historical.** This was the v1.13 draft. The owner
 > approved and the plan ran in v1.15: the 7 holdout sessions were downloaded,
-> ingested and merged, R7-CONFIRM-1 was signed and both hypotheses were
-> confirmed ([research/R7_RESULTS.md](research/R7_RESULTS.md)). Paid data
+> ingested and merged, R7-CONFIRM-1 was signed and both hypotheses passed the
+> v1.15 gate ([research/R7_RESULTS.md](research/R7_RESULTS.md); under the v2.0
+> evidence classes the result is **data-ineligible**, re-issued 2026-10-24). Paid data
 > (Databento) was declined, and the v1.16 in-sample study did not trigger a
 > fresh-data purchase. The text below is kept as written.
 >

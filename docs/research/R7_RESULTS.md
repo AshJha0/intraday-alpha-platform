@@ -33,6 +33,11 @@ Every number below is copied from `research/r7/r7_confirm_result.json` /
 EQ10's holdout IC is above its in-sample IC; EQ05's is about two thirds of
 its in-sample IC. Both clear the gate by a wide margin.
 
+> **Superseded (v2.0 evidence class).** The two `confirmed` cells above are the v1.15 rule's
+> words, kept as the record. The result was re-issued on 2026-10-24 (next section) as
+> `ineligible`; under U0 section 10 its class is **data-ineligible**, and nothing on `main` is
+> confirmed.
+
 ## v1.18 re-issue (2026-10-24, gate F5)
 
 `research/r7/r7_confirm_result_reissue.json` re-issues the result at the registered
@@ -140,7 +145,8 @@ be used for AI4 development before then.
 
 ## What it means for v1.16
 
-EQ10 and EQ05 are now confirmed predictors on unseen data, but with 0 net P&L
+EQ10 and EQ05 passed the v1.15 gate on unseen data (a verdict since re-issued as
+`ineligible`, evidence class **data-ineligible**), but with 0 net P&L
 at 1x cost they are not a strategy. v1.16 is about monetisation: execution
 and sizing that turn a 1s IC of 0.04-0.08 into net P&L, tested under a new
 pre-registration (net-of-cost as the decision rule), plus the AI4 rebuild.

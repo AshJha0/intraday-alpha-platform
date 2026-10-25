@@ -323,6 +323,8 @@ confirmed". Statistical only: no P&L claim was registered.
 | EQ07 reversal @ 10s, sign + | control, expected to fail | −0.012 (−3.0) | −0.021 | −3.95 | 3.85 | **contradicted** (exit 3), as expected |
 | EQ04 trade flow @ 5s | control, expected underpowered | +0.014 (3.6) | +0.028 | 3.15 | 3.89 | weaker, not confirmed, as expected |
 
+> **Evidence class (v2.0, U0 section 10):** "confirmed" in this table is the v1.8 gate's word. The round was run by the developer on the developer's machine and the holdout is now spent, so under the v2.0 classes it is **development-supported** at most; no execution separation, no independent review ([REVIEW_PACK.md](REVIEW_PACK.md) section 0).
+
 Leakage passed on every run; fold sign consistency was 0.75 (EQ01, EQ02,
 EQ05, EQ04), 1.00 (EQ10) and 0.00 (EQ07). Reading it:
 
@@ -354,14 +356,15 @@ REL-10 and REL-04 verification pre-declarations.
 `holdout2026` is a manifest x-version 1 dataset (pre-v1.14 ingest rules, §4):
 the v1.8 table above is a v1.8 / v1.13-rules result, not a current-rules one.
 The confirmatory round on unseen sessions that followed (R7-CONFIRM-1, seven
-2025/26 sessions, EQ10 and EQ05 at 1 s, both `confirmed` on the statistic) is
+2025/26 sessions, EQ10 and EQ05 at 1 s, `confirmed` under the v1.15 rule and
+**data-ineligible** under v2.0 after the 2026-10-24 re-issue) is
 in [research/R7_RESULTS.md](research/R7_RESULTS.md). The recorded result file
 carries `gate_eligible: false` (it was run under the `v4` bundle where `v2` is
 required) and its deflated Sharpe was recorded at the wrong trial count; the DSR
 was recomputed at the registered N = 297 with the verdicts unchanged
 (`research/r7/r7_confirm_result_dsr_recompute.md`), but the result file was not
 re-issued (gate F5, partly met). No net-of-cost edge followed from either
-holdout: confirmed information coefficients of 0.03-0.10 at 1-5 s do not clear
+holdout: gate-passing information coefficients of 0.03-0.10 at 1-5 s do not clear
 the taker round trip (§3.2 above; `docs/SIGNAL_RESEARCH.md` section 8).
 
 **Multi-venue routing on real data (v1.12, X5).** Every real session in

@@ -2,8 +2,8 @@
 
 This file is the **normative copy** of the serialization policy in
 `PLATFORM_CONVENTIONS.md` §2. Any change here requires a version bump in the affected
-schema (`"x-version"`) and an entry in `schemas/MIGRATIONS.md`. All four languages
-(Python/C++/Rust/Java) must produce **byte-identical** files for the same event vector
+schema (`"x-version"`) and an entry in `schemas/MIGRATIONS.md`. All three live languages
+(Python/C++/Rust; the archived Java port at tag `archive/java-v1.14.0` did too) must produce **byte-identical** files for the same event vector
 (verified by SHA-256 in `tests/golden/expected_codec_sha256.json`).
 
 Two physical formats, identical semantics.
@@ -46,7 +46,7 @@ One event per line. Keys **exactly**, in **exactly this order**:
   Rust used `str::trim` and Python `str.strip`, whose Unicode set accepted VT/FF/NBSP, so
   one port rejected files the other two ingested (fixed 2026-09-20).
   The shared fixture `tests/golden/jsonl_reject_cases.txt` (REJECT block, then an `# ACCEPT`
-  block) is consumed by all four test suites.
+  block) is consumed by the three live test suites.
 
 ## 2. IAP1 binary (`*.iap1`)
 
