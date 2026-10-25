@@ -148,8 +148,12 @@ foreach ($x in $Partitions) {
     $state = (Get-ScheduledTask -TaskName $taskName).State
     Write-Host "task:      '$taskName' registered (at start-up, run whether user is logged on or not); state $state"
 
-    $ping = & $Python (Join-Path $Repo 'tools\sealed_service.py') ping --partition $x 2>&1
-    if ($LASTEXITCODE -eq 0) {
+    # stderr captured through cmd so a refusal line is text, not a terminating NativeCommandError
+    $pingOut = Join-Path $env:TEMP "iap-ping-$x.txt"
+    cmd /c "`"$Python`" `"$(Join-Path $Repo 'tools\sealed_service.py')`" ping --partition $x > `"$pingOut`" 2>&1"
+    $ping = (Get-Content $pingOut -Raw -ErrorAction SilentlyContinue)
+    if ($ping) { $ping = $ping.Trim() }
+    if ($LASTEXITCODE -eq 0 -or $ping -match 'Errno 13|Errno 22|caller_account') {
         Write-Host "pipe:      \\.\pipe\iap-sealed-$x answers: $ping (caller_account is the expected refusal for you)"
         $results[$x] = 'up'
     } else {
