@@ -59,6 +59,12 @@ RUN apt-get update && \
 RUN groupadd --gid 10001 iap && \
     useradd --uid 10001 --gid iap --create-home --shell /usr/sbin/nologin iap
 
+# The mounted checkout is owned by another uid: without safe.directory git
+# refuses to read it and the identity check would report "exact commit
+# unavailable". System config, not GIT_CONFIG_* env (trivy DS-0031 reads an
+# ENV named *_KEY_* as a possible secret).
+RUN git config --system safe.directory '*'
+
 # The hashed CI lock, exactly as the python/integration/golden jobs install it.
 # Nothing un-hashed is fetched; the iap package itself is NOT installed (the
 # mounted checkout's python/src is put on PYTHONPATH by the entrypoint, so the
@@ -77,14 +83,9 @@ VOLUME ["/work", "/out"]
 USER iap
 WORKDIR /work
 
-# The mounted checkout is owned by another uid: without safe.directory git
-# refuses to read it and the identity check would report "exact commit
-# unavailable". Byte-code is never written (the checkout may be read-only and
-# a stray __pycache__ must not appear in a tree hash). UTF-8 everywhere.
-ENV GIT_CONFIG_COUNT=1 \
-    GIT_CONFIG_KEY_0=safe.directory \
-    GIT_CONFIG_VALUE_0=* \
-    PYTHONDONTWRITEBYTECODE=1 \
+# Byte-code is never written (the checkout may be read-only and a stray
+# __pycache__ must not appear in a tree hash). UTF-8 everywhere.
+ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONUTF8=1 \
     IAP_REPO_ROOT=/work
