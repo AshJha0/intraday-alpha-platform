@@ -146,12 +146,18 @@ def test_write_before_serve_and_restart_reconciliation(tmp_path):
     assert svc2.handle({"op": "status"}, _caller(ss))[0]["pending"] == resp["checkpoint"]
     # publish needs the exact checkpoint and a commit
     bad = dict(resp["checkpoint"], seq=99)
-    assert svc2.handle({"op": "publish", "commit": "abcdef1", "checkpoint": bad}, _caller(ss))[0][
-        "error"
-    ] == "checkpoint_mismatch"
-    assert svc2.handle(
-        {"op": "publish", "commit": "not-hex", "checkpoint": resp["checkpoint"]}, _caller(ss)
-    )[0]["error"] == "commit_invalid"
+    assert (
+        svc2.handle({"op": "publish", "commit": "abcdef1", "checkpoint": bad}, _caller(ss))[0][
+            "error"
+        ]
+        == "checkpoint_mismatch"
+    )
+    assert (
+        svc2.handle(
+            {"op": "publish", "commit": "not-hex", "checkpoint": resp["checkpoint"]}, _caller(ss)
+        )[0]["error"]
+        == "commit_invalid"
+    )
     ok = svc2.handle(
         {"op": "publish", "commit": "0123abcd", "checkpoint": resp["checkpoint"]}, _caller(ss)
     )[0]
@@ -224,13 +230,42 @@ def test_result_hash_is_stored_once_and_verified(tmp_path):
     resp, stream = svc.handle(_read(make_prereg(priv, pub)), _caller(ss))
     list(stream)
     h = resp["prereg_sha256"]
-    svc.handle({"op": "publish", "commit": "abcdef12", "checkpoint": resp["checkpoint"]}, _caller(ss))
-    assert svc.handle({"op": "store_result", "prereg_sha256": "nope", "result_sha256": "a" * 64}, _caller(ss))[0]["error"] == "unknown_registration"
-    assert svc.handle({"op": "store_result", "prereg_sha256": h, "result_sha256": "short"}, _caller(ss))[0]["error"] == "result_sha256_invalid"
-    assert svc.handle({"op": "store_result", "prereg_sha256": h, "result_sha256": "a" * 64}, _caller(ss))[0]["ok"]
-    assert svc.handle({"op": "store_result", "prereg_sha256": h, "result_sha256": "b" * 64}, _caller(ss))[0]["error"] == "result_already_stored"
-    assert svc.handle({"op": "verify_result", "prereg_sha256": h, "result_sha256": "a" * 64}, _caller(ss))[0]["match"] is True
-    assert svc.handle({"op": "verify_result", "prereg_sha256": h, "result_sha256": "b" * 64}, _caller(ss))[0]["match"] is False
+    svc.handle(
+        {"op": "publish", "commit": "abcdef12", "checkpoint": resp["checkpoint"]}, _caller(ss)
+    )
+    assert (
+        svc.handle(
+            {"op": "store_result", "prereg_sha256": "nope", "result_sha256": "a" * 64}, _caller(ss)
+        )[0]["error"]
+        == "unknown_registration"
+    )
+    assert (
+        svc.handle(
+            {"op": "store_result", "prereg_sha256": h, "result_sha256": "short"}, _caller(ss)
+        )[0]["error"]
+        == "result_sha256_invalid"
+    )
+    assert svc.handle(
+        {"op": "store_result", "prereg_sha256": h, "result_sha256": "a" * 64}, _caller(ss)
+    )[0]["ok"]
+    assert (
+        svc.handle(
+            {"op": "store_result", "prereg_sha256": h, "result_sha256": "b" * 64}, _caller(ss)
+        )[0]["error"]
+        == "result_already_stored"
+    )
+    assert (
+        svc.handle(
+            {"op": "verify_result", "prereg_sha256": h, "result_sha256": "a" * 64}, _caller(ss)
+        )[0]["match"]
+        is True
+    )
+    assert (
+        svc.handle(
+            {"op": "verify_result", "prereg_sha256": h, "result_sha256": "b" * 64}, _caller(ss)
+        )[0]["match"]
+        is False
+    )
 
 
 def test_unknown_op_is_refused_and_audited(tmp_path):

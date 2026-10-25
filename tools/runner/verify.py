@@ -64,7 +64,11 @@ def read_image_digest(root: Path, rel: Path = IMAGE_DIGEST_REL) -> str:
     p = Path(root) / rel
     if not p.is_file():
         raise RegistrationError(f"{rel.as_posix()} missing: no pinned reproduction image digest")
-    digest = p.read_text(encoding="utf-8").strip().split()[0] if p.read_text(encoding="utf-8").strip() else ""
+    digest = (
+        p.read_text(encoding="utf-8").strip().split()[0]
+        if p.read_text(encoding="utf-8").strip()
+        else ""
+    )
     if not digest.startswith("sha256:") or len(digest) != 71:
         raise RegistrationError(f"{rel.as_posix()} does not hold a sha256 image digest")
     return digest
@@ -113,7 +117,9 @@ def verify_registration(
     except ai.IdentityError as exc:
         raise RegistrationError(f"analysis_identity: {exc}") from exc
     if run["dataset_hash_id"] not in (bound.get("data_versions") or []):
-        raise RegistrationError("registered_run.dataset_hash_id is not among the bound data_versions")
+        raise RegistrationError(
+            "registered_run.dataset_hash_id is not among the bound data_versions"
+        )
     return {
         "prereg_id": str(doc.get("prereg_id")),
         "prereg_sha256": prereg_hash(doc),

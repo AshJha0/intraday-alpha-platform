@@ -15,9 +15,8 @@ import subprocess
 import sys
 
 import pytest
-from runner_fixtures import IMAGE, World, git
-
 from runner import redact, results, run, verify  # noqa: E402  (tools/ on sys.path via fixtures)
+from runner_fixtures import IMAGE, World, git
 
 
 @pytest.fixture
@@ -43,7 +42,10 @@ def test_dry_registration_runs_once_and_is_refused_the_second_time(world):
     # the result landed on the results branch, committed by iap-runner
     sha = rec["result_commit"]
     assert git(world.root, "rev-parse", "results") == sha
-    assert git(world.root, "log", "-1", "--format=%an <%ae>", sha) == "iap-runner <iap-runner@localhost>"
+    assert (
+        git(world.root, "log", "-1", "--format=%an <%ae>", sha)
+        == "iap-runner <iap-runner@localhost>"
+    )
     tree = git(world.root, "ls-tree", "-r", "--name-only", sha).splitlines()
     slug = results.slug(world.prereg_rel)
     assert f"results/{slug}/0001/result.json" in tree
@@ -240,7 +242,13 @@ def test_served_dataset_that_differs_from_the_bound_files_does_not_run(world):
         _run(world)
     assert exc.value.code == 2
     assert world.ops() == ["read"]  # served, but no result stored, nothing committed
-    assert subprocess.run(["git", "-C", str(world.root), "rev-parse", "--verify", "--quiet", "results"], capture_output=True).returncode != 0
+    assert (
+        subprocess.run(
+            ["git", "-C", str(world.root), "rev-parse", "--verify", "--quiet", "results"],
+            capture_output=True,
+        ).returncode
+        != 0
+    )
 
 
 def test_tampered_sealed_bytes_fail_the_registration_with_no_retry(world):
@@ -272,21 +280,31 @@ def test_service_refuses_a_caller_that_is_not_the_runner(world):
 def test_rewritten_result_is_detected(world):
     rec, _ = _run(world)
     sha = rec["result_commit"]
-    assert run.verify_result(world.root, world.prereg_rel, sha, 1, transport=world.transport) is True
+    assert (
+        run.verify_result(world.root, world.prereg_rel, sha, 1, transport=world.transport) is True
+    )
     # an attacker rewrites the result and its hashes.json on the branch
     wt = world.root.parent / "attacker"
     git(world.root, "worktree", "add", "-q", str(wt), "results")
     slug = results.slug(world.prereg_rel)
-    (wt / "results" / slug / "0001" / "result.json").write_text(json.dumps({"bytes": 1, "verdict": "PROMOTE"}))
+    (wt / "results" / slug / "0001" / "result.json").write_text(
+        json.dumps({"bytes": 1, "verdict": "PROMOTE"})
+    )
     import hashlib
 
     h = json.loads((wt / "results" / slug / "0001" / "hashes.json").read_text())
-    h["result_sha256"] = hashlib.sha256(json.dumps({"bytes": 1, "verdict": "PROMOTE"}).encode()).hexdigest()
+    h["result_sha256"] = hashlib.sha256(
+        json.dumps({"bytes": 1, "verdict": "PROMOTE"}).encode()
+    ).hexdigest()
     (wt / "results" / slug / "0001" / "hashes.json").write_text(json.dumps(h))
     git(wt, "commit", "-q", "-am", "rewrite")
     bad = git(wt, "rev-parse", "HEAD")
-    assert run.verify_result(world.root, world.prereg_rel, bad, 1, transport=world.transport) is False
-    assert run.verify_result(world.root, world.prereg_rel, bad, 7, transport=world.transport) is False
+    assert (
+        run.verify_result(world.root, world.prereg_rel, bad, 1, transport=world.transport) is False
+    )
+    assert (
+        run.verify_result(world.root, world.prereg_rel, bad, 7, transport=world.transport) is False
+    )
 
 
 def test_results_branch_appends_and_never_overwrites(world, tmp_path):
@@ -315,7 +333,7 @@ def test_results_branch_appends_and_never_overwrites(world, tmp_path):
 
 
 def test_verify_module_is_a_registered_identity_runner():
-    src = (verify.__file__ and open(verify.__file__, encoding="utf-8").read())
+    src = verify.__file__ and open(verify.__file__, encoding="utf-8").read()
     assert "verify_identity(" in src and "verify_signed_document(" in src
 
 

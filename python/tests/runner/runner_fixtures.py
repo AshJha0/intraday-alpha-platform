@@ -25,7 +25,18 @@ IMAGE = "sha256:" + "cd" * 32
 
 def git(cwd: Path, *args: str) -> str:
     return subprocess.run(
-        ["git", "-c", "user.name=dev", "-c", "user.email=dev@example.invalid", "-c", "commit.gpgsign=false", "-C", str(cwd), *args],
+        [
+            "git",
+            "-c",
+            "user.name=dev",
+            "-c",
+            "user.email=dev@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "-C",
+            str(cwd),
+            *args,
+        ],
         capture_output=True,
         text=True,
         check=True,

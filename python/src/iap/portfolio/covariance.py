@@ -73,7 +73,9 @@ def bars_from_features(
     series = {}
     for path in files:
         iid = int(path.stem.split("_")[1])
-        df = iap_io.read_parquet(path, columns=["exchange_ts", "mid_price_v1"], purpose="covariance")
+        df = iap_io.read_parquet(
+            path, columns=["exchange_ts", "mid_price_v1"], purpose="covariance"
+        )
         df = df[np.isfinite(df["mid_price_v1"].to_numpy())]
         bucket = (df["exchange_ts"].to_numpy(dtype=np.int64) // bar_ns) * bar_ns
         # last observation per bucket (rows are time-ordered)

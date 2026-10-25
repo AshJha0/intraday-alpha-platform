@@ -39,14 +39,12 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -101,7 +99,7 @@ def registered_run(
     log = log or redact.RedactingLog([str(root)])
     who = identity if identity is not None else current_identity()
     if who != RUNNER_ACCOUNT:
-        log(f"refused: process identity is not the runner account")
+        log("refused: process identity is not the runner account")
         raise RunRefused(3, "the registered run executes only as the runner account")
     doc = verify.load_prereg(root, prereg_rel)
     try:
@@ -110,7 +108,9 @@ def registered_run(
         log(f"refused before any request: {exc}")
         raise RunRefused(3, str(exc)) from exc
     run = verify.registered_run(doc)
-    log(f"verified prereg {rec['prereg_id']} sha256 {rec['prereg_sha256'][:16]} image {rec['image_digest'][7:23]}")
+    log(
+        f"verified prereg {rec['prereg_id']} sha256 {rec['prereg_sha256'][:16]} image {rec['image_digest'][7:23]}"
+    )
 
     cache_root = Path(cache_root or DEFAULT_CACHE_ROOT)
     cache_root.mkdir(parents=True, exist_ok=True)
@@ -125,10 +125,14 @@ def registered_run(
         )
         if not response.get("ok"):
             log(f"service refused the read: {response.get('error')}")
-            raise RunRefused(2, f"service refused: {response.get('error')}: {response.get('detail', '')}")
+            raise RunRefused(
+                2, f"service refused: {response.get('error')}: {response.get('detail', '')}"
+            )
         seq = int(response["seq"])
         checkpoint = response["checkpoint"]
-        log(f"sealed read served: seq {seq}, {len(files)} file(s), chain head {checkpoint['chain_head'][:16]}")
+        log(
+            f"sealed read served: seq {seq}, {len(files)} file(s), chain head {checkpoint['chain_head'][:16]}"
+        )
         served = {h["file"]: h["sha256"] for h, _ in files}
         if served != dict(response["files"]):
             raise RunRefused(2, "served file set differs from the service's announced file map")
@@ -185,7 +189,11 @@ def registered_run(
         }
         stored, _ = sealed_client.request(
             run["partition"],
-            {"op": "store_result", "prereg_sha256": rec["prereg_sha256"], "result_sha256": result_sha},
+            {
+                "op": "store_result",
+                "prereg_sha256": rec["prereg_sha256"],
+                "result_sha256": result_sha,
+            },
             transport,
         )
         if not stored.get("ok"):
@@ -224,7 +232,11 @@ def verify_result(root: Path, prereg_rel: str, commit: str, seq: int, transport=
         return False
     resp, _ = sealed_client.request(
         run["partition"],
-        {"op": "verify_result", "prereg_sha256": verify.prereg_hash(doc), "result_sha256": committed},
+        {
+            "op": "verify_result",
+            "prereg_sha256": verify.prereg_hash(doc),
+            "result_sha256": committed,
+        },
         transport,
     )
     return bool(resp.get("ok") and resp.get("match"))
@@ -241,7 +253,9 @@ def main(argv=None) -> int:
     r.add_argument("--log", type=Path, default=REPO / "results-log.redacted.txt")
     r.add_argument("--push", action="store_true")
     r.add_argument("--results-branch", default=results.RESULTS_BRANCH)
-    v = sub.add_parser("verify-result", help="compare a committed result hash with the service's copy")
+    v = sub.add_parser(
+        "verify-result", help="compare a committed result hash with the service's copy"
+    )
     v.add_argument("--prereg", required=True)
     v.add_argument("--commit", required=True)
     v.add_argument("--seq", type=int, required=True)
@@ -265,7 +279,9 @@ def main(argv=None) -> int:
             results_branch=a.results_branch,
             log=log,
         )
-        log(f"done: seq {hashes['seq']} result {hashes['result_sha256'][:16]} class {hashes['evidence_class']}")
+        log(
+            f"done: seq {hashes['seq']} result {hashes['result_sha256'][:16]} class {hashes['evidence_class']}"
+        )
     except RunRefused as exc:
         code = exc.code
         log(f"exit {code}")

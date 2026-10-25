@@ -261,7 +261,9 @@ def load_events(session_dir: Path, iid: int, end_ns: int | None = None) -> list:
 def load_feature_day(
     features_dir: Path, iid: int, day: int, columns: Sequence[str]
 ) -> pd.DataFrame:
-    pf = iap_io.parquet_file(features_dir / f"features_{iid}.parquet", purpose="maker_real features")
+    pf = iap_io.parquet_file(
+        features_dir / f"features_{iid}.parquet", purpose="maker_real features"
+    )
     names = set(pf.schema_arrow.names)
     cols = ["instrument_id", "exchange_ts", *[c for c in dict.fromkeys(columns) if c in names]]
     df = pf.read_row_group(day, columns=cols).to_pandas()

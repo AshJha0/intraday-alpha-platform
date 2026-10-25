@@ -93,7 +93,16 @@ def test_threat_model_covers_the_six_properties_and_the_custody_label():
         assert re.search(rf"(^|\n)#+ .*\b{n}\b", text) or f"Property {n}" in text, f"property {n}"
     assert "mechanically isolated" in text
     assert "independently confirmed" in text
-    for needle in ("direct read", "enumeration", "cache", "debug", "CODEOWNERS", "ledger", "append-only", "custody"):
+    for needle in (
+        "direct read",
+        "enumeration",
+        "cache",
+        "debug",
+        "CODEOWNERS",
+        "ledger",
+        "append-only",
+        "custody",
+    ):
         assert needle.lower() in text.lower(), needle
 
 

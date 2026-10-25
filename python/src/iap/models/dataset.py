@@ -28,6 +28,7 @@ import numpy as np
 import pandas as pd
 
 from iap import io as iap_io
+
 _REPO = Path(__file__).resolve().parents[4]
 
 #: Prediction target: 5s cost-adjusted forward return (spec §14 primary).

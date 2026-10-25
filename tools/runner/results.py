@@ -51,7 +51,9 @@ def _git(cwd: Path, *args: str, check: bool = True) -> subprocess.CompletedProce
 
 def branch_exists(root: Path, branch: str = RESULTS_BRANCH) -> bool:
     local = _git(root, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}", check=False)
-    remote = _git(root, "rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{branch}", check=False)
+    remote = _git(
+        root, "rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{branch}", check=False
+    )
     return local.returncode == 0 or remote.returncode == 0
 
 
@@ -101,9 +103,18 @@ def commit_result(
         cp = wt / CHECKPOINTS_REL
         cp.parent.mkdir(parents=True, exist_ok=True)
         with cp.open("a", encoding="utf-8", newline="\n") as f:
-            f.write(json.dumps({"partition": partition, "checkpoint": dict(checkpoint)}, sort_keys=True) + "\n")
+            f.write(
+                json.dumps({"partition": partition, "checkpoint": dict(checkpoint)}, sort_keys=True)
+                + "\n"
+            )
         _git(wt, "add", "-A")
-        _git(wt, "commit", "-q", "-m", f"registered run {prereg_id} seq {seq} (partition {partition})")
+        _git(
+            wt,
+            "commit",
+            "-q",
+            "-m",
+            f"registered run {prereg_id} seq {seq} (partition {partition})",
+        )
         sha = _git(wt, "rev-parse", "HEAD").stdout.strip()
         _git(wt, "checkout", "-q", "--detach")  # free the branch name for the update below
         _git(root, "branch", "-f", branch, sha)

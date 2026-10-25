@@ -183,7 +183,7 @@ def raw_reader_calls(source: str) -> list[tuple[int, str]]:
                 isinstance(base, ast.Attribute)
                 and isinstance(base.value, ast.Name)
                 and base.value.id == "pyarrow"
-                and (f"pq", node.func.attr) in RAW_READERS
+                and ("pq", node.func.attr) in RAW_READERS
             ):
                 out.append((node.lineno, f"pyarrow.parquet.{node.func.attr}"))
     return out

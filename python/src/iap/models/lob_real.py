@@ -79,7 +79,9 @@ def iter_events(session_dir: Path, iid: int, end_ns: int | None = None) -> Itera
     from iap import io as iap_io
     from iap.core.events import MarketEvent
 
-    pf = iap_io.parquet_file(Path(session_dir) / "normalized" / "events.parquet", purpose="lob_real")
+    pf = iap_io.parquet_file(
+        Path(session_dir) / "normalized" / "events.parquet", purpose="lob_real"
+    )
     for rg in range(pf.num_row_groups):
         t = pf.read_row_group(rg, columns=list(EVENT_COLS))
         mask = pc.equal(t.column("instrument_id"), iid)
@@ -282,7 +284,9 @@ def load_unit(path: Path, mmap: bool = True) -> tuple[np.ndarray, np.ndarray, np
     stem = path.name.removesuffix(".meta.npz").removesuffix(".X.npy")
     with iap_io.np_load(path.parent / f"{stem}.meta.npz", purpose="lob unit") as z:
         ts, mid = z["ts"], z["mid"]
-    x = iap_io.np_load(path.parent / f"{stem}.X.npy", mmap_mode="r" if mmap else None, purpose="lob unit")
+    x = iap_io.np_load(
+        path.parent / f"{stem}.X.npy", mmap_mode="r" if mmap else None, purpose="lob unit"
+    )
     return ts, mid, x
 
 

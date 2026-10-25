@@ -397,8 +397,12 @@ class SealedService:
                 "utc": utc_now(),
             }
             self.ledger.save()
-            self.audit.append({**base, "decision": "failed", "reason": "dataset_hash_mismatch", "seq": seq})
-            raise Refused("dataset_hash_mismatch", f"{len(mismatch)} file(s) differ from the record")
+            self.audit.append(
+                {**base, "decision": "failed", "reason": "dataset_hash_mismatch", "seq": seq}
+            )
+            raise Refused(
+                "dataset_hash_mismatch", f"{len(mismatch)} file(s) differ from the record"
+            )
         # write-before-serve: ledger, audit, pending checkpoint, then bytes
         self.ledger.registrations[h] = {
             "prereg_id": pid,
@@ -640,13 +644,17 @@ def serve_pipe(service: SealedService, name: str, once: bool = False) -> None:  
             try:
                 caller = _win_caller(h)
             except Refused as exc:
-                service.audit.append({"event": "connect", "decision": "refused", "reason": exc.code})
+                service.audit.append(
+                    {"event": "connect", "decision": "refused", "reason": exc.code}
+                )
                 continue
             fd = msvcrt.open_osfhandle(h, os.O_RDWR | os.O_BINARY)
             with os.fdopen(fd, "r+b", buffering=0, closefd=False) as f:
                 serve_connection(service, caller, f, f)
         except (EOFError, ValueError, OSError) as exc:
-            service.audit.append({"event": "connect", "decision": "error", "reason": type(exc).__name__})
+            service.audit.append(
+                {"event": "connect", "decision": "error", "reason": type(exc).__name__}
+            )
         finally:
             k32.FlushFileBuffers(wintypes.HANDLE(h))
             k32.DisconnectNamedPipe(wintypes.HANDLE(h))
@@ -691,8 +699,12 @@ def main(argv: Iterable[str] | None = None) -> int:
     v = sub.add_parser("verify", help="verify the local audit chain and ledger (sealed identity)")
     v.add_argument("--root", type=Path, required=True)
     c = sub.add_parser("verify-checkpoints", help="check a committed checkpoint file (anyone)")
-    c.add_argument("path", type=Path, nargs="?", default=REPO / "research" / "audit" / "CHECKPOINTS.jsonl")
-    d = sub.add_parser("add-dataset", help="record a named dataset's files and hashes (sealed identity)")
+    c.add_argument(
+        "path", type=Path, nargs="?", default=REPO / "research" / "audit" / "CHECKPOINTS.jsonl"
+    )
+    d = sub.add_parser(
+        "add-dataset", help="record a named dataset's files and hashes (sealed identity)"
+    )
     d.add_argument("--root", type=Path, required=True)
     d.add_argument("--hash-id", required=True)
     d.add_argument("--dir", type=Path, required=True)

@@ -52,7 +52,7 @@ def expected(identity: str, partition: str) -> str:
 
 def violations(identity: str, report: dict) -> list[str]:
     out = []
-    for part, want_owner in OWNERS.items():
+    for part in OWNERS:
         got = report["partitions"].get(part)
         if got is None:
             out.append(f"{identity} x {part}: partition not probed")
@@ -167,9 +167,7 @@ def test_identity_partition_pair(reports, identity, partition):
 
 # ------------------------------------------------ the matrix logic, in CI too --
 def _synthetic(identity: str, leak: tuple[str, str] | None = None) -> dict:
-    parts = {
-        p: {op: expected(identity, p) for op in OPERATIONS} for p in OWNERS
-    }
+    parts = {p: {op: expected(identity, p) for op in OPERATIONS} for p in OWNERS}
     if leak:
         parts[leak[0]][leak[1]] = "ok"
     return {"identity": identity, "partitions": parts}

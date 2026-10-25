@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 from iap import io as iap_io
+
 NS_DAY = 86_400_000_000_000
 
 LABEL_PREFIXES = (

@@ -36,7 +36,9 @@ def keypair() -> tuple[str, str]:
     return signing.generate_keypair()
 
 
-def sign_document(body: dict[str, Any], priv_hex: str, pub_hex: str, maintainer: str = "test") -> dict:
+def sign_document(
+    body: dict[str, Any], priv_hex: str, pub_hex: str, maintainer: str = "test"
+) -> dict:
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
     doc = {k: v for k, v in body.items() if k != "signature"}
@@ -89,7 +91,9 @@ def make_prereg(
     return sign_document(body, priv, pub)
 
 
-def make_partition(root: Path, partition: str, pub: str, dataset_hash_id: str = "ds-synthetic-0001"):
+def make_partition(
+    root: Path, partition: str, pub: str, dataset_hash_id: str = "ds-synthetic-0001"
+):
     """A partition directory with the service state and one named dataset."""
     state = root / "service"
     state.mkdir(parents=True)

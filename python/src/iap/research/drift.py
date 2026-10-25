@@ -109,6 +109,7 @@ def feature_columns(names: Iterable[str]) -> list[str]:
 def iter_store(dirs: Iterable[str | Path], batch_rows: int = 65_536) -> Iterator[Chunk]:
     """Stream ``{column: ndarray}`` record batches from feature-store dirs."""
     import pyarrow as pa
+
     from iap import io as iap_io
 
     for d in dirs:
