@@ -887,7 +887,7 @@ why `clean` is the only verdict to rely on.
   raw/eq_YYYYMMDD.jsonl              canonical events in file order, one file per session
   normalized/eq_YYYYMMDD.normalized.{jsonl,iap1}, events.parquet, qc_report.json
   configs/instruments/instruments.json   the universe: tick, lot, ref_price, adv, sessions
-  configs/venues/venues.json             XNAS (indicative fees; zero latency)
+  configs/venues/venues.json             XNAS (indicative fees, dated since D4; assumed order-entry latency)
   configs/execution/execution.json       the repository's cost model, venue names replaced
   reference/security_master.json
   reference/corporate_actions.csv        when supplied
@@ -904,7 +904,13 @@ filtered-other-symbols counts, every mapping counter, the system events,
 per-symbol events / volume / crosses / reference price, the raw file's
 sha256, the book check and (LOBSTER) the verification report; and for the
 dataset: the universe, the normalized file hashes, the QC totals and
-`dataset_version`.
+`dataset_version`. Since v2.0 stage 2 D3 the committed
+`research/data_manifest.json` copies the book check, the IEX TOPS
+`book_verification`, the QC totals and the message / event counts of every
+dataset as `evidence` with one verdict per session and per dataset (`clean,
+match` / `clean` / `not clean` / `mismatch` / `none`), and `tools/data_manifest.py
+check` fails a preregistration or ledger that cites a dataset without a
+clean or match verdict ([DATA_SOURCES.md](DATA_SOURCES.md) section 6).
 
 **`dataset_version`** is sha256 over the prefix `iap.real-dataset.v2`
 (`v1` until v1.13: every dataset version changes with the v1.14 rules) and
@@ -1194,7 +1200,11 @@ since v1.13.0 (above).
   default); it is an assumption, not a measurement. The one opt-in exception is the
   IEX `--capture-ts` datasets of §3.6, whose `receive_ts` is the capture host's
   stamp; its offset to IEX's send clock is unknown, so no absolute feed latency
-  is claimed.
+  is claimed. Since v2.0 stage 2 D4 the execution replay applies a DECLARED
+  feed delay by default (`configs/reference/venue_latency.json` `feed_delay`,
+  with the `receive_ts` relationship stated per ingest route), never zero
+  unless a caller asks for zero explicitly, and records which it used
+  (API_TRADING.md section 2.20).
 - **Broken trades** are mapped to `TRADE_BUST` events and counted (§4.2); the book applies them as a no-op, so a broken print is not reversed out of the book.
 - **One tick size and one universe per dataset** (§4.1); listings,
   delistings and symbol changes inside a dataset are backlog XD08.

@@ -66,6 +66,7 @@ import heapq
 import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
+from typing import Any
 
 from iap.core.events import EventType, MarketEvent
 from iap.core.rng import SplitMix64
@@ -89,6 +90,7 @@ from iap.execution.fading import (
     fade_rule,
     queue_cancel_rule,
 )
+from iap.execution.latency import declared_feed_delay
 from iap.execution.optimal import ac_drift_from_signal, ac_trajectory
 from iap.execution.pacing import PacingParams, apportion, pacing_scale, tilted_slice_qty
 from iap.execution.passive import (
@@ -242,6 +244,10 @@ class ExecReplayResult:
     children: dict[int, list[ChildOrder]] = field(default_factory=dict)
     #: v1.17 B4 / B5: every pull of a resting child, in decision order.
     pulls: list[PullRecord] = field(default_factory=list)
+    #: v2.0 D4 (D-06): the market-data delay this run applied and where it came
+    #: from (``md_delay_ns``, ``source`` declared / explicit, ``route``,
+    #: ``receive_ts`` relationship, ``label``); never silently zero.
+    latency: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -354,20 +360,41 @@ class ExecutionReplay:
         router_sweep: bool = False,
         hidden_prints: bool = False,
         peg_ahead_qty: int = 0,
-        md_delay_ns: int = 0,
+        md_delay_ns: int | None = None,
+        md_route: str | None = None,
     ) -> None:
         """``hidden_prints`` / ``peg_ahead_qty`` (v1.18 REL-04, opt-in) are passed
         to the simulator (non-displayed prints fill resting children / midpoint
-        pegs); ``md_delay_ns`` (opt-in) delays every child decision of a
-        ``child_exec`` parent by the market-data delay: the replayed event at
-        ``t`` is only SEEN at ``t + md_delay_ns``, so the child is decided,
-        sent and arrives that much later (order: market data seen, decision,
-        send, venue arrival including the inbound delay; a cancel takes the same
-        path and never overtakes its order)."""
-        if md_delay_ns < 0:
-            raise ValueError("md_delay_ns must be >= 0")
+        pegs); ``md_delay_ns`` delays every child decision of a ``child_exec``
+        parent by the market-data delay: the replayed event at ``t`` is only
+        SEEN at ``t + md_delay_ns``, so the child is decided, sent and arrives
+        that much later (order: market data seen, decision, send, venue arrival
+        including the inbound delay; a cancel takes the same path and never
+        overtakes its order).
+
+        v2.0 D4 (D-06): ``None`` (the default) is the DECLARED delay of
+        ``configs/reference/venue_latency.json`` (``feed_delay``, route
+        ``md_route`` or the table default), never zero; an explicit ``0`` is
+        allowed and recorded as such in :attr:`ExecReplayResult.latency`
+        together with the route's ``receive_ts`` relationship.  Parents without
+        ``child_exec`` are unchanged by the delay (their children follow the
+        pinned simulator legs), so the goldens are untouched."""
+        if md_delay_ns is None:
+            fd = declared_feed_delay(md_route)
+            md_delay_ns = fd.ns
+            self._latency = fd.as_dict()
+        else:
+            if md_delay_ns < 0:
+                raise ValueError("md_delay_ns must be >= 0")
+            fd = declared_feed_delay(md_route)
+            self._latency = {
+                **fd.as_dict(),
+                "md_delay_ns": int(md_delay_ns),
+                "source": "explicit (caller-supplied md_delay_ns)"
+                + (": zero feed delay is an optimistic assumption" if md_delay_ns == 0 else ""),
+            }
         self._config = config
-        self._md_delay_ns = md_delay_ns
+        self._md_delay_ns = int(md_delay_ns)
         self._sim = ExecutionSimulator(
             config, hidden_prints=hidden_prints, peg_ahead_qty=peg_ahead_qty
         )
@@ -1617,6 +1644,7 @@ class ExecutionReplay:
             res.events_processed += 1
         self._sim.cancel_all()
         self._book_new_fills()
+        res.latency = dict(self._latency)
         for ps in self._parents:
             # B10: open dark children at the end of the stream expire unsent
             for dc in ps.dark_open:

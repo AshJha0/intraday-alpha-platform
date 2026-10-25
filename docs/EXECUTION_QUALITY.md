@@ -473,7 +473,11 @@ replaces the non-passive child with:
   decision and the arrival.
 
 **Event ordering.** One chain for every child, order and cancel:
-market data seen at `t` (`md_delay_ns` shifts the decision to `t + md_delay`) ->
+market data seen at `t` (`md_delay_ns` shifts the decision to `t + md_delay`;
+since v2.0 stage 2 D4 its default is the DECLARED feed delay of
+`configs/reference/venue_latency.json`, never zero, and `ExecReplayResult.latency`
+records the value, whether it was declared or explicit, and the route's
+`receive_ts` relationship; API_TRADING.md section 2.20) ->
 decision -> internal legs (decision, risk, wire) -> venue leg (+ jitter) ->
 `inbound_delay_ns` -> arrival and activation, in `(arrival, order_id)` order,
 cancel arrivals merged by time with activations (rule 7). A cancel takes the

@@ -334,10 +334,15 @@ class SmartOrderRouter(venues, options=SorOptions()):
 
 # iap.execution.replay
 ParentReport(parent_id, filled_qty, unfilled_qty, children, notional, avg_price, fees, rebates, impact, total_cost)
-ExecReplayResult(fills, parents: Dict[int, ParentReport] (ascending), events_processed, sor_no_route)
-class ExecutionReplay(config, parents, sor_options=SorOptions()):
+ExecReplayResult(fills, parents: Dict[int, ParentReport] (ascending), events_processed, sor_no_route, ..., latency)
+class ExecutionReplay(config, parents, sor_options=SorOptions(), *, ..., md_delay_ns=None, md_route=None):
     run(events) -> ExecReplayResult         # one-shot (second call RuntimeError); fill outside [start, end] RuntimeError
 ```
+
+`md_delay_ns=None` (the default since v2.0 stage 2 D4) is the DECLARED feed
+delay of `configs/reference/venue_latency.json` (`feed_delay`), never zero;
+`ExecReplayResult.latency` records the value, its source (declared or
+explicit), the route and the route's `receive_ts` relationship (section 2.20).
 
 The MVP wraps these as `AlgoScheduler` (`ExecutionAlgorithm`), `SorAdapter`
 (`SmartOrderRouterLike`, every candidate scored into a `VenueDecision`) and
@@ -1370,6 +1375,50 @@ router-vs-pinned difference (shortfall, all-in, fill rate) with day-clustered SE
 adds `two_venue` (alignment rule, routes, merge counts, router models, `venue_split` per policy
 and `venue_markouts_bps[policy][venue][h]`, day-clustered) and the Markdown a "Two venues"
 section. The run book (commands, memory, decisions) is `research/execution/b8/README.md`.
+
+### 2.20 Declared feed latency, latency sensitivity and dated fees (v2.0 stage 2 D4; defects D-06, D-07)
+
+Nothing here measures a latency: the real feeds carry exchange time only
+(`receive_ts == exchange_ts` on every ingested ITCH and IEX row; the IEX
+capture-stamp datasets carry an unidentified constant offset). D4 makes the
+assumption declared instead of silent.
+
+```python
+# iap.execution.latency
+VENUE_LATENCY_PATH                                  # configs/reference/venue_latency.json
+SENSITIVITY_STEPS_NS = (0.5 s, 1 s, 2 s, 5 s)       # plan section 5.9 grid, in ns
+FeedDelay(ns, route, source, receive_ts, label="assumed")
+declared_feed_delay(route=None, path=None) -> FeedDelay   # table default or the named route; a zero or missing default raises
+latency_sensitivity(number: (latency_ns) -> Any, base_ns, steps=SENSITIVITY_STEPS_NS) -> {"base_ns", "base", "steps_ns", "steps"}
+replay_sensitivity(build: (md_delay_ns) -> ExecutionReplay, events, base_ns=None) -> per-parent filled_qty / avg_price / total_cost at the base and at every step (fills re-simulated, not scaled)
+sensitivity_table(sens, key="total_cost") -> {parent_id: {"base", "0.5s", "1s", "2s", "5s"}}
+
+# iap.execution.sim (EN4 engine model)
+LATENCY_NS == venue_latency.json["engine_decision_to_arrival_ns"] (500 ms, asserted at import)
+LATENCY_STEPS_NS == SENSITIVITY_STEPS_NS
+simulate_sensitivity(market_at=None, **simulate_kwargs) -> {"base": FillOutcome, "steps": {...}}
+expected_cost_sensitivity(qty, quote_at, volume_5m, ...) -> the hurdle's C at every step
+FeeSchedule(per_share, notional_rate=0.0, dated, label="assumed", source="")   # dated is REQUIRED (ISO date); undated -> SimError
+FeeSchedule.from_table(name="engine_default"); FeeSchedule.default()          # the three cost columns read engine_default
+
+# iap.execution.fees
+FEE_SCHEDULES_PATH                                  # research/execution/fees/fee_schedules.json
+load_fee_schedules(path=None); load_fee_schedule(name, path=None)   # every schedule: as_of, label in {quoted, indicative, assumed}, source
+require_as_of(doc, where) -> str                    # UndatedFeeError; used by realism.load_fee_tiers and venues_model.load_venue_model_config
+```
+
+The `feed_delay` table names one default (100 us, the `feed_latency_ns` of
+`configs/prereg/v2.json` and `v3.json`, labelled assumed) and, per route
+(`itch50`, `iex-deep-plus`, `iex-deep`, `iex-capture`, `synthetic`), how
+`receive_ts` relates to `exchange_ts`; `ExecutionReplay(md_delay_ns=0)` is
+still allowed and is recorded as an explicit optimistic assumption. Parents
+without `child_exec` are unchanged by the delay, so every golden is untouched.
+The sensitivity helpers re-run the simulation at each step of the plan 5.9
+grid; a report that prints an execution number prints the grid beside it. Fee
+tables: `fee_schedules.json` (engine default and the indicative XNAS tiers),
+`configs/reference/fee_tiers.json` and `research/execution/venue_model.json`
+carry `as_of` and a label, and their loaders refuse a table without one
+(`python/tests/execution/test_latency_fees.py`).
 
 ## 3. Where the rules live
 

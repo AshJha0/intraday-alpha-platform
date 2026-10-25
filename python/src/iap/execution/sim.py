@@ -8,6 +8,15 @@ prices the one external fill.
 One fill-price convention (C6)::
 
     t_arrival = t_decision + latency           (C8: 500 ms, fixed; stepped only as a sensitivity)
+
+The 500 ms is declared in ``configs/reference/venue_latency.json``
+(``engine_decision_to_arrival_ns``; :data:`LATENCY_NS` is asserted equal to it)
+and every execution number can be reported at the plan 5.9 grid
+(:data:`LATENCY_STEPS_NS`: 0.5 s, 1 s, 2 s, 5 s) by :func:`simulate_sensitivity`
+and :func:`expected_cost_sensitivity` (v2.0 stage 2 D4, defect D-06).  Fees
+come from the dated tables of ``research/execution/fees/fee_schedules.json``
+(:class:`FeeSchedule` refuses an undated schedule; the default of every column
+is the ``engine_default`` row; defect D-07).
     P_fill    = M_arrival + side * (spread_arrival / 2 + impact)
 
 ``impact`` is a deterministic function of the order's size over the displayed
@@ -50,11 +59,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from iap.execution.fees import load_fee_schedule, require_as_of
+from iap.execution.latency import SENSITIVITY_STEPS_NS, declared_feed_delay, latency_sensitivity
 from iap.portfolio.ledger import Fill, Valuation
 
 __all__ = [
     "COLUMNS",
     "LATENCY_NS",
+    "LATENCY_STEPS_NS",
     "AuctionPrint",
     "CostColumn",
     "DailyImpactModel",
@@ -66,13 +78,30 @@ __all__ = [
     "SimError",
     "closeout_valuation",
     "expected_cost_bps",
+    "expected_cost_sensitivity",
     "impact_per_share",
     "simulate",
     "simulate_columns",
     "simulate_daily",
+    "simulate_sensitivity",
 ]
 
-LATENCY_NS = 500_000_000  # C8: t_arrival = t_decision + 500 ms
+LATENCY_NS = 500_000_000  # C8: t_arrival = t_decision + 500 ms (declared in venue_latency.json)
+LATENCY_STEPS_NS = SENSITIVITY_STEPS_NS  # plan 5.9: 0.5 s, 1 s, 2 s, 5 s
+
+
+def _declared_engine_latency_ns() -> int:
+    import json
+
+    from iap.execution.latency import VENUE_LATENCY_PATH
+
+    return int(
+        json.loads(VENUE_LATENCY_PATH.read_text(encoding="utf-8"))["engine_decision_to_arrival_ns"]
+    )
+
+
+assert LATENCY_NS == _declared_engine_latency_ns(), "sim.LATENCY_NS drifted from venue_latency.json"
+assert declared_feed_delay().ns > 0  # D-06: the declared feed delay is never zero
 QUOTE_STALE_NS = 5_000_000_000  # section 3: a quote older than 5 s is stale
 
 
@@ -133,11 +162,46 @@ class DailyImpactModel:
 
 @dataclass(frozen=True, slots=True)
 class FeeSchedule:
-    """Dated fees: per share plus a fraction of notional (both >= 0)."""
+    """Dated fees: per share plus a fraction of notional (both >= 0).
 
-    per_share: float = 0.0005
+    ``dated`` is the schedule's ``as_of`` date and is required: an undated fee
+    cannot be used (D-07).  :meth:`from_table` builds one from a row of
+    ``research/execution/fees/fee_schedules.json``; :meth:`default` is the
+    ``engine_default`` row the three cost columns read.
+    """
+
+    per_share: float
     notional_rate: float = 0.0
-    dated: str = "2026-10-24"
+    dated: str = ""
+    label: str = "assumed"
+    source: str = ""
+
+    def __post_init__(self) -> None:
+        if self.per_share < 0 or self.notional_rate < 0:
+            raise SimError("fees are >= 0")
+        try:
+            require_as_of({"as_of": self.dated}, "FeeSchedule")
+        except ValueError as exc:
+            raise SimError(str(exc)) from exc
+
+    @classmethod
+    def from_table(cls, name: str = "engine_default") -> FeeSchedule:
+        row = load_fee_schedule(name)
+        per_share = row.get("per_share", row.get("taker_fee_per_share"))
+        if per_share is None:
+            raise SimError(f"fee schedule {name!r} has no per-share fee")
+        return cls(
+            per_share=float(per_share),
+            notional_rate=float(row.get("notional_rate", 0.0)),
+            dated=row["as_of"],
+            label=row["label"],
+            source=row["source"],
+        )
+
+    @classmethod
+    def default(cls) -> FeeSchedule:
+        """The ``engine_default`` schedule (E0 section 9 planning value, dated)."""
+        return cls.from_table("engine_default")
 
     def fee(self, qty: int, price: float) -> float:
         return abs(qty) * self.per_share + abs(qty) * price * self.notional_rate
@@ -241,7 +305,7 @@ def expected_cost_bps(
 ) -> float:
     """One-way expected cost of ``qty`` in bps of its notional (half-spread + impact + fees): the hurdle's C_entry / C_exit."""
     coeffs = coeffs or ImpactCoefficients()
-    fees = fees or FeeSchedule()
+    fees = fees or FeeSchedule.default()
     mid = quote.mid
     depth = quote.ask_size if qty > 0 else quote.bid_size
     depth = int(math.floor(depth * column.depth_haircut))
@@ -275,7 +339,7 @@ def simulate(
     """
     col = COLUMNS[column] if isinstance(column, str) else column
     coeffs = coeffs or ImpactCoefficients()
-    fees = fees or FeeSchedule()
+    fees = fees or FeeSchedule.default()
     if isinstance(qty, bool) or not isinstance(qty, int) or qty == 0:
         raise SimError("qty must be a non-zero int")
     if market.name != name:
@@ -361,6 +425,50 @@ def simulate_columns(**kwargs: Any) -> dict[str, FillOutcome]:
     return {c: simulate(column=c, **kwargs) for c in COLUMNS}
 
 
+def simulate_sensitivity(
+    *, steps: tuple[int, ...] = LATENCY_STEPS_NS, **kwargs: Any
+) -> dict[str, Any]:
+    """:func:`simulate` at its latency and at the plan 5.9 grid (0.5 s, 1 s, 2 s, 5 s).
+
+    The quote the order meets is the one in ``market`` (a point-in-time record), so
+    a later arrival changes the fill only through the stale-quote rule and the
+    arrival timestamp here; a caller with a quote timeline passes a ``market``
+    per step through ``market_at(latency_ns)`` instead.  Returns
+    ``{"base_ns", "base": FillOutcome, "steps": {"0.5s": FillOutcome, ...}}``.
+    """
+    market_at = kwargs.pop("market_at", None)
+    base_ns = int(kwargs.pop("latency_ns", LATENCY_NS))
+
+    def number(ns: int) -> FillOutcome:
+        kw = dict(kwargs)
+        if market_at is not None:
+            kw["market"] = market_at(ns)
+        return simulate(latency_ns=ns, **kw)
+
+    return latency_sensitivity(number, base_ns, steps)
+
+
+def expected_cost_sensitivity(
+    qty: int,
+    quote_at,
+    volume_5m: int,
+    *,
+    column: CostColumn | str = "conservative",
+    coeffs: ImpactCoefficients | None = None,
+    fees: FeeSchedule | None = None,
+    base_ns: int = LATENCY_NS,
+    steps: tuple[int, ...] = LATENCY_STEPS_NS,
+) -> dict[str, Any]:
+    """:func:`expected_cost_bps` at the base latency and the plan 5.9 grid; ``quote_at(latency_ns)`` is the quote met at that arrival."""
+
+    col = COLUMNS[column] if isinstance(column, str) else column
+
+    def number(ns: int) -> float:
+        return expected_cost_bps(qty, quote_at(ns), volume_5m, column=col, coeffs=coeffs, fees=fees)
+
+    return latency_sensitivity(number, base_ns, steps)
+
+
 def simulate_daily(
     *,
     ts_decision: int,
@@ -378,7 +486,7 @@ def simulate_daily(
     """Execution at the close or open auction for daily horizons: participation of the auction volume, square-root impact."""
     col = COLUMNS[column] if isinstance(column, str) else column
     model = model or DailyImpactModel()
-    fees = fees or FeeSchedule()
+    fees = fees or FeeSchedule.default()
     if isinstance(qty, bool) or not isinstance(qty, int) or qty == 0:
         raise SimError("qty must be a non-zero int")
     side = 1 if qty > 0 else -1
