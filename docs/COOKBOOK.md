@@ -1,8 +1,8 @@
 # COOKBOOK, v2.0: recipes that run on `main` today
 
 Each recipe gives the exact command, what it prints, and the evidence class of anything it
-produces (LEARN.md section 6). Every command was run on 2026-10-25 against `main` in the CI
-environment (recipe 0) on Linux; on Windows replace `.venv-ci/bin/python` with
+produces (LEARN.md section 6). We ran every command on 2026-10-25 against `main` in the CI
+environment (recipe 0) on Linux and pasted the output we saw; on Windows replace `.venv-ci/bin/python` with
 `.venv-ci\Scripts\python` and `PYTHONPATH=src` with `$env:PYTHONPATH="src"`. Paths are relative to
 the repository root unless a recipe says otherwise. Two recipes depend on a pull request that was
 open when this page was written (2026-10-25) and say so in their heading.

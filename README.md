@@ -1,12 +1,12 @@
 # Intraday Alpha Platform
 
-A research platform for testing whether systematic equity signals make money after costs, built
-so that every result can be reproduced from a hash and every claim carries a stated grade of
-evidence. It takes point-in-time daily and intraday data through forecasts, portfolio
-construction, simulated execution and a cash-reconciled ledger, and confirms a hypothesis only by
-a pre-registered, single-shot test on data the developer cannot read. As of 2026-10-25 no signal
-is confirmed; the machinery is built and tested on synthetic data, and the real data has not yet
-been ingested.
+We built this platform to answer one question carefully: does a systematic equity signal make
+money after costs, and how would we know? It takes point-in-time daily and intraday data through
+forecasts, portfolio construction, simulated execution and a cash-reconciled ledger, and it
+confirms a hypothesis only by a pre-registered, single-shot test on data the developer cannot
+read. Every result can be rebuilt from a hash, and every claim carries a stated grade of
+evidence. As of 2026-10-25 no signal is confirmed: the machinery is built and tested on synthetic
+data, and the real data has not yet been ingested.
 
 **Start here:** [docs/LEARN.md](docs/LEARN.md) (the method and the vocabulary),
 [docs/COOKBOOK.md](docs/COOKBOOK.md) (commands that run today), [docs/ARCHITECTURE_v2.md](docs/ARCHITECTURE_v2.md)
