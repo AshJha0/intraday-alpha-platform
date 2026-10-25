@@ -11,7 +11,9 @@ then loads it back through ``load_signed_rule``.
 
 Run it on a CLEAN checkout of the commit the screen will run at (after the
 REL-08 PR is merged), before any variant is run or any result is examined.
-It reads no market data.  Commit the signed file afterwards: the identity
+It reads no market data.  Since v1.19 R4 the draft must carry a ``dry_run``
+block (:mod:`iap.agents.planted_dry_run`) whose report demonstrates every
+outcome of the rule; without it the tool refuses.  Commit the signed file afterwards: the identity
 accepts HEAD or any descendant whose ``python/src/iap`` tree is unchanged.
 """
 
@@ -26,6 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python" / "src"))
 
 from iap.agents.analysis_identity import build_identity  # noqa: E402
+from iap.agents.planted_dry_run import DryRunRefused, require_dry_run  # noqa: E402
 from iap.research.rel08_rule import (  # noqa: E402
     BOUND_SCRIPTS,
     FAMILY,
@@ -72,6 +75,15 @@ def main(argv: list[str] | None = None) -> int:
     if dirty:
         raise SystemExit(f"refusing: uncommitted changes under the bound paths:\n{dirty}")
     draft = load_draft(root)
+    # v1.19 R4 (defect D-09): no signature without a planted dry run that
+    # demonstrates every outcome the rule can return.  The v1.18 REL-08
+    # signature, whose C1 made ``continue`` and ``stop`` unreachable, would
+    # have been refused here.
+    try:
+        dry = require_dry_run(root, draft.doc)
+    except DryRunRefused as exc:
+        raise SystemExit(f"refusing: planted dry run (R4): {exc}") from exc
+    print(f"planted dry run {dry['path']}: verdict values {dry['verdict_values']} demonstrated")
     identity = build_identity(
         root,
         scripts=list(BOUND_SCRIPTS),

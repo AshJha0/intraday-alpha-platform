@@ -14,6 +14,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from _dry_run_fixture import attach_planted_dry_run
 from iap.agents import signing
 
 REPO = Path(__file__).resolve().parents[2]
@@ -79,6 +80,7 @@ def _bind(r: Path, monkeypatch) -> None:
 
 
 def _sign(r: Path, key: Path) -> None:
+    attach_planted_dry_run(r, PID)  # R4: sign refuses without it
     argv = [
         "--root",
         str(r),

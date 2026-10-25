@@ -37,3 +37,36 @@ inference rests on G = 4 evaluate session clusters (3 df); at G <= 5 the result 
 | ofi | 1 | MSFT | underpowered | -179.5312499999991 | [-1018.1712179828834, 659.1087179828852] | 920.1014854250801 | 148 | 863.38 |
 | ofi | 5 | AAPL | underpowered | -78.78074999999961 | [-767.8393173829006, 610.2778173829013] | 755.9904554976137 | 50 | 66.1 |
 | ofi | 5 | MSFT | underpowered | -43.838750000000616 | [-1595.4970872540453, 1507.819587254044] | 1702.379084571359 | 50 | -245.0 |
+
+## MDE correction (v1.19 R2, 2026-10-25)
+
+The `family MDE` column above was computed by the two-quantile Student rule `(t_{1-alpha/(2K)} + t_{power}) sd / sqrt(G)` (defect D-03). The column below is the exact noncentral-t MDE at 80 % power, G - 1 df, one-sided alpha / (2K) (`iap.validation.confirmatory.mde`, the one MDE implementation since R2), recomputed from the committed `DECISION.json` (`G`, `sd_usd`) by `research/v119/reemit_mde.py`. The signed JSON and the bound run script are untouched; the verdicts do not change (a larger MDE can only confirm `underpowered`).
+
+Family K = 24, two-sided alpha = 0.05 (one-sided 0.00104167 per hypothesis), power = 0.8.
+
+| cell | G | sd USD | family MDE as reported (two-quantile) | family MDE, noncentral t (R2) | ratio |
+|---|---|---|---|---|---|
+| maker flow|1|AAPL | 4 | 119.30 | 659.23 | 753.60 | 1.143 |
+| maker flow|1|MSFT | 4 | 346.67 | 1915.65 | 2189.89 | 1.143 |
+| maker flow|5|AAPL | 4 | 107.91 | 596.30 | 681.66 | 1.143 |
+| maker flow|5|MSFT | 4 | 303.28 | 1675.91 | 1915.83 | 1.143 |
+| maker hid_imb|1|AAPL | 4 | 144.15 | 796.54 | 910.57 | 1.143 |
+| maker hid_imb|1|MSFT | 4 | 629.57 | 3478.91 | 3976.95 | 1.143 |
+| maker hid_imb|5|AAPL | 4 | 213.75 | 1181.18 | 1350.28 | 1.143 |
+| maker hid_imb|5|MSFT | 4 | 538.19 | 2973.99 | 3399.75 | 1.143 |
+| maker ofi|1|AAPL | 4 | 67.77 | 374.49 | 428.10 | 1.143 |
+| maker ofi|1|MSFT | 4 | 166.51 | 920.10 | 1051.82 | 1.143 |
+| maker ofi|5|AAPL | 4 | 136.81 | 755.99 | 864.22 | 1.143 |
+| maker ofi|5|MSFT | 4 | 308.07 | 1702.38 | 1946.09 | 1.143 |
+| taker flow|1|AAPL | 4 | 47.20 | 260.81 | 298.15 | 1.143 |
+| taker flow|1|MSFT | 4 | 352.69 | 1948.90 | 2227.91 | 1.143 |
+| taker flow|5|AAPL | 4 | 167.29 | 924.42 | 1056.76 | 1.143 |
+| taker flow|5|MSFT | 4 | 182.07 | 1006.09 | 1150.12 | 1.143 |
+| taker hid_imb|1|AAPL | 4 | 55.23 | 305.19 | 348.89 | 1.143 |
+| taker hid_imb|1|MSFT | 4 | 438.90 | 2425.28 | 2772.49 | 1.143 |
+| taker hid_imb|5|AAPL | 4 | 164.70 | 910.13 | 1040.42 | 1.143 |
+| taker hid_imb|5|MSFT | 4 | 425.95 | 2353.75 | 2690.71 | 1.143 |
+| taker ofi|1|AAPL | 4 | 50.70 | 280.16 | 320.27 | 1.143 |
+| taker ofi|1|MSFT | 4 | 323.09 | 1785.33 | 2040.92 | 1.143 |
+| taker ofi|5|AAPL | 4 | 165.19 | 912.82 | 1043.50 | 1.143 |
+| taker ofi|5|MSFT | 4 | 100.92 | 557.69 | 637.53 | 1.143 |

@@ -573,12 +573,15 @@ def test_ledger_policy_changes_only_the_tstat_gate(bundle, t_key):
     assert fixed["methods"]["tstat_threshold"] == "fixed" and fixed["gates"] is GATES
     t = fixed[t_key]
     assert fixed["gate_tstat"] == t
-    assert fixed["verdict"] == "PROMOTE" and t > 3.0
+    # v1.19 R1: every legacy PROMOTE gate passes, and the verdict is still ITERATE
+    assert fixed["verdict"] == "ITERATE" and t > 3.0
+    assert all(fixed["promote_gates"].values()) and fixed["legacy_promote_blocked"] is True
     ledger = {**kw, "tstat_threshold": "ledger"}
     below = validate_alpha(*args, **ledger, ledger_t_threshold=t - 0.5)
     above = validate_alpha(*args, **ledger, ledger_t_threshold=t + 0.5)
-    assert below["verdict"] == "PROMOTE"
+    assert below["verdict"] == "ITERATE" and below["legacy_promote_blocked"] is True
     assert above["verdict"] == "ITERATE"  # evidence, not promotion
+    assert above["legacy_promote_blocked"] is False
     assert above["gates"]["min_nw_tstat"] == pytest.approx(t + 0.5)
     assert above["tstat_threshold_policy"] == "ledger"
     assert above["ledger_t_threshold"] == pytest.approx(t + 0.5)

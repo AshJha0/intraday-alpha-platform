@@ -93,6 +93,8 @@ def test_committed_report_is_reproducible(tmp_path):
             str(md),
             "--out-json",
             str(js),
+            "--dsr-trials",
+            "297",  # v1.19 R2: the committed report is regenerated at the registered N = 297
         ],
         check=True,
         capture_output=True,

@@ -16,6 +16,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from _dry_run_fixture import attach_planted_dry_run
 from iap.agents import signing
 from test_v118_stale_quote import IID, _ahead_fix, session_tape
 
@@ -76,6 +77,7 @@ def _bind(r: Path) -> None:
 
 
 def _sign(r: Path, key: Path) -> None:
+    attach_planted_dry_run(r, "research/preregs/rel09_prereg.json")  # R4: sign refuses without it
     argv = ["--root", str(r), "sign", "--prereg", "research/preregs/rel09_prereg.json"]
     assert pbi.main([*argv, "--keyfile", str(key), "--maintainer", "owner"]) == 0
     _git(r, "add", "-A")

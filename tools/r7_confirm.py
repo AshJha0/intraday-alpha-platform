@@ -541,17 +541,29 @@ def sensitivity(
     return out
 
 
-def verdict(look_ok: bool, g: Mapping[str, Any], eligibility: Mapping[str, Any] | None) -> str:
+def verdict(
+    look_ok: bool,
+    g: Mapping[str, Any],
+    eligibility: Mapping[str, Any] | None,
+    confirmatory: Any = None,
+) -> str:
     """Prereg decision rule: pass -> confirmed; any failure is final -> rejected.
 
     v1.18 REL-02d: eligibility is part of the verdict.  A pass by a method that is not
     gate-eligible (``eligibility['gate_eligible']`` is not True, or no eligibility
-    record) is ``ineligible``, never ``confirmed``."""
+    record) is ``ineligible``, never ``confirmed``.
+
+    v1.19 R1 (defect D-01): ``confirmed`` additionally needs the canonical gate's
+    PROMOTE (``confirmatory`` is an :class:`iap.validation.confirmatory.Verdict`
+    whose ``is_promote`` holds).  The HAC-t-against-Bonferroni gate ``g`` alone is a
+    legacy path and yields at most ``ineligible``."""
     if not look_ok:
         return "no_result"
     if not g["passed"]:
         return "rejected"
     if (eligibility or {}).get("gate_eligible") is not True:
+        return "ineligible"
+    if confirmatory is None or not getattr(confirmatory, "is_promote", False):
         return "ineligible"
     return "confirmed"
 

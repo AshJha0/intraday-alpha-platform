@@ -46,9 +46,13 @@ import math
 from pathlib import Path
 from statistics import NormalDist, stdev
 
+from iap.validation.confirmatory import mde_at_t, power_at_t
 from iap.validation.deflated import expected_max_sharpe, probabilistic_sharpe_ratio
 
-R7_POWER_VERSION = 1
+#: 2 since v1.19 R2: the session-clustered MDE is the exact noncentral-t inversion
+#: (``iap.validation.confirmatory.mde_at_t``) instead of ``(thr + z_0.8) sigma / sqrt(S)``,
+#: and the deflated-Sharpe trial count can be pinned (``dsr_trials``; R7 registered N = 297).
+R7_POWER_VERSION = 2
 TIER1_SESSIONS = 7
 TIER2_SESSIONS = 7 + 40
 TARGET_POWER = 0.8
@@ -121,12 +125,14 @@ def _cell(mu, sigma_s, se1, sessions, thr, n_trials) -> dict:
 
 
 def _clustered_cell(mu, sigma_s, sessions, thr, n_trials) -> dict:
-    """Session-clustered statistic (one value per session): ``t = mean /
-    (sigma_s / sqrt(S)) ~ N(mu sqrt(S) / sigma_s, 1)``; DSR as in :func:`_cell`."""
-    root = math.sqrt(sessions)
-    hp = 1.0 - _N.cdf(thr - mu * root / sigma_s)
+    """Session-clustered statistic (one value per session): the one-sample t on S
+    session values, ``S - 1`` df, against the |t| threshold ``thr``.  Power is the
+    noncentral-t tail at ``nc = mu sqrt(S) / sigma_s``; the MDE is the exact
+    inversion :func:`iap.validation.confirmatory.mde_at_t` (v1.19 R2; up to v1.18
+    both used the normal approximation).  DSR as in :func:`_cell`."""
+    hp = power_at_t(sessions, thr, mu / sigma_s) if sigma_s > 0 else float("nan")
     dp = dsr_power(mu / sigma_s, sessions, n_trials)
-    mde_h = (thr + _N.inv_cdf(TARGET_POWER)) * sigma_s / root
+    mde_h = mde_at_t(sessions, thr, TARGET_POWER) * sigma_s
     mde_d = dsr_mde_sr(sessions, n_trials) * sigma_s
     return {
         "sessions": sessions,
@@ -150,12 +156,16 @@ def _recommend(cells: dict[int, dict], effect: float) -> str:
     return "underpowered even on tier 2"
 
 
-def ledger_gate(experiments_path: str | Path) -> dict:
+def ledger_gate(experiments_path: str | Path, dsr_trials: int | None = None) -> dict:
+    """The gate in force from the committed ledger.  ``dsr_trials`` pins the
+    deflated-Sharpe trial count (R7 registered N = 297, ``r7_confirm_prereg.json``)
+    instead of the ledger's running distinct count + 1."""
     d = json.loads(Path(experiments_path).read_text())
     return {
         "total_looks": int(d["total_experiments"]),
         "t_threshold": float(d["bonferroni_t_threshold"]),
-        "dsr_n_trials": int(d["distinct_experiments"]) + 1,
+        "dsr_n_trials": int(dsr_trials) if dsr_trials else int(d["distinct_experiments"]) + 1,
+        "dsr_n_trials_source": "registered" if dsr_trials else "ledger distinct + 1",
     }
 
 

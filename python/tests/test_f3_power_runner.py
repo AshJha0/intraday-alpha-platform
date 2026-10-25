@@ -17,6 +17,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from _dry_run_fixture import attach_planted_dry_run
 from iap.agents import signing
 from scipy import stats
 
@@ -81,6 +82,7 @@ def _bind(r: Path, monkeypatch) -> None:
 
 
 def _sign(r: Path, key: Path) -> None:
+    attach_planted_dry_run(r, PID)  # R4: sign refuses without it
     argv = [
         "--root",
         str(r),

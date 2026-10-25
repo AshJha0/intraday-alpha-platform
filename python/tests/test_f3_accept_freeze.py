@@ -16,6 +16,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from _dry_run_fixture import attach_planted_dry_run
 from iap.agents import signing
 
 REPO = Path(__file__).resolve().parents[2]
@@ -150,6 +151,7 @@ def signed(tmp_path, monkeypatch):
     monkeypatch.setattr(fp, "check_registration_env", lambda **kw: True)
     dpath = r / "research" / "v118" / "f3_accept" / "declaration.json"
     assert fa.main(["--root", str(r), "--decl", str(dpath), "bind"]) == 0
+    attach_planted_dry_run(r, DECL["prereg"])  # R4: sign refuses without it
     argv = [
         "--root",
         str(r),

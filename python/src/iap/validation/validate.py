@@ -17,13 +17,22 @@ set and returns a JSON-serializable report:
 Pinned promotion gates (spec §20 steps 4-7 distilled; thresholds pinned
 here and echoed in every report):
 
-- PROMOTE requires ALL of:
+- The PROMOTE gates (all reported in ``promote_gates``):
     leakage passed; gate IC >= 0.010; gate t >= the significance threshold;
     fold sign consistency >= 0.70; at least 3 NON-DEGENERATE folds;
     hypothesis_confirmed (fitted beta agrees with the stated rationale);
     cost survival (net backtest P&L > 0 at 1.0x costs on the last fold).
+  **Since v1.19 R1 (defect D-01) this function never returns PROMOTE.**  A
+  report whose PROMOTE gates all pass is ITERATE with
+  ``legacy_promote_blocked: true``: the HAC t on within-day rows against a
+  normal Bonferroni quantile is not a confirmatory statistic (the session is
+  the unit of inference).  PROMOTE is constructed only by
+  :func:`iap.validation.confirmatory.decide` (R0: Student t on the G
+  registered session values, Holm at alpha_op = 0.020, fail-closed domain
+  checks); the research runner records that verdict with
+  ``gate: "confirmatory"``.
 - ITERATE: leakage passed, gate IC >= 0.005 and gate t >= 1.5 (evidence
-  of signal, fails at least one PROMOTE gate).
+  of signal; or every legacy PROMOTE gate passing).
 - REJECT: everything else, and ALWAYS when leakage fails.
 
 Round-3 honesty rules baked into the report (all pinned):
@@ -1094,7 +1103,13 @@ def validate_alpha(
         and np.isfinite(gate_t)
         and gate_t >= gates["iterate_min_tstat"]
     )
-    verdict = "PROMOTE" if promote else ("ITERATE" if iterate else "REJECT")
+    # v1.19 R1 (defect D-01): the walk-forward gates no longer construct PROMOTE.
+    # Every PROMOTE gate passing is reported (``promote_gates`` all true,
+    # ``legacy_promote_blocked``) and the verdict is capped at ITERATE; only
+    # ``iap.validation.confirmatory.decide`` constructs PROMOTE, from the
+    # registered session values under the R0 procedure.
+    legacy_promote_blocked = bool(promote)
+    verdict = "ITERATE" if promote else ("ITERATE" if iterate else "REJECT")
 
     # Scale-free IC on the rows the gate reads (uncrossed when that IC is).
     vol_scaled_gate = (
@@ -1284,6 +1299,8 @@ def validate_alpha(
         "ic_bucket_pairs": bucket_size_summary(bcounts),
         "ic_bucket_pairs_uncrossed": bucket_size_summary(bcounts_unc),
         "fold_sign_consistency": _fnum(sign_consistency),
+        "legacy_promote_blocked": legacy_promote_blocked,
+        "gate": "legacy_walk_forward",
         "hypothesis_confirmed": hypothesis_confirmed,
         "hypothesis_rule": hypothesis_rule,
         "hypothesis_confirmed_last_fold": hypothesis_last_fold,

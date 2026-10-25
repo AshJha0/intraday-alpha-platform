@@ -417,14 +417,51 @@ def render_document(doc: Mapping[str, Any]) -> str:
     return json.dumps(doc, indent=2, sort_keys=True, ensure_ascii=True, allow_nan=False) + "\n"
 
 
+def canonical_verdict(report_verdict: str, confirmatory: Any = None) -> Verdict:
+    """The contract verdict of a run (v1.19 R1, defect D-01).
+
+    ``PROMOTE`` comes only from the canonical gate: ``confirmatory`` is an
+    :class:`iap.validation.confirmatory.Verdict` whose ``is_promote`` holds (its
+    token was minted by ``decide``).  A report verdict ``PROMOTE`` from any other
+    path (the legacy walk-forward gates, a monkeypatched ``validate_alpha``) is
+    capped at ITERATE and leaves the record's verdict unchanged.  A canonical
+    REJECT or refusal never upgrades a report; it is recorded beside it."""
+    if confirmatory is not None and getattr(confirmatory, "is_promote", False):
+        return Verdict.PROMOTE
+    v = str(report_verdict)
+    if v == "PROMOTE":
+        return Verdict.ITERATE
+    return Verdict(v)
+
+
+def gate_record(report: Mapping[str, Any], confirmatory: Any = None) -> dict[str, Any]:
+    """The ``gate`` fields persisted with a result: which gate decided and, for the
+    canonical one, the sha256 of its inference object."""
+    blocked = bool(report.get("legacy_promote_blocked", False)) or (
+        str(report.get("verdict")) == "PROMOTE"
+    )
+    if confirmatory is None:
+        return {"gate": "legacy_walk_forward", "legacy_promote_blocked": blocked}
+    return {
+        "gate": "confirmatory",
+        "confirmatory_outcome": str(getattr(confirmatory, "outcome", "")),
+        "inference_sha256": str(getattr(confirmatory, "inference_sha256", "")),
+        "legacy_promote_blocked": blocked,
+    }
+
+
 def build_result(
     spec: ExperimentSpec,
     report: Mapping[str, Any],
     holdout: Mapping[str, float],
     n_experiments_in_ledger: int,
     git_commit: str,
+    confirmatory: Any = None,
 ) -> ExperimentResult:
     """Map a ``validate_alpha`` report + holdout economics onto the contract.
+
+    ``confirmatory`` (v1.19 R1) is the canonical gate's verdict when a registered
+    confirmatory design is in force; see :func:`canonical_verdict`.
 
     ``holdout`` carries ``gross_return_bps``, ``transaction_cost_bps``,
     ``max_drawdown_bps`` and ``sharpe``; ``net_return_bps`` is
@@ -464,7 +501,7 @@ def build_result(
             leakage_passed=bool(leakage["passed"]),
             leakage_detail=_jsonable(leakage, "leakage"),
             hypothesis_sign_confirmed=bool(report["hypothesis_confirmed"]),
-            verdict=Verdict(str(report["verdict"])),
+            verdict=canonical_verdict(report["verdict"], confirmatory),
             n_experiments_in_ledger=int(n_experiments_in_ledger),
             git_commit=str(git_commit),
             created_ts=int(spec.test_period.end_ts),
@@ -713,7 +750,11 @@ class ExperimentRunner:
         )
 
     def _ledger_total_after(
-        self, spec: ExperimentSpec, report: Mapping[str, Any], gate_looks: int | None
+        self,
+        spec: ExperimentSpec,
+        report: Mapping[str, Any],
+        gate_looks: int | None,
+        confirmatory: Any = None,
     ) -> int:
         return self.ledger.record(
             spec.alpha_id,
@@ -725,7 +766,8 @@ class ExperimentRunner:
                 "nw_tstat": report["nw_tstat"],
                 "gate_ic": report["gate_ic"],
                 "gate_tstat": report["gate_tstat"],
-                "verdict": report["verdict"],
+                "verdict": canonical_verdict(report["verdict"], confirmatory).value,
+                **gate_record(report, confirmatory),
             },
             count=self._looks(spec),
             gate_looks=gate_looks,
@@ -814,8 +856,16 @@ class ExperimentRunner:
         *,
         frozen_params: Mapping[str, Any] | None = None,
         prereg_t_threshold: float | None = None,
+        confirmatory: Any = None,
     ) -> ExperimentResult:
         """Run ``spec`` (see the module docs for the six steps).
+
+        v1.19 R1: ``confirmatory`` is the canonical gate's
+        :class:`iap.validation.confirmatory.Verdict` for this run's registered
+        design, when one is in force; the record then carries
+        ``gate: "confirmatory"`` and the inference object's sha256, and PROMOTE
+        is taken from it alone.  The runner refuses to run at all when the
+        canonical module cannot be imported.
 
         v1.13 (R-P1-2), both opt-in: ``frozen_params`` (fitted params from
         the design period) adds a no-refit scoring of the window, reported as
@@ -824,6 +874,15 @@ class ExperimentRunner:
         that pre-registered number (``threshold_policy="prereg"``) instead of
         the ledger's running look count, so the verdict does not depend on
         run order.  The ledger still records the run's looks."""
+        try:
+            import iap.validation.confirmatory as _canonical  # noqa: F401
+        except ImportError as exc:
+            raise ResearchError(
+                "iap.validation.confirmatory is not importable: no run without the "
+                "canonical gate (v1.19 R1)"
+            ) from exc
+        if confirmatory is not None and not hasattr(confirmatory, "outcome"):
+            raise ResearchError("confirmatory must be an iap.validation.confirmatory.Verdict")
         if self._gate is not None:
             self._gate(spec)
         self._check_spec(spec)
@@ -940,9 +999,11 @@ class ExperimentRunner:
             significance_threshold=float(report["gates"]["min_nw_tstat"]),
             threshold_looks=gate_looks,
         )
-        total = self._ledger_total_after(spec, report, gate_looks)
+        total = self._ledger_total_after(spec, report, gate_looks, confirmatory)
         try:
-            result = build_result(spec, report, holdout, total, tracker.git_commit(self.repo_root))
+            result = build_result(
+                spec, report, holdout, total, tracker.git_commit(self.repo_root), confirmatory
+            )
         except ResearchError:
             # The statistics were computed and the failure names one of
             # them: the looks are debited even though no result exists.

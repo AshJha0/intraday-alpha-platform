@@ -441,7 +441,7 @@ def test_build_result_mapping_v2_records_the_gate_statistics(spec):
     ) == (0.025, 0.03, 3.25, 2, 0.52, 40.0, 1.0, 4)
     assert r.net_return_bps == 12.0 - 4.5
     assert r.leakage_passed and r.hypothesis_sign_confirmed
-    assert r.verdict is Verdict.PROMOTE
+    assert r.verdict is Verdict.ITERATE  # v1.19 R1: a report PROMOTE is capped
     assert r.n_experiments_in_ledger == 21 and r.git_commit == "deadbeef"
     assert r.created_ts == spec.test_period.end_ts
     assert r.leakage_detail == _report()["leakage"]
@@ -468,7 +468,7 @@ def test_build_result_mapping_legacy_v1(legacy_spec):
     ) == (0.02, 0.03, 3.5, 2, 0.52, 40.0, 1.0, 4)
     assert r.net_return_bps == 12.0 - 4.5
     assert r.leakage_passed and r.hypothesis_sign_confirmed
-    assert r.verdict is Verdict.PROMOTE
+    assert r.verdict is Verdict.ITERATE  # v1.19 R1: a report PROMOTE is capped
     assert r.n_experiments_in_ledger == 21 and r.git_commit == "deadbeef"
     assert r.created_ts == spec.test_period.end_ts
     assert r.leakage_detail == _report()["leakage"]

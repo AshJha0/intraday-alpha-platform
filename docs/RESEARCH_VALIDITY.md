@@ -671,6 +671,69 @@ gap cannot be reconstructed from the files on disk the inventory says so. Read e
 threshold, expected max |t| and real-data N computed from the ledger as a **lower bound on the
 search breadth**.
 
+## 4i. Confirmatory inference and the MDE convention (v1.19 stage 1, R1 and R2)
+
+The confirmatory verdict is `iap.validation.confirmatory.decide` and nothing else (R0,
+`python/tests/spec/CONFIRMATORY_TEST_SPEC.md`): one-sample Student t on the G registered session
+values, G - 1 df, one-sided, Holm step-down over the registered family at `alpha_op = 0.020` (claim
+FWER <= 0.025), fail-closed outside the validated domain. The walk-forward gates of
+`iap.validation.validate` report their PROMOTE gates and return at most ITERATE
+(`legacy_promote_blocked`); the ledger's normal Bonferroni |t| is report-only; `tools/r7_confirm.py`
+returns `confirmed` only with the canonical PROMOTE.
+
+One MDE implementation, `iap.validation.confirmatory.mde`: the exact noncentral-t inversion at the
+given power with the procedure's df (G - 1 under P-IND; B - 1 under P-BLK), returning the effect in
+units of the session-value standard deviation. Every emitter scales it; none approximates it.
+
+| emitter | what it reports | convention (how it calls `confirmatory.mde`) |
+|---|---|---|
+| `confirmatory.mde(G, alpha, power)` | effect in sd units | one-sided `alpha`; callers pass `alpha_op / K` (Holm floor) and `alpha_op` |
+| `iap.research.study_stats.mde(sd, n, alpha, power)` | per-session USD (maker / quoting / auction studies) | two-sided `alpha` passed as one-sided `alpha / 2`; `sd` = per-session sd; `None` below n = 2 |
+| `iap.research.execution_metrics.ratio_stats` (`mde`, `mde_t`) | pooled ratio, per-cluster units | two-sided 0.05 as one-sided 0.025, G - 1 df, sd of the cluster statistic `se * sqrt(G)`; the two columns are now equal |
+| `iap.research.execution_metrics.ratio_diff_stats` (`mde_t`, `mde_t_family`) | difference of two pooled ratios | as above; the family column at one-sided `0.025 / K` for the declared family K |
+| `iap.research.r7_power` (clustered cells) | R7 session-clustered power / MDE | `confirmatory.mde_at_t(S, t_threshold, 0.8)`: the inversion at the registered |t| threshold instead of an alpha |
+| REL-09 / REL-10 reports | family MDE in USD | re-emitted from the committed `DECISION.json` by `research/v119/reemit_mde.py` (dated correction section; the signed JSONs are untouched) |
+
+Up to v1.18 the emitters used a normal approximation (`z + z`) or the two-quantile Student rule
+(`t_{1-alpha} + t_{power}`); both understate the MDE at small G (G = 4: by about 30 % and about
+10 %). The historical result files keep their recorded numbers; the reports carry the corrected
+column beside them with the date of the correction.
+
+## 4j. The adversarial suite, the candidate domain and the selection history (v1.19 stage 1, R3)
+
+`python/tests/test_confirmatory_adversarial.py` (slow) runs the R0 section 5 cells through the gate:
+the independent generator `python/tests/spec/r3_generators.py` (vectorised SplitMix64, cell seed
+`20301000 + 100 * case + cell`), the runner `python/tests/spec/r3_suite.py`, the evidence
+`research/validation/R0_RESULTS.json` (per cell: seed, n, k, estimate, bounds, half-width, procedure,
+domain class, result, versions) summarised in `research/validation/R0_RESULTS.md`. Outcome of the
+one run (2026-10-25, seeds fixed by R0; a re-run with other seeds would be a new R0 revision):
+
+| class | cells | rule | result |
+|---|---:|---|---|
+| claimed (D-IND size: R3-A rho = 0, R3-B, R3-C tier 1 (a) and (b), R3-D (i), R3-E) | 29 | every k <= 463 of 20,000 | all pass; max k 433 (G = 60, rho = 0) |
+| power (R3-C normal homoskedastic G = 10, 30) | 2 | detections >= 4,047 of 5,000 | 4,487 and 4,486 |
+| candidate (D-BLK: P-BLK, rho in {0, 0.1, 0.2, 0.3}, G in {20, 30, 60}) | 12 | all pass or D-BLK is withdrawn in full | 6 pass (rho 0, 0.1), 6 fail (rho 0.2: 468-522; rho 0.3: 528-623): **D-BLK withdrawn for v1.19** |
+| stress (rho > 0 under P-IND, rho = 0.5, tier 2) | 23 | reported, never fails CI | P-IND inflation 754-900 at rho 0.1, 2,312-3,503 at rho 0.3, 6,687-9,378 at rho 0.5; lognormal 0 (conservative one-sided) |
+
+The withdrawal is mechanical: `confirmatory.dblk_validated` reads the committed results and the gate
+returns `refused: dependence assumptions unsupported (D-BLK withdrawn for v1.19)` for every D-BLK
+declaration; block length is not re-optimised. The deterministic refusals (R3-D (ii)-(iii), R3-E, R3-F,
+R3-G (a)-(j)) are `python/tests/test_confirmatory_refusals.py` (fast); R3-D (ii) records the inflation
+of selecting and testing on one dataset (k = 2,069 against 400 clean) and asserts the ledger refusal.
+
+**Selection history (defect D-08).** `tools/ledger_family_map.py` writes
+`research/validation/LEDGER_FAMILY_MAP.json`: per family (ledger `alpha_id`) the central ledger's
+real and synthetic looks, the external per-dataset looks the central ledger does not hold (the 13
+entries / 1,224 looks of section 4f, enumerated one by one; merging them is the owner-approved
+regenerate flow and is not done), the lower bound `real_looks_lower_bound` that follows, and the
+families dependent on it through looks on the same real dataset version (every EQ family on multi7 is
+dependent on every other). `iap.agents.prereg_gate.selection_history` reads the map and
+`prereg_gate.require` attaches the fields (`central_real_looks`, `external_unmerged_looks`,
+`real_looks_lower_bound`, `dependent_families`, `dependent_real_looks_lower_bound`, `map_sha256`) to
+the pre-registration entry; a prereg that binds `ledger_family_map_sha256` is refused when the committed
+map differs. The gate's verdict carries them as `Verdict.selection_history`. The denominator stays a
+lower bound (section 4f).
+
 ## 5. Tooling
 
 - `python -m iap.research run --alpha ML01`: the opt-in GBM alpha (§4d);
