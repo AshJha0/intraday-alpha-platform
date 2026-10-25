@@ -30,7 +30,7 @@ def environment_key() -> str:
 
 
 def expected_hash(manifest, name):
-    """The pinned hash (string = every environment; mapping = per platform and Python version, D-60)."""
+    """The pinned hash: a string applies to every environment (the D-60 polish makes the share path CPU-independent); a mapping keyed by platform and Python version remains readable should a documented split ever be needed."""
     pinned = manifest["expected_report_sha256"][name]
     if isinstance(pinned, str):
         return pinned
@@ -249,7 +249,6 @@ def test_validation_run_is_a_different_look_with_its_own_hash(
         ledger_path=tmp_path / "l.json",
         identity="iap-dev",
     )
-    print("DIAG-REPORT-BEGIN " + canonical_json(r["report"]) + " DIAG-REPORT-END")
     assert_pinned(manifest, "d1_validation", r["sha256"])
     assert r["report"]["identity"]["partition"] == "validation"
     assert (

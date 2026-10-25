@@ -63,7 +63,9 @@ from iap.execution.sim import (
 from iap.portfolio.ledger import FamilyConfig, Ledger, TradeDecision, Valuation
 from iap.portfolio.project import (
     ConstraintSpec,
+    ProjectionResult,
     SolverIdentity,
+    _constraints,
     check_book,
     construction_stages,
     feasibility,
@@ -103,6 +105,7 @@ __all__ = [
     "forward_label",
     "load_family_spec",
     "load_panel",
+    "polish_weights",
     "record_run",
     "report_hash",
     "run_engine",
@@ -128,6 +131,10 @@ CLOSE_S = 16 * 3600
 ROUND = 6
 #: Decimals for the stage-book rows of block B, whose every value descends from solver weights.
 ROUND_SOLVER = 4
+#: A constraint whose slack at the solver's point is within this is active for the polish (D-60).
+POLISH_ACTIVE_TOL = 1e-7
+#: The polished point must lie within this of the solver's (otherwise the active set was misread).
+POLISH_MAX_SHIFT = 1e-5
 
 _SPEC_SECTIONS = (
     "Hypothesis",
@@ -457,6 +464,110 @@ def _registry_entry(
     )
 
 
+# --------------------------------------------------------------------------- the polish (D-60)
+def _solve_consistent(g: list[list[float]], rhs: list[float], eps: float) -> list[float] | None:
+    """Gauss-Jordan in plain Python floats: one solution of ``g x = rhs`` (free unknowns 0), None if inconsistent."""
+    k = len(g)
+    m = [row[:] + [rhs[i]] for i, row in enumerate(g)]
+    pivots: list[tuple[int, int]] = []
+    r = 0
+    for c in range(k):
+        best = max(range(r, k), key=lambda i: abs(m[i][c]), default=None)
+        if best is None or abs(m[best][c]) <= eps:
+            continue
+        m[r], m[best] = m[best], m[r]
+        pv = m[r][c]
+        m[r] = [v / pv for v in m[r]]
+        for i in range(k):
+            if i != r and m[i][c] != 0.0:
+                f = m[i][c]
+                m[i] = [a - f * b for a, b in zip(m[i], m[r], strict=True)]
+        pivots.append((r, c))
+        r += 1
+        if r == k:
+            break
+    for i in range(r, k):
+        if abs(m[i][k]) > eps:
+            return None
+    x = [0.0] * k
+    for row, col in pivots:
+        x[col] = m[row][k]
+    return x
+
+
+def polish_weights(
+    res: ProjectionResult,
+    w_raw: Mapping[str, float],
+    betas: Mapping[str, float],
+    sectors: Mapping[str, str],
+    *,
+    spec: ConstraintSpec,
+    liquidity_caps: Mapping[str, float],
+    solver: SolverIdentity,
+) -> dict[str, float]:
+    """The repair re-solved exactly on the active set the solver found, in plain Python arithmetic.
+
+    SLSQP's point varies by ~1e-8 with the BLAS kernel of the machine (AVX-512 runners
+    against AVX2 ones), and the integer-share path amplifies that into a one-share flip
+    whenever ``|w| C / close`` lands within that of a half share (D-60).  The minimiser
+    of ``|w - w_raw|^2`` subject to the constraints that are active at the solver's point
+    is a small linear system; solved here without numpy or BLAS it is the same floats on
+    every CPU.  Falls back to the solver's weights when the active set is inconsistent or
+    the polished point moves further than ``POLISH_MAX_SHIFT`` (the active set was misread).
+    """
+    names = tuple(res.names)
+    w = [float(res.weights[n]) for n in names]
+    raw = np.array([float(w_raw[n]) for n in names])
+    beta = np.array([float(betas[n]) for n in names])
+    caps = np.array([float(liquidity_caps.get(n, math.inf)) for n in names])
+    rows, bounds = _constraints(names, np.sign(raw), beta, [sectors[n] for n in names], spec, caps)
+    k = len(names)
+    c_rows: list[list[float]] = []
+    d: list[float] = []
+    for _label, kind, a, b in rows:
+        a_list = [float(v) for v in a]
+        v = sum(ai * wi for ai, wi in zip(a_list, w, strict=True))
+        if kind == "eq" or b - v <= POLISH_ACTIVE_TOL:
+            c_rows.append(a_list)
+            d.append(float(b))
+    for i, (lo, hi) in enumerate(bounds):
+        at = None
+        if hi == lo:
+            at = hi
+        elif hi > 0 and hi - w[i] <= POLISH_ACTIVE_TOL:
+            at = hi
+        elif lo < 0 and w[i] - lo <= POLISH_ACTIVE_TOL:
+            at = lo
+        if at is not None:
+            c_rows.append([1.0 if j == i else 0.0 for j in range(k)])
+            d.append(float(at))
+    raw_l = [float(v) for v in raw]
+    if c_rows:
+        gram = [[sum(a * b for a, b in zip(ri, rj, strict=True)) for rj in c_rows] for ri in c_rows]
+        rhs = [
+            di - sum(a * r for a, r in zip(ri, raw_l, strict=True))
+            for ri, di in zip(c_rows, d, strict=True)
+        ]
+        scale = max((abs(v) for row in gram for v in row), default=1.0) or 1.0
+        lam = _solve_consistent(gram, rhs, 1e-12 * scale)
+        if lam is None:
+            return dict(res.weights)
+        pol = [
+            r + sum(lm * ri[j] for lm, ri in zip(lam, c_rows, strict=True))
+            for j, r in enumerate(raw_l)
+        ]
+    else:
+        pol = raw_l
+    pol = [min(max(v, lo), hi) for v, (lo, hi) in zip(pol, bounds, strict=True)]
+    if max(abs(a - b) for a, b in zip(pol, w, strict=True)) > POLISH_MAX_SHIFT:
+        return dict(res.weights)
+    for _label, kind, a, b in rows:
+        v = sum(float(ai) * wi for ai, wi in zip(a, pol, strict=True))
+        if (abs(v - b) if kind == "eq" else v - b) > solver.constraint_tol:
+            return dict(res.weights)
+    return {n: v for n, v in zip(names, pol, strict=True)}
+
+
 # --------------------------------------------------------------------------- engine
 def _ts(session: str, seconds: int) -> int:
     d = _dt.date.fromisoformat(session)
@@ -719,11 +830,14 @@ def run_engine(
                 if res.refused:
                     reason = "repair refused: " + ", ".join(res.active)
                 else:
+                    weights = polish_weights(
+                        res, raw, betas, secs, spec=cspec, liquidity_caps=caps, solver=solver
+                    )
                     intents: dict[str, int] = {}
-                    for n in sorted(res.weights):
-                        q = int(math.floor(abs(res.weights[n]) * capital / closes[n] + 0.5))
+                    for n in sorted(weights):
+                        q = int(math.floor(abs(weights[n]) * capital / closes[n] + 0.5))
                         if q >= 1:
-                            intents[n] = q if res.weights[n] > 0 else -q
+                            intents[n] = q if weights[n] > 0 else -q
                     final = {n: q * closes[n] / capital for n, q in intents.items()}
                     feas = feasibility(final, gross_target=gross_target, spec=cspec)
                     if not feas.feasible:
