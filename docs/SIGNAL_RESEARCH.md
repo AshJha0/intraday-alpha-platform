@@ -226,7 +226,7 @@ confirmatory result exists.
 
 Three opt-in pieces for the 100-name 2019-01-30 store. Nothing here runs on
 real data in the PR that adds it; the later machine job is in
-`docs/runbooks/RUNBOOK_rel07_breadth_labels.md`.
+`docs/archive/RUNBOOK_rel07_breadth_labels.md` (retired, never run).
 
 **Reference ETF by symbol, feature identity `xasset_v2`.** The v1 rule gives
 every EQUITY row the FIRST ETF row of `instruments.json` as its cross-asset

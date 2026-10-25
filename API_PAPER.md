@@ -71,7 +71,7 @@ from iap.paper.monitors import feature_drift, drift_alerts, realised_ic, ic_chec
   single_venue)` → `{"ic", "n"}` with the research definitions;
   `ic_check(alpha, realised, n, holdout_ic, history, *, min_ratio,
   rolling_window, min_rolling_days)` → the day and rolling ratios to the
-  confirmed holdout IC and their `alerts` (sign flip, day ratio below
+  registered holdout IC and their `alerts` (sign flip, day ratio below
   `min_ratio`, rolling mean below it after `min_rolling_days`). Pure functions:
   alerts never change a pre-registration, a gate or a result.
 

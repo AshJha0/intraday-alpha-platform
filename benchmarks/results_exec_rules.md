@@ -1,6 +1,9 @@
 # C++ execution-rule latency (bench_exec_rules, v1.17 F7)
 
-Pending the first CI run of the `cpp` job (artifact `bench-exec-rules`): the
-table is copied from that artifact, with the run id and runner CPU, once the
-PR's CI is green. Methodology: see `cpp/bench/bench_exec_rules.cpp` and
-benchmarks/RESULTS.md.
+No table has been transcribed into this file: the `bench-exec-rules` artifact is produced by
+the C++ benchmark job on every run (weekly `cpp-full` since v2.0 stage 11, `ci.yml` before that),
+and `.github/workflows/ci.yml` says the figures are copied by hand, which has not happened
+since the step was added in v1.17 (recorded in docs/DOC_AUDIT_v2.md, 2026-10-25). Until a run
+id, runner CPU and table are pasted here, no execution-rule latency figure is quotable anywhere
+in the documentation. Methodology: `cpp/bench/bench_exec_rules.cpp` and benchmarks/RESULTS.md.
+No latency edge is claimed; benchmarks are CI-runner numbers, not colocation.
