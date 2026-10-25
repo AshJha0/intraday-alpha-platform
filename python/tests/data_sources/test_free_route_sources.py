@@ -39,9 +39,13 @@ from iap.data.sources import (
     StooqSource,
     TiingoSource,
     WikiMembershipSource,
+    edgar,
+    french,
+    stooq,
+    tiingo,
+    wiki_membership,
 )
 from iap.data.sources import base as B
-from iap.data.sources import edgar, french, stooq, tiingo, wiki_membership
 
 FIX = Path(__file__).parent / "fixtures"
 TODAY = _dt.date(2026, 10, 25)
@@ -112,7 +116,9 @@ def test_fetch_refuses_unsealed_target(target):
         TiingoSource(Recorder({})).fetch(target, identity="iap-runner")
 
 
-@pytest.mark.parametrize("target", [r"C:\iap-sealed\b\daily", r"c:\IAP-SEALED\c", "/iap-sealed/a/x"])
+@pytest.mark.parametrize(
+    "target", [r"C:\iap-sealed\b\daily", r"c:\IAP-SEALED\c", "/iap-sealed/a/x"]
+)
 def test_fetch_with_runner_and_sealed_target_waits_for_d2(target):
     rec = Recorder({})
     with pytest.raises(SealedServiceUnavailable, match="D2"):
@@ -215,11 +221,11 @@ def test_tiingo_probe_needs_key_and_never_leaks_it():
     )
     cov = TiingoSource(rec, today=TODAY, environ={}).coverage(probe_ticker="AAA")
     assert any("needs owner's TIINGO_API_KEY" in n for n in cov.notes)
-    src = TiingoSource(rec, today=TODAY, environ={tiingo.KEY_ENV: "sk-SECRET"})
+    src = TiingoSource(rec, today=TODAY, environ={tiingo.KEY_ENV: "tiingo-test-key"})
     cov = src.coverage(probe_ticker="AAA")
     assert cov.ranges["metadata_AAA"] == ("1990-01-02", "2026-10-24")
-    assert rec.calls[-1][1]["Authorization"] == "Token sk-SECRET"
-    assert "SECRET" not in json.dumps(cov.to_dict())
+    assert rec.calls[-1][1]["Authorization"] == "Token tiingo-test-key"
+    assert "tiingo-test-key" not in json.dumps(cov.to_dict())
     assert src.limiter.per_hour == 50
 
 
@@ -243,14 +249,18 @@ def test_stooq_listing_parse_and_coverage():
 
 
 def test_stooq_challenge_page_yields_zero_archives():
-    cov = StooqSource(Recorder({stooq.LISTING_URL: "<html><body><noscript>JS</noscript></body></html>"})).coverage()
+    cov = StooqSource(
+        Recorder({stooq.LISTING_URL: "<html><body><noscript>JS</noscript></body></html>"})
+    ).coverage()
     assert cov.counts["archives_listed"] == 0 and cov.counts["bulk_daily_us_present"] == 0
 
 
 # ----------------------------------------------------------------------------- wikipedia
 def test_wiki_parse_constituents_four_spellings_largest_table_wins():
     text = (FIX / "wiki_sp500_recent.wikitext").read_text(encoding="utf-8")
-    assert wiki_membership.parse_constituents(text) == frozenset({"AAA", "BBB", "CCC", "DDD", "EEE", "FFF.B"})
+    assert wiki_membership.parse_constituents(text) == frozenset(
+        {"AAA", "BBB", "CCC", "DDD", "EEE", "FFF.B"}
+    )
 
 
 def test_wiki_intervals_from_snapshots():
@@ -262,7 +272,9 @@ def test_wiki_intervals_from_snapshots():
     ]
     iv = wiki_membership.intervals_from_snapshots("sp500", snaps)
     by = {(i.symbol, i.start): i for i in iv}
-    assert by[("B", d(2020, 1, 1))].end == d(2020, 3, 1) and by[("B", d(2020, 1, 1))].revision_id == 1
+    assert (
+        by[("B", d(2020, 1, 1))].end == d(2020, 3, 1) and by[("B", d(2020, 1, 1))].revision_id == 1
+    )
     assert by[("A", d(2020, 1, 1))].end is None
     assert by[("C", d(2020, 2, 1))].end is None and by[("C", d(2020, 2, 1))].revision_id == 2
     assert all(i.label == "wikipedia-proxy" for i in iv)
@@ -279,12 +291,26 @@ def _wiki_api(revisions: list[tuple[int, str]], contents: dict[int, str]) -> Rec
             assert "intraday-alpha-platform" in headers["User-Agent"]
             if "revids=" in url:
                 rid = int(re.search(r"revids=(\d+)", url).group(1))
-                doc = {"query": {"pages": [{"revisions": [{"revid": rid, "slots": {"main": {"content": contents[rid]}}}]}]}}
+                doc = {
+                    "query": {
+                        "pages": [
+                            {
+                                "revisions": [
+                                    {"revid": rid, "slots": {"main": {"content": contents[rid]}}}
+                                ]
+                            }
+                        ]
+                    }
+                }
                 return json.dumps(doc).encode()
             m = re.search(r"rvcontinue=(\d+)", url)
             start = int(m.group(1)) if m else 0
             page = revisions[start : start + 2]
-            doc = {"query": {"pages": [{"revisions": [{"revid": r, "timestamp": ts} for r, ts in page]}]}}
+            doc = {
+                "query": {
+                    "pages": [{"revisions": [{"revid": r, "timestamp": ts} for r, ts in page]}]
+                }
+            }
             if start + 2 < len(revisions):
                 doc["continue"] = {"rvcontinue": str(start + 2)}
             return json.dumps(doc).encode()
@@ -294,7 +320,7 @@ def _wiki_api(revisions: list[tuple[int, str]], contents: dict[int, str]) -> Rec
 
 def _table(symbols):
     rows = "\n".join(f"|-\n| {{{{NYSE|{s}}}}} || x" for s in symbols)
-    return "{| class=\"wikitable\"\n! Symbol !! Security\n" + rows + "\n|}"
+    return '{| class="wikitable"\n! Symbol !! Security\n' + rows + "\n|}"
 
 
 def test_wiki_coverage_samples_months_and_counts_only(monkeypatch):
@@ -326,12 +352,14 @@ def test_wiki_coverage_samples_months_and_counts_only(monkeypatch):
     assert 3 not in contents  # revision 3 (second in its month) was never fetched
     assert not any("revids=3" in u for u, _ in api.calls)
     text = json.dumps(cov.to_dict())
-    assert "\"A\"" not in text and "NYSE" not in text  # counts only, no symbols leave the call
+    assert '"A"' not in text and "NYSE" not in text  # counts only, no symbols leave the call
     assert "proxy" in cov.notes[0]
 
 
 def test_wiki_quote_matches_percent_encoding():
-    assert wiki_membership._quote("List of S&P 500 companies") == "List%20of%20S%26P%20500%20companies"
+    assert (
+        wiki_membership._quote("List of S&P 500 companies") == "List%20of%20S%26P%20500%20companies"
+    )
     assert wiki_membership._quote("ids|timestamp") == "ids|timestamp"
 
 
@@ -358,21 +386,38 @@ def _submissions(cik, forms, dates, accepted=None):
 
 
 def test_edgar_coverage_over_a_cik_sample_and_user_agent():
-    tickers = {"0": {"cik_str": 1000001, "ticker": "AAA"}, "1": {"cik_str": 1000002, "ticker": "BBB"}, "2": {"cik_str": 1000001}}
+    tickers = {
+        "0": {"cik_str": 1000001, "ticker": "AAA"},
+        "1": {"cik_str": 1000002, "ticker": "BBB"},
+        "2": {"cik_str": 1000001},
+    }
     rec = Recorder(
         {
             edgar.TICKERS_URL: json.dumps(tickers),
             edgar.SUBMISSIONS_URL.format(cik=1000001): json.dumps(
-                _submissions(1000001, ["8-K", "10-Q", "8-K", "4"], ["2026-09-01", "2026-08-05", "2025-01-10", "2026-09-03"])
+                _submissions(
+                    1000001,
+                    ["8-K", "10-Q", "8-K", "4"],
+                    ["2026-09-01", "2026-08-05", "2025-01-10", "2026-09-03"],
+                )
             ),
             edgar.SUBMISSIONS_URL.format(cik=1000002): json.dumps(
-                _submissions(1000002, ["10-K", "8-K"], ["2026-07-15", "2026-09-02"], accepted=["2026-07-15T06:00:00.000Z", ""])
+                _submissions(
+                    1000002,
+                    ["10-K", "8-K"],
+                    ["2026-07-15", "2026-09-02"],
+                    accepted=["2026-07-15T06:00:00.000Z", ""],
+                )
             ),
         }
     )
     cov = EdgarSource(rec, today=TODAY).coverage(sample_size=2)
     assert cov.counts["ciks_sampled"] == 2
-    assert cov.counts["8k_filings"] == 3 and cov.counts["10q_filings"] == 1 and cov.counts["10k_filings"] == 1
+    assert (
+        cov.counts["8k_filings"] == 3
+        and cov.counts["10q_filings"] == 1
+        and cov.counts["10k_filings"] == 1
+    )
     assert cov.counts["8k_with_acceptance_ts"] == 2
     assert cov.ranges["8k_filing_dates"] == ("2025-01-10", "2026-09-02")
     assert cov.counts["ciks_with_older_filing_files"] == 1
@@ -396,9 +441,16 @@ FRENCH_CSV = (
 
 def test_french_summary_and_coverage():
     info = french.summarise_factor_csv(_zip("F-F_Research_Data_Factors_daily.CSV", FRENCH_CSV))
-    assert info == {"rows": 3, "first": "1926-07-01", "last": "2026-08-31", "columns": ["Mkt-RF", "SMB", "HML", "RF"]}
+    assert info == {
+        "rows": 3,
+        "first": "1926-07-01",
+        "last": "2026-08-31",
+        "columns": ["Mkt-RF", "SMB", "HML", "RF"],
+    }
     rec = Recorder({french.BASE: _zip("x.csv", FRENCH_CSV)})
-    cov = FrenchSource(rec, today=TODAY).coverage(files={"ff3_daily": "F-F_Research_Data_Factors_daily_CSV.zip"})
+    cov = FrenchSource(rec, today=TODAY).coverage(
+        files={"ff3_daily": "F-F_Research_Data_Factors_daily_CSV.zip"}
+    )
     assert cov.counts == {"ff3_daily_rows": 3, "ff3_daily_columns": 4}
     assert cov.ranges["ff3_daily_dates"] == ("1926-07-01", "2026-08-31")
     assert "0.10" not in json.dumps(cov.to_dict())
@@ -409,7 +461,9 @@ def test_french_summary_and_coverage():
 
 # ----------------------------------------------------------------------------- the tool
 def _tool():
-    spec = importlib.util.spec_from_file_location("free_data_coverage", REPO_ROOT / "tools" / "free_data_coverage.py")
+    spec = importlib.util.spec_from_file_location(
+        "free_data_coverage", REPO_ROOT / "tools" / "free_data_coverage.py"
+    )
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -427,7 +481,10 @@ def test_tool_runs_adapters_with_an_injected_transport_and_renders():
     out = tool.run(["tiingo", "french", "stooq"], transport=rec, today=TODAY)
     assert set(out) == {"tiingo", "french", "stooq"}
     text = tool.render(out)
-    assert "stocks_us_inactive_before_cutoff: 1" in text and "ff3_daily_dates: 1926-07-01 .. 2026-08-31" in text
+    assert (
+        "stocks_us_inactive_before_cutoff: 1" in text
+        and "ff3_daily_dates: 1926-07-01 .. 2026-08-31" in text
+    )
 
     def broken(url, headers):
         raise ValueError("no network in tests")

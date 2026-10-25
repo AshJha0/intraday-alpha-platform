@@ -125,7 +125,9 @@ def _quote(value: str) -> str:
     """Percent-encode a query value (``|`` and ``:`` kept, as the API accepts them);
     written out because ``iap.data`` may not import ``urllib``."""
     keep = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.~|:")
-    return "".join(c if c in keep else "".join(f"%{b:02X}" for b in c.encode("utf-8")) for c in value)
+    return "".join(
+        c if c in keep else "".join(f"%{b:02X}" for b in c.encode("utf-8")) for c in value
+    )
 
 
 def _strip(cell: str) -> str:
@@ -262,7 +264,9 @@ class WikiMembershipSource(SourceAdapter):
                 out.append((rid, ts))
         return out
 
-    def coverage(self, *, indices: Iterable[str] = ("sp500", "ndx100"), sample: bool = True) -> Coverage:
+    def coverage(
+        self, *, indices: Iterable[str] = ("sp500", "ndx100"), sample: bool = True
+    ) -> Coverage:
         cov = self._coverage()
         for index in indices:
             title, (lo, hi) = PAGES[index]

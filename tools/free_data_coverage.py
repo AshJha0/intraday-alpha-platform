@@ -100,18 +100,26 @@ def render(results: dict[str, dict]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--source", default=",".join(ADAPTERS), help="comma-separated adapter names")
     ap.add_argument("--ciks", type=int, default=50, help="EDGAR CIK sample size")
-    ap.add_argument("--no-wiki-sample", action="store_true", help="revision counts only, no parsing")
-    ap.add_argument("--tiingo-probe", default=None, help="one metadata request for this ticker (needs the key)")
+    ap.add_argument(
+        "--no-wiki-sample", action="store_true", help="revision counts only, no parsing"
+    )
+    ap.add_argument(
+        "--tiingo-probe", default=None, help="one metadata request for this ticker (needs the key)"
+    )
     ap.add_argument("--json", default=None, help="write the counts/ranges document here")
     a = ap.parse_args(argv)
     sources = [s.strip() for s in a.source.split(",") if s.strip()]
     unknown = [s for s in sources if s not in ADAPTERS]
     if unknown:
         ap.error(f"unknown source(s) {unknown}; known: {sorted(ADAPTERS)}")
-    results = run(sources, ciks=a.ciks, wiki_sample=not a.no_wiki_sample, tiingo_probe=a.tiingo_probe)
+    results = run(
+        sources, ciks=a.ciks, wiki_sample=not a.no_wiki_sample, tiingo_probe=a.tiingo_probe
+    )
     print(render(results))
     if a.json:
         Path(a.json).write_text(json.dumps(results, indent=2, sort_keys=True), encoding="utf-8")

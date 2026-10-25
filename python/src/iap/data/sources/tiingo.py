@@ -177,7 +177,9 @@ class TiingoSource(SourceAdapter):
             else:
                 import json
 
-                meta = json.loads(self._get_text(META_URL.format(ticker=probe_ticker), self._auth()))
+                meta = json.loads(
+                    self._get_text(META_URL.format(ticker=probe_ticker), self._auth())
+                )
                 cov.ranges[f"metadata_{probe_ticker}"] = (
                     str(meta.get("startDate", ""))[:10],
                     str(meta.get("endDate", ""))[:10],
@@ -191,4 +193,3 @@ class TiingoSource(SourceAdapter):
         return cov
 
     # fetch(): inherited refusal (identity + sealed target, then SealedServiceUnavailable)
-
