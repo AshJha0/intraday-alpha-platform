@@ -6,10 +6,10 @@ title = "iap gitleaks config"
 useDefault = true
 
 [[allowlists]]
-description = "ledger content keys are SHA-256 digests of the experiment spec, not credentials: research/experiments.json, its v1.18 inventory copy research/v118/LEDGER_INVENTORY.json and the v1.19 R3 ledger family map research/validation/LEDGER_FAMILY_MAP.json (gitleaks scans every pushed branch, so the map on the R1-R5 branch fails every PR's advisory job until it is listed)"
+description = "ledger content keys are SHA-256 digests of the experiment spec, not credentials: research/experiments.json, its v1.18 inventory copy research/v118/LEDGER_INVENTORY.json and the v1.19 R3 family dependency map research/validation/LEDGER_FAMILY_MAP.json (tools/ledger_family_map.py; the field was briefly named key on the stage 1 branch, hence both names)"
 condition = "AND"
 regexTarget = "line"
-regexes = ['''^\s*"key": "[0-9a-f]{64}",?\s*$''']
+regexes = ['''^\s*"(key|ledger_entry_key)": "[0-9a-f]{64}",?\s*$''']
 paths = ['''^research/experiments\.json$''', '''^research/v118/LEDGER_INVENTORY\.json$''', '''^research/validation/LEDGER_FAMILY_MAP\.json$''']
 
 [[allowlists]]
