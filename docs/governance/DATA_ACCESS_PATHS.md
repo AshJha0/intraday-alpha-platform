@@ -115,7 +115,7 @@ the release programme.
 ## Residuals
 
 - The hook is dataset-granular. Authorisation no longer crosses a process boundary: a child process
-  that needs restricted scope must receive the prereg id and guard for itself (D-52 lists the one
+  that needs restricted scope must receive the prereg id and guard for itself (D-55 lists the one
   route that relied on inheritance, the features step of `research/v118/rel04_verify/run_rel04_verify.py`).
 - CSV reads (`iap.auction.*`, `research.auction_real`, `research.conformal_report --input x.csv`) are
   outside the choke point: they read extracted auction files and report inputs, not datasets; a CSV

@@ -79,10 +79,10 @@ Nothing in this repository claims otherwise. Consequences, stated plainly:
 - the audit chain is tamper-evident, not tamper-proof: a person with administrator rights can rewrite it from
   line one; the committed checkpoints make a rewrite after a publish detectable, not impossible (D-24 stands);
 - encryption at rest of the partitions is an operating-system setting (BitLocker or EFS), not something the
-  account script enables (defect D-49);
+  account script enables (defect D-52);
 - the process-image check depends on the service being allowed to query the client process; when Windows
   denies that query between two standard users the service refuses (fail closed) and the owner either grants
-  the query right or leaves `registered_images` empty and relies on the account check alone (D-45).
+  the query right or leaves `registered_images` empty and relies on the account check alone (D-48).
 
 ## 5. Install (owner)
 

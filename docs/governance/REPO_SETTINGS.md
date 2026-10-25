@@ -273,7 +273,7 @@ gh api repos/AshJha0/intraday-alpha-platform/branches/results --jq '.protected'
 ```
 
 No pull-request requirement on `results`: the runner pushes one fast-forward commit per run with the job
-token. A repository administrator can still bypass or delete a ruleset (D-48); the service's copy of each
+token. A repository administrator can still bypass or delete a ruleset (D-51); the service's copy of each
 result hash and the published checkpoints make that detectable.
 
 ### 7.4 Actions policy for the self-hosted runner (public repository)
@@ -293,4 +293,4 @@ outside collaborators" is set in the Actions settings page (no API field).
 
 A ruleset binds everyone except whoever the ruleset's bypass list names and, in practice, the repository
 administrator who can edit the ruleset. On a single-maintainer repository that administrator is the developer.
-The register's D-25, D-47 and D-48 record this; the custody label (property 6) is the honest description.
+The register's D-25, D-50 and D-51 record this; the custody label (property 6) is the honest description.

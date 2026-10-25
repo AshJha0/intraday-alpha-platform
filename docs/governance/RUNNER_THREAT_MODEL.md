@@ -104,13 +104,13 @@ service and runner host administered by someone else.
 - The repository is public: GitHub advises against self-hosted runners for public repositories because a
   pull request from a fork can run on them. This workflow has no `pull_request` trigger, the runner group is
   restricted to this repository and to selected workflows, and fork pull requests require approval before any
-  workflow runs (REPO_SETTINGS.md 7.4; defect D-47).
+  workflow runs (REPO_SETTINGS.md 7.4; defect D-50).
 
 ## Open items (defect register)
 
-D-45 process-image query between standard users · D-46 non-development identities need stored credentials to
-test · D-47 self-hosted runner on a public repository · D-48 the results ruleset cannot bind an administrator ·
-D-49 encryption at rest · D-50 the pinned Linux image cannot execute under `iap-runner` with pipe access, so the
-runner verifies and records the digest and executes in the identity-bound host environment · D-51 the sealed
-service needs read access to the repository code and a pinned trust-root copy · D-52 routes that relied on the
+D-48 process-image query between standard users · D-49 non-development identities need stored credentials to
+test · D-50 self-hosted runner on a public repository · D-51 the results ruleset cannot bind an administrator ·
+D-52 encryption at rest · D-53 the pinned Linux image cannot execute under `iap-runner` with pipe access, so the
+runner verifies and records the digest and executes in the identity-bound host environment · D-54 the sealed
+service needs read access to the repository code and a pinned trust-root copy · D-55 routes that relied on the
 removed `IAP_HOLDOUT_AUTHORISED` inheritance.
