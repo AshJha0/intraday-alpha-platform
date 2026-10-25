@@ -38,3 +38,8 @@ research/v118/f3_accept/*.cmd text eol=crlf
 # byte for byte (CRLF, sha256 900d9e73...); python/tests/spec/test_r0_frozen.py
 # re-hashes it, so git must never normalise its line endings.
 python/tests/spec/CONFIRMATORY_TEST_SPEC.md -text
+
+# v2.0 stage 5: the frozen H1 economic specification (E0 revision 6) is committed
+# byte for byte (CRLF, sha256 e1099e33...); python/tests/equivalence/test_e0_frozen.py
+# re-hashes it, so git must never normalise its line endings.
+research/v119/H1_ALPHA_IMPROVEMENT_SPEC.md -text
