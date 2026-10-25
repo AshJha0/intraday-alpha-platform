@@ -4,8 +4,8 @@ Each recipe gives the exact command, what it prints, and the evidence class of a
 produces (LEARN.md section 6). Every command was run on 2026-10-25 against `main` in the CI
 environment (recipe 0) on Linux; on Windows replace `.venv-ci/bin/python` with
 `.venv-ci\Scripts\python` and `PYTHONPATH=src` with `$env:PYTHONPATH="src"`. Paths are relative to
-the repository root unless a recipe says otherwise. Two recipes depend on pull requests that were
-open when this page was written and say so in their heading.
+the repository root unless a recipe says otherwise. Two recipes depend on a pull request that was
+open when this page was written (2026-10-25) and say so in their heading.
 
 The v1.x engineering cookbook (200 recipes on the intraday engines, the C++ and Rust ports and the
 goldens) is frozen at [../COOKBOOK.md](../COOKBOOK.md); its recipes still run but describe the
@@ -269,9 +269,11 @@ failure. Every development run on a real panel must run this on its own panel
 
 ---
 
-## 7. Read a confirmation profile's declared domain (lands with the stage 10 U13 pull request)
+## 7. Read a confirmation profile's declared domain
 
-A profile's operating domain is read from its committed evidence file and nothing else decides it.
+A profile's operating domain is read from its committed evidence file
+([`research/v2/confirmation_evidence/`](../research/v2/confirmation_evidence/)) and nothing else
+decides it.
 
 ```bash
 PYTHONPATH=python/src .venv-ci/bin/python - <<'EOF'
@@ -282,13 +284,17 @@ for pid in sorted(PROFILES):
 EOF
 ```
 
-Expected: for `PF-1` and `PF-2`, per candidate procedure, the generator cells whose size cells
-passed at every tested length, the smallest validated `T`, and whether the reference cells passed
-both size and power (a procedure whose reference power fails has no domain); for `PF-3`, `None`
-(deferred: every PF-3 registration is refused). The specification and the results table are
-`python/tests/spec/CONFIRMATION_PROFILES.md` sections 6 and 10; the framework is
-`research/v2/CONFIRMATION_FRAMEWORK.md`. A registration is valid only inside the domain of the
-profile it names (LEARN.md section 4). No evidence class: this is the gate's own validation record.
+Expected (abridged): for `PF-1`, `P-HAC-L5` with generators `iid_normal`, `garch11` and `t3`,
+`"T_min": 120`, `"reference_passes": true`, `"reference_power_passes": true`, `"acf1_max": 0.0`;
+`P-CBB` with `"reference_passes": false` (no domain); for `PF-2`, `P-HAC-L20` with `iid_normal`,
+`ar1` at rho 0.1 to 0.3, `garch11` and `t3`, `"T_min": 250`; for `PF-3`, `None` (deferred: every
+PF-3 registration is refused). The specification and the results table are
+[`python/tests/spec/CONFIRMATION_PROFILES.md`](../python/tests/spec/CONFIRMATION_PROFILES.md)
+sections 6 and 10; the framework is
+[`research/v2/CONFIRMATION_FRAMEWORK.md`](../research/v2/CONFIRMATION_FRAMEWORK.md). The fast
+test suite is `python -m pytest -q tests/validation/test_profiles.py` from `python/`. A
+registration is valid only inside the domain of the profile it names (LEARN.md section 4). No
+evidence class: this is the gate's own validation record.
 
 ---
 

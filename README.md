@@ -62,10 +62,9 @@ was rejected by the outside reviewer as a gate.
 **Pending** (dated 2026-10-25): the owner's ingestion of the free daily route and the repository
 settings for the sealed environment ([docs/governance/DD1_INGESTION_RUNBOOK.md](docs/governance/DD1_INGESTION_RUNBOOK.md),
 [docs/governance/REPO_SETTINGS.md](docs/governance/REPO_SETTINGS.md) section 7); the first
-registered run; the H1 prospective window; the combined-book profile PF-3. Two pull requests
-were open on 2026-10-25 and are named where the documents depend on them: #389 (family
-specifications, the research loop, the ML protocol) and #392 (the confirmation framework and
-profiles PF-1 and PF-2). The H3 and H4 intraday families are data-ineligible on the free route and
+registered run; the H1 prospective window; the combined-book profile PF-3. One pull request
+was open on 2026-10-25 and is named where the documents depend on it: #389 (family
+specifications, the research loop, the ML protocol). The H3 and H4 intraday families are data-ineligible on the free route and
 D5 is ineligible on daily data; their specifications say so.
 
 ## Five-minute quick start

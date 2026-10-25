@@ -150,9 +150,11 @@ A daily family with a 20-session holding period produces a different series with
 dependence (overlapping positions, volatility clustering) and a different horizon; applying R0's
 Student t to it would be reusing a validation that never covered it.
 
-The confirmation framework (U13; `research/v2/CONFIRMATION_FRAMEWORK.md` and
-`python/tests/spec/CONFIRMATION_PROFILES.md`, implemented in `iap.validation.profiles`, landing
-with the stage 10 pull request) keeps the framework elements fixed (Holm at the same levels, the
+The confirmation framework (U13;
+[../research/v2/CONFIRMATION_FRAMEWORK.md](../research/v2/CONFIRMATION_FRAMEWORK.md) and
+[../python/tests/spec/CONFIRMATION_PROFILES.md](../python/tests/spec/CONFIRMATION_PROFILES.md),
+implemented in [`iap/validation/profiles.py`](../python/src/iap/validation/profiles.py)) keeps
+the framework elements fixed (Holm at the same levels, the
 economic screen on fixed capital, the coverage rule, a single read by the registered runner, the
 fail-closed order) and makes everything that depends on the series a **profile**: candidate
 procedures, synthetic null generators, a size and power study of its own, a declared operating
