@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import platform
 import sys
+from pathlib import Path
 
 import pytest
 from iap.contracts.versions import canonical_json
@@ -37,6 +39,23 @@ def expected_hash(manifest, name):
     return pinned.get(environment_key())
 
 
+def _cpu_summary() -> str:
+    """The machine behind a mismatch: model name and the SIMD level numpy/OpenBLAS would dispatch to."""
+    try:
+        info = Path("/proc/cpuinfo").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return f"platform={sys.platform} processor={platform.processor()!r}"
+    model = next(
+        (ln.split(":", 1)[1].strip() for ln in info.splitlines() if ln.startswith("model name")),
+        "?",
+    )
+    flags = next(
+        (ln.split(":", 1)[1].split() for ln in info.splitlines() if ln.startswith("flags")), []
+    )
+    simd = [f for f in ("avx2", "fma", "avx512f", "avx512dq", "avx512bw", "avx512vl") if f in flags]
+    return f"model={model!r} simd={simd}"
+
+
 def assert_pinned(manifest, name, sha, report=None):
     """The run's hash equals the pinned one; on a mismatch the canonical report is printed so a
     CI log carries what differed (D-69: the cause is located by diffing reports, never by re-pinning)."""
@@ -48,6 +67,7 @@ def assert_pinned(manifest, name, sha, report=None):
         )
     if sha != pinned and report is not None:
         print(f"REPORT-{name}-BEGIN " + canonical_json(report) + f" REPORT-{name}-END")
+        print("CPU-BEGIN " + _cpu_summary() + " CPU-END")
     assert sha == pinned, (
         f"{name} on {environment_key()}: report hash {sha} differs from the pinned {pinned}"
     )
