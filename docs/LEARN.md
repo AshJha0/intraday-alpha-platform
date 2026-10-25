@@ -101,8 +101,8 @@ identified by its alpha, its kind and the hash of its canonical configuration. R
 configuration five times is still one look; changing a threshold is a new one; the same statistic
 on a different data set is a different look. The ledger is append-only and hash-chained, so the
 denominator can only grow and a rewritten history is detectable. The research loop refuses to run
-without a ledger: a run that leaves no entry is not a research run (`tools/research/run_family.py`,
-pull request #389; [COOKBOOK.md](COOKBOOK.md) recipe 1). Each entry records its **outcome
+without a ledger: a run that leaves no entry is not a research run
+([`tools/research/run_family.py`](../tools/research/run_family.py); [COOKBOOK.md](COOKBOOK.md) recipe 1). Each entry records its **outcome
 exposure**, whether whoever chose the next step saw the result, and the registration of a
 hypothesis for confirmation pays its multiplicity from that count (H1 specification section 12,
 [../research/v119/H1_ALPHA_IMPROVEMENT_SPEC.md](../research/v119/H1_ALPHA_IMPROVEMENT_SPEC.md)).
@@ -373,7 +373,7 @@ neutralisation).
 | **selection ledger** | the append-only, hash-chained record of looks (`research/experiments.json`) | `iap/validation/ledger.py` |
 | **cohort** | the positions opened by one family at one decision time, carried to their scheduled expiry | H1 specification section 7 |
 | **executable ledger** | the cash-and-positions ledger that nets across cohorts and families and reconciles to the identity | `iap/portfolio/ledger.py` |
-| **family** | a hypothesis class with a specification file: H1 (Track A), D1 to D5 and H2 to H4 (Track B); also the `K` hypotheses of one registration | `research/v2/families/README.md` (PR #389), R0 section 2 |
+| **family** | a hypothesis class with a specification file: H1 (Track A), D1 to D5 and H2 to H4 (Track B); also the `K` hypotheses of one registration | `research/v2/families/README.md`, R0 section 2 |
 | **horizon** | the declared holding period of a forecast (`15m`, `5d`, `c2o`); never mixed | `iap/alpha/forecast.py` |
 | **track** | A (H1 under R0), B (families and ML under U13 profiles), C (the combined book) | plan section 2 |
 | **gate** | a fail-closed decision procedure; R0 for H1, a U13 profile for everything else | sections 3 and 4 |

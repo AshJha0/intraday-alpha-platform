@@ -4,8 +4,7 @@ Each recipe gives the exact command, what it prints, and the evidence class of a
 produces (LEARN.md section 6). We ran every command on 2026-10-25 against `main` in the CI
 environment (recipe 0) on Linux and pasted the output we saw; on Windows replace `.venv-ci/bin/python` with
 `.venv-ci\Scripts\python` and `PYTHONPATH=src` with `$env:PYTHONPATH="src"`. Paths are relative to
-the repository root unless a recipe says otherwise. Two recipes depend on a pull request that was
-open when this page was written (2026-10-25) and say so in their heading.
+the repository root unless a recipe says otherwise.
 
 The v1.x engineering cookbook (200 recipes on the intraday engines, the C++ and Rust ports and the
 goldens) is frozen at [../COOKBOOK.md](../COOKBOOK.md); its recipes still run but describe the
@@ -40,7 +39,7 @@ correctness tests on synthetic fixtures.
 
 ---
 
-## 1. Run the research loop on a family specification against the synthetic fixture (lands with pull request #389)
+## 1. Run the research loop on a family specification against the synthetic fixture
 
 The loop refuses anything but the development or validation partition, refuses a family whose
 gate forbids a fit, fits the M0 forecast, runs the engine, builds the E5 report and records the run
@@ -79,9 +78,9 @@ at most *development-supported*.
 
 ---
 
-## 2. Add a family specification (lands with pull request #389)
+## 2. Add a family specification
 
-A family is one Markdown file under `research/v2/families/` holding, in order: hypothesis,
+A family is one Markdown file under [`research/v2/families/`](../research/v2/families/) holding, in order: hypothesis,
 mechanism, artefacts that could fake it, falsifier, data gate and its outcome, label definition,
 signal and eligibility rule, development diagnostics, registration (family size `K` and the U13
 profile) and a machine-readable JSON block the loop reads. The file is complete before any fit; a
@@ -89,7 +88,7 @@ family whose gate failed carries `fit_allowed: false` and has no development run
 
 1. Copy the closest existing specification (`D1_short_term_reversal.md` for a daily family) and
    fill every section; keep the JSON block's keys.
-2. Add a row to `research/v2/families/README.md` with the evidence class **pending**.
+2. Add a row to [`research/v2/families/README.md`](../research/v2/families/README.md) with the evidence class **pending**.
 3. Run the specification test:
 
 ```bash

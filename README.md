@@ -62,9 +62,7 @@ was rejected by the outside reviewer as a gate.
 **Pending** (dated 2026-10-25): the owner's ingestion of the free daily route and the repository
 settings for the sealed environment ([docs/governance/DD1_INGESTION_RUNBOOK.md](docs/governance/DD1_INGESTION_RUNBOOK.md),
 [docs/governance/REPO_SETTINGS.md](docs/governance/REPO_SETTINGS.md) section 7); the first
-registered run; the H1 prospective window; the combined-book profile PF-3. One pull request
-was open on 2026-10-25 and is named where the documents depend on it: #389 (family
-specifications, the research loop, the ML protocol). The H3 and H4 intraday families are data-ineligible on the free route and
+registered run; the H1 prospective window; the combined-book profile PF-3. The H3 and H4 intraday families are data-ineligible on the free route and
 D5 is ineligible on daily data; their specifications say so.
 
 ## Five-minute quick start
@@ -81,7 +79,7 @@ That runs the v2.0 engine suite on its synthetic fixtures: the leakage canaries,
 conservation invariants, the cost waterfall reconciling to the cash identity, the E5 report
 builders and the H1 equivalence test (62 tests, about twenty seconds; CPython 3.11 or 3.12).
 Everything it produces is a correctness check on fixtures and carries no evidence class. The
-research loop on a family specification, once pull request #389 lands, is
+research loop on a family specification is
 [docs/COOKBOOK.md](docs/COOKBOOK.md) recipe 1. The full four-language parity table is
 `bash tests/harness/run_all.sh` (Linux or WSL; needs the C++ and Rust toolchains of
 [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)).
