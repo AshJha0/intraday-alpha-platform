@@ -6,7 +6,7 @@ contracts and `tests/golden/`). Two packages run the other way — `risk/` and
 `execution/` are Python ports of the Rust and C++ references, proven by the
 same goldens (`/API_TRADING.md`). Everything deterministic is seeded via
 SplitMix64 only; no wall clock and no network or LLM client on any trading
-path (`PLATFORM_CONVENTIONS.md` §13.7). All 28 packages are listed below.
+path (`PLATFORM_CONVENTIONS.md` §13.7). All 29 packages are listed below.
 
 ```
 iap/
@@ -95,7 +95,10 @@ iap/
     replay.py      ReplayEngine: deterministic event-time replay over all
                    books; periodic book-state snapshots; checkpoint()/restore()
                    with bit-identical continuation.
-  execution/       Python reference port of the C++ execution stack
+  execution/       Python reference port of the C++ execution stack;
+                   sim.py is the v2.0 EN4 fill simulator (one fill-price
+                   convention, three cost columns, failure cases,
+                   API_PORTFOLIO_TCA.md §8)
                    (cpp/{execution,sor,replay}; conventions §11.2-§11.3). The
                    nine pinned simulator rules are the contract; the golden
                    tests/golden/expected_replay_fills.json is reproduced
@@ -175,7 +178,9 @@ iap/
                    freshness bound (R5). maker_labels.py (v1.9, M3): per
                    decision and side, fill / taker flags, queue ahead,
                    markouts, "filled and not run over".
-  alpha/           The 24 flagship alphas (API_ALPHA.md): base.py (AlphaModel,
+  alpha/           The 24 flagship alphas (API_ALPHA.md); forecast.py and
+                   registry.py (v2.0 EN1), h1.py (the H1 client of the v2.0
+                   engine, API_ALPHA.md §13): base.py (AlphaModel,
                    linear_z_v1 fit / score, the enforced `Economic rationale:`
                    docstring), equity.py (EQ01..EQ12), fx.py (FX01..FX12),
                    fx_exposure.py, cross_sectional.py, data.py (session_days,
@@ -241,6 +246,16 @@ iap/
                    transaction costs under 7 constraint families, INFEASIBLE
                    holds w_prev), covariance.py (EWMA), fx.py (currency
                    exposure), diagnostics.py (the constraint audit).
+                   v2.0 stage 5 (family-agnostic, API_PORTFOLIO_TCA.md §6-7):
+                   ledger.py (EN2 cohort and executable ledgers, the cash
+                   identity), project.py (EN3 constrained least-squares
+                   repair, no-trade band, skip rules, book re-check,
+                   diagnostic covariance).
+  reports/         v2.0 EN5 (API_PORTFOLIO_TCA.md §9): e5.py (the E5 blocks
+                   A-E as Table builders with units, counts and uncertainty;
+                   the session series with the three session kinds; the
+                   economic screen; the six-branch decision tree; the
+                   prohibited-inflation checks).
   tca/             The TCA reference (API_PORTFOLIO_TCA.md §2): fills.py
                    (MarketTimeline, ParentOrder, fill records), tca.py
                    (order_tca: Perold IS = delay + trading + opportunity, spread /

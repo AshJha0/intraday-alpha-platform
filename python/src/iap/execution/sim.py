@@ -109,7 +109,9 @@ class ImpactCoefficients:
     c_depth: float = 0.0002
     c_volume: float = 0.0010
     label: str = "estimated"
-    provenance: str = "E0 section 9 planning values; to be replaced by measured development-subset costs (C7)"
+    provenance: str = (
+        "E0 section 9 planning values; to be replaced by measured development-subset costs (C7)"
+    )
 
     def __post_init__(self) -> None:
         if self.c_depth < 0 or self.c_volume < 0:
@@ -161,7 +163,11 @@ class Quote:
 
     def valid(self, at_ts: int, stale_ns: int = QUOTE_STALE_NS) -> str:
         """'' when usable at ``at_ts``; else the failure cause."""
-        if not (math.isfinite(self.bid) and math.isfinite(self.ask)) or self.bid <= 0 or self.ask <= 0:
+        if (
+            not (math.isfinite(self.bid) and math.isfinite(self.ask))
+            or self.bid <= 0
+            or self.ask <= 0
+        ):
             return "no quote"
         if self.ask < self.bid:
             return "crossed quote"
@@ -296,7 +302,9 @@ def simulate(
     reason = ""
     if abs(qty) > cap_shares:
         if cap_shares < min_ticket:
-            return refuse(f"participation breach: cap {cap_shares} shares below the minimum ticket {min_ticket}")
+            return refuse(
+                f"participation breach: cap {cap_shares} shares below the minimum ticket {min_ticket}"
+            )
         submitted = side * cap_shares
         reason = f"participation: scaled {abs(qty)} to {cap_shares} shares ({participation_cap:.0%} of 5-minute volume)"
     if not mandatory and abs(submitted) < min_ticket:
@@ -375,21 +383,49 @@ def simulate_daily(
         raise SimError("qty must be a non-zero int")
     side = 1 if qty > 0 else -1
     if not math.isfinite(auction.price) or auction.price <= 0 or auction.volume <= 0:
-        return FillOutcome(name, col.name, qty, 0, qty, "no auction print", None, auction.ts, 0.0, 0)
+        return FillOutcome(
+            name, col.name, qty, 0, qty, "no auction print", None, auction.ts, 0.0, 0
+        )
     cap_shares = int(math.floor(participation_cap * auction.volume))
     reason = ""
     submitted = qty
     if abs(qty) > cap_shares:
         if cap_shares < min_ticket:
             return FillOutcome(
-                name, col.name, qty, 0, qty, "participation breach at the auction", None, auction.ts, 0.0, 0
+                name,
+                col.name,
+                qty,
+                0,
+                qty,
+                "participation breach at the auction",
+                None,
+                auction.ts,
+                0.0,
+                0,
             )
         submitted = side * cap_shares
         reason = f"participation: scaled {abs(qty)} to {cap_shares} shares of the auction volume"
     if not mandatory and abs(submitted) < min_ticket:
-        return FillOutcome(name, col.name, qty, 0, qty, f"below the minimum ticket {min_ticket}", None, auction.ts, 0.0, 0)
+        return FillOutcome(
+            name,
+            col.name,
+            qty,
+            0,
+            qty,
+            f"below the minimum ticket {min_ticket}",
+            None,
+            auction.ts,
+            0.0,
+            0,
+        )
     q = abs(submitted)
-    impact = col.impact_multiplier * model.c * auction.sigma_daily * math.sqrt(q / max(auction.adv, 1)) * auction.price
+    impact = (
+        col.impact_multiplier
+        * model.c
+        * auction.sigma_daily
+        * math.sqrt(q / max(auction.adv, 1))
+        * auction.price
+    )
     price = auction.price + side * impact
     fill = Fill(
         ts=ts_decision,
@@ -404,7 +440,16 @@ def simulate_daily(
         column=col.name,
     )
     return FillOutcome(
-        name, col.name, qty, side * q, qty - side * q, reason, fill, auction.ts, q / auction.volume, auction.volume
+        name,
+        col.name,
+        qty,
+        side * q,
+        qty - side * q,
+        reason,
+        fill,
+        auction.ts,
+        q / auction.volume,
+        auction.volume,
     )
 
 
@@ -421,7 +466,9 @@ def closeout_valuation(
     coeffs = coeffs or ImpactCoefficients()
     col = COLUMNS["stress"]
     depth = int(math.floor(depth_at_touch * col.depth_haircut))
-    haircut = reference_spread / 2.0 + impact_per_share(qty, last_valid_mid, depth, volume_5m, col, coeffs)
+    haircut = reference_spread / 2.0 + impact_per_share(
+        qty, last_valid_mid, depth, volume_5m, col, coeffs
+    )
     side = 1 if qty > 0 else -1
     price = last_valid_mid - side * haircut  # a long is valued lower, a short higher
     return Valuation(price=max(price, 1e-9), cause=cause or "unpriced")

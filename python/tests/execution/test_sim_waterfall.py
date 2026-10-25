@@ -57,7 +57,9 @@ def test_one_fill_price_convention_and_latency_drift_is_not_a_cost():
     assert f.mid_arrival == pytest.approx(100.02) and out.arrival_ts == T0 + 500_000_000
     assert f.price == pytest.approx(f.mid_arrival + f.half_spread + f.impact)
     assert f.half_spread == pytest.approx(100.02 * 10 / 1e4 / 2)
-    assert f.latency_drift == pytest.approx(-1000 * 0.02)  # a separate attribution line, never in the price
+    assert f.latency_drift == pytest.approx(
+        -1000 * 0.02
+    )  # a separate attribution line, never in the price
     assert f.column == "conservative"
     sell = simulate(ts_decision=T0, name="AAA", qty=-1000, mid_decision=100.0, market=mkt).fill
     assert sell.price == pytest.approx(sell.mid_arrival - sell.half_spread - sell.impact)
@@ -68,28 +70,41 @@ def test_three_columns_differ_only_by_impact_multiplier_and_depth_haircut():
     outs = simulate_columns(ts_decision=T0, name="AAA", qty=900, mid_decision=50.0, market=mkt)
     assert set(outs) == {"base", "conservative", "stress"}
     base, cons, stress = outs["base"], outs["conservative"], outs["stress"]
-    assert base.filled == 900 and cons.filled == 750 and stress.filled == 500  # 100 / 75 / 50 % of 1000
+    assert (
+        base.filled == 900 and cons.filled == 750 and stress.filled == 500
+    )  # 100 / 75 / 50 % of 1000
     assert cons.refused == 150 and "insufficient depth" in cons.reason
     for o in outs.values():
         f = o.fill
         assert f.half_spread == base.fill.half_spread and f.mid_arrival == base.fill.mid_arrival
         depth = o.depth_available
-        expected = impact_per_share(f.qty, f.mid_arrival, depth, 100_000, COLUMNS[o.column], ImpactCoefficients())
+        expected = impact_per_share(
+            f.qty, f.mid_arrival, depth, 100_000, COLUMNS[o.column], ImpactCoefficients()
+        )
         assert f.impact == pytest.approx(expected)
         assert f.price == pytest.approx(f.mid_arrival + f.half_spread + f.impact)
     # same size and depth, the impact scales exactly with the multiplier
     same = {
-        c: simulate(ts_decision=T0, name="AAA", qty=100, mid_decision=50.0, market=mkt, column=c).fill for c in COLUMNS
+        c: simulate(
+            ts_decision=T0, name="AAA", qty=100, mid_decision=50.0, market=mkt, column=c
+        ).fill
+        for c in COLUMNS
     }
     i1 = same["base"].impact
-    assert same["conservative"].impact == pytest.approx(1.5 * i1 * (1000 // 1) / (1000 * 0.75) * 0 + 1.5 * impact_per_share(100, 50.0, 750, 100_000, COLUMNS["base"], ImpactCoefficients()))
+    assert same["conservative"].impact == pytest.approx(
+        1.5 * i1 * (1000 // 1) / (1000 * 0.75) * 0
+        + 1.5 * impact_per_share(100, 50.0, 750, 100_000, COLUMNS["base"], ImpactCoefficients())
+    )
     assert same["stress"].impact / same["base"].impact > 1.5
     assert ImpactCoefficients().label == "estimated"
 
 
 def test_failure_cases_are_deterministic_and_named():
     k = dict(ts_decision=T0, name="AAA", qty=1000, mid_decision=100.0)
-    assert simulate(**k, market=Market("AAA", None, 100_000)).reason == "quote disappeared before arrival"
+    assert (
+        simulate(**k, market=Market("AAA", None, 100_000)).reason
+        == "quote disappeared before arrival"
+    )
     assert simulate(**k, market=market("AAA", T0, 100.0, halted=True)).reason == "halt"
     stale = quote(T0 + LATENCY_NS - 6 * 10**9, 100.0)
     assert simulate(**k, market=market("AAA", T0, 100.0, quote=stale)).reason == "stale quote"
@@ -103,7 +118,12 @@ def test_failure_cases_are_deterministic_and_named():
     # participation: scaled to 5 % of trailing volume, dropped below the minimum ticket
     thin = market("AAA", T0, 100.0, volume_5m=10_000)
     r = simulate(**k, market=thin)
-    assert r.filled == 500 and r.refused == 500 and "participation" in r.reason and r.participation == pytest.approx(0.05)
+    assert (
+        r.filled == 500
+        and r.refused == 500
+        and "participation" in r.reason
+        and r.participation == pytest.approx(0.05)
+    )
     r = simulate(**k, market=market("AAA", T0, 100.0, volume_5m=10), min_ticket=10)
     assert r.filled == 0 and "participation breach" in r.reason
     r = simulate(**dict(k, qty=5), market=market("AAA", T0, 100.0), min_ticket=10)
@@ -111,15 +131,21 @@ def test_failure_cases_are_deterministic_and_named():
     # insufficient depth: partial, remainder refused (not filled at a worse price)
     r = simulate(**k, market=market("AAA", T0, 100.0, size=400))
     assert r.filled == 300 and r.refused == 700
-    assert simulate(**k, market=market("AAA", T0, 100.0, size=0)).reason.startswith("insufficient depth")
+    assert simulate(**k, market=market("AAA", T0, 100.0, size=0)).reason.startswith(
+        "insufficient depth"
+    )
     with pytest.raises(SimError):
         simulate(**dict(k, qty=0), market=mkt)
     with pytest.raises(SimError):
         simulate(**k, market=market("BBB", T0, 100.0))
-    v = closeout_valuation(100.0, 1000, 100_000, 2000, "halt through the close", reference_spread=0.05)
+    v = closeout_valuation(
+        100.0, 1000, 100_000, 2000, "halt through the close", reference_spread=0.05
+    )
     assert v.cause == "halt through the close" and v.price < 100.0 - 0.025
     assert closeout_valuation(100.0, -1000, 100_000, 2000, "no quote").price > 100.0
-    assert expected_cost_bps(1000, quote(T0, 100.0, 10.0), 200_000) > 5.0  # half-spread alone is 5 bps
+    assert (
+        expected_cost_bps(1000, quote(T0, 100.0, 10.0), 200_000) > 5.0
+    )  # half-spread alone is 5 bps
 
 
 def test_daily_horizon_execution_at_the_auction_with_square_root_impact():
@@ -132,7 +158,13 @@ def test_daily_horizon_execution_at_the_auction_with_square_root_impact():
     assert DailyImpactModel().label == "estimated"
     r = simulate_daily(ts_decision=T0, name="DDD", qty=200_000, mid_decision=40.0, auction=a)
     assert r.filled == 50_000 and "participation" in r.reason
-    r = simulate_daily(ts_decision=T0, name="DDD", qty=10, mid_decision=40.0, auction=AuctionPrint(T0, 40.0, 0, 0.02, 1))
+    r = simulate_daily(
+        ts_decision=T0,
+        name="DDD",
+        qty=10,
+        mid_decision=40.0,
+        auction=AuctionPrint(T0, 40.0, 0, 0.02, 1),
+    )
     assert r.filled == 0 and r.reason == "no auction print"
 
 
@@ -152,8 +184,14 @@ def run_fixture(C=1_000_000.0):
             if o.submitted == 0:
                 continue
             out = simulate(
-                ts_decision=d.ts, name=n, qty=o.submitted, mid_decision=mids[n], market=markets[n],
-                fees=fees, mandatory=o.mandatory != 0, **kw,
+                ts_decision=d.ts,
+                name=n,
+                qty=o.submitted,
+                mid_decision=mids[n],
+                market=markets[n],
+                fees=fees,
+                mandatory=o.mandatory != 0,
+                **kw,
             )
             log.append(out)
             if out.fill is not None:
@@ -163,10 +201,22 @@ def run_fixture(C=1_000_000.0):
     # session 1 -----------------------------------------------------------
     led.open_session("s1")
     t1 = T0
-    led.open_cohort(("h1", "15m", 1), formation_ts=t1 - 15 * MIN, decision_ts=t1, expiry_ts=t1 + 15 * MIN,
-                    intents={"AAA": 2000, "BBB": -1500}, forecasts={"AAA": 8.0, "BBB": 7.0})
-    led.open_cohort(("d1", "5d", 1), formation_ts=t1 - MIN, decision_ts=t1, expiry_ts=t1 + 5 * 24 * 60 * MIN,
-                    intents={"AAA": -500, "CCC": 1000}, forecasts={"AAA": 20.0, "CCC": 30.0})
+    led.open_cohort(
+        ("h1", "15m", 1),
+        formation_ts=t1 - 15 * MIN,
+        decision_ts=t1,
+        expiry_ts=t1 + 15 * MIN,
+        intents={"AAA": 2000, "BBB": -1500},
+        forecasts={"AAA": 8.0, "BBB": 7.0},
+    )
+    led.open_cohort(
+        ("d1", "5d", 1),
+        formation_ts=t1 - MIN,
+        decision_ts=t1,
+        expiry_ts=t1 + 5 * 24 * 60 * MIN,
+        intents={"AAA": -500, "CCC": 1000},
+        forecasts={"AAA": 20.0, "CCC": 30.0},
+    )
     mids = {"AAA": 100.0, "BBB": 50.0, "CCC": 20.0}
     d = led.decide(t1, mids)
     assert d.orders["AAA"].submitted == 1500  # netted across families: 2000 - 500
@@ -190,9 +240,18 @@ def run_fixture(C=1_000_000.0):
     d = led.decide(t3, mids3, pre_close=True)
     execute(d, mids3, {"BBB": market("BBB", t3, 49.7, halted=True)})
     vals = {
-        "BBB": closeout_valuation(49.7, led.positions["BBB"], 100_000, 2000, "halt through the close", reference_spread=0.025),
+        "BBB": closeout_valuation(
+            49.7,
+            led.positions["BBB"],
+            100_000,
+            2000,
+            "halt through the close",
+            reference_spread=0.025,
+        ),
         "CCC": Valuation(20.0),
-        "AAA": Valuation(100.2),  # d1's short of 500 is carried as a matter of course (not flat at close)
+        "AAA": Valuation(
+            100.2
+        ),  # d1's short of 500 is carried as a matter of course (not flat at close)
     }
     r1 = led.close_session(vals)
     assert r1.closeout_failures and r1.carried["BBB"] != 0 and r1.carried["CCC"] == 1000
@@ -214,8 +273,13 @@ def test_waterfall_reconciles_to_the_cash_identity_to_zero_with_partials_netting
     for r in results:
         w = r.waterfall
         total = (
-            w["midpoint_reference_pnl"] + w["latency_drift"] - w["half_spread"] - w["impact"] - w["fees"]
-            + w["execution_residual"] - w["financing"]
+            w["midpoint_reference_pnl"]
+            + w["latency_drift"]
+            - w["half_spread"]
+            - w["impact"]
+            - w["fees"]
+            + w["execution_residual"]
+            - w["financing"]
         )
         assert abs(total - r.net_pnl) <= 1e-9 * max(1.0, abs(r.net_pnl))
         assert abs(r.identity_gap) <= 1e-9
@@ -226,11 +290,20 @@ def test_waterfall_reconciles_to_the_cash_identity_to_zero_with_partials_netting
         cash += -f.qty * f.price - f.fee
     cash -= sum(r.waterfall["financing"] for r in results)
     assert cash == pytest.approx(led.cash)
-    assert sum(r.waterfall["half_spread"] for r in results) == pytest.approx(sum(abs(f.qty) * f.half_spread for f in led.fills))
-    assert sum(r.waterfall["impact"] for r in results) == pytest.approx(sum(abs(f.qty) * f.impact for f in led.fills))
-    assert sum(r.waterfall["latency_drift"] for r in results) == pytest.approx(sum(f.latency_drift for f in led.fills))
+    assert sum(r.waterfall["half_spread"] for r in results) == pytest.approx(
+        sum(abs(f.qty) * f.half_spread for f in led.fills)
+    )
+    assert sum(r.waterfall["impact"] for r in results) == pytest.approx(
+        sum(abs(f.qty) * f.impact for f in led.fills)
+    )
+    assert sum(r.waterfall["latency_drift"] for r in results) == pytest.approx(
+        sum(f.latency_drift for f in led.fills)
+    )
     assert results[1].waterfall["financing"] > 0  # overnight carry was charged, once, at the open
-    assert results[0].waterfall["execution_residual"] != 0 or results[1].waterfall["execution_residual"] != 0
+    assert (
+        results[0].waterfall["execution_residual"] != 0
+        or results[1].waterfall["execution_residual"] != 0
+    )
     # across the two sessions the identity telescopes: sum NetPnL = equity now - C
     equity_now = led.cash + 1000 * 20.25 + led.positions["AAA"] * 100.5
     assert sum(r.net_pnl for r in results) == pytest.approx(equity_now - 1_000_000.0)

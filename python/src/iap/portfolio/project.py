@@ -53,7 +53,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -125,7 +125,12 @@ class ConstraintSpec:
             "max_name_share_of_gross",
         ):
             v = getattr(self, n)
-            if isinstance(v, bool) or not isinstance(v, int | float) or not math.isfinite(v) or v < 0:
+            if (
+                isinstance(v, bool)
+                or not isinstance(v, int | float)
+                or not math.isfinite(v)
+                or v < 0
+            ):
                 raise ProjectionError(f"{n} must be a finite number >= 0")
         if self.min_names_per_leg < 0:
             raise ProjectionError("min_names_per_leg must be >= 0")
@@ -309,7 +314,9 @@ def project(
     w = np.asarray(res.x, dtype=float)
     # clip the sign side exactly (a long never becomes a short): the solver's rounding noise, within tol
     w = np.clip(w, [lo for lo, _ in bounds], [hi for _, hi in bounds])
-    cap_labels = ["liquidity_cap" if caps[k] < spec.name_cap else "name_cap" for k in range(len(names))]
+    cap_labels = [
+        "liquidity_cap" if caps[k] < spec.name_cap else "name_cap" for k in range(len(names))
+    ]
     worst, active = _evaluate(w, names, rows, bounds, solver.constraint_tol, cap_labels)
     iterations = int(getattr(res, "nit", 0))
     distance = float(np.sqrt((w - raw) @ (w - raw)))
@@ -398,15 +405,13 @@ def feasibility(
     share = largest / gross if gross > 0 else 0.0
     reason = ""
     if longs < spec.min_names_per_leg or shorts < spec.min_names_per_leg:
-        reason = (
-            f"fewer than {spec.min_names_per_leg} names per leg (long {longs}, short {shorts})"
-        )
+        reason = f"fewer than {spec.min_names_per_leg} names per leg (long {longs}, short {shorts})"
     elif gross < spec.min_deployed_fraction * gross_target:
-        reason = (
-            f"deployed gross {gross:.6f} below {spec.min_deployed_fraction:.0%} of the target {gross_target:.6f}"
-        )
+        reason = f"deployed gross {gross:.6f} below {spec.min_deployed_fraction:.0%} of the target {gross_target:.6f}"
     elif share > spec.max_name_share_of_gross:
-        reason = f"single name at {share:.4f} of cohort gross exceeds {spec.max_name_share_of_gross}"
+        reason = (
+            f"single name at {share:.4f} of cohort gross exceeds {spec.max_name_share_of_gross}"
+        )
     return FeasibilityResult(reason == "", reason, longs, shorts, gross, share)
 
 
@@ -469,7 +474,9 @@ def choose_band(
         if t > base + 1e-12:
             raise ProjectionError(f"a band cannot raise turnover (band {b}: {t} > {base})")
         reductions[b] = (base - t) / base if base > 0 else 0.0
-    for b in sorted(grid):  # ascending: the smallest qualifying threshold; a tie is the smaller by construction
+    for b in sorted(
+        grid
+    ):  # ascending: the smallest qualifying threshold; a tie is the smaller by construction
         if reductions[b] > 0.10:
             chosen = b
             break
@@ -531,7 +538,12 @@ def diagnostic_covariance(residuals: np.ndarray, names: Sequence[str]) -> dict[s
         raise ProjectionError("residuals contain non-finite values")
     cov = np.cov(r, rowvar=False, ddof=1)
     cov = np.atleast_2d(cov)
-    return {"names": tuple(names), "cov": cov, "observations": int(r.shape[0]), "role": "diagnostic only"}
+    return {
+        "names": tuple(names),
+        "cov": cov,
+        "observations": int(r.shape[0]),
+        "role": "diagnostic only",
+    }
 
 
 def variance_contribution_table(
@@ -584,9 +596,7 @@ def variance_contribution_table(
         e = b.T @ w
         out["factor_variance"] = float(e @ f @ e)
         out["factor_share_of_total"] = (
-            float(e @ f @ e) / (total + float(e @ f @ e))
-            if total + float(e @ f @ e) > 0
-            else 0.0
+            float(e @ f @ e) / (total + float(e @ f @ e)) if total + float(e @ f @ e) > 0 else 0.0
         )
         out["factor_exposures"] = e.tolist()
     return out

@@ -36,7 +36,9 @@ def book(n_long=30, n_short=30, seed=1, gross=1 / 3):
     raw = {}
     for i, n in enumerate(names):
         leg = n_long if i < n_long else n_short
-        raw[n] = (gross / 2 / leg) * (1 + 0.3 * abs(rng.standard_normal())) * (1 if i < n_long else -1)
+        raw[n] = (
+            (gross / 2 / leg) * (1 + 0.3 * abs(rng.standard_normal())) * (1 if i < n_long else -1)
+        )
     betas = {n: float(1 + 0.4 * rng.standard_normal()) for n in names}
     sectors = {n: f"S{i % 3}" for i, n in enumerate(names)}
     return names, raw, betas, sectors
@@ -49,10 +51,16 @@ def violations(w, raw, betas, sectors, spec, caps=None):
     names = sorted(raw)
     net = abs(sum(w[n] for n in names))
     beta = abs(sum(betas[n] * w[n] for n in names)) - spec.beta_tol
-    sec = max(abs(sum(w[n] for n in names if sectors[n] == s)) for s in set(sectors.values())) - spec.sector_cap
+    sec = (
+        max(abs(sum(w[n] for n in names if sectors[n] == s)) for s in set(sectors.values()))
+        - spec.sector_cap
+    )
     name = max(abs(w[n]) for n in names) - spec.name_cap
     gross = sum(abs(w[n]) for n in names) - spec.gross_cap
-    sign = max(0.0 if w[n] == 0 or math.copysign(1, w[n]) == math.copysign(1, raw[n]) else abs(w[n]) for n in names)
+    sign = max(
+        0.0 if w[n] == 0 or math.copysign(1, w[n]) == math.copysign(1, raw[n]) else abs(w[n])
+        for n in names
+    )
     liq = max((abs(w[n]) - caps[n] for n in names if caps and n in caps), default=-1.0)
     return max(net, beta, sec, name, gross, sign, liq)
 
@@ -79,7 +87,9 @@ def test_repair_is_unique_within_tolerance_and_records_the_solver():
     direction -= direction.mean()  # keep dollar neutrality
     for eps in (1e-6, 1e-7):
         trial = {n: w[k] + eps * direction[k] for k, n in enumerate(names)}
-        better = sum((trial[n] - raw[n]) ** 2 for n in names) < sum((r.weights[n] - raw[n]) ** 2 for n in names)
+        better = sum((trial[n] - raw[n]) ** 2 for n in names) < sum(
+            (r.weights[n] - raw[n]) ** 2 for n in names
+        )
         if better:
             assert violations(trial, raw, betas, sectors, SPEC) > 1e-9
 
@@ -182,8 +192,13 @@ def test_band_choice_is_outcome_blind_and_never_overrides_a_constraint_or_a_mand
     # feasibility clause: withholding C would leave the book outside the gross cap, so C is sent regardless
     books = {"C": {"X": 0.6, "Y": -0.6}, "A": {"X": 0.1, "Y": -0.1}}
     held, sent = apply_band(
-        orders, mandatory, 5.0, book_after_withholding=books, betas={"X": 1.0, "Y": 1.0},
-        sectors={"X": "s", "Y": "t"}, spec=ConstraintSpec(gross_cap=1.0, sector_cap=1.0, name_cap=1.0),
+        orders,
+        mandatory,
+        5.0,
+        book_after_withholding=books,
+        betas={"X": 1.0, "Y": 1.0},
+        sectors={"X": "s", "Y": "t"},
+        spec=ConstraintSpec(gross_cap=1.0, sector_cap=1.0, name_cap=1.0),
     )
     assert held == {"A"} and "C" in sent and "gross_cap" in sent["C"]
     assert apply_band(orders, mandatory, 0.0)[0] == frozenset()
@@ -192,13 +207,25 @@ def test_band_choice_is_outcome_blind_and_never_overrides_a_constraint_or_a_mand
 def test_construction_stages_add_constraints_cumulatively():
     names, raw, betas, sectors = book(seed=11)
     st = construction_stages(raw, betas, sectors, spec=SPEC, liquidity_caps={"N00": 0.0})
-    assert list(st) == ["raw", "dollar_neutral", "beta_neutral", "sector_constrained", "name_and_gross_capped", "participation_limited"]
+    assert list(st) == [
+        "raw",
+        "dollar_neutral",
+        "beta_neutral",
+        "sector_constrained",
+        "name_and_gross_capped",
+        "participation_limited",
+    ]
     assert st["raw"].weights == {n: raw[n] for n in names}
     assert abs(sum(st["dollar_neutral"].weights.values())) <= 1e-9
-    assert abs(sum(betas[n] * w for n, w in st["beta_neutral"].weights.items())) <= SPEC.beta_tol + 1e-9
+    assert (
+        abs(sum(betas[n] * w for n, w in st["beta_neutral"].weights.items()))
+        <= SPEC.beta_tol + 1e-9
+    )
     assert st["participation_limited"].weights["N00"] == 0.0
     d = [st[s].distance for s in list(st)[1:]]
-    assert all(b >= a - 1e-12 for a, b in zip(d, d[1:], strict=False))  # more constraints, never closer to raw
+    assert all(
+        b >= a - 1e-12 for a, b in zip(d, d[1:], strict=False)
+    )  # more constraints, never closer to raw
 
 
 def test_diagnostic_covariance_and_variance_contribution_table():
@@ -210,11 +237,15 @@ def test_diagnostic_covariance_and_variance_contribution_table():
     assert cov["role"] == "diagnostic only" and cov["observations"] == 400
     w = {n: (0.01 if i % 2 == 0 else -0.01) for i, n in enumerate(names)}
     sectors = {n: ("a" if i < 6 else "b") for i, n in enumerate(names)}
-    t = variance_contribution_table(w, cov, sectors, factor_loadings=np.ones((12, 1)), factor_covariance=np.array([[1e-6]]))
+    t = variance_contribution_table(
+        w, cov, sectors, factor_loadings=np.ones((12, 1)), factor_covariance=np.array([[1e-6]])
+    )
     assert t["by_name_top"][0][0] == "N0" and 0.5 < t["top_share"] <= 1.0 + 1e-12
     assert abs(sum(t["by_sector"].values()) - 1.0) <= 1e-9
     assert len(t["principal_components"]) == 5 and 0 <= t["pc_share_total"] <= 1 + 1e-9
     assert 1 / 12 <= t["herfindahl"] <= 1.0
-    assert t["factor_share_of_total"] == pytest.approx(0.0)  # a dollar-neutral book has no exposure to a unit factor
+    assert t["factor_share_of_total"] == pytest.approx(
+        0.0
+    )  # a dollar-neutral book has no exposure to a unit factor
     with pytest.raises(ProjectionError):
         diagnostic_covariance(res[:1], names)

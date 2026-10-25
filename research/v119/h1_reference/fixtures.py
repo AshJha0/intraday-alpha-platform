@@ -69,8 +69,10 @@ class SplitMix64:
 
 CONFIG: dict[str, Any] = {
     "capital": 1_000_000.0,
-    "horizons": {"15m": {"formation_bars": 3, "holding_bars": 3, "live_cohorts": 3},
-                 "30m": {"formation_bars": 6, "holding_bars": 6, "live_cohorts": 6}},
+    "horizons": {
+        "15m": {"formation_bars": 3, "holding_bars": 3, "live_cohorts": 3},
+        "30m": {"formation_bars": 6, "holding_bars": 6, "live_cohorts": 6},
+    },
     "bar_ns": 300 * 10**9,
     "session_ns": 86_400 * 10**9,
     "t0_ns": 1_793_025_000_000_000_000,  # 2026-10-26 14:30:00 UTC
@@ -172,7 +174,13 @@ def build(seed: int = 20261025, scenario: str = "reversal") -> dict[str, Any]:
     E = cfg["n_estimation"]
     stale = [[E + 0, 5, "N07", 7.0]]  # [session, bar, name, quote age in seconds]
     gaps = [[E + 1, 9, "N12"]]  # quote disappears before arrival
-    halts = [[E + 2, 14, "N03"], [E + 2, 15, "N03"], [E + 2, 16, "N03"], [E + 0, 22, "N17"], [E + 0, 23, "N17"]]
+    halts = [
+        [E + 2, 14, "N03"],
+        [E + 2, 15, "N03"],
+        [E + 2, 16, "N03"],
+        [E + 0, 22, "N17"],
+        [E + 0, 23, "N17"],
+    ]
     depth_overrides = [[E + 1, 12, "N05", 20]]  # [session, bar, name, displayed depth at arrival]
     return {
         "config": cfg,
@@ -202,8 +210,26 @@ def digest(fx: dict[str, Any]) -> dict[str, str]:
     for key in ("mids", "arrival_drift"):
         a = np.ascontiguousarray(fx[key], dtype="<f8")
         h[key] = hashlib.sha256(a.tobytes()).hexdigest()
-    tables = {k: fx[k] for k in ("names", "sectors", "spread_bps", "depth", "volume_5m", "stale", "gaps", "halts", "depth_overrides", "config", "scenario", "seed")}
-    h["tables"] = hashlib.sha256(json.dumps(tables, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    tables = {
+        k: fx[k]
+        for k in (
+            "names",
+            "sectors",
+            "spread_bps",
+            "depth",
+            "volume_5m",
+            "stale",
+            "gaps",
+            "halts",
+            "depth_overrides",
+            "config",
+            "scenario",
+            "seed",
+        )
+    }
+    h["tables"] = hashlib.sha256(
+        json.dumps(tables, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
     return h
 
 
@@ -221,7 +247,7 @@ MANIFEST = Path(__file__).resolve().parent / "fixtures" / "manifest.json"
 def write_manifest() -> dict[str, Any]:
     doc = {sc: digest(build(scenario=sc)) for sc in SCENARIOS}
     MANIFEST.parent.mkdir(parents=True, exist_ok=True)
-    MANIFEST.write_text(json.dumps(doc, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    MANIFEST.write_bytes((json.dumps(doc, indent=2, sort_keys=True) + "\n").encode("utf-8"))
     return doc
 
 

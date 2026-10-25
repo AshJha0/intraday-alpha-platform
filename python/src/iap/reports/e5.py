@@ -137,7 +137,9 @@ def session_series(
         net += r.net_pnl
         if r.flags:
             flags[r.session_id] = r.flags
-    return SessionSeries(family_id, horizon, capital, r_bps, kept, dropped, counts, gross, net, flags)
+    return SessionSeries(
+        family_id, horizon, capital, r_bps, kept, dropped, counts, gross, net, flags
+    )
 
 
 def retention(net_total: float, gross_total: float) -> float | None:
@@ -185,9 +187,11 @@ def check_no_inflation(
     missing = sorted(set(all_session_ids) - seen)
     if missing:
         raise InflationError(f"sessions omitted from the series: {missing}")
-    if series.counts["usable_no_trades"] and sum(
-        1 for s, r in zip(series.session_ids, series.r_bps, strict=True) if r == 0.0
-    ) < series.counts["usable_no_trades"]:
+    if (
+        series.counts["usable_no_trades"]
+        and sum(1 for s, r in zip(series.session_ids, series.r_bps, strict=True) if r == 0.0)
+        < series.counts["usable_no_trades"]
+    ):
         raise InflationError("a no-trade session is not present as zero")
     if refused_orders_credited:
         raise InflationError(
@@ -250,12 +254,23 @@ def block_a_signal(
         if f.size != zz.size:
             raise ValueError(f"forward returns for {h} do not align with z")
         s = -zz  # S = -z
-        row: dict[str, Any] = {"horizon": h, "ic": _ic(s, f), "rank_ic": _ic(_rank(s), _rank(f)), "n": int(f.size)}
+        row: dict[str, Any] = {
+            "horizon": h,
+            "ic": _ic(s, f),
+            "rank_ic": _ic(_rank(s), _rank(f)),
+            "n": int(f.size),
+        }
         dec = _deciles(s)
-        row["by_signal_decile_bps"] = [float(f[dec == d].mean()) if (dec == d).any() else None for d in range(10)]
+        row["by_signal_decile_bps"] = [
+            float(f[dec == d].mean()) if (dec == d).any() else None for d in range(10)
+        ]
         bins = {"2-2.5": (2.0, 2.5), "2.5-3": (2.5, 3.0), ">3": (3.0, math.inf)}
         row["by_tail_bin_bps"] = {
-            k: (float((np.sign(s) * f)[(abs(zz) >= lo) & (abs(zz) < hi)].mean()) if ((abs(zz) >= lo) & (abs(zz) < hi)).any() else None)
+            k: (
+                float((np.sign(s) * f)[(abs(zz) >= lo) & (abs(zz) < hi)].mean())
+                if ((abs(zz) >= lo) & (abs(zz) < hi)).any()
+                else None
+            )
             for k, (lo, hi) in bins.items()
         }
         row["long_leg_alpha_bps"] = float(f[zz < -z0].mean()) if (zz < -z0).any() else None
@@ -270,27 +285,46 @@ def block_a_signal(
                 "slope_se": se,
                 "intercept_bps": inter,
                 "uncertainty_by_decile_bps": [
-                    float((f - m)[mdec == d].std(ddof=1)) if (mdec == d).sum() > 1 else None for d in range(10)
+                    float((f - m)[mdec == d].std(ddof=1)) if (mdec == d).sum() > 1 else None
+                    for d in range(10)
                 ],
             }
         rows.append(row)
     unc = {"ic_se_approx": float(1 / math.sqrt(zz.size)) if zz.size else None}
     t = Table(
         "E5 block A: signal",
-        {"ic": "correlation", "rank_ic": "correlation", "returns": "bps", "coverage": "share of grid minutes"},
+        {
+            "ic": "correlation",
+            "rank_ic": "correlation",
+            "returns": "bps",
+            "coverage": "share of grid minutes",
+        },
         counts,
         rows,
         unc,
-        ["S = -z; no bucket result becomes a filter, a leg restriction or a threshold (E0 section 13 rule)"],
+        [
+            "S = -z; no bucket result becomes a filter, a leg restriction or a threshold (E0 section 13 rule)"
+        ],
     )
     if decay_bps:
         t.rows.append(
-            {"decay_curve_bps": {int(h): float(np.mean(decay_bps[h])) for h in sorted(decay_bps)}, "n": int(zz.size)}
+            {
+                "decay_curve_bps": {
+                    int(h): float(np.mean(decay_bps[h])) for h in sorted(decay_bps)
+                },
+                "n": int(zz.size),
+            }
         )
     if coverage is not None:
         t.rows.append({"coverage": float(coverage)})
     if quote_age_buckets:
-        t.rows.append({"quote_age_sensitivity_bps": {k: float(np.mean(v)) for k, v in quote_age_buckets.items()}})
+        t.rows.append(
+            {
+                "quote_age_sensitivity_bps": {
+                    k: float(np.mean(v)) for k, v in quote_age_buckets.items()
+                }
+            }
+        )
     return t
 
 
@@ -310,7 +344,15 @@ def block_b_portfolio(
 ) -> Table:
     """Block B: cost-of-neutrality table, return lost to liquidity, utilisation and R_gross, concentration, turnover, retention."""
     rows: list[dict[str, Any]] = []
-    order = ["raw", "dollar_neutral", "beta_neutral", "sector_constrained", "name_and_gross_capped", "participation_limited", "executable"]
+    order = [
+        "raw",
+        "dollar_neutral",
+        "beta_neutral",
+        "sector_constrained",
+        "name_and_gross_capped",
+        "participation_limited",
+        "executable",
+    ]
     stages = [s for s in order if s in stage_books] + [s for s in stage_books if s not in order]
     for s in stages:
         w = stage_books[s]
@@ -320,8 +362,12 @@ def block_b_portfolio(
         rows.append(
             {
                 "stage": s,
-                "expected_gross_alpha_bps_of_C": float(sum(forecasts_bps.get(n, 0.0) * x for n, x in w.items())),
-                "modelled_conservative_cost_bps_of_C": float(sum(cost_bps.get(n, 0.0) * abs(x) for n, x in w.items())),
+                "expected_gross_alpha_bps_of_C": float(
+                    sum(forecasts_bps.get(n, 0.0) * x for n, x in w.items())
+                ),
+                "modelled_conservative_cost_bps_of_C": float(
+                    sum(cost_bps.get(n, 0.0) * abs(x) for n, x in w.items())
+                ),
                 "market_beta": float(sum(betas[n] * x for n, x in w.items())),
                 "largest_sector_net": float(max((abs(v) for v in sec.values()), default=0.0)),
                 "gross": float(sum(abs(x) for x in w.values())),
@@ -330,7 +376,12 @@ def block_b_portfolio(
         )
     w_cap = stage_books.get("name_and_gross_capped", {})
     w_liq = stage_books.get("participation_limited", stage_books.get("executable", {}))
-    lost = float(sum(forecasts_bps.get(n, 0.0) * max(abs(w_cap.get(n, 0.0)) - abs(w_liq.get(n, 0.0)), 0.0) for n in set(w_cap) | set(w_liq)))
+    lost = float(
+        sum(
+            forecasts_bps.get(n, 0.0) * max(abs(w_cap.get(n, 0.0)) - abs(w_liq.get(n, 0.0)), 0.0)
+            for n in set(w_cap) | set(w_liq)
+        )
+    )
     dg = np.asarray(deployed_gross, dtype=float)
     util = dg / series.capital if dg.size else dg
     r_gross = (series.net_total / float(dg.sum())) * 1e4 if dg.size and dg.sum() > 0 else None
@@ -357,11 +408,23 @@ def block_b_portfolio(
     rows.append({"summary": summary})
     return Table(
         "E5 block B: portfolio",
-        {"alpha": "bps of C", "cost": "bps of C", "gross": "fraction of C", "R_gross": "bps of deployed gross", "turnover": "fraction of C"},
+        {
+            "alpha": "bps of C",
+            "cost": "bps of C",
+            "gross": "fraction of C",
+            "R_gross": "bps of deployed gross",
+            "turnover": "fraction of C",
+        },
         {"sessions": series.n, "rebalances": int(tpr.size), "stages": len(stages)},
         rows,
-        {"R_d_se_bps": float(np.std(series.r_bps, ddof=1) / math.sqrt(series.n)) if series.n > 1 else None},
-        ["R_gross is labelled beside the canonical R_d = NetPnL / C; survivors of the liquidity filters are never re-scaled"],
+        {
+            "R_d_se_bps": float(np.std(series.r_bps, ddof=1) / math.sqrt(series.n))
+            if series.n > 1
+            else None
+        },
+        [
+            "R_gross is labelled beside the canonical R_d = NetPnL / C; survivors of the liquidity filters are never re-scaled"
+        ],
     )
 
 
@@ -378,37 +441,69 @@ def block_c_execution(
     latency_sensitivity: Mapping[str, float] | None = None,
 ) -> Table:
     """Block C: the three return measurements, separate waterfall lines, exit cost, rejected-trade attribution, cushion, stress, capacity."""
-    keys = ("midpoint_reference_pnl", "latency_drift", "half_spread", "impact", "fees", "execution_residual", "financing")
+    keys = (
+        "midpoint_reference_pnl",
+        "latency_drift",
+        "half_spread",
+        "impact",
+        "fees",
+        "execution_residual",
+        "financing",
+    )
     tot = {k: float(sum(w.get(k, 0.0) for w in waterfalls)) for k in keys}
-    net = tot["midpoint_reference_pnl"] + tot["latency_drift"] - tot["half_spread"] - tot["impact"] - tot["fees"] + tot["execution_residual"] - tot["financing"]
+    net = (
+        tot["midpoint_reference_pnl"]
+        + tot["latency_drift"]
+        - tot["half_spread"]
+        - tot["impact"]
+        - tot["fees"]
+        + tot["execution_residual"]
+        - tot["financing"]
+    )
     bps = {k: 1e4 * v / capital for k, v in tot.items()}
     rows: list[dict[str, Any]] = [
         {
             "three_return_measurements_bps_of_C": {
                 "mid_to_mid": bps["midpoint_reference_pnl"],
                 "executable_conservative": 1e4 * net / capital,
-                "statistical_alpha_lost_in_execution": bps["midpoint_reference_pnl"] - 1e4 * net / capital,
+                "statistical_alpha_lost_in_execution": bps["midpoint_reference_pnl"]
+                - 1e4 * net / capital,
             }
         },
-        {"waterfall_lines_bps_of_C": {**bps, "net": 1e4 * net / capital, "slippage": "no separate term (latency drift and impact only)"}},
+        {
+            "waterfall_lines_bps_of_C": {
+                **bps,
+                "net": 1e4 * net / capital,
+                "slippage": "no separate term (latency drift and impact only)",
+            }
+        },
         {"exit_cost_bps_of_C": float(1e4 * sum(exit_cost) / capital)},
     ]
     if refusals:
         rows.append(
-            {"rejected_trade_attribution": {k: {"shares": int(v[0]), "expected_gross_alpha_lost_bps_of_C": float(v[1])} for k, v in sorted(refusals.items())}}
+            {
+                "rejected_trade_attribution": {
+                    k: {"shares": int(v[0]), "expected_gross_alpha_lost_bps_of_C": float(v[1])}
+                    for k, v in sorted(refusals.items())
+                }
+            }
         )
     c = np.asarray(cushions_bps, dtype=float)
     rows.append(
         {
             "cost_cushion_B": {
                 "n": int(c.size),
-                "quantiles_bps": [float(q) for q in np.quantile(c, [0.1, 0.5, 0.9])] if c.size else None,
+                "quantiles_bps": [float(q) for q in np.quantile(c, [0.1, 0.5, 0.9])]
+                if c.size
+                else None,
                 "share_below_0_5_bps": float((c < 0.5).mean()) if c.size else None,
             }
         }
     )
     if columns_pnl:
-        rows.append({"cost_stress_bps_of_C": {k: 1e4 * v / capital for k, v in columns_pnl.items()}})
+        rows.append(
+            {"cost_stress_bps_of_C": {k: 1e4 * v / capital for k, v in columns_pnl.items()}}
+        )
     if capacity:
         rows.append({"capacity_multiples": {str(m): dict(v) for m, v in sorted(capacity.items())}})
     if latency_sensitivity:
@@ -418,7 +513,9 @@ def block_c_execution(
         {"pnl": "bps of C", "shares": "shares", "cushion": "bps"},
         {"sessions": len(waterfalls), "trades_with_cushion": int(c.size)},
         rows,
-        {"note": "model sensitivities, never market capacity; actual execution evidence not available (E1)"},
+        {
+            "note": "model sensitivities, never market capacity; actual execution evidence not available (E1)"
+        },
         ["every fill is simulated (C10)"],
     )
 
@@ -463,13 +560,22 @@ def block_d_risk_adjusted(
     rows = [
         {
             "net_session_sharpe": sr,
-            "sharpe_block_bootstrap_95": [float(np.quantile(boots, 0.025)), float(np.quantile(boots, 0.975))] if boots else None,
+            "sharpe_block_bootstrap_95": [
+                float(np.quantile(boots, 0.025)),
+                float(np.quantile(boots, 0.975)),
+            ]
+            if boots
+            else None,
             "dependence_assumption": f"stationary block bootstrap with fixed block length {block_length} sessions; sessions treated as weakly dependent",
             "max_drawdown_bps": dd,
             "expected_shortfall_5pct_bps": es,
             "worst_session_bps": float(r.min()) if n else None,
-            "worst_session_share_of_total": float(abs(r.min()) / abs(r.sum())) if n and r.sum() != 0 else None,
-            "leave_one_session_out_mean_range_bps": [min(loso_mean), max(loso_mean)] if loso_mean else None,
+            "worst_session_share_of_total": float(abs(r.min()) / abs(r.sum()))
+            if n and r.sum() != 0
+            else None,
+            "leave_one_session_out_mean_range_bps": [min(loso_mean), max(loso_mean)]
+            if loso_mean
+            else None,
             "leave_one_session_out_sharpe_range": [min(loso_sr), max(loso_sr)] if loso_sr else None,
             "factor_exposures": dict(factor_exposures or {}),
             "regimes_mean_bps": {k: float(np.mean(v)) for k, v in (regimes or {}).items()},
@@ -483,7 +589,10 @@ def block_d_risk_adjusted(
         {"returns": "bps of C per session", "sharpe": "per session (not annualised)"},
         {"sessions": n, "bootstrap_draws": len(boots), **series.counts},
         rows,
-        {"sharpe_interval": "block bootstrap", "mean_se_bps": float(r.std(ddof=1) / math.sqrt(n)) if n > 1 else None},
+        {
+            "sharpe_interval": "block bootstrap",
+            "mean_se_bps": float(r.std(ddof=1) / math.sqrt(n)) if n > 1 else None,
+        },
         ["no annualisation; every statistic is per session over every usable session"],
     )
 
@@ -500,26 +609,58 @@ def block_e_sensitivity(
     n = len(waterfalls)
     per = {
         k: np.asarray([1e4 * w.get(k, 0.0) / capital for w in waterfalls], dtype=float)
-        for k in ("midpoint_reference_pnl", "latency_drift", "half_spread", "impact", "fees", "execution_residual", "financing")
+        for k in (
+            "midpoint_reference_pnl",
+            "latency_drift",
+            "half_spread",
+            "impact",
+            "fees",
+            "execution_residual",
+            "financing",
+        )
     }
-    net = per["midpoint_reference_pnl"] + per["latency_drift"] - per["half_spread"] - per["impact"] - per["fees"] + per["execution_residual"] - per["financing"]
+    net = (
+        per["midpoint_reference_pnl"]
+        + per["latency_drift"]
+        - per["half_spread"]
+        - per["impact"]
+        - per["fees"]
+        + per["execution_residual"]
+        - per["financing"]
+    )
     means = {k: float(v.mean()) if n else 0.0 for k, v in per.items()}
     ses = {k: float(v.std(ddof=1) / math.sqrt(n)) if n > 1 else None for k, v in per.items()}
     mu = float(net.mean()) if n else 0.0
     sigma = float(net.std(ddof=1)) if n > 1 else float("nan")
-    d = dict(deltas or {"gross_alpha_bps": 0.5, "spread_and_fees_bps": 0.25, "impact_bps": 0.25, "all_costs_pct": 10.0})
+    d = dict(
+        deltas
+        or {
+            "gross_alpha_bps": 0.5,
+            "spread_and_fees_bps": 0.25,
+            "impact_bps": 0.25,
+            "all_costs_pct": 10.0,
+        }
+    )
     costs = means["half_spread"] + means["impact"] + means["fees"]
     scenarios = {
         "gross_alpha_plus": {"delta": d["gross_alpha_bps"], "net_bps": mu + d["gross_alpha_bps"]},
-        "spread_and_fees_minus": {"delta": d["spread_and_fees_bps"], "net_bps": mu + d["spread_and_fees_bps"]},
+        "spread_and_fees_minus": {
+            "delta": d["spread_and_fees_bps"],
+            "net_bps": mu + d["spread_and_fees_bps"],
+        },
         "impact_minus": {"delta": d["impact_bps"], "net_bps": mu + d["impact_bps"]},
-        "all_costs_minus_pct": {"delta": d["all_costs_pct"], "net_bps": mu + costs * d["all_costs_pct"] / 100.0},
+        "all_costs_minus_pct": {
+            "delta": d["all_costs_pct"],
+            "net_bps": mu + costs * d["all_costs_pct"] / 100.0,
+        },
         "break_even_gross_alpha_change_bps": -mu,
     }
     dsr = {
         "formula": "dSR ~ dmu / sigma - (mu / sigma^2) dsigma",
         "d_mu_coefficient": 1 / sigma if sigma and math.isfinite(sigma) and sigma > 0 else None,
-        "d_sigma_coefficient": -mu / sigma**2 if sigma and math.isfinite(sigma) and sigma > 0 else None,
+        "d_sigma_coefficient": -mu / sigma**2
+        if sigma and math.isfinite(sigma) and sigma > 0
+        else None,
     }
     rows = [
         {"gross_to_net_waterfall_bps_per_session": {**means, "net": mu}},
@@ -531,8 +672,13 @@ def block_e_sensitivity(
         {"all": "bps of C per session"},
         {"sessions": n, "usable_sessions": series.n},
         rows,
-        {"standard_errors_bps": ses, "net_se_bps": float(net.std(ddof=1) / math.sqrt(n)) if n > 1 else None},
-        ["each scenario is an arithmetic scenario, not additive and not a forecast; no feature is assigned a Sharpe gain"],
+        {
+            "standard_errors_bps": ses,
+            "net_se_bps": float(net.std(ddof=1) / math.sqrt(n)) if n > 1 else None,
+        },
+        [
+            "each scenario is an arithmetic scenario, not additive and not a forecast; no feature is assigned a Sharpe gain"
+        ],
     )
 
 
@@ -548,9 +694,17 @@ def decision_tree(
 ) -> dict[str, Any]:
     """E0 section 13's six branches; the verdict is a development statement, never a confirmatory one."""
     if e3_red:
-        return {"branch": 1, "verdict": "insufficient evidence", "outcome": "stop: data suitability before alpha research"}
+        return {
+            "branch": 1,
+            "verdict": "insufficient evidence",
+            "outcome": "stop: data suitability before alpha research",
+        }
     if not predictability:
-        return {"branch": 2, "verdict": "not viable", "outcome": "H1 economically unsupported; no rescue filter"}
+        return {
+            "branch": 2,
+            "verdict": "not viable",
+            "outcome": "H1 economically unsupported; no rescue filter",
+        }
     if not screen_passed:
         return {
             "branch": 3,
@@ -559,7 +713,19 @@ def decision_tree(
             "loss_attributed_to": attribution or "unattributed (blocks B and C name the cause)",
         }
     if not powered:
-        return {"branch": 4, "verdict": "economically viable", "outcome": "GREEN-REGISTER-ONLY, confirmation pending"}
+        return {
+            "branch": 4,
+            "verdict": "economically viable",
+            "outcome": "GREEN-REGISTER-ONLY, confirmation pending",
+        }
     if x0_eligible is False:
-        return {"branch": 5, "verdict": "economically viable", "outcome": "X0 not eligible for the exact session series; the gate refuses PROMOTE"}
-    return {"branch": 6, "verdict": "economically viable", "outcome": "X1 -> X2 -> X3 under their separate authorisations"}
+        return {
+            "branch": 5,
+            "verdict": "economically viable",
+            "outcome": "X0 not eligible for the exact session series; the gate refuses PROMOTE",
+        }
+    return {
+        "branch": 6,
+        "verdict": "economically viable",
+        "outcome": "X1 -> X2 -> X3 under their separate authorisations",
+    }

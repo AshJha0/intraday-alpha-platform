@@ -19,7 +19,6 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
-from pathlib import Path
 
 import pytest
 from conftest import REPO_ROOT
@@ -48,7 +47,9 @@ def panels():
 def test_fixtures_match_the_committed_manifest(panels):
     manifest = json.loads((REF_DIR / "fixtures" / "manifest.json").read_text(encoding="utf-8"))
     for sc, fx in panels.items():
-        assert fixtures.digest(fx) == manifest[sc], f"fixture {sc} differs from the committed manifest"
+        assert fixtures.digest(fx) == manifest[sc], (
+            f"fixture {sc} differs from the committed manifest"
+        )
 
 
 def _compare(ref: dict, eng: dict) -> None:
@@ -56,7 +57,9 @@ def _compare(ref: dict, eng: dict) -> None:
         r, e = ref["variants"][h], eng["variants"][h]
         for part in ("research_ledger", "executable_ledger", "orders", "fills", "r_bps"):
             assert canonical_json(r[part]) == canonical_json(e[part]), f"{h}: {part} differs"
-    assert canonical_json({h: (f["rho"], f["se"], f["n"], f["passed"]) for h, f in ref["fits"].items()}) == canonical_json(
+    assert canonical_json(
+        {h: (f["rho"], f["se"], f["n"], f["passed"]) for h, f in ref["fits"].items()}
+    ) == canonical_json(
         {h: (f["rho"], f["se"], f["n"], f["passed"]) for h, f in eng["fits"].items()}
     )
 
@@ -72,15 +75,31 @@ def test_engine_reproduces_the_reference_byte_for_byte(panels, scenario):
     if scenario == "reversal":
         for h, v in eng["variants"].items():
             assert v["fills"] and v["orders"], f"{h}: the reversal fixture must trade"
-            assert any(o["outstanding"] for o in v["orders"]) or any(o["cancelled"] for o in v["orders"])
-            assert any(s["closing_cohorts"] for s in v["executable_ledger"]) or any(s["carried"] for s in v["executable_ledger"])
-            for w, s in zip(v["waterfalls"], v["executable_ledger"], strict=True):  # the identity, re-stated
-                total = w["midpoint_reference_pnl"] + w["latency_drift"] - w["half_spread"] - w["impact"] - w["fees"] + w["execution_residual"] - w["financing"]
+            assert any(o["outstanding"] for o in v["orders"]) or any(
+                o["cancelled"] for o in v["orders"]
+            )
+            assert any(s["closing_cohorts"] for s in v["executable_ledger"]) or any(
+                s["carried"] for s in v["executable_ledger"]
+            )
+            for w, s in zip(
+                v["waterfalls"], v["executable_ledger"], strict=True
+            ):  # the identity, re-stated
+                total = (
+                    w["midpoint_reference_pnl"]
+                    + w["latency_drift"]
+                    - w["half_spread"]
+                    - w["impact"]
+                    - w["fees"]
+                    + w["execution_residual"]
+                    - w["financing"]
+                )
                 assert abs(total - s["net_pnl"]) <= 1e-9 * max(1.0, abs(s["net_pnl"]))
         assert all(f["passed"] for f in eng["fits"].values())
     else:
         for h, v in eng["variants"].items():
-            assert not v["fills"] and not v["orders"] and not v["research_ledger"], f"{h}: fail closed means no trade"
+            assert not v["fills"] and not v["orders"] and not v["research_ledger"], (
+                f"{h}: fail closed means no trade"
+            )
             assert [r for _s, r in v["r_bps"]] == [0.0] * fx["config"]["n_trading"]
             assert v["session_counts"]["usable_no_trades"] == fx["config"]["n_trading"]
         assert not any(f["passed"] for f in eng["fits"].values())

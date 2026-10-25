@@ -11,7 +11,6 @@ hash here.
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 
 from conftest import REPO_ROOT
 
