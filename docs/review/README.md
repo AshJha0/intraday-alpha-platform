@@ -12,6 +12,13 @@
 | defect register (D-01 to D-27, Class A/B/C, blocks column) | [DEFECT_REGISTER_v1.19.md](DEFECT_REGISTER_v1.19.md) |
 | baseline identities and document states | [BASELINE_v1_19.md](BASELINE_v1_19.md) |
 | data-route priced proposal (stage 0-A, B2a) | [DATA_ROUTE_PROPOSAL_v1.19.md](DATA_ROUTE_PROPOSAL_v1.19.md) |
+| v2.0 DP1 data pricing (stage 0; method, G4 checklist, licence summaries, cost columns awaiting key) | [DATA_PRICING_v2.md](DATA_PRICING_v2.md) |
+
+## v2.0 stage 1, session A (R0-R5)
+
+| item | file |
+|---|---|
+| R0 confirmatory test specification, frozen (reviewer freeze decision 2026-10-24, sha256 `900d9e73...` of the text behind the path header; `python/tests/spec/test_r0_frozen.py` re-hashes it) | [../../python/tests/spec/CONFIRMATORY_TEST_SPEC.md](../../python/tests/spec/CONFIRMATORY_TEST_SPEC.md) |
 
 ## Reproduction result (2026-10-18, `tools/reproduce_baseline.py`)
 

@@ -6,7 +6,7 @@ contracts and `tests/golden/`). Two packages run the other way — `risk/` and
 `execution/` are Python ports of the Rust and C++ references, proven by the
 same goldens (`/API_TRADING.md`). Everything deterministic is seeded via
 SplitMix64 only; no wall clock and no network or LLM client on any trading
-path (`PLATFORM_CONVENTIONS.md` §13.7). All 27 packages are listed below.
+path (`PLATFORM_CONVENTIONS.md` §13.7). All 28 packages are listed below.
 
 ```
 iap/
@@ -271,6 +271,13 @@ iap/
                    the ACTIVE -> WATCH -> RETIRED live sub-machine that
                    iap.lifecycle wraps unchanged; breach_rule "cusum" by
                    default since v1.5.0, "consecutive" the legacy rule).
+  data/            v2.0 U2: contracts.py (declarative dataset and feature
+                   contracts: source, availability rule, adjustment, missing
+                   policy, route, leakage test; enforced at import),
+                   pit.py (point-in-time universe: as-of lag, no retroactive
+                   edits, survivorship, delisting retention), leakage.py
+                   (future-shift, shuffled-label, planted-leak canaries),
+                   synthetic.py (the seeded canary panel). docs/DATA_CONTRACTS.md.
   reference/
     refdata.py     ReferenceData service over configs/instruments/instruments.json +
                    configs/venues/venues.json: tick/lot sizes, price<->ticks, venues,

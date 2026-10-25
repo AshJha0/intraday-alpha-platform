@@ -610,3 +610,16 @@ and `tstat_hac >= min_t`, at least `min_regimes` were judged, and (with
 `max_ic_ratio > 0`) the worst judged regime's IC is at least that fraction
 of the pooled IC. No pipeline calls it by default: `validate_alpha`, the
 lifecycle gates and every published verdict are unchanged.
+
+## 12. v2.0 EN1 forecast interface and registry — `iap.alpha.forecast`, `iap.alpha.registry` (Python research; family-agnostic; not a port contract)
+
+The shared engine's input (plan section 6, U9): `iap.alpha.forecast.ForecastRecord` = (`family_id`, `name`,
+`available_ts` ns, `horizon` as `<int>(s|m|h|d)` or `c2o` / `o2c`, `mu_hat_bps`, `uncertainty_bps >= 0`,
+`registry_id` sha256). Construction and `from_dict` refuse a missing, extra, null, non-finite or malformed field
+(`iap.alpha.forecast.ForecastError`); `to_dict` / `canonical` / `record_hash` round-trip through canonical JSON.
+`iap.alpha.forecast.consume` returns the records a consumer may act on at `t_decision`: it refuses records not yet
+available, duplicate `(family, horizon, name)` keys and registry ids the registry does not hold. The registry
+(`iap.alpha.registry.ForecastRegistry`) is content-addressed and append-only: `iap.alpha.registry.RegistryEntry`
+(family, horizon, model class, parameters, feature-set hash, training window, dataset identity, software version,
+selection history, approval) hashes to its id; `save` writes canonical bytes; `load` recomputes every hash and the
+digest and refuses a tampered file. H1 is the first client; nothing here knows a family's rules.

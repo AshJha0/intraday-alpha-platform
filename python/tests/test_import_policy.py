@@ -35,6 +35,7 @@ GUARDED_PACKAGES = (
     "replay",
     "trace",
     "monitoring",
+    "data",  # v2.0 U2: contracts, PIT universe, leakage canaries (vendor SDKs stay in tools/)
 )
 
 #: Top-level module names that are network clients / servers or transports.
