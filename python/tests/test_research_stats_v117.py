@@ -292,12 +292,16 @@ def test_dsr_recompute_uses_the_repo_ledger_count_at_the_look(tmp_path):
     assert b["repo_ledger_today"]["n_trials"] == 7
     # deflating at more trials lowers the DSR; the verdict is re-read, not copied
     dsr = [b[k]["deflated_sharpe"]["dsr"] for k in ("as_recorded", "registered_at_look")]
-    assert dsr[0] > dsr[1] > 0.95 and r["verdict_unchanged"] is True
-    assert b["registered_at_look"]["verdict"] == "confirmed"
+    assert dsr[0] > dsr[1] > 0.95
+    # v1.19 R1 (defect D-01): the legacy HAC-t / DSR path yields at most ``ineligible``;
+    # a historical ``confirmed`` cannot be re-derived without the canonical gate's
+    # PROMOTE, so the re-read verdict differs from the recorded one and the tool says so
+    assert all(v["verdict"] == "ineligible" for v in b.values())
+    assert r["verdict_unchanged"] is False
     # the recorded result is untouched and the recompute names it
     assert json.loads((root / rc.RESULT_REL).read_text()) == recorded
     assert doc["source"] == rc.RESULT_REL and doc["results"][0]["recorded_dsr"] == 0.99995
-    assert rc.recompute_dsr_main(root) == 0
+    assert rc.recompute_dsr_main(root) == 3  # verdict changed -> exit 3
     assert (root / rc.RECOMPUTE_REL).is_file() and (root / rc.RECOMPUTE_MD_REL).is_file()
 
 
