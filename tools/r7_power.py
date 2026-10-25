@@ -49,11 +49,17 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--h1-mean-bps", type=float, help="maker in-sample session-mean edge")
     p.add_argument("--h1-sd-bps", type=float, help="maker in-sample per-session sd")
     p.add_argument("--multi-symbol", action="store_true", help="cross-sectional tables")
+    p.add_argument(
+        "--dsr-trials",
+        type=int,
+        help="pin the deflated-Sharpe trial count (R7 registered N = 297) instead of the "
+        "ledger's distinct count + 1",
+    )
     a = p.parse_args(argv)
     if (a.h1_mean_bps is None) != (a.h1_sd_bps is None):
         p.error("--h1-mean-bps and --h1-sd-bps go together")
     inputs = json.loads(Path(a.inputs).read_text())
-    gate = ledger_gate(a.ledger)
+    gate = ledger_gate(a.ledger, a.dsr_trials)
     if a.multi_symbol:
         res = analyse_multi_symbol(inputs, gate)
         _write(

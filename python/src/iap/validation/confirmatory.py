@@ -67,8 +67,11 @@ __all__ = [
     "decide_many",
     "hac_tstat",
     "holm",
+    "inference_many",
     "inference_only",
     "mde",
+    "mde_at_t",
+    "power_at_t",
     "student_t_one_sample",
 ]
 
@@ -320,12 +323,31 @@ def mde(
         raise MDERefused(f"power must be in (alpha, 1), got {power}")
     if n < 2:
         raise MDERefused(f"the procedure has {n} observation(s); needs at least 2")
+    return mde_at_t(n, float(stats.t.isf(alpha, n - 1)), power, tol=tol)
+
+
+def mde_at_t(n: int, tcrit: float, power: float = 0.8, *, tol: float = 1e-12) -> float:
+    """The same inversion at a critical value instead of an alpha: the smallest
+    ``delta`` (sd units) for which a one-sample t on ``n`` values with ``n - 1`` df
+    exceeds ``tcrit`` with probability ``power`` (``nc = delta * sqrt(n)``).  Used by
+    gates registered as a |t| threshold (R7).  With :func:`power_at_t` this is the ONE
+    noncentral-t evaluation in the repository."""
+    from scipy import stats
+
+    n = int(n)
+    if n < 2:
+        raise MDERefused(f"{n} observation(s); needs at least 2")
+    if not math.isfinite(tcrit) or tcrit <= 0.0:
+        raise MDERefused(f"tcrit must be finite and positive, got {tcrit}")
+    if not (0.0 < power < 1.0):
+        raise MDERefused(f"power must be in (0, 1), got {power}")
     df = n - 1
-    tcrit = float(stats.t.isf(alpha, df))
 
     def pw(nc: float) -> float:
         return float(stats.nct.sf(tcrit, df, nc))
 
+    if pw(0.0) >= power:
+        raise MDERefused("power is reached at a zero effect: tcrit is below the null quantile")
     lo, hi = 0.0, 1.0
     while pw(hi) < power:
         hi *= 2.0
@@ -340,6 +362,20 @@ def mde(
         if hi - lo <= tol * max(1.0, hi):
             break
     return 0.5 * (lo + hi) / math.sqrt(n)
+
+
+def power_at_t(n: int, tcrit: float, delta: float) -> float:
+    """Power of the one-sample t on ``n`` values (``n - 1`` df) against the critical
+    value ``tcrit`` at a true mean of ``delta`` sd units: the noncentral-t upper tail
+    at ``nc = delta * sqrt(n)``.  The forward map :func:`mde_at_t` inverts; every
+    power figure outside this module (R7, the adversarial suite's theoretical power)
+    calls it, so the noncentral t is evaluated in one place."""
+    from scipy import stats
+
+    n = int(n)
+    if n < 2 or not math.isfinite(tcrit):
+        return float("nan")
+    return float(stats.nct.sf(tcrit, n - 1, float(delta) * math.sqrt(n)))
 
 
 # ------------------------------------------------------------- D-BLK state --
@@ -744,8 +780,6 @@ def decide_many(
 
     Returns ``outcome`` (``"refused: ..."`` for all, or per-dataset ``PROMOTE`` /
     ``REJECT`` codes), the per-dataset rejection counts and the PROMOTE mask."""
-    from scipy import stats
-
     panels = np.asarray(panels, dtype=float)
     n, g, k = panels.shape
     reason, hyps = _eligibility(design, root)
@@ -781,7 +815,34 @@ def decide_many(
             "n_rejected": np.zeros(n, dtype=int),
         }
     keep = [i for i, m in enumerate(meta) if str(m.get("session")) in set(used)]
-    x = panels[:, keep, :]
+    out = _many_statistics(design, panels[:, keep, :])
+    out.update(sessions_used=tuple(used), dropped_sessions=tuple(dropped))
+    return out
+
+
+def inference_many(design: Mapping[str, Any], panels: np.ndarray) -> dict[str, Any]:
+    """The vectorised statistic and Holm set of :func:`decide_many` WITHOUT the
+    eligibility gate (the many-dataset form of :func:`inference_only`): every row of
+    ``panels`` ``(n, G, K)`` is one complete dataset, all sessions used.  For the
+    adversarial suite's out-of-domain and candidate cells, whose rejection counts R0
+    asks to report although the gate refuses the declaration.  Labelled exploratory;
+    it carries no PROMOTE and no outcome."""
+    out = _many_statistics(design, np.asarray(panels, dtype=float))
+    out["outcome"] = EXPLORATORY
+    out["note"] = "exploratory; no gate outcome depends on this"
+    out.pop("codes", None)
+    out.pop("code_names", None)
+    out.pop("promote", None)
+    return out
+
+
+def _many_statistics(design: Mapping[str, Any], x: np.ndarray) -> dict[str, Any]:
+    """Per-dataset Student t (P-IND) or block-mean t (P-BLK), Holm step-down and the
+    rejection counts over ``x`` of shape ``(n, G, K)``; the same arithmetic as
+    :func:`student_t_one_sample` and :func:`holm` dataset by dataset (tested)."""
+    from scipy import stats
+
+    n, _g, k = x.shape
     if design["procedure"] == "P-BLK":
         bl = int(design.get("block_length", BLOCK_LENGTH))
         b = x.shape[1] // bl
@@ -819,6 +880,4 @@ def decide_many(
         "n_rejected": n_rej,
         "p": p,
         "t": t,
-        "sessions_used": tuple(used),
-        "dropped_sessions": tuple(dropped),
     }

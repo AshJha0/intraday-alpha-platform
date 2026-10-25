@@ -220,8 +220,12 @@ def ratio_stats(num: Sequence[float], den: Sequence[float], clusters: Sequence[s
         deff = var / iid_var
         out["design_effect"] = deff
         out["ess"] = n / deff if deff > 0 else None
+    # v1.19 R2 (defect D-03): both MDE columns are the exact noncentral-t
+    # inversion of iap.validation.confirmatory.mde (two-sided 0.05 passed as
+    # one-sided 0.025, G - 1 df, 80 % power), scaled by the cluster-level sd
+    # (``se * sqrt(G)``).  ``mde_t`` is kept as a name; it equals ``mde``.
     out["mde"] = mde(se * math.sqrt(g), g)
-    out["mde_t"] = (_t_crit(g - 1, 0.975) + _t_crit(g - 1, POWER)) * se
+    out["mde_t"] = out["mde"]
     return out
 
 
@@ -429,14 +433,17 @@ def ratio_diff_stats(
     est = scale * (ra - rb)
     t95 = _t_crit(g - 1, 0.975)
     tfam = _t_crit(g - 1, 1.0 - 0.025 / family_k)
-    tpow = _t_crit(g - 1, POWER)
+    # v1.19 R2 (defect D-03): exact noncentral-t MDE at 80 % power, G - 1 df,
+    # one-sided 0.025 (two-sided 0.05) and 0.025 / K for the declared family;
+    # the sd of the per-cluster statistic is ``se * sqrt(G)``.
+    sd_cluster = se * math.sqrt(g)
     out.update(
         se=se,
         df=g - 1,
         ci95=[est - t95 * se, est + t95 * se],
         ci_family=[est - tfam * se, est + tfam * se],
-        mde_t=(t95 + tpow) * se,
-        mde_t_family=(tfam + tpow) * se,
+        mde_t=mde(sd_cluster, g),
+        mde_t_family=mde(sd_cluster, g, alpha=0.05 / family_k),
     )
     return out
 

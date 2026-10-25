@@ -78,7 +78,8 @@ def test_ratio_stats_hand_example_cr1_ess_and_mde():
     assert s["df"] == 1 and s["n_clusters"] == 2 and s["n"] == 4
     assert s["mde"] == pytest.approx(mde(s["se"] * math.sqrt(2), 2))
     # Student-t at 1 df is much wider than the normal approximation
-    assert s["mde_t"] > s["mde"]
+    # v1.19 R2: both columns are the exact noncentral-t MDE (one implementation)
+    assert s["mde_t"] == pytest.approx(s["mde"])
     assert s["ess"] is not None and s["design_effect"] > 0
 
 

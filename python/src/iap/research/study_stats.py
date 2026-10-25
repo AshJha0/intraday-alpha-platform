@@ -99,12 +99,25 @@ def per_session_pnl(
 def mde(
     sd: float, n: int, *, alpha: float = DEFAULT_ALPHA, power: float = DEFAULT_POWER
 ) -> float | None:
-    """Minimum detectable mean (two-sided ``alpha``, ``power``; normal
-    approximation): ``(z_{1-alpha/2} + z_{power}) * sd / sqrt(n)``."""
-    if n < 1 or not math.isfinite(sd) or sd <= 0.0:
+    """Minimum detectable mean in the units of ``sd`` (the per-session standard
+    deviation), two-sided ``alpha``, ``power``.
+
+    v1.19 R2 (defect D-03): exact noncentral-t inversion with ``n - 1`` df via
+    :func:`iap.validation.confirmatory.mde`, the one MDE implementation; the
+    two-sided ``alpha`` is passed as the one-sided ``alpha / 2`` (the convention
+    table in docs/RESEARCH_VALIDITY.md).  Up to v1.18 this was the normal
+    approximation ``(z_{1-alpha/2} + z_{power}) * sd / sqrt(n)``, which
+    understates the MDE at small ``n`` (at n = 4 by about a third).  ``None``
+    when not estimable (``n < 2``, non-finite or non-positive ``sd``)."""
+    if n < 2 or not math.isfinite(sd) or sd <= 0.0:
         return None
-    nd = NormalDist()
-    return (nd.inv_cdf(1.0 - alpha / 2.0) + nd.inv_cdf(power)) * sd / math.sqrt(n)
+    from iap.validation.confirmatory import MDERefused
+    from iap.validation.confirmatory import mde as _mde_sd
+
+    try:
+        return float(sd) * _mde_sd(int(n), alpha / 2.0, power)
+    except MDERefused:
+        return None
 
 
 def summarise_study(
