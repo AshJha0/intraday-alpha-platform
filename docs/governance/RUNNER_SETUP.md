@@ -5,6 +5,12 @@ owner's, run once. The result is a GitHub Actions self-hosted runner whose Windo
 account `iap-runner` (created on 2026-10-25 by `tools/admin/create_sealed_accounts.ps1`, DR-5), picking up only
 the `registered-run` workflow. Settings on GitHub are in [REPO_SETTINGS.md](REPO_SETTINGS.md) section 7.
 
+## 0. Shell
+
+The workflow's steps run under Windows PowerShell 5.1 (`shell: powershell`), which every Windows installation has;
+PowerShell 7 (`pwsh`) is not required and the owner's workstation does not have it (run 40222182056 failed on
+`pwsh: command not found`). `gh` is not required on the runner; the API is called with `Invoke-RestMethod`.
+
 ## 1. An interpreter the service accounts can run
 
 The sealed accounts and `iap-runner` cannot read the owner's profile (`C:\Users\<owner>\...`), so a Python that
