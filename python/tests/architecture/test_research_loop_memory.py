@@ -29,16 +29,22 @@ RSS_BUDGET_MB = (
     1536  # declared budget for one family on the synthetic fixture (60 names x 560 sessions)
 )
 FIXTURE = REPO_ROOT / "python" / "tests" / "research" / "fixtures" / "daily_panel.py"
+FAMILY = REPO_ROOT / "research" / "v2" / "families" / "D1_short_term_reversal.md"
 
 CHILD = r"""
 import json, sys
 sys.path.insert(0, sys.argv[1])          # python/src
 sys.path.insert(0, sys.argv[2])          # tests/research/fixtures
+from pathlib import Path
 import daily_panel
 from iap.research import loop
 
-panel = daily_panel.build_panel() if hasattr(daily_panel, "build_panel") else daily_panel.panel()
-report = loop.run_family("d1", "development", panel=panel) if "panel" in loop.run_family.__code__.co_varnames else loop.run_family("d1", "development")
+out = Path.cwd()
+panel = daily_panel.write_fixture(out)                       # regenerated from its seed, sha256 verified
+report = loop.run_family(
+    Path(sys.argv[3]), panel, daily_panel.MANIFEST,
+    partition="development", ledger_path=out / "ledger.json", identity="iap-dev",
+)
 
 def peak_mb():
     if sys.platform == "win32":
@@ -62,9 +68,17 @@ print(json.dumps({"peak_rss_mb": peak_mb(), "ok": report is not None}))
 
 def test_research_loop_peak_rss_on_the_synthetic_fixture_is_within_budget(tmp_path):
     assert FIXTURE.is_file(), FIXTURE
+    assert FAMILY.is_file(), FAMILY
     env = dict(os.environ, PYTHONUTF8="1", IAP_RESEARCH_OUT=str(tmp_path))
     res = subprocess.run(
-        [sys.executable, "-c", CHILD, str(REPO_ROOT / "python" / "src"), str(FIXTURE.parent)],
+        [
+            sys.executable,
+            "-c",
+            CHILD,
+            str(REPO_ROOT / "python" / "src"),
+            str(FIXTURE.parent),
+            str(FAMILY),
+        ],
         capture_output=True,
         text=True,
         env=env,
