@@ -4,7 +4,9 @@
 Four named checks over the tracked Markdown (and ``docs/index.html``):
 
   internal_links      every relative Markdown link ``[..](path)`` names a file
-                      or directory in the tree (external links are lychee's
+                      or directory in the tree, and every ``#fragment`` on a
+                      Markdown target (or on the page itself) names one of its
+                      headings (v2.0 docs rewrite; external links are lychee's
                       job: the advisory step of the ``docs`` CI job)
   diagram_index       every ``docs/diagrams/*.mmd`` is embedded in
                       docs/DIAGRAMS.md or docs/ARCHITECTURE.md, the numbered
@@ -112,6 +114,36 @@ class Findings:
         return [r for r in self.rows if r["check"] == check and r["status"] != "PASS"]
 
 
+_ANCHOR_CACHE: dict[Path, set[str]] = {}
+
+
+def _slug(heading: str) -> str:
+    """GitHub's heading anchor: lower-case, punctuation removed, spaces to hyphens."""
+    text = re.sub(r"`([^`]*)`", r"\1", heading)
+    text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)
+    text = text.strip().lower()
+    text = re.sub(r"[^\w\s-]", "", text)
+    return re.sub(r"\s", "-", text)
+
+
+def _anchors(path: Path) -> set[str]:
+    """Every anchor a Markdown page exposes: its heading slugs (duplicates numbered
+    ``-1``, ``-2`` as GitHub does) and any explicit ``name=`` / ``id=`` targets."""
+    if path not in _ANCHOR_CACHE:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        text = re.sub(r"```.*?```", "", text, flags=re.S)
+        seen: dict[str, int] = {}
+        out: set[str] = set()
+        for m in re.finditer(r"^#{1,6}\s+(.+?)\s*#*\s*$", text, re.M):
+            slug = _slug(m.group(1))
+            k = seen.get(slug, 0)
+            out.add(slug if k == 0 else f"{slug}-{k}")
+            seen[slug] = k + 1
+        out.update(re.findall(r"""(?:name|id)=["']([^"']+)["']""", text))
+        _ANCHOR_CACHE[path] = out
+    return _ANCHOR_CACHE[path]
+
+
 # ---------------------------------------------------------------------------
 def check_internal_links(f: Findings) -> None:
     n = 0
@@ -125,22 +157,22 @@ def check_internal_links(f: Findings) -> None:
             target = m.group(1)
             if re.match(r"^[a-z][a-z0-9+.-]*:", target) or target.startswith("#"):
                 continue
-            path = target.split("#", 1)[0]
-            if not path:
-                continue
+            path, _, fragment = target.partition("#")
             path = path.replace("%20", " ")
             resolved = (doc.parent / path) if not path.startswith("/") else ROOT / path.lstrip("/")
+            resolved = resolved if path else doc
             n += 1
+            line = text[: m.start()].count("\n") + 1
+            where = f"{doc.relative_to(ROOT).as_posix()}:{line}"
             if not resolved.exists():
-                line = text[: m.start()].count("\n") + 1
+                f.add("internal_links", "FAIL", where, f"{target} does not exist")
+            elif fragment and resolved.suffix == ".md" and fragment not in _anchors(resolved):
+                # v2.0 docs rewrite: a ``#fragment`` must name a heading of the target page
                 f.add(
-                    "internal_links",
-                    "FAIL",
-                    f"{doc.relative_to(ROOT).as_posix()}:{line}",
-                    f"{target} does not exist",
+                    "internal_links", "FAIL", where, f"{target}: no heading with anchor #{fragment}"
                 )
     if not f.failed("internal_links"):
-        f.add("internal_links", "PASS", "", f"{n} relative links resolve")
+        f.add("internal_links", "PASS", "", f"{n} relative links and anchors resolve")
 
 
 def check_diagram_index(f: Findings) -> None:

@@ -19,7 +19,7 @@ own caveats.
 | [latency_budget.json](latency_budget.json) | v1.17 (F4): the Python MVP loop per-event latency budget (`iap.mvp.latency`, guard `tests/harness/check_mvp_latency_budget.py`): a measured CI p50 / p99 on the slice with run id and runner CPU, and the limits derived from them |
 | [memory_budget.json](memory_budget.json) | v1.17 (F5): peak RSS of the normaliser and the feature build on the slice (guard `tests/harness/check_slice_memory.py`), measured on CI with provenance, and the limits derived |
 | Python tick-to-trade | `python3 tools/tick_to_trade_py.py` — the same path through the Python reference implementation (events/s and percentiles in µs; laptop-scale, not committed) |
-| Java replay demo | `java/demo.sh` — 25 timed full replays after 5 warmups (a recent container run: ≈ 3.5M events/s), plus the golden IAP1 SHA-256 digests |
+| Java replay demo (historical) | `demo.sh` of the archived Java port, git tag `archive/java-v1.14.0` (not in the tree, not built): 25 timed full replays after 5 warmups (a container run at the time: ≈ 3.5M events/s), plus the golden IAP1 SHA-256 digests |
 
 Reference points from the committed C++ run (regenerated 2026-09-19; see
 `results_cpp.md` for the exact table and caveats): IAP1 decode
@@ -84,10 +84,10 @@ with the hot table. To reproduce the measured input, generate the dataset with
 `equities.flow.calibration` set to `"legacy_budget"`; the commands below run on
 either file, with event counts that differ accordingly.
 
-Reproduce (from the repo root, after `python3 -m iap.marketdata`):
+Reproduce (historical: the Java port lives only at git tag `archive/java-v1.14.0`; check that tag out first):
 
 ```bash
-cd java && bash build.sh
+cd archive/java && bash build.sh
 java -cp out/main com.iap.platform.PaperTrading   --configs ../configs   --events ../data/normalized/eq_20260824.normalized.jsonl   --instrument 11 --state-dir /tmp/iap-cold --report /tmp/iap-cold/report.json
 python3 -m json.tool /tmp/iap-cold/report.json | sed -n '/latency_ns/,/}/p'
 ```

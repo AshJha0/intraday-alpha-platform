@@ -1,3 +1,5 @@
+> **Retired 2026-10-25 (v2.0 docs audit):** this proposal was applied on 2026-10-18 and its outcome (C++ parity-only, 17 required checks) is recorded in docs/governance/GOVERNANCE.md section 0 and REPO_SETTINGS.md section 1; the file's own 'nothing applied' status line below is the pre-application text, kept as written (docs/DOC_AUDIT_v2.md).
+
 # Proposal: D5(a), C++ demoted to parity-only (v1.18 REL-13), APPLIED 2026-10-18
 
 Applied on 2026-10-18 with the owner's approval: the live ruleset `protect-main` no longer requires

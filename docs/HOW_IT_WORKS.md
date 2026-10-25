@@ -38,9 +38,10 @@ Five things to know before reading:
    below beside the default that replaced it.
 4. **There is now real data too, and a maker side.** Since v1.6.0 the same
    pipeline has run on seven real Nasdaq ITCH sessions (2019-20; AAPL, MSFT,
-   QQQ), and v1.8.0 confirmed four pre-registered signals on two unseen
-   2026 days (docs/REAL_DATA.md §3). The signals are real and too small to
-   pay a taker at 1-5 s. v1.9.0 and v1.10.0 add the opt-in maker path,
+   QQQ), and v1.8.0 passed four pre-registered signals through its gate on two
+   unseen 2026 days (docs/REAL_DATA.md §3; evidence class under v2.0:
+   **development-supported**, developer-run, holdout since spent; the later
+   R7 round is **data-ineligible**). They were too small to pay a taker at 1-5 s. v1.9.0 and v1.10.0 add the opt-in maker path,
    auction research, optimal-execution schedules and stronger research
    governance; §3.6-§3.8 and §6.2 below explain them. v1.11.0 adds an
    optional LLM research agent that works only through that governance

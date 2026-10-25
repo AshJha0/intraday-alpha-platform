@@ -4,7 +4,8 @@ Every row names a scenario a production system meets, the real-world example,
 the platform's pinned behaviour (the contract clause that governs it), and the
 tests that construct the exact event sequence in each language. Scenario tests
 are named after the scenario; cross-language determinism is additionally pinned
-by golden vectors in `tests/golden/` consumed by all four suites
+by golden vectors in `tests/golden/` consumed by the three live suites (Python,
+C++, Rust; the Java column below is the archived port, git tag `archive/java-v1.14.0`)
 (`tests/harness/run_golden.sh`).
 
 ## CORE — events / codec / order book / replay / reference data
