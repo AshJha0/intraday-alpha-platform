@@ -162,3 +162,13 @@
 /archive/java/src/main/java/com/iap/tca/     @AshJha0
 /archive/java/src/main/java/com/iap/backtest/ @AshJha0
 /archive/java/src/main/java/com/iap/adaptive/ @AshJha0
+
+# ------------------------------------------------- v2.0 stage 2: sealed data and the registered runner
+# U0 section 2, property 2: the development identity cannot change the
+# registered-run workflow, the runner, the sealed service or the audit anchor
+# without the owner's review (the ruleset requires code-owner review on these).
+/.github/workflows/registered-run.yml   @AshJha0
+/tools/runner/                          @AshJha0
+/tools/sealed_service.py                @AshJha0
+/tools/admin/                           @AshJha0
+/research/audit/                        @AshJha0

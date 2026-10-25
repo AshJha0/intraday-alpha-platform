@@ -275,6 +275,8 @@ RUNNERS = {
     "research/v118/rel09/run_rel09.py": "verify_identity",
     "research/v118/rel10/run_rel10.py": "verify_identity",
     "python/src/iap/auction/rel08c_study.py": "environment_mismatches",
+    # v2.0 CR1: the registered runner verifies the signed prereg's identity before any sealed request
+    "tools/runner/verify.py": "verify_identity",
 }
 # Consume a signed document but run no analysis: binders / signers / the
 # identity module itself / tools that only verify signatures.
@@ -291,6 +293,11 @@ NOT_RUNNERS = {
     "research/v118/f3_power/execution_preflight.py",
     # REL-08 v2 calibration freeze: reads the analysis-identity environment block to bind an UNSIGNED execution manifest (no signed prereg, no analysis)
     "research/v118/rel08/calibration/freeze.py",
+    # v2.0 CR1 / D2: the runner's orchestration and package docstring name the block; verify.py holds the call.
+    # The sealed service verifies the prereg SIGNATURE (its own Ed25519 check under a pinned trust root), runs no analysis.
+    "tools/runner/run.py",
+    "tools/runner/__init__.py",
+    "tools/sealed_service.py",
 }
 
 

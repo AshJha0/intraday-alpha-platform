@@ -19,9 +19,10 @@ Authorisation is service-side and in this order, every check audited:
 1. the caller's account is in ``allowed_accounts`` (default ``iap-runner``);
 2. the caller's process image hash is one of ``registered_images`` (when the
    list is non-empty; a hash that cannot be read refuses);
-3. no checkpoint is pending (write-before-serve: a served read whose
-   checkpoint the runner has not yet published blocks every further read
-   until ``publish`` lands; a restart keeps the pending state);
+3. for ``read``, no checkpoint is pending (write-before-serve: a served read
+   whose checkpoint the runner has not yet published blocks every further
+   read until ``publish`` lands; a restart keeps the pending state; the
+   pending registration's own ``store_result`` and ``publish`` still work);
 4. ``read``: the request carries a SIGNED prereg (Ed25519 under the trust root
    copy pinned in the partition at install) whose ``registered_run`` names
    THIS partition and the requested ``dataset_hash_id``; the registration
@@ -310,7 +311,7 @@ class SealedService:
                 raise Refused("caller_image_unknown", "client process image could not be read")
             if caller.image_sha256 not in self.cfg.registered_images:
                 raise Refused("caller_image", "client process image is not a registered runner")
-        if op not in ("status", "publish") and self.pending() is not None:
+        if op == "read" and self.pending() is not None:
             raise Refused("checkpoint_pending", "publish the pending checkpoint first")
 
     def handle(

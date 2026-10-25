@@ -1,0 +1,96 @@
+# =============================================================================
+# registered-run — the CR1 registered runner (v2.0 stage 2; U0 section 2).
+#
+# One registered analysis, run once, on sealed data, by a process the
+# development identity does not control:
+#
+#   * trigger: workflow_dispatch ONLY (no push, no pull_request: a fork or a
+#     branch cannot start it), naming the signed prereg and its bound commit;
+#   * environment `sealed`: a protected environment whose required reviewer
+#     is the owner's GitHub account, so every run waits for an explicit
+#     approval (docs/governance/REPO_SETTINGS.md section 7);
+#   * runner: the SELF-HOSTED runner registered with the labels below, whose
+#     service runs as the local account `iap-runner` on the workstation
+#     (docs/governance/RUNNER_SETUP.md). No cloud credentials, no secrets in
+#     this file; the sealed service authenticates the caller through the
+#     named pipe (OS identity, no token);
+#   * the job checks out exactly the bound commit, verifies identity,
+#     signature, freeze hashes, image digest and dataset hashes, requests
+#     the sealed read, runs once, commits the result to the protected
+#     `results` branch as iap-runner, publishes the checkpoint, and uploads
+#     ONLY the redacted log (tools/runner/run.py);
+#   * debug modes: ACTIONS_STEP_DEBUG / ACTIONS_RUNNER_DEBUG are forced off
+#     here and must not be set as environment variables or secrets of
+#     `sealed` (REPO_SETTINGS.md); the runner never prints data.
+#
+# Changing this file or tools/runner/ needs the owner's review (CODEOWNERS +
+# the branch ruleset's code-owner requirement). The evidence class of what
+# this workflow produces is "mechanically isolated" while the owner holds
+# development, administration and approval alone (property 6).
+# =============================================================================
+name: registered-run
+
+on:
+  workflow_dispatch:
+    inputs:
+      prereg:
+        description: "Repository-relative path of the SIGNED prereg with a registered_run block"
+        required: true
+        type: string
+      commit:
+        description: "The bound commit (analysis_identity.commit); the job checks out exactly this"
+        required: true
+        type: string
+
+permissions:
+  contents: write # push one commit to the protected results branch; nothing else
+
+concurrency:
+  group: registered-run
+  cancel-in-progress: false # a registration is one run; never cancel one mid-way
+
+jobs:
+  registered-run:
+    name: registered run (sealed)
+    runs-on: [self-hosted, windows, iap-runner]
+    environment: sealed
+    timeout-minutes: 480
+    env:
+      ACTIONS_STEP_DEBUG: "false"
+      ACTIONS_RUNNER_DEBUG: "false"
+      PYTHONUTF8: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Check out the bound commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.commit }}
+          fetch-depth: 0 # the results branch and the trust root history are needed
+          persist-credentials: true # the push to results/ uses the job token
+
+      - name: The process is the runner identity
+        shell: pwsh
+        run: |
+          python tools/runner/run.py whoami
+          if ($LASTEXITCODE -ne 0) { throw "not running as iap-runner" }
+
+      - name: Install the pinned research stack
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r python/requirements-ci.txt
+
+      - name: Registered run (verify, sealed read, run once, commit, publish)
+        shell: pwsh
+        run: |
+          python tools/runner/run.py run --prereg "${{ inputs.prereg }}" --push --log results-log.redacted.txt
+          if ($LASTEXITCODE -ne 0) { throw "registered run exit $LASTEXITCODE (see the redacted log)" }
+
+      - name: Upload the redacted log (the only artifact)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: registered-run-redacted-log
+          path: results-log.redacted.txt
+          if-no-files-found: ignore
+          retention-days: 90
