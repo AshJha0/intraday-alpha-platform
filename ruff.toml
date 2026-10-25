@@ -18,6 +18,10 @@ ignore = ["E501", "E741", "UP042"]
 # contracts/types.py introspects annotations at runtime (typing.get_origin(...) is typing.Union);
 # `X | Y` / `Optional` rewrites yield types.UnionType and break the contract normaliser.
 "python/src/iap/contracts/**" = ["UP007", "UP045"]
+# v2.0 stage 7-8 tests import their pytest fixtures from named modules (a subdirectory conftest.py would
+# shadow tests/conftest.py); a test parameter named after an imported fixture is the pytest idiom, not a redefinition.
+"python/tests/research/**" = ["F811"]
+"python/tests/ml/**" = ["F811"]
 
 [format]
 quote-style = "double"

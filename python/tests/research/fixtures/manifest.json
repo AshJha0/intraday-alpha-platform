@@ -1,0 +1,45 @@
+{
+  "dataset_id": "synthetic.daily_panel",
+  "route": "synthetic",
+  "sealed": false,
+  "file": "daily_panel.csv",
+  "generator": {
+    "module": "python/tests/research/fixtures/daily_panel.py",
+    "seed": 20261025,
+    "n_sessions": 560,
+    "n_names": 60,
+    "phi": 0.5,
+    "kappa": 0.004,
+    "gamma": 0.003
+  },
+  "sha256": "d03e20cb81c89deb64519d0cb57bf3440219e0d0e02d603a72a915f388eb9ddb",
+  "eligibility_overrides": {
+    "min_names_per_leg": 5,
+    "tails": 0.25,
+    "min_abs_z": 0.5,
+    "name_cap": 0.12,
+    "sector_cap": 0.24,
+    "max_name_share_of_gross": 0.25
+  },
+  "partitions": {
+    "development": [
+      "2015-01-02",
+      "2016-08-11"
+    ],
+    "validation": [
+      "2016-08-19",
+      "2017-02-23"
+    ]
+  },
+  "expected_report_sha256": {
+    "d1_development": "c6df2010793dcd0e524e57234c1c4475378a6d713cf4e9181512a94ac4b56539",
+    "d1_validation": {
+      "win32-py3.12": "43f4b69a295c9edac9d94b6e6b0feb38c28e39c99f95917b40f509678de1dbcb",
+      "linux-py3.12": "43f4b69a295c9edac9d94b6e6b0feb38c28e39c99f95917b40f509678de1dbcb",
+      "linux-py3.11": "284841554ef7df54624620bcf6d220cf86503bfc1fef12f273b237a91ac968ca"
+    },
+    "d3_development": "120c31ba24b57f49a906e917c02aff928582bebdc2b67aaf01788a3e01aa4a62"
+  },
+  "note": "synthetic fixture with planted five-session reversal, post-filing drift and overnight asymmetry; no residual momentum planted (D2 is a negative control); nothing here is market data",
+  "expected_report_sha256_note": "a string applies to every environment; a mapping is keyed by '<sys.platform>-py<major>.<minor>' where the integer-share path differed across interpreter builds (CI 2026-10-25: Linux Python 3.12 equals Windows 3.12, Linux Python 3.11 differs; defect D-60); an environment without a pinned hash skips the test and prints the hash so it can be recorded, never passes silently"
+}

@@ -6,7 +6,7 @@ contracts and `tests/golden/`). Two packages run the other way — `risk/` and
 `execution/` are Python ports of the Rust and C++ references, proven by the
 same goldens (`/API_TRADING.md`). Everything deterministic is seeded via
 SplitMix64 only; no wall clock and no network or LLM client on any trading
-path (`PLATFORM_CONVENTIONS.md` §13.7). All 29 packages are listed below.
+path (`PLATFORM_CONVENTIONS.md` §13.7). All 30 packages are listed below.
 
 ```
 iap/
@@ -231,6 +231,17 @@ iap/
                    (O_CREAT | O_EXCL lock file, bounded retry, never broken
                    automatically) and atomic_write_text (temp file +
                    os.replace), used by both ledgers.
+  ml/              v2.0 U6 ML framework under the frozen protocol
+                   research/v2/ML_PROTOCOL.md (iap.ml.protocol: hash, block,
+                   delta derivation): splits.py (chronological development /
+                   validation with purging and embargo = longest label
+                   horizon), trials.py (chain-hashed trial ledger, protocol
+                   freeze first, search budgets), models.py (M1 ridge closed
+                   form, elastic net by cyclic coordinate descent; complexity),
+                   admission.py (paired Delta U, block length from dependence,
+                   stationary block bootstrap, Holm within tier, lexicographic
+                   choice), pipeline.py (the M1 demonstration through the
+                   research loop's engine; synthetic, no claim).
   models/          The gated ML layer (research/ml_reports): dataset.py,
                    splits.py, zoo.py (linear baselines gate the tree models),
                    metalabel.py (isotonic / Platt-calibrated trade / no-trade
@@ -333,6 +344,15 @@ iap/
                    research/experiments/<experiment_id>/{spec,result,eligibility}.json
                    (staged, then one rename) and counted in the multiple-testing
                    ledger research/experiments.json (locked read-modify-write).
+    loop.py        v2.0 RL1 research loop (tools/research/run_family.py): loads a
+                   U3 family specification (research/v2/families/), refuses any
+                   partition but development or validation (identity and path
+                   checks), builds features through iap.data.contracts, fits and
+                   registers M0, runs the engine (project, sim, ledger), builds
+                   the E5 report with its hash, records the run as an analysis
+                   event with outcome exposure in the selection ledger.
+    family_features.py  the contracted D1-D4 signal features and the common
+                   factor-model features on the synthetic fixture route.
     specs.py       build_spec(alpha_id, horizon, configuration, ...): versions
                    from iap.experiment.tracker, pinned configuration keys
                    (n_folds, embargo_ns, cost_multiplier, latency_ns,
