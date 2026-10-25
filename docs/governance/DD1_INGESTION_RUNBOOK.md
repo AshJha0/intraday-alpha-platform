@@ -16,7 +16,7 @@ write code) never touches a sealed partition and never sees a sealed value, befo
 | step | who | what | what you see |
 |---|---|---|---|
 | identity | `iap-runner` | refuses to run as any other account (exit 3) | log line `refused` |
-| pull | `iap-runner` | Stooq bulk daily archive (or Tiingo if `TIINGO_API_KEY` is in the runner's environment); every Wikipedia revision of the S&P 500 and Nasdaq-100 pages (last per day); EDGAR `form.idx` per quarter for the universe's CIKs; the three French daily factor files; Tiingo's public ticker list for listed last dates | counts per source |
+| pull | `iap-runner` | Stooq bulk daily archive, read from your verified download (step 4; or Tiingo if `TIINGO_API_KEY` is in the runner's environment); every Wikipedia revision of the S&P 500 and Nasdaq-100 pages (last per day); EDGAR `form.idx` per quarter for the universe's CIKs; the three French daily factor files; Tiingo's public ticker list for listed last dates | counts per source |
 | cut | `iap-runner` | development = to end of `Y-4`, validation = `Y-3`, Track B = `Y-2`, Track C = `Y-1` onward, `Y` = `--year` (the ingestion year) | the windows in the record |
 | test | `iap-runner` | the five DD1 tests on the **development partition only**: survivorship, corporate actions, calendar, open/close convention, membership intervals (section 4) | `dd1 test <name>: pass` or `FAIL` |
 | write | `iap-runner` | development and validation to `C:\iap\daily\dd1_<Y>\` (you can read them); Track B and C through `\\.\pipe\iap-sealed-b` / `-c` `ingest` (the service writes, re-hashes, records, answers hashes and counts) | `partition b: sealed in b, 5 files, chain head …` |
@@ -47,12 +47,26 @@ Set-Location C:\iap\repo
 3. **The runner**: [RUNNER_SETUP.md](RUNNER_SETUP.md) (work directory, registration as a Windows service under
    `iap-runner`, the `sealed` environment with you as required reviewer, the first-run checks of its section 6).
    Optional: `TIINGO_API_KEY=<key>` in `C:\actions-runner\.env` selects Tiingo; without it the job uses Stooq.
-4. **Trigger the ingestion**: GitHub -> Actions -> `registered-run` -> Run workflow with `mode` = `dd1`, `commit` = the
+4. **Download the Stooq archive yourself** (DR-16, D-86). Since October 2026 stooq.com shows scripts a browser check,
+   and the job does not try to pass it. In your browser, open <https://stooq.com/db/h/>, take the "U.S." daily ASCII
+   archive (`d_us_txt.zip`, several hundred MB), and save it as `C:\iap\inbox\d_us_txt.zip`. Then, in PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force C:\iap\inbox | Out-Null
+icacls C:\iap\inbox /grant "iap-runner:(OI)(CI)RX"
+(Get-FileHash C:\iap\inbox\d_us_txt.zip -Algorithm SHA256).Hash.ToLower()
+```
+
+   Write down the printed hash and the date you downloaded the file. The job refuses before its first request if the
+   file is missing, is not a zip, or does not match that hash, so a bad file cannot waste the four-hour membership pull.
+   The record stores the hash and `archive_origin: owner_browser_download`.
+5. **Trigger the ingestion**: GitHub -> Actions -> `registered-run` -> Run workflow with `mode` = `dd1`, `commit` = the
    merge commit of the PR that added this runbook (or any later `main` commit), `prereg` = anything (ignored in this
-   mode), `year` = empty (this year). The run waits in the `sealed` environment until you approve it; approve it.
-5. **Read the redacted log** (the only artifact; paths, accounts and values are redacted). The last lines are the
+   mode), `year` = empty (this year), `stooq_sha256` = the hash from step 4 (leave it empty only when Tiingo is set).
+   The run waits in the `sealed` environment until you approve it; approve it.
+6. **Read the redacted log** (the only artifact; paths, accounts and values are redacted). The last lines are the
    per-partition results and `record written: status complete`.
-6. **List the record in the manifest** (development identity, your checkout):
+7. **List the record in the manifest** (development identity, your checkout):
 
 ```powershell
 Copy-Item -Recurse C:\iap\daily\dd1_2026 data\real\daily\dd1_2026
