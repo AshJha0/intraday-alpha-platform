@@ -11,7 +11,7 @@ E31) — the driver of the ``risk-fuzz`` CI job.
    line per script) and the audit it produced into ``IAP_RISK_FUZZ_OUT``. The
    Rust engine is its own golden test (``cargo test -p risk --test
    golden_risk_fuzz``) — no extra binaries. (The Java engine was archived in
-   v1.15, frozen at v1.14.0: ``archive/java/``.)
+   v1.15, frozen at v1.14.0, removed from the tree in v2.0 stage 11: git tag ``archive/java-v1.14.0``.)
 3. No divergence: exit 0. Otherwise take the first diverging script, minimise
    it with the delta-debugging shrinker (each round writes the candidate
    scripts to a directory and starts each diverging engine once), write the

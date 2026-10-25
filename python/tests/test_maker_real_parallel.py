@@ -102,7 +102,13 @@ def _args(root: Path, out: Path, workers: int) -> argparse.Namespace:
     )
 
 
-def test_parallel_unit_matches_serial_and_resumes(dataset, tmp_path):
+def test_parallel_unit_matches_serial_and_resumes(dataset, tmp_path, monkeypatch):
+    # S5 (v2.0 stage 11): ``Study.plan_workers`` clamps the pool to the RAM free at that moment
+    # (``(avail - 1 GB) // per_worker``, per_worker >= 0.6 GB).  Under a loaded xdist run the
+    # probe saw too little free memory, the "parallel" study ran with one worker and the
+    # ``workers == 2`` assertion failed (NULL_V3_FROZEN_IDENTITY.md records the flake).  The
+    # test is about serial == parallel, not about the memory planner, so the probe is pinned.
+    monkeypatch.setattr(mr, "available_ram_gb", lambda: None)
     serial, parallel = tmp_path / "serial", tmp_path / "parallel"
     mr.Study(_args(dataset, serial, 1)).run()
     mr.Study(_args(dataset, parallel, 2)).run()

@@ -1,7 +1,7 @@
 # POLYGLOT — which copy of each component is canonical, and which is frozen
 
-> **v1.15 (G-P1-3): the Java engine is archived** in `archive/java/`, frozen at
-> v1.14.0 ([archive/java/README.md](../archive/java/README.md)). Its rows below
+> **v1.15 (G-P1-3): the Java engine is archived** in the git tag `archive/java-v1.14.0`, frozen at
+> v1.14.0 (the git tag `archive/java-v1.14.0`). Its rows below
 > are historical: the Java paths left `tests/harness/polyglot_policy.json`,
 > and parity is now tested across three engines (python, cpp, rust).
 >
@@ -12,7 +12,7 @@
 > is the reference for everything; C++ ports every execution, SOR and
 > dark-venue rule (F7); Rust ports only what Rust owns, the pre-trade risk
 > controls and the venue simulator (F8); **Java is not a port target** — its
-> risk engine (`archive/java/.../risk/`) survives only as the byte-identical
+> risk engine (the git tag `archive/java-v1.14.0`) survives only as the byte-identical
 > mirror of the Rust risk engine checked by `tests/golden/expected_risk_*.json`,
 > and that mirror is the one edit the archive accepts. Every "Java platform /
 > `java` image / `java-platform.yaml`" consumer named in the tables below no
@@ -29,7 +29,18 @@
 > harness, monitoring, portfolio limits, order manager; ARCHITECTURE.md §22)
 > is Python only, and no golden moved. The tables in section 1 keep their
 > v1.10.0 line counts and v1.11.0 decisions as the historical record; the
-> Java rows (paths under `java/`, now `archive/java/`) are not live policy.
+> Java rows (paths under `java/`, now the git tag `archive/java-v1.14.0`) are not live policy.
+>
+> **Status at v2.0 stage 11 (2026-10-25, S1/S2).** The archived Java tree left the checkout
+> (git tag `archive/java-v1.14.0` holds it). `tests/harness/polyglot_policy.json` now lists
+> **10 FROZEN paths (9 copies)**: the six Rust crates above plus `rust/eventbus/src/` and
+> `rust/telemetry/src/` (nine of the eleven workspace crates are exercised by CI parity tests
+> and by no research run; `rust/risk` is the normative risk engine and `rust/features` the
+> pyo3 engine, the two live crates). Per pull request the `rust` job tests `risk` and `features`
+> and the golden job runs every crate's golden target; the whole workspace (unit tests, clippy,
+> benches, coverage) runs weekly in `.github/workflows/weekly-structural.yml`, as do the C++
+> benchmark guards, coverage build and sanitizers. The frozen crates' consumers are unchanged
+> (`rust/venue` stays canonical: Rust owns the venue protocol simulation, F8).
 
 IAP_Next_Releases_Plan item **E3** (v1.11.0). The platform implements several
 components in more than one language: the order book in four, features and

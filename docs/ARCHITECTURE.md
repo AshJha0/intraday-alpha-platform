@@ -66,7 +66,7 @@ release record is [release/v1.18.0_RELEASE_NOTES.md](release/v1.18.0_RELEASE_NOT
 The spec's responsibility matrix, mapped to what actually lives in this
 repository:
 
-| subsystem | Python (`python/src/iap`) | C++ (`cpp/`) | Rust (`rust/`) | Java (`archive/java/`, frozen at v1.14.0, not built — historical column) |
+| subsystem | Python (`python/src/iap`) | C++ (`cpp/`) | Rust (`rust/`) | Java (the git tag `archive/java-v1.14.0`, frozen at v1.14.0, not built — historical column) |
 |---|---|---|---|---|
 | Events / codec (JSONL + IAP1) | `core` (reference) | `marketdata` | `marketdata` crate | `core`, `codec` |
 | Synthetic generator + normalize/QC | `marketdata` (sole owner) | — | — | — |
@@ -122,7 +122,7 @@ called out in §10):
   the full vertical (book → features → alpha → portfolio → risk → execution →
   TCA → backtest → monitoring → paper trading) wired into one process
   (`PaperTrading`). That is history: the engine was archived in v1.15
-  (`archive/java/`, frozen at v1.14.0, not built or tested in CI) and its
+  (the git tag `archive/java-v1.14.0`, frozen at v1.14.0, not built or tested in CI) and its
   deployment image was retired in v1.17 (F9). The live vertical is the Python
   MVP (§9.1) with the forward paper trade (§9.2) and, since v1.18, the paper
   order manager and supervisor (§22); the Java risk engine survives only as
@@ -314,7 +314,7 @@ and by Java and Rust (the lifecycle ports). The harness
 runs every suite with the canonical commands and prints the parity table; a
 main CI run 40015853764 (2026-10-23, commit 23b69fb2, the v1.18.0 tag commit)
 passes 4062/333/376 tests (217/74/75 golden) across python/cpp/rust (Java
-archived in v1.15, `archive/java/`), plus the repo-level `integration` (35)
+archived in v1.15, the git tag `archive/java-v1.14.0`), plus the repo-level `integration` (35)
 and `replay` (6) rows — the same counts the README parity table records.
 The python figure is the Python 3.11 `python` job plus the `python-slow` job:
 3,666 passed (21 skipped, 1 xfailed) and 396 passed (3 skipped), 4,062 in all;
@@ -382,7 +382,7 @@ The `contracts` crate writes canonical JSON with its own writer over
 feature (correctly rounded parsing) — without it the registry byte parity
 broke by 1 ulp on 17-digit decimals.
 
-**Java** (`archive/java/`, archived in v1.15 and frozen at v1.14.0; the
+**Java** (the git tag `archive/java-v1.14.0`, archived in v1.15 and frozen at v1.14.0; the
 figures below are historical): Java 21, plain `javac` (no Maven — Maven Central is
 unreachable in the build environment; `docs/BUILD_NOTES.md` is the normative
 pom-equivalent, JUnit4 vendored from `/usr/share/java`). Hot paths are
@@ -1235,6 +1235,28 @@ The C++ copy has no risk engine and no lifecycle by design (§10); the Java
 platform vertical (`com.iap.{platform,monitoring,api,config}`) and every
 Python-only subsystem have a single copy and are outside the policy.
 
+### 16.1 Layering: the import contracts (v2.0 stage 11, S3)
+
+The v1.19 audit (plan section 2.3) found that the documented layering did not exist in code: 12
+mutual subpackage import cycles, `core` importing `research`. Stage 2 D1 broke `core <-> research`
+(the guard hook is registrable in `iap.core.guard`; `iap/__init__.py` installs the research policy
+once). Stage 11 broke `features <-> labels` (`labels/grid_v2.py` names `InstrumentContext` under
+`TYPE_CHECKING` only) and `execution <-> tca` (the market timeline and markout analysis moved to
+`iap.execution.market_timeline` / `iap.execution.markout`; `iap.tca.fills` and `iap.tca.markout`
+re-export them), and made the layering a test:
+
+- `python/.importlinter`: `core`, `contracts`, `marketdata`, `features`, `execution` import neither
+  `research`, `agents` nor `llm`; `alpha`, `portfolio` (and `ml`, once in the tree) do not import
+  `research`; `labels` does not import `features`; `execution` does not import `tca`. `core` and
+  `contracts` are bound transitively; the others bind **direct** imports (`allow_indirect_imports`),
+  because `mlops -> agents`, `models -> research` and the `validation` cycles still put `research`
+  in nearly every package's transitive reach. Those three edges are the next cuts.
+- `python/tests/architecture/test_layering.py` enforces the same file by an AST scan (no dependency)
+  and pins the remaining cycle set: **9** (`agents <-> lifecycle`, `agents <-> llm`,
+  `agents <-> research`, `alpha <-> execution`, `auction <-> research`, `backtest <-> validation`,
+  `lifecycle <-> research`, `marketdata <-> validation`, `models <-> research`). A new cycle fails.
+- CI runs the real linter (`lint-imports`, version-pinned) in the `lint-and-secrets` job.
+
 ## 17. The v1.11 subsystems: LLM agent, model registry, Rust wheel, extras
 
 All four are opt-in. No default, golden, published number or
@@ -1346,7 +1368,9 @@ places below.
   `slow` (19 test files carry the marker at v1.18.0) with coverage. `governance` verifies the blackboard
   (`verify-board`), checks every signed agent has a registered key, and
   checks the ledger and blackboard only grow against the base branch.
-  `advisory` adds gitleaks and an advisory lychee link check. mypy is a
+  `lint-and-secrets` (called `advisory` until v2.0 stage 11; the alias job keeps the ruleset's
+  context name) adds gitleaks, the import-linter architecture contracts (section 16.1) and an
+  advisory lychee link check. mypy is a
   blocking step of the `python` job (scope: core/orderbook/execution/
   backtest/features since v1.16, item 16, plus agents/llm/mvp/paper since
   v1.17, F3; 0 errors on both). `reproducible-build` (v1.17, F1) builds the
@@ -1398,7 +1422,7 @@ goldens, stores and reports.
 - **Agents over MCP** (`iap.agents.mcp_workflow`): propose, draft a prereg,
   read hit rates and fees; sign-off, confirmatory runs, outcomes and
   promotion have no tool.
-- **Java archived** to `archive/java/`; parity is three languages (python,
+- **Java archived** to the git tag `archive/java-v1.14.0`; parity is three languages (python,
   cpp, rust). v1.17 (F9) retired its deployment image too: the Python
   `iap.metrics` process serves `/metrics`; the Java risk engine survives only
   as the byte-identical mirror of the Rust one checked by the risk goldens.

@@ -4113,7 +4113,7 @@ issues:
     acceptance:
       - "Ruleset updated by owner; parity counts updated"
     evidence:
-      - "archive/java"
+      - "docs/POLYGLOT.md"
 
   - key: A-P0-1
     epic: E35

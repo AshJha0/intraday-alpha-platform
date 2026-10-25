@@ -27,7 +27,11 @@ research/models/*/model.pkl
 /rust/marketdata/fuzz/Cargo.lock
 /python/.hypothesis/
 /.hypothesis/
-/archive/java/out/
+
+# --- result artefacts over 1 MB live as release assets (research/v118/RESULT_ARTEFACTS.json,
+# tools/result_artefacts.py; v2.0 stage 11 S1): a rerun writes them here, never commit them
+/research/v118/known_null_result.json
+/research/v118/known_null_v2_result.json
 
 # --- python
 __pycache__/

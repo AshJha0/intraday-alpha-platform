@@ -65,7 +65,7 @@ from iap.execution.urgency import regime_from_z
 
 if TYPE_CHECKING:  # pragma: no cover
     from iap.execution.fill_hazard import FillHazardModel
-    from iap.tca.fills import MarketTimeline
+    from iap.execution.market_timeline import MarketTimeline
 
 #: ``ChildOrder.cancel_rule`` values: why a resting child was pulled.
 CANCEL_RULES: tuple[str, ...] = (
@@ -272,7 +272,7 @@ def pull_rows(
     the fill the pull forwent (:func:`iap.tca.markout.markout_mid` at
     ``effect_ts + h``). Rows of several sessions pool in :func:`pull_summary`.
     """
-    from iap.tca.markout import DEFAULT_HORIZONS_NS, markout_mid
+    from iap.execution.markout import DEFAULT_HORIZONS_NS, markout_mid
 
     hz = dict(DEFAULT_HORIZONS_NS if horizons_ns is None else horizons_ns)
     want = ("fade:signal", "fade:pressure") if rules is None else tuple(rules)
@@ -412,7 +412,7 @@ def pull_outcomes(
     rules: Sequence[str] | None = None,
 ) -> dict[str, object]:
     """:func:`pull_summary` of :func:`pull_rows` for one timeline (one session)."""
-    from iap.tca.markout import DEFAULT_HORIZONS_NS
+    from iap.execution.markout import DEFAULT_HORIZONS_NS
 
     hz = dict(DEFAULT_HORIZONS_NS if horizons_ns is None else horizons_ns)
     want = ("fade:signal", "fade:pressure") if rules is None else tuple(rules)

@@ -75,3 +75,14 @@ venue behaviour.
 - Any maker / quoting profitability, rebate capture or queue-priority edge.
 - That the Level 1 fill model generalises to held-out days with real orders
   (Level 2, not reachable under D4(a)).
+
+## 5. Traps pinned in stage 11 (S5; `tests/execution/test_simulator_traps.py`, defect D-82)
+
+Each is a modelling limitation stated as a test of what the simulator DOES, so a change is visible;
+none is validated against real fills.
+
+| trap | what the simulator does | why it is a trap | test |
+|---|---|---|---|
+| **C-as-EXECUTE through the cross** | an ITCH `C` (executed with price) becomes an EXECUTE that trades the book order at the BOOK price; the quoted print price is ignored unless `ExecutionSimulator(exec_print_price=True)` (and the ingest's `exec_prints`), in which case the fill is at the printed price. A NON-printable `C` (a cross execution already in the `Q` print) is emitted by the ingest as MODIFY / CANCEL and can never fill a child | an opening or closing cross print is credited to a resting child at its limit, or (opt-in) at the cross price, with no auction participation model | `test_execute_with_a_different_print_price_fills_at_the_book_price_by_default`, `test_exec_print_price_opt_in_fills_at_the_printed_price`, `test_non_printable_c_is_a_size_reduction_for_the_ingest_never_an_execute` |
+| **self-matching crossing ADD** | a marketable ADD is expanded against the pre-event displayed opposite depth and the pool reaches our resting child in queue order | the simulator has no participant identity; a venue with self-match prevention would cancel or re-price an order crossing the same participant's resting child, so a strategy that quotes both sides can be credited with fills a venue would have refused | `test_crossing_add_fills_our_resting_order_without_self_match_prevention` |
+| **odd lots** | a print of 1-99 shares is one pool like a round lot, and odd-lot displayed size counts in `ahead_qty` | odd-lot executions do not set the NBBO and are reported differently by venues; a child filled share for share by odd-lot prints may be optimistic for queue progress | `test_odd_lot_prints_are_ordinary_pools`, `test_odd_lot_displayed_depth_counts_toward_queue_position` |

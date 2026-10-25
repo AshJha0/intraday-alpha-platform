@@ -1,7 +1,7 @@
 # Contributing
 
 This repository holds three maintained implementations of one pinned
-semantics (Python, C++, Rust; the Java port is archived in `archive/java/`,
+semantics (Python, C++, Rust; the Java port is archived in the git tag `archive/java-v1.14.0`,
 frozen at v1.14.0). Contributing means changing that semantics in the reference,
 proving it with a golden vector, and re-matching every port — or leaving the
 semantics alone and proving that too. The binding rules live in
@@ -13,7 +13,9 @@ the working procedure.
 
 - `main` is protected by the `protect-main` ruleset: pull requests only,
   the required CI checks green (`.github/workflows/ci.yml`; 17 checks are
-  required since the v1.18 D5(a) change, `cpp-sanitizers` is not one of them;
+  required since the v1.18 D5(a) change, `cpp-sanitizers` is not one of them and
+  runs weekly since v2.0 stage 11; `advisory` is the ruleset's name for the
+  `lint-and-secrets` job;
   the ruleset is described in `docs/governance/REPO_SETTINGS.md` and
   `docs/governance/GOVERNANCE.md` §0), and the reviewers `CODEOWNERS` names
   for the paths touched. The owner merges in the GitHub UI.
