@@ -15,7 +15,7 @@ import subprocess
 import sys
 
 import pytest
-from runner import redact, results, run, verify  # noqa: E402  (tools/ on sys.path via fixtures)
+from runner import redact, results, run, verify
 from runner_fixtures import IMAGE, World, git
 
 
