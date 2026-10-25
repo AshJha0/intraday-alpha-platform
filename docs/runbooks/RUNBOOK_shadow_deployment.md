@@ -42,7 +42,7 @@ and `ticket_url` (RUNBOOK_alerting.md §2).
 > its own shadow runbook.
 >
 > **Status (historical):** the paper-trading loop was LIVE — `com.iap.platform.PaperTrading`
-> (started by `archive/java/paper.sh` (archived, frozen at v1.14.0) locally, or as the `java-platform` compose
+> (started by `archive/java/paper.sh (at git tag archive/java-v1.14.0)` (archived, frozen at v1.14.0) locally, or as the `java-platform` compose
 > service) runs the full vertical over deterministic replay sessions and
 > serves `/metrics`, `/health`, `/ready`, `/status` and the kill-switch admin
 > API on :8080 (`com.iap.api.MetricsServer`). Replay, paper and production
@@ -71,7 +71,7 @@ and `ticket_url` (RUNBOOK_alerting.md §2).
 >   mid-session checkpoint, not a finished session — no report is written
 >   (§5, §6);
 > - the monitoring/admin listener binds `127.0.0.1` unless `IAP_BIND_ADDR`
->   says otherwise (since v1.3.0). `archive/java/paper.sh` (archived, frozen at v1.14.0) on a workstation is
+>   says otherwise (since v1.3.0). `archive/java/paper.sh (at git tag archive/java-v1.14.0)` (archived, frozen at v1.14.0) on a workstation is
 >   reachable from that workstation only; the image, compose and the k8s
 >   manifest set `IAP_BIND_ADDR=0.0.0.0` and restrict access with the
 >   loopback-only published port (compose) or the NetworkPolicies (k8s).
@@ -486,4 +486,4 @@ before the final checkpoint — the same bounded loss.
 Because STOPPED exits 0, compose (`restart: on-failure`) does not restart
 the container. To continue the session, start it again with `--resume`
 added to the command — the image's default entrypoint does not pass it
-(`archive/java/Dockerfile.java`, retired).
+(`archive/java/Dockerfile.java (at git tag archive/java-v1.14.0)`, retired).

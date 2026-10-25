@@ -131,7 +131,7 @@ CLOSE_S = 16 * 3600
 ROUND = 6
 #: Decimals for the stage-book rows of block B, whose every value descends from solver weights.
 ROUND_SOLVER = 4
-#: A constraint whose slack at the solver's point is within this is active for the polish (D-76).
+#: A constraint whose slack at the solver's point is within this is active for the polish (D-85).
 POLISH_ACTIVE_TOL = 1e-7
 #: The polished point must lie within this of the solver's (otherwise the active set was misread).
 POLISH_MAX_SHIFT = 1e-5
@@ -464,7 +464,7 @@ def _registry_entry(
     )
 
 
-# --------------------------------------------------------------------------- the polish (D-76)
+# --------------------------------------------------------------------------- the polish (D-85)
 def _solve_consistent(g: list[list[float]], rhs: list[float], eps: float) -> list[float] | None:
     """Gauss-Jordan in plain Python floats: one solution of ``g x = rhs`` (free unknowns 0), None if inconsistent."""
     k = len(g)
@@ -509,7 +509,7 @@ def polish_weights(
 
     SLSQP's point varies by ~1e-8 with the BLAS kernel of the machine (AVX-512 runners
     against AVX2 ones), and the integer-share path amplifies that into a one-share flip
-    whenever ``|w| C / close`` lands within that of a half share (D-76).  The minimiser
+    whenever ``|w| C / close`` lands within that of a half share (D-85).  The minimiser
     of ``|w - w_raw|^2`` subject to the constraints that are active at the solver's point
     is a small linear system; solved here without numpy or BLAS it is the same floats on
     every CPU.  Falls back to the solver's weights when the active set is inconsistent or

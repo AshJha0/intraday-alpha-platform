@@ -86,9 +86,9 @@ from typing import Any
 
 from iap.core.events import EventType, MarketEvent
 from iap.execution.config import ExecConfig
+from iap.execution.market_timeline import MarketTimeline
+from iap.execution.markout import build_gated_timeline, markout_mid
 from iap.orderbook.book import SYNTHETIC_ID_BASE, ApplyStatus, ConsolidatedBook
-from iap.tca.fills import MarketTimeline
-from iap.tca.markout import build_gated_timeline, markout_mid
 
 SCHEMA = "iap.exec_calibration"
 VERSION = 1

@@ -3,6 +3,30 @@
 Pinned version, key fingerprint, rotation and revocation: [TRUST_ROOT.md](TRUST_ROOT.md).
 Verify everything (full-history clone): `PYTHONPATH=python/src python tools/verify_signatures.py --trust-ref origin/main --strict`.
 
+## What a signature proves, and the four controls it is not (v2.0 stage 11, G1)
+
+An Ed25519 signature under a maintainer key proves **integrity**: the signed document (a
+pre-registration, a rule, the key registry) did not change after it was signed, and the signer held
+the key. It proves nothing about who ran what, or whether anyone outside the project looked. The
+v1.19 review (plan section 2.3) found the words "signer != runner" read as an independence claim
+where the mechanism was an environment variable; that wording is retired. The programme keeps four
+controls apart, each with its own mechanism and its own evidence class (U0 section 10):
+
+| control | what it establishes | mechanism | status on `main` (2026-10-25) |
+|---|---|---|---|
+| **integrity** | the document is the one that was signed | this page: trust roots read from `origin/main`, `verify_signatures.py --strict`, the governance CI job | enforced |
+| **execution separation** | the developer's identity could not read the sealed inputs or alter the run | operating-system accounts (`iap-dev`, `iap-sealed-{a,b,c}`, `iap-runner`), the sealed service over a named pipe, the registered runner CR1 ([RUNNER_THREAT_MODEL.md](RUNNER_THREAT_MODEL.md)); **not** an environment variable | built and tested on synthetic data; no registered run executed; repository settings of REPO_SETTINGS.md section 7 not yet set |
+| **independent review** | a reviewer approved the protocol before the run | the outside reviewer's written decisions (`docs/release/REVIEWER_*`), the `sealed` environment's required reviewer | decisions on file for F3 and REL-08; the environment does not exist yet |
+| **independent reproduction** | a party outside the project recomputed the result | P2 ([../REPRODUCTION.md](../REPRODUCTION.md) section 6); gate F7 | open: the pinned image reproduces B8 v2 and the REL-08 scorecard "in the pinned image by CI", no independent party has run it |
+
+A result's class follows from which controls held when it was produced, never from the signature
+alone: *independently confirmed* needs execution separation under custody separate from the
+developer plus independent review; *mechanically isolated* is CR1 under the developer's custody;
+everything produced so far is at most *development-supported*. `iap.agents.analysis_identity.require_independent_runner`
+remains in the code as the tamper-evidence check it always was (the declared actor and the absence
+of a signing key in the runner's environment); it is not cited as an independence control anywhere
+in the documentation.
+
 ## What is enforced
 
 - `research/agents/trust_roots.json` lists the maintainers' Ed25519 **public**

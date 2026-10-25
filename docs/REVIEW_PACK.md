@@ -16,6 +16,28 @@ The code, tests, reviews and documents were produced with Claude (AI) assistance
 merges and signs. Nothing in this pack asks you to trust that text: every number below comes
 from a committed artefact and a command that recomputes it.
 
+## 0. Evidence classes: what `main` supports today (v2.0 stage 11, G2)
+
+Every result in this repository carries one of the classes of U0 section 10: **independently
+confirmed** (a registered single-shot decision executed under custody separate from the developer) ·
+**mechanically isolated** (the same, executed by the registered runner CR1 under the developer's sole
+custody) · **development-supported** · **exploratory** · **rejected** · **data-ineligible** · **pending**.
+As of 2026-10-25 nothing is in the first two classes: no registered run has been executed by CR1 (its
+repository settings are not set, [governance/REPO_SETTINGS.md](governance/REPO_SETTINGS.md) section 7)
+and no independent party has reproduced a result (F7 open). The four controls a class rests on, and
+why a signature is only one of them, are in [governance/TRUST_ROOTS.md](governance/TRUST_ROOTS.md).
+
+| result | class | why |
+|---|---|---|
+| R7-CONFIRM-1 (EQ10 @1s, EQ05 @1s on 7 holdout sessions, v1.15) | **data-ineligible** | re-issued 2026-10-24 under the v1.18 verdict rule ([research/R7_RESULTS.md](research/R7_RESULTS.md)); the earlier verdict "confirmed" is a historical record only |
+| v1.8.0 out-of-time holdout (4 of 4 signals, 2026-05-15 / 05-18) | **development-supported** | pre-registered and pushed first, run by the developer on the developer's machine; no execution separation, no independent review |
+| B8 v2 execution benchmark (REL-04b) | **development-supported** | signed, bound, reproduced in the pinned image by CI ([REPRODUCTION.md](REPRODUCTION.md)); no independent rerun (F7) |
+| REL-05, REL-08 screen, REL-09, REL-10 | **development-supported** (every verdict negative, inconclusive or underpowered) | signed single runs by the developer |
+| known-null v1, v2, v3 (F3) | **rejected** as the gate (v3 failed; the reviewer rejected the method); the F3 acceptance study is **development-supported** on synthetic nulls only | [research/v118/](../research/v118/) |
+| taker, capacity, quoting v2, DeepLOB (v1.16) | **development-supported** negatives | in-sample, no holdout look |
+| stage 7-8 family runs on the synthetic fixture | **exploratory** (synthetic, no claim) | the research loop's demonstration |
+| anything on the free daily route (stage 2 DD1) | **pending** | counts and ranges only, no result |
+
 ## 1. The three deliverables (programme section 9.3)
 
 | | deliverable | inputs in this repository | status |
@@ -32,8 +54,8 @@ by overruling you.
 **Pre-registration and analysis-identity binding (gate F1).** A signed prereg can bind an
 `analysis_identity`: script fingerprints, the `python/src/iap` code-tree hash, commit, data
 versions, family, metrics and thresholds. `prereg_gate.require(..., identity_actual=)` and
-`tools/r7_confirm.py` refuse on any mismatch, and the runner must declare an actor that is not the
-signer and hold no signing key. Code: `iap.agents.analysis_identity`, `tools/prereg_bind_identity.py`;
+`tools/r7_confirm.py` refuse on any mismatch, and the runner declares an actor and holds no signing
+key (tamper evidence, not independence: TRUST_ROOTS.md, "What a signature proves"). Code: `iap.agents.analysis_identity`, `tools/prereg_bind_identity.py`;
 tests: [python/tests/test_analysis_identity.py](../python/tests/test_analysis_identity.py). Question to
 answer: can a changed script, configuration or dataset reuse a prior registration?
 

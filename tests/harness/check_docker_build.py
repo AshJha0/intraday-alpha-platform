@@ -23,7 +23,7 @@ the next best thing, which is what actually catches the bug class:
      bench_all, `../../configs` and `../../data/reference` for the Rust
      workspace tests, `/app/configs` and the MVP config for the Python image's
      `iap.metrics` / `iap.mvp` entrypoints (v1.17 F9: the Java image is
-     retired; its Dockerfile is kept, unbuilt, under archive/java/).
+     retired; its Dockerfile survives only at the git tag archive/java-v1.14.0).
      The C++/Rust build stages are compiled by tests/harness/run_all.sh in the
      same CI run, so their commands are covered there; this script asserts
      their INPUTS, which is the half that was broken.

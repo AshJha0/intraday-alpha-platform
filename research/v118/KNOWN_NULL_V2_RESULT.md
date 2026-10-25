@@ -3,7 +3,7 @@
 Run 2026-10-19 (07:06 BST start, `--workers 2`, IEX ingest running beside it) under the signed prereg
 `research/v118/null_protocol_v2_prereg.json` (bound commit `ee7d86b58b71901d02c2b3dbec39d3016743a24e`), runner actor
 `claude-nullv2-runner` (not the signer). Dataset `data/real/multi7` (`ee4c2187...`, `in_sample`), config sha256
-`44adf823...`. Canonical output: `research/v118/known_null_v2_result.json` (sha256 `70f86a06...a0768f`; 1,000 size
+`44adf823...`. Canonical output: `research/v118/known_null_v2_result.json` (sha256 `70f86a06...a0768f`; since v2.0 stage 11 a release asset of v1.18.0, not a tree file: `python tools/result_artefacts.py fetch research/v118/known_null_v2_result.json`; 1,000 size
 trials and 200 power trials per generator, every seed and permutation recorded). Verdict in the file: **FAIL**.
 
 > This inference rests on G = 7 session clusters. For G <= 5 the known-null protocol reports size, not power.

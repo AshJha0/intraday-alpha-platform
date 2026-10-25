@@ -32,7 +32,7 @@ def environment_key() -> str:
 
 
 def expected_hash(manifest, name):
-    """The pinned hash: a string applies to every environment (the D-76 polish makes the share path CPU-independent); a mapping keyed by platform and Python version remains readable should a documented split ever be needed."""
+    """The pinned hash: a string applies to every environment (the D-85 polish makes the share path CPU-independent); a mapping keyed by platform and Python version remains readable should a documented split ever be needed."""
     pinned = manifest["expected_report_sha256"][name]
     if isinstance(pinned, str):
         return pinned
@@ -57,20 +57,20 @@ def _cpu_summary() -> str:
 
 
 def observed_alternates(manifest, name) -> dict[str, str]:
-    """Hashes seen on an identified CI run but never reproduced on a machine at hand (D-76): recorded, never pinned."""
+    """Hashes seen on an identified CI run but never reproduced on a machine at hand (D-85): recorded, never pinned."""
     return manifest.get("observed_alternate_report_sha256", {}).get(name, {})
 
 
 def assert_pinned(manifest, name, sha, report=None):
     """The run's hash equals the pinned one.  A hash recorded as an observed alternate skips with
     the canonical report and the CPU printed, so the CI log carries what differed and where; any
-    other hash fails with the same print (D-76: the cause is located by diffing reports, never by
+    other hash fails with the same print (D-85: the cause is located by diffing reports, never by
     re-pinning)."""
     pinned = expected_hash(manifest, name)
     if pinned is None:
         pytest.skip(
             f"{name}: no pinned report hash for {environment_key()}; this environment produced {sha} "
-            "(record it in the fixture manifest, D-76)"
+            "(record it in the fixture manifest, D-85)"
         )
     if sha != pinned and report is not None:
         print(f"REPORT-{name}-BEGIN " + canonical_json(report) + f" REPORT-{name}-END")
@@ -79,7 +79,7 @@ def assert_pinned(manifest, name, sha, report=None):
     if sha != pinned and sha in seen:
         pytest.skip(
             f"{name} on {environment_key()}: report hash {sha} is the observed alternate recorded in the "
-            f"fixture manifest ({seen[sha]}); the report and CPU are printed above for D-76"
+            f"fixture manifest ({seen[sha]}); the report and CPU are printed above for D-85"
         )
     assert sha == pinned, (
         f"{name} on {environment_key()}: report hash {sha} differs from the pinned {pinned}"

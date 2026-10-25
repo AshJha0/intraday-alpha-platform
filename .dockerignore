@@ -19,7 +19,6 @@
 # --- build trees (host-absolute paths baked into caches)
 cpp/build/
 rust/target/
-archive/java/out/
 **/__pycache__/
 *.py[cod]
 .pytest_cache/

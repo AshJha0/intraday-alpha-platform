@@ -19,7 +19,11 @@ active ruleset, `protect-main` (id 24455225), targets the default branch with
   `main` before merging), 17 checks (live ruleset read back 2026-10-18 after the owner-approved
   edit): `python`, `integration`, `cpp`, `rust`, `golden`, `deployment`, `CodeQL`, `governance`,
   `advisory`, `rust-pyo3`, `python-slow`, `supply-chain`, `analyze (rust)` (the CodeQL matrix
-  entry), `python-312`, `agent-evals`, `docs` and `reproducible-build`. `cpp-sanitizers` stopped
+  entry), `python-312`, `agent-evals`, `docs` and `reproducible-build`. Since v2.0 stage 11 the
+  job behind `advisory` is `lint-and-secrets` (gitleaks, ruff, import-linter; all blocking) and
+  `advisory` is a transitional alias job until the owner renames the context
+  ([REPO_SETTINGS.md](REPO_SETTINGS.md) section 1, which carries the matrix with the risk each
+  check covers and is pinned to the live ruleset snapshot by a test). `cpp-sanitizers` stopped
   being required on 2026-10-18 (D5(a), C++ parity-only; the job still runs and is reported);
   `java` is not required (archived in v1.15);
 - `non_fast_forward` (no force-push) and `deletion` (no branch deletion).
@@ -76,11 +80,11 @@ blast radius:
 
 | Change class | Paths (indicative) | Review requirement |
 |---|---|---|
-| **Alpha / signal logic** | `python/src/iap/alpha/`, `cpp/src/alpha/`, `rust/alpha/`, `archive/java/.../alpha/`, `configs/strategies/` | 1 quant reviewer **+ 1 owner of each production language touched**; golden vectors regenerated only with an explicit "golden change" note explaining why (`python/tools/make_golden.py` runs are deliberate acts, never side effects). |
-| **Risk engine / limits** | `rust/risk/`, `archive/java/.../risk/`, `python/src/iap/risk/`, `configs/risk/risk.json`, risk contracts in `schemas/` | 2 reviewers, one of whom is the risk owner. The three engines are held byte-identical by `expected_risk_*` (`API_TRADING.md` §1); a rule change is a Rust change first, then a golden regeneration, then both ports. Fail-closed semantics may never be weakened in the same PR that adds a feature. Limit changes (`configs/risk/risk.json`) additionally require the audit-log entry of §3 *before* deploy. |
-| **Execution / SOR** | `cpp/src/execution/`, `cpp/src/sor/`, `archive/java/.../execution/`, `python/src/iap/execution/`, `rust/venue/`, `configs/execution/execution.json` | 1 execution owner + 1 second reviewer; determinism proof: `tests/harness/run_golden.sh` parity table attached to the PR. |
+| **Alpha / signal logic** | `python/src/iap/alpha/`, `cpp/src/alpha/`, `rust/alpha/`, the git tag `archive/java-v1.14.0`, `configs/strategies/` | 1 quant reviewer **+ 1 owner of each production language touched**; golden vectors regenerated only with an explicit "golden change" note explaining why (`python/tools/make_golden.py` runs are deliberate acts, never side effects). |
+| **Risk engine / limits** | `rust/risk/`, the git tag `archive/java-v1.14.0`, `python/src/iap/risk/`, `configs/risk/risk.json`, risk contracts in `schemas/` | 2 reviewers, one of whom is the risk owner. The three engines are held byte-identical by `expected_risk_*` (`API_TRADING.md` §1); a rule change is a Rust change first, then a golden regeneration, then both ports. Fail-closed semantics may never be weakened in the same PR that adds a feature. Limit changes (`configs/risk/risk.json`) additionally require the audit-log entry of §3 *before* deploy. |
+| **Execution / SOR** | `cpp/src/execution/`, `cpp/src/sor/`, the git tag `archive/java-v1.14.0`, `python/src/iap/execution/`, `rust/venue/`, `configs/execution/execution.json` | 1 execution owner + 1 second reviewer; determinism proof: `tests/harness/run_golden.sh` parity table attached to the PR. |
 | **Contracts & schemas** | `schemas/` (17 JSON Schemas + `sql/iap_v2.sql`), `python/src/iap/contracts/`, `PLATFORM_CONVENTIONS.md` §1–§2, §13 | 2 reviewers + version bump + `MIGRATIONS.md` entry + regenerated `expected_contracts_examples.json`; all four languages updated in the same PR or the PR is blocked. |
-| **Lifecycle policy / registry** | `configs/strategies/lifecycle.json`, `python/src/iap/lifecycle/`, `archive/java/.../lifecycle/`, `rust/lifecycle/`, `research/alpha_registry.json`, `research/lifecycle_transitions.jsonl` | 1 quant reviewer + 1 risk reviewer; a threshold change is a `lifecycle.json` x-version bump + `expected_lifecycle.json` regeneration; a state change needs its ledger entry id (§2). The registry and the log are never hand-edited. |
+| **Lifecycle policy / registry** | `configs/strategies/lifecycle.json`, `python/src/iap/lifecycle/`, the git tag `archive/java-v1.14.0`, `rust/lifecycle/`, `research/alpha_registry.json`, `research/lifecycle_transitions.jsonl` | 1 quant reviewer + 1 risk reviewer; a threshold change is a `lifecycle.json` x-version bump + `expected_lifecycle.json` regeneration; a state change needs its ledger entry id (§2). The registry and the log are never hand-edited. |
 | **Deployment / observability** | `deployment/`, `docs/runbooks/`, `tests/harness/`, `.github/` | 1 platform reviewer (`CODEOWNERS`); the deployment validation used in CI must pass — `python3 tests/harness/check_deployment.py`, i.e. `promtool check rules` + `check config` + `promtool test rules`, `docker compose config -q`, every Dockerfile `COPY` source resolving in a clean build context, k8s manifests parsing and dry-running, the generated ConfigMaps matching `configs/`, every rule and dashboard expression naming a metric a producer exports, and the Java golden gate covering every `*GoldenTest` class. |
 | Everything else | docs, research scripts, benchmarks | 1 reviewer. |
 

@@ -44,7 +44,7 @@ cd python && PYTHONPATH=src python3 -m iap.mvp run                 # -> ../data/
 Set-Location python; $env:PYTHONPATH = "src"; python -m iap.mvp run     # -> ..\data\mvp\<run_id>\
 ```
 
-**Java paper vertical** (`archive/java/paper.sh` (archived, frozen at v1.14.0), state directory `--state-dir` /
+**Java paper vertical** (`archive/java/paper.sh (at git tag archive/java-v1.14.0)` (archived, frozen at v1.14.0), state directory `--state-dir` /
 `$IAP_STATE_DIR`, `/data/state` in the deployments; `RUNBOOK_shadow_deployment.md`
 §4–§5, PLATFORM_CONVENTIONS.md §12.3):
 
@@ -91,7 +91,7 @@ replays only from the v1.4.0 tag. The same holds across v1.14.0, whose
 and `research/alpha_registry.json` under `/app` — add `--repo-root /app`.
 
 For a Java session the equivalent is a second run over the same input and
-configuration: `bash archive/java/paper.sh` on the same vector produces the same
+configuration: `bash archive/java/paper.sh (at git tag archive/java-v1.14.0)` on the same vector produces the same
 `decision_traces.jsonl` bytes and the same `trace.digest`
 (`PaperTraceTest`: emission is a pure function of the event stream).
 Re-derive the digest of an archived file with `TraceDigest.ofJsonl` (Java)

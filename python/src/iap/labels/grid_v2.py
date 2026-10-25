@@ -34,10 +34,11 @@ row group per input file): ``instrument_id``, ``anchor_ts``,
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 import pyarrow as pa
 
-from iap.features.context import InstrumentContext
 from iap.labels.labels import LABEL_MAX_AGE_FLOOR_NS, MidSeries, max_sample_age
 from iap.labels.labels_v2 import (
     HORIZON_V2_ORDER,
@@ -45,6 +46,11 @@ from iap.labels.labels_v2 import (
     label_columns_v2,
     session_close_ts,
 )
+
+if (
+    TYPE_CHECKING
+):  # S3: labels never imports features at run time (features -> labels is the layer order)
+    from iap.features.context import InstrumentContext
 
 __all__ = [
     "GRID_V2_VERSION",
