@@ -15,8 +15,7 @@ import subprocess
 import sys
 
 import pytest
-from runner import redact, results, run, verify
-from runner_fixtures import IMAGE, World, git
+from runner_fixtures import IMAGE, World, git, redact, results, run, verify
 
 
 @pytest.fixture

@@ -18,7 +18,10 @@ from conftest import REPO_ROOT
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 sys.path.insert(0, str(REPO_ROOT / "python" / "tests" / "isolation"))
 
+from runner import redact, results, run, verify  # noqa: E402
 from sealed_fixtures import keypair, load_tool, make_partition, sign_document  # noqa: E402
+
+__all__ = ["IMAGE", "World", "git", "redact", "results", "run", "verify"]
 
 IMAGE = "sha256:" + "cd" * 32
 
