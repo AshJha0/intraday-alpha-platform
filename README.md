@@ -324,7 +324,7 @@ xfailed), cpp the ctest total, rust the passes of `cargo test --workspace`
 golden over 12 targets in the source tree). Since v2.0 stage 11 (S2) the per-PR
 `rust` job tests the `risk` and `features` crates only and the workspace runs
 weekly (`weekly-structural.yml`), so a PR run's derived rust count is lower than
-the 376 of this table (reported as drift, defect D-72); every crate's golden
+the 376 of this table (reported as drift, defect D-79); every crate's golden
 target still runs per PR in the `golden` job.
 
 ```

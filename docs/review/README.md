@@ -64,4 +64,4 @@ Linux/macOS (the script is portable but was run on Windows only).
 | S5: simulator traps pinned or documented; the `test_maker_real_parallel` flake pinned | `python/tests/execution/test_simulator_traps.py`, [SIMULATOR_CORRECTNESS.md](SIMULATOR_CORRECTNESS.md) section 5 |
 | G1/G2: the four controls, evidence classes, no "confirmed" claim on main | [../governance/TRUST_ROOTS.md](../governance/TRUST_ROOTS.md), [../REVIEW_PACK.md](../REVIEW_PACK.md) section 0, [../SHOWCASE.md](../SHOWCASE.md) |
 | runbook and the research-loop memory budget | [../RUNBOOK_v2.md](../RUNBOOK_v2.md), `python/tests/architecture/test_research_loop_memory.py` |
-| defects D-68 to D-75 | [DEFECT_REGISTER_v1.19.md](DEFECT_REGISTER_v1.19.md) |
+| defects D-75 to D-83 (D-83: the CI lock lacks tzdata, recorded only) | [DEFECT_REGISTER_v1.19.md](DEFECT_REGISTER_v1.19.md) |

@@ -8,7 +8,7 @@ with the measurement that motivates it.
 
 Peak RSS: ``resource.getrusage(RUSAGE_SELF).ru_maxrss`` (KB on Linux, bytes on macOS) or, on
 Windows, ``GetProcessMemoryInfo().PeakWorkingSetSize``.  Skips while ``iap.research.loop`` is not in
-the tree (D-73).
+the tree (D-80).
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import pytest
 from conftest import REPO_ROOT
 
 pytest.importorskip(
-    "iap.research.loop", reason="iap.research.loop lands with the stage 7-8 PR (D-73)"
+    "iap.research.loop", reason="iap.research.loop lands with the stage 7-8 PR (D-80)"
 )
 
 RSS_BUDGET_MB = (

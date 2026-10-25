@@ -76,7 +76,7 @@ venue behaviour.
 - That the Level 1 fill model generalises to held-out days with real orders
   (Level 2, not reachable under D4(a)).
 
-## 5. Traps pinned in stage 11 (S5; `tests/execution/test_simulator_traps.py`, defect D-75)
+## 5. Traps pinned in stage 11 (S5; `tests/execution/test_simulator_traps.py`, defect D-82)
 
 Each is a modelling limitation stated as a test of what the simulator DOES, so a change is visible;
 none is validated against real fills.
