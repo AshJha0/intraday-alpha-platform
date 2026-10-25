@@ -37,10 +37,9 @@ Rust trees are frozen copies under the policy of [POLYGLOT.md](POLYGLOT.md).
 
 Two mechanisms enforce the layering, and they agree by construction:
 
-- `python/.importlinter` (ten contracts; the `lint-and-secrets` CI job runs `lint-imports`) and
-  `python/tests/architecture/test_layering.py`, an AST scan that parses the same file so the fast
-  suite fails on the same violation (both arrive with the stage 11 pull request #391, open as of
-  2026-10-25);
+- [`python/.importlinter`](../python/.importlinter) (ten contracts; the `lint-and-secrets` CI job
+  runs `lint-imports`) and [`python/tests/architecture/test_layering.py`](../python/tests/architecture/test_layering.py),
+  an AST scan that parses the same file so the fast suite fails on the same violation;
 - [`python/tests/test_import_policy.py`](../python/tests/test_import_policy.py): no module of a
   guarded package (`risk`, `execution`, `orderbook`, `portfolio`, `mvp`, `core`, `marketdata`,
   `features`, `alpha`, `replay`, `trace`, `monitoring`, `data`) imports a network client, a server

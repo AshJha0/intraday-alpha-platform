@@ -10,7 +10,7 @@ open when this page was written (2026-10-25) and say so in their heading.
 The v1.x engineering cookbook (200 recipes on the intraday engines, the C++ and Rust ports and the
 goldens) is frozen at [../COOKBOOK.md](../COOKBOOK.md); its recipes still run but describe the
 v1.x flows, not the v2.0 programme. Method: [LEARN.md](LEARN.md). Package map:
-[ARCHITECTURE_v2.md](ARCHITECTURE_v2.md). Operator procedures: `RUNBOOK_v2.md` (pull request #391, open as of 2026-10-25).
+[ARCHITECTURE_v2.md](ARCHITECTURE_v2.md). Operator procedures: [RUNBOOK_v2.md](RUNBOOK_v2.md).
 
 Recipes: 0 the environment · 1 the research loop on a family · 2 add a family specification ·
 3 a forecast record and the engine on a fixture · 4 an E5 report · 5 a dataset's integrity evidence
@@ -383,7 +383,7 @@ them, and no session may. The runbooks are the procedure; this recipe only says 
   repository settings it needs (the `sealed` environment with the owner as required reviewer, the
   `results` branch ruleset) are [governance/REPO_SETTINGS.md](governance/REPO_SETTINGS.md) section 7
   and are not yet set.
-- **Approve a registered run**: `RUNBOOK_v2.md` section 5 (pull request #391, open as of 2026-10-25; the preconditions
+- **Approve a registered run**: [RUNBOOK_v2.md](RUNBOOK_v2.md) section 5 (the preconditions
   anyone can verify without a sealed read, the approval, where the result lands and how to verify
   it). The result's class is *mechanically isolated* while the owner holds every credential.
 
