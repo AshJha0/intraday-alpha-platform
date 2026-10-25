@@ -107,8 +107,8 @@ cd cpp && bash build.sh && ctest --test-dir build --output-on-failure -R 'Replay
 # Rust — deterministic replay demo over the golden vectors
 cd rust && cargo run --release --bin demo
 
-# Java — archived (archive/java/, frozen at v1.14.0, not built; v1.17 retired its image)
-# cd archive/java && bash build.sh && java -cp out/main com.iap.replay.Demo ../../tests/golden
+# Java — archived (git tag archive/java-v1.14.0, frozen at v1.14.0, not built; v1.17 retired its image)
+# cd git tag archive/java-v1.14.0 && bash build.sh && java -cp out/main com.iap.replay.Demo ../../tests/golden
 ```
 
 ```powershell

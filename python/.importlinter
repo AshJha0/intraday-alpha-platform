@@ -1,0 +1,119 @@
+# Architecture contracts (v2.0 stage 11, S3; v1.19 plan section 2.3 / 5 "import-linter with contracts").
+#
+# Run from python/:   PYTHONPATH=src lint-imports            (CI: the lint-and-secrets job, import-linter pinned)
+# The same contracts are enforced without the dependency by
+# tests/architecture/test_layering.py (an AST scan that parses THIS file), so the fast suite fails
+# on the same violation the linter would report.
+#
+# allow_indirect_imports = True on a contract means it binds DIRECT imports only.  The transitive
+# reach is honest and recorded: every package except core, contracts, ml, risk, reference, io,
+# orderbook, experiment and reports reaches iap.research / iap.agents / iap.llm through
+# mlops -> agents, models -> research and validation.  Tightening a contract to indirect imports is
+# a later step that needs those three edges broken (docs/ARCHITECTURE.md, "Layering").
+# exclude_type_checking_imports: an import under `if TYPE_CHECKING:` is an annotation, not a run-time
+# dependency (labels/grid_v2.py names features.InstrumentContext that way).
+
+[importlinter]
+root_package = iap
+include_external_packages = False
+exclude_type_checking_imports = True
+
+# ---- the five contracts of the carried text (plan section 5, S3) --------------------------------
+
+[importlinter:contract:core-independent]
+name = iap.core imports neither research, agents nor llm (D1: the guard hook is registrable, the policy lives above)
+type = forbidden
+source_modules =
+    iap.core
+forbidden_modules =
+    iap.research
+    iap.agents
+    iap.llm
+
+[importlinter:contract:contracts-independent]
+name = iap.contracts imports neither research, agents nor llm
+type = forbidden
+source_modules =
+    iap.contracts
+forbidden_modules =
+    iap.research
+    iap.agents
+    iap.llm
+
+[importlinter:contract:marketdata-independent]
+name = iap.marketdata imports neither research, agents nor llm (direct)
+type = forbidden
+source_modules =
+    iap.marketdata
+forbidden_modules =
+    iap.research
+    iap.agents
+    iap.llm
+allow_indirect_imports = True
+
+[importlinter:contract:features-independent]
+name = iap.features imports neither research, agents nor llm (direct)
+type = forbidden
+source_modules =
+    iap.features
+forbidden_modules =
+    iap.research
+    iap.agents
+    iap.llm
+allow_indirect_imports = True
+
+[importlinter:contract:execution-independent]
+name = iap.execution imports neither research, agents nor llm (direct)
+type = forbidden
+source_modules =
+    iap.execution
+forbidden_modules =
+    iap.research
+    iap.agents
+    iap.llm
+allow_indirect_imports = True
+
+# ---- stage 11 additions (U0 section 3, stage 11): the engine packages never import the research loop
+
+[importlinter:contract:alpha-no-research]
+name = iap.alpha does not import iap.research (direct)
+type = forbidden
+source_modules =
+    iap.alpha
+forbidden_modules =
+    iap.research
+allow_indirect_imports = True
+
+[importlinter:contract:portfolio-no-research]
+name = iap.portfolio does not import iap.research (direct)
+type = forbidden
+source_modules =
+    iap.portfolio
+forbidden_modules =
+    iap.research
+allow_indirect_imports = True
+
+# iap.ml (stage 7-8, PR #389) is not in this tree yet; import-linter refuses a contract on a missing
+# package.  Add, when it lands (the architecture test asserts the pairing):
+#   [importlinter:contract:ml-no-research]  type = forbidden  source_modules = iap.ml
+#   forbidden_modules = iap.research  allow_indirect_imports = True
+
+# ---- the two cycles the carried text names, broken in this stage and kept broken ------------------
+
+[importlinter:contract:labels-below-features]
+name = iap.labels does not import iap.features at run time (features -> labels is the layer order; grid_v2 names the context type under TYPE_CHECKING)
+type = forbidden
+source_modules =
+    iap.labels
+forbidden_modules =
+    iap.features
+allow_indirect_imports = True
+
+[importlinter:contract:execution-below-tca]
+name = iap.execution does not import iap.tca (tca measures execution; the market timeline and markout live in iap.execution since stage 11)
+type = forbidden
+source_modules =
+    iap.execution
+forbidden_modules =
+    iap.tca
+allow_indirect_imports = True

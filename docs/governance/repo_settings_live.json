@@ -1,0 +1,65 @@
+{
+  "actions_workflow_permissions": {
+    "can_approve_pull_request_reviews": false,
+    "default_workflow_permissions": "read"
+  },
+  "branch": "main",
+  "fetched_at": "2026-10-25T16:05:00Z",
+  "private_vulnerability_reporting": false,
+  "pull_request": {
+    "allowed_merge_methods": [
+      "merge",
+      "squash",
+      "rebase"
+    ],
+    "dismiss_stale_reviews_on_push": false,
+    "require_code_owner_review": false,
+    "require_extra_approval_for_unattributed_changes": false,
+    "require_last_push_approval": false,
+    "required_approving_review_count": 0,
+    "required_review_thread_resolution": false
+  },
+  "repo": "AshJha0/intraday-alpha-platform",
+  "required_status_checks": [
+    "CodeQL",
+    "advisory",
+    "agent-evals",
+    "analyze (rust)",
+    "cpp",
+    "deployment",
+    "docs",
+    "golden",
+    "governance",
+    "integration",
+    "python",
+    "python-312",
+    "python-slow",
+    "reproducible-build",
+    "rust",
+    "rust-pyo3",
+    "supply-chain"
+  ],
+  "rule_types": [
+    "deletion",
+    "non_fast_forward",
+    "pull_request",
+    "required_status_checks"
+  ],
+  "rulesets": [
+    {
+      "enforcement": "active",
+      "name": "protect-main",
+      "target": "branch",
+      "updated_at": "2026-10-18T12:55:47.808+01:00"
+    }
+  ],
+  "security_and_analysis": {
+    "dependabot_security_updates": "enabled",
+    "secret_scanning": "enabled",
+    "secret_scanning_non_provider_patterns": "disabled",
+    "secret_scanning_push_protection": "enabled",
+    "secret_scanning_validity_checks": "disabled"
+  },
+  "strict_required_status_checks_policy": true,
+  "x-version": 1
+}

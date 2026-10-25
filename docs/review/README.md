@@ -52,3 +52,16 @@
 Not covered: the signature verifier (reviewer session A), REL-04b and REL-08 reproduction (placeholders
 in [../REVIEW_PACK.md](../REVIEW_PACK.md) section 3), Rust/C++ (no local toolchain; CI only),
 Linux/macOS (the script is portable but was run on Windows only).
+
+## v2.0 stage 11 (S1-S5, G1-G2, runbook)
+
+| item | file |
+|---|---|
+| S1: `archive/java` removed (git tag `archive/java-v1.14.0`); the two known-null result blobs (61 MB) are release assets with their hashes in a manifest and a retrieval tool | [../../research/v118/RESULT_ARTEFACTS.json](../../research/v118/RESULT_ARTEFACTS.json), `tools/result_artefacts.py`, `python/tests/test_result_artefacts.py` |
+| S3: import contracts (import-linter + AST architecture test), two cycles broken, 9 cycles recorded | `python/.importlinter`, `python/tests/architecture/test_layering.py`, [../ARCHITECTURE.md](../ARCHITECTURE.md) section 16.1 |
+| S4: required-check matrix regenerated from the live ruleset, each context justified by risk; `advisory` renamed `lint-and-secrets` with a transitional alias; owner actions | [../governance/REPO_SETTINGS.md](../governance/REPO_SETTINGS.md) section 1, [../governance/repo_settings_live.json](../governance/repo_settings_live.json), `tools/repo_settings_snapshot.py` |
+| S2: C++ benchmarks, coverage and sanitizers and the Rust workspace moved to a weekly workflow; two more Rust crates frozen | `.github/workflows/weekly-structural.yml`, [../POLYGLOT.md](../POLYGLOT.md) |
+| S5: simulator traps pinned or documented; the `test_maker_real_parallel` flake pinned | `python/tests/execution/test_simulator_traps.py`, [SIMULATOR_CORRECTNESS.md](SIMULATOR_CORRECTNESS.md) section 5 |
+| G1/G2: the four controls, evidence classes, no "confirmed" claim on main | [../governance/TRUST_ROOTS.md](../governance/TRUST_ROOTS.md), [../REVIEW_PACK.md](../REVIEW_PACK.md) section 0, [../SHOWCASE.md](../SHOWCASE.md) |
+| runbook and the research-loop memory budget | [../RUNBOOK_v2.md](../RUNBOOK_v2.md), `python/tests/architecture/test_research_loop_memory.py` |
+| defects D-75 to D-83 (D-83: the CI lock lacks tzdata, recorded only) | [DEFECT_REGISTER_v1.19.md](DEFECT_REGISTER_v1.19.md) |

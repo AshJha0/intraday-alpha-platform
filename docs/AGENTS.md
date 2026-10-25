@@ -26,7 +26,8 @@ workflow, the reserve evaluator, the read-only MCP server. They are the
 governance the LLM agents act through; [API_AGENTS.md](../API_AGENTS.md) lists
 them. v1.18 added to them the analysis-identity binding of signed pre-declarations
 (`iap.agents.analysis_identity`, [governance/ANALYSIS_IDENTITY.md](governance/ANALYSIS_IDENTITY.md)): a runner
-must declare an actor that is not the signer and hold no signing key. REL-16 monitoring
+declares an actor and holds no signing key, which is tamper evidence, not independence
+([governance/TRUST_ROOTS.md](governance/TRUST_ROOTS.md), "What a signature proves"). REL-16 monitoring
 (`iap.monitoring`, [MONITORING_POLICY.md](MONITORING_POLICY.md)) lets an explainer
 use only code-computed facts and rejects text that names a different state; no LLM decides a
 monitoring state. No agent promoted a signal in v1.18.

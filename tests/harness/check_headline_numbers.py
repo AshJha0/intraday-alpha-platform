@@ -91,7 +91,11 @@ EXTRA_COUNT_SOURCES = {
     "docs/diagrams/golden_topology.mmd": ROOT / "docs" / "diagrams" / "golden_topology.mmd",
 }
 
-LANGS = ("python", "cpp", "rust")  # Java archived in v1.15 (archive/java/)
+LANGS = (
+    "python",
+    "cpp",
+    "rust",
+)  # Java archived in v1.15, removed in v2.0 stage 11 (git tag archive/java-v1.14.0)
 
 PLATFORM_FAILURES: list[str] = []
 RESEARCH_STALE: list[str] = []

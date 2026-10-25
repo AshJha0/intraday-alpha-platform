@@ -24,7 +24,7 @@
 #           integration-test file (golden_marketdata, golden_book,
 #           golden_features, golden_alpha, golden_risk, golden_risk_fuzz, golden_venue_queue,
 #           golden_replay, golden_canonical_json, golden_trace, golden_lifecycle)
-#   (java: archived in v1.15 under archive/java/, frozen at v1.14.0 — not run)
+#   (java: archived in v1.15, frozen at v1.14.0, removed from the tree in v2.0 stage 11; git tag archive/java-v1.14.0 — not run)
 #   The risk differential-fuzz corpus (tests/golden/risk_fuzz) is replayed by
 #   golden_risk_fuzz / test_risk_fuzz_golden.py.
 #

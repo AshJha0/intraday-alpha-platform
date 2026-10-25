@@ -124,13 +124,13 @@ canonical-JSON byte parity the contracts / lifecycle goldens pin.
 
 ## Java — why there is NO Maven build
 
-> **Archived in v1.15** (G-P1-3): the Java engine lives in `archive/java/`,
+> **Archived in v1.15** (G-P1-3): the Java engine lives in the git tag `archive/java-v1.14.0`,
 > frozen at v1.14.0, and CI no longer builds or tests it. See
-> [archive/java/README.md](../archive/java/README.md). The notes below
+> the git tag `archive/java-v1.14.0`. The notes below
 > describe how it was built.
 
 ```bash
-cd archive/java && bash build.sh && bash test.sh    # at v1.14.0: 575 tests; the seventeen *GoldenTest classes are 124 of them
+# removed from the tree in v2.0 stage 11 (git tag archive/java-v1.14.0): cd git tag archive/java-v1.14.0 && bash build.sh && bash test.sh    # at v1.14.0: 575 tests; the seventeen *GoldenTest classes are 124 of them
 ```
 
 **Maven/Gradle are deliberately not used: Maven Central is unreachable from

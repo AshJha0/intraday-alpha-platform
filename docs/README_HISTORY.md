@@ -1,5 +1,9 @@
 # README history and reference sections
 
+> **Historical record, frozen (v2.0 stage 11, G2).** Nothing on this page is current status; verdict
+> words such as "confirmed" are what a release said at the time. The current evidence class of every
+> result is [REVIEW_PACK.md](REVIEW_PACK.md) section 0.
+
 The material on this page was moved out of [README.md](../README.md) on
 2026-10-15 (v1.17 item G1) so that the README reads in a few minutes. Nothing
 was deleted or reworded: each section below is the README text as it stood at

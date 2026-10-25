@@ -26,21 +26,31 @@ production-ready because of backtest Sharpe alone**, and every result,
 negative ones first, is written down with the artefact that produced it.
 <!-- source: README.md, opening paragraphs and "What this is, and what it is not" -->
 
-## What is proven, and what is not
+## What the evidence supports, and what it does not
 
-**Proven (pre-registered, one look, unseen data).**
+Every result carries an evidence class (U0 section 10; the table of all results is
+[REVIEW_PACK.md](REVIEW_PACK.md) section 0): *independently confirmed*, *mechanically isolated*,
+*development-supported*, *exploratory*, *rejected*, *data-ineligible*, *pending*. **Nothing in this
+repository is in the first two classes** (2026-10-25): no registered run has been executed under
+separated custody and no independent party has reproduced a result.
 
-- Two microstructure signals predict on sessions nobody had seen. The
-  owner-signed confirmatory pre-registration R7-CONFIRM-1 (re-issued 2026-10-24 as `ineligible` under the v1.18 verdict rule; see R7_RESULTS.md) ran once on 7
-  unseen Nasdaq ITCH holdout sessions (AAPL, MSFT, QQQ): EQ10 @1s holdout
-  IC +0.0838, HAC t 13.66; EQ05 @1s IC +0.0409, HAC t 13.20; threshold
-  4.432; 7 of 7 sessions positive for both. Verdict: **both confirmed**
-  (v1.15.0, 2026-10-13).
-  <!-- source: docs/research/R7_RESULTS.md, "Verdicts" table (holdout IC, HAC t, threshold 4.432, sessions > 0) -->
-- An earlier out-of-time holdout (v1.8.0): six hypotheses pre-registered
-  and pushed before any 2026 feature existed; 4 of 4 confirmatory signals
-  confirmed on 2026-05-15 and 2026-05-18, both controls behaved as
-  registered, no run traded at 1x costs.
+**Development-supported, at most (pre-registered, one look, run by the developer).**
+
+- R7-CONFIRM-1 is **data-ineligible**. The owner-signed confirmatory
+  pre-registration ran once (v1.15.0, 2026-10-13) on 7 unseen Nasdaq ITCH
+  holdout sessions (AAPL, MSFT, QQQ) and reported EQ10 @1s holdout
+  IC +0.0838, HAC t 13.66 and EQ05 @1s IC +0.0409, HAC t 13.20 against a
+  threshold of 4.432, 7 of 7 sessions positive for both; on 2026-10-24 the
+  verdict was re-issued as `ineligible` under the v1.18 verdict rule
+  (see R7_RESULTS.md). The 2026-10-13 verdict "confirmed" is a historical
+  record, not the current one.
+  <!-- source: docs/research/R7_RESULTS.md, "Verdicts" table (holdout IC, HAC t, threshold 4.432, sessions > 0) and the 2026-10-24 re-issue -->
+- An earlier out-of-time holdout (v1.8.0) is **development-supported**: six
+  hypotheses pre-registered and pushed before any 2026 feature existed; 4 of 4
+  confirmatory signals passed their registered thresholds on 2026-05-15 and
+  2026-05-18, both controls behaved as registered, no run traded at 1x costs.
+  The run was the developer's, on the developer's machine, with no execution
+  separation and no independent review.
   <!-- source: README.md at v1.16.0 ("Out-of-time holdout (v1.8.0)"), now docs/README_HISTORY.md §1; docs/index.html "Out-of-time holdout" line -->
 - The engineering holds: three independent implementations of one pinned
   semantics, held identical by golden tests, and a deterministic loop whose
@@ -49,7 +59,7 @@ negative ones first, is written down with the artefact that produced it.
 **Not proven: monetisation. The negative results, stated plainly.**
 
 - **Predictive is not tradable (v1.15).** At the primary 1x cost the net
-  P&L of both confirmed signals is 0 (gross, cost, net, Sharpe and drawdown
+  P&L of both R7 signals is 0 (gross, cost, net, Sharpe and drawdown
   all 0.0 bp): the registered verdict is IC-only and says nothing about
   monetisation.
   <!-- source: docs/research/R7_RESULTS.md, "Net P&L (descriptive only)" -->

@@ -1,5 +1,11 @@
 # LEARN.md — A Guided Tour of the Intraday Alpha Platform
 
+> **Frozen (v2.0 stage 11, G2).** This tour is complete at §200 and gets no new sections: a new
+> lesson replaces an old one, and the numbers quoted here are the record of the release that
+> produced them (the current status is README.md; the evidence class of every result is
+> [docs/REVIEW_PACK.md](docs/REVIEW_PACK.md) section 0). The Java recipes refer to the git tag
+> `archive/java-v1.14.0`; that tree is no longer in the checkout.
+
 This document walks through the entire platform the way a textbook would:
 concepts first, then how this repository implements them, always with the
 repo's *real, verified numbers* as worked examples. Everything cited here can
@@ -76,7 +82,7 @@ Three reading paths, depending on why you are here:
 
 A note on Java. The sections below often mention a Java engine or the Java
 paper-trading platform. Since v1.15 that engine is archived, unchanged, in
-`archive/java/` (frozen at v1.14.0) and CI runs parity across Python, C++
+the git tag `archive/java-v1.14.0` (frozen at v1.14.0) and CI runs parity across Python, C++
 and Rust only; where a section says "four languages" it describes the
 platform as it was when the section was written.
 
@@ -3132,8 +3138,8 @@ state refers to.
 `checkpointHasOneCommitPointVerifiedOnResume`,
 `stopRequestCheckpointsOnTheTradingThreadAndResumes`,
 `killLatchesImmediatelyAndIsNeverDropped`) ran in CI until v1.15 archived
-the Java engine to `archive/java/`; with a JDK they still run there,
-`cd archive/java && bash build.sh && bash test.sh`. The Python half runs anywhere:
+the Java engine to the git tag `archive/java-v1.14.0`; with a JDK they still run there,
+`cd git tag archive/java-v1.14.0 && bash build.sh && bash test.sh`. The Python half runs anywhere:
 
 ```bash
 cd python && PYTHONPATH=src python3 -m pytest -q tests/test_research_store_safety.py
@@ -4568,7 +4574,7 @@ moved", v1.14 by "everything moved for a stated reason".
   trust roots, blocking supply-chain audits, and the 15c3-5 control set.
 - **Later:** archiving the frozen Java copy, and switching the opt-in
   execution options on in the v2 maker and quoting pre-registrations.
-  Both were done in v1.15 (`archive/java/`, `configs/prereg/v2.json`).
+  Both were done in v1.15 (the git tag `archive/java-v1.14.0`, `configs/prereg/v2.json`).
 
 The 15c3-5 controls were planned for "later" and shipped in v1.14 anyway.
 The argument for waiting was that a pre-trade check guarding a simulator
@@ -8284,7 +8290,7 @@ for is the realism applied.
 release you can trust, and what do you remove?
 
 **Retire.** Java left the release in v1.17 (decision N7, closed 2026-10-15):
-`archive/java/` holds the code frozen at v1.14.0, unbuilt, and its risk engine
+the git tag `archive/java-v1.14.0` holds the code frozen at v1.14.0, unbuilt, and its risk engine
 is kept only as the byte-identical mirror of the Rust one. Its operational
 role passed to `iap.metrics` (`python -m iap.metrics serve`): a stdlib
 Prometheus exposition on :8080 with `/metrics`, `/health`, `/ready` and

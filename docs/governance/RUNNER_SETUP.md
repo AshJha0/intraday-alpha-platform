@@ -35,12 +35,17 @@ the SHA-256 GitHub prints, then:
 cd C:\actions-runner
 .\config.cmd --url https://github.com/AshJha0/intraday-alpha-platform --token <registration token> `
   --name iap-runner-ws --labels self-hosted,windows,iap-runner --runnergroup "sealed" `
-  --work _work --replace --runasservice --windowslogonaccount iap-runner --windowslogonpassword <password of iap-runner>
+  --work _work --replace --runasservice --windowslogonaccount iap-runner
 ```
 
-`--runasservice` with `--windowslogonaccount iap-runner` installs the Windows service under that account
-(`.\svc.cmd status` / `start` / `stop` manage it). The labels must be exactly those the workflow asks for
-(`runs-on: [self-hosted, windows, iap-runner]`). Grant `iap-runner` "Log on as a service" if the installer asks.
+`--runasservice` with `--windowslogonaccount iap-runner` installs and starts the Windows service
+(`actions.runner.AshJha0-intraday-alpha-platform.iap-runner-ws`) under that account. Omit
+`--windowslogonpassword`: `config.cmd` then prompts for the password, which keeps it out of the shell
+history. There is no `svc.cmd` on Windows (`svc.sh` exists only on Linux and macOS runners); manage the
+service with PowerShell: `Get-Service actions.runner.*`, `Stop-Service` / `Start-Service` on that name,
+or `services.msc`. The labels must be exactly those the workflow asks for
+(`runs-on: [self-hosted, windows, iap-runner]`). Grant `iap-runner` "Log on as a service" if the installer asks
+(stage 11 correction, G2: the earlier text named `.\svc.cmd`, which the owner found absent on 2026-10-25).
 
 ## 4. Runner group and policy (GitHub, organisation or repository settings)
 
@@ -77,4 +82,6 @@ side. The runner's private cache is `C:\iap-sealed\runner\cache` (owned by `iap-
 
 The `iap-runner` password (in the password manager, never in the repository or an environment), the runner's
 registration (re-run `config.cmd --replace` after a reinstall), and the decision to approve each run. Rotating
-the account password means `.\config.cmd remove` and re-registering with the new one.
+the account password means `Stop-Service actions.runner.*`, `.\config.cmd remove --token <removal token>` and
+re-registering with `--runasservice --windowslogonaccount iap-runner` (the password is prompted for, never passed
+on the command line); check with `Get-Service actions.runner.*` that the service is back and running.

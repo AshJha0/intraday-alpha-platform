@@ -256,8 +256,11 @@ iap/
                    the session series with the three session kinds; the
                    economic screen; the six-branch decision tree; the
                    prohibited-inflation checks).
-  tca/             The TCA reference (API_PORTFOLIO_TCA.md §2): fills.py
-                   (MarketTimeline, ParentOrder, fill records), tca.py
+  tca/             The TCA reference (API_PORTFOLIO_TCA.md §2): fills.py and
+                   markout.py (compatibility names since v2.0 stage 11: the
+                   market timeline, fill records and markout analysis live in
+                   execution/market_timeline.py and execution/markout.py so that
+                   tca depends on execution and never the reverse), tca.py
                    (order_tca: Perold IS = delay + trading + opportunity, spread /
                    impact / timing, markouts), simulator.py (the pinned 36-parent
                    harness), report.py; `python -m iap.tca` writes

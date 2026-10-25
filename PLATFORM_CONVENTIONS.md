@@ -58,7 +58,7 @@ intraday-alpha-platform/
                             DecisionTrace, JSONL sink + digest, explain), lifecycle (the 7-state machine,
                             gates, registry) — no Rust execution crate: the C++ simulator is the
                             execution reference, Java and Python the ports
-  archive/java/             (archived in v1.15, frozen at v1.14.0) javac build (build.sh/test.sh): com.iap.* — marketdata, orderbook, features,
+  git tag archive/java-v1.14.0             (archived in v1.15, frozen at v1.14.0) javac build (build.sh/test.sh): com.iap.* — marketdata, orderbook, features,
                             alpha, portfolio, risk, execution, sor, tca, backtest, replay, config,
                             monitoring, api, platform, adaptive + contracts, trace, lifecycle
                             (PaperTrading emits decision_traces.jsonl)
@@ -281,7 +281,7 @@ hot paths allocation-conscious (primitive arrays, no boxing). All: no dead code,
 - python: `cd python && PYTHONPATH=src python3 -m pytest -q`
 - cpp: `cd cpp && bash build.sh && ctest --test-dir build --output-on-failure`
 - rust: `cd rust && cargo test` (workspace)
-- java (archived in v1.15, frozen at v1.14.0, not run by CI): `cd archive/java && bash build.sh && bash test.sh`  (javac + JUnit4 jar at /usr/share/java/junit4.jar; NO Maven; pom.xml equivalents in docs/BUILD_NOTES.md)
+- java (archived in v1.15, frozen at v1.14.0, not run by CI): `cd git tag archive/java-v1.14.0 && bash build.sh && bash test.sh`  (javac + JUnit4 jar at /usr/share/java/junit4.jar; NO Maven; pom.xml equivalents in docs/BUILD_NOTES.md)
 - integration / replay (repo root, no PYTHONPATH — `tests/conftest.py`):
   `python3 -m pytest -q tests/integration` (pipeline smoke chain, the GitHub issue plan,
   `python -m iap.mvp` end to end as a subprocess) and `python3 -m pytest -q tests/replay`
@@ -658,8 +658,8 @@ never updated afterwards — a read-only diagnostic for the markout analysis (no
   `SmartOrderRouter` and the execution simulator) reproduces a golden the Python generates —
   `tests/golden/expected_f7_<rule>.json` from `python/tools/make_golden_f7.py`, fixed vectors
   AND the sampled real slice `benchmarks/slices/itch50_20190130_AAPL` (every 500th event past
-  the prefix), compared as canonical JSON bytes by `cpp/tests/test_f7_<rule>.cpp` (the `cpp`,
-  `cpp-sanitizers` and `golden` jobs); `python/tests/test_f7_golden.py` pins the committed
+  the prefix), compared as canonical JSON bytes by `cpp/tests/test_f7_<rule>.cpp` (the `cpp`
+  and `golden` jobs per pull request, `cpp-sanitizers` weekly since v2.0 stage 11); `python/tests/test_f7_golden.py` pins the committed
   bytes to the Python. "Ported" = byte-identical on both vector sets. The replay-scheduler
   wiring of the B2 / B3 / B4 / B5 rules (which child is decided when, the cancel through rule
   7, `hold` / `repost` / `cross` of the remainder, provenance tagging, the pull accounting) is
@@ -1051,7 +1051,7 @@ Admin endpoints (`RUNBOOK_incident_kill_switch.md` §2 — the manual ENGAGE pat
 
 ### 12.7 Deployment artefacts
 
-- **Build context**: `.dockerignore` excludes `cpp/build`, `rust/target`, `archive/java/out`, `data/raw`,
+- **Build context**: `.dockerignore` excludes `cpp/build`, `rust/target`, `data/raw`,
   `data/normalized`, `data/features`, `data/orderbooks`, `.git`, `__pycache__`. Every image's build
   stage copies the inputs its build *and its build-time test step* read — in particular
   `configs/` and `data/reference/` for the C++ and Rust images, whose golden tests resolve

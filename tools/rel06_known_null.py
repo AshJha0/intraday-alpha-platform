@@ -37,6 +37,7 @@ import numpy as np  # noqa: E402
 from iap.research import known_null as kn  # noqa: E402
 
 CONFIG = ROOT / "research" / "v118" / "known_null_config.json"
+# Outputs over 1 MB are release assets, not tree files (research/v118/RESULT_ARTEFACTS.json, git-ignored here).
 OUT = ROOT / "research" / "v118" / "known_null_result.json"
 OUT_V2 = ROOT / "research" / "v118" / "known_null_v2_result.json"
 MAX_TIMING_TRIALS = 20
