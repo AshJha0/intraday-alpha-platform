@@ -249,6 +249,8 @@ def test_validation_run_is_a_different_look_with_its_own_hash(
         ledger_path=tmp_path / "l.json",
         identity="iap-dev",
     )
+    print("DIAG-REPORT-BEGIN", canonical_json(r["report"]), "DIAG-REPORT-END", sep="
+")
     assert_pinned(manifest, "d1_validation", r["sha256"])
     assert r["report"]["identity"]["partition"] == "validation"
     assert (
