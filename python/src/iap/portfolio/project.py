@@ -486,6 +486,7 @@ def apply_band(
     sectors: Mapping[str, str] | None = None,
     spec: ConstraintSpec | None = None,
     book_gross_cap: float | None = None,
+    tol: float = 1e-9,
 ) -> tuple[frozenset[str], dict[str, str]]:
     """Names whose discretionary aggregate net order (|bps of C| < band) is withheld, and why each was sent anyway.
 
@@ -511,6 +512,7 @@ def apply_band(
                 sectors or {},
                 spec=spec,
                 book_gross_cap=book_gross_cap,
+                tol=tol,
             )
             if not chk.ok:
                 sent_anyway[n] = "; ".join(chk.violations)
