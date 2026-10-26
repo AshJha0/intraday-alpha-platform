@@ -131,8 +131,22 @@ def build(
     unadjusted_split: bool = False,
     drop_sessions: int = 0,
     tiingo: bool = False,
+    extra_symbols: int = 0,
+    reversal: float = 0.0,
+    overnight: float = 0.0,
+    volume_scale: float = 1.0,
 ) -> Fixture:
-    """The fixture for purchase year ``year`` (history from ``first``, default Y-7)."""
+    """The fixture for purchase year ``year`` (history from ``first``, default Y-7).
+
+    ``extra_symbols``, ``reversal``, ``overnight`` and ``volume_scale`` widen the
+    fixture for the research-chain check (``tools/research/dd1_chain.py``): extra
+    index members beyond the twelve, a planted five-session reversal of the daily
+    return, a planted per-name overnight drift (a fraction of the price, sign by
+    name) and a multiple of the session volume (large-cap liquidity, so that the
+    cost hurdle can be met).  At their defaults the bytes are those of the DD1
+    tests' fixture.
+    """
+    universe = SYMBOLS + _extra_names(extra_symbols)
     first = first or _dt.date(year - 7, 1, 2)
     last = _dt.date(year, 6, 30)
     cal = sessions(first, last)
@@ -145,13 +159,15 @@ def build(
     delisted_exit = dev_cal[exit_i]
     delist_date = dev_cal[min(exit_i + 70, len(dev_cal) - 1)]  # trades 70 sessions after exit
     joiner_date = dev_cal[len(dev_cal) // 3]
-    ciks = {s: 1000 + i for i, s in enumerate(SYMBOLS)}
+    ciks = {s: 1000 + i for i, s in enumerate(universe)}
     fx = Fixture(year, first, last, cal, split_date, delist_date, delisted_exit, joiner_date, ciks)
 
     # -- prices ----------------------------------------------------------------
     prices: dict[str, list[tuple[_dt.date, float, float, float, float, int]]] = {}
-    for sym in SYMBOLS:
+    for sym in universe:
         level = 20.0 + 80.0 * rng.uniform()
+        drift = overnight * (1.0 if universe.index(sym) % 2 else -1.0)
+        recent: list[float] = []
         rows = []
         for d in cal:
             if sym == DELISTED and d > delist_date:
@@ -159,12 +175,16 @@ def build(
             if sym == DELISTED and truncate_delisted and d > delisted_exit:
                 break
             ret = 0.01 * rng.normal()
-            o = level * (1 + 0.004 * rng.normal())
+            if reversal and len(recent) == 5:
+                ret -= reversal * sum(recent) / 5.0
+            o = level * (1 + 0.004 * rng.normal() + drift)
+            prev = level
             level = max(1.0, level * (1 + ret))
+            recent = [*recent[-4:], level / prev - 1.0]
             c = level
             hi = max(o, c) * (1 + 0.003 * abs(rng.normal()))
             lo = min(o, c) * (1 - 0.003 * abs(rng.normal()))
-            vol = int(1e5 + 1e5 * rng.uniform())
+            vol = int((1e5 + 1e5 * rng.uniform()) * volume_scale)
             rows.append((d, o, hi, lo, c, vol))
         prices[sym] = rows
     # the split: the random walk IS the adjusted (continuous) series; the raw
@@ -186,7 +206,7 @@ def build(
     if drop_sessions:
         dropped = set(dev_cal[10 : 10 + drop_sessions])
     if tiingo:
-        for sym in SYMBOLS:
+        for sym in universe:
             lines = [
                 "date,close,high,low,open,volume,adjClose,adjHigh,adjLow,adjOpen,adjVolume,divCash,splitFactor"
             ]
@@ -205,7 +225,7 @@ def build(
     else:
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-            for sym in SYMBOLS:
+            for sym in universe:
                 lines = ["<TICKER>,<PER>,<DATE>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>,<OPENINT>"]
                 for d, o, hi, lo, c, vol in adj[sym]:
                     if d in dropped:
@@ -213,7 +233,7 @@ def build(
                     lines.append(
                         f"{sym}.US,D,{d:%Y%m%d},000000,{o:.4f},{hi:.4f},{lo:.4f},{c:.4f},{vol},0"
                     )
-                market = "nasdaq stocks" if SYMBOLS.index(sym) % 2 else "nyse stocks"
+                market = "nasdaq stocks" if universe.index(sym) % 2 else "nyse stocks"
                 zf.writestr(
                     f"data/daily/us/{market}/1/{sym.lower()}.us.txt", "\n".join(lines) + "\n"
                 )
@@ -235,7 +255,7 @@ def build(
     for i, rd in enumerate(rev_dates):
         syms = [
             s
-            for s in SYMBOLS
+            for s in universe
             if not (s == DELISTED and rd >= delisted_exit)
             and not (s == JOINER and rd < joiner_date)
         ]
@@ -276,7 +296,7 @@ def build(
             }
         ).encode()
     # the Nasdaq-100 proxy page: the same symbols minus two, one revision per quarter
-    ndx = [s for s in SYMBOLS if s not in (DELISTED, "KKK")]
+    ndx = [s for s in universe if s not in (DELISTED, "KKK")]
     ndx_revs = [(200000 + i, rd) for i, rd in enumerate(months) if rd.month in (1, 4, 7, 10)]
     fx.urls["wiki:list:Nasdaq-100:"] = json.dumps(
         {
@@ -363,13 +383,19 @@ def build(
     ).encode()
     # Tiingo's public supported-tickers list (vendor metadata; survivorship population)
     rows = ["ticker,exchange,assetType,priceCurrency,startDate,endDate"]
-    for sym in SYMBOLS:
+    for sym in universe:
         end = delist_date if sym == DELISTED else last
         rows.append(f"{sym},NYSE,Stock,USD,{first.isoformat()},{end.isoformat()}")
     fx.urls["https://apimedia.tiingo.com/docs/tiingo/daily/supported_tickers.zip"] = (
         "\n".join(rows) + "\n"
     ).encode()
     return fx
+
+
+def _extra_names(n: int) -> tuple[str, ...]:
+    """``n`` synthetic tickers ``QAA``, ``QAB``, ... (never one of the twelve)."""
+    letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    return tuple(f"Q{letters[i // 26 % 26]}{letters[i % 26]}" for i in range(n))
 
 
 def _wikitext(symbols: list[str], overlap: bool = False) -> str:
