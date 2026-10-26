@@ -54,6 +54,14 @@ What one run does, in order (each step refusing before the next):
    development identity), vendor metadata, the test results and ``status``
    ``complete`` or ``incomplete``.  ``tools/data_manifest.py generate`` lists it.
 
+The parsed constituents of each Wikipedia revision are cached under
+``--cache-root`` (default ``C:\\iap-sealed\\runner\\dd1_wiki_cache``, readable by
+``iap-runner`` only), so a re-run lists the revisions again but fetches only
+the ones it has not parsed before (D-87: the walk is about 4 h at 1 request/s).
+The cache spans the sealed Track B/C windows, so a cache root under
+``--dev-root`` is refused (exit 3).  The log carries the Wikipedia request and
+cache-hit counts.
+
 Exit codes: 0 complete · 2 a DD1 test failed or a service refused (nothing
 sealed; the record says ``incomplete``) · 3 refused before any request.
 """
@@ -125,6 +133,9 @@ PRICE_FIELDS = (
     "split_factor",
     "div_cash",
 )
+#: Default --cache-root of a real run: under the runner's own sealed directory (D-87).
+DEFAULT_CACHE_ROOT = Path(r"C:\iap-sealed\runner\dd1_wiki_cache")
+WIKI_HOST = "en.wikipedia.org"
 MEMBERSHIP_FIELDS = ("index", "symbol", "start", "end", "revision_id", "label")
 FILING_FIELDS = ("cik", "symbol", "form", "filing_date", "path")
 FACTOR_FIELDS = ("date", "mkt_rf", "smb", "hml", "rmw", "cma", "mom", "rf")
@@ -222,6 +233,46 @@ def _date(text: str) -> _dt.date:
 
 
 # ---------------------------------------------------------------- the pull --
+def _under(path: Path, root: Path) -> bool:
+    a = os.path.normcase(str(Path(path).resolve()))
+    b = os.path.normcase(str(Path(root).resolve()))
+    try:
+        return os.path.commonpath([a, b]) == b
+    except ValueError:  # different drives
+        return False
+
+
+class RevisionCache:
+    """Parsed constituents per Wikipedia revision id, one JSON file each under
+    ``root``.  A revision never changes, so a hit is final; an unreadable entry
+    is a miss and is fetched again."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = Path(root) / "wiki_revisions"
+        self.hits = 0
+
+    def _path(self, revid: int) -> Path:
+        return self.root / f"{int(revid)}.json"
+
+    def get(self, revid: int) -> frozenset[str] | None:
+        try:
+            doc = json.loads(self._path(revid).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        if not isinstance(doc, dict) or doc.get("revid") != int(revid):
+            return None
+        self.hits += 1
+        return frozenset(doc.get("symbols", []))
+
+    def put(self, revid: int, symbols: frozenset[str]) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        path = self._path(revid)
+        tmp = path.with_suffix(".tmp")
+        doc = {"revid": int(revid), "symbols": sorted(symbols)}
+        tmp.write_text(json.dumps(doc), encoding="utf-8")
+        os.replace(tmp, path)
+
+
 def pull_membership(
     transport,
     *,
@@ -229,11 +280,21 @@ def pull_membership(
     plausible: Mapping[str, tuple[int, int]] | None = None,
     adapter_kw: Mapping[str, Any] | None = None,
     log=None,
+    cache_root: Path | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Every revision of each index page (last revision per day), parsed; intervals
     from the reliable snapshots; per-year reliability counts (metadata).
-    ``plausible`` overrides the per-index constituent-count range (dry run only)."""
-    src = wiki_membership.WikiMembershipSource(transport, **(adapter_kw or {}))
+    ``plausible`` overrides the per-index constituent-count range (dry run only).
+    ``cache_root``: reuse the revisions an earlier run parsed (D-87)."""
+    wiki_requests = [0]
+
+    def counted(url, headers, *a, **kw):
+        if WIKI_HOST in url:
+            wiki_requests[0] += 1
+        return transport(url, headers, *a, **kw)
+
+    src = wiki_membership.WikiMembershipSource(counted, **(adapter_kw or {}))
+    cache = RevisionCache(cache_root) if cache_root is not None else None
     rows: list[dict[str, Any]] = []
     meta: dict[str, Any] = {}
     for index in indices:
@@ -249,7 +310,11 @@ def pull_membership(
         reliable_dates: dict[str, list[_dt.date]] = {}
         for day in sorted(by_day):
             rid, ts = by_day[day]
-            syms = src.revision_symbols(rid)
+            syms = cache.get(rid) if cache else None
+            if syms is None:
+                syms = src.revision_symbols(rid)
+                if cache:
+                    cache.put(rid, syms)
             y = day[:4]
             stat = per_year.setdefault(y, {"revisions": 0, "reliable": 0})
             stat["revisions"] += 1
@@ -279,6 +344,11 @@ def pull_membership(
             log(
                 f"membership {index}: {len(revs)} revisions, {len(by_day)} days, {len(snapshots)} reliable"
             )
+    if log:
+        log(
+            f"membership: {wiki_requests[0]} Wikipedia requests, "
+            f"{cache.hits if cache else 0} revision cache hits"
+        )
     return rows, meta
 
 
@@ -960,14 +1030,21 @@ def ingest(
     log: redact.RedactingLog | None = None,
     stooq_zip: Path | None = None,
     stooq_sha256: str = "",
+    cache_root: Path | None = None,
 ) -> dict[str, Any]:
     """The whole job (module docstring).  Returns the record written to
     ``dev_root/dd1_<year>/dataset.json``; raises :class:`IngestRefused`.
     ``plausible`` and ``adapter_kw`` (injected clock) are for the dry run.
     ``stooq_zip`` + ``stooq_sha256``: the owner's downloaded archive (DR-15),
-    verified before the first request."""
+    verified before the first request.  ``cache_root``: the revision cache
+    (D-87); never under ``dev_root``, which the development identity reads."""
     env = os.environ if environ is None else environ
     log = log or redact.RedactingLog([str(dev_root)])
+    if cache_root is not None and _under(cache_root, dev_root):
+        log("refused: the revision cache root is under the development root")
+        raise IngestRefused(
+            3, "the revision cache spans the sealed windows: it may not live under --dev-root"
+        )
     today = today or _dt.date.today()
     who = identity if identity is not None else current_identity()
     if who != RUNNER_IDENTITY:
@@ -987,7 +1064,7 @@ def ingest(
     # -- pull
     tables = Tables()
     tables.membership, wiki_meta = pull_membership(
-        transport, plausible=plausible, adapter_kw=adapter_kw, log=log
+        transport, plausible=plausible, adapter_kw=adapter_kw, log=log, cache_root=cache_root
     )
     universe = {r["symbol"] for r in tables.membership}
     if not universe:
@@ -1133,6 +1210,7 @@ def dry_run(year: int, dev_root: Path, sealed_root: Path, **knobs: Any) -> dict[
 
     ss = _sealed_service_module()
     local_zip = knobs.pop("local_zip", False)
+    cache_root = knobs.pop("cache_root", None)
     sha256_override = knobs.pop("sha256_override", "")
     fx = dd1_fixture.build(year, **knobs)
     zip_kw: dict[str, Any] = {}
@@ -1179,6 +1257,7 @@ def dry_run(year: int, dev_root: Path, sealed_root: Path, **knobs: Any) -> dict[
             plausible=DRY_RUN_PLAUSIBLE,
             adapter_kw={"clock": clock, "sleep": lambda _s: None},
             log=log,
+            cache_root=cache_root,
             **zip_kw,
         )
     except IngestRefused as exc:
@@ -1191,6 +1270,8 @@ def dry_run(year: int, dev_root: Path, sealed_root: Path, **knobs: Any) -> dict[
         rec["exit"] = exc.code
     rec["log"] = log.text()
     rec["requests"] = len(fx.requests)
+    rec["wiki_requests"] = sum(WIKI_HOST in u for u in fx.requests)
+    rec["wiki_content_requests"] = sum(WIKI_HOST in u and "revids=" in u for u in fx.requests)
     return rec
 
 
@@ -1211,10 +1292,16 @@ def main(argv: list[str] | None = None) -> int:
         "--stooq-zip", type=Path, default=None, help="the owner's downloaded d_us_txt.zip (DR-15)"
     )
     r.add_argument("--stooq-sha256", default="", help="sha256 the owner recorded for --stooq-zip")
+    r.add_argument(
+        "--cache-root",
+        type=Path,
+        default=None,
+        help=f"revision cache, runner-only (default {DEFAULT_CACHE_ROOT}; dry run: none)",
+    )
     a = ap.parse_args(argv)
     if a.dry_run:
         sealed_root = a.sealed_root or Path(tempfile.mkdtemp(prefix="dd1-sealed-"))
-        rec = dry_run(a.year, a.dev_root, sealed_root)
+        rec = dry_run(a.year, a.dev_root, sealed_root, cache_root=a.cache_root)
         text = rec.pop("log")
         if a.log:
             a.log.write_text(text, encoding="utf-8")
@@ -1230,6 +1317,7 @@ def main(argv: list[str] | None = None) -> int:
             log=log,
             stooq_zip=a.stooq_zip,
             stooq_sha256=a.stooq_sha256,
+            cache_root=a.cache_root or DEFAULT_CACHE_ROOT,
         )
         log(f"done: {rec['status']}")
     except IngestRefused as exc:

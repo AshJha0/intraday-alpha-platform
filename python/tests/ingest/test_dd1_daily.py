@@ -367,3 +367,65 @@ def test_form_index_parser_reads_fixed_width_rows():
         ("8-K", 1001, "2020-02-03", "edgar/data/1001/x.txt"),
         ("S-1", 1002, "2020-02-04", "edgar/data/1002/y.txt"),
     ]
+
+
+# ------------------------------------------------- revision cache (D-87) --
+def test_a_rerun_with_the_cache_fetches_no_revision_again(tmp_path):
+    cache = tmp_path / "runner" / "cache"
+    first = job.dry_run(2026, tmp_path / "dev1", tmp_path / "sealed1", cache_root=cache)
+    assert first["status"] == "complete"
+    assert first["wiki_content_requests"] > 0
+    stored = len(list((cache / "wiki_revisions").glob("*.json")))
+    assert stored == first["wiki_content_requests"]
+    assert "0 revision cache hits" in first["log"]
+
+    second = job.dry_run(2026, tmp_path / "dev2", tmp_path / "sealed2", cache_root=cache)
+    assert second["status"] == "complete"
+    assert second["wiki_content_requests"] == 0
+    assert f"{stored} revision cache hits" in second["log"]
+    assert f"{second['wiki_requests']} Wikipedia requests" in second["log"]
+    # the cache changes no value: every partition's membership file is the same
+    for part in ("development", "validation", "b", "c"):
+        f1, f2 = first["partitions"][part]["files"], second["partitions"][part]["files"]
+        names = [n for n in f1 if n.startswith("membership")]
+        assert names and all(f1[n] == f2[n] for n in names)
+
+
+def test_a_corrupt_cache_entry_is_fetched_again(tmp_path):
+    cache = tmp_path / "cache"
+    job.dry_run(2026, tmp_path / "dev1", tmp_path / "sealed1", cache_root=cache)
+    victim = sorted((cache / "wiki_revisions").glob("*.json"))[0]
+    victim.write_text("not json", encoding="utf-8")
+    rec = job.dry_run(2026, tmp_path / "dev2", tmp_path / "sealed2", cache_root=cache)
+    assert rec["status"] == "complete" and rec["wiki_content_requests"] == 1
+
+
+@pytest.mark.parametrize("sub", ["", "cache", "dd1_2026/wiki"])
+def test_refuses_a_cache_root_under_the_dev_root(tmp_path, sub):
+    dev = tmp_path / "dev"
+    rec = job.dry_run(2026, dev, tmp_path / "sealed", cache_root=dev / sub)
+    assert rec["status"] == "refused" and rec["exit"] == 3
+    assert rec["requests"] == 0
+    assert not dev.exists() or not any(dev.rglob("*")), "a refused run writes nothing"
+
+
+def test_cli_refuses_a_cache_root_under_the_dev_root(tmp_path):
+    code = job.main(
+        [
+            "run",
+            "--year",
+            "2026",
+            "--dev-root",
+            str(tmp_path / "dev"),
+            "--cache-root",
+            str(tmp_path / "dev" / "cache"),
+        ]
+    )
+    assert code == 3
+
+
+def test_the_default_cache_root_is_the_runners_sealed_directory():
+    from iap.data.sources.base import is_sealed_target
+
+    assert is_sealed_target(str(job.DEFAULT_CACHE_ROOT))
+    assert not job._under(job.DEFAULT_CACHE_ROOT, job.Path(r"C:\iap\daily"))
