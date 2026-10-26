@@ -1,5 +1,10 @@
 # Intraday Alpha Platform
 
+> **Status, v2.0.0 (2026-10-26):** engineering-complete platform (Level A). **No confirmed alpha.** The free
+> daily data route was shown **data-ineligible** (survivorship: 85 % of index leavers missing against a 2 % limit).
+> Nothing on `main` is above *development-supported*. See the
+> [release notes, negatives first](docs/release/v2.0.0_RELEASE_NOTES.md).
+
 We built this platform to answer one question carefully: does a systematic equity signal make
 money after costs, and how would we know? It takes point-in-time daily and intraday data through
 forecasts, portfolio construction, simulated execution and a cash-reconciled ledger, and it
