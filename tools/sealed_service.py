@@ -74,6 +74,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import struct
 import sys
 from collections.abc import Callable, Iterable, Iterator, Mapping
@@ -724,8 +725,29 @@ def _win_caller(handle: int) -> Caller:  # pragma: no cover - needs Windows and 
 
     k32 = ctypes.WinDLL("kernel32", use_last_error=True)
     adv = ctypes.WinDLL("advapi32", use_last_error=True)
+    # Windows lets a server impersonate a pipe client only after reading from it
+    # (ERROR_CANNOT_IMPERSONATE, 1368).  Wait, without consuming, until the client's
+    # first frame is in the pipe; the frame is then read normally by serve_connection.
+    avail = wintypes.DWORD(0)
+    for _ in range(100):  # up to ~10 s
+        if not k32.PeekNamedPipe(wintypes.HANDLE(handle), None, 0, None, ctypes.byref(avail), None):
+            raise Refused("client_gone", str(ctypes.get_last_error()))
+        if avail.value:
+            break
+        k32.Sleep(100)
+    else:
+        raise Refused("client_silent", "no request within 10 s of connecting")
+    # a zero-byte read makes the client's data "read" for impersonation without consuming it
     if not adv.ImpersonateNamedPipeClient(wintypes.HANDLE(handle)):
-        raise Refused("impersonation_failed", str(ctypes.get_last_error()))
+        err = ctypes.get_last_error()
+        if err == 1368:
+            dummy = ctypes.c_char()
+            got = wintypes.DWORD(0)
+            k32.ReadFile(wintypes.HANDLE(handle), ctypes.byref(dummy), 0, ctypes.byref(got), None)
+            if not adv.ImpersonateNamedPipeClient(wintypes.HANDLE(handle)):
+                raise Refused("impersonation_failed", str(ctypes.get_last_error()))
+        else:
+            raise Refused("impersonation_failed", str(err))
     try:
         size = wintypes.DWORD(256)
         buf = ctypes.create_unicode_buffer(size.value)
@@ -752,6 +774,76 @@ def _win_caller(handle: int) -> Caller:  # pragma: no cover - needs Windows and 
     return Caller(account=account, pid=pid.value or None, image_sha256=image)
 
 
+#: Client access to the pipe: FILE_GENERIC_READ | FILE_GENERIC_WRITE (0x12019f).  A
+#: Python ``open(name, "r+b")`` asks for GENERIC_READ | GENERIC_WRITE, which for a pipe
+#: maps to exactly this; it includes FILE_CREATE_PIPE_INSTANCE, which the server's
+#: FILE_FLAG_FIRST_PIPE_INSTANCE makes useless to a squatter.
+PIPE_CLIENT_ACCESS = 0x12019F
+
+
+def pipe_sddl(client_sids: Iterable[str]) -> str:
+    """The pipe's DACL (protected, no inheritance): full control for SYSTEM and the
+    service's own account (owner rights), read/write for Administrators (the owner's
+    install-time ``ping``) and for each allowed account's SID.  Windows' default pipe
+    DACL gives everyone else read only, so without this the runner account cannot
+    open the pipe for writing (run 40307510915: PermissionError).  Every caller is
+    still authorised by account and image in :meth:`SealedService.handle`."""
+    sids = sorted(set(client_sids))
+    if not sids or not all(re.fullmatch(r"S-1(-\d+)+", s) for s in sids):
+        raise ValueError(f"need the allowed accounts' string SIDs, got {sids!r}")
+    ace = f"0x{PIPE_CLIENT_ACCESS:x}"
+    clients = "".join(f"(A;;{ace};;;{s})" for s in sids)
+    return f"D:P(A;;GA;;;SY)(A;;GA;;;OW)(A;;{ace};;;BA){clients}"
+
+
+def _account_sid(account: str) -> str:  # pragma: no cover - Windows
+    """String SID of a local account name (LookupAccountNameW); refuses unknown names."""
+    import ctypes
+    from ctypes import wintypes
+
+    adv = ctypes.WinDLL("advapi32", use_last_error=True)
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    sid = ctypes.create_string_buffer(256)
+    cb = wintypes.DWORD(256)
+    dom = ctypes.create_unicode_buffer(256)
+    cch = wintypes.DWORD(256)
+    use = wintypes.DWORD()
+    if not adv.LookupAccountNameW(
+        None, account, sid, ctypes.byref(cb), dom, ctypes.byref(cch), ctypes.byref(use)
+    ):
+        raise SystemExit(f"allowed account {account!r} not found: {ctypes.get_last_error()}")
+    out = wintypes.LPWSTR()
+    if not adv.ConvertSidToStringSidW(sid, ctypes.byref(out)):
+        raise SystemExit(f"cannot render the SID of {account!r}: {ctypes.get_last_error()}")
+    try:
+        return out.value
+    finally:
+        k32.LocalFree(out)
+
+
+def _pipe_security(accounts: Iterable[str]):  # pragma: no cover - Windows
+    """SECURITY_ATTRIBUTES carrying :func:`pipe_sddl` for the allowed accounts."""
+    import ctypes
+    from ctypes import wintypes
+
+    class SECURITY_ATTRIBUTES(ctypes.Structure):
+        _fields_ = [
+            ("nLength", wintypes.DWORD),
+            ("lpSecurityDescriptor", ctypes.c_void_p),
+            ("bInheritHandle", wintypes.BOOL),
+        ]
+
+    adv = ctypes.WinDLL("advapi32", use_last_error=True)
+    sd = ctypes.c_void_p()
+    sddl = pipe_sddl(_account_sid(a) for a in accounts)
+    if not adv.ConvertStringSecurityDescriptorToSecurityDescriptorW(
+        sddl, 1, ctypes.byref(sd), None
+    ):
+        raise SystemExit(f"bad pipe security descriptor: {ctypes.get_last_error()}")
+    sa = SECURITY_ATTRIBUTES(ctypes.sizeof(SECURITY_ATTRIBUTES), sd, False)
+    return sa, sddl
+
+
 def serve_pipe(service: SealedService, name: str, once: bool = False) -> None:  # pragma: no cover
     """Accept clients on the named pipe until interrupted (Windows only)."""
     import ctypes
@@ -761,9 +853,19 @@ def serve_pipe(service: SealedService, name: str, once: bool = False) -> None:  
     k32 = ctypes.WinDLL("kernel32", use_last_error=True)
     k32.CreateNamedPipeW.restype = wintypes.HANDLE
     PIPE_ACCESS_DUPLEX, PIPE_WAIT, PIPE_REJECT_REMOTE = 0x3, 0x0, 0x8
+    FILE_FLAG_FIRST_PIPE_INSTANCE = 0x80000
+    sa, sddl = _pipe_security(service.cfg.allowed_accounts)
+    service.audit.append({"event": "pipe", "decision": "created", "sddl": sddl})
     while True:
         h = k32.CreateNamedPipeW(
-            name, PIPE_ACCESS_DUPLEX, PIPE_WAIT | PIPE_REJECT_REMOTE, 1, 1 << 16, 1 << 16, 0, None
+            name,
+            PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE,
+            PIPE_WAIT | PIPE_REJECT_REMOTE,
+            1,
+            1 << 16,
+            1 << 16,
+            0,
+            ctypes.byref(sa),
         )
         if h == wintypes.HANDLE(-1).value or not h:
             raise SystemExit(f"CreateNamedPipe failed: {ctypes.get_last_error()}")
@@ -775,10 +877,11 @@ def serve_pipe(service: SealedService, name: str, once: bool = False) -> None:  
                 service.audit.append(
                     {"event": "connect", "decision": "refused", "reason": exc.code}
                 )
-                continue
-            fd = msvcrt.open_osfhandle(h, os.O_RDWR | os.O_BINARY)
-            with os.fdopen(fd, "r+b", buffering=0, closefd=False) as f:
-                serve_connection(service, caller, f, f)
+                caller = None
+            if caller is not None:
+                fd = msvcrt.open_osfhandle(h, os.O_RDWR | os.O_BINARY)
+                with os.fdopen(fd, "r+b", buffering=0, closefd=False) as f:
+                    serve_connection(service, caller, f, f)
         except (EOFError, ValueError, OSError) as exc:
             service.audit.append(
                 {"event": "connect", "decision": "error", "reason": type(exc).__name__}
