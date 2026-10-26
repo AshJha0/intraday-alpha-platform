@@ -40,6 +40,15 @@ figures: there is no latency edge, and none is claimed.
 
 ## Quick start
 
+The one-command demo runs the whole loop on one synthetic instrument, explains one order and runs
+the leakage canaries, in about a minute (64 s on the owner's Windows laptop, 2026-10-26):
+
+```bash
+python tools/demo.py              # needs the .venv-ci environment below; --replay adds the replay check
+```
+
+The engine test suite:
+
 ```bash
 git clone https://github.com/AshJha0/intraday-alpha-platform.git
 cd intraday-alpha-platform

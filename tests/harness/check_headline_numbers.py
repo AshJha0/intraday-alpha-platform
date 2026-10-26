@@ -73,8 +73,7 @@ DOCS = {
     "tests/README.md": ROOT / "tests" / "README.md",
     "schemas/README.md": ROOT / "schemas" / "README.md",
     "docs/GOVERNANCE.md": ROOT / "docs" / "GOVERNANCE.md",
-    "docs/RUNBOOKS.md": ROOT
-    / "docs" / "RUNBOOKS.md",
+    "docs/RUNBOOKS.md": ROOT / "docs" / "RUNBOOKS.md",
     "python/src/iap/README.md": ROOT / "python" / "src" / "iap" / "README.md",
     "research/experiments/README.md": ROOT / "research" / "experiments" / "README.md",
 }
