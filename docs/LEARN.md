@@ -68,7 +68,7 @@ are owned by separate operating-system accounts (`iap-sealed-b`, `iap-sealed-c`)
 identity, which is the owner's normal user and every research script, cannot read, list or write
 those directories. The only route to a sealed byte is a local service that authenticates by the
 kernel-reported account name, serves one read per signed registration and refuses a second
-([governance/SEALED_DATA.md](governance/SEALED_DATA.md)). We seal at ingestion, before any script
+([governance/SEALED_DATA.md](GOVERNANCE.md)). We seal at ingestion, before any script
 other than the integrity check touches the data, and we never compute a summary statistic of a
 sealed partition for the development identity. These controls stop the development identity's
 processes; they do not stop the workstation's administrator, who is the same person. Section 6
@@ -180,7 +180,7 @@ rate.
 An honest aside. The predecessor of this gate, the v1.18 known-null protocol, was run on
 2026-10-23 and failed its own calibration: two cells rejected 79 and 80 times out of 1,854 null
 draws, about 4.3 % against a 2.5 % target, and the outside reviewer rejected the method as a gate
-([REVIEW_PACK.md](REVIEW_PACK.md) section 1). A second review found the acceptance criterion
+([REVIEW_PACK.md](../archive/docs/REVIEW_PACK.md) section 1). A second review found the acceptance criterion
 itself ill-posed. R0 was written after that, with the domain declared up front and the acceptance
 counts recomputed independently by the reviewer. The audit also kept two embarrassments visible:
 the first pre-flight evidence file of the F3 acceptance study was overwritten, and the signer's
@@ -308,7 +308,7 @@ reader never has to infer it from tone (U0 section 10):
 
 **What "mechanically isolated" means.** It is the honest name for what one workstation can
 deliver. The registered runner (`iap-runner`,
-[governance/RUNNER_THREAT_MODEL.md](governance/RUNNER_THREAT_MODEL.md)) verifies the signed
+[governance/RUNNER_THREAT_MODEL.md](GOVERNANCE.md)) verifies the signed
 registration, the pinned image digest and the dataset hashes before any read; asks the sealed
 service for one read, which the service logs and never repeats; runs the registered command once
 in a private cache; commits the result to an append-only branch; and publishes a checkpoint that
@@ -317,20 +317,20 @@ a pipe identity check or a repository setting, and the workstation's administrat
 any of them. The administrator is the developer. So the class upgrades to *independently
 confirmed* only when an approval or custody authority other than the developer exists. A
 signature, for the same reason, proves integrity (the document did not change after signing) and
-nothing about who ran what ([governance/TRUST_ROOTS.md](governance/TRUST_ROOTS.md)).
+nothing about who ran what ([governance/TRUST_ROOTS.md](GOVERNANCE.md)).
 
 **Where things stand.** As of 2026-10-25 nothing on `main` is in the first two classes: no
 registered run has been executed and no independent party has reproduced a result. The runner,
 the services and the reproduction image exist and are tested on synthetic data
 ([REPRODUCTION.md](REPRODUCTION.md)). The class of every result so far is listed in
-[REVIEW_PACK.md](REVIEW_PACK.md) section 0.
+[REVIEW_PACK.md](../archive/docs/REVIEW_PACK.md) section 0.
 
 An honest aside about words. In v1.15 the R7 confirmation round reported two signals as
 "confirmed". The result was re-issued on 2026-10-24 under the v1.18 eligibility rule as
 `ineligible`: the run had used a different method bundle from the registered one and its deflated
 Sharpe had been computed at the wrong trial count ([research/R7_RESULTS.md](research/R7_RESULTS.md)).
 Under the classes above it is *data-ineligible*. The records keep the old word, and the audit
-([DOC_AUDIT_v2.md](DOC_AUDIT_v2.md) section 6) lists every place it survives.
+([DOC_AUDIT_v2.md](../archive/docs/DOC_AUDIT_v2.md) section 6) lists every place it survives.
 
 ---
 
@@ -353,7 +353,7 @@ than on a retuned router (`research/execution/b8/REPORT_oos6.md`). The breadth s
 candidates net of cost. The known-null calibration failed (section 3). The order-flow and ETF
 lead-lag families are data-ineligible on the free route and close pressure is ineligible on daily
 data, and their specifications say so instead of being dropped from the list. Every v1.x signed
-run was negative, inconclusive or underpowered ([REVIEW_PACK.md](REVIEW_PACK.md) section 0,
+run was negative, inconclusive or underpowered ([REVIEW_PACK.md](../archive/docs/REVIEW_PACK.md) section 0,
 [release/](release/)).
 
 ---

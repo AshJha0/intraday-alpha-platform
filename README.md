@@ -1,76 +1,44 @@
 # Intraday Alpha Platform
 
-> **Status, v2.0.0 (2026-10-26):** engineering-complete platform (Level A). **No confirmed alpha.** The free
-> daily data route was shown **data-ineligible** (survivorship: 85 % of index leavers missing against a 2 % limit).
-> Nothing on `main` is above *development-supported*. See the
-> [release notes, negatives first](docs/release/v2.0.0_RELEASE_NOTES.md).
+> **Status, v2.0.0 (2026-10-26):** engineering-complete platform. **No confirmed alpha.** Where a
+> signal predicts, it is smaller than the cost of trading it, and the free daily data failed its
+> survivorship test (85 % of index leavers missing against a 2 % limit). Nothing on `main` is
+> above *development-supported*.
 
-We built this platform to answer one question carefully: does a systematic equity signal make
-money after costs, and how would we know? It takes point-in-time daily and intraday data through
-forecasts, portfolio construction, simulated execution and a cash-reconciled ledger, and it
-confirms a hypothesis only by a pre-registered, single-shot test on data the developer cannot
-read. Every result can be rebuilt from a hash, and every claim carries a stated grade of
-evidence. As of 2026-10-25 no signal is confirmed: the machinery is built and tested on synthetic
-data, and the real data has not yet been ingested.
+We built this to answer one question carefully: does a systematic equity signal make money after
+costs, and how would we know? The platform runs from raw market data to a cash-reconciled ledger,
+counts every look it takes, and confirms a hypothesis only by a pre-registered single-shot test
+on data the developer cannot read. The short version is [SUMMARY.md](SUMMARY.md); the full
+account, results first, is [docs/REPORT.md](docs/REPORT.md).
 
-**Start here:** [archive/docs/LEARN.md](archive/docs/LEARN.md) (the method and the vocabulary),
-[archive/docs/COOKBOOK.md](archive/docs/COOKBOOK.md) (commands that run today), [docs/ARCHITECTURE_v2.md](docs/ARCHITECTURE_v2.md)
-(where things are), [docs/governance/](docs/governance/) (who may do what). The v2.0 programme's
-plan of record and unified specification are the owner's documents, kept outside the repository;
-the documents inside cite them by section.
+## Three ways in
 
-## The three evidence tracks and the seven evidence classes
+| if you are | start with | then |
+|---|---|---|
+| **a quant researcher** | [docs/REPORT.md](docs/REPORT.md) §2 (results) and §3 (method: evidence classes, the look ledger, pre-registration, leakage, costs) | [docs/RESEARCH_VALIDITY.md](docs/RESEARCH_VALIDITY.md), [research/v2/families/](research/v2/families/README.md), [docs/RESEARCH_NOTES.md](docs/RESEARCH_NOTES.md) |
+| **a C++ / low-latency engineer** | [docs/POLYGLOT.md](docs/POLYGLOT.md) (three languages, one semantics) and [benchmarks/results_tick_to_trade.md](benchmarks/results_tick_to_trade.md) | [cpp/](cpp/), [docs/API_REFERENCE.md](docs/API_REFERENCE.md) (order book, codec, features), [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md) |
+| **an engineering lead** | [docs/REPORT.md](docs/REPORT.md) §6 (where we over-invested) and §7 (the DD1 incident) | [docs/ARCHITECTURE_v2.md](docs/ARCHITECTURE_v2.md), [docs/GOVERNANCE.md](docs/GOVERNANCE.md), [docs/DECISION_TRACE.md](docs/DECISION_TRACE.md), [CHANGELOG.md](CHANGELOG.md) |
 
-| track | what it tests | its gate | sealed data it never reads during development |
-|---|---|---|---|
-| **A** | H1, one frozen residual-reversal hypothesis ([research/v119/H1_ALPHA_IMPROVEMENT_SPEC.md](research/v119/H1_ALPHA_IMPROVEMENT_SPEC.md)) | R0, the frozen confirmatory specification ([python/tests/spec/CONFIRMATORY_TEST_SPEC.md](python/tests/spec/CONFIRMATORY_TEST_SPEC.md)) | the H1 prospective window (`iap-sealed-a`) |
-| **B** | daily families D1 to D5, intraday families H2 to H4, and machine-learning candidates M0 to M4 | a validated confirmation profile per registration (U13) | the Track B test year (`iap-sealed-b`) |
-| **C** | the combined multi-horizon book | a profile for the combined statistic (PF-3, deferred) | the Track C confirmation window (`iap-sealed-c`) |
+## Results
 
-Every performance statement in this repository carries exactly one of these classes
-(U0 section 10; [archive/docs/LEARN.md](archive/docs/LEARN.md) section 6 explains each):
+Each row carries one of seven evidence classes ([docs/REPORT.md](docs/REPORT.md) §3.1). Negatives
+come first because they are most of what we found.
 
-| class | meaning |
-|---|---|
-| independently confirmed | a registered single-shot decision executed under custody separate from the developer |
-| mechanically isolated | the same, executed by the registered runner under the developer's sole custody |
-| development-supported | positive economics on development data; not confirmed |
-| exploratory | reported, no claim attached |
-| rejected | the registered test or screen failed |
-| data-ineligible | the data to test it does not exist on the route, or failed its suitability gate |
-| pending | registered; the window is accruing or the run has not happened |
+| result | class | source |
+|---|---|---|
+| Free daily route (Stooq) fails all five DD1 data tests, so daily families D1 to D4 cannot be tested on it | rejected; D1 to D4 data-ineligible | [DD1 finding](docs/release/evidence/DD1_FREE_ROUTE_FINDING_2026-10-26.md) |
+| Intraday EQ10 / EQ05 predict 1-second returns on 7 holdout sessions (IC +0.0838 / +0.0409); net P&L at 1x costs is zero | data-ineligible | [docs/SHOWCASE.md](docs/SHOWCASE.md) |
+| Cost-aware taker, 480 grid cells: no trade in any cell | rejected | [docs/SHOWCASE.md](docs/SHOWCASE.md) |
+| Two-sided quoting: loses USD 5.0k to 6.9k per session | rejected | [docs/SHOWCASE.md](docs/SHOWCASE.md) |
+| Known-null calibration of the v1.18 confirmatory method: about 4.3 % false rejections against 2.5 % | rejected | [docs/REPORT.md](docs/REPORT.md) §2 |
+| Platform: pipeline, risk, execution, simulator, ledgers, evidence machinery, three-language parity | development-supported (tests on fixtures; no return claim) | [docs/release/v2.0.0_RELEASE_NOTES.md](docs/release/v2.0.0_RELEASE_NOTES.md) §7 |
 
-## Current status (2026-10-25)
+Measured on a shared CI runner (AMD EPYC 7763, no core pinning, `steady_clock`; not colocation):
+C++ tick-to-trade p50 1,279 ns, p99 2,559 ns, decoded frame to order intent
+([benchmarks/results_tick_to_trade.md](benchmarks/results_tick_to_trade.md)). These are in-process
+figures: there is no latency edge, and none is claimed.
 
-**Nothing is confirmed.** No registered run has been executed and no independent party has
-reproduced a result, so nothing on `main` is in the first two classes; the class of every result
-so far is listed in [archive/docs/REVIEW_PACK.md](archive/docs/REVIEW_PACK.md) section 0. Every v1.x signed run
-was negative, inconclusive or underpowered, and the v1.18 known-null calibration study failed and
-was rejected by the outside reviewer as a gate.
-
-**Built and tested on `main`** (synthetic fixtures in CI; nothing below has touched real data):
-
-- the frozen R0 gate and its fail-closed implementation (`iap.validation.confirmatory`, the only
-  constructor of a PROMOTE verdict), with its adversarial Monte Carlo results committed;
-- data and feature contracts, the point-in-time universe and the leakage canaries (`iap.data`),
-  and the five free-route source adapters;
-- the shared engine: forecast interface and content-addressed registry (`iap.alpha`), projection
-  and the two reconciling ledgers (`iap.portfolio`), the fill simulator with three cost columns
-  (`iap.execution.sim`), the E5 report builders (`iap.reports`); the H1 reference implementation
-  and the byte-for-byte equivalence test;
-- the data-read choke point (`iap.core.guard`), the sealed-data service and the operating-system
-  identities, the registered runner and its threat model, the pinned reproduction image, the
-  ingestion job for the free daily route, and the data manifest with integrity verdicts;
-- the v1.x intraday engines (order book, feature factory, execution simulator, risk engine,
-  replay) in Python with C++ and Rust ports proven equal by golden vectors.
-
-**Pending** (dated 2026-10-25): the owner's ingestion of the free daily route and the repository
-settings for the sealed environment ([docs/GOVERNANCE.md](docs/GOVERNANCE.md),
-[docs/GOVERNANCE.md](docs/GOVERNANCE.md) section 7); the first
-registered run; the H1 prospective window; the combined-book profile PF-3. The H3 and H4 intraday families are data-ineligible on the free route and
-D5 is ineligible on daily data; their specifications say so.
-
-## Five-minute quick start
+## Quick start
 
 ```bash
 git clone https://github.com/AshJha0/intraday-alpha-platform.git
@@ -80,42 +48,33 @@ python -m venv .venv-ci
 cd python && PYTHONPATH=src ../.venv-ci/bin/python -m pytest -q tests/leakage tests/portfolio tests/execution/test_sim_waterfall.py tests/reports tests/equivalence
 ```
 
-That runs the v2.0 engine suite on its synthetic fixtures: the leakage canaries, the ledger
-conservation invariants, the cost waterfall reconciling to the cash identity, the E5 report
-builders and the H1 equivalence test (62 tests, about twenty seconds; CPython 3.11 or 3.12).
-Everything it produces is a correctness check on fixtures and carries no evidence class. The
-research loop on a family specification is
-[archive/docs/COOKBOOK.md](archive/docs/COOKBOOK.md) recipe 1. The full four-language parity table is
-`bash tests/harness/run_all.sh` (Linux or WSL; needs the C++ and Rust toolchains of
-[docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)).
+That runs the v2.0 engine suite on synthetic fixtures: the leakage canaries, the ledger
+conservation invariants, the cost waterfall against the cash identity, the E5 report builders and
+the H1 equivalence test (about twenty seconds; CPython 3.11 or 3.12). It is a correctness check
+and carries no evidence class. The full loop on one instrument is `python -m iap.mvp run`
+([docs/MVP.md](docs/MVP.md)); every runnable command is in [docs/COOKBOOK.md](docs/COOKBOOK.md) (v2.0) and [COOKBOOK.md](COOKBOOK.md) (v1.x).
 
-## Where to go next
+## Documentation
 
-| if you want to | read |
+| for | read |
 |---|---|
-| understand the method: point-in-time data, selection accounting, the gate, the economic chain, evidence classes | [archive/docs/LEARN.md](archive/docs/LEARN.md) |
-| run something that exists today | [archive/docs/COOKBOOK.md](archive/docs/COOKBOOK.md) |
-| find a package, an import rule, an identity or the runner flow | [docs/ARCHITECTURE_v2.md](docs/ARCHITECTURE_v2.md), [python/src/iap/README.md](python/src/iap/README.md) |
-| operate it day to day | [docs/RUNBOOK_v2.md](docs/RUNBOOK_v2.md), [docs/RUNBOOKS.md](docs/RUNBOOKS.md) |
-| check what is enforced and by whom | [docs/GOVERNANCE.md](docs/GOVERNANCE.md), [docs/GOVERNANCE.md](docs/GOVERNANCE.md), [docs/GOVERNANCE.md](docs/GOVERNANCE.md), [docs/GOVERNANCE.md](docs/GOVERNANCE.md) |
-| reproduce a committed result | [docs/REPRODUCTION.md](docs/REPRODUCTION.md) |
-| know what data is used and under which licence | [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md), [docs/review/DATA_COVERAGE_FREE_ROUTE.md](docs/review/DATA_COVERAGE_FREE_ROUTE.md) |
-| read the record: reviews, releases, defects, every result and its class | [archive/docs/REVIEW_PACK.md](archive/docs/REVIEW_PACK.md), [docs/release/](docs/release/), [docs/review/](docs/review/), [CHANGELOG.md](CHANGELOG.md) |
-| see what every document is for and whether it is current | [archive/docs/DOC_AUDIT_v2.md](archive/docs/DOC_AUDIT_v2.md) |
-| the v1.x engines and their contracts | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DIAGRAMS.md](docs/DIAGRAMS.md), [docs/API_REFERENCE.md](docs/API_REFERENCE.md), [docs/API_REFERENCE.md](docs/API_REFERENCE.md), [docs/API_REFERENCE.md](docs/API_REFERENCE.md), [PLATFORM_CONVENTIONS.md](PLATFORM_CONVENTIONS.md), the frozen v1.x [LEARN.md](LEARN.md) and [COOKBOOK.md](COOKBOOK.md) |
-| contribute | [CONTRIBUTING.md](CONTRIBUTING.md), [docs/POLYGLOT.md](docs/POLYGLOT.md) (which language copies are frozen), the pull-request template |
-| the history: how the numbers moved, release by release | [archive/docs/README_HISTORY.md](archive/docs/README_HISTORY.md), [docs/SHOWCASE.md](docs/SHOWCASE.md) |
+| the method and its vocabulary | [docs/LEARN.md](docs/LEARN.md) (v2.0); the v1.x intraday version is [LEARN.md](LEARN.md) |
+| where things are | [docs/ARCHITECTURE_v2.md](docs/ARCHITECTURE_v2.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (v1.x engines), [docs/DIAGRAMS.md](docs/DIAGRAMS.md), [python/src/iap/README.md](python/src/iap/README.md) |
+| interfaces | [docs/API_REFERENCE.md](docs/API_REFERENCE.md), [PLATFORM_CONVENTIONS.md](PLATFORM_CONVENTIONS.md) |
+| operating it | [docs/RUNBOOK_v2.md](docs/RUNBOOK_v2.md), [docs/RUNBOOKS.md](docs/RUNBOOKS.md) |
+| governance, security, reproduction | [docs/GOVERNANCE.md](docs/GOVERNANCE.md), [docs/REPRODUCTION.md](docs/REPRODUCTION.md) |
+| data and licences | [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md), [docs/REAL_DATA.md](docs/REAL_DATA.md) |
+| the record | [docs/release/](docs/release/v2.0.0_RELEASE_NOTES.md), [CHANGELOG.md](CHANGELOG.md); older plans, reviews and release notes are in [archive/docs/](archive/docs/) |
+| contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 ## How it is built, and who checked what
 
 Python is the reference implementation of every semantics; the C++ and Rust copies implement the
 same rules and golden tests prove the three equal. The Java layer of v1.x is archived at the git
-tag `archive/java-v1.14.0` and is not built. The code, tests and documents were produced with
-Claude (AI) assistance; the owner merges and signs, and an outside reviewer has written decisions
-on file for the statistical protocols ([docs/release/](docs/release/)). Nothing here asks a reader
-to trust that text: every number in a document names the artefact it comes from, and the CI jobs
-`docs` and `deployment` re-derive the headline figures and fail on a dead link, a vanished symbol
-or a stale status phrase.
+tag `archive/java-v1.14.0`. The code, tests and documents were produced with Claude (AI)
+assistance; the owner merges and signs, and an outside reviewer wrote decisions on the
+statistical protocols. Every number in a document names the artefact it comes from, and CI
+re-derives the headline figures and fails on a dead link or a stale status phrase.
 
 ## Cross-language parity (the `tests/harness/run_all.sh` table, counts from CI)
 

@@ -4,8 +4,8 @@ One page for a contributor or reviewer who needs to know where things are and wh
 what. The v1.x engine architecture (order book, feature factory, execution simulator, risk engine,
 replay, the C++ and Rust ports and their goldens) is unchanged and documented in
 [ARCHITECTURE.md](ARCHITECTURE.md) and [DIAGRAMS.md](DIAGRAMS.md); this page covers what v2.0
-added on top of it and how the pieces are kept apart. Method and vocabulary: [LEARN.md](../archive/docs/LEARN.md).
-Runnable commands: [COOKBOOK.md](../archive/docs/COOKBOOK.md).
+added on top of it and how the pieces are kept apart. Method and vocabulary: [LEARN.md](../docs/LEARN.md).
+Runnable commands: [COOKBOOK.md](../docs/COOKBOOK.md).
 
 ## 1. Package map
 
