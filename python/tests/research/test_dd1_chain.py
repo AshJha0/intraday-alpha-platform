@@ -232,3 +232,34 @@ def test_m1_records_an_unfitted_tier_instead_of_raising(tmp_path):
     assert rep["decision"]["carried"] == "M0 (incumbent stays)"
     trial = json.loads((tmp_path / "ml" / "trial_ledger.json").read_text())
     assert any(e["kind"] == "m1_not_fitted" for e in trial["entries"])
+
+
+# --------------------------------------------- exploratory runs (U0 DR-19) --
+def _incomplete_copy(dd1_set, tmp_path):
+    import shutil
+
+    copy = tmp_path / "dd1_2026"
+    shutil.copytree(dd1_set[0], copy)
+    rp = copy / "dataset.json"
+    rec = json.loads(rp.read_text())
+    rec["status"] = "incomplete"
+    rp.write_text(json.dumps(rec))
+    return copy
+
+
+def test_an_incomplete_record_runs_only_as_exploratory_with_its_own_ledger(
+    dd1_set, tmp_path, capsys
+):
+    tool = _tool()
+    copy = _incomplete_copy(dd1_set, tmp_path)
+    out = tmp_path / "out"
+    base = ["--dataset", str(copy), "--out", str(out), "--families", "D3", "--ml-family", ""]
+    # without the flag the panel refuses the incomplete record
+    assert tool.main([*base, "--ledger", str(out / "ledger.json")]) == 2
+    # with the flag, a ledger outside --out (the committed one, say) is refused
+    assert tool.main([*base, "--exploratory", "--ledger", str(tmp_path / "ledger.json")]) == 2
+    capsys.readouterr()
+    assert tool.main([*base, "--exploratory", "--ledger", str(out / "ledger.json")]) == 0
+    s = json.loads(capsys.readouterr().out)
+    assert s["evidence_class"].startswith("exploratory, data-ineligible")
+    assert (out / "EXPLORATORY.txt").read_text().startswith("exploratory, data-ineligible")
