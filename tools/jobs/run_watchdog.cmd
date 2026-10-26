@@ -1,5 +1,5 @@
 @echo off
-rem Job watchdog launcher (docs/runbooks/RUNBOOK_job_watchdog.md).
+rem Job watchdog launcher (docs/RUNBOOKS.md).
 rem Usage: run_watchdog.cmd [registry]   default registry: data\real\jobs.json
 rem Runs one tick; schedule it every 10 min with Task Scheduler (see the runbook).
 setlocal

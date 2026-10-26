@@ -7,7 +7,7 @@ hash check) into the :class:`~iap.contracts.protocols.Alpha` protocol: one
 :class:`~iap.contracts.types.AlphaSignal` out.  The raw signal is the
 alpha class's own :meth:`~iap.alpha.base.LinearAlpha.raw_signal` (reused,
 not re-derived); the scaling is the pinned ``linear_z_v1`` rule of
-API_ALPHA.md §2 applied to that one row — ``z = clip((raw - mu) /
+docs/API_REFERENCE.md §2 applied to that one row — ``z = clip((raw - mu) /
 (sigma + EPS), ±z_clip)``, ``er = beta * z``, ``conf = min(1, |z| /
 conf_scale)``, an invalid input or a dead alpha scores ``(0, 0)``.  The
 batch scorer :meth:`~iap.alpha.base.LinearAlpha.score` is a research

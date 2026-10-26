@@ -5,7 +5,7 @@ built-in `_DEFAULT_CONFIG` whenever `generator.json` was absent or the
 `--config` path was typo'd. The defaults happen to equal the committed file
 today, so the divergence would appear only later — as a dataset whose version
 silently changed (anomaly rates, sessions, seed), which breaks the
-reproducibility chain in REPRODUCIBILITY.md.
+reproducibility chain in docs/GOVERNANCE.md.
 
 Contract: PLATFORM_CONVENTIONS.md §8 / §12.2, SPEC §26.
 """

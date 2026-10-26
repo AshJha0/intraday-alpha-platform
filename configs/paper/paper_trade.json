@@ -1,6 +1,6 @@
 {
   "x-version": 1,
-  "description": "Forward paper trade (v1.16 item 9, infrastructure): the rule, realism and monitor thresholds read by python -m iap.paper.daily. Paths are repository-relative; reference feature stores are relative to --data-root. docs/runbooks/RUNBOOK_paper_trade.md.",
+  "description": "Forward paper trade (v1.16 item 9, infrastructure): the rule, realism and monitor thresholds read by python -m iap.paper.daily. Paths are repository-relative; reference feature stores are relative to --data-root. docs/RUNBOOKS.md.",
   "prereg": "configs/prereg/v3.json",
   "mvp_config": "configs/mvp/mvp.json",
   "execution_config": "configs/execution/execution.json",

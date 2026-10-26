@@ -2,7 +2,7 @@
 
 Each test is named after the scenario, constructs the real-world event
 sequence, and pins the behaviour from PLATFORM_CONVENTIONS.md section 4 /
-API_CORE.md sections 3-5, 7. The same scenarios exist in C++, Rust and Java.
+docs/API_REFERENCE.md sections 3-5, 7. The same scenarios exist in C++, Rust and Java.
 """
 
 import json

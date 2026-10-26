@@ -328,7 +328,7 @@ def slice_cases() -> tuple[dict, list]:
 
 def document() -> dict:
     doc = base_document(
-        "F7 rule 5 golden: the Almgren-Chriss eta path (iap.execution.optimal; API_TRADING.md "
+        "F7 rule 5 golden: the Almgren-Chriss eta path (iap.execution.optimal; docs/API_REFERENCE.md "
         "sections 2.11 X-P2-15, 2.13 P0-5, 2.14 B3). calibration cases: "
         "ac_params_from_calibration with `coeff` already resolved (the slope or residual "
         "coefficient; the resolution from a calibration document is a dict read, not "

@@ -86,7 +86,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/PORTFOLIO_BREADTH.md">Portfolio breadth</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/SIGNAL_RESEARCH.md">Signal research</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/DATA_SOURCES.md">Data sources</a>
-      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/governance/GOVERNANCE.md">Governance</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/GOVERNANCE.md">Governance</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/POLYGLOT.md">Polyglot policy</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/CHANGELOG.md">Changelog</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/papers/INDEX.md">Research papers</a>
@@ -481,7 +481,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
       <p>IEX HIST is a free, daily second venue. 9 overlap days approved; day 1 (2025-11-28) is processed:
          148,115,121 IEX-TP messages, 0 sequence gaps, and the TOPS oracle shows 0 mismatches for AAPL, MSFT and
          QQQ (as of v1.17.0). 6 of the 9 days were recorded by v1.17.1; the v1.18 verification run found an identity pass on all six, and absolute IEX latency and Nasdaq skew are not claimed.
-         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/research/IEX_OVERLAP_SET.md">IEX_OVERLAP_SET</a></p></div>
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/RESEARCH_NOTES.md">IEX_OVERLAP_SET</a></p></div>
     <div class="card"><h3>Agents</h3>
       <p>E1 spend ledger with a monthly cap of USD 30; E2 research assistant; E3 morning ops and E4 docs sync on a
          smaller model. The LLM never computes a number, signs, registers or merges.
@@ -495,9 +495,9 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
          hashes and the thresholds; every runner re-checks it. Real data is read only through a fail-closed
          holdout registry that decides by content, not path. One real-data ledger family: real-data N went from 24
          to 256 configurations (6,826 recorded looks over 640 distinct configurations in all).
-         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/governance/ANALYSIS_IDENTITY.md">ANALYSIS_IDENTITY</a>,
-         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/governance/DATA_ACCESS_PATHS.md">DATA_ACCESS_PATHS</a>,
-         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/governance/TRUST_ROOT.md">TRUST_ROOT</a></p></div>
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/GOVERNANCE.md">ANALYSIS_IDENTITY</a>,
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/GOVERNANCE.md">DATA_ACCESS_PATHS</a>,
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/GOVERNANCE.md">TRUST_ROOT</a></p></div>
     <div class="card"><h3>Known-null calibration: failed</h3>
       <p>Null v1 passed vacuously, v2 failed, and v3 (run 2026-10-23) failed: 79 and 80 of 1,854 conditional
          rejections (about 4.3&nbsp;%) against a 2.5&nbsp;% target. The outside reviewer rejected the method as the F3 gate,
@@ -569,14 +569,14 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
          a finding is filed only if every number in it appears in a cited artefact. Budgets cap
          spend, tokens, tool calls and pre-registrations; the transcript is kept. Optional
          <code>[llm]</code> extra; mocked evals in CI
-         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/governance/GOVERNANCE.md">GOVERNANCE §2b</a>).</p></div>
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/GOVERNANCE.md">GOVERNANCE §2b</a>).</p></div>
     <div class="card"><h3>Model registry &amp; shadow mode</h3>
       <p>Fitted models as citable records: the id is a content hash of the artefact, data version
          and dates, features, code fingerprint and seed; records are immutable and re-verified on
          load; registration needs a pre-registration or is marked exploratory. Feature, prediction
          and calibration drift (PSI, KS, ECE, Brier, IC decay) as OK/ALERT, and a candidate scored
          beside the champion that never acts
-         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/API_ADAPTIVE.md">API_ADAPTIVE §9</a>).</p></div>
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/API_REFERENCE.md">API_ADAPTIVE §9</a>).</p></div>
     <div class="card"><h3>Polyglot policy</h3>
       <p>Every component that exists in more than one language has one decision per copy:
          canonical (new behaviour lands here) or frozen (built, tested, golden-pinned, no new
@@ -653,7 +653,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
          passive exit; a two-sided quoter skews an Avellaneda–Stoikov reservation price with the
          alpha. Both decompose P&amp;L exactly; since v1.13 quotes can be set in ticks and markouts
          use one reference convention. Python research code, opt-in; results so far are
-         synthetic (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/API_TRADING.md">API_TRADING §2.6–2.8</a>).</p></div>
+         synthetic (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/API_REFERENCE.md">API_TRADING §2.6–2.8</a>).</p></div>
     <div class="card"><h3>Auction imbalance</h3>
       <p>Nasdaq NOII and cross messages decoded in a separate opt-in pass, so the normalized
          dataset and its version do not change. Auction features (imbalance ratio,
@@ -676,20 +676,20 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
          feedback that stands down, widens or shrinks while fills are toxic (synthetic quoting
          markout −62.75 → −1.75 with a 2 bp threshold). A cost-aware multi-venue router prices fill
          probability, toxicity, latency and fee tiers. Python, opt-in, synthetic only
-         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/API_TRADING.md">API_TRADING §2.9–2.10</a>).</p></div>
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/API_REFERENCE.md">API_TRADING §2.9–2.10</a>).</p></div>
     <div class="card"><h3>Extended features &amp; event clocks</h3>
       <p>Nineteen opt-in features: queue time-to-depletion, trade-sign autocorrelation, Hawkes
          intensities with online recursion, and odd-lot / non-displayed execution shares, with rows
          sampled on an event or volume clock. They carry their own feature version; the default
          registry hash and every golden are unchanged. Not yet run on real data
-         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/API_FEATURES.md">API_FEATURES §8</a>).</p></div>
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/API_REFERENCE.md">API_FEATURES §8</a>).</p></div>
     <div class="card"><h3>Alerting &amp; latency SLOs</h3>
       <p>Alertmanager routes <code>page</code>, <code>ticket</code> and a <code>Watchdog</code>
          heartbeat, with receiver URLs read from Secret files (nothing secret committed) and a local
          echo sink for compose. Multi-window burn-rate SLOs on the order-path and event-path latency histograms
          (99% under ~1.05 ms over 30 days) with promtool tests, and a state-backup CronJob. HA is
          one pod restarting and resuming from its checkpoint, not active-active
-         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/runbooks/RUNBOOK_alerting.md">RUNBOOK_alerting</a>).</p></div>
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/RUNBOOKS.md">RUNBOOK_alerting</a>).</p></div>
     <div class="card"><h3>Research governance</h3>
       <p>Every agent write goes through one broker onto a hash-chained blackboard. A
          pre-registration debits a look on the multiple-testing ledger and records a fingerprint
@@ -701,7 +701,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
          edges need a signed approval. Since v1.14 the agent key registry must be signed by a
          maintainer trust root read from <code>main</code>, the look ledger is itself a hash chain,
          and pip-audit, cargo audit, cargo deny and Trivy block the build
-         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/governance/GOVERNANCE.md">GOVERNANCE</a>).</p></div>
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/GOVERNANCE.md">GOVERNANCE</a>).</p></div>
     <div class="card"><h3>Event-driven backtester</h3>
       <p>Replays every market event in event-time through book → features → alphas →
          portfolio → risk → execution with modeled decision/wire/venue latency, partial
@@ -731,8 +731,8 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
       <p>17 JSON Schemas mirrored by 22 frozen, validated Python contracts and 18 runtime-checkable
          Protocols; canonical JSON reproduced byte for byte in Python, C++ and Rust (Java until its archive). Python ports of the
          hard risk engine and the execution stack proven by the same goldens the archived Java ports used
-         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/API_CONTRACTS.md">API_CONTRACTS</a>,
-         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/API_TRADING.md">API_TRADING</a>).</p></div>
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/API_REFERENCE.md">API_CONTRACTS</a>,
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/API_REFERENCE.md">API_TRADING</a>).</p></div>
     <div class="card"><h3>Promotion lifecycle</h3>
       <p>RESEARCH → CANDIDATE → VALIDATING → PAPER → ACTIVE ⇄ WATCH → RETIRED: 17 pinned edges, 20 gates
          reading typed evidence, a byte-deterministic registry and transition log, a Rust port (and the archived Java one)

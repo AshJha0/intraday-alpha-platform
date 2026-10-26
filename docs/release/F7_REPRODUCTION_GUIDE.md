@@ -136,10 +136,10 @@ was skipped for memory, so plan for a machine with ample RAM and say what you us
 | `iex/iex_20260515` | `bd6f9c707d898007ca281ff093602176c39ac1cf45e0894808e7d1f14bdd3904` | `20260515_IEXTP1_DPLS1.0.pcap.gz`, 11,905,260,029 B | `1b917e6101c1e1af9e082a5c79961e97e66d123d94aefbe7db0efc154ce2c683` | IEX HIST |
 | `iex/iex_20260518` | `ba2022d0d53c013be27f9b3ce6eeef13baa4280009ef32f6c2761b43e61037f4` | `20260518_IEXTP1_DPLS1.0.pcap.gz`, 14,210,389,328 B | `a5239f606eb25a11b6621a379e4c6a77ea96545bee6e2482ee5e72d15a6173a2` | IEX HIST |
 
-`dataset_version` is the sha256 over the normalized IAP1 bytes (`docs/governance/REPRODUCIBILITY.md`
+`dataset_version` is the sha256 over the normalized IAP1 bytes (`docs/GOVERNANCE.md`
 section 1); the ingest is deterministic, so the same raw bytes and the same ingest code give the
 same version, and the runner checks it before any analysis. Ingest procedure:
-`docs/runbooks/RUNBOOK_process_and_delete.md` ("IEX HIST days", `process-iex-day`) for the IEX
+`docs/RUNBOOKS.md` ("IEX HIST days", `process-iex-day`) for the IEX
 days, `python -m iap.marketdata ingest --format itch50 ...` for Nasdaq
 (`docs/REAL_DATA.md` section 3, `docs/runbooks/RUNBOOK_rel07_breadth_labels.md` for an example).
 **The exact ingest invocation per dataset is not recorded in the repository** (not recorded in the repository); the

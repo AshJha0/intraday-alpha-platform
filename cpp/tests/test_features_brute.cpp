@@ -160,7 +160,7 @@ protected:
                     const std::int64_t mid2 = bid[0].first + ask[0].first;
                     // Pinned: compare against the last RECORDED mid sample,
                     // so a one-sided flicker that moves the mid still
-                    // contributes a vol sample (API_FEATURES.md section 2).
+                    // contributes a vol sample (docs/API_REFERENCE.md section 2).
                     if (!have_hist || mid2 != prev_mid2) {
                         const double lm =
                             std::log(static_cast<double>(mid2));

@@ -53,7 +53,7 @@ dark-filled notional plus this child's at the current mid must not exceed
 at once and is counted per code. Per plan row F8 these controls are
 Rust-owned: this module is the Python mirror of the risk-engine interface
 and the golden vectors of :data:`DARK_CONTROL_GOLDENS` are the ones the
-Rust engine must reproduce (``docs/research/B10_F8_HANDOVER.md``).
+Rust engine must reproduce (``docs/RESEARCH_NOTES.md``).
 
 Every function here is plain scalar arithmetic and loops (the C++ port,
 F7, keeps the shape); numpy is not used.

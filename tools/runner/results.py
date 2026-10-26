@@ -6,7 +6,7 @@ the checked-out bound commit is never touched: ``results/<prereg slug>/
 <seq>/result.json`` and ``hashes.json``, plus one line appended to
 ``research/audit/CHECKPOINTS.jsonl`` (the repository anchor of the sealed
 service's audit chain).  History is preserved by the branch protection the
-owner sets (``docs/governance/REPO_SETTINGS.md`` section 7); the service
+owner sets (``docs/GOVERNANCE.md`` section 7); the service
 keeps its own copy of the result hash, so a rewritten result is detectable
 (``tools/runner/run.py verify-result``).
 """

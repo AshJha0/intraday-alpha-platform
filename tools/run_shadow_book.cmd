@@ -1,5 +1,5 @@
 @echo off
-rem Track C forward shadow book (docs/runbooks/RUNBOOK_shadow_book.md).
+rem Track C forward shadow book (docs/RUNBOOKS.md).
 rem Appends the next calendar session from the inbox; prints counts only.
 rem %1 = shadow book directory, %2 = inbox directory (defaults below).
 rem Exit 0 appended / already recorded / calendar exhausted, 2 refused.

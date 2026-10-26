@@ -1,4 +1,4 @@
-//! Feature-engine ingestion scenarios (API_FEATURES.md §2, round-3 RESEARCH).
+//! Feature-engine ingestion scenarios (docs/API_REFERENCE.md §2, round-3 RESEARCH).
 //!
 //! Rust mirror of `python/tests/test_feature_ingestion.py`: each test is a
 //! real-world event sequence whose expected behaviour is pinned by the

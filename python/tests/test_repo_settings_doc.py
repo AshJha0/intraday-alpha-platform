@@ -1,4 +1,4 @@
-"""REPO_SETTINGS.md describes the live ruleset, not a remembered one (v2.0 stage 11, S4).
+"""docs/GOVERNANCE.md describes the live ruleset, not a remembered one (v2.0 stage 11, S4).
 
 ``docs/governance/repo_settings_live.json`` is the snapshot ``tools/repo_settings_snapshot.py write``
 takes with ``gh api``; the CI governance job warns when the live settings drift from it.  This
@@ -16,7 +16,7 @@ import re
 import yaml
 from conftest import REPO_ROOT
 
-DOC = REPO_ROOT / "docs" / "governance" / "REPO_SETTINGS.md"
+DOC = REPO_ROOT / "docs" / "GOVERNANCE.md"
 SNAPSHOT = REPO_ROOT / "docs" / "governance" / "repo_settings_live.json"
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 
@@ -84,7 +84,7 @@ def test_matrix_lists_exactly_the_live_required_contexts():
     documented = [r["context"] for r in rows]
     assert len(documented) == len(set(documented)), "duplicate rows"
     assert sorted(documented) == snap["required_status_checks"], (
-        "REPO_SETTINGS.md section 1 and repo_settings_live.json disagree; "
+        "docs/GOVERNANCE.md section 1 and repo_settings_live.json disagree; "
         "re-run tools/repo_settings_snapshot.py write and update the matrix"
     )
 
@@ -113,7 +113,7 @@ def test_document_states_the_snapshot_date_and_the_count():
 
 def test_the_advisory_alias_exists_while_the_ruleset_names_it():
     """The job is `lint-and-secrets`; the ruleset still says `advisory`.  Until the owner swaps the
-    context (REPO_SETTINGS.md owner action 1) ci.yml must carry the alias job, or no PR can merge."""
+    context (docs/GOVERNANCE.md owner action 1) ci.yml must carry the alias job, or no PR can merge."""
     snap = json.loads(SNAPSHOT.read_text(encoding="utf-8"))
     ci = yaml.safe_load((WORKFLOWS / "ci.yml").read_text(encoding="utf-8"))
     jobs = ci["jobs"]

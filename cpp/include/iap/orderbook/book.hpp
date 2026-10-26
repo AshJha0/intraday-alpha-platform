@@ -1,6 +1,6 @@
 // L1/L2/MBO order book (PLATFORM_CONVENTIONS.md section 4 — pinned).
 //
-// Semantics mirror python/src/iap/orderbook/book.py exactly (see API_CORE.md
+// Semantics mirror python/src/iap/orderbook/book.py exactly (see docs/API_REFERENCE.md
 // section 4): status-gated matching, synthetic ids for id-less QUOTE/SNAPSHOT
 // records, SNAPSHOT countdown validation, the full malformed-event policy
 // (drop + count, checked i64 arithmetic, never throw mid-stream), sequence
@@ -190,7 +190,7 @@ inline bool operator==(const BookCheckpoint& a, const BookCheckpoint& b) {
 // Per-event verdict returned by OrderBook::apply (pinned).
 //
 // applied + dropped + held == events fed, for every book; downstream
-// consumers (feature engine, API_FEATURES.md section 2) MUST ignore every
+// consumers (feature engine, docs/API_REFERENCE.md section 2) MUST ignore every
 // event that is not APPLIED.
 enum class ApplyStatus : std::uint8_t {
     APPLIED = 0,  // the event changed book state (or a valid no-op)
@@ -213,7 +213,7 @@ public:
     // Apply one event (sequence-checked). Throws std::invalid_argument ONLY
     // on routing errors; every malformed event is dropped + counted.
     // Returns the pinned per-event verdict: downstream consumers (the
-    // feature engine, API_FEATURES.md section 2) fold ONLY APPLIED events
+    // feature engine, docs/API_REFERENCE.md section 2) fold ONLY APPLIED events
     // into rolling state.
     ApplyStatus apply(const MarketEvent& ev);
 

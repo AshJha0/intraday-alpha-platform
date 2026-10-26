@@ -15,7 +15,7 @@ own caveats.
 | Rust replay demo | `cd rust && cargo run --release --bin demo` — demo-scale replay throughput over the golden vectors, streamed from a decoder thread through the bounded SPSC event bus into the engine (round-3 slab/intrusive-list book, O(1) cancels; a recent container run: ≈ 6.5M events/s equity, ≈ 5.1M events/s FX including the cross-thread hand-off; single timed pass, high variance) |
 | [results_tick_to_trade.md](results_tick_to_trade.md) | v1.12: per-event tick-to-trade percentiles (p50/p90/p99/p99.9/max) end to end and per stage, from a CI runner; also the baseline of the p50/p99 CI guard. Regenerate: `cpp/build/bench_tick_to_trade benchmarks/results_tick_to_trade.md` (on a CI runner, or download the `bench-tick-to-trade` artifact of the cpp job) |
 | [results_exec_rules.md](results_exec_rules.md) | v1.17 (F7): per-event latency percentiles of the C++ execution-rule ports (sor_v2 sweep / passive route, rule 6b adder, `pov_exact` target, B2 read, B3 pacing, B4 fade, B5 queue rule + hazard) on the golden stream and the real slice, from a CI runner. Regenerate: `cpp/build/bench_exec_rules benchmarks/results_exec_rules.md` (or download the `bench-exec-rules` artifact of the cpp job). Report-only, no guard |
-| [slices/itch50_20190130_AAPL](slices/itch50_20190130_AAPL/SLICE.md) | v1.17 (F4/F5): the committed REAL slice every CI guard below runs on — Nasdaq ITCH 5.0, AAPL, 2019-01-30 from the 09:30 open, 1,132 book-reconstruction ADDs + 64,000 real events (4.69 MB; the book reaches ~2,700 price levels per side); provenance in its `SLICE.md` / `dataset.json`, cut by `tools/extract_real_slice.py` (docs/governance/REPRODUCIBILITY.md §3.5) |
+| [slices/itch50_20190130_AAPL](slices/itch50_20190130_AAPL/SLICE.md) | v1.17 (F4/F5): the committed REAL slice every CI guard below runs on — Nasdaq ITCH 5.0, AAPL, 2019-01-30 from the 09:30 open, 1,132 book-reconstruction ADDs + 64,000 real events (4.69 MB; the book reaches ~2,700 price levels per side); provenance in its `SLICE.md` / `dataset.json`, cut by `tools/extract_real_slice.py` (docs/GOVERNANCE.md §3.5) |
 | [latency_budget.json](latency_budget.json) | v1.17 (F4): the Python MVP loop per-event latency budget (`iap.mvp.latency`, guard `tests/harness/check_mvp_latency_budget.py`): a measured CI p50 / p99 on the slice with run id and runner CPU, and the limits derived from them |
 | [memory_budget.json](memory_budget.json) | v1.17 (F5): peak RSS of the normaliser and the feature build on the slice (guard `tests/harness/check_slice_memory.py`), measured on CI with provenance, and the limits derived |
 | Python tick-to-trade | `python3 tools/tick_to_trade_py.py` — the same path through the Python reference implementation (events/s and percentiles in µs; laptop-scale, not committed) |
@@ -223,7 +223,7 @@ the book grows to ~40,000 resting orders over ~2,700 price levels per side,
 so the level map, the free lists and the feature engine's book view run at
 real depth instead of the handful of levels of the synthetic streams), 10
 timed passes; its `t2t realslice p50 / p99` rows are guarded like the other
-two. Provenance: the slice's `SLICE.md` and `docs/governance/REPRODUCIBILITY.md`
+two. Provenance: the slice's `SLICE.md` and `docs/GOVERNANCE.md`
 §3.5. Same CI-machine caveat as above: a shared runner, CPU model varying
 between runs. Committed run (CI 38805495578, AMD EPYC 7763, 2026-10-15;
 651,320 samples, book drops 0), nanoseconds:

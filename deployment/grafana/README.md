@@ -121,7 +121,7 @@ Source column: `report` = the newest MVP run's `report.json`
 | `md_event_time_gap_seconds`, `book_stale{instrument}` | the live feed thread / books | the exporter reads a finished run's report, not a live feed |
 | `decode_latency_ns`, `book_update_latency_ns`, `exec_slippage_bps`, `jvm_gc_pause_ns` | in-process histograms | `report.json` carries percentiles, not raw samples; there is no JVM |
 | `risk_session_restarts_total`, `risk_resume_open_orders_released_total` | `--resume` | the MVP loop is deterministic and reruns; it does not resume |
-| `admin_requests_total`, `admin_auth_rate_limited_total`, `admin_audit_suppressed_total`, `exec_orders_blocked_kill_pending_total` | the kill-switch admin API | no admin API: the manual halt is the config path (RUNBOOK_incident_kill_switch.md) |
+| `admin_requests_total`, `admin_auth_rate_limited_total`, `admin_audit_suppressed_total`, `exec_orders_blocked_kill_pending_total` | the kill-switch admin API | no admin API: the manual halt is the config path (docs/RUNBOOKS.md) |
 | `risk_routed_venue_mismatch_total` | `PaperTrading.RiskWiring` | not counted by the MVP wiring |
 | `alpha_live_vs_backtest_drift{alpha}`, `alpha_lifecycle_state{alpha}` | `com.iap.adaptive` | the Python drift and lifecycle monitors run offline (`iap.paper.monitors`, `iap.adaptive`), not as a live gauge |
 
@@ -186,7 +186,7 @@ mounted secret files. Compose defaults to the local `alert-sink` echo
 service; real delivery needs the operator's URLs (compose
 `ALERT_PAGE_URL_FILE` / `ALERT_TICKET_URL_FILE`, k8s Secret
 `iap-alertmanager-webhook` keys `page_url` / `ticket_url`;
-docs/runbooks/RUNBOOK_alerting.md). `Watchdog` (`vector(1)`) fires
+docs/RUNBOOKS.md). `Watchdog` (`vector(1)`) fires
 permanently and is routed to its own receiver, which is a no-op here; point
 it at an external dead-man's-switch to be told when the alerting pipeline
 itself stops.

@@ -574,7 +574,7 @@ which data and records how well the inference step behaves on data with no signa
 
 Review finding R-5: `run_meta_labeling` chose `best_tau` on the calibration
 segment, the rows its own calibrator was fitted on. `split_mode=
-"calibrate_select"` (opt-in; API_ALPHA.md §10) adds a *select* segment
+"calibrate_select"` (opt-in; docs/API_REFERENCE.md §10) adds a *select* segment
 between calibration and test (40/20/20/20 of the meta rows by row mass,
 purged at the label horizon and embargoed 60 s at every boundary): the
 calibrator never sees the rows the tau is chosen on, and neither sees the
@@ -616,7 +616,7 @@ Nothing here changes a gate, a threshold or a verdict.
   non-blocking CI `::warning::` when a pull request changes code or features
   that an OPEN pre-registration fingerprints (`--strict` fails locally).
 
-API: [API_ALPHA.md](../API_ALPHA.md) §7.2.
+API: [docs/API_REFERENCE.md](API_REFERENCE.md) §7.2.
 
 ## 4d. v1.17 WS-D: the model-zoo gate, the CPCV path IC and GBM as an alpha
 

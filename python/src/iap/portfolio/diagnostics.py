@@ -30,7 +30,7 @@ def constraint_audit(
     "realized_vol": .., "target_vol": .., "n_binding": .., "feasible": ..,
     "max_violation": ..}``; each constraint row carries name / value / bound
     / slack / binding. ``feasible`` is ``max_violation <= bind_tol`` — an
-    INFEASIBLE solve (API_PORTFOLIO_TCA.md §1.3) audits ``w_prev`` and shows
+    INFEASIBLE solve (docs/API_REFERENCE.md §1.3) audits ``w_prev`` and shows
     negative slack on the violated rows.
     """
     w = np.asarray(w, dtype=np.float64)

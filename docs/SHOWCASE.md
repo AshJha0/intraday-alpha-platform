@@ -119,7 +119,7 @@ separated custody and no independent party has reproduced a result.
 - **Dark venue (B10): modelled, not measured** (no free dark-pool data).
 - **IEX second venue (as of v1.17.0):** day 1 (2025-11-28) processed, TOPS oracle 0
   mismatches for AAPL, MSFT and QQQ; 6 of the 9 overlap days were recorded by v1.17.1.
-  <!-- source: docs/research/IEX_OVERLAP_SET.md -->
+  <!-- source: docs/RESEARCH_NOTES.md -->
 - **Known gap:** v1.17.0 ships no release manifest, no lock-file SBOMs and
   no digest-pinned k8s manifests; fixed by PR #211, ships with v1.17.1.
 <!-- source: CHANGELOG.md "## v1.17.0"; archive/docs/release/v1.17.0_RELEASE_NOTES.md -->
@@ -143,7 +143,7 @@ reported as stale rather than failing).
 | Contracts | 17 JSON Schemas · 22 typed Python contracts · 18 runtime-checkable Protocols | `schemas/`, `python/src/iap/contracts/` |
 | Experiments ledger | real data: 256 configurations holding 1,132 of the looks (per-dataset real ledgers and the B7/B8 execution studies merged in by the v1.18 REL-02 migration); synthetic data: 384 configurations holding 5,694 of the looks (excluded from the real-data N); total 6,826 recorded looks over 640 distinct configurations; expected max \|t\| 4.202; Bonferroni per-test \|t\| ≥ 4.484; a lower bound, not a complete historical denominator (known gaps: `research/v118/LEDGER_INVENTORY.md`) | `research/experiments.json`, `research/v118/LEDGER_INVENTORY.md` |
 | C++ tick-to-trade (shared CI runner AMD EPYC 7763, no pinning, `steady_clock`; not colocation) | p50 1,279 ns · p99 2,559 ns · p99.9 11,263 ns, in-process, decoded frame to order intent | `benchmarks/results_tick_to_trade.md` |
-| Rust feature engine from Python (CI runner ubuntu-24.04; not colocation) | about 790,000 events/s against about 5,250 through the Python reference on the 45 native slots: 150x, not a pipeline speed-up | `rust-pyo3` CI job summary, API_FEATURES.md §7.1 |
+| Rust feature engine from Python (CI runner ubuntu-24.04; not colocation) | about 790,000 events/s against about 5,250 through the Python reference on the 45 native slots: 150x, not a pipeline speed-up | `rust-pyo3` CI job summary, docs/API_REFERENCE.md §7.1 |
 <!-- source: README.md "Headline numbers" table and "Cross-language parity" table (every row); the same figures appear in docs/index.html "Measured, not claimed" -->
 
 **No latency edge; benchmarks are not colocation numbers.** The two speed rows above are in-process

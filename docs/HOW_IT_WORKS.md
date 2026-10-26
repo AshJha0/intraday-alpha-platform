@@ -172,7 +172,7 @@ feature build as a whole is not 150x faster.
 
 Comparing the two engines on every row, rather than only at the golden
 checkpoints, found a real disagreement: inside a SNAPSHOT recovery burst
-the Rust engine read the half-built book, where API_FEATURES.md §2 pins the
+the Rust engine read the half-built book, where docs/API_REFERENCE.md §2 pins the
 pre-burst derived state. The golden checkpoints sit outside bursts, so no
 golden test had seen it. The bug is corrected in v1.11.0. LEARN.md §36
 draws the lesson; diagram 29 in DIAGRAMS.md shows the two backends.
@@ -699,7 +699,7 @@ TRADE prints) instead of the 100 ms clock. Nothing in the maker, quoting or
 auction code reads these columns yet, and they have not been run on the
 real sessions.
 
-**Where to look:** `python/src/iap/features/extended.py`; API_FEATURES.md §8.
+**Where to look:** `python/src/iap/features/extended.py`; docs/API_REFERENCE.md §8.
 **How to run it:** COOKBOOK recipes 58 and 63.
 
 ## 3. Algo and execution: how an order becomes fills
@@ -806,8 +806,8 @@ cannot be measured.
 - `cpp/include/iap/execution/execution.hpp` — the nine rules, as text.
 - `python/src/iap/execution/` — `algos.py`, `sor.py`, `simulator.py`,
   `replay.py`; `python/src/iap/tca/`.
-- `API_TRADING.md` §2 (and §2.4 for the v1.3.0 rule changes),
-  `API_PORTFOLIO_TCA.md` §2.
+- `docs/API_REFERENCE.md` §2 (and §2.4 for the v1.3.0 rule changes),
+  `docs/API_REFERENCE.md` §2.
 - `docs/DIAGRAMS.md` §6 and §12; LEARN.md §10–§11 and §22.
 
 **How to run it**
@@ -876,14 +876,14 @@ print, cross, reopen touch). Output goes to `research/execution/benchmark/`;
 `prereg_DRAFT.json` there is the unsigned draft of the B7 gate. The
 benchmark refuses a holdout directory. With `--signal EQ10` and `base+variant`
 policies (`native+urgency`, `native+pacing`, `native+ac_drift`; v1.17 B2 / B3,
-API_TRADING.md §2.14) the same parents are also worked with a real alpha
+docs/API_REFERENCE.md §2.14) the same parents are also worked with a real alpha
 signal re-read at every child decision — agree posts, adverse crosses,
 participation and slice weights tilt, the Almgren-Chriss drift follows the
 signal — and every variant is paired with its own plain control on the same
 windows, with the urgency-regime shares reported per cell.
 
 Two more things a posted order can do, both opt-in (v1.17 B4 / B5,
-API_TRADING.md §2.16): **fade** — pull the resting child when the signal
+docs/API_REFERENCE.md §2.16): **fade** — pull the resting child when the signal
 turns adverse by a threshold in signal units or the opposite side of the
 book gets heavy (`FadeParams`), holding the quantity off the book until the
 condition clears, and **cancel a hopeless queue** — when more than a cap
@@ -969,7 +969,7 @@ maker study on the seven real sessions (EQ01 / EQ02 / EQ05 / EQ10, taker
 and passive exits) and the M5 quoting study are still running; neither has
 a result (docs/REAL_DATA.md §3.3).
 
-**Where to look:** API_TRADING.md §2.6-§2.7; `python/src/iap/execution/calibration.py`,
+**Where to look:** docs/API_REFERENCE.md §2.6-§2.7; `python/src/iap/execution/calibration.py`,
 `backtest/maker.py`, `backtest/quoting.py`, `labels/maker_labels.py`;
 DIAGRAMS.md §20-§21.
 
@@ -1025,7 +1025,7 @@ TWAP / VWAP / IS schedules and their goldens are unchanged.
   volume profile per instrument from TRADE events, shrunk toward the
   U-shape by `days / (days + shrinkage)`, used by VWAP.
 
-**Where to look:** API_TRADING.md §2.8. **How to run it:** COOKBOOK recipes
+**Where to look:** docs/API_REFERENCE.md §2.8. **How to run it:** COOKBOOK recipes
 41 and 48.
 
 ---
@@ -1055,7 +1055,7 @@ three opt-in pieces (defaults stay byte-identical):
 
 All results are synthetic; none of this has been run on the real sessions.
 
-**Where to look:** API_TRADING.md §2.10; DIAGRAMS.md §32. **How to run it:**
+**Where to look:** docs/API_REFERENCE.md §2.10; DIAGRAMS.md §32. **How to run it:**
 COOKBOOK recipes 61, 63 and 64.
 
 ### 3.10 Cost-aware multi-venue routing (v1.12, X5)
@@ -1071,7 +1071,7 @@ together; a passive post goes where `p x (-rebate - capture + toxicity) +
 toxicity. The real data here is one Nasdaq book, so on it the router has a
 single candidate: this is capability for multi-venue data, not a result.
 
-**Where to look:** `iap.execution.sor_v2`, `venues_model`; API_TRADING.md
+**Where to look:** `iap.execution.sor_v2`, `venues_model`; docs/API_REFERENCE.md
 §2.9; DIAGRAMS.md §33. **How to run it:** COOKBOOK recipe 59.
 
 ### 3.11 What v1.13 changed in execution (quality review 2026-10-11)
@@ -1101,7 +1101,7 @@ behaviours changed or gained an option:
 Also new: quoting parameters in ticks (`skew_mode="ticks"`) with a
 ticks-behind-touch readout, a hazard-based passive-exit fill probability, a
 DST-aware volume curve (`--tz`), and explicit ADV units for Almgren-Chriss
-parameters. API_TRADING.md §2.11.
+parameters. docs/API_REFERENCE.md §2.11.
 
 ### 3.12 What v1.14 changed in execution and risk
 
@@ -1116,7 +1116,7 @@ Everything else is opt-in, because each one moves every maker number and
 belongs in a new pre-registration, not a release: feed latency, exits
 routed through the simulator, fills from hidden prints, adverse selection
 counted once per touch order, and priority-keeping size amends
-(API_TRADING.md §2.12, COOKBOOK recipe 73).
+(docs/API_REFERENCE.md §2.12, COOKBOOK recipe 73).
 
 On the risk side (§4), the audit log became a hash chain and the engine
 gained the SEC 15c3-5 pre-trade set as checks 23-29, run after the 22
@@ -1299,8 +1299,8 @@ inputs (differential fuzzing) is backlog (EPICS E31).
   `killswitch.rs`, `audit.rs`.
 - `python/src/iap/risk/engine.py`, `java/src/main/java/com/iap/risk/`.
 - `tests/golden/expected_risk_*.json` and `expected_risk_edge_*`.
-- `PLATFORM_CONVENTIONS.md` §11.1, `API_TRADING.md` §1 (and §1.4),
-  `docs/runbooks/RUNBOOK_incident_kill_switch.md`.
+- `PLATFORM_CONVENTIONS.md` §11.1, `docs/API_REFERENCE.md` §1 (and §1.4),
+  `docs/RUNBOOKS.md`.
 - `docs/DIAGRAMS.md` §5 and §11; LEARN.md §9 and §21.
 
 **How to run it**
@@ -1414,7 +1414,7 @@ nothing reduces the position automatically.
   `research/ml_reports/ML_REPORT.md`, `research/models/` (one manifest per
   fit).
 - `python/src/iap/adaptive/` (`drift.py`, `lifecycle.py`),
-  `research/adaptive_reports/ADAPTIVE_REPORT.md`, `API_ADAPTIVE.md`.
+  `research/adaptive_reports/ADAPTIVE_REPORT.md`, `docs/API_REFERENCE.md`.
 - LEARN.md §7 and §14; COOKBOOK recipes 6, 7, 18 and 19.
 
 **How to run it**
@@ -1454,7 +1454,7 @@ record:
 `iap.models.zoo.load_registered` load by id; nothing loads from the
 registry unless asked. No registered model is on a trading path, and the
 registry does not make any model earn its costs. **Where to look:**
-`python/src/iap/mlops/`, API_ADAPTIVE.md §9, LEARN.md §39, DIAGRAMS.md
+`python/src/iap/mlops/`, docs/API_REFERENCE.md §9, LEARN.md §39, DIAGRAMS.md
 diagram 27. **How to run it:** COOKBOOK recipes 50 and 54.
 
 ---
@@ -1535,7 +1535,7 @@ GOVERNANCE.md §2a lists what the fingerprint does not cover. LEARN.md §35
 explains why the first drafts (HMAC keys, class-only code hashes) were
 replaced.
 
-**Where to look:** `python/src/iap/agents/`; docs/governance/GOVERNANCE.md
+**Where to look:** `python/src/iap/agents/`; docs/GOVERNANCE.md
 §2a; DIAGRAMS.md §23. **How to run it:** COOKBOOK recipe 47.
 
 The import-policy test has stated gaps: it scans the guarded trading-path
@@ -1646,7 +1646,7 @@ has been used: seven real Nasdaq ITCH sessions and two 2026 holdout days
 - `docs/EPICS.md` — E24 and E30.
 - `docs/DIAGRAMS.md` §19 (the layer as planned at v1.3.0), §23 (the
   governance chain) and §26 (the LLM agent loop).
-- `python/src/iap/llm/`, `docs/governance/GOVERNANCE.md` §2b.
+- `python/src/iap/llm/`, `docs/GOVERNANCE.md` §2b.
 
 **How to run it**
 
@@ -1707,8 +1707,8 @@ Python/Rust comparison found the snapshot-burst bug that way (§2.1a).
 - `PLATFORM_CONVENTIONS.md` §3 and §13.1–§13.2; `docs/DECISION_TRACE.md`.
 - `python/src/iap/core/rng.py`, `python/src/iap/contracts/versions.py`
   (`canonical_json`), `python/src/iap/trace/`.
-- `tests/replay/`, `docs/runbooks/RUNBOOK_incident_replay.md`.
-- `docs/governance/REPRODUCIBILITY.md`; LEARN.md §12, §18 and §25.
+- `tests/replay/`, `docs/RUNBOOKS.md`.
+- `docs/GOVERNANCE.md`; LEARN.md §12, §18 and §25.
 
 **How to run it**
 
@@ -1776,7 +1776,7 @@ and resuming from its checkpoint; there is no active-active. Eight older
 alerts still lack promtool tests, on an allowlist that may only shrink.
 
 **Where to look:** `deployment/alertmanager/`, `deployment/prometheus/slo.yml`;
-docs/runbooks/RUNBOOK_alerting.md; DIAGRAMS.md §34. **How to run it:**
+docs/RUNBOOKS.md; DIAGRAMS.md §34. **How to run it:**
 COOKBOOK recipes 60 and 65.
 
 ---
@@ -1794,6 +1794,6 @@ COOKBOOK recipes 60 and 65.
 | to run the pipeline on real historical files you obtained (ITCH 5.0, LOBSTER) | [REAL_DATA.md](REAL_DATA.md) |
 | what changed in each release, v1.1.0 to v1.18.0 | [../CHANGELOG.md](../CHANGELOG.md) |
 | the real-data studies: 7 sessions, power, the 2026 holdout, auctions | [REAL_DATA.md](REAL_DATA.md) §3 |
-| the governance controls, one table | [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2a |
-| the LLM agent's controls and evals | [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2b |
+| the governance controls, one table | [governance/GOVERNANCE.md](GOVERNANCE.md) §2a |
+| the LLM agent's controls and evals | [governance/GOVERNANCE.md](GOVERNANCE.md) §2b |
 | which language copy is canonical, which frozen | [POLYGLOT.md](POLYGLOT.md) |

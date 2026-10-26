@@ -604,7 +604,7 @@ def _latency_stats(values: Sequence[int]) -> LatencyStats:
 class TcaAdapter:
     """``analyse(parent, executions, market)`` -> :class:`TCAResult`.
 
-    Mapping from :func:`iap.tca.tca.order_tca` (API_PORTFOLIO_TCA.md §2):
+    Mapping from :func:`iap.tca.tca.order_tca` (docs/API_REFERENCE.md §2):
     Perold ``total_is / delay / trading / opportunity`` bps as given;
     ``spread_cost / impact_cost / timing_cost`` (currency) and the fees
     converted to bps of ``qty * decision_mid``; ``avg_fill_price``,

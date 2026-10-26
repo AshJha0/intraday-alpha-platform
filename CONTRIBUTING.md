@@ -6,7 +6,7 @@ frozen at v1.14.0). Contributing means changing that semantics in the reference,
 proving it with a golden vector, and re-matching every port — or leaving the
 semantics alone and proving that too. The binding rules live in
 [PLATFORM_CONVENTIONS.md](PLATFORM_CONVENTIONS.md); the review policy in
-[docs/governance/GOVERNANCE.md](docs/governance/GOVERNANCE.md). This page is
+[docs/GOVERNANCE.md](docs/GOVERNANCE.md). This page is
 the working procedure.
 
 ## 1. Branching
@@ -16,8 +16,8 @@ the working procedure.
   required since the v1.18 D5(a) change, `cpp-sanitizers` is not one of them and
   runs weekly since v2.0 stage 11; `advisory` is the ruleset's name for the
   `lint-and-secrets` job;
-  the ruleset is described in `docs/governance/REPO_SETTINGS.md` and
-  `docs/governance/GOVERNANCE.md` §0), and the reviewers `CODEOWNERS` names
+  the ruleset is described in `docs/GOVERNANCE.md` and
+  `docs/GOVERNANCE.md` §0), and the reviewers `CODEOWNERS` names
   for the paths touched. The owner merges in the GitHub UI.
 - Branch names carry the area and the plan key or issue number:
   `feat/execution-X07-python-port`, `fix/orderbook-B03-reorder-window`,
@@ -268,7 +268,7 @@ Research truth is the product (spec §32). Two rules are mechanical:
    alpha's code fingerprint, and a run whose code changed is refused:
    register with `python -m iap.agents.cli prereg ...`, commit and push the
    board, then `python -m iap.agents.cli anchor` and commit `anchors.json`
-   (COOKBOOK recipe 47, docs/governance/GOVERNANCE.md §2a). Private keys
+   (COOKBOOK recipe 47, docs/GOVERNANCE.md §2a). Private keys
    for `--keyfile` live outside the repository.
 2. **A PR cannot flip a verdict without the ledger entry.** A change to a
    verdict in `research/alpha_reports/*.json` (PROMOTE / ITERATE / REJECT),
@@ -289,7 +289,7 @@ Research truth is the product (spec §32). Two rules are mechanical:
      `python/src/iap/**`, `configs/**`, `data/reference/**`, the hashed lock,
      the environment, the interpreter, dataset content hashes, family,
      metrics, thresholds and the commit) and every runner that consumes one
-     calls `verify_identity` (`docs/governance/ANALYSIS_IDENTITY.md`); a
+     calls `verify_identity` (`docs/GOVERNANCE.md`); a
      signed document is never edited afterwards, because that voids the
      signature (the REL-08 rule's stale `status` text is left as it is for
      that reason);
@@ -297,7 +297,7 @@ Research truth is the product (spec §32). Two rules are mechanical:
      (`research/holdout_registry.json`, `iap.research.holdout_registry`):
      a dataset is `in_sample`, `spent` or `unread`, identity is content and not
      a path, and every decision is appended to a hash-chained access log
-     (`docs/governance/DATA_ACCESS_PATHS.md`). Do not add a data-reading entry
+     (`docs/GOVERNANCE.md`). Do not add a data-reading entry
      point without the guard; the coverage test fails closed;
    - run `PYTHONPATH=python/src python tools/verify_signatures.py` after any
      change to a signed document, the trust root or a blackboard, and
@@ -312,7 +312,7 @@ Research truth is the product (spec §32). Two rules are mechanical:
 
 Promotion requests use the **Alpha promotion request** issue form, one
 transition per request, with evidence per gate
-(`docs/governance/GOVERNANCE.md` §2). An alpha whose fitted sign contradicts
+(`docs/GOVERNANCE.md` §2). An alpha whose fitted sign contradicts
 its `Economic rationale:` docstring can at best be ITERATE.
 
 Since v1.14 the ledger is a hash chain (x-version 4: `chain_head`,
@@ -357,16 +357,16 @@ milestones, epics and issues; `docs/EPICS.md` is generated from it and
 |---|---|
 | Python 3.11 | `ValueError` / `RuntimeError` with messages; type hints and docstrings everywhere; the reference must be readable before it is fast |
 | C++17 | `std::invalid_argument` / `std::runtime_error`; `-Wall -Wextra -Werror` clean; no allocation in book/feature hot loops after warmup (reserve), enforced by tests |
-| Rust (edition 2021) | `Result<_, IapError>`, no panics on input, zero warnings; workspace dependencies are `serde` and `serde_json` only (`docs/governance/SECURITY.md` §1) |
+| Rust (edition 2021) | `Result<_, IapError>`, no panics on input, zero warnings; workspace dependencies are `serde` and `serde_json` only (`docs/GOVERNANCE.md` §1) |
 | Java 21 (archived, frozen at v1.14.0; not accepted as a port target) | `IllegalArgumentException` / `IllegalStateException`; `-Xlint:all` clean; hot paths allocation-conscious (primitive arrays, no boxing) |
-| all | no dead code, no TODOs, no new dependency without a SECURITY.md entry; names follow the repo (`price_ticks`, `exchange_ts`, `feature_version`, `x-version`, `EQ01..FX12`) |
+| all | no dead code, no TODOs, no new dependency without a docs/GOVERNANCE.md entry; names follow the repo (`price_ticks`, `exchange_ts`, `feature_version`, `x-version`, `EQ01..FX12`) |
 
 ## 9. Documentation that moves with the code
 
 A behaviour change updates its contract in the same PR (and, for a
-duplicated component, `docs/POLYGLOT.md` if a copy's decision changes): `API_CORE.md`,
-`API_FEATURES.md`, `API_ALPHA.md`, `API_PORTFOLIO_TCA.md`, `API_ADAPTIVE.md`,
-`API_CONTRACTS.md`, `API_TRADING.md`, `PLATFORM_CONVENTIONS.md` §11–§13,
+duplicated component, `docs/POLYGLOT.md` if a copy's decision changes): `docs/API_REFERENCE.md`,
+`docs/API_REFERENCE.md`, `docs/API_REFERENCE.md`, `docs/API_REFERENCE.md`, `docs/API_REFERENCE.md`,
+`docs/API_REFERENCE.md`, `docs/API_REFERENCE.md`, `PLATFORM_CONVENTIONS.md` §11–§13,
 `docs/LIFECYCLE.md` / `docs/DECISION_TRACE.md` / `docs/DATA_MODEL.md` /
 `docs/MVP.md` / `docs/MONITORING_POLICY.md` / `archive/docs/PORTFOLIO_LIMITS.md` /
 `docs/FACTOR_RISK.md` / `docs/SIM_TO_REAL.md` for their subsystems, `docs/SCENARIOS.md` for a new pinned

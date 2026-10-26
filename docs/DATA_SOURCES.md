@@ -5,7 +5,7 @@ the owner's approval**. This page says which free sources exist, what the
 reader does with each, how a full-market day is processed on a machine that
 cannot hold two of them, and which numbers are measured. The mapping rules are
 in [REAL_DATA.md](REAL_DATA.md) (sections 3.5 and 4.5); the commands are in
-[runbooks/RUNBOOK_process_and_delete.md](runbooks/RUNBOOK_process_and_delete.md).
+[runbooks/RUNBOOK_process_and_delete.md](RUNBOOKS.md).
 Every number below names the committed artefact it comes from. Sections 8 to 13 (v2.0 stage 2 DD1, decision DR-6 of
 the unified specification) record, per free-route source, the public terms read, the use intended and whether that use
 is permitted for this non-commercial research; section 14 lists the licence questions for the owner.
@@ -77,7 +77,7 @@ sha256); the 2019-12-30 file is 268.7 million messages in 3.5 GB of gzip
 - **Daily watch.** `tools/r7_watch_nasdaq.py` also reads the IEX HIST index for
   the last 7 UTC days (one JSON GET per day, never a download) and reports DEEP
   and TOPS days with sizes; see
-  [runbooks/RUNBOOK_r7_nasdaq_watch.md](runbooks/RUNBOOK_r7_nasdaq_watch.md).
+  [runbooks/RUNBOOK_r7_nasdaq_watch.md](RUNBOOKS.md).
 
 ## 3. The approval rule for downloads
 
@@ -142,7 +142,7 @@ These figures come from one run on one machine and are not a benchmark.
 The nine Nasdaq 2025/26 sessions on disk are also on IEX HIST. At v1.18.0 all
 nine are processed (the table's "state" column was last updated for the first
 six on 2026-10-17 and is completed below from the data manifest). `python -m
-iap.marketdata process-iex-day` (RUNBOOK_process_and_delete.md, IEX section)
+iap.marketdata process-iex-day` (docs/RUNBOOKS.md, IEX section)
 pairs each with the same day's IEX book for AAPL, MSFT, QQQ: DEEP+ is the
 book feed, TOPS its oracle (`book_verification`); the TOPS capture is read
 once for the three names' quotes and deleted before DEEP+ is downloaded (one
@@ -151,7 +151,7 @@ manifests and `KEEP.json` stay. Approval (owner, 2026-10-15, verbatim in
 `research/v117/iex_overlap_manifest.json`): "A4 (IEX overlap days, needs your
 download approvals), = approved". Sizes are the HIST index of 2026-10-15; the
 sha256 of each capture is recorded in the day's `process_report.json` and, for
-the first six days, in docs/research/IEX_OVERLAP_SET.md.
+the first six days, in docs/RESEARCH_NOTES.md.
 
 | date | Nasdaq dataset | TOPS gz | DEEP+ gz | DEEP gz (not downloaded) | state |
 |---|---|---|---|---|---|
@@ -222,7 +222,7 @@ refuses it.
   check). A manifest without a sha256 gets the computed one in the result,
   marked `sha256_verified: false`, to pin before the ingest.
 - **Known gap.** The TOPS captures of 2026-05-15 and 05-18 are in
-  docs/research/IEX_OVERLAP_SET.md but in no small file on disk, so the
+  docs/RESEARCH_NOTES.md but in no small file on disk, so the
   manifest reproduces 8 of that document's 10 hashes
   (`python/tests/test_data_manifest.py` pins the two missing).
 - **State at v1.18.0.** The committed manifest lists 39 datasets

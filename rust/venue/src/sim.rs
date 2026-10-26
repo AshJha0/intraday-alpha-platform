@@ -37,7 +37,7 @@
 //!   opposite L1 size; the remainder is CANCELED (REJECTED when the book
 //!   is one-sided). Rust-only order type: no overlay, no queue.
 //! - **Passive queue position (v1.17 B9; execution simulator rule 4 of
-//!   `API_TRADING.md` §2 / PLATFORM_CONVENTIONS.md §11.2, ported from the
+//!   `docs/API_REFERENCE.md` §2 / PLATFORM_CONVENTIONS.md §11.2, ported from the
 //!   Python reference `iap.execution.simulator` and pinned by
 //!   `tests/golden/expected_venue_queue.json`).** A resting order at `P`
 //!   starts with `ahead_qty` = displayed qty at `(side, P)` plus the

@@ -1,6 +1,6 @@
 """Reference L1/L2/MBO order book (PLATFORM_CONVENTIONS.md section 4 — pinned).
 
-Semantics (all languages must mirror exactly; see API_CORE.md section 4):
+Semantics (all languages must mirror exactly; see docs/API_REFERENCE.md section 4):
 
 - ADD: new order at its price level, FIFO tail. While the venue status is
   TRADING a limit ADD that crosses the opposite side executes against the
@@ -58,7 +58,7 @@ Semantics (all languages must mirror exactly; see API_CORE.md section 4):
   explicit API for adapters that learn about a restart out of band.
 - Apply result: ``apply`` returns an :class:`ApplyStatus`
   (APPLIED / DROPPED / HELD) for the event it was handed — the per-event
-  verdict downstream consumers filter on (API_FEATURES.md §2: a feature
+  verdict downstream consumers filter on (docs/API_REFERENCE.md §2: a feature
   engine contributes only APPLIED events to rolling state).
 - Accounting invariant: every event handed to ``apply`` ends in exactly one
   of ``events_applied`` or a drop counter (``duplicates_dropped``,

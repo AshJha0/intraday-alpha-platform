@@ -180,7 +180,7 @@ def scenarios() -> list[dict]:
 
 def document() -> dict:
     doc = base_document(
-        "F7 rule 3 golden: simulator rule 6b, parent impact (API_TRADING.md section 2.13 "
+        "F7 rule 3 golden: simulator rule 6b, parent impact (docs/API_REFERENCE.md section 2.13 "
         "P0-1; iap.execution.simulator._parent_impact is the reference). Each scenario "
         "replays `events` (golden:events_eq_mbo.jsonl = tests/golden/events_eq_mbo.jsonl; "
         "slice = the real slice, see `slice`) through ExecutionReplay(config, parents) and "

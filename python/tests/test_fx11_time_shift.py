@@ -20,7 +20,7 @@ raw-event recompute probe fails every planted leak - and by the lag profile
 for leaks shorter than its first lag.  FX11's real pipeline is probed on the
 committed FX golden vector, and its committed v1.14 numbers
 (``research/alpha_reports/FX11.json``) are fed to the classifier.  See
-``docs/research/FX11_FINDING.md``.
+``docs/RESEARCH_NOTES.md``.
 """
 
 from __future__ import annotations

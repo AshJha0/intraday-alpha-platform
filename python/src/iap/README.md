@@ -98,7 +98,7 @@ iap/
   execution/       Python reference port of the C++ execution stack;
                    sim.py is the v2.0 EN4 fill simulator (one fill-price
                    convention, three cost columns, failure cases,
-                   API_PORTFOLIO_TCA.md §8)
+                   docs/API_REFERENCE.md §8)
                    (cpp/{execution,sor,replay}; conventions §11.2-§11.3). The
                    nine pinned simulator rules are the contract; the golden
                    tests/golden/expected_replay_fills.json is reproduced
@@ -152,12 +152,12 @@ iap/
                    of a pre-registration (configs/prereg/v2.json; v1.16 adds the
                    v3 keys: venue latency, latency stress, fee tier, exec
                    prints, parent impact; configs/prereg/v3.json).
-                   v1.16 opt-ins elsewhere (API_TRADING.md §2.13):
+                   v1.16 opt-ins elsewhere (docs/API_REFERENCE.md §2.13):
                    ExecConfig.impact_model="parent" (simulator rule 6b),
                    estimate_calibration(impact_fit=True) + apply_impact_fit,
                    ParentOrder.pov_exact, ac_params_from_calibration(
                    impact_source="residual").
-  features/        The 205-feature factory (API_FEATURES.md): registry.py (the
+  features/        The 205-feature factory (docs/API_REFERENCE.md): registry.py (the
                    pinned registry + its hash = feature_version), engine.py
                    (event-driven FeatureEngine, validity bitset, cadence),
                    context.py / rolling.py / spec.py (windows, book context),
@@ -178,9 +178,9 @@ iap/
                    freshness bound (R5). maker_labels.py (v1.9, M3): per
                    decision and side, fill / taker flags, queue ahead,
                    markouts, "filled and not run over".
-  alpha/           The 24 flagship alphas (API_ALPHA.md); forecast.py and
+  alpha/           The 24 flagship alphas (docs/API_REFERENCE.md); forecast.py and
                    registry.py (v2.0 EN1), h1.py (the H1 client of the v2.0
-                   engine, API_ALPHA.md §13): base.py (AlphaModel,
+                   engine, docs/API_REFERENCE.md §13): base.py (AlphaModel,
                    linear_z_v1 fit / score, the enforced `Economic rationale:`
                    docstring), equity.py (EQ01..EQ12), fx.py (FX01..FX12),
                    fx_exposure.py, cross_sectional.py, data.py (session_days,
@@ -226,7 +226,7 @@ iap/
   experiment/      tracker.py — data_version() (sha256 over the normalized IAP1
                    bytes), feature_version() (registry hash), git_commit(),
                    hardware_summary(), ExperimentTracker.write_manifest()
-                   (docs/governance/REPRODUCIBILITY.md); new_run claims a run
+                   (docs/GOVERNANCE.md); new_run claims a run
                    id by creating its directory. locking.py — FileLock
                    (O_CREAT | O_EXCL lock file, bounded retry, never broken
                    automatically) and atomic_write_text (temp file +
@@ -252,22 +252,22 @@ iap/
                    deeplob.py / deeplob_baselines.py / deeplob_torch.py (AI4
                    DeepLOB dataset, numpy baseline, optional torch models;
                    the real-data adapter is pending in PR #151).
-  portfolio/       The reference optimizer (API_PORTFOLIO_TCA.md §1):
+  portfolio/       The reference optimizer (docs/API_REFERENCE.md §1):
                    optimizer.py (projected-gradient mean-variance with
                    transaction costs under 7 constraint families, INFEASIBLE
                    holds w_prev), covariance.py (EWMA), fx.py (currency
                    exposure), diagnostics.py (the constraint audit).
-                   v2.0 stage 5 (family-agnostic, API_PORTFOLIO_TCA.md §6-7):
+                   v2.0 stage 5 (family-agnostic, docs/API_REFERENCE.md §6-7):
                    ledger.py (EN2 cohort and executable ledgers, the cash
                    identity), project.py (EN3 constrained least-squares
                    repair, no-trade band, skip rules, book re-check,
                    diagnostic covariance).
-  reports/         v2.0 EN5 (API_PORTFOLIO_TCA.md §9): e5.py (the E5 blocks
+  reports/         v2.0 EN5 (docs/API_REFERENCE.md §9): e5.py (the E5 blocks
                    A-E as Table builders with units, counts and uncertainty;
                    the session series with the three session kinds; the
                    economic screen; the six-branch decision tree; the
                    prohibited-inflation checks).
-  tca/             The TCA reference (API_PORTFOLIO_TCA.md §2): fills.py and
+  tca/             The TCA reference (docs/API_REFERENCE.md §2): fills.py and
                    markout.py (compatibility names since v2.0 stage 11: the
                    market timeline, fill records and markout analysis live in
                    execution/market_timeline.py and execution/markout.py so that
@@ -291,7 +291,7 @@ iap/
                    quoting.py (v1.10, M5, opt-in: QuotingBacktester,
                    QuotingConfig, sharpe_per_day; alpha-skewed two-sided
                    quoting with inventory limit and flatten).
-  adaptive/        The adaptability reference (API_ADAPTIVE.md): drift.py (PSI,
+  adaptive/        The adaptability reference (docs/API_REFERENCE.md): drift.py (PSI,
                    two-sample KS, the rolling IC and its z: ic_z_method
                    "hac" by default since v1.5.0, "legacy" the z up to
                    v1.4.0), refit.py (static / scheduled /
@@ -414,7 +414,7 @@ iap/
                    eligibility and the ledger's expected-max-|t| note; `list`
                    prints a `dataset` column (the folder keeps the
                    experiments of every dataset the ledger has seen).
-  combine/         Signal combination (API_ALPHA.md §8): weights.py (equal_weight,
+  combine/         Signal combination (docs/API_REFERENCE.md §8): weights.py (equal_weight,
                    ic_weighted, ridge with a nested penalty search, Ledoit-Wolf
                    shrinkage mean-variance; signal correlation, effective bets),
                    model.py (CombinedAlpha: an AlphaModel whose inputs are alphas,

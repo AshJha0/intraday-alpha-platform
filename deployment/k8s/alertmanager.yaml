@@ -9,7 +9,7 @@
 # band before first apply (the pod stays in ContainerCreating until it exists):
 #   kubectl -n intraday-alpha create secret generic iap-alertmanager-webhook #     --from-file=page_url=/secure/page_url --from-file=ticket_url=/secure/ticket_url
 # Full procedure, rotation and the v1.11 `url` key migration:
-# docs/runbooks/RUNBOOK_alerting.md §2.
+# docs/RUNBOOKS.md §2.
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment

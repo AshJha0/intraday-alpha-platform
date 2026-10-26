@@ -99,7 +99,7 @@ class Direction(IntEnum):
 
 
 class SolverStatus(str, Enum):
-    """Portfolio solve outcome (API_PORTFOLIO_TCA.md §1.3)."""
+    """Portfolio solve outcome (docs/API_REFERENCE.md §1.3)."""
 
     OPTIMAL = "OPTIMAL"
     INFEASIBLE = "INFEASIBLE"
@@ -526,7 +526,7 @@ class PortfolioLeg(Contract):
 
 @contract(V.PORTFOLIO_TARGET_VERSION, _PORTFOLIO_SCHEMA)
 class PortfolioTarget(Contract):
-    """Output of one portfolio solve (API_PORTFOLIO_TCA.md §1).
+    """Output of one portfolio solve (docs/API_REFERENCE.md §1).
 
     ``portfolio_version`` hashes the problem (constraints + solver
     parameters); ``solver_status`` follows ``PGDResult.status`` with
@@ -769,7 +769,7 @@ class LatencyStats(Contract):
 
 @contract(V.TCA_RESULT_VERSION, _TCA_SCHEMA)
 class TCAResult(Contract):
-    """Per-parent-order TCA record (API_PORTFOLIO_TCA.md §2).
+    """Per-parent-order TCA record (docs/API_REFERENCE.md §2).
 
     Prices are in ticks (``arrival_price_ticks`` integer; the fill average
     and interval benchmarks are doubles in tick units).  Costs are positive

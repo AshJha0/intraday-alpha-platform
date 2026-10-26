@@ -3,8 +3,8 @@
 #
 # GOVERNANCE.md §1 requires "tests/harness/run_all.sh green (all four
 # languages)" and "YAML must pass the structural validation used in CI";
-# RUNBOOK_backtest.md says "CI treats budget breaks as failures";
-# SECURITY.md routes deployment reports to CODEOWNERS. Until round 3 none of
+# docs/RUNBOOKS.md says "CI treats budget breaks as failures";
+# docs/GOVERNANCE.md routes deployment reports to CODEOWNERS. Until round 3 none of
 # that existed.
 # This workflow is it (PLATFORM_CONVENTIONS.md §9, §12.7).
 #
@@ -467,7 +467,7 @@ jobs:
       # v2.0 stage 11 (S2): the benchmark guards, the tick-to-trade and execution-rule
       # benchmarks and the gcov coverage build left the pull-request path. They run
       # weekly (and on demand) in .github/workflows/weekly-structural.yml. This job
-      # keeps build + ctest only: `cpp` is a required context (REPO_SETTINGS.md
+      # keeps build + ctest only: `cpp` is a required context (docs/GOVERNANCE.md
       # section 1) and the golden job builds C++ for the parity gate regardless.
 
   rust:
@@ -629,7 +629,7 @@ jobs:
   # name and runs only when lint-and-secrets succeeded (a lint or secrets failure leaves
   # it skipped, and a skipped required check blocks the merge, as before). Delete it once
   # the owner has replaced `advisory` by `lint-and-secrets` in the ruleset
-  # (docs/governance/REPO_SETTINGS.md section 1, owner action 1).
+  # (docs/GOVERNANCE.md section 1, owner action 1).
   advisory:
     needs: lint-and-secrets
     runs-on: ubuntu-24.04
@@ -833,7 +833,7 @@ jobs:
   # its git anchors and signatures verify; every agent with signed entries has
   # a registered public key; and the ledgers and the board only grow against
   # the base (no lost looks, no rewritten board history). Meant to be a
-  # REQUIRED check (docs/governance/GOVERNANCE.md section 0).
+  # REQUIRED check (docs/GOVERNANCE.md section 0).
   governance:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -851,7 +851,7 @@ jobs:
       # v1.14 (G-P1-4): anchors, trust roots and the board are checked
       # against origin/main, which this change cannot rewrite. v1.15 (G-P1-2):
       # trust roots are enabled; an unsigned registry fails
-      # (docs/governance/TRUST_ROOTS.md).
+      # (docs/GOVERNANCE.md).
       - name: verify-board (chain, git prefixes, anchors, signatures)
         env:
           PYTHONPATH: python/src
@@ -884,7 +884,7 @@ jobs:
           else
             python tests/harness/check_ledger_monotone.py --base origin/main
           fi
-      # v2.0 stage 11 (S4): the required-check matrix in REPO_SETTINGS.md is generated from
+      # v2.0 stage 11 (S4): the required-check matrix in docs/GOVERNANCE.md is generated from
       # the live ruleset (tools/repo_settings_snapshot.py). A drift between the live settings
       # and the committed snapshot is a WARNING here (the default token may be refused on
       # some endpoints; the settings are the owner's), and a failing test
@@ -945,7 +945,7 @@ jobs:
   # summary, not failing; the G5 truth pass cleared them for v1.17.0; a
   # structural failure, exit 1, fails the job).  lychee checks external links
   # as an advisory step.  ADVISORY until the owner adds `docs` to the
-  # protect-main ruleset (docs/governance/REPO_SETTINGS.md).
+  # protect-main ruleset (docs/GOVERNANCE.md).
   docs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -1074,15 +1074,15 @@ jobs:
   #          comes from the hashed image lock (requirements-image.txt).
   #   image  REPORT-ONLY (a mismatch is a ::warning and a job-summary row,
   #          never a failure): the base image IS pinned by digest already
-  #          (SECURITY.md section 1), BuildKit rewrites every layer file
+  #          (docs/GOVERNANCE.md section 1), BuildKit rewrites every layer file
   #          timestamp to SOURCE_DATE_EPOCH (rewrite-timestamp) and the
   #          provenance/SBOM attestation manifests (which carry wall-clock
   #          timestamps) are disabled; what can still differ is the content
   #          `pip install` writes inside a RUN layer (for example .pyc headers
-  #          and other install-time state). docs/governance/REPRODUCIBILITY.md
+  #          and other install-time state). docs/GOVERNANCE.md
   #          section 4 records which of the two matched on the first runs.
   # Not a required check until the owner adds it to the protect-main ruleset
-  # (docs/governance/GOVERNANCE.md section 0).
+  # (docs/GOVERNANCE.md section 0).
   reproducible-build:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -1182,7 +1182,7 @@ jobs:
     # Python/Rust inputs): see the `changes` job. On other PRs this job is
     # skipped, so it must NOT be listed as a required status check (a skipped
     # required check blocks the merge); the required set is in
-    # docs/governance/REPO_SETTINGS.md.
+    # docs/GOVERNANCE.md.
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'pull_request' && needs.changes.outputs.docker == 'true')

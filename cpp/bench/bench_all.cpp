@@ -104,7 +104,7 @@ Result bench_cold(const std::string& name, std::size_t events_per_iter,
 
 // Repo-relative rendering of a path built from IAP_GOLDEN_DIR, so the
 // generated markdown is identical whatever directory the repo is checked out
-// in (REPRODUCIBILITY.md §4: a regenerated artefact must diff only where the
+// in (docs/GOVERNANCE.md §4: a regenerated artefact must diff only where the
 // measurement changed).
 std::string repo_relative(const std::string& path) {
     for (const char* root : {"/data/", "/tests/", "/configs/"}) {

@@ -183,7 +183,7 @@ class SessionSpec:
 
 @dataclass(frozen=True)
 class SolverSpec:
-    """PGD solver parameters (API_PORTFOLIO_TCA.md §1; Java ``SolverParams``)."""
+    """PGD solver parameters (docs/API_REFERENCE.md §1; Java ``SolverParams``)."""
 
     iters: int
     proj_passes: int

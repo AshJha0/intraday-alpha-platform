@@ -1,6 +1,6 @@
 //! Fitted alpha parameters (`configs/strategies/alpha_params.json`).
 //!
-//! Ports never fit (API_ALPHA.md §2): every number is loaded as an opaque
+//! Ports never fit (docs/API_REFERENCE.md §2): every number is loaded as an opaque
 //! f64 from the JSON produced by the Python research layer. The honest-
 //! reporting rule carries over — `hypothesis_confirmed = false` params ship
 //! with the sign the fit produced; this loader never adjusts anything.
@@ -10,7 +10,7 @@ use std::path::Path;
 
 use marketdata::IapError;
 
-/// The six production alpha ids, pinned (API_ALPHA.md).
+/// The six production alpha ids, pinned (docs/API_REFERENCE.md).
 pub const GOLDEN_ALPHA_IDS: [&str; 6] = ["EQ01", "EQ03", "EQ06", "FX01", "FX05", "FX09"];
 
 /// The pinned scoring model implemented by this port.
@@ -45,7 +45,7 @@ pub struct AlphaParams {
     pub n_train: u64,
 }
 
-/// Pinned scoring constants every params file must carry (API_ALPHA.md §2).
+/// Pinned scoring constants every params file must carry (docs/API_REFERENCE.md §2).
 pub const PINNED_Z_CLIP: f64 = 4.0;
 /// Pinned confidence scale.
 pub const PINNED_CONF_SCALE: f64 = 2.0;
@@ -109,7 +109,7 @@ impl AlphaParams {
         let beta_fit = get_f64(obj, alpha_id, "beta_fit")?;
         let z_clip = get_f64(obj, alpha_id, "z_clip")?;
         let conf_scale = get_f64(obj, alpha_id, "conf_scale")?;
-        // Pinned loader validation (API_ALPHA.md §2): the ports obey the
+        // Pinned loader validation (docs/API_REFERENCE.md §2): the ports obey the
         // file's z_clip/conf_scale, so a hand-edited value would silently
         // break cross-language parity — reject it instead.
         if z_clip != PINNED_Z_CLIP || conf_scale != PINNED_CONF_SCALE {
@@ -157,7 +157,7 @@ pub fn document_feature_version(doc: &serde_json::Value) -> Option<&str> {
 }
 
 /// Load the golden alphas, rejecting a `feature_version` that differs from
-/// the engine's registry hash (pinned, API_ALPHA.md §2). Pass `None` only
+/// the engine's registry hash (pinned, docs/API_REFERENCE.md §2). Pass `None` only
 /// for tooling that inspects a historic file.
 pub fn load_params_json_checked(
     doc: &serde_json::Value,

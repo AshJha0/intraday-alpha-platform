@@ -23,7 +23,7 @@ the 100-name 2019-01-30 breadth day, the 20-name REL-04c set and IEX HIST
 DEEP+ datasets for the 2025/26 days (§3.6). The IEX path is checked against
 the TOPS oracle; the LOBSTER reconstruction rules were checked once, on one
 free sample file, through the REL-12 oracle
-([research/ITCH_ORACLE.md](research/ITCH_ORACLE.md)), which does not test the
+([research/ITCH_ORACLE.md](RESEARCH_NOTES.md)), which does not test the
 ITCH byte parser. **No signal is promoted and no edge is claimed from any of
 this data** (v1.18.0 release notes,
 [release/v1.18.0_RELEASE_NOTES.md](../archive/docs/release/v1.18.0_RELEASE_NOTES.md)); the
@@ -369,7 +369,7 @@ the taker round trip (§3.2 above; `archive/docs/SIGNAL_RESEARCH.md` section 8).
 
 **Multi-venue routing on real data (v1.12, X5).** Every real session in
 this repository is Nasdaq TotalView-ITCH (or LOBSTER built from it): one
-venue, `XNAS`. The cost-aware router (`iap.execution.sor_v2`, API_TRADING.md
+venue, `XNAS`. The cost-aware router (`iap.execution.sor_v2`, docs/API_REFERENCE.md
 §2.9) therefore has a single candidate on real data and always returns it;
 its sweep, passive split, toxicity and tier logic is exercised only on
 synthetic multi-venue books. It is capability for multi-venue data later
@@ -526,7 +526,7 @@ without `tools/r7_download.py --i-have-approval` (COOKBOOK recipe 66).
 
 A full-market day's raw and normalized files do not fit beside the next
 one on this machine, so the breadth universe is built with
-`python -m iap.marketdata process-day` (docs/runbooks/RUNBOOK_process_and_delete.md):
+`python -m iap.marketdata process-day` (docs/RUNBOOKS.md):
 disk guard, optional approved download, ingest with
 `--partition-instruments N` (the normaliser works in on-disk partitions
 of N instruments and merges them in event-time windows into byte-identical
@@ -540,7 +540,7 @@ deleted before the kept files verify. The `plan-ingest` batch of section
 
 The nine Nasdaq 2025/26 sessions on disk (2025-11-28, 2025-12-08..12,
 2026-05-15, 2026-05-18, 2026-06-12) are also on IEX HIST, free. `python -m
-iap.marketdata process-iex-day` (RUNBOOK_process_and_delete.md, IEX section)
+iap.marketdata process-iex-day` (docs/RUNBOOKS.md, IEX section)
 builds the same day's IEX dataset for the same three names, venue `IEXG`:
 the TOPS capture is read once for the universe's quotes (the oracle), deleted,
 then the DEEP+ capture is ingested with that oracle as `book_verification`,
@@ -549,7 +549,7 @@ deleted, one vendor file on disk at a time. `tools/iex_hist.py index` writes
 the manifest from the HIST index with the owner's approval sentence;
 `tools/iex_hist.py recent --n 5` writes the rolling list (the latest five HIST
 days with TOPS and DEEP+) without one, so it is a list until approved. The
-per-day results are in docs/research/IEX_OVERLAP_SET.md.
+per-day results are in docs/RESEARCH_NOTES.md.
 
 *v1.18 REL-04 capture timestamp.* `process-iex-day --capture-ts`
 (`ingest(capture_ts=True)`) writes the IEX capture host's packet timestamp as
@@ -570,7 +570,7 @@ Which sessions are in-sample, spent or unread is enforced state, not a table in
 prose: `research/holdout_registry.json` (hash-locked, fail-closed) classifies
 every dataset by content hash and every session by symbol scope, and a read of
 a spent or unread session without a matching signed pre-declaration is refused
-before any data is opened (`docs/governance/DATA_ACCESS_PATHS.md` lists every
+before any data is opened (`docs/GOVERNANCE.md` lists every
 route and its guard). At v1.18.0 it holds 35 datasets: 14 `in_sample` (the
 2019-2021 sessions: the seven `ds3_*` days, `multi7`, the 2019-10-18 / 2021-07-13
 / 2021-08-13 days, the 100-name 2019-01-30 day, and the smoke and REL-04c sets
@@ -1207,7 +1207,7 @@ since v1.13.0 (above).
   feed delay by default (`configs/reference/venue_latency.json` `feed_delay`,
   with the `receive_ts` relationship stated per ingest route), never zero
   unless a caller asks for zero explicitly, and records which it used
-  (API_TRADING.md section 2.20).
+  (docs/API_REFERENCE.md section 2.20).
 - **Broken trades** are mapped to `TRADE_BUST` events and counted (§4.2); the book applies them as a no-op, so a broken print is not reversed out of the book.
 - **One tick size and one universe per dataset** (§4.1); listings,
   delistings and symbol changes inside a dataset are backlog XD08.
@@ -1228,7 +1228,7 @@ since v1.13.0 (above).
   overlap datasets. The seven `ds3_*` days, `multi7` and `holdout2026` are
   x-version 1 (pre-v1.14 rules) and v1.14 refuses them until they are
   re-ingested (§4). LOBSTER has been checked on one free sample through the
-  REL-12 oracle only (docs/research/ITCH_ORACLE.md), not on a licensed vendor file.
+  REL-12 oracle only (docs/RESEARCH_NOTES.md), not on a licensed vendor file.
 - **Not supported:** CBOE PITCH, NYSE feeds, FX ECN feeds (backlog XD02,
   XD07); ITCH versions other than 5.0; the Rust, C++ and Java ports do not
   have these readers — they consume the canonical files the ingest writes.

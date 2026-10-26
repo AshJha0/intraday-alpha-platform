@@ -5,7 +5,7 @@
 #   page     — trading correctness / capital at risk; wake someone up.
 #   critical — feed or platform integrity degraded; act now during session.
 #   warning  — investigate the same day.
-# Each alert links its runbook (docs/runbooks/).
+# Each alert links its runbook (docs/RUNBOOKS.md).
 #
 # Rules (PLATFORM_CONVENTIONS.md §12.7):
 #   - every expression references a metric a component in THIS deployment
@@ -69,9 +69,9 @@ groups:
             affected book is marked stale and the risk engine rejects orders
             against it until a SNAPSHOT recovers the stream. Check book_stale
             for the instrument. Runbook:
-            docs/runbooks/RUNBOOK_data_pipeline.md#sequence-gaps
-          runbook: docs/runbooks/RUNBOOK_data_pipeline.md
-          runbook_url: docs/runbooks/RUNBOOK_data_pipeline.md
+            docs/RUNBOOKS.md#sequence-gaps
+          runbook: docs/RUNBOOKS.md
+          runbook_url: docs/RUNBOOKS.md
 
       # Wall-clock liveness of the feed, scoped to a PACED (realtime) session:
       # a wedged decoder thread stops advancing md_last_event_wallclock_unixtime
@@ -94,9 +94,9 @@ groups:
             A running realtime session has not processed an event in over a
             minute of wall clock — a wedged decode/trading thread or a dead
             upstream. /health returns 503 after 30s of no progress. Runbook:
-            docs/runbooks/RUNBOOK_shadow_deployment.md#feed-stall
-          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
-          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
+            docs/RUNBOOKS.md#feed-stall
+          runbook: docs/RUNBOOKS.md
+          runbook_url: docs/RUNBOOKS.md
 
   - name: iap-alpha-health
     rules:
@@ -118,10 +118,10 @@ groups:
             flowing — feature validity flags, warmup state or a wedged engine.
             NOTE: the demo deployment runs a FINITE session, so `offset 1h`
             baselines are only meaningful for a continuously running feed
-            (RUNBOOK_shadow_deployment.md §1). Runbook:
-            docs/runbooks/RUNBOOK_shadow_deployment.md#signal-rate
-          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
-          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
+            (docs/RUNBOOKS.md §1). Runbook:
+            docs/RUNBOOKS.md#signal-rate
+          runbook: docs/RUNBOOKS.md
+          runbook_url: docs/RUNBOOKS.md
 
   - name: iap-execution
     rules:
@@ -144,9 +144,9 @@ groups:
             Fills per submitted child order below half their 1h-ago baseline
             while orders are flowing — queue-position model, venue health or
             adverse regime shift. Runbook:
-            docs/runbooks/RUNBOOK_shadow_deployment.md#fill-rate
-          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
-          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
+            docs/RUNBOOKS.md#fill-rate
+          runbook: docs/RUNBOOKS.md
+          runbook_url: docs/RUNBOOKS.md
 
       # Pre-trade rejects are normal in small numbers; a sustained majority
       # means the strategy is fighting a limit (or a stale book).
@@ -162,9 +162,9 @@ groups:
             More than half of all risk decisions are rejects for 10m. Read the
             rule_id distribution in the session's risk_audit.jsonl
             (<state-dir>/risk_audit.jsonl) before changing any limit.
-            Runbook: docs/runbooks/RUNBOOK_shadow_deployment.md#rejects
-          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
-          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
+            Runbook: docs/RUNBOOKS.md#rejects
+          runbook: docs/RUNBOOKS.md
+          runbook_url: docs/RUNBOOKS.md
 
   - name: iap-risk
     rules:
@@ -186,9 +186,9 @@ groups:
             Daily P&L (realized + unrealized, reporting currency) is below
             -75% of global.max_daily_loss; at 100% the risk engine latches the
             global kill switch (fail-closed, audit-logged). Runbook:
-            docs/runbooks/RUNBOOK_incident_kill_switch.md
-          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
-          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
+            docs/RUNBOOKS.md
+          runbook: docs/RUNBOOKS.md
+          runbook_url: docs/RUNBOOKS.md
 
       # risk_kill_switch_engaged carries no scope label (the gauge is the
       # GLOBAL latch); scope detail lives in the audit JSONL.
@@ -205,9 +205,9 @@ groups:
             (PLATFORM_CONVENTIONS.md §12.3): a redeploy is not a re-arm path.
             Do NOT clear without following the incident runbook and risk
             approval. Scope and reason are in <state-dir>/risk_audit.jsonl.
-            Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
-          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
-          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
+            Runbook: docs/RUNBOOKS.md
+          runbook: docs/RUNBOOKS.md
+          runbook_url: docs/RUNBOOKS.md
 
       # Gross exposure against the live limit gauge (§12.6).
       - alert: GrossNotionalUtilizationHigh
@@ -223,9 +223,9 @@ groups:
           description: >-
             Gross exposure has been above 90% of global.max_gross_notional for
             5m; the next sizing decision will be rejected by the pre-trade
-            check. Runbook: docs/runbooks/RUNBOOK_shadow_deployment.md#exposure
-          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
-          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
+            check. Runbook: docs/RUNBOOKS.md#exposure
+          runbook: docs/RUNBOOKS.md
+          runbook_url: docs/RUNBOOKS.md
 
   - name: iap-infrastructure
     rules:
@@ -244,9 +244,9 @@ groups:
             platform_session_state = 3 (FAILED): the session process exited
             non-zero (python -m iap.metrics run-session wrote the marker).
             Check the session container's logs. Runbook:
-            docs/runbooks/RUNBOOK_shadow_deployment.md#failed-session
-          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
-          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
+            docs/RUNBOOKS.md#failed-session
+          runbook: docs/RUNBOOKS.md
+          runbook_url: docs/RUNBOOKS.md
 
       # A STOPPED session (value 4: a stop was requested, the session
       # checkpointed mid-stream and exited 0) that nobody resumed. The
@@ -259,7 +259,7 @@ groups:
       # reports RUNNING again (the resume window before the marker is
       # rewritten). A FINISHED session persists 2 and a crash leaves 1, so
       # neither fires this; a crash of the exporter is TargetDown on platform-metrics
-      # (RUNBOOK_shadow_deployment.md#stopped-session).
+      # (docs/RUNBOOKS.md#stopped-session).
       - alert: SessionStoppedNotResumed
         expr: >-
           platform_persisted_session_state == 4
@@ -277,9 +277,9 @@ groups:
             MVP loop is deterministic) or record why it stays down. The
             alert clears when a new session starts (the persisted state
             becomes 1) or finishes (2). Runbook:
-            docs/runbooks/RUNBOOK_shadow_deployment.md#stopped-session
-          runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
-          runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
+            docs/RUNBOOKS.md#stopped-session
+          runbook: docs/RUNBOOKS.md
+          runbook_url: docs/RUNBOOKS.md
 
       # A scrape target disappearing is itself an incident. Every job in
       # prometheus.yml is a target that really exists (§12.7), so this can
@@ -295,9 +295,9 @@ groups:
           description: >-
             Prometheus cannot scrape {{ $labels.instance }}. If this is
             platform-metrics during a session, treat as a platform
-            incident. Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
-          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
-          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
+            incident. Runbook: docs/RUNBOOKS.md
+          runbook: docs/RUNBOOKS.md
+          runbook_url: docs/RUNBOOKS.md
 
   # Heartbeat: fires permanently by design. Alertmanager routes it to the
   # `watchdog` receiver (deployment/alertmanager/alertmanager.yml); an external
@@ -316,5 +316,5 @@ groups:
             This alert is always firing. If it stops arriving at the
             heartbeat receiver, Prometheus rule evaluation or Alertmanager is
             down and no other alert can be trusted.
-          runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
-          runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
+          runbook: docs/RUNBOOKS.md
+          runbook_url: docs/RUNBOOKS.md

@@ -78,7 +78,7 @@ v1.5.0) were produced by the ``regenerate`` job of ``.github/workflows/ci.yml``
 (Ubuntu, Python 3.11, ``python/requirements-ci.txt`` plus the ``ml`` extra),
 which is the environment the test suites then verify them in. A run on
 another platform reproduces them to the documented tolerances, not to the
-byte (docs/governance/REPRODUCIBILITY.md).
+byte (docs/GOVERNANCE.md).
 """
 
 from __future__ import annotations

@@ -5,7 +5,7 @@ venues/venues.json).
 Prices on contracts are integer ticks; this service owns the tick_size /
 lot_size mapping used to convert to/from real prices.
 
-Validation is fail-fast (pinned, API_CORE.md section 7): every instrument
+Validation is fail-fast (pinned, docs/API_REFERENCE.md section 7): every instrument
 must carry a positive finite ``tick_size``, an integer ``lot_size >= 1``, a
 positive ``ref_price``, a non-negative ``adv`` and at least one venue that
 exists in ``venues.json`` with the same asset class; venue ids must be in

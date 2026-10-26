@@ -1,7 +1,7 @@
 // Real-life market-data scenarios for the core layer (docs/SCENARIOS.md,
 // CORE). Mirrors python/tests/test_scenarios_core.py: every test is named
 // after the scenario and pins the behaviour of PLATFORM_CONVENTIONS.md
-// section 4 / API_CORE.md sections 3-5.
+// section 4 / docs/API_REFERENCE.md sections 3-5.
 
 #include <gtest/gtest.h>
 

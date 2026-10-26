@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Watchdog for long detached real-data jobs (docs/runbooks/RUNBOOK_job_watchdog.md).
+"""Watchdog for long detached real-data jobs (docs/RUNBOOKS.md).
 
 Each registered job is a WMI-launched ``.cmd`` wrapper that appends to a log and
 ends with an ``EXIT n`` line.  Every tick the watchdog classifies each job:

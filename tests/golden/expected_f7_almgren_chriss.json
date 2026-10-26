@@ -1,6 +1,6 @@
 {
  "x-version": 1,
- "description": "F7 rule 5 golden: the Almgren-Chriss eta path (iap.execution.optimal; API_TRADING.md sections 2.11 X-P2-15, 2.13 P0-5, 2.14 B3). calibration cases: ac_params_from_calibration with `coeff` already resolved (the slope or residual coefficient; the resolution from a calibration document is a dict read, not arithmetic) -> ACParams or {error}; trajectory cases: ac_kappa, ac_trajectory(qty, params, n, drift), ac_cost of those trades and of the optimal trades; drift cases: ac_drift_from_signal.",
+ "description": "F7 rule 5 golden: the Almgren-Chriss eta path (iap.execution.optimal; docs/API_REFERENCE.md sections 2.11 X-P2-15, 2.13 P0-5, 2.14 B3). calibration cases: ac_params_from_calibration with `coeff` already resolved (the slope or residual coefficient; the resolution from a calibration document is a dict read, not arithmetic) -> ACParams or {error}; trajectory cases: ac_kappa, ac_trajectory(qty, params, n, drift), ac_cost of those trades and of the optimal trades; drift cases: ac_drift_from_signal.",
  "generator": "PYTHONPATH=src python tools/make_golden_f7.py --only r05_almgren_chriss --force",
  "parity": "canonical JSON bytes of `expected` (sorted keys, no whitespace, Python float repr) must equal the C++ port's canonical bytes; `expected_tol` (when present) is compared to `tolerance`",
  "inputs": {

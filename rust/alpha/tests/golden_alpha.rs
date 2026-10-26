@@ -1,4 +1,4 @@
-//! Golden suite for the alpha crate (API_ALPHA.md §§6-7).
+//! Golden suite for the alpha crate (docs/API_REFERENCE.md §§6-7).
 //!
 //! Verified here, all against `tests/golden/expected_alpha.json`:
 //!
@@ -63,7 +63,7 @@ fn engine_vectors(vector: &str, instrument_id: u32, tick: f64) -> (Vec<FeatureVe
         let vec = eng.apply(ev).unwrap().expect("cadence 0 emits");
         last_ts = ev.exchange_ts;
         // one mid sample per book REFRESH; a non-tradable refresh is a
-        // blackout sample (API_FEATURES.md §6)
+        // blackout sample (docs/API_REFERENCE.md §6)
         let seq = eng.refresh_seq(instrument_id);
         if seq != last_refresh {
             last_refresh = seq;

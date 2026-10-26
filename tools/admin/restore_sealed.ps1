@@ -3,7 +3,7 @@
 #   .\tools\admin\restore_sealed.ps1 -BackupSet E:\iap-backup\iap-sealed-20261026T120000Z [-Repo C:\iap\repo]
 #                                    [-Python C:\Python312\python.exe] [-SealedRoot C:\iap-sealed] [-Partitions a,b,c,runner]
 #
-# Runbook and restore drill: docs/governance/SEALED_DATA.md section 6. For a drill, point -SealedRoot at an empty
+# Runbook and restore drill: docs/GOVERNANCE.md section 6. For a drill, point -SealedRoot at an empty
 # scratch directory (e.g. D:\iap-restore-drill); the live partitions are never a drill target.
 #
 # Refuses, before changing anything:

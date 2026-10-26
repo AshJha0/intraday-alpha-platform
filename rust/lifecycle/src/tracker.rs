@@ -1,6 +1,6 @@
 //! The live ACTIVE / WATCH / RETIRED sub-machine — an exact port of
 //! `iap.adaptive.lifecycle.LifecycleTracker` (Java `LifecycleGauge`), rules
-//! pinned in API_ADAPTIVE.md §6:
+//! pinned in docs/API_REFERENCE.md §6:
 //!
 //! - **ACTIVE**: `rolling_ic < watch_ic_gate` → WATCH.
 //! - **WATCH**: a persistent breach → RETIRED, by the configured retirement

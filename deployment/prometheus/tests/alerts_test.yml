@@ -34,8 +34,8 @@ tests:
               domain: meta
             exp_annotations:
               summary: "Alerting pipeline heartbeat (always firing)"
-              runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
-              runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              runbook: docs/RUNBOOKS.md
+              runbook_url: docs/RUNBOOKS.md
               description: >-
                 This alert is always firing. If it stops arriving at the
                 heartbeat receiver, Prometheus rule evaluation or Alertmanager is
@@ -86,13 +86,13 @@ tests:
               service: platform-metrics
             exp_annotations:
               summary: "No market event processed for 5m 0s on platform-metrics"
-              runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
-              runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
+              runbook: docs/RUNBOOKS.md
+              runbook_url: docs/RUNBOOKS.md
               description: >-
                 A running realtime session has not processed an event in over a
                 minute of wall clock — a wedged decode/trading thread or a dead
                 upstream. /health returns 503 after 30s of no progress. Runbook:
-                docs/runbooks/RUNBOOK_shadow_deployment.md#feed-stall
+                docs/RUNBOOKS.md#feed-stall
 
   # ---------------------------------------------------------------------------
   # Test 15 — loss-limit utilization is computed against the EXPORTED limit
@@ -118,13 +118,13 @@ tests:
               service: platform-metrics
             exp_annotations:
               summary: "Daily loss limit utilization 76%"
-              runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
-              runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              runbook: docs/RUNBOOKS.md
+              runbook_url: docs/RUNBOOKS.md
               description: >-
                 Daily P&L (realized + unrealized, reporting currency) is below
                 -75% of global.max_daily_loss; at 100% the risk engine latches the
                 global kill switch (fail-closed, audit-logged). Runbook:
-                docs/runbooks/RUNBOOK_incident_kill_switch.md
+                docs/RUNBOOKS.md
 
   - interval: 15s
     name: LossLimitUtilizationHigh follows an approved limit override
@@ -159,14 +159,14 @@ tests:
               service: platform-metrics
             exp_annotations:
               summary: "Sequence gap on platform-metrics (1 in 5m)"
-              runbook: docs/runbooks/RUNBOOK_data_pipeline.md
-              runbook_url: docs/runbooks/RUNBOOK_data_pipeline.md
+              runbook: docs/RUNBOOKS.md
+              runbook_url: docs/RUNBOOKS.md
               description: >-
                 At least one sequence gap. max_sequence_gap_before_halt = 1: the
                 affected book is marked stale and the risk engine rejects orders
                 against it until a SNAPSHOT recovers the stream. Check book_stale
                 for the instrument. Runbook:
-                docs/runbooks/RUNBOOK_data_pipeline.md#sequence-gaps
+                docs/RUNBOOKS.md#sequence-gaps
   # ---------------------------------------------------------------------------
   # The kill-switch page renders (this is the rule whose `default` template
   # function made Prometheus refuse the ENTIRE alerts.yml at load time).
@@ -188,15 +188,15 @@ tests:
               service: platform-metrics
             exp_annotations:
               summary: "Global kill switch engaged on platform-metrics"
-              runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
-              runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              runbook: docs/RUNBOOKS.md
+              runbook_url: docs/RUNBOOKS.md
               description: >-
                 The global kill switch latched — trading is halted and every order
                 in scope is rejected pre-trade. The latch SURVIVES a restart
                 (PLATFORM_CONVENTIONS.md §12.3): a redeploy is not a re-arm path.
                 Do NOT clear without following the incident runbook and risk
                 approval. Scope and reason are in <state-dir>/risk_audit.jsonl.
-                Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+                Runbook: docs/RUNBOOKS.md
 
   # ---------------------------------------------------------------------------
   # A failed session pages immediately.
@@ -218,13 +218,13 @@ tests:
               service: platform-metrics
             exp_annotations:
               summary: "Paper-trading session FAILED on platform-metrics"
-              runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
-              runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
+              runbook: docs/RUNBOOKS.md
+              runbook_url: docs/RUNBOOKS.md
               description: >-
                 platform_session_state = 3 (FAILED): the session process exited
                 non-zero (python -m iap.metrics run-session wrote the marker).
                 Check the session container's logs. Runbook:
-                docs/runbooks/RUNBOOK_shadow_deployment.md#failed-session
+                docs/RUNBOOKS.md#failed-session
 
   # ---------------------------------------------------------------------------
   # v1.3.0 safety rules. platform_session_state 4 (STOPPED): the trading
@@ -258,8 +258,8 @@ tests:
               service: platform-metrics
             exp_annotations:
               summary: "Paper-trading session STOPPED and not resumed on platform-metrics"
-              runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
-              runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
+              runbook: docs/RUNBOOKS.md
+              runbook_url: docs/RUNBOOKS.md
               description: >-
                 The persisted session state is 4 (STOPPED) and no running
                 session has reported for 10m. The session process was
@@ -267,7 +267,7 @@ tests:
                 MVP loop is deterministic) or record why it stays down. The
                 alert clears when a new session starts (the persisted state
                 becomes 1) or finishes (2). Runbook:
-                docs/runbooks/RUNBOOK_shadow_deployment.md#stopped-session
+                docs/RUNBOOKS.md#stopped-session
       - eval_time: 12m
         alertname: PlatformSessionFailed
         exp_alerts: []          # a stop is not a failure
@@ -293,8 +293,8 @@ tests:
               service: platform-metrics
             exp_annotations:
               summary: "Paper-trading session STOPPED and not resumed on platform-metrics"
-              runbook: docs/runbooks/RUNBOOK_shadow_deployment.md
-              runbook_url: docs/runbooks/RUNBOOK_shadow_deployment.md
+              runbook: docs/RUNBOOKS.md
+              runbook_url: docs/RUNBOOKS.md
               description: >-
                 The persisted session state is 4 (STOPPED) and no running
                 session has reported for 10m. The session process was
@@ -302,7 +302,7 @@ tests:
                 MVP loop is deterministic) or record why it stays down. The
                 alert clears when a new session starts (the persisted state
                 becomes 1) or finishes (2). Runbook:
-                docs/runbooks/RUNBOOK_shadow_deployment.md#stopped-session
+                docs/RUNBOOKS.md#stopped-session
       - eval_time: 20m
         alertname: SessionStoppedNotResumed
         exp_alerts: []
@@ -351,9 +351,9 @@ tests:
               service: crashed
             exp_annotations:
               summary: "Scrape target platform-metrics/ down"
-              runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
-              runbook_url: docs/runbooks/RUNBOOK_incident_kill_switch.md
+              runbook: docs/RUNBOOKS.md
+              runbook_url: docs/RUNBOOKS.md
               description: >-
                 Prometheus cannot scrape . If this is
                 platform-metrics during a session, treat as a platform
-                incident. Runbook: docs/runbooks/RUNBOOK_incident_kill_switch.md
+                incident. Runbook: docs/RUNBOOKS.md

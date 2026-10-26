@@ -10,5 +10,5 @@ contact_links:
     url: https://github.com/AshJha0/intraday-alpha-platform/blob/main/PLATFORM_CONVENTIONS.md
     about: Canonical types, serialization, determinism, book semantics, golden rules, trading contracts.
   - name: Security policy
-    url: https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/governance/SECURITY.md
+    url: https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/GOVERNANCE.md
     about: Report risk-engine, kill-switch or deployment defects privately, not as a public issue.

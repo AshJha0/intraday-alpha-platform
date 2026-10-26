@@ -27,7 +27,7 @@ the outcome:
   (``research`` at CANDIDATE, ``validation`` at VALIDATING, ``paper`` at
   PAPER, ``live`` / a null or uninformative rolling IC at ACTIVE / WATCH)
   evaluates nothing and moves nothing — not even the failure counter
-  (silence is not evidence, API_ADAPTIVE.md §6).  RESEARCH is the exception
+  (silence is not evidence, docs/API_REFERENCE.md §6).  RESEARCH is the exception
   by construction: its ``ledger_entry_exists`` gate IS the presence check;
 * **live** (ACTIVE / WATCH): delegated unchanged to
   :class:`iap.adaptive.lifecycle.LifecycleTracker` with the pinned

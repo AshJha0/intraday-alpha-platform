@@ -39,7 +39,7 @@ carries the owner's approval sentence; nothing here contacts the network
     python -m iap.marketdata process-iex-day ... --render-cmd data/real/run_iex_20251128.cmd \\
         [--jobs-registry data/real/jobs.json]
 
-Runbook: docs/runbooks/RUNBOOK_process_and_delete.md (IEX section).
+Runbook: docs/RUNBOOKS.md (IEX section).
 """
 
 from __future__ import annotations
@@ -553,7 +553,7 @@ def render_iex_wrapper(
     log: str,
     extra_args: str = "",
 ) -> str:
-    """A detached-run ``.cmd`` (RUNBOOK_job_watchdog.md): one ``process-iex-day``
+    """A detached-run ``.cmd`` (docs/RUNBOOKS.md): one ``process-iex-day``
     call per date IN ORDER; a failed day is logged (``EXIT_<date> n``) and the
     chain goes on to the next one, so one missing HIST day does not stop the
     set.  The last line is ``EXIT <number of failed days>``."""

@@ -74,7 +74,7 @@ def render_report(records: dict[int, dict]) -> str:
     skipped = {iid: p["crossed_states_skipped"] for iid, p in records.items()}
     n_states = {iid: p["n_states"] for iid, p in records.items()}
     lines.append(
-        "**Timeline rule (pinned, API_PORTFOLIO_TCA.md §2.1)**: crossed "
+        "**Timeline rule (pinned, docs/API_REFERENCE.md §2.1)**: crossed "
         "consolidated states (cross-venue bid > ask, a synthetic-generator "
         "artifact) are SKIPPED and counted, locked states (half-spread 0) "
         "are kept; markouts past the timeline end or across a HALT are "

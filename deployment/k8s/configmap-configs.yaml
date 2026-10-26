@@ -649,7 +649,7 @@ data:
         "alpha_registry": "research/alpha_registry.json"
       },
       "notes": [
-        "alphas: EQ01 (microprice), EQ03 (multi-level OFI) and EQ06 (short-horizon momentum) are three of the six golden production alphas of API_ALPHA.md; all three carry fitted, non-dead linear_z_v1 parameters in configs/strategies/alpha_params.json (feature_version-checked on load), so no substitution was needed.",
+        "alphas: EQ01 (microprice), EQ03 (multi-level OFI) and EQ06 (short-horizon momentum) are three of the six golden production alphas of docs/API_REFERENCE.md; all three carry fitted, non-dead linear_z_v1 parameters in configs/strategies/alpha_params.json (feature_version-checked on load), so no substitution was needed.",
         "horizon: the alphas read their pinned features but the MVP acts on a 1 s holding horizon; EQ03 (pinned 5 s) and EQ06 (pinned 10 s) enter the ensemble as z-scores (iap.backtest.engine.ensemble_scores: equal-weight z average rescaled by the mean |beta|), so the mixture is scale-free; the research runner measured EQ03@1s IC +0.018 and EQ06@1s IC +0.016 (research/experiments).",
         "portfolio.tc_bps (0.001 bp): the optimizer's linear transaction-cost penalty is deliberately orders of magnitude BELOW the modelled round-trip cost (half-spread + fee + impact, about 1 bp on a USD 190 stock) - the fitted expected returns are 0.001-0.05 bp per decision, so with the honest cost the mean-variance solve would never trade and the execution / TCA / trace path would stay unexercised. It acts as a dead-band on negligible expected returns. The report measures the real cost through TCA and states the net result; it never assumes the optimizer's number.",
         "portfolio.conf_min (0.1): below it the optimizer sees a zero expected return and flattens (the Java paper vertical's rule); urgency = ensemble confidence selects the algo: TWAP (passive limit at the same-side best) up to 0.2, POV up to 0.35, IS above.",
@@ -780,7 +780,7 @@ data:
   paper__paper_trade.json: |
     {
       "x-version": 1,
-      "description": "Forward paper trade (v1.16 item 9, infrastructure): the rule, realism and monitor thresholds read by python -m iap.paper.daily. Paths are repository-relative; reference feature stores are relative to --data-root. docs/runbooks/RUNBOOK_paper_trade.md.",
+      "description": "Forward paper trade (v1.16 item 9, infrastructure): the rule, realism and monitor thresholds read by python -m iap.paper.daily. Paths are repository-relative; reference feature stores are relative to --data-root. docs/RUNBOOKS.md.",
       "prereg": "configs/prereg/v3.json",
       "mvp_config": "configs/mvp/mvp.json",
       "execution_config": "configs/execution/execution.json",
@@ -836,7 +836,7 @@ data:
   paper__shadow_book.json: |
     {
       "x-version": 1,
-      "description": "Track C forward shadow book (v2.0 stage 10; U13 protocol section 8). TEMPLATE: frozen_configuration_sha256, capital, T_min, m_min, grid_points and the calendar are fixed by the registration before T0 and replaced then; the values here are placeholders that make the job refuse every real input. docs/runbooks/RUNBOOK_shadow_book.md.",
+      "description": "Track C forward shadow book (v2.0 stage 10; U13 protocol section 8). TEMPLATE: frozen_configuration_sha256, capital, T_min, m_min, grid_points and the calendar are fixed by the registration before T0 and replaced then; the values here are placeholders that make the job refuse every real input. docs/RUNBOOKS.md.",
       "frozen_configuration_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "capital": 1000000.0,
       "calendar": "shadow_book_calendar.json",

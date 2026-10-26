@@ -1,6 +1,6 @@
 //! `tests/golden/expected_dark_controls.json`: the B10 -> F8 golden vectors
 //! of the stateless dark-first pre-trade check
-//! (`docs/research/B10_F8_HANDOVER.md` §2; the Python mirror pins the same
+//! (`docs/RESEARCH_NOTES.md` §2; the Python mirror pins the same
 //! rows as `iap.execution.dark.DARK_CONTROL_GOLDENS`).
 
 use std::collections::BTreeSet;

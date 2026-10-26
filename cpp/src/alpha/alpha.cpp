@@ -66,7 +66,7 @@ std::map<std::string, LinearZParams> load_alpha_params(
         lp.beta = p["beta"].num();
         lp.z_clip = p["z_clip"].num();
         lp.conf_scale = p["conf_scale"].num();
-        // Pinned loader validation (API_ALPHA.md section 2).
+        // Pinned loader validation (docs/API_REFERENCE.md section 2).
         if (lp.z_clip != PINNED_Z_CLIP || lp.conf_scale != PINNED_CONF_SCALE) {
             throw std::invalid_argument(
                 std::string(aid) + ": z_clip/conf_scale must be the pinned "
@@ -109,7 +109,7 @@ double raw_signal(const std::string& alpha_id, const FeatureVector& vec) {
         return feature_or_nan(vec, F_MICRO_MID_DEV_BPS);
     }
     if (alpha_id == "EQ03") {
-        // pinned weights 0.5 / 0.3 / 0.2 (API_ALPHA.md section 4)
+        // pinned weights 0.5 / 0.3 / 0.2 (docs/API_REFERENCE.md section 4)
         return 0.5 * feature_or_nan(vec, F_OFI_NORM_L1_W1S) +
                0.3 * feature_or_nan(vec, F_OFI_NORM_L5_W1S) +
                0.2 * feature_or_nan(vec, F_OFI_NORM_L5_W5S);

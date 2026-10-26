@@ -21,7 +21,7 @@ not compute is *absent*, never a number), so an evidence document round-trips
 through ``to_dict`` / ``from_dict`` byte-exactly and a port can replay the
 golden's evidence without float drift.  A missing block means "no evidence
 for that stage" and, except for the RESEARCH -> CANDIDATE presence gate, an
-absent block moves nothing (silence is not evidence — API_ADAPTIVE.md §6).
+absent block moves nothing (silence is not evidence — docs/API_REFERENCE.md §6).
 
 **The significance threshold travels with the evidence (pinned, v1.5.0).**
 ``significance_threshold`` is the PROMOTE t threshold the research result
@@ -232,7 +232,7 @@ class PaperEvidence:
 
 @dataclass(frozen=True)
 class LiveEvidence:
-    """One live rolling-IC evaluation (API_ADAPTIVE.md §4/§6).
+    """One live rolling-IC evaluation (docs/API_REFERENCE.md §4/§6).
 
     ``rolling_ic`` is the mean of the matured live bucket ICs, or ``None``
     when fewer than ``min_ic_buckets`` buckets exist (no evidence);

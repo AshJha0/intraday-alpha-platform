@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://iap.example/schemas/tca/tca_result.schema.json",
   "title": "TCAResult",
-  "description": "Per-parent-order TCA record (API_PORTFOLIO_TCA.md section 2). Prices in ticks; costs positive when execution was worse than the benchmark. Identities: implementation_shortfall_bps = delay + trading + opportunity; trading = spread + impact + timing. venue_contribution_bps keyed by decimal venue id.",
+  "description": "Per-parent-order TCA record (docs/API_REFERENCE.md section 2). Prices in ticks; costs positive when execution was worse than the benchmark. Identities: implementation_shortfall_bps = delay + trading + opportunity; trading = spread + impact + timing. venue_contribution_bps keyed by decimal venue id.",
   "x-version": 1,
   "type": "object",
   "properties": {

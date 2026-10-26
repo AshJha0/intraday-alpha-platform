@@ -15,7 +15,7 @@ subject to (any subset active):
 - volatility target       w' Sigma w <= vol_target^2
 
 Algorithm (PINNED — the Java production service must replicate exactly;
-see API_PORTFOLIO_TCA.md):
+see docs/API_REFERENCE.md):
 
 1. ``w = project(w_prev)``.
 2. For ``k = 0 .. iters-1``:

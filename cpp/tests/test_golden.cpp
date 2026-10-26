@@ -1,5 +1,5 @@
 // Golden suite: cross-language parity against tests/golden/
-// (API_CORE.md section 6). All integer comparisons are exact.
+// (docs/API_REFERENCE.md section 6). All integer comparisons are exact.
 
 #include <gtest/gtest.h>
 

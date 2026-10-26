@@ -66,7 +66,7 @@ identity, never through the pipe, so the authorisation order above is
 untouched.  They record and check the sha256 of every file and the audit chain
 head; they print counts and hashes only.
 
-Single-machine limit (``docs/governance/SEALED_DATA.md``): everything here
+Single-machine limit (``docs/GOVERNANCE.md``): everything here
 runs on one workstation whose administrator is the owner.  The controls stop
 the development identity's processes, not the administrator; the evidence
 class stays "mechanically isolated" (U0 section 2, property 6).
@@ -90,7 +90,7 @@ from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
 #: The service may run from an all-users interpreter and a checkout outside the
-#: owner's profile (``docs/governance/SEALED_DATA.md`` section 5, e.g. ``C:\\iap\\repo``):
+#: owner's profile (``docs/GOVERNANCE.md`` section 5, e.g. ``C:\\iap\\repo``):
 #: the package root is this checkout's ``python/src``, or ``IAP_REPO`` when the
 #: script was copied elsewhere.
 _SRC = REPO / "python" / "src"

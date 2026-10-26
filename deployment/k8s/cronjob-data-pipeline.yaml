@@ -6,7 +6,7 @@
 # Schedule: 07:30 UTC daily (before EU/US overlap analysis windows; the
 # pipeline is deterministic, so a re-run after failure is safe and produces
 # bit-identical output for the pinned seed in configs/marketdata/generator.json).
-# Runbook: docs/runbooks/RUNBOOK_data_pipeline.md
+# Runbook: docs/RUNBOOKS.md
 # =============================================================================
 apiVersion: batch/v1
 kind: CronJob
@@ -58,7 +58,7 @@ spec:
               imagePullPolicy: IfNotPresent
               # Configs from the ConfigMap (not the baked copy) so a config
               # change does not require an image rebuild; every config change
-              # is audit-logged per docs/governance/GOVERNANCE.md.
+              # is audit-logged per docs/GOVERNANCE.md.
               #
               # `command` REPLACES the image ENTRYPOINT rather than appending
               # to it: the entrypoint already carries --configs-dir/--out, and

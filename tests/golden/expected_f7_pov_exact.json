@@ -1,6 +1,6 @@
 {
  "x-version": 1,
- "description": "F7 rule 4 golden: ParentOrder.pov_exact (API_TRADING.md section 2.13 P0-5; iap.execution.replay._pov_target and the deficit loops of _schedule / _schedule_passive are the reference). Same scenario / row shapes as expected_f7_impact_parent.json plus `passive`: the PassiveStats of every PASSIVE parent (keyed by parent_id as a string).",
+ "description": "F7 rule 4 golden: ParentOrder.pov_exact (docs/API_REFERENCE.md section 2.13 P0-5; iap.execution.replay._pov_target and the deficit loops of _schedule / _schedule_passive are the reference). Same scenario / row shapes as expected_f7_impact_parent.json plus `passive`: the PassiveStats of every PASSIVE parent (keyed by parent_id as a string).",
  "generator": "PYTHONPATH=src python tools/make_golden_f7.py --only r04_pov_exact --force",
  "parity": "canonical JSON bytes of `expected` (sorted keys, no whitespace, Python float repr) must equal the C++ port's canonical bytes; `expected_tol` (when present) is compared to `tolerance`",
  "inputs": {

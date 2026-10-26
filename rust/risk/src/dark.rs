@@ -1,5 +1,5 @@
 //! The stateless dark-first pre-trade check of the B10 dark-venue model
-//! (v1.17 F8; `docs/research/B10_F8_HANDOVER.md`): a pure function of the
+//! (v1.17 F8; `docs/RESEARCH_NOTES.md`): a pure function of the
 //! inputs the execution replay supplies per dark post, pinned by
 //! `tests/golden/expected_dark_controls.json` (the rows of the Python
 //! mirror's `iap.execution.dark.DARK_CONTROL_GOLDENS`).

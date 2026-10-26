@@ -24,7 +24,7 @@
 # There is NO admin API any more: the kill-switch runbook's manual halt is
 # the config path (configs/risk/risk.json global.kill_switch_engaged, then
 # regenerate the ConfigMap and rollout restart), see
-# docs/runbooks/RUNBOOK_incident_kill_switch.md.
+# docs/RUNBOOKS.md.
 #
 # SINGLETON (PLATFORM_CONVENTIONS.md §12.7): replicas 1 + strategy Recreate.
 # The state PVC is ReadWriteOnce and the session writes it; a second replica

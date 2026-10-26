@@ -518,7 +518,7 @@ void FeatureEngine::emit(InstState& st, std::uint32_t iid, std::int64_t t,
     out.values.fill(kNaN);
     out.valid.fill(false);
 
-    // Single value funnel (API_FEATURES.md section 1): a non-finite value can
+    // Single value funnel (docs/API_REFERENCE.md section 1): a non-finite value can
     // never be emitted with valid == true.
     auto put = [&](int slot, double v, bool ok) {
         const bool good = ok && std::isfinite(v);

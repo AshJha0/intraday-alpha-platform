@@ -124,7 +124,7 @@ the ten loop contracts added 2026-09-19 — `portfolio/portfolio_target`, `risk/
 `trace/decision_trace` (which `$ref`s the others). Every schema is mirrored by one frozen,
 validated Python type in `iap.contracts.types` (`SCHEMA`, `x_version`); `SCHEMA_VERSIONS` in
 `iap.contracts.versions` is the inventory and a golden test keeps it equal to the files on disk
-(API_CONTRACTS.md §5). Any field change bumps the version, the constant and the type, regenerates
+(docs/API_REFERENCE.md §5). Any field change bumps the version, the constant and the type, regenerates
 `tests/golden/expected_contracts_examples.json` and adds a MIGRATIONS.md entry. A move of a schema
 or config file within the tree is a MIGRATIONS.md entry too (old → new path table) but bumps
 nothing. Book / engine checkpoints carry `"x-version": 2` and are cross-language JSON (API_CORE
@@ -140,7 +140,7 @@ store of another version is rebuilt, never migrated in place).
 - The synthetic generator, the backtester fill model, and every simulation take explicit seeds
   from configs; identical seed ⇒ identical outputs bit-for-bit (integer paths) across runs.
 - **The bundled dataset is pinned by content** (2026-10-03, v1.4.0): `data_version` is the sha256
-  over the normalized IAP1 bytes (docs/governance/REPRODUCIBILITY.md §1) and the raw-file hashes
+  over the normalized IAP1 bytes (docs/GOVERNANCE.md §1) and the raw-file hashes
   of the committed generator config are asserted in `tests/replay/test_generator_determinism.py`,
   for the default (`equities.flow.calibration = "session"`) and for the documented legacy value
   (`"legacy_budget"`, the dataset of v1.3.0 and earlier). A change to the dataset is a change to
@@ -308,7 +308,7 @@ Python 3.11 (numpy/pandas/scipy/sklearn/matplotlib/pytest; polars/duckdb/pyarrow
 with --break-system-packages; xgboost/lightgbm may be installable — try, fall back to sklearn's
 GradientBoosting + document). g++13/CMake/GoogleTest/Eigen. Rust 1.99.0 (pinned, `rust/rust-toolchain.toml`) + crates.io (deps as
 shipped: **serde, serde_json only** — `rand` was permitted in wave 1 but is unused and
-SECURITY.md §1 allows serde/serde_json alone; crossbeam optional). Java 21 + JUnit4 jar.
+docs/GOVERNANCE.md §1 allows serde/serde_json alone; crossbeam optional). Java 21 + JUnit4 jar.
 2 CPUs — benchmark methodology must state this; use -j2.
 
 ## 11. Trading contracts (risk, execution simulator, SOR, algos, paper wiring, currency)
@@ -322,9 +322,9 @@ Normative implementations: **risk** = `rust/risk` (the pinned rule text and the 
 `cpp/tools/make_replay_fills_golden.cpp`; Java `com.iap.{execution,sor}` and Python `iap.execution`
 — `python/src/iap/execution/` — mirror it and reproduce `tests/golden/expected_replay_fills.json`);
 **portfolio / TCA / research backtest** = Python `iap.{portfolio,tca,backtest}`
-(`API_PORTFOLIO_TCA.md`; Java `com.iap.{portfolio,tca}` mirrors). Stated exactly: **Rust remains
+(`docs/API_REFERENCE.md`; Java `com.iap.{portfolio,tca}` mirrors). Stated exactly: **Rust remains
 normative for the risk rule text and C++ for the execution rule text; Python is now the
-reference-equivalent implementation of both, proven by the same goldens** (`API_TRADING.md`), so
+reference-equivalent implementation of both, proven by the same goldens** (`docs/API_REFERENCE.md`), so
 the platform principle "Python defines the semantics, C++/Rust/Java implement them, golden tests
 prove equivalence" holds for the whole loop the MVP runs, with the ownership of those two rule
 texts and their generators as the one stated qualification. Goldens are produced by the owning
@@ -405,7 +405,7 @@ implements it (`docs/SCENARIOS.md`, TRADING section).
   | dark participation cap (dark-first router rule) | `max_dark_participation_bps` + `dark_participation_floor_qty` | 32 `DARK_PARTICIPATION` | off |
   | dark-fill notional limit | `max_dark_fill_notional` | 33 `DARK_FILL_NOTIONAL` | off |
 
-  **Two forms, by design.** The B10 hand-over (`docs/research/B10_F8_HANDOVER.md`) defines the
+  **Two forms, by design.** The B10 hand-over (`docs/RESEARCH_NOTES.md`) defines the
   same three controls as a STATELESS function the execution replay evaluates before a dark post,
   from inputs the risk engine never sees: the trailing displayed lit EXECUTE volume over
   `participation_window_ns`, the PARENT's cumulative dark-filled notional and the child notional
@@ -641,7 +641,7 @@ never updated afterwards — a read-only diagnostic for the markout analysis (no
   every child carries `expire_ts = parent.end_ts`, so no child outlives its window; POV deficit
   is measured against filled + in-flight qty; a fill outside `[arrival_ts, end_ts]` is an error.
 
-- Execution policy (v1.5.0, `ParentOrder.policy`; API_TRADING.md §2.5): `NATIVE` (default) is
+- Execution policy (v1.5.0, `ParentOrder.policy`; docs/API_REFERENCE.md §2.5): `NATIVE` (default) is
   the child style above and is the only one the pre-existing goldens exercise; `AGGRESSIVE`
   sends every child as MARKET; `PASSIVE` runs POST → REST → REPRICE / CROSS — post at the near
   touch (one tick inside when the spread is `>= improve_min_spread_ticks`, never at or through
@@ -697,7 +697,7 @@ never updated afterwards — a read-only diagnostic for the markout analysis (no
   `iap.execution.dark.dark_pretrade_check` / `DarkControls` is the Python mirror of that
   interface and `DARK_CONTROL_GOLDENS` the vectors Rust must reproduce. Until F8 lands the
   Python mirror is the only implementation; the hand-over is
-  `docs/research/B10_F8_HANDOVER.md`.
+  `docs/RESEARCH_NOTES.md`.
 
   | control (F8) | semantics | Python mirror | Rust |
   |---|---|---|---|
@@ -730,7 +730,7 @@ never updated afterwards — a read-only diagnostic for the markout analysis (no
 - The optimizer's `Infeasible` result holds the previous weights (never NaN); the platform
   keeps the current position on an infeasible solve.
 
-### 11.5 TCA and portfolio (Python reference, Java port) — see `API_PORTFOLIO_TCA.md`
+### 11.5 TCA and portfolio (Python reference, Java port) — see `docs/API_REFERENCE.md`
 
 Crossed consolidated states are skipped + counted, locked kept (§2.1); MAKER fills are attributed
 against the state before the event that filled them, TAKER fills against the state at `ts`
@@ -885,7 +885,7 @@ may apply `lot_size` a second time and none may omit it. Consequences that are t
   (`risk_resume_open_orders_released_total`), or they would inflate every projection for the
   rest of the session. The market-data book, feature warm-up and the
   execution simulator are deliberately NOT snapshotted: they rebuild from the stream after the
-  cursor (documented in `RUNBOOK_shadow_deployment.md` §6). Round trip is golden-tested
+  cursor (documented in `docs/RUNBOOKS.md` §6). Round trip is golden-tested
   (`PaperStateRecoveryTest`): the snapshot restored at cursor *k* is byte-identical to the
   snapshot an uninterrupted run takes at cursor *k*.
 - Unreadable/corrupt state under `--resume` **fails closed**: the process exits non-zero with the
@@ -911,7 +911,7 @@ may apply `lot_size` a second time and none may omit it. Consequences that are t
     decisions/s is ≈ 130 GB/h), so a full-rate day needs its own archival step like the audit —
     archive it with the report's `trace.digest` (= `TraceDigest.ofJsonl(file)`); `--resume`
     refuses a torn trace file (line count ≠ `session_state.json` `trace_lines`);
-  - archival is an operator step, not a process step: `RUNBOOK_shadow_deployment.md` §7 step 1
+  - archival is an operator step, not a process step: `docs/RUNBOOKS.md` §7 step 1
     exports the file with its sha256 (recorded in the report as `risk.audit_sha256`) before the
     directory is reused. GOVERNANCE §3 sets the retention period for the archive; the platform's
     contract is only that the file is complete, fsynced and checksummed when the session ends.
@@ -960,7 +960,7 @@ events_processed, last_event_ts, last_event_wallclock, mode, alpha_id, instrumen
 kill_switch_engaged, lifecycle, config_sha256, restarts` and updates **during** the session
 (`events_processed` is written by the trading thread on every event).
 
-Admin endpoints (`RUNBOOK_incident_kill_switch.md` §2 — the manual ENGAGE path):
+Admin endpoints (`docs/RUNBOOKS.md` §2 — the manual ENGAGE path):
 
 - **Bind address** (2026-10-03): the listener binds `127.0.0.1` unless `$IAP_BIND_ADDR` names
   another address — the admin verbs must not be reachable from other hosts by default. The
@@ -1086,7 +1086,7 @@ Admin endpoints (`RUNBOOK_incident_kill_switch.md` §2 — the manual ENGAGE pat
   `configmap-alertmanager.yaml` is generated from it). The receiver is a generic webhook whose
   URL is read from a mounted secret file. `Watchdog` (`vector(1)`, always firing) is the
   heartbeat, routed to its own receiver.
-- **Alerting, SLOs and state backup** (v1.12.0, plan P4; docs/runbooks/RUNBOOK_alerting.md):
+- **Alerting, SLOs and state backup** (v1.12.0, plan P4; docs/RUNBOOKS.md):
   - *Routing*: `severity: page` → receiver `page`; `critical`/`warning` → `ticket`; `Watchdog`
     → `watchdog`; anything else falls through to `ticket`. Inhibition is always scoped to the same
     `service`. Every alert carries `severity` (`page|critical|warning|none`) and `runbook` +
@@ -1125,13 +1125,13 @@ Admin endpoints (`RUNBOOK_incident_kill_switch.md` §2 — the manual ENGAGE pat
   `ubuntu-24.04`, cargo runs `--locked`, and the workflow token is `contents: read`. CodeQL
   (`codeql.yml`), Dependabot (`dependabot.yml`) and a tag-triggered release workflow
   (`release.yml`: images to GHCR, build-provenance attestation, `release-manifest.json`; not yet
-  exercised by a tag) sit beside it. `CODEOWNERS` names the reviewers `SECURITY.md` and
+  exercised by a tag) sit beside it. `CODEOWNERS` names the reviewers `docs/GOVERNANCE.md` and
   `GOVERNANCE.md` refer to; branch protection itself is a repository setting that is not yet
-  configured (`docs/governance/REPO_SETTINGS.md`).
+  configured (`docs/GOVERNANCE.md`).
 
 ## 13. Contracts, lifecycle, trace and data model (Python `iap.{contracts,lifecycle,trace,store}`; ports `com.iap.{contracts,trace,lifecycle}`, `rust/{contracts,lifecycle}`, `cpp/include/iap/contracts/`)
 
-Normative implementation: Python (`API_CONTRACTS.md`, `docs/LIFECYCLE.md`, `docs/DECISION_TRACE.md`,
+Normative implementation: Python (`docs/API_REFERENCE.md`, `docs/LIFECYCLE.md`, `docs/DECISION_TRACE.md`,
 `docs/DATA_MODEL.md`); the ports are proven by `tests/golden/expected_canonical_json.json`,
 `expected_contracts_examples.json` and `expected_lifecycle.json` (§5). Everything below is pinned.
 
@@ -1283,7 +1283,7 @@ comparison and never sets a state. The bundled result: 23 CANDIDATE / 0 beyond
 (`net_pnl_after_costs` and `net_pnl_bootstrap_ci` fail for all 24 — 17 alphas make no trade, 7
 have a negative lower bound; `cross_alpha_correlation` passes vacuously for all 24, nobody being
 at VALIDATING). In the live Java loop the state is **observational**
-(API_ADAPTIVE.md §6; GOVERNANCE gate 11): the machine decides state, not size.
+(docs/API_REFERENCE.md §6; GOVERNANCE gate 11): the machine decides state, not size.
 
 ### 13.5 The store is a derived, rebuildable index
 
@@ -1466,7 +1466,7 @@ backlog was built in v1.7.0 (`iap.agents`: write broker and blackboard, pre-regi
 reserve, signed approvals, read-only MCP server, evaluations) and hardened in v1.10.0, and
 v1.11.0 added an optional LLM research agent (`iap.llm`) that works only through it and is
 outside every trading-path package; the rule of this section is unchanged
-(docs/governance/GOVERNANCE.md §2a-§2b). The paragraph as written on 2026-10-03 follows.
+(docs/GOVERNANCE.md §2a-§2b). The paragraph as written on 2026-10-03 follows.
 There was no LLM, agent or MCP code in the repository then. What exists is the foundation an agent layer would stand on, each piece useful
 without one: the research store that is safe for parallel automated writers and the gate
 eligibility rule (§13.6), the import-policy test, and machine-readable tooling —
@@ -1728,7 +1728,7 @@ changed; this table is the index.
 | risk audit hash chain (`seq`, `prev_sha256`; chained restore) | §11.1; `risk_event.schema.json` x-version 2 | on |
 | SEC 15c3-5 checks 23-29, bounded two-party override, sanity gate, bounded state | §11.1; `risk.json` x-version 4 | each check off unless its key is set; the repo config sets all but participation |
 | MODIFY size-down credits `ahead_qty` | §11.2 rule 4; `execution.hpp` | on |
-| feed latency, routed exits, hidden prints, per-order markouts, size amends | API_TRADING.md §2.12 | off |
+| feed latency, routed exits, hidden prints, per-order markouts, size amends | docs/API_REFERENCE.md §2.12 | off |
 | causal row block, automatic day-separated HAC, time-shift leakage, looks per gate decision, per-instrument scaling, fold-majority hypothesis | docs/RESEARCH_VALIDITY.md §4b | on in `v2` / `v3` / `v4`; the v1.13 rules as `*_v113` |
-| chained look ledger (x-version 4), trust roots, `ed25519-v2` | docs/governance/GOVERNANCE.md | on |
-| model content hash (`content.json`) | API_ADAPTIVE.md §9.1 | written for new records, backfilled by `verify_content` |
+| chained look ledger (x-version 4), trust roots, `ed25519-v2` | docs/GOVERNANCE.md | on |
+| model content hash (`content.json`) | docs/API_REFERENCE.md §9.1 | written for new records, backfilled by `verify_content` |

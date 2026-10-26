@@ -1,7 +1,7 @@
 //! Reference L1/L2/MBO order book (PLATFORM_CONVENTIONS.md §4 — pinned).
 //!
 //! Semantics mirrored exactly from the Python reference (`iap/orderbook/book.py`,
-//! API_CORE.md §4):
+//! docs/API_REFERENCE.md §4):
 //!
 //! - ADD: new order at its price level, FIFO tail. While `status == TRADING`
 //!   a limit ADD that crosses the opposite side executes against the book
@@ -53,7 +53,7 @@ pub const DEPTH_LEVELS: usize = 10;
 /// Per-event verdict returned by [`OrderBook::apply`] (pinned).
 ///
 /// `applied + dropped + held == events fed` for every book; downstream
-/// consumers (feature engine, API_FEATURES.md §2) MUST ignore every event
+/// consumers (feature engine, docs/API_REFERENCE.md §2) MUST ignore every event
 /// that is not `Applied`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApplyStatus {
@@ -333,7 +333,7 @@ impl OrderBook {
     /// instrument/venue); every malformed event is dropped + counted.
     ///
     /// Returns the pinned per-event verdict ([`ApplyStatus`]): downstream
-    /// consumers (the feature engine, API_FEATURES.md §2) fold ONLY
+    /// consumers (the feature engine, docs/API_REFERENCE.md §2) fold ONLY
     /// `Applied` events into rolling state.
     pub fn apply(&mut self, ev: &MarketEvent) -> Result<ApplyStatus, IapError> {
         if ev.instrument_id != self.instrument_id

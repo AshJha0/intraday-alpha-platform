@@ -1,6 +1,6 @@
 //! Real-life market-data scenarios for the core layer (docs/SCENARIOS.md,
 //! CORE). Mirrors `python/tests/test_scenarios_core.py`: every test is named
-//! after the scenario and pins PLATFORM_CONVENTIONS.md §4 / API_CORE.md §4.
+//! after the scenario and pins PLATFORM_CONVENTIONS.md §4 / docs/API_REFERENCE.md §4.
 
 use marketdata::{EventType, MarketEvent, SessionStatus, Side, SYNTHETIC_ID_BASE};
 use orderbook::{synthetic_order_id, ConsolidatedBook, OrderBook, MAX_REORDER_WINDOW};

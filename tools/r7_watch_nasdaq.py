@@ -12,7 +12,7 @@ informational: it goes to the JSON report (``iex``) and the toast text, and a
 separate ``iex_new`` flag; the exit code is decided by Nasdaq alone.
 
 Exit codes: 0 = nothing new, 10 = new usable ITCH 5.0 day(s), 1 = error.
-Runbook: docs/runbooks/RUNBOOK_r7_nasdaq_watch.md.
+Runbook: docs/RUNBOOKS.md.
 """
 
 from __future__ import annotations

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Snapshot of the repository settings that live outside the tree (v2.0 stage 11, S4).
 
-``docs/governance/REPO_SETTINGS.md`` must describe the LIVE ruleset, not a remembered one
+``docs/GOVERNANCE.md`` must describe the LIVE ruleset, not a remembered one
 (the v1.19 audit found 13 documented, 6 in the JSON block and 17 live).  This tool reads the
 settings with ``gh api`` and writes ``docs/governance/repo_settings_live.json``:
 
     python tools/repo_settings_snapshot.py write            # refresh the snapshot (owner / maintainer, with gh)
     python tools/repo_settings_snapshot.py check            # exit 1 when the live settings differ from the snapshot
-    python tools/repo_settings_snapshot.py matrix           # print the required-check rows REPO_SETTINGS.md must carry
+    python tools/repo_settings_snapshot.py matrix           # print the required-check rows docs/GOVERNANCE.md must carry
 
 What is read (all GET, no write):
 
@@ -19,7 +19,7 @@ What is read (all GET, no write):
 
 ``check`` runs in the CI governance job with ``continue-on-error`` (a warning, not a failure: the
 default token may be refused on some endpoints and the live settings are the owner's to change);
-``tests/test_repo_settings_doc.py`` fails when REPO_SETTINGS.md's matrix and the snapshot disagree.
+``tests/test_repo_settings_doc.py`` fails when docs/GOVERNANCE.md's matrix and the snapshot disagree.
 """
 
 from __future__ import annotations
@@ -165,7 +165,7 @@ def main(argv: list[str] | None = None) -> int:
         for p in problems:
             print("  " + p)
         print(
-            "re-run `python tools/repo_settings_snapshot.py write` and update REPO_SETTINGS.md section 1"
+            "re-run `python tools/repo_settings_snapshot.py write` and update docs/GOVERNANCE.md section 1"
         )
         return 1
     print(

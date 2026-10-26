@@ -1,5 +1,5 @@
 //! Golden book-state parity: exact-integer state after events
-//! 100/500/1000/1500/2000 of the EQ MBO vector (API_CORE.md §6).
+//! 100/500/1000/1500/2000 of the EQ MBO vector (docs/API_REFERENCE.md §6).
 
 use std::path::PathBuf;
 

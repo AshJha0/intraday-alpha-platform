@@ -1,4 +1,4 @@
-//! Golden suite for the marketdata crate (API_CORE.md §6):
+//! Golden suite for the marketdata crate (docs/API_REFERENCE.md §6):
 //! SplitMix64 known answers, IAP1 SHA-256 byte-parity, JSONL byte-identical
 //! re-encode. All integer comparisons exact; uniforms bit-exact doubles.
 

@@ -65,8 +65,8 @@ was rejected by the outside reviewer as a gate.
   replay) in Python with C++ and Rust ports proven equal by golden vectors.
 
 **Pending** (dated 2026-10-25): the owner's ingestion of the free daily route and the repository
-settings for the sealed environment ([docs/governance/DD1_INGESTION_RUNBOOK.md](docs/governance/DD1_INGESTION_RUNBOOK.md),
-[docs/governance/REPO_SETTINGS.md](docs/governance/REPO_SETTINGS.md) section 7); the first
+settings for the sealed environment ([docs/GOVERNANCE.md](docs/GOVERNANCE.md),
+[docs/GOVERNANCE.md](docs/GOVERNANCE.md) section 7); the first
 registered run; the H1 prospective window; the combined-book profile PF-3. The H3 and H4 intraday families are data-ineligible on the free route and
 D5 is ineligible on daily data; their specifications say so.
 
@@ -96,13 +96,13 @@ research loop on a family specification is
 | understand the method: point-in-time data, selection accounting, the gate, the economic chain, evidence classes | [archive/docs/LEARN.md](archive/docs/LEARN.md) |
 | run something that exists today | [archive/docs/COOKBOOK.md](archive/docs/COOKBOOK.md) |
 | find a package, an import rule, an identity or the runner flow | [docs/ARCHITECTURE_v2.md](docs/ARCHITECTURE_v2.md), [python/src/iap/README.md](python/src/iap/README.md) |
-| operate it day to day | [docs/RUNBOOK_v2.md](docs/RUNBOOK_v2.md), [docs/runbooks/](docs/runbooks/) |
-| check what is enforced and by whom | [docs/governance/GOVERNANCE.md](docs/governance/GOVERNANCE.md), [docs/governance/TRUST_ROOTS.md](docs/governance/TRUST_ROOTS.md), [docs/governance/SEALED_DATA.md](docs/governance/SEALED_DATA.md), [docs/governance/RUNNER_THREAT_MODEL.md](docs/governance/RUNNER_THREAT_MODEL.md) |
+| operate it day to day | [docs/RUNBOOK_v2.md](docs/RUNBOOK_v2.md), [docs/RUNBOOKS.md](docs/RUNBOOKS.md) |
+| check what is enforced and by whom | [docs/GOVERNANCE.md](docs/GOVERNANCE.md), [docs/GOVERNANCE.md](docs/GOVERNANCE.md), [docs/GOVERNANCE.md](docs/GOVERNANCE.md), [docs/GOVERNANCE.md](docs/GOVERNANCE.md) |
 | reproduce a committed result | [docs/REPRODUCTION.md](docs/REPRODUCTION.md) |
 | know what data is used and under which licence | [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md), [docs/review/DATA_COVERAGE_FREE_ROUTE.md](docs/review/DATA_COVERAGE_FREE_ROUTE.md) |
 | read the record: reviews, releases, defects, every result and its class | [archive/docs/REVIEW_PACK.md](archive/docs/REVIEW_PACK.md), [docs/release/](docs/release/), [docs/review/](docs/review/), [CHANGELOG.md](CHANGELOG.md) |
 | see what every document is for and whether it is current | [archive/docs/DOC_AUDIT_v2.md](archive/docs/DOC_AUDIT_v2.md) |
-| the v1.x engines and their contracts | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DIAGRAMS.md](docs/DIAGRAMS.md), [API_CORE.md](API_CORE.md), [API_FEATURES.md](API_FEATURES.md), [API_TRADING.md](API_TRADING.md), [PLATFORM_CONVENTIONS.md](PLATFORM_CONVENTIONS.md), the frozen v1.x [LEARN.md](LEARN.md) and [COOKBOOK.md](COOKBOOK.md) |
+| the v1.x engines and their contracts | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DIAGRAMS.md](docs/DIAGRAMS.md), [docs/API_REFERENCE.md](docs/API_REFERENCE.md), [docs/API_REFERENCE.md](docs/API_REFERENCE.md), [docs/API_REFERENCE.md](docs/API_REFERENCE.md), [PLATFORM_CONVENTIONS.md](PLATFORM_CONVENTIONS.md), the frozen v1.x [LEARN.md](LEARN.md) and [COOKBOOK.md](COOKBOOK.md) |
 | contribute | [CONTRIBUTING.md](CONTRIBUTING.md), [docs/POLYGLOT.md](docs/POLYGLOT.md) (which language copies are frozen), the pull-request template |
 | the history: how the numbers moved, release by release | [archive/docs/README_HISTORY.md](archive/docs/README_HISTORY.md), [docs/SHOWCASE.md](docs/SHOWCASE.md) |
 

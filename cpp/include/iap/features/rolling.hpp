@@ -1,4 +1,4 @@
-// Rolling event-time primitives for the native feature engine (API_FEATURES.md
+// Rolling event-time primitives for the native feature engine (docs/API_REFERENCE.md
 // section 2; mirrors python/src/iap/features/rolling.py semantics exactly).
 //
 // All windows are half-open intervals (t - w, t] on exchange_ts: a sample

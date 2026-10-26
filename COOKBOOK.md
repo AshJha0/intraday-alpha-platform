@@ -263,7 +263,7 @@ know before quoting a number from this book:
   `PYTHONPATH=python/src python3 tools/verify_signatures.py`, and check that
   the research record cites only listed datasets with
   `python3 tools/data_manifest.py check`
-  ([docs/governance/TRUST_ROOT.md](docs/governance/TRUST_ROOT.md)).
+  ([docs/GOVERNANCE.md](docs/GOVERNANCE.md)).
 - Nothing in these recipes finds an edge. On the bundled data 0 alphas are
   PROMOTE (12 ITERATE, 12 REJECT), 23 are CANDIDATE and none is beyond it; the
   MVP loop and the maker and quoting examples lose money after costs. The
@@ -398,7 +398,7 @@ committed v1.5.0 artefacts, like the v1.4.0 ones before them, were produced
 by the manual
 `regenerate` job of `.github/workflows/ci.yml`; a run on another platform
 reproduces them to the documented tolerances, not to the byte
-(docs/governance/REPRODUCIBILITY.md). Recipes 5, 6, 18 and 27 are the
+(docs/GOVERNANCE.md). Recipes 5, 6, 18 and 27 are the
 individual steps; use them one at a time only for a deliberate,
 single-report change.
 
@@ -613,7 +613,7 @@ evidence per alpha, the appending multiple-testing ledger
 `research/experiments.json`, and refreshed day-1-fitted
 `configs/strategies/alpha_params.json` (the port contract input —
 regenerating goldens after a deliberate change is recipe territory for
-API_ALPHA.md §6). The ledger is scoped by dataset since v1.4.0 and by
+docs/API_REFERENCE.md §6). The ledger is scoped by dataset since v1.4.0 and by
 method bundle since v1.5.0: on a dataset the ledger has already seen under
 the same bundle, a rerun is recorded as a rerun, adds no looks and is
 judged at the look count recorded the first time; a first run adds
@@ -739,7 +739,7 @@ cd python && PYTHONPATH=src python3 -m pytest -q tests/test_portfolio_golden.py
 ## 9. Run risk checks against the golden decisions
 
 The Rust engine is the reference; the archived Java engine and Python (`iap.risk`,
-[API_TRADING.md](API_TRADING.md) §1) port it. The golden replays a full
+[docs/API_REFERENCE.md](docs/API_REFERENCE.md) §1) port it. The golden replays a full
 step sequence (orders, fills, market moves, gaps, venue outages, kill
 switches, loss-limit overrides, session rolls, a mid-stream snapshot) and
 pins every decision, deciding rule and severity, the notification events,
@@ -772,7 +772,7 @@ cd rust && cargo run -p risk --bin make_risk_golden -- ../tests/golden --force
 
 Kill-switch operations in production — including the re-arm order
 (`override_loss_limit` → `clear_kill`, `roll_session` keeps kills) — follow
-`docs/runbooks/RUNBOOK_incident_kill_switch.md`; the scenario tests
+`docs/RUNBOOKS.md`; the scenario tests
 (`rust/risk/tests/rules.rs`, `RiskScenarioTest`) are listed per scenario in
 `docs/SCENARIOS.md`.
 
@@ -791,7 +791,7 @@ ctest --test-dir build --output-on-failure -R 'ReplayFillsGolden|Exec'
 
 Python (and the archived Java engine) must reproduce the same fills to the tick (Python's golden
 test additionally asserts every money field bit-identical —
-[API_TRADING.md](API_TRADING.md) §2):
+[docs/API_REFERENCE.md](docs/API_REFERENCE.md) §2):
 
 ```bash
 # removed from the tree in v2.0 stage 11 (git tag archive/java-v1.14.0): cd git tag archive/java-v1.14.0 && bash build.sh && bash test.sh    # includes ReplayFillsGoldenTest, ExecutionSimTest, AlgosTest
@@ -875,7 +875,7 @@ pinned EQ01 backtest on the golden frame is golden-tested cross-language
 (`tests/golden/expected_backtest.json`; C++/Java golden groups); that
 vector stays on the legacy rules, which its `config` names, because the
 Java research backtester implements only those. Full
-procedure and troubleshooting: `docs/runbooks/RUNBOOK_backtest.md`.
+procedure and troubleshooting: `docs/RUNBOOKS.md`.
 
 ## 12. Run paper trading and scrape /metrics
 
@@ -963,7 +963,7 @@ The port comes from `configs/execution/execution.json` `monitoring.port` (defaul
 8080 — the Grafana/Prometheus contract; `deployment/prometheus/` scrapes it
 in the docker-compose stack). The session report lands in
 `archive/java/out/paper_session_report.json (at git tag archive/java-v1.14.0)`. Full ops procedure:
-`docs/runbooks/RUNBOOK_shadow_deployment.md`. Note the honest P&L: paper
+`docs/RUNBOOKS.md`. Note the honest P&L: paper
 trading the golden vector *loses* money — consistent with the promotion
 report, not an embarrassment to be tuned away.
 
@@ -1034,7 +1034,7 @@ the pre-event state, undefined markouts) are golden-tested
 ## 16. Add a NEW alpha (full walkthrough)
 
 Say you want `EQ13`, a spread-revert alpha. The interface
-(`python/src/iap/alpha/base.py`, documented in API_ALPHA.md) forces the
+(`python/src/iap/alpha/base.py`, documented in docs/API_REFERENCE.md) forces the
 discipline:
 
 **Step 1 — write the class** in `python/src/iap/alpha/equity.py`:
@@ -1086,7 +1086,7 @@ the report moves accordingly.
 
 **Step 5 — production, only if promoted** (spec §20): port the scorer
 against `configs/strategies/alpha_params.json` (ports never fit —
-API_ALPHA.md §2), add golden cases via
+docs/API_REFERENCE.md §2), add golden cases via
 `python/tools/make_golden_alpha.py` + a `schemas/MIGRATIONS.md` entry, and
 make the C++/Rust golden groups reproduce your cases before any paper
 deployment.
@@ -1101,7 +1101,7 @@ registry pins their order and hashes their definitions.
 `<stem>_<params>_v1` and write the `doc` and `depends_on` honestly.
 
 **Step 2 — implement the update rule** in the family module/engine following
-the pinned semantics of API_FEATURES.md §2: sample at the right refresh kind
+the pinned semantics of docs/API_REFERENCE.md §2: sample at the right refresh kind
 (mid-change vs every book_ok refresh vs every refresh), half-open windows
 `(t−w, t]`, integer sums for integer inputs, at-or-before history lookups,
 and explicit validity (warmup, book_ok, defined inputs). **NaN must never
@@ -1133,7 +1133,7 @@ for a production port), implement it in `cpp/src/features/`,
 `rust/features/` and re-run
 `tests/harness/run_all.sh` — the feature golden groups in all three languages
 must agree at 1e-9. Otherwise it remains a Python research feature until its
-family is ported (API_FEATURES.md §1).
+family is ported (docs/API_REFERENCE.md §1).
 
 ## 18. Run the adaptive policy comparison (drift → refit → retire)
 
@@ -1213,7 +1213,7 @@ re-captured, for the reason given in recipe 12. Since v1.5.0 the Java
 rolling IC behind `alpha_rolling_ic` is the pair-count-weighted mean of the
 bucket ICs, not the unweighted one, which moves the value again.)
 
-`alpha_live_vs_backtest_drift` is the pinned PSI (API_ADAPTIVE.md §2) of
+`alpha_live_vs_backtest_drift` is the pinned PSI (docs/API_REFERENCE.md §2) of
 a rolling 256-value window of the live EQ01 signal (recomputed every 32
 confident signals) against `research/baselines/signal_eq01.json` — the
 Java-parity baseline; `alpha_rolling_ic` is the mean of event-time bucket
@@ -1525,7 +1525,7 @@ at RESEARCH at the pinned bootstrap event time (the latest fold `test_end`)
 and advances it until it stops moving. On the bundled data that is one
 step for 23 of the 24 alphas: they reach CANDIDATE and hold there. FX11 stays
 at RESEARCH, held by the v1.14 time-shift leakage gate (`leakage_clean`,
-docs/research/FX11_FINDING.md). All 23 candidates fail
+docs/RESEARCH_NOTES.md). All 23 candidates fail
 `net_pnl_after_costs`, its bootstrap bound `net_pnl_bootstrap_ci` and
 `capacity`; for six of them (EQ01, EQ02, EQ03, EQ06, EQ12, FX04)
 those are the only failed gates. Nothing is beyond CANDIDATE.
@@ -2397,11 +2397,11 @@ everything this recipe wrote (except the access-log lines).
 
 ## 37. Work a parent order passively and read its markouts
 
-`ParentOrder.policy` selects the child execution policy (API_TRADING.md
+`ParentOrder.policy` selects the child execution policy (docs/API_REFERENCE.md
 §2.5): `NATIVE` (default), `AGGRESSIVE`, or `PASSIVE` — post at the near
 touch, rest for a patience set by `urgency`, reprice once, cross the rest.
 `iap.tca.markout` then tells you what each fill was worth afterwards
-(API_PORTFOLIO_TCA.md §2.9). One TWAP parent on the golden equity vector
+(docs/API_REFERENCE.md §2.9). One TWAP parent on the golden equity vector
 under each policy:
 
 ```bash
@@ -2466,7 +2466,7 @@ LEARN.md §30 explains adverse selection and how to read the table.
 ## 38. Combine alphas out of sample and count the independent bets
 
 A combination is an alpha whose inputs are alphas (`iap.combine`,
-API_ALPHA.md §8). `fit` estimates the weights inside the training rows it
+docs/API_REFERENCE.md §8). `fit` estimates the weights inside the training rows it
 is given — on the members' out-of-sample predictions from three inner
 walk-forward folds — so fitting on day 1 and scoring day 2 is honest. Four
 equity members, three of which are order-flow alphas:
@@ -2530,7 +2530,7 @@ equity and the FX members) — every combination fails the cost gate
 ## 39. Calibrate the simulator and run a maker-side backtest (v1.9)
 
 The research backtester only takes liquidity. The v1.9 maker path
-(API_TRADING.md §2.6) posts at the touch instead. It first calibrates fill
+(docs/API_REFERENCE.md §2.6) posts at the touch instead. It first calibrates fill
 rates, queue-depletion hazards, latency, markouts and impact from the event
 stream (M1). It then builds trade-matched labels (M3) and replays a score
 series through the FIFO simulator, gated on expected edge > measured adverse
@@ -2642,7 +2642,7 @@ the backtester.
 
 ## 40. Quote both sides with an alpha-skewed reservation price (v1.10)
 
-`iap.backtest.quoting.QuotingBacktester` (API_TRADING.md §2.7) keeps a bid
+`iap.backtest.quoting.QuotingBacktester` (docs/API_REFERENCE.md §2.7) keeps a bid
 and an ask resting through the FIFO simulator. Quotes sit around an
 Avellaneda-Stoikov reservation price that the alpha shifts
 (`r = mid + alpha_weight * er * mid - gamma * sigma^2 * q * tau`), with a
@@ -3202,7 +3202,7 @@ hash or dependency versions changed since registration; re-register with
 before v1.10 (the six 2026 holdout entries) carry no fingerprint and were
 never debited; they are anchored to commit `6723fd0`. Non-alpha hypotheses
 such as `AUC01` register and debit a look, but carry no code fingerprint,
-because there is no alpha class to hash. docs/governance/GOVERNANCE.md §2a
+because there is no alpha class to hash. docs/GOVERNANCE.md §2a
 lists what the fingerprint covers and what it does not.
 
 ## 48. Walk the Almgren-Chriss efficient frontier (v1.10)
@@ -3307,7 +3307,7 @@ For the feature store, `python3 -m iap.features --engine rust` takes the
 `features_summary.json`; the other 160 features still come from Python.
 Measure the speed on your machine with
 `cd python && PYTHONPATH=src python tools/bench_native_features.py` (CI: about 150x on the golden
-vectors). The anomaly vectors match on every row too (API_FEATURES.md
+vectors). The anomaly vectors match on every row too (docs/API_REFERENCE.md
 §7.1).
 
 ## 50. Register a model, monitor it, and shadow a candidate (v1.11)
@@ -3381,14 +3381,14 @@ candidate (fitted on the shifted window, lower threshold) trades more and
 loses 27 units against the champion in shadow. Its decisions are recorded
 but never used: `sr.run` returns the champion's mask. Promotion goes
 through `promotion_decision`, which also requires the lifecycle PROMOTION
-gates (API_ADAPTIVE.md section 9).
+gates (docs/API_REFERENCE.md section 9).
 
 ## 51. Run the LLM research agent and its behaviour evals (v1.11)
 
 Plan items AI1 and AI2. A Claude model drafts a hypothesis, pre-registers
 it through the signed broker (one look), runs the gated study and files a
 finding; every number in the finding is checked against the artefact it
-cites (docs/governance/GOVERNANCE.md §2b). The evals first, because the
+cites (docs/GOVERNANCE.md §2b). The evals first, because the
 mocked run needs no key and costs nothing:
 
 ```bash
@@ -3505,7 +3505,7 @@ python
 How to read it. A wheel that imports is not a wheel that agrees: run the
 parity test file, not just the import. The anomaly-vector comparison in it
 covers rows inside a SNAPSHOT recovery burst, the one place the two engines
-were found to disagree (API_FEATURES.md §7.1, LEARN.md §36); check the
+were found to disagree (docs/API_REFERENCE.md §7.1, LEARN.md §36); check the
 current state of that test in the file rather than assuming it. The
 benchmark ratio (about 150x in CI) compares the 45 native slots in Rust with
 the full 205-feature Python engine; the feature store build is not 150x
@@ -4027,7 +4027,7 @@ between: this is capability for multi-venue data, not a measured result.
 ## 60. Route alerts, read the latency SLOs and back up trading state (v1.12)
 
 Plan item P4. Three operational pieces, all in `deployment/`. The full
-procedures are in `docs/runbooks/RUNBOOK_alerting.md`.
+procedures are in `docs/RUNBOOKS.md`.
 
 **1. See alerts arrive with no secrets.** Compose routes both receivers to
 the in-compose echo service by default:
@@ -4078,11 +4078,11 @@ kubectl -n intraday-alpha logs job/state-backup-now     # backup ok: state-<ts>.
 The job runs only on the node that holds the trading pod's volume, and mounts
 it read-only. There is no active-active: recovery is one pod resuming from its
 checkpoint, and a restored archive either resumes exactly or is refused by the
-fail-closed resume guard. RUNBOOK_alerting.md §4 has the restore steps.
+fail-closed resume guard. docs/RUNBOOKS.md §4 has the restore steps.
 
 ## 61. Fit a fill hazard and run a post-only, repricing, feedback-driven maker (v1.12)
 
-Plan item X4 (API_TRADING.md §2.9). The fill-hazard model is fitted on the
+Plan item X4 (docs/API_REFERENCE.md §2.9). The fill-hazard model is fitted on the
 v1.9 M3 maker labels of one synthetic stream, saved as versioned JSON, and
 drives the hazard reprice policy of the maker backtest on another stream,
 together with post-only posts and markout feedback. Everything is opt-in:
@@ -4288,7 +4288,7 @@ fills say nothing about whether queue depletion predicts anything.
 ## 64. The markout feedback loop on a toxic regime (v1.12)
 
 **Goal:** see what `FeedbackConfig` does when every passive fill is run
-over (API_TRADING.md §2.10, LEARN.md §43). The stream drifts up and the score
+over (docs/API_REFERENCE.md §2.10, LEARN.md §43). The stream drifts up and the score
 always says "sell", so the quoter's asks are lifted just before the price
 rises. Save as `python/recipe64.py` and run `cd python && PYTHONUTF8=1 PYTHONPATH=src python recipe64.py`:
 
@@ -5754,7 +5754,7 @@ The class is a diagnosis for a human reviewer. By default it does not
 change `passed`: a time-shift failure still blocks promotion.
 `LeakageTester(accept_fast_causal=True)` is the opt-in that lets a
 `fast_causal` failure pass. FX11 is the worked case
-([docs/research/FX11_FINDING.md](docs/research/FX11_FINDING.md)): "fast,
+([docs/RESEARCH_NOTES.md](docs/RESEARCH_NOTES.md)): "fast,
 not leak", still RESEARCH pending review.
 
 **Pitfall:** `causality_unproven` means the recompute probe (recipe 30) did
@@ -5895,7 +5895,7 @@ quotes gross accuracy is valid JSON but tells a reviewer nothing.
 
 **Goal:** see whether a real alpha signal, re-read at every child decision,
 lowers implementation shortfall against the plain algo on the SAME windows.
-The B1 benchmark (API_TRADING.md §2.14) works each parent under a plain
+The B1 benchmark (docs/API_REFERENCE.md §2.14) works each parent under a plain
 policy and under `base+variant` arms — `urgency` (B2: agree → post, adverse
 → cross, in signal units), `pacing` (B3: POV participation / slice tilt),
 `ac` and `ac_drift` (B3: Almgren-Chriss with the signal as the drift, IS
@@ -6042,7 +6042,7 @@ python -m iap.marketdata process-iex-day --manifest research/v117/iex_overlap_ma
 
 The wrapper `cd`s into `python/`, sets `PYTHONPATH=src` and logs to a `.log`
 beside itself. The nine approved overlap days and their sizes are in
-`docs/research/IEX_OVERLAP_SET.md`; its results table has one row per finished
+`docs/RESEARCH_NOTES.md`; its results table has one row per finished
 day (six of the nine at v1.18.0).
 
 **Pitfall:** `--peak-gb N` replaces the disk guard's estimate with a measured
@@ -6052,7 +6052,7 @@ not a flag. `--feed deep` switches the book feed to price levels.
 **What it is not:** an approval. The manifest's `approval` sentence is the
 owner's, recorded verbatim; the chain refuses to download without
 `--i-have-approval` on top of it. Runbook:
-`docs/runbooks/RUNBOOK_process_and_delete.md` (IEX section).
+`docs/RUNBOOKS.md` (IEX section).
 
 ## 104. List IEX days and apply the download approval rule (v1.17 A4)
 
@@ -7149,7 +7149,7 @@ python -m iap.agents research --env-file ~/.config/iap/anthropic.env --task "Exp
 printed or logged). Options: `--model` (`claude-haiku-5-5`, `claude-opus-5-5`,
 `claude-sonnet-5-5`), `--max-usd` (default per-run budget USD 1), `--max-tool-calls`,
 `--max-tokens`, `--effort`, `--data-root`, `--runner {cli,planted}`. Roster, caps
-and refusals: `docs/AGENTS.md` §1, `API_AGENTS.md`. Tests:
+and refusals: `docs/AGENTS.md` §1, `docs/API_REFERENCE.md`. Tests:
 `python -m pytest python/tests/test_agents_wse.py -q` (17 passed).
 
 **Pitfall:** a draft is for a human: signing and registering are separate human
@@ -7262,7 +7262,7 @@ Output (run here): `30.0 1.0 0.8 {'research': 'claude-sonnet-5-5', 'ops':
 'claude-haiku-5-5', 'docs': 'claude-haiku-5-5', 'eval': 'claude-haiku-5-5'}` and
 `refused: no price for model 'some-unknown-model'`. Tests:
 `python -m pytest python/tests/test_llm_spend.py -q` (15 passed). Governance:
-`docs/governance/GOVERNANCE.md` §2c.
+`docs/GOVERNANCE.md` §2c.
 
 **Pitfall:** a `--dry-run` writes no ledger row, so month-to-date does not move; only
 live calls are charged. The ledger lives outside the repo on purpose: the class refuses
@@ -7290,7 +7290,7 @@ v1.17 worktree before the COOKBOOK block of this section was written the run pri
 fails on any undated status phrase). CI runs the same
 script in the `docs` job, plus the external-link check (`lychee`, configured in
 `lychee.toml`: it excludes the GitHub API, loopback and private hosts). The `docs`
-job is a **required check** since 2026-10-18 (`docs/governance/GOVERNANCE.md` §0); the
+job is a **required check** since 2026-10-18 (`docs/GOVERNANCE.md` §0); the
 `lychee` link step inside it stays advisory.
 
 **Pitfall:** the relative-link check follows links that end in a `#anchor`; a heading rename
@@ -7343,7 +7343,7 @@ one step of the release flow (recipe 87 prints the flow). Tests on a fixture man
 `python -m pytest python/tests/test_release_tool.py -q` (28 passed).
 
 **Pitfall:** `reproducible-build` has been a required check since 2026-10-18
-(`docs/governance/GOVERNANCE.md` §0). Hash-pinned installs apply to a
+(`docs/GOVERNANCE.md` §0). Hash-pinned installs apply to a
 whole `pip` command (`--require-hashes`), so do not mix a hashed lock with an unpinned
 package in one call. `--execute` goes **before** the subcommand (recipe 87).
 
@@ -7380,7 +7380,7 @@ cd python && python -m coverage combine .coverage.fast .coverage.slow && python 
 was 54 on the fast `python` job alone (55.90 % and 54.76 % in CI runs 38794738398 and
 38805345163); since v1.18 (REL-13) it is 92 on the combined suite (`COV_FLOOR` in
 `.github/workflows/ci.yml`), and the `coverage` job is not yet a required check
-(`docs/governance/GOVERNANCE.md` §0). Raise the floor when coverage rises; never lower
+(`docs/GOVERNANCE.md` §0). Raise the floor when coverage rises; never lower
 it without a CHANGELOG line. mypy runs with
 Python 3.12 semantics (`python_version = "3.12"`).
 
@@ -11976,7 +11976,7 @@ trust-root pin problems: []
 ```
 
 The fingerprint equals the one pinned in `tools/verify_signatures.py` and
-published in `docs/governance/TRUST_ROOT.md`.
+published in `docs/GOVERNANCE.md`.
 
 **Caveats:**
 - The check needs a git checkout (`git ls-files`); an exported tarball fails with
@@ -11984,10 +11984,10 @@ published in `docs/governance/TRUST_ROOT.md`.
 - A passing signature means the document is unchanged since the maintainer
   signed it. Whether the analysis you run matches what it binds is a second
   check, `verify_identity`, made by the signed-run entry points
-  (`docs/governance/ANALYSIS_IDENTITY.md`).
+  (`docs/GOVERNANCE.md`).
 - `python/tests/test_verify_signatures.py` pins the tool (8 passed here).
 - Editing `PINNED` to make a failure go away is a key rotation by definition:
-  follow `docs/governance/TRUST_ROOT.md`.
+  follow `docs/GOVERNANCE.md`.
 
 ## 198. Dry-run the holdout guard and break its log chain on throw-away data (v1.18)
 
@@ -12136,7 +12136,7 @@ not in this worktree.
   files are intact. The holdout guard re-hashes them on an allowed read.
 - A clean check says every cited version is listed, not that the study read the
   dataset it cites (that is the analysis identity's job,
-  `docs/governance/ANALYSIS_IDENTITY.md`).
+  `docs/GOVERNANCE.md`).
 - `python/tests/test_data_manifest.py`: 10 passed here.
 
 ## 200. Print the release flow and exercise the digest pinning offline (v1.18)

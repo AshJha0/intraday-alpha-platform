@@ -15,7 +15,7 @@ POSIX ``ru_maxrss``; no psutil) next to ``benchmarks/memory_budget.json``.
 The budget file holds MEASURED CI figures with provenance (run id, runner
 CPU, slice ``dataset_version``) and ``budget = measured x margin``: the
 guard catches a path that starts holding the day in memory again (the
-v1.16 failure mode, docs/research/MEMORY_REVIEW_v116.md), not drift of a
+v1.16 failure mode, docs/RESEARCH_NOTES.md), not drift of a
 few percent.  Without a ``budget`` block, or with ``--advisory``, it reports
 and never fails.
 

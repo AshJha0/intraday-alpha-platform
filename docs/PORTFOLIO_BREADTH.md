@@ -178,7 +178,7 @@ day-clustered mean net return per round trip). Pass / fail per candidate comes
 from the pre-registration's rules; one ledger look per candidate of kind
 `net_of_cost_screen`. The full description is
 [SIGNAL_RESEARCH.md section 8](../archive/docs/SIGNAL_RESEARCH.md); the API is
-`API_PORTFOLIO_TCA.md` section 1.10.
+`docs/API_REFERENCE.md` section 1.10.
 
 How it gates this page:
 
@@ -255,4 +255,4 @@ checks the draft and dry-runs the screen gate that the registration uses.
   on this day: no breadth statistic beyond that screen is claimed.
 
 Tests: `python/tests/test_v117_breadth_book.py`, `python/tests/test_v117_screen.py`.
-API: `API_PORTFOLIO_TCA.md` sections 1.8 to 1.10.
+API: `docs/API_REFERENCE.md` sections 1.8 to 1.10.

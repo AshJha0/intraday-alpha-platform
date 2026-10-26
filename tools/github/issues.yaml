@@ -227,7 +227,7 @@ epics:
       event-time labels at 11 horizons.
     scope:
       - "python/src/iap/features (10 family modules, registry, engine, rolling primitives), python/src/iap/labels"
-      - "cpp features, rust/features, java com.iap.features; API_FEATURES.md"
+      - "cpp features, rust/features, java com.iap.features; docs/API_REFERENCE.md"
     acceptance:
       - "data/reference/feature_registry.json lists 205 features with name/family/version/params/doc/depends_on"
       - "NaN never leaks into a valid=true value; warmup and stale book => invalid"
@@ -247,7 +247,7 @@ epics:
       under the v1.5.0 default research methods.
     scope:
       - "python/src/iap/alpha/{base,equity,fx,cross_sectional,fx_exposure,data}.py"
-      - "configs/strategies/alpha_params.json (x-version 2), API_ALPHA.md, research/alpha_reports/"
+      - "configs/strategies/alpha_params.json (x-version 2), docs/API_REFERENCE.md, research/alpha_reports/"
     acceptance:
       - "Every alpha class carries an `Economic rationale:` docstring; a sign contradiction can at best be ITERATE"
       - "expected_alpha.json matches in C++/Rust/Java for the six golden alphas"
@@ -286,7 +286,7 @@ epics:
       from 1-minute bars, FX currency-exposure translation, and a Java port
       matched at 1e-9.
     scope:
-      - "python/src/iap/portfolio/{optimizer,covariance,fx,diagnostics}.py; java com.iap.portfolio; API_PORTFOLIO_TCA.md §1"
+      - "python/src/iap/portfolio/{optimizer,covariance,fx,diagnostics}.py; java com.iap.portfolio; docs/API_REFERENCE.md §1"
     acceptance:
       - "Objective alpha'w - lambda w'Sigma w - sum tc |w - w_prev| with L1-ball projection; INFEASIBLE returns w_prev, never NaN"
       - "expected_portfolio.json matches in Java at 1e-9 and was validated against an SLSQP optimum"
@@ -362,7 +362,7 @@ epics:
       opportunity; spread, impact, fees, fill rate and adverse-selection
       markouts; a Java service matched at 1e-9 and a deterministic report.
     scope:
-      - "python/src/iap/tca/{tca,fills,simulator,report}.py; java com.iap.tca; research/tca/; API_PORTFOLIO_TCA.md §2"
+      - "python/src/iap/tca/{tca,fills,simulator,report}.py; java com.iap.tca; research/tca/; docs/API_REFERENCE.md §2"
     acceptance:
       - "delay + trading + opportunity == total IS exactly for every order"
       - "Crossed consolidated states are skipped and counted; markouts across a HALT are null, never a stale mid"
@@ -502,7 +502,7 @@ epics:
       deployment backtest that replays them without lookahead, and live
       Java monitors fed from the same baseline files the research used.
     scope:
-      - "python/src/iap/adaptive/{drift,refit,lifecycle}.py, python/src/iap/backtest/adaptive.py; java com.iap.adaptive; API_ADAPTIVE.md; research/adaptive_reports/"
+      - "python/src/iap/adaptive/{drift,refit,lifecycle}.py, python/src/iap/backtest/adaptive.py; java com.iap.adaptive; docs/API_REFERENCE.md; research/adaptive_reports/"
     acceptance:
       - "PSI/KS at 1e-10, refit decisions as exact booleans and lifecycle sequences as exact states in the adaptive golden"
       - "Live monitors are observational and never feed back into an in-session decision"
@@ -920,7 +920,7 @@ issues:
     evidence:
       - "python/src/iap/contracts/{__init__,ids,versions,types,protocols,validate,examples}.py (22 typed contracts, 18 runtime_checkable Protocols)"
       - "python/tests/test_contracts.py; python/tests/test_contracts_schema_golden.py; tests/golden/expected_contracts_examples.json (python/tools/make_golden_contracts.py)"
-      - "python/src/iap/mvp/adapters.py (the MVP consumes the Protocols, not concrete classes); API_CONTRACTS.md"
+      - "python/src/iap/mvp/adapters.py (the MVP consumes the Protocols, not concrete classes); docs/API_REFERENCE.md"
 
   - key: C06
     epic: E01
@@ -994,7 +994,7 @@ issues:
       - "GOVERNANCE.md lists the gates in order and names the hard cross-language gate"
       - "CODEOWNERS covers contracts, risk, core, execution, research, platform and runbooks"
     evidence:
-      - "docs/governance/GOVERNANCE.md; docs/governance/REPRODUCIBILITY.md; docs/governance/SECURITY.md"
+      - "docs/GOVERNANCE.md; docs/GOVERNANCE.md; docs/GOVERNANCE.md"
       - "CODEOWNERS"
 
   - key: R03
@@ -1151,7 +1151,7 @@ issues:
       - "qc_report.json is byte-stable across reruns"
     evidence:
       - "python/src/iap/marketdata/normalize.py; python/src/iap/marketdata/__main__.py; python/tests/test_normalize.py"
-      - "docs/runbooks/RUNBOOK_data_pipeline.md; README headline numbers (data/normalized/qc_report.json)"
+      - "docs/RUNBOOKS.md; README headline numbers (data/normalized/qc_report.json)"
 
   - key: M07
     epic: E03
@@ -1252,7 +1252,7 @@ issues:
       - "A resumed session produces the same subsequent decisions and audit lines as an uninterrupted one"
     evidence:
       - "java/src/main/java/com/iap/platform/{PaperTrading,SessionStore}.java; java PaperStateRecoveryTest"
-      - "PLATFORM_CONVENTIONS.md §12.3; docs/runbooks/RUNBOOK_shadow_deployment.md"
+      - "PLATFORM_CONVENTIONS.md §12.3; docs/RUNBOOKS.md"
 
   - key: RP04
     epic: E04
@@ -1308,7 +1308,7 @@ issues:
       - "A single-venue book is never crossed from a valid stream in continuous trading"
     evidence:
       - "python/src/iap/orderbook/book.py; python/tests/bruteforce_book.py; python/tests/test_book.py"
-      - "API_CORE.md §4; PLATFORM_CONVENTIONS.md §4"
+      - "docs/API_REFERENCE.md §4; PLATFORM_CONVENTIONS.md §4"
 
   - key: B02
     epic: E05
@@ -1423,7 +1423,7 @@ issues:
     status: done
     estimate_days: 5
     context: >
-      The pinned core set in API_FEATURES.md; each port is cross-checked
+      The pinned core set in docs/API_REFERENCE.md; each port is cross-checked
       against a brute-force recomputation and against expected_features.json
       and expected_features_anomalies.json (validity under gaps and stale
       books).
@@ -1433,7 +1433,7 @@ issues:
       - "cpp/include/iap/features/feature_engine.hpp; cpp/tests/test_features_golden.cpp; cpp/tests/test_features_brute.cpp"
       - "rust/features/src/engine.rs; rust/features/tests/{golden_features,incremental_vs_brute}.rs"
       - "java/src/main/java/com/iap/features/FeatureEngine.java; java FeatureGoldenTest, FeatureBruteTest"
-      - "tests/golden/expected_features.json; tests/golden/expected_features_anomalies.json; API_FEATURES.md"
+      - "tests/golden/expected_features.json; tests/golden/expected_features_anomalies.json; docs/API_REFERENCE.md"
 
   - key: F04
     epic: E06
@@ -1482,7 +1482,7 @@ issues:
       - "A documented procedure: add the feature to the port, extend the golden via make_golden_features.py, MIGRATIONS entry"
       - "The first non-core feature ported this way is golden-tested in all three ports"
     evidence:
-      - "API_FEATURES.md (native set); python/tools/make_golden_features.py"
+      - "docs/API_REFERENCE.md (native set); python/tools/make_golden_features.py"
 
   # ---------------------------------------------------------------- E07 ----
   - key: A01
@@ -1532,7 +1532,7 @@ issues:
       liquidity-conditioned momentum, vol-regime reversion, session
       transition, macro-surprise response, venue toxicity.
     acceptance:
-      - "FX05/FX06 golden cases embed all cross-pair inputs (API_ALPHA.md §6)"
+      - "FX05/FX06 golden cases embed all cross-pair inputs (docs/API_REFERENCE.md §6)"
     evidence:
       - "python/src/iap/alpha/fx.py; python/src/iap/alpha/fx_exposure.py; research/alpha_reports/FX01.json .. FX12.json"
 
@@ -1545,14 +1545,14 @@ issues:
     estimate_days: 3
     context: >
       The scoring path (z-score, clip, confidence) for the six alphas in
-      API_ALPHA.md, including the FX05 pseudo-inverse (Eigen in C++), matched
+      docs/API_REFERENCE.md, including the FX05 pseudo-inverse (Eigen in C++), matched
       against expected_alpha.json at 1e-9. Alpha scoring 38.5 ns/row (C++).
     acceptance:
       - "expected_alpha.json matches in all three ports"
     evidence:
       - "cpp/include/iap/alpha/alpha.hpp; cpp/tests/test_alpha_golden.cpp"
       - "rust/alpha/src/{scoring,fx_exposure}.rs; rust/alpha/tests/golden_alpha.rs"
-      - "java/src/main/java/com/iap/alpha/{Alphas,Fx05}.java; java AlphaGoldenTest; tests/golden/expected_alpha.json; API_ALPHA.md"
+      - "java/src/main/java/com/iap/alpha/{Alphas,Fx05}.java; java AlphaGoldenTest; tests/golden/expected_alpha.json; docs/API_REFERENCE.md"
 
   - key: A05
     epic: E07
@@ -1637,7 +1637,7 @@ issues:
     acceptance:
       - "Each newly ported alpha gains a golden case via make_golden_alpha.py and a parity row in all three ports"
     evidence:
-      - "python/tools/make_golden_alpha.py; API_ALPHA.md"
+      - "python/tools/make_golden_alpha.py; docs/API_REFERENCE.md"
 
   # ---------------------------------------------------------------- E08 ----
   - key: V01
@@ -1728,7 +1728,7 @@ issues:
     acceptance:
       - "GATES are pinned in code and echoed in every report"
     evidence:
-      - "python/src/iap/validation/validate.py; research/alpha_reports/REPORT.md (Pinned promotion gates); docs/governance/GOVERNANCE.md §2"
+      - "python/src/iap/validation/validate.py; research/alpha_reports/REPORT.md (Pinned promotion gates); docs/GOVERNANCE.md §2"
 
   - key: V06
     epic: E08
@@ -1818,7 +1818,7 @@ issues:
     acceptance:
       - "max_violation reports the worst constraint slack; SLSQP agrees on the golden cases"
     evidence:
-      - "python/src/iap/portfolio/optimizer.py; python/tests/test_portfolio_optimizer.py; API_PORTFOLIO_TCA.md §1"
+      - "python/src/iap/portfolio/optimizer.py; python/tests/test_portfolio_optimizer.py; docs/API_REFERENCE.md §1"
 
   - key: P02
     epic: E09
@@ -1903,7 +1903,7 @@ issues:
       - "Re-arm precedence is tested in Rust and Java and mirrored by the incident runbook"
     evidence:
       - "rust/risk/src/engine.rs; java/src/main/java/com/iap/platform/AdminService.java; java AdminApiTest, RiskScenarioTest"
-      - "docs/runbooks/RUNBOOK_incident_kill_switch.md; deployment/prometheus/alerts.yml (KillSwitchEngaged)"
+      - "docs/RUNBOOKS.md; deployment/prometheus/alerts.yml (KillSwitchEngaged)"
 
   - key: K03
     epic: E10
@@ -1972,7 +1972,7 @@ issues:
     evidence:
       - "python/src/iap/risk/{limits,refdata,orders,events,engine,serialize}.py"
       - "python/tests/test_risk_golden.py (expected_risk_decisions.json exact, expected_risk_audit.jsonl and expected_risk_snapshot.json byte-identical, restore continuation); python/tests/test_risk_rules.py"
-      - "python/src/iap/mvp/adapters.py (RiskEngineAdapter emits iap.contracts.types.RiskDecision); API_TRADING.md"
+      - "python/src/iap/mvp/adapters.py (RiskEngineAdapter emits iap.contracts.types.RiskDecision); docs/API_REFERENCE.md"
 
   # ---------------------------------------------------------------- E11 ----
   - key: X01
@@ -2110,7 +2110,7 @@ issues:
     evidence:
       - "python/src/iap/execution/{types,config,simulator,algos,sor,replay}.py"
       - "python/tests/test_execution_golden.py (expected_replay_fills.json bit-identical); python/tests/test_execution_rules.py; python/tests/test_exec_algos.py; python/tests/test_sor.py"
-      - "API_TRADING.md"
+      - "docs/API_REFERENCE.md"
 
   - key: X10
     epic: E11
@@ -2277,7 +2277,7 @@ issues:
     acceptance:
       - "Spread-cost lines are never negative by construction; n_defined is reported per markout horizon"
     evidence:
-      - "python/src/iap/tca/tca.py (spread_and_impact_cost, adverse_selection_with_counts, impact_regression); API_PORTFOLIO_TCA.md §2.4-2.5"
+      - "python/src/iap/tca/tca.py (spread_and_impact_cost, adverse_selection_with_counts, impact_regression); docs/API_REFERENCE.md §2.4-2.5"
 
   - key: T03
     epic: E13
@@ -2334,7 +2334,7 @@ issues:
     evidence:
       - "python/src/iap/tca/markout.py; python/tests/test_markout.py; python/tools/make_golden_markout.py"
       - "java/src/main/java/com/iap/tca/Markout.java; java/src/test/java/com/iap/MarkoutGoldenTest.java"
-      - "tests/golden/expected_markout.json; API_PORTFOLIO_TCA.md section 2.9"
+      - "tests/golden/expected_markout.json; docs/API_REFERENCE.md section 2.9"
 
   - key: T05
     epic: E13
@@ -2447,7 +2447,7 @@ issues:
       - "expected_adaptive.json lifecycle sequences match exactly in Python and Java"
     evidence:
       - "python/src/iap/adaptive/lifecycle.py; java/src/main/java/com/iap/adaptive/LifecycleGauge.java; java LifecycleGaugeTest, AdaptiveGoldenTest"
-      - "configs/strategies/strategies.json (adaptive.lifecycle); research/lifecycle_log.jsonl; API_ADAPTIVE.md"
+      - "configs/strategies/strategies.json (adaptive.lifecycle); research/lifecycle_log.jsonl; docs/API_REFERENCE.md"
 
   - key: L02
     epic: E15
@@ -2500,14 +2500,14 @@ issues:
       RETIRED halts allocation in the backtest (iap.backtest.adaptive) but in
       the live Java loop the lifecycle gauge is observational: a RETIRED alpha
       keeps trading at full size and AlphaLifecycleRetired pages a human
-      (API_ADAPTIVE.md §6, GOVERNANCE.md gate 11). Closing that divergence
+      (docs/API_REFERENCE.md §6, GOVERNANCE.md gate 11). Closing that divergence
       means feeding the gauge back into the allocation deterministically.
     acceptance:
       - "A RETIRED alpha's target weight is zeroed before the optimizer with the change visible in the decision trace"
       - "Determinism preserved: the gate reads the same baseline files and event-time IC as the gauge; paper session goldens regenerated with a MIGRATIONS entry"
-      - "API_ADAPTIVE.md §6 and README updated to remove the divergence note"
+      - "docs/API_REFERENCE.md §6 and README updated to remove the divergence note"
     evidence:
-      - "API_ADAPTIVE.md §6; java/src/main/java/com/iap/adaptive/LifecycleGauge.java; python/src/iap/backtest/adaptive.py"
+      - "docs/API_REFERENCE.md §6; java/src/main/java/com/iap/adaptive/LifecycleGauge.java; python/src/iap/backtest/adaptive.py"
 
   - key: L05
     epic: E15
@@ -2580,7 +2580,7 @@ issues:
       - "The session summary line is reproducible bit-for-bit over the golden vector"
     evidence:
       - "java/src/main/java/com/iap/platform/{PaperTrading,SessionStore,AdminService}.java; java PaperObservabilityTest, PaperStateRecoveryTest"
-      - "docs/governance/GOVERNANCE.md §3"
+      - "docs/GOVERNANCE.md §3"
 
   - key: O04
     epic: E16
@@ -2745,7 +2745,7 @@ issues:
       - "README's documentation index links all six"
     evidence:
       - "docs/MVP.md; docs/DATA_MODEL.md; docs/LIFECYCLE.md; docs/DECISION_TRACE.md; archive/docs/ROADMAP.md; docs/EPICS.md (generated)"
-      - "README.md documentation index; API_CONTRACTS.md; API_TRADING.md; docs/runbooks/RUNBOOK_incident_replay.md"
+      - "README.md documentation index; docs/API_REFERENCE.md; docs/API_REFERENCE.md; docs/RUNBOOKS.md"
 
   # ---------------------------------------------------------------- E19 ----
   - key: Q01
@@ -2883,7 +2883,7 @@ issues:
     acceptance:
       - "A pinned model serialization (JSON, x-version) and a scoring golden for one tree model"
     evidence:
-      - "python/src/iap/models/zoo.py; API_ALPHA.md (linear_z_v1 only)"
+      - "python/src/iap/models/zoo.py; docs/API_REFERENCE.md (linear_z_v1 only)"
 
   # ---------------------------------------------------------------- E21 ----
   - key: AD01
@@ -3124,7 +3124,7 @@ issues:
     acceptance:
       - "Read endpoints require a bearer token in k8s; secrets sourced from a Secret, not env literals"
     evidence:
-      - "java/src/main/java/com/iap/api/MetricsServer.java; deployment/k8s/networkpolicy.yaml; docs/governance/SECURITY.md"
+      - "java/src/main/java/com/iap/api/MetricsServer.java; deployment/k8s/networkpolicy.yaml; docs/GOVERNANCE.md"
 
   # ---------------------------------------------------------------- E24 ----
   - key: AG01
@@ -3398,7 +3398,7 @@ issues:
       - "Horizons are configuration; markouts per horizon appear in expected_tca.json and match across languages"
       - "The MVP report shows the markout curve, not a single number"
     evidence:
-      - "python/src/iap/tca/; tests/golden/expected_tca.json; API_PORTFOLIO_TCA.md"
+      - "python/src/iap/tca/; tests/golden/expected_tca.json; docs/API_REFERENCE.md"
 
   - key: CAL03
     epic: E27
@@ -3440,7 +3440,7 @@ issues:
       - "Factor exposures are computed from positions and a documented loading table, and limited by config"
       - "The rule is a Rust change first, with a golden vector and byte-identical Java and Python ports"
     evidence:
-      - "rust/risk/src/limits_eval.rs; configs/risk/risk.json; API_TRADING.md"
+      - "rust/risk/src/limits_eval.rs; configs/risk/risk.json; docs/API_REFERENCE.md"
 
   - key: BR02
     epic: E28
@@ -3482,7 +3482,7 @@ issues:
       - "A reconciliation job compares internal and drop-copy state and emits a break event with the differing records"
       - "A break in a replayed session latches the kill switch and appears in the risk audit"
     evidence:
-      - "java/src/main/java/com/iap/platform/; docs/runbooks/RUNBOOK_incident_kill_switch.md"
+      - "java/src/main/java/com/iap/platform/; docs/RUNBOOKS.md"
 
   - key: RT01
     epic: E29
@@ -3524,7 +3524,7 @@ issues:
       - "Weights are a deterministic function of the ledgered evidence and reproduce from the manifest"
       - "An alpha that adds nothing after correlation gets zero weight in a fixture"
     evidence:
-      - "python/src/iap/lifecycle/; python/src/iap/portfolio/; docs/governance/GOVERNANCE.md section 2"
+      - "python/src/iap/lifecycle/; python/src/iap/portfolio/; docs/GOVERNANCE.md section 2"
 
   - key: AL01
     epic: E30
@@ -3567,7 +3567,7 @@ issues:
       - "The hidden seed is never exposed to agents or written to any readable artefact; only the verdict is"
       - "Each reserve session is single-use and its use is recorded in the ledger"
     evidence:
-      - "configs/marketdata/generator.json; python/src/iap/marketdata/; docs/governance/REPRODUCIBILITY.md"
+      - "configs/marketdata/generator.json; python/src/iap/marketdata/; docs/GOVERNANCE.md"
 
   - key: AL04
     epic: E30
@@ -3623,7 +3623,7 @@ issues:
       - "Adversarial fixtures (instructions embedded in a ledger reason or report) do not change agent actions in the evaluation harness"
       - "Free text passed to an agent is delimited and length-bounded by one shared function"
     evidence:
-      - "tools/agents/ (proposed); docs/governance/SECURITY.md"
+      - "tools/agents/ (proposed); docs/GOVERNANCE.md"
 
   - key: FZ01
     epic: E31
@@ -3708,7 +3708,7 @@ issues:
       - "After a kill at any injected point the restored session keeps the latch, positions and an audit log that is a valid prefix extension"
       - "A torn write to the state directory is detected and refused rather than loaded"
     evidence:
-      - "java/src/main/java/com/iap/platform/PaperTrading.java; docs/runbooks/RUNBOOK_shadow_deployment.md"
+      - "java/src/main/java/com/iap/platform/PaperTrading.java; docs/RUNBOOKS.md"
 
   - key: FZ05
     epic: E31
@@ -3973,7 +3973,7 @@ issues:
     acceptance:
       - "Finding written; triage tested; passing alphas' reports byte-identical"
     evidence:
-      - "docs/research/FX11_FINDING.md; python/tests/test_fx11_time_shift.py"
+      - "docs/RESEARCH_NOTES.md; python/tests/test_fx11_time_shift.py"
 
   - key: R-P1-4
     epic: E35
@@ -4381,7 +4381,7 @@ issues:
     acceptance:
       - "Each follow-up tested"
     evidence:
-      - "python/src/iap/validation/beta_stability.py; tools/prereg_touch_check.py; docs/research/MEMORY_REVIEW_v116.md"
+      - "python/src/iap/validation/beta_stability.py; tools/prereg_touch_check.py; docs/RESEARCH_NOTES.md"
 
   - key: V116-13
     epic: E36

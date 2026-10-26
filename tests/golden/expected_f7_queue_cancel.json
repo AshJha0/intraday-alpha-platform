@@ -1,6 +1,6 @@
 {
  "x-version": 1,
- "description": "F7 rule 9 golden: B5 queue-aware cancels (iap.execution.fading.queue_cancel_rule; API_TRADING.md section 2.16) with the hazard probability leg (iap.execution.fill_hazard.FillHazardModel.features / bucket_hazards / p_fill_within on the UTC clock; `model` = the fitted document the port loads) and the X-4 depletion split read (iap.tca.markout.queue_bucket, ExecCalibration.queue_{exec_,cancel_,}depletion_hazard over `calibration_docs`, null = no document / no cell / no rate), plus iap.execution.sor_v2.hazard_fill_prob (lam null = None) and time_of_day on the UTC clock.",
+ "description": "F7 rule 9 golden: B5 queue-aware cancels (iap.execution.fading.queue_cancel_rule; docs/API_REFERENCE.md section 2.16) with the hazard probability leg (iap.execution.fill_hazard.FillHazardModel.features / bucket_hazards / p_fill_within on the UTC clock; `model` = the fitted document the port loads) and the X-4 depletion split read (iap.tca.markout.queue_bucket, ExecCalibration.queue_{exec_,cancel_,}depletion_hazard over `calibration_docs`, null = no document / no cell / no rate), plus iap.execution.sor_v2.hazard_fill_prob (lam null = None) and time_of_day on the UTC clock.",
  "generator": "PYTHONPATH=src python tools/make_golden_f7.py --only r09_queue_cancel --force",
  "parity": "canonical JSON bytes of `expected` (sorted keys, no whitespace, Python float repr) must equal the C++ port's canonical bytes; `expected_tol` (when present) is compared to `tolerance`",
  "inputs": {

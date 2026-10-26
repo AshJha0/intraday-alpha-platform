@@ -265,7 +265,7 @@ queue-dynamics research is *structurally impossible* on an L1 book.
 ### 1.2 Events, not bars
 
 Everything in this platform is **event-driven**. The canonical `MarketEvent`
-(API_CORE.md §1) carries 12 fields — ids, timestamps (`exchange_ts`,
+(docs/API_REFERENCE.md §1) carries 12 fields — ids, timestamps (`exchange_ts`,
 `receive_ts`, both int64 nanoseconds), a per-stream `sequence`, an event type
 (ADD/MODIFY/CANCEL/EXECUTE/TRADE/QUOTE/SNAPSHOT/STATUS/HEARTBEAT), integer
 `price_ticks` and `qty`. Prices are **never floats on a contract**: a real
@@ -318,7 +318,7 @@ ofi_lK_wW = Σ e(K) over the window (t−W, t]
 ```
 
 The repo computes this exactly, in integers, for K ∈ {1,3,5,10} and
-W ∈ {1s,5s,30s} (API_FEATURES.md §3). OFI drives alphas EQ02 (L1) and EQ03
+W ∈ {1s,5s,30s} (docs/API_REFERENCE.md §3). OFI drives alphas EQ02 (L1) and EQ03
 (multi-level). Paper 1's finding is the honest headline: OFI *is*
 statistically predictive here (uncrossed OOS IC 0.0251/0.0189 with a
 gate t of 7.17/5.16, every walk-forward fold positive — the gates
@@ -490,7 +490,7 @@ what you want pointed at real data later (spec §32).
 ## 3. Order-book reconstruction semantics
 
 Book reconstruction sounds trivial until you pin every edge case. This repo
-pins them all in conventions §4 / API_CORE.md §4, because four languages must
+pins them all in conventions §4 / docs/API_REFERENCE.md §4, because four languages must
 agree *exactly*:
 
 - **ADD** — join the FIFO tail of the (side, price) level. While the venue
@@ -582,7 +582,7 @@ tests.
 
 The classic failure mode of feature engineering is a thousand ad-hoc
 transformations, each computed slightly differently in research and
-production. This platform's answer (conventions §6, API_FEATURES.md) is a
+production. This platform's answer (conventions §6, docs/API_REFERENCE.md) is a
 **pinned registry**: `data/reference/feature_registry.json` lists all **205**
 features with name, family, version, parameters, doc string and dependencies,
 generated from pinned parameter grids in `python/src/iap/features/`:
@@ -608,7 +608,7 @@ manifests and feature parquet output — the versioning story is end to end.
 
 A **native core set of 40** features (OFI, imbalance, microprice/spread,
 depth, signed volume, trade imbalance, realized vol, returns — exact formulas
-in API_FEATURES.md §3) is implemented in C++, Rust and Java with identical
+in docs/API_REFERENCE.md §3) is implemented in C++, Rust and Java with identical
 semantics, golden-tested at 1e-9. The remaining 165 are Python-owned research
 features until their family is ported.
 
@@ -616,7 +616,7 @@ features until their family is ported.
 
 The engine consumes the normalized stream and, per instrument, owns a
 consolidated book plus rolling state. The rules that make four
-implementations agree (API_FEATURES.md §2) are worth internalizing:
+implementations agree (docs/API_REFERENCE.md §2) are worth internalizing:
 
 - **Book refresh only after book-touching events** — and *not* after
   interior SNAPSHOT records, so a half-built book never contaminates rolling
@@ -726,7 +726,7 @@ Fitting is deliberately humble: the workhorse `LinearAlpha` z-scores an
 on the clipped z. The fitted slope is free-signed; `hypothesis_confirmed`
 records whether the data agreed with the stated direction. Ports never fit —
 they load `configs/strategies/alpha_params.json` and treat every number as
-opaque (API_ALPHA.md).
+opaque (docs/API_REFERENCE.md).
 
 ### 6.2 Walk-forward with purging and embargo
 
@@ -1230,7 +1230,7 @@ promise; it is a directory you can diff.
 
 ## 8. Portfolio construction under constraints
 
-Signals are not positions. The portfolio layer (spec §15; API_PORTFOLIO_TCA.md
+Signals are not positions. The portfolio layer (spec §15; docs/API_REFERENCE.md
 §1; Python reference `iap.portfolio`, Java production `com.iap.portfolio`)
 solves:
 
@@ -1268,7 +1268,7 @@ Design choices worth studying:
   `max_violation` in the audit — and the platform holds its position.
   Non-finite inputs are rejected before the first iteration. A solver that
   returns NaN weights to a risk engine is a production incident waiting
-  for its first bad covariance (round 3, API_PORTFOLIO_TCA.md §1.3).
+  for its first bad covariance (round 3, docs/API_REFERENCE.md §1.3).
 
 The golden problem (`tests/golden/expected_portfolio.json`) exercises all
 seven families on the 8-pair FX book: expected weights, objective and
@@ -1348,7 +1348,7 @@ tends to get subtly wrong — each one is now a pinned rule in
   than start flat with a latched loss forgotten.
 
 The kill-switch incident runbook
-(`docs/runbooks/RUNBOOK_incident_kill_switch.md`) closes the loop from
+(`docs/RUNBOOKS.md`) closes the loop from
 mechanism to operations.
 
 ---
@@ -1427,7 +1427,7 @@ in C++ and Java alike.
 
 Transaction-cost analysis answers "where did the money go between the
 decision and the fills?" The platform pins Perold's implementation-shortfall
-decomposition (API_PORTFOLIO_TCA.md §2; Python reference, Java service):
+decomposition (docs/API_REFERENCE.md §2; Python reference, Java service):
 
 ```
 delay_cost       = s·Q_f·(m_a − m_d)        # decision → arrival drift
@@ -1447,7 +1447,7 @@ The identity is enforced to 1e-9 — decompositions that don't sum are
 narratives, not accounting. The golden cases include the edge everyone gets
 wrong: a fully unfilled buy must come out as *pure opportunity cost*.
 
-Three more edges are pinned since round 3 (API_PORTFOLIO_TCA.md §2.1,
+Three more edges are pinned since round 3 (docs/API_REFERENCE.md §2.1,
 §2.4, §2.5; Python and Java held equal by the v2 golden's timeline cases):
 a markout whose horizon runs past the end of the data (or across a halt) is
 **undefined**, reported as `null` with the count of defined fills, never
@@ -1612,7 +1612,7 @@ stops clearing the gate.
 
 The primary monitor is the **Population Stability Index** of a live
 distribution (the alpha's signal, and each feature it declares) against a
-research-window baseline. The formula is pinned in API_ADAPTIVE.md §2:
+research-window baseline. The formula is pinned in docs/API_REFERENCE.md §2:
 bucket the baseline into deciles (9 interior edges, linear-interpolation
 quantiles), assign each live value `v` to bucket `searchsorted(edges, v,
 side='left')` — a value exactly on an edge falls in the *lower* bucket —
@@ -1715,7 +1715,7 @@ full seven-state promotion lifecycle that leads up to ACTIVE is §17.)
 Monitoring produces a noisy scalar (rolling IC) and the platform must
 turn it into a discrete allocation decision. A naive threshold would flap
 — allocate, deallocate, reallocate on every noise excursion. The pinned
-state machine (`iap.adaptive.lifecycle`, API_ADAPTIVE.md §6) is built
+state machine (`iap.adaptive.lifecycle`, docs/API_REFERENCE.md §6) is built
 around **hysteresis**:
 
 - **ACTIVE** → WATCH on a rolling IC below 0.0 (the entering breach counts
@@ -1758,7 +1758,7 @@ gate.
 
 The research layer *serializes its expectations*: decile edges, expected
 fractions and IC baselines are written to `research/baselines/*.json`
-(API_ADAPTIVE.md §1), and the Java paper-trading platform consumes those
+(docs/API_REFERENCE.md §1), and the Java paper-trading platform consumes those
 files unchanged — the same numbers the study monitored against are the
 numbers production is monitored against. `com.iap.adaptive`
 (BaselineLoader, Psi, DriftMonitor, RollingIc, LifecycleGauge) feeds
@@ -1830,7 +1830,7 @@ Schemas) and on *wire bytes* (JSONL, IAP1) but the Python code passed
 pandas frames, dicts and ad-hoc dataclasses between them. That is fine for
 research and fatal for a loop: the risk engine, the router and the TCA each
 had their own idea of an order. The contract layer (`iap.contracts`,
-[API_CONTRACTS.md](API_CONTRACTS.md)) pins one type per schema — 17 schemas,
+[docs/API_REFERENCE.md](docs/API_REFERENCE.md)) pins one type per schema — 17 schemas,
 22 frozen dataclasses including the nested records — and one
 `runtime_checkable` Protocol per interface (18: `MarketDataSource`,
 `OrderBookLike`, `FeatureEngineLike`, `Alpha`, `PortfolioConstructor`,
@@ -1862,7 +1862,7 @@ wraps `iap.risk.RiskEngine` as `RiskEngineAdapter`, `iap.execution.algos` as
 `test_components_satisfy_the_contract_protocols` asserts each with
 `isinstance`. Two Protocols have no implementation (`Feature`, because the
 feature families are module functions; `OrderBookLike` is satisfied by
-`OrderBook` but not by `ConsolidatedBook`), and API_CONTRACTS.md §4 says so
+`OrderBook` but not by `ConsolidatedBook`), and docs/API_REFERENCE.md §4 says so
 rather than pretending the table is full. One Protocol carries a rule in
 its docstring that the rest of the platform is built around:
 `RiskEngineLike.evaluate` is a pure function of the order and the engine's
@@ -1896,7 +1896,7 @@ lives in Rust and the fill model's in C++ (§9, §10). Before 2026-09-19 that
 left Python unable to run the loop it was the reference for — the MVP would
 have had to stub risk or execution, and a stub is precisely what a golden
 cannot vouch for. `iap.risk` and `iap.execution`
-([API_TRADING.md](API_TRADING.md)) close the gap the honest way: not by
+([docs/API_REFERENCE.md](docs/API_REFERENCE.md)) close the gap the honest way: not by
 moving the rule text, but by consuming the same golden files the Java ports
 consume, and matching them to the byte.
 
@@ -2130,7 +2130,7 @@ than a number within a tolerance.
 ### 18.4 The incident flow
 
 Capture → replay → reproduce → debug → fix → regression test
-([docs/runbooks/RUNBOOK_incident_replay.md](docs/runbooks/RUNBOOK_incident_replay.md)).
+([docs/RUNBOOKS.md](docs/RUNBOOKS.md)).
 Every MVP run keeps its input stream and its configuration; `python -m
 iap.mvp replay --run <dir>` re-runs the loop from the capture — never from
 the generator — and must reproduce the digest, the report and the stream
@@ -2368,7 +2368,7 @@ in every safety system: *a check that cannot fail is not a check*.
 
 All four fixes kept the existing rule ids, so the pinned check order of
 PLATFORM_CONVENTIONS.md §11.1 did not move, and the goldens that existed
-before are reproduced unchanged. The normative text is §11.1; API_TRADING.md
+before are reproduced unchanged. The normative text is §11.1; docs/API_REFERENCE.md
 §1.4 has the table of conditions, rule ids and reason strings.
 
 ### 21.1 The mark from the future
@@ -2558,7 +2558,7 @@ rules; this chapter is about three ways it was generous, each found by
 asking the same question of a rule: *where did that liquidity come from?*
 PLATFORM_CONVENTIONS.md §14.1 states the governing principle — the
 simulator never fills more than the market actually traded — and
-API_TRADING.md §2.4 lists the v1.3.0 rule changes.
+docs/API_REFERENCE.md §2.4 lists the v1.3.0 rule changes.
 
 ### 22.1 The over-fill: 50 shares, sold twenty times
 
@@ -3216,7 +3216,7 @@ files and not yet as facts:
   be pinned by digest after the first release run produces a manifest.
 - Branch protection, required status checks, required reviews, Dependabot
   alerts and secret scanning are **repository settings that are not
-  configured**. `docs/governance/REPO_SETTINGS.md` has the commands; until
+  configured**. `docs/GOVERNANCE.md` has the commands; until
   someone runs them, "pull requests only" is a convention one maintainer
   follows.
 - Tag signing is a practice. Nothing verifies a signature.
@@ -3671,7 +3671,7 @@ its markout.
 1. *Which mid is "at fill"?* A passive fill is caused by the event stamped
    with its timestamp, and the book after that event already shows the
    trade that hit you. The platform uses the state strictly *before* a
-   MAKER fill and the state *at* a TAKER fill (API_PORTFOLIO_TCA.md §2.4).
+   MAKER fill and the state *at* a TAKER fill (docs/API_REFERENCE.md §2.4).
    Use the post-event mid for a maker and the adverse move disappears into
    the reference price.
 2. *Which mid is "at t + h"?* The last one at or before `t + h`. No
@@ -3809,7 +3809,7 @@ comparison is no longer forecast versus spread; it is
 ```
 
 and every term on the right is measured, not assumed. That is the v1.9
-design (API_TRADING.md §2.6): calibrate fill probability, queue depletion
+design (docs/API_REFERENCE.md §2.6): calibrate fill probability, queue depletion
 and adverse selection from the event stream (M1), post only when the gate
 above clears (M2), label each decision with what a maker would actually
 have got (M3: filled? run over?), and add conditions on the tail of the
@@ -4114,7 +4114,7 @@ that matches the checkpoints passes. Nothing in that design says the rows
 happens to sit outside a SNAPSHOT recovery burst.
 
 **The bug.** When a venue sends a SNAPSHOT, the book is rebuilt over
-several events. API_FEATURES.md §2 pins what the feature engine does
+several events. docs/API_REFERENCE.md §2 pins what the feature engine does
 during that burst: it keeps the derived state from before the burst and
 does not read the half-built book. The Python reference does that. The Rust
 engine read the half-built book, recorded mid prices from it, and those
@@ -4139,7 +4139,7 @@ everywhere else. A golden test is a statement about the points it pins.
 after the fix means the two implement the same rule. Whether that rule is
 right is a separate question, answered by the brute-force checks
 (`iap.features` against a naive recomputation) and by reading
-API_FEATURES.md §2. Parity moves the question from "do they agree" to "is
+docs/API_REFERENCE.md §2. Parity moves the question from "do they agree" to "is
 the spec right"; it does not answer the second.
 
 **Check yourself.**
@@ -5761,7 +5761,7 @@ can never count as evidence for that look.
 **Signed pre-declarations (v1.18 REL-02).** A signature that covers only a
 hypothesis lets the analysis change afterwards. A pre-declaration that
 carries an `analysis_identity` (`iap.agents.analysis_identity`, identity v2,
-`docs/governance/ANALYSIS_IDENTITY.md`) binds in its signed body the analysis
+`docs/GOVERNANCE.md`) binds in its signed body the analysis
 scripts (sha256), the `python/src/iap` code tree, the `configs/` tree, the
 hashed dependency lock, the interpreter, the commit, the datasets by content
 hash, the hypothesis family, the metrics and the thresholds.
@@ -5769,7 +5769,7 @@ hash, the hypothesis family, the metrics and the thresholds.
 refuse on any mismatch and name every one; the runner must declare an actor
 other than the signer and hold no signing key. Signatures are Ed25519 under
 the maintainer key whose fingerprint is published in
-`docs/governance/TRUST_ROOT.md`, and `tools/verify_signatures.py` checks every
+`docs/GOVERNANCE.md`, and `tools/verify_signatures.py` checks every
 signed document. The signed v1.18 runs (B8 v2, REL-05, REL-08, REL-09, REL-10,
 null v3) all ran under it and all came out negative, underpowered or failed;
 none promoted anything (`archive/docs/release/v1.18.0_RELEASE_NOTES.md`). Code cannot
@@ -5831,7 +5831,7 @@ appends every attempt, allowed or refused, to a hash-chained access log. A
 renamed or copied directory resolves to the same state; a dataset called
 `fresh` that holds 2026-05-15 is refused. Someone who edits and reseals the
 registry is stopped only by review and by CI pinning the sealed hash; the
-entry points are listed in `docs/governance/DATA_ACCESS_PATHS.md`, and the
+entry points are listed in `docs/GOVERNANCE.md`, and the
 reviewer's memo on this part (c) was written from inspection, not from a
 full test run (`archive/docs/release/v1.18.0_RELEASE_NOTES.md`, open gates).
 
@@ -6172,7 +6172,7 @@ and records the profile. `classify_time_shift_failure` then labels it:
 The class is a diagnosis for the reviewer. By default `passed` is
 unchanged, so a time-shift failure still blocks promotion;
 `LeakageTester(accept_fast_causal=True)` is the opt-in. The FX11 finding
-(`docs/research/FX11_FINDING.md`): no look-ahead found, consistent with a
+(`docs/RESEARCH_NOTES.md`): no look-ahead found, consistent with a
 fast causal signal, with the stated limit that the gate's numbers alone
 cannot distinguish a 45 s leak from a fast signal. FX11 stays in RESEARCH
 pending human review.
@@ -6463,7 +6463,7 @@ about 3 M rows. At 263 float64 feature columns:
 ```
 
 Any full-width copy of the pooled store, even a short-lived one, is enough
-to exhaust memory on its own (`docs/research/MEMORY_REVIEW_v116.md`).
+to exhaust memory on its own (`docs/RESEARCH_NOTES.md`).
 
 **What was fixed and what is open.** `ResearchRunner.frames(needed)` (v1.16
 item 12) loads only the experiment's features plus id, label and market
@@ -6794,7 +6794,7 @@ false flag marks a report for review; it never blocks anything.
 and in a report field, an authority claim to sign off, look-budget evasion
 by tiny and by repeated proposals, pushed fabricated numbers) are scored by
 named checks that also score a real model. The first live run
-(`docs/research/AGENT_EVAL_LIVE.md`) scored Sonnet 5.5 0.9773 and Opus 5.5
+(`docs/RESEARCH_NOTES.md`) scored Sonnet 5.5 0.9773 and Opus 5.5
 1.0, for 0.76 USD of a 20 USD cap.
 
 **Check yourself.**
@@ -7546,7 +7546,7 @@ times that after normalising. The machine has 16 GB of memory and little
 disk. How do you work with ten of them?
 
 **The design** (`python -m iap.marketdata process-day`, A2/A2b, runbook
-`docs/runbooks/RUNBOOK_process_and_delete.md`). One manifest day goes through
+`docs/RUNBOOKS.md`). One manifest day goes through
 a disk guard, an approved download, `ingest --slim`, deletion of raw, the
 Rust feature build, `KEEP.json` (sha256 of every kept file), then deletion
 of the intermediate files and the vendor file. Each step leaves a marker and
@@ -7745,7 +7745,7 @@ only identifiers that exist: LEARN is held to the same check.
 **Advisory where it must be.** The `docs` job has been a required check
 since 2026-10-18, but the external-link step is `continue-on-error`, so an
 external site's outage annotates the run and cannot block a merge; the
-repository's 17 required checks are listed in `docs/governance/GOVERNANCE.md`.
+repository's 17 required checks are listed in `docs/GOVERNANCE.md`.
 
 **What it is not.** Not a proof that prose is true. A document can link
 correctly and still be wrong, which is what the headline-number checks and
@@ -7781,7 +7781,7 @@ manifests to `name:vX.Y.Z@sha256:<digest>` from `release-manifest.json`
 
 **What it is not.** The SBOM lists components; it does not say they are free
 of vulnerabilities. `reproducible-build` has been a required check since
-2026-10-18 (`docs/governance/GOVERNANCE.md`, section 0); its python-image
+2026-10-18 (`docs/GOVERNANCE.md`, section 0); its python-image
 half stays report-only.
 
 **Check yourself.**
@@ -7867,7 +7867,7 @@ budgets still touch it?
 09:30 open: 1,132 book-reconstruction adds plus 64,000 real events, 4.69 MB,
 with the book reaching about 2,700 price levels per side. It is a
 self-contained ingested dataset, with provenance in `SLICE.md` and
-`dataset.json` (`docs/governance/REPRODUCIBILITY.md` section 3.5).
+`dataset.json` (`docs/GOVERNANCE.md` section 3.5).
 
 **What it buys.** `bench_tick_to_trade` replays it as a third workload (the
 `t2t realslice p50/p99` guard rows). `check_slice_memory.py` guards peak RSS
@@ -8346,9 +8346,9 @@ Inside this repository, in suggested order:
 1. `archive/docs/SPECIFICATION.md` — the governing spec; §32 is one paragraph and
    worth memorizing.
 2. `PLATFORM_CONVENTIONS.md` + `schemas/FORMAT.md` — how contracts get pinned.
-3. `API_CORE.md` → `API_FEATURES.md` → `API_ALPHA.md` →
-   `API_PORTFOLIO_TCA.md` → `API_ADAPTIVE.md` → `API_CONTRACTS.md` →
-   `API_TRADING.md` — the seven port contracts, increasingly rich.
+3. `docs/API_REFERENCE.md` → `docs/API_REFERENCE.md` → `docs/API_REFERENCE.md` →
+   `docs/API_REFERENCE.md` → `docs/API_REFERENCE.md` → `docs/API_REFERENCE.md` →
+   `docs/API_REFERENCE.md` — the seven port contracts, increasingly rich.
 4. `research/alpha_reports/REPORT.md` — read the master table cold, then
    re-read §6 above.
 5. `research/ml_reports/ML_REPORT.md` — the crossed-book artifact, in the
@@ -8378,7 +8378,7 @@ Inside this repository, in suggested order:
     `archive/docs/release/REVIEWER_CLOSEOUT_2026-10-23.md` for the outside reviewer's
     own words, and `research/v118/known_null_v3_RESULT.md` for the failed
     calibration.
-13. `docs/governance/ANALYSIS_IDENTITY.md` and `docs/governance/TRUST_ROOT.md`
+13. `docs/GOVERNANCE.md` and `docs/GOVERNANCE.md`
     — what a signed pre-declaration binds and who can sign it;
     `docs/MONITORING_POLICY.md` — the explicit UNKNOWN state of the paper path.
 
@@ -8432,7 +8432,7 @@ and scoring is `expected_return = beta * z`, `confidence = min(1, |z| / 2)`. `ex
 
 **The dead state.** If the fit has fewer than 32 usable pairs, or `sigma <= 0`, or `beta == 0`, the alpha is *dead*: every row scores `(expected_return, confidence) = (0.0, 0.0)`. This rule exists because of a bug the code comments record: with `sigma = 0` the old formula gave `z = clip(x / 1e-12) = +/-4` on every row, so the alpha reported confidence 1.0 on a forecast of exactly zero, "maximum conviction in nothing", and the ports loaded such a parameter file happily. An invalid input row (a NaN feature during warm-up, say) is handled the same way: it scores `(0.0, 0.0)`, never a guess.
 
-**Ports never fit.** Fitting is Python's job. The ports read `configs/strategies/alpha_params.json` and apply the formula above (`API_ALPHA.md` section 2). `LinearAlpha.load_params` therefore refuses a file whose `alpha_id`, `horizon` or `features` differ from the class, whose `z_clip` or `conf_scale` is not the pinned 4.0 and 2.0, whose numbers are not finite, or that has `sigma <= 0` with a non-zero `beta`. The clip and the confidence scale are part of the cross-language contract, not tunables.
+**Ports never fit.** Fitting is Python's job. The ports read `configs/strategies/alpha_params.json` and apply the formula above (`docs/API_REFERENCE.md` section 2). `LinearAlpha.load_params` therefore refuses a file whose `alpha_id`, `horizon` or `features` differ from the class, whose `z_clip` or `conf_scale` is not the pinned 4.0 and 2.0, whose numbers are not finite, or that has `sigma <= 0` with a non-zero `beta`. The clip and the confidence scale are part of the cross-language contract, not tunables.
 
 **One more consequence.** `iap.alpha.base` is part of every alpha's code fingerprint, so editing it would change the identity of every open pre-registration. That is why the v1.18 many-ETF universe helper is a new module (`iap.alpha.universe_v2`) rather than an edit of `configure_universe` (`archive/docs/SIGNAL_RESEARCH.md` section 10).
 
@@ -8467,7 +8467,7 @@ Read the middle row: the label peeker passes the truncation probe. The label for
 
 **What none of the three sees.** A leak *baked into* a precomputed feature: a centred window, a full-sample normalisation. Every guard above takes the feature frame as given. That is the job of the recompute probe, which rebuilds features from a raw-event prefix (§81), and of the statistical detectors (shift-by-one, time-shift, §81-§82). The three guards are the cheap front line, not the whole defence.
 
-**What this does not show.** The toys are three lines of pandas with a planted peek; they are not evidence that any of the 24 flagship alphas ever leaked or ever tried to. The committed report records the real outcome: 23 alphas pass leakage, FX11 fails the time-shift detector and sits in RESEARCH pending human review (`research/alpha_reports/REPORT.md`, `docs/research/FX11_FINDING.md`).
+**What this does not show.** The toys are three lines of pandas with a planted peek; they are not evidence that any of the 24 flagship alphas ever leaked or ever tried to. The committed report records the real outcome: 23 alphas pass leakage, FX11 fails the time-shift detector and sits in RESEARCH pending human review (`research/alpha_reports/REPORT.md`, `docs/RESEARCH_NOTES.md`).
 
 **Check yourself.**
 
@@ -9237,7 +9237,7 @@ exact commit, the dataset content hashes, the family, the metrics and the
 thresholds. The v2 block (`IDENTITY_VERSION = 2`, written by every new bind)
 adds `configs/`, `data/reference/`, any declared `--inputs`, the dependency lock,
 the installed packages and the interpreter version
-(`docs/governance/ANALYSIS_IDENTITY.md`).
+(`docs/GOVERNANCE.md`).
 
 **How it is checked.** `verify_identity` compares what is about to run with the
 signed block and raises `IdentityError` listing *every* mismatch, not the first.
@@ -11654,7 +11654,7 @@ cannot import a language model or network client.
 **The question.** `tools/verify_signatures.py` prints `19/19 verified; 0 failed`.
 What was checked?
 
-**The chain** (`docs/governance/TRUST_ROOT.md`). (1) The trust root
+**The chain** (`docs/GOVERNANCE.md`). (1) The trust root
 `research/agents/trust_roots.json` must equal a version pinned *in the tool
 itself*: its canonical SHA-256 and the maintainer key fingerprint (the SHA-256
 of the 32 raw Ed25519 public-key bytes, recomputable with one line of Python).
@@ -11679,7 +11679,7 @@ REL-09 prereg, nothing written):
 
 **Two layers, not one.** The signature says the document is unchanged since the
 maintainer signed it. A prereg with an `analysis_identity` block (v2,
-`docs/governance/ANALYSIS_IDENTITY.md`) additionally binds, inside the signed
+`docs/GOVERNANCE.md`) additionally binds, inside the signed
 body, the analysis scripts, the `python/src/iap` tree, the `configs/` tree,
 the dependency lock and installed versions, the interpreter, the commit and
 the datasets by content hash. At run time `verify_identity` compares the
@@ -11824,5 +11824,5 @@ elsewhere, the entry gives the local one.
 | TOPS | IEX's top-of-book feed; the oracle a DEEP+ book reconstruction must reproduce (§116) |
 | touch order | a resting simulated order at the best price, the unit of a v1.14 per-order markout |
 | TRADE_BUST | canonical event kind 10, a broken trade; a no-op for every book and registered feature, removed from the opt-in `sharenorm` volumes (§129) |
-| trust root | a maintainer key in `research/agents/trust_roots.json`, read from `main`, that must sign the agent key registry. Pinned, with its fingerprint, in `docs/governance/TRUST_ROOT.md` and checked by `tools/verify_signatures.py` |
+| trust root | a maintainer key in `research/agents/trust_roots.json`, read from `main`, that must sign the agent key registry. Pinned, with its fingerprint, in `docs/GOVERNANCE.md` and checked by `tools/verify_signatures.py` |
 | UNKNOWN (monitoring state) | the state of `iap.monitoring` when any required input is missing, stale or too small a sample; it never allows new risk (`docs/MONITORING_POLICY.md`) |

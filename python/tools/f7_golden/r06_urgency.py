@@ -142,7 +142,7 @@ def slice_block() -> tuple[dict, list, list]:
 
 def document() -> dict:
     doc = base_document(
-        "F7 rule 6 golden: B2 alpha urgency (API_TRADING.md section 2.14): "
+        "F7 rule 6 golden: B2 alpha urgency (docs/API_REFERENCE.md section 2.14): "
         "iap.execution.signal.zscore cases ([z], mean, std); "
         "iap.execution.urgency.regime_from_z cases; queries against "
         "ArraySignalSource(sources) under each AlphaUrgencyPolicy, classified as the replay "

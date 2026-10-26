@@ -24,7 +24,7 @@
 //! hand-edited `expected_risk_decisions.json` step script should still fail
 //! with a message naming the step and the field, not a bare panic. The
 //! platform's Rust dependency set is `serde`/`serde_json` only (no `anyhow`,
-//! PLATFORM_CONVENTIONS.md §10 / SECURITY.md §1), so field access goes
+//! PLATFORM_CONVENTIONS.md §10 / docs/GOVERNANCE.md §1), so field access goes
 //! through the small `field_*` helpers below, which return `Result<_, String>`
 //! with the offending step and key in the message; `run()` propagates with
 //! `?` and `main()` prints the error and exits 1.

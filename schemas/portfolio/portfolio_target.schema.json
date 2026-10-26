@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://iap.example/schemas/portfolio/portfolio_target.schema.json",
   "title": "PortfolioTarget",
-  "description": "Output of one portfolio solve (API_PORTFOLIO_TCA.md section 1). solver_status: OPTIMAL (feasible best iterate), INFEASIBLE (no feasible iterate; targets hold prev_qty), MAX_ITER (iteration budget exhausted without a declared best). Legs sorted by instrument_id.",
+  "description": "Output of one portfolio solve (docs/API_REFERENCE.md section 1). solver_status: OPTIMAL (feasible best iterate), INFEASIBLE (no feasible iterate; targets hold prev_qty), MAX_ITER (iteration budget exhausted without a declared best). Legs sorted by instrument_id.",
   "x-version": 1,
   "type": "object",
   "properties": {

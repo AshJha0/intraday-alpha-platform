@@ -74,7 +74,7 @@ Two independent detectors, both mandatory in the promotion pipeline:
    The class is a diagnosis for the human reviewer.  By default it does
    NOT change ``passed``: a time-shift failure still blocks promotion.
    ``LeakageTester(accept_fast_causal=True)`` (opt-in) lets a
-   ``"fast_causal"`` failure pass.  See ``docs/research/FX11_FINDING.md``.
+   ``"fast_causal"`` failure pass.  See ``docs/RESEARCH_NOTES.md``.
 
 3. **Engine-level leak probe** (``truncation_probe``): re-score the model on
    frames truncated at each of several anchors and assert the score at the

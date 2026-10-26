@@ -5,7 +5,7 @@ that enumerates, verifies, reports per file and fails loudly:
 
     PYTHONPATH=python/src python tools/verify_signatures.py [--root .] [--trust-ref origin/main] [--json]
 
-What it checks (``docs/governance/TRUST_ROOT.md``):
+What it checks (``docs/GOVERNANCE.md``):
 
 1. **Trust root.** ``research/agents/trust_roots.json`` matches the pinned
    version (:data:`PINNED`: canonical-JSON sha256 and the maintainer key
@@ -43,7 +43,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python" / "src"))
 
-#: The pinned trust root (docs/governance/TRUST_ROOT.md).  Changing it is a
+#: The pinned trust root (docs/GOVERNANCE.md).  Changing it is a
 #: key rotation or revocation: follow that procedure, never edit it to make a
 #: failure go away.
 PINNED: dict[str, Any] = {
@@ -98,7 +98,7 @@ def check_trust_root(root: Path, pinned: dict[str, Any] | None = None) -> list[s
         bad.append(
             f"trust root changed: canonical sha256 {got} != pinned "
             f"{pinned['trust_roots_canonical_sha256']} (version {pinned['version']}); "
-            "a rotation updates the pin in tools/verify_signatures.py and TRUST_ROOT.md"
+            "a rotation updates the pin in tools/verify_signatures.py and docs/GOVERNANCE.md"
         )
     have = roots.get("maintainers") or {}
     for name, want in pinned["maintainers"].items():

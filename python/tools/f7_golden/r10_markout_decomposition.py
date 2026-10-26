@@ -291,7 +291,7 @@ def slice_block() -> tuple[dict, dict, dict]:
 def document() -> dict:
     doc = base_document(
         "F7 rule 10 golden: B6 markout decomposition (iap.tca.markout_decomposition; "
-        "API_TRADING.md section 2.16). cluster_mean cases; `day_clusters` = fill_rows / "
+        "docs/API_REFERENCE.md section 2.16). cluster_mean cases; `day_clusters` = fill_rows / "
         "decompose / markout_decomposition over the fixed fills ([fill_id, order_id, "
         "parent_id, instrument_id, venue_id, side, price_ticks, qty, ts, liquidity, fee, "
         "impact_cost]) and orders (B4/B5/B2 provenance fields) on the fixed timeline of "

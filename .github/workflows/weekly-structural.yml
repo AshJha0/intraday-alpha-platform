@@ -3,7 +3,7 @@
 # v2.0 stage 11 (S2; v1.19 plan section 2.3: C++ is a parity-only port, nine of
 # the eleven Rust crates are FROZEN and exercised by no research run).
 #
-# What runs here and why it is weekly, not per PR (docs/governance/REPO_SETTINGS.md
+# What runs here and why it is weekly, not per PR (docs/GOVERNANCE.md
 # section 1 has the required-check matrix and the risk each check covers):
 #   cpp-full          Release build + ctest + the benchmark guards (bench_all,
 #                     tick-to-trade, execution rules) + the gcov/lcov coverage build.

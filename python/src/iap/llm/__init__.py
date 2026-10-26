@@ -1,7 +1,7 @@
 """LLM research agent (v1.11, AI1/AI2): a Claude model driving research
 through the agent governance of :mod:`iap.agents`.
 
-The boundary (docs/governance/GOVERNANCE.md §2b): the model proposes
+The boundary (docs/GOVERNANCE.md §2b): the model proposes
 hypotheses, pre-registers them through the signed
 :class:`~iap.agents.broker.WriteBroker` (one look each), asks for gated runs
 and files findings.  It never computes a number: every number in a finding

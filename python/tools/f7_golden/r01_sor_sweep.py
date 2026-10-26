@@ -222,7 +222,7 @@ def slice_block() -> tuple[dict, list]:
 
 def document() -> dict:
     doc = base_document(
-        "F7 rule 1 golden: iap.execution.sor_v2.CostAwareRouter.plan_sweep (API_TRADING.md "
+        "F7 rule 1 golden: iap.execution.sor_v2.CostAwareRouter.plan_sweep (docs/API_REFERENCE.md "
         "section 2.9 / 2.13 P0-4) on fixed three-venue books (events = MarketEvent rows "
         "[event_id, instrument_id, venue_id, exchange_ts, receive_ts, sequence, event_type, "
         "side, price_ticks, qty, order_id, trade_id] applied to a ConsolidatedBook of "

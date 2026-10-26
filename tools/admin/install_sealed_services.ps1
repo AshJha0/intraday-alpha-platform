@@ -3,7 +3,7 @@
 #   .\tools\admin\install_sealed_services.ps1 [-Repo C:\iap\repo] [-Python C:\Python312\python.exe]
 #                                            [-SealedRoot C:\iap-sealed] [-DailyRoot C:\iap\daily] [-Partitions a,b,c]
 #
-# Prerequisites (docs/governance/DD1_INGESTION_RUNBOOK.md): the accounts and partitions exist
+# Prerequisites (docs/GOVERNANCE.md): the accounts and partitions exist
 # (create_sealed_accounts.ps1, DR-5); CPython 3.12 is installed for all users (tools/admin/install_all_users_python.md)
 # with the pinned stack; the repository is checked out OUTSIDE the owner's profile (default C:\iap\repo), readable by
 # the sealed accounts and iap-runner. Nothing is downloaded. Safe to re-run: existing state is kept.
@@ -165,5 +165,5 @@ foreach ($x in $Partitions) {
 Write-Host ''
 Write-Host 'Summary:'
 foreach ($x in $Partitions) { Write-Host "  partition $x : $($results[$x])" }
-Write-Host 'Next: install the runner (docs/governance/RUNNER_SETUP.md), then start the registered-run workflow in mode dd1'
-Write-Host '(docs/governance/DD1_INGESTION_RUNBOOK.md). The services survive a reboot (at start-up trigger).'
+Write-Host 'Next: install the runner (docs/GOVERNANCE.md), then start the registered-run workflow in mode dd1'
+Write-Host '(docs/GOVERNANCE.md). The services survive a reboot (at start-up trigger).'

@@ -68,7 +68,7 @@ def test_pinned_fingerprint_is_the_sha256_of_the_trust_root_key():
             hashlib.sha256(bytes.fromhex(pin["public_key"])).hexdigest()
             == pin["fingerprint_sha256"]
         )
-    doc = (REPO / "docs/governance/TRUST_ROOT.md").read_text(encoding="utf-8")
+    doc = (REPO / "docs/GOVERNANCE.md").read_text(encoding="utf-8")
     assert pin["fingerprint_sha256"] in doc and vs.PINNED["trust_roots_canonical_sha256"] in doc
 
 

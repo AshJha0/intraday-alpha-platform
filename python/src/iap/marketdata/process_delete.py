@@ -34,7 +34,7 @@ make room.  The wrapper for a detached run and the ``jobs.json`` entry for
 Nothing here contacts the network (``iap.marketdata`` import policy): the
 download is a subprocess call to ``tools/r7_download.py`` with the owner's
 approval flag passed through, and it refuses without it.  Runbook:
-docs/runbooks/RUNBOOK_process_and_delete.md.
+docs/RUNBOOKS.md.
 """
 
 from __future__ import annotations
@@ -472,7 +472,7 @@ def render_wrapper(
     log: str,
     extra_args: str = "",
 ) -> str:
-    """A detached-run ``.cmd`` (WMI launch, docs/runbooks/RUNBOOK_job_watchdog.md):
+    """A detached-run ``.cmd`` (WMI launch, docs/RUNBOOKS.md):
     ``START``, the process-day call, ``EXIT n``."""
     L = [
         "@echo off",

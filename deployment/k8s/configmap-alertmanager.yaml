@@ -18,18 +18,17 @@ data:
     #\n# SECRET-FREE. Receiver URLs normally embed a token, so none is written here:\n# every webhook\
     \ uses `url_file`, read by Alertmanager at send time from a\n# mounted file \u2014\n#   Kubernetes:\
     \     Secret `iap-alertmanager-webhook`, keys `page_url` and\n#                   `ticket_url` (created\
-    \ out of band by the operator; see\n#                   docs/runbooks/RUNBOOK_alerting.md \xA72)\n\
-    #   docker-compose: secrets `alert_page_url` / `alert_ticket_url`, from the\n#                   files\
-    \ named by ALERT_PAGE_URL_FILE / ALERT_TICKET_URL_FILE.\n#                   Unset, both default to\
-    \ deployment/alertmanager/local-sink.url,\n#                   which points at the in-compose `alert-sink`\
-    \ echo service \u2014\n#                   NOT a secret, and nothing leaves the compose network.\n\
-    # tests/harness/check_deployment.py (`alerting_secret_free`) fails the build\n# if an inline `url:`,\
-    \ a token-looking string, or a non-local URL is committed\n# under deployment/alertmanager/.\n#\n\
-    # Routing by the `severity` label (alerts.yml \"Severity policy\"):\n#   page               -> receiver\
-    \ `page`   (wake someone up)\n#   critical, warning  -> receiver `ticket` (act during the session\
-    \ / same day)\n#   none (Watchdog)    -> receiver `watchdog` (no-op; point it at a\n#            \
-    \             dead-man's-switch service to alarm when it STOPS)\n# Anything unlabelled falls through\
-    \ to `ticket` \u2014 never silently dropped.\n# =============================================================================\n\
+    \ out of band by the operator; see\n#                   docs/RUNBOOKS.md \xA72)\n#   docker-compose:\
+    \ secrets `alert_page_url` / `alert_ticket_url`, from the\n#                   files named by ALERT_PAGE_URL_FILE\
+    \ / ALERT_TICKET_URL_FILE.\n#                   Unset, both default to deployment/alertmanager/local-sink.url,\n\
+    #                   which points at the in-compose `alert-sink` echo service \u2014\n#           \
+    \        NOT a secret, and nothing leaves the compose network.\n# tests/harness/check_deployment.py\
+    \ (`alerting_secret_free`) fails the build\n# if an inline `url:`, a token-looking string, or a non-local\
+    \ URL is committed\n# under deployment/alertmanager/.\n#\n# Routing by the `severity` label (alerts.yml\
+    \ \"Severity policy\"):\n#   page               -> receiver `page`   (wake someone up)\n#   critical,\
+    \ warning  -> receiver `ticket` (act during the session / same day)\n#   none (Watchdog)    -> receiver\
+    \ `watchdog` (no-op; point it at a\n#                         dead-man's-switch service to alarm when\
+    \ it STOPS)\n# Anything unlabelled falls through to `ticket` \u2014 never silently dropped.\n# =============================================================================\n\
     global:\n  resolve_timeout: 5m\n\nroute:\n  receiver: ticket\n  group_by: [alertname, service]\n \
     \ group_wait: 30s\n  group_interval: 5m\n  repeat_interval: 4h\n  routes:\n    - matchers:\n     \
     \   - alertname = \"Watchdog\"\n      receiver: watchdog\n      group_wait: 0s\n      repeat_interval:\

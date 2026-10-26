@@ -185,7 +185,7 @@ def slice_block(model_doc: dict, docs: dict) -> tuple[dict, list]:
 def document() -> dict:
     doc = base_document(
         "F7 rule 9 golden: B5 queue-aware cancels (iap.execution.fading.queue_cancel_rule; "
-        "API_TRADING.md section 2.16) with the hazard probability leg "
+        "docs/API_REFERENCE.md section 2.16) with the hazard probability leg "
         "(iap.execution.fill_hazard.FillHazardModel.features / bucket_hazards / "
         "p_fill_within on the UTC clock; `model` = the fitted document the port loads) "
         "and the X-4 depletion split read (iap.tca.markout.queue_bucket, "

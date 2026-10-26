@@ -116,9 +116,9 @@ groups:
             The decision-to-wire order path (incl. the pre-trade risk check) is burning its 30-day error budget (99% under
             1.05 ms) at 6x or more: at this rate the budget is gone in days.
             Check job:order_path_latency_ns:p99 and the venue latency realism
-            of the run (configs/prereg/v3.json). Runbook: docs/runbooks/RUNBOOK_alerting.md#latency-slo
-          runbook: docs/runbooks/RUNBOOK_alerting.md
-          runbook_url: docs/runbooks/RUNBOOK_alerting.md#latency-slo
+            of the run (configs/prereg/v3.json). Runbook: docs/RUNBOOKS.md#latency-slo
+          runbook: docs/RUNBOOKS.md
+          runbook_url: docs/RUNBOOKS.md#latency-slo
 
       - alert: OrderPathLatencySLOSlowBurn
         expr: >-
@@ -141,6 +141,6 @@ groups:
           description: >-
             The decision-to-wire order path (incl. the pre-trade risk check) is consuming its 30-day error budget (99% under
             1.05 ms) faster than it accrues. Not urgent; investigate the same
-            day. Runbook: docs/runbooks/RUNBOOK_alerting.md#latency-slo
-          runbook: docs/runbooks/RUNBOOK_alerting.md
-          runbook_url: docs/runbooks/RUNBOOK_alerting.md#latency-slo
+            day. Runbook: docs/RUNBOOKS.md#latency-slo
+          runbook: docs/RUNBOOKS.md
+          runbook_url: docs/RUNBOOKS.md#latency-slo

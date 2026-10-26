@@ -10,7 +10,7 @@ are counted separately, attributed to the LOBSTER message type of the row.
 
 This checks the book reconstruction rules, not the ITCH 5.0 byte parser:
 LOBSTER is derived from ITCH, but no ITCH bytes are read here
-(docs/research/ITCH_ORACLE.md).
+(docs/RESEARCH_NOTES.md).
 
 Usage::
 

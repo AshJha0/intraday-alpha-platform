@@ -1,4 +1,4 @@
-# Installs the Track C shadow book as a Windows scheduled task (docs/runbooks/RUNBOOK_shadow_book.md).
+# Installs the Track C shadow book as a Windows scheduled task (docs/RUNBOOKS.md).
 # The OWNER runs this once, after registration (configs/paper/shadow_book.json filled in). Nothing else
 # installs it. Runs tools\run_shadow_book.cmd Monday-Friday at 17:30 local time (after the US close
 # for a London clock; pass -At for another zone). -WhatIf prints the task without registering it.

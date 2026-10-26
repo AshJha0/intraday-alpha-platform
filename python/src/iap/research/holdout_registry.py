@@ -38,7 +38,7 @@ reach :func:`reader_guard` through the one choke point
 :func:`iap.core.guard.check` (v2.0 D1; this module registers itself as the
 hook when imported), so an entry point that forgot its own guard is still
 refused.  The supported routes and the unsupported ones are listed in
-``docs/governance/DATA_ACCESS_PATHS.md``.
+``docs/GOVERNANCE.md``.
 
 The registry body carries ``body_sha256``; :func:`load_registry` refuses a
 file whose body no longer matches, so an edit must go through

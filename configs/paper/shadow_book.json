@@ -1,6 +1,6 @@
 {
   "x-version": 1,
-  "description": "Track C forward shadow book (v2.0 stage 10; U13 protocol section 8). TEMPLATE: frozen_configuration_sha256, capital, T_min, m_min, grid_points and the calendar are fixed by the registration before T0 and replaced then; the values here are placeholders that make the job refuse every real input. docs/runbooks/RUNBOOK_shadow_book.md.",
+  "description": "Track C forward shadow book (v2.0 stage 10; U13 protocol section 8). TEMPLATE: frozen_configuration_sha256, capital, T_min, m_min, grid_points and the calendar are fixed by the registration before T0 and replaced then; the values here are placeholders that make the job refuse every real input. docs/RUNBOOKS.md.",
   "frozen_configuration_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "capital": 1000000.0,
   "calendar": "shadow_book_calendar.json",

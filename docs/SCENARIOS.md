@@ -10,7 +10,7 @@ C++, Rust; the Java column below is the archived port, git tag `archive/java-v1.
 
 ## CORE — events / codec / order book / replay / reference data
 
-Contract: `API_CORE.md` (§3 codec, §4 order book, §5 replay, §7 reference
+Contract: `docs/API_REFERENCE.md` (§3 codec, §4 order book, §5 replay, §7 reference
 data), `PLATFORM_CONVENTIONS.md` §1-§5, `schemas/FORMAT.md`. Golden vectors:
 `events_eq_anomalies.jsonl` / `events_fx_anomalies.jsonl` +
 `expected_anomaly_states.json` (per-venue state, all 12 counters, consolidated
@@ -62,8 +62,8 @@ universe).
 Contract: `PLATFORM_CONVENTIONS.md` §11 (risk §11.1, simulator §11.2, SOR/algos
 §11.3, paper wiring §11.4, TCA/portfolio §11.5, currency §11.6),
 `cpp/include/iap/execution/execution.hpp` (pinned simulator rules 1-9),
-`API_PORTFOLIO_TCA.md` (§1.3/1.7 optimizer, §2.1-2.7 TCA, §4 currency),
-`docs/runbooks/RUNBOOK_incident_kill_switch.md` §5 (re-arm), `API_TRADING.md`
+`docs/API_REFERENCE.md` (§1.3/1.7 optimizer, §2.1-2.7 TCA, §4 currency),
+`docs/RUNBOOKS.md` §5 (re-arm), `docs/API_REFERENCE.md`
 (the Python ports). References: risk = Rust (`rust/risk`), execution/SOR/algos
 = C++ (`cpp/{execution,sor}`), TCA/portfolio/research backtest = Python; Java
 ports all three and, since 2026-09-19, Python ports risk (`iap.risk`) and
@@ -149,13 +149,13 @@ the reason vocabulary is the Rust sim's own.
 Contract: `PLATFORM_CONVENTIONS.md` §12 (12.1 money unit, 12.2 configuration,
 12.3 state and session end, 12.4 monitoring concurrency, 12.5 HTTP endpoints,
 12.6 metric semantics, 12.7 deployment artefacts), spec §25 (observability),
-§26 (configuration), §16 (kill switches), `docs/governance/GOVERNANCE.md` §1/§3.
+§26 (configuration), §16 (kill switches), `docs/GOVERNANCE.md` §1/§3.
 Only Java implements a platform layer, so the "tests" column is Java unless a
 row is a deployment artefact, in which case it is a harness case in
 `tests/harness/check_deployment.py` / `check_docker_build.py` or a
 `promtool test rules` case in `deployment/prometheus/tests/alerts_test.yml`
 — except the two decision-trace / replay rows (`PLATFORM_CONVENTIONS.md`
-§13.2–§13.3, `docs/DECISION_TRACE.md`, `RUNBOOK_incident_replay.md`), which
+§13.2–§13.3, `docs/DECISION_TRACE.md`, `docs/RUNBOOKS.md`), which
 the Python MVP pins as well (`python/tests/test_mvp_golden.py`,
 `tests/replay/test_mvp_replay_determinism.py`, `python/tests/test_trace.py`;
 Java `PaperTraceTest`, `TraceGoldenTest`).
@@ -167,7 +167,7 @@ Test files: java `PlatformConfigTest`, `PaperStateRecoveryTest`,
 | scenario | real-world example | platform behaviour (pinned rule) | contract clause | tests (py / cpp / rs / java) |
 |---|---|---|---|---|
 | Runaway strategy: ops must halt trading NOW | A model misprices after a corporate action at 10:14; risk calls the halt | `POST /admin/kill` with a bearer token and an approval `reason` enqueues the command; the TRADING thread applies it at the next event boundary, so the `RiskEvent` carries event time. From that instant `risk_allowed_total` stops climbing, `risk_kill_switch_engaged` is 1, `/status` says `kill_switch_engaged: true`, and both `risk_audit.jsonl` and `admin_audit.jsonl` record it (token as sha256, never in clear) | conventions §12.5, spec §16 | – / – / – / `AdminApiTest.scenarioRunawayStrategyManualKillHaltsAndAudits` |
-| Kill-switch API without, or with the wrong, credentials | An unauthenticated pod on the same network probes `/admin/kill` | No token configured ⇒ the routes are not registered at all (404). Token configured: missing ⇒ 401, wrong ⇒ 403 (constant-time compare), `GET` ⇒ 405, missing/blank `reason` or an unknown scope ⇒ 400. Every attempt is audited with its status; nothing mutates risk state | conventions §12.5, SECURITY.md | – / – / – / `AdminApiTest` (`adminApiIsDisabledWithoutAToken`, `overrideAndRollValidateArguments`, `commandsAreRefusedWhenNoSessionIsDraining`) |
+| Kill-switch API without, or with the wrong, credentials | An unauthenticated pod on the same network probes `/admin/kill` | No token configured ⇒ the routes are not registered at all (404). Token configured: missing ⇒ 401, wrong ⇒ 403 (constant-time compare), `GET` ⇒ 405, missing/blank `reason` or an unknown scope ⇒ 400. Every attempt is audited with its status; nothing mutates risk state | conventions §12.5, docs/GOVERNANCE.md | – / – / – / `AdminApiTest` (`adminApiIsDisabledWithoutAToken`, `overrideAndRollValidateArguments`, `commandsAreRefusedWhenNoSessionIsDraining`) |
 | Deploy-time hard stop before the open | `configs/risk/risk.json` `kill_switch_engaged: true` shipped for a session nobody should trade | The engine boots latched: zero allowed orders, `risk_kill_switch_engaged` 1 from the first scrape, no fills, `kill_switch_engaged: true` in the session report | spec §16, conventions §12.1 | – / – / rs (`RiskRuleTest` engine-level) / `PaperUnitsTest.scenarioConfigMasterKillSwitchHaltsTheSession` |
 | Daily loss limit breached intraday | The book bleeds through the day's stop | Daily P&L (realized + unrealized, reporting currency) at or below `-max_daily_loss` latches the global switch; orders are rejected afterwards and the latch is in the audit log. The limit and the P&L are in the SAME money unit (`qty × qty_unit × price × tick`, converted) — the round-2 platform accounted them 100× apart, so the limit could not fire | conventions §12.1, §11.1 | – / – / – / `PaperUnitsTest.scenarioDailyLossLimitLatchesTheKillSwitch` |
 | The dashboard's utilization stat must mean something | Risk reads "daily loss-limit utilization 2%" while the report says −634k | `risk_daily_pnl == grossPnl − spreadCost` exactly, and `report.pnl.total == that − fees − impact`; `portfolio_gross_notional == \|risk position\| × qty_unit × mark`. Alerts and stats divide by the exported `risk_limit{limit=...}` gauge, never a copied constant | conventions §12.1, §12.6 | – / – / – / `PaperUnitsTest` (`riskAndPortfolioNotionalsAgree`, `riskAndBacktestPnlAgreeInOneUnit`), harness `promtool test rules` `LossLimitUtilizationHigh…` |
@@ -175,7 +175,7 @@ Test files: java `PlatformConfigTest`, `PaperStateRecoveryTest`,
 | Corrupt or foreign checkpoint on restart | The PVC was restored from the wrong snapshot, or a write was torn | `--resume` fails closed and names the file: no checkpoint, malformed JSON, a snapshot version it does not know, a checkpoint for a different instrument/alpha, or a cursor at/past the end of the stream. It never starts flat and un-latched by accident | conventions §12.3 | – / – / – / `PaperStateRecoveryTest` (`resumeFailsClosedOnMissingOrCorruptState`, `corruptRiskSnapshotIsRejected`) |
 | A hard kill between the audit flush and the checkpoint rename | SIGKILL/OOM at 11:02; `risk_audit.jsonl` holds three decisions the checkpoint predates | `--resume` compares the audit's line count with `session_state.json`'s `audit_lines` and REFUSES when they differ, naming both counts. Resuming would replay decisions the file already records and break the "the audit replays byte-identically" property the postmortem depends on. A shorter file means a truncated or foreign audit — escalate, never resume | conventions §12.3, GOVERNANCE §3 | – / – / – / `PaperStateRecoveryTest.scenarioTornAuditAppendRefusesToResume` |
 | Postmortem needs the session's decisions | "Attach the audit log; it must replay byte-identically" (GOVERNANCE §3) | `<state-dir>/risk_audit.jsonl` is written for every session (append + fsync at each checkpoint) and is byte-identical to `RiskEngine.auditJsonl()`; the report carries its path and sha256; two identical sessions produce identical files | spec §16, §26, GOVERNANCE §3 | – / – / – / `PaperStateRecoveryTest.auditLogIsPersistedAndMatchesTheEngine` |
-| Replay an incident from the captured stream | "Why did order 17 fill 0 of 250?" — a week later, on a different machine | Every MVP run keeps its stream (`events.jsonl` + IAP1 twin, `data_version` = sha256 of the IAP1 bytes) and its configuration (`config_version`); `python -m iap.mvp replay --run <dir>` re-runs the loop from the capture, never from the generator, and must reproduce the trace digest, `report.json` and the stream sha256 (exit 1 with a diff otherwise); a reference document that changed since the run is reported as a `config_version` mismatch before anything runs | conventions §13.2–§13.3; docs/MVP.md §6; `RUNBOOK_incident_replay.md` | `test_mvp_golden.py::test_replay_from_captured_stream_reproduces_the_digest`, `test_config_in_force_matches_the_golden`; `tests/replay/test_mvp_replay_determinism.py::test_replay_from_captured_stream_is_byte_identical`; `tests/integration/test_mvp_end_to_end.py::test_cli_run_explain_replay` / — / — / `PaperTraceTest` (two identical runs ⇒ identical `decision_traces.jsonl` and digest) |
+| Replay an incident from the captured stream | "Why did order 17 fill 0 of 250?" — a week later, on a different machine | Every MVP run keeps its stream (`events.jsonl` + IAP1 twin, `data_version` = sha256 of the IAP1 bytes) and its configuration (`config_version`); `python -m iap.mvp replay --run <dir>` re-runs the loop from the capture, never from the generator, and must reproduce the trace digest, `report.json` and the stream sha256 (exit 1 with a diff otherwise); a reference document that changed since the run is reported as a `config_version` mismatch before anything runs | conventions §13.2–§13.3; docs/MVP.md §6; `docs/RUNBOOKS.md` | `test_mvp_golden.py::test_replay_from_captured_stream_reproduces_the_digest`, `test_config_in_force_matches_the_golden`; `tests/replay/test_mvp_replay_determinism.py::test_replay_from_captured_stream_is_byte_identical`; `tests/integration/test_mvp_end_to_end.py::test_cli_run_explain_replay` / — / — / `PaperTraceTest` (two identical runs ⇒ identical `decision_traces.jsonl` and digest) |
 | A trace file and its digest disagree | An archived `decision_traces.jsonl` was truncated in transit, or one field was edited "to fix a typo" | The digest is sha256 over every canonical line + LF in emission order: any changed field or changed order changes it; `TraceDigest.of_jsonl(file)` ≠ the report's `trace.digest` means the file is not the evidence. Java `--resume` refuses a trace file whose line count ≠ `session_state.json` `trace_lines` (both named); a trace that fails validation is never written by any sink | conventions §13.2; docs/DECISION_TRACE.md §4–§5, §7 | `test_trace.py::test_digest_is_sensitive_to_one_field_and_to_order`, `test_digest_of_jsonl_recanonicalises`, `test_sinks_validate_before_persisting` / `TraceGolden.*` / `golden_trace.rs` / `PaperTraceTest` (resume continuity + torn-file refusal), `TraceGoldenTest` |
 | A scraper connects and stalls | A wedged Prometheus, or a slow network on a large exposition | Metrics are lock-free (atomics + concurrent sorted maps); the exposition never takes a monitor the trading thread holds, handlers run on a bounded pool with `maxReqTime`/`maxRspTime`. Four stalled clients do not stop the trading thread; every scrape still has `+Inf == _count` | conventions §12.4, spec §23 | – / – / rs (telemetry unit tests) / `MetricsConcurrencyTest` |
 | An operator asks "is it making progress?" | Runbook step: scrape `/status` mid-session | `events_processed` is written on EVERY event (it used to read 0 for the whole session) and the body carries `kill_switch_engaged`, `last_event_ts`, `mode`, `alpha_id`, `lifecycle`, `config_sha256`, `restarts`, `status` | conventions §12.5 | – / – / – / `ApiEndpointTest.statusReportsProgressDuringTheSession` |
@@ -213,10 +213,10 @@ Test files: java `PlatformConfigTest`, `PaperStateRecoveryTest`,
 
 ## RESEARCH — features / labels / alphas / validation / adaptive / backtest
 
-Contract: `API_FEATURES.md` (§2 ingestion + §2.1 stale recovery + §2.2
+Contract: `docs/API_REFERENCE.md` (§2 ingestion + §2.1 stale recovery + §2.2
 quantity bound, §3 time zones, §4 validity/EPS guards, §6 labels),
-`API_ALPHA.md` (§2 scoring + §2.1 loader validation, §5 FX05 universe),
-`API_ADAPTIVE.md` (§1.1 monitor windows, §4 rolling IC, §6 lifecycle),
+`docs/API_REFERENCE.md` (§2 scoring + §2.1 loader validation, §5 FX05 universe),
+`docs/API_REFERENCE.md` (§1.1 monitor windows, §4 rolling IC, §6 lifecycle),
 `PLATFORM_CONVENTIONS.md` §6/§7, spec §§10-14, §18, §20, §26, §32.
 Golden vectors: `expected_features.json`, **`expected_features_anomalies.json`**
 (new — the native-45 sub-vector plus `events_processed` / `events_dropped` /
@@ -285,7 +285,7 @@ and fuzz corpus that the Rust and Java engines replay.
 
 | Scenario | Real-world example | Pinned behaviour | Contract | Tests (py) |
 |---|---|---|---|---|
-| A feature samples a book that never existed | An ITCH `U` replace arrives as CANCEL + ADD with one timestamp; sampling after the CANCEL sees the order gone and its replacement missing | Events of one instrument sharing an `exchange_ts` are one state change: one refresh and one row, at the group's last event | API_CORE.md §9, API_FEATURES.md §2.3 | `test_group_ends_follow_each_instrument_substream`, `test_coalesced_group_is_one_refresh_one_row_and_no_phantom_book`, `test_apply_without_group_flag_is_the_legacy_engine` |
+| A feature samples a book that never existed | An ITCH `U` replace arrives as CANCEL + ADD with one timestamp; sampling after the CANCEL sees the order gone and its replacement missing | Events of one instrument sharing an `exchange_ts` are one state change: one refresh and one row, at the group's last event | docs/API_REFERENCE.md §9, docs/API_REFERENCE.md §2.3 | `test_group_ends_follow_each_instrument_substream`, `test_coalesced_group_is_one_refresh_one_row_and_no_phantom_book`, `test_apply_without_group_flag_is_the_legacy_engine` |
 | Someone edits the risk audit log after an incident | One line is changed to hide a rejected order | Every line carries `seq` and the previous line's SHA-256; verification names the first broken link; a restore continues the chain | PLATFORM_CONVENTIONS.md §11.1 | `test_audit_chain_links_every_record_and_detects_tampering` |
 | A strategy floods cancels | A runaway quoter cancels and replaces thousands of times a second | Token buckets per strategy (`CANCEL_RATE`) and per venue (`VENUE_MESSAGE_RATE`); a cancel is never refused, the next order is | §11.1, checks 28-29 | `test_cancel_requests_spend_strategy_and_venue_budgets` |
 | One person raises a loss limit at 2 a.m. | An override typed with one approver, or ten times the limit | Needs `min_approvers` distinct approvers and at most `max_loss_override_multiple` times the configured limit; a refused override is audited | §11.1 | `test_loss_override_is_bounded_and_two_party` |

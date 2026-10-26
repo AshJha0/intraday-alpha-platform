@@ -1,4 +1,4 @@
-// Event-driven native feature engine (API_FEATURES.md; conventions section 6).
+// Event-driven native feature engine (docs/API_REFERENCE.md; conventions section 6).
 //
 // Implements the pinned native core set of 40 features plus the 8 extra
 // registry features the production alphas read (ofi_norm_l{1,5}_w{1s,5s,30s},
@@ -7,11 +7,11 @@
 // in tests/golden/expected_features.json must match at abs/rel 1e-9.
 //
 // This port exposes the documented 48-slot sub-vector indexed by registry
-// names (API_FEATURES.md section 1: "golden comparisons are by feature
+// names (docs/API_REFERENCE.md section 1: "golden comparisons are by feature
 // name"); slots not implemented natively are simply absent from the
 // sub-vector. Order below is pinned by the Feature enum.
 //
-// State-update semantics (pinned, section 2 of API_FEATURES.md):
+// State-update semantics (pinned, section 2 of docs/API_REFERENCE.md):
 // - an exchange_ts below the instrument's last seen exchange_ts (cross-venue
 //   clock skew) is dropped + counted before the book sees it;
 // - events are applied to the per-venue books of a ConsolidatedBook; ONLY
@@ -72,7 +72,7 @@ constexpr std::int64_t W_5M = 300 * NS_PER_SEC;
 // Pinned EPS used in every guarded division (spec EPS = 1e-12).
 constexpr double FEATURE_EPS = 1e-12;
 
-// Largest quantity folded into a rolling window (API_FEATURES.md section 2.2):
+// Largest quantity folded into a rolling window (docs/API_REFERENCE.md section 2.2):
 // beyond this a feed is malformed, not a market, and an int64 window sum could
 // no longer be exact in every port.
 constexpr std::int64_t FEATURE_MAX_QTY = std::int64_t{1} << 40;
@@ -137,7 +137,7 @@ const char* feature_name(int slot);
 // slot for a registry name, or -1 when the name is not implemented natively.
 int feature_index(const std::string& name);
 
-// FeatureVector contract (48-slot documented sub-vector; API_FEATURES.md
+// FeatureVector contract (48-slot documented sub-vector; docs/API_REFERENCE.md
 // section 1). values[i] is finite whenever valid[i]; invalid slots carry NaN.
 struct FeatureVector {
     std::uint32_t instrument_id = 0;

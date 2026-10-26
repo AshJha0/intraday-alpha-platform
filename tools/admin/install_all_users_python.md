@@ -53,7 +53,7 @@ icacls C:\iap\repo /inheritance:r /grant:r "Users:(OI)(CI)RX" "SYSTEM:(OI)(CI)F"
 services resolve `python/src` from that checkout (`tools/sealed_service.py` also honours `IAP_REPO` if the script is
 ever run from a copy). Update it with `git -C C:\iap\repo pull` as the owner and restart the three service tasks
 (`Restart-ScheduledTask` does not exist: `Stop-ScheduledTask` then `Start-ScheduledTask` on "IAP sealed service x").
-The runner has its own checkout under `C:\actions-runner\_work` (RUNNER_SETUP.md section 2).
+The runner has its own checkout under `C:\actions-runner\_work` (docs/GOVERNANCE.md section 2).
 
 ## 4. Point the services and the runner at it
 
@@ -64,4 +64,4 @@ The runner has its own checkout under `C:\actions-runner\_work` (RUNNER_SETUP.md
   [Environment]::GetEnvironmentVariable('Path', 'Machine'), 'Machine')` elevated, then restart the runner service),
   or write `PATH=C:\Python312;...` into `C:\actions-runner\.env` (the runner reads that file at service start).
 - Optional Tiingo key for the ingestion job: a line `TIINGO_API_KEY=<key>` in `C:\actions-runner\.env` (readable only
-  by `iap-runner` and administrators, RUNNER_SETUP.md section 2). It is never a GitHub secret and never printed.
+  by `iap-runner` and administrators, docs/GOVERNANCE.md section 2). It is never a GitHub secret and never printed.
