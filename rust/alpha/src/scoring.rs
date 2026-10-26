@@ -1,5 +1,5 @@
 //! `linear_z_v1` scoring and the pinned raw-signal formulas
-//! (docs/API_REFERENCE.md §§2 and 4).
+//! (API_ALPHA.md §§2 and 4).
 //!
 //! ```text
 //! z    = clip((raw - mu) / (sigma + EPS), -z_clip, +z_clip)
@@ -71,7 +71,7 @@ pub fn score_row(
     }
 }
 
-/// Raw signals of the five single-frame golden alphas (docs/API_REFERENCE.md §4).
+/// Raw signals of the five single-frame golden alphas (API_ALPHA.md §4).
 /// Inputs are registry feature values, `None` = invalid; any invalid input
 /// makes the raw signal invalid. FX05's raw signal comes from
 /// [`crate::fx_exposure`] instead.

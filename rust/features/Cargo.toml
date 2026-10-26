@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
-description = "IAP event-driven feature engine: the 40 pinned native features per docs/API_REFERENCE.md"
+description = "IAP event-driven feature engine: the 40 pinned native features per API_FEATURES.md"
 
 [dependencies]
 marketdata = { path = "../marketdata" }

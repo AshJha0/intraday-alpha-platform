@@ -1,4 +1,4 @@
-// ReplayEngine unit tests (docs/API_REFERENCE.md section 5).
+// ReplayEngine unit tests (API_CORE.md section 5).
 
 #include <gtest/gtest.h>
 

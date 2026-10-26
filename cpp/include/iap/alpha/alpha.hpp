@@ -1,4 +1,4 @@
-// Production alpha scoring — the 6 golden flagship alphas (docs/API_REFERENCE.md).
+// Production alpha scoring — the 6 golden flagship alphas (API_ALPHA.md).
 //
 // Model linear_z_v1 (all 6): with params {mu, sigma, beta, z_clip,
 // conf_scale} loaded from configs/strategies/alpha_params.json (ports NEVER
@@ -9,7 +9,7 @@
 //   conf = min(1, |z| / conf_scale)
 //   invalid raw (NaN)  =>  er = 0.0, conf = 0.0 exactly
 //
-// Raw signals (docs/API_REFERENCE.md section 4; inputs are registry features produced
+// Raw signals (API_ALPHA.md section 4; inputs are registry features produced
 // by the native feature engine — a NaN/invalid input makes raw NaN):
 //
 //   EQ01  micro_mid_dev_bps_v1                                  (h = 1s)
@@ -62,7 +62,7 @@ struct LinearZParams {
     std::vector<std::string> features;
 
     // True when the fit found no usable evidence: every row scores (0, 0)
-    // (pinned dead-alpha rule, docs/API_REFERENCE.md section 2).
+    // (pinned dead-alpha rule, API_ALPHA.md section 2).
     bool is_dead() const { return !(sigma > 0.0) || beta == 0.0; }
 };
 
@@ -119,7 +119,7 @@ bool fx_solve_factors(const std::array<double, FX_NUM_PAIRS>& returns,
 // FX05 raw signals for one grid cross-section: raw_i = -(r_i - fitted_i)
 // for pairs with finite r_i, NaN otherwise; all-NaN when < 2 valid pairs.
 // Which observable pairs carry identifiable relative-value information
-// (pinned, docs/API_REFERENCE.md section 5): a pair is identified iff every free
+// (pinned, API_ALPHA.md section 5): a pair is identified iff every free
 // currency it touches appears in at least two observable pairs. A currency
 // seen in a single pair has its factor absorb the whole return, so the
 // residual would be 0 by construction (a constant, not a signal).

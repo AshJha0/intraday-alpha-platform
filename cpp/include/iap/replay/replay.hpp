@@ -1,4 +1,4 @@
-// Deterministic event-time replay driving order books (docs/API_REFERENCE.md section 5).
+// Deterministic event-time replay driving order books (API_CORE.md section 5).
 //
 // Mirrors python/src/iap/replay/replay.py: consumes normalized events in
 // event-time order, validates ids against an optional universe

@@ -1,4 +1,4 @@
-//! Event-driven incremental feature engine (docs/API_REFERENCE.md, pinned).
+//! Event-driven incremental feature engine (API_FEATURES.md, pinned).
 //!
 //! Rust port of the reference `iap/features/engine.py` restricted to the 40
 //! native features (+5 auxiliary alpha inputs, see [`crate::names`]). The
@@ -54,7 +54,7 @@ const NS: i64 = 1_000_000_000;
 const HIST_KEEP_NS: i64 = 660 * NS;
 /// Pinned epsilon for guarded divisions (conventions / API_FEATURES §3).
 pub const EPS: f64 = 1e-12;
-/// Largest quantity folded into a rolling window (docs/API_REFERENCE.md §2.2):
+/// Largest quantity folded into a rolling window (API_FEATURES.md §2.2):
 /// beyond this a feed is malformed, not a market, and an i64 window sum
 /// could no longer be exact in every port.
 pub const FEATURE_MAX_QTY: i64 = 1 << 40;
@@ -266,7 +266,7 @@ impl InstState {
     }
 
     /// Clear every rolling window and history; re-anchor warmup at `t`
-    /// (stale->fresh recovery, docs/API_REFERENCE.md §2.1).
+    /// (stale->fresh recovery, API_FEATURES.md §2.1).
     fn reset_rolling(&mut self, t: i64) {
         self.warm_ts = Some(t);
         self.recoveries += 1;
@@ -440,7 +440,7 @@ impl FeatureEngine {
         let t = ev.exchange_ts;
         if st.first_ts.is_some() && t < st.last_ts {
             // Cross-venue exchange_ts regression: dropped + counted before
-            // the book sees it (pinned, docs/API_REFERENCE.md §2). Never an error.
+            // the book sees it (pinned, API_FEATURES.md §2). Never an error.
             self.ts_regressions_dropped += 1;
             self.events_dropped += 1;
             self.events_processed += 1;
@@ -832,7 +832,7 @@ impl FeatureEngine {
             if warm(w_ns) && warm(W10S) && st.depthavg.count > 0 {
                 let denom = (st.depthavg.sums[bi] + st.depthavg.sums[ai]) as f64
                     / st.depthavg.count as f64;
-                // Exact INTEGER guard (docs/API_REFERENCE.md §4): a float `> 0`
+                // Exact INTEGER guard (API_FEATURES.md §4): a float `> 0`
                 // test would flip between languages on accumulation drift.
                 if st.depthavg.sums[bi] + st.depthavg.sums[ai] > 0 {
                     Some(st.ofi[wi].sums[ki] as f64 / (denom + EPS))
@@ -873,7 +873,7 @@ impl FeatureEngine {
 
     /// Current consolidated mid and half-spread (price units) for an
     /// instrument, when its merged book is two-sided. Used by label
-    /// construction (docs/API_REFERENCE.md §6: one mid sample per `book_ok`
+    /// construction (API_FEATURES.md §6: one mid sample per `book_ok`
     /// refresh).
     pub fn mid_state(&self, instrument_id: u32) -> Option<(f64, f64)> {
         let st = self.states.get(&instrument_id)?;
@@ -885,14 +885,14 @@ impl FeatureEngine {
     }
 
     /// Monotone count of merged-view refreshes for an instrument: the label
-    /// layer samples the mid series once per refresh (docs/API_REFERENCE.md §6).
+    /// layer samples the mid series once per refresh (API_FEATURES.md §6).
     pub fn refresh_seq(&self, instrument_id: u32) -> u64 {
         self.states
             .get(&instrument_id)
             .map_or(0, |st| st.refresh_seq)
     }
 
-    /// True when this refresh is a TRADABLE market state (docs/API_REFERENCE.md
+    /// True when this refresh is a TRADABLE market state (API_FEATURES.md
     /// §6): two-sided merged book, no stale venue.  (Session status is not
     /// tracked by this port; a caller that observes STATUS events must add
     /// the HALT / AUCTION condition itself.)

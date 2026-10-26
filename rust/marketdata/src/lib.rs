@@ -1,6 +1,6 @@
 //! IAP market-data core: canonical events, pinned RNG, IAP1 + JSONL codecs.
 //!
-//! Rust port of `python/src/iap/core` per `docs/API_REFERENCE.md` and
+//! Rust port of `python/src/iap/core` per `API_CORE.md` and
 //! `schemas/FORMAT.md` (normative). All contracts are integer-exact; the
 //! encoders are byte-exact across languages (verified by SHA-256 goldens).
 

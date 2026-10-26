@@ -1,5 +1,5 @@
 //! IAP replay crate: deterministic event-time replay driving order books,
-//! with snapshot emission and checkpoint/restart (docs/API_REFERENCE.md §5).
+//! with snapshot emission and checkpoint/restart (API_CORE.md §5).
 
 pub mod engine;
 

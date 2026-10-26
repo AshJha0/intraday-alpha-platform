@@ -2,16 +2,16 @@
 //!
 //! The first [`NATIVE_COUNT`] entries are the 40 pinned native features of
 //! `/API_FEATURES.md` §3; the remaining entries are auxiliary features the
-//! engine also computes natively because the production alphas (docs/API_REFERENCE.md
+//! engine also computes natively because the production alphas (API_ALPHA.md
 //! §4) consume them — their formulas are pinned by the Python reference
 //! (`ofi_norm` in `iap/features/orderflow.py`, `ret_vol_adj` in `price.py`,
 //! `vol_regime_ratio` in `regime.py`).
 //!
-//! Golden comparisons are by feature *name* (docs/API_REFERENCE.md §1): this crate
+//! Golden comparisons are by feature *name* (API_FEATURES.md §1): this crate
 //! exposes a documented sub-vector of the 205-feature registry, indexed by
 //! the registry names below.
 
-/// Number of pinned native features (docs/API_REFERENCE.md §3).
+/// Number of pinned native features (API_FEATURES.md §3).
 pub const NATIVE_COUNT: usize = 40;
 
 /// Total features this engine computes (native 40 + 5 auxiliary).

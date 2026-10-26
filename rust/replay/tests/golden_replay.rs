@@ -1,5 +1,5 @@
 //! Golden replay tests: determinism and checkpoint-restart equivalence over
-//! the golden vectors (docs/API_REFERENCE.md §5-§6).
+//! the golden vectors (API_CORE.md §5-§6).
 
 use std::path::PathBuf;
 

@@ -1,4 +1,4 @@
-// JSONL + IAP1 codec unit tests (schemas/FORMAT.md; docs/API_REFERENCE.md section 3).
+// JSONL + IAP1 codec unit tests (schemas/FORMAT.md; API_CORE.md section 3).
 
 #include <gtest/gtest.h>
 

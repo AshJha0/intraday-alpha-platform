@@ -1,4 +1,4 @@
-// Feature-engine golden parity (docs/API_REFERENCE.md section 5) + engine
+// Feature-engine golden parity (API_FEATURES.md section 5) + engine
 // behavior: cadence, warmup, validity rules.
 //
 // Golden comparisons are BY FEATURE NAME: every checkpoint feature that this
@@ -96,7 +96,7 @@ void check_checkpoint(const std::string& market, const std::string& cp_key,
 }
 
 TEST(FeatureGolden, NativeNamesResolveAndCount) {
-    // All 40 pinned native names (docs/API_REFERENCE.md section 3) must resolve.
+    // All 40 pinned native names (API_FEATURES.md section 3) must resolve.
     std::vector<std::string> native;
     for (int k : {1, 3, 5, 10}) {
         for (const char* w : {"1s", "5s", "30s"}) {
@@ -271,7 +271,7 @@ TEST(FeatureEngineBehavior, UnknownInstrumentThrows) {
 }  // namespace
 
 // ---------------------------------------------------------------------------
-// Anomaly-vector golden (docs/API_REFERENCE.md section 2 ingestion rules)
+// Anomaly-vector golden (API_FEATURES.md section 2 ingestion rules)
 // ---------------------------------------------------------------------------
 
 namespace {

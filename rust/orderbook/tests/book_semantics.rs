@@ -1,5 +1,5 @@
 //! Unit tests over the pinned book semantics and QC counters
-//! (PLATFORM_CONVENTIONS.md §4 / docs/API_REFERENCE.md §4).
+//! (PLATFORM_CONVENTIONS.md §4 / API_CORE.md §4).
 
 use marketdata::{EventType, MarketEvent, SessionStatus, Side};
 use orderbook::{ConsolidatedBook, OrderBook};

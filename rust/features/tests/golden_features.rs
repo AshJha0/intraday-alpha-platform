@@ -1,4 +1,4 @@
-//! Golden suite for the native feature engine (docs/API_REFERENCE.md §5).
+//! Golden suite for the native feature engine (API_FEATURES.md §5).
 //!
 //! Drives the pinned golden vectors through the engine at cadence 0
 //! (same-timestamp events coalesced, v1.14 D-P1-1: `group_ends` +
@@ -142,7 +142,7 @@ fn fx_golden_checkpoints_match() {
 #[test]
 fn registry_contract_agrees() {
     // A port loading the registry must agree on hash and count
-    // (docs/API_REFERENCE.md §5): sha256 of the canonical JSON (sorted keys,
+    // (API_FEATURES.md §5): sha256 of the canonical JSON (sorted keys,
     // compact separators) of the registry entries.
     let golden = load_json("expected_features.json");
     let reg_text = std::fs::read_to_string(
@@ -238,7 +238,7 @@ fn cadence_limits_emissions() {
 }
 
 // ---------------------------------------------------------------------------
-// Anomaly-vector golden (docs/API_REFERENCE.md §2 ingestion rules)
+// Anomaly-vector golden (API_FEATURES.md §2 ingestion rules)
 // ---------------------------------------------------------------------------
 
 /// Replay one anomaly vector and check every pinned checkpoint: emission
@@ -347,7 +347,7 @@ fn anomaly_golden_fx_matches() {
 
 /// Rows INSIDE and right after every SNAPSHOT recovery burst
 /// (`expected_features_snapshot_burst.json`, Python reference): interior
-/// records keep the pre-burst derived state (docs/API_REFERENCE.md §2). The
+/// records keep the pre-burst derived state (API_FEATURES.md §2). The
 /// anomaly checkpoints above never land in a burst (v1.11.0 fix).
 fn check_snapshot_burst_side(side: &str, tick: f64) {
     let golden = load_json("expected_features_snapshot_burst.json");

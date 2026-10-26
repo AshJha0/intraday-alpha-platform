@@ -6,7 +6,7 @@
 //! at-or-before `x` — ONE sample per book REFRESH, each carrying a
 //! `tradable` flag (two-sided merged book, no stale venue, no HALT/AUCTION).
 //!
-//! A label is valid only when (docs/API_REFERENCE.md §6, pinned):
+//! A label is valid only when (API_FEATURES.md §6, pinned):
 //! 1. the stream was observed through `t + h`;
 //! 2. the anchor sample exists, is tradable and has a positive mid;
 //! 3. the forward sample exists, is tradable and is FRESH

@@ -1,4 +1,4 @@
-// Markout primitives (docs/API_REFERENCE.md section 2.9; v1.17 F7 part 1 C++
+// Markout primitives (API_PORTFOLIO_TCA.md section 2.9; v1.17 F7 part 1 C++
 // port of the parts of iap.tca.fills (MarketTimeline) and iap.tca.markout
 // (reference_mid, markout_mid, fill_measures) that the B4 counterfactual
 // (fading.hpp) and the B6 markout decomposition (markout_decomposition.hpp)

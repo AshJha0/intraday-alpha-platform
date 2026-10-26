@@ -1,5 +1,5 @@
 // Order book unit tests: every pinned semantic and error path
-// (PLATFORM_CONVENTIONS.md section 4; docs/API_REFERENCE.md section 4).
+// (PLATFORM_CONVENTIONS.md section 4; API_CORE.md section 4).
 
 #include <algorithm>
 #include <gtest/gtest.h>

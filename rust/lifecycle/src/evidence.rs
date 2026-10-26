@@ -192,7 +192,7 @@ pub struct PaperEvidence {
     pub tracking_error: f64,
 }
 
-/// One live rolling-IC evaluation (docs/API_REFERENCE.md §4/§6).
+/// One live rolling-IC evaluation (API_ADAPTIVE.md §4/§6).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LiveEvidence {

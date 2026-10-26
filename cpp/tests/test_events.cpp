@@ -1,4 +1,4 @@
-// MarketEvent layout + validation rules (docs/API_REFERENCE.md section 1).
+// MarketEvent layout + validation rules (API_CORE.md section 1).
 
 #include <gtest/gtest.h>
 

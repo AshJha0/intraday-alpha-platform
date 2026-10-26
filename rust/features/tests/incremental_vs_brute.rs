@@ -139,7 +139,7 @@ impl BruteState {
         if self.book_ok {
             self.mid2 = self.bid[0].0 + self.ask[0].0;
             // Pinned sampling: compare against the last RECORDED mid sample
-            // (docs/API_REFERENCE.md §2), so a one-sided flicker that moves the
+            // (API_FEATURES.md §2), so a one-sided flicker that moves the
             // mid still contributes a vol sample.
             let last = self.mid_log.last().map(|&(_, m)| m);
             if last != Some(self.mid2) {

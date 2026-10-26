@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
-description = "IAP production alpha scoring: the 6 golden alphas per docs/API_REFERENCE.md (linear_z_v1 + FX05 currency-exposure machinery)"
+description = "IAP production alpha scoring: the 6 golden alphas per API_ALPHA.md (linear_z_v1 + FX05 currency-exposure machinery)"
 
 [dependencies]
 marketdata = { path = "../marketdata" }

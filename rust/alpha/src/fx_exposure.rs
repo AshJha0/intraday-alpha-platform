@@ -1,4 +1,4 @@
-//! FX05 currency-exposure machinery (docs/API_REFERENCE.md §5, pinned).
+//! FX05 currency-exposure machinery (API_ALPHA.md §5, pinned).
 //!
 //! Currencies (sorted): AUD, CAD, CHF, EUR, GBP, JPY, NZD, USD; numeraire
 //! USD. Long 1 unit of BASE/QUOTE = +1 BASE, -1 QUOTE. The factor solve
@@ -213,7 +213,7 @@ pub fn solve_factor_returns(
 }
 
 /// Which observable pairs carry IDENTIFIABLE relative-value information
-/// (pinned, docs/API_REFERENCE.md §5): a pair is identified iff every FREE currency
+/// (pinned, API_ALPHA.md §5): a pair is identified iff every FREE currency
 /// it touches appears in at least two observable pairs.  A currency seen in
 /// a single observable pair has its factor absorb that pair's whole return,
 /// so the residual is 0 by construction — a constant, not a signal.
@@ -246,7 +246,7 @@ pub fn identified_pairs(pair_ids: &[u32], observable: &[bool]) -> Result<Vec<boo
 /// FX05 raw signals for one grid cross-section: `-(r_i - fitted_i)` per
 /// IDENTIFIED pair, NaN where the pair's own return is NaN, fewer than 2
 /// pairs are valid, or the pair carries no identifiable relative value
-/// (docs/API_REFERENCE.md §5).
+/// (API_ALPHA.md §5).
 pub fn fx05_raw_signals(pair_ids: &[u32], returns: &[f64]) -> Result<Vec<f64>, IapError> {
     let observable: Vec<bool> = returns.iter().map(|v| v.is_finite()).collect();
     let n_valid = observable.iter().filter(|&&v| v).count();

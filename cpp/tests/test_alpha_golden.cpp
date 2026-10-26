@@ -1,4 +1,4 @@
-// Alpha golden parity (docs/API_REFERENCE.md sections 2-7) + scoring invariants.
+// Alpha golden parity (API_ALPHA.md sections 2-7) + scoring invariants.
 //
 // Two layers per alpha, both against tests/golden/expected_alpha.json:
 //  - embedded-input scoring: the golden cases carry every input feature
@@ -8,7 +8,7 @@
 //    pinned rows must reproduce expected_return/confidence at 1e-9.
 // FX05 scores its embedded 8-pair grid cross-sections through the pinned
 // currency-factor pseudo-inverse solve (golden deviation documented in
-// docs/API_REFERENCE.md section 6: the golden vectors carry one FX pair only).
+// API_ALPHA.md section 6: the golden vectors carry one FX pair only).
 
 #include <gtest/gtest.h>
 
@@ -107,7 +107,7 @@ TEST(AlphaGolden, ParamsLoadPinned) {
         EXPECT_TRUE(std::isfinite(lp.beta));
         EXPECT_FALSE(lp.features.empty());
     }
-    // Pinned horizons (docs/API_REFERENCE.md section 4).
+    // Pinned horizons (API_ALPHA.md section 4).
     EXPECT_EQ(p.at("EQ01").horizon, "1s");
     EXPECT_EQ(p.at("EQ03").horizon, "5s");
     EXPECT_EQ(p.at("EQ06").horizon, "10s");
