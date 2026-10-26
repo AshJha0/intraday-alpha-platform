@@ -8,6 +8,8 @@
 attrs==26.1.0
 cffi==2.1.1
 cloudpickle==3.1.2
+# colorama: pytest needs it on Windows (D-83).
+colorama==0.4.6
 coverage==7.16.2
 cryptography==50.0.2
 databento-dbn==0.72.0
@@ -38,3 +40,6 @@ six==1.17.0
 sortedcontainers==2.4.0
 threadpoolctl==3.7.0
 typing-extensions==4.16.0
+# pandas needs tzdata on Windows (no system tz database); pinned so the
+# hashed lock installs on a Windows interpreter too (D-83).
+tzdata==2026.5
