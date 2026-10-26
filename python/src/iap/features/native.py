@@ -1,7 +1,7 @@
 """Native feature backends: the Python reference or the Rust engine (v1.11 E2).
 
 The Rust crate ``rust/features`` computes a documented 45-slot sub-vector of
-the 205-feature registry -- the 40 pinned native features of API_FEATURES.md
+the 205-feature registry -- the 40 pinned native features of docs/API_REFERENCE.md
 §3 plus 5 auxiliary alpha inputs -- and is golden-parity-tested against the
 same vectors as the Python reference.  ``rust/features_py`` exposes it to
 Python through pyo3 as the optional extension module ``iap_features_rs``

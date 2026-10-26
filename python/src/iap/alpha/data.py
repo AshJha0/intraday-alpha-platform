@@ -35,10 +35,6 @@ LABEL_PREFIXES = (
 )
 
 
-def label_columns(df: pd.DataFrame) -> list[str]:
-    return [c for c in df.columns if c.startswith(LABEL_PREFIXES)]
-
-
 #: feature columns the backtester / validator read besides the alphas' own
 MARKET_FEATURE_COLUMNS = frozenset(
     {

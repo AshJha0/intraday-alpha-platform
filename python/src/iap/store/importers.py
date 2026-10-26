@@ -83,7 +83,7 @@ __all__ = [
 PathLike = str | Path
 
 #: The platform's pinned sentinel for "no git commit recorded"
-#: (docs/governance/REPRODUCIBILITY.md).
+#: (docs/GOVERNANCE.md).
 UNVERSIONED = "unversioned-workspace"
 
 #: ``dataset_version`` of a ledger entry that carries no dataset at all.

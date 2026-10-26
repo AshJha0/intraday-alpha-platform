@@ -72,7 +72,7 @@ spec:
 # CronJob (cronjob-state-backup.yaml, v1.12.0 P4). Prefer a DIFFERENT storage
 # class / failure domain from iap-platform-state where the cluster offers one, and
 # ship archives off-cluster for disaster recovery
-# (docs/runbooks/RUNBOOK_alerting.md §4).
+# (docs/RUNBOOKS.md §4).
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

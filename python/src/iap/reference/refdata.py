@@ -5,7 +5,7 @@ venues/venues.json).
 Prices on contracts are integer ticks; this service owns the tick_size /
 lot_size mapping used to convert to/from real prices.
 
-Validation is fail-fast (pinned, API_CORE.md section 7): every instrument
+Validation is fail-fast (pinned, docs/API_REFERENCE.md section 7): every instrument
 must carry a positive finite ``tick_size``, an integer ``lot_size >= 1``, a
 positive ``ref_price``, a non-negative ``adv`` and at least one venue that
 exists in ``venues.json`` with the same asset class; venue ids must be in
@@ -301,9 +301,6 @@ class ReferenceData:
             raise ValueError(f"unknown instrument: {key!r}")
         return inst
 
-    def has_instrument(self, instrument_id: int) -> bool:
-        return instrument_id in self._by_id
-
     def instruments(self, asset_class: str | None = None) -> list[Instrument]:
         """All instruments (sorted by id), optionally filtered by asset class."""
         out = [self._by_id[k] for k in sorted(self._by_id)]
@@ -327,9 +324,6 @@ class ReferenceData:
         if ven is None:
             raise ValueError(f"unknown venue: {key!r}")
         return ven
-
-    def has_venue(self, venue_id: int) -> bool:
-        return venue_id in self._venue_by_id
 
     def venues(self, asset_class: str | None = None) -> list[Venue]:
         out = [self._venue_by_id[k] for k in sorted(self._venue_by_id)]

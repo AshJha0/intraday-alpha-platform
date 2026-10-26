@@ -75,7 +75,7 @@ body:
     id: gates
     attributes:
       label: Gates this experiment addresses
-      description: The pinned promotion gates (python/src/iap/validation/validate.py GATES; docs/governance/GOVERNANCE.md §2).
+      description: The pinned promotion gates (python/src/iap/validation/validate.py GATES; docs/GOVERNANCE.md §2).
       options:
         - label: leakage passed (label-column guard, shift-by-one destroys IC)
         - label: uncrossed OOS IC >= 0.010

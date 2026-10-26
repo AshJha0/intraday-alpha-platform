@@ -4,8 +4,8 @@ One page for a contributor or reviewer who needs to know where things are and wh
 what. The v1.x engine architecture (order book, feature factory, execution simulator, risk engine,
 replay, the C++ and Rust ports and their goldens) is unchanged and documented in
 [ARCHITECTURE.md](ARCHITECTURE.md) and [DIAGRAMS.md](DIAGRAMS.md); this page covers what v2.0
-added on top of it and how the pieces are kept apart. Method and vocabulary: [LEARN.md](LEARN.md).
-Runnable commands: [COOKBOOK.md](COOKBOOK.md).
+added on top of it and how the pieces are kept apart. Method and vocabulary: [LEARN.md](../docs/LEARN.md).
+Runnable commands: [COOKBOOK.md](../docs/COOKBOOK.md).
 
 ## 1. Package map
 
@@ -69,16 +69,16 @@ Contracts marked `allow_indirect_imports` bind direct imports only; the transiti
 
 | what | where | who may read | authority |
 |---|---|---|---|
-| the development identity (`iap-dev` by role: the owner's normal user, every agent session, every research script) | the repository checkout, `data/` (in-sample and development partitions) | itself | [governance/SEALED_DATA.md](governance/SEALED_DATA.md) section 1 |
-| development and validation partitions of the daily route | `C:\iap\daily\dd1_<Y>\` on the workstation (written by the ingestion job as `iap-runner`, readable by the development identity) | `iap-dev`, `iap-runner` | [governance/DD1_INGESTION_RUNBOOK.md](governance/DD1_INGESTION_RUNBOOK.md) |
-| Track A sealed window (H1) | `C:\iap-sealed\a` | `iap-sealed-a`, and `iap-runner` through the service only | SEALED_DATA.md |
-| Track B test year | `C:\iap-sealed\b` | `iap-sealed-b`, and `iap-runner` through the service only | SEALED_DATA.md |
-| Track C confirmation slice and forward window | `C:\iap-sealed\c` | `iap-sealed-c`, and `iap-runner` through the service only | SEALED_DATA.md |
-| the runner's private cache | `C:\iap-sealed\runner` | `iap-runner` | [governance/RUNNER_THREAT_MODEL.md](governance/RUNNER_THREAT_MODEL.md) property 1 |
-| the sealed service (one process per partition, a Windows named pipe, OS-authenticated) | `tools/sealed_service.py`, installed by `tools/admin/install_sealed_services.ps1` | answers `iap-runner` only | SEALED_DATA.md section 2 |
-| the audit anchor | `research/audit/CHECKPOINTS.jsonl` on the `results` branch | anyone (`sealed_service.py verify-checkpoints`) | SEALED_DATA.md section 3 |
+| the development identity (`iap-dev` by role: the owner's normal user, every agent session, every research script) | the repository checkout, `data/` (in-sample and development partitions) | itself | [governance/SEALED_DATA.md](GOVERNANCE.md) section 1 |
+| development and validation partitions of the daily route | `C:\iap\daily\dd1_<Y>\` on the workstation (written by the ingestion job as `iap-runner`, readable by the development identity) | `iap-dev`, `iap-runner` | [governance/DD1_INGESTION_RUNBOOK.md](GOVERNANCE.md) |
+| Track A sealed window (H1) | `C:\iap-sealed\a` | `iap-sealed-a`, and `iap-runner` through the service only | docs/GOVERNANCE.md |
+| Track B test year | `C:\iap-sealed\b` | `iap-sealed-b`, and `iap-runner` through the service only | docs/GOVERNANCE.md |
+| Track C confirmation slice and forward window | `C:\iap-sealed\c` | `iap-sealed-c`, and `iap-runner` through the service only | docs/GOVERNANCE.md |
+| the runner's private cache | `C:\iap-sealed\runner` | `iap-runner` | [governance/RUNNER_THREAT_MODEL.md](GOVERNANCE.md) property 1 |
+| the sealed service (one process per partition, a Windows named pipe, OS-authenticated) | `tools/sealed_service.py`, installed by `tools/admin/install_sealed_services.ps1` | answers `iap-runner` only | docs/GOVERNANCE.md section 2 |
+| the audit anchor | `research/audit/CHECKPOINTS.jsonl` on the `results` branch | anyone (`sealed_service.py verify-checkpoints`) | docs/GOVERNANCE.md section 3 |
 | what a record may cite | `research/data_manifest.json` (every dataset with its integrity verdict; DD1 partitions by hash id) | anyone (`tools/data_manifest.py check` in CI) | `tools/data_manifest.py` |
-| the in-process access decision for every read | `iap.core.guard.check(path, purpose)` and the registered hook (`iap.research.holdout_registry`) | n/a | [governance/DATA_ACCESS_PATHS.md](governance/DATA_ACCESS_PATHS.md) |
+| the in-process access decision for every read | `iap.core.guard.check(path, purpose)` and the registered hook (`iap.research.holdout_registry`) | n/a | [governance/DATA_ACCESS_PATHS.md](GOVERNANCE.md) |
 
 The partition calendar (development to the end of year `Y-4`, validation `Y-3`, Track B `Y-2`,
 Track C `Y-1` onward, `Y` the ingestion year) is cut by the ingestion job before any fit; the
@@ -89,7 +89,7 @@ isolated* (LEARN.md section 6).
 
 ## 4. The registered-run flow
 
-The procedure of [governance/RUNNER_THREAT_MODEL.md](governance/RUNNER_THREAT_MODEL.md), as the
+The procedure of [governance/RUNNER_THREAT_MODEL.md](GOVERNANCE.md), as the
 code executes it ([`tools/runner/run.py`](../tools/runner/run.py),
 [`.github/workflows/registered-run.yml`](../.github/workflows/registered-run.yml)); each step
 refuses before the next:
@@ -134,4 +134,4 @@ partitions through the service's `ingest` endpoint and never reads one.
 | a confirmation verdict for H1 | `iap.validation.confirmatory.decide` | PROMOTE or `refused: <reason>`; the class of the surrounding run is the runner's |
 | a confirmation verdict for any other registration | `iap.validation.profiles.decide` (U13) | the same |
 | `results/<prereg>/<seq>/hashes.json` | the registered runner | mechanically isolated (until custody separate from the developer exists) |
-| the release notes and `docs/REVIEW_PACK.md` section 0 | the maintainer | one class per result, in the words of U0 section 10 |
+| the release notes and `archive/docs/REVIEW_PACK.md` section 0 | the maintainer | one class per result, in the words of U0 section 10 |

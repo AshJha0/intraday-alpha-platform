@@ -13,7 +13,7 @@ piece is still in another pull request it says so. The programme's evidence voca
 As of 2026-10-26 no result on `main` is above *development-supported*: no registered run has been
 executed by CR1, no independent party has reproduced anything, and the DD1 2026 ingestion failed its
 data tests (DR-19; research on it is *exploratory, data-ineligible*)
-([REVIEW_PACK.md](REVIEW_PACK.md) section 0, [SHOWCASE.md](SHOWCASE.md)).
+([REVIEW_PACK.md](../archive/docs/REVIEW_PACK.md) section 0, [SHOWCASE.md](SHOWCASE.md)).
 
 ## 1. The environment
 
@@ -31,7 +31,7 @@ data tests (DR-19; research on it is *exploratory, data-ineligible*)
 ## 2. What runs by itself
 
 **On every pull request and push to `main`** (`.github/workflows/ci.yml`): 17 required contexts
-(the matrix with the risk each covers: [governance/REPO_SETTINGS.md](governance/REPO_SETTINGS.md)
+(the matrix with the risk each covers: [governance/REPO_SETTINGS.md](GOVERNANCE.md)
 section 1). The `lint-and-secrets` job (gitleaks, ruff, import-linter) is blocking; `advisory` is a
 transitional alias for the ruleset's context name. `images` runs on `main` and on PRs that change
 image inputs; `coverage` reports the whole-suite floor.
@@ -80,7 +80,7 @@ its data tests it refuses unless `--exploratory` is given, which labels every ou
 `python/tests/architecture/test_research_loop_memory.py` fails when the loop's peak RSS on the
 synthetic fixture exceeds its declared budget; raise the budget only with the measurement in the
 CHANGELOG. Every real-data read goes through `iap.io` and the guard hook of `iap.core.guard`
-([governance/DATA_ACCESS_PATHS.md](governance/DATA_ACCESS_PATHS.md)); a reader anywhere else fails
+([governance/DATA_ACCESS_PATHS.md](GOVERNANCE.md)); a reader anywhere else fails
 the AST test `test_guard_hook.py`.
 
 ## 5. A registered run (CR1)
@@ -93,7 +93,7 @@ Preconditions, all verifiable without reading sealed data:
 3. The dataset id is in `research/data_manifest.json` (`python tools/data_manifest.py check`).
 4. The three sealed services are up as their identities (section 6) and the runner answers
    `python tools/runner/run.py whoami` with `iap-runner`.
-5. The repository settings of REPO_SETTINGS.md section 7 are set. As of 2026-10-26 the `sealed`
+5. The repository settings of docs/GOVERNANCE.md section 7 are set. As of 2026-10-26 the `sealed`
    environment exists (the owner approves every run of `registered-run`, including DD1 runs); no
    registered analysis has run yet, so the `results` branch does not exist.
 
@@ -105,11 +105,11 @@ on the `results` branch (`results/<slug>/<seq>/{result.json,hashes.json}`) and v
 `python tools/sealed_service.py verify-checkpoints research/audit/CHECKPOINTS.jsonl`. Its class is
 *mechanically isolated* while the developer holds custody of the machine (property 6 of the threat
 model); nothing in the tooling makes it *independently confirmed*. A refused run is recorded, never
-retried without a new registration ([governance/RUNNER_THREAT_MODEL.md](governance/RUNNER_THREAT_MODEL.md)).
+retried without a new registration ([governance/RUNNER_THREAT_MODEL.md](GOVERNANCE.md)).
 
 ## 6. The sealed services (Windows workstation, owner)
 
-Install once per partition as [governance/SEALED_DATA.md](governance/SEALED_DATA.md) section 5. Day to day:
+Install once per partition as [governance/SEALED_DATA.md](GOVERNANCE.md) section 5. Day to day:
 
 ```bash
 python tools/sealed_service.py serve --partition b --root C:\iap-sealed\b        # as iap-sealed-b, one per partition
@@ -143,14 +143,14 @@ python tools/repo_settings_snapshot.py check                                    
 ```
 
 A signature proves the document did not change after signing, and nothing else
-([governance/TRUST_ROOTS.md](governance/TRUST_ROOTS.md), "What a signature proves"). Re-signing
-after a registry change and key rotation: TRUST_ROOTS.md. The private key never enters the
+([governance/TRUST_ROOTS.md](GOVERNANCE.md), "What a signature proves"). Re-signing
+after a registry change and key rotation: docs/GOVERNANCE.md. The private key never enters the
 repository, a log or a chat.
 
 ## 9. Owner-only actions (none applied by any file)
 
-Repository settings: REPO_SETTINGS.md sections 1 (the required-check matrix and the `advisory` to
+Repository settings: docs/GOVERNANCE.md sections 1 (the required-check matrix and the `advisory` to
 `lint-and-secrets` swap), 3, 4 and 7 (sealed environment, results ruleset, runner policy). Accounts,
-passwords and the runner registration: RUNNER_SETUP.md section 7. Approving each registered run.
+passwords and the runner registration: docs/GOVERNANCE.md section 7. Approving each registered run.
 Naming the independent party for P2 (REPRODUCTION.md section 6). Purchases, signatures and sealed
 reads are the owner's alone.

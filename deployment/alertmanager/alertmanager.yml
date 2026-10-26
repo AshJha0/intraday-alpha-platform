@@ -11,7 +11,7 @@
 # mounted file —
 #   Kubernetes:     Secret `iap-alertmanager-webhook`, keys `page_url` and
 #                   `ticket_url` (created out of band by the operator; see
-#                   docs/runbooks/RUNBOOK_alerting.md §2)
+#                   docs/RUNBOOKS.md §2)
 #   docker-compose: secrets `alert_page_url` / `alert_ticket_url`, from the
 #                   files named by ALERT_PAGE_URL_FILE / ALERT_TICKET_URL_FILE.
 #                   Unset, both default to deployment/alertmanager/local-sink.url,

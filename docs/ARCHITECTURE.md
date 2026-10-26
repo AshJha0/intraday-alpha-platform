@@ -4,7 +4,7 @@ This document describes the system as it exists in this repository: which
 responsibilities live in which language tree, how data flows, what the
 contracts and versioning rules are, how determinism and cross-language parity
 are enforced, and how the thing is observed and deployed. The governing
-design is [SPECIFICATION.md](SPECIFICATION.md); the binding low-level
+design is [SPECIFICATION.md](../archive/docs/SPECIFICATION.md); the binding low-level
 decisions are [../PLATFORM_CONVENTIONS.md](../PLATFORM_CONVENTIONS.md).
 Diagram sources live in [diagrams/](diagrams/) (identical to the embedded
 versions below). For a shorter, top-down explanation of how the quant, algo
@@ -24,7 +24,7 @@ trade (`iap.paper`). The v1.17 topical pages are
 [EXECUTION_QUALITY.md](EXECUTION_QUALITY.md) (the shortfall benchmark,
 signal-aware urgency and pacing, the realism layer),
 [PORTFOLIO_BREADTH.md](PORTFOLIO_BREADTH.md) (the breadth universe and the
-cross-sectional book), [SIGNAL_RESEARCH.md](SIGNAL_RESEARCH.md) (the statistics
+cross-sectional book), [SIGNAL_RESEARCH.md](../archive/docs/SIGNAL_RESEARCH.md) (the statistics
 revision and the new models and gates) and [DATA_SOURCES.md](DATA_SOURCES.md)
 (free Nasdaq and IEX data, process-and-delete). Section 22 was added with
 v1.18.0 (2026-10-23): the measurement instrument and the paper-path safety
@@ -34,9 +34,9 @@ REL-05 replay harness, monitoring, portfolio limits, the order manager).
 v1.18 promotes no signal and claims no edge; the fill model is validated at
 Level 1 (deterministic replay) only. Its topical pages are
 [MONITORING_POLICY.md](MONITORING_POLICY.md), [FACTOR_RISK.md](FACTOR_RISK.md),
-[PORTFOLIO_LIMITS.md](PORTFOLIO_LIMITS.md), [SIM_TO_REAL.md](SIM_TO_REAL.md)
-and [governance/ANALYSIS_IDENTITY.md](governance/ANALYSIS_IDENTITY.md); the
-release record is [release/v1.18.0_RELEASE_NOTES.md](release/v1.18.0_RELEASE_NOTES.md).
+[PORTFOLIO_LIMITS.md](../archive/docs/PORTFOLIO_LIMITS.md), [SIM_TO_REAL.md](SIM_TO_REAL.md)
+and [governance/ANALYSIS_IDENTITY.md](GOVERNANCE.md); the
+release record is [release/v1.18.0_RELEASE_NOTES.md](../archive/docs/release/v1.18.0_RELEASE_NOTES.md).
 
 ## 1. Design principles (spec §1, condensed)
 
@@ -49,7 +49,7 @@ release record is [release/v1.18.0_RELEASE_NOTES.md](release/v1.18.0_RELEASE_NOT
    review. Two components qualify this honestly: the hard-risk rule text is
    owned by Rust and the execution rule text by C++, and Python holds a
    reference-equivalent port of each proven by the same goldens
-   (`API_TRADING.md`) — so the loop the MVP runs is the reference loop.
+   (`docs/API_REFERENCE.md`) — so the loop the MVP runs is the reference loop.
 3. **Determinism everywhere it matters.** Same seed + config + inputs ⇒
    bit-identical outputs across runs (and, for integer paths, across
    languages). No wall clock, no unordered iteration, one pinned RNG.
@@ -104,7 +104,7 @@ called out in §10):
 - **Rust owns the hard risk engine** — the safety-critical component — and
   the golden risk decision vector is generated from it (every rule
   unit-tested first). Java ports it for platform orchestration; Python
-  ports it as `iap.risk` (`API_TRADING.md` §1: exact decisions,
+  ports it as `iap.risk` (`docs/API_REFERENCE.md` §1: exact decisions,
   byte-identical audit JSONL and snapshot, restore continuation — the same
   files the Java port is proven by); C++ does not implement risk.
 - **C++ owns execution** — the fill-model reference
@@ -112,7 +112,7 @@ called out in §10):
   queue-position and latency rules) — plus the fastest codec/book/feature/
   alpha hot path, the benchmark suite, and the canonical-JSON / decision-trace
   contract for that hot path. Java and Python (`iap.execution`,
-  `API_TRADING.md` §2: `expected_replay_fills.json` bit-identical) port it.
+  `docs/API_REFERENCE.md` §2: `expected_replay_fills.json` bit-identical) port it.
 - **Python owns the contract layer and the loop.** `iap.contracts` types
   every hop, `iap.trace` records it, `iap.lifecycle` decides promotion,
   `iap.store` indexes it, `iap.research` produces the ledgered evidence, and
@@ -188,7 +188,7 @@ decision cycle is one `DecisionTrace` (`docs/DECISION_TRACE.md`) whose fills
 and TCA feed the paper evidence the lifecycle's PAPER gates read
 (`paper_evidence.json`), whose attribution separates model-explained P&L
 from the residual, and whose stream digest is what an incident replay must
-reproduce (`docs/runbooks/RUNBOOK_incident_replay.md`).
+reproduce (`docs/RUNBOOKS.md`).
 
 ## 4. Contracts and schema versioning
 
@@ -207,7 +207,7 @@ in `iap.contracts.protocols` (18: `MarketDataSource`, `OrderBookLike`,
 `ExecutionAlgorithm`, `SmartOrderRouterLike`, `ExecutionSimulatorLike`,
 `TCAEngine`, `ExperimentRunner`, `LifecycleGate`, `AlphaLifecycle`,
 `TraceSink`, …), and `iap.contracts.validate` validates any document
-offline against the schema set (`API_CONTRACTS.md`). The rules
+offline against the schema set (`docs/API_REFERENCE.md`). The rules
 (`schemas/MIGRATIONS.md`):
 
 - **Any field change bumps the schema's x-version** and adds a MIGRATIONS
@@ -408,7 +408,7 @@ when the extension is absent) and `python -m iap.features --engine rust`
 takes the 45 native feature columns from it. Parity with the Python
 reference is tested on every row of the golden vectors in the `rust-pyo3`
 CI job; measured there, the extension replays about 150x more events per
-second than the Python engine. Details: API_FEATURES.md §7.1.
+second than the Python engine. Details: docs/API_REFERENCE.md §7.1.
 
 The honest engineering conclusion (paper 6): at this platform's feed rates
 every port is overprovisioned by orders of magnitude; the languages were
@@ -452,7 +452,7 @@ histograms end `_ns` with fixed log2 buckets, gauges are bare nouns.
   AdminAuthRateLimited, AdminAuditSuppressed, the event-path SLO — were
   retired with their metrics in v1.17 and are listed in the header of
   `alerts.yml`) — each with a runbook anchor in
-  `docs/runbooks/`). Since v1.3.0 Prometheus delivers to Alertmanager
+  `docs/RUNBOOKS.md`). Since v1.3.0 Prometheus delivers to Alertmanager
   (`deployment/alertmanager/`), which routes by severity (page vs ticket,
   with inhibition) to webhooks whose URLs are operator-supplied secrets;
   compose defaults to a local echo sink (v1.12.0). Latency SLOs with
@@ -515,7 +515,7 @@ histograms end `_ns` with fixed log2 buckets, gauges are bare nouns.
 ### 8.1 Adaptability layer (spec §20 steps 12-13)
 
 The monitoring loop is closed by the adaptability layer, contract-pinned
-in [/API_ADAPTIVE.md](../API_ADAPTIVE.md):
+in [/API_ADAPTIVE.md](API_REFERENCE.md):
 
 - **Reference** (`python/src/iap/adaptive`): `drift.py` (the pinned PSI
   formula + diagnostic two-sample KS), `refit.py` (static / scheduled /
@@ -588,7 +588,7 @@ the Java platform's; the deployed Python session only records its exit state,
 see §8.) A `state-backup`
 CronJob archives `/data/state` every 30 minutes to its own claim, mounting the
 state read-only on the trading pod's node (required pod affinity).
-docs/runbooks/RUNBOOK_alerting.md §4 has the restore procedure and its
+docs/RUNBOOKS.md §4 has the restore procedure and its
 fail-closed outcome.
 
 Three properties of the shape matter more than the box diagram
@@ -743,8 +743,8 @@ recorder, fill-tape and replay-comparison modules and the REL-18 feed guard,
 order manager, reconciliation, paper venue and supervisor (§22). It is
 distinct from the Java `PaperTrading` shadow stack
 described above (the shadow stack's runbook is
-[RUNBOOK_shadow_deployment.md](runbooks/RUNBOOK_shadow_deployment.md); this one
-is [RUNBOOK_paper_trade.md](runbooks/RUNBOOK_paper_trade.md)).
+[docs/RUNBOOKS.md](RUNBOOKS.md); this one
+is [docs/RUNBOOKS.md](RUNBOOKS.md)).
 
 | module | role |
 |---|---|
@@ -759,8 +759,8 @@ report.json, report.md}`. The morning ops agent (`python -m iap.agents ops`,
 [AGENTS.md](AGENTS.md)) reads that output: thresholds are rules in code, the
 model writes only the narrative, and every number in it is checked against the
 alerts document. The package is inside the blocking mypy scope. Signatures:
-[../API_PAPER.md](../API_PAPER.md); cross-reference from
-[../API_TRADING.md](../API_TRADING.md) section 4.
+[../API_PAPER.md](API_REFERENCE.md); cross-reference from
+[../API_TRADING.md](API_REFERENCE.md) section 4.
 
 ## 10. Known deviations from the spec blueprint (documented, not hidden)
 
@@ -788,7 +788,7 @@ alerts document. The package is inside the blocking mypy scope. Signatures:
   `docs/BUILD_NOTES.md` is the normative pom-equivalent dependency list.
 - **FX05's golden cases** deviate from the two-vector pattern (the golden
   vectors carry one FX pair; FX05 is inherently cross-pair) — its cases pin
-  bundled-frame rows and embed all inputs; documented in API_ALPHA.md §6.
+  bundled-frame rows and embed all inputs; documented in docs/API_REFERENCE.md §6.
 - **The pipeline's own data is synthetic; the real data is free and public.**
   Spec Phase 1's licensed-data acquisition is out of scope for this build; the
   QC/normalization machinery runs against injected anomalies on the seeded
@@ -981,7 +981,7 @@ the goldens.
   limit.
 - **It is not delivered alerting by itself.** A latched kill switch pages a
   human only if the operator has created the receiver Secret
-  (RUNBOOK_alerting.md §2); out of the box compose delivers to a local echo
+  (docs/RUNBOOKS.md §2); out of the box compose delivers to a local echo
   sink, not a person.
 
 ## 13. The research-store concurrency model
@@ -1176,7 +1176,7 @@ hash-chained blackboard. The board is committed and pushed, then
 `cli anchor` records the first commit holding each entry. The research gate
 recomputes the fingerprint before a run and refuses changed code. `cli
 verify-board` re-checks the chain, the git prefix property, the anchors and
-every signature. Details and gaps: docs/governance/GOVERNANCE.md §2a.
+every signature. Details and gaps: docs/GOVERNANCE.md §2a.
 
 ### 15.6 Real-data status of these subsystems
 
@@ -1186,7 +1186,7 @@ found no quoting edge (`research/quoting_real/QUOTING_V2_RESULT.md`); R7
 confirmed EQ10 and EQ05 as predictive with zero net P&L (§20); the
 v1.17-v1.18 execution studies (B8, B8 v2, REL-05, REL-09, REL-10) are
 negative or underpowered (§8 of EXECUTION_QUALITY.md, §22 and
-[release/v1.18.0_RELEASE_NOTES.md](release/v1.18.0_RELEASE_NOTES.md)).
+[release/v1.18.0_RELEASE_NOTES.md](../archive/docs/release/v1.18.0_RELEASE_NOTES.md)).
 
 | subsystem | real-data status (2026-10-11, v1.13.0) |
 |---|---|
@@ -1305,7 +1305,7 @@ hash. Registration links to a blackboard pre-registration or is marked
 exploratory. `monitor` and `ShadowRunner` read registered models; nothing
 in the research pipelines loads from the registry unless asked
 (`MakerFilter.from_registry`, `iap.models.zoo.load_registered`). The
-default location is `research/models/registry`. API_ADAPTIVE.md §9.
+default location is `research/models/registry`. docs/API_REFERENCE.md §9.
 
 ### 17.3 The Rust feature engine as a Python wheel (E2)
 
@@ -1319,7 +1319,7 @@ parity tests and records the benchmark. The extension wraps the
 `rust/features` crate (canonical under §16), releases the GIL during a
 replay and hands its row buffers to numpy without a copy.
 `iap.features.native` is the only Python caller and falls back to the
-Python engine when the wheel is absent. API_FEATURES.md §7.1.
+Python engine when the wheel is absent. docs/API_REFERENCE.md §7.1.
 
 ### 17.4 Optional extras and dependencies
 
@@ -1465,17 +1465,17 @@ Level 2** (no real orders or fills exist, owner decision D4(a)). Everything
 below is Python only and outside the cross-language parity table: the golden
 counts of §6 (217/74/75) are those of v1.17.1. The release record, with every
 number and the open gates, is
-[release/v1.18.0_RELEASE_NOTES.md](release/v1.18.0_RELEASE_NOTES.md); the
+[release/v1.18.0_RELEASE_NOTES.md](../archive/docs/release/v1.18.0_RELEASE_NOTES.md); the
 artefact index is [release/RESULTS_INDEX.md](release/RESULTS_INDEX.md).
 
 ### 22.1 Research authorisation: who may read what, and what is counted
 
 | component | module / artefact | what it does |
 |---|---|---|
-| analysis identity (REL-02a) | `iap.agents.analysis_identity` (`build_identity`, `verify_identity`, `require_independent_runner`); [governance/ANALYSIS_IDENTITY.md](governance/ANALYSIS_IDENTITY.md) | a signed pre-registration binds, in its signed body, the scripts, the whole `python/src/iap` tree, `configs/`, `data/reference/`, declared study inputs, the hashed lock and the installed package versions, the interpreter, the commit, the dataset versions, the hypothesis family, the metrics and the thresholds. A runner refuses on any mismatch; a signer may not be the runner (`IAP_RUN_ACTOR`). Preregs signed under identity v1 stay verifiable and are not re-signed |
+| analysis identity (REL-02a) | `iap.agents.analysis_identity` (`build_identity`, `verify_identity`, `require_independent_runner`); [governance/ANALYSIS_IDENTITY.md](GOVERNANCE.md) | a signed pre-registration binds, in its signed body, the scripts, the whole `python/src/iap` tree, `configs/`, `data/reference/`, declared study inputs, the hashed lock and the installed package versions, the interpreter, the commit, the dataset versions, the hypothesis family, the metrics and the thresholds. A runner refuses on any mismatch; a signer may not be the runner (`IAP_RUN_ACTOR`). Preregs signed under identity v1 stay verifiable and are not re-signed |
 | pre-registration gate | `iap.agents.prereg_gate`, `tools/verify_signatures.py`, `tools/prereg_bind_identity.py` | the Ed25519 signature check the research runners call; a scan test fails if a new prereg consumer does not call the identity check |
-| trust root | `research/agents/trust_roots.json`; [governance/TRUST_ROOT.md](governance/TRUST_ROOT.md) | the maintainer key, a pinned trust-root version and its fingerprint, published outside the repository (PR #315) |
-| holdout registry (REL-02b) | `iap.research.holdout_registry`, `research/holdout_registry.json`; [governance/DATA_ACCESS_PATHS.md](governance/DATA_ACCESS_PATHS.md) | every ingested dataset and every (session, symbol) scope of the 2025/26 holdout is `in_sample`, `spent` or `unread`, looked up by content hash and by scope, never by path string. `guard` fails closed (an unknown real dataset is refused) and decides before a data file is opened; `reader_guard` is a backstop in the low-level readers; every attempt is appended to a hash-chained, git-ignored access log. The registry is sealed with a body hash that CI pins; someone who edits and reseals it is stopped by review only |
+| trust root | `research/agents/trust_roots.json`; [governance/TRUST_ROOT.md](GOVERNANCE.md) | the maintainer key, a pinned trust-root version and its fingerprint, published outside the repository (PR #315) |
+| holdout registry (REL-02b) | `iap.research.holdout_registry`, `research/holdout_registry.json`; [governance/DATA_ACCESS_PATHS.md](GOVERNANCE.md) | every ingested dataset and every (session, symbol) scope of the 2025/26 holdout is `in_sample`, `spent` or `unread`, looked up by content hash and by scope, never by path string. `guard` fails closed (an unknown real dataset is refused) and decides before a data file is opened; `reader_guard` is a backstop in the low-level readers; every attempt is appended to a hash-chained, git-ignored access log. The registry is sealed with a body hash that CI pins; someone who edits and reseals it is stopped by review only |
 | one ledger family (REL-02c) | `iap.validation.ledger` (`data_family`), `tools/ledger_family_report.py`, `tools/migrate_ledger_rel02.py`, `research/v118/REL02_LEDGER_MIGRATION.md` | every entry of `research/experiments.json` is `real` or `synthetic`. After the owner-approved migration (2026-10-18): 640 distinct configurations and 6,826 looks, of which 256 configurations holding 1,132 of the looks are real-data (real-data N 24 -> 256). The tag is not part of the chained identity and the migration only appended. The PROMOTE gate still uses the total look count |
 | ledger completeness | `tools/ledger_inventory.py`, `research/v118/LEDGER_INVENTORY.md` | lists every ledger-shaped record and what the central ledger lacks; the ledger is a lower bound on the looks taken, with its known gaps written down |
 | data manifest | `tools/data_manifest.py`, `research/data_manifest.json` | sha256 and provenance of the datasets the registry refers to |
@@ -1525,7 +1525,7 @@ All of it is paper only (no broker, D4(a)) and exercised on synthetic feeds.
   `iap.portfolio.enforced` (optimizer constraints from the limits; a result
   that still breaches is refused) and `iap.portfolio.capacity` (net bps and USD
   against notional and participation;
-  [PORTFOLIO_LIMITS.md](PORTFOLIO_LIMITS.md)). The pinned order-level risk
+  [PORTFOLIO_LIMITS.md](../archive/docs/PORTFOLIO_LIMITS.md)). The pinned order-level risk
   engine and its Rust parity goldens are unchanged.
 - **Resilience (REL-18).** `iap.paper.feed.FeedGuard` (duplicate dropping,
   reorder window, gap policy HALT / RESYNC / SKIP, clock guard, stale

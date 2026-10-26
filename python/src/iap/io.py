@@ -6,7 +6,7 @@ Every wrapper calls :func:`iap.core.guard.check` first, so a read of a file
 inside a registered (spent / unread / unregistered real) dataset is refused
 before the library opens it, whatever the caller.  The static test
 ``python/tests/test_guard_hook.py::test_no_raw_reader_outside_iap_io`` keeps
-every other module on these wrappers; ``docs/governance/DATA_ACCESS_PATHS.md``
+every other module on these wrappers; ``docs/GOVERNANCE.md``
 lists the routes.
 """
 

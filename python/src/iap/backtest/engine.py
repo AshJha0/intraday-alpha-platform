@@ -117,7 +117,7 @@ Pinned semantics (mirrored by the accounting-identity tests):
   liquidation; the cost of closing is visible in the stress section where
   it matters).
 
-- **Currency** (pinned, API_PORTFOLIO_TCA.md §4): every instrument's cash,
+- **Currency** (pinned, docs/API_REFERENCE.md §4): every instrument's cash,
   costs and marks are in its quote currency (JPY for USD/JPY, CAD for
   USD/CAD, ...). Nothing is summed across currencies: each row's equity
   increment is converted into the reporting currency (USD) at the

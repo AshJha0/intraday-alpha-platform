@@ -47,7 +47,7 @@ volumes:
 
 # Alert receiver URLs are SECRETS (they usually embed a token) and are never
 # committed. Point ALERT_PAGE_URL_FILE / ALERT_TICKET_URL_FILE at files OUTSIDE
-# the repo (docs/runbooks/RUNBOOK_alerting.md). Unset, both use the tracked,
+# the repo (docs/RUNBOOKS.md). Unset, both use the tracked,
 # secret-free local-sink.url -> the `alert-sink` echo service below, so
 # `docker compose up` works with no secrets and alerts can be watched arriving
 # (`docker logs -f iap-alert-sink`). ALERT_WEBHOOK_URL_FILE (<= v1.11) is still
@@ -334,7 +334,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # Secrets stay OUT of source control (SECURITY.md): the admin password
+      # Secrets stay OUT of source control (docs/GOVERNANCE.md): the admin password
       # comes from the host environment / an .env file that is git-ignored.
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in the environment}

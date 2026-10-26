@@ -72,8 +72,8 @@ body:
     attributes:
       label: Confirmations
       options:
-        - label: The evidence above is regenerable from a seed and a commit (docs/governance/REPRODUCIBILITY.md)
+        - label: The evidence above is regenerable from a seed and a commit (docs/GOVERNANCE.md)
           required: true
         - label: No gate is skipped; backtest Sharpe alone is not cited as evidence (spec §1)
           required: true
-        - label: If the target is ACTIVE, I understand RETIRED is observational in the live Java loop until the allocation gate lands (API_ADAPTIVE.md §6)
+        - label: If the target is ACTIVE, I understand RETIRED is observational in the live Java loop until the allocation gate lands (docs/API_REFERENCE.md §6)

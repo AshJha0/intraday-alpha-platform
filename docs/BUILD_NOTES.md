@@ -116,7 +116,7 @@ them).
 
 Rust 1.99.0 (pinned in `rust/rust-toolchain.toml`; CI and `Dockerfile.rust` name the same version and `check_deployment.py` fails if they drift; the workspace MSRV stays 1.75; the figures in the papers were measured with rustc 1.95.0), crates.io reachable; keep deps to serde/serde_json only (`rand` was
 permitted historically but is NOT used — the pinned RNG is SplitMix64,
-conventions §3 — and SECURITY.md §1 allows serde/serde_json alone) (+ crossbeam
+conventions §3 — and docs/GOVERNANCE.md §1 allows serde/serde_json alone) (+ crossbeam
 where justified); zero warnings. `serde_json` is built with its
 `float_roundtrip` feature (workspace `Cargo.toml`): the default parser is
 best-effort on 17-digit decimals (up to 1 ulp off), which would break the
@@ -186,7 +186,7 @@ Two repository-level checks cover the research record, not the code; both read
 only committed files and no private key:
 
 ```bash
-PYTHONPATH=python/src python3 tools/verify_signatures.py   # every signed document vs the pinned trust root (docs/governance/TRUST_ROOT.md)
+PYTHONPATH=python/src python3 tools/verify_signatures.py   # every signed document vs the pinned trust root (docs/GOVERNANCE.md)
 python3 tools/data_manifest.py check                       # every dataset version cited by a prereg or ledger is listed in research/data_manifest.json with a clean/match verdict (D3)
 ```
 

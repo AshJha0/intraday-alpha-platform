@@ -3,7 +3,7 @@
 # come from GENERATED ConfigMaps (configmap-grafana.yaml — regenerate with
 # deployment/k8s/generate_configmaps.py after editing deployment/grafana/).
 #
-# Secrets separation (docs/governance/SECURITY.md): the admin password is NOT
+# Secrets separation (docs/GOVERNANCE.md): the admin password is NOT
 # in this repo. Create it out-of-band before first apply:
 #   kubectl -n intraday-alpha create secret generic iap-grafana-admin \
 #     --from-literal=admin-user=admin --from-literal=admin-password='<strong>'

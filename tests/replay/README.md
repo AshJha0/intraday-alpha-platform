@@ -2,7 +2,7 @@
 
 The replay level of the testing strategy (`tests/README.md`) pins the
 platform's reproducibility promise (PLATFORM_CONVENTIONS.md §3,
-docs/governance/REPRODUCIBILITY.md): **a seeded run, repeated, produces the
+docs/GOVERNANCE.md): **a seeded run, repeated, produces the
 same bytes** — not merely the same numbers within tolerance.
 
 What belongs here:
@@ -22,7 +22,7 @@ What belongs here:
   (`test_mvp_replay_determinism.py`: `python -m iap.mvp verify` / `replay` on
   `configs/mvp/mvp_tiny.json` — identical event-stream sha256, trace digest,
   `traces.jsonl`, `report.json` and `risk_audit.jsonl` bytes; docs/MVP.md §5);
-- cross-run comparisons of any artefact `docs/governance/REPRODUCIBILITY.md`
+- cross-run comparisons of any artefact `docs/GOVERNANCE.md`
   says is byte-stable.
 
 What does not: value-level golden comparisons (those are `tests/golden/` and

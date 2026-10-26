@@ -24,7 +24,7 @@ registry with no trust roots at all fails too.  Bootstrap: when the trust
 ref holds no maintainer yet (only the one pull request that introduces the
 first trust root), :func:`read_roots` falls back to the working tree's roots
 and says so on stderr; once a maintainer is on main the fallback never fires
-again.  Key rotation and restore: ``docs/governance/TRUST_ROOTS.md``.
+again.  Key rotation and restore: ``docs/GOVERNANCE.md``.
 """
 
 from __future__ import annotations

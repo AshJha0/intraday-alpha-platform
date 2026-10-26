@@ -113,7 +113,7 @@ MVP reference data imported) → report → paper evidence.
 `improve_min_spread_ticks`, `end_margin_ns`). The committed document carries
 neither, which means NATIVE — the run this page and the golden describe.
 With `"passive"`, step 8 posts each child at the PASSIVE policy's price
-(API_TRADING.md §2.5) and `MvpEngine._work_passive` runs the same POST →
+(docs/API_REFERENCE.md §2.5) and `MvpEngine._work_passive` runs the same POST →
 REST → REPRICE / CROSS machine as `ExecutionReplay`, before the scheduler
 issues new children. A replacement child (the re-post or the cross of a
 cancelled remainder) goes through routing, the latency-budget and
@@ -160,7 +160,7 @@ decided), exactly as in `BacktestEngine.decide`.
 ### 4.1 Why the MVP stays per-event (v1.14)
 
 Since v1.14 the research feature engine treats events of one instrument
-with the same `exchange_ts` as one state change (API_CORE.md §9). The MVP
+with the same `exchange_ts` as one state change (docs/API_REFERENCE.md §9). The MVP
 does not. It is a streaming loop: when an EXECUTE arrives it cannot know
 whether a TRADE with the same timestamp follows without waiting for the
 next event, and waiting is a lookahead a live system does not have. So
@@ -549,7 +549,7 @@ about 6.0 M events in 2 h 29 m, gross P&L USD +801, execution cost incl. fees
 USD 10,027, net USD -9,226 (about 70 k parents in one day; costs swamp the
 edge). One in-sample day: an integration test and a cost baseline, not
 evidence. It ran without an end-of-day flatten, so open positions were marked
-to market (§10 adds the flatten). Write-up: `docs/research/MVP_REAL_20191018.md`.
+to market (§10 adds the flatten). Write-up: `archive/docs/research/MVP_REAL_20191018.md`.
 
 ### 9.1 v3 pre-registration keys in the MVP (v1.16, P0-3)
 

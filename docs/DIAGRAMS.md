@@ -542,7 +542,7 @@ WATCH → RETIRED, table-driven (`machine.ALLOWED_TRANSITIONS`, pinned as
 `transition_table` in `tests/golden/expected_lifecycle.json`), with the gate
 names of every SYSTEM edge and the HUMAN-only manual edges. The ACTIVE/WATCH/
 RETIRED sub-machine is `iap.adaptive.lifecycle.LifecycleTracker`
-(API_ADAPTIVE.md §6), whose retirement rule is the CUSUM rule by default
+(docs/API_REFERENCE.md §6), whose retirement rule is the CUSUM rule by default
 since v1.5.0, with the consecutive-breach rule selectable by name; the full table, thresholds and evidence blocks are in
 [LIFECYCLE.md](LIFECYCLE.md). Ports: `com.iap.lifecycle`, `rust/lifecycle`.
 
@@ -645,7 +645,7 @@ flowchart TD
 Diagram 5 with the branches the 2026-10-03 review added, each marked NEW and
 placed where it sits in the pinned check order. All of them reuse existing rule
 ids, so the order itself and the main risk golden did not move; the reason
-strings are the ones the engines emit (API_TRADING.md §1.4). The right-hand
+strings are the ones the engines emit (docs/API_REFERENCE.md §1.4). The right-hand
 flow is the fill path: a fill that cannot be booked latches the GLOBAL kill.
 Source: [`diagrams/risk_fail_closed_branches.mmd`](diagrams/risk_fail_closed_branches.mmd).
 
@@ -698,7 +698,7 @@ The processing order of one market event (rule 9 of
 fixes: queue tracking runs after the book update and only for an event the book
 applied, and the crossing pool is displayed size minus what the overlay already
 consumed. The dotted note at the bottom is what the code did before
-(API_TRADING.md §2.4, LEARN.md §22).
+(docs/API_REFERENCE.md §2.4, LEARN.md §22).
 Source: [`diagrams/simulator_fill_flow.mmd`](diagrams/simulator_fill_flow.mmd).
 
 ```mermaid
@@ -791,7 +791,7 @@ The path of `POST /admin/kill` through `com.iap.platform.AdminService`. The
 kill latches before the request waits for the trading thread, so the outcome of
 the wait changes only the response code — `200` applied, or `202` latched — never
 whether trading stops (PLATFORM_CONVENTIONS.md §12.5,
-`docs/runbooks/RUNBOOK_incident_kill_switch.md` §2).
+`docs/RUNBOOKS.md` §2).
 Source: [`diagrams/admin_kill_latch.mmd`](diagrams/admin_kill_latch.mmd).
 
 ```mermaid
@@ -928,7 +928,7 @@ reading it as "no successful run" (the v1.4.0 release failed on that once
 although CI was green), polls an unfinished run and stops on a failed or
 missing run.
 One box says what is not true yet: branch protection is not configured
-(`docs/governance/REPO_SETTINGS.md`, LEARN.md §26).
+(`docs/GOVERNANCE.md`, LEARN.md §26).
 Source: [`diagrams/ci_release_pipeline.mmd`](diagrams/ci_release_pipeline.mmd).
 
 ```mermaid
@@ -979,7 +979,7 @@ flowchart LR
         ATT --> MAN
     end
     MAN -.->|"manual step: pin the deployment manifests<br/>to name:tag@digest, verify the attestation"| DEPLOY["deployment/docker<br/>deployment/k8s"]
-    NOTE["repository settings NOT configured:<br/>branch protection, required checks, required reviews<br/>(docs/governance/REPO_SETTINGS.md)"] -.-> PR
+    NOTE["repository settings NOT configured:<br/>branch protection, required checks, required reviews<br/>(docs/GOVERNANCE.md)"] -.-> PR
 ```
 
 ## 18. Deployment topology: NetworkPolicies and alert delivery (v1.3.0)
@@ -1088,7 +1088,7 @@ flowchart TD
 How one session's events become the calibration document that the
 simulator, the maker gate and the execution algorithms read. Everything here
 is opt-in: `ExecutionSimulator(config)` without a calibration behaves as
-before. API_TRADING.md §2.6, COOKBOOK recipes 39 and 45.
+before. docs/API_REFERENCE.md §2.6, COOKBOOK recipes 39 and 45.
 
 Source: [`diagrams/exec_calibration_flow.mmd`](diagrams/exec_calibration_flow.mmd).
 
@@ -1232,7 +1232,7 @@ flowchart TD
 
 ## 25. Release roadmap, v1.9 to v1.11
 
-Plan items by release (docs/ROADMAP.md §3.4-3.6). v1.9.0 and v1.10.0 are
+Plan items by release (archive/docs/ROADMAP.md §3.4-3.6). v1.9.0 and v1.10.0 are
 released, and so is v1.11.0 (2026-10-10). This is the history as of v1.11.0;
 the current release is v1.18.0 (§41). The real-data studies were running on
 their own branches at that point, exploratory and in-sample, with no result
@@ -1319,7 +1319,7 @@ sequenceDiagram
 ## 27. Model registry, monitoring and shadow mode (v1.11, AI3)
 
 How a fitted model becomes a citable, immutable record, how it is
-monitored, and why a candidate in shadow cannot act. API_ADAPTIVE.md §9,
+monitored, and why a candidate in shadow cannot act. docs/API_REFERENCE.md §9,
 COOKBOOK recipes 50 and 54, LEARN.md §39.
 
 Source: [`diagrams/mlops_registry_shadow.mmd`](diagrams/mlops_registry_shadow.mmd).
@@ -1387,7 +1387,7 @@ flowchart LR
 ## 29. Rust and Python feature backends behind one API (v1.11, E2)
 
 Both engines return the same `NativeFrame`; the Rust one is opt-in and
-covers only the 45 native slots. API_FEATURES.md §7.1, COOKBOOK recipes 49
+covers only the 45 native slots. docs/API_REFERENCE.md §7.1, COOKBOOK recipes 49
 and 52, LEARN.md §36.
 
 Source: [`diagrams/rust_python_features.mmd`](diagrams/rust_python_features.mmd).
@@ -1454,7 +1454,7 @@ flowchart TD
 
 ## 32. X4 passive policy: post-only, hazard reprices and markout feedback (v1.12)
 
-One entry of the opt-in maker policy. The hazard is fitted offline on M3 maker labels; the feedback EWMA takes a fill's markout only after its horizon has passed on the replay clock, so the loop is causal. Defaults (no X4 options) are byte-identical to v1.11. API_TRADING.md §2.10, COOKBOOK recipes 61, 63 and 64, LEARN.md §43.
+One entry of the opt-in maker policy. The hazard is fitted offline on M3 maker labels; the feedback EWMA takes a fill's markout only after its horizon has passed on the replay clock, so the loop is causal. Defaults (no X4 options) are byte-identical to v1.11. docs/API_REFERENCE.md §2.10, COOKBOOK recipes 61, 63 and 64, LEARN.md §43.
 
 Source: [`diagrams/passive_policy_hazard_feedback.mmd`](diagrams/passive_policy_hazard_feedback.mmd).
 
@@ -1481,7 +1481,7 @@ flowchart TD
 
 ## 33. Cost-aware multi-venue routing (v1.12, X5)
 
-The pinned router (best displayed price, fee tie-break) is unchanged; this one is opt-in through MakerBacktester(router=). On the Nasdaq-only real data there is one candidate venue, so the router is capability, not a measured result. API_TRADING.md §2.9, COOKBOOK recipe 59.
+The pinned router (best displayed price, fee tie-break) is unchanged; this one is opt-in through MakerBacktester(router=). On the Nasdaq-only real data there is one candidate venue, so the router is capability, not a measured result. docs/API_REFERENCE.md §2.9, COOKBOOK recipe 59.
 
 Source: [`diagrams/sor_cost_aware_flow.mmd`](diagrams/sor_cost_aware_flow.mmd).
 
@@ -1504,7 +1504,7 @@ flowchart TD
 
 ## 34. Alert routing and latency SLO burn rates (v1.12, P4)
 
-Receiver URLs are read from files (compose) or the Secret iap-alertmanager-webhook with keys page_url and ticket_url (Kubernetes); nothing secret is committed. SLO: 99% of samples under 1,048,575 ns over 30 days, so the budget is 1%. RUNBOOK_alerting.md, COOKBOOK recipes 60 and 65.
+Receiver URLs are read from files (compose) or the Secret iap-alertmanager-webhook with keys page_url and ticket_url (Kubernetes); nothing secret is committed. SLO: 99% of samples under 1,048,575 ns over 30 days, so the budget is 1%. docs/RUNBOOKS.md, COOKBOOK recipes 60 and 65.
 
 Source: [`diagrams/alert_routing_slo.mmd`](diagrams/alert_routing_slo.mmd).
 
@@ -1726,7 +1726,7 @@ flowchart LR
 | topic | document |
 |---|---|
 | Full architecture narrative, per-language engineering notes | [ARCHITECTURE.md](ARCHITECTURE.md) |
-| Governing institutional specification (verbatim) | [SPECIFICATION.md](SPECIFICATION.md) |
+| Governing institutional specification (verbatim) | [SPECIFICATION.md](../archive/docs/SPECIFICATION.md) |
 | Teaching walkthrough of every subsystem | [../LEARN.md](../LEARN.md) |
 | How the quant, algo and AI sides work, top-down | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) |
 | 200 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
@@ -1734,18 +1734,18 @@ flowchart LR
 | The 7-state promotion lifecycle: gates, evidence, registry, bootstrap result | [LIFECYCLE.md](LIFECYCLE.md) |
 | The decision trace: record, ids, canonical JSON, digest, sinks, replay | [DECISION_TRACE.md](DECISION_TRACE.md) |
 | The executable MVP and its honest golden run | [MVP.md](MVP.md) |
-| Typed contracts, Protocols, schema index, validation | [../API_CONTRACTS.md](../API_CONTRACTS.md) |
-| Python risk / execution reference ports and their golden parity | [../API_TRADING.md](../API_TRADING.md) |
-| Roadmap: what exists, with evidence; what is backlog | [ROADMAP.md](ROADMAP.md) |
+| Typed contracts, Protocols, schema index, validation | [../API_CONTRACTS.md](API_REFERENCE.md) |
+| Python risk / execution reference ports and their golden parity | [../API_TRADING.md](API_REFERENCE.md) |
+| Roadmap: what exists, with evidence; what is backlog | [ROADMAP.md](../archive/docs/ROADMAP.md) |
 | v1.17 execution quality: the shortfall benchmark, signal-aware urgency and pacing, the realism layer | [EXECUTION_QUALITY.md](EXECUTION_QUALITY.md) |
 | v1.17 breadth: the universe rule and the cross-sectional book | [PORTFOLIO_BREADTH.md](PORTFOLIO_BREADTH.md) |
-| v1.17 signal research: the statistics revision, new models and gates | [SIGNAL_RESEARCH.md](SIGNAL_RESEARCH.md) |
+| v1.17 signal research: the statistics revision, new models and gates | [SIGNAL_RESEARCH.md](../archive/docs/SIGNAL_RESEARCH.md) |
 | v1.17 data sources: free Nasdaq and IEX days, process-and-delete | [DATA_SOURCES.md](DATA_SOURCES.md) |
-| v1.18 monitoring policy, factor risk, portfolio limits and kill switch, sim-to-real levels | [MONITORING_POLICY.md](MONITORING_POLICY.md), [FACTOR_RISK.md](FACTOR_RISK.md), [PORTFOLIO_LIMITS.md](PORTFOLIO_LIMITS.md), [SIM_TO_REAL.md](SIM_TO_REAL.md) |
-| v1.18 outside-reviewer pack | [REVIEW_PACK.md](REVIEW_PACK.md) |
+| v1.18 monitoring policy, factor risk, portfolio limits and kill switch, sim-to-real levels | [MONITORING_POLICY.md](MONITORING_POLICY.md), [FACTOR_RISK.md](FACTOR_RISK.md), [PORTFOLIO_LIMITS.md](../archive/docs/PORTFOLIO_LIMITS.md), [SIM_TO_REAL.md](SIM_TO_REAL.md) |
+| v1.18 outside-reviewer pack | [REVIEW_PACK.md](../archive/docs/REVIEW_PACK.md) |
 | Which language copy is canonical, which frozen; the `POLYGLOT-OVERRIDE` rule | [POLYGLOT.md](POLYGLOT.md) |
-| Research governance and the LLM agent's controls | [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2a-§2b |
+| Research governance and the LLM agent's controls | [governance/GOVERNANCE.md](GOVERNANCE.md) §2a-§2b |
 | The research methods (defaults since v1.5.0, with their legacy rules), the safe research store, gate eligibility | [RESEARCH_VALIDITY.md](RESEARCH_VALIDITY.md) |
 | Release notes | [../CHANGELOG.md](../CHANGELOG.md) |
-| Six research papers from the platform's own numbers | [papers/INDEX.md](papers/INDEX.md) |
+| Six research papers from the platform's own numbers | [papers/INDEX.md](../archive/docs/papers/INDEX.md) |
 | Benchmark methodology + results | [../benchmarks/RESULTS.md](../benchmarks/RESULTS.md) |

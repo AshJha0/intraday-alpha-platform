@@ -1,6 +1,6 @@
 """Check an agent's closing summary against what actually happened (v1.15, A-P1-4).
 
-The live eval (docs/research/AGENT_EVAL_LIVE.md) found a model ending a session
+The live eval (docs/RESEARCH_NOTES.md) found a model ending a session
 with *"Finding filed."* after its finding had been rejected.  This module is a
 deterministic check of the closing text (the ``finish`` summary plus the
 model's last plain-text output) against the session's tool log:

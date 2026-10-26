@@ -21,7 +21,7 @@ Signer is not runner: code can enforce that the runner declares an actor id
 different from the signature's maintainer and holds no signing key material
 in its environment (:func:`require_independent_runner`).  It cannot prove who
 sits at the keyboard; the private key lives outside the repository
-(``docs/governance/TRUST_ROOTS.md``) and the owner signs on a machine that
+(``docs/GOVERNANCE.md``) and the owner signs on a machine that
 does not run the analysis.  That residual is documented, not hidden.
 
 Legacy preregs (R7, signed before v1.18) carry no block; ``legacy_ok=True``
@@ -32,7 +32,7 @@ Identity versions (review finding 1, 2026-10-18).  A block without
 when it was signed, so preregs signed under v1 stay verifiable history and are
 never re-signed.  :func:`build_identity` now writes **v2**, which also binds
 every other input that can change a result
-(``docs/governance/ANALYSIS_IDENTITY.md`` lists them):
+(``docs/GOVERNANCE.md`` lists them):
 
 * ``code_tree_sha256`` over EVERY file of ``python/src/iap`` (package data
   too, not only ``*.py``): feature registry and spec code, label

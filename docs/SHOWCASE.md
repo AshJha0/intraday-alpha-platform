@@ -6,7 +6,7 @@ is named beside it in an HTML comment; the platform numbers are re-derived
 from their artefacts by `tests/harness/check_headline_numbers.py` on every
 CI run. Nothing here is a claim of profitability. The long form is
 [README.md](../README.md); the full history is
-[docs/README_HISTORY.md](README_HISTORY.md).
+[archive/docs/README_HISTORY.md](../archive/docs/README_HISTORY.md).
 
 ## What it is
 
@@ -29,7 +29,7 @@ negative ones first, is written down with the artefact that produced it.
 ## What the evidence supports, and what it does not
 
 Every result carries an evidence class (U0 section 10; the table of all results is
-[REVIEW_PACK.md](REVIEW_PACK.md) section 0): *independently confirmed*, *mechanically isolated*,
+[REVIEW_PACK.md](../archive/docs/REVIEW_PACK.md) section 0): *independently confirmed*, *mechanically isolated*,
 *development-supported*, *exploratory*, *rejected*, *data-ineligible*, *pending*. **Nothing in this
 repository is in the first two classes** (2026-10-25): no registered run has been executed under
 separated custody and no independent party has reproduced a result.
@@ -51,7 +51,7 @@ separated custody and no independent party has reproduced a result.
   2026-05-18, both controls behaved as registered, no run traded at 1x costs.
   The run was the developer's, on the developer's machine, with no execution
   separation and no independent review.
-  <!-- source: README.md at v1.16.0 ("Out-of-time holdout (v1.8.0)"), now docs/README_HISTORY.md §1; docs/index.html "Out-of-time holdout" line -->
+  <!-- source: README.md at v1.16.0 ("Out-of-time holdout (v1.8.0)"), now archive/docs/README_HISTORY.md §1; docs/index.html "Out-of-time holdout" line -->
 - The engineering holds: three independent implementations of one pinned
   semantics, held identical by golden tests, and a deterministic loop whose
   run-twice and replay-from-capture digests match (the parity table below).
@@ -65,28 +65,28 @@ separated custody and no independent party has reproduced a result.
   <!-- source: docs/research/R7_RESULTS.md, "Net P&L (descriptive only)" -->
   The full loop on a real ITCH day (2019-10-18, AAPL/MSFT/QQQ) earned
   +$801 gross and lost $9,226 net at about 70,000 parent orders.
-  <!-- source: README.md "Current status" (v1.15.0 paragraph), citing docs/research/MVP_REAL_20191018.md -->
+  <!-- source: README.md "Current status" (v1.15.0 paragraph), citing archive/docs/research/MVP_REAL_20191018.md -->
 - **Taker: no-go (v1.16, P0-6).** EQ10 / EQ05 as a cost-aware taker on 10
   in-sample sessions, a grid of 480 cells: **zero trades in every cell**.
   The largest expected return was about 0.1-0.2 bp against a median
   round-trip cost of about 0.8-1.2 bp.
-  <!-- source: docs/release/v1.16.0_RELEASE_NOTES.md, "P0-6 in-sample monetisation study" -->
+  <!-- source: archive/docs/release/v1.16.0_RELEASE_NOTES.md, "P0-6 in-sample monetisation study" -->
 - **Capacity: none (v1.16, item 7).** **0 of 45 cells** have a break-even
   size above zero; the best tail edge is 0.92 bp (EQ10, AAPL, 1 min, top
   0.1% of signals) against a round-trip cost of 0.8-2.4 bp.
-  <!-- source: docs/release/v1.16.0_RELEASE_NOTES.md, "Item 7 taker capacity curve" -->
+  <!-- source: archive/docs/release/v1.16.0_RELEASE_NOTES.md, "Item 7 taker capacity curve" -->
 - **Quoting v2: no edge (v1.16).** Two-sided skewed quoting, registered and
   signed, run in-sample on 6 test sessions: every cell loses $5.0-6.9k per
   session with Bonferroni intervals below zero, and adverse selection is
   about 4x the spread captured. Skewing with EQ01 or EQ05 cuts the loss by
   about $750-920 per session against the no-skew control, so the signals
   are useful as an execution input, not as a strategy.
-  <!-- source: docs/release/v1.16.0_RELEASE_NOTES.md, "M5 two-sided quoting study v2" -->
+  <!-- source: archive/docs/release/v1.16.0_RELEASE_NOTES.md, "M5 two-sided quoting study v2" -->
 - **AI4 DeepLOB: closed (v1.16, item 10).** In-sample failure: net
   -0.69 bp per trade (gross +0.27 bp against a 0.97 bp cost); the linear
   baseline nets -0.74 bp and GBM -0.68 bp; the accept rule fails on all
   three symbols. No holdout look was spent, by owner decision.
-  <!-- source: docs/release/v1.16.0_RELEASE_NOTES.md, "AI4 DeepLOB (item 10)" -->
+  <!-- source: archive/docs/release/v1.16.0_RELEASE_NOTES.md, "AI4 DeepLOB (item 10)" -->
 - **Bundled synthetic data: 0 PROMOTE of 24 alphas.** 18 never forecast a
   move larger than their round-trip cost and make no trade; the 6 that
   trade lose. 23 alphas sit at CANDIDATE and none advances, because every
@@ -95,15 +95,15 @@ separated custody and no independent party has reproduced a result.
 
 **Released: v1.18.0 (2026-10-23), a measurement instrument and recorded negative results. No signal is promoted and no edge is claimed.**
 - **The known-null calibration failed** (null v3, run 2026-10-23): A0 conditional rejection 79 and 80 of 1,854 (about 4.3 %) in two cells against a 2.5 % target; the outside reviewer rejected the method as the F3 gate, so no real-data error-rate control is claimed.
-  <!-- source: research/v118/known_null_v3_RESULT.md; docs/release/REVIEWER_CLOSEOUT_2026-10-23.md -->
+  <!-- source: research/v118/known_null_v3_RESULT.md; archive/docs/release/REVIEWER_CLOSEOUT_2026-10-23.md -->
 - **Every signed run is negative or underpowered.** B8 v2: all 6 comparisons underpowered, none better than pinned Nasdaq (3 evaluation sessions). REL-05: AAPL and MSFT inconclusive, QQQ supports. REL-08 (one-session screen, 7 variants): all underpowered, with defects found afterwards. REL-09: underpowered. REL-10: one taker cell rejected (`hid_imb` 1 min AAPL loses money), the rest underpowered. REL-08c was dropped.
-  <!-- source: docs/release/v1.18.0_RELEASE_NOTES.md, "Negative and inconclusive results, first" -->
+  <!-- source: archive/docs/release/v1.18.0_RELEASE_NOTES.md, "Negative and inconclusive results, first" -->
 - **The fill model is validated at Level 1 (deterministic replay) only, not at Level 2**; there is no latency edge. No real orders or fills exist (decision D4(a)).
-  <!-- source: docs/SIM_TO_REAL.md; docs/release/v1.18.0_RELEASE_NOTES.md -->
+  <!-- source: docs/SIM_TO_REAL.md; archive/docs/release/v1.18.0_RELEASE_NOTES.md -->
 - **Built:** signed pre-declarations that bind script, commit, data and thresholds, a fail-closed holdout registry, one real-data ledger family, execution benchmark v2 metrics, a capped child simulator with an invariant suite, monitoring with an UNKNOWN state, factor risk and portfolio limits with a kill switch, and a paper-path order manager (60-minute and 6-hour soaks PASS on a synthetic feed, not a live venue).
   <!-- source: CHANGELOG.md "## v1.18.0"; research/v118/rel18_soak_6h/ -->
 - **Open gates, accepted open for this tag:** F3, F7 (no independent rerun of the B8 v2 JSON), the reviewer's full findings memo; F5 partly met.
-  <!-- source: docs/release/v1.18.0_RELEASE_NOTES.md, "Open gates"; docs/release/FOUNDATION_COMPLETE_v1.18.md -->
+  <!-- source: archive/docs/release/v1.18.0_RELEASE_NOTES.md, "Open gates"; archive/docs/release/FOUNDATION_COMPLETE_v1.18.md -->
 
 **Released: v1.17.1 (2026-10-17), a patch release; v1.17.0 released 2026-10-16.**
 - **B7 closed** on its negative in-sample result; **B8 negative on 2 overlap days** (`sor` +5.1 ± 1.3 bps, `sor_sweep` +3.8 ± 2.1; provisional); pre-declared six-day out-of-sample run also negative (`sor` +2.2 / +1.1, `sor_sweep` +0.6 / +1.2 bps; AAPL / MSFT; no interval excludes zero); 6 of 9 IEX days recorded; #211 fixes the missing manifest, SBOMs and digest pins.
@@ -119,12 +119,12 @@ separated custody and no independent party has reproduced a result.
 - **Dark venue (B10): modelled, not measured** (no free dark-pool data).
 - **IEX second venue (as of v1.17.0):** day 1 (2025-11-28) processed, TOPS oracle 0
   mismatches for AAPL, MSFT and QQQ; 6 of the 9 overlap days were recorded by v1.17.1.
-  <!-- source: docs/research/IEX_OVERLAP_SET.md -->
+  <!-- source: docs/RESEARCH_NOTES.md -->
 - **Known gap:** v1.17.0 ships no release manifest, no lock-file SBOMs and
   no digest-pinned k8s manifests; fixed by PR #211, ships with v1.17.1.
-<!-- source: CHANGELOG.md "## v1.17.0"; docs/release/v1.17.0_RELEASE_NOTES.md -->
+<!-- source: CHANGELOG.md "## v1.17.0"; archive/docs/release/v1.17.0_RELEASE_NOTES.md -->
 
-**Next (not part of v1.18.0):** this documentation pass, a diagnostic review of the failed known-null method, a REL-08 rule v2 with a multi-session screen, and v1.19 planning (nothing planned or approved yet). See [docs/ROADMAP.md](ROADMAP.md) §3.14.
+**Next (not part of v1.18.0):** this documentation pass, a diagnostic review of the failed known-null method, a REL-08 rule v2 with a multi-session screen, and v1.19 planning (nothing planned or approved yet). See [archive/docs/ROADMAP.md](../archive/docs/ROADMAP.md) §3.14.
 
 ## Numbers a CI check re-derives
 
@@ -143,7 +143,7 @@ reported as stale rather than failing).
 | Contracts | 17 JSON Schemas · 22 typed Python contracts · 18 runtime-checkable Protocols | `schemas/`, `python/src/iap/contracts/` |
 | Experiments ledger | real data: 256 configurations holding 1,132 of the looks (per-dataset real ledgers and the B7/B8 execution studies merged in by the v1.18 REL-02 migration); synthetic data: 384 configurations holding 5,694 of the looks (excluded from the real-data N); total 6,826 recorded looks over 640 distinct configurations; expected max \|t\| 4.202; Bonferroni per-test \|t\| ≥ 4.484; a lower bound, not a complete historical denominator (known gaps: `research/v118/LEDGER_INVENTORY.md`) | `research/experiments.json`, `research/v118/LEDGER_INVENTORY.md` |
 | C++ tick-to-trade (shared CI runner AMD EPYC 7763, no pinning, `steady_clock`; not colocation) | p50 1,279 ns · p99 2,559 ns · p99.9 11,263 ns, in-process, decoded frame to order intent | `benchmarks/results_tick_to_trade.md` |
-| Rust feature engine from Python (CI runner ubuntu-24.04; not colocation) | about 790,000 events/s against about 5,250 through the Python reference on the 45 native slots: 150x, not a pipeline speed-up | `rust-pyo3` CI job summary, API_FEATURES.md §7.1 |
+| Rust feature engine from Python (CI runner ubuntu-24.04; not colocation) | about 790,000 events/s against about 5,250 through the Python reference on the 45 native slots: 150x, not a pipeline speed-up | `rust-pyo3` CI job summary, docs/API_REFERENCE.md §7.1 |
 <!-- source: README.md "Headline numbers" table and "Cross-language parity" table (every row); the same figures appear in docs/index.html "Measured, not claimed" -->
 
 **No latency edge; benchmarks are not colocation numbers.** The two speed rows above are in-process
@@ -229,8 +229,8 @@ in, 308,975 out, from the QC report).
   result.
 - [COOKBOOK.md](../COOKBOOK.md): 200 task-oriented recipes with runnable
   commands.
-- [docs/release/v1.18.0_RELEASE_NOTES.md](release/v1.18.0_RELEASE_NOTES.md),
-  [docs/release/v1.16.0_RELEASE_NOTES.md](release/v1.16.0_RELEASE_NOTES.md)
+- [archive/docs/release/v1.18.0_RELEASE_NOTES.md](../archive/docs/release/v1.18.0_RELEASE_NOTES.md),
+  [archive/docs/release/v1.16.0_RELEASE_NOTES.md](../archive/docs/release/v1.16.0_RELEASE_NOTES.md)
   and [docs/research/R7_RESULTS.md](research/R7_RESULTS.md): the documents
   the negative and positive results above are copied from.
 - [docs/REAL_DATA.md](REAL_DATA.md): how to obtain and ingest real files

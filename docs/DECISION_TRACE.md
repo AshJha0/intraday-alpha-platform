@@ -43,7 +43,7 @@ An empty list or `null` means *the stage did not run* — a REJECT trace has
 signal, portfolio and risk and nothing after; a C++ replay trace has the
 execution stages and nothing before. Nothing is ever fabricated to fill a
 stage. Every field is validated on construction and again by
-`validate_typed` before any sink persists it (API_CONTRACTS.md §3).
+`validate_typed` before any sink persists it (docs/API_REFERENCE.md §3).
 
 ## 2. Ids
 
@@ -57,7 +57,7 @@ stage. Every field is validated on construction and again by
   concatenation and one hash.
 - **Version hashes**: `data_version` = sha256 of the IAP1 encoding of the
   event stream (the platform's dataset-version definition;
-  REPRODUCIBILITY.md §2), `feature_version` = the registry hash every
+  docs/GOVERNANCE.md §2), `feature_version` = the registry hash every
   `FeatureVector` carries, `model_version` = `content_hash` of the model
   definition, `config_version` = `content_hash` of the configuration
   documents in force (`configs/…` as read, keyed by repo-relative path).
@@ -191,8 +191,8 @@ refuses a torn trace file (line count ≠ `trace_lines`, both named).
 ## 8. Incident replay with the trace
 
 Capture → replay → reproduce → debug → fix → regression test, with exact
-commands, is `docs/runbooks/RUNBOOK_incident_replay.md` (MVP: docs/MVP.md
-§6; Java: the state directory of `RUNBOOK_shadow_deployment.md` §4–§5). The
+commands, is `docs/RUNBOOKS.md` (MVP: docs/MVP.md
+§6; Java: the state directory of `docs/RUNBOOKS.md` §4–§5). The
 short form: the JSONL file and its digest are the evidence; `replay` must
 reproduce the digest from the captured stream; `explain` and
 `v_order_chain` locate the decision; the engine is a plain object you can
@@ -208,7 +208,7 @@ The trace format did not change. Two things around it did:
   indices, so old readers parse new traces.
 - The risk audit log a trace points to is a hash chain. When an incident
   replay reproduces the trace digest, check the audit chain too
-  (RUNBOOK_incident_kill_switch.md §6): a matching trace digest with a
+  (docs/RUNBOOKS.md §6): a matching trace digest with a
   broken audit chain means the log was touched after the run.
 
 The MVP trace digest moved during v1.14 for two reasons. Config files that
@@ -222,9 +222,9 @@ well as outputs.
 
 | topic | document |
 |---|---|
-| the type inventory, Protocols, validation | [../API_CONTRACTS.md](../API_CONTRACTS.md) |
+| the type inventory, Protocols, validation | [../API_CONTRACTS.md](API_REFERENCE.md) |
 | canonical JSON, trace id, digest, no-LLM-on-the-path rule | [../PLATFORM_CONVENTIONS.md](../PLATFORM_CONVENTIONS.md) §13 |
 | the store tables and views | [DATA_MODEL.md](DATA_MODEL.md) |
 | the diagram | [DIAGRAMS.md](DIAGRAMS.md) §9, `diagrams/decision_trace_chain.mmd` |
-| Java state directory, retention, archival | `RUNBOOK_shadow_deployment.md` §4–§5; PLATFORM_CONVENTIONS.md §12.3 |
+| Java state directory, retention, archival | `docs/RUNBOOKS.md` §4–§5; PLATFORM_CONVENTIONS.md §12.3 |
 | the observability story (metrics + audit + trace) | [ARCHITECTURE.md](ARCHITECTURE.md) §8 |

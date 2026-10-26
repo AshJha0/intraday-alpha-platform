@@ -13,7 +13,7 @@
 #
 # Offline-agnostic: everything comes from Debian packages + the repo itself —
 # no external package registries at build time beyond apt.
-# Digest pinning policy: see Dockerfile.python header / SECURITY.md (base images are
+# Digest pinning policy: see Dockerfile.python header / docs/GOVERNANCE.md (base images are
 # pinned by digest below; Dependabot's docker ecosystem proposes bumps).
 # =============================================================================
 

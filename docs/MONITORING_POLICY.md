@@ -154,7 +154,7 @@ least once. WATCH asks only for attention and never stops trading.
 ## 9. Open hooks
 
 - **REL-17** supplies `PositionsSnapshot` limits and acts on HALT through the
-  kill switch (`iap.risk.portfolio_limits`, `docs/PORTFOLIO_LIMITS.md`).
+  kill switch (`iap.risk.portfolio_limits`, `archive/docs/PORTFOLIO_LIMITS.md`).
 - **REL-18** supplies `OrdersSnapshot.reconciliation_exceptions` from fill and
   position reconciliation (`iap.paper.reconcile`).
 - `iap.paper.supervisor.PaperSupervisor` wires the three together for a paper

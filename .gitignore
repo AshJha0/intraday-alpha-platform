@@ -91,5 +91,5 @@ deployment/alertmanager/*.url
 research/**/*.jsonl.lock
 research/**/*.json.lock
 
-# CI-lock venv for registering pre-registrations (docs/runbooks/RUNBOOK_prereg_environment.md)
+# CI-lock venv for registering pre-registrations (docs/RUNBOOKS.md)
 .venv-ci/

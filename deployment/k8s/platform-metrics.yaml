@@ -1,7 +1,7 @@
 # =============================================================================
 # platform-metrics — the Python /metrics process (v1.17 WS-F item F9; the
 # Java platform image was retired with DECISION_N7,
-# docs/release/DECISION_N7_JAVA_IMAGE.md). Image: the `python` image,
+# archive/docs/release/DECISION_N7_JAVA_IMAGE.md). Image: the `python` image,
 # deployment/docker/Dockerfile.python.
 #
 # Two containers in ONE pod, mirroring the retired java-platform + sidecar:
@@ -24,7 +24,7 @@
 # There is NO admin API any more: the kill-switch runbook's manual halt is
 # the config path (configs/risk/risk.json global.kill_switch_engaged, then
 # regenerate the ConfigMap and rollout restart), see
-# docs/runbooks/RUNBOOK_incident_kill_switch.md.
+# docs/RUNBOOKS.md.
 #
 # SINGLETON (PLATFORM_CONVENTIONS.md §12.7): replicas 1 + strategy Recreate.
 # The state PVC is ReadWriteOnce and the session writes it; a second replica

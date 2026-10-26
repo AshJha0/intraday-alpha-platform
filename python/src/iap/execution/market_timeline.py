@@ -9,7 +9,7 @@ from __future__ import annotations
 import bisect
 from dataclasses import dataclass, field
 
-#: Fill liquidity flags (API_PORTFOLIO_TCA.md §2.4).
+#: Fill liquidity flags (docs/API_REFERENCE.md §2.4).
 TAKER = "TAKER"
 MAKER = "MAKER"
 

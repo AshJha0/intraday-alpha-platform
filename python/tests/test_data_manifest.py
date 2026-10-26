@@ -123,13 +123,15 @@ def test_committed_manifest_covers_every_committed_citation():
 
 def test_committed_manifest_reproduces_the_iex_overlap_hashes():
     """REL-12 gate: the manifest reproduces the vendor hashes in
-    docs/research/IEX_OVERLAP_SET.md.  Known gap, pinned so it cannot grow:
+    docs/RESEARCH_NOTES.md.  Known gap, pinned so it cannot grow:
     the TOPS captures of 2026-05-15 / 05-18 are recorded in no small file on
     disk (their days have no process_report.json)."""
     m = json.loads(dm.DEFAULT_OUT.read_text(encoding="utf-8"))
     shas = {i["sha256"] for d in m["datasets"] for s in d["sessions"].values() for i in s["inputs"]}
     shas |= {o["sha256"] for d in m["datasets"] for o in d.get("oracle_inputs", [])}
-    doc = (REPO_ROOT / "docs" / "research" / "IEX_OVERLAP_SET.md").read_text(encoding="utf-8")
+    notes = (REPO_ROOT / "docs" / "RESEARCH_NOTES.md").read_text(encoding="utf-8")
+    # only the IEX overlap section (merged into RESEARCH_NOTES.md in v2.1 Track 0)
+    doc = notes.split("## IEX overlap set", 1)[1].split("\n---\n", 1)[0]
     missing = set(re.findall(r"\b[0-9a-f]{64}\b", doc)) - shas
     assert missing == {
         "a583bc3163efa28452d037f0eff081ffae3d0c8ec8777c5401694741f0ccfae9",

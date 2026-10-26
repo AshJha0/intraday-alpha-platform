@@ -23,7 +23,7 @@ its per-venue book inside a per-instrument ``ConsolidatedBook``, and:
 
 Determinism: no wall clock, no unordered iteration — all maps are walked in
 sorted key order when serializing. Checkpoint JSON is cross-language
-(x-version 2; see API_CORE.md section 5).
+(x-version 2; see docs/API_REFERENCE.md section 5).
 """
 
 from __future__ import annotations

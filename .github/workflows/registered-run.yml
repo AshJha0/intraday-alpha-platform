@@ -8,10 +8,10 @@
 #     branch cannot start it), naming the signed prereg and its bound commit;
 #   * environment `sealed`: a protected environment whose required reviewer
 #     is the owner's GitHub account, so every run waits for an explicit
-#     approval (docs/governance/REPO_SETTINGS.md section 7);
+#     approval (docs/GOVERNANCE.md section 7);
 #   * runner: the SELF-HOSTED runner registered with the labels below, whose
 #     service runs as the local account `iap-runner` on the workstation
-#     (docs/governance/RUNNER_SETUP.md). No cloud credentials, no secrets in
+#     (docs/GOVERNANCE.md). No cloud credentials, no secrets in
 #     this file; the sealed service authenticates the caller through the
 #     named pipe (OS identity, no token);
 #   * the job checks out exactly the bound commit, verifies identity,
@@ -21,11 +21,11 @@
 #     ONLY the redacted log (tools/runner/run.py);
 #   * debug modes: ACTIONS_STEP_DEBUG / ACTIONS_RUNNER_DEBUG are forced off
 #     here and must not be set as environment variables or secrets of
-#     `sealed` (REPO_SETTINGS.md); the runner never prints data;
+#     `sealed` (docs/GOVERNANCE.md); the runner never prints data;
 #   * mode `dd1` (v2.0 stage 2 DD1): the same approval, runner identity and
 #     redacted-log rules, no prereg: tools/ingest/dd1_daily.py pulls the free
 #     daily route and seals Track B and Track C through the services' ingest
-#     endpoint (docs/governance/DD1_INGESTION_RUNBOOK.md). `prereg` is
+#     endpoint (docs/GOVERNANCE.md). `prereg` is
 #     ignored in that mode; TIINGO_API_KEY, if the owner set it in the
 #     runner service's own environment, selects Tiingo over Stooq (never a
 #     secret of this workflow). `stooq_sha256` (DR-16): Stooq now serves

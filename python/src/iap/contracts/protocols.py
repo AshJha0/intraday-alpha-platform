@@ -128,7 +128,7 @@ class BookViewLike(Protocol):
 
 @runtime_checkable
 class OrderBookLike(BookViewLike, Protocol):
-    """One venue book (``iap.orderbook.OrderBook`` satisfies it; API_CORE.md
+    """One venue book (``iap.orderbook.OrderBook`` satisfies it; docs/API_REFERENCE.md
     §4 pins the semantics).
 
     ``apply`` returns the pinned ``ApplyStatus`` (APPLIED / DROPPED / HELD)
@@ -188,7 +188,7 @@ class FeatureEngineLike(Protocol):
     """Event-driven feature engine (``iap.features.engine.FeatureEngine``
     satisfies it).  ``apply(event)`` feeds one event and returns the
     emitted vector or ``None``; only APPLIED book events feed rolling
-    state (API_FEATURES.md §2).  ``feature_version`` is the registry hash
+    state (docs/API_REFERENCE.md §2).  ``feature_version`` is the registry hash
     every emitted vector carries."""
 
     feature_version: str
@@ -204,7 +204,7 @@ class Alpha(Protocol):
     ``alpha_id`` is the pinned id (``EQ03``); ``version`` identifies the
     scoring model and parameter set (the ``model_version`` written into the
     signal).  Stateless per row unless the alpha's spec says otherwise
-    (API_ALPHA.md §3); no RNG on the scoring path; an invalid input scores
+    (docs/API_REFERENCE.md §3); no RNG on the scoring path; an invalid input scores
     ``(0.0, confidence 0)``, never NaN.
 
     The research batch scorer ``iap.alpha.base.AlphaModel`` (pandas frames
@@ -223,7 +223,7 @@ class Alpha(Protocol):
 
 @runtime_checkable
 class PortfolioConstructor(Protocol):
-    """Portfolio construction (API_PORTFOLIO_TCA.md §1).
+    """Portfolio construction (docs/API_REFERENCE.md §1).
 
     ``construct(signals, portfolio_state, constraints)`` maps the current
     signals, the held positions / covariance state and the constraint set
@@ -302,7 +302,7 @@ class ExecutionSimulatorLike(Protocol):
 
 @runtime_checkable
 class TCAEngine(Protocol):
-    """Transaction-cost analysis (API_PORTFOLIO_TCA.md §2).
+    """Transaction-cost analysis (docs/API_REFERENCE.md §2).
 
     ``analyse(parent_order, executions, market)`` computes the pinned
     Perold decomposition and benchmarks from the parent, its execution

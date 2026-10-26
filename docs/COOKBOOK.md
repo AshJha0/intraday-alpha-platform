@@ -365,7 +365,7 @@ cd python && PYTHONPATH=src ../.venv-ci/bin/python -m pytest -q tests/runner tes
 
 Expected: `33 passed` and `29 passed, 20 skipped` (the identity-by-partition matrix needs the
 Windows accounts and `IAP_ISOLATION_CREDENTIALS`; it skips elsewhere). A signature proves integrity
-and nothing else ([governance/TRUST_ROOTS.md](governance/TRUST_ROOTS.md)).
+and nothing else ([governance/TRUST_ROOTS.md](GOVERNANCE.md)).
 
 ---
 
@@ -374,13 +374,13 @@ and nothing else ([governance/TRUST_ROOTS.md](governance/TRUST_ROOTS.md)).
 Both are owner actions on the workstation and in the GitHub UI; nothing in this repository performs
 them, and no session may. The runbooks are the procedure; this recipe only says where they are.
 
-- **Ingest the free daily route**: [governance/DD1_INGESTION_RUNBOOK.md](governance/DD1_INGESTION_RUNBOOK.md)
+- **Ingest the free daily route**: [governance/DD1_INGESTION_RUNBOOK.md](GOVERNANCE.md)
   section 2 (interpreter for all users, the three sealed services, the runner, trigger
   `registered-run` in `dd1` mode, approve the `sealed` environment, read the redacted log, list the
   record in the manifest). Nothing has been ingested as of 2026-10-25.
-- **Install the runner once**: [governance/RUNNER_SETUP.md](governance/RUNNER_SETUP.md); the
+- **Install the runner once**: [governance/RUNNER_SETUP.md](GOVERNANCE.md); the
   repository settings it needs (the `sealed` environment with the owner as required reviewer, the
-  `results` branch ruleset) are [governance/REPO_SETTINGS.md](governance/REPO_SETTINGS.md) section 7
+  `results` branch ruleset) are [governance/REPO_SETTINGS.md](GOVERNANCE.md) section 7
   and are not yet set.
 - **Approve a registered run**: [RUNBOOK_v2.md](RUNBOOK_v2.md) section 5 (the preconditions
   anyone can verify without a sealed read, the approval, where the result lands and how to verify
@@ -398,7 +398,7 @@ Expected: the image pulled by the digest in `deployment/docker/IMAGE_DIGEST`, th
 and report and the REL-08 scorecard re-derived and compared byte for byte, exit 0. The full
 procedure, the status vocabulary ("reproduced in the pinned image by CI" is not "reproduced
 independently") and what an independent party runs are [REPRODUCTION.md](REPRODUCTION.md).
-**Evidence class of both results: development-supported** ([REVIEW_PACK.md](REVIEW_PACK.md)
+**Evidence class of both results: development-supported** ([REVIEW_PACK.md](../archive/docs/REVIEW_PACK.md)
 section 0).
 
 ---

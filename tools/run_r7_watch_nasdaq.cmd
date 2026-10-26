@@ -1,5 +1,5 @@
 @echo off
-rem Nasdaq ITCH sample-directory watch (docs/runbooks/RUNBOOK_r7_nasdaq_watch.md).
+rem Nasdaq ITCH sample-directory watch (docs/RUNBOOKS.md).
 rem One read-only GET of the listing; never downloads. Exit 0 nothing new, 10 new day(s), 1 error.
 setlocal
 set "REPO=%~dp0.."

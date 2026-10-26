@@ -97,7 +97,7 @@ def test_codeowners_cover_the_workflow_and_the_runner():
 
 
 def test_repo_settings_list_the_protections_the_owner_must_set():
-    text = (GOV / "REPO_SETTINGS.md").read_text(encoding="utf-8")
+    text = (REPO_ROOT / "docs" / "GOVERNANCE.md").read_text(encoding="utf-8")
     for needle in (
         "sealed",
         "required reviewer",
@@ -112,7 +112,7 @@ def test_repo_settings_list_the_protections_the_owner_must_set():
 
 
 def test_threat_model_covers_the_six_properties_and_the_custody_label():
-    text = (GOV / "RUNNER_THREAT_MODEL.md").read_text(encoding="utf-8")
+    text = (REPO_ROOT / "docs" / "GOVERNANCE.md").read_text(encoding="utf-8")
     for n in range(1, 7):
         assert re.search(rf"(^|\n)#+ .*\b{n}\b", text) or f"Property {n}" in text, f"property {n}"
     assert "mechanically isolated" in text
@@ -131,14 +131,14 @@ def test_threat_model_covers_the_six_properties_and_the_custody_label():
 
 
 def test_sealed_data_doc_states_the_single_machine_limit():
-    text = (GOV / "SEALED_DATA.md").read_text(encoding="utf-8")
+    text = (REPO_ROOT / "docs" / "GOVERNANCE.md").read_text(encoding="utf-8")
     assert "single" in text.lower() and "machine" in text.lower()
     assert "administrator" in text.lower()
     assert "mechanically isolated" in text
 
 
 def test_runner_setup_installs_nothing_from_the_repository():
-    text = (GOV / "RUNNER_SETUP.md").read_text(encoding="utf-8")
+    text = (REPO_ROOT / "docs" / "GOVERNANCE.md").read_text(encoding="utf-8")
     assert "iap-runner" in text and "config.cmd" in text and "svc" in text.lower()
     assert "sealed" in text
 

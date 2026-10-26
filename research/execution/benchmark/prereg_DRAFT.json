@@ -64,7 +64,7 @@
   ],
   "fresh_test": {
     "command": "python -m iap.research.execution_benchmark --data-dir <each fresh dataset> --config-dir <its configs> --walk-depth 50 --window-min 30 --signal EQ10 --policies native,native+urgency,native+pacing,native+ac,native+ac_drift --allow-holdout --tag b7_<day> (then one pooled day-clustered table over the days)",
-    "note": "plan row B7: the IEX overlap days (data/real/iex/iex_<day>, venue IEXG, docs/research/IEX_OVERLAP_SET.md) plus the Nasdaq overlap days (the same nine 2025/26 sessions). The run happens once, after signature, on every day listed with both dataset_version hashes filled; a day whose IEX dataset is not ingested at signing time is dropped from the list before signing, never padded. None of these days has been read by the benchmark.",
+    "note": "plan row B7: the IEX overlap days (data/real/iex/iex_<day>, venue IEXG, docs/RESEARCH_NOTES.md) plus the Nasdaq overlap days (the same nine 2025/26 sessions). The run happens once, after signature, on every day listed with both dataset_version hashes filled; a day whose IEX dataset is not ingested at signing time is dropped from the list before signing, never padded. None of these days has been read by the benchmark.",
     "sessions": [
       {
         "day": "2025-11-28",

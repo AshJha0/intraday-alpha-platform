@@ -23,10 +23,10 @@ the 100-name 2019-01-30 breadth day, the 20-name REL-04c set and IEX HIST
 DEEP+ datasets for the 2025/26 days (§3.6). The IEX path is checked against
 the TOPS oracle; the LOBSTER reconstruction rules were checked once, on one
 free sample file, through the REL-12 oracle
-([research/ITCH_ORACLE.md](research/ITCH_ORACLE.md)), which does not test the
+([research/ITCH_ORACLE.md](RESEARCH_NOTES.md)), which does not test the
 ITCH byte parser. **No signal is promoted and no edge is claimed from any of
 this data** (v1.18.0 release notes,
-[release/v1.18.0_RELEASE_NOTES.md](release/v1.18.0_RELEASE_NOTES.md)); the
+[release/v1.18.0_RELEASE_NOTES.md](../archive/docs/release/v1.18.0_RELEASE_NOTES.md)); the
 studies recorded so far are in §3. Backlog issue XD10 ([EPICS.md](EPICS.md),
 E25) is still listed as backlog there. §9 gives the two opt-in tests.
 
@@ -323,7 +323,7 @@ confirmed". Statistical only: no P&L claim was registered.
 | EQ07 reversal @ 10s, sign + | control, expected to fail | −0.012 (−3.0) | −0.021 | −3.95 | 3.85 | **contradicted** (exit 3), as expected |
 | EQ04 trade flow @ 5s | control, expected underpowered | +0.014 (3.6) | +0.028 | 3.15 | 3.89 | weaker, not confirmed, as expected |
 
-> **Evidence class (v2.0, U0 section 10):** "confirmed" in this table is the v1.8 gate's word. The round was run by the developer on the developer's machine and the holdout is now spent, so under the v2.0 classes it is **development-supported** at most; no execution separation, no independent review ([REVIEW_PACK.md](REVIEW_PACK.md) section 0).
+> **Evidence class (v2.0, U0 section 10):** "confirmed" in this table is the v1.8 gate's word. The round was run by the developer on the developer's machine and the holdout is now spent, so under the v2.0 classes it is **development-supported** at most; no execution separation, no independent review ([REVIEW_PACK.md](../archive/docs/REVIEW_PACK.md) section 0).
 
 Leakage passed on every run; fold sign consistency was 0.75 (EQ01, EQ02,
 EQ05, EQ04), 1.00 (EQ10) and 0.00 (EQ07). Reading it:
@@ -365,11 +365,11 @@ was recomputed at the registered N = 297 with the verdicts unchanged
 (`research/r7/r7_confirm_result_dsr_recompute.md`), but the result file was not
 re-issued (gate F5, partly met). No net-of-cost edge followed from either
 holdout: gate-passing information coefficients of 0.03-0.10 at 1-5 s do not clear
-the taker round trip (§3.2 above; `docs/SIGNAL_RESEARCH.md` section 8).
+the taker round trip (§3.2 above; `archive/docs/SIGNAL_RESEARCH.md` section 8).
 
 **Multi-venue routing on real data (v1.12, X5).** Every real session in
 this repository is Nasdaq TotalView-ITCH (or LOBSTER built from it): one
-venue, `XNAS`. The cost-aware router (`iap.execution.sor_v2`, API_TRADING.md
+venue, `XNAS`. The cost-aware router (`iap.execution.sor_v2`, docs/API_REFERENCE.md
 §2.9) therefore has a single candidate on real data and always returns it;
 its sweep, passive split, toxicity and tier logic is exercised only on
 synthetic multi-venue books. It is capability for multi-venue data later
@@ -389,7 +389,7 @@ synthetic multi-venue books. It is capability for multi-venue data later
 result below (v1.12.0, 2026-10-10) is NO DEMONSTRATED EDGE, and the 2026
 holdout verdict is **NOT CONFIRMED** (0 trades on 6 holdout decisions, frozen
 `C-300s` fit; `data/real/auction/AUC01_holdout2026.json`, which is git-ignored;
-summarised in [README_HISTORY.md](README_HISTORY.md)). Both are pre-registered
+summarised in [README_HISTORY.md](../archive/docs/README_HISTORY.md)). Both are pre-registered
 (prereg sha256 `9ea0915c…`). The paragraphs below are kept as written on
 2026-10-10 where marked.
 
@@ -440,7 +440,7 @@ decisions, 0 trades, verdict `NOT CONFIRMED`. (The paragraph that stood here on
 **Maker and quoting studies: finished, no edge.** The pre-registered maker
 study (EQ01 / EQ02 / EQ05 / EQ10 with taker and passive exits) on the seven
 in-sample sessions finished in v1.15 with no maker edge: every traded cell was
-negative ([README_HISTORY.md](README_HISTORY.md); its hypothesis was dropped from
+negative ([README_HISTORY.md](../archive/docs/README_HISTORY.md); its hypothesis was dropped from
 R7). The M5 quoting study v1 was aborted before any result was read
 (`data/real/quoting_real/ABORTED.md`); the v2 study, registered 2026-10-14 on
 the same seven sessions, reads **no quoting edge** (signal skew reduces the
@@ -526,7 +526,7 @@ without `tools/r7_download.py --i-have-approval` (COOKBOOK recipe 66).
 
 A full-market day's raw and normalized files do not fit beside the next
 one on this machine, so the breadth universe is built with
-`python -m iap.marketdata process-day` (docs/runbooks/RUNBOOK_process_and_delete.md):
+`python -m iap.marketdata process-day` (docs/RUNBOOKS.md):
 disk guard, optional approved download, ingest with
 `--partition-instruments N` (the normaliser works in on-disk partitions
 of N instruments and merges them in event-time windows into byte-identical
@@ -540,7 +540,7 @@ deleted before the kept files verify. The `plan-ingest` batch of section
 
 The nine Nasdaq 2025/26 sessions on disk (2025-11-28, 2025-12-08..12,
 2026-05-15, 2026-05-18, 2026-06-12) are also on IEX HIST, free. `python -m
-iap.marketdata process-iex-day` (RUNBOOK_process_and_delete.md, IEX section)
+iap.marketdata process-iex-day` (docs/RUNBOOKS.md, IEX section)
 builds the same day's IEX dataset for the same three names, venue `IEXG`:
 the TOPS capture is read once for the universe's quotes (the oracle), deleted,
 then the DEEP+ capture is ingested with that oracle as `book_verification`,
@@ -549,7 +549,7 @@ deleted, one vendor file on disk at a time. `tools/iex_hist.py index` writes
 the manifest from the HIST index with the owner's approval sentence;
 `tools/iex_hist.py recent --n 5` writes the rolling list (the latest five HIST
 days with TOPS and DEEP+) without one, so it is a list until approved. The
-per-day results are in docs/research/IEX_OVERLAP_SET.md.
+per-day results are in docs/RESEARCH_NOTES.md.
 
 *v1.18 REL-04 capture timestamp.* `process-iex-day --capture-ts`
 (`ingest(capture_ts=True)`) writes the IEX capture host's packet timestamp as
@@ -570,7 +570,7 @@ Which sessions are in-sample, spent or unread is enforced state, not a table in
 prose: `research/holdout_registry.json` (hash-locked, fail-closed) classifies
 every dataset by content hash and every session by symbol scope, and a read of
 a spent or unread session without a matching signed pre-declaration is refused
-before any data is opened (`docs/governance/DATA_ACCESS_PATHS.md` lists every
+before any data is opened (`docs/GOVERNANCE.md` lists every
 route and its guard). At v1.18.0 it holds 35 datasets: 14 `in_sample` (the
 2019-2021 sessions: the seven `ds3_*` days, `multi7`, the 2019-10-18 / 2021-07-13
 / 2021-08-13 days, the 100-name 2019-01-30 day, and the smoke and REL-04c sets
@@ -1207,7 +1207,7 @@ since v1.13.0 (above).
   feed delay by default (`configs/reference/venue_latency.json` `feed_delay`,
   with the `receive_ts` relationship stated per ingest route), never zero
   unless a caller asks for zero explicitly, and records which it used
-  (API_TRADING.md section 2.20).
+  (docs/API_REFERENCE.md section 2.20).
 - **Broken trades** are mapped to `TRADE_BUST` events and counted (§4.2); the book applies them as a no-op, so a broken print is not reversed out of the book.
 - **One tick size and one universe per dataset** (§4.1); listings,
   delistings and symbol changes inside a dataset are backlog XD08.
@@ -1228,7 +1228,7 @@ since v1.13.0 (above).
   overlap datasets. The seven `ds3_*` days, `multi7` and `holdout2026` are
   x-version 1 (pre-v1.14 rules) and v1.14 refuses them until they are
   re-ingested (§4). LOBSTER has been checked on one free sample through the
-  REL-12 oracle only (docs/research/ITCH_ORACLE.md), not on a licensed vendor file.
+  REL-12 oracle only (docs/RESEARCH_NOTES.md), not on a licensed vendor file.
 - **Not supported:** CBOE PITCH, NYSE feeds, FX ECN feeds (backlog XD02,
   XD07); ITCH versions other than 5.0; the Rust, C++ and Java ports do not
   have these readers — they consume the canonical files the ingest writes.

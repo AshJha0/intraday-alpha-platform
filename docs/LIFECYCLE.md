@@ -80,7 +80,7 @@ Pinned semantics of `advance(alpha_id, event_ts, evidence)`:
 - **RETIRED is terminal for SYSTEM.** A SYSTEM `advance` on a RETIRED alpha
   records outcome `TERMINAL` and returns nothing. The adaptive tracker's
   RETIRED → WATCH recovery models shadow scoring inside one backtest
-  (API_ADAPTIVE.md §6); on the platform re-entry is the HUMAN reset to
+  (docs/API_REFERENCE.md §6); on the platform re-entry is the HUMAN reset to
   RESEARCH, which re-runs the whole evidence chain.
 - Live wrapping: the tracker's `Transition(reason, rolling_ic)` becomes
   `LifecycleTransition(gates={"rolling_ic": GateResult(passed, value=rolling_ic,
@@ -671,7 +671,7 @@ changed.
   bootstrap gate out. Both replay LC05 and LC06 exactly. Neither port
   computes a correlation or resamples: they evaluate the gates from the
   evidence document.
-- **Caveat, unchanged (API_ADAPTIVE.md §6, README, GOVERNANCE gate 11):** in
+- **Caveat, unchanged (docs/API_REFERENCE.md §6, README, GOVERNANCE gate 11):** in
   the live Java paper loop the lifecycle gauge is **observational** — a
   RETIRED alpha keeps trading at full size and `AlphaLifecycleRetired` pages
   a human. Making RETIRED an allocation gate is backlog issue `L04`
@@ -723,9 +723,9 @@ configurations (HOW_IT_WORKS.md §2.7).
 
 | topic | document |
 |---|---|
-| ACTIVE / WATCH / RETIRED rules, informative evaluations, `lifecycle_log.jsonl` | [../API_ADAPTIVE.md](../API_ADAPTIVE.md) §6 |
-| the `LifecycleTransition` / `GateResult` contract | [../API_CONTRACTS.md](../API_CONTRACTS.md), `schemas/alpha/lifecycle_transition.schema.json` |
+| ACTIVE / WATCH / RETIRED rules, informative evaluations, `lifecycle_log.jsonl` | [../API_ADAPTIVE.md](API_REFERENCE.md) §6 |
+| the `LifecycleTransition` / `GateResult` contract | [../API_CONTRACTS.md](API_REFERENCE.md), `schemas/alpha/lifecycle_transition.schema.json` |
 | the `lifecycle_transitions` table (live ledger under the current scope, archived ledgers under their own) and `v_alpha_scorecard` | [DATA_MODEL.md](DATA_MODEL.md) §3.2, §4 |
-| the promotion-gate rule (no verdict / state change without a ledger entry id) | [../CONTRIBUTING.md](../CONTRIBUTING.md) §6, [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2 |
+| the promotion-gate rule (no verdict / state change without a ledger entry id) | [../CONTRIBUTING.md](../CONTRIBUTING.md) §6, [governance/GOVERNANCE.md](GOVERNANCE.md) §2 |
 | the diagram | [DIAGRAMS.md](DIAGRAMS.md) §8, `diagrams/lifecycle_state_machine.mmd` |
 | scenarios (demotion, manual retire, silence) | [SCENARIOS.md](SCENARIOS.md), RESEARCH section |

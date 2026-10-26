@@ -2,7 +2,7 @@
 # state-backup — periodic copy of the platform state volume (v1.12.0, plan
 # P4 "HA for single-PVC state"; v1.17 F9: the volume is the Python
 # platform-metrics pod's iap-platform-state, the image is the python image).
-# Runbook: docs/runbooks/RUNBOOK_alerting.md §4 (backup / restore / node loss).
+# Runbook: docs/RUNBOOKS.md §4 (backup / restore / node loss).
 #
 # WHAT HA MEANS HERE (and what it does not):
 #   - The session is a SINGLETON (platform-metrics.yaml): replicas 1, strategy

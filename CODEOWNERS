@@ -1,6 +1,6 @@
 # CODEOWNERS — review ownership by area.
 #
-# Referenced by docs/governance/SECURITY.md ("reports about deployment go to
+# Referenced by docs/GOVERNANCE.md ("reports about deployment go to
 # CODEOWNERS for deployment/") and GOVERNANCE.md §1/§3 (a limit or contract
 # change needs the owning reviewer). GitHub requires a review from every
 # matching owner before a PR to a protected branch can merge; the last
@@ -14,21 +14,14 @@
 # limits, core (market data, book, codecs, replay), execution (simulator, SOR,
 # algos, TCA), research (features, alphas, models, papers), docs/contracts.
 # Note: GitHub does not let a PR author approve their own PR, so a rule that
-# requires code-owner review needs a second maintainer (REPO_SETTINGS.md).
+# requires code-owner review needs a second maintainer (docs/GOVERNANCE.md).
 
 # ------------------------------------------------------------- default ------
 *                                   @AshJha0
 
 # ------------------------------------------------------------- contracts ----
 /PLATFORM_CONVENTIONS.md            @AshJha0
-/API_CORE.md                        @AshJha0
-/API_FEATURES.md                    @AshJha0
-/API_ALPHA.md                       @AshJha0
-/API_ADAPTIVE.md                    @AshJha0
-/API_PORTFOLIO_TCA.md               @AshJha0
-/API_CONTRACTS.md                   @AshJha0
-/API_TRADING.md                     @AshJha0
-/docs/SPECIFICATION.md              @AshJha0
+/docs/docs/SPECIFICATION.md              @AshJha0
 /docs/LIFECYCLE.md                  @AshJha0
 /docs/DECISION_TRACE.md             @AshJha0
 /docs/DATA_MODEL.md                 @AshJha0
@@ -126,9 +119,8 @@
 /CODEOWNERS                         @AshJha0
 
 # ------------------------------------------------------------- runbooks -----
-/docs/runbooks/                     @AshJha0
-/docs/runbooks/RUNBOOK_incident_kill_switch.md @AshJha0
-/docs/runbooks/RUNBOOK_incident_replay.md @AshJha0
+/docs/RUNBOOKS.md                  @AshJha0
+/docs/GOVERNANCE.md                @AshJha0
 /docs/governance/                   @AshJha0
 /docs/SCENARIOS.md                  @AshJha0
 
@@ -144,24 +136,8 @@
 /rust/alpha/src/                     @AshJha0
 /rust/contracts/src/                 @AshJha0
 /rust/lifecycle/src/                 @AshJha0
-/cpp/src/contracts/                  @AshJha0
-/cpp/include/iap/contracts/          @AshJha0
-/archive/java/src/main/java/com/iap/core/    @AshJha0
-/archive/java/src/main/java/com/iap/codec/   @AshJha0
-/archive/java/src/main/java/com/iap/orderbook/ @AshJha0
-/archive/java/src/main/java/com/iap/replay/  @AshJha0
-/archive/java/src/main/java/com/iap/features/ @AshJha0
-/archive/java/src/main/java/com/iap/alpha/   @AshJha0
-/archive/java/src/main/java/com/iap/risk/    @AshJha0
-/archive/java/src/main/java/com/iap/execution/ @AshJha0
-/archive/java/src/main/java/com/iap/sor/     @AshJha0
-/archive/java/src/main/java/com/iap/contracts/ @AshJha0
-/archive/java/src/main/java/com/iap/trace/   @AshJha0
-/archive/java/src/main/java/com/iap/lifecycle/ @AshJha0
 /archive/java/src/main/java/com/iap/portfolio/ @AshJha0
-/archive/java/src/main/java/com/iap/tca/     @AshJha0
 /archive/java/src/main/java/com/iap/backtest/ @AshJha0
-/archive/java/src/main/java/com/iap/adaptive/ @AshJha0
 
 # ------------------------------------------------- v2.0 stage 2: sealed data and the registered runner
 # U0 section 2, property 2: the development identity cannot change the

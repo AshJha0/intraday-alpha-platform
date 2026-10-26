@@ -8,7 +8,7 @@
 #   prometheus  -> alertmanager:9093     (alert delivery)
 # Nothing else in-cluster may reach the platform pod. (v1.17 F9: the Java
 # kill-switch admin API and its operator -> :8080 rule are retired; the
-# manual halt is the config path, RUNBOOK_incident_kill_switch.md.)
+# manual halt is the config path, docs/RUNBOOKS.md.)
 #
 # EGRESS is default-deny too (default-deny-egress), with explicit allowances:
 #   all pods        -> kube-dns:53 (UDP+TCP)

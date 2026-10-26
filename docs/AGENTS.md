@@ -5,7 +5,7 @@ Roster and model pins as of v1.17 WS-E (2026-10-15), unchanged in v1.18.0 (2026-
 and a set of non-LLM agent-layer controls. Every LLM call is paid from the
 owner's Anthropic key (`ANTHROPIC_API_KEY` or `--env-file`; never printed,
 logged or persisted), charged to the shared spend ledger
-([GOVERNANCE.md §2c](governance/GOVERNANCE.md)) and refused before it is made
+([GOVERNANCE.md §2c](GOVERNANCE.md)) and refused before it is made
 when it would pass the monthly cap. Tests and CI use the scripted client of
 `iap.llm.fake`: no network, no key, no spend.
 
@@ -23,11 +23,11 @@ Non-LLM agent-layer components (`iap.agents`): the hash-chained blackboard and
 its single writer (`WriteBroker`), Ed25519 signing and the maintainer-signed key
 registry, the pre-registration gate and fingerprint, the human sign-off
 workflow, the reserve evaluator, the read-only MCP server. They are the
-governance the LLM agents act through; [API_AGENTS.md](../API_AGENTS.md) lists
+governance the LLM agents act through; [docs/API_REFERENCE.md](API_REFERENCE.md) lists
 them. v1.18 added to them the analysis-identity binding of signed pre-declarations
-(`iap.agents.analysis_identity`, [governance/ANALYSIS_IDENTITY.md](governance/ANALYSIS_IDENTITY.md)): a runner
+(`iap.agents.analysis_identity`, [governance/ANALYSIS_IDENTITY.md](GOVERNANCE.md)): a runner
 declares an actor and holds no signing key, which is tamper evidence, not independence
-([governance/TRUST_ROOTS.md](governance/TRUST_ROOTS.md), "What a signature proves"). REL-16 monitoring
+([governance/TRUST_ROOTS.md](GOVERNANCE.md), "What a signature proves"). REL-16 monitoring
 (`iap.monitoring`, [MONITORING_POLICY.md](MONITORING_POLICY.md)) lets an explainer
 use only code-computed facts and rejects text that names a different state; no LLM decides a
 monitoring state. No agent promoted a signal in v1.18.
@@ -107,6 +107,6 @@ patch that applies cleanly and leaves the tree untouched. Every eval asserts
 that the (temporary) spend ledger holds one row per model call. The `docs` job
 (advisory) runs `tests/harness/check_docs.py` and lychee.
 
-Related: [GOVERNANCE.md §2a-2d](governance/GOVERNANCE.md),
-[RUNBOOK_paper_trade.md](runbooks/RUNBOOK_paper_trade.md),
+Related: [GOVERNANCE.md §2a-2d](GOVERNANCE.md),
+[docs/RUNBOOKS.md](RUNBOOKS.md),
 [DIAGRAMS.md §26](DIAGRAMS.md) (the AI1 loop and its controls).

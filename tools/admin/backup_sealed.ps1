@@ -3,7 +3,7 @@
 #   .\tools\admin\backup_sealed.ps1 -Destination E:\iap-backup [-Repo C:\iap\repo] [-Python C:\Python312\python.exe]
 #                                   [-SealedRoot C:\iap-sealed] [-Partitions a,b,c,runner]
 #
-# Runbook: docs/governance/SEALED_DATA.md section 6. Run it after each ingestion and each registered run, when no
+# Runbook: docs/GOVERNANCE.md section 6. Run it after each ingestion and each registered run, when no
 # ingestion or run is in flight. The destination is an NTFS volume (exFAT and FAT32 drop the access lists), normally
 # an external drive encrypted with BitLocker To Go and kept offline between backups.
 #

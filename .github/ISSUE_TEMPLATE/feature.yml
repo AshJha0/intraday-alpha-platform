@@ -31,7 +31,7 @@ body:
     id: context
     attributes:
       label: Context
-      description: Which contract clause or spec section this serves (PLATFORM_CONVENTIONS.md §, API_*.md §, docs/SPECIFICATION.md §). Why now.
+      description: Which contract clause or spec section this serves (PLATFORM_CONVENTIONS.md §, API_*.md §, archive/docs/SPECIFICATION.md §). Why now.
     validations:
       required: true
   - type: textarea

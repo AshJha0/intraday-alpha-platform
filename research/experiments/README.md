@@ -29,7 +29,7 @@ research/experiments/
   `iap.research.specs`), the three walk-forward periods (train, the
   purged + embargoed validation tail, the holdout test session) and the
   seed — everything needed to reproduce the run
-  (docs/governance/REPRODUCIBILITY.md).
+  (docs/GOVERNANCE.md).
 - `result.json` (`schemas/research/experiment_result.schema.json`) carries
   the walk-forward evidence (`iap.validation.validate_alpha`: IC, rank IC,
   the gate t — under the default methods the HAC t of the pooled slope,

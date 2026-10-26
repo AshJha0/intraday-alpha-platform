@@ -12,7 +12,7 @@ section 8). Fill the `TBD` cells and delete this banner when the result PR lands
 Gate F7 (programme section 9.2): *the outside reviewer reproduces the REL-04b JSON under the
 reproducibility contract (section 9.6)*. Deliverable (b) of section 9.3: *reproduce the REL-04b
 JSON and one alpha-track scorecard from the review pack on your own machine, with a written note
-of what you could not reproduce.* This guide supplements [../REVIEW_PACK.md](../REVIEW_PACK.md)
+of what you could not reproduce.* This guide supplements [../REVIEW_PACK.md](../../archive/docs/REVIEW_PACK.md)
 section 3, whose REL-04b and REL-08 entries are still placeholders.
 
 ## 0. Read this first: three tiers, and what each proves
@@ -136,10 +136,10 @@ was skipped for memory, so plan for a machine with ample RAM and say what you us
 | `iex/iex_20260515` | `bd6f9c707d898007ca281ff093602176c39ac1cf45e0894808e7d1f14bdd3904` | `20260515_IEXTP1_DPLS1.0.pcap.gz`, 11,905,260,029 B | `1b917e6101c1e1af9e082a5c79961e97e66d123d94aefbe7db0efc154ce2c683` | IEX HIST |
 | `iex/iex_20260518` | `ba2022d0d53c013be27f9b3ce6eeef13baa4280009ef32f6c2761b43e61037f4` | `20260518_IEXTP1_DPLS1.0.pcap.gz`, 14,210,389,328 B | `a5239f606eb25a11b6621a379e4c6a77ea96545bee6e2482ee5e72d15a6173a2` | IEX HIST |
 
-`dataset_version` is the sha256 over the normalized IAP1 bytes (`docs/governance/REPRODUCIBILITY.md`
+`dataset_version` is the sha256 over the normalized IAP1 bytes (`docs/GOVERNANCE.md`
 section 1); the ingest is deterministic, so the same raw bytes and the same ingest code give the
 same version, and the runner checks it before any analysis. Ingest procedure:
-`docs/runbooks/RUNBOOK_process_and_delete.md` ("IEX HIST days", `process-iex-day`) for the IEX
+`docs/RUNBOOKS.md` ("IEX HIST days", `process-iex-day`) for the IEX
 days, `python -m iap.marketdata ingest --format itch50 ...` for Nasdaq
 (`docs/REAL_DATA.md` section 3, `docs/runbooks/RUNBOOK_rel07_breadth_labels.md` for an example).
 **The exact ingest invocation per dataset is not recorded in the repository** (not recorded in the repository); the
@@ -357,5 +357,5 @@ Dataset versions for the REL-05 sessions: 2019-01-30 `06419d74...7293`, 2019-03-
 * Commit the result files (section 3.4, 5) so a reviewer can run tier A without asking: B8 v2
   results are currently untracked in the owner's `wt-b8v2-run`; REL-05, 09, 10 results in
   `wt-q-rel05`, `wt-q-rel09`, `wt-q-rel10`; REL-08 in `wt-rel08-run`.
-* Replace the `TBD` placeholders in `docs/REVIEW_PACK.md` section 3 with a pointer to this file
+* Replace the `TBD` placeholders in `archive/docs/REVIEW_PACK.md` section 3 with a pointer to this file
   and the commit that carries the results.

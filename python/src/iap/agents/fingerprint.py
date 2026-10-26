@@ -208,7 +208,7 @@ def check_registration_env(
     Returns ``True`` when they match.  On a mismatch prints a warning (to
     ``out``, default stderr) and returns ``False``; with ``require_ci_env``
     raises ``SystemExit(2)`` instead.  See
-    docs/runbooks/RUNBOOK_prereg_environment.md.
+    docs/RUNBOOKS.md.
     """
     import sys
 
@@ -221,7 +221,7 @@ def check_registration_env(
     print(
         f"[ci-env] WARNING: deps differ from {Path(lock).name}: {rows}. A prereg registered "
         "here will be refused by CI's prereg gate ('deps changed since pre-registration'). "
-        "Register from the CI venv: docs/runbooks/RUNBOOK_prereg_environment.md",
+        "Register from the CI venv: docs/RUNBOOKS.md",
         file=out,
     )
     if require_ci_env:

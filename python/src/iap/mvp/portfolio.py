@@ -3,7 +3,7 @@
 :class:`SingleStockPortfolio` implements
 :class:`~iap.contracts.protocols.PortfolioConstructor` over the production
 optimizer :func:`iap.portfolio.optimizer.solve` (deterministic PGD,
-API_PORTFOLIO_TCA.md §1) with the RiskMetrics EWMA variance of
+docs/API_REFERENCE.md §1) with the RiskMetrics EWMA variance of
 :func:`iap.portfolio.covariance.ewma_covariance` on completed 1-minute bar
 log returns — the same sizing chain the Java paper vertical runs
 (``PaperTrading.solveWeight``).

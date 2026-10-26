@@ -52,9 +52,9 @@ tests:
             exp_annotations:
               summary: "order-path-latency SLO fast burn on platform-metrics"
               description: "The decision-to-wire order path (incl. the pre-trade risk check) is burning its 30-day error budget (99% under 1.05 ms) at 6x or more: at this rate the budget is gone in days. Check job:order_path_latency_ns:p99 and the venue latency realism
-                of the run (configs/prereg/v3.json). Runbook: docs/runbooks/RUNBOOK_alerting.md#latency-slo"
-              runbook: docs/runbooks/RUNBOOK_alerting.md
-              runbook_url: docs/runbooks/RUNBOOK_alerting.md#latency-slo
+                of the run (configs/prereg/v3.json). Runbook: docs/RUNBOOKS.md#latency-slo"
+              runbook: docs/RUNBOOKS.md
+              runbook_url: docs/RUNBOOKS.md#latency-slo
       - eval_time: 20m
         alertname: OrderPathLatencySLOSlowBurn
         exp_alerts: []
@@ -80,9 +80,9 @@ tests:
               slo: order-path-latency
             exp_annotations:
               summary: "order-path-latency SLO slow burn on platform-metrics"
-              description: "The decision-to-wire order path (incl. the pre-trade risk check) is consuming its 30-day error budget (99% under 1.05 ms) faster than it accrues. Not urgent; investigate the same day. Runbook: docs/runbooks/RUNBOOK_alerting.md#latency-slo"
-              runbook: docs/runbooks/RUNBOOK_alerting.md
-              runbook_url: docs/runbooks/RUNBOOK_alerting.md#latency-slo
+              description: "The decision-to-wire order path (incl. the pre-trade risk check) is consuming its 30-day error budget (99% under 1.05 ms) faster than it accrues. Not urgent; investigate the same day. Runbook: docs/RUNBOOKS.md#latency-slo"
+              runbook: docs/RUNBOOKS.md
+              runbook_url: docs/RUNBOOKS.md#latency-slo
   - interval: 1m
     name: order-path-latency no traffic (finished session) fires nothing
     input_series:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Markdown rows for docs/research/IEX_OVERLAP_SET.md from the finished days'
+"""Markdown rows for docs/RESEARCH_NOTES.md from the finished days'
 ``process_report.json`` (v1.17, A4).  Read-only.
 
     python tools/iex_overlap_rows.py --out-root data/real/iex [--date 2025-11-28]

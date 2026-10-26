@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Safety-relevant defects (risk engine, kill switch, admin API, audit logs) follow
-        docs/governance/SECURITY.md instead of a public issue.
+        docs/GOVERNANCE.md instead of a public issue.
   - type: dropdown
     id: languages
     attributes:
@@ -21,7 +21,7 @@ body:
     attributes:
       label: Contract clause violated
       description: The pinned rule the behaviour contradicts.
-      placeholder: "PLATFORM_CONVENTIONS.md §11.2 rule 7 / API_CORE.md §4 / execution.hpp rule 3b"
+      placeholder: "PLATFORM_CONVENTIONS.md §11.2 rule 7 / docs/API_REFERENCE.md §4 / execution.hpp rule 3b"
     validations:
       required: true
   - type: textarea

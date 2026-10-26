@@ -5,7 +5,7 @@ Replays the first 500 events of ``tests/golden/events_eq_mbo.jsonl`` through
 ``iap.features.engine.FeatureEngine`` (built from the nested configs tree) and
 asserts that the chain produces a ``FeatureVector`` whose ``feature_version``
 is the feature-registry hash — the contract every downstream consumer keys on
-(schemas/features/feature_vector.schema.json, API_FEATURES.md §1).
+(schemas/features/feature_vector.schema.json, docs/API_REFERENCE.md §1).
 """
 
 from __future__ import annotations

@@ -15,7 +15,7 @@ capped child, B8 v2, REL-05 and REL-04c). Every number below is copied from a co
 artefact named next to it; the LLM computes none of them. The negative and
 inconclusive findings are stated as such. Companion pages:
 [HOW_IT_WORKS.md](HOW_IT_WORKS.md) section 3.5 (what a simulated cost is),
-[../API_TRADING.md](../API_TRADING.md) section 2 (the signatures).
+[../API_TRADING.md](API_REFERENCE.md) section 2 (the signatures).
 
 ## 1. What the implementation-shortfall benchmark measures
 
@@ -121,7 +121,7 @@ child of section 10, used by the signed B8 v2 run (section 11).
 ## 4. Signal-aware urgency and pacing (B2 / B3)
 
 Both are opt-in and byte-identical off (the existing execution goldens are
-unchanged). Signatures: [../API_TRADING.md](../API_TRADING.md) section 2.14.
+unchanged). Signatures: [../API_TRADING.md](API_REFERENCE.md) section 2.14.
 
 | piece | where | switched on by |
 |---|---|---|
@@ -145,7 +145,7 @@ not whether the alpha is worth trading.
 The simulator's v1.12-v1.16 realism opt-ins (fill hazard, post-only and
 reprices, markout feedback, impact calibration, maker queue model, the
 net-of-cost prereg keys) are catalogued in
-[../API_TRADING.md](../API_TRADING.md) sections 2.10-2.13. v1.17 adds:
+[../API_TRADING.md](API_REFERENCE.md) sections 2.10-2.13. v1.17 adds:
 
 - **One entry point.** `iap.execution.realism.apply(prereg, exec_config,
   calibration=, impact=, maker_config=, quoting_config=)` returns an
@@ -218,7 +218,7 @@ no execution, SOR or dark-venue logic moved to Rust. B10 is section 7.
 No free dark-pool data exists, so the platform cannot replay a dark fill the
 way it replays a lit one. B10 adds a dark / midpoint venue type
 (`VenueSpec.venue_type`), a fill model, a dark-first router rule and three
-pre-trade controls (API_TRADING.md §2.17), and labels every number that comes
+pre-trade controls (docs/API_REFERENCE.md §2.17), and labels every number that comes
 out of them **modelled, not measured**. The label is in the calibration
 document, in the replay diagnostics and in the benchmark report, and a
 document without it is refused.
@@ -257,7 +257,7 @@ model's own scale, p = 0.36 for 100 shares after 1,000 displayed shares and
 unfilled remainder to the lit book after the horizon. Three pre-trade
 controls gate every dark post — venue-type restriction, a participation cap
 against the trailing displayed volume, a dark-fill notional limit per
-parent — and are Rust-owned per plan item F8 (`docs/research/B10_F8_HANDOVER.md`
+parent — and are Rust-owned per plan item F8 (`docs/RESEARCH_NOTES.md`
 lists them with the golden vectors the Rust engine must reproduce); the
 Python engine mirrors the interface.
 
@@ -269,7 +269,7 @@ decomposition's `dark` fill type, whose negated price impact is the adverse
 selection of the modelled dark fills. B8 pairs the same variant
 router-vs-pinned on the Nasdaq / IEX overlap days with both lit venues in
 `--venues`. The multi7 dark benchmark was not run in the B10 PR; the command
-is in API_TRADING.md §2.17. Whatever it produces, the dark rows are a model's
+is in docs/API_REFERENCE.md §2.17. Whatever it produces, the dark rows are a model's
 output: they say what the proxy implies, never what a dark pool did.
 
 ## 8. Two venues on real books (B8)
@@ -279,7 +279,7 @@ synthetic venues: the real data was Nasdaq only, so the cost-aware router had
 one candidate and always chose it. B8 replaces that with real books of two lit
 venues on the same day: the Nasdaq ITCH dataset and the IEX DEEP+ dataset of
 each overlap day (docs/DATA_SOURCES.md section 5), merged into one
-consolidated stream (API_TRADING.md section 2.19).
+consolidated stream (docs/API_REFERENCE.md section 2.19).
 
 **Alignment.** Both clocks are nanoseconds since New York midnight on the
 exchange's UTC clock. Nasdaq stamps are used as they are; the IEX reader
@@ -477,7 +477,7 @@ market data seen at `t` (`md_delay_ns` shifts the decision to `t + md_delay`;
 since v2.0 stage 2 D4 its default is the DECLARED feed delay of
 `configs/reference/venue_latency.json`, never zero, and `ExecReplayResult.latency`
 records the value, whether it was declared or explicit, and the route's
-`receive_ts` relationship; API_TRADING.md section 2.20) ->
+`receive_ts` relationship; docs/API_REFERENCE.md section 2.20) ->
 decision -> internal legs (decision, risk, wire) -> venue leg (+ jitter) ->
 `inbound_delay_ns` -> arrival and activation, in `(arrival, order_id)` order,
 cancel arrivals merged by time with activations (rule 7). A cancel takes the
