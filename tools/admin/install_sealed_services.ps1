@@ -153,7 +153,7 @@ foreach ($x in $Partitions) {
     cmd /c "`"$Python`" `"$(Join-Path $Repo 'tools\sealed_service.py')`" ping --partition $x > `"$pingOut`" 2>&1"
     $ping = (Get-Content $pingOut -Raw -ErrorAction SilentlyContinue)
     if ($ping) { $ping = $ping.Trim() }
-    if ($LASTEXITCODE -eq 0 -or $ping -match 'Errno 13|Errno 22|caller_account') {
+    if ($ping -match 'caller_account') {  # Errno 13 (access denied) means the pipe refuses writers: D-101
         Write-Host "pipe:      \\.\pipe\iap-sealed-$x answers: $ping (caller_account is the expected refusal for you)"
         $results[$x] = 'up'
     } else {
