@@ -477,12 +477,13 @@ def test_ingest_without_an_sec_contact_refuses_before_any_request(tmp_path, monk
 def test_a_403_from_edgar_stops_the_job_before_the_membership_walk(tmp_path):
     import io
     import urllib.error
+    from urllib.parse import urlsplit
 
     calls = []
 
     def transport(url, headers):
-        calls.append(url)
-        if "sec.gov" in url:
+        calls.append(urlsplit(url).hostname)
+        if urlsplit(url).hostname == "www.sec.gov":
             raise urllib.error.HTTPError(url, 403, "Forbidden", {}, io.BytesIO(b""))
         raise AssertionError(f"request after the EDGAR refusal: {url}")
 
@@ -496,7 +497,7 @@ def test_a_403_from_edgar_stops_the_job_before_the_membership_walk(tmp_path):
             adapter_kw={"clock": _tick_clock(), "sleep": lambda _s: None},
         )
     assert exc.value.code == 2
-    assert not any("wikipedia" in u for u in calls), "the membership walk must not have started"
+    assert calls == ["www.sec.gov"], "the membership walk must not have started"
 
 
 def test_preflight_runs_before_the_membership_walk(clean_run):
