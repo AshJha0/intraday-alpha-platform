@@ -159,6 +159,36 @@ class TrialLedger:
         self._require_frozen()
         return self._append({"kind": kind, **fields})
 
+    def check_complete(
+        self, required: tuple[str, ...] = ("config_sha256", "data_partition", "seed", "fit_sha256")
+    ) -> dict[str, Any]:
+        """Refuse a ledger in which a fit lacks a required field, an evaluation or a tier decision.
+
+        Every ``fit`` must carry ``required`` and be evaluated exactly once
+        (a fit is never silently dropped from the comparison); every tier with a
+        fit must close with a ``decision`` for that family.
+        """
+        self._require_frozen()
+        fits = [e for e in self.entries if e["kind"] == "fit"]
+        evaluated: dict[int, int] = {}
+        for e in self.entries:
+            if e["kind"] == "evaluation":
+                evaluated[e["fit_seq"]] = evaluated.get(e["fit_seq"], 0) + 1
+        problems = []
+        for f in fits:
+            missing = [k for k in required if f.get(k) in (None, "")]
+            if missing:
+                problems.append(f"fit {f['seq']} lacks {missing}")
+            if evaluated.get(f["seq"], 0) != 1:
+                problems.append(f"fit {f['seq']} evaluated {evaluated.get(f['seq'], 0)} times")
+        decided = {(e["tier"], e["family_id"]) for e in self.entries if e["kind"] == "decision"}
+        for tier, fam in sorted({(f["tier"], f["family_id"]) for f in fits}):
+            if (tier, fam) not in decided:
+                problems.append(f"{fam} {tier} has fits but no decision")
+        if problems:
+            raise TrialLedgerError("trial ledger incomplete: " + "; ".join(problems))
+        return {"fits": len(fits), "decisions": len(decided)}
+
     # ------------------------------------------------------------------ persistence
     def to_document(self) -> dict[str, Any]:
         return {

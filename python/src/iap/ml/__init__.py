@@ -7,6 +7,8 @@
 | :mod:`.trials`    | the trial ledger (chain-hashed, protocol hash first, search budgets enforced) |
 | :mod:`.models`    | M1 ridge (closed form) and elastic net (cyclic coordinate descent), deterministic, with complexity |
 | :mod:`.admission` | paired Delta U, block length from dependence, stationary block bootstrap, Holm within tier, lexicographic choice |
+| :mod:`.nonlinear` | M2 GAM (penalised cubic splines) and M3 bounded gradient-boosted trees with validation early stopping |
+| :mod:`.ladder`    | the tier ladder M0 -> M1 -> M2 -> M3 with admission refusals and a complete trial ledger |
 | :mod:`.pipeline`  | the M1 demonstration on the synthetic fixture through the research loop's engine; registry integration |
 
 Nothing here opens a sealed partition: every engine run goes through
@@ -24,6 +26,7 @@ from iap.ml.admission import (
     holm_within_tier,
 )
 from iap.ml.models import ElasticNetModel, RidgeModel
+from iap.ml.nonlinear import GAMModel, GBTModel
 from iap.ml.protocol import (
     PROTOCOL_PATH,
     ProtocolError,
@@ -41,6 +44,8 @@ __all__ = [
     "BudgetExceeded",
     "ChronologicalSplit",
     "ElasticNetModel",
+    "GAMModel",
+    "GBTModel",
     "ProtocolError",
     "RidgeModel",
     "SplitError",
