@@ -94,6 +94,9 @@ def _summary(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+EXPLORATORY_LABEL = "exploratory, data-ineligible (U0 DR-19): the DD1 record failed its data tests; not a finding, a candidate or a registration"
+
+
 def run_chain(
     dataset: Path,
     out: Path,
@@ -103,10 +106,14 @@ def run_chain(
     ml_family: str | None,
     identity: str | None = None,
     synthetic_ml: bool = False,
+    exploratory: bool = False,
 ) -> dict[str, Any]:
     timings: dict[str, float] = {}
     t = time.perf_counter()
-    panel, manifest = dd1_panel.write_panel(dataset, out / "panel")
+    panel, manifest = dd1_panel.write_panel(dataset, out / "panel", allow_incomplete=exploratory)
+    if exploratory:  # every output directory says what it is before anything is written into it
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "EXPLORATORY.txt").write_text(EXPLORATORY_LABEL + "\n", encoding="utf-8")
     timings["panel"] = time.perf_counter() - t
     man = json.loads(manifest.read_text(encoding="utf-8"))
     summary: dict[str, Any] = {
@@ -116,6 +123,8 @@ def run_chain(
         "families": {},
         "timings_s": timings,
     }
+    if exploratory:
+        summary["evidence_class"] = EXPLORATORY_LABEL
     for fam in families:
         t = time.perf_counter()
         res = run_family(
@@ -191,6 +200,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--history-years", type=int, default=7, help="synthetic: years before the purchase year"
     )
+    ap.add_argument(
+        "--exploratory",
+        action="store_true",
+        help="run on an incomplete DD1 record; outputs labelled data-ineligible (DR-19); ledger must be under --out",
+    )
     ap.add_argument("--identity", default=None, help=argparse.SUPPRESS)  # tests only
     args = ap.parse_args(argv)
     out = Path(args.out)
@@ -213,6 +227,12 @@ def main(argv: list[str] | None = None) -> int:
     else:
         dataset = Path(args.dataset)
         ledger = Path(args.ledger)
+        if args.exploratory and out.resolve() not in ledger.resolve().parents:
+            print(
+                "refused: an exploratory run keeps its own ledger under --out, never the committed one",
+                file=sys.stderr,
+            )
+            return 2
     built = time.perf_counter() - t
     try:
         summary = run_chain(
@@ -223,6 +243,7 @@ def main(argv: list[str] | None = None) -> int:
             ml_family=args.ml_family.strip().upper() or None,
             identity=args.identity,
             synthetic_ml=args.synthetic,
+            exploratory=args.exploratory,
         )
     except dd1_panel.PanelRefused as exc:
         print(f"refused: {exc}", file=sys.stderr)
