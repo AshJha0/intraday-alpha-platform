@@ -746,3 +746,51 @@ def test_the_panel_reads_a_development_only_record(tmp_path):
     job.ingest(**_ingest_kw(f, tmp_path, sealed), dev_only=True)
     rec = dd1_panel.read_record(tmp_path / "dev" / "dd1_2026")
     assert rec["status"] == "development_only"
+
+
+# ------------------------------------- real-format parsers (D-104, D-105) --
+#: three rows of the real 2026 Q4 form.idx (public SEC data): a 17-wide form column under
+#: a 12-wide header, a form type with a space, trailing blanks as served
+REAL_IDX = (
+    "Form Type   Company Name                                                  CIK         Date Filed  File Name\n"
+    + "-" * 141
+    + "\n"
+    "1-A POS          Ark7 Properties Advance LLC                                   2025051     2026-10-19  edgar/data/2025051/0002025051-26-000007.txt         \n"
+    "8-K              1 800 FLOWERS COM INC                                         1084869     2026-10-23  edgar/data/1084869/0001084869-26-000041.txt         \n"
+    "10-Q             1ST SOURCE CORP                                               34782       2026-10-22  edgar/data/34782/0000034782-26-000055.txt         \n"
+)
+
+
+def test_form_index_rows_parse_the_real_2026_layout():
+    rows = list(job.parse_form_index_rows(REAL_IDX))
+    assert rows == [
+        ("1-A POS", 2025051, "2026-10-19", "edgar/data/2025051/0002025051-26-000007.txt"),
+        ("8-K", 1084869, "2026-10-23", "edgar/data/1084869/0001084869-26-000041.txt"),
+        ("10-Q", 34782, "2026-10-22", "edgar/data/34782/0000034782-26-000055.txt"),
+    ]
+
+
+def test_ndx100_membership_walks_the_list_page_too():
+    f = fx.build(2026)
+    rows, meta = job.pull_membership(
+        f.transport,
+        plausible=job.DRY_RUN_PLAUSIBLE,
+        adapter_kw={"clock": _tick_clock(), "sleep": lambda _s: None},
+    )
+    assert meta["ndx100"]["pages"] == ["Nasdaq-100", "List of NASDAQ-100 companies"]
+    assert any("List" in u and "NASDAQ-100" in u for u in f.requests)
+    assert any(r["index"] == "ndx100" for r in rows)
+
+
+def test_probe_refuses_when_the_current_edgar_quarter_parses_to_nothing(tmp_path):
+    f = fx.build(2026)
+    last = f.last
+    q = (last.month - 1) // 3 + 1
+    key = f"https://www.sec.gov/Archives/edgar/full-index/{last.year}/QTR{q}/form.idx"
+    f.urls[key] = b"Form Type   Company Name\n" + b"-" * 40 + b"\nsomething unparseable\n"
+
+    def sealed(part, request, files):
+        return {"ok": True, "pending": None}
+
+    with pytest.raises(job.IngestRefused, match="parsed to no rows"):
+        job.ingest(**_ingest_kw(f, tmp_path, sealed), probe=True)

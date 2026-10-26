@@ -43,6 +43,7 @@ from iap.data.sources.base import Coverage, SourceAdapter, SourceDeclaration
 
 __all__ = [
     "DECLARATION",
+    "EXTRA_TITLES",
     "PAGES",
     "PROXY_LABEL",
     "MembershipInterval",
@@ -57,6 +58,12 @@ PROXY_LABEL = "wikipedia-proxy"
 PAGES: dict[str, tuple[str, tuple[int, int]]] = {
     "sp500": ("List of S&P 500 companies", (480, 520)),
     "ndx100": ("Nasdaq-100", (95, 110)),
+}
+#: Further pages that carry an index's constituent table, preferred over the main page
+#: on a day both were edited.  The Nasdaq-100 table moved to its own list page; the
+#: main page's recent revisions have no table (probe run 40320099644: 0 symbols, D-105).
+EXTRA_TITLES: dict[str, tuple[str, ...]] = {
+    "ndx100": ("List of NASDAQ-100 companies",),
 }
 
 DECLARATION = SourceDeclaration(

@@ -330,6 +330,46 @@ def build(
                 }
             }
         ).encode()
+    # the separate list page the Nasdaq-100 table moved to (D-105): the same symbols,
+    # revised the day after the main page in the later half, so the membership
+    # intervals are unchanged and the two-page walk is exercised
+    list_revs = [
+        (300000 + i, rd + _dt.timedelta(days=1))
+        for i, (_, rd) in enumerate(ndx_revs)
+        if i >= len(ndx_revs) // 2
+    ]
+    fx.urls["wiki:list:List of NASDAQ-100 companies:"] = json.dumps(
+        {
+            "query": {
+                "pages": [
+                    {
+                        "revisions": [
+                            {"revid": rid, "timestamp": f"{rd.isoformat()}T12:00:00Z"}
+                            for rid, rd in list_revs
+                        ]
+                    }
+                ]
+            }
+        }
+    ).encode()
+    for rid, rd in list_revs:
+        fx.urls[f"wiki:content:{rid}"] = json.dumps(
+            {
+                "query": {
+                    "pages": [
+                        {
+                            "revisions": [
+                                {
+                                    "revid": rid,
+                                    "timestamp": f"{rd.isoformat()}T12:00:00Z",
+                                    "slots": {"main": {"content": _wikitext(ndx)}},
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        ).encode()
 
     # -- EDGAR -----------------------------------------------------------------
     fx.urls["https://www.sec.gov/files/company_tickers.json"] = json.dumps(

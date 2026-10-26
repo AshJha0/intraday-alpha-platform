@@ -97,6 +97,7 @@ for _p in (str(TOOLS), str(REPO / "python" / "src")):
 from iap.data.sources import edgar, french, stooq, tiingo, wiki_membership  # noqa: E402
 from iap.data.sources.base import RUNNER_IDENTITY, current_identity  # noqa: E402
 from iap.data.sources.wiki_membership import (  # noqa: E402
+    EXTRA_TITLES,
     PAGES,
     PROXY_LABEL,
     intervals_from_snapshots,
@@ -347,28 +348,36 @@ def pull_membership(
         title, (lo, hi) = PAGES[index]
         if plausible and index in plausible:
             lo, hi = plausible[index]
-        revs = src.list_revisions(title)
-        by_day: dict[str, tuple[int, str]] = {}
-        for rid, ts in revs:
-            by_day[ts[:10]] = (rid, ts)  # the last revision of each day wins
+        titles = (title, *EXTRA_TITLES.get(index, ()))
+        revs: list[tuple[int, str]] = []
+        # day -> {title rank: (revid, ts)}; the last revision of each day per page wins
+        by_day: dict[str, dict[int, tuple[int, str]]] = {}
+        for rank, t in enumerate(titles):
+            page_revs = src.list_revisions(t)
+            revs.extend(page_revs)
+            for rid, ts in page_revs:
+                by_day.setdefault(ts[:10], {})[rank] = (rid, ts)
         snapshots = []
         per_year: dict[str, dict[str, Any]] = {}
         reliable_dates: dict[str, list[_dt.date]] = {}
         for day in sorted(by_day):
-            rid, ts = by_day[day]
-            syms = cache.get(rid) if cache else None
-            if syms is None:
-                syms = src.revision_symbols(rid)
-                if cache:
-                    cache.put(rid, syms)
             y = day[:4]
             stat = per_year.setdefault(y, {"revisions": 0, "reliable": 0})
             stat["revisions"] += 1
-            if lo <= len(syms) <= hi:
-                stat["reliable"] += 1
-                d = _dt.date.fromisoformat(day)
-                snapshots.append((d, rid, syms))
-                reliable_dates.setdefault(y, []).append(d)
+            # the later-listed page (the list page) first; the main page as fallback (D-105)
+            for rank in sorted(by_day[day], reverse=True):
+                rid, ts = by_day[day][rank]
+                syms = cache.get(rid) if cache else None
+                if syms is None:
+                    syms = src.revision_symbols(rid)
+                    if cache:
+                        cache.put(rid, syms)
+                if lo <= len(syms) <= hi:
+                    stat["reliable"] += 1
+                    d = _dt.date.fromisoformat(day)
+                    snapshots.append((d, rid, syms))
+                    reliable_dates.setdefault(y, []).append(d)
+                    break
         for y, stat in per_year.items():
             ds = reliable_dates.get(y, [])
             gaps = [(b - a).days for a, b in zip(ds, ds[1:], strict=False)]
@@ -380,6 +389,7 @@ def pull_membership(
             rows.append(iv.to_dict())
         meta[index] = {
             "revisions_listed": len(revs),
+            "pages": list(titles),
             "days_parsed": len(by_day),
             "reliable_snapshots": len(snapshots),
             "per_year": per_year,
@@ -577,7 +587,12 @@ def pull_prices_tiingo(
     return rows, meta
 
 
-_IDX_LINE = re.compile(r"^(.{12})(.{62})(.{12})(.{12})(.*)$")
+#: A ``form.idx`` row, anchored on the right: the header's column widths are not the
+#: data's (real 2026 files pad the form type to 17 characters under a 12-wide header,
+#: D-104), so CIK, date and path are matched from the end and the form type is the
+#: text before the first run of two or more spaces (form types such as "SC 13G"
+#: contain single spaces; company names may contain anything).
+_IDX_LINE = re.compile(r"^(\S.*?)\s{2,}(.*?)\s+(\d{1,10})\s+(\d{4}-\d{2}-\d{2})\s+(edgar/\S+)\s*$")
 
 
 def parse_form_index_rows(text: str) -> Iterable[tuple[str, int, str, str]]:
@@ -1115,22 +1130,29 @@ def _preflight(step: str, fn: Callable[[], Any], log) -> Any:
         raise IngestRefused(2, f"{step} unreachable before the membership pull: {exc}") from exc
 
 
-def _probe_rest(transport, *, adapter_kw, log, today: _dt.date) -> None:
+def _probe_rest(transport, *, adapter_kw, log, today: _dt.date, plausible=None) -> None:
     """``--probe``: one sample of every request pattern the long steps make, so a
     refusing endpoint shows in minutes, not after the walk (D-100)."""
     wsrc = wiki_membership.WikiMembershipSource(transport, **(adapter_kw or {}))
     for index in ("sp500", "ndx100"):
-        title, _ = PAGES[index]
-        revs = _preflight(
-            f"Wikipedia revisions ({index})", lambda t=title: wsrc.list_revisions(t), log
-        )
-        if not revs:
-            raise IngestRefused(2, f"Wikipedia listed no revisions for {index}")
-        rid = revs[-1][0]
-        syms = _preflight(
-            f"Wikipedia revision ({index})", lambda r=rid: wsrc.revision_symbols(r), log
-        )
-        log(f"probe: {index} latest revision parsed, {len(syms)} symbols")
+        title, (lo, hi) = PAGES[index]
+        if plausible and index in plausible:
+            lo, hi = plausible[index]
+        best = 0
+        for t in (title, *EXTRA_TITLES.get(index, ())):
+            revs = _preflight(f"Wikipedia revisions ({t})", lambda t=t: wsrc.list_revisions(t), log)
+            if not revs:
+                raise IngestRefused(2, f"Wikipedia listed no revisions for {t}")
+            # the last few revisions: one vandalised or mid-edit revision is normal
+            for rid, _ts in revs[-3:]:
+                syms = _preflight(
+                    f"Wikipedia revision ({t})", lambda r=rid: wsrc.revision_symbols(r), log
+                )
+                best = max(best, len(syms))
+            log(f"probe: {index} page, best of the last 3 revisions: {best} symbols")
+        if not lo <= best <= hi:
+            log(f"refused: {index} latest constituents outside {lo}-{hi}")
+            raise IngestRefused(2, f"{index}: no page parses to {lo}-{hi} constituents today")
     esrc = edgar.EdgarSource(transport, **(adapter_kw or {}))
     last = (today.year, (today.month - 1) // 3 + 1)
     for y, q in ((EDGAR_FIRST_YEAR, 1), last):
@@ -1141,6 +1163,9 @@ def _probe_rest(transport, *, adapter_kw, log, today: _dt.date) -> None:
         )
         n = sum(1 for r in parse_form_index_rows(text) if r[0] in FORMS)
         log(f"probe: EDGAR {y}Q{q} parsed, {n} rows of {', '.join(FORMS)}")
+        if (y, q) == last and n == 0:
+            log("refused: the current EDGAR quarter parsed to no 8-K/10-Q/10-K rows")
+            raise IngestRefused(2, "EDGAR form index parsed to no rows (format changed?)")
 
 
 # ------------------------------------------------------------------ the run --
@@ -1231,7 +1256,7 @@ def ingest(
             raise IngestRefused(2, f"sealed service {part} has a pending checkpoint")
     log("preflight passed: EDGAR, French, Tiingo and the sealed services answered")
     if probe:
-        _probe_rest(transport, adapter_kw=adapter_kw, log=log, today=today)
+        _probe_rest(transport, adapter_kw=adapter_kw, log=log, today=today, plausible=plausible)
         for root in (Path(dev_root), Path(cache_root) if cache_root is not None else None):
             if root is None:
                 continue
