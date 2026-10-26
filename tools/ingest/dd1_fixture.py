@@ -361,6 +361,18 @@ def build(
             fx.urls[f"https://www.sec.gov/Archives/edgar/full-index/{y}/QTR{q}/form.idx"] = (
                 "\n".join(lines) + "\n"
             ).encode()
+    # EDGAR's first quarter (the probe samples it): an index with no universe rows
+    first_idx = "https://www.sec.gov/Archives/edgar/full-index/1993/QTR1/form.idx"
+    fx.urls.setdefault(
+        first_idx,
+        (
+            "Form Type   Company Name"
+            + " " * 50
+            + "CIK         Date Filed  File Name\n"
+            + "-" * 140
+            + "\n"
+        ).encode(),
+    )
 
     # -- French factors (the calendar) -----------------------------------------
     base = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/"

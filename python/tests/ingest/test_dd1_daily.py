@@ -266,7 +266,9 @@ def test_a_browser_check_page_from_stooq_is_a_named_refusal():
 
 
 def test_sealed_refusal_leaves_the_record_incomplete(tmp_path):
-    def refusing(part, request, files):
+    def refusing(part, request, files):  # answers the preflight, refuses the ingest itself
+        if request.get("op") == "status":
+            return {"ok": True, "partition": part, "pending": None}
         return {"ok": False, "error": "caller_account"}
 
     f = fx.build(2026)
@@ -504,3 +506,212 @@ def test_preflight_runs_before_the_membership_walk(clean_run):
     _, rec = clean_run
     log = rec["log"]
     assert log.index("preflight passed") < log.index("membership ")
+
+
+# ------------------------------------ run hardening after run 40294681732 (D-96..D-100) --
+class _Resp:
+    def __init__(self, body: bytes) -> None:
+        self.body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def read(self) -> bytes:
+        return self.body
+
+
+def _http_error(code: int, retry_after: str | None = None):
+    import email.message
+    import io
+    import urllib.error
+
+    h = email.message.Message()
+    if retry_after is not None:
+        h["Retry-After"] = retry_after
+    return urllib.error.HTTPError("https://www.sec.gov/x", code, "x", h, io.BytesIO(b""))
+
+
+def test_transport_retries_busy_answers_then_succeeds():
+    answers = [_http_error(503), _http_error(429, retry_after="7"), _Resp(b"ok")]
+    slept = []
+
+    def opener(req, timeout):
+        a = answers.pop(0)
+        if isinstance(a, Exception):
+            raise a
+        return a
+
+    out = job.urllib_transport("https://www.sec.gov/x", {}, sleep=slept.append, opener=opener)
+    assert out == b"ok"
+    assert slept == [job.RETRY_WAITS[0], 7.0], "scheduled wait, then the Retry-After value"
+
+
+def test_transport_gives_up_after_the_last_wait_and_never_retries_a_404():
+    import urllib.error
+
+    calls = [0]
+
+    def busy(req, timeout):
+        calls[0] += 1
+        raise _http_error(503)
+
+    with pytest.raises(urllib.error.HTTPError):
+        job.urllib_transport("https://www.sec.gov/x", {}, sleep=lambda s: None, opener=busy)
+    assert calls[0] == len(job.RETRY_WAITS) + 1
+
+    calls[0] = 0
+
+    def missing(req, timeout):
+        calls[0] += 1
+        raise _http_error(404)
+
+    with pytest.raises(urllib.error.HTTPError):
+        job.urllib_transport("https://www.sec.gov/x", {}, sleep=lambda s: None, opener=missing)
+    assert calls[0] == 1
+
+
+def _edgar_transport(seen):
+    def transport(url, headers):
+        seen.append(url)
+        if url == job.edgar.TICKERS_URL:
+            return b'{"0": {"cik_str": 320193, "ticker": "AAPL"}}'
+        row = f"{'10-Q':<12}{'APPLE INC':<62}{320193:<12}{'1993-05-02':<12}edgar/data/320193/x.txt"
+        head = "Form Type   Company Name" + " " * 50 + "CIK         Date Filed  File Name"
+        return ("\n".join([head, "-" * 140, row]) + "\n").encode()
+
+    return transport
+
+
+def test_filings_start_at_1993_and_finished_quarters_come_from_the_cache(tmp_path):
+    import datetime as dt
+
+    seen: list[str] = []
+    kw = {"clock": _tick_clock(), "sleep": lambda _s: None}
+    today = dt.date(2026, 10, 26)
+    first, _ = job.pull_filings(
+        _edgar_transport(seen),
+        {"AAPL"},
+        range(1990, 1995),
+        today=today,
+        adapter_kw=kw,
+        cache_root=tmp_path,
+    )
+    assert first, "the fixed-width row parses"
+    idx = [u for u in seen if "full-index" in u]
+    assert idx and all("/1990/" not in u and "/1992/" not in u for u in idx)
+    assert len(idx) == 8, "1993 and 1994, four quarters each"
+    seen.clear()
+    rows, meta = job.pull_filings(
+        _edgar_transport(seen),
+        {"AAPL"},
+        range(1990, 1995),
+        today=today,
+        adapter_kw=kw,
+        cache_root=tmp_path,
+    )
+    assert [u for u in seen if "full-index" in u] == [], "every finished quarter is cached"
+    assert meta["quarters_from_cache"] == 8
+    assert rows == first, "the cache returns what the network returned"
+
+
+def test_the_running_quarter_is_never_cached(tmp_path):
+    import datetime as dt
+
+    seen: list[str] = []
+    kw = {"clock": _tick_clock(), "sleep": lambda _s: None}
+    for _ in range(2):
+        job.pull_filings(
+            _edgar_transport(seen),
+            {"AAPL"},
+            [2026],
+            today=dt.date(2026, 10, 26),
+            adapter_kw=kw,
+            cache_root=tmp_path,
+        )
+    q4 = [u for u in seen if "/2026/QTR4/" in u]
+    assert len(q4) == 2, "Q4 2026 is still being written by EDGAR: fetched each run"
+
+
+def _ingest_kw(f, tmp_path, sealed):
+    return dict(
+        year=2026,
+        dev_root=tmp_path / "dev",
+        transport=f.transport,
+        sealed_transport=sealed,
+        identity="iap-runner",
+        environ={},
+        today=f.last,
+        plausible=job.DRY_RUN_PLAUSIBLE,
+        adapter_kw={"clock": _tick_clock(), "sleep": lambda _s: None},
+        require_sec_contact=False,
+    )
+
+
+@pytest.mark.parametrize(
+    "answer, reason",
+    [
+        ({"ok": False, "error": "caller_image"}, "refused this caller"),
+        ({"ok": True, "pending": {"seq": 3}}, "pending checkpoint"),
+    ],
+)
+def test_sealed_services_are_checked_before_the_membership_walk(tmp_path, answer, reason):
+    f = fx.build(2026)
+
+    def sealed(part, request, files):
+        assert request["op"] == "status", "nothing but status before the data exist"
+        return answer
+
+    with pytest.raises(job.IngestRefused, match=reason) as exc:
+        job.ingest(**_ingest_kw(f, tmp_path, sealed))
+    assert exc.value.code == 2
+    assert not any("wikipedia" in u and "rvprop" in u for u in f.requests)
+
+
+def test_an_already_sealed_identical_partition_completes_the_record(tmp_path):
+    f = fx.build(2026)
+
+    def sealed(part, request, files):
+        if request["op"] == "status":
+            return {"ok": True, "pending": None}
+        return {"ok": False, "error": "dataset_exists"}
+
+    rec = job.ingest(**_ingest_kw(f, tmp_path, sealed))
+    assert rec["status"] == "complete"
+    for name in ("b", "c"):
+        assert rec["partitions"][name]["note"].startswith("already recorded")
+        assert len(rec["partitions"][name]["dataset_hash_id"]) == 64
+
+
+def test_probe_touches_every_source_and_writes_no_data(tmp_path):
+    f = fx.build(2026)
+    calls = []
+
+    def sealed(part, request, files):
+        calls.append((part, request["op"]))
+        return {"ok": True, "pending": None}
+
+    rec = job.ingest(**_ingest_kw(f, tmp_path, sealed), probe=True, cache_root=tmp_path / "cache")
+    assert rec == {"status": "probe_passed"}
+    assert sorted(calls) == [("b", "status"), ("c", "status")]
+    hosts = {u.split("/")[2] for u in f.requests}
+    assert {"www.sec.gov", "mba.tuck.dartmouth.edu", "apimedia.tiingo.com"} <= hosts
+    assert any("wikipedia" in h for h in hosts)
+    assert any("full-index/1993/QTR1" in u for u in f.requests)
+    assert not (tmp_path / "dev" / "dd1_2026").exists(), "a probe writes no partition or record"
+    assert len(f.requests) < 60, "a probe is a sample, not the walk"
+
+
+def test_the_redacted_log_is_written_when_the_job_crashes(tmp_path, monkeypatch):
+    def boom(**kw):
+        kw["log"]("membership sp500: 10 revisions")
+        raise RuntimeError("simulated crash mid-run")
+
+    monkeypatch.setattr(job, "ingest", boom)
+    out = tmp_path / "log.txt"
+    with pytest.raises(RuntimeError):
+        job.main(["run", "--dev-root", str(tmp_path / "dev"), "--log", str(out)])
+    text = out.read_text(encoding="utf-8")
+    assert "membership sp500" in text and "failed: RuntimeError" in text
