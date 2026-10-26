@@ -60,6 +60,12 @@ registration; ``verify-result`` compares a result commit's hash with the
 service's copy (property 5: a result commit that does not match is a
 detectable tamper).
 
+Backup (``tools/admin/backup_sealed.ps1`` / ``restore_sealed.ps1``): the offline
+subcommands ``backup-manifest`` and ``verify-backup`` run AS the partition's
+identity, never through the pipe, so the authorisation order above is
+untouched.  They record and check the sha256 of every file and the audit chain
+head; they print counts and hashes only.
+
 Single-machine limit (``docs/governance/SEALED_DATA.md``): everything here
 runs on one workstation whose administrator is the owner.  The controls stop
 the development identity's processes, not the administrator; the evidence
@@ -871,6 +877,54 @@ def check_install(root: Path, partition: str) -> list[str]:
     return problems
 
 
+BACKUP_SCHEMA = "iap.sealed_backup/v1"
+
+
+def backup_manifest(root: Path, partition: str) -> dict[str, Any]:
+    """The per-partition backup record (run AS the partition's identity, offline):
+    the sha256 of every file under ``root`` and the audit chain head.  Hashes and
+    relative names only, never a byte of content; no timestamp, so the same tree
+    always gives the same document (the owner's script stamps the backup set)."""
+    files = {
+        p.relative_to(root).as_posix(): sha256_file(p)
+        for p in sorted(root.rglob("*"))
+        if p.is_file()
+    }
+    audit = Audit(root / "service" / "audit.jsonl")
+    return {
+        "schema": BACKUP_SCHEMA,
+        "partition": partition,
+        "file_count": len(files),
+        "files": files,
+        "chain_head": audit.head() if audit.path.is_file() else None,
+        "audit_problems": audit.verify(),
+    }
+
+
+def backup_problems(root: Path, manifest: Mapping[str, Any], partition: str) -> list[str]:
+    """What differs between a restored (or copied) partition and its manifest:
+    the audit chain must be intact and its head must equal the recorded head, and
+    the file set and every sha256 must match.  Messages name files, never content."""
+    if manifest.get("schema") != BACKUP_SCHEMA:
+        return [f"manifest schema {manifest.get('schema')!r} != {BACKUP_SCHEMA}"]
+    if manifest.get("partition") != partition:
+        return [f"manifest is for partition {manifest.get('partition')!r}, not {partition!r}"]
+    if manifest.get("audit_problems"):
+        return ["the manifest records a broken audit chain at backup time; not a restore source"]
+    now = backup_manifest(root, partition)
+    problems = [f"audit: {p}" for p in now["audit_problems"]]
+    if now["chain_head"] != manifest.get("chain_head"):
+        problems.append(f"chain head {now['chain_head']} != manifest {manifest.get('chain_head')}")
+    want: Mapping[str, str] = manifest.get("files") or {}
+    have = now["files"]
+    problems += [f"missing: {n}" for n in sorted(set(want) - set(have))]
+    problems += [f"unexpected: {n}" for n in sorted(set(have) - set(want))]
+    problems += [
+        f"sha256 differs: {n}" for n in sorted(set(want) & set(have)) if want[n] != have[n]
+    ]
+    return problems
+
+
 def main(argv: Iterable[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -905,7 +959,49 @@ def main(argv: Iterable[str] | None = None) -> int:
         "ping", help="send one status request over the pipe; exit 0 if the service answered at all"
     )
     g.add_argument("--partition", required=True, choices=("a", "b", "c"))
+    m = sub.add_parser(
+        "backup-manifest",
+        help="write the partition's sha256-per-file + chain-head record (partition identity)",
+    )
+    m.add_argument("--partition", required=True, choices=("a", "b", "c", "runner"))
+    m.add_argument("--root", type=Path, required=True)
+    m.add_argument("--out", type=Path, required=True, help="outside the partition")
+    vb = sub.add_parser(
+        "verify-backup",
+        help="check a copied or restored partition against its manifest (partition identity)",
+    )
+    vb.add_argument("--partition", required=True, choices=("a", "b", "c", "runner"))
+    vb.add_argument("--root", type=Path, required=True)
+    vb.add_argument("--manifest", type=Path, required=True)
     a = ap.parse_args(list(argv) if argv is not None else None)
+    if a.cmd == "backup-manifest":
+        if a.out.resolve().is_relative_to(a.root.resolve()):
+            print("refused: --out must be outside the partition", file=sys.stderr)
+            return 2
+        doc = backup_manifest(a.root, a.partition)
+        a.out.parent.mkdir(parents=True, exist_ok=True)
+        a.out.write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        # counts and the chain head only: the head is a hash, never content
+        print(
+            json.dumps(
+                {
+                    "partition": a.partition,
+                    "files": doc["file_count"],
+                    "chain_head": doc["chain_head"],
+                    "audit_ok": not doc["audit_problems"],
+                }
+            )
+        )
+        return 1 if doc["audit_problems"] else 0
+    if a.cmd == "verify-backup":
+        manifest = json.loads(a.manifest.read_text(encoding="utf-8"))
+        problems = backup_problems(a.root, manifest, a.partition)
+        for p in problems:
+            print(f"MISMATCH: {p}", file=sys.stderr)
+        if problems:
+            return 1
+        print(f"partition {a.partition}: {manifest['file_count']} files and chain head match")
+        return 0
     if a.cmd == "serve":
         if sys.platform != "win32":
             raise SystemExit("the named-pipe transport is Windows only (single-machine design)")
