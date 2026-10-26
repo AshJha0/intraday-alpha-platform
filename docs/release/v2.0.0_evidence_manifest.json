@@ -121,6 +121,25 @@
     {
       "artefacts": [
         {
+          "path": "docs/release/evidence/DD1_2026_EXPLORATORY_RUN_2026-10-26.md",
+          "sha256": "c238c56da18f8afc47bbf152cd690b332c5596509dcd423514cacaa4811cf7ab"
+        },
+        {
+          "path": "tools/research/dd1_chain.py",
+          "sha256": "2c2898777a5a7b2b074853f31f86658a0e5954b6d89e0c7ace8d0325f7d359ef"
+        },
+        {
+          "path": "python/tests/research/test_dd1_chain.py",
+          "sha256": "41785eba9900c74e494d0f6fe6e4e4daffcbd8b07ebadf2689c32aa2a5e59836"
+        }
+      ],
+      "claim": "Exploratory, data-ineligible (DR-19): D1-D4 on the incomplete DD1 2026 development partition (26d9d888...): D1 -0.015 bps per session (s.e. 0.467, 681 traded sessions), D3 -0.699 bps (s.e. 0.248, 801), conservative costs, survivor-only data; D2 and D4 opened no cohort (D-106, D-107). No claim is drawn.",
+      "evidence_class": "exploratory",
+      "id": "E01"
+    },
+    {
+      "artefacts": [
+        {
           "path": "python/tests/equivalence/test_h1_equivalence.py",
           "sha256": "577381151e88da4466b3d5067dd9d422e3585fb30031e09b1c464ec9a1b5b24f"
         },
@@ -190,7 +209,7 @@
       "artefacts": [
         {
           "path": "tools/research/dd1_chain.py",
-          "sha256": "620b7f9efd5667dec91baf3529db9600aa87e0e60e2dcaddf6514413d5fbb964"
+          "sha256": "2c2898777a5a7b2b074853f31f86658a0e5954b6d89e0c7ace8d0325f7d359ef"
         },
         {
           "path": "research/v2/families/README.md",
@@ -289,7 +308,7 @@
   "classes": {
     "data-ineligible": 4,
     "development-supported": 9,
-    "exploratory": 0,
+    "exploratory": 1,
     "independently confirmed": 0,
     "mechanically isolated": 0,
     "pending": 4,
