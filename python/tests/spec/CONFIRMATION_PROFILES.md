@@ -114,7 +114,9 @@ procedure and resampling design can be validated at the accrual lengths Track C 
 rules of PF-1/PF-2 do not carry over; a validated size pass at the Track C `T` is required); (5) the family `K_C`
 (the registered C0-C2 configurations) and the strategy-selection adjustment for the C0-C2 choice; (6) the
 sample-accrual rule (m_min analogue, coverage, cap, single read); (7) whether the combined book's economic screen is on
-the combined capital or per component. The five ruled-out practices apply in full.
+the combined capital or per component. The five ruled-out practices apply in full. The answers are in
+[U13_CONFIRMATION_PROTOCOL.md](../../../research/v2/U13_CONFIRMATION_PROTOCOL.md) section 11 (2026-10-26), for the panel's
+freeze; this section is otherwise unchanged and PF-3 stays refused here until that freeze.
 
 ## 9. Pilot-stage record (before the confirmatory synthetic run; nothing observed on real data)
 
