@@ -1,0 +1,16 @@
+Description:           Master Index of EDGAR Dissemination Feed by Form Type
+Last Data Received:    March 31, 2024
+Comments:              webmaster@sec.gov
+Anonymous FTP:         ftp://ftp.sec.gov/edgar/
+ 
+ 
+ 
+ 
+Form Type   Company Name                                                  CIK         Date Filed  File Name
+---------------------------------------------------------------------------------------------------------------------------------------------
+8-K         SYNTHETIC CORP                                                1000001     2024-02-02  edgar/data/1000001/0001000001-24-000017.txt
+8-K         SYNTHETIC CORP                                                1000001     2024-02-09  edgar/data/1000001/0001000001-24-000018.txt
+8-K/A       OTHER SYNTHETIC INC                                           1000002     2024-03-05  edgar/data/1000002/0001000002-24-000003.txt
+8-K12B      SYNTHETIC CORP                                                1000001     2024-03-01  edgar/data/1000001/0001000001-24-000019.txt
+10-Q        SYNTHETIC CORP                                                1000001     2024-02-02  edgar/data/1000001/0001000001-24-000020.txt
+8-K         UNIVERSE OUTSIDER LLC                                         9999999     2024-01-15  edgar/data/9999999/0009999999-24-000001.txt

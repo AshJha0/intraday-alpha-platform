@@ -105,3 +105,16 @@ after), C and the conservative column as E0.
   "diagnostics": ["A", "B", "C", "D", "E"]
 }
 ```
+
+### Revision 2026-10-26: an additional input, nothing frozen changed
+
+A free, point-in-time earnings-announcement calendar now exists on the same route: contract `edgar.earnings_8k`
+(adapter `python/src/iap/data/sources/edgar_events.py`, job `tools/ingest/dd1_events.py`, runs as `iap-runner`, cut
+by the DD1 partition windows). Each row is an 8-K (or a first-of-its-kind 8-K/A) with item 2.02 (item 12 before
+August 2004), its EDGAR acceptance time in US Eastern wall time, a timing class (`before_open`, `during`,
+`after_close`, `non_session`) and the first session it may be read (`usable_session`). The input is recorded here so
+the data gate can name it; **this revision does not change the hypothesis, the signal, the label, the eligibility
+rule, the registered family or the section 3 decision** (every filing is still usable from the session after its
+acceptance date, and the conservative rule still governs). Any use of the timing class or of the item 2.02 treatment
+set in the registered family is a later revision, made before registration and before any fit. Evidence class of the
+calendar itself: **pending** (no live run; the job has run on synthetic fixtures only).
