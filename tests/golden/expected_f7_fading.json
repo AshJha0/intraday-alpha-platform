@@ -1,6 +1,6 @@
 {
  "x-version": 1,
- "description": "F7 rule 8 golden: B4 quote fading (iap.execution.fading; docs/API_REFERENCE.md section 2.16): book_pressure cases [own, opp]; fade_rule cases; would_have_filled cases on the fixed timeline (states [ts, bid, ask, bid_sz, ask_sz], halts); pull_rows / pull_summary / pull_outcomes over PullRecord rows (PullRecord.to_dict field names). `rows` = pull_rows(pulls, timeline, 0.01, horizons, qty_unit 1, cluster 's1'); `summary` = pull_summary(rows, horizons, lost_race=1); `rows_queue` / `summary_queue` = the queue rules at qty_unit 100, horizons 1s and 5s; `outcomes` = pull_outcomes(pulls, timeline, 0.01, horizons).",
+ "description": "F7 rule 8 golden: B4 quote fading (iap.execution.fading; API_TRADING.md section 2.16): book_pressure cases [own, opp]; fade_rule cases; would_have_filled cases on the fixed timeline (states [ts, bid, ask, bid_sz, ask_sz], halts); pull_rows / pull_summary / pull_outcomes over PullRecord rows (PullRecord.to_dict field names). `rows` = pull_rows(pulls, timeline, 0.01, horizons, qty_unit 1, cluster 's1'); `summary` = pull_summary(rows, horizons, lost_race=1); `rows_queue` / `summary_queue` = the queue rules at qty_unit 100, horizons 1s and 5s; `outcomes` = pull_outcomes(pulls, timeline, 0.01, horizons).",
  "generator": "PYTHONPATH=src python tools/make_golden_f7.py --only r08_fading --force",
  "parity": "canonical JSON bytes of `expected` (sorted keys, no whitespace, Python float repr) must equal the C++ port's canonical bytes; `expected_tol` (when present) is compared to `tolerance`",
  "inputs": {

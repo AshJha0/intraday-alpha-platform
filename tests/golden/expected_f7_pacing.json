@@ -1,6 +1,6 @@
 {
  "x-version": 1,
- "description": "F7 rule 7 golden: B3 signal-aware pacing (iap.execution.pacing; docs/API_REFERENCE.md section 2.14): pacing_scale cases (z null = no reading), apportion cases, tilted_slice_qty cases, and the replay's POV pacing accumulation per step (_schedule_signal: scale, p_eff = min(p * scale, max_participation), rate = p_eff / (1 - p_eff) under pov_exact else p_eff, target_f += rate * dV, target = floor(target_f)). The slice block runs the accumulation over the real TRADEs with the planted readings and tilts the pinned 8-slice curves.",
+ "description": "F7 rule 7 golden: B3 signal-aware pacing (iap.execution.pacing; API_TRADING.md section 2.14): pacing_scale cases (z null = no reading), apportion cases, tilted_slice_qty cases, and the replay's POV pacing accumulation per step (_schedule_signal: scale, p_eff = min(p * scale, max_participation), rate = p_eff / (1 - p_eff) under pov_exact else p_eff, target_f += rate * dV, target = floor(target_f)). The slice block runs the accumulation over the real TRADEs with the planted readings and tilts the pinned 8-slice curves.",
  "generator": "PYTHONPATH=src python tools/make_golden_f7.py --only r07_pacing --force",
  "parity": "canonical JSON bytes of `expected` (sorted keys, no whitespace, Python float repr) must equal the C++ port's canonical bytes; `expected_tol` (when present) is compared to `tolerance`",
  "inputs": {

@@ -258,7 +258,7 @@ def slice_block() -> tuple[dict, dict]:
 
 def document() -> dict:
     doc = base_document(
-        "F7 rule 7 golden: B3 signal-aware pacing (iap.execution.pacing; docs/API_REFERENCE.md "
+        "F7 rule 7 golden: B3 signal-aware pacing (iap.execution.pacing; API_TRADING.md "
         "section 2.14): pacing_scale cases (z null = no reading), apportion cases, "
         "tilted_slice_qty cases, and the replay's POV pacing accumulation per step "
         "(_schedule_signal: scale, p_eff = min(p * scale, max_participation), rate = "

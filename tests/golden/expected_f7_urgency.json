@@ -1,6 +1,6 @@
 {
  "x-version": 1,
- "description": "F7 rule 6 golden: B2 alpha urgency (docs/API_REFERENCE.md section 2.14): iap.execution.signal.zscore cases ([z], mean, std); iap.execution.urgency.regime_from_z cases; queries against ArraySignalSource(sources) under each AlphaUrgencyPolicy, classified as the replay does at a child decision (ExecutionReplay._reading: the last reading with ts <= t - latency_ns, stale when older than max_age_ns > 0; _signal_child: the regime is the status without a reading, else regime_from_z). The slice block derives readings from the book (readings_rule) and records their z (zscore on real data) and every query.",
+ "description": "F7 rule 6 golden: B2 alpha urgency (API_TRADING.md section 2.14): iap.execution.signal.zscore cases ([z], mean, std); iap.execution.urgency.regime_from_z cases; queries against ArraySignalSource(sources) under each AlphaUrgencyPolicy, classified as the replay does at a child decision (ExecutionReplay._reading: the last reading with ts <= t - latency_ns, stale when older than max_age_ns > 0; _signal_child: the regime is the status without a reading, else regime_from_z). The slice block derives readings from the book (readings_rule) and records their z (zscore on real data) and every query.",
  "generator": "PYTHONPATH=src python tools/make_golden_f7.py --only r06_urgency --force",
  "parity": "canonical JSON bytes of `expected` (sorted keys, no whitespace, Python float repr) must equal the C++ port's canonical bytes; `expected_tol` (when present) is compared to `tolerance`",
  "inputs": {

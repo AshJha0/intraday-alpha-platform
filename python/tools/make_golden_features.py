@@ -71,7 +71,7 @@ FX_CHECKPOINTS = (400, 800)
 TOL = 1e-9
 
 #: Representative features — at least one per family, weighted toward the
-#: cross-language core set in docs/API_REFERENCE.md.
+#: cross-language core set in API_FEATURES.md.
 REPRESENTATIVE = [
     # price
     "ret_simple_5s_v1",

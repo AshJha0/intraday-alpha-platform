@@ -1,5 +1,5 @@
 {
-  "_comment": "Template. Copy to data/real/jobs.json (git-ignored) and edit. Relative paths resolve against the registry file's directory. See docs/RUNBOOKS.md. process_pattern 'chai[n]' is the bracket trick: the regex never matches a command line that merely contains the pattern text itself (e.g. a findstr/grep).",
+  "_comment": "Template. Copy to data/real/jobs.json (git-ignored) and edit. Relative paths resolve against the registry file's directory. See docs/runbooks/RUNBOOK_job_watchdog.md. process_pattern 'chai[n]' is the bracket trick: the regex never matches a command line that merely contains the pattern text itself (e.g. a findstr/grep).",
   "watchdog_log": "watchdog.log",
   "state_file": "watchdog_state.json",
   "jobs": [

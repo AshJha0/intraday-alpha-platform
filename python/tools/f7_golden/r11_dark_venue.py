@@ -645,7 +645,7 @@ def scenarios() -> list[dict]:
 
 def document() -> dict:
     doc = base_document(
-        "F7 part 2 golden, rule 11: the B10 dark / midpoint venue model (docs/API_REFERENCE.md section "
+        "F7 part 2 golden, rule 11: the B10 dark / midpoint venue model (API_TRADING.md section "
         "2.17; iap.execution.dark and the dark-first rule of iap.execution.replay are the "
         "reference; every dark fill is MODELLED, not measured). scalar: sigmoid, "
         "dark_features ([lit_volume, spread_ticks, qty, queue_ahead]), p_fill per model, "

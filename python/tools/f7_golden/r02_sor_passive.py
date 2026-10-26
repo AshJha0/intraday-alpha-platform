@@ -217,7 +217,7 @@ def slice_block(docs) -> tuple[dict, list]:
 def document() -> dict:
     doc = base_document(
         "F7 rule 2 golden: iap.execution.sor_v2.CostAwareRouter passive routing with fill "
-        "probability (docs/API_REFERENCE.md section 2.9 / 2.13 P0-4): passive_costs / "
+        "probability (API_TRADING.md section 2.9 / 2.13 P0-4): passive_costs / "
         "route_passive with the model's p_fill_touch or with "
         "hazard_fill_prob(rate, horizon_s) where rate(vid, side, q) reads the per-venue "
         "calibration document (`calibration_docs`, keyed by venue id; `source` exec = "

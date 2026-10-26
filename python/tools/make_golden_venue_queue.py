@@ -3,7 +3,7 @@
 rule-4 queue-position golden of the Rust venue simulator (v1.17 B9).
 
 The Python execution simulator (``iap.execution.simulator``, the reference
-for execution simulator rule 4, docs/API_REFERENCE.md section 2) is driven through
+for execution simulator rule 4, API_TRADING.md section 2) is driven through
 a handful of fixed, hand-designed vectors with ZERO latency (internal legs 0,
 venue leg 0, no jitter): an order submitted after the event with ``event_id``
 k (``after_event``) activates before the next event against the book event k
@@ -68,7 +68,7 @@ MAKER_REBATE = 0.002
 DESCRIPTION = (
     "Rule-4 queue-position golden of the Rust venue simulator (v1.17 B9, review row X-10): "
     "fixed vectors run through the Python execution simulator (the rule-4 reference, "
-    "docs/API_REFERENCE.md section 2) with zero latency. `events` are canonical market events of "
+    "API_TRADING.md section 2) with zero latency. `events` are canonical market events of "
     "instrument 1 on venue 1 (tick 0.01); `actions` happen after the event whose `event_id` is `after_event` "
     "has been processed and before the next one: `submit` places the order (ids are the simulator's own, "
     "in submission order; `order_type` is the venue wire code, 2 = LIMIT; `decision_ts` = that "

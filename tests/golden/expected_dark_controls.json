@@ -1,6 +1,6 @@
 {
   "x-version": 1,
-  "description": "B10 -> F8 golden vectors of the stateless dark-first pre-trade check (docs/RESEARCH_NOTES.md section 2): `controls` holds the non-default DarkControls keys (defaults: max_participation 0, participation_window_ns 30 s, allowed_venue_types [dark, midpoint], max_dark_notional 0); evaluation order venue_type, participation, notional, first failure wins; `expected` is the failing code or \"\". Rust: rust/risk/src/dark.rs (rust/risk/tests/golden_dark_controls.rs); Python: iap.execution.dark.dark_pretrade_check, whose DARK_CONTROL_GOLDENS must equal these rows.",
+  "description": "B10 -> F8 golden vectors of the stateless dark-first pre-trade check (docs/research/B10_F8_HANDOVER.md section 2): `controls` holds the non-default DarkControls keys (defaults: max_participation 0, participation_window_ns 30 s, allowed_venue_types [dark, midpoint], max_dark_notional 0); evaluation order venue_type, participation, notional, first failure wins; `expected` is the failing code or \"\". Rust: rust/risk/src/dark.rs (rust/risk/tests/golden_dark_controls.rs); Python: iap.execution.dark.dark_pretrade_check, whose DARK_CONTROL_GOLDENS must equal these rows.",
   "codes": [
     "venue_type",
     "participation",

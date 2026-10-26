@@ -158,7 +158,7 @@ def scenarios() -> list[dict]:
 
 def document() -> dict:
     doc = base_document(
-        "F7 rule 4 golden: ParentOrder.pov_exact (docs/API_REFERENCE.md section 2.13 P0-5; "
+        "F7 rule 4 golden: ParentOrder.pov_exact (API_TRADING.md section 2.13 P0-5; "
         "iap.execution.replay._pov_target and the deficit loops of _schedule / "
         "_schedule_passive are the reference). Same scenario / row shapes as "
         "expected_f7_impact_parent.json plus `passive`: the PassiveStats of every PASSIVE "

@@ -1,6 +1,6 @@
 {
   "x-version": 1,
-  "description": "Pinned 8-FX-pair portfolio problem for the deterministic PGD optimizer (iap.portfolio.optimizer.solve). All languages must reproduce weights and objective to 1e-9. Solver parameters are part of the contract; see docs/API_REFERENCE.md.",
+  "description": "Pinned 8-FX-pair portfolio problem for the deterministic PGD optimizer (iap.portfolio.optimizer.solve). All languages must reproduce weights and objective to 1e-9. Solver parameters are part of the contract; see API_PORTFOLIO_TCA.md.",
   "problem": {
     "pair_symbols": [
       "EUR/USD",

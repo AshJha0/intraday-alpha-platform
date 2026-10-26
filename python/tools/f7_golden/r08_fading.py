@@ -232,7 +232,7 @@ def slice_block() -> tuple[dict, dict]:
 
 def document() -> dict:
     doc = base_document(
-        "F7 rule 8 golden: B4 quote fading (iap.execution.fading; docs/API_REFERENCE.md section "
+        "F7 rule 8 golden: B4 quote fading (iap.execution.fading; API_TRADING.md section "
         "2.16): book_pressure cases [own, opp]; fade_rule cases; would_have_filled cases on "
         "the fixed timeline (states [ts, bid, ask, bid_sz, ask_sz], halts); pull_rows / "
         "pull_summary / pull_outcomes over PullRecord rows (PullRecord.to_dict field "
