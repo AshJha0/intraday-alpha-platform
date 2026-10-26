@@ -6,6 +6,8 @@
 -c requirements-ci.in
 numpy
 pandas
+# pandas needs tzdata on Windows (D-83).
+tzdata
 scipy
 scikit-learn
 pyarrow
