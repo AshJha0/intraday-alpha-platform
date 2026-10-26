@@ -213,7 +213,7 @@ def compare(
                 )
         rows.append(row)
 
-    def strat(field: str, value_key: str) -> dict[str, Any]:
+    def strat(field: str) -> dict[str, Any]:
         groups: dict[Any, list[dict]] = defaultdict(list)
         for r in rows:
             groups[r[field]].append(r)
@@ -250,9 +250,9 @@ def compare(
                 [r["fill_frac_err"] for r in rows], [r["parent_id"] for r in rows]
             ),
         },
-        "by_venue": strat("venue_id", "venue"),
-        "by_order_type": strat("order_type", "type"),
-        "by_regime": strat("regime", "regime"),
+        "by_venue": strat("venue_id"),
+        "by_order_type": strat("order_type"),
+        "by_regime": strat("regime"),
         "children": rows,
         "trace": _trace(rec, result, timelines, tick),
     }

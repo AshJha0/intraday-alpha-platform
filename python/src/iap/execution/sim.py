@@ -55,7 +55,6 @@ convention still holds.
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -580,12 +579,3 @@ def closeout_valuation(
     side = 1 if qty > 0 else -1
     price = last_valid_mid - side * haircut  # a long is valued lower, a short higher
     return Valuation(price=max(price, 1e-9), cause=cause or "unpriced")
-
-
-def three_kinds_of_session() -> Mapping[str, str]:
-    """E0 section 10 (C11): the three session kinds the reports count."""
-    return {
-        "usable_no_trades": "R_d = 0 and counted",
-        "coverage_failure": "dropped before analysis under R0 section 3 and listed",
-        "unpriced_at_close": "R_d carries the stress valuation and a failure flag",
-    }

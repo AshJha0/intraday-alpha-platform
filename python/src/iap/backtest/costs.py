@@ -343,16 +343,3 @@ class CostModel:
                 return float("inf")
             participation = per_leg_bps / (self.impact_coeff_bps_per_pct_adv * 100.0)
         return float(participation * adv / unit)
-
-    def execution_costs(
-        self,
-        qty: np.ndarray,
-        mid: np.ndarray,
-        half_spread: np.ndarray,
-        asset_class: str,
-        adv: float,
-        lot_size: int,
-    ) -> np.ndarray:
-        """Total cost per execution row (arrays aligned; qty signed units)."""
-        c = self.cost_components(qty, mid, half_spread, asset_class, adv, lot_size)
-        return c["spread"] + c["fee"] + c["impact"]
