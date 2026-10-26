@@ -1,0 +1,301 @@
+{
+  "claims": [
+    {
+      "artefacts": [
+        {
+          "path": "docs/release/evidence/DD1_FREE_ROUTE_FINDING_2026-10-26.md",
+          "sha256": "2302c2f62c07f51c7db6610842d46eeb5502781594e78209bad442d1b415872f"
+        },
+        {
+          "path": "tools/ingest/dd1_daily.py",
+          "sha256": "100524b16e2145bb13fbb3bdeed0e2bdf7e56c77d2b4ecc1ed56fe9db75d6c5f"
+        },
+        {
+          "path": "python/tests/ingest/test_dd1_daily.py",
+          "sha256": "30dacf480f5880f4bab86e93e9a45d678d4e06d144139c4b8433350abfd4804c"
+        }
+      ],
+      "claim": "The free daily route (Stooq bulk archive) fails all five DD1 tests on run 40328224317 (main 7c755bc1): survivorship 315/372 leavers missing (85 % vs 2 %), 268 absent from the archive; opens = prior close 13.1 % (vs 5 %); 57 residual split jumps; 323 members without prices; 2 of 15,356 calendar sessions missing. A Tiingo ticker-list pre-check leaves 101/372 leavers missing (27 %). Decision record DR-19.",
+      "evidence_class": "rejected",
+      "id": "N01"
+    },
+    {
+      "artefacts": [
+        {
+          "path": "research/v2/confirmation_evidence/PF-3_STUDY.json",
+          "sha256": "332f4bcc1ff672d82ce968a5da0626fbac97d0688cee293578b40b4164871a7d"
+        },
+        {
+          "path": "research/v2/confirmation_evidence/PF-3_STUDY.md",
+          "sha256": "dba13a17c5709adc9e39cfa0769c0ad04d0164fd90006267d10f16ff687dea2f"
+        }
+      ],
+      "claim": "PF-3 / P-SCBB fails size for every book with a component held 10 or more sessions (k 461-1,373 against the 463 bar; power 6-18 % at the reference effect); it is validated only for iid_normal, garch11 and t3 with a 1-session overlapping-exposure horizon. Decision record DR-17; no threshold re-tuned.",
+      "evidence_class": "rejected",
+      "id": "N02"
+    },
+    {
+      "artefacts": [
+        {
+          "path": "docs/release/evidence/DD1_FREE_ROUTE_FINDING_2026-10-26.md",
+          "sha256": "2302c2f62c07f51c7db6610842d46eeb5502781594e78209bad442d1b415872f"
+        },
+        {
+          "path": "research/v2/families/README.md",
+          "sha256": "44430708836bcad38a49ece1ab016a4360d5d553dd0ce24c77ffcfe5fd94f03f"
+        }
+      ],
+      "claim": "Daily families D1 short-term reversal, D2 residual momentum, D3 overnight asymmetry and D4 filing-date drift on the free daily route.",
+      "evidence_class": "data-ineligible",
+      "id": "I01",
+      "reason": "the route fails the DD1 survivorship and data-quality tests (N01); under DR-6 a failing test downgrades the family and is not relaxed (DR-19)"
+    },
+    {
+      "artefacts": [
+        {
+          "path": "research/v2/confirmation_evidence/PF-3_STUDY.json",
+          "sha256": "332f4bcc1ff672d82ce968a5da0626fbac97d0688cee293578b40b4164871a7d"
+        },
+        {
+          "path": "research/v2/U13_CONFIRMATION_PROTOCOL.md",
+          "sha256": "0af555e451a07fa0ce45c42b150f9dc6ac957cd278727e99f12d5ae025fad32a"
+        }
+      ],
+      "claim": "D2 and D4 books are not confirmable at the available sample length under U13 revision 1.",
+      "evidence_class": "data-ineligible",
+      "id": "I02",
+      "reason": "their holding periods exceed the 1-session validated PF-3 domain (DR-17); a U13 revision 2 is deferred past v2.0"
+    },
+    {
+      "artefacts": [
+        {
+          "path": "research/v2/families/D5_close_pressure.md",
+          "sha256": "1269d28e15024e9142eb3bb388f34b5658e34a13675958402457dded046314ce"
+        }
+      ],
+      "claim": "D5 close pressure on daily data.",
+      "evidence_class": "data-ineligible",
+      "id": "I03",
+      "reason": "G4: the daily route carries no auction-level data"
+    },
+    {
+      "artefacts": [
+        {
+          "path": "research/v2/families/H3_etf_lead_lag.md",
+          "sha256": "4ec5e83de99ae02a1b7126081e033fa46645c9a10ed24ef1cdadfb802ffebde3"
+        },
+        {
+          "path": "research/v2/families/H4_order_flow_imbalance.md",
+          "sha256": "d9beec4046a4f6f42413730b7e72401ec4689926407925cc09afc0dd1e2c207c"
+        }
+      ],
+      "claim": "H3 ETF-constituent lead-lag and H4 order-flow imbalance.",
+      "evidence_class": "data-ineligible",
+      "id": "I04",
+      "reason": "no sub-second synchronised quotes (H3) and no order-level data on the free route (H4, DR-6)"
+    },
+    {
+      "claim": "Gate F3 (confirmatory test acceptance on real data).",
+      "evidence_class": "pending",
+      "id": "P01",
+      "reason": "open; the F3 acceptance study certifies a synthetic domain only (defect D-12; docs/release/REVIEWER_F3_POSTEXEC_DECISION_2026-10-24.md)"
+    },
+    {
+      "claim": "Gate F7 part P2: independent reproduction of the release results by someone other than the developer.",
+      "evidence_class": "pending",
+      "id": "P02",
+      "reason": "not attempted (defect D-17); part P1, the pinned reproduction image, is reproduced by CI (claim S07)"
+    },
+    {
+      "claim": "Real-data ML admission (M0 vs M1 and above on the development partition).",
+      "evidence_class": "pending",
+      "id": "P03",
+      "reason": "ML protocol revision 1 carries synthetic delta placeholders and allows fits on the synthetic route only; awaits a revision 2 freeze (defect D-92; research/v2/ML_PROTOCOL.md)"
+    },
+    {
+      "claim": "Track B and Track C confirmation, Level B economics on certified data, Levels C and D.",
+      "evidence_class": "pending",
+      "id": "P04",
+      "reason": "not reached in v2.0; each needs a survivorship-clean point-in-time daily source (DR-19); no alpha is confirmed in this release"
+    },
+    {
+      "artefacts": [
+        {
+          "path": "python/tests/equivalence/test_h1_equivalence.py",
+          "sha256": "577381151e88da4466b3d5067dd9d422e3585fb30031e09b1c464ec9a1b5b24f"
+        },
+        {
+          "path": "python/tests/equivalence/test_e0_frozen.py",
+          "sha256": "787f73d0a93484e9d983cf14c1be1328482f3d0e49df47bdeb8c7f2447e72fad"
+        }
+      ],
+      "claim": "The H1 reference implementation and the shared engine reproduce each other byte for byte on both synthetic scenarios (PR #385).",
+      "evidence_class": "development-supported",
+      "id": "S01"
+    },
+    {
+      "artefacts": [
+        {
+          "path": "python/tests/isolation/test_sealed_pipe_dacl.py",
+          "sha256": "ac5310d3757544e358de07e4334c8da4bef626b748542eb96f20b5ca7c1e7f94"
+        },
+        {
+          "path": "python/tests/isolation/test_sealed_service.py",
+          "sha256": "36a77f9190d0413782e4a04279d9330ec5e097c5707cea5fa3df9753e8c2eb6a"
+        },
+        {
+          "path": "python/tests/isolation/test_identity_partitions.py",
+          "sha256": "beeb03e13473da7a93ffbe62944b45c2cdb53173988582bc1e1ec7b14dcf3732"
+        },
+        {
+          "path": "python/tests/isolation/test_sealed_ingest.py",
+          "sha256": "26c352af98d086469723f7bbd8cac28a9146f85c81463846427828c2217ff304"
+        }
+      ],
+      "claim": "Sealed-service isolation across the OS accounts on Windows: protected pipe DACL, impersonation after the first frame, caller identified from the thread token, every refusal answered with a reason (D-101, D-102, D-103; PRs #401, #402).",
+      "evidence_class": "development-supported",
+      "id": "S02"
+    },
+    {
+      "artefacts": [
+        {
+          "path": "tools/ingest/dd1_daily.py",
+          "sha256": "100524b16e2145bb13fbb3bdeed0e2bdf7e56c77d2b4ecc1ed56fe9db75d6c5f"
+        },
+        {
+          "path": "python/tests/ingest/test_dd1_daily.py",
+          "sha256": "30dacf480f5880f4bab86e93e9a45d678d4e06d144139c4b8433350abfd4804c"
+        }
+      ],
+      "claim": "Probe-first DD1 ingestion: retries with back-off, EDGAR quarters from 1993 Q1 cached, sealed services asked before the walk, partial-seal re-runs, a log on every exit, a probe mode that writes no data (D-96 to D-100; PR #400), and the development-only mode dd1-dev (DR-18; PR #403).",
+      "evidence_class": "development-supported",
+      "id": "S03"
+    },
+    {
+      "artefacts": [
+        {
+          "path": "python/src/iap/data/sources/wiki_membership.py",
+          "sha256": "90722602d6d806cdfbb0a2d4d1b1e7518108725b0b15e0d39bf20eecf83c1eba"
+        },
+        {
+          "path": "python/tests/ingest/test_dd1_daily.py",
+          "sha256": "30dacf480f5880f4bab86e93e9a45d678d4e06d144139c4b8433350abfd4804c"
+        }
+      ],
+      "claim": "Real-format parsers: EDGAR form.idx rows matched from the right (all 60,724 rows of the real 2026 Q4 index parse) and both Nasdaq-100 Wikipedia pages walked (D-104, D-105; PR #404).",
+      "evidence_class": "development-supported",
+      "id": "S04"
+    },
+    {
+      "artefacts": [
+        {
+          "path": "tools/research/dd1_chain.py",
+          "sha256": "620b7f9efd5667dec91baf3529db9600aa87e0e60e2dcaddf6514413d5fbb964"
+        },
+        {
+          "path": "research/v2/families/README.md",
+          "sha256": "44430708836bcad38a49ece1ab016a4360d5d553dd0ce24c77ffcfe5fd94f03f"
+        },
+        {
+          "path": "python/tests/research/test_family_specs.py",
+          "sha256": "fe35b004341b78ceec87045b2b904c0a31e7ff996a59b51c05dcdaa5dea68a7f"
+        }
+      ],
+      "claim": "Research chain on synthetic data: family specifications, the RL1 research loop, E5 reports, the DD1 panel and chain (PRs #389, #400).",
+      "evidence_class": "development-supported",
+      "id": "S05"
+    },
+    {
+      "artefacts": [
+        {
+          "path": "python/src/iap/alpha/combined_book.py",
+          "sha256": "528e8f63249b341f95c84c686795bf589f05fee6c47fc4d1451332463eda80c9"
+        },
+        {
+          "path": "python/src/iap/portfolio/netting.py",
+          "sha256": "ccaf95f9be4c18470adcef9a390d4556b1165852a47bc36b393df8f649a9d464"
+        },
+        {
+          "path": "python/src/iap/reports/u12.py",
+          "sha256": "4891a12d951dd3d6b8d1df351cbe41d67a15c468b89513d8a3832ef9db1261ec"
+        },
+        {
+          "path": "python/tests/portfolio/test_combined_book.py",
+          "sha256": "587b8be29dc9a7cfc22e0d05ed664e6a19b844fcbbb0b23a7be2e2a32f83f51f"
+        }
+      ],
+      "claim": "Combined book C0-C2 with U11 netting conservation and the U12 report, on a synthetic three-family fixture (PR #400).",
+      "evidence_class": "development-supported",
+      "id": "S06"
+    },
+    {
+      "artefacts": [
+        {
+          "path": ".github/workflows/repro-image.yml",
+          "sha256": "d7d0e6bc9380878fb67a5af486642cb874ccaaa2f96dec77b2c418c1c0a2c212"
+        },
+        {
+          "path": "deployment/docker/Dockerfile.repro",
+          "sha256": "eaab4b2659cbe218e3cbf12c8d4eb636db9277270cf2bcb570100c6411aa4bef"
+        },
+        {
+          "path": "python/tests/test_repro_image.py",
+          "sha256": "877c9ffe18274f42d3fb9e719ae1e7aa733efc497cdd23ee8fb91e27e8dc5cc9"
+        }
+      ],
+      "claim": "Pinned reproduction image built, and the B8 v2 and REL-08 scorecard files of record reproduced inside it by CI (F7 part P1; PR #386).",
+      "evidence_class": "development-supported",
+      "id": "S07"
+    },
+    {
+      "artefacts": [
+        {
+          "path": "research/v2/confirmation_evidence/PF-1_RESULTS.json",
+          "sha256": "8f7ef271fce0fdd3f9146480bc7c8aaeedbf32539ed55aaae4c3a0e810cfdd0f"
+        },
+        {
+          "path": "research/v2/confirmation_evidence/PF-2_RESULTS.json",
+          "sha256": "e95ba25f76230748ca1e4be78cb6dd1bd1b7f465c1083bc324db0d7d3e64796c"
+        },
+        {
+          "path": "python/src/iap/validation/pf3.py",
+          "sha256": "3f5e4ab65feae4c5b14037971ff9fbfe9d6468e961b4674cb010747544c05ebd"
+        },
+        {
+          "path": "research/v2/U13_CONFIRMATION_PROTOCOL.md",
+          "sha256": "0af555e451a07fa0ce45c42b150f9dc6ac957cd278727e99f12d5ae025fad32a"
+        }
+      ],
+      "claim": "U13 confirmation machinery: profiles PF-1 and PF-2 with synthetic size and power evidence, PF-3 revision 1, fail-closed decide (PRs #392, #400).",
+      "evidence_class": "development-supported",
+      "id": "S08"
+    },
+    {
+      "artefacts": [
+        {
+          "path": "research/v2/ML_PROTOCOL.md",
+          "sha256": "b37cc5887ce0d8fde9e2f207701d2fa72384add2675f0f40f048130de29ddbe3"
+        },
+        {
+          "path": "python/tests/ml/test_protocol_frozen.py",
+          "sha256": "eae271179f7d866671c29e301ba2d96d53e470e8fea87c9e14a824b0b5f69db9"
+        }
+      ],
+      "claim": "Frozen ML protocol revision 1 and the M0/M1 framework with a chain-hashed trial ledger, exercised on synthetic data only (PR #389).",
+      "evidence_class": "development-supported",
+      "id": "S09"
+    }
+  ],
+  "classes": {
+    "data-ineligible": 4,
+    "development-supported": 9,
+    "exploratory": 0,
+    "independently confirmed": 0,
+    "mechanically isolated": 0,
+    "pending": 4,
+    "rejected": 2
+  },
+  "kind": "release_evidence_manifest",
+  "release": "v2.0.0",
+  "x-version": 1
+}
