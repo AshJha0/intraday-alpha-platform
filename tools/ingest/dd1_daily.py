@@ -1162,6 +1162,7 @@ def ingest(
     cache_root: Path | None = None,
     require_sec_contact: bool = True,
     probe: bool = False,
+    dev_only: bool = False,
 ) -> dict[str, Any]:
     """The whole job (module docstring).  Returns the record written to
     ``dev_root/dd1_<year>/dataset.json``; raises :class:`IngestRefused`.
@@ -1213,7 +1214,7 @@ def ingest(
         lambda: pull_listed_ends(transport, adapter_kw=adapter_kw, log=log),
         log,
     )
-    for part in SEALED.values():
+    for part in () if dev_only else SEALED.values():
         try:
             st = sealed_transport(part, {"op": "status"}, [])
         except Exception as exc:  # the pipe itself: absent service, denied connect
@@ -1331,7 +1332,17 @@ def ingest(
 
     # -- seal (only when every test passed)
     sealed_ok = True
-    if tests["pass"]:
+    if dev_only:
+        # DR-18: the test years are not saved anywhere; they are re-pulled and sealed
+        # once the sealed services accept the runner. Counts only, no hashes, no files.
+        for name in SEALED:
+            record["partitions"][name] = {
+                "location": "not saved",
+                "reason": "development-only ingestion (DR-18): re-pulled and sealed later",
+                "row_counts": parts[name].counts(),
+            }
+        log("development-only: Track B and C not saved; the sealed services were not contacted")
+    elif tests["pass"]:
         for name, part in SEALED.items():
             files = serialise(name, parts[name], win[name], year)
             hashes = file_hashes(files)
@@ -1378,13 +1389,16 @@ def ingest(
             )
     else:
         log("a DD1 test failed: nothing sealed")
-    record["status"] = "complete" if tests["pass"] and sealed_ok else "incomplete"
+    if dev_only:
+        record["status"] = "development_only" if tests["pass"] else "incomplete"
+    else:
+        record["status"] = "complete" if tests["pass"] and sealed_ok else "incomplete"
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "dataset.json").write_text(
         json.dumps(record, indent=1, sort_keys=True) + "\n", encoding="utf-8"
     )
     log(f"record written: status {record['status']}")
-    if record["status"] != "complete":
+    if record["status"] not in ("complete", "development_only"):
         raise IngestRefused(2, "ingestion incomplete (see the record)")
     return record
 
@@ -1404,6 +1418,7 @@ def dry_run(year: int, dev_root: Path, sealed_root: Path, **knobs: Any) -> dict[
     cache_root = knobs.pop("cache_root", None)
     sha256_override = knobs.pop("sha256_override", "")
     require_sec_contact = bool(knobs.pop("require_sec_contact", False))
+    dev_only = bool(knobs.pop("dev_only", False))
     fx = dd1_fixture.build(year, **knobs)
     zip_kw: dict[str, Any] = {}
     if local_zip:  # the owner's download (DR-15): the fixture archive, served from disk
@@ -1451,6 +1466,7 @@ def dry_run(year: int, dev_root: Path, sealed_root: Path, **knobs: Any) -> dict[
             log=log,
             cache_root=cache_root,
             require_sec_contact=require_sec_contact,
+            dev_only=dev_only,
             **zip_kw,
         )
     except IngestRefused as exc:
@@ -1491,6 +1507,11 @@ def main(argv: list[str] | None = None) -> int:
         help="check every source and the sealed services in minutes; write no data (D-100)",
     )
     r.add_argument(
+        "--dev-only",
+        action="store_true",
+        help="write development and validation only; Track B and C not saved (DR-18)",
+    )
+    r.add_argument(
         "--cache-root",
         type=Path,
         default=None,
@@ -1517,6 +1538,7 @@ def main(argv: list[str] | None = None) -> int:
             stooq_sha256=a.stooq_sha256,
             cache_root=a.cache_root or DEFAULT_CACHE_ROOT,
             probe=a.probe,
+            dev_only=a.dev_only,
         )
         log(f"done: {rec['status']}")
     except IngestRefused as exc:

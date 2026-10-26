@@ -26,7 +26,7 @@ def test_workflow_is_manual_only_in_the_sealed_environment_on_the_runner_identit
     assert list(on) == ["workflow_dispatch"], "only workflow_dispatch may start a registered run"
     inputs = on["workflow_dispatch"]["inputs"]
     assert set(inputs) == {"prereg", "commit", "mode", "year", "stooq_sha256"}  # DR-16
-    assert inputs["mode"]["options"] == ["registered", "dd1", "dd1-probe"]
+    assert inputs["mode"]["options"] == ["registered", "dd1", "dd1-probe", "dd1-dev"]
     assert inputs["mode"]["default"] == "registered"
     assert wf["permissions"] == {"contents": "write"}
     assert wf["concurrency"] == {"group": "registered-run", "cancel-in-progress": False}
@@ -56,9 +56,11 @@ def test_workflow_is_manual_only_in_the_sealed_environment_on_the_runner_identit
     dd1 = [s for s in steps if "tools/ingest/dd1_daily.py run" in (s.get("run") or "")]
     assert (
         len(dd1) == 1
-        and dd1[0]["if"] == "${{ inputs.mode == 'dd1' || inputs.mode == 'dd1-probe' }}"
+        and dd1[0]["if"]
+        == "${{ inputs.mode == 'dd1' || inputs.mode == 'dd1-probe' || inputs.mode == 'dd1-dev' }}"
     )
     assert '-eq "dd1-probe") { $zip += "--probe" }' in dd1[0]["run"]
+    assert '-eq "dd1-dev") { $zip += "--dev-only" }' in dd1[0]["run"]
     analysis = [s for s in steps if "tools/runner/run.py run" in (s.get("run") or "")]
     assert analysis[0]["if"] == "${{ inputs.mode == 'registered' }}"  # a new mode never runs it
     assert "--log results-log.redacted.txt" in dd1[0]["run"]

@@ -94,7 +94,8 @@ def read_record(dataset_dir: str | Path, *, allow_incomplete: bool = False) -> d
     rec = json.loads(rec_path.read_text(encoding="utf-8"))
     if rec.get("kind") != "daily_pit":
         raise PanelRefused(f"record kind {rec.get('kind')!r} is not daily_pit")
-    if rec.get("status") != "complete" and not allow_incomplete:
+    # development_only (DR-18): development and validation written, test years not saved
+    if rec.get("status") not in ("complete", "development_only") and not allow_incomplete:
         raise PanelRefused(
             f"record status {rec.get('status')!r}: a DD1 test failed or a service refused; "
             "the research loop runs on a complete ingestion only"

@@ -715,3 +715,34 @@ def test_the_redacted_log_is_written_when_the_job_crashes(tmp_path, monkeypatch)
         job.main(["run", "--dev-root", str(tmp_path / "dev"), "--log", str(out)])
     text = out.read_text(encoding="utf-8")
     assert "membership sp500" in text and "failed: RuntimeError" in text
+
+
+# ----------------------------------------- development-only ingestion (DR-18) --
+def test_dev_only_never_contacts_the_sealed_services_and_saves_no_test_years(tmp_path):
+    f = fx.build(2026)
+
+    def sealed(part, request, files):
+        raise AssertionError("a development-only run must not contact a sealed service")
+
+    rec = job.ingest(**_ingest_kw(f, tmp_path, sealed), dev_only=True)
+    assert rec["status"] == "development_only"
+    for name in ("b", "c"):
+        p = rec["partitions"][name]
+        assert p["location"] == "not saved" and "files" not in p and "dataset_hash_id" not in p
+    for name in ("development", "validation"):
+        assert len(rec["partitions"][name]["dataset_hash_id"]) == 64
+    written = {q.name for q in (tmp_path / "dev" / "dd1_2026").iterdir()}
+    assert written == {"development", "validation", "dataset.json"}, "no b/ or c/ on disk"
+
+
+def test_the_panel_reads_a_development_only_record(tmp_path):
+    from iap.research import dd1_panel
+
+    f = fx.build(2026)
+
+    def sealed(part, request, files):
+        raise AssertionError("not contacted")
+
+    job.ingest(**_ingest_kw(f, tmp_path, sealed), dev_only=True)
+    rec = dd1_panel.read_record(tmp_path / "dev" / "dd1_2026")
+    assert rec["status"] == "development_only"
