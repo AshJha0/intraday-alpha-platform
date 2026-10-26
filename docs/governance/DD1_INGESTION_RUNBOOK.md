@@ -64,13 +64,22 @@ icacls C:\iap\inbox /grant "iap-runner:(OI)(CI)RX"
    Write down the printed hash and the date you downloaded the file. The job refuses before its first request if the
    file is missing, is not a zip, or does not match that hash, so a bad file cannot waste the four-hour membership pull.
    The record stores the hash and `archive_origin: owner_browser_download`.
-5. **Trigger the ingestion**: GitHub -> Actions -> `registered-run` -> Run workflow with `mode` = `dd1`, `commit` = the
+5. **Probe first (a few minutes)**: run the workflow with `mode` = `dd1-probe` and the same other fields as step 6.
+   It checks your zip and SEC contact, then makes one request of each kind the long run makes (Wikipedia revision
+   list and one revision per index, EDGAR's ticker map and the 1993 Q1 and current quarter indexes, the three French
+   files, Tiingo's ticker list), asks each sealed service for its status as the runner, and checks it can write to
+   the output and cache folders. It writes no data. The last log line is `probe passed`; anything else names the
+   source that refused (D-100). Start the full run only after a passed probe.
+6. **Trigger the ingestion**: GitHub -> Actions -> `registered-run` -> Run workflow with `mode` = `dd1`, `commit` = the
    merge commit of the PR that added this runbook (or any later `main` commit), `prereg` = anything (ignored in this
-   mode), `year` = empty (this year), `stooq_sha256` = the hash from step 4 (leave it empty only when Tiingo is set).
+   mode), `year` = empty (this year), `stooq_sha256` = the hash from step 4 (leave it empty only when Tiingo is set). A failed run can be started again with the same
+   fields: busy answers are retried with back-off (D-96), parsed Wikipedia revisions and finished EDGAR quarters are
+   read from the runner-only cache (D-87, D-97), and a partition the sealed service already holds is not sent twice
+   (D-99), so a re-run resumes rather than starting over.
    The run waits in the `sealed` environment until you approve it; approve it.
-6. **Read the redacted log** (the only artifact; paths, accounts and values are redacted). The last lines are the
+7. **Read the redacted log** (the only artifact; paths, accounts and values are redacted). The last lines are the
    per-partition results and `record written: status complete`.
-7. **List the record in the manifest** (development identity, your checkout):
+8. **List the record in the manifest** (development identity, your checkout):
 
 ```powershell
 Copy-Item -Recurse C:\iap\daily\dd1_2026 data\real\daily\dd1_2026

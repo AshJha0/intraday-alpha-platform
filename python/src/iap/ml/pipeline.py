@@ -139,7 +139,15 @@ def run_m1_demo(
     dataset_identity = f"{manifest.get('dataset_id', 'panel')}:{data_sha[:16]}"
     registry = ForecastRegistry()
     feature_set_hash = content_hash([lineage(f) for f in group["features"]])
-    for model_class in proto["tiers"]["M1"]["classes"]:
+    n_ok = int((np.all(np.isfinite(x_train), axis=1) & np.isfinite(y_train)).sum())
+    n_need = max(30, 5 * x_train.shape[1])  # the M1 models' own minimum (iap.ml.models)
+    fit_grid = n_ok >= n_need
+    if not fit_grid:
+        # too little purged training history for the feature group (e.g. D2's 253-session
+        # lookback on a short development partition): the tier is recorded as not fitted and
+        # the incumbent stays, instead of the first grid point raising
+        trials.record_note("m1_not_fitted", rows=n_ok, required=n_need)
+    for model_class in proto["tiers"]["M1"]["classes"] if fit_grid else ():
         for hyper in proto["grids"][model_class]:
             name = f"{model_class}[{grid_index}]"
             if model_class == "M1.ridge":
@@ -220,9 +228,11 @@ def run_m1_demo(
             grid_index += 1
 
     # ------------------------------------------------------------ Holm within the tier, the carried candidate
-    hol = holm_within_tier(
-        {c["name"]: c["admission"]["p_value"] for c in candidates},
-        alpha=float(proto["admission"]["holm_alpha"]),
+    alpha = float(proto["admission"]["holm_alpha"])
+    hol = (
+        holm_within_tier({c["name"]: c["admission"]["p_value"] for c in candidates}, alpha=alpha)
+        if candidates
+        else {"K": 0, "alpha": alpha, "adjusted": {}, "rejected": {}}
     )
     for c in candidates:
         c["holm_adjusted_p"] = hol["adjusted"][c["name"]]

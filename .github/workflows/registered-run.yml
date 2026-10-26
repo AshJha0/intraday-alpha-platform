@@ -52,13 +52,14 @@ on:
         required: true
         type: string
       mode:
-        description: "registered: one signed analysis on sealed data. dd1: the DD1 ingestion of the free daily route (no prereg)"
+        description: "registered: one signed analysis on sealed data. dd1: the DD1 ingestion of the free daily route (no prereg). dd1-probe: a few minutes, every DD1 source and the sealed services checked, no data written"
         required: false
         default: registered
         type: choice
         options:
           - registered
           - dd1
+          - dd1-probe
       year:
         description: "dd1 only: the purchase year Y that cuts the partitions (default: this year)"
         required: false
@@ -133,19 +134,20 @@ jobs:
           pip install --no-deps tzdata==2026.5
 
       - name: Registered run (verify, sealed read, run once, commit, publish)
-        if: ${{ inputs.mode != 'dd1' }}
+        if: ${{ inputs.mode == 'registered' }}
         shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
           python tools/runner/run.py run --prereg "${{ inputs.prereg }}" --push --log results-log.redacted.txt
           if ($LASTEXITCODE -ne 0) { throw "registered run exit $LASTEXITCODE (see the redacted log)" }
 
       - name: DD1 ingestion (pull, cut, test, seal Track B and C, record)
-        if: ${{ inputs.mode == 'dd1' }}
+        if: ${{ inputs.mode == 'dd1' || inputs.mode == 'dd1-probe' }}
         shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
           $year = if ("${{ inputs.year }}" -ne "") { "${{ inputs.year }}" } else { (Get-Date).Year }
           $zip = @()
           if ("${{ inputs.stooq_sha256 }}" -ne "") { $zip = @("--stooq-zip", "C:\iap\inbox\d_us_txt.zip", "--stooq-sha256", "${{ inputs.stooq_sha256 }}") }
+          if ("${{ inputs.mode }}" -eq "dd1-probe") { $zip += "--probe" }
           python tools/ingest/dd1_daily.py run --year $year --dev-root C:\iap\daily --log results-log.redacted.txt @zip
           if ($LASTEXITCODE -ne 0) { throw "dd1 ingestion exit $LASTEXITCODE (see the redacted log)" }
 

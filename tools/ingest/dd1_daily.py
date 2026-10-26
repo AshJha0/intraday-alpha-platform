@@ -141,6 +141,8 @@ MEMBERSHIP_FIELDS = ("index", "symbol", "start", "end", "revision_id", "label")
 FILING_FIELDS = ("cik", "symbol", "form", "filing_date", "path")
 FACTOR_FIELDS = ("date", "mkt_rf", "smb", "hml", "rmw", "cma", "mom", "rf")
 FORMS = ("8-K", "10-Q", "10-K")
+#: EDGAR's quarterly full index begins with 1993 Q1; earlier quarters do not exist (D-97).
+EDGAR_FIRST_YEAR = 1993
 
 #: Defaults of the DD1 tests (coverage report section 5; defect register D-59 .. D-61).
 THRESHOLDS = {
@@ -171,14 +173,57 @@ class IngestRefused(RuntimeError):
 
 
 # ------------------------------------------------------------------ transport --
-def urllib_transport(url: str, headers: Mapping[str, str], *, timeout: float = 120.0) -> bytes:
+#: HTTP answers a source gives while busy or briefly down; anything else is final.
+RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
+#: Waits before the 2nd, 3rd, 4th and 5th attempt (seconds); a Retry-After header
+#: up to RETRY_AFTER_MAX replaces the scheduled wait (D-96).
+RETRY_WAITS = (5.0, 20.0, 60.0, 180.0)
+RETRY_AFTER_MAX = 600.0
+
+
+def _retry_after(exc: urllib.error.HTTPError) -> float | None:
+    try:
+        v = float((exc.headers or {}).get("Retry-After", ""))
+    except (TypeError, ValueError):
+        return None
+    return v if 0 <= v <= RETRY_AFTER_MAX else None
+
+
+def urllib_transport(
+    url: str,
+    headers: Mapping[str, str],
+    *,
+    timeout: float = 120.0,
+    waits: tuple[float, ...] = RETRY_WAITS,
+    sleep: Callable[[float], None] | None = None,
+    opener: Callable[..., Any] | None = None,
+) -> bytes:
+    """GET one allow-listed https URL.  429/5xx answers, timeouts and dropped
+    connections are retried ``len(waits)`` times (D-96); 4xx other than 429 is
+    final.  ``sleep`` and ``opener`` are for tests."""
+    import time
+
     scheme, sep, rest = url.partition("://")
     host = rest.split("/", 1)[0].split("@")[-1].split(":")[0].lower() if sep else ""
     if scheme != "https" or host not in ALLOWED_HOSTS:
         raise ValueError(f"URL not on the allow-list (https only): {url}")
-    req = urllib.request.Request(url, headers=dict(headers), method="GET")
-    with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 - allow-listed https
-        return r.read()
+    sleep = sleep or time.sleep
+    opener = opener or urllib.request.urlopen
+    for attempt in range(len(waits) + 1):
+        req = urllib.request.Request(url, headers=dict(headers), method="GET")
+        try:
+            with opener(req, timeout=timeout) as r:  # noqa: S310 - allow-listed https
+                return r.read()
+        except urllib.error.HTTPError as exc:
+            if exc.code not in RETRY_STATUS or attempt == len(waits):
+                raise
+            ra = _retry_after(exc)
+            sleep(ra if ra is not None else waits[attempt])
+        except (urllib.error.URLError, TimeoutError, ConnectionError, OSError):
+            if attempt == len(waits):
+                raise
+            sleep(waits[attempt])
+    raise AssertionError("unreachable")
 
 
 def _sealed_service_module():
@@ -561,8 +606,14 @@ def pull_filings(
     adapter_kw: Mapping[str, Any] | None = None,
     log=None,
     tickers_text: str | None = None,
+    cache_root: Path | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Quarter indexes from EDGAR_FIRST_YEAR on.  A quarter that ended before
+    ``today`` never changes, so its FORMS rows are cached under ``cache_root``
+    (runner-only, D-87) and a re-run reads them instead of the network (D-97)."""
     src = edgar.EdgarSource(transport, **(adapter_kw or {}))
+    qcache = Path(cache_root) / "edgar_quarters" if cache_root is not None else None
+    cache_hits = 0
     if tickers_text is None:
         tickers_text = src._get_text(edgar.TICKERS_URL)
     doc = json.loads(tickers_text)
@@ -576,12 +627,31 @@ def pull_filings(
     rows: list[dict[str, Any]] = []
     quarters = 0
     for y in years:
+        if y < EDGAR_FIRST_YEAR:
+            continue
         for q in range(1, 5):
-            if _dt.date(y, 3 * (q - 1) + 1, 1) > today:
+            start = _dt.date(y, 3 * (q - 1) + 1, 1)
+            if start > today:
                 continue
-            text = src._get_text(edgar.FULL_INDEX_URL.format(year=y, quarter=q))
+            ended = (_dt.date(y + 1, 1, 1) if q == 4 else _dt.date(y, 3 * q + 1, 1)) <= today
+            cpath = qcache / f"{y}Q{q}.json" if qcache is not None else None
+            qrows = None
+            if cpath is not None and ended:
+                try:
+                    qrows = [tuple(r) for r in json.loads(cpath.read_text(encoding="utf-8"))]
+                    cache_hits += 1
+                except (OSError, ValueError):
+                    qrows = None
+            if qrows is None:
+                text = src._get_text(edgar.FULL_INDEX_URL.format(year=y, quarter=q))
+                qrows = [r for r in parse_form_index_rows(text) if r[0] in FORMS]
+                if cpath is not None and ended:
+                    cpath.parent.mkdir(parents=True, exist_ok=True)
+                    tmp = cpath.with_suffix(".tmp")
+                    tmp.write_text(json.dumps(qrows), encoding="utf-8")
+                    os.replace(tmp, cpath)
             quarters += 1
-            for form, cik, date, path in parse_form_index_rows(text):
+            for form, cik, date, path in qrows:
                 if form in FORMS and cik in by_cik:
                     rows.append(
                         {
@@ -595,6 +665,8 @@ def pull_filings(
     meta = {
         "source": "sec_edgar",
         "quarters_read": quarters,
+        "quarters_from_cache": cache_hits,
+        "first_year": EDGAR_FIRST_YEAR,
         "universe_symbols": len(universe),
         "symbols_with_cik": len(cik_of),
         "symbols_without_cik": len(universe) - len(cik_of),
@@ -605,7 +677,10 @@ def pull_filings(
         "contract": edgar.DECLARATION.to_dict(),
     }
     if log:
-        log(f"edgar: {quarters} quarter indexes, {len(cik_of)} of {len(universe)} symbols mapped")
+        log(
+            f"edgar: {quarters} quarter indexes ({cache_hits} from cache), "
+            f"{len(cik_of)} of {len(universe)} symbols mapped"
+        )
     return rows, meta
 
 
@@ -1035,6 +1110,37 @@ def _preflight(step: str, fn: Callable[[], Any], log) -> Any:
         raise IngestRefused(
             2, f"{step} answered HTTP {exc.code} before the membership pull"
         ) from exc
+    except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+        log(f"refused: {step} unreachable ({type(exc).__name__})")
+        raise IngestRefused(2, f"{step} unreachable before the membership pull: {exc}") from exc
+
+
+def _probe_rest(transport, *, adapter_kw, log, today: _dt.date) -> None:
+    """``--probe``: one sample of every request pattern the long steps make, so a
+    refusing endpoint shows in minutes, not after the walk (D-100)."""
+    wsrc = wiki_membership.WikiMembershipSource(transport, **(adapter_kw or {}))
+    for index in ("sp500", "ndx100"):
+        title, _ = PAGES[index]
+        revs = _preflight(
+            f"Wikipedia revisions ({index})", lambda t=title: wsrc.list_revisions(t), log
+        )
+        if not revs:
+            raise IngestRefused(2, f"Wikipedia listed no revisions for {index}")
+        rid = revs[-1][0]
+        syms = _preflight(
+            f"Wikipedia revision ({index})", lambda r=rid: wsrc.revision_symbols(r), log
+        )
+        log(f"probe: {index} latest revision parsed, {len(syms)} symbols")
+    esrc = edgar.EdgarSource(transport, **(adapter_kw or {}))
+    last = (today.year, (today.month - 1) // 3 + 1)
+    for y, q in ((EDGAR_FIRST_YEAR, 1), last):
+        text = _preflight(
+            f"EDGAR form index {y}Q{q}",
+            lambda y=y, q=q: esrc._get_text(edgar.FULL_INDEX_URL.format(year=y, quarter=q)),
+            log,
+        )
+        n = sum(1 for r in parse_form_index_rows(text) if r[0] in FORMS)
+        log(f"probe: EDGAR {y}Q{q} parsed, {n} rows of {', '.join(FORMS)}")
 
 
 # ------------------------------------------------------------------ the run --
@@ -1055,6 +1161,7 @@ def ingest(
     stooq_sha256: str = "",
     cache_root: Path | None = None,
     require_sec_contact: bool = True,
+    probe: bool = False,
 ) -> dict[str, Any]:
     """The whole job (module docstring).  Returns the record written to
     ``dev_root/dd1_<year>/dataset.json``; raises :class:`IngestRefused`.
@@ -1076,7 +1183,7 @@ def ingest(
         raise IngestRefused(3, "the DD1 ingestion runs only as the runner account")
     ss = _sealed_service_module()
     out_dir = Path(dev_root) / f"dd1_{year}"
-    if (out_dir / "dataset.json").is_file():
+    if not probe and (out_dir / "dataset.json").is_file():
         raise IngestRefused(
             3, "a record for this purchase year exists; a re-ingestion is a new year"
         )
@@ -1106,7 +1213,30 @@ def ingest(
         lambda: pull_listed_ends(transport, adapter_kw=adapter_kw, log=log),
         log,
     )
-    log("preflight passed: EDGAR, French and Tiingo answered")
+    for part in SEALED.values():
+        try:
+            st = sealed_transport(part, {"op": "status"}, [])
+        except Exception as exc:  # the pipe itself: absent service, denied connect
+            log(f"refused: sealed service {part} did not answer ({type(exc).__name__})")
+            raise IngestRefused(2, f"sealed service {part} did not answer: {exc}") from exc
+        if not st.get("ok"):
+            log(f"refused: sealed service {part} refused status: {st.get('error')}")
+            raise IngestRefused(2, f"sealed service {part} refused this caller: {st.get('error')}")
+        if st.get("pending"):
+            log(f"refused: sealed service {part} has a pending checkpoint")
+            raise IngestRefused(2, f"sealed service {part} has a pending checkpoint")
+    log("preflight passed: EDGAR, French, Tiingo and the sealed services answered")
+    if probe:
+        _probe_rest(transport, adapter_kw=adapter_kw, log=log, today=today)
+        for root in (Path(dev_root), Path(cache_root) if cache_root is not None else None):
+            if root is None:
+                continue
+            root.mkdir(parents=True, exist_ok=True)
+            mark = root / ".dd1_probe"
+            mark.write_text("probe", encoding="utf-8")
+            mark.unlink()
+        log("probe passed: every source and the sealed services answered; nothing written")
+        return {"status": "probe_passed"}
 
     # -- pull
     tables.membership, wiki_meta = pull_membership(
@@ -1133,6 +1263,7 @@ def ingest(
         adapter_kw=adapter_kw,
         log=log,
         tickers_text=tickers_text,
+        cache_root=cache_root,
     )
     tables.vendor = {
         "prices": price_meta,
@@ -1212,6 +1343,18 @@ def ingest(
                 },
                 files,
             )
+            if not resp.get("ok") and resp.get("error") == "dataset_exists":
+                # the id is the content hash: the service already holds these exact files
+                log(f"partition {name}: already sealed in {part} (same content hash)")
+                record["partitions"][name] = {
+                    "location": f"sealed-{part}",
+                    "dataset_hash_id": hid,
+                    "files": hashes,
+                    "row_counts": parts[name].counts(),
+                    "chain_head": None,
+                    "note": "already recorded by the service on an earlier run (dataset_exists)",
+                }
+                continue
             if not resp.get("ok"):
                 sealed_ok = False
                 log(f"service {part} refused the ingest: {resp.get('error')}")
@@ -1340,6 +1483,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     r.add_argument("--stooq-sha256", default="", help="sha256 the owner recorded for --stooq-zip")
     r.add_argument(
+        "--probe",
+        action="store_true",
+        help="check every source and the sealed services in minutes; write no data (D-100)",
+    )
+    r.add_argument(
         "--cache-root",
         type=Path,
         default=None,
@@ -1365,15 +1513,21 @@ def main(argv: list[str] | None = None) -> int:
             stooq_zip=a.stooq_zip,
             stooq_sha256=a.stooq_sha256,
             cache_root=a.cache_root or DEFAULT_CACHE_ROOT,
+            probe=a.probe,
         )
         log(f"done: {rec['status']}")
     except IngestRefused as exc:
         code = exc.code
         log(f"exit {code}")
-    if a.log:
-        a.log.parent.mkdir(parents=True, exist_ok=True)
-        a.log.write_text(log.text(), encoding="utf-8")
-    sys.stdout.write(log.text())
+    except Exception as exc:  # the log must reach the artifact whatever failed (D-100)
+        code = 1
+        log(f"failed: {type(exc).__name__} (message withheld: the log carries no values)")
+        raise
+    finally:
+        if a.log:
+            a.log.parent.mkdir(parents=True, exist_ok=True)
+            a.log.write_text(log.text(), encoding="utf-8")
+        sys.stdout.write(log.text())
     return code
 
 

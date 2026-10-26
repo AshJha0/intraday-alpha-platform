@@ -98,9 +98,9 @@ object's sha256 that the PROMOTE token certifies.
 |---|---|---|---|---|---|
 | PF-1 | daily marked-to-market portfolio return | 1-5 sessions | `P-HAC-L5` (Newey-West lag 5, fixed-smoothing t reference), `P-CBB` (circular block bootstrap, block from the development diagnostic, floor 5, cap 20) | iid normal; AR(1) rho in {0.1, 0.2, 0.3, 0.5}; GARCH(1,1) 0.08/0.90; Student t3; overlapping-position MA dependence h in {2, 3, 5}; T in {120, 250} | validated by its evidence file; operating domain = the passing cells |
 | PF-2 | the same, book with overlapping positions | 20-60 sessions | `P-HAC-L20`, `P-HAC-L60`, `P-CBB` (floor 10, cap 60) | the same families with h in {20, 40, 60}; T in {250, 500} | validated by its evidence file; non-overlapping windows are not assumed independent |
-| PF-3 | the combined multi-horizon book's net session return on the registered capital | mixed | to be designed with C0-C2 | its domain questions are written (profiles specification section 8) | deferred; every PF-3 registration is refused |
+| PF-3 | the combined multi-horizon book's net session return on the registered capital | mixed | `P-SCBB` (studentized circular block bootstrap with the abutting-block correction, block from the development diagnostic, floor 5, cap 60), specified in [U13_CONFIRMATION_PROTOCOL.md](U13_CONFIRMATION_PROTOCOL.md) | iid normal, GARCH, t3, short-plus-long overlapping mixtures `h_long` 10-60, with common volatility, t3 tails, allocation shift, AR short component; T in {250, 500} | protocol and study written for the panel's freeze; the gate refuses every PF-3 registration until that freeze |
 
-## 6. Track C confirmation design, minimum contents (V2-C6; filled when PF-3 is designed)
+## 6. Track C confirmation design, minimum contents (V2-C6; written in U13_CONFIRMATION_PROTOCOL.md)
 
 Primary statistic = the combined book's net session return on the registered capital under the conservative column;
 the confirmation family (the registered configurations, `K_C`, fixed) and its Holm allocation; the dependence model and
@@ -108,7 +108,7 @@ the diagnostics that decide its domain (volatility clustering, serial dependence
 exposures); the inference procedure with its own reference cases, adversarial size and power study on declared
 synthetic domains, and fail-closed refusal outside them; the sample-accrual rule (m_min, coverage, window cap, single
 read at completion); the strategy-selection adjustment for the C0-C2 choice. No forward accrual counts for Track C
-until PF-3 is validated and frozen.
+until PF-3 is validated and frozen. Each element is specified in [U13_CONFIRMATION_PROTOCOL.md](U13_CONFIRMATION_PROTOCOL.md).
 
 ## 7. Reference cases and tests
 

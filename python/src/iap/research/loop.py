@@ -365,6 +365,13 @@ def build_features(frame: pd.DataFrame, feature_ids: Sequence[str]) -> pd.DataFr
         lag = c.total_lag_periods
         values = fn(frame)
         out[fid] = values.groupby(frame["name"], sort=False).shift(lag)
+    if "member" in frame.columns:
+        # a point-in-time panel (iap.research.dd1_panel): rows outside the universe feed the
+        # trailing windows but are never fitted or traded, so their signals are blanked
+        outside = frame["member"].to_numpy() != 1
+        for fid in out.columns[2:]:
+            if not fid.startswith("common."):
+                out.loc[outside, fid] = np.nan
     return out
 
 
@@ -695,13 +702,15 @@ def run_engine(
         nonlocal fills
         decision = led.decide(ts, prices)
         traded_notional = 0.0
+        # one lookup per session, not a scan of the frame per order (D3 fills most names daily)
+        sig_of = dict(zip(f["name"], f["sigma"].astype(float), strict=True))
+        adv_of = dict(zip(f["name"], f["adv"].astype(float), strict=True))
         for n in sorted(decision.orders):
             o = decision.orders[n]
             if o.submitted == 0:
                 continue
-            r = f.loc[f["name"] == n].iloc[0]
-            sigma = float(r["sigma"]) if np.isfinite(r["sigma"]) else 0.02
-            adv = float(r["adv"]) if np.isfinite(r["adv"]) else 1.0
+            sigma = sig_of[n] if np.isfinite(sig_of[n]) else 0.02
+            adv = adv_of[n] if np.isfinite(adv_of[n]) else 1.0
             out = simulate_daily(
                 ts_decision=ts,
                 name=n,
