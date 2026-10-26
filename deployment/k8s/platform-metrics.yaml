@@ -222,6 +222,10 @@ spec:
                 path: mvp/venues.json
               - key: paper__paper_trade.json
                 path: paper/paper_trade.json
+              - key: paper__shadow_book.json
+                path: paper/shadow_book.json
+              - key: paper__shadow_book_calendar.json
+                path: paper/shadow_book_calendar.json
               - key: prereg__v2.json
                 path: prereg/v2.json
               - key: prereg__v3.json
