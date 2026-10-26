@@ -100,7 +100,8 @@ def _git(*args: str) -> str:
 
 def tracked_docs() -> list[Path]:
     out = _git("ls-files", "-z", "*.md", "docs/index.html")
-    return [ROOT / p for p in out.split("\0") if p]
+    # archive/ is frozen history (v2.1 Track 0): its links point at the tree it was written in.
+    return [ROOT / p for p in out.split("\0") if p and not p.startswith("archive/")]
 
 
 class Findings:

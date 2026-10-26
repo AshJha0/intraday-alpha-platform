@@ -306,7 +306,7 @@ iap/
                    pit.py (point-in-time universe: as-of lag, no retroactive
                    edits, survivorship, delisting retention), leakage.py
                    (future-shift, shuffled-label, planted-leak canaries),
-                   synthetic.py (the seeded canary panel). docs/DATA_CONTRACTS.md.
+                   synthetic.py (the seeded canary panel). archive/docs/DATA_CONTRACTS.md.
     sources/       v2.0 DD1 free data route (U0 DR-6): tiingo.py, stooq.py,
                    wiki_membership.py, edgar.py, french.py; each declares a
                    dataset contract and a licence id, coverage() returns counts

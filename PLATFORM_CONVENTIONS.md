@@ -1,6 +1,6 @@
 # Intraday Alpha Platform — Engineering Conventions (binding for every agent)
 
-Source spec: docs/SPECIFICATION.md (the institutional spec, verbatim). This file pins every
+Source spec: archive/docs/SPECIFICATION.md (the institutional spec, verbatim). This file pins every
 cross-language decision. Read it fully before writing code. Nothing here may be changed by a
 component agent; report conflicts instead of silently deviating.
 

@@ -160,7 +160,7 @@ A seeded generator that produces realistic multi-venue equity MBO and FX quote/t
 | key | title | status | est. (d) | milestone | evidence |
 |---|---|---|---:|---|---|
 | M01 | Regime-switching efficient price with vol regimes and spread dynamics | done | 2 | Week 1 | `python/src/iap/marketdata/generator.py (_EffPrice, new_session, mid_at)`<br>`configs/marketdata/generator.json; python/tests/test_generator.py` |
-| M02 | Equity MBO streams: Hawkes-style clustered flow, FIFO queue dynamics, trades, quotes, depth | done | 3 | Week 1 | `python/src/iap/marketdata/generator.py (_eq_add, _eq_slot, _eq_session_stream, _snapshot_burst)`<br>`docs/README_HISTORY.md References [3] Hawkes (1971); tests/golden/events_eq_mbo.jsonl` |
+| M02 | Equity MBO streams: Hawkes-style clustered flow, FIFO queue dynamics, trades, quotes, depth | done | 3 | Week 1 | `python/src/iap/marketdata/generator.py (_eq_add, _eq_slot, _eq_session_stream, _snapshot_burst)`<br>`archive/docs/README_HISTORY.md References [3] Hawkes (1971); tests/golden/events_eq_mbo.jsonl` |
 | M03 | Multi-venue books with AR(1) venue noise and latency profiles (XV1/XV2, LP1/LP2/PRI) | done | 2 | Week 1 | `python/src/iap/marketdata/generator.py (_fx_pair_session, _emit); configs/venues/venues.json`<br>`tests/golden/events_fx_quote.jsonl` |
 | M04 | Auctions and halts: open/close auctions, HALT status, reopen auction | done | 1 | Week 1 | `python/src/iap/marketdata/generator.py (_reopen_auction); configs/instruments/instruments.json (sessions)`<br>`docs/SCENARIOS.md (halts, auctions); tests/golden/expected_anomaly_states.json` |
 | M05 | Feed anomaly injection and the pinned anomaly golden vectors | done | 2 | Week 1 | `python/src/iap/marketdata/golden_anomalies.py; python/src/iap/marketdata/generator.py (_inject_file_anomalies)`<br>`tests/golden/events_eq_anomalies.jsonl; tests/golden/events_fx_anomalies.jsonl; tests/golden/expected_anomaly_states.json`<br>`python/tests/test_golden_anomalies.py; java AnomalyGoldenTest` |
@@ -272,7 +272,7 @@ EQ01..EQ12 and FX01..FX12 as an alpha library with an enforced economic rational
 | A03 | FX alphas FX01..FX12 with currency-exposure machinery (FX05/FX06) | done | 4 | Week 3 | `python/src/iap/alpha/fx.py; python/src/iap/alpha/fx_exposure.py; research/alpha_reports/FX01.json .. FX12.json` |
 | A04 | Six golden production alphas ported to C++/Rust/Java (linear_z_v1 scoring) | done | 3 | Week 3 | `cpp/include/iap/alpha/alpha.hpp; cpp/tests/test_alpha_golden.cpp`<br>`rust/alpha/src/{scoring,fx_exposure}.rs; rust/alpha/tests/golden_alpha.rs`<br>`java/src/main/java/com/iap/alpha/{Alphas,Fx05}.java; java AlphaGoldenTest; tests/golden/expected_alpha.json; API_ALPHA.md` |
 | A05 | Fitted alpha parameters with provenance (configs/strategies/alpha_params.json, x-version 2) | done | 1 | Week 3 | `configs/strategies/alpha_params.json; python/src/iap/alpha/__init__.py (fit_all, params_provenance, save_params)`<br>`java/src/main/java/com/iap/alpha/LinearZParams.java; rust/alpha/src/params.rs` |
-| A06 | 24-alpha promotion report: 0 PROMOTE / 11 ITERATE / 13 REJECT, none net-positive at 1x | done | 3 | Week 3 | `research/alpha_reports/REPORT.md; research/alpha_reports/run_all.py; research/alpha_reports/EQ01.json .. FX12.json (24 per-alpha files)`<br>`research/experiments.json; docs/papers/01_ofi_predictability_equities.md (with errata); python/src/iap/validation/validate.py (GATES)` |
+| A06 | 24-alpha promotion report: 0 PROMOTE / 11 ITERATE / 13 REJECT, none net-positive at 1x | done | 3 | Week 3 | `research/alpha_reports/REPORT.md; research/alpha_reports/run_all.py; research/alpha_reports/EQ01.json .. FX12.json (24 per-alpha files)`<br>`research/experiments.json; archive/docs/papers/01_ofi_predictability_equities.md (with errata); python/src/iap/validation/validate.py (GATES)` |
 | A07 | Research: EQ03 iteration — can cost-aware horizon/threshold selection make net P&L positive? | backlog | 2 | Backlog | `research/alpha_reports/EQ03.json (current: ITERATE); research/experiments.json` |
 | A08 | Port the remaining 18 alphas to the production languages when one reaches CANDIDATE | backlog | 6 | Backlog | `python/tools/make_golden_alpha.py; API_ALPHA.md` |
 
@@ -303,7 +303,7 @@ Honest research machinery: walk-forward with purging and embargo, automatic leak
 | V06 | Cost, latency and regime stress tests | done | 1 | Week 3 | `python/src/iap/validation/stress.py; research/alpha_reports/*.json (stress)` |
 | V07 | Research backtester with the pinned cost model and ensemble scoring | done | 3 | Week 3 | `python/src/iap/backtest/{engine,costs}.py; python/tests/test_backtester.py; tests/golden/expected_backtest.json`<br>`java/src/main/java/com/iap/backtest/{BacktestEngine,ResearchBacktester,CostModel}.java; java BacktestTest, BacktestGoldenTest (legacy and v1.5.0 default rules)` |
 | V08 | ExperimentRunner: spec -> deterministic id -> result document -> ledger entry | done | 3 | Week 3 | `python/src/iap/research/{specs,runner,registry,golden,__main__}.py (ExperimentRunner satisfies iap.contracts.protocols.ExperimentRunner)`<br>`research/experiments/README.md; research/experiments/{217fa0cb1d89a9c8,4a2900e4a6705542,c73bb6294d226163,d0dd1ab0711d33a1,d7b554d0a3fa3b26}/{spec,result}.json`<br>`python/tests/test_research_runner.py; python/tests/test_research_golden.py; tests/golden/expected_experiment_golden_frame.json (python/tools/make_golden_research.py)` |
-| V09 | Full deflated Sharpe ratio (skew/kurtosis) and Harvey-Liu-Zhu adjusted p-values | backlog | 2 | Backlog | `python/src/iap/validation/ledger.py; docs/README_HISTORY.md References [10], [13]` |
+| V09 | Full deflated Sharpe ratio (skew/kurtosis) and Harvey-Liu-Zhu adjusted p-values | backlog | 2 | Backlog | `python/src/iap/validation/ledger.py; archive/docs/README_HISTORY.md References [10], [13]` |
 
 ## Week 4
 
@@ -380,14 +380,14 @@ Parent-order algorithms (TWAP/VWAP/POV/IS) sliced into children with time-in-for
 |---|---|---|---:|---|---|
 | X01 | Parent-order algorithms TWAP / VWAP / POV / IS with child splitting and time-in-force | done | 3 | Week 5 | `cpp/include/iap/execution/algos.hpp; cpp/src/execution/algos.cpp; cpp/tests/test_exec_algos.cpp`<br>`java/src/main/java/com/iap/execution/{Algos,AlgoType,ParentOrder,ChildOrder}.java; java AlgosTest; configs/execution/execution.json (algos)` |
 | X02 | Smart order router with deterministic venue scoring and tie-break ladder | done | 2 | Week 5 | `cpp/include/iap/sor/sor.hpp; cpp/src/sor/sor.cpp; java/src/main/java/com/iap/sor/{SmartOrderRouter,SorOptions}.java`<br>`configs/execution/execution.json (sor); PLATFORM_CONVENTIONS.md §11.3` |
-| X03 | Event-driven execution simulator: seeded latency, queue position, partial fills, liquidity overlay, fees, impact | done | 5 | Week 5 | `cpp/include/iap/execution/execution.hpp (normative rule text); cpp/src/execution/execution.cpp; cpp/tests/test_execution.cpp`<br>`docs/diagrams/queue_position_model.mmd; docs/papers/05_queue_aware_execution_adverse_selection.md` |
+| X03 | Event-driven execution simulator: seeded latency, queue position, partial fills, liquidity overlay, fees, impact | done | 5 | Week 5 | `cpp/include/iap/execution/execution.hpp (normative rule text); cpp/src/execution/execution.cpp; cpp/tests/test_execution.cpp`<br>`docs/diagrams/queue_position_model.mmd; archive/docs/papers/05_queue_aware_execution_adverse_selection.md` |
 | X04 | Cancels, expiry, end-of-stream sweep, venue trading-state gate and the pinned processing order | done | 2 | Week 5 | `cpp/include/iap/execution/execution.hpp; cpp/tests/test_execution.cpp; java ExecutionScenarioTest, ExecutionSimTest`<br>`docs/SCENARIOS.md (TRADING section)` |
 | X05 | Java execution simulator and SOR port with the C++-generated fills golden, plus enforced execution controls | done | 4 | Week 5 | `java/src/main/java/com/iap/execution/ExecutionSimulator.java; java ReplayFillsGoldenTest; tests/golden/expected_replay_fills.json`<br>`java/src/main/java/com/iap/platform/PaperTrading.java (controls); java PaperTradingSmokeTest; PLATFORM_CONVENTIONS.md §11.4` |
 | X06 | Rust venue layer: IAPV1 order/report framing and the simulated venue endpoint | done | 2 | Week 5 | `rust/venue/src/{codec,messages,sim}.rs; rust/venue/tests/{codec_roundtrip,sim_venue,scenario_venue_gating}.rs` |
 | X07 | Python execution port (iap.execution): simulator, algos and SOR against the same goldens | done | 5 | Week 5 | `python/src/iap/execution/{types,config,simulator,algos,sor,replay}.py`<br>`python/tests/test_execution_golden.py (expected_replay_fills.json bit-identical); python/tests/test_execution_rules.py; python/tests/test_exec_algos.py; python/tests/test_sor.py`<br>`API_TRADING.md` |
 | X10 | Execution policies: NATIVE / AGGRESSIVE / PASSIVE (post, rest, reprice, cross) in C++, Java and Python | done | 4 | Week 5 | `cpp/include/iap/execution/algos.hpp; cpp/src/replay/exec_replay.cpp; cpp/tests/test_replay_fills_passive.cpp`<br>`java/src/main/java/com/iap/execution/PassivePolicy.java; java/src/test/java/com/iap/ReplayFillsPassiveGoldenTest.java; java/src/test/java/com/iap/PassivePolicyTest.java`<br>`python/src/iap/execution/passive.py; python/tests/test_passive_policy.py; tests/golden/expected_replay_fills_passive.json`<br>`research/execution/run_execution_study.py; research/execution/EXECUTION_REPORT.md` |
 | X08 | PEG and MID order types in the execution simulator | backlog | 3 | Backlog | `schemas/order/order_request.schema.json (order_type enum); cpp/include/iap/execution/execution.hpp (rule 9 note)` |
-| X09 | Closed-form Almgren-Chriss IS trajectory as an alternative to the front-loaded exponential | backlog | 2 | Backlog | `cpp/include/iap/execution/algos.hpp; docs/README_HISTORY.md References [6]` |
+| X09 | Closed-form Almgren-Chriss IS trajectory as an alternative to the front-loaded exponential | backlog | 2 | Backlog | `cpp/include/iap/execution/algos.hpp; archive/docs/README_HISTORY.md References [6]` |
 
 ### E12 — Performance architecture
 
@@ -408,7 +408,7 @@ Hot paths built for predictability: fixed-size structures mirroring the 72-byte 
 |---|---|---|---:|---|---|
 | H01 | Hot-path discipline: fixed-layout structs and pooled nodes in C++, allocation-conscious Java with GC metrics | done | 4 | Week 5 | `cpp/include/iap/orderbook/{book,order_index}.hpp; cpp/tests/test_book.cpp; PLATFORM_CONVENTIONS.md §8`<br>`java/src/main/java/com/iap/monitoring/GcMetrics.java; deployment/prometheus/alerts.yml (GcPauseHigh); docs/ARCHITECTURE.md §7` |
 | H02 | Rust SPSC ring-buffer event bus with unsafe confined to one file | done | 2 | Week 5 | `rust/eventbus/src/lib.rs; rust/eventbus/tests/threading.rs; docs/ARCHITECTURE.md §7` |
-| H03 | Benchmark suite and honest methodology (single-threaded means, 2 CPUs, no pinning) | done | 1 | Week 5 | `cpp/bench/bench_all.cpp; benchmarks/results_cpp.md; benchmarks/RESULTS.md; docs/papers/06_cpp_vs_rust_vs_java_event_driven.md` |
+| H03 | Benchmark suite and honest methodology (single-threaded means, 2 CPUs, no pinning) | done | 1 | Week 5 | `cpp/bench/bench_all.cpp; benchmarks/results_cpp.md; benchmarks/RESULTS.md; archive/docs/papers/06_cpp_vs_rust_vs_java_event_driven.md` |
 | H05 | Python/Rust/Java benchmark harnesses and percentile latency figures | backlog | 3 | Backlog | `benchmarks/RESULTS.md (index); rust/replay/src/bin/demo.rs; java/src/main/java/com/iap/replay/Demo.java` |
 
 ## Week 6
@@ -538,7 +538,7 @@ The platform's persistent records — experiments, lifecycle transitions, orders
 
 One command runs the whole loop on one instrument — generate -> book -> features -> alpha -> portfolio target -> risk -> execution -> TCA -> trace — and running it twice produces identical bytes.
 
-**Scope:** python -m iap.mvp --seed 12345 --instrument SYN.EQ.AAPL; docs/MVP.md; docs/ROADMAP.md.
+**Scope:** python -m iap.mvp --seed 12345 --instrument SYN.EQ.AAPL; docs/MVP.md; archive/docs/ROADMAP.md.
 
 **Acceptance criteria:**
 
@@ -551,7 +551,7 @@ One command runs the whole loop on one instrument — generate -> book -> featur
 |---|---|---|---:|---|---|
 | MV01 | python -m iap.mvp --seed 12345 --instrument SYN.EQ.AAPL: one-command end-to-end loop | done | 4 | Week 6 | `python/src/iap/mvp/{__main__,config,feed,alpha,portfolio,adapters,engine,report,session,golden}.py; configs/mvp/{mvp,mvp_tiny,instruments,venues,generator,generator_tiny}.json`<br>`python/tests/test_mvp.py; tests/integration/test_mvp_end_to_end.py; docs/MVP.md` |
 | MV02 | MVP run-twice determinism golden | done | 1 | Week 6 | `tests/replay/test_mvp_replay_determinism.py; python/tests/test_mvp_golden.py; tests/golden/expected_mvp.json (python/tools/make_golden_mvp.py)` |
-| MV03 | Documentation set: MVP.md, DATA_MODEL.md, LIFECYCLE.md, DECISION_TRACE.md, ROADMAP.md, EPICS.md | done | 2 | Week 6 | `docs/MVP.md; docs/DATA_MODEL.md; docs/LIFECYCLE.md; docs/DECISION_TRACE.md; docs/ROADMAP.md; docs/EPICS.md (generated)`<br>`README.md documentation index; API_CONTRACTS.md; API_TRADING.md; docs/runbooks/RUNBOOK_incident_replay.md` |
+| MV03 | Documentation set: MVP.md, DATA_MODEL.md, LIFECYCLE.md, DECISION_TRACE.md, ROADMAP.md, EPICS.md | done | 2 | Week 6 | `docs/MVP.md; docs/DATA_MODEL.md; docs/LIFECYCLE.md; docs/DECISION_TRACE.md; archive/docs/ROADMAP.md; docs/EPICS.md (generated)`<br>`README.md documentation index; API_CONTRACTS.md; API_TRADING.md; docs/runbooks/RUNBOOK_incident_replay.md` |
 
 ### E19 — Six-level testing strategy
 
@@ -640,7 +640,7 @@ Turn the research framework into a factory: spec-driven batches through the Expe
 
 | key | title | status | est. (d) | milestone | evidence |
 |---|---|---|---:|---|---|
-| AF01 | Six flagship research papers with dated errata | done | 3 | Phase 2 | `docs/papers/INDEX.md; docs/papers/01_ofi_predictability_equities.md .. docs/papers/06_cpp_vs_rust_vs_java_event_driven.md` |
+| AF01 | Six flagship research papers with dated errata | done | 3 | Phase 2 | `archive/docs/papers/INDEX.md; archive/docs/papers/01_ofi_predictability_equities.md .. archive/docs/papers/06_cpp_vs_rust_vs_java_event_driven.md` |
 | AF02 | Alpha factory: spec-driven batches through the ExperimentRunner with automatic ledger entries | backlog | 4 | Phase 2 | `python/src/iap/research (V08); research/experiments/README.md` |
 | AF03 | Gate 8: cross-alpha correlation and incremental contribution | done | 2 | Phase 2 | `python/src/iap/lifecycle/gates.py; python/src/iap/lifecycle/evidence.py; python/tests/test_lifecycle.py`<br>`python/src/iap/combine; python/tests/test_combine.py; research/combination/REPORT.md; research/combination/signal_correlation.json`<br>`java/src/main/java/com/iap/lifecycle/Gates.java; rust/lifecycle/src/gates.rs; tests/golden/expected_lifecycle.json`<br>`docs/LIFECYCLE.md section 3; PLATFORM_CONVENTIONS.md section 13.4 and 13.8` |
 | AF04 | Scheduled report regeneration in CI with a stale-number diff | backlog | 1 | Backlog | `.github/workflows/ci.yml; tests/harness/check_headline_numbers.py (exit 2 semantics)` |
@@ -655,7 +655,7 @@ Production engineering — real feeds, HA, kernel bypass, regulatory controls. D
 
 Name what a live deployment would need beyond this repository — real feed handlers, HA, kernel bypass, regulatory controls, real reference data, hardened endpoints — so the boundary between what is validated here and what is not is explicit. The container/k8s stack that exists is recorded here too.
 
-**Scope:** docs/README_HISTORY.md §Real-world usage notes; deployment/.
+**Scope:** archive/docs/README_HISTORY.md §Real-world usage notes; deployment/.
 
 **Acceptance criteria:**
 
@@ -741,9 +741,9 @@ Move from throughput benchmarks to latency evidence: tick-to-trade percentiles m
 
 | key | title | status | est. (d) | milestone | evidence |
 |---|---|---|---:|---|---|
-| LT01 | Tick-to-trade percentile harness gated in CI | backlog | 5 | Backlog | `benchmarks/; cpp/bench/bench_all.cpp; docs/papers/06_cpp_vs_rust_vs_java_event_driven.md` |
+| LT01 | Tick-to-trade percentile harness gated in CI | backlog | 5 | Backlog | `benchmarks/; cpp/bench/bench_all.cpp; archive/docs/papers/06_cpp_vs_rust_vs_java_event_driven.md` |
 | LT02 | Allocation-free hot-path audit for C++, Rust and Java | backlog | 4 | Backlog | `cpp/src/; rust/*/src; java/src/main/java/com/iap/ (audit proposed)` |
-| LT03 | Hardware timestamps and a clock-synchronisation error budget | backlog | 5 | Backlog | `docs/papers/04_alpha_decay_vs_latency.md; deployment/grafana/README.md` |
+| LT03 | Hardware timestamps and a clock-synchronisation error budget | backlog | 5 | Backlog | `archive/docs/papers/04_alpha_decay_vs_latency.md; deployment/grafana/README.md` |
 | LT04 | Jitter and GC-pause budgets with CPU isolation methodology | backlog | 3 | Backlog | `deployment/prometheus/alerts.yml; java/src/main/java/com/iap/monitoring/` |
 
 ### E27 — Simulator calibration to live fills, multi-horizon markouts, venue/algo TCA
@@ -964,7 +964,7 @@ Release v1.15 per IAP_v1.15_Plan.md: run the R7 confirmatory round on unseen ses
 | M-P0-1 | v1.15 M-P0-1: AI4 DeepLOB vs baselines, net of costs | backlog | 6 | v1.15 | `planned: v1.16 item 10 (V116-10)` |
 | M-P1-2 | v1.15 M-P1-2: conformal sizing (opt-in) | done | 3 | v1.15 | `python/src/iap/models/conformal.py` |
 | X-P1-1 | v1.15 X-P1-1: dated SEC Section 31 + FINRA TAF fees | done | 3 | v1.15 | `configs/reference/regulatory_fee_schedule.json; tests/golden/expected_regulatory_fees.json` |
-| X-P1-2 | v1.15 X-P1-2: MVP on a real ITCH session end to end | done | 2 | v1.15 | `python/src/iap/mvp/real.py; python/tests/test_mvp_real.py; docs/research/MVP_REAL_20191018.md` |
+| X-P1-2 | v1.15 X-P1-2: MVP on a real ITCH session end to end | done | 2 | v1.15 | `python/src/iap/mvp/real.py; python/tests/test_mvp_real.py; archive/docs/research/MVP_REAL_20191018.md` |
 | X-P1-3 | v1.15 X-P1-3: market-trade prints feed the risk participation cap | done | 2 | v1.15 | `tests/golden/expected_risk_participation_prints.json` |
 | G-P0-1 | v1.15 G-P0-1: registry content hash and model card enforced at promotion | done | 2 | v1.15 | `python/src/iap/mlops/registry.py; python/src/iap/mlops/model_card.py` |
 | G-P1-2 | v1.15 G-P1-2: trust roots enabled, registry signed, verification blocking | done | 2 | v1.15 | `python/src/iap/agents/signing.py; python/src/iap/agents/trust.py` |
@@ -973,7 +973,7 @@ Release v1.15 per IAP_v1.15_Plan.md: run the R7 confirmatory round on unseen ses
 | A-P1-2 | v1.15 A-P1-2: agent proposals debit the chained ledger | done | 2 | v1.15 | `python/src/iap/validation/ledger.py` |
 | A-P1-3 | v1.15 A-P1-3: agent eval harness | done | 2 | v1.15 | `python/src/iap/agents/eval_harness.py` |
 | A-P1-4 | v1.15 A-P1-4: summary claim check against the tool log | done | 2 | v1.15 | `python/src/iap/agents/eval_harness.py (merged in #103)` |
-| E-P1-1 | v1.15 E-P1-1: release automation (tools/release.py) | done | 2 | v1.15 | `tools/release.py; python/tests/test_release_tool.py; docs/release/V1150_REHEARSAL.md` |
+| E-P1-1 | v1.15 E-P1-1: release automation (tools/release.py) | done | 2 | v1.15 | `tools/release.py; python/tests/test_release_tool.py; archive/docs/release/V1150_REHEARSAL.md` |
 | E-P2-2 | v1.15 E-P2-2: EPICS.md regeneration | done | 1 | v1.15 | `tools/github/issues.yaml; docs/EPICS.md` |
 | E-P2-3 | v1.15 E-P2-3: housekeeping (stale worktree, step-2 abort entries, v2 quoting prereg in ticks) | backlog | 1 | v1.15 | `planned: research/ (step-2 abort entries)` |
 

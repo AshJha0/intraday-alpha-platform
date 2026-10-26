@@ -307,7 +307,7 @@ Research truth is the product (spec §32). Two rules are mechanical:
      real-data N is the denominator of a real-data claim), and a result that is
      underpowered is reported as underpowered with its minimum detectable
      effect and the number of session clusters G, never as a negative or a
-     positive (`docs/release/v1.18.0_RELEASE_NOTES.md`, consolidated MDE
+     positive (`archive/docs/release/v1.18.0_RELEASE_NOTES.md`, consolidated MDE
      table).
 
 Promotion requests use the **Alpha promotion request** issue form, one
@@ -368,7 +368,7 @@ duplicated component, `docs/POLYGLOT.md` if a copy's decision changes): `API_COR
 `API_FEATURES.md`, `API_ALPHA.md`, `API_PORTFOLIO_TCA.md`, `API_ADAPTIVE.md`,
 `API_CONTRACTS.md`, `API_TRADING.md`, `PLATFORM_CONVENTIONS.md` §11–§13,
 `docs/LIFECYCLE.md` / `docs/DECISION_TRACE.md` / `docs/DATA_MODEL.md` /
-`docs/MVP.md` / `docs/MONITORING_POLICY.md` / `docs/PORTFOLIO_LIMITS.md` /
+`docs/MVP.md` / `docs/MONITORING_POLICY.md` / `archive/docs/PORTFOLIO_LIMITS.md` /
 `docs/FACTOR_RISK.md` / `docs/SIM_TO_REAL.md` for their subsystems, `docs/SCENARIOS.md` for a new pinned
 behaviour, the runbooks for anything an operator sees, `docs/EPICS.md`
 (via the YAML) for the plan, and `README.md` for any headline number. A

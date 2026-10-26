@@ -190,7 +190,7 @@ scenarios (`SCENARIOS`), mocked in CI, `--live` by the owner
 
 Signed pre-declarations can bind the analysis they authorise, and a fail-closed registry guards the datasets they
 may read. Documented in [docs/governance/ANALYSIS_IDENTITY.md](docs/governance/ANALYSIS_IDENTITY.md) and
-[docs/REVIEW_PACK.md §2](docs/REVIEW_PACK.md); names are taken from the modules' definitions.
+[archive/docs/REVIEW_PACK.md §2](archive/docs/REVIEW_PACK.md); names are taken from the modules' definitions.
 
 ```python
 from iap.agents.analysis_identity import (build_identity, verify_identity, verify_signed_document, require_independent_runner,

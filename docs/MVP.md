@@ -549,7 +549,7 @@ about 6.0 M events in 2 h 29 m, gross P&L USD +801, execution cost incl. fees
 USD 10,027, net USD -9,226 (about 70 k parents in one day; costs swamp the
 edge). One in-sample day: an integration test and a cost baseline, not
 evidence. It ran without an end-of-day flatten, so open positions were marked
-to market (§10 adds the flatten). Write-up: `docs/research/MVP_REAL_20191018.md`.
+to market (§10 adds the flatten). Write-up: `archive/docs/research/MVP_REAL_20191018.md`.
 
 ### 9.1 v3 pre-registration keys in the MVP (v1.16, P0-3)
 

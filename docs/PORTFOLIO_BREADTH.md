@@ -177,7 +177,7 @@ net day-clustered t of the cost-adjusted label `y - sign(z) * cost`, plus the
 day-clustered mean net return per round trip). Pass / fail per candidate comes
 from the pre-registration's rules; one ledger look per candidate of kind
 `net_of_cost_screen`. The full description is
-[SIGNAL_RESEARCH.md section 8](SIGNAL_RESEARCH.md); the API is
+[SIGNAL_RESEARCH.md section 8](../archive/docs/SIGNAL_RESEARCH.md); the API is
 `API_PORTFOLIO_TCA.md` section 1.10.
 
 How it gates this page:

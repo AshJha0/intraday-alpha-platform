@@ -117,4 +117,4 @@ from iap.paper.supervisor import PaperSupervisor, MonitoringRefused
 Related v1.18 Python APIs, documented in their own documents: `iap.monitoring`
 ([docs/MONITORING_POLICY.md](docs/MONITORING_POLICY.md)), `iap.portfolio.factor_risk`
 ([docs/FACTOR_RISK.md](docs/FACTOR_RISK.md)), `iap.risk.portfolio_limits` and `iap.portfolio.enforced`
-([docs/PORTFOLIO_LIMITS.md](docs/PORTFOLIO_LIMITS.md)).
+([archive/docs/PORTFOLIO_LIMITS.md](archive/docs/PORTFOLIO_LIMITS.md)).

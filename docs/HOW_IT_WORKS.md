@@ -62,7 +62,7 @@ Five things to know before reading:
    paper order manager with write-ahead log and reconciliation, factor
    risk and a kill switch, and a monitoring policy with an explicit UNKNOWN
    state. Details and the open gates are in
-   `docs/release/v1.18.0_RELEASE_NOTES.md`.
+   `archive/docs/release/v1.18.0_RELEASE_NOTES.md`.
 
 The commands assume the seeded dataset exists. If `data/features/` is
 empty, build it once (about two minutes):
@@ -1197,7 +1197,7 @@ simulator can be trusted, and it promoted nothing.
   2,931 process kills, 0 reconciliation exceptions); it is not a live-venue
   test.
 
-Where to look: `docs/release/v1.18.0_RELEASE_NOTES.md`, `docs/EXECUTION_QUALITY.md`.
+Where to look: `archive/docs/release/v1.18.0_RELEASE_NOTES.md`, `docs/EXECUTION_QUALITY.md`.
 
 ## 4. Risk: the engine that says no
 
@@ -1790,7 +1790,7 @@ COOKBOOK recipes 60 and 65.
 | the system design, failure modes and the gaps to production | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | the pictures | [DIAGRAMS.md](DIAGRAMS.md) |
 | every pinned rule | [../PLATFORM_CONVENTIONS.md](../PLATFORM_CONVENTIONS.md) |
-| what is done and what is backlog | [ROADMAP.md](ROADMAP.md), [EPICS.md](EPICS.md) |
+| what is done and what is backlog | [ROADMAP.md](../archive/docs/ROADMAP.md), [EPICS.md](EPICS.md) |
 | to run the pipeline on real historical files you obtained (ITCH 5.0, LOBSTER) | [REAL_DATA.md](REAL_DATA.md) |
 | what changed in each release, v1.1.0 to v1.18.0 | [../CHANGELOG.md](../CHANGELOG.md) |
 | the real-data studies: 7 sessions, power, the 2026 holdout, auctions | [REAL_DATA.md](REAL_DATA.md) §3 |

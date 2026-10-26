@@ -3,7 +3,7 @@
 > **Frozen (v2.0 stage 11, G2).** This tour is complete at §200 and gets no new sections: a new
 > lesson replaces an old one, and the numbers quoted here are the record of the release that
 > produced them (the current status is README.md; the evidence class of every result is
-> [docs/REVIEW_PACK.md](docs/REVIEW_PACK.md) section 0). The Java recipes refer to the git tag
+> [archive/docs/REVIEW_PACK.md](archive/docs/REVIEW_PACK.md) section 0). The Java recipes refer to the git tag
 > `archive/java-v1.14.0`; that tree is no longer in the checkout.
 
 This document walks through the entire platform the way a textbook would:
@@ -77,7 +77,7 @@ Three reading paths, depending on why you are here:
   CI gates, budgets) and §128-§129, §137-§139 (data features, opt-in
   discipline, releases).
 - *You are reviewing the platform.* §20, §27, §44, then
-  [docs/ROADMAP.md](docs/ROADMAP.md) §3.8-3.10 and CHANGELOG.md. These say
+  [archive/docs/ROADMAP.md](archive/docs/ROADMAP.md) §3.8-3.10 and CHANGELOG.md. These say
   what is wrong or unfinished, in the platform's own words.
 
 A note on Java. The sections below often mention a Java engine or the Java
@@ -3891,7 +3891,7 @@ t-distribution with 6 degrees of freedom, not a normal. Neither number is
 **What did not change.** The `v3` bundle is not the default. Every
 published number, golden and report is still the `v2` rule, so nothing
 moved when v1.9 shipped. Re-running the real-data batch under `v3` is a
-v1.11 item (docs/ROADMAP.md §3.5); until then, the honest reading of the
+v1.11 item (archive/docs/ROADMAP.md §3.5); until then, the honest reading of the
 2019-20 statistics is "strong at the row level, unproven at the day level".
 
 **Check yourself.**
@@ -5772,7 +5772,7 @@ the maintainer key whose fingerprint is published in
 `docs/governance/TRUST_ROOT.md`, and `tools/verify_signatures.py` checks every
 signed document. The signed v1.18 runs (B8 v2, REL-05, REL-08, REL-09, REL-10,
 null v3) all ran under it and all came out negative, underpowered or failed;
-none promoted anything (`docs/release/v1.18.0_RELEASE_NOTES.md`). Code cannot
+none promoted anything (`archive/docs/release/v1.18.0_RELEASE_NOTES.md`). Code cannot
 prove who sits at the keyboard; the private key lives outside the repository
 and the owner signs on a machine that does not run the analysis.
 
@@ -5833,7 +5833,7 @@ renamed or copied directory resolves to the same state; a dataset called
 registry is stopped only by review and by CI pinning the sealed hash; the
 entry points are listed in `docs/governance/DATA_ACCESS_PATHS.md`, and the
 reviewer's memo on this part (c) was written from inspection, not from a
-full test run (`docs/release/v1.18.0_RELEASE_NOTES.md`, open gates).
+full test run (`archive/docs/release/v1.18.0_RELEASE_NOTES.md`, open gates).
 
 **Check yourself.**
 
@@ -7355,7 +7355,7 @@ from 0.99995 to 0.99886 and EQ05 from 0.9999998 to 0.99996
 (`research/r7/r7_confirm_result_dsr_recompute.{json,md}`; the note
 `research/r7/R7_DEVIATION_dsr_trials.md`). The gate is DSR > 0.95; both
 verdicts are unchanged. A descriptive variant without two sessions moves EQ05
-from 0.988 to 0.956 at N = 297, still above 0.95 (`docs/SIGNAL_RESEARCH.md`).
+from 0.988 to 0.956 at N = 297, still above 0.95 (`archive/docs/SIGNAL_RESEARCH.md`).
 
 **What it teaches.** The correction was small because the evidence was
 strong, but the recording was wrong, and it was found by review and
@@ -7363,7 +7363,7 @@ recorded as a deviation, not quietly fixed. Nothing in
 `r7_confirm_result.json` was rewritten. v1.18 left this partly open (gate F5,
 accepted open for the tag): the recompute exists at the registered N = 297 and
 the verdicts are unchanged, but the original result file was not re-issued with
-the new eligibility rule applied (`docs/release/FOUNDATION_COMPLETE_v1.18.md`).
+the new eligibility rule applied (`archive/docs/release/FOUNDATION_COMPLETE_v1.18.md`).
 
 **What it is not.** Not a new look, and not a statement that the alphas are
 tradable (§78).
@@ -8124,7 +8124,7 @@ store CLI does not write the `longwin` features. v1.18 REL-07 added the labels
 to it: `python -m iap.features --labels-v2 STEP` writes the 15 m / 30 m / 1 h
 session-close-truncated labels on a session-local grid
 (`labels_v2_<iid>.parquet`, `iap.labels.grid_v2`, a causal `anchor_ts` and a
-`truncated` flag; `docs/SIGNAL_RESEARCH.md` section 10).
+`truncated` flag; `archive/docs/SIGNAL_RESEARCH.md` section 10).
 
 **Check yourself.**
 
@@ -8161,7 +8161,7 @@ identity; older identities reproduce byte for byte.
 `research/preregs/linear_z_v2_prereg_DRAFT.json` is unsigned and no
 pre-registered `linear_z_v2` study has run. The `_z2` twins were candidates in
 the in-sample net-of-cost screen on multi7 (0 pass of 22, 1 not screened;
-`linear_z_v2` moves no verdict, `docs/SIGNAL_RESEARCH.md`). `COMBINATION.json`
+`linear_z_v2` moves no verdict, `archive/docs/SIGNAL_RESEARCH.md`). `COMBINATION.json`
 is still the pre-v1.17 run.
 
 **Check yourself.**
@@ -8307,14 +8307,14 @@ regenerated by a CI job under rules the owner flips deliberately, not by a
 laptop. The changelog marks which outputs follow it ("CI regenerate").
 
 **The truth pass.** `docs/EXECUTION_QUALITY.md`, `docs/PORTFOLIO_BREADTH.md`
-and `docs/SIGNAL_RESEARCH.md` reserved headings as placeholders at v1.17 for a
+and `archive/docs/SIGNAL_RESEARCH.md` reserved headings as placeholders at v1.17 for a
 final pass that replaces each with what is true at the tag. A document written
 before its results exist says so, and the pass replaces it. For v1.18 that pass
 is the item REL-14c, run after the tag, so that the prose describes what
 shipped and not what was planned.
 
 **A release that promotes nothing (v1.18.0).** The v1.18.0 notes
-(`docs/release/v1.18.0_RELEASE_NOTES.md`) lead with the negative results and
+(`archive/docs/release/v1.18.0_RELEASE_NOTES.md`) lead with the negative results and
 list what is not in the release. The release is a measurement instrument and
 recorded negative results: no signal is promoted, no edge is claimed, there is
 no latency edge, and the fill model is validated at Level 1 (deterministic
@@ -8323,7 +8323,7 @@ gates were accepted open for the tag and are named as open: F3 (the
 known-null method failed, §115), F7 (nobody independent has rerun the B8 v2
 JSON) and the reviewer's full findings memo; F5 (the R7 re-issue) is partly
 met. The foundation note is signed only in its truthful form
-(`docs/release/FOUNDATION_COMPLETE_v1.18.md`). A release is allowed to ship
+(`archive/docs/release/FOUNDATION_COMPLETE_v1.18.md`). A release is allowed to ship
 with gates open if, and only if, they are written down next to the version.
 
 **What it is not.** Not a statement that the open gates are closed, and the
@@ -8343,7 +8343,7 @@ Inside this repository, in suggested order:
 
 0. `docs/HOW_IT_WORKS.md` — the whole platform top-down in one sitting,
    before any of the below.
-1. `docs/SPECIFICATION.md` — the governing spec; §32 is one paragraph and
+1. `archive/docs/SPECIFICATION.md` — the governing spec; §32 is one paragraph and
    worth memorizing.
 2. `PLATFORM_CONVENTIONS.md` + `schemas/FORMAT.md` — how contracts get pinned.
 3. `API_CORE.md` → `API_FEATURES.md` → `API_ALPHA.md` →
@@ -8355,14 +8355,14 @@ Inside this repository, in suggested order:
    authors' own numbers.
 6. `research/adaptive_reports/ADAPTIVE_REPORT.md` — the adaptive study;
    start with "READ THIS FIRST", then §14 above.
-7. `docs/papers/INDEX.md` — all six papers; paper 4 (latency) and paper 6
+7. `archive/docs/papers/INDEX.md` — all six papers; paper 4 (latency) and paper 6
    (C++/Rust/Java case study) especially.
 8. `cpp/include/iap/execution/execution.hpp` — the header comment is the
    best short document on deterministic fill modeling in the repo.
 9. `docs/MVP.md` — the loop end to end, the wiring review, the IC audit and
    the success-criteria table; then `docs/LIFECYCLE.md`,
    `docs/DECISION_TRACE.md` and `docs/DATA_MODEL.md` for the three
-   subsystems it exercises, and `docs/ROADMAP.md` for what is done with
+   subsystems it exercises, and `archive/docs/ROADMAP.md` for what is done with
    evidence and what is backlog.
 10. `docs/RESEARCH_VALIDITY.md` and `research/power/POWER_REPORT.md` — the
     corrected methods (opt-in in v1.3.0 and v1.4.0, the defaults since
@@ -8371,11 +8371,11 @@ Inside this repository, in suggested order:
     `CHANGELOG.md` for what v1.3.0 fixed and what it leaves open, for
     the v1.4.0 dataset regeneration (§2.3), and for the v1.5.0 table of
     what each new default moved.
-11. `docs/ROADMAP.md` §3.8-3.10 and the v1.14.0 section of `CHANGELOG.md`
+11. `archive/docs/ROADMAP.md` §3.8-3.10 and the v1.14.0 section of `CHANGELOG.md`
     — the 2026-10-11 review, what v1.14 fixed and every number it moved.
-12. `docs/release/v1.18.0_RELEASE_NOTES.md` — read the negative results first,
+12. `archive/docs/release/v1.18.0_RELEASE_NOTES.md` — read the negative results first,
     then the REL status table and the open gates;
-    `docs/release/REVIEWER_CLOSEOUT_2026-10-23.md` for the outside reviewer's
+    `archive/docs/release/REVIEWER_CLOSEOUT_2026-10-23.md` for the outside reviewer's
     own words, and `research/v118/known_null_v3_RESULT.md` for the failed
     calibration.
 13. `docs/governance/ANALYSIS_IDENTITY.md` and `docs/governance/TRUST_ROOT.md`
@@ -8434,7 +8434,7 @@ and scoring is `expected_return = beta * z`, `confidence = min(1, |z| / 2)`. `ex
 
 **Ports never fit.** Fitting is Python's job. The ports read `configs/strategies/alpha_params.json` and apply the formula above (`API_ALPHA.md` section 2). `LinearAlpha.load_params` therefore refuses a file whose `alpha_id`, `horizon` or `features` differ from the class, whose `z_clip` or `conf_scale` is not the pinned 4.0 and 2.0, whose numbers are not finite, or that has `sigma <= 0` with a non-zero `beta`. The clip and the confidence scale are part of the cross-language contract, not tunables.
 
-**One more consequence.** `iap.alpha.base` is part of every alpha's code fingerprint, so editing it would change the identity of every open pre-registration. That is why the v1.18 many-ETF universe helper is a new module (`iap.alpha.universe_v2`) rather than an edit of `configure_universe` (`docs/SIGNAL_RESEARCH.md` section 10).
+**One more consequence.** `iap.alpha.base` is part of every alpha's code fingerprint, so editing it would change the identity of every open pre-registration. That is why the v1.18 many-ETF universe helper is a new module (`iap.alpha.universe_v2`) rather than an edit of `configure_universe` (`archive/docs/SIGNAL_RESEARCH.md` section 10).
 
 **Where the 24 stand at v1.18.0.** `research/alpha_registry.json` holds 23 alphas in CANDIDATE and 1 (FX11) in RESEARCH, and every one of them has `outcome: HOLD`. All 23 candidates fail the gates `net_pnl_after_costs`, `net_pnl_bootstrap_ci` and `capacity`; FX11 stops earlier, at `leakage_clean`. No alpha is promoted, and v1.18.0 claims no edge. These are statements about registered hypotheses on the seeded synthetic dataset (`data_version` `116b7787...`), not about markets.
 
@@ -8590,7 +8590,7 @@ cost bp  gross IC   net IC  net ret bp/row
 
 This also shows why the screen has *two* money rules. At a cost of 0.12 bp the net IC is still positive (+0.0181) while the mean net return is already negative. A correlation can survive a cost that the P&L cannot.
 
-**Consequences in the code.** `python -m iap.research run --require-screen PATH` refuses a confirmatory run before reading data (`not_screened`); `breadth_book --require-screen` and `WriteBroker.preregister(..., screen=PATH)` refuse a candidate that failed or was never screened. The C8 breadth-book pre-registration used the screen as a hard gate and the screen refused the candidate at registration, so no confirmatory look was taken (`docs/SIGNAL_RESEARCH.md` section 8).
+**Consequences in the code.** `python -m iap.research run --require-screen PATH` refuses a confirmatory run before reading data (`not_screened`); `breadth_book --require-screen` and `WriteBroker.preregister(..., screen=PATH)` refuse a candidate that failed or was never screened. The C8 breadth-book pre-registration used the screen as a hard gate and the screen refused the candidate at registration, so no confirmatory look was taken (`archive/docs/SIGNAL_RESEARCH.md` section 8).
 
 **What this does not show.** It is in-sample and uses a one-lot size; it says "not at this size, on these days, under this cost model". It does not say no edge exists anywhere. The prereg that defines the rules is an unsigned DRAFT (`research/preregs/net_of_cost_screen_prereg_DRAFT.json`). Tests: `python/tests/test_v117_screen.py`.
 
@@ -8635,7 +8635,7 @@ features with exactly one reader: 23
 
 So 176 of the 205 registered features are read by no flagship alpha (this entry does not claim what else reads them). The `exec` family (expected fill probability, impact, urgency) is read by none, as one would expect: those are execution inputs, not return forecasters. The most-shared input is `ofi_norm_l1_w1s_v1`, declared by EQ02, EQ03 and EQ12. That is consistent with the earlier finding that EQ02, EQ03 and EQ12 are close to one signal three times (COOKBOOK recipe 38: effective independent bets 1.64 of 4): alphas with different names and rationales can sit on the same feature.
 
-**A feature is only as good as its reference (v1.18 REL-07).** The `xasset` family measures a stock against a reference ETF. The v1 rule gives every equity row the *first* ETF row of `instruments.json`; on the 100-name 2019-01-30 store that is AMLP, so every `xasset` feature there is measured against an MLP fund. The opt-in `--xasset-reference symbol_map` reads `configs/reference/reference_etf_map_v1.json` instead: QQQ for the 21 names that were Nasdaq-100 members on 2019-01-30, SPY for the other 50. The names and formulas do not change, so the registry hash does not move; the store instead records `xasset_reference` (feature identity `xasset_v2`, map version and SHA) in `features_summary.json`, and a consumer must read it before mixing stores. The map is recalled from public reconstitution notices, not a licensed constituent file, and the file itself marks six names low confidence (AABA, AMD, FLEX, MRVL, TVIX, VXXB) and lists its own limitations, among them that the two VIX ETNs get a poor SPY reference (`configs/reference/reference_etf_map_v1.json`, `docs/SIGNAL_RESEARCH.md` section 10). The REL-08 screen is a consumer: `load_screen_data` refuses a feature store that is not `xasset_v2` and reads its reference ETF and sector for each name from this map, so REL-08's inconclusive result inherits the map's limits.
+**A feature is only as good as its reference (v1.18 REL-07).** The `xasset` family measures a stock against a reference ETF. The v1 rule gives every equity row the *first* ETF row of `instruments.json`; on the 100-name 2019-01-30 store that is AMLP, so every `xasset` feature there is measured against an MLP fund. The opt-in `--xasset-reference symbol_map` reads `configs/reference/reference_etf_map_v1.json` instead: QQQ for the 21 names that were Nasdaq-100 members on 2019-01-30, SPY for the other 50. The names and formulas do not change, so the registry hash does not move; the store instead records `xasset_reference` (feature identity `xasset_v2`, map version and SHA) in `features_summary.json`, and a consumer must read it before mixing stores. The map is recalled from public reconstitution notices, not a licensed constituent file, and the file itself marks six names low confidence (AABA, AMD, FLEX, MRVL, TVIX, VXXB) and lists its own limitations, among them that the two VIX ETNs get a poor SPY reference (`configs/reference/reference_etf_map_v1.json`, `archive/docs/SIGNAL_RESEARCH.md` section 10). The REL-08 screen is a consumer: `load_screen_data` refuses a feature store that is not `xasset_v2` and reads its reference ETF and sector for each name from this map, so REL-08's inconclusive result inherits the map's limits.
 
 **What this does not show.** The count of 29 says which features the alphas *declare*; it does not say they are useful. The registry guarantees a stable definition, not predictive power.
 
@@ -8686,7 +8686,7 @@ The unit of observation is the *rebalance*, not the row: one rank IC (Spearman) 
 
 The recipe "Re-derive a REL-08 lower bound and see how many rebalances it takes" repeats the bootstrap on synthetic ICs with a fixed mean of 0.04 and sd 0.19 (chosen so that n = 25 gives an SE near V1's): lower bound -0.0197 at n = 25, -0.0056 at 100, +0.0183 at 400, +0.0281 at 1,600. At this spread the same mean needs a few hundred rebalances to clear zero; at the 26 non-overlapping 15-minute decisions per session that the rule counts, 400 rebalances is about 15 sessions.
 
-**The honest verdict.** All 7 variants are `underpowered` (`inconclusive`), none `continue`, none `stop`. The release notes add that the screen has known defects found afterwards: the data-gap criterion C1 is a probable bug that fails by construction, V1/V2 trade a nearly flat book, and the scorecard cumulative-dollar columns sit under a "bps per rebalance" heading. So it is not a clean negative either (`docs/release/v1.18.0_RELEASE_NOTES.md`, items 6-7). The continuation rule v2 is an unsigned draft; REL-08b was not run.
+**The honest verdict.** All 7 variants are `underpowered` (`inconclusive`), none `continue`, none `stop`. The release notes add that the screen has known defects found afterwards: the data-gap criterion C1 is a probable bug that fails by construction, V1/V2 trade a nearly flat book, and the scorecard cumulative-dollar columns sit under a "bps per rebalance" heading. So it is not a clean negative either (`archive/docs/release/v1.18.0_RELEASE_NOTES.md`, items 6-7). The continuation rule v2 is an unsigned draft; REL-08b was not run.
 
 **What this does not show.** It shows nothing about whether VWAP reversion exists in 2019 Nasdaq stocks. One session is one cluster: no day-clustered t is reported or implied. It is in-sample, a hypothesis screen, no edge claim, and the 2025/26 breadth holdout stays unread.
 
@@ -9308,7 +9308,7 @@ COOKBOOK recipe on the REL-08 rule: criteria and outcome equal the stored ones f
 was 380-405 minutes against a 30-minute limit.
 
 **The defect.** The investigation
-(`docs/release/ANOMALY_REL08_INVESTIGATION_2026-10-20.md`) called C1 a probable
+(`archive/docs/release/ANOMALY_REL08_INVESTIGATION_2026-10-20.md`) called C1 a probable
 bug: `rel08_screen.py` builds the gaps from `grid[0] - rebalance_ns` followed by
 the usable rebalances, so the idle time from the grid origin to the first usable
 rebalance counts, and C1 fails by construction on any dataset. Also, V1 and V2
@@ -9552,7 +9552,7 @@ with them", and that a paper or live deployment must commit its own version.
 `PortfolioLimits.load` is strict: a wrong `x-version`, an unknown key, or a
 negative, NaN or boolean bound fails the load.
 
-**Where each limit acts** (`docs/PORTFOLIO_LIMITS.md`):
+**Where each limit acts** (`archive/docs/PORTFOLIO_LIMITS.md`):
 
 - *Linear limits the optimizer enforces:* gross, net, name, sector-net, beta
   and participation. `solve_enforced` turns them into the optimizer's
@@ -9909,7 +9909,7 @@ bound above zero (C8);
 none has one. No capacity section applies.
 
 **What was found afterwards.** The post-run investigation
-(`docs/release/ANOMALY_REL08_INVESTIGATION_2026-10-20.md`, summarised in the
+(`archive/docs/release/ANOMALY_REL08_INVESTIGATION_2026-10-20.md`, summarised in the
 v1.18 release notes) found defects, so the screen is not a clean negative:
 
 - *C1 fails by construction.* The gap criterion measures from the grid origin
@@ -11142,7 +11142,7 @@ is made.
 
 **A worked example.** The pre-declaration assumed the closing NOII starts at 15:50.
 In the 2019-01-30 file every one of the 30,010 closing-cross NOII rows has a time of
-15:55:00.005 or later (`docs/release/ANOMALY_REL08_INVESTIGATION_2026-10-20.md`,
+15:55:00.005 or later (`archive/docs/release/ANOMALY_REL08_INVESTIGATION_2026-10-20.md`,
 section 1b). The decision times and the exit all precede the first snapshot, so the
 imbalance arm could never trade; with `min_trades = 30` the rule could never return
 continue or reject. COOKBOOK recipe "Test the premise of a closing-imbalance study"
@@ -11699,7 +11699,7 @@ the interpreter; they keep verifying and are not re-signed. And a signature
 promises nothing about results: none of the signed v1.18 runs (B8 v2, REL-05,
 REL-08, REL-09, REL-10, null v3) promoted a signal; they are negative,
 underpowered or inconclusive, and the null v3 study failed
-(`docs/release/v1.18.0_RELEASE_NOTES.md`).
+(`archive/docs/release/v1.18.0_RELEASE_NOTES.md`).
 
 **Check yourself.**
 
@@ -11769,7 +11769,7 @@ machine that wrote it, not a public record. A clean
 `check` says the record cites listed versions, not that the listed bytes
 are intact. The outside reviewer's findings memo, which covers this part,
 is one of the gates accepted open for the v1.18.0 tag
-(`docs/release/v1.18.0_RELEASE_NOTES.md`).
+(`archive/docs/release/v1.18.0_RELEASE_NOTES.md`).
 
 **Check yourself.**
 

@@ -13,8 +13,8 @@ read. Every result can be rebuilt from a hash, and every claim carries a stated 
 evidence. As of 2026-10-25 no signal is confirmed: the machinery is built and tested on synthetic
 data, and the real data has not yet been ingested.
 
-**Start here:** [docs/LEARN.md](docs/LEARN.md) (the method and the vocabulary),
-[docs/COOKBOOK.md](docs/COOKBOOK.md) (commands that run today), [docs/ARCHITECTURE_v2.md](docs/ARCHITECTURE_v2.md)
+**Start here:** [archive/docs/LEARN.md](archive/docs/LEARN.md) (the method and the vocabulary),
+[archive/docs/COOKBOOK.md](archive/docs/COOKBOOK.md) (commands that run today), [docs/ARCHITECTURE_v2.md](docs/ARCHITECTURE_v2.md)
 (where things are), [docs/governance/](docs/governance/) (who may do what). The v2.0 programme's
 plan of record and unified specification are the owner's documents, kept outside the repository;
 the documents inside cite them by section.
@@ -28,7 +28,7 @@ the documents inside cite them by section.
 | **C** | the combined multi-horizon book | a profile for the combined statistic (PF-3, deferred) | the Track C confirmation window (`iap-sealed-c`) |
 
 Every performance statement in this repository carries exactly one of these classes
-(U0 section 10; [docs/LEARN.md](docs/LEARN.md) section 6 explains each):
+(U0 section 10; [archive/docs/LEARN.md](archive/docs/LEARN.md) section 6 explains each):
 
 | class | meaning |
 |---|---|
@@ -44,7 +44,7 @@ Every performance statement in this repository carries exactly one of these clas
 
 **Nothing is confirmed.** No registered run has been executed and no independent party has
 reproduced a result, so nothing on `main` is in the first two classes; the class of every result
-so far is listed in [docs/REVIEW_PACK.md](docs/REVIEW_PACK.md) section 0. Every v1.x signed run
+so far is listed in [archive/docs/REVIEW_PACK.md](archive/docs/REVIEW_PACK.md) section 0. Every v1.x signed run
 was negative, inconclusive or underpowered, and the v1.18 known-null calibration study failed and
 was rejected by the outside reviewer as a gate.
 
@@ -85,7 +85,7 @@ conservation invariants, the cost waterfall reconciling to the cash identity, th
 builders and the H1 equivalence test (62 tests, about twenty seconds; CPython 3.11 or 3.12).
 Everything it produces is a correctness check on fixtures and carries no evidence class. The
 research loop on a family specification is
-[docs/COOKBOOK.md](docs/COOKBOOK.md) recipe 1. The full four-language parity table is
+[archive/docs/COOKBOOK.md](archive/docs/COOKBOOK.md) recipe 1. The full four-language parity table is
 `bash tests/harness/run_all.sh` (Linux or WSL; needs the C++ and Rust toolchains of
 [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)).
 
@@ -93,18 +93,18 @@ research loop on a family specification is
 
 | if you want to | read |
 |---|---|
-| understand the method: point-in-time data, selection accounting, the gate, the economic chain, evidence classes | [docs/LEARN.md](docs/LEARN.md) |
-| run something that exists today | [docs/COOKBOOK.md](docs/COOKBOOK.md) |
+| understand the method: point-in-time data, selection accounting, the gate, the economic chain, evidence classes | [archive/docs/LEARN.md](archive/docs/LEARN.md) |
+| run something that exists today | [archive/docs/COOKBOOK.md](archive/docs/COOKBOOK.md) |
 | find a package, an import rule, an identity or the runner flow | [docs/ARCHITECTURE_v2.md](docs/ARCHITECTURE_v2.md), [python/src/iap/README.md](python/src/iap/README.md) |
 | operate it day to day | [docs/RUNBOOK_v2.md](docs/RUNBOOK_v2.md), [docs/runbooks/](docs/runbooks/) |
 | check what is enforced and by whom | [docs/governance/GOVERNANCE.md](docs/governance/GOVERNANCE.md), [docs/governance/TRUST_ROOTS.md](docs/governance/TRUST_ROOTS.md), [docs/governance/SEALED_DATA.md](docs/governance/SEALED_DATA.md), [docs/governance/RUNNER_THREAT_MODEL.md](docs/governance/RUNNER_THREAT_MODEL.md) |
 | reproduce a committed result | [docs/REPRODUCTION.md](docs/REPRODUCTION.md) |
 | know what data is used and under which licence | [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md), [docs/review/DATA_COVERAGE_FREE_ROUTE.md](docs/review/DATA_COVERAGE_FREE_ROUTE.md) |
-| read the record: reviews, releases, defects, every result and its class | [docs/REVIEW_PACK.md](docs/REVIEW_PACK.md), [docs/release/](docs/release/), [docs/review/](docs/review/), [CHANGELOG.md](CHANGELOG.md) |
-| see what every document is for and whether it is current | [docs/DOC_AUDIT_v2.md](docs/DOC_AUDIT_v2.md) |
+| read the record: reviews, releases, defects, every result and its class | [archive/docs/REVIEW_PACK.md](archive/docs/REVIEW_PACK.md), [docs/release/](docs/release/), [docs/review/](docs/review/), [CHANGELOG.md](CHANGELOG.md) |
+| see what every document is for and whether it is current | [archive/docs/DOC_AUDIT_v2.md](archive/docs/DOC_AUDIT_v2.md) |
 | the v1.x engines and their contracts | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DIAGRAMS.md](docs/DIAGRAMS.md), [API_CORE.md](API_CORE.md), [API_FEATURES.md](API_FEATURES.md), [API_TRADING.md](API_TRADING.md), [PLATFORM_CONVENTIONS.md](PLATFORM_CONVENTIONS.md), the frozen v1.x [LEARN.md](LEARN.md) and [COOKBOOK.md](COOKBOOK.md) |
 | contribute | [CONTRIBUTING.md](CONTRIBUTING.md), [docs/POLYGLOT.md](docs/POLYGLOT.md) (which language copies are frozen), the pull-request template |
-| the history: how the numbers moved, release by release | [docs/README_HISTORY.md](docs/README_HISTORY.md), [docs/SHOWCASE.md](docs/SHOWCASE.md) |
+| the history: how the numbers moved, release by release | [archive/docs/README_HISTORY.md](archive/docs/README_HISTORY.md), [docs/SHOWCASE.md](docs/SHOWCASE.md) |
 
 ## How it is built, and who checked what
 
@@ -159,7 +159,7 @@ headline numbers: all headline numbers match their artefacts
 The policy of [docs/POLYGLOT.md](docs/POLYGLOT.md) (v1.11.0) froze 20 of the
 duplicated language copies and retired none, so these counts are unchanged by it.
 What the counts contain (which goldens, which suites, why the time column is
-blank) is explained in [docs/README_HISTORY.md](docs/README_HISTORY.md) §4;
+blank) is explained in [archive/docs/README_HISTORY.md](archive/docs/README_HISTORY.md) §4;
 the six-level testing strategy with exact commands is in
 [tests/README.md](tests/README.md). The `numbers` row is
 `tests/harness/check_headline_numbers.py`, which re-derives every headline

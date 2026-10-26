@@ -78,7 +78,7 @@ current release (0 issues as of 2026-09-20: the release closed all 15),
 `backlog` says what would prove it done. Snapshot counts as of the 2026-09-20 release (not recounted since; the
 `docs/EPICS.md` summary is authoritative): 31 epics, 163 issues — 109 done,
 0 `in-progress`, 54 backlog (`docs/EPICS.md` summary;
-`docs/ROADMAP.md` maps them to the phases).
+`archive/docs/ROADMAP.md` maps them to the phases).
 
 ## Keeping it in sync
 

@@ -4,7 +4,7 @@ This document describes the system as it exists in this repository: which
 responsibilities live in which language tree, how data flows, what the
 contracts and versioning rules are, how determinism and cross-language parity
 are enforced, and how the thing is observed and deployed. The governing
-design is [SPECIFICATION.md](SPECIFICATION.md); the binding low-level
+design is [SPECIFICATION.md](../archive/docs/SPECIFICATION.md); the binding low-level
 decisions are [../PLATFORM_CONVENTIONS.md](../PLATFORM_CONVENTIONS.md).
 Diagram sources live in [diagrams/](diagrams/) (identical to the embedded
 versions below). For a shorter, top-down explanation of how the quant, algo
@@ -24,7 +24,7 @@ trade (`iap.paper`). The v1.17 topical pages are
 [EXECUTION_QUALITY.md](EXECUTION_QUALITY.md) (the shortfall benchmark,
 signal-aware urgency and pacing, the realism layer),
 [PORTFOLIO_BREADTH.md](PORTFOLIO_BREADTH.md) (the breadth universe and the
-cross-sectional book), [SIGNAL_RESEARCH.md](SIGNAL_RESEARCH.md) (the statistics
+cross-sectional book), [SIGNAL_RESEARCH.md](../archive/docs/SIGNAL_RESEARCH.md) (the statistics
 revision and the new models and gates) and [DATA_SOURCES.md](DATA_SOURCES.md)
 (free Nasdaq and IEX data, process-and-delete). Section 22 was added with
 v1.18.0 (2026-10-23): the measurement instrument and the paper-path safety
@@ -34,9 +34,9 @@ REL-05 replay harness, monitoring, portfolio limits, the order manager).
 v1.18 promotes no signal and claims no edge; the fill model is validated at
 Level 1 (deterministic replay) only. Its topical pages are
 [MONITORING_POLICY.md](MONITORING_POLICY.md), [FACTOR_RISK.md](FACTOR_RISK.md),
-[PORTFOLIO_LIMITS.md](PORTFOLIO_LIMITS.md), [SIM_TO_REAL.md](SIM_TO_REAL.md)
+[PORTFOLIO_LIMITS.md](../archive/docs/PORTFOLIO_LIMITS.md), [SIM_TO_REAL.md](SIM_TO_REAL.md)
 and [governance/ANALYSIS_IDENTITY.md](governance/ANALYSIS_IDENTITY.md); the
-release record is [release/v1.18.0_RELEASE_NOTES.md](release/v1.18.0_RELEASE_NOTES.md).
+release record is [release/v1.18.0_RELEASE_NOTES.md](../archive/docs/release/v1.18.0_RELEASE_NOTES.md).
 
 ## 1. Design principles (spec §1, condensed)
 
@@ -1186,7 +1186,7 @@ found no quoting edge (`research/quoting_real/QUOTING_V2_RESULT.md`); R7
 confirmed EQ10 and EQ05 as predictive with zero net P&L (§20); the
 v1.17-v1.18 execution studies (B8, B8 v2, REL-05, REL-09, REL-10) are
 negative or underpowered (§8 of EXECUTION_QUALITY.md, §22 and
-[release/v1.18.0_RELEASE_NOTES.md](release/v1.18.0_RELEASE_NOTES.md)).
+[release/v1.18.0_RELEASE_NOTES.md](../archive/docs/release/v1.18.0_RELEASE_NOTES.md)).
 
 | subsystem | real-data status (2026-10-11, v1.13.0) |
 |---|---|
@@ -1465,7 +1465,7 @@ Level 2** (no real orders or fills exist, owner decision D4(a)). Everything
 below is Python only and outside the cross-language parity table: the golden
 counts of §6 (217/74/75) are those of v1.17.1. The release record, with every
 number and the open gates, is
-[release/v1.18.0_RELEASE_NOTES.md](release/v1.18.0_RELEASE_NOTES.md); the
+[release/v1.18.0_RELEASE_NOTES.md](../archive/docs/release/v1.18.0_RELEASE_NOTES.md); the
 artefact index is [release/RESULTS_INDEX.md](release/RESULTS_INDEX.md).
 
 ### 22.1 Research authorisation: who may read what, and what is counted
@@ -1525,7 +1525,7 @@ All of it is paper only (no broker, D4(a)) and exercised on synthetic feeds.
   `iap.portfolio.enforced` (optimizer constraints from the limits; a result
   that still breaches is refused) and `iap.portfolio.capacity` (net bps and USD
   against notional and participation;
-  [PORTFOLIO_LIMITS.md](PORTFOLIO_LIMITS.md)). The pinned order-level risk
+  [PORTFOLIO_LIMITS.md](../archive/docs/PORTFOLIO_LIMITS.md)). The pinned order-level risk
   engine and its Rust parity goldens are unchanged.
 - **Resilience (REL-18).** `iap.paper.feed.FeedGuard` (duplicate dropping,
   reorder window, gap policy HALT / RESYNC / SKIP, clock guard, stale

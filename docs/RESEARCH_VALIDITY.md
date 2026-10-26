@@ -568,7 +568,7 @@ which data and records how well the inference step behaves on data with no signa
   until the failure mechanism has been investigated (post-release item).
 - **Reproduction (F7, open).** The reviewer inspected the committed B8 v2 report
   and JSON and the REL-08 scorecard but did not rerun them; independent
-  reproduction is open (`docs/release/v1.18.0_RELEASE_NOTES.md`, "Open gates").
+  reproduction is open (`archive/docs/release/v1.18.0_RELEASE_NOTES.md`, "Open gates").
 
 ## 4e. v1.17 WS-D: meta-label calibrate/select split, sizing hook, conformal sizing (opt-in)
 

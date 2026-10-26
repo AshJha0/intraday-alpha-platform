@@ -104,7 +104,7 @@ purchase):
 | H2 momentum / H3 lead-lag / H4 OFI | as H1; H4 adds order-level depth on a bounded universe | not sufficient | as H1; H4: item (iii) | H3/H4 gates per plan section 15.8 |
 
 Common to every row: constituents must be dated files usable under the as-of rule (`iap.data.pit`), the route is
-recorded in every feature contract (`docs/DATA_CONTRACTS.md`), and the partitions of U0 section 2 are cut by calendar
+recorded in every feature contract (`archive/docs/DATA_CONTRACTS.md`), and the partitions of U0 section 2 are cut by calendar
 before any fit.
 
 ## 5. Licence summaries (public pages read 2026-10-24; what was and was not readable)

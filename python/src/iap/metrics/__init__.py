@@ -1,7 +1,7 @@
 """``iap.metrics`` — the Python ``/metrics`` process (v1.17 WS-F item F9).
 
 Replaces the Java ``/metrics`` container retired with DECISION_N7
-(``docs/release/DECISION_N7_JAVA_IMAGE.md``): a stdlib-only Prometheus text
+(``archive/docs/release/DECISION_N7_JAVA_IMAGE.md``): a stdlib-only Prometheus text
 exposition (:mod:`iap.metrics.registry`, the format the retired
 ``com.iap.monitoring`` registry rendered), a file-backed exporter over the
 configs, the session marker and the newest MVP run

@@ -37,7 +37,7 @@ Closes #
 
 ## Research / lifecycle (delete if not applicable)
 
-- [ ] Every performance statement this PR adds carries one of the seven evidence classes of U0 section 10 (docs/LEARN.md section 6); nothing is called confirmed, validated or an edge without one.
+- [ ] Every performance statement this PR adds carries one of the seven evidence classes of U0 section 10 (archive/docs/LEARN.md section 6); nothing is called confirmed, validated or an edge without one.
 - [ ] This PR touches `.github/workflows/registered-run.yml`, `tools/runner/`, `tools/sealed_service.py`, `tools/admin/` or `research/audit/` (code-owner review; docs/governance/RUNNER_THREAT_MODEL.md property 2): yes / no.
 - [ ] `python/tests/spec/CONFIRMATORY_TEST_SPEC.md` and `research/v119/H1_ALPHA_IMPROVEMENT_SPEC.md` are untouched (frozen; a change is a new reviewer-approved revision).
 - [ ] Every new look at the data is in `research/experiments.json`; the report prints the denominator.

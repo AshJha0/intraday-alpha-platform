@@ -533,7 +533,7 @@ Nothing in this section changes a registered alpha, the default feature
 registry, `alpha_params.json`, a golden or a port: every object here is a
 NEW identity built beside the registered ones, and the fingerprinted
 modules (`iap/alpha/base.py`, `equity.py`, `fx.py`, the feature families)
-are untouched. See docs/research/V117_WSC_MODELS.md for the opt-in map.
+are untouched. See archive/docs/research/V117_WSC_MODELS.md for the opt-in map.
 
 ### 11.1 `linear_z_v2` — per-instrument causal standardisation (`iap.alpha.linear_v2`, C3 / R-7)
 

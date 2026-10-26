@@ -13,7 +13,7 @@ piece is still in another pull request it says so. The programme's evidence voca
 As of 2026-10-26 no result on `main` is above *development-supported*: no registered run has been
 executed by CR1, no independent party has reproduced anything, and the DD1 2026 ingestion failed its
 data tests (DR-19; research on it is *exploratory, data-ineligible*)
-([REVIEW_PACK.md](REVIEW_PACK.md) section 0, [SHOWCASE.md](SHOWCASE.md)).
+([REVIEW_PACK.md](../archive/docs/REVIEW_PACK.md) section 0, [SHOWCASE.md](SHOWCASE.md)).
 
 ## 1. The environment
 

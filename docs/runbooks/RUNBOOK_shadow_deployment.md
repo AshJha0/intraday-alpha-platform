@@ -1,6 +1,6 @@
 # RUNBOOK — Paper Trading / Shadow Deployment
 
-> **Retired flow (v2.0 docs audit, 2026-10-25).** This runbook describes the Java shadow stack, archived at git tag `archive/java-v1.14.0` and no longer in the tree; none of its commands runs on `main`. It stays at this path because the Prometheus alert annotations in `deployment/k8s/configmap-prometheus.yaml` name it as their runbook and `tests/harness/check_deployment.py` validates those annotations. The maintained equivalents are `docs/RUNBOOK_v2.md`, `docs/runbooks/RUNBOOK_paper_trade.md` and `deployment/grafana/README.md` (docs/DOC_AUDIT_v2.md).
+> **Retired flow (v2.0 docs audit, 2026-10-25).** This runbook describes the Java shadow stack, archived at git tag `archive/java-v1.14.0` and no longer in the tree; none of its commands runs on `main`. It stays at this path because the Prometheus alert annotations in `deployment/k8s/configmap-prometheus.yaml` name it as their runbook and `tests/harness/check_deployment.py` validates those annotations. The maintained equivalents are `docs/RUNBOOK_v2.md`, `docs/runbooks/RUNBOOK_paper_trade.md` and `deployment/grafana/README.md` (archive/docs/DOC_AUDIT_v2.md).
 
 > **Shells.** These procedures run on the Linux side (the cluster, the containers, WSL or
 > Git Bash): the `bash` blocks are bash. From the owner's Windows PowerShell, translate

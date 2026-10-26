@@ -208,7 +208,7 @@ a port contract; no registered result reads it.
 ### 1.11 Net-of-cost screen (v1.17 C6, opt-in; Python only)
 
 `iap.research.screen` — the pre-registered screen every candidate passes
-through before any confirmatory look (docs/SIGNAL_RESEARCH.md section 8,
+through before any confirmatory look (archive/docs/SIGNAL_RESEARCH.md section 8,
 docs/PORTFOLIO_BREADTH.md "The net-of-cost screen").
 
 | name | what |
@@ -587,7 +587,7 @@ still `message`, so no TCA report or golden changed.
 
 `iap.portfolio.factor_risk` (factor risk model, Euler contributions, VaR / ES, stress scenarios;
 [docs/FACTOR_RISK.md](docs/FACTOR_RISK.md)), `iap.risk.portfolio_limits` (`PortfolioGuard`, `LimitRefused`, kill switch)
-and `iap.portfolio.enforced` (`solve_enforced`, the optimizer under the limits; [docs/PORTFOLIO_LIMITS.md](docs/PORTFOLIO_LIMITS.md)).
+and `iap.portfolio.enforced` (`solve_enforced`, the optimizer under the limits; [archive/docs/PORTFOLIO_LIMITS.md](archive/docs/PORTFOLIO_LIMITS.md)).
 The order-level hard risk engine (`iap.risk.engine`, Rust parity) is unchanged.
 
 ## 6. v2.0 EN2 ledgers and the cash identity — `iap.portfolio.ledger` (Python research; family-agnostic; not a port contract)

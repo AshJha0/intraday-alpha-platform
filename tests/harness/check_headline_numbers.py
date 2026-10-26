@@ -54,7 +54,7 @@ DOCS = {
     "docs/index.html": ROOT / "docs" / "index.html",
     # added 2026-10-15 (v1.17 G1): the three-minute showcase quotes the same figures.
     "docs/SHOWCASE.md": ROOT / "docs" / "SHOWCASE.md",
-    "docs/README_HISTORY.md": ROOT / "docs" / "README_HISTORY.md",
+    "archive/docs/README_HISTORY.md": ROOT / "docs" / "README_HISTORY.md",
     "docs/DIAGRAMS.md": ROOT / "docs" / "DIAGRAMS.md",
     "docs/BUILD_NOTES.md": ROOT / "docs" / "BUILD_NOTES.md",
     # added round 3: all three quote counts that the harness produces, and all
@@ -67,7 +67,7 @@ DOCS = {
     "docs/MVP.md": ROOT / "docs" / "MVP.md",
     "docs/LIFECYCLE.md": ROOT / "docs" / "LIFECYCLE.md",
     "docs/DECISION_TRACE.md": ROOT / "docs" / "DECISION_TRACE.md",
-    "docs/ROADMAP.md": ROOT / "docs" / "ROADMAP.md",
+    "archive/docs/ROADMAP.md": ROOT / "docs" / "ROADMAP.md",
     "docs/DATA_MODEL.md": ROOT / "docs" / "DATA_MODEL.md",
     "API_CONTRACTS.md": ROOT / "API_CONTRACTS.md",
     "API_TRADING.md": ROOT / "API_TRADING.md",
@@ -75,7 +75,7 @@ DOCS = {
     "CONTRIBUTING.md": ROOT / "CONTRIBUTING.md",
     "tests/README.md": ROOT / "tests" / "README.md",
     "schemas/README.md": ROOT / "schemas" / "README.md",
-    "docs/papers/INDEX.md": ROOT / "docs" / "papers" / "INDEX.md",
+    "archive/docs/papers/INDEX.md": ROOT / "docs" / "papers" / "INDEX.md",
     "docs/governance/REPRODUCIBILITY.md": ROOT / "docs" / "governance" / "REPRODUCIBILITY.md",
     "docs/runbooks/RUNBOOK_incident_replay.md": ROOT
     / "docs"

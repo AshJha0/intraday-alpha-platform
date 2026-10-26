@@ -1,6 +1,6 @@
 # v1.18 result artefacts: index (file, producing prereg, signing commit, actor, sha256)
 
-Generated 2026-10-20 from the run outputs in the owner's worktrees; copied byte for byte, nothing edited. Signature key: `ashjha0` for every prereg. All results here are **underpowered, inconclusive or negative; none promotes a signal** (see `docs/release/v1.18.0_RELEASE_NOTES.md` in draft PR #320).
+Generated 2026-10-20 from the run outputs in the owner's worktrees; copied byte for byte, nothing edited. Signature key: `ashjha0` for every prereg. All results here are **underpowered, inconclusive or negative; none promotes a signal** (see `archive/docs/release/v1.18.0_RELEASE_NOTES.md` in draft PR #320).
 
 **Known limitations (see `docs/release/F7_REPRODUCTION_GUIDE.md`):** the files contain absolute `C:\Work\Claude\...` paths and run timestamps, so they are not byte-reproducible on another machine; `run_manifest.json` files are not reproducible by design; the code under `python/src/iap` on current main differs from the signing commit, so a re-run must check out the signing commit listed here.
 

@@ -269,7 +269,7 @@ know before quoting a number from this book:
   MVP loop and the maker and quoting examples lose money after costs. The
   v1.18 results (B8 v2, REL-05, REL-08, REL-09, REL-10, the failed known-null
   calibration) are in
-  [docs/release/v1.18.0_RELEASE_NOTES.md](docs/release/v1.18.0_RELEASE_NOTES.md).
+  [archive/docs/release/v1.18.0_RELEASE_NOTES.md](archive/docs/release/v1.18.0_RELEASE_NOTES.md).
 
 Recipes 5, 6, 7 and 18 rewrite committed reports, so their figures were read
 from the committed artefacts (last regenerated at v1.17.0). Recipes 2, 10, 12,
@@ -3008,7 +3008,7 @@ before you run it.
 ## 46. Run the maker backtest on a real session (how-to; no maker edge found)
 
 This is the shape of one unit of the pre-registered maker study described
-in docs/ROADMAP.md §3.5: fit the alpha on an earlier session, calibrate on
+in archive/docs/ROADMAP.md §3.5: fit the alpha on an earlier session, calibrate on
 that same earlier session, then post on the later one with a taker exit and
 with a passive exit. Save it as `maker_day.py`:
 
@@ -3094,12 +3094,12 @@ PYTHONUTF8=1 PYTHONPATH=src python3 maker_day.py \
 The pre-registered study (`research/maker_real/prereg.json`, merged from
 branch `research/maker-real` in v1.16 item 11: EQ01, EQ02, EQ05 and EQ10,
 taker and passive exits, walk-forward over the seven sessions with session 1
-as warm-up) finished with **no maker edge** (docs/ROADMAP.md, v1.9 section;
+as warm-up) finished with **no maker edge** (archive/docs/ROADMAP.md, v1.9 section;
 this book does not reproduce its per-cell table). It is in-sample: those
 sessions were used to design every alpha, so even a positive result would
 only have justified an out-of-sample test. The later v1.18 REL-10 study found
 its maker cells underpowered (12 of 12; `research/v118/rel10/REPORT.md`,
-docs/release/v1.18.0_RELEASE_NOTES.md): no maker edge is claimed anywhere in
+archive/docs/release/v1.18.0_RELEASE_NOTES.md): no maker edge is claimed anywhere in
 this repository. The script above was checked on the
 two-session synthetic dataset of recipe 43, where it is plumbing only
 (`taker`: every row gated out; `passive`: 2,534 posts, no fill on that
@@ -5608,7 +5608,7 @@ calibration, recipe 79). The smoke run on AAPL (first 200k events) gave
 - Datasets ingested before v1.14 need `--allow-legacy-dataset`, and the run
   is then recorded as legacy.
 - One day is an integration test and a cost baseline, not evidence.
-  `docs/research/MVP_REAL_20191018.md` shows costs swamping the edge by
+  `archive/docs/research/MVP_REAL_20191018.md` shows costs swamping the edge by
   about 12x.
 - Add the opt-in end-of-day flatten (recipe 86) through `--mvp-config` if
   you want to end the day flat.
@@ -7286,7 +7286,7 @@ PowerShell: `$env:PYTHONUTF8 = "1"; python tests/harness/check_docs.py`. The las
 reads `<n> failure(s), <m> stale status row(s)`; `--json` prints one machine-readable document, `--verbose` prints more detail and `--strict` makes stale status text fail. On the
 v1.17 worktree before the COOKBOOK block of this section was written the run printed
 `0 failure(s)` and a list of stale `status_freshness` rows in `docs/EPICS.md`,
-`docs/ROADMAP.md`  and a few others (a historical run; before a tag use `--release`, which
+`archive/docs/ROADMAP.md`  and a few others (a historical run; before a tag use `--release`, which
 fails on any undated status phrase). CI runs the same
 script in the `docs` job, plus the external-link check (`lychee`, configured in
 `lychee.toml`: it excludes the GitHub API, loopback and private hosts). The `docs`
@@ -8332,7 +8332,7 @@ synthetic per-rebalance rank ICs, sample mean 0.04, sd 0.19, block 2, 9,999 draw
 
 Reading it. Every variant is `underpowered`. V1's mean IC of +0.0401 sits below its MDE of 0.0716 (`2.49 * SE`, the rule's `mde_z_sum`), and its lower bound at the Bonferroni level 0.992857 is negative, so the data cannot separate it from zero at 25 rebalances. The synthetic rows (sample mean 0.04, sd 0.19 chosen so n = 25 gives an SE near V1's; this is not REL-08 data) show the same mean needing roughly 400 rebalances for a positive lower bound.
 
-**Caveats:** one session is one cluster in the rule, so no day-clustered inference is made or implied; the scorecard's net-bps columns are cumulative dollars under a "bps" heading and the C1 data-gap criterion is a probable bug (`docs/release/v1.18.0_RELEASE_NOTES.md`, items 6-7), so this is not a clean negative either. REL-08b was not run and the v2 continuation rule is an unsigned draft. The tests `python/tests/test_v118_rel08_screen.py` cover the bootstrap and ESS arithmetic.
+**Caveats:** one session is one cluster in the rule, so no day-clustered inference is made or implied; the scorecard's net-bps columns are cumulative dollars under a "bps" heading and the C1 data-gap criterion is a probable bug (`archive/docs/release/v1.18.0_RELEASE_NOTES.md`, items 6-7), so this is not a clean negative either. REL-08b was not run and the v2 continuation rule is an unsigned draft. The tests `python/tests/test_v118_rel08_screen.py` cover the bootstrap and ESS arithmetic.
 
 ## 151. Measure how noisy a Sharpe ratio is, and the PSR and minimum track record (v1.18)
 
@@ -9736,7 +9736,7 @@ is an unsigned draft.
 - Do not run `rel08_screen` on a session to "see what the fix gives": that is another
   ledger look per variant, and the corrected rule is an unsigned draft (the release notes
   say signing needs a synthetic dry run, a reviewer and a signature before any new session
-  is read; `docs/release/ANOMALY_REL08_INVESTIGATION_2026-10-20.md`).
+  is read; `archive/docs/release/ANOMALY_REL08_INVESTIGATION_2026-10-20.md`).
 
 **What it is not:** a re-run, an edge claim or evidence about the scores. REL-08b was not
 run; REL-08c was dropped.
@@ -11358,7 +11358,7 @@ dropped because no closing NOII row exists before 15:55:00 in the 2019-01-30 dat
 (`research/v118/rel08c/DROPPED.md`). The recipe reproduces the mechanism with
 `features_at` on a synthetic NOII table whose first snapshot is set to 15:55:00.005,
 the time the real file showed. The real 2019 file is not in this checkout; the
-fact comes from `docs/release/ANOMALY_REL08_INVESTIGATION_2026-10-20.md`
+fact comes from `archive/docs/release/ANOMALY_REL08_INVESTIGATION_2026-10-20.md`
 section 1b.
 
 ```bash
@@ -12217,7 +12217,7 @@ missing from the manifest is an error rather than an unpinned reference. On
   `release-manifest.json` asset of the GitHub release.
 - The v1.18.0 release was published with named open gates (F3, F7, the reviewer's
   findings memo); the tool does not know about gates, the release notes
-  (`docs/release/v1.18.0_RELEASE_NOTES.md`) do.
+  (`archive/docs/release/v1.18.0_RELEASE_NOTES.md`) do.
 
 
 <!-- G5 placeholders: B10 dark model; C6 screen; F7 C++ ports; B9/F8 Rust -->

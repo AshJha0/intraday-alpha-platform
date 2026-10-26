@@ -1232,7 +1232,7 @@ flowchart TD
 
 ## 25. Release roadmap, v1.9 to v1.11
 
-Plan items by release (docs/ROADMAP.md §3.4-3.6). v1.9.0 and v1.10.0 are
+Plan items by release (archive/docs/ROADMAP.md §3.4-3.6). v1.9.0 and v1.10.0 are
 released, and so is v1.11.0 (2026-10-10). This is the history as of v1.11.0;
 the current release is v1.18.0 (§41). The real-data studies were running on
 their own branches at that point, exploratory and in-sample, with no result
@@ -1726,7 +1726,7 @@ flowchart LR
 | topic | document |
 |---|---|
 | Full architecture narrative, per-language engineering notes | [ARCHITECTURE.md](ARCHITECTURE.md) |
-| Governing institutional specification (verbatim) | [SPECIFICATION.md](SPECIFICATION.md) |
+| Governing institutional specification (verbatim) | [SPECIFICATION.md](../archive/docs/SPECIFICATION.md) |
 | Teaching walkthrough of every subsystem | [../LEARN.md](../LEARN.md) |
 | How the quant, algo and AI sides work, top-down | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) |
 | 200 runnable recipes | [../COOKBOOK.md](../COOKBOOK.md) |
@@ -1736,16 +1736,16 @@ flowchart LR
 | The executable MVP and its honest golden run | [MVP.md](MVP.md) |
 | Typed contracts, Protocols, schema index, validation | [../API_CONTRACTS.md](../API_CONTRACTS.md) |
 | Python risk / execution reference ports and their golden parity | [../API_TRADING.md](../API_TRADING.md) |
-| Roadmap: what exists, with evidence; what is backlog | [ROADMAP.md](ROADMAP.md) |
+| Roadmap: what exists, with evidence; what is backlog | [ROADMAP.md](../archive/docs/ROADMAP.md) |
 | v1.17 execution quality: the shortfall benchmark, signal-aware urgency and pacing, the realism layer | [EXECUTION_QUALITY.md](EXECUTION_QUALITY.md) |
 | v1.17 breadth: the universe rule and the cross-sectional book | [PORTFOLIO_BREADTH.md](PORTFOLIO_BREADTH.md) |
-| v1.17 signal research: the statistics revision, new models and gates | [SIGNAL_RESEARCH.md](SIGNAL_RESEARCH.md) |
+| v1.17 signal research: the statistics revision, new models and gates | [SIGNAL_RESEARCH.md](../archive/docs/SIGNAL_RESEARCH.md) |
 | v1.17 data sources: free Nasdaq and IEX days, process-and-delete | [DATA_SOURCES.md](DATA_SOURCES.md) |
-| v1.18 monitoring policy, factor risk, portfolio limits and kill switch, sim-to-real levels | [MONITORING_POLICY.md](MONITORING_POLICY.md), [FACTOR_RISK.md](FACTOR_RISK.md), [PORTFOLIO_LIMITS.md](PORTFOLIO_LIMITS.md), [SIM_TO_REAL.md](SIM_TO_REAL.md) |
-| v1.18 outside-reviewer pack | [REVIEW_PACK.md](REVIEW_PACK.md) |
+| v1.18 monitoring policy, factor risk, portfolio limits and kill switch, sim-to-real levels | [MONITORING_POLICY.md](MONITORING_POLICY.md), [FACTOR_RISK.md](FACTOR_RISK.md), [PORTFOLIO_LIMITS.md](../archive/docs/PORTFOLIO_LIMITS.md), [SIM_TO_REAL.md](SIM_TO_REAL.md) |
+| v1.18 outside-reviewer pack | [REVIEW_PACK.md](../archive/docs/REVIEW_PACK.md) |
 | Which language copy is canonical, which frozen; the `POLYGLOT-OVERRIDE` rule | [POLYGLOT.md](POLYGLOT.md) |
 | Research governance and the LLM agent's controls | [governance/GOVERNANCE.md](governance/GOVERNANCE.md) §2a-§2b |
 | The research methods (defaults since v1.5.0, with their legacy rules), the safe research store, gate eligibility | [RESEARCH_VALIDITY.md](RESEARCH_VALIDITY.md) |
 | Release notes | [../CHANGELOG.md](../CHANGELOG.md) |
-| Six research papers from the platform's own numbers | [papers/INDEX.md](papers/INDEX.md) |
+| Six research papers from the platform's own numbers | [papers/INDEX.md](../archive/docs/papers/INDEX.md) |
 | Benchmark methodology + results | [../benchmarks/RESULTS.md](../benchmarks/RESULTS.md) |

@@ -123,7 +123,7 @@ Boundary caveat: the three languages' replay figures are NOT
 boundary-identical — the C++ bench times the replay loop over pre-decoded
 events with warmup and ≥0.5 s loops, while the Rust and Java demos include
 engine construction and validation passes (see
-`docs/papers/06_cpp_vs_rust_vs_java_event_driven.md` §4.2). Only
+`archive/docs/papers/06_cpp_vs_rust_vs_java_event_driven.md` §4.2). Only
 order-of-magnitude comparisons are supported.
 
 ## Tick-to-trade latency percentiles (v1.12)

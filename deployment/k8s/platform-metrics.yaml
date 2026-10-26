@@ -1,7 +1,7 @@
 # =============================================================================
 # platform-metrics — the Python /metrics process (v1.17 WS-F item F9; the
 # Java platform image was retired with DECISION_N7,
-# docs/release/DECISION_N7_JAVA_IMAGE.md). Image: the `python` image,
+# archive/docs/release/DECISION_N7_JAVA_IMAGE.md). Image: the `python` image,
 # deployment/docker/Dockerfile.python.
 #
 # Two containers in ONE pod, mirroring the retired java-platform + sidecar:

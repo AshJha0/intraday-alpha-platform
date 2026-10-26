@@ -1564,7 +1564,7 @@ and nothing else. `python/src/iap/marketdata`, `iap/features`,
   Timings of run 37186937013: `power` 994.5 s, `power_extended` 2,461.1 s.
 - **Docs that quote report version 2** as a dated statement (the errata of
   `docs/papers/01` and `03`, the v1.4.0 / v1.5.0 result tables of
-  CHANGELOG.md and docs/ROADMAP.md) were left as written; the current
+  CHANGELOG.md and archive/docs/ROADMAP.md) were left as written; the current
   figures are in CHANGELOG.md ("Added — detection power") and
   docs/RESEARCH_VALIDITY.md §2.
 - Migration path: regenerate

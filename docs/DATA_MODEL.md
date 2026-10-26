@@ -303,7 +303,7 @@ names measured against the reference ETF of a versioned symbol map, so its
 `xasset` columns are not comparable with a store that lacks the key) and
 `labels_v2` (the store also holds `labels_v2_<instrument_id>.parquet`, the
 15 m / 30 m / 1 h session-grid labels keyed by `instrument_id, anchor_ts`;
-docs/SIGNAL_RESEARCH.md section 10).
+archive/docs/SIGNAL_RESEARCH.md section 10).
 
 The v1.18 REL-02 ledger migration (`research/v118/REL02_LEDGER_MIGRATION.md`) appended entries and tagged each
 with a `data_family` (real or synthetic) in the entry JSON. The store has no `data_family` column and does not

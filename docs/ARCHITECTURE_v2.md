@@ -4,8 +4,8 @@ One page for a contributor or reviewer who needs to know where things are and wh
 what. The v1.x engine architecture (order book, feature factory, execution simulator, risk engine,
 replay, the C++ and Rust ports and their goldens) is unchanged and documented in
 [ARCHITECTURE.md](ARCHITECTURE.md) and [DIAGRAMS.md](DIAGRAMS.md); this page covers what v2.0
-added on top of it and how the pieces are kept apart. Method and vocabulary: [LEARN.md](LEARN.md).
-Runnable commands: [COOKBOOK.md](COOKBOOK.md).
+added on top of it and how the pieces are kept apart. Method and vocabulary: [LEARN.md](../archive/docs/LEARN.md).
+Runnable commands: [COOKBOOK.md](../archive/docs/COOKBOOK.md).
 
 ## 1. Package map
 
@@ -134,4 +134,4 @@ partitions through the service's `ingest` endpoint and never reads one.
 | a confirmation verdict for H1 | `iap.validation.confirmatory.decide` | PROMOTE or `refused: <reason>`; the class of the surrounding run is the runner's |
 | a confirmation verdict for any other registration | `iap.validation.profiles.decide` (U13) | the same |
 | `results/<prereg>/<seq>/hashes.json` | the registered runner | mechanically isolated (until custody separate from the developer exists) |
-| the release notes and `docs/REVIEW_PACK.md` section 0 | the maintainer | one class per result, in the words of U0 section 10 |
+| the release notes and `archive/docs/REVIEW_PACK.md` section 0 | the maintainer | one class per result, in the words of U0 section 10 |

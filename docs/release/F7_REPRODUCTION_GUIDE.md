@@ -12,7 +12,7 @@ section 8). Fill the `TBD` cells and delete this banner when the result PR lands
 Gate F7 (programme section 9.2): *the outside reviewer reproduces the REL-04b JSON under the
 reproducibility contract (section 9.6)*. Deliverable (b) of section 9.3: *reproduce the REL-04b
 JSON and one alpha-track scorecard from the review pack on your own machine, with a written note
-of what you could not reproduce.* This guide supplements [../REVIEW_PACK.md](../REVIEW_PACK.md)
+of what you could not reproduce.* This guide supplements [../REVIEW_PACK.md](../../archive/docs/REVIEW_PACK.md)
 section 3, whose REL-04b and REL-08 entries are still placeholders.
 
 ## 0. Read this first: three tiers, and what each proves
@@ -357,5 +357,5 @@ Dataset versions for the REL-05 sessions: 2019-01-30 `06419d74...7293`, 2019-03-
 * Commit the result files (section 3.4, 5) so a reviewer can run tier A without asking: B8 v2
   results are currently untracked in the owner's `wt-b8v2-run`; REL-05, 09, 10 results in
   `wt-q-rel05`, `wt-q-rel09`, `wt-q-rel10`; REL-08 in `wt-rel08-run`.
-* Replace the `TBD` placeholders in `docs/REVIEW_PACK.md` section 3 with a pointer to this file
+* Replace the `TBD` placeholders in `archive/docs/REVIEW_PACK.md` section 3 with a pointer to this file
   and the commit that carries the results.

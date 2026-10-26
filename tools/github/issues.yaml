@@ -452,7 +452,7 @@ epics:
       features -> alpha -> portfolio target -> risk -> execution -> TCA ->
       trace — and running it twice produces identical bytes.
     scope:
-      - "python -m iap.mvp --seed 12345 --instrument SYN.EQ.AAPL; docs/MVP.md; docs/ROADMAP.md"
+      - "python -m iap.mvp --seed 12345 --instrument SYN.EQ.AAPL; docs/MVP.md; archive/docs/ROADMAP.md"
     acceptance:
       - "The MVP run writes a report and a trace; a second run with the same seed is byte-identical (golden)"
       - "Every stage consumes a typed contract from python/src/iap/contracts"
@@ -537,7 +537,7 @@ epics:
       here and what is not is explicit. The container/k8s stack that exists is
       recorded here too.
     scope:
-      - "docs/README_HISTORY.md §Real-world usage notes; deployment/"
+      - "archive/docs/README_HISTORY.md §Real-world usage notes; deployment/"
     acceptance:
       - "Every out-of-scope item has an issue stating what would prove it done"
       - "The existing deployment stack passes tests/harness/check_deployment.py"
@@ -1074,7 +1074,7 @@ issues:
       - "Clustering is visible in inter-arrival statistics and documented as a simplification"
     evidence:
       - "python/src/iap/marketdata/generator.py (_eq_add, _eq_slot, _eq_session_stream, _snapshot_burst)"
-      - "docs/README_HISTORY.md References [3] Hawkes (1971); tests/golden/events_eq_mbo.jsonl"
+      - "archive/docs/README_HISTORY.md References [3] Hawkes (1971); tests/golden/events_eq_mbo.jsonl"
 
   - key: M03
     epic: E03
@@ -1601,7 +1601,7 @@ issues:
       - "Every headline number is re-derived by check_headline_numbers.py"
     evidence:
       - "research/alpha_reports/REPORT.md; research/alpha_reports/run_all.py; research/alpha_reports/EQ01.json .. FX12.json (24 per-alpha files)"
-      - "research/experiments.json; docs/papers/01_ofi_predictability_equities.md (with errata); python/src/iap/validation/validate.py (GATES)"
+      - "research/experiments.json; archive/docs/papers/01_ofi_predictability_equities.md (with errata); python/src/iap/validation/validate.py (GATES)"
 
   - key: A07
     epic: E07
@@ -1801,7 +1801,7 @@ issues:
       - "DSR with skew/kurtosis reported next to the existing yardstick in every report"
       - "README references updated from 'style' to the implemented method"
     evidence:
-      - "python/src/iap/validation/ledger.py; docs/README_HISTORY.md References [10], [13]"
+      - "python/src/iap/validation/ledger.py; archive/docs/README_HISTORY.md References [10], [13]"
 
   # ---------------------------------------------------------------- E09 ----
   - key: P01
@@ -2033,7 +2033,7 @@ issues:
       - "Each rule has a scenario test; the queue-position model is diagrammed and documented in paper 5"
     evidence:
       - "cpp/include/iap/execution/execution.hpp (normative rule text); cpp/src/execution/execution.cpp; cpp/tests/test_execution.cpp"
-      - "docs/diagrams/queue_position_model.mmd; docs/papers/05_queue_aware_execution_adverse_selection.md"
+      - "docs/diagrams/queue_position_model.mmd; archive/docs/papers/05_queue_aware_execution_adverse_selection.md"
 
   - key: X04
     epic: E11
@@ -2172,7 +2172,7 @@ issues:
     acceptance:
       - "New AlgoType variant behind config; TCA_REPORT compares both schedules on the same seed"
     evidence:
-      - "cpp/include/iap/execution/algos.hpp; docs/README_HISTORY.md References [6]"
+      - "cpp/include/iap/execution/algos.hpp; archive/docs/README_HISTORY.md References [6]"
 
   # ---------------------------------------------------------------- E12 ----
   - key: H01
@@ -2228,7 +2228,7 @@ issues:
     acceptance:
       - "Every figure quoted in README is in results_cpp.md with its methodology"
     evidence:
-      - "cpp/bench/bench_all.cpp; benchmarks/results_cpp.md; benchmarks/RESULTS.md; docs/papers/06_cpp_vs_rust_vs_java_event_driven.md"
+      - "cpp/bench/bench_all.cpp; benchmarks/results_cpp.md; benchmarks/RESULTS.md; archive/docs/papers/06_cpp_vs_rust_vs_java_event_driven.md"
 
   - key: H05
     epic: E12
@@ -2744,7 +2744,7 @@ issues:
       - "Each document names its schemas, modules, goldens and the tests that pin it"
       - "README's documentation index links all six"
     evidence:
-      - "docs/MVP.md; docs/DATA_MODEL.md; docs/LIFECYCLE.md; docs/DECISION_TRACE.md; docs/ROADMAP.md; docs/EPICS.md (generated)"
+      - "docs/MVP.md; docs/DATA_MODEL.md; docs/LIFECYCLE.md; docs/DECISION_TRACE.md; archive/docs/ROADMAP.md; docs/EPICS.md (generated)"
       - "README.md documentation index; API_CONTRACTS.md; API_TRADING.md; docs/runbooks/RUNBOOK_incident_replay.md"
 
   # ---------------------------------------------------------------- E19 ----
@@ -2981,7 +2981,7 @@ issues:
     acceptance:
       - "Every number in a paper is regenerable from a script in research/"
     evidence:
-      - "docs/papers/INDEX.md; docs/papers/01_ofi_predictability_equities.md .. docs/papers/06_cpp_vs_rust_vs_java_event_driven.md"
+      - "archive/docs/papers/INDEX.md; archive/docs/papers/01_ofi_predictability_equities.md .. archive/docs/papers/06_cpp_vs_rust_vs_java_event_driven.md"
 
   - key: AF02
     epic: E22
@@ -3328,7 +3328,7 @@ issues:
       - "A budget file lists a percentile budget and a noise margin per language and stage"
       - "CI fails on a regression beyond the margin and reports the measured distribution"
     evidence:
-      - "benchmarks/; cpp/bench/bench_all.cpp; docs/papers/06_cpp_vs_rust_vs_java_event_driven.md"
+      - "benchmarks/; cpp/bench/bench_all.cpp; archive/docs/papers/06_cpp_vs_rust_vs_java_event_driven.md"
 
   - key: LT02
     epic: E26
@@ -3356,7 +3356,7 @@ issues:
       - "A capture path records NIC timestamps and a report states the synchronisation error bound"
       - "Latency histograms are labelled with their timestamp source"
     evidence:
-      - "docs/papers/04_alpha_decay_vs_latency.md; deployment/grafana/README.md"
+      - "archive/docs/papers/04_alpha_decay_vs_latency.md; deployment/grafana/README.md"
 
   - key: LT04
     epic: E26
@@ -4057,7 +4057,7 @@ issues:
     acceptance:
       - "Digest recorded; site shows it"
     evidence:
-      - "python/src/iap/mvp/real.py; python/tests/test_mvp_real.py; docs/research/MVP_REAL_20191018.md"
+      - "python/src/iap/mvp/real.py; python/tests/test_mvp_real.py; archive/docs/research/MVP_REAL_20191018.md"
 
   - key: X-P1-3
     epic: E35
@@ -4179,11 +4179,11 @@ issues:
     status: done
     estimate_days: 2
     context: >
-      The v1.14 release flow as code, dry-run by default; rehearsed for v1.15.0 in docs/release/V1150_REHEARSAL.md.
+      The v1.14 release flow as code, dry-run by default; rehearsed for v1.15.0 in archive/docs/release/V1150_REHEARSAL.md.
     acceptance:
       - "Dry-run plans match the documented flow; mocked tests"
     evidence:
-      - "tools/release.py; python/tests/test_release_tool.py; docs/release/V1150_REHEARSAL.md"
+      - "tools/release.py; python/tests/test_release_tool.py; archive/docs/release/V1150_REHEARSAL.md"
 
   - key: E-P2-2
     epic: E35

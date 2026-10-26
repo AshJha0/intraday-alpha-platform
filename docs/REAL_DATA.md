@@ -26,7 +26,7 @@ free sample file, through the REL-12 oracle
 ([research/ITCH_ORACLE.md](research/ITCH_ORACLE.md)), which does not test the
 ITCH byte parser. **No signal is promoted and no edge is claimed from any of
 this data** (v1.18.0 release notes,
-[release/v1.18.0_RELEASE_NOTES.md](release/v1.18.0_RELEASE_NOTES.md)); the
+[release/v1.18.0_RELEASE_NOTES.md](../archive/docs/release/v1.18.0_RELEASE_NOTES.md)); the
 studies recorded so far are in §3. Backlog issue XD10 ([EPICS.md](EPICS.md),
 E25) is still listed as backlog there. §9 gives the two opt-in tests.
 
@@ -323,7 +323,7 @@ confirmed". Statistical only: no P&L claim was registered.
 | EQ07 reversal @ 10s, sign + | control, expected to fail | −0.012 (−3.0) | −0.021 | −3.95 | 3.85 | **contradicted** (exit 3), as expected |
 | EQ04 trade flow @ 5s | control, expected underpowered | +0.014 (3.6) | +0.028 | 3.15 | 3.89 | weaker, not confirmed, as expected |
 
-> **Evidence class (v2.0, U0 section 10):** "confirmed" in this table is the v1.8 gate's word. The round was run by the developer on the developer's machine and the holdout is now spent, so under the v2.0 classes it is **development-supported** at most; no execution separation, no independent review ([REVIEW_PACK.md](REVIEW_PACK.md) section 0).
+> **Evidence class (v2.0, U0 section 10):** "confirmed" in this table is the v1.8 gate's word. The round was run by the developer on the developer's machine and the holdout is now spent, so under the v2.0 classes it is **development-supported** at most; no execution separation, no independent review ([REVIEW_PACK.md](../archive/docs/REVIEW_PACK.md) section 0).
 
 Leakage passed on every run; fold sign consistency was 0.75 (EQ01, EQ02,
 EQ05, EQ04), 1.00 (EQ10) and 0.00 (EQ07). Reading it:
@@ -365,7 +365,7 @@ was recomputed at the registered N = 297 with the verdicts unchanged
 (`research/r7/r7_confirm_result_dsr_recompute.md`), but the result file was not
 re-issued (gate F5, partly met). No net-of-cost edge followed from either
 holdout: gate-passing information coefficients of 0.03-0.10 at 1-5 s do not clear
-the taker round trip (§3.2 above; `docs/SIGNAL_RESEARCH.md` section 8).
+the taker round trip (§3.2 above; `archive/docs/SIGNAL_RESEARCH.md` section 8).
 
 **Multi-venue routing on real data (v1.12, X5).** Every real session in
 this repository is Nasdaq TotalView-ITCH (or LOBSTER built from it): one
@@ -389,7 +389,7 @@ synthetic multi-venue books. It is capability for multi-venue data later
 result below (v1.12.0, 2026-10-10) is NO DEMONSTRATED EDGE, and the 2026
 holdout verdict is **NOT CONFIRMED** (0 trades on 6 holdout decisions, frozen
 `C-300s` fit; `data/real/auction/AUC01_holdout2026.json`, which is git-ignored;
-summarised in [README_HISTORY.md](README_HISTORY.md)). Both are pre-registered
+summarised in [README_HISTORY.md](../archive/docs/README_HISTORY.md)). Both are pre-registered
 (prereg sha256 `9ea0915c…`). The paragraphs below are kept as written on
 2026-10-10 where marked.
 
@@ -440,7 +440,7 @@ decisions, 0 trades, verdict `NOT CONFIRMED`. (The paragraph that stood here on
 **Maker and quoting studies: finished, no edge.** The pre-registered maker
 study (EQ01 / EQ02 / EQ05 / EQ10 with taker and passive exits) on the seven
 in-sample sessions finished in v1.15 with no maker edge: every traded cell was
-negative ([README_HISTORY.md](README_HISTORY.md); its hypothesis was dropped from
+negative ([README_HISTORY.md](../archive/docs/README_HISTORY.md); its hypothesis was dropped from
 R7). The M5 quoting study v1 was aborted before any result was read
 (`data/real/quoting_real/ABORTED.md`); the v2 study, registered 2026-10-14 on
 the same seven sessions, reads **no quoting edge** (signal skew reduces the
