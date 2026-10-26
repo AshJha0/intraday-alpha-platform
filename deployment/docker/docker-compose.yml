@@ -68,7 +68,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.python
-    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.18.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v2.0.0
     container_name: iap-data-generator
     # Deterministic batch job: identical seed => bit-identical /data outputs
     # (configs/marketdata/generator.json pins seed 20260829). Runs to completion; the
@@ -89,7 +89,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.cpp
-    image: ghcr.io/ashjha0/intraday-alpha-platform-cpp:v1.18.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-cpp:v2.0.0
     container_name: iap-cpp-replay
     # Deterministic replay + execution-sim pass over the golden vectors;
     # writes its methodology/results table to the shared volume.
@@ -106,7 +106,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.rust
-    image: ghcr.io/ashjha0/intraday-alpha-platform-rust:v1.18.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-rust:v2.0.0
     container_name: iap-rust-replay
     command: ["/golden"]
     restart: "no"
@@ -130,7 +130,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.python
-    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.18.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v2.0.0
     container_name: iap-mvp-session
     entrypoint: ["python3", "-m", "iap.metrics", "run-session"]
     command:
@@ -186,7 +186,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.python
-    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.18.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v2.0.0
     container_name: iap-platform-metrics
     entrypoint: ["python3", "-m", "iap.metrics", "serve", "--port", "8080"]
     command: []
@@ -300,7 +300,7 @@ services:
     build:
       context: ../..
       dockerfile: deployment/docker/Dockerfile.python
-    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v1.18.0
+    image: ghcr.io/ashjha0/intraday-alpha-platform-python:v2.0.0
     container_name: iap-alert-sink
     restart: unless-stopped
     networks: [iap-net]
