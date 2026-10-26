@@ -53,6 +53,13 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
 <header>
   <div class="wrap">
     <h1>intraday-alpha-platform</h1>
+    <p style="border:2px solid #b45309;border-radius:6px;padding:10px 14px;background:#fffbeb;color:#111827">
+       <strong>Status, v2.0.0 (26 Oct 2026):</strong> engineering-complete platform (Level A). <strong>No confirmed
+       alpha.</strong> The free daily data route was tested and shown <strong>data-ineligible</strong> (survivorship:
+       85&nbsp;% of index leavers missing against a 2&nbsp;% limit), so nothing on this page is above
+       <em>development-supported</em>. Earlier "confirmed" wording below is a historical record under the older rules.
+       <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/v2.0.0_RELEASE_NOTES.md">Release notes, negatives first</a>.
+    </p>
     <p>An event-driven trading research platform for equities and FX, written in three
        languages on purpose: Python for research and the reference implementation, C++ for
        the latency-critical path, Rust for the hard risk engine and infrastructure (the Java
@@ -271,7 +278,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     Adaptive lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; PSI/KS drift monitors · 88 drift-triggered refits in the study · CUSUM retirement rule · RETIRED halts allocation in the backtest, pages a human live<br>
     Verdicts (honest)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 PROMOTE · 12 ITERATE · 12 REJECT (v1.14.0) — 7 alphas clear the multiple-testing threshold (t ≥ 4.426), 18 never forecast a move larger than their cost and make no trade, the 6 that trade lose; nothing survives costs, and we say so<br>
     Real data&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 7 Nasdaq ITCH sessions (2019-01-30 … 2020-01-30; AAPL, MSFT, QQQ; 3,100,181 feature rows) · 0 PROMOTE / 8 ITERATE / 4 REJECT · strong ICs (EQ01 microprice 0.105, t 21) but not one trade survives costs: a 1 s edge of ~0.07 bp against a ~0.7 bp taker round trip<br>
-    Out-of-time holdout&nbsp;&nbsp;&nbsp;&nbsp; six hypotheses pre-registered and pushed before any 2026 feature existed · 4 of 4 confirmatory signals confirmed on 2026-05-15/18 (EQ01 t 7.7 · EQ02 t 8.0 · EQ10 t 8.1 · EQ05 t 9.5) · both controls behaved as registered · no trade at 1x costs<br>
+    Out-of-time holdout&nbsp;&nbsp;&nbsp;&nbsp; six hypotheses pre-registered and pushed before any 2026 feature existed · 4 of 4 confirmatory signals passed their registered thresholds on 2026-05-15/18 (EQ01 t 7.7 · EQ02 t 8.0 · EQ10 t 8.1 · EQ05 t 9.5; development-supported, the developer's own run) · both controls behaved as registered · no trade at 1x costs<br>
     Power study&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; planted order flow detected at the PROMOTE threshold (t ≥ 4.365) in 2 of 20 runs on 2 sessions, 10 of 20 on 4 and 20 of 20 on 8 (EQ04, declared 5 s label) · planted lead-lag 0 of 20 at EQ10's declared 1 s label, 16 of 20 at a 5 s label on 8 sessions · null 0 of 20 throughout · nothing promoted at any size — 20 seeds per cell, Wilson 95 % intervals<br>
     Maker economics&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; calibration from the event stream (touch fill rates by queue-ahead, depletion hazards, latency, maker markouts at 100 ms/1 s/10 s, impact) · posting backtest with FIFO queue fills, rebates and a passive exit · P&amp;L identity tested · synthetic only so far: −6.7 bp/trip passive exit vs −11.4 bp crossing out<br>
     Quoting&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Avellaneda–Stoikov two-sided quoter with an alpha-skewed reservation price, hard inventory limit, calibrated adverse-selection floor and end-of-session flatten · P&amp;L split into spread, markout, inventory, flatten, rebates, fees · real-data result (v1.16 quoting v2, in-sample, 6 test sessions): no quoting edge, every cell loses $5.0&ndash;6.9k per session, skew with EQ01/EQ05 cuts the loss by $750&ndash;920 per session<br>
@@ -352,7 +359,8 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     v1.7.2 measured detection power on real-noise nulls (0 of 20 false flags). v1.8.0 cut a full-day
     ingest from 260 min / 17.6 GB to 59 min / 7.75 GB with byte-identical output, and ran the first
     out-of-time holdout: four signals pre-registered and git-timestamped before the 2026 data was
-    touched, all four confirmed. The signals are real; at a one-second horizon they are too small to
+    touched; all four passed their registered thresholds (development-supported, not independently
+    confirmed). The signals were detectable; at a one-second horizon they are too small to
     pay a taker's spread and fees. Those 2026 days are now spent.
   </div>
 
@@ -545,8 +553,8 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     <div class="card"><h3>Distance to production</h3>
       <p>Stated plainly, with a backlog epic for each gap: real exchange data at scale
          (ITCH 5.0 / LOBSTER ingestion exists; v1.6.0 ran all alphas on 7 real Nasdaq
-         days — real but untradable signals, no trade survives costs; v1.8.0 confirmed four
-         of them out of time), measured
+         days — detectable but untradable signals, no trade survives costs; four of them passed an
+         out-of-time check in v1.8.0, development-supported only), measured
          tick-to-trade latency, a simulator calibrated to live fills, book-level risk,
          research throughput. Nothing here is a claim about a market.
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/ARCHITECTURE.md#14-distance-to-production-at-a-top-tier-firm">ARCHITECTURE §14</a></p></div>
