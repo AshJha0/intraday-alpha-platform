@@ -10,8 +10,9 @@ piece is still in another pull request it says so. The programme's evidence voca
 > under the developer's sole custody) · **development-supported** · **exploratory** · **rejected** ·
 > **data-ineligible** · **pending**.
 
-As of 2026-10-25 no result on `main` is above *development-supported*: no registered run has been
-executed by CR1, and no independent party has reproduced anything
+As of 2026-10-26 no result on `main` is above *development-supported*: no registered run has been
+executed by CR1, no independent party has reproduced anything, and the DD1 2026 ingestion failed its
+data tests (DR-19; research on it is *exploratory, data-ineligible*)
 ([REVIEW_PACK.md](REVIEW_PACK.md) section 0, [SHOWCASE.md](SHOWCASE.md)).
 
 ## 1. The environment
@@ -69,10 +70,13 @@ loaded runner; the test pins the probe since stage 11 (S5).
 ## 4. Research: families and the loop (stage 7-8)
 
 The family specifications, the research loop (`iap.research.loop`, `tools/research/run_family.py`)
-and the ML protocol are in the stage 7-8 pull request, not on `main` as of this runbook. When it
-lands: `PYTHONPATH=python/src python tools/research/run_family.py <family> <partition>` runs one
-family on one partition and exits 2 on a refusal (unregistered real data, `fit_allowed: false`, a
-partition the loop may not read). The memory-budget test
+and the ML protocol are on `main` (PR #389). `PYTHONPATH=python/src python tools/research/run_family.py
+<family> <partition>` runs one family on one partition and exits 2 on a refusal (unregistered real
+data, `fit_allowed: false`, a partition the loop may not read). On a DD1 record,
+`PYTHONPATH=python/src python tools/research/dd1_chain.py --dataset <dev-root>/dd1_<Y> --out <dir>
+--ledger <dir>/selection_ledger.json` runs D1-D4, the E5 reports and M0 vs M1; on a record that failed
+its data tests it refuses unless `--exploratory` is given, which labels every output
+*exploratory, data-ineligible* and keeps the ledger under `--out` (DR-19). The memory-budget test
 `python/tests/architecture/test_research_loop_memory.py` fails when the loop's peak RSS on the
 synthetic fixture exceeds its declared budget; raise the budget only with the measurement in the
 CHANGELOG. Every real-data read goes through `iap.io` and the guard hook of `iap.core.guard`
@@ -89,8 +93,9 @@ Preconditions, all verifiable without reading sealed data:
 3. The dataset id is in `research/data_manifest.json` (`python tools/data_manifest.py check`).
 4. The three sealed services are up as their identities (section 6) and the runner answers
    `python tools/runner/run.py whoami` with `iap-runner`.
-5. The repository settings of REPO_SETTINGS.md section 7 are set (as of 2026-10-25 they are **not**:
-   no `sealed` environment, no `results` branch; the run is refused at the environment step).
+5. The repository settings of REPO_SETTINGS.md section 7 are set. As of 2026-10-26 the `sealed`
+   environment exists (the owner approves every run of `registered-run`, including DD1 runs); no
+   registered analysis has run yet, so the `results` branch does not exist.
 
 Then: Actions tab > `registered-run` > run with the prereg path; approve the `sealed` environment
 when prompted (the owner, not the runner). The job verifies registration -> digest -> identity ->
