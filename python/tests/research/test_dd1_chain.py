@@ -175,6 +175,7 @@ def test_build_features_blanks_signals_outside_the_universe(panel):
 
 
 # ------------------------------------------------------------------ the chain --
+@pytest.mark.slow  # 70 s locally, 150 s on a GitHub runner: the python-slow job runs it
 def test_the_chain_runs_end_to_end_on_a_synthetic_dd1_set(tmp_path, capsys):
     """CI: dry-run DD1 set -> panel -> D1..D4 development runs -> E5 -> M0 vs M1, in about a minute."""
     tool = _tool()
@@ -207,7 +208,8 @@ def test_the_chain_runs_end_to_end_on_a_synthetic_dd1_set(tmp_path, capsys):
     assert s["ml_synthetic"]["n_fits"] >= 1, "the M1 grid is fitted on the DD1-shaped panel"
     ledger = json.loads((tmp_path / "selection_ledger.json").read_text())
     assert ledger, "every run is ledgered"
-    assert elapsed < 120, f"the chain took {elapsed:.0f} s"
+    # a guard against a runaway chain, not a benchmark: runner hardware varies about 2x
+    assert elapsed < 300, f"the chain took {elapsed:.0f} s"
 
 
 def test_m1_records_an_unfitted_tier_instead_of_raising(tmp_path):
