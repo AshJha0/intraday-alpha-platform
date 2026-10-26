@@ -717,6 +717,45 @@ def pipe_name(partition: str) -> str:
     return PIPE_PREFIX + partition
 
 
+def _thread_token_account(adv, k32) -> str | None:  # pragma: no cover - Windows
+    """The account name of the impersonated client: OpenThreadToken(TOKEN_QUERY,
+    OpenAsSelf) -> TokenUser -> LookupAccountSidW.  None when any step fails."""
+    import ctypes
+    from ctypes import wintypes
+
+    tok = wintypes.HANDLE()
+    TOKEN_QUERY, TOKEN_USER = 0x0008, 1
+    if not adv.OpenThreadToken(k32.GetCurrentThread(), TOKEN_QUERY, True, ctypes.byref(tok)):
+        return None
+    try:
+        need = wintypes.DWORD(0)
+        adv.GetTokenInformation(tok, TOKEN_USER, None, 0, ctypes.byref(need))
+        if not need.value:
+            return None
+        info = ctypes.create_string_buffer(need.value)
+        if not adv.GetTokenInformation(tok, TOKEN_USER, info, need, ctypes.byref(need)):
+            return None
+        sid = ctypes.cast(info, ctypes.POINTER(ctypes.c_void_p))[0]  # TOKEN_USER.User.Sid
+        name = ctypes.create_unicode_buffer(256)
+        cn = wintypes.DWORD(256)
+        dom = ctypes.create_unicode_buffer(256)
+        cd = wintypes.DWORD(256)
+        use = wintypes.DWORD()
+        if not adv.LookupAccountSidW(
+            None,
+            ctypes.c_void_p(sid),
+            name,
+            ctypes.byref(cn),
+            dom,
+            ctypes.byref(cd),
+            ctypes.byref(use),
+        ):
+            return None
+        return name.value
+    finally:
+        k32.CloseHandle(tok)
+
+
 def _win_caller(handle: int) -> Caller:  # pragma: no cover - needs Windows and a client
     """The kernel's answer about the connected client: account name via
     impersonation, process id via the pipe, image hash via a limited process query."""
@@ -751,9 +790,14 @@ def _win_caller(handle: int) -> Caller:  # pragma: no cover - needs Windows and 
     try:
         size = wintypes.DWORD(256)
         buf = ctypes.create_unicode_buffer(size.value)
-        if not adv.GetUserNameW(buf, ctypes.byref(size)):
-            raise Refused("username_unreadable", str(ctypes.get_last_error()))
-        account = buf.value
+        # A standard-user server gets an identification-level token for the client;
+        # the documented way to name the user at that level is the thread token's
+        # TokenUser SID (D-103).  GetUserNameW is the fallback.
+        account = _thread_token_account(adv, k32)
+        if account is None:
+            if not adv.GetUserNameW(buf, ctypes.byref(size)):
+                raise Refused("username_unreadable", str(ctypes.get_last_error()))
+            account = buf.value
     finally:
         adv.RevertToSelf()
     pid = wintypes.ULONG(0)
@@ -878,6 +922,21 @@ def serve_pipe(service: SealedService, name: str, once: bool = False) -> None:  
                     {"event": "connect", "decision": "refused", "reason": exc.code}
                 )
                 caller = None
+                # name the refusal to the client (a code and a Windows error number,
+                # never data): a silent hang-up cannot be diagnosed outside the
+                # partition (D-103)
+                fd = msvcrt.open_osfhandle(h, os.O_RDWR | os.O_BINARY)
+                with os.fdopen(fd, "r+b", buffering=0, closefd=False) as f:
+                    try:
+                        write_frame(
+                            f,
+                            json.dumps(
+                                {"ok": False, "error": exc.code, "detail": str(exc.detail)[:80]},
+                                sort_keys=True,
+                            ).encode("utf-8"),
+                        )
+                    except OSError:
+                        pass
             if caller is not None:
                 fd = msvcrt.open_osfhandle(h, os.O_RDWR | os.O_BINARY)
                 with os.fdopen(fd, "r+b", buffering=0, closefd=False) as f:

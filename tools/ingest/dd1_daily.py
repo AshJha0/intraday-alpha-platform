@@ -1217,7 +1217,10 @@ def ingest(
         try:
             st = sealed_transport(part, {"op": "status"}, [])
         except Exception as exc:  # the pipe itself: absent service, denied connect
-            log(f"refused: sealed service {part} did not answer ({type(exc).__name__})")
+            win = getattr(exc, "winerror", None) or getattr(exc, "errno", None)
+            log(
+                f"refused: sealed service {part} did not answer ({type(exc).__name__}, error {win})"
+            )
             raise IngestRefused(2, f"sealed service {part} did not answer: {exc}") from exc
         if not st.get("ok"):
             log(f"refused: sealed service {part} refused status: {st.get('error')}")
