@@ -111,3 +111,68 @@ Nothing in this repository claims otherwise. Consequences, stated plainly:
 
 The DD1 ingestion itself (the free daily route into the four partitions) is the owner's run of the `registered-run`
 workflow in mode `dd1`: [DD1_INGESTION_RUNBOOK.md](DD1_INGESTION_RUNBOOK.md).
+
+## 6. Backup and restore (owner)
+
+The partitions have one copy each, on the laptop's own disk. A disk failure would lose Track B and Track C and the
+audit chains that make every registered run checkable. The backup is the owner's job, run by hand; nothing in CI or
+the runner does it.
+
+**What is backed up.** All four partitions, `C:\iap-sealed\a`, `b`, `c` and `runner`: the datasets, each service's
+state (`service\audit.jsonl`, `ledger.json`, `datasets.json`, any pending checkpoint, `config.json`, the pinned trust
+roots) and the runner's cache. The repository, the committed checkpoints and the accounts' passwords are not in the
+set: the repository is on GitHub, and the passwords belong in the owner's password manager.
+
+**How often.** After each DD1 ingestion has finished and after each registered run has published its checkpoint.
+Those are the only events that change a partition, so a backup taken then is complete until the next one. Never
+during an ingestion or a run: the script stops the services for the copy.
+
+**Where.** An external drive formatted NTFS (exFAT and FAT32 cannot hold the access lists), encrypted with BitLocker
+To Go, unlocked only while a backup or a restore runs, and otherwise unplugged and stored away from the laptop. Keep
+at least the last two sets. The BitLocker recovery key goes in the password manager, not on the laptop.
+
+**Backup.** From an elevated PowerShell, with the drive unlocked (here `E:`):
+
+```powershell
+.\tools\admin\backup_sealed.ps1 -Destination E:\iap-backup
+```
+
+It asks for each partition account's password and, per partition: stops the service; has the partition's own
+account write a manifest (`sealed_service.py backup-manifest`: the sha256 of every file and the audit chain head);
+copies the partition with `robocopy /B /COPYALL`, which uses the administrator's backup privilege to copy bytes and
+access lists without opening the files through the access check; has the account check the copy against the manifest
+(`verify-backup`); and restarts the service. The set is a folder `iap-sealed-<UTC stamp>` holding the four copies
+(each readable only by its account and SYSTEM, like the original), the four manifests and `backup_manifest.json`,
+which records each manifest's sha256, file count and chain head. The console shows counts, chain heads and
+robocopy's exit code, never file content. Write the stamp and the four chain heads in your log; a chain head can be
+compared with the last line of `research/audit/CHECKPOINTS.jsonl` for that partition.
+
+**Restore.** After a disk replacement, recreate the accounts and the services first
+(`create_sealed_accounts.ps1`, `install_sealed_services.ps1`; new passwords are fine), move the empty new partitions
+aside or delete them, then:
+
+```powershell
+.\tools\admin\restore_sealed.ps1 -BackupSet E:\iap-backup\iap-sealed-<stamp>
+```
+
+The script refuses before changing anything if the set has no `backup_manifest.json`, a manifest's sha256 differs
+from the one the set recorded, or a target folder exists and is not empty (a live partition is refused too, since
+the administrator cannot list it). It then recreates each partition with its access list, copies the files back with
+their own access lists, and has each account run `verify-backup` on its restored partition: the audit chain must be
+intact and its head and every file's sha256 must equal the manifest. Only then does it start that service. A
+partition that fails stays stopped.
+
+**Restore drill.** Every three months, and after any change to these scripts, restore the latest set into a scratch
+folder instead of the live one:
+
+```powershell
+.\tools\admin\restore_sealed.ps1 -BackupSet E:\iap-backup\iap-sealed-<stamp> -SealedRoot D:\iap-restore-drill
+```
+
+A drill never stops or starts the live services. Pass means every partition reports `restored`. Afterwards delete
+the drill folder from an elevated shell (`takeown /f D:\iap-restore-drill /r /a`, then remove it), and record the
+date and result in your log. A drill that fails means the backups are not usable: take a new set before the next
+ingestion.
+
+The limit in section 4 applies here too: the administrator who can copy a partition with backup privilege can also
+read the copy. The backup protects against losing the data, not against the owner.
