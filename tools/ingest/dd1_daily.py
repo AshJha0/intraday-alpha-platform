@@ -80,6 +80,7 @@ import re
 import statistics
 import sys
 import tempfile
+import urllib.error
 import urllib.request
 import zipfile
 from collections.abc import Callable, Iterable, Mapping
@@ -559,9 +560,12 @@ def pull_filings(
     today: _dt.date,
     adapter_kw: Mapping[str, Any] | None = None,
     log=None,
+    tickers_text: str | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     src = edgar.EdgarSource(transport, **(adapter_kw or {}))
-    doc = json.loads(src._get_text(edgar.TICKERS_URL))
+    if tickers_text is None:
+        tickers_text = src._get_text(edgar.TICKERS_URL)
+    doc = json.loads(tickers_text)
     entries = list(doc.values()) if isinstance(doc, dict) else list(doc)
     cik_of: dict[str, int] = {}
     for e in entries:
@@ -1014,6 +1018,25 @@ def file_hashes(files: list[tuple[str, bytes]]) -> dict[str, str]:
     return {n: hashlib.sha256(b).hexdigest() for n, b in files}
 
 
+def sec_contact_ok(user_agent: str) -> bool:
+    """SEC fair access asks for a declared name and an email address in the
+    User-Agent (``https://www.sec.gov/os/accessing-edgar-data``); without one
+    every EDGAR request answers 403 (run 40284491015)."""
+    return bool(re.search(r"[^\s@]+@[^\s@]+\.[^\s@]+", user_agent or ""))
+
+
+def _preflight(step: str, fn: Callable[[], Any], log) -> Any:
+    """Run one source step before the long membership walk, so a refusal by a
+    source costs seconds, not the walk (D-88)."""
+    try:
+        return fn()
+    except urllib.error.HTTPError as exc:
+        log(f"refused: {step} answered HTTP {exc.code}")
+        raise IngestRefused(
+            2, f"{step} answered HTTP {exc.code} before the membership pull"
+        ) from exc
+
+
 # ------------------------------------------------------------------ the run --
 def ingest(
     *,
@@ -1031,6 +1054,7 @@ def ingest(
     stooq_zip: Path | None = None,
     stooq_sha256: str = "",
     cache_root: Path | None = None,
+    require_sec_contact: bool = True,
 ) -> dict[str, Any]:
     """The whole job (module docstring).  Returns the record written to
     ``dev_root/dd1_<year>/dataset.json``; raises :class:`IngestRefused`.
@@ -1060,9 +1084,31 @@ def ingest(
     if stooq_zip is not None:
         local_blob, digest = read_local_archive(stooq_zip, stooq_sha256)
         log(f"local Stooq archive verified: sha256 {digest[:16]}")
+    if require_sec_contact and not sec_contact_ok(edgar.DECLARATION.user_agent):
+        log("refused: no SEC contact email in the runner environment")
+        raise IngestRefused(
+            3,
+            f"set {edgar.CONTACT_ENV}='<name> <email>' in the runner's environment (SEC fair access)",
+        )
+
+    # -- preflight: every step that does not need the universe, before the walk
+    tables = Tables()
+    tickers_text = _preflight(
+        "EDGAR company tickers",
+        lambda: edgar.EdgarSource(transport, **(adapter_kw or {}))._get_text(edgar.TICKERS_URL),
+        log,
+    )
+    tables.factors, french_meta = _preflight(
+        "French factors", lambda: pull_factors(transport, adapter_kw=adapter_kw, log=log), log
+    )
+    listed_end, listed_meta = _preflight(
+        "Tiingo ticker list",
+        lambda: pull_listed_ends(transport, adapter_kw=adapter_kw, log=log),
+        log,
+    )
+    log("preflight passed: EDGAR, French and Tiingo answered")
 
     # -- pull
-    tables = Tables()
     tables.membership, wiki_meta = pull_membership(
         transport, plausible=plausible, adapter_kw=adapter_kw, log=log, cache_root=cache_root
     )
@@ -1086,9 +1132,8 @@ def ingest(
         today=today,
         adapter_kw=adapter_kw,
         log=log,
+        tickers_text=tickers_text,
     )
-    tables.factors, french_meta = pull_factors(transport, adapter_kw=adapter_kw, log=log)
-    listed_end, listed_meta = pull_listed_ends(transport, adapter_kw=adapter_kw, log=log)
     tables.vendor = {
         "prices": price_meta,
         "membership": wiki_meta,
@@ -1212,6 +1257,7 @@ def dry_run(year: int, dev_root: Path, sealed_root: Path, **knobs: Any) -> dict[
     local_zip = knobs.pop("local_zip", False)
     cache_root = knobs.pop("cache_root", None)
     sha256_override = knobs.pop("sha256_override", "")
+    require_sec_contact = bool(knobs.pop("require_sec_contact", False))
     fx = dd1_fixture.build(year, **knobs)
     zip_kw: dict[str, Any] = {}
     if local_zip:  # the owner's download (DR-15): the fixture archive, served from disk
@@ -1258,6 +1304,7 @@ def dry_run(year: int, dev_root: Path, sealed_root: Path, **knobs: Any) -> dict[
             adapter_kw={"clock": clock, "sleep": lambda _s: None},
             log=log,
             cache_root=cache_root,
+            require_sec_contact=require_sec_contact,
             **zip_kw,
         )
     except IngestRefused as exc:

@@ -289,6 +289,7 @@ def test_sealed_refusal_leaves_the_record_incomplete(tmp_path):
             plausible=job.DRY_RUN_PLAUSIBLE,
             adapter_kw={"clock": clock, "sleep": lambda _s: None},
             log=log,
+            require_sec_contact=False,
         )
     assert exc.value.code == 2
     rec = json.loads((tmp_path / "dd1_2026" / "dataset.json").read_text())
@@ -429,3 +430,76 @@ def test_the_default_cache_root_is_the_runners_sealed_directory():
 
     assert is_sealed_target(str(job.DEFAULT_CACHE_ROOT))
     assert not job._under(job.DEFAULT_CACHE_ROOT, job.Path(r"C:\iap\daily"))
+
+
+# ------------------------------------- SEC contact and source preflight (D-88) --
+@pytest.mark.parametrize(
+    "ua, ok",
+    [
+        ("intraday-alpha-platform research https://github.com/x/y", False),
+        ("intraday-alpha-platform research Jane Doe", False),
+        ("intraday-alpha-platform research Jane Doe jane@example.com", True),
+    ],
+)
+def test_sec_contact_needs_an_email(ua, ok):
+    assert job.sec_contact_ok(ua) is ok
+
+
+def _tick_clock():
+    tick = [0.0]
+
+    def clock() -> float:  # advances, so the rate limiter never waits
+        tick[0] += 10.0
+        return tick[0]
+
+    return clock
+
+
+def test_ingest_without_an_sec_contact_refuses_before_any_request(tmp_path, monkeypatch):
+    import dataclasses
+
+    monkeypatch.setattr(
+        job.edgar,
+        "DECLARATION",
+        dataclasses.replace(job.edgar.DECLARATION, user_agent="iap research https://x"),
+    )
+    calls = []
+
+    def transport(url, headers):
+        calls.append(url)
+        raise AssertionError("no request may be made")
+
+    with pytest.raises(job.IngestRefused, match="IAP_SEC_CONTACT") as exc:
+        job.ingest(year=2026, dev_root=tmp_path / "dev", transport=transport, identity="iap-runner")
+    assert exc.value.code == 3 and calls == []
+
+
+def test_a_403_from_edgar_stops_the_job_before_the_membership_walk(tmp_path):
+    import io
+    import urllib.error
+
+    calls = []
+
+    def transport(url, headers):
+        calls.append(url)
+        if "sec.gov" in url:
+            raise urllib.error.HTTPError(url, 403, "Forbidden", {}, io.BytesIO(b""))
+        raise AssertionError(f"request after the EDGAR refusal: {url}")
+
+    with pytest.raises(job.IngestRefused, match="EDGAR company tickers answered HTTP 403") as exc:
+        job.ingest(
+            year=2026,
+            dev_root=tmp_path / "dev",
+            transport=transport,
+            identity="iap-runner",
+            require_sec_contact=False,
+            adapter_kw={"clock": _tick_clock(), "sleep": lambda _s: None},
+        )
+    assert exc.value.code == 2
+    assert not any("wikipedia" in u for u in calls), "the membership walk must not have started"
+
+
+def test_preflight_runs_before_the_membership_walk(clean_run):
+    _, rec = clean_run
+    log = rec["log"]
+    assert log.index("preflight passed") < log.index("membership ")
