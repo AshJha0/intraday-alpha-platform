@@ -1,0 +1,11 @@
+{
+  "x-version": 1,
+  "kind": "prereg_template",
+  "template_id": "PF-3",
+  "template_revision": 0,
+  "deferred": true,
+  "status": "PLACEHOLDER: PF-3 (the combined multi-horizon book) has no validated profile; tools/prereg_from_template.py refuses to fill this file, and iap.validation.profiles.decide refuses every PF-3 registration.",
+  "profile_title": "the combined multi-horizon book (deferred until C0-C2 exist)",
+  "framework": "research/v2/CONFIRMATION_FRAMEWORK.md",
+  "to_be_written_when": "PF-3 is designed with C0-C2, its size and power study is committed as research/v2/confirmation_evidence/PF-3_RESULTS.json, and the reviewer freezes it (framework section 6)."
+}

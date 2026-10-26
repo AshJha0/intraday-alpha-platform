@@ -1,0 +1,111 @@
+{
+  "x-version": 1,
+  "kind": "prereg_template",
+  "template_id": "PF-2",
+  "template_revision": 1,
+  "status": "TEMPLATE: unsigned; not a registration. tools/prereg_from_template.py fills it; only the owner signs the filled prereg.",
+  "profile_title": "daily marked-to-market portfolio return of a 20-60 session horizon book with overlapping positions",
+  "profile_specification": "python/tests/spec/CONFIRMATION_PROFILES.md",
+  "framework": "research/v2/CONFIRMATION_FRAMEWORK.md",
+  "evidence": "research/v2/confirmation_evidence/PF-2_RESULTS.json",
+  "procedure_note": "P-HAC-L20 is the only candidate procedure of PF-2 whose reference cells pass size and power in the committed evidence; the bootstrap candidates have no operating domain and are not offered.",
+  "registration": {
+    "profile": "PF-2",
+    "statistic": "daily_mtm_portfolio_return",
+    "horizon_sessions": {
+      "$fill": "horizon_sessions",
+      "rule": "integer holding horizon of the book in sessions, 20 to 60 inclusive"
+    },
+    "family": {
+      "$fill": "family",
+      "rule": "list of K distinct hypothesis ids, named before the window opens"
+    },
+    "procedure": "P-HAC-L20",
+    "hac_lag": 20,
+    "alpha_op": 0.02,
+    "sample_size": {
+      "T_min": {
+        "$fill": "T_min",
+        "rule": "integer usable sessions, at least 250 (the smallest validated T)"
+      },
+      "cap": 1.25
+    },
+    "refusal_conditions": [
+      "acf1",
+      "sq_acf1",
+      "excess_kurtosis"
+    ],
+    "economic_screen": {
+      "capital_usd": {
+        "$fill": "capital_usd",
+        "rule": "positive registered capital in USD"
+      },
+      "hurdle_bps": {
+        "$fill": "hurdle_bps",
+        "rule": "registered hurdle on the mean daily net return, bps; never computed from the confirmation series"
+      },
+      "margin": {
+        "$fill": "margin",
+        "rule": "common margin, non-negative fraction (0.25 means the hurdle times 1.25)"
+      }
+    },
+    "m_min": {
+      "min_units_per_session": {
+        "$fill": "min_units_per_session",
+        "rule": "positive integer: usable units of the registered grid a session needs (framework section 2 (a))"
+      },
+      "time_coverage": 0.6,
+      "grid_coverage": 0.5
+    },
+    "registry": {
+      "window_state": "fresh",
+      "confirmation_dataset_looks": 0
+    },
+    "data": {
+      "origin": {
+        "$fill": "origin",
+        "rule": "'real' for a registration; 'synthetic' only for a dry registration"
+      },
+      "partition": {
+        "$fill": "partition",
+        "rule": "same value as registered_run.partition"
+      },
+      "dataset": {
+        "$fill": "dataset",
+        "rule": "the dataset name in the data manifest"
+      }
+    }
+  },
+  "registered_run": {
+    "partition": {
+      "$fill": "partition",
+      "rule": "'b' for a Track B test on iap-sealed-b, 'c' for a Track C confirmation on iap-sealed-c (U0 section 2); must equal data.partition"
+    },
+    "dataset_hash_id": {
+      "$fill": "dataset_hash_id",
+      "rule": "content hash of the sealed dataset as the data manifest records it; becomes the only entry of analysis_identity.data_versions"
+    },
+    "dataset_files": {
+      "$fill": "dataset_files",
+      "rule": "optional: object file name -> sha256 of every file the service will serve; null to omit (the runner then checks only the dataset id)"
+    },
+    "image_digest": {
+      "$fill": "image_digest",
+      "rule": "the one line of deployment/docker/IMAGE_DIGEST at the bound commit (sha256:<64 hex>)"
+    },
+    "command": {
+      "$fill": "command",
+      "rule": "list of strings: the registered analysis; the runner appends the dataset directory and the output directory and requires result.json"
+    }
+  },
+  "identity": {
+    "scripts": {
+      "$fill": "scripts",
+      "rule": "repo-relative analysis scripts, committed at the bound commit"
+    },
+    "inputs": {
+      "$fill": "inputs",
+      "rule": "further repo-relative files the analysis reads outside python/src/iap, configs/ and data/reference/ (may be empty)"
+    }
+  }
+}
