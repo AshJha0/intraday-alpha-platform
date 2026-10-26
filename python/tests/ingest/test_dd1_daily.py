@@ -289,6 +289,7 @@ def test_sealed_refusal_leaves_the_record_incomplete(tmp_path):
             plausible=job.DRY_RUN_PLAUSIBLE,
             adapter_kw={"clock": clock, "sleep": lambda _s: None},
             log=log,
+            require_sec_contact=False,
         )
     assert exc.value.code == 2
     rec = json.loads((tmp_path / "dd1_2026" / "dataset.json").read_text())
@@ -367,3 +368,139 @@ def test_form_index_parser_reads_fixed_width_rows():
         ("8-K", 1001, "2020-02-03", "edgar/data/1001/x.txt"),
         ("S-1", 1002, "2020-02-04", "edgar/data/1002/y.txt"),
     ]
+
+
+# ------------------------------------------------- revision cache (D-87) --
+def test_a_rerun_with_the_cache_fetches_no_revision_again(tmp_path):
+    cache = tmp_path / "runner" / "cache"
+    first = job.dry_run(2026, tmp_path / "dev1", tmp_path / "sealed1", cache_root=cache)
+    assert first["status"] == "complete"
+    assert first["wiki_content_requests"] > 0
+    stored = len(list((cache / "wiki_revisions").glob("*.json")))
+    assert stored == first["wiki_content_requests"]
+    assert "0 revision cache hits" in first["log"]
+
+    second = job.dry_run(2026, tmp_path / "dev2", tmp_path / "sealed2", cache_root=cache)
+    assert second["status"] == "complete"
+    assert second["wiki_content_requests"] == 0
+    assert f"{stored} revision cache hits" in second["log"]
+    assert f"{second['wiki_requests']} Wikipedia requests" in second["log"]
+    # the cache changes no value: every partition's membership file is the same
+    for part in ("development", "validation", "b", "c"):
+        f1, f2 = first["partitions"][part]["files"], second["partitions"][part]["files"]
+        names = [n for n in f1 if n.startswith("membership")]
+        assert names and all(f1[n] == f2[n] for n in names)
+
+
+def test_a_corrupt_cache_entry_is_fetched_again(tmp_path):
+    cache = tmp_path / "cache"
+    job.dry_run(2026, tmp_path / "dev1", tmp_path / "sealed1", cache_root=cache)
+    victim = sorted((cache / "wiki_revisions").glob("*.json"))[0]
+    victim.write_text("not json", encoding="utf-8")
+    rec = job.dry_run(2026, tmp_path / "dev2", tmp_path / "sealed2", cache_root=cache)
+    assert rec["status"] == "complete" and rec["wiki_content_requests"] == 1
+
+
+@pytest.mark.parametrize("sub", ["", "cache", "dd1_2026/wiki"])
+def test_refuses_a_cache_root_under_the_dev_root(tmp_path, sub):
+    dev = tmp_path / "dev"
+    rec = job.dry_run(2026, dev, tmp_path / "sealed", cache_root=dev / sub)
+    assert rec["status"] == "refused" and rec["exit"] == 3
+    assert rec["requests"] == 0
+    assert not dev.exists() or not any(dev.rglob("*")), "a refused run writes nothing"
+
+
+def test_cli_refuses_a_cache_root_under_the_dev_root(tmp_path):
+    code = job.main(
+        [
+            "run",
+            "--year",
+            "2026",
+            "--dev-root",
+            str(tmp_path / "dev"),
+            "--cache-root",
+            str(tmp_path / "dev" / "cache"),
+        ]
+    )
+    assert code == 3
+
+
+def test_the_default_cache_root_is_the_runners_sealed_directory():
+    from iap.data.sources.base import is_sealed_target
+
+    assert is_sealed_target(str(job.DEFAULT_CACHE_ROOT))
+    assert not job._under(job.DEFAULT_CACHE_ROOT, job.Path(r"C:\iap\daily"))
+
+
+# ------------------------------------- SEC contact and source preflight (D-88) --
+@pytest.mark.parametrize(
+    "ua, ok",
+    [
+        ("intraday-alpha-platform research https://github.com/x/y", False),
+        ("intraday-alpha-platform research Jane Doe", False),
+        ("intraday-alpha-platform research Jane Doe jane@example.com", True),
+    ],
+)
+def test_sec_contact_needs_an_email(ua, ok):
+    assert job.sec_contact_ok(ua) is ok
+
+
+def _tick_clock():
+    tick = [0.0]
+
+    def clock() -> float:  # advances, so the rate limiter never waits
+        tick[0] += 10.0
+        return tick[0]
+
+    return clock
+
+
+def test_ingest_without_an_sec_contact_refuses_before_any_request(tmp_path, monkeypatch):
+    import dataclasses
+
+    monkeypatch.setattr(
+        job.edgar,
+        "DECLARATION",
+        dataclasses.replace(job.edgar.DECLARATION, user_agent="iap research https://x"),
+    )
+    calls = []
+
+    def transport(url, headers):
+        calls.append(url)
+        raise AssertionError("no request may be made")
+
+    with pytest.raises(job.IngestRefused, match="IAP_SEC_CONTACT") as exc:
+        job.ingest(year=2026, dev_root=tmp_path / "dev", transport=transport, identity="iap-runner")
+    assert exc.value.code == 3 and calls == []
+
+
+def test_a_403_from_edgar_stops_the_job_before_the_membership_walk(tmp_path):
+    import io
+    import urllib.error
+    from urllib.parse import urlsplit
+
+    calls = []
+
+    def transport(url, headers):
+        calls.append(urlsplit(url).hostname)
+        if urlsplit(url).hostname == "www.sec.gov":
+            raise urllib.error.HTTPError(url, 403, "Forbidden", {}, io.BytesIO(b""))
+        raise AssertionError(f"request after the EDGAR refusal: {url}")
+
+    with pytest.raises(job.IngestRefused, match="EDGAR company tickers answered HTTP 403") as exc:
+        job.ingest(
+            year=2026,
+            dev_root=tmp_path / "dev",
+            transport=transport,
+            identity="iap-runner",
+            require_sec_contact=False,
+            adapter_kw={"clock": _tick_clock(), "sleep": lambda _s: None},
+        )
+    assert exc.value.code == 2
+    assert calls == ["www.sec.gov"], "the membership walk must not have started"
+
+
+def test_preflight_runs_before_the_membership_walk(clean_run):
+    _, rec = clean_run
+    log = rec["log"]
+    assert log.index("preflight passed") < log.index("membership ")

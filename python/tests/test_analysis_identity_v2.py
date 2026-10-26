@@ -297,6 +297,10 @@ NOT_RUNNERS = {
     # The sealed service verifies the prereg SIGNATURE (its own Ed25519 check under a pinned trust root), runs no analysis.
     "tools/runner/run.py",
     "tools/runner/__init__.py",
+    # v2.0 round 5: fills a profile template into an UNSIGNED prereg (builds the block, runs no analysis)
+    "tools/prereg_from_template.py",
+    # v2.0 round 6 (U14): hashes signed preregs and runner records into the release manifest (runs no analysis)
+    "tools/release/evidence_manifest.py",
     "tools/sealed_service.py",
 }
 

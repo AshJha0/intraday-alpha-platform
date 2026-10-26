@@ -47,6 +47,10 @@ Set-Location C:\iap\repo
 3. **The runner**: [RUNNER_SETUP.md](RUNNER_SETUP.md) (work directory, registration as a Windows service under
    `iap-runner`, the `sealed` environment with you as required reviewer, the first-run checks of its section 6).
    Optional: `TIINGO_API_KEY=<key>` in `C:\actions-runner\.env` selects Tiingo; without it the job uses Stooq.
+   **Required: `IAP_SEC_CONTACT=<your name> <your email>`** in the same file, then restart the runner service. The SEC
+   answers 403 to any EDGAR request whose User-Agent has no contact email (its fair-access rule; run 40284491015 failed
+   on it after 48 minutes). The job refuses to start without an email there (exit 3), and it calls EDGAR, French and
+   Tiingo before the membership walk, so a refusing source stops the run in the first minute (D-88).
 4. **Download the Stooq archive yourself** (DR-16, D-86). Since October 2026 stooq.com shows scripts a browser check,
    and the job does not try to pass it. In your browser, open <https://stooq.com/db/h/>, take the "U.S." daily ASCII
    archive (`d_us_txt.zip`, several hundred MB), and save it as `C:\iap\inbox\d_us_txt.zip`. Then, in PowerShell:
