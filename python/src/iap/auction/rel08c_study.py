@@ -74,7 +74,7 @@ from iap.auction.rel08c_extract import (
     NOII_FILE,
     NS_S,
 )
-from iap.research import claims
+from iap.governance import claims
 
 STUDY_VERSION = 1
 POLICIES = ("baseline", "imbalance")
@@ -349,8 +349,8 @@ def prereg_signed(prereg_id: str, root: Path | None = None) -> bool:
     identity check that the runner performs)."""
     import json
 
-    from iap.agents.analysis_identity import IdentityError, environment_mismatches
-    from iap.research.holdout_registry import REPO, prereg_is_signed
+    from iap.governance.analysis_identity import IdentityError, environment_mismatches
+    from iap.governance.holdout_registry import REPO, prereg_is_signed
 
     if not prereg_is_signed(prereg_id, root):
         return False

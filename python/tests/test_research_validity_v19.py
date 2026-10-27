@@ -25,6 +25,7 @@ from iap.labels.labels import (
     max_sample_age,
     trailing_max_sample_age,
 )
+from iap.marketdata.manifest_records import book_scope_for_dataset, record_day_sampling
 from iap.validation.methods import METHODS_V2, METHODS_V3, methods
 from iap.validation.metrics import (
     bucket_ics_with_counts,
@@ -34,10 +35,8 @@ from iap.validation.metrics import (
     pooled_slope_hac_tstat,
 )
 from iap.validation.sessions import (
-    book_scope_for_dataset,
     day_tags,
     event_day_mask,
-    record_day_sampling,
     stratified_day_sample,
 )
 from iap.validation.splits import WalkForwardSplitter

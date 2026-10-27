@@ -43,8 +43,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from iap.agents import citations, untrusted
-from iap.agents.mcp_server import FREE_TEXT
+from iap.governance import citations, untrusted
+from iap.governance.mcp_server import FREE_TEXT
 from iap.llm import verify
 from iap.llm.budget import Budget
 from iap.llm.loop import LoopResult, ToolRefused, ToolSpec, run_tool_loop
@@ -291,7 +291,7 @@ class ResearchAssistant:
         ds = self.data_root / dataset
         if not (ds / "dataset.json").is_file():
             raise ToolRefused(f"no ingested dataset {dataset!r} under {self.data_root}")
-        from iap.research.holdout_registry import HoldoutRefused, guard
+        from iap.governance.holdout_registry import HoldoutRefused, guard
 
         try:  # v1.18 REL-02b: an agent holds no prereg id; only in-sample data passes
             guard(ds, purpose="research_assistant")

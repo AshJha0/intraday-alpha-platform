@@ -57,7 +57,7 @@ from iap.execution.passive import (
     post_price,
 )
 from iap.execution.replay import ExecReplayResult, ExecutionReplay, ParentReport
-from iap.execution.signal import AlphaUrgencySource, ArraySignalSource, SignalReading
+from iap.execution.signal import ArraySignalSource, SignalReading
 from iap.execution.simulator import ExecutionSimulator
 from iap.execution.sor import NO_ROUTE, SmartOrderRouter
 from iap.execution.types import (
@@ -77,7 +77,6 @@ from iap.execution.urgency import AlphaUrgencyPolicy
 __all__ = [
     "AlgoType",
     "AlphaUrgencyPolicy",
-    "AlphaUrgencySource",
     "ArraySignalSource",
     "PacingParams",
     "SignalReading",

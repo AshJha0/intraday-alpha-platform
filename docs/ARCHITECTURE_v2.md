@@ -57,7 +57,8 @@ The contracts, in words:
 3. `iap.alpha`, `iap.portfolio` and `iap.ml` do not import `iap.research`: the engine is
    family-agnostic and the research loop is its client, never the other way round.
 4. `iap.labels` does not import `iap.features` at run time, and `iap.execution` does not import
-   `iap.tca`: the two cycles stage 11 broke stay broken.
+   `iap.tca`: the two cycles stage 11 broke stay broken. Since v2.1 Track 3 there is no
+   subpackage import cycle at all (`ARCHITECTURE.md` section 16.1 lists the moves).
 5. `iap.data` imports no network module; every source adapter takes an injected transport, so CI
    makes no request and the vendor SDKs stay in `tools/`.
 

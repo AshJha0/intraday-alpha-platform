@@ -2,12 +2,12 @@
 
 ``python -m iap.agents.mcp_workflow --root PATH --agent ID --key-env VAR``
 speaks the same newline-delimited JSON-RPC 2.0 as the read-only server
-(:mod:`iap.agents.mcp_server`) and exposes exactly the AGENT side of
-:mod:`iap.agents.workflow`:
+(:mod:`iap.governance.mcp_server`) and exposes exactly the AGENT side of
+:mod:`iap.governance.workflow`:
 
 ``propose``
     record a hypothesis; debits one look on the chained ledger through the
-    same :class:`~iap.agents.broker.WriteBroker` the LLM session uses (an
+    same :class:`~iap.governance.broker.WriteBroker` the LLM session uses (an
     Ed25519-signed request; the private key is held by this process, read
     from an environment variable, never by the MCP client);
 ``draft_prereg``
@@ -22,9 +22,9 @@ speaks the same newline-delimited JSON-RPC 2.0 as the read-only server
     the drafts on the board awaiting human sign-off.
 
 Sign-off, confirmatory runs, outcomes and promotion are human-only
-(:data:`iap.agents.workflow.HUMAN_ONLY_OPS`) and have NO tool here; the
+(:data:`iap.governance.workflow.HUMAN_ONLY_OPS`) and have NO tool here; the
 module refuses to import if one is ever added (and a test enumerates the
-tool list).  Free text is returned wrapped by :mod:`iap.agents.untrusted`.
+tool list).  Free text is returned wrapped by :mod:`iap.governance.untrusted`.
 """
 
 from __future__ import annotations
@@ -38,16 +38,16 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from iap.agents import signing, untrusted
-from iap.agents.broker import BrokerError, WriteBroker, sign
-from iap.agents.mcp_server import FREE_TEXT, PROTOCOL, ToolError
-from iap.agents.workflow import (
+from iap.execution.regulatory import SCHEDULE_RELPATH, RegulatoryFeeSchedule
+from iap.governance import signing, untrusted
+from iap.governance.broker import BrokerError, WriteBroker, sign
+from iap.governance.mcp_server import FREE_TEXT, PROTOCOL, ToolError
+from iap.governance.workflow import (
     HUMAN_ONLY_OPS,
     Workflow,
     WorkflowError,
     hit_rate,
 )
-from iap.execution.regulatory import SCHEDULE_RELPATH, RegulatoryFeeSchedule
 
 PUBKEYS_RELPATH = Path("research") / "agents" / "agent_pubkeys.json"
 DEFAULT_LOOK_CAP = 3

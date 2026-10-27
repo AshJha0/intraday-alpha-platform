@@ -259,7 +259,7 @@ def holdout_verdict(fitted: bool, net_bps: np.ndarray) -> dict[str, Any]:
 
 
 def _require(horizon: str) -> dict:
-    from iap.agents.prereg_gate import require
+    from iap.governance.prereg_gate import require
 
     return require(ROOT, "AUC01", horizon, board=PREREG_BOARD)
 

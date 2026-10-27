@@ -42,6 +42,7 @@ __all__ = [
     "block_c_execution",
     "block_d_risk_adjusted",
     "block_e_sensitivity",
+    "block_f_overfitting",
     "check_no_inflation",
     "decision_tree",
     "economic_screen",
@@ -678,6 +679,72 @@ def block_e_sensitivity(
         },
         [
             "each scenario is an arithmetic scenario, not additive and not a forecast; no feature is assigned a Sharpe gain"
+        ],
+    )
+
+
+# --------------------------------------------------------------------------- block F
+def block_f_overfitting(
+    series: SessionSeries,
+    *,
+    n_trials: int,
+    trials_sr_variance: float | None = None,
+    candidates: np.ndarray | Sequence[Sequence[float]] | None = None,
+    pbo_blocks: int = 16,
+) -> Table:
+    """Block F: the deflated Sharpe ratio of the session series and, given a sweep, PBO by CSCV.
+
+    The deflated Sharpe ratio (Bailey and Lopez de Prado 2014) is the probability
+    that the true per-session Sharpe exceeds ``SR0``, the Sharpe the best of
+    ``n_trials`` skill-less trials would show by luck; skew and kurtosis of the
+    series widen the error.  ``n_trials`` is what the selection ledger records,
+    never a number chosen for the report.  PBO (Bailey, Borwein, Lopez de Prado
+    and Zhu 2017) needs the candidates' per-session returns as a ``T x M``
+    matrix (``candidates``); without one the PBO row says so.  Both delegate to
+    :mod:`iap.validation` (one implementation, its own tests).
+    """
+    from iap.validation.cpcv import probability_of_backtest_overfitting
+    from iap.validation.deflated import deflated_sharpe_ratio, sharpe_moments
+
+    r = np.asarray(series.r_bps, dtype=float)
+    mom = sharpe_moments(r)
+    n = int(mom["n"])
+    dsr: dict[str, Any] | None = None
+    if n > 2 and math.isfinite(mom["sharpe"]):
+        dsr = deflated_sharpe_ratio(
+            mom["sharpe"], n, n_trials, mom["skew"], mom["kurtosis"], trials_sr_variance
+        )
+    pbo: dict[str, Any] | None = None
+    pbo_note = "no candidate matrix supplied: PBO needs the sweep's per-session returns"
+    if candidates is not None:
+        out = probability_of_backtest_overfitting(candidates, n_blocks=pbo_blocks)
+        pbo = {k: out[k] for k in ("pbo", "logit_median", "n_splits", "n_blocks", "n_candidates")}
+        pbo_note = "PBO = share of CSCV splits whose in-sample best ranks at or below the out-of-sample median"
+    rows = [
+        {
+            "session_sharpe": mom["sharpe"],
+            "skew": mom["skew"],
+            "kurtosis": mom["kurtosis"],
+            "n_trials": int(n_trials),
+            "expected_max_sharpe_sr0": dsr["sr0"] if dsr else None,
+            "deflated_sharpe_ratio": dsr["dsr"] if dsr else None,
+            "trials_sr_variance": dsr["trials_sr_variance"] if dsr else None,
+        },
+        {"probability_of_backtest_overfitting": pbo},
+    ]
+    return Table(
+        "E5 block F: selection and overfitting",
+        {
+            "sharpe": "per session (not annualised)",
+            "deflated_sharpe_ratio": "probability",
+            "pbo": "probability",
+        },
+        {"sessions": n, "n_trials": int(n_trials), **series.counts},
+        rows,
+        {"dsr": "normal approximation with skew and kurtosis (PSR at SR0)"},
+        [
+            "kurtosis is non-excess (3 for a normal series)",
+            pbo_note,
         ],
     )
 

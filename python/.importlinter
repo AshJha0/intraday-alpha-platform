@@ -5,11 +5,10 @@
 # tests/architecture/test_layering.py (an AST scan that parses THIS file), so the fast suite fails
 # on the same violation the linter would report.
 #
-# allow_indirect_imports = True on a contract means it binds DIRECT imports only.  The transitive
-# reach is honest and recorded: every package except core, contracts, risk, reference, io,
-# orderbook, experiment and reports reaches iap.research / iap.agents / iap.llm through
-# mlops -> agents, models -> research and validation.  Tightening a contract to indirect imports is
-# a later step that needs those three edges broken (docs/ARCHITECTURE.md, "Layering").
+# allow_indirect_imports = True on a contract means it binds DIRECT imports only.  Until v2.1 the
+# transitive reach went through mlops -> agents, models -> research and the validation cycles;
+# v2.1 Track 3 removed every subpackage cycle (docs/ARCHITECTURE.md, "Layering").  Tightening a
+# contract to indirect imports is a separate step that needs the reach measured again.
 # exclude_type_checking_imports: an import under `if TYPE_CHECKING:` is an annotation, not a run-time
 # dependency (labels/grid_v2.py names features.InstrumentContext that way).
 

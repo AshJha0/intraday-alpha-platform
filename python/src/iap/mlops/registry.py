@@ -19,7 +19,7 @@ by ``record_hash``) but are not part of the identity.
 
 **Pre-registration.**  :meth:`ModelRegistry.register` refuses a model
 without a pre-registration entry (a blackboard ``prereg`` entry, e.g. from
-:func:`iap.agents.prereg_gate.require`; its ``hash`` is recorded as
+:func:`iap.governance.prereg_gate.require`; its ``hash`` is recorded as
 ``prereg_hash``) unless ``exploratory=True``, which is recorded on the
 record so an exploratory model can never be mistaken for a confirmatory one.
 
@@ -166,10 +166,10 @@ def content_sha256(model: Any) -> str:
 
 
 def default_code_hash(alpha_id: str | None = None) -> str:
-    """Code fingerprint (:mod:`iap.agents.fingerprint`): the alpha's
+    """Code fingerprint (:mod:`iap.governance.fingerprint`): the alpha's
     ``code_hash`` when ``alpha_id`` names one, else the import-closure hash
     of the model modules (:data:`DEFAULT_CODE_MODULES`)."""
-    from iap.agents import fingerprint as fp
+    from iap.governance import fingerprint as fp
 
     if alpha_id:
         got = fp.fingerprint(alpha_id)
@@ -264,7 +264,7 @@ class ModelRegistry:
         if prereg is None and not exploratory:
             raise RegistryError(
                 f"model {name!r} has no pre-registration entry; pass prereg= (a blackboard "
-                "prereg entry, iap.agents.prereg_gate.require) or exploratory=True"
+                "prereg entry, iap.governance.prereg_gate.require) or exploratory=True"
             )
         if prereg is not None and (prereg.get("kind") != "prereg" or not prereg.get("hash")):
             raise RegistryError("prereg must be a blackboard entry of kind 'prereg' with a hash")

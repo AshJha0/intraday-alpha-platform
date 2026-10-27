@@ -216,8 +216,9 @@ iap/
                    method bundles "v2", the default, "legacy_v1", the
                    rules up to v1.4.0, and the opt-in "v3" of v1.9:
                    ResearchMethods, methods(name)), sessions.py (v1.9, R1:
-                   FOMC / holiday-thin calendar, stratified_day_sample,
-                   record_day_sampling, book_scope_for_dataset).
+                   FOMC / holiday-thin calendar, stratified_day_sample;
+                   the manifest writers moved to
+                   marketdata/manifest_records.py in v2.1).
                    cpcv.py and deflated.py (v1.12: combinatorial purged
                    CV, PBO, PSR / DSR / minimum track record);
                    multiple_testing.py (v1.16, report-only Holm / BH /

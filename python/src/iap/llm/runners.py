@@ -26,7 +26,7 @@ from typing import Any
 
 import numpy as np
 
-from iap.agents.blackboard import digest
+from iap.governance.blackboard import digest
 
 Runner = Callable[[str, str, str], dict[str, Any]]
 PLANTED_DATASET = "synthetic:planted-v1"

@@ -16,7 +16,7 @@
 
 ``run``, ``combine``, ``power`` and ``power-real`` refuse unless their
 (alpha, horizon) pairs are pre-registered on research/agents/blackboard.jsonl
-(:mod:`iap.agents.prereg_gate`; ``combine`` checks the combination id);
+(:mod:`iap.governance.prereg_gate`; ``combine`` checks the combination id);
 ``--no-prereg`` makes the run exploratory and says so.
 
 ``run`` builds the spec (:func:`iap.research.build_spec`), runs it through
@@ -228,7 +228,7 @@ def _print_json(doc: Any) -> None:
 
 def _guard_dataset(args: argparse.Namespace) -> None:
     """v1.18 REL-02b: the content-hash holdout registry check, before any read."""
-    from iap.research.holdout_registry import HoldoutRefused, dataset_root, guard
+    from iap.governance.holdout_registry import HoldoutRefused, dataset_root, guard
 
     if not (dataset_root(args.dataset_dir) / "dataset.json").is_file():
         # nothing is read without a manifest (the caller reports "needs dataset.json");
@@ -313,7 +313,7 @@ def _check_prereg(args: argparse.Namespace) -> dict | None:
     if args.no_prereg:
         print("NOT pre-registered (--no-prereg): exploratory, not evidence for a gate")
         return None
-    from iap.agents.prereg_gate import PreregistrationError, board_path, require
+    from iap.governance.prereg_gate import PreregistrationError, board_path, require
     from iap.research.specs import pinned_horizon
 
     root = args.repo_root if args.repo_root is not None else REPO
@@ -372,7 +372,7 @@ def _check_prereg_pairs(args: argparse.Namespace, pairs: list[tuple[str, str]], 
             file=sys.stderr,
         )
         return
-    from iap.agents.prereg_gate import PreregistrationError, board_path, require
+    from iap.governance.prereg_gate import PreregistrationError, board_path, require
 
     root = args.repo_root if getattr(args, "repo_root", None) is not None else REPO
     for alpha_id, horizon in pairs:
@@ -416,7 +416,7 @@ def _runner_gate(args: argparse.Namespace, entry: dict | None):
     reading data; this one travels with the runner). ``None`` under ``--no-prereg``."""
     if entry is None:
         return None
-    from iap.agents.prereg_gate import require
+    from iap.governance.prereg_gate import require
 
     root = args.repo_root if args.repo_root is not None else REPO
 
@@ -602,7 +602,7 @@ def _combine_gate(args: argparse.Namespace):
     if args.no_prereg:
         print("NOT pre-registered (--no-prereg): exploratory, not evidence for a gate")
         return None
-    from iap.agents.prereg_gate import PreregistrationError, board_path, require
+    from iap.governance.prereg_gate import PreregistrationError, board_path, require
 
     root = args.repo_root if args.repo_root is not None else REPO
 
@@ -776,7 +776,7 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="JSON {family, metrics, thresholds} the run declares; checked against the "
-        "analysis_identity a signed prereg binds (iap.agents.analysis_identity)",
+        "analysis_identity a signed prereg binds (iap.governance.analysis_identity)",
     )
     run.add_argument("--features-dir", type=Path, default=REPO / "data" / "features")
     run.add_argument(

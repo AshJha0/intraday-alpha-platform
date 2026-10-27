@@ -43,11 +43,11 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from iap.agents import signing
-from iap.agents.blackboard import Blackboard
-from iap.agents.broker import WriteBroker
-from iap.agents.broker import _default_fingerprint as default_fingerprint
-from iap.agents.workflow import PROPOSAL_KIND
+from iap.governance import signing
+from iap.governance.blackboard import Blackboard
+from iap.governance.broker import WriteBroker
+from iap.governance.broker import _default_fingerprint as default_fingerprint
+from iap.governance.workflow import PROPOSAL_KIND
 from iap.llm import verify
 from iap.llm.agent import PUBKEYS_RELPATH, TOOL_NAMES, open_session, run_session
 from iap.llm.budget import EVAL_MODEL, PRICES, Budget
@@ -296,7 +296,7 @@ def _success_script(sid: str, ctx: dict[str, Any]) -> list[Any]:
 
 
 def _success_check(ws: Path, sid: str, summary: dict[str, Any], ctx: dict[str, Any]) -> dict:
-    from iap.agents import citations
+    from iap.governance import citations
 
     confirmed = []
     for f in summary["findings"]:

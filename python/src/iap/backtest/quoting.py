@@ -121,7 +121,7 @@ from iap.execution.config import ExecConfig
 from iap.execution.markout_feedback import FeedbackConfig, MarkoutFeedback
 from iap.execution.simulator import ExecutionSimulator
 from iap.execution.types import ChildOrder, Liquidity, OrderType
-from iap.validation.deflated import DAYS_PER_YEAR, pnl_sharpe
+from iap.stats import DAYS_PER_YEAR, pnl_sharpe
 
 
 @dataclass(frozen=True)

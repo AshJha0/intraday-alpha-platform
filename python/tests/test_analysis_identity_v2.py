@@ -125,10 +125,12 @@ def test_dataset_change_is_a_new_version_and_tampering_is_refused(tmp_path):
     man = {"kind": "real", "dataset_version": content_hash({"a.iap1": sha}),
            "normalized": {"files": {"a.iap1": sha}}}  # fmt: skip
     _w(d / "dataset.json", json.dumps(man))
-    v = ai.dataset_version_of(d)
+    from iap.research.holdout_registry import dataset_version_of
+
+    v = dataset_version_of(d)
     (d / "normalized/a.iap1").write_text("events-2")  # same manifest, changed bytes
     with pytest.raises(ai.IdentityError, match="content differs"):
-        ai.dataset_version_of(d)
+        dataset_version_of(d)
     assert v == man["dataset_version"]
 
 
@@ -269,8 +271,8 @@ RUNNERS = {
     "research/v118/f3_power/run_f3_power.py": "verify_identity",
     "python/src/iap/research/rel08_screen.py": "check_identity",
     "python/src/iap/research/rel08_rule.py": "verify_identity",
-    "python/src/iap/agents/prereg_gate.py": "verify_identity",
-    "python/src/iap/research/holdout_registry.py": "environment_mismatches",
+    "python/src/iap/governance/prereg_gate.py": "verify_identity",
+    "python/src/iap/governance/holdout_registry.py": "environment_mismatches",
     "research/auction/rel08c/run_rel08c.py": "verify_identity",
     "research/v118/rel09/run_rel09.py": "verify_identity",
     "research/v118/rel10/run_rel10.py": "verify_identity",
@@ -281,7 +283,9 @@ RUNNERS = {
 # Consume a signed document but run no analysis: binders / signers / the
 # identity module itself / tools that only verify signatures.
 NOT_RUNNERS = {
-    "python/src/iap/agents/analysis_identity.py",
+    "python/src/iap/governance/analysis_identity.py",
+    "python/src/iap/agents/analysis_identity.py",  # v2.1 T3: the alias of the module above
+    "python/src/iap/governance/__init__.py",  # the package docstring names the module
     "tools/prereg_bind_identity.py",
     "tools/rel08_rule_sign.py",
     "tools/verify_signatures.py",
@@ -323,7 +327,7 @@ def test_no_prereg_consumer_skips_the_identity_check():
     unknown = sorted(_prereg_consumers() - set(RUNNERS) - NOT_RUNNERS)
     # files that only mention the block name in docs / pass it through
     passthrough = {
-        "python/src/iap/agents/broker.py",  # writes the block into a prereg body
+        "python/src/iap/governance/broker.py",  # writes the block into a prereg body
         "python/src/iap/research/__main__.py",  # declares identity_actual -> prereg_gate
         "python/src/iap/research/known_null.py",  # identity_args helper
         "python/src/iap/research/rel08_screen.py",

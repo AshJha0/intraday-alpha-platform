@@ -86,9 +86,7 @@ from iap.validation.metrics import (  # noqa: F401
 from iap.validation.sessions import (  # noqa: F401
     FOMC_DAYS,
     HOLIDAY_THIN_DAYS,
-    book_scope_for_dataset,
     day_tags,
-    record_day_sampling,
     stratified_day_sample,
 )
 from iap.validation.splits import (  # noqa: F401

@@ -2,10 +2,11 @@
 
 This page explains the method the platform follows, for two readers at once: a practitioner who
 will check each claim against the code, and a student meeting these ideas for the first time.
-Each section opens with the idea in plain words, then states what we built and where the rule
-lives. Every rule is cited to a file or a test; the file, not this page, is the authority. There
-is no tuning advice here and no performance figure, because as of 2026-10-25 we have none to
-report: nothing on `main` is confirmed, and the real daily data has not yet been ingested.
+Each section opens with the idea in plain words, then gives the formal statement and where the
+rule lives, and where it helps, a worked example you can check by hand. Every rule is cited to a file or a test; the file, not this page, is the authority. There
+is no tuning advice here and no performance figure, because as of v2.0.0 (2026-10-26) there is
+none to claim: nothing on `main` is confirmed, the free daily route failed all five DD1 data tests
+and was rejected ([REPORT.md](REPORT.md) section 2, row 1), and D1 to D4 are data-ineligible.
 
 The v1.x tutorial on the intraday engines is kept at [../LEARN.md](../LEARN.md) (frozen, 12,000
 lines). The vocabulary below is the one every current document uses; section 8 defines each term
@@ -319,11 +320,13 @@ confirmed* only when an approval or custody authority other than the developer e
 signature, for the same reason, proves integrity (the document did not change after signing) and
 nothing about who ran what ([governance/TRUST_ROOTS.md](GOVERNANCE.md)).
 
-**Where things stand.** As of 2026-10-25 nothing on `main` is in the first two classes: no
-registered run has been executed and no independent party has reproduced a result. The runner,
+**Where things stand.** As of v2.0.0 (2026-10-26) nothing on `main` is in the first two classes
+and nothing is above development-supported. The DD1 ingestion ran and rejected the free daily
+route ([DD1 finding](release/evidence/DD1_FREE_ROUTE_FINDING_2026-10-26.md)); no registered
+confirmation run has been executed and no independent party has reproduced a result. The runner,
 the services and the reproduction image exist and are tested on synthetic data
-([REPRODUCTION.md](REPRODUCTION.md)). The class of every result so far is listed in
-[REVIEW_PACK.md](../archive/docs/REVIEW_PACK.md) section 0.
+([REPRODUCTION.md](REPRODUCTION.md)). The class of every result is listed in
+[REPORT.md](REPORT.md) section 2.
 
 An honest aside about words. In v1.15 the R7 confirmation round reported two signals as
 "confirmed". The result was re-issued on 2026-10-24 under the v1.18 eligibility rule as

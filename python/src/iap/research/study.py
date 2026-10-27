@@ -137,7 +137,7 @@ class StudyBase:
 
     def check_prereg(self, repo_root: Path | str) -> list[dict]:
         """The blackboard entries of every pre-registered cell (raises if missing)."""
-        from iap.agents.prereg_gate import require
+        from iap.governance.prereg_gate import require
 
         return [require(Path(repo_root), *self.prereg_key(c)) for c in self.prereg["cells"]]
 

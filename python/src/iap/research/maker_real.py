@@ -124,7 +124,7 @@ def check_prereg(
 ) -> list[dict]:
     """The blackboard entries of every pre-registered cell (raises if missing);
     ``board`` defaults to :data:`PREREG_BOARD` (the archived fork board)."""
-    from iap.agents.prereg_gate import require
+    from iap.governance.prereg_gate import require
 
     b = PREREG_BOARD if board is None else board
     return [

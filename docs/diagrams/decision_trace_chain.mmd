@@ -18,7 +18,7 @@ flowchart LR
     SINKS --> EXPL["explain(trace) / python -m iap.store explain<br/>v_order_chain — one row per parent order"]
     subgraph EMIT["emission points"]
         E1["Python: iap.mvp (TraceBuilder per decision)"]
-        E2["Java: PaperTrading → decision_traces.jsonl<br/>(one per pre-trade risk decision)"]
+        E2["Java PaperTrading (archived v1.14) → decision_traces.jsonl<br/>(one per pre-trade risk decision)"]
         E3["C++: ExecutionReplay::set_trace_sink<br/>(one per parent order, after the run)"]
         E4["Rust: contracts::trace JsonlTraceSink<br/>(telemetry re-export, trace_records_total)"]
     end

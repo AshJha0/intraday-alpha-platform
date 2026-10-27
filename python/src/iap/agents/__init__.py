@@ -2,7 +2,7 @@
 
 Off the trading path by construction (``tests/test_import_policy.py`` keeps every
 trading-path package from importing this one).  Standard library plus
-``cryptography`` (Ed25519 agent signatures, :mod:`iap.agents.signing`, v1.10).
+``cryptography`` (Ed25519 agent signatures, :mod:`iap.governance.signing`, v1.10).
 
 - ``untrusted``  - free text from ledgers, reports and agents is data, never instructions.
 - ``citations``  - resolve ``experiment:<id>`` / ``alpha:<id>`` / ``lifecycle:<n>`` references.

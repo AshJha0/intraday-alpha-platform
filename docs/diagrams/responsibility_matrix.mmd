@@ -21,7 +21,7 @@ flowchart LR
         rcontracts["contracts crate: canonical JSON, DecisionTrace,<br/>JSONL sink + digest · lifecycle crate"]
         rtel["telemetry: counters/gauges/histograms<br/>Prometheus exposition (+ trace_records_total)"]
     end
-    subgraph JVL["Java — institutional platform layer"]
+    subgraph JVL["Java (archived v1.14.0, not built): former platform layer"]
         jcore["codec · book · replay · features · alphas"]
         jplat["event-driven backtester · portfolio service ·<br/>risk orchestration · execution/SOR · TCA service"]
         jcontracts["contracts · trace · lifecycle<br/>(PaperTrading emits decision_traces.jsonl)"]

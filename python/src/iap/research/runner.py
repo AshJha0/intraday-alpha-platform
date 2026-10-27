@@ -124,6 +124,7 @@ from iap.contracts.types import ExperimentResult, ExperimentSpec, Verdict
 from iap.contracts.validate import validate_typed
 from iap.experiment import tracker
 from iap.experiment.locking import atomic_write_text
+from iap.marketdata.manifest_records import book_scope_for_dataset
 from iap.reference.refdata import session_meta
 from iap.research.errors import ResearchError
 from iap.research.specs import (
@@ -152,7 +153,6 @@ from iap.validation.methods import (
     methods,
 )
 from iap.validation.metrics import HORIZONS_NS
-from iap.validation.sessions import book_scope_for_dataset
 from iap.validation.splits import Fold
 from iap.validation.validate import validate_alpha
 

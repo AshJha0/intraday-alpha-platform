@@ -52,7 +52,7 @@ __all__ = [
 ]
 
 LEVELS = 10
-# R7 holdout sessions are refused through iap.research.holdout_registry (v1.18 REL-02b).
+# R7 holdout sessions are refused through iap.governance.holdout_registry (v1.18 REL-02b).
 
 
 EVENT_COLS = (
@@ -100,7 +100,7 @@ def iter_events(session_dir: Path, iid: int, end_ns: int | None = None) -> Itera
 def _refuse_holdout(name: str) -> None:
     """v1.18 REL-02b: refuse by the holdout registry (session date / dataset label),
     not by a hard-coded list; an unregistered date is refused too."""
-    from iap.research.holdout_registry import HoldoutRefused, refuse_unit_name
+    from iap.governance.holdout_registry import HoldoutRefused, refuse_unit_name
 
     try:
         refuse_unit_name(name)
@@ -310,7 +310,7 @@ def build_cache(
     for sess in sessions:
         _refuse_holdout(sess)
         sdir = data_root / sess
-        from iap.research.holdout_registry import HoldoutRefused, guard
+        from iap.governance.holdout_registry import HoldoutRefused, guard
 
         try:
             guard(sdir, purpose="ai4_build_cache")

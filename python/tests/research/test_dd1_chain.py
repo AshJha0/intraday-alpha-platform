@@ -263,3 +263,64 @@ def test_an_incomplete_record_runs_only_as_exploratory_with_its_own_ledger(
     s = json.loads(capsys.readouterr().out)
     assert s["evidence_class"].startswith("exploratory, data-ineligible")
     assert (out / "EXPLORATORY.txt").read_text().startswith("exploratory, data-ineligible")
+
+
+@pytest.mark.slow  # two synthetic sets, about 2 minutes each locally: the python-slow job runs it
+@pytest.mark.parametrize(
+    ("names", "years", "families"),
+    [(250, 4, ["D1", "D3"]), (130, 6, ["D2", "D4"])],
+    ids=["D1-D3", "D2-D4"],
+)
+def test_every_family_trades_in_an_exploratory_run(tmp_path, names, years, families):
+    """D-106, D-107: on the DD1 2026 partition D2 and D4 never traded because M0 failed its
+    quality rule (no forecast at all) and D4's signal was finite on about two names a
+    session.  An exploratory run costs the registered direction at the fitted magnitude and
+    holds a D4 reaction for five sessions; each family must then open cohorts and fill.
+    (D1 needs more names than D2 and D4 need history, hence two sets.)"""
+    import datetime as dt
+
+    tool = _tool()
+    dataset = tool.synthetic_dataset(
+        tmp_path / "dd1",
+        extra_symbols=names - 12,
+        first=dt.date(tool.SYNTHETIC_YEAR - years, 1, 2),
+    )
+    s = tool.run_chain(
+        dataset,
+        tmp_path,
+        ledger=tmp_path / "selection_ledger.json",
+        families=families,
+        ml_family=None,
+        identity="dev-test",
+        exploratory=True,
+    )
+    for fam in families:
+        v = s["families"][fam]
+        assert v["cohorts_opened"] > 0 and v["fills"] > 0, (fam, v["refusals"])
+    if "D4" in families:
+        assert s["families"]["D4"]["model_class"] == "M0.exploratory_ungated"
+
+
+def test_a_failed_m0_is_refused_by_name_not_as_too_few_names(dd1_set, tmp_path, monkeypatch):
+    """D-106: a failed M0 forecasts nothing; the refusal says so instead of blaming breadth,
+    and only an exploratory run swaps in the ungated model."""
+    from iap.research import loop
+
+    tool = _tool()
+    panel, manifest = dd1_panel.write_panel(dd1_set[0], tmp_path / "panel")
+    real_fit = loop.fit_m0
+
+    def failed(*a, **k):
+        m = real_fit(*a, **k)
+        m.passed = False
+        return m
+
+    monkeypatch.setattr(loop, "fit_m0", failed)
+    res = loop.run_family(tool.SPECS["D3"], panel, manifest, identity="dev-test")
+    assert res["run"].fills == 0
+    assert set(res["run"].refusals) == {
+        "construction: no forecast: the incumbent model failed its quality rule"
+    }
+    res = loop.run_family(tool.SPECS["D3"], panel, manifest, identity="dev-test", exploratory=True)
+    assert res["model"].model_class == "M0.exploratory_ungated"
+    assert res["report"]["identity"]["exploratory"]["model"] == "M0.exploratory_ungated"

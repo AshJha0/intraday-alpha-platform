@@ -319,7 +319,7 @@ def load_signed_rule(
     doc = json.loads(p.read_text(encoding="utf-8"))
     if doc.get("signed") is not True or not isinstance(doc.get("signature"), Mapping):
         raise RuleRefused(f"{p}: the rule is not signed; the screen refuses an unsigned rule")
-    from iap.agents.analysis_identity import SignatureError, verify_signed_document
+    from iap.governance.analysis_identity import SignatureError, verify_signed_document
 
     try:
         verify_signed_document(r, doc)
@@ -347,8 +347,8 @@ def sign_rule(
     prereg convention, verified by ``verify_signed_document``)."""
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-    from iap.agents import signing
-    from iap.agents.blackboard import canonical
+    from iap.governance import signing
+    from iap.governance.blackboard import canonical
 
     doc = draft_body(draft)
     doc.update(
@@ -365,7 +365,7 @@ def sign_rule(
         "maintainer": maintainer,
         "public_key": pub,
         "trust_root": "research/agents/trust_roots.json",
-        "message": "iap.agents.blackboard.canonical(this document without 'signature')",
+        "message": "iap.governance.blackboard.canonical(this document without 'signature')",
         "message_sha256": hashlib.sha256(msg).hexdigest(),
         "sig": sig,
     }
@@ -379,7 +379,7 @@ def render(doc: Mapping[str, Any]) -> str:
 def check_identity(rule: Rule, root: Path | None, dataset_version: str) -> dict[str, Any]:
     """REL-02a: the code, commit and dataset about to run are those the
     signature bound.  :class:`RuleRefused` lists every mismatch."""
-    from iap.agents.analysis_identity import IdentityError, verify_identity
+    from iap.governance.analysis_identity import IdentityError, verify_identity
 
     if not rule.signed:
         raise RuleRefused("check_identity needs a signed rule")

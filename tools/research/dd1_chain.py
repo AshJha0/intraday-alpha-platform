@@ -85,6 +85,7 @@ def _summary(result: dict[str, Any]) -> dict[str, Any]:
     return {
         "report_sha256": result["sha256"],
         "model_passed": bool(getattr(result["model"], "passed", True)),
+        "model_class": result["model"].model_class,
         "sessions": rep["sessions"],
         "cohorts_opened": run.cohorts_opened,
         "fills": run.fills,
@@ -135,6 +136,7 @@ def run_chain(
             out_dir=out / "reports",
             ledger_path=ledger,
             identity=identity,
+            exploratory=exploratory,
         )
         timings[fam] = time.perf_counter() - t
         summary["families"][fam] = _summary(res)

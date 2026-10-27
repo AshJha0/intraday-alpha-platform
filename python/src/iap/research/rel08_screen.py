@@ -13,7 +13,7 @@ reads every number from the SIGNED JSON copy (:mod:`iap.research.rel08_rule`).
 1. the signed rule loads (:func:`~iap.research.rel08_rule.load_signed_rule`:
    unsigned, invalid or mismatched -> exit 2);
 2. the holdout registry allows the dataset
-   (:func:`iap.research.holdout_registry.guard`): it must be a REAL dataset in
+   (:func:`iap.governance.holdout_registry.guard`): it must be a REAL dataset in
    state ``in_sample`` whose ``dataset_version`` is the one the rule names;
 3. the analysis identity the signature bound (scripts, code tree, commit,
    dataset version, family, metrics, thresholds) matches what is about to run,
@@ -71,8 +71,8 @@ import pandas as pd
 
 from iap.alpha.data import asof_to_grid, make_grid
 from iap.backtest.costs import CostModel
+from iap.governance import claims
 from iap.research import breadth_book as bb
-from iap.research import claims
 from iap.research.rel08_rule import FAMILY, METRICS, Rule, RuleRefused
 
 _REPO = Path(__file__).resolve().parents[4]
@@ -903,8 +903,8 @@ def load_screen_data(dataset_dir: Path, reference_map: Path | None = None) -> Sc
 
 def gate(dataset_dir: Path, rule_path: Path | None, root: Path) -> tuple[Rule, str]:
     """Gates 1-3 of the module docs; :class:`RuleRefused` / ``HoldoutRefused``."""
-    from iap.agents.analysis_identity import IdentityError, require_independent_runner
-    from iap.research.holdout_registry import HoldoutRefused, guard
+    from iap.governance.analysis_identity import IdentityError, require_independent_runner
+    from iap.governance.holdout_registry import HoldoutRefused, guard
     from iap.research.rel08_rule import check_identity, load_signed_rule
 
     rule = load_signed_rule(rule_path, root)
@@ -938,7 +938,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--no-timestamp", action="store_true")
     args = ap.parse_args(argv)
 
-    from iap.research.holdout_registry import HoldoutRefused
+    from iap.governance.holdout_registry import HoldoutRefused
     from iap.validation.ledger import ExperimentLedger
 
     try:

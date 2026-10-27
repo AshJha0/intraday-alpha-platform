@@ -1,7 +1,13 @@
 # How it works — the quant, algo and AI sides of the platform
 
+> **Read this when** you are new and want the quant, algo, risk and AI sides explained top-down.
+> It was written across v1.3 to v1.18, and version notes inside mark when each rule changed. For
+> the v2.0 layout see [ARCHITECTURE_v2.md](ARCHITECTURE_v2.md); for what is and is not claimed (no
+> alpha confirmed at v2.0.0), [REPORT.md](REPORT.md).
+
+
 A guided explanation for a technically literate newcomer. It goes top-down:
-the pipeline on one page, then one section per side of the platform — quant
+the pipeline on one page, then one section per side of the platform: quant
 research, execution algorithms, hard risk, machine learning, the AI / agent
 boundary, determinism. Every section ends with **where to look** (file
 paths) and **how to run it** (a command that works from a checkout).
@@ -24,8 +30,8 @@ Five things to know before reading:
    researched; none is promoted. Eighteen of them never forecast a move
    larger than the cost of trading it, and make no trade; the six that
    trade lose. The end-to-end loop loses 82.84 USD on its
-   golden session. The ML gate passes on this dataset — the linear baseline
-   has a small positive IC, so the trees and the network are fitted — and
+   golden session. The ML gate passes on this dataset, the linear baseline
+   has a small positive IC, so the trees and the network are fitted, and
    no model earns its costs. The platform is built so that those sentences
    are trustworthy, not so that they read well.
 3. **The corrected methods are the defaults.** Where the v1.3.0 review
@@ -33,15 +39,16 @@ Five things to know before reading:
    rule as an opt-in (v1.3.0 and v1.4.0). Since v1.5.0 the corrected rule
    is what runs when nothing is named, every research artefact was
    regenerated under it on the unchanged dataset, and every number below is
-   a v1.5.0 number. Each old rule stays selectable under a legacy name —
-   the bundle `legacy_v1` reproduces the v1.4.0 report — and is named
+   a v1.5.0 number. Each old rule stays selectable under a legacy name
+   the bundle `legacy_v1` reproduces the v1.4.0 report, and is named
    below beside the default that replaced it.
 4. **There is now real data too, and a maker side.** Since v1.6.0 the same
    pipeline has run on seven real Nasdaq ITCH sessions (2019-20; AAPL, MSFT,
    QQQ), and v1.8.0 passed four pre-registered signals through its gate on two
    unseen 2026 days (docs/REAL_DATA.md §3; evidence class under v2.0:
    **development-supported**, developer-run, holdout since spent; the later
-   R7 round is **data-ineligible**). They were too small to pay a taker at 1-5 s. v1.9.0 and v1.10.0 add the opt-in maker path,
+   R7 round is **data-ineligible**). They were too small to pay a taker at 1-5 s, and at v2.0.0 nothing is above
+   development-supported ([REPORT.md](REPORT.md)). v1.9.0 and v1.10.0 add the opt-in maker path,
    auction research, optimal-execution schedules and stronger research
    governance; §3.6-§3.8 and §6.2 below explain them. v1.11.0 adds an
    optional LLM research agent that works only through that governance
@@ -107,9 +114,10 @@ events -> order book -> features -> alphas -> portfolio -> hard risk
 Four languages implement parts of this. Python is the reference for
 everything and runs the whole loop. C++ owns the latency-critical path and
 the execution rule text. Rust owns the hard risk engine's rule text. Java
-is the platform layer that runs paper sessions. They are held together by
+was the platform layer that ran paper sessions until v1.14.0; it was archived in v1.15 and
+removed in v2.0, and Python now runs the paper path. They are held together by
 golden files: one implementation writes the expected output, every other
-one must reproduce it — exactly for integers and bytes, to 1e-9 for
+one must reproduce it: exactly for integers and bytes, to 1e-9 for
 floats.
 
 The loop above is not a diagram of intent. One command runs it on one
@@ -119,10 +127,10 @@ USD: about +0.02 bps of alpha against −0.44 bps of execution cost.
 
 **Where to look**
 
-- `python/src/iap/mvp/engine.py` — the per-event order of the whole loop.
-- `docs/MVP.md` — the same loop explained module by module, with its results.
+- `python/src/iap/mvp/engine.py`: the per-event order of the whole loop.
+- `docs/MVP.md`: the same loop explained module by module, with its results.
 - `docs/DIAGRAMS.md` §1 (pipeline) and §10 (the MVP loop).
-- `PLATFORM_CONVENTIONS.md` — every pinned rule, by section.
+- `PLATFORM_CONVENTIONS.md`: every pinned rule, by section.
 
 **How to run it**
 
@@ -144,7 +152,7 @@ does it survive costs?* Everything here exists to make a wrong "yes" hard.
 A feature is not a column someone computed in a notebook. It is an entry
 in a registry (`data/reference/feature_registry.json`): a name such as
 `ofi_l5_w1s_v1`, a family, a version, parameters and declared
-dependencies. The registry has 205 entries in 10 families — price,
+dependencies. The registry has 205 entries in 10 families: price,
 microstructure, order flow, liquidity, volatility, time of day,
 cross-asset, venue, regime, execution. The hash of the registry is the
 `feature_version` stamped on every experiment, so a result always says
@@ -182,7 +190,7 @@ draws the lesson; diagram 29 in DIAGRAMS.md shows the two backends.
 
 An alpha is a class with a fixed interface. It declares which features it
 reads, it is fitted on training rows, and it scores a row into an
-`AlphaSignal` — an expected return and a confidence. Two rules are enforced
+`AlphaSignal`: an expected return and a confidence. Two rules are enforced
 in code:
 
 - The class must carry a docstring section `Economic rationale:`. An alpha
@@ -203,7 +211,7 @@ the story afterwards.
 
 A label is the thing a signal is supposed to predict: the forward return
 from time `t` to `t + h`. They are computed in event time at 11 horizons
-from 10 ms to 15 minutes, in two forms — mid-to-mid, and cost-adjusted
+from 10 ms to 15 minutes, in two forms: mid-to-mid, and cost-adjusted
 (paying half the spread at both ends). A label is *valid* only if the
 stream was observed through `t + h`, the book was tradable at both ends,
 and no halt, auction or stale-venue gap falls inside the horizon. The
@@ -250,7 +258,7 @@ significance of that slope and of no other.
 ### 2.5 Purged, embargoed walk-forward
 
 The data is split in time, never at random. With four folds, each fold
-trains on everything before its test segment — minus two exclusions:
+trains on everything before its test segment: minus two exclusions:
 
 - **Purge.** A training row whose label window reaches into the test
   segment is dropped. Its label was computed from prices the test set also
@@ -265,7 +273,7 @@ degenerate and counted as a failure.
 
 ### 2.6 The gate t: pooled-slope HAC, and the within-bucket t it replaced
 
-An IC needs a significance test, and the rows are not independent —
+An IC needs a significance test, and the rows are not independent
 overlapping labels are autocorrelated. Up to v1.4.0 the gate computed one
 IC per five-minute bucket, took their mean weighted by the number of pairs
 in each bucket, and divided by a Newey–West (Bartlett-weighted) long-run
@@ -273,7 +281,7 @@ standard error.
 
 That statistic has a blind spot. A within-bucket correlation demeans score
 and label inside each bucket, so signal that lives *between* buckets is
-removed from the test — while the gate IC beside it is pooled and keeps it.
+removed from the test: while the gate IC beside it is pooled and keeps it.
 The gate was testing one number and thresholding another. The
 **pooled-slope HAC t** tests the pooled slope directly with the same
 buckets and weights, and since v1.5.0 it is the statistic the gate reads
@@ -293,7 +301,7 @@ data are recorded in a ledger (`research/experiments.json`). The ledger is
 not a complete history: earlier looks were overwritten, compressed or never
 recorded, so its count is a lower bound (v1.18 inventory and coverage
 statement: `research/v118/LEDGER_INVENTORY.md`). Entries are identified
-by alpha, kind, configuration and — since v1.4.0 — dataset, so that
+by alpha, kind, configuration and, since v1.4.0, dataset, so that
 re-running a script does not inflate the count. As of v1.17.0 it holds
 5,732 looks over 422 entries (`research/experiments.json`, its `datasets`
 block): 1,068 on the v1.3.0 dataset, 4,626 on the regenerated synthetic
@@ -322,7 +330,7 @@ Up to v1.4.0 the PROMOTE gate asked for t ≥ 3.0 whatever the count, and
 the report printed the yardsticks beside it. Since v1.5.0 the gate follows
 the count (`tstat_threshold="ledger"`; the legacy rule is `"fixed"`): the
 threshold is the larger of 3.0 and the Bonferroni |t| at the look count
-the run is judged at — the ledger before the run plus what the run adds,
+the run is judged at: the ledger before the run plus what the run adds,
 declared before the first alpha is evaluated and recorded with the result.
 The promotion report was judged at a count of 3,936, which gives 4.365.
 Three alphas clear it (EQ02 7.17, EQ03 5.16, EQ12 7.20) where six cleared
@@ -371,7 +379,7 @@ FX08, FX10) and zero for the other 21.
 
 The cost-aware policy does not rescue anything, and a policy that never
 trades is not a result: it is no evidence that abstaining pays. COOKBOOK
-recipe 28 runs both policies on EQ03 over both sessions — no trade under
+recipe 28 runs both policies on EQ03 over both sessions: no trade under
 the default, 38,222 trades and a loss of 826,926 under the legacy rules.
 What "0 PROMOTE" says is narrower than it sounds: on this synthetic book
 the forecasts are smaller than the spread, for an alpha that crosses it.
@@ -401,7 +409,7 @@ since v1.5.0:
    MVP session the lagged IC does not collapse (EQ01: 0.217 unlagged, 0.149
    lagged by one decision), because the signals persist from one decision
    to the next. That is persistence, not a leak, and not proof of
-   cleanliness either — the evidence against a leak is the pinned label
+   cleanliness either: the evidence against a leak is the pinned label
    definition and the truncation probe (docs/MVP.md).
 3. **Truncation probe.** Re-score on a truncated feature frame. The score
    at the cut must be bit-identical.
@@ -439,7 +447,7 @@ a 95 % interval around the net P&L of all four folds has to be above zero,
 and an alpha that never trades has no interval and fails (17 of the 24;
 the 7 that trade lose). The correlation gate asks whether a candidate is
 more than 0.7 correlated with an alpha that is already at VALIDATING or
-beyond; nobody is, so it passes for all 24 without having been tested —
+beyond; nobody is, so it passes for all 24 without having been tested
 §2.13 shows what it would do. Statistical significance fails
 for 21, stability for 14, the IC gate for 12. Under the v1.4.0 rules the
 cost gate failed for all 24 and was the only failure for four (the three
@@ -453,7 +461,7 @@ Since v1.3.0 there is one more condition, and it is about the evidence
 rather than the alpha. A research result is **gate-eligible** only if it
 was produced under the pinned protocol or something stricter (costs at 1×
 or more, at least four folds, the standard latency and embargo), on the
-periods derived from the dataset, and — since v1.5.0 — under the default
+periods derived from the dataset, and, since v1.5.0, under the default
 method bundle. Any other configuration still runs and
 is still counted in the ledger, but every gate that reads it fails.
 Halving the costs is a legitimate experiment and is not promotion evidence.
@@ -462,7 +470,7 @@ Halving the costs is a legitimate experiment and is not promotion evidence.
 
 "Nothing was promoted" is only informative if the chain *could* promote
 something real. So the generator has an opt-in mode that plants effects of
-known size — informed order flow, and one instrument leading another — and
+known size, informed order flow, and one instrument leading another, and
 the unmodified pipeline is run on the result (`python -m iap.research
 power`). Each run is generated once and scored on its first 1, 2, 4 (and
 in the extended grid 8) sessions, 20 generator seeds per cell, so a rate
@@ -509,11 +517,11 @@ What it means:
 - The **ledger threshold costs sessions, not detections**: 80 % power at
   4.365 needs about 5 sessions for the order-flow effect and at 3.0 about 3.
 - It is **not fooled** by an effect that reverses half-way through (no
-  evidence in any of 20 runs), and the break test — the difference between
-  the slope before and after mid-sample — flags the reversal in 20 of 20
+  evidence in any of 20 runs), and the break test, the difference between
+  the slope before and after mid-sample, flags the reversal in 20 of 20
   runs for order flow and 15 of 20 for lead-lag on 8 sessions, with at most
   one false alarm in 20 on a stable run.
-- It **promotes nothing, at any size or session count** — not even an
+- It **promotes nothing, at any size or session count**: not even an
   effect with a mean t of 18. At the reference size the cost-aware backtest
   makes no trade on the 5 s forecast; where it trades (the 10 s label, or
   twice the reference size) no fold survives 1× costs and no bootstrap
@@ -530,11 +538,11 @@ missed there nine times in ten.
 
 - `python/src/iap/features/` (registry, engine), `python/src/iap/alpha/`
   (base class and the 24 alphas), `python/src/iap/labels/`.
-- `python/src/iap/validation/` — `splits.py`, `metrics.py`, `leakage.py`,
+- `python/src/iap/validation/`: `splits.py`, `metrics.py`, `leakage.py`,
   `stress.py`, `ledger.py`, `validate.py`, `diagnostics.py`, and
   `methods.py`, the one place the default (`v2`) and legacy (`legacy_v1`)
   rule sets are written down.
-- `python/src/iap/research/` — the experiment runner, gate eligibility
+- `python/src/iap/research/`: the experiment runner, gate eligibility
   (`specs.py`), the power study (`power.py`).
 - `python/src/iap/lifecycle/` and `docs/LIFECYCLE.md`.
 - `research/alpha_reports/REPORT.md`, `research/power/POWER_REPORT.md`,
@@ -567,7 +575,7 @@ correlated they average down faster than the common forecast does. For
 The square-root term is the **breadth** you actually have. With `rho = 0`
 it is `sqrt(K)`: twelve independent signals triple the IC (√12 ≈ 3.5).
 With `rho = 1` it is 1: twelve copies of one signal are one signal. This is
-the "fundamental law" — information ratio ≈ IC × √breadth — and its fine
+the "fundamental law", information ratio ≈ IC × √breadth, and its fine
 print: breadth counts *independent* bets.
 
 `iap.combine` builds the blend as an alpha whose inputs are alphas and
@@ -579,14 +587,14 @@ weights are estimated inside the training window, on predictions the
 members made for rows they were not fitted on (three inner folds, same
 purge and embargo). A weight never sees a test row; a test corrupts every
 row from the test start onwards and checks that not one fitted number
-moves. Four methods are available — equal weights (the default, and the
+moves. Four methods are available: equal weights (the default, and the
 baseline: it estimates nothing), IC weights, ridge regression with the
 penalty chosen inside the training window, and a mean-variance blend on a
 shrunk covariance matrix. The last two account for correlation between
 members; the first two do not.
 
 **Combining is a search, and is charged as one.** Each (member list,
-method) pair costs 83 + K looks — its validation plus one per member — and
+method) pair costs 83 + K looks, its validation plus one per member, and
 a report that tries four methods declares all four before it evaluates the
 first. The committed report was charged 760 of them and was judged at a t threshold
 of 4.42.
@@ -602,16 +610,16 @@ of 4.42.
 
 The arithmetic works: the measured equal-weight IC is what mean IC × √breadth
 predicts, to within a few parts in ten thousand. The fitted methods do
-better statistically — the equity ridge blend has an IC of 0.043 and a t of
+better statistically: the equity ridge blend has an IC of 0.043 and a t of
 7. And none of the eight combinations is promotable, for the reason no
 member is: the forecast, in return units, is smaller than the cost of
 acting on it. The equity blends make between 0 and 6 trades in four folds;
 the FX blends that trade lose. Breadth multiplies IC. It does not multiply
-the size of the move being forecast, and that — not statistical
-significance — is what this dataset lacks.
+the size of the move being forecast, and that, not statistical
+significance, is what this dataset lacks.
 
 **Why a correlation gate follows.** Of the twelve equity alphas, three
-(EQ02, EQ03, EQ12 — three ways of measuring order-flow imbalance) are
+(EQ02, EQ03, EQ12: three ways of measuring order-flow imbalance) are
 correlated 0.95 to 1.00. They look like three alphas that each pass the
 significance gate; they are one bet counted three times, and the twelve
 equity signals hold about 6.5 independent bets. Allocating to all three
@@ -766,7 +774,7 @@ v1.3.0 corrected four of these rules, in C++, Java and Python together:
 | rule | before | after |
 |---|---|---|
 | crossing pool | rebuilt from the displayed size on every event, so a static 50-share display filled a 1,000-share order | displayed size **minus what was already consumed**; the check debits the overlay |
-| which events count | every raw event | only events the book reports as **applied** — a retransmitted duplicate trades nothing |
+| which events count | every raw event | only events the book reports as **applied**: a retransmitted duplicate trades nothing |
 | execute size | the quantity the event quoted | **capped** at the book order's remaining size, at the book order's side and price |
 | cancels | every cancel at our level moved us up by its quoted size | only a cancel of an order **known to be ahead of us**, by the size the book removed |
 
@@ -792,9 +800,9 @@ implementation shortfall = delay + trading + opportunity
 trading                  = spread + impact + timing
 ```
 
-- **Delay** — the price moved between the decision and the first child.
-- **Trading** — what the fills cost against the arrival price.
-- **Opportunity** — what was missed on the part that never filled.
+- **Delay**: the price moved between the decision and the first child.
+- **Trading**: what the fills cost against the arrival price.
+- **Opportunity**: what was missed on the part that never filled.
 
 The identities hold to 1e-9 and are enforced as contract invariants. TCA
 also reports post-fill markouts at 100 ms, 1 s and 10 s (did the price
@@ -803,8 +811,8 @@ cannot be measured.
 
 **Where to look**
 
-- `cpp/include/iap/execution/execution.hpp` — the nine rules, as text.
-- `python/src/iap/execution/` — `algos.py`, `sor.py`, `simulator.py`,
+- `cpp/include/iap/execution/execution.hpp`: the nine rules, as text.
+- `python/src/iap/execution/`: `algos.py`, `sor.py`, `simulator.py`,
   `replay.py`; `python/src/iap/tca/`.
 - `docs/API_REFERENCE.md` §2 (and §2.4 for the v1.3.0 rule changes),
   `docs/API_REFERENCE.md` §2.
@@ -826,9 +834,9 @@ a MARKET child pays. The execution policy of a parent order
 
 - `NATIVE`, the default, is what §3.1 describes.
 - `AGGRESSIVE` crosses with every child.
-- `PASSIVE` posts each schedule step at the near touch — one tick inside
+- `PASSIVE` posts each schedule step at the near touch, one tick inside
   when the spread is three ticks or more, never at or through the other
-  side — and lets it rest. How long is the parent's patience:
+  side, and lets it rest. How long is the parent's patience:
   `30 s × (1 − urgency)`, times `e^(−risk_aversion)` for IS. When the rest
   time is up the child is repriced once (or simply left in the queue if the
   touch has not moved), and after that the remainder is cancelled and
@@ -845,7 +853,7 @@ Whether posting helped is a measurement, not an assumption. The **markout**
 of a fill is the signed move of the mid after it,
 `s × (mid(t_fill + h) − fill price)`, at 100 ms, 1 s, 5 s, 30 s, 60 s and
 5 min. A passive buy at the bid starts half a spread ahead; if the mid then
-falls, the fill was *adversely selected* — it happened because someone
+falls, the fill was *adversely selected*: it happened because someone
 better informed wanted to sell. The decomposition is exact:
 *effective half-spread = realised half-spread + price impact*. A markout
 window that runs past the end of the data, or across a halt or a gap in the
@@ -856,8 +864,8 @@ golden `expected_markout.json`).
 
 `research/execution/EXECUTION_REPORT.md` runs the same parent orders under
 each policy on the bundled equities and prices the quantity a passive order
-failed to fill — at the move of the mid over the window plus the cost of
-crossing it at the end — so that not trading cannot pass for cheap trading.
+failed to fill, at the move of the mid over the window plus the cost of
+crossing it at the end, so that not trading cannot pass for cheap trading.
 It also says which part of the result is the simulator: our resting order
 never changes the replayed book, so nobody reacts to it.
 
@@ -871,22 +879,22 @@ an impact adder rather than measuring one. Two columns make the simulator's
 silences visible: `depth_exhausted` (an aggressive child cancelled because
 the walk ran out of displayed depth within `ExecConfig.walk_depth_levels`,
 default 10) and the fill-provenance shares (`Fill.provenance`: which rule
-produced the fill — aggressive walk, EXECUTE print, marketable ADD, hidden
+produced the fill, aggressive walk, EXECUTE print, marketable ADD, hidden
 print, cross, reopen touch). Output goes to `research/execution/benchmark/`;
 `prereg_DRAFT.json` there is the unsigned draft of the B7 gate. The
 benchmark refuses a holdout directory. With `--signal EQ10` and `base+variant`
 policies (`native+urgency`, `native+pacing`, `native+ac_drift`; v1.17 B2 / B3,
 docs/API_REFERENCE.md §2.14) the same parents are also worked with a real alpha
-signal re-read at every child decision — agree posts, adverse crosses,
+signal re-read at every child decision, agree posts, adverse crosses,
 participation and slice weights tilt, the Almgren-Chriss drift follows the
-signal — and every variant is paired with its own plain control on the same
+signal, and every variant is paired with its own plain control on the same
 windows, with the urgency-regime shares reported per cell.
 
 Two more things a posted order can do, both opt-in (v1.17 B4 / B5,
-docs/API_REFERENCE.md §2.16): **fade** — pull the resting child when the signal
+docs/API_REFERENCE.md §2.16): **fade**, pull the resting child when the signal
 turns adverse by a threshold in signal units or the opposite side of the
 book gets heavy (`FadeParams`), holding the quantity off the book until the
-condition clears, and **cancel a hopeless queue** — when more than a cap
+condition clears, and **cancel a hopeless queue**, when more than a cap
 sits ahead of the child, or the fill-hazard model of §3.9 puts its chance of
 filling inside the horizon below a floor (`QueueCancelParams`), then cross.
 Both go through the simulator's ordinary cancel, which travels the latency
@@ -894,10 +902,10 @@ path and can lose the race to a fill. The benchmark's `passive+fade` /
 `passive+qcancel` variants report, beside the paired cost difference,
 **fades saved vs fills missed**: for every pulled quantity, whether the
 market traded through the pulled price inside the horizon and what the
-fill we forwent would have been worth — a counterfactual on a book our
+fill we forwent would have been worth, a counterfactual on a book our
 order never moved, labelled as such. Its **markout decomposition** (B6)
-splits every fill by type — passive, aggressive, faded (the cancel lost the
-race), cancelled-replaced — and by the B2 regime it was decided in, with
+splits every fill by type, passive, aggressive, faded (the cancel lost the
+race), cancelled-replaced, and by the B2 regime it was decided in, with
 standard errors clustered by session like every v1.17 gate; the hazard's
 time-of-day feature can be fitted on the exchange clock (`clock=
 "America/New_York"`, with the IEX capture clock's 37 s TAI offset
@@ -1255,7 +1263,7 @@ output, and nothing may weaken a risk decision on the strength of one.
 ### 4.3 Kill switches
 
 A kill switch stops new orders at one of four scopes: **global**,
-**strategy**, **instrument**, **venue**. It latches — it never clears
+**strategy**, **instrument**, **venue**. It latches: it never clears
 itself. Loss limits engage it automatically: daily P&L is realised plus
 unrealised, marked on every market update, so a position can breach its
 limit with no fill at all. Re-arming has a fixed order (override the
@@ -1280,9 +1288,9 @@ reason string goes through one integer-scaled formatter, because
 
 Two golden fixtures pin this:
 
-- the **main golden** — one engine, a 110-step script, 59 orders, a
+- the **main golden**: one engine, a 110-step script, 59 orders, a
   77-line audit, a snapshot taken mid-script and restored;
-- the **edge golden** (new in v1.3.0) — eight independent scenarios, each
+- the **edge golden** (new in v1.3.0): eight independent scenarios, each
   with its own engine, covering what one script cannot reach: venue kills
   and orders through the router, kill commands that do not parse, a mark
   from the future, timestamp and position overflow, unvaluable exposure, a
@@ -1295,7 +1303,7 @@ inputs (differential fuzzing) is backlog (EPICS E31).
 
 **Where to look**
 
-- `rust/risk/src/` — `limits_eval.rs` is the rule order; `engine.rs`,
+- `rust/risk/src/`: `limits_eval.rs` is the rule order; `engine.rs`,
   `killswitch.rs`, `audit.rs`.
 - `python/src/iap/risk/engine.py`, `java/src/main/java/com/iap/risk/`.
 - `tests/golden/expected_risk_*.json` and `expected_risk_edge_*`.
@@ -1338,12 +1346,12 @@ not that it works.
 
 On the v1.3.0 dataset the same gate failed (ridge −0.043) and the advanced
 models were never fitted. The sign of a number that small moved with the
-dataset; the conclusion — nothing here should be promoted — did not.
+dataset; the conclusion, nothing here should be promoted, did not.
 
 The same linear models score an IC of 0.96 against the *cost-adjusted*
 label. That number is an artefact: the cost-adjusted target contains the
 observable spread, and predicting the spread is easy. The gate once read
-that label and passed trivially. The lesson is in LEARN.md §7.2 — a model
+that label and passed trivially. The lesson is in LEARN.md §7.2: a model
 can ace its target and tell you nothing about alpha.
 
 ### 5.2 Meta-labelling
@@ -1358,15 +1366,15 @@ profitable after costs. The calibrated meta-model (AUC 0.670) puts every
 test probability below the threshold, so it takes zero of 4,100 trades.
 The report flags this `gate_degenerate: true` and does not present it as a
 good decision: a gate that never fires is no evidence either way. (Since
-v1.5.0 a missing meta-feature stays missing for the tree model —
-`impute_nan=False`, 275 of 131,880 values — where it used to be imputed to
+v1.5.0 a missing meta-feature stays missing for the tree model
+`impute_nan=False`, 275 of 131,880 values, where it used to be imputed to
 zero; `impute_nan=True` is the legacy rule. The AUC moved from 0.655 and
 the outcome did not.)
 
 ### 5.3 Drift monitoring and refit policies
 
 Models decay. The adaptive layer measures it with three monitors: PSI
-(population stability index — has the distribution of a feature or signal
+(population stability index: has the distribution of a feature or signal
 shifted?), a KS statistic (diagnostic only), and the rolling realised IC
 compared with the research baseline as a z-score. A refit can be
 triggered on a schedule or by drift (PSI above 0.25, or the IC z-score
@@ -1385,7 +1393,7 @@ defaults since v1.5.0:
   threshold 0.01): each reading adds its shortfall below the gate, weighted
   by the share of its window that is new, and the alpha retires on a
   breach once the sum reaches the threshold. The legacy rule
-  (`"consecutive"`) retired on the sixth breach in a row — and six
+  (`"consecutive"`) retired on the sixth breach in a row: and six
   readings of a two-hour window that advances fifteen minutes at a time
   are mostly the same rows.
 
@@ -1643,7 +1651,7 @@ has been used: seven real Nasdaq ITCH sessions and two 2026 holdout days
 
 - `docs/ARCHITECTURE.md` §11, `PLATFORM_CONVENTIONS.md` §13.7.
 - `python/tests/test_import_policy.py`, `docs/RESEARCH_VALIDITY.md` §3–§5.
-- `docs/EPICS.md` — E24 and E30.
+- `docs/EPICS.md`: E24 and E30.
 - `docs/DIAGRAMS.md` §19 (the layer as planned at v1.3.0), §23 (the
   governance chain) and §26 (the LLM agent loop).
 - `python/src/iap/llm/`, `docs/GOVERNANCE.md` §2b.
@@ -1678,7 +1686,7 @@ The rules (`PLATFORM_CONVENTIONS.md` §3):
 - **Integers on contracts.** Prices in ticks, quantities in units,
   timestamps in nanoseconds.
 - **Canonical JSON.** Sorted keys, compact separators, one pinned float
-  format — reproduced byte for byte in Python, Java, Rust and C++.
+  format: reproduced byte for byte in Python, Java, Rust and C++.
 
 What that buys:
 

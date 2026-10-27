@@ -1,5 +1,12 @@
 # ARCHITECTURE — how the platform is actually built
 
+> **Read this when** you need the v1.x engine detail: per-language responsibilities, contracts,
+> determinism, goldens and hot-path notes. For the v2.0 system start with
+> [ARCHITECTURE_v2.md](ARCHITECTURE_v2.md); for results and what is claimed, [REPORT.md](REPORT.md).
+> Java columns and boxes here are historical (tag `archive/java-v1.14.0`, removed in v2.0 stage 11,
+> not built). As of v2.0.0 (2026-10-26) no alpha is confirmed.
+
+
 This document describes the system as it exists in this repository: which
 responsibilities live in which language tree, how data flows, what the
 contracts and versioning rules are, how determinism and cross-language parity
@@ -8,8 +15,8 @@ design is [SPECIFICATION.md](../archive/docs/SPECIFICATION.md); the binding low-
 decisions are [../PLATFORM_CONVENTIONS.md](../PLATFORM_CONVENTIONS.md).
 Diagram sources live in [diagrams/](diagrams/) (identical to the embedded
 versions below). For a shorter, top-down explanation of how the quant, algo
-and AI sides work — written for a newcomer, with a command to run at the end
-of every section — start with [HOW_IT_WORKS.md](HOW_IT_WORKS.md). Sections
+and AI sides work, written for a newcomer, with a command to run at the end
+of every section, start with [HOW_IT_WORKS.md](HOW_IT_WORKS.md). Sections
 12–14 below were added with v1.3.0: the failure modes the design defends
 against, the concurrency model of the research store, and the distance
 between this repository and a production system. Section 15 was added with
@@ -49,12 +56,12 @@ release record is [release/v1.18.0_RELEASE_NOTES.md](../archive/docs/release/v1.
    review. Two components qualify this honestly: the hard-risk rule text is
    owned by Rust and the execution rule text by C++, and Python holds a
    reference-equivalent port of each proven by the same goldens
-   (`docs/API_REFERENCE.md`) — so the loop the MVP runs is the reference loop.
+   (`docs/API_REFERENCE.md`): so the loop the MVP runs is the reference loop.
 3. **Determinism everywhere it matters.** Same seed + config + inputs ⇒
    bit-identical outputs across runs (and, for integer paths, across
    languages). No wall clock, no unordered iteration, one pinned RNG.
-4. **Fail closed.** Unknown or degraded state — sequence gap, stale book,
-   invalid feature input, disconnected venue — produces no signal and no
+4. **Fail closed.** Unknown or degraded state, sequence gap, stale book,
+   invalid feature input, disconnected venue, produces no signal and no
    order, never a wrong one. §12 lists the failure modes one by one,
    including the four places where the v1.3.0 review found the risk engine
    failing open instead.
@@ -66,33 +73,33 @@ release record is [release/v1.18.0_RELEASE_NOTES.md](../archive/docs/release/v1.
 The spec's responsibility matrix, mapped to what actually lives in this
 repository:
 
-| subsystem | Python (`python/src/iap`) | C++ (`cpp/`) | Rust (`rust/`) | Java (the git tag `archive/java-v1.14.0`, frozen at v1.14.0, not built — historical column) |
+| subsystem | Python (`python/src/iap`) | C++ (`cpp/`) | Rust (`rust/`) | Java (the git tag `archive/java-v1.14.0`, frozen at v1.14.0, not built: historical column) |
 |---|---|---|---|---|
 | Events / codec (JSONL + IAP1) | `core` (reference) | `marketdata` | `marketdata` crate | `core`, `codec` |
-| Synthetic generator + normalize/QC | `marketdata` (sole owner) | — | — | — |
+| Synthetic generator + normalize/QC | `marketdata` (sole owner) | - | - | - |
 | Order book (L1/L2/MBO, consolidated) | `orderbook` (reference) | `orderbook` | `orderbook` crate | `orderbook` |
 | Deterministic replay | `replay` | `replay` | `replay` crate (+ demo bin) | `replay` (+ Demo) |
 | Feature engine (native 40 / registry 205) | `features` (all 205, reference; `features.native` selects the Rust backend since v1.11) | `features` | `features` crate (+ `rust/features_py`, the pyo3 wheel, outside the workspace) | `features` (frozen since v1.11) |
-| Labels (event-time, 11 horizons) | `labels` (sole owner) | — | — | — |
+| Labels (event-time, 11 horizons) | `labels` (sole owner) | - | - | - |
 | Alpha library / scoring | `alpha` (all 24, fitting) | `alpha` (6 golden, scoring) | `alpha` crate (6 golden, scoring) | `alpha` (6 golden, scoring) |
-| Validation framework, experiment ledger, ExperimentRunner | `validation`, `experiment`, `research` (sole owner) | — | — | — |
-| ML + meta-labeling | `models` (sole owner) | — | — | — |
-| Portfolio optimizer | `portfolio` (reference) | — | — | `portfolio` (production service) |
-| Hard risk engine | `risk` (reference-equivalent port, same goldens) | — | `risk` crate (**reference**: rule text + golden generator) | `risk` (orchestration port) |
-| Execution algos + event-driven simulator | `execution` (reference-equivalent port, same golden) | `execution` (**reference**: rule text + golden generator) | — | `execution` |
+| Validation framework, experiment ledger, ExperimentRunner | `validation`, `experiment`, `research` (sole owner) | - | - | - |
+| ML + meta-labeling | `models` (sole owner) | - | - | - |
+| Portfolio optimizer | `portfolio` (reference) | - | - | `portfolio` (production service) |
+| Hard risk engine | `risk` (reference-equivalent port, same goldens) | - | `risk` crate (**reference**: rule text + golden generator) | `risk` (orchestration port) |
+| Execution algos + event-driven simulator | `execution` (reference-equivalent port, same golden) | `execution` (**reference**: rule text + golden generator) | - | `execution` |
 | SOR / venue adapters | `execution.sor` (port) | `sor` | `venue` crate (protocol codec + sim venue) | `sor` |
-| Research backtester | `backtest` (reference) | — | — | `backtest` |
-| Adaptability (drift / refit / live lifecycle) | `adaptive` + `backtest.adaptive` (reference) | — | — | `adaptive` (live monitors) |
-| TCA | `tca` (reference + report) | — | — | `tca` (service) |
-| Contracts / canonical JSON / decision trace | `contracts`, `trace` (reference: 22 typed contracts, 18 Protocols, `canonical_json`, `TraceDigest`, `explain`, attribution) | `contracts` (`iap::contracts::{Value, DecisionTrace, TraceDigest}` — byte-identical canonical lines; `ExecutionReplay` emits one trace per parent order) | `contracts` crate (canonical JSON + SHA-256 + `DecisionTrace` + JSONL sink / digest + `explain`; `telemetry::trace` re-exports the sink with `trace_records_total`) | `contracts`, `trace` (`PaperTrading` emits `decision_traces.jsonl`) |
-| Alpha promotion lifecycle (7 states) | `lifecycle` (reference; wraps `adaptive.lifecycle`) | — (by design) | `lifecycle` crate (gate table, 17-edge machine, live rolling-IC rules, byte-identical `alpha_registry.json`) | `lifecycle` (+ `ConfigService.LIFECYCLE`) |
-| Data model / store | `store` (SQLite over `schemas/sql/iap_v2.sql`; importers for every research artefact) | — | — | — |
-| The traced end-to-end loop (MVP) | `mvp` (`python -m iap.mvp run / replay / verify / explain`) | — | — | `platform` (the paper vertical) |
-| Event bus / threading | — | — | `eventbus` crate (SPSC ring) | — |
-| Telemetry / metrics | `metrics` (the one deployed producer since v1.17, §8) | — | `telemetry` crate (sets the metric-name contract; format reference only) | `monitoring` + `api` (MetricsServer) |
-| Paper trading / platform loop | `paper` (forward paper trade §9.2; v1.18 order manager, feed guard, supervisor §22), `mvp` | — | — | `platform` (PaperTrading), `config`, `api` |
-| Research authorisation, holdout registry, ledger family (v1.18) | `agents.analysis_identity`, `agents.prereg_gate`, `research.holdout_registry`, `validation.ledger` (sole owner, §22) | — | — | — |
-| Monitoring policy, factor risk, portfolio limits, capacity (v1.18) | `monitoring`, `portfolio.factor_risk`, `risk.portfolio_limits`, `portfolio.enforced`, `portfolio.capacity` (sole owner, §22) | — | — | — |
+| Research backtester | `backtest` (reference) | - | - | `backtest` |
+| Adaptability (drift / refit / live lifecycle) | `adaptive` + `backtest.adaptive` (reference) | - | - | `adaptive` (live monitors) |
+| TCA | `tca` (reference + report) | - | - | `tca` (service) |
+| Contracts / canonical JSON / decision trace | `contracts`, `trace` (reference: 22 typed contracts, 18 Protocols, `canonical_json`, `TraceDigest`, `explain`, attribution) | `contracts` (`iap::contracts::{Value, DecisionTrace, TraceDigest}`: byte-identical canonical lines; `ExecutionReplay` emits one trace per parent order) | `contracts` crate (canonical JSON + SHA-256 + `DecisionTrace` + JSONL sink / digest + `explain`; `telemetry::trace` re-exports the sink with `trace_records_total`) | `contracts`, `trace` (`PaperTrading` emits `decision_traces.jsonl`) |
+| Alpha promotion lifecycle (7 states) | `lifecycle` (reference; wraps `adaptive.lifecycle`) | (by design) | `lifecycle` crate (gate table, 17-edge machine, live rolling-IC rules, byte-identical `alpha_registry.json`) | `lifecycle` (+ `ConfigService.LIFECYCLE`) |
+| Data model / store | `store` (SQLite over `schemas/sql/iap_v2.sql`; importers for every research artefact) | - | - | - |
+| The traced end-to-end loop (MVP) | `mvp` (`python -m iap.mvp run / replay / verify / explain`) | - | - | `platform` (the paper vertical) |
+| Event bus / threading | - | - | `eventbus` crate (SPSC ring) | - |
+| Telemetry / metrics | `metrics` (the one deployed producer since v1.17, §8) | - | `telemetry` crate (sets the metric-name contract; format reference only) | `monitoring` + `api` (MetricsServer) |
+| Paper trading / platform loop | `paper` (forward paper trade §9.2; v1.18 order manager, feed guard, supervisor §22), `mvp` | - | - | `platform` (PaperTrading), `config`, `api` |
+| Research authorisation, holdout registry, ledger family (v1.18) | `agents.analysis_identity`, `agents.prereg_gate`, `research.holdout_registry`, `validation.ledger` (sole owner, §22) | - | - | - |
+| Monitoring policy, factor risk, portfolio limits, capacity (v1.18) | `monitoring`, `portfolio.factor_risk`, `risk.portfolio_limits`, `portfolio.enforced`, `portfolio.capacity` (sole owner, §22) | - | - | - |
 
 Notes on the realized shape (deviations from the spec's idealized matrix are
 called out in §10):
@@ -101,15 +108,15 @@ called out in §10):
   ML, reports) and the reference for everything portable. Reference means:
   validated first (against brute-force implementations), then frozen into
   golden files that the other languages must match.
-- **Rust owns the hard risk engine** — the safety-critical component — and
+- **Rust owns the hard risk engine**, the safety-critical component, and
   the golden risk decision vector is generated from it (every rule
   unit-tested first). Java ports it for platform orchestration; Python
   ports it as `iap.risk` (`docs/API_REFERENCE.md` §1: exact decisions,
-  byte-identical audit JSONL and snapshot, restore continuation — the same
+  byte-identical audit JSONL and snapshot, restore continuation, the same
   files the Java port is proven by); C++ does not implement risk.
-- **C++ owns execution** — the fill-model reference
+- **C++ owns execution**, the fill-model reference
   (`cpp/include/iap/execution/execution.hpp` is the normative text for the
-  queue-position and latency rules) — plus the fastest codec/book/feature/
+  queue-position and latency rules), plus the fastest codec/book/feature/
   alpha hot path, the benchmark suite, and the canonical-JSON / decision-trace
   contract for that hot path. Java and Python (`iap.execution`,
   `docs/API_REFERENCE.md` §2: `expected_replay_fills.json` bit-identical) port it.
@@ -143,16 +150,16 @@ flowchart TD
     V2 --> RAW
     RAW --> NORM["Normalization + sequence validation<br/>python iap.marketdata.normalize<br/>gaps / dups / late / resets / ts-regressions / invalid counted -> qc_report.json"]
     NORM --> CANON["Canonical event stream<br/>JSONL + IAP1 v2 binary (72-byte LE records + CRC-32 trailer)<br/>+ Parquet research dataset — schemas x-version 1"]
-    CANON --> BOOK["Order-book reconstruction<br/>Python ref / C++ / Rust / Java<br/>MBO FIFO, status-gated matching, synthetic ids, dup-drop,<br/>gap->stale, reorder window, sequence resets, SNAPSHOT recovery"]
-    BOOK --> FEAT["Feature engine<br/>205-feature registry (hash = feature_version)<br/>native 40 in C++/Rust/Java — validity bitset, NaN never valid"]
+    CANON --> BOOK["Order-book reconstruction<br/>Python ref / C++ / Rust (Java archived)<br/>MBO FIFO, status-gated matching, synthetic ids, dup-drop,<br/>gap->stale, reorder window, sequence resets, SNAPSHOT recovery"]
+    BOOK --> FEAT["Feature engine<br/>205-feature registry (hash = feature_version)<br/>native 40 in C++/Rust — validity bitset, NaN never valid"]
     FEAT --> LBL["Event-time labels (Python-owned)<br/>11 horizons, mid-to-mid + cost-adjusted<br/>at-or-before rule, no lookahead"]
     FEAT --> ALPHA["Alpha ensemble<br/>24 flagship alphas (EQ01-FX12)<br/>linear_z_v1 scoring; 6 golden alphas ported"]
-    ALPHA --> PORT["Portfolio construction<br/>PGD + prox, 7 constraint families, EWMA cov<br/>Python reference, Java production service"]
-    PORT --> RISK["Hard risk engine — FAIL-CLOSED<br/>Rust reference, Java orchestration, Python reference port<br/>limits, throttles, gap/stale gates, kill switches"]
-    RISK --> EXEC["Execution algos + event-driven simulator<br/>VWAP / TWAP / POV / IS; deterministic queue model<br/>C++ reference, Java + Python ports"]
+    ALPHA --> PORT["Portfolio construction<br/>PGD + prox, 7 constraint families, EWMA cov<br/>Python reference (Java service archived v1.14)"]
+    PORT --> RISK["Hard risk engine — FAIL-CLOSED<br/>Rust reference, Python reference port<br/>limits, throttles, gap/stale gates, kill switches"]
+    RISK --> EXEC["Execution algos + event-driven simulator<br/>VWAP / TWAP / POV / IS; deterministic queue model<br/>C++ reference, Python port"]
     EXEC --> SOR["SOR / venue adapters<br/>cpp/sor, rust venue protocol + sim"]
     SOR --> FILLS["Executions (fills, fees, rebates, impact)"]
-    FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
+    FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
     TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (6,826 looks / 640 configs as of the v1.18 REL-02 migration, research/experiments.json)<br/>REPORT.md, ML_REPORT.md, model manifests"]
@@ -176,7 +183,7 @@ reports, research documents and golden files.
 
 **The loop closes twice.** Research → trading: an alpha reaches the trading
 path only through the promotion lifecycle (`iap.lifecycle`,
-`docs/LIFECYCLE.md`) — RESEARCH → CANDIDATE needs a ledger entry and a clean
+`docs/LIFECYCLE.md`): RESEARCH → CANDIDATE needs a ledger entry and a clean
 leakage test, CANDIDATE → VALIDATING the nine research gates (IC, the gate
 t against the multiple-testing threshold the evidence carries, fold
 consistency, hypothesis sign, net P&L after costs, capacity, stability),
@@ -192,13 +199,13 @@ reproduce (`docs/RUNBOOKS.md`).
 
 ## 4. Contracts and schema versioning
 
-Seventeen contracts are pinned as JSON Schema in `schemas/<domain>/` — the
+Seventeen contracts are pinned as JSON Schema in `schemas/<domain>/`, the
 seven canonical ones of spec §6 (`market_event`, `book_update`,
 `feature_vector`, `alpha_signal`, `order_request`, `execution_report`,
 `risk_event`) and the ten loop contracts of 2026-09-19 (`portfolio_target`,
 `risk_decision`, `parent_order`, `child_order`, `venue_decision`,
 `tca_result`, `experiment_spec`, `experiment_result`,
-`lifecycle_transition`, `decision_trace`) — each carrying `"x-version": 1`
+`lifecycle_transition`, `decision_trace`), each carrying `"x-version": 1`
 (`schemas/README.md` is the index). On the Python side every schema is one
 frozen, validated dataclass in `iap.contracts.types` (22 types including
 the nested records), every loop interface is a `runtime_checkable` Protocol
@@ -224,8 +231,8 @@ offline against the schema set (`docs/API_REFERENCE.md`). The rules
   cross-language JSON document (x-version 2) pinned by
   `expected_checkpoint_eq_1000.json`. Contract documents (traces, lifecycle
   transitions, experiment specs/results, the registry) are **canonical
-  JSON** — sorted keys, compact separators, ASCII, Python float repr,
-  NaN rejected — reproduced byte for byte by Java, Rust and C++
+  JSON**, sorted keys, compact separators, ASCII, Python float repr,
+  NaN rejected, reproduced byte for byte by Java, Rust and C++
   (`PLATFORM_CONVENTIONS.md` §13.1, `expected_canonical_json.json`).
 - **Version identity propagates**: the feature registry's canonical-JSON
   hash is `FeatureVector.feature_version` and appears in feature output,
@@ -253,7 +260,7 @@ aspiration:
 | mechanism | rule |
 |---|---|
 | One RNG | SplitMix64 only, implemented identically 4× and known-answer-tested (`tests/golden/splitmix64.json`); explicit seeds from configs |
-| No wall clock | on any deterministic path — replay, features, fills; wall time appears only in throughput printouts and report headers |
+| No wall clock | on any deterministic path: replay, features, fills; wall time appears only in throughput printouts and report headers |
 | No unordered iteration | sorted keys everywhere state is serialized (books, consolidated views, feature emission, venue merging in ascending venue_id) |
 | Integer arithmetic | ticks/qty/window sums stay integer end-to-end; float creep is confined to genuinely real-valued inputs |
 | Pinned algorithms | not just results: PGD projection order and passes, EWMA initialization, queue-model tie-breaks, latency draw order, fold boundaries are all specified |
@@ -296,7 +303,7 @@ flowchart LR
 
 Reference ownership is per-domain: Python generates most goldens (after
 brute-force cross-validation), but the **fills golden comes from C++** (the
-execution reference) and the **risk golden from Rust** (the risk reference) —
+execution reference) and the **risk golden from Rust** (the risk reference)
 each domain's owning language pins the truth, and everyone else matches it,
 Python included since 2026-09-19 (`iap.execution`, `iap.risk`). One fixture
 runs the other way: the risk **edge** golden of v1.3.0
@@ -315,12 +322,12 @@ runs every suite with the canonical commands and prints the parity table; a
 main CI run 40015853764 (2026-10-23, commit 23b69fb2, the v1.18.0 tag commit)
 passes 4062/333/376 tests (217/74/75 golden) across python/cpp/rust (Java
 archived in v1.15, the git tag `archive/java-v1.14.0`), plus the repo-level `integration` (35)
-and `replay` (6) rows — the same counts the README parity table records.
+and `replay` (6) rows, the same counts the README parity table records.
 The python figure is the Python 3.11 `python` job plus the `python-slow` job:
 3,666 passed (21 skipped, 1 xfailed) and 396 passed (3 skipped), 4,062 in all;
 the 3.12 job passes 3,654 with 33 skipped; cpp is the `ctest` count; rust is the static
 `#[test]` count (75 golden over 12 targets), checked against the tree by
-`tests/harness/check_headline_numbers.py` — the CI rust job sums more passes
+`tests/harness/check_headline_numbers.py`, the CI rust job sums more passes
 than that static count, so it is not quoted. History: v1.17.1 (CI run
 39043729536) read 3,208 python tests with the same cpp and rust counts; rust was 365/71 at the v1.14.0 tag itself (CI
 run 38142218467), 366/72 after the v1.15 fee commits and 376/75 after the
@@ -333,14 +340,14 @@ All measured on the stated 2-CPU Xeon container (methodology caveats in
 
 **C++** (`cpp/`): fixed-layout structs mirroring the 72-byte IAP1 record
 (decode 184.1 ns/event, of which the great majority is the IAP1 v2 CRC-32
-integrity check over the record body — a byte-serial table CRC at
+integrity check over the record body, a byte-serial table CRC at
 ~5 cycles/byte; the pre-round-3 unchecked decode was 3.5 ns/event); order
-book on pooled nodes with free lists and intrusive per-level FIFO lists —
+book on pooled nodes with free lists and intrusive per-level FIFO lists
 **no allocation in book/feature hot loops after warmup**, enforced by tests
 (conventions §8); book update 26.4 ns, replay 27.2M events/s, 48-feature
 engine 514.1 ns/event, alpha scoring 33.6 ns/row (the 2026-09-19
 regeneration of `benchmarks/results_cpp.md`; the previous table read
-174.4 / 25.7 / 28.1M / 530.4 / 38.5 — within the stated few-percent
+174.4 / 25.7 / 28.1M / 530.4 / 38.5, within the stated few-percent
 cross-run variance, and the docs follow the table, not the other way round).
 `-Wall -Wextra -Werror`, C++17, Release `-O3`.
 
@@ -353,7 +360,7 @@ platform risk engine (Rust/Java/Python; the C++ decision stage is a
 bench-local stand-in). `cpp/bench/bench_tick_to_trade` measures it per
 event with percentiles; on a shared GitHub-hosted runner the committed run
 reads p50 ≈ 1.3 µs and p99 ≈ 2.6 µs end to end on the golden vector, with the
-feature engine the largest stage — figures for a shared VM, not for a
+feature engine the largest stage: figures for a shared VM, not for a
 colocated, pinned host (`benchmarks/RESULTS.md`).
 
 **Decision trace (`cpp/include/iap/contracts/`)**: the C++ hot path (book →
@@ -366,24 +373,24 @@ i64/u64 integers, code-point key order = bytewise UTF-8 order),
 `TraceDigest` is sha256 over `line + "\n"` per trace, and
 `ExecutionReplay::set_trace_sink` emits one trace per parent order (parent,
 children, the SOR's candidate table per child, one `ExecutionReport` per
-fill) AFTER the replay — never inside the event loop. Cost, measured: 31.7 µs
+fill) AFTER the replay: never inside the event loop. Cost, measured: 31.7 µs
 per 5.6 KB trace to serialise (+ ~30 µs to hash), i.e. ~37 ns/event
 amortised on the 2,000-event golden replay (`benchmarks/results_cpp.md`,
 trace-path table).
 
 **Rust** (`rust/`): eleven-crate workspace; same pooling/intrusive-structure
-discipline expressed through ownership — the entire workspace confines
+discipline expressed through ownership, the entire workspace confines
 `unsafe` to the five sites of one SPSC ring-buffer file (`eventbus`), with
 everything else in safe Rust at zero warnings; `Result<_, IapError>`
 end-to-end, no panics on input. Demo-scale replay ≈ 6.9M events/s. Dev/test
 profiles build at opt-level 2 to keep `cargo test` inside the < 120 s budget.
 The `contracts` crate writes canonical JSON with its own writer over
 `serde_json::Value` and the workspace enables serde_json's `float_roundtrip`
-feature (correctly rounded parsing) — without it the registry byte parity
+feature (correctly rounded parsing), without it the registry byte parity
 broke by 1 ulp on 17-digit decimals.
 
 **Java** (the git tag `archive/java-v1.14.0`, archived in v1.15 and frozen at v1.14.0; the
-figures below are historical): Java 21, plain `javac` (no Maven — Maven Central is
+figures below are historical): Java 21, plain `javac` (no Maven: Maven Central is
 unreachable in the build environment; `docs/BUILD_NOTES.md` is the normative
 pom-equivalent, JUnit4 vendored from `/usr/share/java`). Hot paths are
 allocation-conscious by construction: primitive `long[]`/`int[]` structures,
@@ -392,12 +399,12 @@ are exported so pauses are observable rather than assumed away. Demo-scale
 replay ≈ 3.5M events/s.
 
 **Python** (`python/`): correctness-first reference; vectorized
-(NumPy/pandas) where it matters — the 205-feature × 309k-event pipeline runs
+(NumPy/pandas) where it matters, the 205-feature × 309k-event pipeline runs
 in about a minute, the full 24-alpha promotion pipeline in ~18 s, the MVP
 session (15,805 events through simulator, risk, features, three alphas,
 optimizer, TCA and traces) in under a minute. Speed is a convenience here, not a
 contract; the contract is that Python's semantics are the ones everyone
-else must reproduce — and, for risk and execution, that Python reproduces
+else must reproduce, and, for risk and execution, that Python reproduces
 the Rust and C++ goldens statement for statement.
 
 **Python calling Rust** (v1.11.0, plan item E2): the Rust feature engine is
@@ -412,8 +419,8 @@ second than the Python engine. Details: docs/API_REFERENCE.md §7.1.
 
 The honest engineering conclusion (paper 6): at this platform's feed rates
 every port is overprovisioned by orders of magnitude; the languages were
-chosen for correctness leverage and engineering cost, and the golden suite —
-not the benchmark table — is what keeps them interchangeable.
+chosen for correctness leverage and engineering cost, and the golden suite
+not the benchmark table, is what keeps them interchangeable.
 
 ## 8. Observability wiring
 
@@ -422,7 +429,7 @@ contract set by the Rust telemetry crate** and binding on every producer
 (`deployment/grafana/README.md`): snake_case, counters end `_total`, latency
 histograms end `_ns` with fixed log2 buckets, gauges are bare nouns.
 
-- **Producer**: exactly one — since v1.17 (WS-F item F9, DECISION_N7 closed)
+- **Producer**: exactly one, since v1.17 (WS-F item F9, DECISION_N7 closed)
   the Python process `python -m iap.metrics serve` (`iap.metrics`: a stdlib
   registry rendering the same exposition the retired Java
   `com.iap.monitoring` did, a file-backed exporter and an HTTP server on
@@ -435,23 +442,23 @@ histograms end `_ns` with fixed log2 buckets, gauges are bare nouns.
   lists in `iap/metrics/exporter.py` being the contract
   `check_deployment.py` reads. There is no admin API. `rust/telemetry`
   remains the reference for the exposition FORMAT and is unit-tested there,
-  but no deployed Rust binary writes metrics anywhere Prometheus can read —
+  but no deployed Rust binary writes metrics anywhere Prometheus can read
   so round 3 removed the `rust-telemetry` scrape job, the exporter sidecar and
   every rule and panel built on `venue_*` rather than leave a permanently-down
   target and an always-firing `TargetDown` (§12.7 "no aspirational targets").
-- **Scrape**: `deployment/prometheus/prometheus.yml` — jobs `platform-metrics`
+- **Scrape**: `deployment/prometheus/prometheus.yml`, jobs `platform-metrics`
   (:8080) and Prometheus's self-scrape, plus recording rules and alerts
   (`recording.yml`, `alerts.yml`: SequenceGapDetected, FeedWallClockStall,
   SignalRateCollapse, FillRateDrop, PreTradeRejectRatioHigh,
   LossLimitUtilizationHigh, KillSwitchEngaged, GrossNotionalUtilizationHigh,
   PlatformSessionFailed, SessionStoppedNotResumed, TargetDown and the
   always-firing `Watchdog` heartbeat; `slo.yml`: the order-path burn-rate
-  pair. The Java-only alerts — BookStale, StaleFeed, LiveVsBacktestDrift,
+  pair. The Java-only alerts, BookStale, StaleFeed, LiveVsBacktestDrift,
   AlphaLifecycleRetired, RoutedVenueMismatch, KillPendingNotRecorded,
   ResumeReleasedOpenOrders, GcPauseHigh, SessionRestartsClimbing,
-  AdminAuthRateLimited, AdminAuditSuppressed, the event-path SLO — were
+  AdminAuthRateLimited, AdminAuditSuppressed, the event-path SLO, were
   retired with their metrics in v1.17 and are listed in the header of
-  `alerts.yml`) — each with a runbook anchor in
+  `alerts.yml`), each with a runbook anchor in
   `docs/RUNBOOKS.md`). Since v1.3.0 Prometheus delivers to Alertmanager
   (`deployment/alertmanager/`), which routes by severity (page vs ticket,
   with inhibition) to webhooks whose URLs are operator-supplied secrets;
@@ -461,11 +468,11 @@ histograms end `_ns` with fixed log2 buckets, gauges are bare nouns.
   EVENT-time gap so a historical replay does not page; limit-utilization rules
   divide by the exported `risk_limit{limit=...}` gauges, never a copied
   constant. `eventbus_queue_depth` and `md_out_of_order_total` remain
-  PLACEHOLDER **names** in `deployment/grafana/README.md` — with no rule and
+  PLACEHOLDER **names** in `deployment/grafana/README.md`, with no rule and
   no panel until a producer exists. Everything is validated in CI by
   `promtool check rules/config`, `promtool test rules` and
   `tests/harness/check_deployment.py`.
-- **Dashboards**: two provisioned Grafana dashboards — *Market Data &
+- **Dashboards**: two provisioned Grafana dashboards: *Market Data &
   Latency* (feed status, market-data events/sec, session state, sequence-gap
   rate, stream QC gaps/duplicates, order-path latency decision-to-wire
   p50/p99/p999) and *Trading & Risk* (kill switch, daily P&L and drawdown,
@@ -478,10 +485,10 @@ histograms end `_ns` with fixed log2 buckets, gauges are bare nouns.
 - **State and the shape of the deployment** (this bullet describes the Java
   `PaperTrading` vertical, archived; the deployed Python `mvp-session` is a
   finite run that records only the exit marker `session_exit.json` in
-  `$IAP_STATE_DIR` — it has no `--resume`; the v1.18 paper-path durability
+  `$IAP_STATE_DIR`, it has no `--resume`; the v1.18 paper-path durability
   is the order manager's write-ahead journal, §22): the paper-trading
   vertical was a
-  SINGLETON with durable state (`PLATFORM_CONVENTIONS.md` §12.3) — risk
+  SINGLETON with durable state (`PLATFORM_CONVENTIONS.md` §12.3), risk
   snapshot, session accounting and the risk/config/admin audit JSONL are
   checkpointed to `$IAP_STATE_DIR` every 1,024 events, at session end and on
   a stop request, and `--resume` restores positions, realized P&L and every
@@ -500,7 +507,7 @@ histograms end `_ns` with fixed log2 buckets, gauges are bare nouns.
 - **The decision trace joins the metrics and the audit** (`docs/DECISION_TRACE.md`).
   Metrics say *how many* and *how fast*; `risk_audit.jsonl` says *what the
   risk engine decided and why*; `decision_traces.jsonl` says *why we traded*
-  — one record per pre-trade decision in the Java paper loop, archived (the
+  one record per pre-trade decision in the Java paper loop, archived (the
   Python MVP writes the same record to `traces.jsonl`)
   (`com.iap.platform.PaperTraces`: signal, portfolio target, risk decision,
   parent, child, every venue scored, fills, TCA over the paper timeline,
@@ -530,7 +537,7 @@ in [/API_ADAPTIVE.md](API_REFERENCE.md):
   forcing positions flat while shadow scoring continues.
 - **Serialized expectations**: research baselines (decile edges, expected
   fractions, IC statistics) are written to `research/baselines/*.json` and
-  consumed unchanged by the live side — the studied numbers and the
+  consumed unchanged by the live side: the studied numbers and the
   monitored numbers are the same files.
 - **Live port** (`com.iap.adaptive`, Java, archived in v1.15; the three
   gauges: since v1.17 `alpha_rolling_ic` is exported by the Python producer
@@ -540,7 +547,7 @@ in [/API_ADAPTIVE.md](API_REFERENCE.md):
   take over the drift and decay role): BaselineLoader/Psi/DriftMonitor/
   RollingIc/LifecycleGauge feed the three per-alpha gauges named above
   (`alpha_live_vs_backtest_drift`, `alpha_rolling_ic`,
-  `alpha_lifecycle_state`) from inside `PaperTrading` — observational
+  `alpha_lifecycle_state`) from inside `PaperTrading`: observational
   only, never feeding back into an in-session trading decision, so
   determinism is untouched.
 - **Parity**: `tests/golden/expected_adaptive.json` pins PSI/KS at 1e-10,
@@ -548,7 +555,7 @@ in [/API_ADAPTIVE.md](API_REFERENCE.md):
   states (generated by `python/tools/make_golden_adaptive.py`,
   brute-force validated first).
 - **Evidence**: the policy-comparison study lives in
-  `research/adaptive_reports/ADAPTIVE_REPORT.md` — reported honestly:
+  `research/adaptive_reports/ADAPTIVE_REPORT.md`: reported honestly:
   on two synthetic sessions no refit policy demonstrably beats static;
   what is established is that the machinery is deterministic, leak-free
   and behaves exactly as pinned, with every look counted in
@@ -559,7 +566,7 @@ in [/API_ADAPTIVE.md](API_REFERENCE.md):
 
 `deployment/docker/docker-compose.yml` composes the full stack:
 `data-generator` (Python image; runs the seeded pipeline into a shared
-volume — data is never baked into images) → `cpp-replay` + `rust-replay`,
+volume, data is never baked into images) → `cpp-replay` + `rust-replay`,
 `mvp-session` (Python image: the MVP loop over the golden instrument, finite,
 wrapped by `python -m iap.metrics run-session` so the session marker survives
 the process) and `platform-metrics` (Python image: `python -m iap.metrics
@@ -577,7 +584,7 @@ HTTPS on non-private addresses; the operator → admin-port rule went with the
 Java admin API in v1.17); the platform has its own state PVC and a read-only
 root filesystem; compose publishes the platform, Prometheus and Alertmanager
 ports on the host's loopback only. The platform's listener itself binds
-`127.0.0.1` unless `IAP_BIND_ADDR` says otherwise — the containers set it to
+`127.0.0.1` unless `IAP_BIND_ADDR` says otherwise, the containers set it to
 `0.0.0.0` and rely on those controls. DIAGRAMS.md §18 draws the topology;
 §17 the CI and release pipeline that would build the images.
 
@@ -605,7 +612,7 @@ Three properties of the shape matter more than the box diagram
   minutes and made every `offset 1h` baseline meaningless.
 - **The trading vertical is a singleton with durable state.** `replicas: 1`,
   no rollout overlap, one writer on the ReadWriteOnce PVC, `$IAP_STATE_DIR` on
-  that PVC — so an eviction or a node drain resumed the Java platform with its
+  that PVC: so an eviction or a node drain resumed the Java platform with its
   positions, realized P&L and any latched kill switch intact. The singleton
   and PVC layout is unchanged; the resume behaviour went with the Java
   platform (§8), and the Python MVP session has no resume.
@@ -654,8 +661,8 @@ sequenceDiagram
     PT->>Op: summary line + out/paper_session_report.json<br/>(events, orders, fills, pnl, risk allowed/rejected)
 ```
 
-The same contracts drive replay, paper and (hypothetically) production —
-spec §1's core requirement — which is why the paper session over the golden
+The same contracts drive replay, paper and (hypothetically) production
+spec §1's core requirement, which is why the paper session over the golden
 vector is also a smoke test (`PaperTradingSmokeTest`) and why its honest
 summary line (`events=2000 orders=420 fills=421 pnl=-100.801250
 risk[allowed=420 rejected=5]`, re-derived 2026-09-06 after the round-3
@@ -766,7 +773,7 @@ alerts document. The package is inside the blocking mypy scope. Signatures:
 
 - **Rust workspace membership** differs from the spec's sketch: the
   realized workspace is `marketdata, orderbook, replay, eventbus, telemetry,
-  features, alpha, risk, venue, contracts, lifecycle` — `features`, `alpha`,
+  features, alpha, risk, venue, contracts, lifecycle`: `features`, `alpha`,
   `contracts` and `lifecycle` crates were added (golden parity of the native
   40, the golden alphas, the canonical-JSON / trace contract and the
   promotion machine), and there is **no `execution` crate**: execution
@@ -777,7 +784,7 @@ alerts document. The package is inside the blocking mypy scope. Signatures:
 - **C++ has no risk module and no lifecycle port**: hard risk is Rust
   (reference) + Java (orchestration; archived, kept only as the byte-identical
   mirror) + Python (`iap.risk`, the
-  reference-equivalent port the MVP runs — added 2026-09-19, which fills the
+  reference-equivalent port the MVP runs: added 2026-09-19, which fills the
   spec matrix's "Research" cell for risk); the lifecycle is a research /
   platform concern implemented in Python, Rust and (archived) Java, and C++
   carries the trace contract instead.
@@ -787,7 +794,7 @@ alerts document. The package is inside the blocking mypy scope. Signatures:
   driven by `build.sh`/`test.sh` with JUnit4 vendored locally.
   `docs/BUILD_NOTES.md` is the normative pom-equivalent dependency list.
 - **FX05's golden cases** deviate from the two-vector pattern (the golden
-  vectors carry one FX pair; FX05 is inherently cross-pair) — its cases pin
+  vectors carry one FX pair; FX05 is inherently cross-pair): its cases pin
   bundled-frame rows and embed all inputs; documented in docs/API_REFERENCE.md §6.
 - **The pipeline's own data is synthetic; the real data is free and public.**
   Spec Phase 1's licensed-data acquisition is out of scope for this build; the
@@ -808,9 +815,9 @@ of it was built (`PLATFORM_CONVENTIONS.md` §13.7) so that nothing built
 later can cross it.
 
 **State of the repository, said first (v1.18.0): four optional LLM-backed
-agents exist — the research agent `iap.llm` (v1.11) and, since v1.17, the
+agents exist, the research agent `iap.llm` (v1.11) and, since v1.17, the
 research assistant, the morning ops agent and the docs-sync agent in
-`iap.agents` (roster, models and caps: [AGENTS.md](AGENTS.md)) — and each
+`iap.agents` (roster, models and caps: [AGENTS.md](AGENTS.md)), and each
 runs only when an operator invokes it with an API key; nothing in the default
 build, the tests or CI calls a model, and nothing on the trading path can.** The governance layer it works
 through was built first:
@@ -826,8 +833,8 @@ built (the status column says which).
 ### 11.1 The boundary (pinned)
 
 - **LLM reasoning only, never on the critical path.** No module on the
-  trading path — `iap.{risk,execution,portfolio,orderbook,features,core}`,
-  `rust/risk`, `cpp/execution`, `com.iap.{risk,execution,portfolio}` —
+  trading path, `iap.{risk,execution,portfolio,orderbook,features,core}`,
+  `rust/risk`, `cpp/execution`, `com.iap.{risk,execution,portfolio}`
   imports a network or LLM client, and `RiskEngineLike.evaluate` is a pure
   function of the order and the engine's own state (no wall clock, no I/O,
   no model). The risk engine never depends on a model: its inputs are
@@ -881,16 +888,16 @@ core). Plan issue AG03 is closed on that basis, with the gaps recorded in it.
 | hypothesis pre-registration | E30 AL02 | the hypothesis is committed before any data is read | built v1.7.0 (CLI gate); look debit and code fingerprint v1.10.0 |
 | reserve sessions on a hidden seed | E30 AL03 | a final evaluation the agents cannot have tuned to | built v1.7.0; cap keyed on (alpha, horizon, code hash) v1.10.0 |
 | authenticated HUMAN approvals | E30 AL04 | a lifecycle edge's `actor = HUMAN` was asserted by the caller, not verified | built v1.7.0 for the retire and reset edges |
-| agent evaluations | E30 AL06 | planted leak, seeded bug, shuffled-label null, citation resolution — each must fail when its control is removed | built v1.7.0 (`iap.agents.evals`) |
+| agent evaluations | E30 AL06 | planted leak, seeded bug, shuffled-label null, citation resolution: each must fail when its control is removed | built v1.7.0 (`iap.agents.evals`) |
 | untrusted free-text handling | E30 AL07 | ledger text, report text and tool output are data, not instructions | built v1.7.0 (`iap.agents.untrusted`) |
-| the research agent itself | AI1-AI4 (plan) | — | built v1.11.0: AI1 the agent (`iap.llm`), AI2 its behaviour evals, AI3 the model registry (`iap.mlops`); AI4 (deep order-book baselines) deferred |
+| the research agent itself | AI1-AI4 (plan) | - | built v1.11.0: AI1 the agent (`iap.llm`), AI2 its behaviour evals, AI3 the model registry (`iap.mlops`); AI4 (deep order-book baselines) deferred |
 
 The ordering is the design. An agent given the goal "get an alpha promoted"
 will find the cheapest path to a pass faster than a person: cheaper costs, a
 chosen holdout, uncounted looks. v1.3.0 closed those three in the tooling
 (LEARN.md §24) and measured what the validation chain can detect at all
 (the planted-signal power study, LEARN.md §23). It did not build the agents
-(v1.7.0 built the controls; v1.11.0 built the agent on top of them), and with a ledger that holds 6,826 looks over 640 distinct configurations as of the v1.18 REL-02 migration (`research/experiments.json`: 384 configurations holding 5,694 of the looks on the two synthetic datasets — 1,068 on the v1.3.0 dataset, 4,626 on the regenerated one across the v1.4.0, v1.5.0 and v1.14 method revisions — and 256 configurations holding 1,132 of the looks on real data; §22), more searching is not what the platform lacks (HOW_IT_WORKS.md §6.4
+(v1.7.0 built the controls; v1.11.0 built the agent on top of them), and with a ledger that holds 6,826 looks over 640 distinct configurations as of the v1.18 REL-02 migration (`research/experiments.json`: 384 configurations holding 5,694 of the looks on the two synthetic datasets, 1,068 on the v1.3.0 dataset, 4,626 on the regenerated one across the v1.4.0, v1.5.0 and v1.14 method revisions, and 256 configurations holding 1,132 of the looks on real data; §22), more searching is not what the platform lacks (HOW_IT_WORKS.md §6.4
 lists what would be theatre on this data, and why). DIAGRAMS.md §19 draws
 the layer as planned at v1.3.0, and §26 the agent loop as built in v1.11.
 
@@ -898,14 +905,14 @@ the layer as planned at v1.3.0, and §26 the agent loop as built in v1.11.
 
 A fail-closed design is only as good as the list of failures it was
 designed against. This is that list: what can go wrong, what the platform
-does, and — where it applies — what it did before v1.3.0.
+does, and, where it applies, what it did before v1.3.0.
 
 ### 12.1 Market data
 
 | failure | behaviour | where pinned |
 |---|---|---|
 | sequence gap | the venue book is marked stale, contributes nothing to the merged book, and only SNAPSHOT / STATUS / TRADE / HEARTBEAT are applied until a complete snapshot burst recovers it; features go invalid; risk rejects `SEQUENCE_GAP` | API_CORE §4, conventions §11.1 |
-| duplicate or unknown-order event | dropped and counted; every consumer ignores an event the book did not apply — since v1.3.0 that includes the simulator's queue tracking | API_CORE §4, conventions §14.1 |
+| duplicate or unknown-order event | dropped and counted; every consumer ignores an event the book did not apply: since v1.3.0 that includes the simulator's queue tracking | API_CORE §4, conventions §14.1 |
 | stale reference price | `STALE_PRICE` once the mark is older than `stale_feed_timeout_ns`, measured on market-data event time, never a decision clock | conventions §11.1 |
 | **reference price stamped in the future** | `STALE_PRICE` when stamped beyond the engine's event clock by more than the timeout. *Before: a negative age never exceeded the timeout, so the mark was trusted and genuine updates behind it were dropped as regressions* | conventions §11.1, edge golden |
 | one venue recovers while another is still stale | the risk gap gate reopens only when no venue of the instrument is stale. *Before: the first recovery reopened it* | conventions §11.4 |
@@ -918,7 +925,7 @@ does, and — where it applies — what it did before v1.3.0.
 | NaN or infinite reference data | Java and Python refuse to construct it; Rust lands the engine on `CONFIG_MISSING`. *Before: Java accepted `+Infinity`* | conventions §11.1 |
 | NaN in a limit comparison | every float limit is written so that NaN fails it. *Before: `NaN > limit` was false and the order passed* | conventions §11.1 |
 | i64 overflow in a position projection | `MALFORMED_ORDER`. *Before: Python raised, the Rust test build panicked, the Rust release build and Java wrapped* | conventions §11.1, edge golden |
-| i64 overflow booking a fill | nothing is booked and the GLOBAL kill latches — an engine that cannot book a fill no longer knows its exposure | conventions §11.1, edge golden |
+| i64 overflow booking a fill | nothing is booked and the GLOBAL kill latches: an engine that cannot book a fill no longer knows its exposure | conventions §11.1, edge golden |
 | i64 overflow in a timestamp difference | `MALFORMED_ORDER` | conventions §11.1, edge golden |
 | a position or open order that cannot be valued | the gross/net check rejects; daily P&L is undeterminable (`None`), not zero | conventions §14.3 |
 | a missing conversion rate | `FX_RATE_MISSING`; never a guessed 1.0 | conventions §11.1, §11.6 |
@@ -963,7 +970,7 @@ the goldens.
 |---|---|---|
 | look-ahead in scoring or in a feature | label guard, shift-by-one and truncation probes on every validation; the recompute probe (in the standard suite since v1.5.0, when the raw events are available) rebuilds features from truncated raw events, and a report without events says `recompute_ok: null` and is not gate-eligible | `iap.validation.leakage` |
 | a leaking fold | purge at the label horizon plus a 60 s embargo; the walk-forward window ends where the declared holdout begins, asserted on every run | conventions §14.2 |
-| a metric that cannot be computed | a `ResearchError`, or `null` in a report — never a number | `iap.research.runner`, RESEARCH_VALIDITY §1 |
+| a metric that cannot be computed | a `ResearchError`, or `null` in a report: never a number | `iap.research.runner`, RESEARCH_VALIDITY §1 |
 | a result that would look better under kinder assumptions | runs, is ledgered, and is not gate-eligible | conventions §13.6 |
 | two writers on the ledger | both land (§13) | conventions §13.6 |
 
@@ -972,9 +979,9 @@ the goldens.
 - **It is not correctness.** Three engines can agree byte for byte on a
   wrong rule. Every "before" above passed every golden that existed, because
   no golden contained the input. The edge golden covers some of the new
-  branches — not the NaN comparisons, the invalid-reference-data landing or
+  branches, not the NaN comparisons, the invalid-reference-data landing or
   the future-stamped conversion rate, which have per-language rule tests
-  only — and differential fuzzing of the three engines is backlog (E31).
+  only, and differential fuzzing of the three engines is backlog (E31).
 - **It is not availability.** A corrupt future-stamped mark closes the
   instrument until event time catches up or the engine is restored. That is
   the intended trade: a halt costs basis points, a missing halt costs the
@@ -987,7 +994,7 @@ the goldens.
 ## 13. The research-store concurrency model
 
 Until v1.3.0 the research store assumed one writer at a time: a person at a
-terminal. Automated research — a batch driver, or several agents — breaks
+terminal. Automated research, a batch driver, or several agents, breaks
 that assumption, and the failure is silent: a lost ledger update is a look
 that was never counted. The model now is:
 
@@ -1001,7 +1008,7 @@ that was never counted. The model now is:
 
 **What a reader sees.** A ledger file is always a whole document (the
 replace is atomic). An experiment directory is complete or absent. A
-directory that is nevertheless unreadable — a crash, a manual edit — is
+directory that is nevertheless unreadable, a crash, a manual edit, is
 skipped and reported by the listing (`ExperimentRegistry.skipped`, the
 `skipped` array of `list --json`), not raised. The store importer ignores
 staging directories.
@@ -1021,14 +1028,14 @@ staging directories.
   ledger merge are backlog (E29 RT02).
 
 **Identity under concurrency.** The ledger de-duplicates by (alpha, kind,
-canonical configuration, dataset — the dataset since v1.4.0, ledger
+canonical configuration, dataset, the dataset since v1.4.0, ledger
 x-version 2; the method bundle is part of the configuration since v1.5.0,
-x-version 3; since v1.18 REL-02c an entry also carries a `data_family` tag, `real` or `synthetic`, which is not part of the chained identity — §22). A rerun adds no looks whichever writer lands
+x-version 3; since v1.18 REL-02c an entry also carries a `data_family` tag, `real` or `synthetic`, which is not part of the chained identity, §22). A rerun adds no looks whichever writer lands
 first; a new configuration adds its 84 (28 under `legacy_v1`) exactly once. With a single writer
 the locked path writes exactly the bytes the unlocked implementation wrote,
 so the committed ledger did not change.
 
-**Tests.** `python/tests/test_research_store_safety.py` — including a
+**Tests.** `python/tests/test_research_store_safety.py`: including a
 two-process test that loses no update, concurrent run-id allocation, and
 the complete-or-absent property of a new experiment directory. DIAGRAMS.md
 §15 draws one run.
@@ -1043,16 +1050,16 @@ what would prove it done.
 
 | gap | what exists | what a production system has | epic |
 |---|---|---|---|
-| **Real exchange data** | a seeded generator; instruments named `SYN.EQ.*`; no vendor data in the repository. A Python ingestion path for owner-supplied Nasdaq ITCH 5.0 and LOBSTER files, a point-in-time security master and a corporate-actions adjustment API exist ([REAL_DATA.md](REAL_DATA.md)), run on 7 real Nasdaq ITCH days (2019–2020, AAPL/MSFT/QQQ; v1.6.0 ran the 24-alpha batch on them — 0 PROMOTE, no trade survives costs). Since v1.17 free IEX HIST days give a second lit venue on overlap days ([DATA_SOURCES.md](DATA_SOURCES.md)), and v1.18 added a 20-name single-venue execution universe (REL-04c, secondary result) and a LOBSTER free-sample book check (REL-12 oracle); all of it is free public data, none vendor-licensed or consolidated-feed, and studies do not yet read reference data as-of or apply adjustments | decoders for real order-by-order feeds, a point-in-time security master, corporate actions applied without look-ahead | E25 |
+| **Real exchange data** | a seeded generator; instruments named `SYN.EQ.*`; no vendor data in the repository. A Python ingestion path for owner-supplied Nasdaq ITCH 5.0 and LOBSTER files, a point-in-time security master and a corporate-actions adjustment API exist ([REAL_DATA.md](REAL_DATA.md)), run on 7 real Nasdaq ITCH days (2019–2020, AAPL/MSFT/QQQ; v1.6.0 ran the 24-alpha batch on them: 0 PROMOTE, no trade survives costs). Since v1.17 free IEX HIST days give a second lit venue on overlap days ([DATA_SOURCES.md](DATA_SOURCES.md)), and v1.18 added a 20-name single-venue execution universe (REL-04c, secondary result) and a LOBSTER free-sample book check (REL-12 oracle); all of it is free public data, none vendor-licensed or consolidated-feed, and studies do not yet read reference data as-of or apply adjustments | decoders for real order-by-order feeds, a point-in-time security master, corporate actions applied without look-ahead | E25 |
 | **Latency measurement** | throughput and stage timings from a 2-CPU container without pinning, plus the in-process tick-to-trade benchmark with percentiles of v1.12 (§7; shared-runner figures); in-memory, single-threaded. v1.18 claims no latency edge and no absolute IEX feed latency (the capture clock offset is unknown) | tick-to-trade percentiles (p50 / p99 / p99.9 / max) measured without coordinated omission, gated in CI, with hardware timestamps and an audited allocation-free hot path | E26 |
-| **Simulator calibration to live fills** | a pinned, deterministic, conservative rule set; impact as a formula; a tape that never reacts to our orders; markouts at three fixed horizons; since v1.18 a record -> replay -> compare harness (REL-05, §22): **Level 1 (deterministic replay) only, Level 2 against real fills NOT validated** — no real orders exist (owner decision D4(a)) | fill, queue and impact models fitted to observed fills with held-out error, multi-horizon markouts, cost attribution by venue and by algorithm | E27 |
+| **Simulator calibration to live fills** | a pinned, deterministic, conservative rule set; impact as a formula; a tape that never reacts to our orders; markouts at three fixed horizons; since v1.18 a record -> replay -> compare harness (REL-05, §22): **Level 1 (deterministic replay) only, Level 2 against real fills NOT validated**: no real orders exist (owner decision D4(a)) | fill, queue and impact models fitted to observed fills with held-out error, multi-horizon markouts, cost attribution by venue and by algorithm | E27 |
 | **Book-level risk** | a per-order, per-instrument engine with position, notional and loss limits and four kill scopes; since v1.18 (REL-17, §22) a research-side factor risk model, declarative portfolio limits with a latching kill switch, and capacity curves, on the paper path only and not in the pinned order-level engine | factor exposures, stress scenarios on the live book, the regulatory pre-trade control set, drop-copy reconciliation that halts on a break | E28 |
 | **Research throughput** | features recomputed per run; one process; alphas judged stand-alone | a point-in-time feature store, sharded runs with a deterministic ledger merge, capital allocated by marginal contribution | E29 |
 
 And around those five, the production engineering that was out of scope
 from the start (E23): real feed handlers and venue protocols, high
-availability and failover — the trading vertical here is a deliberate
-singleton — kernel-bypass networking, surveillance and audit retention,
+availability and failover, the trading vertical here is a deliberate
+singleton, kernel-bypass networking, surveillance and audit retention,
 authenticated read endpoints, secrets managed outside the environment.
 
 Three statements that follow, and that the rest of the documentation is
@@ -1060,8 +1067,8 @@ written to be consistent with:
 
 1. **No result here is a claim about a market.** The alphas are evaluated
    on a generator whose mid is mean-reverting by construction; the costs are
-   a model; the fills are a model. The honest findings — nothing promoted, a
-   cost-negative loop, no ML model that earns its costs — are findings about
+   a model; the fills are a model. The honest findings, nothing promoted, a
+   cost-negative loop, no ML model that earns its costs, are findings about
    this pipeline on this data.
 2. **The latency figures are not tick-to-trade.** They are in-memory stage
    timings and belong next to their methodology (`benchmarks/RESULTS.md`).
@@ -1201,7 +1208,7 @@ negative or underpowered (§8 of EXECUTION_QUALITY.md, §22 and
 ## 16. Polyglot policy: canonical and frozen copies (v1.11.0, plan E3)
 
 The responsibility matrix of §2 leaves several components implemented in more
-than one language — the order book in four, the native features and the six
+than one language: the order book in four, the native features and the six
 golden alphas in four, risk in three, the lifecycle in three. Golden fixtures
 keep the copies equal; what they cannot do is stop a copy from growing on its
 own, which is how drift starts. [POLYGLOT.md](POLYGLOT.md) is the inventory
@@ -1209,14 +1216,14 @@ own, which is how drift starts. [POLYGLOT.md](POLYGLOT.md) is the inventory
 k8s and the MVP) and the decision per copy:
 
 - **CANONICAL** (18 copies, counted at v1.11.0 and unchanged by the Java
-  archive) — where new behaviour lands: the Python reference
+  archive): where new behaviour lands: the Python reference
   for every domain it owns, the normative owners of a rule text (`rust/risk`
   plus its reference-equivalent Python port and fuzz oracle `iap.risk`;
   `cpp/{execution,sor}` plus `iap.execution`), the C++ hot path (codec, book,
   replay, features, alpha) and the Rust feature fast path (`rust/features`,
   plan item E2).
 - **FROZEN** (7 copies, 8 paths in `tests/harness/polyglot_policy.json` as of
-  v1.18.0) — the Rust codec/book/replay/alpha/contracts/lifecycle crates and
+  v1.18.0): the Rust codec/book/replay/alpha/contracts/lifecycle crates and
   the C++ contracts. v1.11.0 also froze 13 Java copies (16 more paths, under
   `com.iap.{core,codec,orderbook,replay,features,alpha,risk,execution,sor,
   contracts,trace,lifecycle,portfolio,tca,backtest,adaptive}`); the Java
@@ -1226,7 +1233,7 @@ k8s and the MVP) and the decision per copy:
   <reason>` and a new function or type `POLYGLOT-OVERRIDE: new-api <reason>`.
   `tests/harness/check_polyglot_policy.py` enforces this in the CI
   `deployment` job (blocking on pull requests).
-- **RETIRE candidates** — Rust `alpha` and Rust `lifecycle` have no consumer
+- **RETIRE candidates**: Rust `alpha` and Rust `lifecycle` have no consumer
   outside their own golden tests. They are kept, because those tests are the
   Rust proof of the alpha and lifecycle contracts; nothing was deleted in
   v1.11.0 and no parity test changed.
@@ -1249,13 +1256,34 @@ re-export them), and made the layering a test:
   `research`, `agents` nor `llm`; `alpha`, `portfolio` (and `ml`, once in the tree) do not import
   `research`; `labels` does not import `features`; `execution` does not import `tca`. `core` and
   `contracts` are bound transitively; the others bind **direct** imports (`allow_indirect_imports`),
-  because `mlops -> agents`, `models -> research` and the `validation` cycles still put `research`
-  in nearly every package's transitive reach. Those three edges are the next cuts.
+  because `research` stayed in nearly every package's transitive reach while the cycles below
+  existed. Tightening a contract to indirect imports is still a separate step (it needs the reach
+  measured again; nothing in v2.1 changed a contract).
 - `python/tests/architecture/test_layering.py` enforces the same file by an AST scan (no dependency)
-  and pins the remaining cycle set: **9** (`agents <-> lifecycle`, `agents <-> llm`,
-  `agents <-> research`, `alpha <-> execution`, `auction <-> research`, `backtest <-> validation`,
-  `lifecycle <-> research`, `marketdata <-> validation`, `models <-> research`). A new cycle fails.
+  and pins the subpackage cycle set, which is **empty** since v2.1 Track 3. A new cycle fails.
 - CI runs the real linter (`lint-imports`, version-pinned) in the `lint-and-secrets` job.
+
+**v2.1 Track 3: the last nine cycles.** The count is a direct-import count between top-level
+subpackages, every import at any depth (function-local imports included), `TYPE_CHECKING` imports
+excluded. Before the change it was 9; after it, 0. Behaviour is unchanged: apart from import lines,
+the only rewritten code is the signed-approval apply step, now one function that both CLIs call.
+Each move put code in the package that owns what it reads or writes:
+
+| cycle | the edge that closed it | the fix |
+|---|---|---|
+| `agents <-> llm`, `agents <-> research` | `iap.llm` and `iap.research` imported the governance primitives that lived in `iap.agents` (blackboard, broker, signing, trust, citations, untrusted, fingerprint, prereg gate, analysis identity, workflow, MCP server) | those modules moved to a new `iap.governance`; the broker's screen check reads `iap.governance.screen_gate` (the pure document check, moved out of `iap.research.screen`, which re-exports it) |
+| `lifecycle <-> research`, `auction <-> research`, `models <-> research` | `iap.lifecycle.bootstrap`, `iap.auction.rel08c_study` and `iap.models.lob_real` imported `iap.research.claims` / `iap.research.holdout_registry` | both moved to `iap.governance` (neither imports the research package); `dataset_version_of` moved from the analysis identity to the holdout registry, next to the manifest it reads |
+| `agents <-> lifecycle` | `iap.lifecycle.__main__` called `iap.agents.cli apply` for a signed approval | the apply step is `iap.lifecycle.__main__.apply_approval`; `approvals` and `reserve` moved to `iap.governance`; the agent CLI calls the lifecycle function |
+| `alpha <-> execution` | `iap.execution.signal.AlphaUrgencySource.from_dataset` built alphas | the class moved to `iap.alpha.urgency_source` (it is the alpha-to-execution adapter; alpha already sat above execution) |
+| `backtest <-> validation` | the adaptive and quoting backtests imported `ic` and `pnl_sharpe` from validation | the pure statistics moved to a new `iap.stats` (no `iap` imports); `iap.validation.metrics` and `.deflated` re-export them |
+| `marketdata <-> validation` | `iap.validation.sessions` wrote and read the dataset manifest | `record_day_sampling` and `book_scope_for_dataset` moved to `iap.marketdata.manifest_records` |
+
+Every old module path in `iap.agents` and `iap.research` still imports: the old module replaces
+itself in `sys.modules` with the new one, so `iap.agents.broker is iap.governance.broker` and a
+monkeypatch on either name reaches the running code. The three single functions and the class above
+moved without an alias (an alias would be the same import edge); their callers were updated, and the
+v1.x root `COOKBOOK.md`, a frozen reference, still shows the old `iap.execution.AlphaUrgencySource`
+import.
 
 ## 17. The v1.11 subsystems: LLM agent, model registry, Rust wheel, extras
 

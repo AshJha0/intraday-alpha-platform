@@ -2,8 +2,8 @@
 
 > **Frozen (v2.0 stage 11, G2).** This tour is complete at §200 and gets no new sections: a new
 > lesson replaces an old one, and the numbers quoted here are the record of the release that
-> produced them (the current status is README.md; the evidence class of every result is
-> [archive/docs/REVIEW_PACK.md](archive/docs/REVIEW_PACK.md) section 0). The Java recipes refer to the git tag
+> produced them (the current status is [docs/REPORT.md](docs/REPORT.md); the current method tour is
+> [docs/LEARN.md](docs/LEARN.md)). The Java recipes refer to the git tag
 > `archive/java-v1.14.0`; that tree is no longer in the checkout.
 
 This document walks through the entire platform the way a textbook would:
@@ -123,7 +123,7 @@ Contents:
 25. [Crash consistency and commit points](#25-crash-consistency-and-commit-points)
 26. [Supply-chain hygiene](#26-supply-chain-hygiene)
 27. [Twelve pitfalls this platform is built to avoid](#27-twelve-pitfalls-this-platform-is-built-to-avoid)
-28. [Twelve interview questions (with answers from this repo)](#28-twelve-interview-questions-with-answers-from-this-repo)
+28. [Twelve questions to check your understanding (answers from this repo)](#28-twelve-questions-to-check-your-understanding-answers-from-this-repo)
 29. [Combining weak signals, and why correlation gates matter](#29-combining-weak-signals-and-why-correlation-gates-matter)
 30. [Adverse selection and markouts](#30-adverse-selection-and-markouts)
 31. [Why taker-only research cannot pay at 1 s, and what maker economics changes](#31-why-taker-only-research-cannot-pay-at-1-s-and-what-maker-economics-changes)
@@ -3306,7 +3306,7 @@ Dependabot bump is being asked to do.
 
 ---
 
-## 28. Twelve interview questions (with answers from this repo)
+## 28. Twelve questions to check your understanding (answers from this repo)
 
 **Q1. Why can order-flow imbalance be a real predictor and still lose
 money?**

@@ -3396,7 +3396,8 @@ later).
 on the dataset (mean / std of `expected_return` over the alpha's scored
 rows of that instrument), so every threshold below is "so many standard
 deviations of this alpha's scores", whatever its `beta`. The sign is the
-alpha's (positive = price expected to rise). `AlphaUrgencySource.
+alpha's (positive = price expected to rise). `AlphaUrgencySource`
+(`iap.alpha.urgency_source` since v2.1; it was `iap.execution.signal`). `AlphaUrgencySource.
 from_dataset(alpha_id, features_dir, *, params_path=None,
 instruments_json=None, refit=False, instrument_ids=None)` (a classmethod; everything after `features_dir` is keyword-only, `instrument_ids` limits the instruments scored) scores a flagship alpha (`EQ10`, `EQ05`, ...) with the
 registered parameters of `configs/strategies/alpha_params.json` (its

@@ -2,7 +2,8 @@
 
 > **Frozen (v2.0 stage 11, G2).** 200 recipes and no more: a new recipe replaces an old one. Java
 > recipes refer to the git tag `archive/java-v1.14.0` (the tree left the checkout in stage 11); the
-> operator's current procedures are [docs/RUNBOOK_v2.md](docs/RUNBOOK_v2.md).
+> operator's current procedures are [docs/RUNBOOK_v2.md](docs/RUNBOOK_v2.md), and the current recipes
+> are [docs/COOKBOOK.md](docs/COOKBOOK.md).
 
 Every recipe below is runnable from a fresh checkout of this repository in
 the standard environment (Python 3.11 + pyarrow, g++ 13/CMake, Rust 1.99.0,

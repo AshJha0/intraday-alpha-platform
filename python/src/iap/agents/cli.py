@@ -20,7 +20,7 @@
 
 Since v1.14 (G-P1-4) a non-empty agent key registry is used only when a
 maintainer listed in ``research/agents/trust_roots.json`` has signed it
-(:mod:`iap.agents.trust`); ``prereg`` refuses an unsigned write by an agent
+(:mod:`iap.governance.trust`); ``prereg`` refuses an unsigned write by an agent
 that has a registered key, and signed requests are bound to the board head
 and board id (``ed25519-v2``).
 
@@ -43,24 +43,17 @@ import time
 from pathlib import Path
 from typing import Any
 
-from iap.agents import approvals
-from iap.agents.broker import WriteBroker
-from iap.agents.reserve import EVALUATOR, ReserveEvaluator
+from iap.governance import approvals
+from iap.governance.broker import WriteBroker
+from iap.governance.reserve import EVALUATOR, ReserveEvaluator
 
 NS_MIN = 60 * 10**9
 #: committed registry of agent Ed25519 PUBLIC keys (G4); private keys stay outside
 PUBKEYS_RELPATH = Path("research") / "agents" / "agent_pubkeys.json"
 
 
-def _outside(path: Path, root: Path) -> Path:
-    path, root = path.resolve(), root.resolve()
-    if path == root or root in path.parents:
-        raise SystemExit(f"{path}: secrets must live outside the repository ({root})")
-    return path
-
-
-def _keys(path: Path) -> dict[str, str]:
-    return json.loads(path.read_text(encoding="ascii")) if path.is_file() else {}
+_outside = approvals.outside_repo
+_keys = approvals.load_keys
 
 
 def _broker(root: Path, agents: set[str] | None = None) -> WriteBroker:
@@ -101,22 +94,9 @@ def cmd_issue(a: argparse.Namespace) -> int:
 
 
 def cmd_apply(a: argparse.Namespace) -> int:
-    from iap.lifecycle.__main__ import _load
-    from iap.lifecycle.bootstrap import REGISTRY_RELPATH
+    from iap.lifecycle.__main__ import apply_approval
 
-    keys = _keys(_outside(a.keyfile, a.root))
-    approval = json.loads(Path(a.approval).read_text(encoding="ascii"))
-    _, registry, machine = _load(a.root)
-    try:
-        tr = approvals.apply(approval, keys, _broker(a.root), machine, time.time_ns())
-    except (approvals.ApprovalError, ValueError) as exc:
-        print(f"refused: {exc}", file=sys.stderr)
-        return 1
-    registry.save(a.root / REGISTRY_RELPATH)
-    print(
-        f"{approval['action']} {approval['alpha_id']}: {tr.from_state.name} -> {tr.to_state.name}"
-    )
-    return 0
+    return apply_approval(a.root, Path(a.approval), a.keyfile)
 
 
 def cmd_reserve(a: argparse.Namespace) -> int:
@@ -139,7 +119,7 @@ def cmd_reserve(a: argparse.Namespace) -> int:
 def cmd_agent_keygen(a: argparse.Namespace) -> int:
     """An Ed25519 key pair for an agent (G4): the private key into a key file
     OUTSIDE the repository, the public key into the committed registry."""
-    from iap.agents import signing
+    from iap.governance import signing
 
     path = _outside(a.keyfile, a.root)
     keys = _keys(path)
@@ -160,7 +140,7 @@ def cmd_agent_keygen(a: argparse.Namespace) -> int:
 
 def _pubkeys(root: Path, ref: str | None = None) -> dict[str, str]:
     """The registry, only if it is empty or maintainer-signed (G-P1-4)."""
-    from iap.agents import trust
+    from iap.governance import trust
 
     try:
         return trust.trusted_pubkeys(root, ref)
@@ -171,7 +151,7 @@ def _pubkeys(root: Path, ref: str | None = None) -> dict[str, str]:
 def cmd_maintainer_keygen(a: argparse.Namespace) -> int:
     """A trust-root key pair: private key OUTSIDE the repo, public key into
     research/agents/trust_roots.json (trusted by CI once it is on main)."""
-    from iap.agents import signing, trust
+    from iap.governance import signing, trust
 
     path = _outside(a.keyfile, a.root)
     keys = _keys(path)
@@ -191,7 +171,7 @@ def cmd_maintainer_keygen(a: argparse.Namespace) -> int:
 
 def cmd_sign_registry(a: argparse.Namespace) -> int:
     """Sign the current agent key registry as a maintainer (G-P1-4)."""
-    from iap.agents import trust
+    from iap.governance import trust
 
     keys = _keys(_outside(a.keyfile, a.root))
     if a.maintainer not in keys:
@@ -205,7 +185,7 @@ def cmd_sign_registry(a: argparse.Namespace) -> int:
 
 def cmd_prereg(a: argparse.Namespace) -> int:
     """Pre-register a hypothesis (debits one look, records the code fingerprint)."""
-    from iap.agents.broker import BrokerError, sign
+    from iap.governance.broker import BrokerError, sign
 
     pubkeys = None
     auth = None
@@ -254,7 +234,8 @@ def cmd_prereg(a: argparse.Namespace) -> int:
 
 def cmd_anchor(a: argparse.Namespace) -> int:
     """Write research/agents/anchors.json: the first commit holding each entry (G3)."""
-    from iap.agents import anchor, prereg_gate
+    from iap.agents import anchor
+    from iap.governance import prereg_gate
 
     doc = anchor.anchors(a.root, prereg_gate.board_path(a.root))
     out = a.root / anchor.ANCHORS_RELPATH
@@ -265,9 +246,10 @@ def cmd_anchor(a: argparse.Namespace) -> int:
 
 def cmd_verify_board(a: argparse.Namespace) -> int:
     """Chain + git-history (re-chaining) + anchors + signatures (G3, G4)."""
-    from iap.agents import anchor, prereg_gate, trust
-    from iap.agents.blackboard import Blackboard
-    from iap.agents.broker import board_id
+    from iap.agents import anchor
+    from iap.governance import prereg_gate, trust
+    from iap.governance.blackboard import Blackboard
+    from iap.governance.broker import board_id
 
     board = prereg_gate.board_path(a.root)
     report = anchor.verify(a.root, board, a.root / anchor.ANCHORS_RELPATH, ref=a.trust_ref)
