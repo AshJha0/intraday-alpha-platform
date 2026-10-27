@@ -49,7 +49,7 @@ flowchart TD
 
 How one validated Python reference pins three implementations. The parity table is
 printed by `tests/harness/run_all.sh` (python 4062 · cpp 333 · rust 376
-tests; 217/74/75 in the golden groups — the Rust gate runs twelve golden
+tests; 217/74/75 in the golden groups: the Rust gate runs twelve golden
 targets; the Java engine is archived in v1.15, the git tag `archive/java-v1.14.0`). Two goldens are
 owned by a port language and consumed by Python as well: the fills golden
 (C++) by `iap.execution`, the risk goldens (Rust) by `iap.risk`.
@@ -176,7 +176,7 @@ flowchart LR
 
 The pinned check order shared by the Rust reference, the Java port and the Python
 reference port (`iap.risk`, proven by the same goldens). Any missing or malformed
-limit configuration rejects (CONFIG_MISSING) — the engine never "fails open."
+limit configuration rejects (CONFIG_MISSING): the engine never "fails open."
 This is the overview; diagram 11 places the fail-closed branches added in v1.3.0
 (future-stamped marks, NaN, overflow, venue-0 orders) in the same order.
 
@@ -247,7 +247,7 @@ flowchart TD
 
 The relational index over every contract and research artefact, as built by
 `python -m iap.store build` (SQLite; the same DDL runs on PostgreSQL). Solid
-edges are declared foreign keys — every normalized stage row of a decision
+edges are declared foreign keys: every normalized stage row of a decision
 trace hangs off `decision_traces`; dotted edges are logical references between
 independently imported artefacts. Column lists are abridged; the full model,
 the views and the query cookbook are in [DATA_MODEL.md](DATA_MODEL.md).
@@ -795,7 +795,7 @@ sequenceDiagram
 
 The path of `POST /admin/kill` through `com.iap.platform.AdminService`. The
 kill latches before the request waits for the trading thread, so the outcome of
-the wait changes only the response code — `200` applied, or `202` latched — never
+the wait changes only the response code, `200` applied, or `202` latched, never
 whether trading stops (PLATFORM_CONVENTIONS.md §12.5,
 `docs/RUNBOOKS.md` §2).
 Source: [`diagrams/admin_kill_latch.mmd`](diagrams/admin_kill_latch.mmd).
@@ -841,7 +841,7 @@ One `python -m iap.research run`, from the request to the persisted evidence:
 where the ledger-derived threshold (the default since v1.5.0; `--methods
 legacy_v1` selects the fixed 3.0, and the `--tstat-threshold` flag is gone)
 is read, where the looks are
-debited — a dry run included — how the experiment directory appears in one
+debited, a dry run included, how the experiment directory appears in one
 rename, and where gate eligibility is decided (PLATFORM_CONVENTIONS.md §13.6,
 docs/RESEARCH_VALIDITY.md §3–§4, LEARN.md §24).
 Source: [`diagrams/research_run_sequence.mmd`](diagrams/research_run_sequence.mmd).

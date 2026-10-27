@@ -177,7 +177,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     <strong>v1.17.1 (released 2026-10-17): a patch release. Negative results first.</strong>
     <ul>
       <li><strong>B7 closed on its negative in-sample result</strong> (2026-10-16): no cell cheaper by the 2 bp minimum; nothing signed or registered (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/preregs/B7_CLOSED_v117.md">B7_CLOSED_v117.md</a>).</li>
-      <li><strong>B8 two-venue router: negative on the first 2 overlap days</strong> &mdash; <code>sor</code> +5.1 &plusmn; 1.3 bps and 8 pp lower fill than pinned Nasdaq; <code>sor_sweep</code> +3.8 &plusmn; 2.1 bps; 2 day clusters, provisional. The pre-declared six-day out-of-sample run is also negative: <code>sor</code> +2.2 / +1.1 bps, <code>sor_sweep</code> +0.6 / +1.2 bps (AAPL / MSFT), no interval excludes zero.</li>
+      <li><strong>B8 two-venue router: negative on the first 2 overlap days</strong>: <code>sor</code> +5.1 &plusmn; 1.3 bps and 8 pp lower fill than pinned Nasdaq; <code>sor_sweep</code> +3.8 &plusmn; 2.1 bps; 2 day clusters, provisional. The pre-declared six-day out-of-sample run is also negative: <code>sor</code> +2.2 / +1.1 bps, <code>sor_sweep</code> +0.6 / +1.2 bps (AAPL / MSFT), no interval excludes zero.</li>
       <li><strong>Release workflow fixed (#211):</strong> v1.17.1 is the first release with a release manifest, lock-file SBOMs and digest-pinned k8s manifests.</li>
       <li><strong>IEX overlap set:</strong> 6 of 9 days recorded, TOPS oracle 0 mismatches.</li>
     </ul>
@@ -194,9 +194,9 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
       <li><strong>Breadth book (C8): registered under option (a), no confirmatory look.</strong> The screen is a hard
           gate and refused every candidate; the holdout is unread
           (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/preregs/breadth_book_prereg.json">breadth_book_prereg.json</a>).</li>
-      <li><strong>Dark venue (B10): modelled, not measured</strong> &mdash; there is no free dark-pool data.</li>
+      <li><strong>Dark venue (B10): modelled, not measured</strong>: there is no free dark-pool data.</li>
       <li><strong>B7 (signal-aware execution): closed 2026-10-16 on its in-sample result, no fresh test</strong>
-          &mdash; no cell cheaper by the 2 bp minimum, the urgency arm dearer on TWAP/VWAP at 1&ndash;2 % ADV
+          no cell cheaper by the 2 bp minimum, the urgency arm dearer on TWAP/VWAP at 1&ndash;2 % ADV
           (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/preregs/B7_CLOSED_v117.md">B7_CLOSED_v117.md</a>).
           B8 (two-venue router) real-data results shipped in v1.17.1.</li>
       <li><strong>Known gap:</strong> v1.17.0 has no release manifest, no lock-file SBOMs and no digest-pinned k8s
@@ -235,7 +235,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     </ul>
     Write-ups: <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/research/R7_RESULTS.md">R7_RESULTS</a>,
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/archive/docs/research/MVP_REAL_20191018.md">MVP_REAL_20191018</a>.
-    Next, in v1.16: monetisation &mdash; realistic execution costs first, then a cost-aware strategy
+    Next, in v1.16: monetisation: realistic execution costs first, then a cost-aware strategy
     tested once on fresh sessions.
   </div>
   <div class="honest">
@@ -278,26 +278,26 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
      net-of-cost screen passes 0 of 22, and the v1.16 monetisation study found no taker, capacity,
      quoting or DeepLOB edge. Real-data and synthetic-data looks are counted separately below.</p>
   <div class="numbers">
-    Cross-language parity&nbsp;&nbsp;&nbsp; python 4062&nbsp; · cpp 333&nbsp; · rust 376 tests — 4,771 green (main CI run 40015853764, 2026-10-23, v1.18.0); golden groups 217/74/75 (Java archived in v1.15)<br>
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 4062&nbsp; · cpp 333&nbsp; · rust 376 tests, 4,771 green (main CI run 40015853764, 2026-10-23, v1.18.0); golden groups 217/74/75 (Java archived in v1.15)<br>
     Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in python, cpp and rust (Java archived in v1.15)<br>
     C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 2-CPU container (Intel Xeon 2.10 GHz, no pinning, steady_clock, cache-resident means; not colocation): IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
     Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly; the MVP run twice and replayed from its capture reproduces its trace digest<br>
     Contracts&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 17 JSON Schemas · 22 typed contracts · 18 Protocols; Python risk and execution ports proven by the Rust and C++ goldens (audit + snapshot byte-identical, fills bit-identical)<br>
     Feature factory&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 205 registered, versioned features across 10 families; validity-bitset semantics, no NaN ever valid<br>
     Alpha research&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 24 flagship alphas · walk-forward + purging/embargo · 6,826-look multiple-testing ledger over 640 distinct configurations after the v1.18 REL-02 migration (real data: 256 configurations holding 1,132 of the looks, per-dataset real ledgers and B7/B8 execution studies included; synthetic data: 384 configurations holding 5,694 of the looks), every dataset and method revision counted, hash-chained (expected max |t| 4.202, Bonferroni |t| ≥ 4.484; source <code>research/experiments.json</code>)<br>
-    Promotion lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 7 states · 17 pinned edges · 20 gates; bundled data: 23 alphas at CANDIDATE, 0 beyond (FX11 held in RESEARCH by the time-shift leakage gate) — every candidate fails net P&amp;L after costs and capacity<br>
+    Promotion lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 7 states · 17 pinned edges · 20 gates; bundled data: 23 alphas at CANDIDATE, 0 beyond (FX11 held in RESEARCH by the time-shift leakage gate), every candidate fails net P&amp;L after costs and capacity<br>
     MVP golden run&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 15,805 events · 800 decisions · 231 parent orders · 163 fills · P&amp;L −82.84 USD (cost-negative, stated) · digest a7f1ee60…<br>
     Adaptive lifecycle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; PSI/KS drift monitors · 88 drift-triggered refits in the study · CUSUM retirement rule · RETIRED halts allocation in the backtest, pages a human live<br>
-    Verdicts (honest)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 PROMOTE · 12 ITERATE · 12 REJECT (v1.14.0) — 7 alphas clear the multiple-testing threshold (t ≥ 4.426), 18 never forecast a move larger than their cost and make no trade, the 6 that trade lose; nothing survives costs, and we say so<br>
+    Verdicts (honest)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 PROMOTE · 12 ITERATE · 12 REJECT (v1.14.0), 7 alphas clear the multiple-testing threshold (t ≥ 4.426), 18 never forecast a move larger than their cost and make no trade, the 6 that trade lose; nothing survives costs, and we say so<br>
     Real data&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 7 Nasdaq ITCH sessions (2019-01-30 … 2020-01-30; AAPL, MSFT, QQQ; 3,100,181 feature rows) · 0 PROMOTE / 8 ITERATE / 4 REJECT · strong ICs (EQ01 microprice 0.105, t 21) but not one trade survives costs: a 1 s edge of ~0.07 bp against a ~0.7 bp taker round trip<br>
     Out-of-time holdout&nbsp;&nbsp;&nbsp;&nbsp; six hypotheses pre-registered and pushed before any 2026 feature existed · 4 of 4 confirmatory signals passed their registered thresholds on 2026-05-15/18 (EQ01 t 7.7 · EQ02 t 8.0 · EQ10 t 8.1 · EQ05 t 9.5; development-supported, the developer's own run) · both controls behaved as registered · no trade at 1x costs<br>
-    Power study&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; planted order flow detected at the PROMOTE threshold (t ≥ 4.365) in 2 of 20 runs on 2 sessions, 10 of 20 on 4 and 20 of 20 on 8 (EQ04, declared 5 s label) · planted lead-lag 0 of 20 at EQ10's declared 1 s label, 16 of 20 at a 5 s label on 8 sessions · null 0 of 20 throughout · nothing promoted at any size — 20 seeds per cell, Wilson 95 % intervals<br>
+    Power study&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; planted order flow detected at the PROMOTE threshold (t ≥ 4.365) in 2 of 20 runs on 2 sessions, 10 of 20 on 4 and 20 of 20 on 8 (EQ04, declared 5 s label) · planted lead-lag 0 of 20 at EQ10's declared 1 s label, 16 of 20 at a 5 s label on 8 sessions · null 0 of 20 throughout · nothing promoted at any size, 20 seeds per cell, Wilson 95 % intervals<br>
     Maker economics&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; calibration from the event stream (touch fill rates by queue-ahead, depletion hazards, latency, maker markouts at 100 ms/1 s/10 s, impact) · posting backtest with FIFO queue fills, rebates and a passive exit · P&amp;L identity tested · synthetic only so far: −6.7 bp/trip passive exit vs −11.4 bp crossing out<br>
     Quoting&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Avellaneda–Stoikov two-sided quoter with an alpha-skewed reservation price, hard inventory limit, calibrated adverse-selection floor and end-of-session flatten · P&amp;L split into spread, markout, inventory, flatten, rebates, fees · real-data result (v1.16 quoting v2, in-sample, 6 test sessions): no quoting edge, every cell loses $5.0&ndash;6.9k per session, skew with EQ01/EQ05 cuts the loss by $750&ndash;920 per session<br>
-    Auctions &amp; execution&nbsp;&nbsp; ITCH NOII decoded in a separate opt-in pass (dataset bytes unchanged) · closing-cross strategy with purged day-aligned walk-forward, pre-registration required · Almgren–Chriss trajectory and efficient frontier, alpha urgency, forecast VWAP curve — all opt-in, pinned schedules unchanged<br>
+    Auctions &amp; execution&nbsp;&nbsp; ITCH NOII decoded in a separate opt-in pass (dataset bytes unchanged) · closing-cross strategy with purged day-aligned walk-forward, pre-registration required · Almgren–Chriss trajectory and efficient frontier, alpha urgency, forecast VWAP curve, all opt-in, pinned schedules unchanged<br>
     Research governance&nbsp;&nbsp;&nbsp; a pre-registration costs one look and records a code + feature + dependency fingerprint · blackboard history checked against git and anchored to the first commit holding each entry · agent writes Ed25519-signed, broker holds public keys only<br>
     Rust engine (pyo3)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; the 45 native feature slots from Python: ~790,000 events/s in Rust vs ~5,250 through the Python reference, 150x on the golden vectors (CI runner ubuntu-24.04, wall clock; not colocation) · not a pipeline speed-up: 160 features stay in Python · opt-in <code>--engine rust</code><br>
-    LLM agent evals&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 4 of 4 mocked in CI (p-hacking, prompt injection, hallucinated citation, task success), each control also shown to fail when removed · live on claude-haiku-5-5 (2026-10-10): 4 of 4, est. $0.0096 — the model behaved, so the live run did not stress the controls<br>
+    LLM agent evals&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 4 of 4 mocked in CI (p-hacking, prompt injection, hallucinated citation, task success), each control also shown to fail when removed · live on claude-haiku-5-5 (2026-10-10): 4 of 4, est. $0.0096, the model behaved, so the live run did not stress the controls<br>
     Polyglot policy&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 18 canonical / 20 frozen copies (24 paths) · 2 retire candidates kept as parity evidence · nothing deleted · a change to a frozen copy needs <code>POLYGLOT-OVERRIDE:</code><br>
     Tick-to-trade (C++)&nbsp;&nbsp;&nbsp;&nbsp; decoded IAP1 frame → book → features → alpha → order decision, per event, shared CI runner (AMD EPYC 7763, no pinning, steady_clock; not colocation): golden eq_mbo p50 1,279 ns · p99 2,559 ns · p99.9 11,263 ns · max 33,112 ns; generated day p50 1,407 · p99 1,727 · p99.9 12,287 ns · in-process only: no network, no kernel bypass, no C++ risk engine<br>
     Deflated Sharpe&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; CPCV paths, PBO, PSR / DSR / minimum track record with N from the ledger's distinct configurations (DSR at raw looks beside it) · paper's worked example reproduced (DSR 0.9004) · opt-in <code>v4</code> bundle, report-only<br>
@@ -308,7 +308,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
   <summary>Release history, v1.3 to v1.13: what each review found and what moved</summary>
   <div class="honest">
     <strong>Research truth over backtest cosmetics.</strong> The adversarial review of this
-    platform found — and fixed — a generator artifact that left the consolidated equity book
+    platform found, and fixed, a generator artifact that left the consolidated equity book
     crossed 95% of the time and silently inflated ML information coefficients. After the fix
     (a shared efficient price per instrument) the crossed fraction is 0.26% on the current dataset, every golden file
     and research report was regenerated, and the alpha promotion count honestly fell from 2 to 0.
@@ -323,7 +323,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     of its three languages, and letting router-bound orders past a venue kill. The execution
     simulator re-filled a resting order against the same displayed shares on every event. The
     paper platform could resume a cursor beside a risk snapshot from another moment. All
-    three engines agreed byte for byte throughout — parity proves agreement, not correctness.
+    three engines agreed byte for byte throughout: parity proves agreement, not correctness.
     Each is fixed, pinned by a regression test, and written up as a case study in
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">LEARN.md §21–§25</a>;
     the <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/CHANGELOG.md">changelog</a>
@@ -559,13 +559,13 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
          v1.5.0, each with its old rule selectable under a legacy name: a pooled-slope HAC t, a
          ledger-derived threshold, a cost-aware position policy, a recompute leakage probe,
          per-fold diagnostics (report-only). A planted-signal
-         study measures what the validation chain can detect — and shows it promotes nothing.
+         study measures what the validation chain can detect: and shows it promotes nothing.
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/RESEARCH_VALIDITY.md">RESEARCH_VALIDITY</a>,
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/power/POWER_REPORT.md">POWER_REPORT</a></p></div>
     <div class="card"><h3>Distance to production</h3>
       <p>Stated plainly, with a backlog epic for each gap: real exchange data at scale
          (ITCH 5.0 / LOBSTER ingestion exists; v1.6.0 ran all alphas on 7 real Nasdaq
-         days — detectable but untradable signals, no trade survives costs; four of them passed an
+         days: detectable but untradable signals, no trade survives costs; four of them passed an
          out-of-time check in v1.8.0, development-supported only), measured
          tick-to-trade latency, a simulator calibrated to live fills, book-level risk,
          research throughput. Nothing here is a claim about a market.
@@ -604,7 +604,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     <div class="card"><h3>Order books</h3>
       <p>L1/L2/MBO reconstruction with FIFO queues, pinned modify semantics, marketable
          crossing ADDs, snapshot recovery (incl. broken-burst rule), per-venue + consolidated
-         views, deterministic checkpoints — identical state in Python, C++ and Rust (and Java, until
+         views, deterministic checkpoints: identical state in Python, C++ and Rust (and Java, until
          its archive at v1.14.0) after every event.</p></div>
     <div class="card"><h3>Feature factory</h3>
       <p>205 registered features across price, microstructure, order flow (OFI L1–L10),
@@ -622,7 +622,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     <div class="card"><h3>Validation framework</h3>
       <p>Event-time labels at 11 horizons (10ms–15m), walk-forward with purging + embargo,
          automatic leakage tests incl. a recompute-from-raw-events probe, IC/RankIC/pooled-slope HAC t/hit/decay/turnover/edge-breakeven capacity,
-         a persistent multiple-testing ledger, and cost/latency/regime stress — the §20
+         a persistent multiple-testing ledger, and cost/latency/regime stress: the §20
          promotion gates, enforced literally. The opt-in <code>v3</code> bundle (v1.9) adds
          day-aligned folds, day-clustered and day-block-bootstrap t, an FOMC/holiday-excluded
          block and the equal-weight per-instrument gate IC.</p></div>
@@ -630,7 +630,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
       <p>Linear baselines gate the advanced models, literally: trees and the MLP run only if
          the best linear model shows OOS signal against the frictionless label. On the bundled
          data it does, barely (ridge, pooled OOS IC +0.0081), so xgboost, lightgbm and the MLP
-         were fitted — and no model earns its costs. A calibrated
+         were fitted: and no model earns its costs. A calibrated
          trade/no-trade meta-label gate, evaluated economically, takes zero trades and is
          reported as degenerate rather than as a success. Reproducibility manifests
          (data/feature/model versions, windows, hardware) on every fit.</p></div>
@@ -643,7 +643,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     <div class="card"><h3>Fail-closed risk</h3>
       <p>Fat-finger, price-band, stale-price, position/notional/gross/net, loss limits,
          rate throttle, duplicate-order and self-match prevention, sequence-gap gating,
-         venue-disconnect handling and four-scope kill switches — Rust reference with a Python
+         venue-disconnect handling and four-scope kill switches: Rust reference with a Python
          port (and the archived Java mirror), byte-identical audit logs, replayable. Since v1.3.0 also closed
          against future-stamped marks, NaN, integer overflow and router-bound orders under a
          venue kill, with an edge golden all three engines replay. Since v1.14 the audit log is a
@@ -652,7 +652,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     <div class="card"><h3>Execution &amp; SOR</h3>
       <p>Market/limit/IOC/FOK, VWAP/TWAP/POV/IS parent algos, deterministic queue-position
          modeling for passive orders (pinned depletion rules), fees/rebates/impact,
-         venue latency with seeded jitter, and fee-aware smart order routing — C++ reference
+         venue latency with seeded jitter, and fee-aware smart order routing: C++ reference
          fills reproduced exactly by Python (and the archived Java port). Since v1.18 a venue-aware capped child
          simulator with an invariant suite (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/EXECUTION_QUALITY.md">EXECUTION_QUALITY</a>). The simulator never fills more than the
          market displayed or traded. Opt-in since v1.10 (Python only): an Almgren–Chriss IS
@@ -721,7 +721,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
          bit-identical to uninterrupted runs.</p></div>
     <div class="card"><h3>TCA &amp; attribution</h3>
       <p>Arrival/VWAP/TWAP benchmarks, Perold implementation-shortfall decomposition
-         (delay/trading/opportunity — exact identity), spread/impact/timing split,
+         (delay/trading/opportunity: exact identity), spread/impact/timing split,
          post-fill adverse-selection markouts at 100ms/1s/10s, and impact regression
          versus participation.</p></div>
     <div class="card"><h3>Adaptive lifecycle</h3>
@@ -729,7 +729,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
          serialized research baselines, rolling realized-vs-research IC, drift-triggered
          refits on purged/embargoed windows, and an IC-gated ACTIVE&rarr;WATCH&rarr;RETIRED state
          machine with hysteresis and a CUSUM retirement rule (the legacy consecutive-breach rule stays selectable). In the adaptive <em>backtest</em> RETIRED verifiably halts the
-         allocation; in the live paper loop the gauge is deliberately <em>observational</em> —
+         allocation; in the live paper loop the gauge is deliberately <em>observational</em>
          the <code>AlphaLifecycleRetired</code> alert pages a human, nothing reduces the position
          automatically (API_ADAPTIVE &sect;6, PLATFORM_CONVENTIONS &sect;12.6). Live PSI,
          rolling-IC and lifecycle gauges are scraped in paper trading.</p></div>
@@ -750,8 +750,8 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
          reading typed evidence, a byte-deterministic registry and transition log, a Rust port (and the archived Java one)
          from one golden. Bootstrapped on the bundled research: 23 CANDIDATE, 0 beyond.</p></div>
     <div class="card"><h3>Decision trace &amp; data model</h3>
-      <p>One validated record per decision — signal, portfolio, risk, orders, routing, fills, TCA,
-         attribution — as canonical JSONL with a stream digest that an incident replay must
+      <p>One validated record per decision, signal, portfolio, risk, orders, routing, fills, TCA,
+         attribution, as canonical JSONL with a stream digest that an incident replay must
          reproduce, indexed by a SQLite/PostgreSQL-portable store (24 tables, 3 views) and rendered
          by <code>explain()</code> identically in Python, Rust and C++ (and Java, until its archive).</p></div>
     <div class="card"><h3>The executable MVP</h3>
@@ -778,7 +778,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
          C++ vs Rust vs Java for event-driven trading.</p></div>
     <div class="card"><h3>Performance engineering</h3>
       <p>Benchmark suite with published methodology (hardware, toolchain, boundaries,
-         variance caveats — no isolated numbers): codec, book, replay, feature engine,
+         variance caveats: no isolated numbers): codec, book, replay, feature engine,
          alpha scoring and execution-sim stages, plus demo-scale Rust/Java replay
          throughput. Since v1.12 a tick-to-trade benchmark reports per-event p50 / p99 / p99.9 /
          max latency end to end and per stage (decode 271, book 83, features 735, alpha 135,
@@ -790,11 +790,11 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     <div class="card"><h3><a href="https://ashjha0.github.io/quant-portfolio/" style="color:inherit">quant-portfolio</a></h3>
       <p>The end-to-end quantitative finance portfolio this platform sits alongside:
          10 project areas built twice each (equity + FX) in Python with C++ and Rust
-         performance twins — 31 sub-projects, 6,446 tests, golden-vector
+         performance twins: 31 sub-projects, 6,446 tests, golden-vector
          cross-language validation, a 481-question learning guide and a 63-recipe
          cookbook. <a href="https://github.com/AshJha0/quant-portfolio">GitHub&nbsp;→</a></p></div>
     <div class="card"><h3><a href="https://github.com/AshJha0/Quant-Finance-Library" style="color:inherit">quantfinlib</a></h3>
-      <p>A zero-dependency quantitative finance platform for the JVM — research,
+      <p>A zero-dependency quantitative finance platform for the JVM: research,
          validation, execution and connectivity, from walk-forward backtesting to a
          measured sub-microsecond tick-to-order path, with 1,090+ tests and CI on
          every push. <a href="https://github.com/AshJha0/Quant-Finance-Library">GitHub&nbsp;→</a></p></div>
