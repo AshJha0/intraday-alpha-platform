@@ -74,6 +74,7 @@ and carries no evidence class. The full loop on one instrument is `python -m iap
 | governance, security, reproduction | [docs/GOVERNANCE.md](docs/GOVERNANCE.md), [docs/REPRODUCTION.md](docs/REPRODUCTION.md) |
 | data and licences | [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md), [docs/REAL_DATA.md](docs/REAL_DATA.md) |
 | the record | [docs/release/](docs/release/v2.0.0_RELEASE_NOTES.md), [CHANGELOG.md](CHANGELOG.md); older plans, reviews and release notes are in [archive/docs/](archive/docs/) |
+| explaining the project from a quant, C++ or engineering-lead angle, with the hard questions | [docs/LEARNING_GUIDE.md](docs/LEARNING_GUIDE.md) |
 | contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 ## How it is built, and who checked what
