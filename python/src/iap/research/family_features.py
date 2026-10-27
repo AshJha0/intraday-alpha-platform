@@ -48,6 +48,7 @@ __all__ = [
     "feature_d2_residual_momentum",
     "feature_d3_overnight_spread",
     "feature_d4_filing_reaction_z",
+    "feature_d4_filing_reaction_z_live5",
     "residual_returns",
 ]
 
@@ -248,6 +249,25 @@ def feature_d4_filing_reaction_z(frame: pd.DataFrame) -> pd.Series:
     filed_prev = _by_name(frame)["filing"].shift(1)
     z = _z(res, sd)
     return z.where(filed_prev == 1)
+
+
+#: Sessions a filing reaction stays tradable in the exploratory D4 variant (D-107).
+D4_LIVE_SESSIONS = 5
+
+
+@feature(
+    _contract(
+        "d4.filing_reaction_z_live5",
+        2 * BETA_WINDOW + 2 + D4_LIVE_SESSIONS,
+        "D4 exploratory variant: the latest filing reaction z, held for 5 sessions after it is first usable; NaN otherwise",
+    )
+)
+def feature_d4_filing_reaction_z_live5(frame: pd.DataFrame) -> pd.Series:
+    """D-107: the registered signal is finite on about two names a session on a real universe, too
+    few for a cohort; holding each reaction for five sessions pools the week's filers (exploratory only)."""
+    z = feature_d4_filing_reaction_z(frame)
+    held = z.groupby(frame["name"], sort=False).ffill(limit=D4_LIVE_SESSIONS - 1)
+    return held
 
 
 enforce_module(__name__)

@@ -354,6 +354,7 @@ def build_features(frame: pd.DataFrame, feature_ids: Sequence[str]) -> pd.DataFr
         "d2.residual_momentum": ff.feature_d2_residual_momentum,
         "d3.overnight_spread": ff.feature_d3_overnight_spread,
         "d4.filing_reaction_z": ff.feature_d4_filing_reaction_z,
+        "d4.filing_reaction_z_live5": ff.feature_d4_filing_reaction_z_live5,
     }
     for fid in ("common.beta_60", "common.sigma_60", "common.adv_20", *feature_ids):
         if fid in out.columns:
@@ -433,6 +434,36 @@ class LinearM0:
             "passed": self.passed,
             "resid_sd_bps": self.resid_sd_bps,
         }
+
+
+@dataclass(slots=True)
+class ExploratoryM0:
+    """An exploratory run's forecast when M0 fails its quality rule (D-106, D-107; U0 DR-19).
+
+    Trades the family's registered direction (a positive signal is long) at the fitted
+    magnitude ``|rho|``, so the registered hypothesis is costed even when the estimation
+    window rejects it.  Never used outside ``exploratory=True``; the report names it.
+    """
+
+    fitted: LinearM0
+    passed: bool = False  # the gate result it bypassed, reported as such
+    model_class: str = "M0.exploratory_ungated"
+    registry_id: str = "0" * 64
+
+    def predict(self, rows: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+        z = rows[self.fitted.feature].to_numpy(dtype=float)
+        m = self.fitted
+        return abs(m.rho) * z, np.abs(z) * m.se + m.resid_sd_bps
+
+    def parameters(self) -> dict[str, Any]:
+        return {
+            **self.fitted.parameters(),
+            "gate": "bypassed (exploratory): registered sign, fitted |rho|",
+        }
+
+
+#: Exploratory-only signal substitutions (D-107): the registered D4 signal is too sparse for a cohort.
+EXPLORATORY_SIGNAL = {"d4": "d4.filing_reaction_z_live5"}
 
 
 def fit_m0(
@@ -808,7 +839,10 @@ def run_engine(
                 else:
                     refuse("hurdle", "hurdle", q0, abs(forecasts[n]) * w0)
             n_leg = int(math.floor(tails * len(eligible)))
-            if n_leg < cspec.min_names_per_leg:
+            if len(cand) == 0 and isinstance(model, LinearM0) and not model.passed:
+                # D-106: a failed M0 forecasts nothing; say so instead of blaming breadth
+                reason = "no forecast: the incumbent model failed its quality rule"
+            elif n_leg < cspec.min_names_per_leg:
                 reason = f"fewer than {cspec.min_names_per_leg} names per leg ({len(eligible)} eligible after the hurdle)"
             else:
                 ranked = sorted(eligible, key=lambda n: (-forecasts[n], n))
@@ -1142,14 +1176,22 @@ def run_family(
     model: Forecaster | None = None,
     extra_features: Sequence[str] = (),
     registry_entry: RegistryEntry | None = None,
+    exploratory: bool = False,
 ) -> dict[str, Any]:
     """The loop (module docstring).  Returns ``{"report", "sha256", "ledger", "paths"}``.
 
     ``model`` is a candidate :class:`Forecaster` (the ML framework's) run in place
     of M0 on the same sessions; ``extra_features`` are its feature group's
     contracted features, built alongside the family's signal.
+
+    ``exploratory`` (U0 DR-19, data-ineligible runs only): a failed M0 is replaced by
+    :class:`ExploratoryM0` and the family's signal by :data:`EXPLORATORY_SIGNAL`, so
+    that every family is costed; both are recorded in the report's identity.
     """
     spec = load_family_spec(spec_path)
+    substituted = EXPLORATORY_SIGNAL.get(spec.family_id) if exploratory else None
+    if substituted:
+        spec = FamilySpec(spec.path, spec.sha256, {**spec.doc, "features": [substituted]})
     manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
     frame, data_sha = load_panel(data_path)
     who = check_partition(partition, manifest, data_path, identity=identity, data_sha256=data_sha)
@@ -1197,6 +1239,8 @@ def run_family(
             )
         )
         model = m0
+        if exploratory and not m0.passed:
+            model = ExploratoryM0(m0, registry_id=m0.registry_id)
     else:
         entry = registry_entry or _registry_entry(
             spec,
@@ -1227,6 +1271,11 @@ def run_family(
         "software_version": SOFTWARE_VERSION,
         "registry_digest": registry.digest,
     }
+    if exploratory:
+        ident["exploratory"] = {
+            "model": model.model_class,
+            "signal_substituted": substituted,
+        }
     ident.pop("identity", None)  # the OS user name is not part of the report's identity
     report = build_report(spec, run, feats, labels, model, ident)
     sha = report_hash(report)

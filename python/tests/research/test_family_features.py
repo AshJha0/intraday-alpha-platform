@@ -20,6 +20,7 @@ FEATURE_FNS = [
     ff.feature_d2_residual_momentum,
     ff.feature_d3_overnight_spread,
     ff.feature_d4_filing_reaction_z,
+    ff.feature_d4_filing_reaction_z_live5,
 ]
 
 
