@@ -8,7 +8,7 @@
 ``retire`` / ``reset`` are HUMAN actions on ``research/alpha_registry.json``
 and append to ``research/lifecycle_transitions.jsonl``.  Since v1.13
 (G-P1-3) they require a verified approval record
-(:mod:`iap.agents.approvals`, issued with ``python -m iap.agents.cli issue``):
+(:mod:`iap.governance.approvals`, issued with ``python -m iap.agents.cli issue``):
 the approval must name the same alpha, action and reason, its signature is
 checked against ``--keyfile`` (outside the repository), and its nonce is
 burned on the blackboard - exactly what ``python -m iap.agents.cli apply``
@@ -133,8 +133,6 @@ def _approved_manual(
             file=sys.stderr,
         )
         return 2
-    from iap.agents import cli as agents_cli
-
     try:
         doc = json.loads(Path(approval).read_text(encoding="ascii"))
     except (OSError, ValueError) as exc:
@@ -148,17 +146,34 @@ def _approved_manual(
             file=sys.stderr,
         )
         return 2
-    return agents_cli.main(
-        [
-            "--root",
-            str(root),
-            "apply",
-            "--approval",
-            str(approval),
-            "--keyfile",
-            str(keyfile),
-        ]
-    )
+    return apply_approval(root, Path(approval), keyfile)
+
+
+def apply_approval(root: Path, approval: Path, keyfile: Path) -> int:
+    """Apply a signed HUMAN approval to the lifecycle registry (``python -m iap.agents.cli apply``
+    and ``--approval`` here both land in this one function).
+
+    Lived in :mod:`iap.agents.cli` until v2.1 Track 3; it moved here so the lifecycle package does
+    not import the agent layer (that edge was the agents <-> lifecycle import cycle)."""
+    import json
+    import time
+
+    from iap.governance import approvals
+    from iap.governance.broker import WriteBroker
+    from iap.governance.reserve import EVALUATOR
+
+    keys = approvals.load_keys(approvals.outside_repo(keyfile, root))
+    doc = json.loads(Path(approval).read_text(encoding="ascii"))
+    _, registry, machine = _load(root)
+    broker = WriteBroker(root, set(), trusted={approvals.APPROVER, EVALUATOR})
+    try:
+        tr = approvals.apply(doc, keys, broker, machine, time.time_ns())
+    except (approvals.ApprovalError, ValueError) as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 1
+    registry.save(root / REGISTRY_RELPATH)
+    print(f"{doc['action']} {doc['alpha_id']}: {tr.from_state.name} -> {tr.to_state.name}")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -4,7 +4,7 @@ Every supported reader of market data in this package (:mod:`iap.io`,
 :func:`iap.core.codec.read_iap1` / :func:`iap.core.codec.iter_iap1`, the
 feature and dataset loaders) calls :func:`check` before it opens a file.
 ``check`` delegates to ONE registered hook, installed by whoever owns the
-access policy (the holdout registry, :mod:`iap.research.holdout_registry`,
+access policy (the holdout registry, :mod:`iap.governance.holdout_registry`,
 registers itself when it is imported; :mod:`iap` registers a lazy hook that
 imports it on the first real read).  ``iap.core`` itself never names
 ``iap.research`` (D-11: the import contract "core independent of research"
@@ -89,7 +89,7 @@ def _default(path: Path, purpose: str) -> None:
     if (root is not None and kind != "synthetic") or _under_data_real(p):
         raise GuardRefused(
             f"{p}: no data-access hook is registered and the file is (or may be) real market "
-            f"data (dataset kind {kind!r}); import iap.research.holdout_registry or register a "
+            f"data (dataset kind {kind!r}); import iap.governance.holdout_registry or register a "
             f"hook with iap.core.guard.register before reading ({purpose})"
         )
 

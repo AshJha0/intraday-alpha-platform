@@ -170,9 +170,9 @@ def run_day(
     """The driver (module docstring); returns (exit code, report or None if skipped)."""
     from iap.backtest.costs import CostModel
     from iap.execution.regulatory import load_default_schedule, prereg_wants_regulatory_fees
+    from iap.marketdata.manifest_records import book_scope_for_dataset
     from iap.mvp.real import prepare_symbol, run_symbol
     from iap.paper import drill, monitors, tca_compare
-    from iap.validation.sessions import book_scope_for_dataset
 
     cfg = _load(config_path)
     data_root = data_root or REPO_ROOT / "data" / "real"
@@ -197,7 +197,7 @@ def run_day(
     dataset = Path(dataset)
     if is_forbidden(dataset.name, forbidden):
         raise ValueError(f"{dataset.name} is a forbidden (holdout) dataset")
-    from iap.research.holdout_registry import HoldoutRefused, guard
+    from iap.governance.holdout_registry import HoldoutRefused, guard
 
     try:  # v1.18 REL-02b: the content-hash registry, whatever the directory is called
         guard(dataset, purpose="paper_daily")

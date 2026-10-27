@@ -274,7 +274,7 @@ def stage_register(
 
         manifest_main = _manifest
     if seed_main is None or guard is None:
-        from iap.research import holdout_registry as hr
+        from iap.governance import holdout_registry as hr
 
         seed_main = seed_main or hr.main
         guard = guard or hr.guard

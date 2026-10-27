@@ -13,7 +13,7 @@ from typing import Any
 
 import numpy as np
 
-from iap.agents import citations
+from iap.governance import citations
 
 IC_CEILING = 0.30  # an intraday feature-to-label correlation above this is implausible
 N_NULLS = 400

@@ -31,7 +31,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from iap.agents.blackboard import Blackboard, BlackboardError
+from iap.governance.blackboard import Blackboard, BlackboardError
 
 ANCHORS_RELPATH = Path("research") / "agents" / "anchors.json"
 

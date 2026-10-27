@@ -72,7 +72,7 @@ from iap.adaptive.lifecycle import (
 )
 from iap.adaptive.refit import RefitContext, RefitPolicy
 from iap.backtest.engine import Backtester, BacktestResult
-from iap.validation.metrics import HORIZONS_NS, ic
+from iap.stats import HORIZONS_NS, ic
 
 if TYPE_CHECKING:
     from iap.alpha.base import AlphaModel

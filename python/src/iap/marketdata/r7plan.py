@@ -297,7 +297,8 @@ def _verify_main(argv: list[str]) -> int:
 
 def _sampling_main(argv: list[str]) -> int:
     from iap.marketdata.ingest import load_manifest
-    from iap.validation.sessions import STRATA, record_day_sampling, stratified_day_sample
+    from iap.marketdata.manifest_records import record_day_sampling
+    from iap.validation.sessions import STRATA, stratified_day_sample
 
     p = argparse.ArgumentParser(prog="python -m iap.marketdata record-sampling")
     p.add_argument("--dataset-dir", required=True)

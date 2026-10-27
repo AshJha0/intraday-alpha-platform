@@ -2,7 +2,7 @@
 
 A finding is ``title`` + ``text`` + ``refs``.  It is accepted only if
 
-1. every reference resolves (:func:`iap.agents.citations.resolve`), at least
+1. every reference resolves (:func:`iap.governance.citations.resolve`), at least
    one is a ``report:`` of the current session, and
 2. every number written in the title or text appears in the EVIDENCE of an
    artefact the finding cites, under exact-decimal matching (v1.13, G-P2-2):
@@ -41,8 +41,8 @@ from decimal import ROUND_HALF_EVEN, ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, cast
 
-from iap.agents import citations
-from iap.agents.mcp_server import FREE_TEXT
+from iap.governance import citations
+from iap.governance.mcp_server import FREE_TEXT
 
 NUMBER = re.compile(
     r"(?<![A-Za-z0-9_.:/-])([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)(%?)(?![A-Za-z0-9_])"

@@ -6,7 +6,7 @@ no tool that edits files, runs code, touches the lifecycle or places orders.
 
 - ``propose_hypothesis`` drafts (no look);
 - ``preregister`` turns a draft into a signed PROPOSAL plus a DRAFT
-  pre-registration (:mod:`iap.agents.workflow`, v1.15 A-P0-1; Ed25519,
+  pre-registration (:mod:`iap.governance.workflow`, v1.15 A-P0-1; Ed25519,
   private key held by this process, never by the model): one look on the
   chained ledger per proposal, code + feature fingerprint on the board,
   capped per session.  It never writes a pre-registration: only a HUMAN
@@ -18,7 +18,7 @@ no tool that edits files, runs code, touches the lifecycle or places orders.
   human-only; code computes the metrics and the verdict and writes a report
   under ``research/agents/llm_sessions/<session>/reports/``;
 - ``read_report`` returns a report or board entry, free text wrapped as
-  untrusted data (:mod:`iap.agents.untrusted`);
+  untrusted data (:mod:`iap.governance.untrusted`);
 - ``file_finding`` is verified (:func:`iap.llm.verify.verify_finding`) and
   only then filed on the board as a signed task -> claim -> finding -> release.
 
@@ -40,11 +40,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from iap.agents import untrusted
-from iap.agents.broker import BrokerError, WriteBroker, sign
-from iap.agents.mcp_server import FREE_TEXT
-from iap.agents.prereg_gate import PreregistrationError, require
-from iap.agents.workflow import Workflow, WorkflowError
+from iap.governance import untrusted
+from iap.governance.broker import BrokerError, WriteBroker, sign
+from iap.governance.mcp_server import FREE_TEXT
+from iap.governance.prereg_gate import PreregistrationError, require
+from iap.governance.workflow import Workflow, WorkflowError
 from iap.llm import summary_check, verify
 from iap.llm.budget import DEFAULT_MODEL, Budget, BudgetExceeded
 from iap.llm.envfile import redact
@@ -334,7 +334,7 @@ class Session:
         return {"ref": ref, "board_ref": f"board:{entry['hash'][:16]}", "report": report}
 
     def _load(self, ref: str) -> Any:
-        from iap.agents import citations
+        from iap.governance import citations
 
         doc = citations.artefact(ref, self.workspace)
         if doc is None:
@@ -414,7 +414,7 @@ def open_session(
     The agent's public key must already be in the workspace registry
     (``python -m iap.agents.cli --root WORKSPACE agent-keygen``) and match
     ``private_key``."""
-    from iap.agents import signing
+    from iap.governance import signing
 
     bad = sorted(d for d in datasets if not str(d).startswith(EXPLORATORY_PREFIX))
     if bad:

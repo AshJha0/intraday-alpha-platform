@@ -79,6 +79,21 @@
 #                                committed corpus instead (golden group) and
 #                                the python job fails on a stale corpus
 #
+#
+# v2.1 Track 3: risk-based pull-request path (docs/HOT_PATH.md, "CI time"). Every job
+# above still runs on every pull request and reports under its own name (each is or
+# may become a required context; a skipped required check blocks a merge), but on a
+# pull request:
+#   - no coverage is collected (it cost about 11.7 of the 20.5 min of the 3.11 fast
+#     suite in run 40406094034); the `coverage` job and its floor run on push to main,
+#     nightly and on workflow_dispatch;
+#   - python-slow runs its suite only when the PR touches Python sources, tests,
+#     configs, schemas, goldens or the reference data (its `risk` step); otherwise it
+#     reports green with a note in the job summary;
+#   - cpp builds, tests and benchmarks only when the PR touches cpp/, the goldens or
+#     configs (the golden job builds C++ for the parity gate on every PR regardless).
+# A nightly schedule (02:23 UTC) runs everything with coverage, as push to main does.
+#
 # Local equivalent of the whole thing:  bash tests/harness/run_all.sh
 # =============================================================================
 name: ci
@@ -87,6 +102,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    # v2.1 Track 3: the full run (coverage, slow suite, C++) every night, so a PR that
+    # took the fast path is covered within a day even when nothing merges.
+    - cron: "23 2 * * *"
   workflow_dispatch:
     inputs:
       regenerate:
@@ -207,12 +226,13 @@ jobs:
         working-directory: python
         env:
           PYTHONPATH: src
-          COV_ARGS: ${{ matrix.python-version == '3.11' && '--cov=iap --cov-report=' || '' }}
+          # v2.1 Track 3: coverage on push / schedule / dispatch only, not on pull requests.
+          COV_ARGS: ${{ matrix.python-version == '3.11' && github.event_name != 'pull_request' && '--cov=iap --cov-report=' || '' }}
         run: >
           python -m pytest -q -n auto --dist loadfile --durations=25
           -m "not slow" $COV_ARGS
       - name: upload fast-suite coverage data
-        if: matrix.python-version == '3.11'
+        if: matrix.python-version == '3.11' && github.event_name != 'pull_request'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-data-fast
@@ -293,14 +313,49 @@ jobs:
   python-slow:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: read   # the risk filter lists the PR's files
     env:
       PYTEST_ADDOPTS: --junitxml=/tmp/parity/junit.xml   # v1.18 REL-14a parity counts
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # v2.1 Track 3: on a pull request the slow suite runs only when the PR touches
+      # what it tests.  Push to main, the nightly schedule and dispatch always run it.
+      - name: risk filter (pull requests)
+        id: risk
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          filters: |
+            slow:
+              - 'python/src/**'
+              - 'python/tests/**'
+              - 'python/tools/**'
+              - 'python/requirements-ci.txt'
+              - 'python/pyproject.toml'
+              - 'configs/**'
+              - 'schemas/**'
+              - 'tests/golden/**'
+              - 'data/reference/**'
+              - 'research/preregs/**'
+              - 'benchmarks/slices/**'
+              - '.github/workflows/ci.yml'
+      - name: decide
+        id: run
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ] || [ "${{ steps.risk.outputs.slow }}" = "true" ]; then
+            echo "slow=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "slow=false" >> "$GITHUB_OUTPUT"
+            echo "python-slow: no Python, config, schema or golden path changed; the slow suite runs on push to main and nightly" >> "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        if: steps.run.outputs.slow == 'true'
         with:
           python-version: "3.11"
       - name: Install the research stack
+        if: steps.run.outputs.slow == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install --require-hashes -r python/requirements-ci.txt
@@ -313,6 +368,7 @@ jobs:
       # feature-engine sources, so a change to any of them regenerates
       # (~10 s market data + ~60 s features; identical seed => identical bytes).
       - name: Restore the seeded dataset
+        if: steps.run.outputs.slow == 'true'
         id: dataset-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -322,7 +378,7 @@ jobs:
             data/features
           key: dataset-${{ runner.os }}-${{ hashFiles('configs/marketdata/generator.json', 'configs/instruments/instruments.json', 'configs/venues/venues.json', 'data/reference/feature_registry.json', 'python/src/iap/marketdata/**', 'python/src/iap/features/**', 'python/src/iap/core/**', 'python/src/iap/orderbook/**') }}
       - name: Generate the seeded dataset (cache miss)
-        if: steps.dataset-cache.outputs.cache-hit != 'true'
+        if: steps.run.outputs.slow == 'true' && steps.dataset-cache.outputs.cache-hit != 'true'
         working-directory: python
         env:
           PYTHONPATH: src
@@ -346,13 +402,16 @@ jobs:
       # (PR #183, 55.90%), A5 / PR #189 lowered it to 54 (54.76% on main);
       # that slow-only floor is retired, see the `coverage` job.
       - name: pytest (slow)
+        if: steps.run.outputs.slow == 'true'
         working-directory: python
         env:
           PYTHONPATH: src
+          COV_ARGS: ${{ github.event_name != 'pull_request' && '--cov=iap --cov-report=' || '' }}
         run: >
           python -m pytest -q -n auto --dist loadfile --durations=25 -m slow
-          --cov=iap --cov-report=
+          $COV_ARGS
       - name: upload slow-suite coverage data
+        if: steps.run.outputs.slow == 'true' && github.event_name != 'pull_request'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-data-slow
@@ -360,7 +419,7 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
       - name: upload parity counts input (v1.18 REL-14a)
-        if: always()
+        if: always() && steps.run.outputs.slow == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: parity-python-slow
@@ -374,6 +433,9 @@ jobs:
   # raise it when coverage rises, never lower it without a CHANGELOG line.
   coverage:
     needs: [python, python-slow]
+    # v2.1 Track 3: pull requests collect no coverage (see the header); the floor is
+    # enforced on push to main, nightly and on dispatch.  Not a required context.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -441,28 +503,76 @@ jobs:
   cpp:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: read   # the risk filter lists the PR's files
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # v2.1 Track 3: on a pull request the C++ build runs only when the PR touches C++
+      # inputs (the golden job builds C++ for the parity gate on every PR regardless).
+      - name: risk filter (pull requests)
+        id: risk
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          filters: |
+            cpp:
+              - 'cpp/**'
+              - 'tests/golden/**'
+              - 'configs/**'
+              - 'benchmarks/slices/**'
+              - '.github/workflows/ci.yml'
+      - name: decide
+        id: run
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ] || [ "${{ steps.risk.outputs.cpp }}" = "true" ]; then
+            echo "cpp=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "cpp=false" >> "$GITHUB_OUTPUT"
+            echo "cpp: no C++, golden or config path changed; build + ctest run on push to main and nightly (the golden job built C++ on this PR)" >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Toolchain
+        if: steps.run.outputs.cpp == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             g++ cmake make libgtest-dev libeigen3-dev
       - name: build
+        if: steps.run.outputs.cpp == 'true'
         working-directory: cpp
         run: bash build.sh
       - name: ctest
+        if: steps.run.outputs.cpp == 'true'
         working-directory: cpp
         shell: bash
         run: |
           mkdir -p /tmp/parity
           ctest --test-dir build --output-on-failure | tee /tmp/parity/ctest.txt
       - name: upload parity counts input (v1.18 REL-14a)
-        if: always()
+        if: always() && steps.run.outputs.cpp == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: parity-cpp
           path: /tmp/parity/ctest.txt
+          if-no-files-found: ignore
+      # v2.1 Track 3: the book + feature-engine latency distribution (about 10 s).
+      # Report only: a shared runner's timing never gates a merge.  The table goes to the
+      # job summary and the artifact; benchmarks/results_book_features.md is the committed
+      # copy of one run, with its host stated in the file.
+      - name: bench book + features (report only)
+        if: steps.run.outputs.cpp == 'true'
+        continue-on-error: true
+        env:
+          IAP_BENCH_HOST: GitHub-hosted ubuntu-24.04 runner (shared VM, no pinning)
+        run: |
+          cpp/build/bench_book_features "$RUNNER_TEMP/results_book_features.md" > /dev/null
+          cat "$RUNNER_TEMP/results_book_features.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: upload bench book + features
+        if: always() && steps.run.outputs.cpp == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: book-features-bench
+          path: ${{ runner.temp }}/results_book_features.md
           if-no-files-found: ignore
       # v2.0 stage 11 (S2): the benchmark guards, the tick-to-trade and execution-rule
       # benchmarks and the gcov coverage build left the pull-request path. They run

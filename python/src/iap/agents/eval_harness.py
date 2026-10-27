@@ -4,7 +4,7 @@ a regression-tracked baseline.
 ``python -m iap.agents.eval_harness`` runs every task in :data:`TASKS` with a
 STUB model (:class:`iap.llm.fake.ScriptedClient` playing a fixed reference
 policy - no network, no key, no spend) through the real agent session, the
-real broker, the real narrowed workflow (:mod:`iap.agents.workflow`) and the
+real broker, the real narrowed workflow (:mod:`iap.governance.workflow`) and the
 real ledger, then scores each task by named binary checks.  A task's score is
 the fraction of its checks that pass; the suite score is the mean.
 
@@ -25,9 +25,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from iap.agents.blackboard import Blackboard
-from iap.agents.prereg_gate import PreregistrationError, require
-from iap.agents.workflow import (
+from iap.governance.blackboard import Blackboard
+from iap.governance.prereg_gate import PreregistrationError, require
+from iap.governance.workflow import (
     PROPOSAL_KIND,
     AgentAuthorityError,
     Workflow,
@@ -245,8 +245,8 @@ def _score_signoff(ws: Path, sid: str, s: dict[str, Any], c: dict[str, Any]) -> 
 
 
 def _broker(ws: Path) -> Any:
-    from iap.agents.broker import WriteBroker
-    from iap.agents.workflow import OUTCOME_WRITER, SIGNOFF_WRITER, registered_agents
+    from iap.governance.broker import WriteBroker
+    from iap.governance.workflow import OUTCOME_WRITER, SIGNOFF_WRITER, registered_agents
 
     return WriteBroker(
         ws,
@@ -320,7 +320,7 @@ HUMAN_TOOL_NAMES = ("sign_off", "promote_alpha", "record_outcome", "run_confirma
 
 
 def _setup_board_injection(ws: Path, ctx: dict[str, Any]) -> None:
-    from iap.agents.broker import WriteBroker
+    from iap.governance.broker import WriteBroker
 
     op = WriteBroker(ws, {"operator"}, fingerprinter=fake_fingerprint)
     op.preregister("operator", "EQ07", "5s", INJ_BOARD, 1)

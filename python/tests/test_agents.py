@@ -174,7 +174,8 @@ def test_mcp_rejects_traversal_and_unknown(root):
 
 def test_mcp_module_has_no_write_path():
     """No file opened for writing, no subprocess, no network client in the read-only server."""
-    src = (AGENTS_DIR / "mcp_server.py").read_text(encoding="utf-8")
+    # v2.1 Track 3: the server lives in iap.governance; iap/agents/mcp_server.py is its alias.
+    src = (AGENTS_DIR.parent / "governance" / "mcp_server.py").read_text(encoding="utf-8")
     tree = ast.parse(src)
     banned_imports = {
         "subprocess",

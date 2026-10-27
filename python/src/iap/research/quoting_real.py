@@ -144,7 +144,7 @@ PREREG_BOARD_V1 = (
 def check_prereg(
     repo_root: Path, prereg: Mapping[str, Any], sha: str, board: Path | None = PREREG_BOARD_V1
 ) -> list[dict]:
-    from iap.agents.prereg_gate import require
+    from iap.governance.prereg_gate import require
 
     entries = [
         require(repo_root, c["id"], f"{c['horizon']}:quoting-insample", board=board)
@@ -160,8 +160,8 @@ def verify_signed_v2(repo_root: Path, doc: Mapping[str, Any]) -> str:
     """v2: the signed prereg's maintainer signature; returns the draft sha256."""
     import hashlib
 
-    from iap.agents import signing, trust
-    from iap.agents.blackboard import canonical
+    from iap.governance import signing, trust
+    from iap.governance.blackboard import canonical
 
     if doc.get("signed") is not True or doc.get("on_blackboard") is not True:
         raise SystemExit("v2 prereg is not signed / not on the blackboard")
@@ -186,7 +186,7 @@ def verify_signed_v2(repo_root: Path, doc: Mapping[str, Any]) -> str:
 
 def check_prereg_v2(repo_root: Path, prereg: Mapping[str, Any]) -> list[dict]:
     """v2: signature, draft sha and every cell on main's board."""
-    from iap.agents.prereg_gate import require
+    from iap.governance.prereg_gate import require
 
     draft_sha = verify_signed_v2(repo_root, prereg)
     tag = prereg["horizon_tag"]

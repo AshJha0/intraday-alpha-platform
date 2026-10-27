@@ -874,7 +874,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = ap.parse_args(argv)
 
-    from iap.research.holdout_registry import HoldoutRefused, guard
+    from iap.governance.holdout_registry import HoldoutRefused, guard
 
     for _d in (args.dataset_dir, args.features_dir if args.dataset_dir is None else None):
         if _d is None:

@@ -113,6 +113,7 @@ from typing import Any
 from iap.alpha import ALPHA_IDS
 from iap.contracts.types import ExperimentResult, ExperimentSpec, LifecycleState, Period, Verdict
 from iap.contracts.versions import content_hash
+from iap.governance import claims
 from iap.lifecycle.config import PolicyConfig, load_policy_config, repo_root
 from iap.lifecycle.evidence import (
     CrossAlphaEvidence,
@@ -122,7 +123,6 @@ from iap.lifecycle.evidence import (
 )
 from iap.lifecycle.machine import STATE_COUNT, AlphaLifecycle
 from iap.lifecycle.registry import AlphaRegistry, LifecycleTransitionLog
-from iap.research import claims
 from iap.validation.methods import DEFAULT_METHODS
 
 __all__ = [

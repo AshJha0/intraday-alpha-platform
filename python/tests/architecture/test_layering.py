@@ -26,21 +26,11 @@ CONTRACTS_FILE = PY_DIR / ".importlinter"
 
 #: The subpackage import cycles that exist after stage 11 (an AST count, direct imports,
 #: TYPE_CHECKING excluded).  v1.18: 12 (plan 2.3).  After stage 2 D1 (core <-> research broken): 11.
-#: After stage 11 (features <-> labels and execution <-> tca broken): 9.  A NEW cycle fails this
-#: test; removing one means deleting its row here (and saying so in the CHANGELOG).
-RECORDED_CYCLES = frozenset(
-    {
-        ("agents", "lifecycle"),
-        ("agents", "llm"),
-        ("agents", "research"),
-        ("alpha", "execution"),
-        ("auction", "research"),
-        ("backtest", "validation"),
-        ("lifecycle", "research"),
-        ("marketdata", "validation"),
-        ("models", "research"),
-    }
-)
+#: After stage 11 (features <-> labels and execution <-> tca broken): 9.  v2.1 Track 3: 0 (the
+#: shared governance primitives moved to iap.governance, the pure statistics to iap.stats, and three
+#: single functions to the package that owns their data; docs/ARCHITECTURE.md, "Layering").  A NEW
+#: cycle fails this test.
+RECORDED_CYCLES: frozenset[tuple[str, str]] = frozenset()
 
 
 # --------------------------------------------------------------------------- module graph

@@ -1256,13 +1256,34 @@ re-export them), and made the layering a test:
   `research`, `agents` nor `llm`; `alpha`, `portfolio` (and `ml`, once in the tree) do not import
   `research`; `labels` does not import `features`; `execution` does not import `tca`. `core` and
   `contracts` are bound transitively; the others bind **direct** imports (`allow_indirect_imports`),
-  because `mlops -> agents`, `models -> research` and the `validation` cycles still put `research`
-  in nearly every package's transitive reach. Those three edges are the next cuts.
+  because `research` stayed in nearly every package's transitive reach while the cycles below
+  existed. Tightening a contract to indirect imports is still a separate step (it needs the reach
+  measured again; nothing in v2.1 changed a contract).
 - `python/tests/architecture/test_layering.py` enforces the same file by an AST scan (no dependency)
-  and pins the remaining cycle set: **9** (`agents <-> lifecycle`, `agents <-> llm`,
-  `agents <-> research`, `alpha <-> execution`, `auction <-> research`, `backtest <-> validation`,
-  `lifecycle <-> research`, `marketdata <-> validation`, `models <-> research`). A new cycle fails.
+  and pins the subpackage cycle set, which is **empty** since v2.1 Track 3. A new cycle fails.
 - CI runs the real linter (`lint-imports`, version-pinned) in the `lint-and-secrets` job.
+
+**v2.1 Track 3: the last nine cycles.** The count is a direct-import count between top-level
+subpackages, every import at any depth (function-local imports included), `TYPE_CHECKING` imports
+excluded. Before the change it was 9; after it, 0. Behaviour is unchanged: apart from import lines,
+the only rewritten code is the signed-approval apply step, now one function that both CLIs call.
+Each move put code in the package that owns what it reads or writes:
+
+| cycle | the edge that closed it | the fix |
+|---|---|---|
+| `agents <-> llm`, `agents <-> research` | `iap.llm` and `iap.research` imported the governance primitives that lived in `iap.agents` (blackboard, broker, signing, trust, citations, untrusted, fingerprint, prereg gate, analysis identity, workflow, MCP server) | those modules moved to a new `iap.governance`; the broker's screen check reads `iap.governance.screen_gate` (the pure document check, moved out of `iap.research.screen`, which re-exports it) |
+| `lifecycle <-> research`, `auction <-> research`, `models <-> research` | `iap.lifecycle.bootstrap`, `iap.auction.rel08c_study` and `iap.models.lob_real` imported `iap.research.claims` / `iap.research.holdout_registry` | both moved to `iap.governance` (neither imports the research package); `dataset_version_of` moved from the analysis identity to the holdout registry, next to the manifest it reads |
+| `agents <-> lifecycle` | `iap.lifecycle.__main__` called `iap.agents.cli apply` for a signed approval | the apply step is `iap.lifecycle.__main__.apply_approval`; `approvals` and `reserve` moved to `iap.governance`; the agent CLI calls the lifecycle function |
+| `alpha <-> execution` | `iap.execution.signal.AlphaUrgencySource.from_dataset` built alphas | the class moved to `iap.alpha.urgency_source` (it is the alpha-to-execution adapter; alpha already sat above execution) |
+| `backtest <-> validation` | the adaptive and quoting backtests imported `ic` and `pnl_sharpe` from validation | the pure statistics moved to a new `iap.stats` (no `iap` imports); `iap.validation.metrics` and `.deflated` re-export them |
+| `marketdata <-> validation` | `iap.validation.sessions` wrote and read the dataset manifest | `record_day_sampling` and `book_scope_for_dataset` moved to `iap.marketdata.manifest_records` |
+
+Every old module path in `iap.agents` and `iap.research` still imports: the old module replaces
+itself in `sys.modules` with the new one, so `iap.agents.broker is iap.governance.broker` and a
+monkeypatch on either name reaches the running code. The three single functions and the class above
+moved without an alias (an alias would be the same import edge); their callers were updated, and the
+v1.x root `COOKBOOK.md`, a frozen reference, still shows the old `iap.execution.AlphaUrgencySource`
+import.
 
 ## 17. The v1.11 subsystems: LLM agent, model registry, Rust wheel, extras
 

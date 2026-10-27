@@ -120,7 +120,7 @@ def _refs(log: Iterable[Mapping[str, Any]]) -> list[str]:
 def _pool(
     log: Sequence[Mapping[str, Any]], root: Path, session_id: str
 ) -> list[tuple[str | None, float]]:
-    from iap.agents import citations
+    from iap.governance import citations
 
     pool: list[tuple[str | None, float]] = []
     rdir = root / "research" / "agents" / "llm_sessions" / session_id / "reports"

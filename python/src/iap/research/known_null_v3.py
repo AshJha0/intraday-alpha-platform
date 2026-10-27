@@ -474,7 +474,7 @@ def verify_binding(
        ``python/src/iap`` tree hash matches, and the bound commit is HEAD or its ancestor;
     4. the bound configuration hash equals the file passed as ``--config``;
     5. the actor (``IAP_RUN_ACTOR``) is not the signer."""
-    from iap.agents.analysis_identity import (
+    from iap.governance.analysis_identity import (
         IdentityError,
         require_independent_runner,
         verify_identity,

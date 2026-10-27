@@ -19,12 +19,11 @@ days:
 - :func:`stratified_day_sample` — a deterministic draw of ``n`` days from a
   candidate list, stratified by month (default), weekday or event tag, with
   the seed, the strata and the allocation in the returned record.
-- :func:`record_day_sampling` — writes that record into a real dataset's
-  ``dataset.json`` under ``"sampling"`` (the manifest's other fields and its
-  ``dataset_version`` are untouched: the version hashes the normalized
-  files, not the manifest).
-- :func:`book_scope_for_dataset` — ``"single_venue"`` for an ingested
-  ITCH/LOBSTER dataset (one Nasdaq book, no consolidated NBBO; R4).
+- :func:`iap.marketdata.manifest_records.record_day_sampling` writes that record into
+  a real dataset's ``dataset.json`` (it lived here until v2.1 Track 3; it
+  writes a marketdata manifest, so it moved to the marketdata package).
+- :func:`iap.marketdata.manifest_records.book_scope_for_dataset` (R4) reads
+  the book scope from the manifest; it moved with the sampling record.
 """
 
 from __future__ import annotations
@@ -179,7 +178,7 @@ def stratified_day_sample(
     the earlier stratum), never more than it holds; days inside a stratum
     are drawn without replacement by ``numpy.random.default_rng(seed)``.
 
-    Returns the record :func:`record_day_sampling` stores::
+    Returns the record :func:`iap.marketdata.manifest_records.record_day_sampling` stores::
 
         {"method", "seed", "n", "strata", "exclude_tags", "excluded",
          "allocation": {stratum: k}, "selected": [sorted dates],
@@ -224,34 +223,3 @@ def stratified_day_sample(
         "selected": selected,
         "event_days": {d: sorted(day_tags(d)) for d in selected if day_tags(d)},
     }
-
-
-def record_day_sampling(dataset_dir: str | Path, record: dict) -> dict:
-    """Store ``record`` as ``"sampling"`` in a real dataset's manifest and
-    return the updated manifest.  Every selected day must be a session of
-    the dataset (fail closed: a record naming a day that was never ingested
-    describes another dataset)."""
-    from iap.marketdata.ingest import MANIFEST_NAME, load_manifest
-
-    manifest = load_manifest(dataset_dir)
-    missing = sorted(set(record.get("selected", ())) - set(manifest.get("sessions", {})))
-    if missing:
-        raise ValueError(f"sampling record names days the dataset does not hold: {missing}")
-    manifest["sampling"] = record
-    path = Path(dataset_dir) / MANIFEST_NAME
-    with open(path, "w", encoding="utf-8", newline="\n") as f:
-        f.write(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
-    return manifest
-
-
-def book_scope_for_dataset(dataset_dir: str | Path | None) -> str:
-    """``"single_venue"`` for an ingested real dataset (one exchange's own
-    book: ITCH and LOBSTER are Nasdaq-only, there is no consolidated NBBO
-    and a crossed book cannot be a stale other-venue quote), else
-    ``"consolidated"`` (the synthetic multi-venue books)."""
-    if dataset_dir is None or not (Path(dataset_dir) / "dataset.json").is_file():
-        return "consolidated"
-    from iap.marketdata.ingest import load_manifest
-
-    manifest = load_manifest(dataset_dir)
-    return "single_venue" if manifest.get("source", {}).get("venue") else "consolidated"

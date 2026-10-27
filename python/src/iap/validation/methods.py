@@ -53,7 +53,7 @@ folds are day-aligned (``split_mode="day_aligned"``) and every report
 carries the ``validity`` block (day-clustered / day-block-bootstrap t, the
 day-separated HAC t, results without FOMC and holiday-thin days).  The
 book scope (R4) is a property of the DATA, not of the bundle: pass
-``book_scope`` from :func:`iap.validation.sessions.book_scope_for_dataset`.
+``book_scope`` from :func:`iap.marketdata.manifest_records.book_scope_for_dataset`.
 
 ``"v4"`` (v1.12, opt-in) is ``v3`` plus the report-only overfitting
 statistics of plan item R7: the ``cpcv`` block (combinatorial purged CV,

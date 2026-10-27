@@ -111,6 +111,7 @@ from pathlib import Path
 
 import numpy as np
 
+from iap.alpha.urgency_source import AlphaUrgencySource
 from iap.core.codec import read_iap1, read_jsonl
 from iap.core.rng import SplitMix64
 from iap.execution import (
@@ -140,7 +141,7 @@ from iap.execution.dark import (
 )
 from iap.execution.fading import CANCEL_RULES, pull_rows, pull_summary
 from iap.execution.optimal import ac_params_from_calibration
-from iap.execution.signal import URGENCY_REGIMES, AlphaUrgencySource
+from iap.execution.signal import URGENCY_REGIMES
 from iap.execution.types import FILL_PROVENANCES
 from iap.research import execution_metrics as exm
 from iap.research.two_venue import (
@@ -733,10 +734,10 @@ def _paired_summary(base: list[dict], other: list[dict], seed: int) -> dict[str,
 
 def check_data_access(data_dir: Path, *, allow_holdout: bool | str = False) -> None:
     """The single entry-point data-access check of the benchmark: delegates to the
-    REL-02 hash-locked holdout registry (``iap.research.holdout_registry``), which
+    REL-02 hash-locked holdout registry (``iap.governance.holdout_registry``), which
     replaced the v1.17 path-substring rule. A legacy ``allow_holdout`` bool
     authorises nothing; a signed prereg id does."""
-    from iap.research.holdout_registry import guard_or_exit
+    from iap.governance.holdout_registry import guard_or_exit
 
     guard_or_exit(data_dir, "execution_benchmark", allow_holdout)
 

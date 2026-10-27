@@ -143,3 +143,12 @@ target_compile_definitions(bench_tick_to_trade PRIVATE IAP_GOLDEN_DIR="${IAP_GOL
 add_executable(bench_exec_rules bench/bench_exec_rules.cpp)
 target_link_libraries(bench_exec_rules PRIVATE iap_core)
 target_compile_definitions(bench_exec_rules PRIVATE IAP_GOLDEN_DIR="${IAP_GOLDEN_DIR}")
+
+# bench_book_features (v2.1 Track 3): per-event p50 / p99 / p99.9 of the
+# order book and the feature engine on their own, at two seeded depths and on
+# the real ITCH slice, with a heap-allocation count per stage. Writes
+# benchmarks/results_book_features.md when given an output path; the CI `cpp`
+# job runs it on every pull request (report only, never a gate).
+add_executable(bench_book_features bench/bench_book_features.cpp)
+target_link_libraries(bench_book_features PRIVATE iap_core)
+target_compile_definitions(bench_book_features PRIVATE IAP_GOLDEN_DIR="${IAP_GOLDEN_DIR}")

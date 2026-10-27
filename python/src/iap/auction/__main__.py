@@ -7,7 +7,7 @@
 
 ``backtest`` refuses to run unless the hypothesis ``AUC01`` at horizon
 ``<cross_type>-<decision_s>s`` (e.g. ``C-300s``) is pre-registered on the
-research blackboard (:mod:`iap.agents.prereg_gate`, read only);
+research blackboard (:mod:`iap.governance.prereg_gate`, read only);
 ``--no-prereg`` makes the run exploratory and says so.
 """
 
@@ -46,7 +46,7 @@ def _backtest(a: argparse.Namespace) -> int:
         print("NOT pre-registered (--no-prereg): exploratory, not evidence for a gate")
         prereg = None
     else:
-        from iap.agents.prereg_gate import PreregistrationError, require
+        from iap.governance.prereg_gate import PreregistrationError, require
 
         try:
             prereg = require(REPO_ROOT, ALPHA_ID, horizon, a.prereg_board)

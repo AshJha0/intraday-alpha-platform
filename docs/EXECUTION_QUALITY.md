@@ -125,7 +125,7 @@ unchanged). Signatures: [../API_TRADING.md](API_REFERENCE.md) section 2.14.
 
 | piece | where | switched on by |
 |---|---|---|
-| signal source | `iap.execution.signal`: `SignalSource`, `ArraySignalSource`, `AlphaUrgencySource.from_dataset` (a flagship alpha's registered parameters scored on a dataset's feature frames; causal readings in units of the z-score of the alpha's own scores) | constructing one |
+| signal source | `iap.execution.signal`: `SignalSource`, `ArraySignalSource`; `iap.alpha.urgency_source`: `AlphaUrgencySource.from_dataset` (a flagship alpha's registered parameters scored on a dataset's feature frames; causal readings in units of the z-score of the alpha's own scores) | constructing one |
 | urgency policy | `ParentOrder(urgency_policy="alpha", alpha_urgency=AlphaUrgencyPolicy(threshold_z, passive_urgency, max_age_ns, latency_ns))`: agree -> post, adverse -> cross, neutral -> the base style, re-evaluated at every child decision; each child records `urgency_regime`, `signal_z`, `pacing_scale` | the two parent fields |
 | pacing | `iap.execution.pacing.PacingParams` with `pov_signal_pacing` (per-trade participation scaled by the signal), `slice_signal_tilt` (remaining quantity re-apportioned per slice, never negative), `ac_signal_drift` (Almgren-Chriss re-solved per slice with the signal as drift; `ac_holdings` / `ac_trajectory` gain `drift=0.0`) | `PacingParams` on the parent |
 | benchmark | `execution_benchmark --signal EQ10\|EQ05\|synthetic` and `base+variant` policies (`native+urgency`, `native+pacing`, `native+ac`, `native+ac_drift`); every variant is paired with its own plain control on the same windows (day-clustered) and the urgency-regime shares are reported per cell | CLI flags |
