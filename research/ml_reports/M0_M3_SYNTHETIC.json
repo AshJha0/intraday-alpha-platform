@@ -1,0 +1,106 @@
+{
+  "evidence_class": null,
+  "data": "SYNTHETIC",
+  "seed": 20261027,
+  "panel": {
+    "n_periods": 200,
+    "n_names": 60,
+    "beta": 0.3
+  },
+  "splits": {
+    "folds": 4,
+    "label_horizon_periods": 1,
+    "embargo_periods": 3
+  },
+  "chance_band_ic_per_period": 0.3873,
+  "canaries": {
+    "future_shift": {
+      "passed": true
+    },
+    "shuffled_label": {
+      "passed": true
+    },
+    "planted_leak": {
+      "passed": true
+    }
+  },
+  "leaked_feature_ic_if_undetected": 1.0,
+  "results": {
+    "linear": {
+      "M0 linear (signal only)": {
+        "fold_ic": [
+          0.2716,
+          0.2963,
+          0.2737,
+          0.2734
+        ],
+        "mean_ic": 0.2788
+      },
+      "M1 ridge alpha=1": {
+        "fold_ic": [
+          0.2713,
+          0.2974,
+          0.2751,
+          0.2712
+        ],
+        "mean_ic": 0.2787
+      },
+      "M2 GAM lambda=1": {
+        "fold_ic": [
+          0.2592,
+          0.299,
+          0.2733,
+          0.2635
+        ],
+        "mean_ic": 0.2737
+      },
+      "M3 GBT 8 leaves lr=0.1": {
+        "fold_ic": [
+          0.2505,
+          0.2851,
+          0.2734,
+          0.2553
+        ],
+        "mean_ic": 0.2661
+      }
+    },
+    "nonlinear": {
+      "M0 linear (signal only)": {
+        "fold_ic": [
+          0.0093,
+          -0.015,
+          0.033,
+          -0.0135
+        ],
+        "mean_ic": 0.0035
+      },
+      "M1 ridge alpha=1": {
+        "fold_ic": [
+          0.0044,
+          -0.0168,
+          0.0462,
+          -0.0151
+        ],
+        "mean_ic": 0.0047
+      },
+      "M2 GAM lambda=1": {
+        "fold_ic": [
+          0.3743,
+          0.4151,
+          0.3593,
+          0.3399
+        ],
+        "mean_ic": 0.3721
+      },
+      "M3 GBT 8 leaves lr=0.1": {
+        "fold_ic": [
+          0.2848,
+          0.3635,
+          0.3421,
+          0.3195
+        ],
+        "mean_ic": 0.3275
+      }
+    }
+  }
+}
