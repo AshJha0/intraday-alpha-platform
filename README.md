@@ -1,6 +1,6 @@
 # Intraday Alpha Platform
 
-> **Status, v2.0.0 (2026-10-26):** engineering-complete platform. **No confirmed alpha.** Where a
+> **Status, v2.1.0 (2026-10-27):** engineering-complete platform; v2.1 made it legible and added no research claim. **No confirmed alpha.** Where a
 > signal predicts, it is smaller than the cost of trading it, and the free daily data failed its
 > survivorship test (85 % of index leavers missing against a 2 % limit). Nothing on `main` is
 > above *development-supported*.
