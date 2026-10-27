@@ -230,13 +230,18 @@ def run_algos(tape: Tape | None = None) -> list[TcaRow]:
     """One buy parent (6,000 shares, 10 minutes, XV1) worked by TWAP, VWAP and IS."""
     tape = tape or synthetic_tape()
     rows = []
-    for label, algo, kw in (
-        ("TWAP", AlgoType.TWAP, {}),
-        ("VWAP", AlgoType.VWAP, {}),
-        ("IS (risk aversion 1.0)", AlgoType.IS, {"risk_aversion": 1.0}),
-        ("IS (risk aversion 3.0)", AlgoType.IS, {"risk_aversion": 3.0}),
+    for label, algo, risk_aversion in (
+        ("TWAP", AlgoType.TWAP, None),
+        ("VWAP", AlgoType.VWAP, None),
+        ("IS (risk aversion 1.0)", AlgoType.IS, 1.0),
+        ("IS (risk aversion 3.0)", AlgoType.IS, 3.0),
     ):
-        p = _parent(1, algo, ALGO_START_S, ALGO_DUR_S, ALGO_PARENT_QTY, **kw)
+        if risk_aversion is None:
+            p = _parent(1, algo, ALGO_START_S, ALGO_DUR_S, ALGO_PARENT_QTY)
+        else:
+            p = _parent(
+                1, algo, ALGO_START_S, ALGO_DUR_S, ALGO_PARENT_QTY, risk_aversion=risk_aversion
+            )
         res = ExecutionReplay(exec_config(), [p], md_delay_ns=0).run(tape.events)
         rows.append(tca_row(label, p, res, tape))
     return rows
@@ -358,8 +363,8 @@ def run_sor(tape: Tape | None = None) -> list[SorRow]:
         ("passive cost-aware SOR, XV2-favouring fill model", 0, XV2_FAVOURING_MODELS),
     ):
         ps = [replace(p, algo=AlgoType.TWAP, qty=2000, venue_id=venue) for p in sor_parents(0)]
-        kw = {"router": CostAwareRouter(models)} if models else {}
-        res = ExecutionReplay(cfg, ps, md_delay_ns=0, **kw).run(tape.events)
+        passive_router = CostAwareRouter(models) if models else None
+        res = ExecutionReplay(cfg, ps, md_delay_ns=0, router=passive_router).run(tape.events)
         out.append(_sor_summary(label, ps, res, tape))
     return out
 
