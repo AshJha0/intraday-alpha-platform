@@ -54,7 +54,7 @@ spec:
             - name: pipeline
               # Release step: `python tools/release.py publish` pins this by
               # digest from release-manifest.json (...:v1.17.0@sha256:...).
-              image: ghcr.io/ashjha0/intraday-alpha-platform-python:v2.0.0@sha256:03e462d2675a81ec9e552a7955c582051510b684fc85b761edf4f09bde3ec637
+              image: ghcr.io/ashjha0/intraday-alpha-platform-python:v2.1.0@sha256:d6d45c492f001615ec6e678d897102f117e5c25c4cd86a5c7e1398637356a160
               imagePullPolicy: IfNotPresent
               # Configs from the ConfigMap (not the baked copy) so a config
               # change does not require an image rebuild; every config change
