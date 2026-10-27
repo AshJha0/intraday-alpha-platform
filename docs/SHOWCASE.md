@@ -28,10 +28,10 @@ negative ones first, is written down with the artefact that produced it.
 
 ## What the evidence supports, and what it does not
 
-Every result carries an evidence class (U0 section 10; the table of all results is
-[REVIEW_PACK.md](../archive/docs/REVIEW_PACK.md) section 0): *independently confirmed*, *mechanically isolated*,
+Every result carries an evidence class ([REPORT.md](REPORT.md) section 3.1; the results table is
+REPORT.md section 2): *independently confirmed*, *mechanically isolated*,
 *development-supported*, *exploratory*, *rejected*, *data-ineligible*, *pending*. **Nothing in this
-repository is in the first two classes** (2026-10-25): no registered run has been executed under
+repository is in the first two classes** (v2.0.0, 2026-10-26): no registered run has been executed under
 separated custody and no independent party has reproduced a result.
 
 **Development-supported, at most (pre-registered, one look, run by the developer).**
@@ -57,6 +57,11 @@ separated custody and no independent party has reproduced a result.
   run-twice and replay-from-capture digests match (the parity table below).
 
 **Not proven: monetisation. The negative results, stated plainly.**
+
+- **Daily route: data-ineligible (v2.0).** The free Stooq route fails DD1: 85 % of index leavers
+  missing against a 2 % limit, opens equal to the prior close on 13.1 % of rows, 57 residual split
+  jumps. So daily families D1 to D4 cannot be tested on it.
+  <!-- source: docs/REPORT.md section 2 row 1; docs/release/evidence/DD1_FREE_ROUTE_FINDING_2026-10-26.md -->
 
 - **Predictive is not tradable (v1.15).** At the primary 1x cost the net
   P&L of both R7 signals is 0 (gross, cost, net, Sharpe and drawdown
@@ -92,6 +97,13 @@ separated custody and no independent party has reproduced a result.
   trade lose. 23 alphas sit at CANDIDATE and none advances, because every
   one fails the net-P&L-after-costs gate.
   <!-- source: README.md "Headline numbers" (Promotion verdicts, Lifecycle registry rows) and docs/index.html "Results so far" -->
+
+**Current: v2.0.0 (2026-10-26), engineering-complete; no alpha is confirmed.** The free daily
+route fails all five DD1 data tests, so D1 to D4 are data-ineligible; exploratory D1 and D3 on the
+incomplete 2026 partition are negative after costs; the combined-book test PF-3 is rejected.
+Nothing on main is above development-supported. Source: [REPORT.md](REPORT.md) section 2 and the
+[v2.0.0 release notes](release/v2.0.0_RELEASE_NOTES.md). The entries below are the earlier
+releases, kept as history.
 
 **Released: v1.18.0 (2026-10-23), a measurement instrument and recorded negative results. No signal is promoted and no edge is claimed.**
 - **The known-null calibration failed** (null v3, run 2026-10-23): A0 conditional rejection 79 and 80 of 1,854 (about 4.3 %) in two cells against a 2.5 % target; the outside reviewer rejected the method as the F3 gate, so no real-data error-rate control is claimed.
@@ -167,22 +179,36 @@ flowchart TD
     V2 --> RAW
     RAW --> NORM["Normalization + sequence validation<br/>python iap.marketdata.normalize<br/>gaps / dups / late / resets / ts-regressions / invalid counted -> qc_report.json"]
     NORM --> CANON["Canonical event stream<br/>JSONL + IAP1 v2 binary (72-byte LE records + CRC-32 trailer)<br/>+ Parquet research dataset — schemas x-version 1"]
-    CANON --> BOOK["Order-book reconstruction<br/>Python ref / C++ / Rust / Java<br/>MBO FIFO, status-gated matching, synthetic ids, dup-drop,<br/>gap->stale, reorder window, sequence resets, SNAPSHOT recovery"]
-    BOOK --> FEAT["Feature engine<br/>205-feature registry (hash = feature_version)<br/>native 40 in C++/Rust/Java — validity bitset, NaN never valid"]
+    CANON --> BOOK["Order-book reconstruction<br/>Python ref / C++ / Rust (Java archived)<br/>MBO FIFO, status-gated matching, synthetic ids, dup-drop,<br/>gap->stale, reorder window, sequence resets, SNAPSHOT recovery"]
+    BOOK --> FEAT["Feature engine<br/>205-feature registry (hash = feature_version)<br/>native 40 in C++/Rust — validity bitset, NaN never valid"]
     FEAT --> LBL["Event-time labels (Python-owned)<br/>11 horizons, mid-to-mid + cost-adjusted<br/>at-or-before rule, no lookahead"]
     FEAT --> ALPHA["Alpha ensemble<br/>24 flagship alphas (EQ01-FX12)<br/>linear_z_v1 scoring; 6 golden alphas ported"]
-    ALPHA --> PORT["Portfolio construction<br/>PGD + prox, 7 constraint families, EWMA cov<br/>Python reference, Java production service"]
-    PORT --> RISK["Hard risk engine — FAIL-CLOSED<br/>Rust reference, Java orchestration, Python reference port<br/>limits, throttles, gap/stale gates, kill switches"]
-    RISK --> EXEC["Execution algos + event-driven simulator<br/>VWAP / TWAP / POV / IS; deterministic queue model<br/>C++ reference, Java + Python ports"]
+    ALPHA --> PORT["Portfolio construction<br/>PGD + prox, 7 constraint families, EWMA cov<br/>Python reference (Java service archived v1.14)"]
+    PORT --> RISK["Hard risk engine — FAIL-CLOSED<br/>Rust reference, Python reference port<br/>limits, throttles, gap/stale gates, kill switches"]
+    RISK --> EXEC["Execution algos + event-driven simulator<br/>VWAP / TWAP / POV / IS; deterministic queue model<br/>C++ reference, Python port"]
     EXEC --> SOR["SOR / venue adapters<br/>cpp/sor, rust venue protocol + sim"]
     SOR --> FILLS["Executions (fills, fees, rebates, impact)"]
-    FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
+    FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
     TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (6,826 looks / 640 configs as of the v1.18 REL-02 migration, research/experiments.json)<br/>REPORT.md, ML_REPORT.md, model manifests"]
     RESEARCH --> LIFE["Alpha promotion lifecycle (iap.lifecycle)<br/>RESEARCH -> CANDIDATE -> VALIDATING -> PAPER -> ACTIVE <-> WATCH -> RETIRED<br/>20 gates, 17 edges; bundled data: 23 CANDIDATE / 0 beyond"]
     LIFE -. "gated, ledgered transitions<br/>(research/alpha_registry.json)" .-> ALPHA
 ```
+
+## Three ways in
+
+- **Quant research:** [REPORT.md](REPORT.md) section 2 (results, negatives first) and section 3
+  (method), then [RESEARCH_NOTES.md](RESEARCH_NOTES.md).
+- **C++ and latency:** [POLYGLOT.md](POLYGLOT.md) and
+  [benchmarks/results_tick_to_trade.md](../benchmarks/results_tick_to_trade.md). These are
+  in-process numbers from a shared CI runner, not colocation, and show no latency edge.
+- **Engineering lead:** [REPORT.md](REPORT.md) sections 6 and 7, then [GOVERNANCE.md](GOVERNANCE.md).
+
+## One-command demo
+
+`python tools/demo.py` runs the whole loop on one synthetic instrument, explains one order and
+runs the leakage canaries in about a minute; `--replay` adds the replay check.
 
 ## Ten-minute quick start
 

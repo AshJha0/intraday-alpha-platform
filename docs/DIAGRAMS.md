@@ -1,5 +1,10 @@
 # Architecture diagrams
 
+> **Read this when** you want a picture of one v1.x subsystem. Diagrams are dated in their titles;
+> anything labelled Java, "planned" or "roadmap" is historical. The v2.0 structure is in
+> [ARCHITECTURE_v2.md](ARCHITECTURE_v2.md) and the current findings in [REPORT.md](REPORT.md).
+
+
 Every diagram on this page renders natively on GitHub. Raw sources live in
 [`docs/diagrams/`](diagrams/); the first three are also embedded in
 [ARCHITECTURE.md](ARCHITECTURE.md) and every embedded block is kept
@@ -23,16 +28,16 @@ flowchart TD
     V2 --> RAW
     RAW --> NORM["Normalization + sequence validation<br/>python iap.marketdata.normalize<br/>gaps / dups / late / resets / ts-regressions / invalid counted -> qc_report.json"]
     NORM --> CANON["Canonical event stream<br/>JSONL + IAP1 v2 binary (72-byte LE records + CRC-32 trailer)<br/>+ Parquet research dataset — schemas x-version 1"]
-    CANON --> BOOK["Order-book reconstruction<br/>Python ref / C++ / Rust / Java<br/>MBO FIFO, status-gated matching, synthetic ids, dup-drop,<br/>gap->stale, reorder window, sequence resets, SNAPSHOT recovery"]
-    BOOK --> FEAT["Feature engine<br/>205-feature registry (hash = feature_version)<br/>native 40 in C++/Rust/Java — validity bitset, NaN never valid"]
+    CANON --> BOOK["Order-book reconstruction<br/>Python ref / C++ / Rust (Java archived)<br/>MBO FIFO, status-gated matching, synthetic ids, dup-drop,<br/>gap->stale, reorder window, sequence resets, SNAPSHOT recovery"]
+    BOOK --> FEAT["Feature engine<br/>205-feature registry (hash = feature_version)<br/>native 40 in C++/Rust — validity bitset, NaN never valid"]
     FEAT --> LBL["Event-time labels (Python-owned)<br/>11 horizons, mid-to-mid + cost-adjusted<br/>at-or-before rule, no lookahead"]
     FEAT --> ALPHA["Alpha ensemble<br/>24 flagship alphas (EQ01-FX12)<br/>linear_z_v1 scoring; 6 golden alphas ported"]
-    ALPHA --> PORT["Portfolio construction<br/>PGD + prox, 7 constraint families, EWMA cov<br/>Python reference, Java production service"]
-    PORT --> RISK["Hard risk engine — FAIL-CLOSED<br/>Rust reference, Java orchestration, Python reference port<br/>limits, throttles, gap/stale gates, kill switches"]
-    RISK --> EXEC["Execution algos + event-driven simulator<br/>VWAP / TWAP / POV / IS; deterministic queue model<br/>C++ reference, Java + Python ports"]
+    ALPHA --> PORT["Portfolio construction<br/>PGD + prox, 7 constraint families, EWMA cov<br/>Python reference (Java service archived v1.14)"]
+    PORT --> RISK["Hard risk engine — FAIL-CLOSED<br/>Rust reference, Python reference port<br/>limits, throttles, gap/stale gates, kill switches"]
+    RISK --> EXEC["Execution algos + event-driven simulator<br/>VWAP / TWAP / POV / IS; deterministic queue model<br/>C++ reference, Python port"]
     EXEC --> SOR["SOR / venue adapters<br/>cpp/sor, rust venue protocol + sim"]
     SOR --> FILLS["Executions (fills, fees, rebates, impact)"]
-    FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
+    FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
     TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (6,826 looks / 640 configs as of the v1.18 REL-02 migration, research/experiments.json)<br/>REPORT.md, ML_REPORT.md, model manifests"]
@@ -73,10 +78,11 @@ flowchart LR
     MIG["regeneration: deliberate only,<br/>+ schemas/MIGRATIONS.md entry"] -.-> MG
 ```
 
-## 3. Paper-trading session (Java platform vertical)
+## 3. Paper-trading session (Java platform vertical, historical: v1.14.0 and earlier)
 
-The live loop behind `java/paper.sh`: every subsystem the platform ships, wired
-end-to-end with metrics served on `:8080`.
+The loop behind the archived `java/paper.sh` (tag `archive/java-v1.14.0`; not built since v1.15,
+removed in v2.0): every subsystem it wired end to end, with metrics served on `:8080`. The current
+paper path is the Python MVP and order manager.
 
 ```mermaid
 sequenceDiagram
@@ -146,7 +152,7 @@ flowchart LR
         rcontracts["contracts crate: canonical JSON, DecisionTrace,<br/>JSONL sink + digest · lifecycle crate"]
         rtel["telemetry: counters/gauges/histograms<br/>Prometheus exposition (+ trace_records_total)"]
     end
-    subgraph JVL["Java — institutional platform layer"]
+    subgraph JVL["Java (archived v1.14.0, not built): former platform layer"]
         jcore["codec · book · replay · features · alphas"]
         jplat["event-driven backtester · portfolio service ·<br/>risk orchestration · execution/SOR · TCA service"]
         jcontracts["contracts · trace · lifecycle<br/>(PaperTrading emits decision_traces.jsonl)"]
@@ -571,7 +577,7 @@ flowchart TD
     RETIRED -. "MANUAL reset_to_research (HUMAN):<br/>the whole evidence chain again" .-> RESEARCH
     SILENCE["Silence is not evidence: an absent evidence block<br/>(or rolling_ic null / uninformative) evaluates nothing<br/>and moves nothing — outcome NO_EVIDENCE"] -.-> CANDIDATE
     RESULT["Bundled data (bootstrap rebuilt 2026-10-04, v1.5.0 default methods):<br/>24 alphas CANDIDATE, 0 VALIDATING —<br/>every alpha fails net_pnl_after_costs at 1x costs and capacity"] -.-> CANDIDATE
-    OBS["Live Java loop: the state is OBSERVATIONAL —<br/>RETIRED pages a human, does not cut size (API_ADAPTIVE §6)"] -.-> RETIRED
+    OBS["Paper loop: the state is OBSERVATIONAL;<br/>RETIRED pages a human, does not cut size (API_REFERENCE adaptive section)"] -.-> RETIRED
 ```
 
 ## 9. The decision trace (`iap.trace`, `schemas/trace/decision_trace.schema.json`)
@@ -604,7 +610,7 @@ flowchart LR
     SINKS --> EXPL["explain(trace) / python -m iap.store explain<br/>v_order_chain — one row per parent order"]
     subgraph EMIT["emission points"]
         E1["Python: iap.mvp (TraceBuilder per decision)"]
-        E2["Java: PaperTrading → decision_traces.jsonl<br/>(one per pre-trade risk decision)"]
+        E2["Java PaperTrading (archived v1.14) → decision_traces.jsonl<br/>(one per pre-trade risk decision)"]
         E3["C++: ExecutionReplay::set_trace_sink<br/>(one per parent order, after the run)"]
         E4["Rust: contracts::trace JsonlTraceSink<br/>(telemetry re-export, trace_records_total)"]
     end
@@ -1369,7 +1375,7 @@ flowchart LR
         RF["Rust marketdata, orderbook, replay, contracts"]
         RC["Rust alpha, lifecycle<br/>(RETIRE candidates, kept as parity evidence)"]
         CC["C++ contracts"]
-        JV["Java core, codec, orderbook, replay, features, alpha,<br/>risk, execution, sor, contracts, trace, lifecycle,<br/>portfolio, tca, backtest, adaptive"]
+        JV["Java (archived, tag archive/java-v1.14.0): core, codec, orderbook, replay, features, alpha,<br/>risk, execution, sor, contracts, trace, lifecycle,<br/>portfolio, tca, backtest, adaptive"]
     end
     GOLD[("tests/golden/<br/>pins every copy")] --> CAN
     GOLD --> FRZ

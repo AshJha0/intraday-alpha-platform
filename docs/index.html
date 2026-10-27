@@ -69,8 +69,8 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
        deterministic replay → TCA → decision trace → 7-state promotion lifecycle. Cross-language
        golden tests hold it together, and one command (<code>python -m iap.mvp run</code>) runs
        the whole loop on one instrument. Its golden result loses money, and the page says so.</p>
-    <p>Seven real Nasdaq ITCH sessions and a two-day 2026 holdout have been studied. The signals
-       are statistically real; none pays its trading costs. Nothing is claimed to be profitable.</p>
+    <p>Seven real Nasdaq ITCH sessions and a two-day 2026 holdout have been studied. The free daily
+       route failed its data tests; no result is above development-supported, and none pays its trading costs. Nothing is claimed to be profitable.</p>
     <nav>
       <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/HOW_IT_WORKS.md">How it works</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/LEARN.md">Learn (the method)</a>
@@ -80,18 +80,18 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/MVP.md">MVP</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/LIFECYCLE.md">Lifecycle</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/DECISION_TRACE.md">Decision trace</a>
-      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/ROADMAP.md">Roadmap</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/archive/docs/ROADMAP.md">Roadmap</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/REAL_DATA.md">Real data</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/EXECUTION_QUALITY.md">Execution quality</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/PORTFOLIO_BREADTH.md">Portfolio breadth</a>
-      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/SIGNAL_RESEARCH.md">Signal research</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/archive/docs/SIGNAL_RESEARCH.md">Signal research</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/DATA_SOURCES.md">Data sources</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/GOVERNANCE.md">Governance</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/POLYGLOT.md">Polyglot policy</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/CHANGELOG.md">Changelog</a>
-      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/papers/INDEX.md">Research papers</a>
-      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/SPECIFICATION.md">Specification</a>
-      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/README_HISTORY.md#references">References</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/archive/docs/papers/INDEX.md">Research papers</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/archive/docs/SPECIFICATION.md">Specification</a>
+      <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/archive/docs/README_HISTORY.md#references">References</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/SHOWCASE.md">Showcase (3 min)</a>
       <a class="secondary" href="https://github.com/AshJha0/intraday-alpha-platform">GitHub</a>
       <a class="secondary" href="https://ashjha0.github.io/quant-portfolio/">Quant portfolio</a>
@@ -107,7 +107,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     the numbers a CI check re-derives, one architecture diagram and a ten-minute quick start.
     The sections moved out of the README (release history, the reviews that moved the numbers,
     usage notes, references) are in
-    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/README_HISTORY.md">archive/docs/README_HISTORY.md</a>.
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/archive/docs/README_HISTORY.md">archive/docs/README_HISTORY.md</a>.
   </div>
 
   <h2>What this is, and what it is not</h2>
@@ -139,17 +139,29 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
   <div class="tbl"><table>
     <tr><th>Question</th><th>Answer</th><th>Where</th></tr>
     <tr><td>Does any alpha pass every gate on the bundled data?</td><td>No. 0 PROMOTE of 24; 18 never forecast a move larger than their cost, and the 6 that trade lose.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/alpha_reports/REPORT.md">REPORT</a></td></tr>
-    <tr><td>Are the signals real on real data?</td><td>Statistically, yes: EQ01 microprice IC 0.105, t 21 (v1.13 statistics, before the v1.14 day-separated HAC, which will lower the t).</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/REAL_DATA.md">REAL_DATA §3.1</a></td></tr>
+    <tr><td>Are the signals real on real data?</td><td>Not established. R7 holdout IC +0.0838 (EQ10) and +0.0409 (EQ05) at 1 s, re-issued as data-ineligible on 2026-10-24; net P&amp;L at 1x cost is zero.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/REAL_DATA.md">REAL_DATA §3.1</a></td></tr>
     <tr><td>Do they pay?</td><td>No. A 1 s edge of ~0.07 bp against a ~0.7 bp taker round trip.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">LEARN §31</a></td></tr>
     <tr><td>Do they hold out of time?</td><td>4 of 4 confirmatory signals passed their registered thresholds on two 2026 sessions, pre-registered first (development-supported: the developer's own run, no separated custody). Their size is not established, and those two days are spent.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/REAL_DATA.md">REAL_DATA §3.2</a></td></tr>
     <tr><td>Does the closing-cross strategy work?</td><td>No demonstrated edge: +19.4 bp, 95% CI −254 to +293 bp, from 3 trades. Underpowered, not negative. Holdout not confirmed, 0 trades.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">LEARN §42</a></td></tr>
-    <tr><td>Can a maker do better than a taker?</td><td>No, not on real data (v1.16). Taker capacity: 0 of 45 cells break even. Two-sided quoting v2 (in-sample, 6 test sessions): every cell loses $5&ndash;7k per session, adverse selection about 4x the spread captured; skewing with EQ01/EQ05 cuts the loss by about $750&ndash;920 per session, so the signals help execution, not a standalone maker. Synthetic maker backtest: −6.7 bp per trip.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/ROADMAP.md">ROADMAP §3.11</a></td></tr>
+    <tr><td>Can a maker do better than a taker?</td><td>No, not on real data (v1.16). Taker capacity: 0 of 45 cells break even. Two-sided quoting v2 (in-sample, 6 test sessions): every cell loses $5&ndash;7k per session, adverse selection about 4x the spread captured; skewing with EQ01/EQ05 cuts the loss by about $750&ndash;920 per session, so the signals help execution, not a standalone maker. Synthetic maker backtest: −6.7 bp per trip.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/archive/docs/ROADMAP.md">ROADMAP §3.11</a></td></tr>
     <tr><td>Is the fill model validated against real fills?</td><td>No. Level 1 (deterministic replay) only; Level 2 is not validated, because no real orders or fills exist. The v1.18 real-tape test: AAPL and MSFT inconclusive, QQQ supports; no latency edge is claimed.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/SIM_TO_REAL.md">SIM_TO_REAL</a></td></tr>
     <tr><td>Does the statistical gate control false rejections on real data?</td><td>Not shown. The known-null calibration (null v3) failed: 4.3&nbsp;% conditional rejection against a 2.5&nbsp;% target in two cells, and the outside reviewer rejected the method as the gate.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/v118/known_null_v3_RESULT.md">known_null_v3_RESULT</a></td></tr>
     <tr><td>What does the full loop do?</td><td>Loses 82.84 USD on its golden session.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/MVP.md">MVP</a></td></tr>
   </table></div>
 
     <div class="honest new">
+    <strong>v2.0.0 (released 2026-10-26): engineering-complete, no alpha confirmed.</strong>
+    The free daily route fails DD1 (85 % of index leavers missing against a 2 % limit), so D1 to D4
+    are data-ineligible; exploratory D1 and D3 are negative after costs; PF-3 is rejected.
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/v2.0.0_RELEASE_NOTES.md">Release notes</a>,
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/REPORT.md">technical report</a>,
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/SUMMARY.md">one-page summary</a>. Three ways in: quant research
+    (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/REPORT.md">REPORT</a> sections 2 and 3), C++ and latency
+    (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/POLYGLOT.md">POLYGLOT</a>; in-process CI numbers, not colocation, no latency
+    edge), engineering lead (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/REPORT.md">REPORT</a> sections 6 and 7).
+    </div>
+
+    <div class="honest">
     <strong>v1.18.0 (released 2026-10-23): a measurement instrument and recorded negative results. No signal promoted, no edge claimed.</strong>
     <ul>
       <li><strong>Known-null calibration failed</strong> (null v3, 2026-10-23): 4.3&nbsp;% conditional rejection against a 2.5&nbsp;% target in two cells; the outside reviewer rejected the method as the gate. No real-data error-rate control is claimed.</li>
@@ -157,7 +169,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
       <li><strong>Built:</strong> signed pre-declarations, a fail-closed holdout registry, one real-data ledger family, an execution-correctness suite, monitoring with an UNKNOWN state, enforced portfolio limits and a kill switch, a resilient paper path (60-minute and 6-hour soaks PASS on a synthetic feed, not a live venue).</li>
       <li><strong>Open gates accepted for this tag:</strong> F3, F7, the reviewer's full findings memo; F5 was partly met at the tag and is met by the 2026-10-24 R7 re-issue (both R7 verdicts are now `ineligible` under the v1.18 rule).</li>
     </ul>
-    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/v1.18.0_RELEASE_NOTES.md">Release notes (v1.18.0)</a>,
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/archive/docs/release/v1.18.0_RELEASE_NOTES.md">Release notes (v1.18.0)</a>,
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/CHANGELOG.md">CHANGELOG</a>.
   </div>
 
@@ -169,7 +181,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
       <li><strong>Release workflow fixed (#211):</strong> v1.17.1 is the first release with a release manifest, lock-file SBOMs and digest-pinned k8s manifests.</li>
       <li><strong>IEX overlap set:</strong> 6 of 9 days recorded, TOPS oracle 0 mismatches.</li>
     </ul>
-    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/v1.17.1_RELEASE_NOTES.md">Release notes</a>,
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/archive/docs/release/v1.17.1_RELEASE_NOTES.md">Release notes</a>,
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/CHANGELOG.md">CHANGELOG</a>.
   </div>
 
@@ -193,7 +205,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     Also shipped: a real second venue (IEX HIST), an implementation-shortfall benchmark, quote fading,
     queue-aware cancels, budgeted LLM agents, and C++/Rust parity for the new rules.
     Followed by v1.17.1 (B8 real-data results, more IEX overlap days, the #211 manifest fix) and v1.18.0 (above).
-    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/v1.17.0_RELEASE_NOTES.md">Release notes</a>,
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/archive/docs/release/v1.17.0_RELEASE_NOTES.md">Release notes</a>,
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/CHANGELOG.md">CHANGELOG</a>,
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/SHOWCASE.md">Showcase</a>.
   </div>
@@ -222,7 +234,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
           v1.16.</li>
     </ul>
     Write-ups: <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/research/R7_RESULTS.md">R7_RESULTS</a>,
-    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/research/MVP_REAL_20191018.md">MVP_REAL_20191018</a>.
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/archive/docs/research/MVP_REAL_20191018.md">MVP_REAL_20191018</a>.
     Next, in v1.16: monetisation &mdash; realistic execution costs first, then a cost-aware strategy
     tested once on fresh sessions.
   </div>
@@ -504,7 +516,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
          so no real-data error-rate control is claimed. F3, F7 and the reviewer's findings memo are open, accepted
          open for the tag.
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/v118/known_null_v3_RESULT.md">known_null_v3_RESULT</a>,
-         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/REVIEWER_CLOSEOUT_2026-10-23.md">reviewer close-out</a></p></div>
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/archive/docs/release/REVIEWER_CLOSEOUT_2026-10-23.md">reviewer close-out</a></p></div>
     <div class="card"><h3>Execution measurement</h3>
       <p>B8 v2 on real Nasdaq and IEX books: none of 6 comparisons better than pinned Nasdaq (3 sessions,
          underpowered). The fill model passes Level 1 (replay); the real-tape test is inconclusive on AAPL and MSFT,
@@ -515,7 +527,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
       <p>REL-08 (one session, 7 variants) and REL-09 are underpowered; REL-10 rejects one taker cell
          (<code>hid_imb</code> 1 min AAPL loses money) and leaves the rest underpowered; REL-08c was dropped
          because the closing imbalance stream starts after the registered exit. Nothing is promoted.
-         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/v1.18.0_RELEASE_NOTES.md">Release notes</a></p></div>
+         <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/archive/docs/release/v1.18.0_RELEASE_NOTES.md">Release notes</a></p></div>
     <div class="card"><h3>Paper-path resilience</h3>
       <p>Monitoring with an explicit UNKNOWN state, a factor risk model, enforced limits and a kill switch, and an
          idempotent paper order manager with a write-ahead journal and reconciliation. 60-minute and 6-hour
@@ -627,7 +639,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
          vol-target and FX currency-exposure constraints; deterministic projected-gradient
          optimizer (Python reference; the Java production port is archived at v1.14.0), with a
          constraint-audit report. Since v1.18 a factor risk model and enforced limits with a kill switch
-         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/PORTFOLIO_LIMITS.md">PORTFOLIO_LIMITS</a>, <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/FACTOR_RISK.md">FACTOR_RISK</a>).</p></div>
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/archive/docs/PORTFOLIO_LIMITS.md">PORTFOLIO_LIMITS</a>, <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/FACTOR_RISK.md">FACTOR_RISK</a>).</p></div>
     <div class="card"><h3>Fail-closed risk</h3>
       <p>Fat-finger, price-band, stale-price, position/notional/gross/net, loss limits,
          rate throttle, duplicate-order and self-match prevention, sequence-gap gating,
@@ -795,18 +807,21 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
 cd python && PYTHONPATH=src python3 -m iap.marketdata && PYTHONPATH=src python3 -m iap.features && cd ..
 
 # run everything — builds and tests python, cpp and rust, prints the parity table
+# one-command demo (about a minute)
+python tools/demo.py
+
 bash tests/harness/run_all.sh
 
 # the whole trading loop on one instrument, fully traced; then replay it from its capture
-cd python && PYTHONPATH=src python3 -m iap.mvp run && PYTHONPATH=src python3 -m iap.mvp replay --run ../data/mvp/58a10f2194a3c81c && cd ..
+cd python && PYTHONPATH=src python3 -m iap.mvp run && PYTHONPATH=src python3 -m iap.mvp replay --run ../data/mvp/&lt;run_id&gt; && cd ..
 
 # research pipelines (honest reports in research/)
 PYTHONPATH=python/src python3 research/alpha_reports/run_all.py
 PYTHONPATH=python/src python3 research/ml_reports/run_ml.py</pre>
 
-  <footer>intraday-alpha-platform — a polyglot, golden-tested, honestly-validated trading
+  <footer>intraday-alpha-platform: a polyglot, golden-tested trading research
     platform built on a bundled seeded synthetic dataset, with an ingestion path for owner-supplied ITCH/LOBSTER files, for education and demonstration.
-    See <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/SPECIFICATION.md">the
+    See <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/archive/docs/SPECIFICATION.md">the
     governing specification</a> and
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/README.md">README</a>.</footer>
 </div>

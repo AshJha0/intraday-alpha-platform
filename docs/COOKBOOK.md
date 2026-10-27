@@ -1,5 +1,9 @@
 # COOKBOOK, v2.0: recipes that run on `main` today
 
+The quickest look at the whole system is the one-command demo: `.venv-ci/bin/python tools/demo.py`
+runs the MVP loop on one synthetic instrument, explains one parent order and runs the leakage
+canaries in about a minute (64 s measured on 2026-10-26; synthetic data, no evidence class).
+
 Each recipe gives the exact command, what it prints, and the evidence class of anything it
 produces (LEARN.md section 6). We ran every command on 2026-10-25 against `main` in the CI
 environment (recipe 0) on Linux and pasted the output we saw; on Windows replace `.venv-ci/bin/python` with
@@ -377,11 +381,13 @@ them, and no session may. The runbooks are the procedure; this recipe only says 
 - **Ingest the free daily route**: [governance/DD1_INGESTION_RUNBOOK.md](GOVERNANCE.md)
   section 2 (interpreter for all users, the three sealed services, the runner, trigger
   `registered-run` in `dd1` mode, approve the `sealed` environment, read the redacted log, list the
-  record in the manifest). Nothing has been ingested as of 2026-10-25.
+  record in the manifest). The 2026-10-26 run failed all five DD1 tests and the route is rejected
+  ([DD1 finding](release/evidence/DD1_FREE_ROUTE_FINDING_2026-10-26.md)); a rerun needs a different
+  data source, not this runbook.
 - **Install the runner once**: [governance/RUNNER_SETUP.md](GOVERNANCE.md); the
   repository settings it needs (the `sealed` environment with the owner as required reviewer, the
-  `results` branch ruleset) are [governance/REPO_SETTINGS.md](GOVERNANCE.md) section 7
-  and are not yet set.
+  `results` branch ruleset) are [governance/REPO_SETTINGS.md](GOVERNANCE.md) (set by
+  the owner for the 2026-10-26 DD1 run).
 - **Approve a registered run**: [RUNBOOK_v2.md](RUNBOOK_v2.md) section 5 (the preconditions
   anyone can verify without a sealed read, the approval, where the result lands and how to verify
   it). The result's class is *mechanically isolated* while the owner holds every credential.

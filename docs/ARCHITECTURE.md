@@ -1,5 +1,12 @@
 # ARCHITECTURE — how the platform is actually built
 
+> **Read this when** you need the v1.x engine detail: per-language responsibilities, contracts,
+> determinism, goldens and hot-path notes. For the v2.0 system start with
+> [ARCHITECTURE_v2.md](ARCHITECTURE_v2.md); for results and what is claimed, [REPORT.md](REPORT.md).
+> Java columns and boxes here are historical (tag `archive/java-v1.14.0`, removed in v2.0 stage 11,
+> not built). As of v2.0.0 (2026-10-26) no alpha is confirmed.
+
+
 This document describes the system as it exists in this repository: which
 responsibilities live in which language tree, how data flows, what the
 contracts and versioning rules are, how determinism and cross-language parity
@@ -143,16 +150,16 @@ flowchart TD
     V2 --> RAW
     RAW --> NORM["Normalization + sequence validation<br/>python iap.marketdata.normalize<br/>gaps / dups / late / resets / ts-regressions / invalid counted -> qc_report.json"]
     NORM --> CANON["Canonical event stream<br/>JSONL + IAP1 v2 binary (72-byte LE records + CRC-32 trailer)<br/>+ Parquet research dataset — schemas x-version 1"]
-    CANON --> BOOK["Order-book reconstruction<br/>Python ref / C++ / Rust / Java<br/>MBO FIFO, status-gated matching, synthetic ids, dup-drop,<br/>gap->stale, reorder window, sequence resets, SNAPSHOT recovery"]
-    BOOK --> FEAT["Feature engine<br/>205-feature registry (hash = feature_version)<br/>native 40 in C++/Rust/Java — validity bitset, NaN never valid"]
+    CANON --> BOOK["Order-book reconstruction<br/>Python ref / C++ / Rust (Java archived)<br/>MBO FIFO, status-gated matching, synthetic ids, dup-drop,<br/>gap->stale, reorder window, sequence resets, SNAPSHOT recovery"]
+    BOOK --> FEAT["Feature engine<br/>205-feature registry (hash = feature_version)<br/>native 40 in C++/Rust — validity bitset, NaN never valid"]
     FEAT --> LBL["Event-time labels (Python-owned)<br/>11 horizons, mid-to-mid + cost-adjusted<br/>at-or-before rule, no lookahead"]
     FEAT --> ALPHA["Alpha ensemble<br/>24 flagship alphas (EQ01-FX12)<br/>linear_z_v1 scoring; 6 golden alphas ported"]
-    ALPHA --> PORT["Portfolio construction<br/>PGD + prox, 7 constraint families, EWMA cov<br/>Python reference, Java production service"]
-    PORT --> RISK["Hard risk engine — FAIL-CLOSED<br/>Rust reference, Java orchestration, Python reference port<br/>limits, throttles, gap/stale gates, kill switches"]
-    RISK --> EXEC["Execution algos + event-driven simulator<br/>VWAP / TWAP / POV / IS; deterministic queue model<br/>C++ reference, Java + Python ports"]
+    ALPHA --> PORT["Portfolio construction<br/>PGD + prox, 7 constraint families, EWMA cov<br/>Python reference (Java service archived v1.14)"]
+    PORT --> RISK["Hard risk engine — FAIL-CLOSED<br/>Rust reference, Python reference port<br/>limits, throttles, gap/stale gates, kill switches"]
+    RISK --> EXEC["Execution algos + event-driven simulator<br/>VWAP / TWAP / POV / IS; deterministic queue model<br/>C++ reference, Python port"]
     EXEC --> SOR["SOR / venue adapters<br/>cpp/sor, rust venue protocol + sim"]
     SOR --> FILLS["Executions (fills, fees, rebates, impact)"]
-    FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference, Java service"]
+    FILLS --> TCA["TCA + attribution<br/>Perold IS = delay + trading + opportunity (exact)<br/>Python reference"]
     TCA --> TRACE["Decision trace — one DecisionTrace per decision<br/>signal · portfolio · risk · orders · routing · fills · TCA · attribution<br/>canonical JSONL + stream digest + SQLite index (iap.store); explain()"]
     LBL --> RESEARCH
     TRACE --> RESEARCH["Research feedback / alpha factory<br/>ExperimentRunner -> research/experiments/ID/ + the ledger (6,826 looks / 640 configs as of the v1.18 REL-02 migration, research/experiments.json)<br/>REPORT.md, ML_REPORT.md, model manifests"]

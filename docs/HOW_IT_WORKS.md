@@ -1,5 +1,11 @@
 # How it works — the quant, algo and AI sides of the platform
 
+> **Read this when** you are new and want the quant, algo, risk and AI sides explained top-down.
+> It was written across v1.3 to v1.18, and version notes inside mark when each rule changed. For
+> the v2.0 layout see [ARCHITECTURE_v2.md](ARCHITECTURE_v2.md); for what is and is not claimed (no
+> alpha confirmed at v2.0.0), [REPORT.md](REPORT.md).
+
+
 A guided explanation for a technically literate newcomer. It goes top-down:
 the pipeline on one page, then one section per side of the platform — quant
 research, execution algorithms, hard risk, machine learning, the AI / agent
@@ -41,7 +47,8 @@ Five things to know before reading:
    QQQ), and v1.8.0 passed four pre-registered signals through its gate on two
    unseen 2026 days (docs/REAL_DATA.md §3; evidence class under v2.0:
    **development-supported**, developer-run, holdout since spent; the later
-   R7 round is **data-ineligible**). They were too small to pay a taker at 1-5 s. v1.9.0 and v1.10.0 add the opt-in maker path,
+   R7 round is **data-ineligible**). They were too small to pay a taker at 1-5 s, and at v2.0.0 nothing is above
+   development-supported ([REPORT.md](REPORT.md)). v1.9.0 and v1.10.0 add the opt-in maker path,
    auction research, optimal-execution schedules and stronger research
    governance; §3.6-§3.8 and §6.2 below explain them. v1.11.0 adds an
    optional LLM research agent that works only through that governance
@@ -107,7 +114,8 @@ events -> order book -> features -> alphas -> portfolio -> hard risk
 Four languages implement parts of this. Python is the reference for
 everything and runs the whole loop. C++ owns the latency-critical path and
 the execution rule text. Rust owns the hard risk engine's rule text. Java
-is the platform layer that runs paper sessions. They are held together by
+was the platform layer that ran paper sessions until v1.14.0; it was archived in v1.15 and
+removed in v2.0, and Python now runs the paper path. They are held together by
 golden files: one implementation writes the expected output, every other
 one must reproduce it — exactly for integers and bytes, to 1e-9 for
 floats.
