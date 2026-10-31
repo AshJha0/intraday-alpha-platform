@@ -25,7 +25,7 @@
 # ecosystem proposes bumps. The built iap/* images are pinned by digest in the
 # release manifest produced by .github/workflows/release.yml.
 # =============================================================================
-FROM python:3.11-slim@sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce
+FROM python:3.15-slim@sha256:94d3426f1def7db4a106a232ac121bfd975393e5dfd40a619b955fae45fe7913
 
 # Never run as root in production images.
 RUN groupadd --gid 10001 iap && \
