@@ -42,4 +42,4 @@ threadpoolctl==3.7.0
 typing-extensions==4.16.0
 # pandas needs tzdata on Windows (no system tz database); pinned so the
 # hashed lock installs on a Windows interpreter too (D-83).
-tzdata==2026.5
+tzdata==2026.6
