@@ -213,7 +213,7 @@ runs the leakage canaries in about a minute; `--replay` adds the replay check.
 ## Ten-minute quick start
 
 Prerequisites: Python 3.11 (+ pyarrow); g++ 13 / CMake / GoogleTest and
-Rust 1.99.0 only for the C++ and Rust suites
+Rust 1.99.1 only for the C++ and Rust suites
 ([docs/BUILD_NOTES.md](BUILD_NOTES.md)). The commands are the README's
 quick start, steps 1-4 and 8.
 <!-- source: README.md "Quick start"; COOKBOOK.md recipe 1 (the dataset regeneration) -->
