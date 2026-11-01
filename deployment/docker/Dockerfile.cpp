@@ -18,7 +18,7 @@
 # =============================================================================
 
 # ---------------------------------------------------------------- build stage
-FROM debian:bookworm-slim@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8 AS build
+FROM debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3 AS build
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         g++ cmake make libgtest-dev libeigen3-dev \
@@ -60,7 +60,7 @@ RUN cd cpp && bash build.sh
 RUN cd cpp && ctest --test-dir build --output-on-failure
 
 # -------------------------------------------------------------- runtime stage
-FROM debian:bookworm-slim@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8
+FROM debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3
 
 # v1.14 (G-P1-7): take the Debian security fixes the pinned base image does not
 # carry yet (the `images` job's trivy scan blocks on fixable HIGH/CRITICAL).
