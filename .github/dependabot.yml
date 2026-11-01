@@ -27,3 +27,8 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # The image Python minor is a deliberate, tested move (CI matrix, hashed
+      # requirements-image.txt, wheels for numpy/scipy). 3.15 has no numpy/scipy wheels yet.
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

@@ -1407,7 +1407,7 @@ places below.
   The 17 required checks are listed in GOVERNANCE.md §0.
 - **Dependencies.** Python installs come from hashed lock files
   (`requirements-ci.txt`, `requirements-image.txt`) with
-  `--require-hashes`; the Rust toolchain is 1.99.0 everywhere.
+  `--require-hashes`; the Rust toolchain is 1.99.1 everywhere.
 - **Artefacts.** `atomic_write_text` writes LF on every OS, so ledgers and
   study files hash the same on Windows and Linux.
 - **Order book.** `OrderBook.order(order_id)` is an O(1) lookup; the

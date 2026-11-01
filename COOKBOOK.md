@@ -6,7 +6,7 @@
 > are [docs/COOKBOOK.md](docs/COOKBOOK.md).
 
 Every recipe below is runnable from a fresh checkout of this repository in
-the standard environment (Python 3.11 + pyarrow, g++ 13/CMake, Rust 1.99.0,
+the standard environment (Python 3.11 + pyarrow, g++ 13/CMake, Rust 1.99.1,
 Java 21 only for the archived engine in the git tag `archive/java-v1.14.0`; see [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md)). Paths are relative
 to the repo root unless a recipe says otherwise. Recipes that read
 `data/features/` need recipes 1 and 3 to have run first: generated data is
@@ -3462,7 +3462,7 @@ attacks them and each ablation shows the failure getting through.
 
 Plan item E2. Recipe 49 uses the wheel; this recipe is how to build it on
 your own machine and check it before you trust it. It needs a Rust toolchain
-(the repository pins 1.99.0 in `rust/rust-toolchain.toml`) and Python 3.10
+(the repository pins 1.99.1 in `rust/rust-toolchain.toml`) and Python 3.10
 or newer. The commands below are the ones the CI job `rust-pyo3` runs; they
 were not run on the Windows machine this recipe was written on, which has no
 cargo, so no output is quoted for the build itself.
