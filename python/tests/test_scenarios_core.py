@@ -135,7 +135,7 @@ def test_snapshot_heartbeat_and_trade_interleaved_inside_burst():
 
 
 def test_scenario_venue_sequence_reset_daily_restart():
-    """LSE/Xetra-style daily reset: seqs 1..500, then a burst from seq 1 and 2.."""
+    """Exchange-style daily reset: seqs 1..500, then a burst from seq 1 and 2.."""
     b = OrderBook(1, 1)
     for s in range(1, 501):
         b.apply(

@@ -502,7 +502,7 @@ agree *exactly*:
   reverse-engineer those consumptions for queue accounting (§10). During a
   HALT / AUCTION call phase / after CLOSE **nothing matches**: crossing ADDs
   rest, the book is legitimately crossed (`is_crossed()`), and the venue's
-  own EXECUTE messages perform the uncross — exactly what LSE SETS, Xetra or
+  own EXECUTE messages perform the uncross — exactly what a European exchange or
   a NYSE re-opening auction looks like on the wire.
 - **MODIFY** — quantity change only. Decrease keeps queue position; increase
   moves the order to the level tail (you lose priority when you upsize —
@@ -544,8 +544,8 @@ agree *exactly*:
 accepted whatever its sequence (0 included); a duplicate (sequence ≤ last)
 is dropped and counted; a gap marks the book `stale = true`, and while stale
 only SNAPSHOT/STATUS/TRADE/HEARTBEAT apply. Two things real feeds do that a
-naive book cannot survive are pinned too: a **venue sequence reset** (LSE,
-Xetra, Euronext and Nasdaq restart channel sequences daily; T7 on fail-over)
+naive book cannot survive are pinned too: a **venue sequence reset** (Xetra,
+Euronext, Nasdaq and other major exchanges restart channel sequences daily; T7 on fail-over)
 is recognised when a SNAPSHOT burst starts below the last sequence — new
 epoch, `sequence_resets`, stale until the burst completes — and a
 **retransmission** (MoldUDP64 re-request, A/B arbitration) is reordered by

@@ -185,7 +185,7 @@ TIINGO_CSV = "\n".join(
         "BBB,NASDAQ,Stock,USD,2005-03-01,2026-10-24",
         "CCC,NASDAQ,Stock,USD,1999-06-01,2014-02-28",  # inactive: delisted name still listed
         "DDD,NYSE,ETF,USD,2001-01-02,2026-10-24",
-        "EEE,LSE,Stock,GBP,1995-01-02,2026-10-24",  # not US
+        "EEE,XETRA,Stock,GBP,1995-01-02,2026-10-24",  # not US
         "FFF,NYSE,Stock,USD,,",  # undated
     ]
 )

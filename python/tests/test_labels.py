@@ -201,7 +201,7 @@ def test_series_rejects_decreasing_timestamps():
 
 
 def test_scenario_labels_invalid_across_halt():
-    """LSE halt 09:03 -> reopen auction 09:08 with the mid 30 bp higher.
+    """Exchange halt 09:03 -> reopen auction 09:08 with the mid 30 bp higher.
 
     Every anchor whose (t, t+h] window touches the halt must be invalid, so
     the pre-halt OFI rows are never credited with the reopen jump.

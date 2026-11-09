@@ -114,7 +114,7 @@ adds a `schemas/MIGRATIONS.md` entry.
 - `TRADE`: tape print; `trade_id` set; `side` = aggressor side; `qty > 0`, `price_ticks > 0`;
   updates trade_flow only.
 - `QUOTE` (FX): replaces the venue's whole `side` at L1 with (`price_ticks`, `qty`), both
-  `> 0`. `order_id = 0` means id-less (LP streams, EBS/Reuters): the book keys the level
+  `> 0`. `order_id = 0` means id-less (LP and interdealer FX streams): the book keys the level
   by a synthetic id; an explicit id must be unique per side.
 - `SNAPSHOT`: full-book recovery burst, one record per resting order, best→worst price,
   FIFO within level, bids then asks; `trade_id` = records remaining in the burst after
