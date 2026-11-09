@@ -189,7 +189,7 @@ jobs:
       # PLATFORM_CONVENTIONS.md §11.1). Report-only, uploaded as an artifact;
       # no threshold gate (no existing baseline).
       - name: install cargo-llvm-cov
-        uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with:
           tool: cargo-llvm-cov
       - name: rust/risk coverage (cargo-llvm-cov)

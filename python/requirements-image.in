@@ -14,4 +14,4 @@ pyarrow
 jsonschema
 referencing
 cryptography
-setuptools>=84
+setuptools>=84.2.1

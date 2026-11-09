@@ -14,7 +14,7 @@ coverage==7.17.0
 cryptography==50.0.2
 databento-dbn==0.72.0
 execnet==2.1.2
-hypothesis==6.170.5
+hypothesis==6.170.13
 iniconfig==2.3.1
 joblib==1.6.0
 jsonschema-specifications==2025.9.1
@@ -22,7 +22,7 @@ jsonschema==4.26.0
 narwhals==2.28.0
 numpy==2.4.6
 packaging==26.3
-pandas==3.0.6
+pandas==3.1.0
 pluggy==1.7.0
 pycparser==3.11
 pyarrow==26.0.0
