@@ -141,7 +141,7 @@ def test_scenario_gateway_replay_after_reconnect(contexts, idx):
 
 
 def test_scenario_venue_disconnect_then_snapshot_recovery(contexts, idx):
-    """LSE-style disconnect at t, snapshot recovery 120 s later 1 % higher.
+    """Exchange-style disconnect at t, snapshot recovery 120 s later 1 % higher.
 
     Pinned: rolling windows reset at the recovery, warmup restarts
     (``warmup_after_recovery``) and the vol-adjusted return / trend score /

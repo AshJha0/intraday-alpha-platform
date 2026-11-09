@@ -677,7 +677,7 @@ TEST(ExecLifecycle, CancelAndValidation) {
 
 // ------------------------------------------------ round-3 scenario tests ---
 
-// Scenario: LSE-style halt at 09:03 followed by a re-open auction. A MARKET
+// Scenario: Exchange-style halt at 09:03 followed by a re-open auction. A MARKET
 // child arriving during the halt is cancelled (VENUE_NOT_TRADING), a LIMIT
 // child rests without executing, and at the uncross (first TRADING event)
 // the crossed resting order fills at the TOUCH, not at its limit (rule 8).
