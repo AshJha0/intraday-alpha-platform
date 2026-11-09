@@ -9,7 +9,7 @@ description = "Intraday Alpha Platform - Python reference implementation"
 requires-python = ">=3.11"
 dependencies = [
   "numpy>=2.4,<3",
-  "pandas>=3.0,<4",
+  "pandas>=3.1.0,<4",
   "scipy>=1.17,<2",
   "scikit-learn>=1.9,<2",
   "pyarrow>=26.0.0,<27",

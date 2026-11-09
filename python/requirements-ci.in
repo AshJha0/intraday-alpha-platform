@@ -22,7 +22,7 @@ jsonschema==4.26.0
 narwhals==2.28.0
 numpy==2.4.6
 packaging==26.3
-pandas==3.0.6
+pandas==3.1.0
 pluggy==1.7.0
 pycparser==3.11
 pyarrow==26.0.0
