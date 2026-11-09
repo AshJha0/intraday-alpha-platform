@@ -27,6 +27,10 @@
 # =============================================================================
 FROM python:3.11-slim@sha256:673719e071ecf27434fd2635bbd8d00f49f4fdd81f243143438a42ced8bedf60
 
+# Apply Debian security updates published after the base digest was cut, so
+# the image scan (HIGH/CRITICAL, fixed only) stays clean between base bumps.
+RUN apt-get update && \n    apt-get upgrade -y --no-install-recommends && \n    rm -rf /var/lib/apt/lists/*
+
 # Never run as root in production images.
 RUN groupadd --gid 10001 iap && \
     useradd --uid 10001 --gid iap --create-home --shell /usr/sbin/nologin iap
