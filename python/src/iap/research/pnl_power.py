@@ -28,7 +28,8 @@ import math
 from collections.abc import Sequence
 
 from scipy import stats
-from scipy.optimize import brentq
+
+from iap.validation.confirmatory import mde_at_t, power_at_t
 
 __all__ = [
     "PNL_POWER_VERSION",
@@ -70,10 +71,12 @@ def power(
     sessions_per_year: int = SESSIONS_PER_YEAR,
 ) -> float:
     """Probability that the session-level t test rejects when the true
-    annualised Sharpe is ``sharpe_annual``."""
+    annualised Sharpe is ``sharpe_annual``.  The noncentral t is evaluated by
+    :func:`iap.validation.confirmatory.power_at_t`, the one place the
+    repository does so."""
     crit = critical_t(sessions, alpha, n_tests)
-    delta = sharpe_annual * math.sqrt(sessions / sessions_per_year)
-    return float(stats.nct.sf(crit, sessions - 1, delta))
+    delta = sharpe_annual / math.sqrt(sessions_per_year)  # per-session Sharpe, in sd units
+    return power_at_t(sessions, crit, delta)
 
 
 def sessions_needed(
@@ -110,13 +113,12 @@ def mde_sharpe(
     n_tests: int = 1,
     sessions_per_year: int = SESSIONS_PER_YEAR,
 ) -> float:
-    """Minimum detectable annualised Sharpe on ``sessions`` sessions."""
-    _check(sessions, alpha, n_tests)
-
-    def gap(sr: float) -> float:
-        return power(sr, sessions, alpha, n_tests, sessions_per_year) - target_power
-
-    return float(brentq(gap, 0.0, 1000.0, xtol=1e-6))
+    """Minimum detectable annualised Sharpe on ``sessions`` sessions: the
+    repository's one noncentral-t inversion
+    (:func:`iap.validation.confirmatory.mde_at_t`, in per-session sd units)
+    scaled to a year."""
+    crit = critical_t(sessions, alpha, n_tests)
+    return mde_at_t(sessions, crit, target_power) * math.sqrt(sessions_per_year)
 
 
 def table(

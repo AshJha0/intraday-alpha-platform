@@ -133,7 +133,7 @@ digest ([docs/MVP.md](MVP.md)).
 
 **Three languages, one semantics.** Each ported component has golden vectors produced by
 the Python reference. The C++ and Rust copies must match them byte for byte. On the v1.18.0
-CI run the table counted 4,062 Python, 333 C++ and 376 Rust tests, with 217, 74 and 75 golden
+CI run the table counted 4,062 Python, 333 C++ and 388 Rust tests, with 217, 74 and 75 golden
 ([README.md](../README.md), parity table).
 
 ## 5. Engineering numbers

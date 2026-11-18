@@ -320,7 +320,7 @@ and by Java and Rust (the lifecycle ports). The harness
 (`tests/harness/run_all.sh`, with `run_golden.sh` as the golden-only alias)
 runs every suite with the canonical commands and prints the parity table; a
 main CI run 40015853764 (2026-10-23, commit 23b69fb2, the v1.18.0 tag commit)
-passes 4062/333/376 tests (217/74/75 golden) across python/cpp/rust (Java
+passes 4062/333/388 tests (217/74/75 golden) across python/cpp/rust (Java
 archived in v1.15, the git tag `archive/java-v1.14.0`), plus the repo-level `integration` (35)
 and `replay` (6) rows, the same counts the README parity table records.
 The python figure is the Python 3.11 `python` job plus the `python-slow` job:

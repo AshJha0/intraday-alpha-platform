@@ -126,7 +126,7 @@ abs and rel 1e-9; adaptive PSI/KS at 1e-10 with exact refit booleans and
 lifecycle state sequences; canonical-JSON lines, trace digests, the risk
 audit / snapshot and the lifecycle registry are byte-identical; the 7-state
 lifecycle golden is compared exactly, field by field. The README's table
-(from main CI run 40015853764 (2026-10-23, v1.18.0 at 23b69fb2)) reads python 4062 / cpp 333 / rust 376
+(from main CI run 40015853764 (2026-10-23, v1.18.0 at 23b69fb2)) reads python 4062 / cpp 333 / rust 388
 (golden 217/74/75; Java archived in v1.15), `integration` 35, `replay` 6; the
 deployment job derives the counts from the CI jobs' artefacts
 (`tests/harness/parity_counts.py`) and warns when the table drifts.

@@ -295,7 +295,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
      net-of-cost screen passes 0 of 22, and the v1.16 monetisation study found no taker, capacity,
      quoting or DeepLOB edge. Real-data and synthetic-data looks are counted separately below.</p>
   <div class="numbers">
-    Cross-language parity&nbsp;&nbsp;&nbsp; python 4062&nbsp; · cpp 333&nbsp; · rust 376 tests, 4,771 green (main CI run 40015853764, 2026-10-23, v1.18.0); golden groups 217/74/75 (Java archived in v1.15)<br>
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 4062&nbsp; · cpp 333&nbsp; · rust 388 tests, 4,783 green (main CI run 40015853764, 2026-10-23, v1.18.0); golden groups 217/74/75 (Java archived in v1.15)<br>
     Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in python, cpp and rust (Java archived in v1.15)<br>
     C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 2-CPU container (Intel Xeon 2.10 GHz, no pinning, steady_clock, cache-resident means; not colocation): IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
     Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly; the MVP run twice and replayed from its capture reproduces its trace digest<br>

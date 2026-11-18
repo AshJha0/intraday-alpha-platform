@@ -104,11 +104,11 @@ are from main CI run 40015853764 (2026-10-23, v1.18.0 at 23b69fb2); CI derives
 them from the jobs' own artefacts (`tests/harness/parity_counts.py`): python is
 the fast job plus the `python-slow` job (3,666 + 396 passed; 21 + 3 skipped, 1
 xfailed), cpp the ctest total, rust the passes of `cargo test --workspace`
-(and `check_headline_numbers.py` re-counts 376 `#[test]` functions with 75
-golden over 12 targets in the source tree). Since v2.0 stage 11 (S2) the per-PR
+(and `check_headline_numbers.py` re-counts 388 `#[test]` functions with 75
+golden in the source tree; the rust row was raised from 376 to 388 on 2026-11-18 with the `itchbars` crate, counted from the source tree and not yet from a main CI run). Since v2.0 stage 11 (S2) the per-PR
 `rust` job tests the `risk` and `features` crates only and the workspace runs
 weekly (`weekly-structural.yml`), so a PR run's derived rust count is lower than
-the 376 of this table (reported as drift, defect D-79); every crate's golden
+the 388 of this table (reported as drift, defect D-79); every crate's golden
 target still runs per PR in the `golden` job.
 
 ```
@@ -117,7 +117,7 @@ language | tests passed | golden passed  | time   | status
 ---------+--------------+----------------+--------+-------
 python   | 4062         | 217            |    -s | PASS
 cpp      | 333          | 74             |    -s | PASS
-rust     | 376          | 75             |    -s | PASS
+rust     | 388          | 75             |    -s | PASS
 integration | 35           | -              |    -s | PASS
 replay   | 6            | -              |    -s | PASS
 deployment | -            | -              |    -s | PASS
