@@ -279,6 +279,8 @@ RUNNERS = {
     "python/src/iap/auction/rel08c_study.py": "environment_mismatches",
     # v2.0 CR1: the registered runner verifies the signed prereg's identity before any sealed request
     "tools/runner/verify.py": "verify_identity",
+    # round 1: the one look at the sealed breadth holdout on the bars path
+    "python/src/iap/research/breadth_holdout.py": "verify_identity",
 }
 # Consume a signed document but run no analysis: binders / signers / the
 # identity module itself / tools that only verify signatures.
