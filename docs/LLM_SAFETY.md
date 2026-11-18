@@ -92,6 +92,17 @@ Signing, registration and lifecycle promotion are commands a person runs
 agent's own Ed25519 key signs its blackboard proposals so they can be attributed; it
 signs nothing that changes a gate.
 
+### 2.5 The tool loop survives bad turns
+
+Both loops (`iap.llm.loop.run_tool_loop` and `iap.llm.agent.run_session`) handle four
+cases the same way. A tool that raises an unexpected exception is returned to the model
+as an error result (exception type and text, key scrubbed) and logged with `ok: false`;
+the session goes on. If the API call itself raises, `session.json` is written with
+status `client_error` and the exception is then re-raised to the caller. A response cut
+off at `max_tokens` ends the session with status `max_tokens` and none of its tool calls
+run, because their inputs may be truncated; the turn is still in the transcript. A
+`pause_turn` response is sent back as is and the loop continues; it counts as a turn.
+
 ## 3. What this does not protect against
 
 - A finding can quote true numbers and still draw a wrong conclusion. The checker

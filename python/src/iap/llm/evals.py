@@ -393,7 +393,7 @@ def run_scenario(
             "control": control,
             "status": summary["status"],
             "usd": summary["budget"]["usd"],
-            "workspace": str(ws),
+            "workspace": ws.name,  # basename only: no local path in a public file
         }
     )
     return row

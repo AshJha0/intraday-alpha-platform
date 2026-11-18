@@ -235,3 +235,19 @@ def test_scenarios_run_with_the_real_fingerprinter(tmp_path, name):
     fingerprint); every scenario's setup and session must accept it."""
     row = evals.run_scenario(name, tmp_path, fingerprinter=None)
     assert row["ok"], row
+
+
+def test_eval_row_workspace_is_a_basename(tmp_path):
+    """A public eval record must not carry a local path (user name)."""
+    row = evals.run_scenario("task_success", tmp_path)
+    assert row["workspace"] == "task_success-on"
+    import pathlib
+
+    from conftest import REPO_ROOT
+
+    rec = json.loads(
+        pathlib.Path(REPO_ROOT, "research/agents/eval_live_sdk2.json").read_text("utf-8")
+    )
+    rows = rec if isinstance(rec, list) else rec.get("rows", rec.get("results", []))
+    text = json.dumps(rec)
+    assert "Users" not in text and ":\\\\" not in text, rows
