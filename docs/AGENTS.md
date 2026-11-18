@@ -116,7 +116,7 @@ that the (temporary) spend ledger holds one row per model call. The `docs` job
 
 ## 7. Read-only MCP server (official SDK)
 
-`python -m iap.governance.mcp_sdk_server --root .` serves the read tools,
+`python -m iap.memory.mcp_server --root .` serves the read tools (plus the research-memory tools),
 resources and two prompts over stdio, built on the official `mcp` SDK (an
 optional extra; `.mcp.json` at the root launches it). Details, versions and
 the tests behind each security property: [MCP_SERVER.md](MCP_SERVER.md).

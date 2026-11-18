@@ -1,7 +1,9 @@
 # MCP server (official SDK)
 
 `iap.governance.mcp_sdk_server` is a read-only Model Context Protocol server
-built on the official `mcp` Python SDK. It sits beside the older hand-written
+built on the official `mcp` Python SDK. `python -m iap.memory.mcp_server` serves
+the same server plus two research-memory tools; that is the launcher `.mcp.json`
+and the `iap-mcp-sdk` script use. It sits beside the older hand-written
 server, `iap.governance.mcp_server`, which stays as it was. Both read the same
 files through the same `Tools` class, so a tool returns the same payload from
 either one; a test checks that for every tool.
@@ -18,7 +20,8 @@ files do not mention it.
 
 ```
 pip install -e "python[mcp]"
-python -m iap.governance.mcp_sdk_server --root .
+python -m iap.memory.mcp_server --root .          # base tools + memory tools
+python -m iap.governance.mcp_sdk_server --root .  # base tools only
 ```
 
 The server speaks over stdio and has no network listener. Without the extra it
@@ -47,8 +50,14 @@ text for older clients).
 | `memory_search` | `query` (1-500 characters), `k` (1-20, default 10), `kinds` (`doc`, `research`, `ledger`) | research-memory hits with file:line citations; heading and snippet wrapped as untrusted |
 | `prior_tests` | `alpha_id`, `horizon`, `text` (at most 500 characters), `k` (1-20) | nearest ledger entries and result documents; ranking only, the same-test rule is in `iap.graph.wiring` |
 
-The two memory tools come from `MemoryTools` in the same module, which builds the
-[research memory](RESEARCH_MEMORY.md) index on first use. See [AI_STACK.md](AI_STACK.md).
+The last two rows are served only by `python -m iap.memory.mcp_server`. They live in
+`iap.memory.mcp_tools` (`MemoryTools`, which builds the [research memory](RESEARCH_MEMORY.md)
+index on first use) and reach the server as a tool provider:
+`build_server(root, providers=[register])` calls `register(server, ctx)` after the base
+tools, with a `ProviderContext` holding the root, the read-only annotation, the identifier
+type and the error-mapping `call`. A provider must add read-only tools only. The
+governance module never imports `iap.memory`: memory sits above governance, and a test
+checks that the import goes one way. See [AI_STACK.md](AI_STACK.md).
 
 ## Resources
 
