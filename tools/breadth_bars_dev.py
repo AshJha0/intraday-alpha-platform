@@ -102,9 +102,8 @@ def render(doc: dict) -> str:
         "  days and carry no confirmation weight: the independent unit is the session.",
         f"- Session tags from the event calendar: {', '.join(doc['session_tags']) or 'none'}. An event day",
         "  is not a typical session.",
-        f"- Looks taken here: {doc['looks']} (two scores, two entry delays), counted in this report and",
-        "  NOT yet entered in `research/experiments.json`; they are entered with the round's pull",
-        "  request, because a ledger entry moves the look counts quoted in other documents. The 1-minute delay is",
+        f"- Looks taken here: {doc['looks']} (two scores, two entry delays), recorded in",
+        "  `research/round1/looks_ledger.json` with the round's other looks. The 1-minute delay is",
         "  the primary; delay 0 assumes a trade at the quote the decision was made on.",
         "- Costs: the book crosses the quoted spread to enter and to exit and turns over fully",
         "  each rebalance. No fee, no impact, no borrow. Nasdaq's own quote is wider than the",
@@ -144,7 +143,7 @@ def main(argv: list[str] | None = None) -> int:
         "median_notional": float(np.median(notional)),
     }
     runs = [bb.run_study(panel, rows, LOOKBACK, STEP, HORIZON, d) for d in DELAYS]
-    sessions_listed = 46
+    sessions_listed = 10
     doc = {
         "schema": "iap.round1.breadth_bars_dev/1",
         "date": args.date,

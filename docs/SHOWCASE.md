@@ -98,11 +98,11 @@ separated custody and no independent party has reproduced a result.
   one fails the net-P&L-after-costs gate.
   <!-- source: README.md "Headline numbers" (Promotion verdicts, Lifecycle registry rows) and docs/index.html "Results so far" -->
 
-**Current: v2.2.0 ([[PENDING: release date]]); no alpha is confirmed.** Both free routes to a
+**Current: v2.2.0 (2026-11-19); no alpha is confirmed.** Both free routes to a
 confirmation sample are closed: IEX withdrew its intraday captures from direct download, and the
 daily route has no eligible free source. Ten free in-sample Nasdaq sessions remain, too few to
 confirm a realistic Sharpe. An event-driven quoter lost more than the grid quoter on its one
-development session. Pooled ten-session and family results: [[PENDING: pooled and F1 to F3 results, one line]].
+development session. Pooled ten-session and family results: both reversal scores lose about 6.2 to 6.3 bps per rebalance after the spread (session-level t -11.7 and -9.3, 0 of 10 sessions positive); momentum -5.78 bps (t -4.71), opening reversal -10.57 (t -1.97), closing-auction imbalance +0.32 (t 0.64; positive before the spread in all ten sessions). The sealed holdout was not read.
 Source: [REPORT.md](REPORT.md) section 2, rows 12 to 18, and the
 [v2.2.0 release notes](release/v2.2.0_RELEASE_NOTES.md). v2.1.0 (2026-10-27) added no research
 claim ([notes](release/v2.1.0_RELEASE_NOTES.md)).

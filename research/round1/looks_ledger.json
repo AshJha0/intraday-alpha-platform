@@ -1,0 +1,2005 @@
+{
+  "bonferroni_p_threshold": 0.0006578947368421052,
+  "bonferroni_t_threshold": 3.4065501007800694,
+  "chain_head": "df50325bf386a41d36385364ee0c6d03cee239659549d5dfb1c3f46869d25598",
+  "chain_length": 76,
+  "datasets": [
+    {
+      "dataset_version": "7c8d7281dd720c8ebb56bc375484144d96ce998f9a46e64898a47659dbf960f0",
+      "entries": 7,
+      "looks": 7
+    },
+    {
+      "dataset_version": "a82d2e35be2b71a1fc3eeb8af16d8dba835396ef119290c65a5353b4c0e01dca",
+      "entries": 7,
+      "looks": 7
+    },
+    {
+      "dataset_version": "8cc124cefab7642ef3fa3a92da38cf3d63aae5c3cff44e71deb6c9288734d96c",
+      "entries": 7,
+      "looks": 7
+    },
+    {
+      "dataset_version": "23aaa8918abbe2dfeeb1969dbc261e04168dfd79eb7921278a33d86af46333b0",
+      "entries": 7,
+      "looks": 7
+    },
+    {
+      "dataset_version": "4cffde03c45d72c154af291f319d4a03fa6377c27017b5f9d38d21302e408b5f",
+      "entries": 7,
+      "looks": 7
+    },
+    {
+      "dataset_version": "986c3f228c6fc36f9bb7df0b5aa7d5657aa7ffcc5b23500c84016d775d52d397",
+      "entries": 7,
+      "looks": 7
+    },
+    {
+      "dataset_version": "a82fa837ef674944a674dc0e259ef3059082725c81f0dd39d76894d4f7722534",
+      "entries": 7,
+      "looks": 7
+    },
+    {
+      "dataset_version": "d741e9611b7dd4d392fb6cc91990c58b903a0521135c798b34819d0032bcb90e",
+      "entries": 7,
+      "looks": 7
+    },
+    {
+      "dataset_version": "933ee8961f497fbd73fee726cec998cbd3f13c4bb9da7cc52c5a54e33dd7c3b3",
+      "entries": 7,
+      "looks": 7
+    },
+    {
+      "dataset_version": "a625f462173f2b308a092ec620dc2e74dd23785e4714d6353d529c694364daed",
+      "entries": 7,
+      "looks": 7
+    },
+    {
+      "dataset_version": "8c97b5b13bc451c012c2466fb7e258da134dab29aa47b67fe7b0088c78e870be",
+      "entries": 6,
+      "looks": 6
+    }
+  ],
+  "description": "Multiple-testing ledger (spec \u00a713). Deterministic: no wall-clock; identical rerun => identical file. Experiments are de-duplicated by (alpha_id, kind, canonical config, dataset_version): re-running the same script on the same dataset does not inflate the Bonferroni denominator; the same configuration on a new dataset is a new look, and the looks of earlier datasets are kept (`datasets`). An entry judged under the ledger t-stat policy carries `gate_looks`, the look count its threshold was derived from.",
+  "distinct_experiments": 76,
+  "entries": [
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-01-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "7c8d7281dd720c8ebb56bc375484144d96ce998f9a46e64898a47659dbf960f0",
+      "key": "96ae18b6c7b74f31254d92a9a38eff69f9f44be03d3fe6133021ee536dbe3b87",
+      "kind": "breadth_bars_dev",
+      "n": 1,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": -1.7170886846563986,
+        "net_bps_per_rebalance": -9.840835527101591,
+        "rank_ic": -0.011948321255494306,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-01-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "7c8d7281dd720c8ebb56bc375484144d96ce998f9a46e64898a47659dbf960f0",
+      "key": "a0713c9c57cec550645a5721e737d14478d62d52d0ba842d32b69977ee148d95",
+      "kind": "breadth_bars_dev",
+      "n": 2,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": -0.9509180223112613,
+        "net_bps_per_rebalance": -8.986054693017033,
+        "rank_ic": -0.006846498258626867,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-01-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "7c8d7281dd720c8ebb56bc375484144d96ce998f9a46e64898a47659dbf960f0",
+      "key": "1615057b2821d7487efe100fa1b33d75414ec0cf68c826f4056c194b7ac2b1e2",
+      "kind": "breadth_bars_dev",
+      "n": 3,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": -1.6581206606972703,
+        "net_bps_per_rebalance": -9.597046783695406,
+        "rank_ic": -0.012600986462667184,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-01-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "7c8d7281dd720c8ebb56bc375484144d96ce998f9a46e64898a47659dbf960f0",
+      "key": "a149c1f0199e72c5a5af3557f9d8da5005b60ab6144dc0a3fefdf96e9602e32f",
+      "kind": "breadth_bars_dev",
+      "n": 4,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": -1.0659199038916358,
+        "net_bps_per_rebalance": -8.90141670259637,
+        "rank_ic": -0.013336204903926735,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "F1_momentum_30",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "delay": 1,
+          "horizon": 30,
+          "lookback": 30,
+          "step": 30
+        },
+        "prespec": "FAMILIES_PRESPEC section 1",
+        "session": "2019-01-30",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "7c8d7281dd720c8ebb56bc375484144d96ce998f9a46e64898a47659dbf960f0",
+      "key": "bd5dd1ca1d6909026f20ef031330e0aacf1962ad9b5785275df68e6592a8c3bb",
+      "kind": "breadth_bars_family",
+      "n": 5,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": -4.012736509902917,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F2_open_reversal",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision": 14,
+          "delay": 1,
+          "exit": 44,
+          "start": 0
+        },
+        "prespec": "FAMILIES_PRESPEC section 2",
+        "session": "2019-01-30",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "7c8d7281dd720c8ebb56bc375484144d96ce998f9a46e64898a47659dbf960f0",
+      "key": "dcd7e28c46beb7f9f9d253b6d832ffffb7a1bcfbb8145879c1e1e47a9d0c9425",
+      "kind": "breadth_bars_family",
+      "n": 6,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": -20.176369448261806,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F3v2_closing_imbalance",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision_ns": 57305000000000,
+          "entry": 385,
+          "exit": "cross",
+          "normaliser": "displayed volume bars 0..384",
+          "version": 2
+        },
+        "prespec": "FAMILIES_PRESPEC erratum, F3 version 2",
+        "session": "2019-01-30",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "7c8d7281dd720c8ebb56bc375484144d96ce998f9a46e64898a47659dbf960f0",
+      "key": "f3ddc744364059b717a1592f86dcb13f57ce26826e68b6f1fb649901d34c903c",
+      "kind": "breadth_bars_family",
+      "n": 7,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": 187,
+        "session_net_bps": 2.476155654428209,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-03-27",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a82d2e35be2b71a1fc3eeb8af16d8dba835396ef119290c65a5353b4c0e01dca",
+      "key": "25230c038c48ef973a0733f4320e049da96a23e83088e51293b3dc6227c8935d",
+      "kind": "breadth_bars_dev",
+      "n": 8,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 3.068112399305301,
+        "net_bps_per_rebalance": -3.2089570017054445,
+        "rank_ic": 0.0615436296126178,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-03-27",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a82d2e35be2b71a1fc3eeb8af16d8dba835396ef119290c65a5353b4c0e01dca",
+      "key": "b19c4d39e4111aacf18e0ca3ec69add076fb78db0087589d612d809251d549a6",
+      "kind": "breadth_bars_dev",
+      "n": 9,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 2.0055618074188666,
+        "net_bps_per_rebalance": -4.366649140734579,
+        "rank_ic": 0.050243158329301985,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-03-27",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a82d2e35be2b71a1fc3eeb8af16d8dba835396ef119290c65a5353b4c0e01dca",
+      "key": "fa0b5b9f272ccb85c63891a195242e4b58a9b11b9924eb02e37b0cfca7964ce8",
+      "kind": "breadth_bars_dev",
+      "n": 10,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 3.348894804640383,
+        "net_bps_per_rebalance": -2.9965660901676188,
+        "rank_ic": 0.07148182296783819,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-03-27",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a82d2e35be2b71a1fc3eeb8af16d8dba835396ef119290c65a5353b4c0e01dca",
+      "key": "89c9b5c6b663aa2c6541a33f997c7912d43541b68c52566d2cf73083714fd7e1",
+      "kind": "breadth_bars_dev",
+      "n": 11,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 2.5076663717658203,
+        "net_bps_per_rebalance": -3.8507239582799557,
+        "rank_ic": 0.053973182247249486,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "F1_momentum_30",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "delay": 1,
+          "horizon": 30,
+          "lookback": 30,
+          "step": 30
+        },
+        "prespec": "FAMILIES_PRESPEC section 1",
+        "session": "2019-03-27",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a82d2e35be2b71a1fc3eeb8af16d8dba835396ef119290c65a5353b4c0e01dca",
+      "key": "e241db67a88ef8d9af5b097bd5b0fa7b19c17e7b2770285a5cf1233cff9290dd",
+      "kind": "breadth_bars_family",
+      "n": 12,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": -9.510703203999988,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F2_open_reversal",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision": 14,
+          "delay": 1,
+          "exit": 44,
+          "start": 0
+        },
+        "prespec": "FAMILIES_PRESPEC section 2",
+        "session": "2019-03-27",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a82d2e35be2b71a1fc3eeb8af16d8dba835396ef119290c65a5353b4c0e01dca",
+      "key": "d67f6dde0c65bc4d6adb100bc62c39b61fbaf7154f02d95bba6c2168732afd94",
+      "kind": "breadth_bars_family",
+      "n": 13,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": -4.914633608812903,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F3v2_closing_imbalance",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision_ns": 57305000000000,
+          "entry": 385,
+          "exit": "cross",
+          "normaliser": "displayed volume bars 0..384",
+          "version": 2
+        },
+        "prespec": "FAMILIES_PRESPEC erratum, F3 version 2",
+        "session": "2019-03-27",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a82d2e35be2b71a1fc3eeb8af16d8dba835396ef119290c65a5353b4c0e01dca",
+      "key": "13ea5211bc05ffc467a789ffb0a57aef10736e53733b70637c23fcf78ff972ea",
+      "kind": "breadth_bars_family",
+      "n": 14,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": 183,
+        "session_net_bps": 1.20787590189432,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-07-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "8cc124cefab7642ef3fa3a92da38cf3d63aae5c3cff44e71deb6c9288734d96c",
+      "key": "aabe99f39e97d26b7a8c1cc6e80dc06ee1153b8ed3823d1ccd3ea362a310461c",
+      "kind": "breadth_bars_dev",
+      "n": 15,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 0.6214637248464593,
+        "net_bps_per_rebalance": -5.229654246665316,
+        "rank_ic": 0.01268378136670424,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-07-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "8cc124cefab7642ef3fa3a92da38cf3d63aae5c3cff44e71deb6c9288734d96c",
+      "key": "5499669c3c64aeae60f45dc7bb5b725df068f51946269128f746012f6c12f86c",
+      "kind": "breadth_bars_dev",
+      "n": 16,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 0.3583123321068218,
+        "net_bps_per_rebalance": -5.5350192745762135,
+        "rank_ic": 0.03048955059081517,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-07-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "8cc124cefab7642ef3fa3a92da38cf3d63aae5c3cff44e71deb6c9288734d96c",
+      "key": "34c7a97decbab10bbf83c13b92d648b122a6de00beb51df7917ed795cc6ce0cc",
+      "kind": "breadth_bars_dev",
+      "n": 17,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": -0.1256605199285191,
+        "net_bps_per_rebalance": -6.044203639802272,
+        "rank_ic": -0.001474974520210966,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-07-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "8cc124cefab7642ef3fa3a92da38cf3d63aae5c3cff44e71deb6c9288734d96c",
+      "key": "1d7a4ee0473a48491e004dd597f53248b7186128edfdb981814430700dfbb67c",
+      "kind": "breadth_bars_dev",
+      "n": 18,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 0.21248906794147682,
+        "net_bps_per_rebalance": -5.703711298552267,
+        "rank_ic": 0.02531707231988374,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "F1_momentum_30",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "delay": 1,
+          "horizon": 30,
+          "lookback": 30,
+          "step": 30
+        },
+        "prespec": "FAMILIES_PRESPEC section 1",
+        "session": "2019-07-30",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "8cc124cefab7642ef3fa3a92da38cf3d63aae5c3cff44e71deb6c9288734d96c",
+      "key": "5aa99be3bd07e4dee10ced02681be9d03e2083b1a780138e9603564f0967706e",
+      "kind": "breadth_bars_family",
+      "n": 19,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": -0.9016387547655981,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F2_open_reversal",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision": 14,
+          "delay": 1,
+          "exit": 44,
+          "start": 0
+        },
+        "prespec": "FAMILIES_PRESPEC section 2",
+        "session": "2019-07-30",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "8cc124cefab7642ef3fa3a92da38cf3d63aae5c3cff44e71deb6c9288734d96c",
+      "key": "9604119dc58ccd840f9dfd079deb7a4ca27194695541cd16572db9d6929ba8ab",
+      "kind": "breadth_bars_family",
+      "n": 20,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": 27.475652167499014,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F3v2_closing_imbalance",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision_ns": 57305000000000,
+          "entry": 385,
+          "exit": "cross",
+          "normaliser": "displayed volume bars 0..384",
+          "version": 2
+        },
+        "prespec": "FAMILIES_PRESPEC erratum, F3 version 2",
+        "session": "2019-07-30",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "8cc124cefab7642ef3fa3a92da38cf3d63aae5c3cff44e71deb6c9288734d96c",
+      "key": "28bed0f2b36677ba11a1f46936223167244c357ef15b050382cd75e35015165f",
+      "kind": "breadth_bars_family",
+      "n": 21,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": 182,
+        "session_net_bps": -0.9680748796603983,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-08-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "23aaa8918abbe2dfeeb1969dbc261e04168dfd79eb7921278a33d86af46333b0",
+      "key": "8858b2f1e8681f1199199a3edcb0cb6a0a98d292e4624a1eaf7bdb59843b1150",
+      "kind": "breadth_bars_dev",
+      "n": 22,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 3.968814501957888,
+        "net_bps_per_rebalance": -3.333398441840677,
+        "rank_ic": 0.08784048850335968,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-08-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "23aaa8918abbe2dfeeb1969dbc261e04168dfd79eb7921278a33d86af46333b0",
+      "key": "2933e43f8da10e36465914e7c2bf050fe800b92413e44ca60e8458e2c5af7aa7",
+      "kind": "breadth_bars_dev",
+      "n": 23,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 2.987258343831917,
+        "net_bps_per_rebalance": -4.322148707725975,
+        "rank_ic": 0.08643329891379137,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-08-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "23aaa8918abbe2dfeeb1969dbc261e04168dfd79eb7921278a33d86af46333b0",
+      "key": "a8be9899bd4b23f630047e364548f39e2f243fc091f5bd1213facd77ffc6e2cc",
+      "kind": "breadth_bars_dev",
+      "n": 24,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 3.0747734977512793,
+        "net_bps_per_rebalance": -4.085496797575593,
+        "rank_ic": 0.06401537530960555,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-08-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "23aaa8918abbe2dfeeb1969dbc261e04168dfd79eb7921278a33d86af46333b0",
+      "key": "a78b22aa232668fe62d536f20ecc971ee4f2540ddc6904618fb74eb2e22315e8",
+      "kind": "breadth_bars_dev",
+      "n": 25,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 1.8203759774907695,
+        "net_bps_per_rebalance": -5.245800427983106,
+        "rank_ic": 0.06528345168278549,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "F1_momentum_30",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "delay": 1,
+          "horizon": 30,
+          "lookback": 30,
+          "step": 30
+        },
+        "prespec": "FAMILIES_PRESPEC section 1",
+        "session": "2019-08-30",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "23aaa8918abbe2dfeeb1969dbc261e04168dfd79eb7921278a33d86af46333b0",
+      "key": "42b76b53927021003be1440623e4602573769fd8b02537e1809ea74ab95cbe3a",
+      "kind": "breadth_bars_family",
+      "n": 26,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": -11.284679192593982,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F2_open_reversal",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision": 14,
+          "delay": 1,
+          "exit": 44,
+          "start": 0
+        },
+        "prespec": "FAMILIES_PRESPEC section 2",
+        "session": "2019-08-30",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "23aaa8918abbe2dfeeb1969dbc261e04168dfd79eb7921278a33d86af46333b0",
+      "key": "8b94abc28cce2b13110f5ed78b875b9dfafb35d7a5b6899790f639ed994664fc",
+      "kind": "breadth_bars_family",
+      "n": 27,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": -18.809845577742593,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F3v2_closing_imbalance",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision_ns": 57305000000000,
+          "entry": 385,
+          "exit": "cross",
+          "normaliser": "displayed volume bars 0..384",
+          "version": 2
+        },
+        "prespec": "FAMILIES_PRESPEC erratum, F3 version 2",
+        "session": "2019-08-30",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "23aaa8918abbe2dfeeb1969dbc261e04168dfd79eb7921278a33d86af46333b0",
+      "key": "1566c54ef6a7b2bda3430eca0dd8424c848eed7011aa9f2c5f9d1112f3f9c520",
+      "kind": "breadth_bars_family",
+      "n": 28,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": 179,
+        "session_net_bps": 0.2381607429643827,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-10-18",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "4cffde03c45d72c154af291f319d4a03fa6377c27017b5f9d38d21302e408b5f",
+      "key": "369f2af82dda7f47051b26c03e44b36cd9a8bb02d314ba91d422b256145b5995",
+      "kind": "breadth_bars_dev",
+      "n": 29,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": -2.9360420821161046,
+        "net_bps_per_rebalance": -9.525966589477125,
+        "rank_ic": -0.04573307384292563,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-10-18",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "4cffde03c45d72c154af291f319d4a03fa6377c27017b5f9d38d21302e408b5f",
+      "key": "ce45b18d05782d6428cb1b1f03e884956832bd478ebf971776a4047becdeb176",
+      "kind": "breadth_bars_dev",
+      "n": 30,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": -2.8056330022962723,
+        "net_bps_per_rebalance": -9.548225602955661,
+        "rank_ic": -0.03568945284923327,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-10-18",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "4cffde03c45d72c154af291f319d4a03fa6377c27017b5f9d38d21302e408b5f",
+      "key": "9d00806dd03651871bf42ab7d093aca3a0aa037b3dd4021757d36bb8240207fb",
+      "kind": "breadth_bars_dev",
+      "n": 31,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": -2.683115061789518,
+        "net_bps_per_rebalance": -9.33445357940834,
+        "rank_ic": -0.04274068807239482,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-10-18",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "4cffde03c45d72c154af291f319d4a03fa6377c27017b5f9d38d21302e408b5f",
+      "key": "fbd2d65379a49bd58a6aa2d8a33021d2657b2f2b5e3df15341d02226ea4c146e",
+      "kind": "breadth_bars_dev",
+      "n": 32,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": -2.4828399488201267,
+        "net_bps_per_rebalance": -9.139184211979364,
+        "rank_ic": -0.03331799791010939,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "F1_momentum_30",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "delay": 1,
+          "horizon": 30,
+          "lookback": 30,
+          "step": 30
+        },
+        "prespec": "FAMILIES_PRESPEC section 1",
+        "session": "2019-10-18",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "4cffde03c45d72c154af291f319d4a03fa6377c27017b5f9d38d21302e408b5f",
+      "key": "7788ee7ee38dda8cbadf0603f11e3e7b0ae369237450cf9a9e19a40872df9a58",
+      "kind": "breadth_bars_family",
+      "n": 33,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": 1.3715808090525266,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F2_open_reversal",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision": 14,
+          "delay": 1,
+          "exit": 44,
+          "start": 0
+        },
+        "prespec": "FAMILIES_PRESPEC section 2",
+        "session": "2019-10-18",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "4cffde03c45d72c154af291f319d4a03fa6377c27017b5f9d38d21302e408b5f",
+      "key": "1b04e4e9b18c1e6661da21a1512853d1cd757c064b1046017b3fe6e4a53444fb",
+      "kind": "breadth_bars_family",
+      "n": 34,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": -29.058728243008524,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F3v2_closing_imbalance",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision_ns": 57305000000000,
+          "entry": 385,
+          "exit": "cross",
+          "normaliser": "displayed volume bars 0..384",
+          "version": 2
+        },
+        "prespec": "FAMILIES_PRESPEC erratum, F3 version 2",
+        "session": "2019-10-18",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "4cffde03c45d72c154af291f319d4a03fa6377c27017b5f9d38d21302e408b5f",
+      "key": "a6bfae7a2ec22ea5781df259be153ed85b19764b9bc86971a738a8c16fac9c6d",
+      "kind": "breadth_bars_family",
+      "n": 35,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": 181,
+        "session_net_bps": 3.2777025425229884,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-10-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "986c3f228c6fc36f9bb7df0b5aa7d5657aa7ffcc5b23500c84016d775d52d397",
+      "key": "9114f48932cbc69ced5e952ab347523f5d987d532882f9dc1c0a9d009eb20663",
+      "kind": "breadth_bars_dev",
+      "n": 36,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 2.219153959159711,
+        "net_bps_per_rebalance": -5.894790624446226,
+        "rank_ic": 0.03298396309109467,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-10-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "986c3f228c6fc36f9bb7df0b5aa7d5657aa7ffcc5b23500c84016d775d52d397",
+      "key": "fa8d38209e6846aa3d31589d99d584da1fd489eb53f6682922b4a0aed104d160",
+      "kind": "breadth_bars_dev",
+      "n": 37,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 1.3701909676637278,
+        "net_bps_per_rebalance": -6.800636156632367,
+        "rank_ic": 0.043299896350686894,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-10-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "986c3f228c6fc36f9bb7df0b5aa7d5657aa7ffcc5b23500c84016d775d52d397",
+      "key": "a44ab86d6887befc8bd27112ccb6653262b781a0c60a23a701acfb9d14deedf9",
+      "kind": "breadth_bars_dev",
+      "n": 38,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 2.6174709135346896,
+        "net_bps_per_rebalance": -5.219606032183617,
+        "rank_ic": 0.04031243356254875,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-10-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "986c3f228c6fc36f9bb7df0b5aa7d5657aa7ffcc5b23500c84016d775d52d397",
+      "key": "c6dc21cb220755830e066c2ea2cd9513304433978fa1c1a247bd92885a4b29c8",
+      "kind": "breadth_bars_dev",
+      "n": 39,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 2.101523809016383,
+        "net_bps_per_rebalance": -5.805365539336388,
+        "rank_ic": 0.05514245337439868,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "F1_momentum_30",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "delay": 1,
+          "horizon": 30,
+          "lookback": 30,
+          "step": 30
+        },
+        "prespec": "FAMILIES_PRESPEC section 1",
+        "session": "2019-10-30",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "986c3f228c6fc36f9bb7df0b5aa7d5657aa7ffcc5b23500c84016d775d52d397",
+      "key": "7e0b57feec1d0065a15f410fa06a46997768def28924630c9322dcfe2591d224",
+      "kind": "breadth_bars_family",
+      "n": 40,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": -7.143689653003807,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F2_open_reversal",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision": 14,
+          "delay": 1,
+          "exit": 44,
+          "start": 0
+        },
+        "prespec": "FAMILIES_PRESPEC section 2",
+        "session": "2019-10-30",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "986c3f228c6fc36f9bb7df0b5aa7d5657aa7ffcc5b23500c84016d775d52d397",
+      "key": "eaf0a2dd45e9fe649fda74f8bd10a2f3a459e5f516f94ecf1973ae578dedb519",
+      "kind": "breadth_bars_family",
+      "n": 41,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": -19.78377675330742,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F3v2_closing_imbalance",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision_ns": 57305000000000,
+          "entry": 385,
+          "exit": "cross",
+          "normaliser": "displayed volume bars 0..384",
+          "version": 2
+        },
+        "prespec": "FAMILIES_PRESPEC erratum, F3 version 2",
+        "session": "2019-10-30",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "986c3f228c6fc36f9bb7df0b5aa7d5657aa7ffcc5b23500c84016d775d52d397",
+      "key": "9ae3f79a629647fb904ebc7c4573bae8b294013bcaf8bd685da8c3ba46cd347a",
+      "kind": "breadth_bars_family",
+      "n": 42,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": 180,
+        "session_net_bps": -0.5360948245345857,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-12-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a82fa837ef674944a674dc0e259ef3059082725c81f0dd39d76894d4f7722534",
+      "key": "646a57941c3c4b3161c805dbac06ab5215b1abbe6b28c0cf17dc8d725ec6f4b2",
+      "kind": "breadth_bars_dev",
+      "n": 43,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 0.6617845732399904,
+        "net_bps_per_rebalance": -5.6943903268963325,
+        "rank_ic": 0.026271180787768942,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-12-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a82fa837ef674944a674dc0e259ef3059082725c81f0dd39d76894d4f7722534",
+      "key": "46c91d275da71526bf1d4e79de5334c339140810a4c08f09e38a4bd7f326e6fa",
+      "kind": "breadth_bars_dev",
+      "n": 44,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 1.1931790988245636,
+        "net_bps_per_rebalance": -5.215396183074253,
+        "rank_ic": 0.06333947632039262,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-12-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a82fa837ef674944a674dc0e259ef3059082725c81f0dd39d76894d4f7722534",
+      "key": "b49758388d11c0aa812ab8bfbea6992243bfc2fcd79104ba8e0d5031d048119c",
+      "kind": "breadth_bars_dev",
+      "n": 45,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 0.140002851995536,
+        "net_bps_per_rebalance": -5.979253043273077,
+        "rank_ic": 0.005524069702463395,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2019-12-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a82fa837ef674944a674dc0e259ef3059082725c81f0dd39d76894d4f7722534",
+      "key": "236a0ccfc803437959c9b6506f45c5a1d40c4f18470f9ebbb6a7671a2f2a480e",
+      "kind": "breadth_bars_dev",
+      "n": 46,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 0.40430433371754065,
+        "net_bps_per_rebalance": -5.676252251273348,
+        "rank_ic": 0.03625884432681832,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "F1_momentum_30",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "delay": 1,
+          "horizon": 30,
+          "lookback": 30,
+          "step": 30
+        },
+        "prespec": "FAMILIES_PRESPEC section 1",
+        "session": "2019-12-30",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a82fa837ef674944a674dc0e259ef3059082725c81f0dd39d76894d4f7722534",
+      "key": "366580b2e0d745f40f8a6b1e96311f6dcf02290f95ea9294df6a988f29051770",
+      "kind": "breadth_bars_family",
+      "n": 47,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": -7.481321805364217,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F2_open_reversal",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision": 14,
+          "delay": 1,
+          "exit": 44,
+          "start": 0
+        },
+        "prespec": "FAMILIES_PRESPEC section 2",
+        "session": "2019-12-30",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a82fa837ef674944a674dc0e259ef3059082725c81f0dd39d76894d4f7722534",
+      "key": "e7a14a05ca1aebdd7204fb31503bfe2dc4e6c7aaeefe86873388f0bdcb996d22",
+      "kind": "breadth_bars_family",
+      "n": 48,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": -28.304151558554825,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F3v2_closing_imbalance",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision_ns": 57305000000000,
+          "entry": 385,
+          "exit": "cross",
+          "normaliser": "displayed volume bars 0..384",
+          "version": 2
+        },
+        "prespec": "FAMILIES_PRESPEC erratum, F3 version 2",
+        "session": "2019-12-30",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a82fa837ef674944a674dc0e259ef3059082725c81f0dd39d76894d4f7722534",
+      "key": "cbcad0a8f23a3a915f16fad632e985628b86fccb637c42cf4ab4965ef757f356",
+      "kind": "breadth_bars_family",
+      "n": 49,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": 234,
+        "session_net_bps": -1.6193260878353886,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2020-01-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "d741e9611b7dd4d392fb6cc91990c58b903a0521135c798b34819d0032bcb90e",
+      "key": "9c2b1755fef79dcc2370dbb82d66c9b86c550a835e71eb26a87b62b281963d75",
+      "kind": "breadth_bars_dev",
+      "n": 50,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 0.2138680574755548,
+        "net_bps_per_rebalance": -7.4343054981893175,
+        "rank_ic": -0.02696986359745122,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2020-01-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "d741e9611b7dd4d392fb6cc91990c58b903a0521135c798b34819d0032bcb90e",
+      "key": "810b5d3dfd5ce3bbbe0a881a21daeb7f524514af0ffd47cc16a377fae4175df4",
+      "kind": "breadth_bars_dev",
+      "n": 51,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 1.1124358245421118,
+        "net_bps_per_rebalance": -6.735978957859039,
+        "rank_ic": -0.011807481088568446,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2020-01-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "d741e9611b7dd4d392fb6cc91990c58b903a0521135c798b34819d0032bcb90e",
+      "key": "ccba8de8e31caec41b0831bca1bbccd4088edfde278a6c6baa8e04890b7bf520",
+      "kind": "breadth_bars_dev",
+      "n": 52,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": -0.07873502818153237,
+        "net_bps_per_rebalance": -7.677428730556332,
+        "rank_ic": -0.02865141422372011,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2020-01-30",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "d741e9611b7dd4d392fb6cc91990c58b903a0521135c798b34819d0032bcb90e",
+      "key": "fd07d3b7e385dd656a31d983804324c27c896a277a2c5031fd74e80b3458a90a",
+      "kind": "breadth_bars_dev",
+      "n": 53,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 0.5620380063824383,
+        "net_bps_per_rebalance": -7.209487868548481,
+        "rank_ic": -0.0236832524482328,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "F1_momentum_30",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "delay": 1,
+          "horizon": 30,
+          "lookback": 30,
+          "step": 30
+        },
+        "prespec": "FAMILIES_PRESPEC section 1",
+        "session": "2020-01-30",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "d741e9611b7dd4d392fb6cc91990c58b903a0521135c798b34819d0032bcb90e",
+      "key": "ab403b136b41373a01ab7ccc35cfb79ec5807151b9acbf09c7188279e0f75a1f",
+      "kind": "breadth_bars_family",
+      "n": 54,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": -6.216991694956601,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F2_open_reversal",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision": 14,
+          "delay": 1,
+          "exit": 44,
+          "start": 0
+        },
+        "prespec": "FAMILIES_PRESPEC section 2",
+        "session": "2020-01-30",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "d741e9611b7dd4d392fb6cc91990c58b903a0521135c798b34819d0032bcb90e",
+      "key": "f5a1404568064fc38f05407f9502e51c2ab01d31b3d410d3dd01be756f583c4d",
+      "kind": "breadth_bars_family",
+      "n": 55,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": 2.4203126822895116,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F3v2_closing_imbalance",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision_ns": 57305000000000,
+          "entry": 385,
+          "exit": "cross",
+          "normaliser": "displayed volume bars 0..384",
+          "version": 2
+        },
+        "prespec": "FAMILIES_PRESPEC erratum, F3 version 2",
+        "session": "2020-01-30",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "d741e9611b7dd4d392fb6cc91990c58b903a0521135c798b34819d0032bcb90e",
+      "key": "356cf2e2aba55b2784fe089b63c1c7670386c4c4a0067cb340fb0c07d1ddb16e",
+      "kind": "breadth_bars_family",
+      "n": 56,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": 188,
+        "session_net_bps": -0.17365748884537316,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2021-07-13",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "933ee8961f497fbd73fee726cec998cbd3f13c4bb9da7cc52c5a54e33dd7c3b3",
+      "key": "79d973c438a3c474df57e4ec007aebe6d287abbbdcef3bf2683100c704b3b477",
+      "kind": "breadth_bars_dev",
+      "n": 57,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 0.792642373828588,
+        "net_bps_per_rebalance": -5.859704401994269,
+        "rank_ic": 0.015103964963030424,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2021-07-13",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "933ee8961f497fbd73fee726cec998cbd3f13c4bb9da7cc52c5a54e33dd7c3b3",
+      "key": "851b4dce8416d49936c615ff4198f953e38ead0c6f7947c0f20b0b24d49a1f56",
+      "kind": "breadth_bars_dev",
+      "n": 58,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 0.5945701961766217,
+        "net_bps_per_rebalance": -6.238660790745224,
+        "rank_ic": 0.010890745976340807,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2021-07-13",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "933ee8961f497fbd73fee726cec998cbd3f13c4bb9da7cc52c5a54e33dd7c3b3",
+      "key": "e4b181b4e91e4038f09c6c18823d34e1a90a74b5fd8caa8bbae4915e5c1a6f30",
+      "kind": "breadth_bars_dev",
+      "n": 59,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 1.4091956957953033,
+        "net_bps_per_rebalance": -5.100317937171345,
+        "rank_ic": 0.03618069394015395,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2021-07-13",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "933ee8961f497fbd73fee726cec998cbd3f13c4bb9da7cc52c5a54e33dd7c3b3",
+      "key": "579802cc3dd1838a92cb0da2aaad3e6ebb048ebb5d2fcbb09c58b9fb3340e192",
+      "kind": "breadth_bars_dev",
+      "n": 60,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 1.6656113987370482,
+        "net_bps_per_rebalance": -5.068173343846454,
+        "rank_ic": 0.03712581479101993,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "F1_momentum_30",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "delay": 1,
+          "horizon": 30,
+          "lookback": 30,
+          "step": 30
+        },
+        "prespec": "FAMILIES_PRESPEC section 1",
+        "session": "2021-07-13",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "933ee8961f497fbd73fee726cec998cbd3f13c4bb9da7cc52c5a54e33dd7c3b3",
+      "key": "bfe59c7f63e6a16401264b8a503bd9f92b9482c3dbe1f2366c2c39616b6fa721",
+      "kind": "breadth_bars_family",
+      "n": 61,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": -8.309151731980782,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F2_open_reversal",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision": 14,
+          "delay": 1,
+          "exit": 44,
+          "start": 0
+        },
+        "prespec": "FAMILIES_PRESPEC section 2",
+        "session": "2021-07-13",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "933ee8961f497fbd73fee726cec998cbd3f13c4bb9da7cc52c5a54e33dd7c3b3",
+      "key": "c3043cb02fc128dcba4ba44024278682a639418ad9b8b61be92ecedea5be2eda",
+      "kind": "breadth_bars_family",
+      "n": 62,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": -3.2314809033896643,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F3v2_closing_imbalance",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision_ns": 57305000000000,
+          "entry": 385,
+          "exit": "cross",
+          "normaliser": "displayed volume bars 0..384",
+          "version": 2
+        },
+        "prespec": "FAMILIES_PRESPEC erratum, F3 version 2",
+        "session": "2021-07-13",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "933ee8961f497fbd73fee726cec998cbd3f13c4bb9da7cc52c5a54e33dd7c3b3",
+      "key": "a42eefc8ce8350cb32dcc526e183ea56000f0357df6a275ac16074022b075155",
+      "kind": "breadth_bars_family",
+      "n": 63,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": 408,
+        "session_net_bps": -0.4835819454938184,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2021-08-13",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a625f462173f2b308a092ec620dc2e74dd23785e4714d6353d529c694364daed",
+      "key": "bfb66910f3ab77dcf25ce60c59910e43272eba1adb4b87c91dce6978c58ac0ba",
+      "kind": "breadth_bars_dev",
+      "n": 64,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 0.14184578957795613,
+        "net_bps_per_rebalance": -6.631330875447362,
+        "rank_ic": 0.007008959365862312,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 0,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2021-08-13",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a625f462173f2b308a092ec620dc2e74dd23785e4714d6353d529c694364daed",
+      "key": "e3ce918f5a1c376e0f2190658ed340fa028ed96d37c029ad55d680804895b1ad",
+      "kind": "breadth_bars_dev",
+      "n": 65,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 1.1534972862863717,
+        "net_bps_per_rebalance": -5.519996928889917,
+        "rank_ic": 0.03321548652675332,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "residual_reversion",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2021-08-13",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a625f462173f2b308a092ec620dc2e74dd23785e4714d6353d529c694364daed",
+      "key": "fd5ae6816dd983ca1f9465f3750d364ac55ee7dee631f2f24c6a1d35f6e18d8f",
+      "kind": "breadth_bars_dev",
+      "n": 66,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": -0.15152782699480613,
+        "net_bps_per_rebalance": -6.897076659943753,
+        "rank_ic": 0.002273914256985763,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "vwap_deviation",
+      "config": {
+        "decile_q": 0.1,
+        "delay": 1,
+        "horizon": 15,
+        "lookback": 15,
+        "session": "2021-08-13",
+        "step": 15,
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a625f462173f2b308a092ec620dc2e74dd23785e4714d6353d529c694364daed",
+      "key": "1436ecca37c8fee3b3d1d050429cd320642d7211ad7599c69aca66e0050a1090",
+      "kind": "breadth_bars_dev",
+      "n": 67,
+      "result": {
+        "evidence_class": "exploratory",
+        "gross_bps_per_rebalance": 0.9147383356072973,
+        "net_bps_per_rebalance": -5.75989864487532,
+        "rank_ic": 0.02819187884144853,
+        "source": "research/round1/breadth_bars_pooled.json"
+      }
+    },
+    {
+      "alpha_id": "F1_momentum_30",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "delay": 1,
+          "horizon": 30,
+          "lookback": 30,
+          "step": 30
+        },
+        "prespec": "FAMILIES_PRESPEC section 1",
+        "session": "2021-08-13",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a625f462173f2b308a092ec620dc2e74dd23785e4714d6353d529c694364daed",
+      "key": "15d7c922896374558d95e17b341f2666cfd91f6bed2fdf9018e7656471c908ee",
+      "kind": "breadth_bars_family",
+      "n": 68,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": -4.319061297074163,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F2_open_reversal",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision": 14,
+          "delay": 1,
+          "exit": 44,
+          "start": 0
+        },
+        "prespec": "FAMILIES_PRESPEC section 2",
+        "session": "2021-08-13",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a625f462173f2b308a092ec620dc2e74dd23785e4714d6353d529c694364daed",
+      "key": "8d2430d60373cd893a9ebf551c77455ae36d11702fc22c1dfb36eb5a15913635",
+      "kind": "breadth_bars_family",
+      "n": 69,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": null,
+        "session_net_bps": -11.334043216377856,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "F3v2_closing_imbalance",
+      "config": {
+        "params": {
+          "decile_q": 0.1,
+          "decision_ns": 57305000000000,
+          "entry": 385,
+          "exit": "cross",
+          "normaliser": "displayed volume bars 0..384",
+          "version": 2
+        },
+        "prespec": "FAMILIES_PRESPEC erratum, F3 version 2",
+        "session": "2021-08-13",
+        "universe": "round1/universe_20190130"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "a625f462173f2b308a092ec620dc2e74dd23785e4714d6353d529c694364daed",
+      "key": "98440d622615d4b927c7fcf5159def64cec11d0661d0b4edd313fcbb628a6152",
+      "kind": "breadth_bars_family",
+      "n": 70,
+      "result": {
+        "evidence_class": "exploratory",
+        "names_with_score": 402,
+        "session_net_bps": -0.26727422945598833,
+        "source": "research/round1/breadth_families.json"
+      }
+    },
+    {
+      "alpha_id": "quoter_grid",
+      "config": {
+        "session": "2019-01-30",
+        "symbol": "AAPL",
+        "trigger_mode": "grid"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "8c97b5b13bc451c012c2466fb7e258da134dab29aa47b67fe7b0088c78e870be",
+      "key": "c4876b3f056a337bfa36bacc93c5b8244f66b277d8b71d46ca3d61f841134ec5",
+      "kind": "quoter_event_dev",
+      "n": 71,
+      "result": {
+        "evidence_class": "exploratory",
+        "net": -6465.60457802545,
+        "source": "research/round1/quoter_event_dev/2019-01-30_AAPL.json"
+      }
+    },
+    {
+      "alpha_id": "quoter_events",
+      "config": {
+        "session": "2019-01-30",
+        "symbol": "AAPL",
+        "trigger_mode": "events"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "8c97b5b13bc451c012c2466fb7e258da134dab29aa47b67fe7b0088c78e870be",
+      "key": "7ebd0dba1ee48229018807a02c0866720cab6c50d32bc91a70e293017751a695",
+      "kind": "quoter_event_dev",
+      "n": 72,
+      "result": {
+        "evidence_class": "exploratory",
+        "net": -6426.815932372212,
+        "source": "research/round1/quoter_event_dev/2019-01-30_AAPL.json"
+      }
+    },
+    {
+      "alpha_id": "quoter_grid",
+      "config": {
+        "session": "2019-01-30",
+        "symbol": "MSFT",
+        "trigger_mode": "grid"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "8c97b5b13bc451c012c2466fb7e258da134dab29aa47b67fe7b0088c78e870be",
+      "key": "4494bb610923d5f0bd61b9bab94f561d527ed99003570cfa50a9076c5db02ba7",
+      "kind": "quoter_event_dev",
+      "n": 73,
+      "result": {
+        "evidence_class": "exploratory",
+        "net": -1733.3073519772881,
+        "source": "research/round1/quoter_event_dev/2019-01-30_MSFT.json"
+      }
+    },
+    {
+      "alpha_id": "quoter_events",
+      "config": {
+        "session": "2019-01-30",
+        "symbol": "MSFT",
+        "trigger_mode": "events"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "8c97b5b13bc451c012c2466fb7e258da134dab29aa47b67fe7b0088c78e870be",
+      "key": "3b9e76ed190ebd03307fd89dc3b5f50d68f63d6a38f6fdd2ab6a779d8ca4e50b",
+      "kind": "quoter_event_dev",
+      "n": 74,
+      "result": {
+        "evidence_class": "exploratory",
+        "net": -2500.3153656856166,
+        "source": "research/round1/quoter_event_dev/2019-01-30_MSFT.json"
+      }
+    },
+    {
+      "alpha_id": "quoter_grid",
+      "config": {
+        "session": "2019-01-30",
+        "symbol": "QQQ",
+        "trigger_mode": "grid"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "8c97b5b13bc451c012c2466fb7e258da134dab29aa47b67fe7b0088c78e870be",
+      "key": "547f44820807b09567814407c84de672879d07ff091ff7e3863ea51cd0eba241",
+      "kind": "quoter_event_dev",
+      "n": 75,
+      "result": {
+        "evidence_class": "exploratory",
+        "net": -1956.3039919493417,
+        "source": "research/round1/quoter_event_dev/2019-01-30_QQQ.json"
+      }
+    },
+    {
+      "alpha_id": "quoter_events",
+      "config": {
+        "session": "2019-01-30",
+        "symbol": "QQQ",
+        "trigger_mode": "events"
+      },
+      "count": 1,
+      "data_family": "real",
+      "dataset_version": "8c97b5b13bc451c012c2466fb7e258da134dab29aa47b67fe7b0088c78e870be",
+      "key": "52ab5f79783a55100feab872067eed59fdf118a5695433f9f05f7ec0c64fa0e6",
+      "kind": "quoter_event_dev",
+      "n": 76,
+      "result": {
+        "evidence_class": "exploratory",
+        "net": -2274.379406893153,
+        "source": "research/round1/quoter_event_dev/2019-01-30_QQQ.json"
+      }
+    }
+  ],
+  "expected_max_null_t": 2.94303698253567,
+  "pinned_alpha": 0.05,
+  "total_experiments": 76,
+  "x-version": 4
+}

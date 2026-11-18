@@ -72,7 +72,7 @@ def render(doc: dict) -> str:
         "the independent unit.",
         "",
         f"Sessions: {len(doc['sessions'])}. Looks: {doc['looks']} (two scores, two entry delays, "
-        "each session a new look), not yet in `research/experiments.json`.",
+        "each session a new look), recorded in `research/round1/looks_ledger.json`.",
         "",
         "## Across sessions (bps per rebalance; Student t on sessions - 1 degrees of freedom)",
         "",

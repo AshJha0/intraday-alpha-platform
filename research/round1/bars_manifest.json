@@ -1,0 +1,116 @@
+{
+ "note": "One row per in-sample session: the vendor file (sha256 computed while downloading; the 2019-01-30 value is the one recorded in research/breadth/universe.json), and the itchbars outputs built from it. The files themselves are not committed.",
+ "schema": "iap.round1.bars_manifest/1",
+ "sessions": [
+  {
+   "auction_rows": 2622613,
+   "auction_sha256": "1cf61afa4f1c3e8e1e8e07ef81f8c5a6d383c4ed71a99f872f2f14d7a6ec6540",
+   "bars_bytes": 226540779,
+   "bars_sha256": "7c8d7281dd720c8ebb56bc375484144d96ce998f9a46e64898a47659dbf960f0",
+   "date": "2019-01-30",
+   "file": "01302019.NASDAQ_ITCH50.gz",
+   "messages": 368366634,
+   "raw_sha256": "8c97b5b13bc451c012c2466fb7e258da134dab29aa47b67fe7b0088c78e870be",
+   "symbols": 8695
+  },
+  {
+   "auction_rows": 2622312,
+   "auction_sha256": "6e08eca56f7cffd77d043e5478c1cc5b78aa359ffb144e01f2f38ea7fc5a26de",
+   "bars_bytes": 226780735,
+   "bars_sha256": "a82d2e35be2b71a1fc3eeb8af16d8dba835396ef119290c65a5353b4c0e01dca",
+   "date": "2019-03-27",
+   "file": "03272019.NASDAQ_ITCH50.gz",
+   "messages": 422264305,
+   "raw_sha256": "7997025b9e09dd6c2ecb0bfa48a856197e6e800711ab67367ee0f2ab724b9ba8",
+   "symbols": 8693
+  },
+  {
+   "auction_rows": 2663549,
+   "auction_sha256": "a55b3ed7eab03e6da1cab20bdd1429b65c8496f727dcc9c36e1ab2b5312e1374",
+   "bars_bytes": 230899390,
+   "bars_sha256": "8cc124cefab7642ef3fa3a92da38cf3d63aae5c3cff44e71deb6c9288734d96c",
+   "date": "2019-07-30",
+   "file": "07302019.NASDAQ_ITCH50.gz",
+   "messages": 282229684,
+   "raw_sha256": "c65784c48c28735901ae442dc00e215834218a359bc12a139ab4eec209bc2d4a",
+   "symbols": 8841
+  },
+  {
+   "auction_rows": 2661141,
+   "auction_sha256": "eb74013a52e03daf8a1f1cdfc89d6b2976c20c7713ad2a9263f6e0795aa42716",
+   "bars_bytes": 229314795,
+   "bars_sha256": "23aaa8918abbe2dfeeb1969dbc261e04168dfd79eb7921278a33d86af46333b0",
+   "date": "2019-08-30",
+   "file": "08302019.NASDAQ_ITCH50.gz",
+   "messages": 310317357,
+   "raw_sha256": "2f6639a37487f377851883ed54171f5565f164556c1855a28abc8475ce408b47",
+   "symbols": 8826
+  },
+  {
+   "auction_rows": 2674686,
+   "auction_sha256": "3b1aef0b084fda5c8a7c3f1dcb1e3393982d10e107fabbccb69beb85b4d8ad7e",
+   "bars_bytes": 230673527,
+   "bars_sha256": "4cffde03c45d72c154af291f319d4a03fa6377c27017b5f9d38d21302e408b5f",
+   "date": "2019-10-18",
+   "file": "S101819-v50.txt.gz",
+   "messages": 302347067,
+   "raw_sha256": "390acb4df5a01d3d8e6c34557858604ac7c655c8edc0a9e312da3c032c5d8da4",
+   "symbols": 8869
+  },
+  {
+   "auction_rows": 2674686,
+   "auction_sha256": "6bbf788bae8a0e302eb76c45d968bf02badec21572f8510f9c9a0ce987e596f6",
+   "bars_bytes": 231373620,
+   "bars_sha256": "986c3f228c6fc36f9bb7df0b5aa7d5657aa7ffcc5b23500c84016d775d52d397",
+   "date": "2019-10-30",
+   "file": "10302019.NASDAQ_ITCH50.gz",
+   "messages": 293989079,
+   "raw_sha256": "0ad86b61a0eb7f1bce2cffca0e08c8658026451c68657ea6b06f61ff3710b999",
+   "symbols": 8872
+  },
+  {
+   "auction_rows": 2947886,
+   "auction_sha256": "f64722a4e1eae22c484aef15f75876c891761783d8869c33e0f7122a87c77662",
+   "bars_bytes": 230966879,
+   "bars_sha256": "a82fa837ef674944a674dc0e259ef3059082725c81f0dd39d76894d4f7722534",
+   "date": "2019-12-30",
+   "file": "12302019.NASDAQ_ITCH50.gz",
+   "messages": 268744780,
+   "raw_sha256": "ef03df46a27e6bda4dead017f84c2e3979df7211f02c7868b51d53fceb99c689",
+   "symbols": 8892
+  },
+  {
+   "auction_rows": 2950867,
+   "auction_sha256": "f48548f482ca5ffc0a202ca34a00f2bee0f6c48137d447d75979c1eecc0dfdee",
+   "bars_bytes": 232845389,
+   "bars_sha256": "d741e9611b7dd4d392fb6cc91990c58b903a0521135c798b34819d0032bcb90e",
+   "date": "2020-01-30",
+   "file": "01302020.NASDAQ_ITCH50.gz",
+   "messages": 423285709,
+   "raw_sha256": "8f5399155242f8d84338c36fdd78a47c0b0aa3df5707829b20c5158c258364c6",
+   "symbols": 8900
+  },
+  {
+   "auction_rows": 3619485,
+   "auction_sha256": "e72467f7741a53fd0eb07d60d59ce38db3deefa8cf0e741f6491ab1b46ea3908",
+   "bars_bytes": 284119953,
+   "bars_sha256": "933ee8961f497fbd73fee726cec998cbd3f13c4bb9da7cc52c5a54e33dd7c3b3",
+   "date": "2021-07-13",
+   "file": "S071321-v50.txt.gz",
+   "messages": 459781103,
+   "raw_sha256": "b39b72621a8bc3ff92601701e0e9bd93afbdf30fea2fd68cdbe83c6b0bfb8ccd",
+   "symbols": 10888
+  },
+  {
+   "auction_rows": 3672776,
+   "auction_sha256": "0d8a8839c10f651062398f8d74eb3cd99e9458474ce3b84a1e8d4c7efa67b473",
+   "bars_bytes": 286681479,
+   "bars_sha256": "a625f462173f2b308a092ec620dc2e74dd23785e4714d6353d529c694364daed",
+   "date": "2021-08-13",
+   "file": "S081321-v50.txt.gz",
+   "messages": 367986583,
+   "raw_sha256": "64f4f1b076164ee72971d87fb548ae73cb924e2e45a73de059cc77328bcde4e7",
+   "symbols": 11042
+  }
+ ]
+}

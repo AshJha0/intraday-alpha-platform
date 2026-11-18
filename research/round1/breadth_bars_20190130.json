@@ -4,8 +4,8 @@
  "evidence_class": "exploratory",
  "looks": 4,
  "power": {
-  "mde_sharpe": 6.701455073713431,
-  "sessions_listed": 46
+  "mde_sharpe": 15.81104562093793,
+  "sessions_listed": 10
  },
  "runs": [
   {

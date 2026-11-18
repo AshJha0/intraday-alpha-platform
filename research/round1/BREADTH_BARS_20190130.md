@@ -31,13 +31,12 @@ Median round-trip spread cost in the universe: 4.29 bps.
   days and carry no confirmation weight: the independent unit is the session.
 - Session tags from the event calendar: fomc. An event day
   is not a typical session.
-- Looks taken here: 4 (two scores, two entry delays), counted in this report and
-  NOT yet entered in `research/experiments.json`; they are entered with the round's pull
-  request, because a ledger entry moves the look counts quoted in other documents. The 1-minute delay is
+- Looks taken here: 4 (two scores, two entry delays), recorded in
+  `research/round1/looks_ledger.json` with the round's other looks. The 1-minute delay is
   the primary; delay 0 assumes a trade at the quote the decision was made on.
 - Costs: the book crosses the quoted spread to enter and to exit and turns over fully
   each rebalance. No fee, no impact, no borrow. Nasdaq's own quote is wider than the
   consolidated one, so the spread cost is overstated; the missing fee and impact go the
   other way.
-- Power: one session detects nothing. 46 sessions would
-  detect a net Sharpe of about 6.7 or more (`docs/research/PNL_POWER_TABLE.md`).
+- Power: one session detects nothing. 10 sessions would
+  detect a net Sharpe of about 15.8 or more (`docs/research/PNL_POWER_TABLE.md`).

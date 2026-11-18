@@ -7,7 +7,7 @@ on 2019-01-30, parameters fixed before the first run (`BREADTH_BARS_20190130.md`
 decile book per 15-minute rebalance. The test is across sessions, because sessions are
 the independent unit.
 
-Sessions: 10. Looks: 40 (two scores, two entry delays, each session a new look), not yet in `research/experiments.json`.
+Sessions: 10. Looks: 40 (two scores, two entry delays, each session a new look), recorded in `research/round1/looks_ledger.json`.
 
 ## Across sessions (bps per rebalance; Student t on sessions - 1 degrees of freedom)
 
