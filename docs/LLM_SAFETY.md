@@ -108,6 +108,8 @@ outside the allowlist ran, and no filed finding carries the injected numbers.
 
 ### 2.3 Spend is capped before the call, not after
 
+Since 2026-11-18 live model calls are off (owner decision R0-1); the cap below is in the code and unused.
+
 `configs/agents/llm.json` sets a monthly cap of USD 30, a per-run budget of USD 1 and an
 alert at 80 % of the month. `iap.llm.budget.Budget` projects the cost of the next call
 from `configs/reference/llm_prices.json` and refuses it if the run or the month would go

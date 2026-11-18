@@ -1,4 +1,14 @@
-# Data sources: free Nasdaq sample days, IEX HIST, process-and-delete, and the v2.0 free data route (v1.17 WS-A; status as of 2026-10-25)
+# Data sources: free Nasdaq sample days, IEX HIST, process-and-delete, and the v2.0 free data route (v1.17 WS-A; status as of 2026-11-18)
+
+> **Status on 2026-11-18.** **IEX HIST is withdrawn from direct download.** Its index has answered
+> HTTP 403 since the watchdog run of 2026-11-14, and on 2026-11-18 the owner's browser check of the IEX
+> market-data page found the HIST section reading "Historical PCAP data is not currently available for
+> direct download", with questions referred to IEX Market Operations
+> ([ROUND0_GATES.md](../research/round0/ROUND0_GATES.md) section 6). The IEX sections below describe the
+> reader and what was measured before; no new IEX day can be fetched. **Tiingo is dropped** by owner
+> decision R0-4 (2026-11-18): no account is created, so the daily route has no eligible free source
+> (Stooq failed DD1). The free Nasdaq ITCH sample days remain: ten in-sample full-market days and the
+> nine sealed 2025/26 sessions (ROUND0_GATES.md section 8).
 
 The platform's real-data rule is **free data only, nothing downloaded without
 the owner's approval**. This page says which free sources exist, what the
@@ -232,6 +242,8 @@ refuses it.
 
 ## 7. IEX HIST terms of use
 
+Since 2026-11-18 the question is moot until IEX offers the captures again (status note at the top).
+
 > **TODO (owner):** record the IEX HIST terms here (the terms page URL, the
 > date read, and what they say about research use, redistribution and
 > attribution). The committed documents only state "free, no account, T+1"
@@ -241,6 +253,9 @@ refuses it.
 > (docs/REAL_DATA.md, "Never redistributed").
 
 ## 8. Tiingo end-of-day (v2.0 free route; licence id `tiingo`)
+
+**Dropped 2026-11-18** (owner decision R0-4, [ROUND0_GATES.md](../research/round0/ROUND0_GATES.md) section 1): no
+account is created and the adapter is not used. The section is kept as the record of what was read.
 
 Adapter `python/src/iap/data/sources/tiingo.py` (contract `tiingo.daily`). Pages read on 2026-10-25: the pricing page
 (`tiingo.com/about/pricing`), the end-of-day documentation (`tiingo.com/documentation/end-of-day`) and the product page.
@@ -351,6 +366,9 @@ inputs, nothing derived from them is republished, and the citation is given.
 
 ## 13. IEX HIST (v2.0 free route for intraday breadth; licence id `iex_hist`)
 
+**Closed 2026-11-18**: withdrawn from direct download (status note at the top). The only free step left is the
+owner's email to IEX Market Operations asking whether research access is offered.
+
 Section 7 above holds the owner's open note D-22: the IEX HIST terms are not yet recorded in this repository. The free
 route keeps IEX HIST as the intraday source (DR-6; adapter and parser work are B2b's, not this PR's). Read on
 2026-10-25 from the IEX product page: HIST is described as "Free historical data downloads from IEX equities available
@@ -361,7 +379,7 @@ id.
 
 ## 14. Licence questions for the owner (not blockers; defaults in brackets)
 
-1. **Tiingo**: does committing aggregate statistics computed from Tiingo data count as "display or share the data"?
+1. **Tiingo** (moot since R0-4, 2026-11-18: Tiingo is dropped): does committing aggregate statistics computed from Tiingo data count as "display or share the data"?
    [default: no; the repository commits aggregates only, as for every vendor]. Is the 500-unique-symbols-per-month
    free-tier limit acceptable for a universe above that size? [default: ingestion spread over months; Stooq for breadth
    once its terms are read].
@@ -371,4 +389,5 @@ id.
    from the revisions? [default: yes, with page URL and revision ids; nothing published yet].
 4. **SEC EDGAR**: which contact goes into the User-Agent (`IAP_SEC_CONTACT`)? [default: the repository URL].
 5. **Kenneth French**: accept use with citation in the absence of a terms page? [default: yes].
-6. **IEX HIST**: D-22 stands (record the terms).
+6. **IEX HIST**: D-22 stands (record the terms), now behind the access question: downloads were withdrawn on or
+   before 2026-11-18.

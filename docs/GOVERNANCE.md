@@ -1435,6 +1435,16 @@ manifest, and ingesting a holdout day is a supported, planned step (R7, IEX over
 is a dataset that every analysis route above guards. `tools/r7_holdout_check.py` checks raw-file
 hashes against the signed prereg before an ingest; it is a check, not a guard.
 
+**The bars path (2026-11-18).** `tools/itch_bars_chain.py` with `rust/itchbars` is a raw-feed reader of
+the same kind, and the bars CSV it writes is read with `pandas.read_csv`, not through `iap.io`, so
+neither `guard` nor the `reader_guard` backstop sees it. Only date checks stand in front of it: the
+chain touches only `insample` days of `research/breadth/candidates.json` and refuses 2025 and later,
+and `tools/breadth_bars_pooled.py` refuses bars files dated 2025 or later. The one supported route to the
+nine sealed 2025/26 sessions on bars is `iap.research.breadth_holdout` (`tools/breadth_bars_holdout.py`),
+which checks a signed, identity-bound pre-registration and the registry reservation before any download
+and marks the sessions spent afterwards. Its checks, their tests and what it cannot stop:
+[HOLDOUT_LOOK_PROCEDURE.md](../research/round1/HOLDOUT_LOOK_PROCEDURE.md) section 4.
+
 ### Unsupported routes
 
 Anything not listed above is **unsupported**, and the platform makes no claim about it: ad-hoc

@@ -1,9 +1,11 @@
 # Intraday Alpha Platform
 
-> **Status, v2.1.0 (2026-10-27):** engineering-complete platform; v2.1 made it legible and added no research claim. **No confirmed alpha.** Where a
-> signal predicts, it is smaller than the cost of trading it, and the free daily data failed its
-> survivorship test (85 % of index leavers missing against a 2 % limit). Nothing on `main` is
-> above *development-supported*.
+> **Status, v2.2.0 ([[PENDING: release date]]):** **No confirmed alpha.** Where a signal predicts, it
+> is smaller than the cost of trading it. Both free routes to a confirmation sample are closed: the
+> free daily data failed its survivorship test (85 % of index leavers missing against a 2 % limit) and
+> IEX withdrew its intraday captures from direct download (2026-11-18). Ten free in-sample Nasdaq
+> sessions remain, enough to develop an idea and too few to confirm a realistic Sharpe. Nothing on
+> `main` is above *development-supported*.
 
 We built this to answer one question carefully: does a systematic equity signal make money after
 costs, and how would we know? The platform runs from raw market data to a cash-reconciled ledger,
@@ -31,6 +33,9 @@ come first because they are most of what we found.
 | Cost-aware taker, 480 grid cells: no trade in any cell | rejected | [docs/SHOWCASE.md](docs/SHOWCASE.md) |
 | Two-sided quoting: loses USD 5.0k to 6.9k per session | rejected | [docs/SHOWCASE.md](docs/SHOWCASE.md) |
 | Known-null calibration of the v1.18 confirmatory method: about 4.3 % false rejections against 2.5 % | rejected | [docs/REPORT.md](docs/REPORT.md) §2 |
+| Intraday breadth on IEX HIST: captures withdrawn from direct download; daily route: no eligible free source (Tiingo dropped) | data-ineligible | [ROUND0_GATES.md](research/round0/ROUND0_GATES.md) §1, §6 |
+| Event-driven quoter on one session (2019-01-30, three names): loses more than the grid quoter (USD -11,201.51 against -10,155.22) | exploratory | [QUOTER_EVENT_DRIVEN_DEV.md](research/round1/QUOTER_EVENT_DRIVEN_DEV.md) §5 |
+| Cross-sectional reversal on full-market bars, ten in-sample sessions: [[PENDING: pooled ten-session reversal result]]; families F1 to F3: [[PENDING: F1, F2, F3 results]] | [[PENDING: evidence class of the pooled and family results]] | [docs/REPORT.md](docs/REPORT.md) §2 |
 | Platform: pipeline, risk, execution, simulator, ledgers, evidence machinery, three-language parity | development-supported (tests on fixtures; no return claim) | [docs/release/v2.0.0_RELEASE_NOTES.md](docs/release/v2.0.0_RELEASE_NOTES.md) §7 |
 
 Measured on a shared CI runner (AMD EPYC 7763, no core pinning, `steady_clock`; not colocation):
@@ -73,6 +78,7 @@ and carries no evidence class. The full loop on one instrument is `python -m iap
 | operating it | [docs/RUNBOOK_v2.md](docs/RUNBOOK_v2.md), [docs/RUNBOOKS.md](docs/RUNBOOKS.md) |
 | governance, security, reproduction | [docs/GOVERNANCE.md](docs/GOVERNANCE.md), [docs/REPRODUCTION.md](docs/REPRODUCTION.md) |
 | data and licences | [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md), [docs/REAL_DATA.md](docs/REAL_DATA.md) |
+| the AI layer (research memory, research graph, MCP server, offline evals, skills) and what measures it | [docs/AI_STACK.md](docs/AI_STACK.md) |
 | the record | [docs/release/](docs/release/v2.0.0_RELEASE_NOTES.md), [CHANGELOG.md](CHANGELOG.md); older plans, reviews and release notes are in [archive/docs/](archive/docs/) |
 | explaining the project from a quant, C++ or engineering-lead angle, with the hard questions | [docs/LEARNING_GUIDE.md](docs/LEARNING_GUIDE.md) |
 | contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |

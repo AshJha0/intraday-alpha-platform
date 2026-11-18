@@ -9,6 +9,13 @@ logged or persisted), charged to the shared spend ledger
 when it would pass the monthly cap. Tests and CI use the scripted client of
 `iap.llm.fake`: no network, no key, no spend.
 
+> **Since 2026-11-18 live model calls are off** (owner decision R0-1,
+> [ROUND0_GATES.md](../research/round0/ROUND0_GATES.md) section 1). The capped path below stays in the
+> code, unused; the guardrails are measured offline, with no model
+> ([AGENT_EVALS.md](AGENT_EVALS.md), [AI_STACK.md](AI_STACK.md)). The 2026-11-18 round added no LLM agent;
+> it fixed the tool loop (a tool crash, a client error, `max_tokens` and `pause_turn` no longer end a
+> session badly) and added tracing ([TRACING.md](TRACING.md)).
+
 ## 1. Roster
 
 | Agent | Since | Model (dated pin, `configs/agents/llm.json`) | Entry point | Writes | Never |
