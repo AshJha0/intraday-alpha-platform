@@ -50,6 +50,7 @@ from iap.llm.budget import DEFAULT_MODEL, Budget, BudgetExceeded
 from iap.llm.envfile import redact
 from iap.llm.prices import ModelPin, load_llm_config
 from iap.llm.runners import PLANTED_DATASET, T_THRESHOLD, Runner, verdict
+from iap.llm.tracing import Tracer, session_tracer
 
 #: the only datasets an agent session may run (A-P0-1: exploratory, never confirmatory)
 EXPLORATORY_PREFIX = "synthetic:"
@@ -521,6 +522,7 @@ def run_session(
     max_turns: int = 60,
     secret: str | None = None,
     clock: Callable[[], float] = time.time,
+    tracer: Tracer | None = None,
 ) -> dict[str, Any]:
     """Drive the model until it finishes, stops calling tools, or a cap is hit.
 
@@ -533,6 +535,8 @@ def run_session(
     system = [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}]
     messages: list[dict[str, Any]] = [{"role": "user", "content": task}]
     log.append("transcript.jsonl", {"t": clock(), "role": "user", "content": task})
+    tr = session_tracer(session.dir, secret, tracer)
+    root = tr.session_start(session.agent, session.session_id, model)
     status = "max_turns"
     served_models: set[str] = set()  # resp.model of every call (G-P2-12)
     tool_log: list[dict[str, Any]] = []
@@ -543,6 +547,7 @@ def run_session(
             session.budget.check_model_call(model)
         except BudgetExceeded as exc:
             session.budget.refusals.append(str(exc))
+            tr.budget_refusal(root, str(exc))
             status = "budget_exhausted"
             break
         kwargs: dict[str, Any] = {
@@ -554,9 +559,11 @@ def run_session(
         }
         if effort:
             kwargs["output_config"] = {"effort": effort}
+        mspan = tr.model_start(model, turn, session.session_id)
         try:
             resp = client.messages.create(**kwargs)
         except Exception as exc:
+            tr.end(mspan, error=exc)
             # the summary is written below; the error is re-raised after it
             status = "client_error"
             client_exc = exc
@@ -564,7 +571,9 @@ def run_session(
         served = getattr(resp, "model", None)
         if served:
             served_models.add(str(served))
+        usd0 = session.budget.usd
         session.budget.charge(model, resp.usage)
+        tr.model_end(mspan, resp, session.budget.usd - usd0)
         content = list(resp.content)
         texts = [
             str(getattr(b, "text", "") or "") for b in content if getattr(b, "type", None) == "text"
@@ -601,6 +610,7 @@ def run_session(
         exhausted = False
         for b in uses:
             rec: dict[str, Any] = {"t": clock(), "turn": turn, "tool": b.name, "input": b.input}
+            tspan = tr.tool_start(b, turn)
             try:
                 session.budget.check_tool_call()
                 out = session.call(b.name, b.input)
@@ -632,6 +642,7 @@ def run_session(
                 )
             log.append("tool_log.jsonl", rec)
             tool_log.append(rec)
+            tr.tool_end(tspan, rec, session.budget.refusals)
         messages.append({"role": "user", "content": results})
         log.append("transcript.jsonl", {"t": clock(), "role": "user", "content": results})
         if session.finished is not None:
@@ -664,6 +675,7 @@ def run_session(
     summary["summary_verdict"] = (
         "verified" if check["summary_claims_verified"] else "unsupported_claims"
     )
+    tr.session_end(root, status, session.budget)
     log.write("session.json", summary)
     if client_exc is not None:
         raise client_exc

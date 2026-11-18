@@ -261,11 +261,28 @@ def execute(
     max_steps: int = 100,
     first_step: int = 1,
     observer: Observer | None = None,
+    tracer: Any = None,
 ) -> RunResult:
     """Run ``graph`` from ``node`` (default: the entry) until a terminal
     node finishes or a node interrupts.  ``observer(event, state, interrupt)``
     is called after every node (the checkpoint writer hooks in here).
-    More than ``max_steps`` node executions raise :class:`StepLimitError`."""
+    More than ``max_steps`` node executions raise :class:`StepLimitError`.
+    ``tracer`` (an :class:`iap.llm.tracing.Tracer`) records one span per
+    node under one root span per call; it never changes what runs."""
+    if tracer is not None:
+        from iap.graph.tracing import traced_execute
+
+        return traced_execute(
+            execute,
+            graph,
+            state,
+            node,
+            tracer,
+            clock=clock,
+            max_steps=max_steps,
+            first_step=first_step,
+            observer=observer,
+        )
     if max_steps < 1:
         raise GraphError("max_steps must be at least 1")
     current = graph.entry if node is None else node
