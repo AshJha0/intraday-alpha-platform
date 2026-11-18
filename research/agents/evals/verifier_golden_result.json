@@ -5,20 +5,20 @@
   "cases": 146,
   "false_accept": {
    "k": 0,
-   "n": 68,
+   "n": 69,
    "rate": 0.0,
    "wilson95": [
     0.0,
-    0.053471
+    0.052737
    ]
   },
   "false_reject": {
-   "k": 1,
-   "n": 78,
-   "rate": 0.01282051282051282,
+   "k": 0,
+   "n": 77,
+   "rate": 0.0,
    "wilson95": [
-    0.002267,
-    0.069109
+    0.0,
+    0.047518
    ]
   }
  },
@@ -279,20 +279,20 @@
    "cases": 10,
    "false_accept": {
     "k": 0,
-    "n": 7,
+    "n": 8,
     "rate": 0.0,
     "wilson95": [
      0.0,
-     0.35433
+     0.324408
     ]
    },
    "false_reject": {
-    "k": 1,
-    "n": 3,
-    "rate": 0.3333333333333333,
+    "k": 0,
+    "n": 2,
+    "rate": 0.0,
     "wilson95": [
-     0.061492,
-     0.79234
+     0.0,
+     0.65762
     ]
    }
   },
@@ -425,28 +425,9 @@
  },
  "errors": [],
  "defects": [],
- "mislabels": [
-  "v102"
- ],
+ "mislabels": [],
  "unclassified": [],
- "disagreements": [
-  {
-   "id": "v102",
-   "category": "ranges_lists",
-   "label": "accept",
-   "verdict": "reject",
-   "title": "Finding",
-   "text": "IC 0.41\u20130.52",
-   "reason": "en-dash range, both stored",
-   "problems": [
-    "numbers not found in any cited artefact: ['0.41 (ic)'] - copy numbers verbatim from tool results and cite the artefact that holds them"
-   ],
-   "classification": {
-    "kind": "mislabel",
-    "why": "the evidence fields are lo/hi and the text labels the number 'IC': by the documented labelled-statistic rule a reviewer must reject"
-   }
-  }
- ],
+ "disagreements": [],
  "heldout": {
   "schema": "iap.verifier_golden_result/1",
   "what": "offline measurement of iap.llm.verify.verify_finding against hand labels; no model is involved",
@@ -454,20 +435,20 @@
    "cases": 55,
    "false_accept": {
     "k": 0,
-    "n": 28,
+    "n": 29,
     "rate": 0.0,
     "wilson95": [
      0.0,
-     0.120643
+     0.11697
     ]
    },
    "false_reject": {
-    "k": 1,
-    "n": 27,
-    "rate": 0.037037037037037035,
+    "k": 0,
+    "n": 26,
+    "rate": 0.0,
     "wilson95": [
-     0.006568,
-     0.182835
+     0.0,
+     0.128729
     ]
    }
   },
@@ -560,20 +541,20 @@
     "cases": 4,
     "false_accept": {
      "k": 0,
-     "n": 1,
+     "n": 2,
      "rate": 0.0,
      "wilson95": [
       0.0,
-      0.793451
+      0.65762
      ]
     },
     "false_reject": {
-     "k": 1,
-     "n": 3,
-     "rate": 0.3333333333333333,
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
      "wilson95": [
-      0.061492,
-      0.79234
+      0.0,
+      0.65762
      ]
     }
    },
@@ -874,27 +855,8 @@
   },
   "errors": [],
   "defects": [],
-  "mislabels": [
-   "h009"
-  ],
+  "mislabels": [],
   "unclassified": [],
-  "disagreements": [
-   {
-    "id": "h009",
-    "category": "half_edge",
-    "label": "accept",
-    "verdict": "reject",
-    "title": "Finding",
-    "text": "x 0.25",
-    "reason": "half-even of 0.255",
-    "problems": [
-     "numbers not found in any cited artefact: ['0.25'] - copy numbers verbatim from tool results and cite the artefact that holds them"
-    ],
-    "classification": {
-     "kind": "mislabel",
-     "why": "half-even of 0.255 at 2 dp is 0.26 (the kept digit 5 is odd), and half-up is 0.26 too; 0.25 is neither"
-    }
-   }
-  ]
+  "disagreements": []
  }
 }

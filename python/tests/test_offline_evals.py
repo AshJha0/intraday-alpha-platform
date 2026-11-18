@@ -69,7 +69,7 @@ def test_verifier_check_gate(tmp_path, capsys):
     assert verifier_eval.main(["--check"]) == 0
     worse = copy.deepcopy(VRESULT)
     for key in ("false_accept", "false_reject"):
-        worse["overall"][key]["rate"] = 0.0
+        worse["overall"][key]["rate"] = -0.01  # below today's rate, which is zero
     p = tmp_path / "old.json"
     p.write_text(json.dumps(worse), encoding="utf-8")
     assert verifier_eval.main(["--check", "--out", str(p)]) == 1
@@ -119,7 +119,7 @@ def test_heldout_file_is_separate_and_gated():
     h = VRESULT["heldout"]
     assert h["unclassified"] == [] and h["defects"] == []
     worse = copy.deepcopy(VRESULT)
-    worse["heldout"]["overall"]["false_reject"]["rate"] = 0.0
+    worse["heldout"]["overall"]["false_reject"]["rate"] = -0.01  # below today's rate, which is zero
     assert any(m.startswith("held-out") for m in verifier_eval.gate(VRESULT, worse))
 
 

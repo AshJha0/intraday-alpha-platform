@@ -61,11 +61,13 @@ states the new reading rules, so the documented rule and the code agree.
 
 | | Before the fixes | After the fixes |
 |---|---|---|
-| False accept | 11 / 68 = 0.162, Wilson [0.093, 0.267] | 0 / 68, [0.000, 0.053] |
-| False reject | 14 / 78 = 0.179, Wilson [0.110, 0.279] | 1 / 78, [0.002, 0.069] |
+| False accept | 11 / 68 = 0.162, Wilson [0.093, 0.267] | 0 / 69, [0.000, 0.053] |
+| False reject | 14 / 78 = 0.179, Wilson [0.110, 0.279] | 0 / 77, [0.000, 0.048] |
 | Crashes | 1 (`v143`) | 0 |
 
-The remaining false reject is `v102`, a case whose label is disputed (below).
+The "before" column is scored under the original labels. The "after" column is scored
+after the owner relabelled `v102` from accept to reject on 2026-11-18 (below), which moves
+one case from the accept side to the reject side.
 
 **Held-out set.** The fixes were designed on the golden set, so they may fit it too
 closely. To check that, a second file of 55 new cases was written:
@@ -76,17 +78,18 @@ before running the fixed verifier on it. Its sha256 was recorded at that moment,
 
 | | Before the fixes | After the fixes |
 |---|---|---|
-| False accept | 12 / 28 = 0.429, Wilson [0.265, 0.609] | 0 / 28, [0.000, 0.121] |
-| False reject | 12 / 27 = 0.444, Wilson [0.276, 0.627] | 1 / 27, [0.007, 0.183] |
+| False accept | 12 / 28 = 0.429, Wilson [0.265, 0.609] | 0 / 29, [0.000, 0.117] |
+| False reject | 12 / 27 = 0.444, Wilson [0.276, 0.627] | 0 / 26, [0.000, 0.129] |
 | Crashes | 1 (`h054`) | 0 |
 
-The remaining held-out false reject is `h009`, also a disputed label.
+As above, the "after" column follows the owner's relabelling of `h009` from accept to
+reject on 2026-11-18.
 
 Read the held-out result with one caveat. Its author had already diagnosed the golden-set
 defects, so the new cases probe the same failure families. The held-out set is evidence
 against fitting individual cases. It is not evidence of robustness to new kinds of
-evasion. With 27 or 28 cases per side, the upper bounds of the intervals are still 12 to
-18%.
+evasion. With 26 and 29 cases per side, the upper bounds of the intervals are still 12 to
+13%.
 
 The runner scores both files and records both in
 [verifier_golden_result.json](../research/agents/evals/verifier_golden_result.json):
@@ -126,9 +129,11 @@ unit. The existing tests pin that, and a bar label like `10s` is common in this
 repository. `percent` written as a word is still not read as `%`. A date such as
 `2026-11-18` is still read as numbers, so a finding that contains one is refused.
 
-### Disputed labels (left for the owner)
+### Two labels corrected by the owner (2026-11-18)
 
-The labels were not changed. Each disputed case carries a `note` with the reasoning.
+The author of the cases disputed two of their own labels and left them unchanged. The owner
+decided both on 2026-11-18: relabel as reject. Each case keeps a `note` with the reasoning
+and the original label. No other label was changed.
 
 - `v102`, `IC 0.41–0.52` against fields `lo` and `hi`, labelled accept. The documented
   rule says a number labelled IC must match an IC field, and these fields are not IC
@@ -139,8 +144,8 @@ The labels were not changed. Each disputed case carries a `note` with the reason
   0.25 matches neither rule. The verifier rejects the case, both before and after the
   fix.
 
-The "net of mislabels" rows in the result file score these two cases under the corrected
-label. Under that scoring, both sets have zero disagreements.
+After the relabelling both sets have zero disagreements, and the "net of mislabels" rows
+of the result file equal the overall rows.
 
 ## 2. Injection suite
 

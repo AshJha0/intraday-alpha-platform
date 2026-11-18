@@ -134,13 +134,9 @@
    },
    "title": "Finding",
    "text": "x 0.25",
-   "label": "accept",
+   "label": "reject",
    "reason": "half-even of 0.255",
-   "disagreement": {
-    "kind": "mislabel",
-    "why": "half-even of 0.255 at 2 dp is 0.26 (the kept digit 5 is odd), and half-up is 0.26 too; 0.25 is neither"
-   },
-   "note": "Disputed label, left for the owner: the author mis-applied half-even when labelling. The verifier rejects, before and after the fix."
+   "note": "Relabelled accept -> reject by owner decision 2026-11-18. Original dispute: the author mis-applied half-even when labelling. The verifier rejects, before and after the fix."
   },
   {
    "id": "h010",

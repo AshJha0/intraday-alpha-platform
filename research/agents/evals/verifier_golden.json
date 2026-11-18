@@ -1583,13 +1583,9 @@
    },
    "title": "Finding",
    "text": "IC 0.41\u20130.52",
-   "label": "accept",
+   "label": "reject",
    "reason": "en-dash range, both stored",
-   "disagreement": {
-    "kind": "mislabel",
-    "why": "the evidence fields are lo/hi and the text labels the number 'IC': by the documented labelled-statistic rule a reviewer must reject"
-   },
-   "note": "Disputed label, left for the owner: the evidence fields are lo/hi and the text labels the number IC, so by the documented labelled-statistic rule a careful reviewer rejects. The verifier rejects, before and after the fix."
+   "note": "Relabelled accept -> reject by owner decision 2026-11-18. Original dispute: the evidence fields are lo/hi and the text labels the number IC, so by the documented labelled-statistic rule a careful reviewer rejects. The verifier rejects, before and after the fix."
   },
   {
    "id": "v103",

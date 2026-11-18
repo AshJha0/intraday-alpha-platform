@@ -79,8 +79,8 @@ session ([AGENTS.md §4](AGENTS.md)).
 
 After them:
 
-- false accepts are 0/68 ([0, 0.053]);
-- false rejects are 1/78 ([0.002, 0.069]).
+- false accepts are 0/69 ([0, 0.053]);
+- false rejects are 0/77 ([0, 0.048]), after the owner relabelled one case as reject on 2026-11-18.
 
 The one remaining false reject is a case whose label the author now disputes.
 
@@ -89,8 +89,8 @@ them:
 
 | Held-out set | Before the fixes | After the fixes |
 |---|---|---|
-| False accepts | 12/28 ([0.265, 0.609]) | 0/28 ([0, 0.121]) |
-| False rejects | 12/27 ([0.276, 0.627]) | 1/27 ([0.007, 0.183]), again a disputed label |
+| False accepts | 12/28 ([0.265, 0.609]) | 0/29 ([0, 0.117]) |
+| False rejects | 12/27 ([0.276, 0.627]) | 0/26 ([0, 0.129]), after the owner relabelled one case as reject on 2026-11-18 |
 
 These numbers measure the verifier on adversarial edge cases written by one person. They
 say nothing about any model.
