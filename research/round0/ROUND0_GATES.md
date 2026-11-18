@@ -1,6 +1,7 @@
 # Round 0 gates (2026-11-18): what must be true before any new study is run
 
-Status: written on branch `round0-gates`. No market data was read and nothing was downloaded.
+Status: written on branch `round0-gates`. No market data was read and nothing was downloaded
+(four metadata requests to the IEX HIST index and reads of its public market-data page, section 6).
 Two items are new work of this round (sections 2 and 4); the rest records what the repository
 already holds and what it does not. Owner's rules in force: zero spend, no payment card, free
 sources only.
@@ -87,12 +88,26 @@ normalised ITCH and IEX datasets are gone. So:
 - the market-making rerun needs the free Nasdaq sample days fetched and ingested again;
 - the 100-name breadth day (2019-01-30) can be rebuilt from the file on disk.
 
-## 6. Intraday breadth on IEX HIST: go, with one prerequisite
+## 6. Intraday breadth on IEX HIST: BLOCKED on access, checked 2026-11-18
 
-Measured on 2026-10-24 (`archive/docs/review/DATA_ROUTE_PROPOSAL_v1.19.md`, not re-measured):
+The HIST index (`https://iextrading.com/api/1.0/hist?date=...`) answers **HTTP 403 Forbidden** for
+every date since the watchdog run of 2026-11-14 (`data/real/r7_watch/watch.log`; the run before it
+listed 2026-11-06 to 2026-11-11 normally). Four manual GETs on 2026-11-18 returned 403 as well,
+including a date that listed on 2026-10-24. The cause is not known: an outage, a block of this
+address after daily polling, or a change of the service. No attempt was made to get round it. The
+route cannot be called "go" until the owner opens the HIST section of the IEX market-data page in
+a browser and confirms that downloads are offered, and on what terms (this is also item D-22).
+
+Measured on 2026-10-24, before the 403 (`archive/docs/review/DATA_ROUTE_PROPOSAL_v1.19.md`):
 TOPS and DEEP listed back to at least 2024-10-01 (about 500 sessions); 13 to 16 GB per feed per
-day now; the Python reader takes about 9 to 10 minutes per GB, so 250 sessions are 500 to 650
+day; the Python reader takes about 9 to 10 minutes per GB, so 250 sessions are 500 to 650
 hours of this laptop.
+
+Free fallback that needs no new source: every Nasdaq ITCH sample file holds the whole market, not
+three names. The public listing has 46 entries (watchdog, 2026-11-18). A cross-sectional book of
+several hundred names can be built on those days from the reader the repository already has. By
+section 2 that many sessions detect only a net Sharpe near 6 or more, so it is a development
+sample for route A, not a confirmation sample.
 
 Prerequisite: a native TOPS reader that writes bars directly. Design, to be built first in round 1:
 
@@ -114,7 +129,7 @@ note (D-22, `docs/DATA_SOURCES.md` section 13) is still an open owner item.
 
 | route | status | next step |
 |---|---|---|
-| A: cross-sectional intraday book on IEX HIST | go, powered for a net Sharpe near 3 or more at 250 sessions | native TOPS reader, then one measured day |
+| A: cross-sectional intraday book | IEX HIST blocked on access (section 6); development possible on the Nasdaq ITCH sample days at full breadth | owner checks IEX HIST access; meanwhile a several-hundred-name book on the ITCH days; the native TOPS reader only once access is confirmed |
 | B: event-driven market making on Nasdaq ITCH sample days | method work only: too few sessions for any Sharpe claim (section 2) | re-ingest the sample days; event-driven quoter; markout curves |
 | C: daily families on Tiingo free tier | the only route powered for a Sharpe near 1; waits on the owner's sign-up | owner creates the account; DD1 tests on the first 500 symbols |
 | D: filing-text signal for D4 | waits on route C's universe and on EDGAR access from the owner's machine | local model, look-ahead control by filing date against model cut-off |
