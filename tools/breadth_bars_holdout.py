@@ -101,7 +101,22 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("--alpha", type=float, required=True)
     d.add_argument("--min-sessions", type=int, required=True)
     d.add_argument("--out", type=Path, required=True)
+    m = sub.add_parser("assemble", help="merge the filled draft into the bound file (unsigned)")
+    m.add_argument("--draft", type=Path, required=True)
+    m.add_argument("--bound", type=Path, required=True)
     a = ap.parse_args(argv)
+    if a.cmd == "assemble":
+        bound = json.loads(a.bound.read_text(encoding="utf-8"))
+        draft = json.loads(a.draft.read_text(encoding="utf-8"))
+        try:
+            doc = bh.assemble(ROOT, draft, bound)
+        except bh.LookRefused as exc:
+            print(f"REFUSED: {exc}", file=sys.stderr)
+            return 2
+        with a.bound.open("w", encoding="ascii", newline="\n") as fh:
+            fh.write(json.dumps(doc, indent=2, sort_keys=True, ensure_ascii=True) + "\n")
+        print(f"assembled {a.bound} (unsigned); review it, then sign")
+        return 0
     if a.cmd == "planted-dry-run":
         a.out.parent.mkdir(parents=True, exist_ok=True)
         a.out.write_text(

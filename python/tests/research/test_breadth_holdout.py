@@ -351,3 +351,58 @@ def test_planted_dry_run_demonstrates_every_verdict():
 def test_signing_module_matches_the_test_signer():
     pub = _KEY.public_key().public_bytes_raw().hex()
     assert signing.verify_ed25519(pub, b"m", _KEY.sign(b"m").hex())
+
+
+def _bound(doc: dict) -> dict:
+    return {
+        "kind": "analysis_prereg",
+        "prereg_id": REL,
+        "signed": False,
+        "analysis_identity": {
+            "commit": "c0ffee",
+            "family": doc["family"]["name"],
+            "data_versions": bh.data_versions_of(doc),
+            "metrics": [bh.STATISTIC],
+            "thresholds": bh.thresholds_of(doc),
+        },
+        "dry_run": {"path": "x.json"},
+    }
+
+
+def test_assemble_merges_draft_into_bound(repo):
+    draft = _doc(repo)
+    draft["status"] = "DRAFT"
+    out = bh.assemble(repo, draft, _bound(draft))
+    assert out["kind"] == bh.KIND and out["bars_tool"]["commit"] == "c0ffee"
+    assert out["analysis_identity"]["commit"] == "c0ffee" and "status" not in out
+
+
+@pytest.mark.parametrize(
+    "change, match",
+    [
+        (lambda d, b: d["family"].update(name="<FILL: x>"), "placeholders"),
+        (lambda d, b: b.update(signed=True), "already signed"),
+        (lambda d, b: b.pop("dry_run"), "run bind first"),
+        (lambda d, b: b["analysis_identity"].update(family="other"), "family"),
+        (lambda d, b: b["analysis_identity"].update(data_versions=[]), "data_versions"),
+        (lambda d, b: b["analysis_identity"].update(thresholds={}), "thresholds"),
+    ],
+)
+def test_assemble_refusals(repo, change, match):
+    draft = _doc(repo)
+    bound = _bound(draft)
+    change(draft, bound)
+    with pytest.raises(bh.LookRefused, match=match):
+        bh.assemble(repo, draft, bound)
+
+
+def test_committed_draft_is_marked_draft_and_refused_by_assemble():
+    root = Path(__file__).resolve().parents[3]
+    draft = json.loads(
+        (root / "research/preregs/drafts/breadth_bars_holdout_DRAFT.json").read_text()
+    )
+    assert draft["signed"] is False and "DRAFT" in draft["status"]
+    assert list(draft["holdout"]["sessions"]) == list(bh.HOLDOUT_SESSIONS)
+    assert draft["universe"]["sha256"] == bh.file_sha256(root / draft["universe"]["path"])
+    with pytest.raises(bh.LookRefused):
+        bh.assemble(root, draft, _bound({**draft, "family": {"name": "x"}}))

@@ -429,6 +429,48 @@ def run_look(
     return result
 
 
+# ----------------------------------------------------------------- assemble --
+#: draft fields the bind step owns, or that only describe the draft
+_NOT_COPIED = ("status", "signed", "analysis_identity", "dry_run", "prereg_id", "open_for_owner")
+
+
+def assemble(root: Path, draft: Mapping[str, Any], bound: Mapping[str, Any]) -> dict[str, Any]:
+    """The document to sign: the identity-bound file written by
+    ``tools/prereg_bind_identity.py bind`` plus the study fields of the filled
+    draft, with ``bars_tool`` taken from the bound commit and the tree now.
+    Refuses a signed bound file, a bound file without identity or dry run, and
+    any placeholder left in the draft."""
+    if bound.get("signed") is True or "signature" in bound:
+        raise LookRefused("the bound file is already signed; assembling would void it")
+    ident = bound.get("analysis_identity")
+    if not isinstance(ident, Mapping) or not isinstance(bound.get("dry_run"), Mapping):
+        raise LookRefused(
+            "the bound file has no analysis_identity or dry_run block; run bind first"
+        )
+    doc = dict(bound)
+    for k, v in draft.items():
+        if k not in _NOT_COPIED:
+            doc[k] = v
+    doc["kind"] = KIND
+    doc["bars_tool"] = {
+        "path": BARS_TOOL_REL,
+        "commit": ident.get("commit"),
+        "tree_sha256": tree_sha256(Path(root), BARS_TOOL_REL),
+    }
+    holes = _placeholders(doc)
+    if holes:
+        raise LookRefused(f"unfilled placeholders at {holes[:8]}")
+    if ident.get("family") != (doc.get("family") or {}).get("name"):
+        raise LookRefused("bound family differs from the draft's family.name")
+    if sorted(ident.get("data_versions") or []) != data_versions_of(doc):
+        raise LookRefused("bound data_versions are not the nine raw-file sha256 of the draft")
+    if ident.get("metrics") != [STATISTIC] or dict(ident.get("thresholds") or {}) != thresholds_of(
+        doc
+    ):
+        raise LookRefused("bound metrics / thresholds differ from the draft's statistic / decision")
+    return doc
+
+
 # ------------------------------------------------------------ planted dry run --
 def planted_dry_run(alpha_one_sided: float, min_sessions: int) -> dict[str, Any]:
     """The R4 report (:mod:`iap.agents.planted_dry_run`): the verdict rule on
