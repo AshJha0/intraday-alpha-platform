@@ -333,6 +333,8 @@ def test_no_prereg_consumer_skips_the_identity_check():
         "python/src/iap/research/__main__.py",  # declares identity_actual -> prereg_gate
         "python/src/iap/research/known_null.py",  # identity_args helper
         "python/src/iap/research/rel08_screen.py",
+        # builds an UNSIGNED draft that carries the block; reads no signed document
+        "python/src/iap/graph/research_flow.py",
     }
     assert sorted(set(unknown) - passthrough) == [], (
         "a new file consumes signed preregs: add it to RUNNERS with its identity check"
