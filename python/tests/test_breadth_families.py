@@ -108,7 +108,7 @@ def _f3_case(rng, n: int = N):
                 kind="Q",
                 ts_ns=bf.F3_DECISION_NS + 6 * 60 * 10**9,
                 cross_type="C",
-                price=mid[i, 325] * (1 + 0.002 * imb[i]),
+                price=mid[i, 385] * (1 + 0.002 * imb[i]),
                 shares=5e4,
             )
         )
@@ -128,7 +128,7 @@ def test_f3_finds_planted_imbalance_pressure_and_reports_coverage():
 
 def test_f3_score_uses_last_message_by_decision_and_handles_directions():
     mid = np.full((4, bb.BARS), 10.0)
-    vol = np.full((4, bb.BARS), 10.0)  # 3,250 shares over bars 0..324
+    vol = np.full((4, bb.BARS), 10.0)  # 3,850 shares over bars 0..384
     panel = _panel(mid, vol=vol)
     t = bf.F3_DECISION_NS
     auction = _auction(
@@ -145,7 +145,7 @@ def test_f3_score_uses_last_message_by_decision_and_handles_directions():
                 symbol="S000",
                 kind="I",
                 ts_ns=t,
-                imbalance_shares=325,
+                imbalance_shares=385,
                 direction="B",
                 cross_type="C",
             ),
@@ -176,7 +176,7 @@ def test_f3_score_uses_last_message_by_decision_and_handles_directions():
         ]
     )
     s = bf.f3_score(panel, _rows(4), auction)
-    assert s[0] == pytest.approx(325 / 3250)
+    assert s[0] == pytest.approx(385 / 3850)
     assert s[1] == 0.0
     assert np.isnan(s[2]) and np.isnan(s[3])
 
@@ -199,11 +199,11 @@ def test_no_score_uses_anything_after_its_decision_bar():
         bf.f2_gap_score(base, _rows(), prev, _rows()),
         bf.f2_gap_score(_panel(spoiled), _rows(), prev, _rows()),
     )
-    # F3: volume and quotes after bar 324 and messages after 15:55:00 do not move the score
+    # F3: volume and quotes after bar 384 and messages after 15:55:05 do not move the score
     panel, auction, _ = _f3_case(np.random.default_rng(5))
     s0 = bf.f3_score(panel, _rows(), auction)
     vol = panel.vol.copy()
-    vol[:, bf.F3_DECISION + 1 :] = 1e9
+    vol[:, bf.F3_VOLUME_LAST + 1 :] = 1e9
     later = pd.concat(
         [
             auction,
@@ -252,7 +252,7 @@ def test_f3_cost_is_the_entry_half_spread_only():
     n = 10
     mid = np.full((n, bb.BARS), 20.0)
     hs = np.full((n, bb.BARS), 0.0004)
-    hs[0, 325], hs[9, 325] = 0.001, 0.0002
+    hs[0, 385], hs[9, 385] = 0.001, 0.0002
     p = _panel(mid)
     panel = bb.Panel(p.symbols, p.etp, p.mid, hs, p.vol, p.notional, p.valid_ns)
     rows = []
@@ -374,9 +374,10 @@ def test_run_tool_on_synthetic_sessions(tmp_path):
     assert not first["overnight_gap_d1"]["defined"]
     assert second["overnight_gap_d1"]["defined"]  # Thursday -> Friday
     assert "closing_imbalance_d1" in second and "closing_imbalance_d1" not in first
+    assert "closing_imbalance_d0" not in second and "closing_imbalance_d1_mid_exit" in second
     assert doc["pooled"]["momentum_30_d1"]["sessions"] == 2
     assert doc["pooled"]["closing_imbalance_d1"]["sessions"] == 1
-    assert json.loads(out.read_text(encoding="utf-8"))["bonferroni_k"] == 7
+    assert json.loads(out.read_text(encoding="utf-8"))["bonferroni_k"] == 8
 
 
 def test_run_tool_refuses_holdout_sessions(tmp_path):
@@ -384,3 +385,84 @@ def test_run_tool_refuses_holdout_sessions(tmp_path):
     (tmp_path / "bars_20250102.csv").write_text("# x\n", encoding="utf-8")
     with pytest.raises(SystemExit, match="sealed holdout"):
         tool.session_files(tmp_path)
+
+
+# --------------------------------------------------------------------------- F3 version 2
+
+
+def test_f3_decision_instant_is_15_55_05_exactly():
+    assert bf.F3_DECISION_NS == 57_305 * 10**9
+    assert (bf.F3_VOLUME_LAST, bf.F3_ENTRY, bf.LAST_BAR) == (384, 385, 389)
+
+
+def test_f3_message_boundary_at_15_55_05():
+    panel = _panel(np.full((2, bb.BARS), 10.0))
+    auction = _auction(
+        [
+            dict(
+                symbol="S000",
+                kind="I",
+                ts_ns=57_305 * 10**9,
+                imbalance_shares=50,
+                direction="B",
+                cross_type="C",
+            ),
+            dict(
+                symbol="S001",
+                kind="I",
+                ts_ns=57_305 * 10**9 + 1,
+                imbalance_shares=50,
+                direction="B",
+                cross_type="C",
+            ),
+        ]
+    )
+    s = bf.f3_score(panel, _rows(2), auction)
+    assert np.isfinite(s[0]) and np.isnan(s[1])
+
+
+def test_f3_never_enters_at_the_bar_384_quote_and_has_no_delay_argument():
+    panel, auction, _ = _f3_case(np.random.default_rng(9))
+    base = bf.closing_imbalance(panel, _rows(), auction)
+    mid, hs = panel.mid.copy(), panel.half_spread.copy()
+    mid[:, 384] = 1.0
+    hs[:, 384] = 0.5
+    spoiled = bb.Panel(panel.symbols, panel.etp, mid, hs, panel.vol, panel.notional, panel.valid_ns)
+    again = bf.closing_imbalance(spoiled, _rows(), auction)
+    assert again["session_net_bps"] == base["session_net_bps"]
+    assert base["params"]["entry"] == 385 and base["params"]["version"] == 2
+    with pytest.raises(TypeError):
+        bf.closing_imbalance(panel, _rows(), auction, 0)
+
+
+# Outputs of F1 and F2 as committed before F3 version 2 (commit 8a7544c5), on
+# a seeded synthetic panel: version 2 must not change them.
+_F1F2_REFERENCE = {
+    "momentum_30_d1": (-9.720400417610273, -2.4731193162438023, -0.07328593306944363),
+    "open_reversal_d1": (0.014219300160258188, 6.706398543784631, 0.08763287529167747),
+    "momentum_30_d0": (-7.130207157159415, -0.4843157355119471, -0.04996040551956537),
+    "open_reversal_d0": (-0.9537790997546672, 6.432780153687756, 0.04211141530037836),
+}
+
+
+def test_f1_and_f2_outputs_are_unchanged_by_f3_version_2():
+    rng = np.random.default_rng(11)
+    n = 60
+    mid = 50 * np.exp(np.cumsum(rng.normal(0, 4e-4, (n, bb.BARS)), axis=1))
+    mid[rng.random(mid.shape) < 0.02] = np.nan
+    hs = np.where(np.isfinite(mid), rng.uniform(1e-4, 6e-4, mid.shape), np.nan)
+    v = np.full(mid.shape, 100.0)
+    panel = bb.Panel(
+        tuple(f"S{i:03d}" for i in range(n)),
+        np.zeros(n, bool),
+        mid,
+        hs,
+        v,
+        v * np.nan_to_num(mid),
+        np.where(np.isfinite(mid), 6e10, 0.0),
+    )
+    for d in (1, 0):
+        for name, fn in (("momentum_30", bf.momentum_30), ("open_reversal", bf.open_reversal)):
+            o = fn(panel, _rows(n), d)
+            got = (o["session_net_bps"], o["gross_bps_per_rebalance"]["mean"], o["rank_ic"]["mean"])
+            assert got == _F1F2_REFERENCE[f"{name}_d{d}"], name
