@@ -107,6 +107,13 @@ patch that applies cleanly and leaves the tree untouched. Every eval asserts
 that the (temporary) spend ledger holds one row per model call. The `docs` job
 (advisory) runs `tests/harness/check_docs.py` and lychee.
 
+## 7. Read-only MCP server (official SDK)
+
+`python -m iap.governance.mcp_sdk_server --root .` serves the read tools,
+resources and two prompts over stdio, built on the official `mcp` SDK (an
+optional extra; `.mcp.json` at the root launches it). Details, versions and
+the tests behind each security property: [MCP_SERVER.md](MCP_SERVER.md).
+
 Related: [GOVERNANCE.md §2a-2d](GOVERNANCE.md),
 [docs/RUNBOOKS.md](RUNBOOKS.md),
 [DIAGRAMS.md §26](DIAGRAMS.md) (the AI1 loop and its controls).

@@ -28,6 +28,8 @@ dbn = ["databento-dbn>=0.72.0,<1"]
 databento = ["databento>=0.89.0,<1"]
 # v1.15 AI4 deep LOB models (iap.models.deeplob_torch); CI does not install it, tests skip
 deep = ["torch>=2.15.0"]
+# v2.x official MCP SDK server (iap.governance.mcp_sdk_server); CI does not install it, tests skip
+mcp = ["mcp>=2.3.0,<3"]
 dev = ["pytest>=9.1,<10", "pytest-cov>=7.1,<8", "pytest-xdist>=3.8,<4", "pyyaml>=6.0,<7"]
 
 [project.scripts]
@@ -39,6 +41,7 @@ iap-lifecycle = "iap.lifecycle.__main__:main"
 iap-store = "iap.store.__main__:main"
 iap-mvp = "iap.mvp.__main__:main"
 iap-mcp = "iap.agents.mcp_server:main"
+iap-mcp-sdk = "iap.governance.mcp_sdk_server:main"
 iap-mcp-agent = "iap.agents.mcp_workflow:main"
 iap-agents = "iap.agents.cli:main"
 

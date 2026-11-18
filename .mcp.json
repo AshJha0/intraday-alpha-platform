@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "iap-research": {
+      "command": "python",
+      "args": ["-m", "iap.governance.mcp_sdk_server", "--root", "."],
+      "env": {"PYTHONPATH": "python/src"}
+    }
+  }
+}
