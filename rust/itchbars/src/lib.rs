@@ -23,6 +23,22 @@
 //! * `hidden_vol`, `hidden_notional`: non-displayed prints (`P`);
 //! * crosses (`Q`) are not counted: the bars describe continuous trading.
 //!
+//! Optional second output (`Builder::with_auction`, `--auction <path>`): the
+//! closing cross's Net Order Imbalance Indicator messages (`I`, cross type
+//! `C`, timestamp in `[15:50:00, 16:00:00]`) and closing cross prints (`Q`,
+//! cross type `C`), one row each.  Offsets from the type byte, per the Nasdaq
+//! TotalView-ITCH 5.0 specification and agreeing with `_I` / `_Q` in
+//! `python/src/iap/marketdata/itch50.py`:
+//!
+//! * `I` (50 bytes): paired shares u64 @11, imbalance shares u64 @19,
+//!   direction @27, stock @28..36, far u32 @36, near u32 @40, reference u32
+//!   @44, cross type @48, price variation @49;
+//! * `Q` (40 bytes): shares u64 @11, stock @19..27, price u32 @27, match
+//!   number u64 @31, cross type @39.
+//!
+//! Collecting them never touches the books, so the bars are the same with or
+//! without the second output.
+//!
 //! What it does not do: halts and LULD states are not applied (a halted
 //! symbol shows its last quote), and the session clock is fixed rather than
 //! read from system events.  Both are stated in the output header.
@@ -34,6 +50,37 @@ pub const OPEN_NS: u64 = (9 * 3600 + 30 * 60) * 1_000_000_000;
 pub const MINUTE_NS: u64 = 60 * 1_000_000_000;
 pub const BARS: usize = 390;
 pub const CLOSE_NS: u64 = OPEN_NS + BARS as u64 * MINUTE_NS;
+/// Start of the closing imbalance window (15:50:00).
+pub const NOII_FROM_NS: u64 = CLOSE_NS - 10 * MINUTE_NS;
+pub const NOII_LEN: usize = 50;
+pub const CROSS_LEN: usize = 40;
+
+/// One row of the auction output: an imbalance message or a cross print.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AuctionRow {
+    Imbalance {
+        symbol: String,
+        ts: u64,
+        paired: u64,
+        imbalance: u64,
+        direction: char,
+        far: u32,
+        near: u32,
+        reference: u32,
+        cross_type: char,
+    },
+    Cross {
+        symbol: String,
+        ts: u64,
+        price: u32,
+        shares: u64,
+        cross_type: char,
+    },
+}
+
+fn stock(b: &[u8], o: usize) -> String {
+    String::from_utf8_lossy(&b[o..o + 8]).trim_end().to_string()
+}
 
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
 pub struct Bar {
@@ -140,6 +187,8 @@ pub struct Stats {
     pub messages: u64,
     pub unknown_order_refs: u64,
     pub short_messages: u64,
+    /// `I` / `Q` messages too short to decode (counted only with the auction output on)
+    pub short_auction_messages: u64,
 }
 
 pub struct Builder {
@@ -147,6 +196,7 @@ pub struct Builder {
     symbols: Vec<Option<[u8; 8]>>,
     etp: Vec<u8>,
     orders: HashMap<u64, Order>,
+    auction: Option<Vec<AuctionRow>>,
     pub stats: Stats,
 }
 
@@ -198,7 +248,62 @@ impl Builder {
             symbols: vec![None; 1 << 16],
             etp: vec![b' '; 1 << 16],
             orders: HashMap::with_capacity(1 << 22),
+            auction: None,
             stats: Stats::default(),
+        }
+    }
+
+    /// Also collect the closing auction rows (see the module note).
+    pub fn with_auction(mut self) -> Self {
+        self.auction = Some(Vec::new());
+        self
+    }
+
+    /// The auction rows collected so far, in message order (empty when off).
+    pub fn auction_rows(&self) -> &[AuctionRow] {
+        self.auction.as_deref().unwrap_or(&[])
+    }
+
+    fn auction_message(&mut self, kind: u8, msg: &[u8], ts: u64) {
+        let Some(rows) = self.auction.as_mut() else {
+            return;
+        };
+        if kind == b'I' {
+            if msg.len() < NOII_LEN {
+                self.stats.short_auction_messages += 1;
+                return;
+            }
+            let cross_type = msg[48] as char;
+            if cross_type != 'C' || !(NOII_FROM_NS..=CLOSE_NS).contains(&ts) {
+                return;
+            }
+            rows.push(AuctionRow::Imbalance {
+                symbol: stock(msg, 28),
+                ts,
+                paired: be64(msg, 11),
+                imbalance: be64(msg, 19),
+                direction: msg[27] as char,
+                far: be32(msg, 36),
+                near: be32(msg, 40),
+                reference: be32(msg, 44),
+                cross_type,
+            });
+        } else {
+            if msg.len() < CROSS_LEN {
+                self.stats.short_auction_messages += 1;
+                return;
+            }
+            let cross_type = msg[39] as char;
+            if cross_type != 'C' {
+                return;
+            }
+            rows.push(AuctionRow::Cross {
+                symbol: stock(msg, 19),
+                ts,
+                price: be32(msg, 27),
+                shares: be64(msg, 11),
+                cross_type,
+            });
         }
     }
 
@@ -312,6 +417,7 @@ impl Builder {
                 let price = be32(msg, 32);
                 self.trade(locate, ts, price, shares, true);
             }
+            b'I' | b'Q' => self.auction_message(kind, msg, ts),
             _ => {}
         }
     }
@@ -396,6 +502,44 @@ pub fn write_csv<W: Write>(mut w: W, rows: &[(String, char, u64, Box<[Bar]>)]) -
                 b.hidden_vol,
                 b.hidden_notional
             )?;
+        }
+    }
+    Ok(())
+}
+
+pub const AUCTION_HEADER: &str = "symbol,kind,ts_ns,paired_shares,imbalance_shares,direction,far,near,reference,cross_type,price,shares";
+
+/// Write the auction rows as CSV (prices in 1e-4 dollars; the fields that do
+/// not apply to a row's kind are empty).
+pub fn write_auction_csv<W: Write>(mut w: W, rows: &[AuctionRow]) -> io::Result<()> {
+    writeln!(
+        w,
+        "# itchbars-auction/1: closing NOII (cross type C, 15:50:00-16:00:00) and closing cross prints"
+    )?;
+    writeln!(w, "{AUCTION_HEADER}")?;
+    for r in rows {
+        match r {
+            AuctionRow::Imbalance {
+                symbol,
+                ts,
+                paired,
+                imbalance,
+                direction,
+                far,
+                near,
+                reference,
+                cross_type,
+            } => writeln!(
+                w,
+                "{symbol},I,{ts},{paired},{imbalance},{direction},{far},{near},{reference},{cross_type},,"
+            )?,
+            AuctionRow::Cross {
+                symbol,
+                ts,
+                price,
+                shares,
+                cross_type,
+            } => writeln!(w, "{symbol},Q,{ts},,,,,,,{cross_type},{price},{shares}")?,
         }
     }
     Ok(())
@@ -612,6 +756,198 @@ mod tests {
         assert_eq!(
             lines[2],
             "TEST,N,0,1000000,1000150,100,100,150.0000,60000000000,0,0,0,0,0"
+        );
+    }
+
+    fn sym8(sym: &str) -> [u8; 8] {
+        let mut s = [b' '; 8];
+        s[..sym.len()].copy_from_slice(sym.as_bytes());
+        s
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn noii(
+        ts: u64,
+        sym: &str,
+        paired: u64,
+        imb: u64,
+        dir: u8,
+        prices: [u32; 3],
+        cross: u8,
+    ) -> Vec<u8> {
+        let mut v = head(b'I', 1, ts);
+        v.extend_from_slice(&paired.to_be_bytes());
+        v.extend_from_slice(&imb.to_be_bytes());
+        v.push(dir);
+        v.extend_from_slice(&sym8(sym));
+        for p in prices {
+            v.extend_from_slice(&p.to_be_bytes());
+        }
+        v.push(cross);
+        v.push(b'L');
+        assert_eq!(v.len(), NOII_LEN);
+        v
+    }
+    fn cross(ts: u64, sym: &str, shares: u64, price: u32, kind: u8) -> Vec<u8> {
+        let mut v = head(b'Q', 1, ts);
+        v.extend_from_slice(&shares.to_be_bytes());
+        v.extend_from_slice(&sym8(sym));
+        v.extend_from_slice(&price.to_be_bytes());
+        v.extend_from_slice(&42u64.to_be_bytes());
+        v.push(kind);
+        assert_eq!(v.len(), CROSS_LEN);
+        v
+    }
+
+    #[test]
+    fn noii_message_decodes_every_field_at_the_spec_offsets() {
+        let t = NOII_FROM_NS + 5 * S;
+        let m = noii(
+            t,
+            "TEST",
+            12_345,
+            678,
+            b'B',
+            [1_000_100, 1_000_200, 1_000_300],
+            b'C',
+        );
+        // the hand-built layout against the specification's offsets
+        assert_eq!(be64(&m, 11), 12_345);
+        assert_eq!(be64(&m, 19), 678);
+        assert_eq!(m[27], b'B');
+        assert_eq!(&m[28..36], b"TEST    ");
+        assert_eq!(be32(&m, 44), 1_000_300);
+        assert_eq!((m[48], m[49]), (b'C', b'L'));
+        let mut b = Builder::new().with_auction();
+        b.apply(&m);
+        assert_eq!(
+            b.auction_rows(),
+            &[AuctionRow::Imbalance {
+                symbol: "TEST".into(),
+                ts: t,
+                paired: 12_345,
+                imbalance: 678,
+                direction: 'B',
+                far: 1_000_100,
+                near: 1_000_200,
+                reference: 1_000_300,
+                cross_type: 'C',
+            }]
+        );
+    }
+
+    #[test]
+    fn cross_message_decodes_and_only_closing_crosses_are_kept() {
+        let m = cross(CLOSE_NS + S / 10, "TEST", 5_000_000_000, 1_000_600, b'C');
+        assert_eq!(&m[19..27], b"TEST    ");
+        assert_eq!(be32(&m, 27), 1_000_600);
+        assert_eq!(be64(&m, 31), 42);
+        let mut b = Builder::new().with_auction();
+        b.apply(&cross(OPEN_NS, "TEST", 900, 999_000, b'O'));
+        b.apply(&m);
+        b.apply(&cross(OPEN_NS, "TEST", 1, 1, b'H'));
+        assert_eq!(
+            b.auction_rows(),
+            &[AuctionRow::Cross {
+                symbol: "TEST".into(),
+                ts: CLOSE_NS + S / 10,
+                price: 1_000_600,
+                shares: 5_000_000_000,
+                cross_type: 'C',
+            }]
+        );
+    }
+
+    #[test]
+    fn imbalance_window_and_cross_type_filter() {
+        let mut b = Builder::new().with_auction();
+        let mk = |ts, c| noii(ts, "TEST", 1, 1, b'S', [0, 0, 0], c);
+        b.apply(&mk(NOII_FROM_NS - 1, b'C')); // before 15:50
+        b.apply(&mk(NOII_FROM_NS, b'C')); // kept: window start
+        b.apply(&mk(CLOSE_NS, b'C')); // kept: window end
+        b.apply(&mk(CLOSE_NS + 1, b'C')); // after 16:00
+        b.apply(&mk(NOII_FROM_NS + S, b'O')); // opening cross imbalance
+        b.apply(&mk(NOII_FROM_NS + S, b'H')); // halt cross imbalance
+        let ts: Vec<u64> = b
+            .auction_rows()
+            .iter()
+            .map(|r| match r {
+                AuctionRow::Imbalance { ts, .. } | AuctionRow::Cross { ts, .. } => *ts,
+            })
+            .collect();
+        assert_eq!(ts, vec![NOII_FROM_NS, CLOSE_NS]);
+    }
+
+    #[test]
+    fn short_auction_messages_are_counted_and_skipped() {
+        let mut m = noii(NOII_FROM_NS, "TEST", 1, 1, b'B', [0, 0, 0], b'C');
+        m.truncate(NOII_LEN - 1);
+        let mut q = cross(CLOSE_NS, "TEST", 1, 1, b'C');
+        q.truncate(CROSS_LEN - 1);
+        let mut b = Builder::new().with_auction();
+        b.apply(&m);
+        b.apply(&q);
+        assert!(b.auction_rows().is_empty());
+        assert_eq!(b.stats.short_auction_messages, 2);
+        let mut off = Builder::new();
+        off.apply(&m);
+        off.apply(&q);
+        assert_eq!(off.stats.short_auction_messages, 0);
+        assert_eq!(off.stats.messages, b.stats.messages);
+    }
+
+    fn session(msgs: &[Vec<u8>], auction: bool) -> (Vec<u8>, Vec<u8>) {
+        let mut stream = Vec::new();
+        for m in msgs {
+            stream.extend_from_slice(&(m.len() as u16).to_be_bytes());
+            stream.extend_from_slice(m);
+        }
+        let mut b = Builder::new();
+        if auction {
+            b = b.with_auction();
+        }
+        b.read_stream(&stream[..]).unwrap();
+        let mut a = Vec::new();
+        write_auction_csv(&mut a, b.auction_rows()).unwrap();
+        let rows = b.finish();
+        let mut out = Vec::new();
+        write_csv(&mut out, &rows).unwrap();
+        (out, a)
+    }
+
+    #[test]
+    fn bars_output_is_byte_identical_with_and_without_the_auction_output() {
+        let plain = vec![
+            directory(1, "TEST", b'N'),
+            add(1, OPEN_NS - S, 1, true, 300, 1_000_000),
+            add(1, OPEN_NS - S, 2, false, 300, 1_000_200),
+            exec(OPEN_NS + 10 * S, 1, 100),
+            hidden(1, OPEN_NS + 20 * S, 50, 1_000_100),
+            add(1, CLOSE_NS - 3 * MINUTE_NS, 3, true, 100, 1_000_100),
+        ];
+        let mut with_auction = plain.clone();
+        with_auction.insert(
+            4,
+            noii(NOII_FROM_NS + S, "TEST", 10, 20, b'B', [1, 2, 3], b'C'),
+        );
+        with_auction.push(noii(CLOSE_NS - S, "TEST", 30, 40, b'S', [4, 5, 6], b'C'));
+        with_auction.push(cross(CLOSE_NS + S, "TEST", 700, 1_000_150, b'C'));
+        let (reference, _) = session(&plain, false);
+        let (off, _) = session(&with_auction, false);
+        let (on, auction) = session(&with_auction, true);
+        assert_eq!(off, reference);
+        assert_eq!(on, reference);
+        let text = String::from_utf8(auction).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines[1], AUCTION_HEADER);
+        let want = [
+            format!("TEST,I,{},10,20,B,1,2,3,C,,", NOII_FROM_NS + S),
+            format!("TEST,I,{},30,40,S,4,5,6,C,,", CLOSE_NS - S),
+            format!("TEST,Q,{},,,,,,,C,1000150,700", CLOSE_NS + S),
+        ];
+        assert_eq!(
+            lines[2..],
+            want.iter().map(String::as_str).collect::<Vec<_>>()[..]
         );
     }
 }
