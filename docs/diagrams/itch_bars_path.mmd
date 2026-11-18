@@ -1,0 +1,22 @@
+flowchart LR
+    subgraph SRC["Free Nasdaq ITCH 5.0 sample days"]
+        MAN["research/breadth/candidates.json<br/>ten in-sample days; 2025/26 days are the sealed holdout"]
+    end
+    subgraph CHAIN["tools/itch_bars_chain.py (one raw file on disk at a time)"]
+        DL["download<br/>allowed hosts, size and sha256 check"]
+        RB["rust/itchbars in WSL<br/>decompressed stream to one-minute bars per symbol"]
+        DEL["delete the raw file<br/>append chain_log.jsonl"]
+    end
+    BARS["bars_YYYYMMDD.csv<br/>auction_YYYYMMDD.csv (NOII and cross rows)"]
+    subgraph STUDY["python iap.research"]
+        UNI["breadth_bars: universe rule<br/>top 500 by displayed notional, no return input"]
+        DEV["breadth_bars_dev / breadth_bars_pooled<br/>session-level t on a fixed universe"]
+        FAM["breadth_families F1 to F3<br/>pre-specified, K = 7"]
+    end
+    HO["breadth_holdout runner<br/>refuses unless the holdout registry permits the read"]
+    MAN --> DL --> RB --> DEL
+    RB --> BARS
+    BARS --> UNI --> DEV
+    UNI --> FAM
+    FAM -. "at most one candidate, by the rule fixed before the pooled result" .-> HO
+    MAN -. "2025 or later refused" .-> DL

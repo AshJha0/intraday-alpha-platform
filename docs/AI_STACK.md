@@ -90,8 +90,8 @@ Number verifier, from [research/agents/evals/verifier_golden_result.json](../res
 
 | Set | False accept | False reject |
 |---|---|---|
-| Golden (146 cases) | 0 / 68, Wilson 95% [0.0, 0.053471] | 1 / 78, Wilson 95% [0.002267, 0.069109] |
-| Held-out (55 cases, `heldout` key) | 0 / 28, Wilson 95% [0.0, 0.120643] | 1 / 27, Wilson 95% [0.006568, 0.182835] |
+| Golden (146 cases) | 0 / 69, Wilson 95% [0.0, 0.052737] | 0 / 77, Wilson 95% [0.0, 0.047518] |
+| Held-out (55 cases, `heldout` key) | 0 / 29, Wilson 95% [0.0, 0.11697] | 0 / 26, Wilson 95% [0.0, 0.128729] |
 
 Injection suite, from [research/agents/evals/injection_result.json](../research/agents/evals/injection_result.json):
 

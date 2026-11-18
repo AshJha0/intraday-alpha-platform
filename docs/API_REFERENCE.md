@@ -2,18 +2,7 @@
 
 One page for the public Python, Rust and C++ interfaces, by area. It merges the ten API_*.md pages that used to sit at the repository root (v2.1 Track 0).
 
-Former file → section:
-
-- `docs/API_REFERENCE.md`
-- `docs/API_REFERENCE.md`
-- `docs/API_REFERENCE.md`
-- `docs/API_REFERENCE.md`
-- `docs/API_REFERENCE.md`
-- `docs/API_REFERENCE.md`
-- `docs/API_REFERENCE.md`
-- `docs/API_REFERENCE.md`
-- `docs/API_REFERENCE.md`
-- `docs/API_REFERENCE.md`
+Former file → section: `API_CORE.md` → API_CORE; `API_FEATURES.md` → API_FEATURES; `API_ALPHA.md` → API_ALPHA; `API_PORTFOLIO_TCA.md` → API contract, Portfolio Optimizer & TCA; `API_TRADING.md` → API_TRADING; `API_ADAPTIVE.md` → API_ADAPTIVE; `API_CONTRACTS.md` → API_CONTRACTS; `API_PAPER.md` → API_PAPER; `API_AGENTS.md` → API_AGENTS; `API_LLM.md` → API_LLM. The v2.2 modules (research graph, research memory, tracing, offline evals, MCP SDK server, bars studies) are in API_V22 at the end.
 
 ## API_CORE — the contract every port must mirror
 
@@ -5111,3 +5100,57 @@ from iap.llm.summary_check import check_summary, action_claims, clauses
 - `iap.llm.evals`: `SCENARIOS` (`p_hacking`, `prompt_injection`,
   `hallucinated_citation`, `task_success`), `run_scenario`, `run_all`,
   `fake_fingerprint`; mocked in CI, `--live` by the owner.
+
+## API_V22 — the 2026-11-18 round: graph, memory, tracing, evals, MCP SDK server, bars studies (Python)
+
+Every module below is offline: none calls a model API or the network. Narrative pages:
+[AI_STACK.md](AI_STACK.md), [RESEARCH_GRAPH.md](RESEARCH_GRAPH.md), [RESEARCH_MEMORY.md](RESEARCH_MEMORY.md),
+[TRACING.md](TRACING.md), [AGENT_EVALS.md](AGENT_EVALS.md), [MCP_SERVER.md](MCP_SERVER.md).
+
+### 1. Research graph, `iap.graph` (CLI `python -m iap.graph run | resume | verify-text`)
+
+- `iap.graph.core`: `Graph`, `execute`, `Interrupt` (the human approval stop), `RunResult`,
+  `GraphError`, `StepLimitError`, `state_sha256`.
+- `iap.graph.checkpoint`: `start`, `resume`, `verify_chain` (hash-chained checkpoints), `event_log`,
+  `CheckpointError`.
+- `iap.graph.research_flow`: `ResearchState`, `ResearchDeps`, `build_research_graph`,
+  `validate_hypothesis`, `triage`, `fallback_narrative`, `stub_deps`.
+- `iap.graph.wiring`: `build_wired_flow` and `wired_deps` (memory, holdout registry and verifier
+  behind the injected steps), `same_test`, `related_test`, `registry_is_holdout`,
+  `verify_narrative`, `stub_runner` (fixed numbers, not results), `load_runner`.
+- `iap.graph.tracing.traced_execute`; `iap.graph.langgraph_adapter.to_langgraph` (optional, untested
+  against an installed `langgraph`).
+
+### 2. Research memory, `iap.memory` (CLI `python -m iap.memory search | prior-tests | eval`)
+
+- `iap.memory.corpus`: `build_corpus`, `chunk_markdown`, `ledger_chunks`, `Chunk` (path and line span).
+- `iap.memory.bm25`: `BM25`, `tokenize`.
+- `iap.memory.search`: `Memory`, `default_memory`, `search`, `Hit`, `run_eval`.
+
+### 3. Tracing and offline evals, `iap.llm`
+
+- `iap.llm.tracing`: `Tracer`, `Span`, `JsonlExporter`, `session_tracer`, `load_spans`, `summarize`,
+  `to_otel` (OpenTelemetry GenAI field layout, no dependency).
+- `iap.llm.verifier_eval` (`python -m iap.llm.verifier_eval [--check]`): `evaluate`, `judge`,
+  `wilson`, `gate`.
+- `iap.llm.injection_eval` (`python -m iap.llm.injection_eval [--check]`): `evaluate`, `flagged`,
+  `structural`, `gate`.
+
+### 4. MCP server on the official SDK, `iap.governance.mcp_sdk_server`
+
+`build_server(root)` and `main` (entry point `iap-mcp-sdk`, optional extra `mcp`); read-only
+tools through the same `Tools` class as `iap.governance.mcp_server`, plus `MemoryTools`
+(capped at 20 hits and 500-character queries).
+
+### 5. Bars studies and power, `iap.research`
+
+- `iap.research.pnl_power`: `sessions_needed`, `mde_sharpe`, `power`, `critical_t`, `table`,
+  `render_markdown` (the source of [research/PNL_POWER_TABLE.md](research/PNL_POWER_TABLE.md)).
+- `iap.research.breadth_bars`: `load_panel`, `select_universe` (no return input), `run_study`,
+  `pool_sessions` (session-level t), `rank_ic`, `Panel`.
+- `iap.research.breadth_families`: `momentum_30` (F1), `open_reversal` (F2), `closing_imbalance`
+  (F3), `load_auction`, `FAMILIES`.
+- `iap.research.breadth_holdout`: `preflight`, `run_look`, `assemble`, `verdict`, `LookRefused`
+  (raised before any download when the registry does not permit the read).
+- Rust: `rust/itchbars` (binary `itchbars`): a decompressed ITCH 5.0 stream on standard input to
+  one-minute bars per symbol, with optional closing-auction rows.

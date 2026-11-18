@@ -1727,7 +1727,73 @@ flowchart LR
     R7 -. "closed" .-> AI4
 ```
 
-## 42. Where to go deeper
+## 42. The AI stack (v2.2): memory, graph, MCP server, verifier, skills
+
+Who calls what, and which records each piece reads. Code computes every number and verdict; no
+step calls a model API. Guarantees, tests and measured numbers are in [AI_STACK.md](AI_STACK.md).
+
+```mermaid
+flowchart TB
+    subgraph top["Callers"]
+        SK["Claude Code skills<br/>.claude/skills/*"]
+        MC["MCP client<br/>(.mcp.json)"]
+    end
+    subgraph mid["Read and decide (python/src/iap)"]
+        MS["MCP server<br/>governance.mcp_sdk_server"]
+        GR["Research graph<br/>graph.research_flow + graph.wiring"]
+        ME["Research memory<br/>memory (BM25)"]
+        VE["Number verifier<br/>llm.verify"]
+    end
+    subgraph low["Records"]
+        LE["Experiment ledger<br/>research/experiments.json"]
+        RE["Reports and notes<br/>research/, docs/"]
+        GO["Governance<br/>holdout_registry.json, preregs"]
+    end
+    SK -->|"python -m iap.graph / iap.memory"| GR
+    SK -->|"prior-tests, search"| ME
+    MC --> MS
+    MS -->|"memory_search, prior_tests"| ME
+    MS -->|"ledger, reports (read-only)"| LE
+    GR -->|"search_prior"| ME
+    GR -->|"is_holdout"| GO
+    GR -->|"verify narrative"| VE
+    ME --> LE
+    ME --> RE
+    VE -->|"evidence"| RE
+```
+
+## 43. The bars path (v2.2): one ITCH day to a cross-sectional study
+
+One in-sample day at a time: download, build bars natively, delete the raw file, then study the
+bars. Results and their limits are in [REPORT.md](REPORT.md) section 2; the recipe is
+[COOKBOOK.md](COOKBOOK.md) recipe 14.
+
+```mermaid
+flowchart LR
+    subgraph SRC["Free Nasdaq ITCH 5.0 sample days"]
+        MAN["research/breadth/candidates.json<br/>ten in-sample days; 2025/26 days are the sealed holdout"]
+    end
+    subgraph CHAIN["tools/itch_bars_chain.py (one raw file on disk at a time)"]
+        DL["download<br/>allowed hosts, size and sha256 check"]
+        RB["rust/itchbars in WSL<br/>decompressed stream to one-minute bars per symbol"]
+        DEL["delete the raw file<br/>append chain_log.jsonl"]
+    end
+    BARS["bars_YYYYMMDD.csv<br/>auction_YYYYMMDD.csv (NOII and cross rows)"]
+    subgraph STUDY["python iap.research"]
+        UNI["breadth_bars: universe rule<br/>top 500 by displayed notional, no return input"]
+        DEV["breadth_bars_dev / breadth_bars_pooled<br/>session-level t on a fixed universe"]
+        FAM["breadth_families F1 to F3<br/>pre-specified, K = 7"]
+    end
+    HO["breadth_holdout runner<br/>refuses unless the holdout registry permits the read"]
+    MAN --> DL --> RB --> DEL
+    RB --> BARS
+    BARS --> UNI --> DEV
+    UNI --> FAM
+    FAM -. "at most one candidate, by the rule fixed before the pooled result" .-> HO
+    MAN -. "2025 or later refused" .-> DL
+```
+
+## 44. Where to go deeper
 
 | topic | document |
 |---|---|

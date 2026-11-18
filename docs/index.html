@@ -145,11 +145,22 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     <tr><td>Does the closing-cross strategy work?</td><td>No demonstrated edge: +19.4 bp, 95% CI −254 to +293 bp, from 3 trades. Underpowered, not negative. Holdout not confirmed, 0 trades.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/LEARN.md">LEARN §42</a></td></tr>
     <tr><td>Can a maker do better than a taker?</td><td>No, not on real data (v1.16). Taker capacity: 0 of 45 cells break even. Two-sided quoting v2 (in-sample, 6 test sessions): every cell loses $5&ndash;7k per session, adverse selection about 4x the spread captured; skewing with EQ01/EQ05 cuts the loss by about $750&ndash;920 per session, so the signals help execution, not a standalone maker. Synthetic maker backtest: −6.7 bp per trip.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/archive/docs/ROADMAP.md">ROADMAP §3.11</a></td></tr>
     <tr><td>Is the fill model validated against real fills?</td><td>No. Level 1 (deterministic replay) only; Level 2 is not validated, because no real orders or fills exist. The v1.18 real-tape test: AAPL and MSFT inconclusive, QQQ supports; no latency edge is claimed.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/SIM_TO_REAL.md">SIM_TO_REAL</a></td></tr>
-    <tr><td>Does the statistical gate control false rejections on real data?</td><td>Not shown. The known-null calibration (null v3) failed: 4.3&nbsp;% conditional rejection against a 2.5&nbsp;% target in two cells, and the outside reviewer rejected the method as the gate.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/v118/known_null_v3_RESULT.md">known_null_v3_RESULT</a></td></tr>
+    <tr><td>Does the statistical gate control false rejections on real data?</td><td>Not shown. The known-null calibration (null v3) failed: 4.3&nbsp;% conditional rejection against a 2.5&nbsp;% target in two cells, and the outside reviewer rejected the method as the gate. A 2026-11-18 simulation shows that arm on seven sessions cannot tell a 2.5&nbsp;% test from a 4.3&nbsp;% one, so the FAIL is not evidence of over-rejection either; the verdict stands.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/research/v118/known_null_v3_RESULT.md">known_null_v3_RESULT</a></td></tr>
     <tr><td>What does the full loop do?</td><td>Loses 82.84 USD on its golden session.</td><td><a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/MVP.md">MVP</a></td></tr>
   </table></div>
 
     <div class="honest new">
+    <strong>v2.2.0 ([[PENDING: release date]]): the gates of Round 0, full-market bars, an offline-measured AI layer. No alpha confirmed.</strong>
+    Both free routes to a confirmation sample are closed: IEX withdrew its HIST captures from direct download
+    (owner's check, 2026-11-18) and the daily route has no eligible free source. Ten free in-sample Nasdaq sessions
+    detect only a net Sharpe of about 16 or more, so they can develop an idea, not confirm one. An event-driven
+    quoter lost more than the grid quoter on its one development session. Pooled and family results:
+    [[PENDING: pooled ten-session and F1 to F3 results, one line]].
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/v2.2.0_RELEASE_NOTES.md">Release notes</a>,
+    <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/AI_STACK.md">AI stack</a>.
+    </div>
+
+    <div class="honest">
     <strong>v2.1.0 (released 2026-10-27): showcase and streamline.</strong> No new research claim; a technical report,
     three ways in, a one-command demo, a learning guide, and four one-pagers (quant, algo/SOR, C++, AI/ML).
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/v2.1.0_RELEASE_NOTES.md">Release notes</a>.
@@ -498,11 +509,14 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     <div class="card"><h3>IEX second venue</h3>
       <p>IEX HIST is a free, daily second venue. 9 overlap days approved; day 1 (2025-11-28) is processed:
          148,115,121 IEX-TP messages, 0 sequence gaps, and the TOPS oracle shows 0 mismatches for AAPL, MSFT and
-         QQQ (as of v1.17.0). 6 of the 9 days were recorded by v1.17.1; the v1.18 verification run found an identity pass on all six, and absolute IEX latency and Nasdaq skew are not claimed.
+         QQQ (as of v1.17.0). 6 of the 9 days were recorded by v1.17.1; the v1.18 verification run found an identity pass on all six, and absolute IEX latency and Nasdaq skew are not claimed. Since 2026-11-18 IEX HIST is withdrawn from direct download
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/DATA_SOURCES.md">DATA_SOURCES</a>).
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/RESEARCH_NOTES.md">IEX_OVERLAP_SET</a></p></div>
     <div class="card"><h3>Agents</h3>
       <p>E1 spend ledger with a monthly cap of USD 30; E2 research assistant; E3 morning ops and E4 docs sync on a
-         smaller model. The LLM never computes a number, signs, registers or merges.
+         smaller model. The LLM never computes a number, signs, registers or merges. Since 2026-11-18 live model calls
+         are off (owner decision R0-1); the guardrails are measured offline
+         (<a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/AGENT_EVALS.md">AGENT_EVALS</a>).
          <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/AGENTS.md">AGENTS</a></p></div>
   </div>
 
