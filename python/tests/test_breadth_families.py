@@ -465,4 +465,6 @@ def test_f1_and_f2_outputs_are_unchanged_by_f3_version_2():
         for name, fn in (("momentum_30", bf.momentum_30), ("open_reversal", bf.open_reversal)):
             o = fn(panel, _rows(n), d)
             got = (o["session_net_bps"], o["gross_bps_per_rebalance"]["mean"], o["rank_ic"]["mean"])
-            assert got == _F1F2_REFERENCE[f"{name}_d{d}"], name
+            # relative 1e-12: the reference was computed on Windows, and the same
+            # sums differ in the last bits on the Linux CI runners (observed 1e-15)
+            assert got == pytest.approx(_F1F2_REFERENCE[f"{name}_d{d}"], rel=1e-12, abs=1e-12), name
