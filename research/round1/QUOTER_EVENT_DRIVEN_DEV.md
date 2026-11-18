@@ -116,3 +116,118 @@ resting at the touch and at any price; inventory distribution.
 Looks: exactly two configurations (`grid`, `events`) per symbol, three
 symbols, one session: six runs, run once each. The driver prints the count
 before it runs: `python -m iap.research.quoter_event_dev`.
+
+## 4. Synthetic results (mechanics, not economics)
+
+Tests: `python/tests/test_quoting_event_driven.py`, 13 tests. They cover:
+
+- grid mode byte-identical to the code before this work (two pinned digests, default and v2-shaped);
+- `dev_diagnostics` changes no number;
+- events mode is deterministic and keeps the P&L identity and the inventory limit;
+- repricing on a touch move is decided at the event and arrives only after the feed and order latency, and the grid quoter never reprices;
+- the minimum resting time defers a reprice;
+- the guard cancels before a planted sweep exactly when `gap >= feed + latency`, and it does not fire without the imbalance;
+- the message cap holds in every trailing second;
+- the minimum resting time holds on every cancel.
+
+The comparison below uses the repository's random MBO generator
+(`synth_events`, 6000 steps). It has no informed flow, and its spreads are
+often wider than one tick, so faster requoting is mechanically rewarded.
+Read it as a check that the mode runs and reacts, not as evidence about
+real markets.
+
+| seed | drift | quoter | net | spread | markout 1 s | markout 10 s | inventory P&L | flatten | rebates | fills | messages | at touch (bid) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 0.0 | grid | +642.74 | +683.25 | -22.75 | -34.75 | -29.75 | -6.75 | +18.90 | 142 | 156 | 0.15 |
+| 1 | 0.0 | events | +1655.18 | +1667.50 | -28.50 | -52.00 | -10.00 | -13.50 | +40.00 | 263 | 615 | 0.21 |
+| 1 | 0.15 | grid | +2119.04 | +2189.50 | -28.50 | -25.75 | -35.50 | -26.00 | +19.70 | 137 | 148 | 0.11 |
+| 1 | 0.15 | events | +4519.24 | +4527.25 | +6.50 | -29.00 | -30.25 | -26.00 | +41.90 | 285 | 624 | 0.18 |
+| 2 | 0.0 | grid | +904.00 | +887.00 | +5.50 | -1.75 | -8.50 | +0.00 | +20.00 | 138 | 150 | 0.09 |
+| 2 | 0.0 | events | +1786.60 | +1777.00 | -16.00 | -23.75 | -13.00 | +0.00 | +38.60 | 241 | 628 | 0.19 |
+| 2 | 0.15 | grid | +1915.52 | +2142.00 | -43.25 | -74.00 | -68.75 | -133.00 | +19.20 | 125 | 154 | 0.11 |
+| 2 | 0.15 | events | +4528.24 | +4546.25 | -39.25 | -42.25 | +14.75 | -33.25 | +39.90 | 267 | 628 | 0.17 |
+| 3 | 0.0 | grid | +294.60 | +287.50 | -31.00 | -10.50 | +20.50 | +0.00 | +17.60 | 123 | 163 | 0.11 |
+| 3 | 0.0 | events | +652.94 | +642.00 | -17.25 | -22.00 | -8.50 | -0.25 | +37.10 | 251 | 611 | 0.21 |
+| 3 | 0.15 | grid | +1134.84 | +1171.00 | +5.00 | -19.50 | -53.75 | -6.75 | +19.50 | 138 | 155 | 0.05 |
+| 3 | 0.15 | events | +2311.14 | +2326.25 | -24.50 | -41.50 | -22.00 | -6.75 | +38.30 | 246 | 633 | 0.16 |
+
+## 5. Real day: 2019-01-30, AAPL, MSFT, QQQ (in-sample, development)
+
+Data: ingested from the raw Nasdaq ITCH file with the plain `ingest` command,
+which keeps the raw file; the book check was clean. Output is in
+`data/real/quoter_dev/ds_20190130` (git-ignored). Per-symbol JSON:
+`research/round1/quoter_event_dev/`. The driver printed
+`configurations: 2 per symbol x 3 symbols = 6` before running. An earlier
+launch stopped while loading the fee schedule, before any configuration
+ran.
+
+USD, one session. Markouts are per quote fill, against the pre-fill mid, in bps of quote notional (negative is adverse). Total bps columns pool the three names by quote notional.
+
+| metric | AAPL grid | AAPL events | MSFT grid | MSFT events | QQQ grid | QQQ events | total grid | total events |
+|---|---|---|---|---|---|---|---|---|
+| net | -6,465.60 | -6,426.82 | -1,733.31 | -2,500.32 | -1,956.30 | -2,274.38 | -10,155.22 | -11,201.51 |
+| spread captured | 3,265.70 | 2,685.49 | 1,649.64 | 1,243.55 | 1,272.49 | 795.58 | 6,187.84 | 4,724.63 |
+| markout at 1 s (rule 6) | -8,309.25 | -7,838.08 | -3,645.27 | -4,038.92 | -4,096.36 | -3,752.57 | -16,050.87 | -15,629.57 |
+| inventory P&L | -2,141.84 | -1,760.15 | -453.16 | -222.67 | 69.13 | 14.49 | -2,525.86 | -1,968.33 |
+| flatten cost | -1.23 | -0.25 | -0.24 | -0.40 | -0.69 | -0.50 | -2.16 | -1.15 |
+| rebates | 735.73 | 757.63 | 728.06 | 848.66 | 829.89 | 919.57 | 2,293.68 | 2,525.86 |
+| taker fees (incl. regulatory) | 14.62 | 269.96 | 12.29 | 328.88 | 30.50 | 248.76 | 57.41 | 847.60 |
+| impact | 0.09 | 1.49 | 0.06 | 1.66 | 0.27 | 2.20 | 0.42 | 5.35 |
+| markout 1 s, bps | -0.61 | -0.52 | -0.59 | -0.50 | -0.26 | -0.20 | -0.45 | -0.37 |
+| markout 10 s, bps | -0.70 | -0.60 | -0.69 | -0.53 | -0.26 | -0.23 | -0.50 | -0.42 |
+| markout 60 s, bps | -0.81 | -0.65 | -0.67 | -0.54 | -0.25 | -0.22 | -0.54 | -0.44 |
+| spread captured, bps | 0.24 | 0.18 | 0.27 | 0.15 | 0.08 | 0.04 | 0.17 | 0.11 |
+| net, bps | -0.47 | -0.42 | -0.28 | -0.31 | -0.12 | -0.12 | -0.29 | -0.27 |
+| quote fills | 11,844 | 12,386 | 7,311 | 9,425 | 11,442 | 12,646 | 30,597 | 34,457 |
+| quote shares filled | 839,114 | 929,638 | 584,049 | 764,319 | 960,120 | 1,125,190 | 2,383,283 | 2,819,147 |
+| maker share of quote fills | 0.997 | 0.945 | 0.995 | 0.906 | 0.993 | 0.951 | | |
+| fill rate, bid / ask (filled / posted) | 0.33 / 0.33 | 0.14 / 0.15 | 0.38 / 0.38 | 0.20 / 0.21 | 0.41 / 0.41 | 0.17 / 0.17 | | |
+| fills during cancel (flatten) | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 1 |
+| messages (submits + cancels) | 43,876 | 122,992 | 26,028 | 72,367 | 37,702 | 125,995 | 107,606 | 321,354 |
+| time at touch, bid / ask | 0.40 / 0.38 | 0.41 / 0.40 | 0.54 / 0.53 | 0.57 / 0.55 | 0.47 / 0.46 | 0.49 / 0.58 | | |
+| time quoted, bid / ask | 0.86 / 0.86 | 0.85 / 0.84 | 0.91 / 0.91 | 0.93 / 0.93 | 0.86 / 0.85 | 0.89 / 0.87 | | |
+| mean abs inventory (shares, time-weighted) | 48.3 | 45.8 | 41.6 | 45.0 | 41.2 | 39.9 | | |
+| abs inventory p90 / p99 / max | 149 / 265 / 300 | 140 / 242 / 300 | 124 / 218 / 300 | 134 / 225 / 300 | 120 / 209 / 300 | 118 / 207 / 300 | | |
+| event decisions | - | 1,071,756 | - | 763,664 | - | 1,875,551 | | |
+| guard pulls | - | 13,054 | - | 12,374 | - | 24,751 | | 50,179 |
+| event retries held by min rest / by rate cap | - | 719,417 / 821,105 | - | 528,692 / 444,009 | - | 887,588 / 1,627,841 | | |
+
+## 6. Reading
+
+**Plain statement.** On this one day, reacting to the book did not rescue
+the quoter. Both lose: about 10.2 thousand USD (grid) against 11.2 thousand
+USD (events) over the three names. Per dollar, the event quoter's fills are
+less adversely selected: the 1 s markout is -0.37 bps against -0.45 bps,
+and the gap holds at 10 s and 60 s. It gives that gain back, and more, in
+spread captured (0.11 against 0.17 bps) and in taker fees.
+
+**What the difference shows.**
+
+- The mechanism the review named is real, but it is small here. Repricing
+  and the guard cut the adverse markout by about 0.08 bps per filled
+  dollar. Most of the markout loss (about 16 thousand USD) remains in both
+  quoters. So being picked off between grid points is not the main source
+  of the loss. The quoter joins the touch with no alpha and no
+  adverse-selection floor, and touch fills on these names are adverse at
+  these horizons either way.
+- The event quoter paid for its speed. It sent three times the messages and
+  about halved the fill rate per posted share. It also turned 5 to 9 per cent
+  of its quote fills into taker fills: a reprice decided on a touch move can
+  arrive after the book has moved through its price, and without `post_only`
+  it then takes. That cost about 850 USD in fees, against 57 USD for the grid
+  quoter. Turning `post_only` on would be a second look if done after this
+  table, so it is listed as a follow-up and not applied.
+- Pacing bound the policy hard. The rate cap and the minimum resting time
+  held back more than a million event retries in total. These numbers
+  describe a paced quoter, not an unconstrained one.
+
+**What it does not show.** One session, three names, in sample. Both
+quoters ran without a calibration from an earlier day, without an alpha,
+and with an adverse-selection floor of 0. One day gives no variance
+estimate. A difference of about 1 thousand USD on one day says nothing
+about which quoter is better on average. Nothing here bears on the signed
+v2 result, and nothing here says any quoter would earn money.
+
+**Looks taken:** 6 (2 configurations x 3 symbols x 1 session), each run
+once with the parameters of section 3. These are for the coordinator to enter in the
+experiment ledger. `research/experiments.json` was not edited here.

@@ -143,7 +143,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     syms = a.symbols.split(",")
     manifest = json.loads((ds / "dataset.json").read_text(encoding="utf-8"))
     iids = {u["symbol"]: int(u["instrument_id"]) for u in manifest["universe"]}
-    exec_config = load_exec_config(ds / "configs", regulatory_fees=True)
+    from dataclasses import replace
+
+    from iap.execution.regulatory import load_default_schedule
+    from iap.research.maker_real import ROOT
+
+    # the dated Section 31 + TAF schedule lives in the repository's configs
+    exec_config = replace(
+        load_exec_config(ds / "configs"),
+        regulatory_fees=load_default_schedule(ROOT / "configs"),
+    )
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     g0, g1 = ns_at(a.date, "09:31:00"), ns_at(a.date, "15:59:00")
