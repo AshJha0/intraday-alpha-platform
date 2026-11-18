@@ -78,7 +78,7 @@ advisory.
 | Reviewer ownership by path | Enforced as a file, applied only once the ruleset requires code-owner review | `CODEOWNERS` (every path owned by `@AshJha0`) |
 | Force-push and branch-deletion protection | **Enforced** | `protect-main` (`non_fast_forward`, `deletion`) |
 | Blackboard chain, anchors and signatures verify; every signed writer has a registered key; ledger and board only grow vs the base (v1.13) | **Enforced as a merge gate** (`governance` job is a required check) | `iap.agents.cli verify-board`, `tests/harness/check_agent_keys.py`, `tests/harness/check_ledger_monotone.py` |
-| HUMAN lifecycle edges (`retire`, `reset`) need a signed, single-use approval (v1.13) | Enforced in code | `python -m iap.lifecycle retire|reset --approval --keyfile`, `iap.agents.approvals` |
+| HUMAN lifecycle edges (`retire`, `reset`) need a signed, single-use approval (v1.13) | Enforced in code | `python -m iap.lifecycle retire|reset --approval --keyfile`, `iap.governance.approvals` |
 | Signed release tags | **A practice, not enforced** | Nothing verifies tag signatures ([docs/GOVERNANCE.md](GOVERNANCE.md) section 2) |
 | Dependabot alerts and security updates | **Required setting, not yet configured** (version-update PRs are configured by `.github/dependabot.yml`) | [docs/GOVERNANCE.md](GOVERNANCE.md) section 3 |
 | Audit logs shipped off-host daily (section 3) | **Not implemented** | Nothing ships them; they exist only on the state volume |
@@ -319,7 +319,7 @@ The model is a client of the 2a controls, not an exception to them.
 | A run needs a verified pre-registration and an allowed dataset; one run per (alpha, horizon, dataset) | `prereg_gate.require`, `Session.run_gated_study` | unregistered runs, re-running until lucky, unapproved data |
 | Metrics and verdict computed by code and written as a report | `iap.llm.runners.verdict` | a model "deciding" a result |
 | Every number in a finding must appear in the evidence of a cited artefact (`metrics`/`result(s)`/`stats` subtrees and `t_threshold`, not metadata) under exact-decimal matching (integers exactly; decimals by rounding at the precision shown); a labelled statistic (`IC`, `t`, `Sharpe`, `hit rate`) must match a field of that statistic; number words are refused (v1.13); free-text fields are not evidence; at least one cited report must be from the session | `iap.llm.verify.verify_finding` | invented, derived or injected numbers; hallucinated citations |
-| Tool output free text wrapped and flagged as untrusted; the system prompt says it is data | `iap.agents.untrusted` | prompt injection (advisory; the structural controls above are the real ones) |
+| Tool output free text wrapped and flagged as untrusted; the system prompt says it is data | `iap.governance.untrusted` | prompt injection (advisory; the structural controls above are the real ones) |
 | Caps on estimated USD (projected one call ahead), tokens, tool calls; session stops at the first | `iap.llm.budget.Budget` | runaway spend |
 | Monthly cap on the shared spend ledger, checked before every call in every process; 80 % alert; prices and pins from configuration (§2c) | `iap.llm.spend.SpendLedger`, `iap.llm.prices` | spend across sessions passing the owner's cap; a silent model or price change |
 | Transcript, tool log and summary persisted; the API key is scrubbed from anything written | `run_session`, `envfile.redact` | unaudited sessions, key leaks |
@@ -1388,7 +1388,7 @@ reader, so it is blocked even without its own guard.
 |---|---|---|---|
 | `python -m iap.research run` / `combine` / `power-real` | dataset.json, features, normalized | `_guard_dataset` -> `guard(prereg_id=--holdout-prereg-id)` | yes |
 | `agents.research_assistant.run_in_sample` (agent tool) | dataset via the `iap.research run` subprocess | `guard(purpose="research_assistant")` | yes |
-| `agents.mcp_server` tools | ledger, reports, blackboard (no market data) | n.a. | n.a. |
+| `governance.mcp_server` tools | ledger, reports, blackboard (no market data) | n.a. | n.a. |
 | `python -m iap.research.screen` | features | `assert_not_holdout` -> `guard` (`--allow-holdout` now lifts only the prereg's exclusion list; the registry still decides) | yes |
 | `python -m iap.research.breadth_book` | features | `guard(prereg_id)` | yes |
 | `research.two_venue.load_merged_session` | normalized iap1, two venues | `guard_session_label` (selected session) | yes |

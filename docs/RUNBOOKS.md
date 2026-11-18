@@ -2143,7 +2143,7 @@ is a `PaperTraceTest`-style case over the same vector asserting the
 ## Runbook: register pre-registrations in the CI environment
 
 A pre-registration's fingerprint records `deps` (installed numpy, pandas, scipy).
-`iap.agents.prereg_gate.require` refuses a registered run whose current deps differ
+`iap.governance.prereg_gate.require` refuses a registered run whose current deps differ
 ("deps changed since pre-registration"). CI installs `python/requirements-ci.txt`, so a
 prereg registered with other versions is refused in CI (this happened to R7 in v1.15).
 Register from a venv built from that lock. Nothing here changes existing registrations.

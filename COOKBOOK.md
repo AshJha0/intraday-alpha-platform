@@ -3323,7 +3323,7 @@ from pathlib import Path
 
 import numpy as np
 
-from iap.agents.blackboard import Blackboard, digest
+from iap.governance.blackboard import Blackboard, digest
 from iap.backtest.maker import MakerFilter
 from iap.mlops import ModelRegistry, ShadowRunner, monitor
 
@@ -5368,7 +5368,7 @@ their archived board (`PREREG_BOARD` in `iap.research.maker_real` and
 ```python
 import json
 from pathlib import Path
-from iap.agents.blackboard import Blackboard
+from iap.governance.blackboard import Blackboard
 
 for fork in ("maker-real", "step2"):
     d = Path("research/agents/forks") / fork
@@ -5849,7 +5849,7 @@ shows registration. Save as `python/recipe100.py` and run
 import tempfile
 from pathlib import Path
 import numpy as np
-from iap.agents.blackboard import Blackboard, digest
+from iap.governance.blackboard import Blackboard, digest
 from iap.backtest.maker import MakerFilter
 from iap.mlops import ModelRegistry
 from iap.mlops.registry import RegistryError

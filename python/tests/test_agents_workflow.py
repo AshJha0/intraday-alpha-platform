@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 from iap.agents import eval_harness, signing
-from iap.agents.broker import BrokerError, WriteBroker
-from iap.agents.prereg_gate import PreregistrationError, require
-from iap.agents.workflow import (
+from iap.governance.broker import BrokerError, WriteBroker
+from iap.governance.prereg_gate import PreregistrationError, require
+from iap.governance.workflow import (
     HUMAN_ONLY_OPS,
     OUTCOME_WRITER,
     PROPOSAL_KIND,

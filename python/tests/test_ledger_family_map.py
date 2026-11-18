@@ -16,8 +16,8 @@ import json
 from pathlib import Path
 
 import pytest
-from iap.agents.broker import WriteBroker
-from iap.agents.prereg_gate import (
+from iap.governance.broker import WriteBroker
+from iap.governance.prereg_gate import (
     FAMILY_MAP_REL,
     PreregistrationError,
     require,
@@ -147,7 +147,7 @@ def test_require_refuses_a_prereg_bound_to_another_map(tmp_path):
     # broker's own writer would be the honest path; here the bound hash is injected through
     # a second, properly written entry
     assert '"ledger_family_map_sha256"' not in text
-    from iap.agents.blackboard import Blackboard
+    from iap.governance.blackboard import Blackboard
 
     bb = Blackboard(board)
     clock = Clock()

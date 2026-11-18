@@ -132,7 +132,7 @@ def _assert_registration_signed(path: Path) -> None:
     import hashlib
 
     from iap.agents import signing
-    from iap.agents.blackboard import canonical
+    from iap.governance.blackboard import canonical
 
     doc = json.loads(path.read_text(encoding="utf-8"))
     sig = doc.pop("signature")

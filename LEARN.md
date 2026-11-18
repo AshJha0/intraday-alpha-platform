@@ -5746,7 +5746,7 @@ realism switches (`configs/prereg/v2.json`, `v3.json`, hashed into the
 registration), the statistic and its threshold, and the decision rule. A
 choice made after seeing a result is a new look, chosen by the result.
 
-**How the platform enforces it.** `iap.agents.prereg_gate.require` runs
+**How the platform enforces it.** `iap.governance.prereg_gate.require` runs
 before the research runner touches any data. It verifies the blackboard's
 hash chain, finds the pre-registration for (alpha, horizon), refuses one
 written by an agent id (agents may draft, a human signs off), and refuses
@@ -7668,7 +7668,7 @@ A verification failure of the closing text makes `python -m iap.agents
 research` exit 3: the drafts it wrote stand, the text does not.
 
 **Why free text is wrapped.** Tool results go through
-`iap.agents.untrusted`, which marks free text as data. Even so the controls
+`iap.governance.untrusted`, which marks free text as data. Even so the controls
 that matter are structural (§99): the verifier and the missing tools hold
 whether or not the model obeys.
 

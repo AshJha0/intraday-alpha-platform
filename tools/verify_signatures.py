@@ -157,9 +157,10 @@ def check_registry(root: Path, ref: str | None) -> str | None:
 
 
 def check_board(root: Path, rel: str, ref: str | None) -> list[str]:
-    from iap.agents import anchor, prereg_gate, trust
-    from iap.agents.blackboard import Blackboard, BlackboardError
-    from iap.agents.broker import board_id
+    from iap.agents import anchor, trust
+    from iap.governance import prereg_gate
+    from iap.governance.blackboard import Blackboard, BlackboardError
+    from iap.governance.broker import board_id
 
     board = root / rel
     fork = board.parent / "FORK.json"
@@ -198,7 +199,7 @@ def check_fork_board(board: Path, fork: Path) -> list[str]:
     ``FORK.json``, its chain is intact and its agents' signatures verify under
     the fork's own archived ``agent_pubkeys.json`` (pinned by FORK.json in a
     reviewed commit; that registry is not maintainer-signed)."""
-    from iap.agents.blackboard import Blackboard, BlackboardError
+    from iap.governance.blackboard import Blackboard, BlackboardError
 
     meta = json.loads(fork.read_text(encoding="utf-8"))
     problems = []

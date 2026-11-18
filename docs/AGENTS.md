@@ -68,7 +68,7 @@ Model ids are explicit, never a floating alias; changing a pin is its own PR.
 | run holdout or confirmatory data | AI1 sessions accept only `synthetic:` datasets; E2 refuses every dataset matching `forbidden_datasets` of `configs/paper/paper_trade.json` (the R7 holdout, `holdout2026`) and `*holdout*`; every report says `confirmatory: false` |
 | touch the committed research ledger | E2 runs the research CLI with `--ledger` and `--out-dir` under a scratch directory; AI1 proposals cost one look each through the broker, capped per session |
 | edit a file, run code, apply a patch, merge | no such tool; the docs-sync output is a `.patch` a human applies; the ops output is a document |
-| follow instructions found in data | tool results are wrapped by `iap.agents.untrusted`; the system prompts say so; the structural controls above hold regardless |
+| follow instructions found in data | tool results are wrapped by `iap.governance.untrusted`; the system prompts say so; the structural controls above hold regardless |
 | spend past the caps | `iap.llm.budget.Budget` + `iap.llm.spend.SpendLedger`: refused before the call |
 | act unaudited | transcript, tool log and summary persisted per session; the API key scrubbed from anything written |
 

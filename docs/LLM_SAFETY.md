@@ -65,7 +65,7 @@ session ([AGENTS.md §4](AGENTS.md)).
 
 ### 2.2 Untrusted data stays data
 
-`iap.agents.untrusted.wrap(text, source)` turns free text written by a person or another
+`iap.governance.untrusted.wrap(text, source)` turns free text written by a person or another
 agent into `{"untrusted": true, "source": ..., "text": ..., "flags": [...]}`: control
 characters removed, length capped at 4000 characters, likely injection phrases flagged.
 The module docstring is explicit that flagging is advisory. The real control is

@@ -4,7 +4,7 @@
 
     python tools/quoting_v2_record_outcome.py --i-am-the-owner --all [--dry-run]
 
-Thin CLI over ``iap.agents.workflow.Workflow.record_outcome`` (actor ``ashjha0``,
+Thin CLI over ``iap.governance.workflow.Workflow.record_outcome`` (actor ``ashjha0``,
 writer ``outcomes``), one outcome per registered cell (board seq 16-19). The
 outcome is DERIVED from the pre-registered verdict in
 research/quoting_real/v2_summary.json, never typed: "EXISTS ..." -> confirmed,
@@ -45,8 +45,8 @@ def plan(root: Path) -> list[tuple[str, str, str]]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    from iap.agents.broker import WriteBroker
-    from iap.agents.workflow import OUTCOME_WRITER, Workflow, registered_agents
+    from iap.governance.broker import WriteBroker
+    from iap.governance.workflow import OUTCOME_WRITER, Workflow, registered_agents
 
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--i-am-the-owner", action="store_true", required=True)

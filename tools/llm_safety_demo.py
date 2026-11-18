@@ -13,7 +13,7 @@ gated-run report, then puts three would-be findings through the same check the l
    number is not in any artefact either;
 
 and shows how text another party wrote reaches the model wrapped as inert data
-(``iap.agents.untrusted.wrap``), with the injection flagged.
+(``iap.governance.untrusted.wrap``), with the injection flagged.
 
 The report numbers are made up for the demo; nothing printed carries an evidence class.
 Exit status is 0 only if every case behaves as described (the test suite runs it).
@@ -29,7 +29,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python" / "src"))
 
-from iap.agents.untrusted import wrap  # noqa: E402
+from iap.governance.untrusted import wrap  # noqa: E402
 from iap.llm.verify import verify_finding  # noqa: E402
 
 SESSION = "20261027T090000-demo01"

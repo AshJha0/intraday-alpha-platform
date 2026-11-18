@@ -9,9 +9,9 @@ from pathlib import Path
 
 import pytest
 from iap.agents import eval_harness, mcp_workflow, signing
-from iap.agents.prereg_gate import PreregistrationError, require
-from iap.agents.workflow import HUMAN_ONLY_OPS, PROPOSAL_KIND
 from iap.execution.regulatory import SCHEDULE_RELPATH
+from iap.governance.prereg_gate import PreregistrationError, require
+from iap.governance.workflow import HUMAN_ONLY_OPS, PROPOSAL_KIND
 from iap.validation.ledger import ExperimentLedger
 
 REPO = Path(__file__).resolve().parents[2]

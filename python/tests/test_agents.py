@@ -8,9 +8,10 @@ import json
 
 import pytest
 from conftest import REPO_ROOT
-from iap.agents import evals, mcp_server, untrusted
-from iap.agents.blackboard import BlackboardError
-from iap.agents.broker import BrokerError, WriteBroker
+from iap.agents import evals
+from iap.governance import mcp_server, untrusted
+from iap.governance.blackboard import BlackboardError
+from iap.governance.broker import BrokerError, WriteBroker
 
 AGENTS_DIR = REPO_ROOT / "python" / "src" / "iap" / "agents"
 SEC = 10**9
@@ -174,7 +175,7 @@ def test_mcp_rejects_traversal_and_unknown(root):
 
 def test_mcp_module_has_no_write_path():
     """No file opened for writing, no subprocess, no network client in the read-only server."""
-    # v2.1 Track 3: the server lives in iap.governance; iap/agents/mcp_server.py is its alias.
+    # v2.1 Track 3: the server lives in iap.governance; iap/governance/mcp_server.py is its alias.
     src = (AGENTS_DIR.parent / "governance" / "mcp_server.py").read_text(encoding="utf-8")
     tree = ast.parse(src)
     banned_imports = {
@@ -250,7 +251,7 @@ def test_trusted_writers_are_disjoint_and_limited(root):
 
 
 def test_reserve_returns_only_pass_fail_and_caps_attempts(root):
-    from iap.agents.reserve import ReserveError, ReserveEvaluator
+    from iap.governance.reserve import ReserveError, ReserveEvaluator
 
     b = WriteBroker(root, {"alice"}, trusted={"evaluator"}, clock=Clock())
     seen = []
@@ -284,7 +285,7 @@ class FakeLifecycle:
 
 
 def test_human_approval_signed_expiring_single_use(root):
-    from iap.agents import approvals
+    from iap.governance import approvals
 
     clock = Clock()
     b = WriteBroker(root, {"alice"}, trusted={"approvals"}, clock=clock)
@@ -350,7 +351,7 @@ def test_cli_keygen_issue_apply_on_real_lifecycle(tmp_path):
 
 
 def test_prereg_gate_blocks_run_before_data_is_read(root, capsys):
-    from iap.agents.prereg_gate import PreregistrationError, require
+    from iap.governance.prereg_gate import PreregistrationError, require
     from iap.research.__main__ import main as research_main
 
     with pytest.raises(PreregistrationError, match="not pre-registered"):
@@ -414,7 +415,7 @@ def test_direction_check_compares_ic_sign_with_the_prereg(expected, ic, ok, caps
 
 
 def test_runner_gate_runs_before_any_data_is_read(tmp_path):
-    from iap.agents.prereg_gate import PreregistrationError
+    from iap.governance.prereg_gate import PreregistrationError
     from iap.research.runner import ExperimentRunner
 
     seen = []

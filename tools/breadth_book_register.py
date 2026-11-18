@@ -31,7 +31,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python" / "src"))
 
-from iap.agents.broker import BrokerError, WriteBroker  # noqa: E402
+from iap.governance.broker import BrokerError, WriteBroker  # noqa: E402
 from iap.research.screen import ScreenRefusal, require_screened  # noqa: E402
 
 KEYFILE = Path("C:/Users/ashis/.iap_keys/maintainer.key")
@@ -104,7 +104,7 @@ def main(argv: list[str] | None = None) -> int:
 
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     from iap.agents import signing, trust
-    from iap.agents.blackboard import canonical
+    from iap.governance.blackboard import canonical
 
     key = json.loads(KEYFILE.read_text(encoding="ascii"))[APPROVER]
     pub = trust.read_roots(root)["maintainers"][APPROVER]
@@ -137,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
                 "draft_file": DRAFT,
                 "draft_sha256": dh,
                 "registered_utc": now,
-                "path": "iap.agents.broker.WriteBroker.preregister(screen=...)",
+                "path": "iap.governance.broker.WriteBroker.preregister(screen=...)",
                 "candidate": f"{ALPHA}/{HORIZON}",
                 "screen_refusal": refusal,
                 "entry": entry,
@@ -154,7 +154,7 @@ def main(argv: list[str] | None = None) -> int:
         "maintainer": APPROVER,
         "public_key": pub,
         "trust_root": "research/agents/trust_roots.json",
-        "message": "iap.agents.blackboard.canonical(this document without 'signature')",
+        "message": "iap.governance.blackboard.canonical(this document without 'signature')",
         "message_sha256": hashlib.sha256(msg).hexdigest(),
         "sig": sig,
     }

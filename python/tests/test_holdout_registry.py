@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 from iap.agents import signing
-from iap.agents.blackboard import canonical
+from iap.governance.blackboard import canonical
 from iap.research import holdout_registry as hr
 
 REPO = Path(__file__).resolve().parents[2]

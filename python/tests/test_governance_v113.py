@@ -11,7 +11,7 @@ import sys
 
 import pytest
 from conftest import REPO_ROOT
-from iap.agents.blackboard import Blackboard, BlackboardError
+from iap.governance.blackboard import Blackboard, BlackboardError
 from iap.llm import verify
 
 
@@ -204,7 +204,7 @@ def test_lifecycle_retire_requires_approval(tmp_path, capsys):
 _WRITER = """
 import sys
 sys.path.insert(0, {src!r})
-from iap.agents.blackboard import Blackboard
+from iap.governance.blackboard import Blackboard
 b = Blackboard({path!r})
 for i in range({n}):
     b.append("finding", "w{w}", 1, {{"i": i}})
@@ -324,7 +324,7 @@ def test_honest_finding_passes(tmp_path):
 
 
 def test_mcp_read_cap_and_tail(tmp_path, monkeypatch):
-    from iap.agents import mcp_server
+    from iap.governance import mcp_server
 
     research = tmp_path / "research"
     (research / "alpha_reports").mkdir(parents=True)
