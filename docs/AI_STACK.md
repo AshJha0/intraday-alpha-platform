@@ -52,7 +52,7 @@ returns fixed numbers and a writer that copies facts into one sentence.
 |---|---|---|
 | Research memory ([RESEARCH_MEMORY.md](RESEARCH_MEMORY.md)) | Deterministic lexical retrieval; every hit cites file and line; snippets returned as untrusted | `python -m iap.memory eval --check`; `python/tests/test_research_memory.py` |
 | Research graph ([RESEARCH_GRAPH.md](RESEARCH_GRAPH.md)) | Validated transitions, hash-chained checkpoints, a human approval stop before any run | `python/tests/test_research_graph.py` |
-| Wiring: same test | A prior hit stops the flow only when one ledger entry has the same alpha id, exact horizon and universe; text similarity never does | `test_same_test_rule`, `test_duplicate_hypothesis_stops_at_prior_art`, `test_text_similarity_alone_is_not_a_duplicate` in `python/tests/test_graph_wiring.py` |
+| Wiring: same test | A prior hit stops the flow only when one ledger entry has the same alpha id, exact horizon and universe (by name, symbol set, or the dataset it ran on); text similarity never does | `test_same_test_rule`, `test_same_test_judges_an_entry_by_the_dataset_it_ran_on`, `test_the_rule_fires_on_the_committed_ledger`, `test_duplicate_hypothesis_stops_at_prior_art`, `test_text_similarity_alone_is_not_a_duplicate` in `python/tests/test_graph_wiring.py` |
 | Wiring: holdout | A dataset the registry does not hold as `in_sample` is refused, an unknown one included; a missing registry fails closed | `test_unknown_dataset_is_refused`, `test_registry_predicate_on_the_committed_registry`, `test_registry_predicate_fails_closed_without_registry` |
 | Wiring: narrative | Writer text stands only if every number matches the run's facts and the verdict is named; otherwise the code-written text is used | `test_narrative_verifier`, `test_wrong_number_falls_back_to_code_text` |
 | Number verifier ([AGENT_EVALS.md](AGENT_EVALS.md)) | Exact-decimal matching of every written number against cited evidence | `python -m iap.llm.verifier_eval --check` |
@@ -113,12 +113,16 @@ only the unit cases in `test_narrative_verifier`, not a labelled eval set.
   behaves under injection. Every number above comes from fixed, hand-labelled files.
 - **Lexical retrieval only.** The memory is BM25 over words. It does not match synonyms or
   paraphrases, and it cannot tell that two differently worded entries are the same test.
-- **The same-test rule cannot fire on today's ledger.** Of the 640 entries in
-  `research/experiments.json`, 228 record a horizon and none records a universe
-  (`config.universe` or `config.symbols`), counted on 2026-11-18. So no committed entry
-  can stop the flow as a duplicate. `python -m iap.graph run` prints those entries with the
-  same alpha and horizon as `check by hand`, and the person decides. The graph also accepts
-  only horizons of one minute and longer, while most ledger horizons are in seconds.
+- **The same-test rule reaches only part of the ledger.** No entry of
+  `research/experiments.json` records both a horizon and a symbol list, so the rule judges
+  an entry by the dataset it ran on (`dataset_version`, resolved through
+  `research/data_manifest.json`). Counted on 2026-11-18: of 640 entries, 205 record a
+  horizon and 158 of those a dataset version, so 158 can stop the flow as a duplicate. A
+  dataset version that is not in the manifest (older synthetic datasets) matches only when
+  the hypothesis names that version itself. The 435 entries with no horizon in their config
+  (execution studies, adaptive deployments, screens) never count. `python -m iap.graph run`
+  prints every entry with the same alpha and horizon on another or an unknown universe as
+  `check by hand`, and the person decides at the approval step.
 - **The runner is a stub.** `python -m iap.graph run` returns fixed numbers unless a runner
   is given with `--runner module:function`; those numbers are not results.
 - **Approval is not authenticated.** `--by` is a label, and an approved draft is not a

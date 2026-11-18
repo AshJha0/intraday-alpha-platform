@@ -27,7 +27,9 @@ from iap.governance.untrusted import sanitise
 
 from .core import Graph, Interrupt, Router
 
-HORIZONS = frozenset({"1m", "5m", "15m", "30m", "60m", "1d"})
+#: the horizons a hypothesis may name: the plain horizons the ledger already uses
+#: (so a repeat of an old test can be submitted and stopped) and the bar horizons
+HORIZONS = frozenset({"500ms", "1s", "5s", "10s", "30s", "1m", "5m", "15m", "30m", "60m", "1d"})
 DEFAULT_THRESHOLDS = {"min_abs_t": 2.0, "min_sessions": 10}
 VERDICTS = ("pass", "fail", "wrong_sign", "insufficient_data")
 

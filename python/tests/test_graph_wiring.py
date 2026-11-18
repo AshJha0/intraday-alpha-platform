@@ -292,4 +292,80 @@ def test_cli_flags_entries_without_a_universe(tmp_path, capsys, monkeypatch):
     )
     text = capsys.readouterr().out
     assert "same test already" not in text and "awaiting: human approval" in text
-    assert f"universe not recorded: research/experiments.json#{KEY_A}" in text
+    assert f"entry records no universe: research/experiments.json#{KEY_A}" in text
+
+
+_DS = {
+    "v-multi": {"path": "multi7", "symbols": frozenset({"AAPL", "MSFT", "QQQ"})},
+    "v-other": {"path": "breadth/day1", "symbols": frozenset({"AMD", "INTC"})},
+}
+
+
+def _hyp(**universe):
+    return {"alpha_id": "EQ10", "horizon": "1s", "universe": {"name": "u", **universe}}
+
+
+@pytest.mark.parametrize(
+    ("version", "universe", "same", "reason"),
+    [
+        ("v-multi", {"datasets": ["v-multi"]}, True, "same dataset"),
+        ("v-multi", {"datasets": ["MULTI7"]}, True, "same dataset"),  # by manifest path
+        ("v-multi", {"datasets": ["new"], "symbols": ["qqq", "aapl", "msft"]}, True, "manifest"),
+        ("v-multi", {"datasets": ["new"], "symbols": ["AAPL"]}, False, "universe differs"),
+        ("v-other", {"datasets": ["multi7"]}, False, "universe differs"),
+        # a version the manifest does not know matches only when named itself
+        ("v-gone", {"datasets": ["v-gone"]}, True, "same dataset"),
+        ("v-gone", {"datasets": ["multi7"], "symbols": ["AAPL"]}, False, "universe differs"),
+        (None, {"datasets": ["multi7"]}, False, "no universe"),
+    ],
+)
+def test_same_test_judges_an_entry_by_the_dataset_it_ran_on(version, universe, same, reason):
+    entry = {"alpha_id": "eq10", "config": {"horizon": "1s"}, "dataset_version": version}
+    got, why = wiring.same_test(entry, _hyp(**universe), _DS)
+    assert got is same and reason in why
+
+
+def test_related_test_is_same_alpha_and_horizon_on_any_universe():
+    entry = {"alpha_id": "EQ10", "config": {"horizon": "1s"}, "dataset_version": "v-other"}
+    assert wiring.related_test(entry, _hyp(datasets=["multi7"]))
+    assert not wiring.same_test(entry, _hyp(datasets=["multi7"]), _DS)[0]
+    assert not wiring.related_test({**entry, "config": {"horizon": "5s"}}, _hyp(datasets=["x"]))
+    assert not wiring.related_test({**entry, "alpha_id": "EQ05"}, _hyp(datasets=["x"]))
+
+
+def test_manifest_datasets_reads_versions_paths_and_symbols(tmp_path):
+    (tmp_path / "research").mkdir()
+    (tmp_path / "research" / "data_manifest.json").write_text(
+        json.dumps(
+            {
+                "datasets": [
+                    {"path": "a", "dataset_version": "v1", "universe": [{"symbol": "aapl"}]},
+                    {"path": "b", "dataset_version": "v2"},
+                    {"path": "c"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    got = wiring.manifest_datasets(tmp_path)
+    assert got == {
+        "v1": {"path": "a", "symbols": frozenset({"AAPL"})},
+        "v2": {"path": "b", "symbols": None},
+    }
+    assert wiring.manifest_datasets(tmp_path / "nowhere") == {}
+
+
+def test_the_rule_fires_on_the_committed_ledger():
+    """The gap this closes: before the dataset route no committed entry could
+    ever count as the same test, because none records both a horizon and symbols."""
+    from conftest import REPO_ROOT
+
+    entries = json.loads((REPO_ROOT / "research" / "experiments.json").read_text("utf-8"))[
+        "entries"
+    ]
+    datasets = wiring.manifest_datasets(REPO_ROOT)
+    repeat = _hyp(datasets=["multi7"])
+    assert sum(wiring.same_test(e, repeat, datasets)[0] for e in entries) >= 1
+    assert sum(wiring.same_test(e, repeat)[0] for e in entries) == 0  # config alone: never
+    fresh = {"alpha_id": "EQ10", "horizon": "5m", "universe": {"name": "u", "datasets": ["multi7"]}}
+    assert sum(wiring.same_test(e, fresh, datasets)[0] for e in entries) == 0

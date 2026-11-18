@@ -114,10 +114,8 @@ def main(argv: list[str] | None = None) -> int:
             if st.duplicate_of:
                 print(f"prior art: same test already in {st.duplicate_of}")
             for h in st.prior_hits:
-                if h.get("reason") == "entry records no universe":
-                    print(
-                        f"check by hand: same alpha and horizon, universe not recorded: {h['id']}"
-                    )
+                if h.get("related") and not h.get("same_test"):
+                    print(f"check by hand: same alpha and horizon, {h.get('reason')}: {h['id']}")
             if st.draft is not None and result.interrupt is not None:
                 print("draft (unsigned):")
                 print(json.dumps(st.draft, indent=2, sort_keys=True))

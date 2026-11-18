@@ -24,16 +24,29 @@ A ledger entry of ``research/experiments.json`` counts only when all three hold:
 2. its configured horizon (``config.horizon``, else
    ``config.candidate.horizon``) equals the hypothesis horizon exactly
    (``1s`` does not match ``1s:quoting-insample``);
-3. its universe matches: ``config.universe`` equals ``universe.name``
-   (case-insensitive), or ``config.symbols`` (else
-   ``config.candidate.symbols``) is the same set as ``universe.symbols``.
+3. its universe matches, by the first of these that applies:
+   ``config.universe`` equals ``universe.name`` (case-insensitive);
+   ``config.symbols`` (else ``config.candidate.symbols``) is the same set as
+   ``universe.symbols``; the entry's ``dataset_version`` (or that dataset's path
+   in ``research/data_manifest.json``) is one of ``universe.datasets``; or the
+   manifest's symbol list for that dataset is the same set as
+   ``universe.symbols``.
+
+The dataset route exists because most ledger entries record a horizon and a
+``dataset_version`` but no symbol list: the ledger itself identifies a look by
+(alpha, kind, config, dataset version), so the dataset is the entry's universe.
 
 Text similarity never makes a hit "the same test"; BM25 only ranks the
-candidates.  Limits: an entry that records no universe never counts, so a
-re-run of an old test whose entry lacks ``symbols`` is shown as prior art but
-does not stop the flow; a renamed alpha id or a horizon written another way
-(``60s`` against ``1m``) is not caught; and only the ledger is checked, not
-result documents that were never entered in it.
+candidates.  A ledger hit with the same alpha id and horizon on another or an
+unknown universe is marked ``related``: it does not stop the flow, and it is
+shown to the person at the approval step.
+
+Limits: a dataset version absent from the manifest (older synthetic datasets)
+matches only when the hypothesis names that version itself; entries with no
+horizon in their config (execution studies, adaptive deployments, screens)
+never count; a renamed alpha id or a horizon written another way (``60s``
+against ``1m``) is not caught; and only the ledger is checked, not result
+documents that were never entered in it.
 """
 
 from __future__ import annotations
@@ -55,9 +68,12 @@ from .research_flow import VERDICTS, ResearchDeps, build_research_graph
 
 SAME_TEST_RULE = (
     "same alpha_id (case-insensitive), the exact same horizon, and the same universe "
-    "(config.universe == universe.name, or config.symbols == universe.symbols as sets) "
-    "in one ledger entry; text similarity alone never counts"
+    "(config.universe == universe.name; or config.symbols == universe.symbols as sets; or the "
+    "entry's dataset_version or its manifest path is in universe.datasets; or the manifest's "
+    "symbols for that dataset == universe.symbols) in one ledger entry; text similarity alone "
+    "never counts"
 )
+DATA_MANIFEST = "research/data_manifest.json"
 #: candidate ledger entries examined per hypothesis, and document hits kept for context
 MAX_LEDGER_CANDIDATES = 50
 MAX_DOCUMENT_HITS = 3
@@ -86,24 +102,79 @@ def _symbols(value: Any) -> frozenset[str] | None:
     return None
 
 
-def same_test(entry: Mapping[str, Any], hypothesis: Mapping[str, Any]) -> tuple[bool, str]:
+def _hyp_universe(hypothesis: Mapping[str, Any]) -> Mapping[str, Any]:
+    uni = hypothesis.get("universe")
+    return uni if isinstance(uni, Mapping) else {}
+
+
+def _horizon_matches(entry: Mapping[str, Any], hypothesis: Mapping[str, Any]) -> bool:
+    horizon = _from_cfg(entry, "horizon")
+    return (
+        horizon is not None
+        and str(horizon).strip().lower() == str(hypothesis.get("horizon")).lower()
+    )
+
+
+def manifest_datasets(root: Path) -> dict[str, dict[str, Any]]:
+    """``dataset_version -> {"path", "symbols"}`` from the committed data manifest
+    (``research/data_manifest.json``); empty when the file is absent."""
+    path = root / DATA_MANIFEST
+    if not path.is_file():
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for d in json.loads(path.read_text(encoding="utf-8")).get("datasets", []):
+        version = d.get("dataset_version")
+        if not isinstance(version, str):
+            continue
+        uni = d.get("universe") if isinstance(d.get("universe"), list) else []
+        syms = [u.get("symbol") for u in uni if isinstance(u, Mapping)]
+        out[version] = {"path": str(d.get("path", "")), "symbols": _symbols(syms)}
+    return out
+
+
+def same_test(
+    entry: Mapping[str, Any],
+    hypothesis: Mapping[str, Any],
+    datasets: Mapping[str, Mapping[str, Any]] | None = None,
+) -> tuple[bool, str]:
     """Whether ledger ``entry`` already ran ``hypothesis`` (:data:`SAME_TEST_RULE`),
-    with the reason in words."""
+    with the reason in words.  ``datasets`` is :func:`manifest_datasets`: it lets
+    an entry that records no universe in its config be judged by the dataset it
+    ran on, which is how the ledger itself identifies a look."""
     if str(entry.get("alpha_id", "")).lower() != str(hypothesis.get("alpha_id", "")).lower():
         return False, "different alpha_id"
-    horizon = _from_cfg(entry, "horizon")
-    if horizon is None or str(horizon).strip().lower() != str(hypothesis.get("horizon")).lower():
-        return False, f"horizon {horizon!r} differs"
-    uni = hypothesis.get("universe") if isinstance(hypothesis.get("universe"), Mapping) else {}
+    if not _horizon_matches(entry, hypothesis):
+        return False, f"horizon {_from_cfg(entry, 'horizon')!r} differs"
+    uni = _hyp_universe(hypothesis)
+    want = _symbols(uni.get("symbols"))
     name = _from_cfg(entry, "universe")
     if isinstance(name, str) and name.lower() == str(uni.get("name", "")).lower():
         return True, "same alpha_id, horizon and universe name"
-    have, want = _symbols(_from_cfg(entry, "symbols")), _symbols(uni.get("symbols"))
-    if have is None and not isinstance(name, str):
-        return False, "entry records no universe"
+    have = _symbols(_from_cfg(entry, "symbols"))
     if have is not None and have == want:
         return True, "same alpha_id, horizon and symbol set"
+    version = entry.get("dataset_version")
+    named = {str(x).lower() for x in uni.get("datasets") or [] if isinstance(x, str)}
+    if isinstance(version, str) and version:
+        known = (datasets or {}).get(version, {})
+        path = str(known.get("path", "")).lower()
+        if version.lower() in named or (path and path in named):
+            return True, "same alpha_id and horizon on the same dataset"
+        if want is not None and known.get("symbols") == want:
+            return True, "same alpha_id, horizon and symbol set (from the data manifest)"
+        return False, "universe differs"
+    if have is None and not isinstance(name, str):
+        return False, "entry records no universe"
     return False, "universe differs"
+
+
+def related_test(entry: Mapping[str, Any], hypothesis: Mapping[str, Any]) -> bool:
+    """Same alpha id and horizon, whatever the universe: not a duplicate, but a
+    prior look the person approving the draft should see."""
+    same_alpha = (
+        str(entry.get("alpha_id", "")).lower() == str(hypothesis.get("alpha_id", "")).lower()
+    )
+    return same_alpha and _horizon_matches(entry, hypothesis)
 
 
 def _ledger_entries(root: Path) -> dict[str, dict[str, Any]]:
@@ -120,6 +191,7 @@ def memory_search_prior(
     """``search_prior`` backed by ``memory``: ledger entries of the same alpha id
     (judged by :func:`same_test`) and a few result documents for context."""
     entries = _ledger_entries(memory.root)
+    datasets = manifest_datasets(memory.root)
 
     def search_prior(h: Mapping[str, Any]) -> list[dict[str, Any]]:
         alpha = str(h.get("alpha_id") or "")
@@ -133,8 +205,16 @@ def memory_search_prior(
         out: list[dict[str, Any]] = []
         for hit in res["ledger"]:
             entry = entries.get(hit.path.split("#", 1)[1] if "#" in hit.path else "", {})
-            same, why = same_test(entry, h) if entry else (False, "entry not readable")
-            out.append({"id": hit.citation, "kind": "ledger", "same_test": same, "reason": why})
+            same, why = same_test(entry, h, datasets) if entry else (False, "entry not readable")
+            out.append(
+                {
+                    "id": hit.citation,
+                    "kind": "ledger",
+                    "same_test": same,
+                    "related": bool(entry) and related_test(entry, h),
+                    "reason": why,
+                }
+            )
         for hit in res["documents"][:MAX_DOCUMENT_HITS]:
             out.append(
                 {
