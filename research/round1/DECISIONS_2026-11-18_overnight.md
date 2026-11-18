@@ -1,0 +1,20 @@
+# Decisions taken on the owner's behalf, 2026-11-18 evening to 2026-11-19 morning
+
+The owner's words, 2026-11-18 about 21:00: "from now till tomorrow morning including during
+night time, when I will be sleeping keeping laptop open, I authorise you to take decisions on
+my behalf (no money spend, no card details), so that you don't need to wait for me". Earlier
+the same evening: "I authorise you to merge PR, release, tag and other things", and on the one
+sealed holdout look, "Yes, you sign".
+
+This file lists every decision taken under that delegation, why, and how to reverse it. The
+delegation covers this round only and ends on the morning of 2026-11-19. Standing rules that
+stayed in force: no spend; no second review; no London Stock Exchange material; no sign-ups;
+no gate weakened to get a pass; no release on a failing or unfinished test run; negative results
+reported as found.
+
+| # | time | decision | why | how to reverse |
+|---|---|---|---|---|
+| 1 | 20:35 | Stopped the first bars chain (it had hung for 33 minutes on a stalled download with no timeout), deleted its partial download and relaunched it with a socket timeout and retries | the job could not finish | none needed: no result was produced by the hung run |
+| 2 | 20:40 | The relaunched chain downloads all ten in-sample days again and also writes the closing-auction rows; existing bars are kept and each re-made file must be byte-identical or the day fails | family F3 needs the auction messages, and the raw files had been deleted | delete `data/real/bars/auction_*.csv` |
+| 3 | 20:55 | Added `python/src/iap/graph/research_flow.py` to the pass-through list of `test_no_prereg_consumer_skips_the_identity_check` | the module builds an unsigned draft that carries an `analysis_identity` block and reads no signed document; the test's own list exists for that case. No runner was exempted from its identity check | remove the line; the test then fails until the module is registered as a runner |
+| 4 | 21:00 | The sealed holdout look is governed by the rule written before any pooled result (`FAMILIES_PRESPEC_2026-11-18.md`, section 5): a candidate needs a positive ten-session mean net, a one-sided p below 0.00357 (session-level t above 3.46) and at least 7 of 10 positive sessions; if none qualifies the holdout stays sealed. The owner's "yes" is applied through that rule, not instead of it | spending the only untouched data on a candidate that failed its own pre-written bar would waste it, and lowering the bar would weaken a gate | the owner may register a look by a different rule at any time; nothing is spent if none qualifies |
