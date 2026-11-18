@@ -25,6 +25,7 @@ from typing import Any
 from iap.llm.budget import Budget, BudgetExceeded
 from iap.llm.envfile import redact
 from iap.llm.prices import load_llm_config
+from iap.llm.tracing import Tracer, session_tracer
 
 __all__ = ["LoopResult", "ToolRefused", "ToolSpec", "run_tool_loop", "schema", "wire_spend"]
 
@@ -166,6 +167,7 @@ def run_tool_loop(
     max_turns: int = 40,
     secret: str | None = None,
     clock: Callable[[], float] = time.time,
+    tracer: Tracer | None = None,
 ) -> LoopResult:
     """Drive ``client`` until it calls ``finish_tool``, stops calling tools or
     a cap is hit.  ``dispatch(name, args)`` runs a tool (raise
@@ -179,6 +181,8 @@ def run_tool_loop(
     sys_blocks = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
     messages: list[dict[str, Any]] = [{"role": "user", "content": task}]
     log.append("transcript.jsonl", {"t": clock(), "role": "user", "content": task})
+    tr = session_tracer(Path(out_dir), secret, tracer)
+    root = tr.session_start(budget.role or "tool_loop", session_id, model)
     status = "max_turns"
     served: set[str] = set()
     tool_log: list[dict[str, Any]] = []
@@ -190,6 +194,7 @@ def run_tool_loop(
             budget.check_model_call(model)
         except BudgetExceeded as exc:
             budget.refusals.append(str(exc))
+            tr.budget_refusal(root, str(exc))
             status = "budget_exhausted"
             break
         kwargs: dict[str, Any] = {
@@ -201,16 +206,20 @@ def run_tool_loop(
         }
         if effort:
             kwargs["output_config"] = {"effort": effort}
+        mspan = tr.model_start(model, turn, session_id)
         try:
             resp = client.messages.create(**kwargs)
         except Exception as exc:
+            tr.end(mspan, error=exc)
             # the summary is written below; the error is re-raised after it
             status = "client_error"
             client_exc = exc
             break
         if getattr(resp, "model", None):
             served.add(str(resp.model))
+        usd0 = budget.usd
         budget.charge(model, resp.usage)
+        tr.model_end(mspan, resp, budget.usd - usd0)
         content = list(resp.content)
         texts = [
             str(getattr(b, "text", "") or "") for b in content if getattr(b, "type", None) == "text"
@@ -247,6 +256,7 @@ def run_tool_loop(
         exhausted = False
         for b in uses:
             rec: dict[str, Any] = {"t": clock(), "turn": turn, "tool": b.name, "input": b.input}
+            tspan = tr.tool_start(b, turn)
             try:
                 budget.check_tool_call()
                 spec = by_name.get(str(b.name))
@@ -284,6 +294,7 @@ def run_tool_loop(
                 )
             log.append("tool_log.jsonl", rec)
             tool_log.append(rec)
+            tr.tool_end(tspan, rec, budget.refusals)
         messages.append({"role": "user", "content": results})
         log.append("transcript.jsonl", {"t": clock(), "role": "user", "content": results})
         if finished is not None:
@@ -303,6 +314,7 @@ def run_tool_loop(
         finished=finished,
         out_dir=Path(out_dir),
     )
+    tr.session_end(root, status, budget)
     log.write("session.json", result.as_dict())
     if client_exc is not None:
         raise client_exc
