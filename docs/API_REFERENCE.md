@@ -5138,9 +5138,11 @@ Every module below is offline: none calls a model API or the network. Narrative 
 
 ### 4. MCP server on the official SDK, `iap.governance.mcp_sdk_server`
 
-`build_server(root)` and `main` (entry point `iap-mcp-sdk`, optional extra `mcp`); read-only
-tools through the same `Tools` class as `iap.governance.mcp_server`, plus `MemoryTools`
-(capped at 20 hits and 500-character queries).
+`build_server(root, providers=())`, `ProviderContext` and `main` (optional extra `mcp`); read-only
+tools through the same `Tools` class as `iap.governance.mcp_server`. Callers add tools as
+providers. `iap.memory.mcp_tools.MemoryTools` and `iap.memory.mcp_tools.register` add the
+two research-memory tools (capped at 20 hits and 500-character queries);
+`iap.memory.mcp_server.main` (entry point `iap-mcp-sdk`) serves both.
 
 ### 5. Bars studies and power, `iap.research`
 

@@ -17,7 +17,7 @@ flowchart TB
         MC["MCP client<br/>(.mcp.json)"]
     end
     subgraph mid["Read and decide (python/src/iap)"]
-        MS["MCP server<br/>governance.mcp_sdk_server"]
+        MS["MCP server<br/>governance.mcp_sdk_server<br/>+ memory.mcp_tools"]
         GR["Research graph<br/>graph.research_flow + graph.wiring"]
         ME["Research memory<br/>memory (BM25)"]
         VE["Number verifier<br/>llm.verify"]
@@ -57,7 +57,7 @@ returns fixed numbers and a writer that copies facts into one sentence.
 | Wiring: narrative | Writer text stands only if every number matches the run's facts and the verdict is named; otherwise the code-written text is used | `test_narrative_verifier`, `test_wrong_number_falls_back_to_code_text` |
 | Number verifier ([AGENT_EVALS.md](AGENT_EVALS.md)) | Exact-decimal matching of every written number against cited evidence | `python -m iap.llm.verifier_eval --check` |
 | Untrusted text and tool allowlist ([AGENT_EVALS.md](AGENT_EVALS.md)) | Injected text is flagged by pattern (weak); off-allowlist calls are refused (structural) | `python -m iap.llm.injection_eval --check` |
-| MCP server ([MCP_SERVER.md](MCP_SERVER.md)) | Read-only tools with typed, bounded inputs; no write, subprocess or network path in the module; memory tools capped at 20 hits and 500-character queries | `python/tests/test_mcp_sdk_server.py` (end-to-end tests skip without the optional `mcp` extra) |
+| MCP server ([MCP_SERVER.md](MCP_SERVER.md)) | Read-only tools with typed, bounded inputs; no write, subprocess or network path in its modules; memory tools (`iap.memory.mcp_tools`, served by `python -m iap.memory.mcp_server`) capped at 20 hits and 500-character queries; the governance module never imports memory | `python/tests/test_mcp_sdk_server.py` (end-to-end tests skip without the optional `mcp` extra) |
 | Skills ([.claude/skills/](../.claude/skills/)) | Each states its guardrails; every command it names exists | `python/tests/test_skills.py` |
 
 ### Skills

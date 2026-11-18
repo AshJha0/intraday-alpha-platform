@@ -1,4 +1,5 @@
-"""The SDK-based read-only MCP server (iap.governance.mcp_sdk_server).
+"""The SDK-based read-only MCP server (iap.governance.mcp_sdk_server) and its
+research-memory launcher (iap.memory.mcp_server, tools in iap.memory.mcp_tools).
 
 The end-to-end tests start the server as a subprocess and drive it over stdio
 with the SDK's own client; they skip when the optional ``mcp`` extra is not
@@ -18,10 +19,18 @@ from pathlib import Path
 import pytest
 from iap.governance import mcp_sdk_server as sdk
 from iap.governance import mcp_server
+from iap.memory import mcp_server as memory_launcher
+from iap.memory import mcp_tools
 
 REPO = Path(__file__).resolve().parents[2]
 SRC = REPO / "python" / "src"
 MODULE = SRC / "iap" / "governance" / "mcp_sdk_server.py"
+#: every module the combined server loads beyond the hand-written server
+SCANNED = (
+    MODULE,
+    SRC / "iap" / "memory" / "mcp_tools.py",
+    SRC / "iap" / "memory" / "mcp_server.py",
+)
 HAS_SDK = importlib.util.find_spec("mcp") is not None
 needs_sdk = pytest.mark.skipif(not HAS_SDK, reason="optional extra 'mcp' not installed")
 
@@ -41,9 +50,10 @@ MEMORY_CALLS = {
 
 
 # ------------------------------------------------------------- no SDK needed
-def test_sdk_module_has_no_write_subprocess_or_network_path():
-    """Same idea as test_agents.test_mcp_module_has_no_write_path, on the new module."""
-    tree = ast.parse(MODULE.read_text(encoding="utf-8"))
+@pytest.mark.parametrize("module", SCANNED, ids=lambda p: p.name)
+def test_sdk_module_has_no_write_subprocess_or_network_path(module):
+    """Same idea as test_agents.test_mcp_module_has_no_write_path, on the new modules."""
+    tree = ast.parse(module.read_text(encoding="utf-8"))
     banned_imports = {
         "subprocess",
         "socket",
@@ -89,6 +99,19 @@ def test_sdk_module_has_no_write_subprocess_or_network_path():
             assert not any((n or "").split(".")[0] in {"mcp", "pydantic"} for n in names)
 
 
+def test_governance_server_does_not_import_memory():
+    """Layering: memory may import governance, never the reverse."""
+    for node in ast.walk(ast.parse(MODULE.read_text(encoding="utf-8"))):
+        names = (
+            [node.module or ""]
+            if isinstance(node, ast.ImportFrom)
+            else [a.name for a in node.names]
+            if isinstance(node, ast.Import)
+            else []
+        )
+        assert not any(n.startswith("iap.memory") for n in names), names
+
+
 def test_prompts_state_untrusted_rule_and_refuse_bad_ids():
     tri = sdk.triage_run_text("abc123")
     assert sdk.UNTRUSTED_RULE in tri and "stored" in tri and "abc123" in tri
@@ -113,7 +136,7 @@ def test_resources_refuse_traversal_without_sdk(tmp_path):
 
 
 def test_memory_tools_are_bounded_and_wrap_snippets():
-    mem = sdk.MemoryTools(REPO)
+    mem = mcp_tools.MemoryTools(REPO)
     out = mem.memory_search("holdout registry", k=3)
     assert 1 <= len(out["hits"]) <= 3
     for h in out["hits"]:
@@ -126,8 +149,8 @@ def test_memory_tools_are_bounded_and_wrap_snippets():
     assert "same_test" in pt["note"]
     for bad in (
         lambda: mem.memory_search("x", k=0),
-        lambda: mem.memory_search("x", k=sdk.MAX_MEMORY_HITS + 1),
-        lambda: mem.memory_search("x" * (sdk.MAX_QUERY_CHARS + 1)),
+        lambda: mem.memory_search("x", k=mcp_tools.MAX_MEMORY_HITS + 1),
+        lambda: mem.memory_search("x" * (mcp_tools.MAX_QUERY_CHARS + 1)),
         lambda: mem.memory_search("   "),
         lambda: mem.memory_search("x", kinds=["secrets"]),
         lambda: mem.prior_tests(alpha_id="../EQ01"),
@@ -143,6 +166,9 @@ def test_main_without_sdk_exits_with_hint(monkeypatch, capsys):
     monkeypatch.setitem(sys.modules, "mcp", None)  # import mcp -> ImportError
     assert sdk.main(["--root", str(REPO)]) == 2
     assert "pip install" in capsys.readouterr().err
+    assert memory_launcher.main(["--root", str(REPO)]) == 2
+    err = capsys.readouterr().err
+    assert "pip install" in err and "iap.memory.mcp_server" in err
 
 
 # ---------------------------------------------------------- end to end (SDK)
@@ -153,7 +179,7 @@ def _run(body):
 
     params = StdioServerParameters(
         command=sys.executable,
-        args=["-m", "iap.governance.mcp_sdk_server", "--root", str(REPO)],
+        args=["-m", "iap.memory.mcp_server", "--root", str(REPO)],
         env={
             "PYTHONPATH": str(SRC),
             **({"SYSTEMROOT": os.environ["SYSTEMROOT"]} if "SYSTEMROOT" in os.environ else {}),
@@ -232,6 +258,7 @@ def test_end_to_end_over_stdio():
 
     # tools: all six, typed schemas, read-only hint, structured output
     tools = {t.name: t for t in o["tools"]}
+    assert set(MEMORY_CALLS) == set(mcp_tools.TOOL_NAMES)
     assert set(tools) == set(TOOL_CALLS) | set(MEMORY_CALLS)
     assert set(TOOL_CALLS) == set(mcp_server._SCHEMAS)
     for t in tools.values():
@@ -240,15 +267,18 @@ def test_end_to_end_over_stdio():
         if t.name in TOOL_CALLS:
             assert set(t.input_schema.get("properties", {})) == set(mcp_server._SCHEMAS[t.name])
     ms = tools["memory_search"].input_schema
-    assert ms["required"] == ["query"] and ms["properties"]["k"]["maximum"] == sdk.MAX_MEMORY_HITS
-    assert ms["properties"]["query"]["maxLength"] == sdk.MAX_QUERY_CHARS
+    assert (
+        ms["required"] == ["query"]
+        and ms["properties"]["k"]["maximum"] == mcp_tools.MAX_MEMORY_HITS
+    )
+    assert ms["properties"]["query"]["maxLength"] == mcp_tools.MAX_QUERY_CHARS
     assert set(tools["prior_tests"].input_schema["properties"]) == {
         "alpha_id",
         "horizon",
         "text",
         "k",
     }
-    direct = sdk.MemoryTools(REPO)
+    direct = mcp_tools.MemoryTools(REPO)
     for name, res in o["memory"].items():
         assert not res.is_error, (name, res.content)
         args = MEMORY_CALLS[name]

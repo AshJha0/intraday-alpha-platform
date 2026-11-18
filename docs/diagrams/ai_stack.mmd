@@ -4,7 +4,7 @@ flowchart TB
         MC["MCP client<br/>(.mcp.json)"]
     end
     subgraph mid["Read and decide (python/src/iap)"]
-        MS["MCP server<br/>governance.mcp_sdk_server"]
+        MS["MCP server<br/>governance.mcp_sdk_server<br/>+ memory.mcp_tools"]
         GR["Research graph<br/>graph.research_flow + graph.wiring"]
         ME["Research memory<br/>memory (BM25)"]
         VE["Number verifier<br/>llm.verify"]
