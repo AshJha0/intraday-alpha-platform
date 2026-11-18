@@ -98,6 +98,12 @@ address after daily polling, or a change of the service. No attempt was made to 
 route cannot be called "go" until the owner opens the HIST section of the IEX market-data page in
 a browser and confirms that downloads are offered, and on what terms (this is also item D-22).
 
+**Owner's check, 2026-11-18 (browser):** the HIST download section of the IEX market-data page now
+reads "Historical PCAP data is not currently available for direct download" and refers questions to
+IEX Market Operations. So the 403 is the service being withdrawn from direct download, not a block
+of this machine. The route is closed until IEX says otherwise; the only free step left is the
+owner's email to Market Operations asking whether and how research access is offered.
+
 Measured on 2026-10-24, before the 403 (`archive/docs/review/DATA_ROUTE_PROPOSAL_v1.19.md`):
 TOPS and DEEP listed back to at least 2024-10-01 (about 500 sessions); 13 to 16 GB per feed per
 day; the Python reader takes about 9 to 10 minutes per GB, so 250 sessions are 500 to 650
@@ -129,7 +135,7 @@ note (D-22, `docs/DATA_SOURCES.md` section 13) is still an open owner item.
 
 | route | status | next step |
 |---|---|---|
-| A: cross-sectional intraday book | IEX HIST blocked on access (section 6); development possible on the Nasdaq ITCH sample days at full breadth | owner checks IEX HIST access; meanwhile a several-hundred-name book on the ITCH days; the native TOPS reader only once access is confirmed |
+| A: cross-sectional intraday book | IEX HIST withdrawn from direct download (section 6, owner check 2026-11-18); development possible on the Nasdaq ITCH sample days at full breadth | owner may email IEX Market Operations; meanwhile a several-hundred-name book on the ITCH days; the native TOPS reader only once access is confirmed |
 | B: event-driven market making on Nasdaq ITCH sample days | method work only: too few sessions for any Sharpe claim (section 2) | re-ingest the sample days; event-driven quoter; markout curves |
 | C: daily families on Tiingo free tier | the only route powered for a Sharpe near 1; waits on the owner's sign-up | owner creates the account; DD1 tests on the first 500 symbols |
 | D: filing-text signal for D4 | waits on route C's universe and on EDGAR access from the owner's machine | local model, look-ahead control by filing date against model cut-off |
