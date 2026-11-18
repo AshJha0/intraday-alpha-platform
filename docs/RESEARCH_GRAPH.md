@@ -119,7 +119,10 @@ run ends at `rejected` and the runner is never called.
 
 - It does not call a model or the network. `write`, `verify`,
   `search_prior`, `run_in_sample` and `is_holdout` are injected; the demo
-  uses stubs. Wiring real implementations is a separate decision.
+  uses stubs. `iap.graph.wiring` backs `search_prior`, `is_holdout` and
+  `verify` with the memory, the holdout registry and the number verifier
+  (`python -m iap.graph run`); the runner and writer stay injected. See
+  [AI_STACK.md](AI_STACK.md).
 - It does not pre-register. The draft is unsigned and stays in the state;
   approving it here is not `WriteBroker.preregister` or a sign-off under
   `iap.governance.workflow`.

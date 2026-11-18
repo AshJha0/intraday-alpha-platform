@@ -34,6 +34,10 @@ TOOL_CALLS = {
     "blackboard_state": {},
 }
 PROMPTS = {"triage_run", "draft_preregistration"}
+MEMORY_CALLS = {
+    "memory_search": {"query": "holdout registry", "k": 3},
+    "prior_tests": {"alpha_id": "EQ01", "k": 2},
+}
 
 
 # ------------------------------------------------------------- no SDK needed
@@ -108,6 +112,33 @@ def test_resources_refuse_traversal_without_sdk(tmp_path):
         res.alpha("..")
 
 
+def test_memory_tools_are_bounded_and_wrap_snippets():
+    mem = sdk.MemoryTools(REPO)
+    out = mem.memory_search("holdout registry", k=3)
+    assert 1 <= len(out["hits"]) <= 3
+    for h in out["hits"]:
+        assert h["snippet"]["untrusted"] is True and h["heading"]["untrusted"] is True
+        assert len(h["snippet"]["text"]) <= 400
+    assert out["query"]["untrusted"] is True
+    pt = mem.prior_tests(alpha_id="EQ01", k=2)
+    assert 1 <= len(pt["ledger"]) <= 2 and all(h["alpha_id"] == "EQ01" for h in pt["ledger"])
+    assert all(h["snippet"]["untrusted"] is True for h in pt["ledger"] + pt["documents"])
+    assert "same_test" in pt["note"]
+    for bad in (
+        lambda: mem.memory_search("x", k=0),
+        lambda: mem.memory_search("x", k=sdk.MAX_MEMORY_HITS + 1),
+        lambda: mem.memory_search("x" * (sdk.MAX_QUERY_CHARS + 1)),
+        lambda: mem.memory_search("   "),
+        lambda: mem.memory_search("x", kinds=["secrets"]),
+        lambda: mem.prior_tests(alpha_id="../EQ01"),
+        lambda: mem.prior_tests(text="t", k=True),
+    ):
+        with pytest.raises(mcp_server.ToolError):
+            bad()
+    with pytest.raises(ValueError):  # nothing to search for
+        mem.prior_tests()
+
+
 def test_main_without_sdk_exits_with_hint(monkeypatch, capsys):
     monkeypatch.setitem(sys.modules, "mcp", None)  # import mcp -> ImportError
     assert sdk.main(["--root", str(REPO)]) == 2
@@ -161,6 +192,12 @@ def test_end_to_end_over_stdio():
         calls["get_experiment"] = {"experiment_id": first.structured_content["data"]["ids"][0]}
         out["calls"] = {n: (a, await c.call_tool(n, a)) for n, a in calls.items()}
         out["bad_tool"] = await c.call_tool("get_experiment", {"experiment_id": "../x"})
+        out["memory"] = {n: await c.call_tool(n, a) for n, a in MEMORY_CALLS.items()}
+        out["bad_memory"] = [
+            await c.call_tool("memory_search", {"query": "x", "k": 999}),
+            await c.call_tool("prior_tests", {}),
+            await c.call_tool("prior_tests", {"alpha_id": "../x"}),
+        ]
         out["resources"] = (await c.list_resources()).resources
         out["templates"] = (await c.list_resource_templates()).resource_templates
         out["reads"] = {}
@@ -195,11 +232,33 @@ def test_end_to_end_over_stdio():
 
     # tools: all six, typed schemas, read-only hint, structured output
     tools = {t.name: t for t in o["tools"]}
-    assert set(tools) == set(TOOL_CALLS) == set(mcp_server._SCHEMAS)
+    assert set(tools) == set(TOOL_CALLS) | set(MEMORY_CALLS)
+    assert set(TOOL_CALLS) == set(mcp_server._SCHEMAS)
     for t in tools.values():
         assert t.annotations.read_only_hint is True and t.annotations.destructive_hint is False
         assert t.output_schema is not None
-        assert set(t.input_schema.get("properties", {})) == set(mcp_server._SCHEMAS[t.name])
+        if t.name in TOOL_CALLS:
+            assert set(t.input_schema.get("properties", {})) == set(mcp_server._SCHEMAS[t.name])
+    ms = tools["memory_search"].input_schema
+    assert ms["required"] == ["query"] and ms["properties"]["k"]["maximum"] == sdk.MAX_MEMORY_HITS
+    assert ms["properties"]["query"]["maxLength"] == sdk.MAX_QUERY_CHARS
+    assert set(tools["prior_tests"].input_schema["properties"]) == {
+        "alpha_id",
+        "horizon",
+        "text",
+        "k",
+    }
+    direct = sdk.MemoryTools(REPO)
+    for name, res in o["memory"].items():
+        assert not res.is_error, (name, res.content)
+        args = MEMORY_CALLS[name]
+        want = (
+            direct.memory_search(args["query"], args["k"])
+            if name == "memory_search"
+            else direct.prior_tests(alpha_id=args["alpha_id"], k=args["k"])
+        )
+        assert res.structured_content == want, name
+    assert all(r.is_error for r in o["bad_memory"])
     assert tools["list_experiments"].input_schema["properties"]["limit"]["type"] == "integer"
     assert tools["get_experiment"].input_schema["required"] == ["experiment_id"]
 

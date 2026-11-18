@@ -31,7 +31,7 @@ must be one with the extra installed.
 
 ## Tools
 
-All six are read-only and carry `readOnlyHint: true`,
+All eight are read-only and carry `readOnlyHint: true`,
 `destructiveHint: false` and `openWorldHint: false`. Each has a typed input
 schema and returns structured output (the same object is also sent as JSON
 text for older clients).
@@ -44,6 +44,11 @@ text for older clients).
 | `lifecycle_log` | `tail` (1-200, default 20) | the last lines of the lifecycle log |
 | `alpha_report` | `alpha_id` | `research/alpha_reports/<id>.json` |
 | `blackboard_state` | none | the agents' blackboard and its chain check |
+| `memory_search` | `query` (1-500 characters), `k` (1-20, default 10), `kinds` (`doc`, `research`, `ledger`) | research-memory hits with file:line citations; heading and snippet wrapped as untrusted |
+| `prior_tests` | `alpha_id`, `horizon`, `text` (at most 500 characters), `k` (1-20) | nearest ledger entries and result documents; ranking only, the same-test rule is in `iap.graph.wiring` |
+
+The two memory tools come from `MemoryTools` in the same module, which builds the
+[research memory](RESEARCH_MEMORY.md) index on first use. See [AI_STACK.md](AI_STACK.md).
 
 ## Resources
 
