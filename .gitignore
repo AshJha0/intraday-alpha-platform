@@ -93,3 +93,6 @@ research/**/*.json.lock
 
 # CI-lock venv for registering pre-registrations (docs/RUNBOOKS.md)
 .venv-ci/
+
+# worktree venv for the optional MCP SDK extra (docs/MCP_SERVER.md)
+.venv-mcp/
