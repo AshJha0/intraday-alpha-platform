@@ -1,0 +1,845 @@
+{
+ "schema": "iap.verifier_golden/1",
+ "rule": "held-out set: iap.llm.verify module docstring; labels set by hand before the fixed verifier ran",
+ "cases": [
+  {
+   "id": "h001",
+   "category": "exact",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "gate_ic": 0.0273
+    }
+   },
+   "title": "Finding",
+   "text": "Gate IC came in at 0.0273.",
+   "label": "accept",
+   "reason": "verbatim"
+  },
+  {
+   "id": "h002",
+   "category": "exact",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "gate_ic": 0.0273
+    }
+   },
+   "title": "Finding",
+   "text": "Gate IC came in at 0.0237.",
+   "label": "reject",
+   "reason": "transposed digits"
+  },
+  {
+   "id": "h003",
+   "category": "exact",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "t_stat": 3.07
+    }
+   },
+   "title": "Finding",
+   "text": "t-statistic 3.07",
+   "label": "accept",
+   "reason": "verbatim"
+  },
+  {
+   "id": "h004",
+   "category": "rounding",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "sharpe": 0.87654
+    }
+   },
+   "title": "Finding",
+   "text": "Sharpe 0.877",
+   "label": "accept",
+   "reason": "rounds at 3 dp"
+  },
+  {
+   "id": "h005",
+   "category": "rounding",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "sharpe": 0.87654
+    }
+   },
+   "title": "Finding",
+   "text": "Sharpe 0.876",
+   "label": "reject",
+   "reason": "truncated"
+  },
+  {
+   "id": "h006",
+   "category": "rounding",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "sharpe": 0.87654
+    }
+   },
+   "title": "Finding",
+   "text": "Sharpe 1",
+   "label": "reject",
+   "reason": "integer must be exact"
+  },
+  {
+   "id": "h007",
+   "category": "half_edge",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "x": 0.245
+    }
+   },
+   "title": "Finding",
+   "text": "x 0.24",
+   "label": "accept",
+   "reason": "half-even of 0.245"
+  },
+  {
+   "id": "h008",
+   "category": "half_edge",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "x": 0.245
+    }
+   },
+   "title": "Finding",
+   "text": "x 0.25",
+   "label": "accept",
+   "reason": "half-up of 0.245"
+  },
+  {
+   "id": "h009",
+   "category": "half_edge",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "x": 0.255
+    }
+   },
+   "title": "Finding",
+   "text": "x 0.25",
+   "label": "accept",
+   "reason": "half-even of 0.255",
+   "disagreement": {
+    "kind": "mislabel",
+    "why": "half-even of 0.255 at 2 dp is 0.26 (the kept digit 5 is odd), and half-up is 0.26 too; 0.25 is neither"
+   },
+   "note": "Disputed label, left for the owner: the author mis-applied half-even when labelling. The verifier rejects, before and after the fix."
+  },
+  {
+   "id": "h010",
+   "category": "half_edge",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "x": 0.265
+    }
+   },
+   "title": "Finding",
+   "text": "x 0.28",
+   "label": "reject",
+   "reason": "neither rule"
+  },
+  {
+   "id": "h011",
+   "category": "percent",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "hit_rate": 0.512
+    }
+   },
+   "title": "Finding",
+   "text": "hit rate 51.2%",
+   "label": "accept",
+   "reason": "x100"
+  },
+  {
+   "id": "h012",
+   "category": "percent",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "hit_rate": 0.512
+    }
+   },
+   "title": "Finding",
+   "text": "hit rate 0.512%",
+   "label": "reject",
+   "reason": "0.512% is 0.00512"
+  },
+  {
+   "id": "h013",
+   "category": "percent",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "hit_rate": 0.512
+    }
+   },
+   "title": "Finding",
+   "text": "hit rate 51.2 %",
+   "label": "accept",
+   "reason": "spaced percent sign"
+  },
+  {
+   "id": "h014",
+   "category": "percent",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "fill_pct": 87.5
+    }
+   },
+   "title": "Finding",
+   "text": "fill 87.5%",
+   "label": "accept",
+   "reason": "field already in percent"
+  },
+  {
+   "id": "h015",
+   "category": "labelled_stat",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "gate_ic": 0.031,
+     "sharpe": 2.1
+    }
+   },
+   "title": "Finding",
+   "text": "Sharpe 0.031",
+   "label": "reject",
+   "reason": "0.031 is the IC"
+  },
+  {
+   "id": "h016",
+   "category": "labelled_stat",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "gate_ic": 0.031,
+     "t_stat": 4.4
+    }
+   },
+   "title": "Finding",
+   "text": "IC, t of 0.031, 4.4 respectively",
+   "label": "accept",
+   "reason": "each number matches its statistic in order"
+  },
+  {
+   "id": "h017",
+   "category": "labelled_stat",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "gate_ic": 0.031,
+     "t_stat": 4.4
+    }
+   },
+   "title": "Finding",
+   "text": "IC and t of 4.4 and 0.031 respectively",
+   "label": "reject",
+   "reason": "swapped: IC is not 4.4"
+  },
+  {
+   "id": "h018",
+   "category": "labelled_stat",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "information_coefficient": 0.019
+    }
+   },
+   "title": "Finding",
+   "text": "rank IC 0.019",
+   "label": "accept",
+   "reason": "information coefficient field; rank IC label is the IC family"
+  },
+  {
+   "id": "h019",
+   "category": "metadata",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "ic": 0.02
+    }
+   },
+   "title": "Finding",
+   "text": "with 250 names",
+   "label": "reject",
+   "reason": "n is metadata"
+  },
+  {
+   "id": "h020",
+   "category": "metadata",
+   "evidence": {
+    "config": {
+     "window": 30
+    },
+    "metrics": {
+     "ic": 0.02
+    }
+   },
+   "title": "Finding",
+   "text": "a 30 bar window",
+   "label": "reject",
+   "reason": "config is metadata"
+  },
+  {
+   "id": "h021",
+   "category": "free_text_evidence",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "ic": 0.02,
+     "notes": "t was 6.6"
+    }
+   },
+   "title": "Finding",
+   "text": "t 6.6",
+   "label": "reject",
+   "reason": "prose is not evidence"
+  },
+  {
+   "id": "h022",
+   "category": "free_text_evidence",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "ic_band": "0.011 to 0.029"
+    }
+   },
+   "title": "Finding",
+   "text": "band 0.011 to 0.029",
+   "label": "accept",
+   "reason": "non-prose string leaf"
+  },
+  {
+   "id": "h023",
+   "category": "derived",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "a": 0.3,
+     "b": 0.1
+    }
+   },
+   "title": "Finding",
+   "text": "a ratio of 3.0",
+   "label": "reject",
+   "reason": "derived ratio"
+  },
+  {
+   "id": "h024",
+   "category": "derived",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "a": 0.3,
+     "b": 0.1
+    }
+   },
+   "title": "Finding",
+   "text": "a gap of 0.2",
+   "label": "reject",
+   "reason": "derived difference"
+  },
+  {
+   "id": "h025",
+   "category": "number_words",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "ic": 0.02
+    }
+   },
+   "title": "Finding",
+   "text": "four symbols passed",
+   "label": "reject",
+   "reason": "number word"
+  },
+  {
+   "id": "h026",
+   "category": "number_words",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "ic": 0.02
+    }
+   },
+   "title": "Finding",
+   "text": "a couple of regimes",
+   "label": "reject",
+   "reason": "a quantity in words"
+  },
+  {
+   "id": "h027",
+   "category": "number_words",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "ic": 0.02
+    }
+   },
+   "title": "Finding",
+   "text": "estimated half-lives were short",
+   "label": "accept",
+   "reason": "a term, not a quantity"
+  },
+  {
+   "id": "h028",
+   "category": "number_words",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "ic": 0.02
+    }
+   },
+   "title": "Finding",
+   "text": "a two-sided test at IC 0.02",
+   "label": "accept",
+   "reason": "test type, not a quantity"
+  },
+  {
+   "id": "h029",
+   "category": "sign_zero",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "t_stat": -2.2
+    }
+   },
+   "title": "Finding",
+   "text": "t -2.2",
+   "label": "accept",
+   "reason": "negative stored"
+  },
+  {
+   "id": "h030",
+   "category": "sign_zero",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "t_stat": 2.2
+    }
+   },
+   "title": "Finding",
+   "text": "t -2.2",
+   "label": "reject",
+   "reason": "sign flipped"
+  },
+  {
+   "id": "h031",
+   "category": "sign_zero",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "t_stat": -2.2
+    }
+   },
+   "title": "Finding",
+   "text": "t \u22122.2",
+   "label": "accept",
+   "reason": "unicode minus on a true negative"
+  },
+  {
+   "id": "h032",
+   "category": "scientific",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "p_value": 3.4e-07
+    }
+   },
+   "title": "Finding",
+   "text": "p 3.4e-7",
+   "label": "accept",
+   "reason": "same value"
+  },
+  {
+   "id": "h033",
+   "category": "scientific",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "p_value": 3.4e-07
+    }
+   },
+   "title": "Finding",
+   "text": "p 3.4e-8",
+   "label": "reject",
+   "reason": "off by ten"
+  },
+  {
+   "id": "h034",
+   "category": "thousands",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "n_trades": 56789
+    }
+   },
+   "title": "Finding",
+   "text": "56,789 trades",
+   "label": "accept",
+   "reason": "separator"
+  },
+  {
+   "id": "h035",
+   "category": "thousands",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "n_trades": 56,
+     "other": 789
+    }
+   },
+   "title": "Finding",
+   "text": "56,789 trades",
+   "label": "reject",
+   "reason": "56789 is not stored"
+  },
+  {
+   "id": "h036",
+   "category": "thousands",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "pnl": 1250000
+    }
+   },
+   "title": "Finding",
+   "text": "PnL 1,250,000",
+   "label": "accept",
+   "reason": "two separators"
+  },
+  {
+   "id": "h037",
+   "category": "ranges_lists",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "lo": 0.2
+    }
+   },
+   "title": "Finding",
+   "text": "values 0.2-0.7",
+   "label": "reject",
+   "reason": "0.7 not stored"
+  },
+  {
+   "id": "h038",
+   "category": "ranges_lists",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "a": 0.8
+    }
+   },
+   "title": "Finding",
+   "text": "ratio 0.8/0.9",
+   "label": "reject",
+   "reason": "0.9 not stored"
+  },
+  {
+   "id": "h039",
+   "category": "ranges_lists",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "a": 0.2,
+     "b": 0.7
+    }
+   },
+   "title": "Finding",
+   "text": "values 0.2-0.7",
+   "label": "accept",
+   "reason": "both stored"
+  },
+  {
+   "id": "h040",
+   "category": "ranges_lists",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "a": 0.2
+    }
+   },
+   "title": "Finding",
+   "text": "Sharpe:0.75",
+   "label": "reject",
+   "reason": "0.75 not stored"
+  },
+  {
+   "id": "h041",
+   "category": "units",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "spread_bps": 7
+    }
+   },
+   "title": "Finding",
+   "text": "spread 40bp",
+   "label": "reject",
+   "reason": "40 not stored"
+  },
+  {
+   "id": "h042",
+   "category": "units",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "spread_bps": 7
+    }
+   },
+   "title": "Finding",
+   "text": "spread 7bp",
+   "label": "accept",
+   "reason": "7 stored"
+  },
+  {
+   "id": "h043",
+   "category": "units",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "lev": 3.5
+    }
+   },
+   "title": "Finding",
+   "text": "leverage 3.5x",
+   "label": "accept",
+   "reason": "3.5 stored"
+  },
+  {
+   "id": "h044",
+   "category": "units",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "lev": 3.5
+    }
+   },
+   "title": "Finding",
+   "text": "gross 4x",
+   "label": "reject",
+   "reason": "4 not stored"
+  },
+  {
+   "id": "h045",
+   "category": "identifiers",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "ic": 0.02
+    }
+   },
+   "title": "Finding",
+   "text": "instrument FX07 IC 0.02",
+   "label": "accept",
+   "reason": "identifier"
+  },
+  {
+   "id": "h046",
+   "category": "identifiers",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "ic": 0.02
+    }
+   },
+   "title": "Finding",
+   "text": "listing 2318.HK IC 0.02",
+   "label": "accept",
+   "reason": "ticker"
+  },
+  {
+   "id": "h047",
+   "category": "identifiers",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "ic": 0.02
+    }
+   },
+   "title": "Finding",
+   "text": "config c2 IC 0.02",
+   "label": "accept",
+   "reason": "identifier"
+  },
+  {
+   "id": "h048",
+   "category": "title",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "ic": 0.02
+    }
+   },
+   "title": "IC 0.05 holds",
+   "text": "held",
+   "label": "reject",
+   "reason": "title number not stored"
+  },
+  {
+   "id": "h049",
+   "category": "title",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "ic": 0.02
+    }
+   },
+   "title": "IC triples, 3x",
+   "text": "IC 0.02",
+   "label": "reject",
+   "reason": "glued multiple in title"
+  },
+  {
+   "id": "h050",
+   "category": "lookalike_digits",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "ic": 0.33
+    }
+   },
+   "title": "Finding",
+   "text": "IC O.77",
+   "label": "reject",
+   "reason": "letter O disguises 0.77"
+  },
+  {
+   "id": "h051",
+   "category": "lookalike_digits",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "ic": 0.33
+    }
+   },
+   "title": "Finding",
+   "text": "IC \uff10.\uff13\uff13",
+   "label": "accept",
+   "reason": "full-width, same value"
+  },
+  {
+   "id": "h052",
+   "category": "lookalike_digits",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "ic": 0.33
+    }
+   },
+   "title": "Finding",
+   "text": "IC 0.\u200b77",
+   "label": "reject",
+   "reason": "renders as 0.77, not stored"
+  },
+  {
+   "id": "h053",
+   "category": "lookalike_digits",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "ic": 0.33
+    }
+   },
+   "title": "Finding",
+   "text": "IC \u2212\u20600.33",
+   "label": "reject",
+   "reason": "hidden minus: -0.33 not stored"
+  },
+  {
+   "id": "h054",
+   "category": "long_decimal",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "x": 98765.4321
+    }
+   },
+   "title": "Finding",
+   "text": "x 98765.43210000000000000000000000",
+   "label": "accept",
+   "reason": "trailing zeros, same value"
+  },
+  {
+   "id": "h055",
+   "category": "long_decimal",
+   "evidence": {
+    "seq": 3,
+    "n": 250,
+    "metrics": {
+     "x": 98765.4321
+    }
+   },
+   "title": "Finding",
+   "text": "x 98765.43210000000000000000000009",
+   "label": "reject",
+   "reason": "different value"
+  }
+ ]
+}

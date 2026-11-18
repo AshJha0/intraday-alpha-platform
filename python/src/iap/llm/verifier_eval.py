@@ -42,6 +42,8 @@ from iap.llm.verify import verify_finding
 ROOT = Path(__file__).resolve().parents[4]
 CASES = ROOT / "research" / "agents" / "evals" / "verifier_golden.json"
 RESULT = ROOT / "research" / "agents" / "evals" / "verifier_golden_result.json"
+#: cases written and labelled before the verifier fixes ran on them
+HELDOUT = ROOT / "research" / "agents" / "evals" / "verifier_heldout.json"
 SESSION = "eval"
 REF = f"report:{SESSION}.r1"
 LABELS = ("accept", "reject")
@@ -170,6 +172,10 @@ def gate(new: Mapping[str, Any], old: Mapping[str, Any]) -> list[str]:
             out.append(f"{key} rate rose from {b:.4f} to {a:.4f}")
     if new.get("unclassified"):
         out.append(f"disagreements without a defect/mislabel classification: {new['unclassified']}")
+    if "heldout" in new and "heldout" in old:
+        out += [f"held-out: {m}" for m in gate(new["heldout"], old["heldout"])]
+    elif "heldout" in old:
+        out.append("held-out set missing from the new run")
     return out
 
 
@@ -185,6 +191,9 @@ def _fmt(name: str, r: Mapping[str, Any]) -> str:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m iap.llm.verifier_eval")
     ap.add_argument("--cases", type=Path, default=CASES)
+    ap.add_argument(
+        "--heldout", type=Path, default=HELDOUT, help="held-out case file ('none' to skip)"
+    )
     ap.add_argument("--out", type=Path, default=RESULT)
     ap.add_argument("--check", action="store_true", help="fail if a rate rose; do not write")
     a = ap.parse_args(argv)
@@ -192,16 +201,23 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
     cases = validate_cases(json.loads(a.cases.read_text(encoding="utf-8")))
     res = evaluate(cases)
-    print(_fmt("overall", res["overall"]))
-    print(_fmt("net of mislabels", res["overall_net_of_mislabels"]))
-    for k, r in res["per_category"].items():
-        print(_fmt(k, r))
-    for d in res["disagreements"]:
-        kind = (d["classification"] or {}).get("kind", "UNCLASSIFIED")
-        print(
-            f"  {d['id']} [{d['category']}] label={d['label']} verifier={d['verdict']} "
-            f"({kind}): {d['text']!a}"
-        )
+    if a.heldout is not None and a.heldout.name != "none":
+        res["heldout"] = evaluate(validate_cases(json.loads(a.heldout.read_text(encoding="utf-8"))))
+    for tag, r in [("golden", res), ("held-out", res.get("heldout"))]:
+        if r is None:
+            continue
+        print(f"== {tag}")
+        print(_fmt("overall", r["overall"]))
+        print(_fmt("net of mislabels", r["overall_net_of_mislabels"]))
+        if tag == "golden":
+            for k, rr in r["per_category"].items():
+                print(_fmt(k, rr))
+        for d in r["disagreements"]:
+            kind = (d["classification"] or {}).get("kind", "UNCLASSIFIED")
+            print(
+                f"  {d['id']} [{d['category']}] label={d['label']} verifier={d['verdict']} "
+                f"({kind}): {d['text']!a}"
+            )
     if a.check:
         if not a.out.is_file():
             print(f"no committed result at {a.out}")
