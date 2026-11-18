@@ -1,0 +1,2309 @@
+{
+ "schema": "iap.verifier_golden/1",
+ "rule": "iap.llm.verify module docstring (v1.13, G-P2-2); labels set by hand before running the verifier",
+ "cases": [
+  {
+   "id": "v001",
+   "category": "exact",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "gate_ic": 0.041
+    }
+   },
+   "title": "Finding",
+   "text": "The gate IC was 0.041.",
+   "label": "accept",
+   "reason": "verbatim copy of metrics.gate_ic"
+  },
+  {
+   "id": "v002",
+   "category": "exact",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "t_stat": 5.31
+    }
+   },
+   "title": "Finding",
+   "text": "t = 5.31 on the held-out days.",
+   "label": "accept",
+   "reason": "verbatim t_stat"
+  },
+  {
+   "id": "v003",
+   "category": "exact",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "sharpe": 1.2
+    }
+   },
+   "title": "Finding",
+   "text": "Sharpe 1.2 after costs.",
+   "label": "accept",
+   "reason": "verbatim sharpe"
+  },
+  {
+   "id": "v004",
+   "category": "exact",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "hit_rate": 0.53
+    }
+   },
+   "title": "Finding",
+   "text": "hit rate 0.53",
+   "label": "accept",
+   "reason": "verbatim hit_rate"
+  },
+  {
+   "id": "v005",
+   "category": "exact",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "gate_ic": 0.041
+    }
+   },
+   "title": "Finding",
+   "text": "The gate IC was 0.051.",
+   "label": "reject",
+   "reason": "0.051 is not stored"
+  },
+  {
+   "id": "v006",
+   "category": "exact",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "max_drawdown": 12
+    }
+   },
+   "title": "Finding",
+   "text": "Max drawdown was 12 units, see table.",
+   "label": "accept",
+   "reason": "integer 12 stored exactly"
+  },
+  {
+   "id": "v007",
+   "category": "exact",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "max_drawdown": 12
+    }
+   },
+   "title": "Finding",
+   "text": "Max drawdown was 13 units.",
+   "label": "reject",
+   "reason": "13 not stored"
+  },
+  {
+   "id": "v008",
+   "category": "rounding",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "gate_ic": 0.41187
+    }
+   },
+   "title": "Finding",
+   "text": "gate IC 0.412",
+   "label": "accept",
+   "reason": "0.41187 rounds to 0.412"
+  },
+  {
+   "id": "v009",
+   "category": "rounding",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "gate_ic": 0.41187
+    }
+   },
+   "title": "Finding",
+   "text": "gate IC 0.41",
+   "label": "accept",
+   "reason": "0.41187 rounds to 0.41"
+  },
+  {
+   "id": "v010",
+   "category": "rounding",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "gate_ic": 0.41187
+    }
+   },
+   "title": "Finding",
+   "text": "gate IC 0.4",
+   "label": "accept",
+   "reason": "0.41187 rounds to 0.4"
+  },
+  {
+   "id": "v011",
+   "category": "rounding",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "gate_ic": 0.41187
+    }
+   },
+   "title": "Finding",
+   "text": "gate IC 0.4119",
+   "label": "accept",
+   "reason": "0.41187 rounds to 0.4119"
+  },
+  {
+   "id": "v012",
+   "category": "rounding",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "gate_ic": 0.41187
+    }
+   },
+   "title": "Finding",
+   "text": "gate IC 0.411",
+   "label": "reject",
+   "reason": "truncation, not rounding"
+  },
+  {
+   "id": "v013",
+   "category": "rounding",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "gate_ic": 0.41187
+    }
+   },
+   "title": "Finding",
+   "text": "gate IC 0.42",
+   "label": "reject",
+   "reason": "wrong at 2 dp"
+  },
+  {
+   "id": "v014",
+   "category": "rounding",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "gate_ic": 0.41187
+    }
+   },
+   "title": "Finding",
+   "text": "gate IC 0",
+   "label": "reject",
+   "reason": "no decimal point: exact match required"
+  },
+  {
+   "id": "v015",
+   "category": "rounding",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "gate_ic": 0.41187
+    }
+   },
+   "title": "Finding",
+   "text": "gate IC 0.41190",
+   "label": "reject",
+   "reason": "5 dp claims 0.41190; the stored value is 0.41187"
+  },
+  {
+   "id": "v016",
+   "category": "rounding",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ratio": 2.5
+    }
+   },
+   "title": "Finding",
+   "text": "the ratio was 2",
+   "label": "reject",
+   "reason": "an integer written must match exactly"
+  },
+  {
+   "id": "v017",
+   "category": "rounding",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ratio": 2.5
+    }
+   },
+   "title": "Finding",
+   "text": "the ratio was 3",
+   "label": "reject",
+   "reason": "an integer written must match exactly"
+  },
+  {
+   "id": "v018",
+   "category": "rounding",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ratio": 3
+    }
+   },
+   "title": "Finding",
+   "text": "the ratio was 3.0",
+   "label": "accept",
+   "reason": "3 shown at 1 dp is 3.0"
+  },
+  {
+   "id": "v019",
+   "category": "rounding",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ratio": 3.0
+    }
+   },
+   "title": "Finding",
+   "text": "the ratio was 3",
+   "label": "accept",
+   "reason": "stored 3.0 equals 3"
+  },
+  {
+   "id": "v020",
+   "category": "rounding",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 0.30000000000000004
+    }
+   },
+   "title": "Finding",
+   "text": "the value was 0.3",
+   "label": "accept",
+   "reason": "0.30000000000000004 rounds to 0.3"
+  },
+  {
+   "id": "v021",
+   "category": "rounding",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 0.41
+    }
+   },
+   "title": "Finding",
+   "text": "the value was 0.410",
+   "label": "accept",
+   "reason": "0.41 shown at 3 dp"
+  },
+  {
+   "id": "v022",
+   "category": "rounding",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 0.41
+    }
+   },
+   "title": "Finding",
+   "text": "the value was 0.4100001",
+   "label": "reject",
+   "reason": "claims a different value"
+  },
+  {
+   "id": "v023",
+   "category": "half_edge",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 0.125
+    }
+   },
+   "title": "Finding",
+   "text": "x was 0.12",
+   "label": "accept",
+   "reason": "half-even of 0.125"
+  },
+  {
+   "id": "v024",
+   "category": "half_edge",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 0.125
+    }
+   },
+   "title": "Finding",
+   "text": "x was 0.13",
+   "label": "accept",
+   "reason": "half-up of 0.125"
+  },
+  {
+   "id": "v025",
+   "category": "half_edge",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 0.135
+    }
+   },
+   "title": "Finding",
+   "text": "x was 0.13",
+   "label": "reject",
+   "reason": "both rules give 0.14"
+  },
+  {
+   "id": "v026",
+   "category": "half_edge",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 0.135
+    }
+   },
+   "title": "Finding",
+   "text": "x was 0.14",
+   "label": "accept",
+   "reason": "both rules give 0.14"
+  },
+  {
+   "id": "v027",
+   "category": "half_edge",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 1.005
+    }
+   },
+   "title": "Finding",
+   "text": "x was 1.01",
+   "label": "accept",
+   "reason": "half-up on the decimal repr 1.005"
+  },
+  {
+   "id": "v028",
+   "category": "half_edge",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 1.005
+    }
+   },
+   "title": "Finding",
+   "text": "x was 1.00",
+   "label": "accept",
+   "reason": "half-even on the decimal repr 1.005"
+  },
+  {
+   "id": "v029",
+   "category": "half_edge",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 2.5
+    }
+   },
+   "title": "Finding",
+   "text": "x was 2.",
+   "label": "reject",
+   "reason": "a bare trailing point: the integer 2 is not 2.5"
+  },
+  {
+   "id": "v030",
+   "category": "half_edge",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 0.0625
+    }
+   },
+   "title": "Finding",
+   "text": "x was 0.062",
+   "label": "accept",
+   "reason": "half-even of 0.0625"
+  },
+  {
+   "id": "v031",
+   "category": "half_edge",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 0.0625
+    }
+   },
+   "title": "Finding",
+   "text": "x was 0.063",
+   "label": "accept",
+   "reason": "half-up of 0.0625"
+  },
+  {
+   "id": "v032",
+   "category": "half_edge",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 0.0625
+    }
+   },
+   "title": "Finding",
+   "text": "x was 0.061",
+   "label": "reject",
+   "reason": "neither rule gives 0.061"
+  },
+  {
+   "id": "v033",
+   "category": "percent",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "hit_rate": 0.53
+    }
+   },
+   "title": "Finding",
+   "text": "hit rate 53%",
+   "label": "accept",
+   "reason": "0.53 x 100 = 53 exactly"
+  },
+  {
+   "id": "v034",
+   "category": "percent",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "hit_rate": 0.53
+    }
+   },
+   "title": "Finding",
+   "text": "hit rate 53.0%",
+   "label": "accept",
+   "reason": "53 shown at 1 dp"
+  },
+  {
+   "id": "v035",
+   "category": "percent",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "hit_rate": 0.531
+    }
+   },
+   "title": "Finding",
+   "text": "hit rate 53%",
+   "label": "reject",
+   "reason": "53.1 is not exactly 53"
+  },
+  {
+   "id": "v036",
+   "category": "percent",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "hit_rate": 0.531
+    }
+   },
+   "title": "Finding",
+   "text": "hit rate 53.1%",
+   "label": "accept",
+   "reason": "53.1 exactly"
+  },
+  {
+   "id": "v037",
+   "category": "percent",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "hit_rate": 0.53
+    }
+   },
+   "title": "Finding",
+   "text": "hit rate 0.53%",
+   "label": "reject",
+   "reason": "0.53% means 0.0053, not 0.53",
+   "disagreement": {
+    "kind": "defect",
+    "why": "matches() also tries the unscaled value when % is present, so 0.53% matches 0.53; the documented rule is value x 100 only"
+   }
+  },
+  {
+   "id": "v038",
+   "category": "percent",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "hit_rate": 0.53
+    }
+   },
+   "title": "Finding",
+   "text": "hit rate 53 %",
+   "label": "accept",
+   "reason": "53 % with a space still means 0.53",
+   "disagreement": {
+    "kind": "defect",
+    "why": "the % must be glued to the digits; '53 %' is read as the bare integer 53"
+   }
+  },
+  {
+   "id": "v039",
+   "category": "percent",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "hit_rate": 0.53
+    }
+   },
+   "title": "Finding",
+   "text": "hit rate 54%",
+   "label": "reject",
+   "reason": "54% is not stored"
+  },
+  {
+   "id": "v040",
+   "category": "percent",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "turnover_pct": 12.5
+    }
+   },
+   "title": "Finding",
+   "text": "turnover 12.5%",
+   "label": "accept",
+   "reason": "stored already in percent units"
+  },
+  {
+   "id": "v041",
+   "category": "labelled_stat",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "gate_ic": 0.041,
+     "sharpe": 1.2
+    }
+   },
+   "title": "Finding",
+   "text": "IC 1.2",
+   "label": "reject",
+   "reason": "1.2 is the Sharpe, not the IC"
+  },
+  {
+   "id": "v042",
+   "category": "labelled_stat",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "gate_ic": 0.041,
+     "t_stat": 5.3
+    }
+   },
+   "title": "Finding",
+   "text": "t = 0.041",
+   "label": "reject",
+   "reason": "0.041 is the IC, not t"
+  },
+  {
+   "id": "v043",
+   "category": "labelled_stat",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "gate_ic": 0.041,
+     "sharpe": 1.2
+    }
+   },
+   "title": "Finding",
+   "text": "Sharpe 0.041",
+   "label": "reject",
+   "reason": "0.041 is the IC"
+  },
+  {
+   "id": "v044",
+   "category": "labelled_stat",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "hit_rate": 0.53,
+     "gate_ic": 0.6
+    }
+   },
+   "title": "Finding",
+   "text": "hit rate 0.6",
+   "label": "reject",
+   "reason": "0.6 is the IC"
+  },
+  {
+   "id": "v045",
+   "category": "labelled_stat",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "rank_ic": 0.05
+    }
+   },
+   "title": "Finding",
+   "text": "rank IC 0.05",
+   "label": "accept",
+   "reason": "rank_ic field"
+  },
+  {
+   "id": "v046",
+   "category": "labelled_stat",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "information_coefficient": 0.05
+    }
+   },
+   "title": "Finding",
+   "text": "IC 0.05",
+   "label": "accept",
+   "reason": "the information coefficient is the IC",
+   "disagreement": {
+    "kind": "defect",
+    "why": "label families match field-name tokens only; information_coefficient has no 'ic' token"
+   }
+  },
+  {
+   "id": "v047",
+   "category": "labelled_stat",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "gate_ic": 0.041,
+     "t_stat": 5.3
+    }
+   },
+   "title": "Finding",
+   "text": "IC and t of 0.041 and 5.3 respectively",
+   "label": "accept",
+   "reason": "each number matches its statistic",
+   "disagreement": {
+    "kind": "defect",
+    "why": "a label applies to the next number within 24 characters, so 0.041 is read as a t statistic"
+   }
+  },
+  {
+   "id": "v048",
+   "category": "labelled_stat",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "t_threshold": 1.96,
+     "t_stat": 5.3
+    }
+   },
+   "title": "Finding",
+   "text": "t 1.96",
+   "label": "reject",
+   "reason": "1.96 is the threshold, not the t statistic"
+  },
+  {
+   "id": "v049",
+   "category": "labelled_stat",
+   "evidence": {
+    "metrics": {
+     "t_stat": 5.3
+    },
+    "t_threshold": 1.96
+   },
+   "title": "Finding",
+   "text": "above the threshold 1.96",
+   "label": "accept",
+   "reason": "t_threshold is evidence"
+  },
+  {
+   "id": "v050",
+   "category": "labelled_stat",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "gate_ic": 0.041,
+     "t_stat": 5.3
+    }
+   },
+   "title": "Finding",
+   "text": "t-stat 5.3 and IC 0.041",
+   "label": "accept",
+   "reason": "both labels match"
+  },
+  {
+   "id": "v051",
+   "category": "metadata",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "gate_ic": 0.041
+    }
+   },
+   "title": "Finding",
+   "text": "over 412 days",
+   "label": "reject",
+   "reason": "n is metadata"
+  },
+  {
+   "id": "v052",
+   "category": "metadata",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "gate_ic": 0.041
+    }
+   },
+   "title": "Finding",
+   "text": "at sequence 7",
+   "label": "reject",
+   "reason": "seq is metadata"
+  },
+  {
+   "id": "v053",
+   "category": "metadata",
+   "evidence": {
+    "params": {
+     "lookback": 20
+    },
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "lookback 20",
+   "label": "reject",
+   "reason": "params are not evidence"
+  },
+  {
+   "id": "v054",
+   "category": "metadata",
+   "evidence": {
+    "expected_sign": 1,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "sign 1",
+   "label": "reject",
+   "reason": "expected_sign is metadata"
+  },
+  {
+   "id": "v055",
+   "category": "metadata",
+   "evidence": {
+    "id": "r12",
+    "ts": 1700000000,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "at time 1700000000",
+   "label": "reject",
+   "reason": "ts is metadata"
+  },
+  {
+   "id": "v056",
+   "category": "metadata",
+   "evidence": {
+    "results": {
+     "n_obs": 412
+    }
+   },
+   "title": "Finding",
+   "text": "over 412 observations",
+   "label": "accept",
+   "reason": "a count inside results is evidence"
+  },
+  {
+   "id": "v057",
+   "category": "free_text_evidence",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "gate_ic": 0.041,
+     "note": "IC was 0.9"
+    }
+   },
+   "title": "Finding",
+   "text": "IC 0.9",
+   "label": "reject",
+   "reason": "a number planted in prose is not evidence"
+  },
+  {
+   "id": "v058",
+   "category": "free_text_evidence",
+   "evidence": {
+    "metrics": {
+     "gate_ic": 0.041
+    },
+    "hypothesis": "expect t 4.0"
+   },
+   "title": "Finding",
+   "text": "t 4.0",
+   "label": "reject",
+   "reason": "hypothesis is prose"
+  },
+  {
+   "id": "v059",
+   "category": "free_text_evidence",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic_ci": "[0.031, 0.052]"
+    }
+   },
+   "title": "Finding",
+   "text": "CI from 0.031 to 0.052",
+   "label": "accept",
+   "reason": "numbers inside a non-prose string leaf"
+  },
+  {
+   "id": "v060",
+   "category": "free_text_evidence",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "description": "0.77"
+    }
+   },
+   "title": "Finding",
+   "text": "value 0.77",
+   "label": "reject",
+   "reason": "description is prose"
+  },
+  {
+   "id": "v061",
+   "category": "free_text_evidence",
+   "evidence": {
+    "results": {
+     "text": "Sharpe 3.1",
+     "sharpe": 1.1
+    }
+   },
+   "title": "Finding",
+   "text": "Sharpe 1.1",
+   "label": "accept",
+   "reason": "the numeric field"
+  },
+  {
+   "id": "v062",
+   "category": "free_text_evidence",
+   "evidence": {
+    "results": {
+     "text": "Sharpe 3.1",
+     "sharpe": 1.1
+    }
+   },
+   "title": "Finding",
+   "text": "Sharpe 3.1",
+   "label": "reject",
+   "reason": "only the prose holds 3.1"
+  },
+  {
+   "id": "v063",
+   "category": "derived",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic_a": 0.05,
+     "ic_b": 0.03
+    }
+   },
+   "title": "Finding",
+   "text": "the difference was 0.02",
+   "label": "reject",
+   "reason": "a derived difference"
+  },
+  {
+   "id": "v064",
+   "category": "derived",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic_a": 0.06,
+     "ic_b": 0.03
+    }
+   },
+   "title": "Finding",
+   "text": "a ratio of 2",
+   "label": "reject",
+   "reason": "a derived ratio"
+  },
+  {
+   "id": "v065",
+   "category": "derived",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "a": 0.4,
+     "b": 0.6
+    }
+   },
+   "title": "Finding",
+   "text": "mean 0.5",
+   "label": "reject",
+   "reason": "a derived mean"
+  },
+  {
+   "id": "v066",
+   "category": "derived",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "a": 0.4,
+     "b": 0.6
+    }
+   },
+   "title": "Finding",
+   "text": "a sum of 1.0",
+   "label": "reject",
+   "reason": "a derived sum"
+  },
+  {
+   "id": "v067",
+   "category": "derived",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "sharpe": 1.2
+    }
+   },
+   "title": "Finding",
+   "text": "annualised Sharpe 19.05",
+   "label": "reject",
+   "reason": "derived by scaling"
+  },
+  {
+   "id": "v068",
+   "category": "derived",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.041
+    }
+   },
+   "title": "Finding",
+   "text": "IC improved by 0.011 over the 0.030 baseline",
+   "label": "reject",
+   "reason": "neither baseline nor delta stored"
+  },
+  {
+   "id": "v069",
+   "category": "derived",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "a": 0.4,
+     "b": 0.6
+    }
+   },
+   "title": "Finding",
+   "text": "values 0.4 and 0.6",
+   "label": "accept",
+   "reason": "both stored"
+  },
+  {
+   "id": "v070",
+   "category": "number_words",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "three of the signals passed",
+   "label": "reject",
+   "reason": "a count in words"
+  },
+  {
+   "id": "v071",
+   "category": "number_words",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "the IC doubled",
+   "label": "reject",
+   "reason": "a ratio in words"
+  },
+  {
+   "id": "v072",
+   "category": "number_words",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "Twice the baseline",
+   "label": "reject",
+   "reason": "number word, capitalised"
+  },
+  {
+   "id": "v073",
+   "category": "number_words",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "a dozen symbols",
+   "label": "reject",
+   "reason": "number word"
+  },
+  {
+   "id": "v074",
+   "category": "number_words",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "a pair of signals agreed",
+   "label": "reject",
+   "reason": "a quantity (2) in words outside the word list",
+   "disagreement": {
+    "kind": "defect",
+    "why": "the number-word list is closed; 'pair' (and couple, both, single...) pass. Judgement call: the docstring list ends with '...'"
+   }
+  },
+  {
+   "id": "v075",
+   "category": "number_words",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "the signal half-life is short",
+   "label": "accept",
+   "reason": "half-life is a term, not a quantity",
+   "disagreement": {
+    "kind": "defect",
+    "why": "'half' in 'half-life' is refused: a hyphen does not make it an identifier. Fails closed (over-refusal)"
+   }
+  },
+  {
+   "id": "v076",
+   "category": "number_words",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "see field ic_first_half",
+   "label": "accept",
+   "reason": "an identifier, not a word"
+  },
+  {
+   "id": "v077",
+   "category": "number_words",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "IC 0.04 in the first period",
+   "label": "accept",
+   "reason": "the ordinal 'first' is not a quantity"
+  },
+  {
+   "id": "v078",
+   "category": "sign_zero",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": -0.041
+    }
+   },
+   "title": "Finding",
+   "text": "IC -0.041",
+   "label": "accept",
+   "reason": "negative value stored"
+  },
+  {
+   "id": "v079",
+   "category": "sign_zero",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.041
+    }
+   },
+   "title": "Finding",
+   "text": "IC -0.041",
+   "label": "reject",
+   "reason": "sign flipped"
+  },
+  {
+   "id": "v080",
+   "category": "sign_zero",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": -0.041
+    }
+   },
+   "title": "Finding",
+   "text": "IC 0.041",
+   "label": "reject",
+   "reason": "sign dropped"
+  },
+  {
+   "id": "v081",
+   "category": "sign_zero",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.041
+    }
+   },
+   "title": "Finding",
+   "text": "IC +0.041",
+   "label": "accept",
+   "reason": "explicit plus"
+  },
+  {
+   "id": "v082",
+   "category": "sign_zero",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.0
+    }
+   },
+   "title": "Finding",
+   "text": "IC -0.0",
+   "label": "accept",
+   "reason": "negative zero equals zero"
+  },
+  {
+   "id": "v083",
+   "category": "sign_zero",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": -0.0
+    }
+   },
+   "title": "Finding",
+   "text": "IC 0.0",
+   "label": "accept",
+   "reason": "zero equals negative zero"
+  },
+  {
+   "id": "v084",
+   "category": "sign_zero",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0
+    }
+   },
+   "title": "Finding",
+   "text": "IC -0",
+   "label": "accept",
+   "reason": "-0 equals 0"
+  },
+  {
+   "id": "v085",
+   "category": "sign_zero",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": -0.0004
+    }
+   },
+   "title": "Finding",
+   "text": "IC -0.000",
+   "label": "accept",
+   "reason": "-0.0004 rounds to -0.000"
+  },
+  {
+   "id": "v086",
+   "category": "scientific",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "p_value": 1.2e-05
+    }
+   },
+   "title": "Finding",
+   "text": "p = 1.2e-5",
+   "label": "accept",
+   "reason": "same value"
+  },
+  {
+   "id": "v087",
+   "category": "scientific",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "p_value": 1e-05
+    }
+   },
+   "title": "Finding",
+   "text": "p 1e-5",
+   "label": "accept",
+   "reason": "same value"
+  },
+  {
+   "id": "v088",
+   "category": "scientific",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "p_value": 1.2e-05
+    }
+   },
+   "title": "Finding",
+   "text": "p 1.3e-5",
+   "label": "reject",
+   "reason": "different value"
+  },
+  {
+   "id": "v089",
+   "category": "scientific",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 300
+    }
+   },
+   "title": "Finding",
+   "text": "x 3.0e2",
+   "label": "accept",
+   "reason": "300"
+  },
+  {
+   "id": "v090",
+   "category": "scientific",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "p_value": 1.2e-05
+    }
+   },
+   "title": "Finding",
+   "text": "p 0.000012",
+   "label": "accept",
+   "reason": "same value in fixed notation"
+  },
+  {
+   "id": "v091",
+   "category": "scientific",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "p_value": 1.25e-05
+    }
+   },
+   "title": "Finding",
+   "text": "p 1.2E-5",
+   "label": "accept",
+   "reason": "half-even of 1.25e-5"
+  },
+  {
+   "id": "v092",
+   "category": "scientific",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "p_value": 1.2e-05
+    }
+   },
+   "title": "Finding",
+   "text": "p 1.2e-6",
+   "label": "reject",
+   "reason": "off by a factor of ten"
+  },
+  {
+   "id": "v093",
+   "category": "thousands",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "n_trades": 1234
+    }
+   },
+   "title": "Finding",
+   "text": "1,234 trades",
+   "label": "accept",
+   "reason": "1,234 is 1234",
+   "disagreement": {
+    "kind": "defect",
+    "why": "no thousands-separator parsing: '1,234' is read as 1 and 234. Fails closed here"
+   }
+  },
+  {
+   "id": "v094",
+   "category": "thousands",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "n_trades": 1234
+    }
+   },
+   "title": "Finding",
+   "text": "1234 trades",
+   "label": "accept",
+   "reason": "verbatim"
+  },
+  {
+   "id": "v095",
+   "category": "thousands",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "pnl": 1234.5
+    }
+   },
+   "title": "Finding",
+   "text": "PnL 1,234.5",
+   "label": "accept",
+   "reason": "1,234.5 is 1234.5",
+   "disagreement": {
+    "kind": "defect",
+    "why": "no thousands-separator parsing: '1,234.5' is read as 1 and 234.5"
+   }
+  },
+  {
+   "id": "v096",
+   "category": "thousands",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "n_trades": 1234
+    }
+   },
+   "title": "Finding",
+   "text": "1\u00a0234 trades",
+   "label": "accept",
+   "reason": "a non-breaking-space separator: 1234",
+   "disagreement": {
+    "kind": "defect",
+    "why": "no thousands-separator parsing: '1 234' (no-break space) is read as 1 and 234"
+   }
+  },
+  {
+   "id": "v097",
+   "category": "thousands",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "n_trades": 1234
+    }
+   },
+   "title": "Finding",
+   "text": "1,235 trades",
+   "label": "reject",
+   "reason": "1235 is not stored"
+  },
+  {
+   "id": "v098",
+   "category": "thousands",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "n_trades": 1,
+     "other": 234
+    }
+   },
+   "title": "Finding",
+   "text": "1,234 trades",
+   "label": "reject",
+   "reason": "1,234 means 1234, which is not stored",
+   "disagreement": {
+    "kind": "defect",
+    "why": "no thousands-separator parsing: '1,234' verifies against stored 1 and 234 separately (false accept)"
+   }
+  },
+  {
+   "id": "v099",
+   "category": "ranges_lists",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "lo": 0.41,
+     "hi": 0.52
+    }
+   },
+   "title": "Finding",
+   "text": "IC from 0.41 to 0.52",
+   "label": "accept",
+   "reason": "both ends stored"
+  },
+  {
+   "id": "v100",
+   "category": "ranges_lists",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "lo": 0.41
+    }
+   },
+   "title": "Finding",
+   "text": "IC from 0.41 to 0.52",
+   "label": "reject",
+   "reason": "0.52 not stored"
+  },
+  {
+   "id": "v101",
+   "category": "ranges_lists",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "lo": 0.41
+    }
+   },
+   "title": "Finding",
+   "text": "IC between 0.41-0.99",
+   "label": "reject",
+   "reason": "0.99 not stored",
+   "disagreement": {
+    "kind": "defect",
+    "why": "a number preceded by '-' that is glued to a digit is never extracted, so the upper end of '0.41-0.99' is unchecked"
+   }
+  },
+  {
+   "id": "v102",
+   "category": "ranges_lists",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "lo": 0.41,
+     "hi": 0.52
+    }
+   },
+   "title": "Finding",
+   "text": "IC 0.41\u20130.52",
+   "label": "accept",
+   "reason": "en-dash range, both stored",
+   "disagreement": {
+    "kind": "mislabel",
+    "why": "the evidence fields are lo/hi and the text labels the number 'IC': by the documented labelled-statistic rule a reviewer must reject"
+   }
+  },
+  {
+   "id": "v103",
+   "category": "ranges_lists",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "lo": 0.41
+    }
+   },
+   "title": "Finding",
+   "text": "IC 0.41\u20130.99",
+   "label": "reject",
+   "reason": "0.99 not stored"
+  },
+  {
+   "id": "v104",
+   "category": "ranges_lists",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "a": 0.1,
+     "b": 0.2,
+     "cc": 0.3
+    }
+   },
+   "title": "Finding",
+   "text": "values 0.1, 0.2 and 0.3",
+   "label": "accept",
+   "reason": "all stored"
+  },
+  {
+   "id": "v105",
+   "category": "ranges_lists",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "a": 0.1,
+     "b": 0.2
+    }
+   },
+   "title": "Finding",
+   "text": "values 0.1, 0.2, 0.3",
+   "label": "reject",
+   "reason": "0.3 not stored"
+  },
+  {
+   "id": "v106",
+   "category": "ranges_lists",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "a": 1.2
+    }
+   },
+   "title": "Finding",
+   "text": "ratio 1.2/1.5",
+   "label": "reject",
+   "reason": "1.5 not stored",
+   "disagreement": {
+    "kind": "defect",
+    "why": "a number after '/' is never extracted, so '1.2/1.5' checks only 1.2"
+   }
+  },
+  {
+   "id": "v107",
+   "category": "ranges_lists",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "a": 0.41
+    }
+   },
+   "title": "Finding",
+   "text": "IC:0.99",
+   "label": "reject",
+   "reason": "0.99 not stored (colon glued)",
+   "disagreement": {
+    "kind": "defect",
+    "why": "a number after ':' is never extracted, so 'IC:0.99' checks nothing"
+   }
+  },
+  {
+   "id": "v108",
+   "category": "ranges_lists",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "a": 0.41
+    }
+   },
+   "title": "Finding",
+   "text": "[0.41, 0.77]",
+   "label": "reject",
+   "reason": "0.77 not stored"
+  },
+  {
+   "id": "v109",
+   "category": "units",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "spread_bps": 12
+    }
+   },
+   "title": "Finding",
+   "text": "spread 12bps",
+   "label": "accept",
+   "reason": "12 stored"
+  },
+  {
+   "id": "v110",
+   "category": "units",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "spread_bps": 12
+    }
+   },
+   "title": "Finding",
+   "text": "spread 99bps",
+   "label": "reject",
+   "reason": "99 is a quantity, not stored",
+   "disagreement": {
+    "kind": "defect",
+    "why": "digits glued to letters are skipped as identifiers, so a unit-suffixed integer like 99bps is unchecked (documented as an identifier rule, but it lets quantities through)"
+   }
+  },
+  {
+   "id": "v111",
+   "category": "units",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "lev": 1.5
+    }
+   },
+   "title": "Finding",
+   "text": "leverage 1.5x",
+   "label": "accept",
+   "reason": "1.5 stored",
+   "disagreement": {
+    "kind": "defect",
+    "why": "regex backtracking on '1.5x' extracts '1' (followed by '.'), which does not equal 1.5; fails closed"
+   }
+  },
+  {
+   "id": "v112",
+   "category": "units",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "lev": 1.5
+    }
+   },
+   "title": "Finding",
+   "text": "leverage 2.5x",
+   "label": "reject",
+   "reason": "2.5 not stored"
+  },
+  {
+   "id": "v113",
+   "category": "units",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "lat": 5
+    }
+   },
+   "title": "Finding",
+   "text": "latency 5ms",
+   "label": "accept",
+   "reason": "5 stored"
+  },
+  {
+   "id": "v114",
+   "category": "units",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "spread_bps": 0.99
+    }
+   },
+   "title": "Finding",
+   "text": "spread 0.99bps",
+   "label": "accept",
+   "reason": "0.99 stored",
+   "disagreement": {
+    "kind": "defect",
+    "why": "regex backtracking on '0.99bps' extracts '0'; fails closed"
+   }
+  },
+  {
+   "id": "v115",
+   "category": "units",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "lev": 2.0
+    }
+   },
+   "title": "Finding",
+   "text": "leverage 2.0x",
+   "label": "accept",
+   "reason": "2.0 stored"
+  },
+  {
+   "id": "v116",
+   "category": "units",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "spread_bps": 12
+    }
+   },
+   "title": "Finding",
+   "text": "spread 12 bps",
+   "label": "accept",
+   "reason": "12 stored"
+  },
+  {
+   "id": "v117",
+   "category": "identifiers",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "symbol EQ02 had IC 0.04",
+   "label": "accept",
+   "reason": "EQ02 is an identifier"
+  },
+  {
+   "id": "v118",
+   "category": "identifiers",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "run r12 had IC 0.04",
+   "label": "accept",
+   "reason": "r12 is an identifier"
+  },
+  {
+   "id": "v119",
+   "category": "identifiers",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "under protocol v1.13 IC 0.04",
+   "label": "accept",
+   "reason": "a version is an identifier"
+  },
+  {
+   "id": "v120",
+   "category": "identifiers",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "ticker 0700.HK had IC 0.04",
+   "label": "accept",
+   "reason": "0700.HK is a ticker",
+   "disagreement": {
+    "kind": "defect",
+    "why": "'0700.HK': the trailing '.' is not in the lookahead set, so 0700 is read as a number"
+   }
+  },
+  {
+   "id": "v121",
+   "category": "identifiers",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "see report:eval.r1 with IC 0.04",
+   "label": "accept",
+   "reason": "the citation is stripped"
+  },
+  {
+   "id": "v122",
+   "category": "identifiers",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "bar size 10s, IC 0.04",
+   "label": "accept",
+   "reason": "10s is a bar label"
+  },
+  {
+   "id": "v123",
+   "category": "identifiers",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "experiment exp_2024 IC 0.04",
+   "label": "accept",
+   "reason": "glued identifier"
+  },
+  {
+   "id": "v124",
+   "category": "identifiers",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Finding",
+   "text": "IC 0.04 on 2026-11-18",
+   "label": "reject",
+   "reason": "a free-standing date is a written number not in evidence (documented rule)"
+  },
+  {
+   "id": "v125",
+   "category": "title",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "IC 0.09 holds",
+   "text": "the IC held",
+   "label": "reject",
+   "reason": "title number not stored"
+  },
+  {
+   "id": "v126",
+   "category": "title",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "IC 0.04 holds",
+   "text": "the IC held",
+   "label": "accept",
+   "reason": "title number stored"
+  },
+  {
+   "id": "v127",
+   "category": "title",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "Three signals hold",
+   "text": "the IC held",
+   "label": "reject",
+   "reason": "number word in the title"
+  },
+  {
+   "id": "v128",
+   "category": "title",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "sharpe": 1.2
+    }
+   },
+   "title": "IC 1.2",
+   "text": "ok",
+   "label": "reject",
+   "reason": "labelled statistic on the wrong field in the title"
+  },
+  {
+   "id": "v129",
+   "category": "title",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "IC up 2x",
+   "text": "IC 0.04",
+   "label": "reject",
+   "reason": "a derived multiple in the title",
+   "disagreement": {
+    "kind": "defect",
+    "why": "'2x' is a glued unit and is skipped, so a derived multiple in the title is unchecked"
+   }
+  },
+  {
+   "id": "v130",
+   "category": "title",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.04
+    }
+   },
+   "title": "EQ02 study",
+   "text": "IC 0.04",
+   "label": "accept",
+   "reason": "glued identifier in the title"
+  },
+  {
+   "id": "v131",
+   "category": "lookalike_digits",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": -0.41
+    }
+   },
+   "title": "Finding",
+   "text": "IC \u22120.41",
+   "label": "accept",
+   "reason": "unicode minus, value -0.41 stored",
+   "disagreement": {
+    "kind": "defect",
+    "why": "U+2212 minus is not a sign to the regex; the number is read as +0.41 and fails against -0.41"
+   }
+  },
+  {
+   "id": "v132",
+   "category": "lookalike_digits",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.41
+    }
+   },
+   "title": "Finding",
+   "text": "IC \u22120.41",
+   "label": "reject",
+   "reason": "unicode minus flips the sign: -0.41 not stored",
+   "disagreement": {
+    "kind": "defect",
+    "why": "U+2212 minus is dropped, so '-0.41' verifies against a stored +0.41 (false accept, sign flip)"
+   }
+  },
+  {
+   "id": "v133",
+   "category": "lookalike_digits",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.41
+    }
+   },
+   "title": "Finding",
+   "text": "IC \uff10.\uff14\uff11",
+   "label": "accept",
+   "reason": "full-width digits, same value"
+  },
+  {
+   "id": "v134",
+   "category": "lookalike_digits",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.41
+    }
+   },
+   "title": "Finding",
+   "text": "IC \u0660.\u0664\u0661",
+   "label": "accept",
+   "reason": "Arabic-Indic digits, same value"
+  },
+  {
+   "id": "v135",
+   "category": "lookalike_digits",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.52
+    }
+   },
+   "title": "Finding",
+   "text": "IC O.41",
+   "label": "reject",
+   "reason": "letter O disguises the claim 0.41, not stored",
+   "disagreement": {
+    "kind": "defect",
+    "why": "letter O in place of zero: no number is extracted at all, so the claim is unchecked"
+   }
+  },
+  {
+   "id": "v136",
+   "category": "lookalike_digits",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.52
+    }
+   },
+   "title": "Finding",
+   "text": "IC 0.4l",
+   "label": "reject",
+   "reason": "letter l disguises a number that is not stored"
+  },
+  {
+   "id": "v137",
+   "category": "lookalike_digits",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.41
+    }
+   },
+   "title": "Finding",
+   "text": "IC 0.4\u200b1",
+   "label": "accept",
+   "reason": "zero-width space; renders as 0.41, stored",
+   "disagreement": {
+    "kind": "defect",
+    "why": "a zero-width space splits 0.41 into 0.4 and 1; fails closed"
+   }
+  },
+  {
+   "id": "v138",
+   "category": "lookalike_digits",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.41
+    }
+   },
+   "title": "Finding",
+   "text": "IC 0.9\u200b9",
+   "label": "reject",
+   "reason": "renders as 0.99, not stored"
+  },
+  {
+   "id": "v139",
+   "category": "lookalike_digits",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.41
+    }
+   },
+   "title": "Finding",
+   "text": "IC \ud835\udfce.\ud835\udfd2\ud835\udfcf",
+   "label": "accept",
+   "reason": "mathematical bold digits, same value"
+  },
+  {
+   "id": "v140",
+   "category": "lookalike_digits",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "ic": 0.41
+    }
+   },
+   "title": "Finding",
+   "text": "IC \u2212\u200b0.41",
+   "label": "reject",
+   "reason": "hidden minus: -0.41 not stored",
+   "disagreement": {
+    "kind": "defect",
+    "why": "U+2212 followed by a zero-width space: the hidden minus is dropped (false accept, sign flip)"
+   }
+  },
+  {
+   "id": "v141",
+   "category": "long_decimal",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 0.123456789012345
+    }
+   },
+   "title": "Finding",
+   "text": "x 0.123456789012345",
+   "label": "accept",
+   "reason": "verbatim repr"
+  },
+  {
+   "id": "v142",
+   "category": "long_decimal",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 0.123456789012345
+    }
+   },
+   "title": "Finding",
+   "text": "x 0.1234567890123456789",
+   "label": "reject",
+   "reason": "claims digits beyond the stored value"
+  },
+  {
+   "id": "v143",
+   "category": "long_decimal",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 12345.6
+    }
+   },
+   "title": "Finding",
+   "text": "x 12345.600000000000000000000000",
+   "label": "accept",
+   "reason": "same value with trailing zeros",
+   "disagreement": {
+    "kind": "defect",
+    "why": "Decimal.quantize raises InvalidOperation when the written precision exceeds the 28-digit context: verify_finding crashes"
+   }
+  },
+  {
+   "id": "v144",
+   "category": "long_decimal",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 12345.6
+    }
+   },
+   "title": "Finding",
+   "text": "x 12345.600000000000000000000001",
+   "label": "reject",
+   "reason": "a different value"
+  },
+  {
+   "id": "v145",
+   "category": "long_decimal",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 0.3333333333333333
+    }
+   },
+   "title": "Finding",
+   "text": "x 0.3333333333",
+   "label": "accept",
+   "reason": "rounds at 10 dp"
+  },
+  {
+   "id": "v146",
+   "category": "long_decimal",
+   "evidence": {
+    "seq": 7,
+    "n": 412,
+    "metrics": {
+     "x": 1e-300
+    }
+   },
+   "title": "Finding",
+   "text": "x 1.0e-400",
+   "label": "reject",
+   "reason": "a different magnitude"
+  }
+ ]
+}
