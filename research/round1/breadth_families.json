@@ -1,0 +1,2472 @@
+{
+ "bonferroni_k": 7,
+ "one_sided_threshold": 0.0035714285714285718,
+ "pooled": {
+  "closing_imbalance_d0": {
+   "sessions": 0
+  },
+  "closing_imbalance_d1": {
+   "sessions": 0
+  },
+  "closing_imbalance_d1_mid_exit": {
+   "sessions": 0
+  },
+  "momentum_30_d0": {
+   "mean": -6.269798574522949,
+   "n": 10,
+   "p_one_sided": 0.9995713318023492,
+   "positive_sessions": 1,
+   "se": 1.281705152105526,
+   "sessions": 10,
+   "t": -4.891763573098863
+  },
+  "momentum_30_d1": {
+   "mean": -5.7808393034589525,
+   "n": 10,
+   "p_one_sided": 0.9994452226244047,
+   "positive_sessions": 1,
+   "se": 1.2281984394040992,
+   "sessions": 10,
+   "t": -4.70676327048886
+  },
+  "open_reversal_d0": {
+   "mean": -9.965164700984825,
+   "n": 10,
+   "p_one_sided": 0.9465613893847782,
+   "positive_sessions": 3,
+   "se": 5.56356952943697,
+   "sessions": 10,
+   "t": -1.7911458908276274
+  },
+  "open_reversal_d1": {
+   "mean": -10.571706445966706,
+   "n": 10,
+   "p_one_sided": 0.9595280465656141,
+   "positive_sessions": 2,
+   "se": 5.379017786865838,
+   "sessions": 10,
+   "t": -1.9653600089927314
+  },
+  "overnight_gap_d1": {
+   "sessions": 0
+  }
+ },
+ "prespec": "research/round1/FAMILIES_PRESPEC_2026-11-18.md",
+ "primary": [
+  "momentum_30_d1",
+  "open_reversal_d1",
+  "closing_imbalance_d1"
+ ],
+ "sessions": {
+  "2019-01-30": {
+   "closing_imbalance_d0": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 1.9989661765380828,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 0,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 1.9132423633788818,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1_mid_exit": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 4.473057180753489,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "mid",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "missing": 0,
+   "momentum_30_d0": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": 3.342362209058476,
+     "n": 11,
+     "se": 2.3331830290898377,
+     "t": 1.4325332249490577
+    },
+    "median_names_used": 500.0,
+    "median_round_trip_cost_bps": 4.3100415550091125,
+    "net_bps_per_rebalance": {
+     "mean": -4.912270385632038,
+     "n": 11,
+     "se": 2.571831402214191,
+     "t": -1.9100281540239656
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 0,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": 0.026802389924086536,
+     "n": 11,
+     "se": 0.03206110071900162,
+     "t": 0.8359784699532038
+    },
+    "rebalances": 11,
+    "session_net_bps": -4.912270385632038
+   },
+   "momentum_30_d1": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": 3.8516838845163592,
+     "n": 11,
+     "se": 2.560370187339583,
+     "t": 1.5043464822243333
+    },
+    "median_names_used": 500.0,
+    "median_round_trip_cost_bps": 4.212832413559219,
+    "net_bps_per_rebalance": {
+     "mean": -4.012736509902917,
+     "n": 11,
+     "se": 2.7396539254531516,
+     "t": -1.4646873725991472
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 1,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": 0.04158792248914341,
+     "n": 11,
+     "se": 0.03403659893047516,
+     "t": 1.2218589340871853
+    },
+    "rebalances": 11,
+    "session_net_bps": -4.012736509902917
+   },
+   "names": 500,
+   "open_reversal_d0": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": -4.847468536861489,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 500.0,
+    "median_round_trip_cost_bps": 8.396770881984022,
+    "net_bps_per_rebalance": {
+     "mean": -21.190538429135636,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 0,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": -0.038132367440108575,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": -21.190538429135636
+   },
+   "open_reversal_d1": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": -6.3044361993497064,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 500.0,
+    "median_round_trip_cost_bps": 7.7701518315521305,
+    "net_bps_per_rebalance": {
+     "mean": -20.176369448261806,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 1,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": -0.058153418110045554,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": -20.176369448261806
+   },
+   "overnight_gap_d1": {
+    "defined": false,
+    "family": "overnight_gap"
+   }
+  },
+  "2019-03-27": {
+   "closing_imbalance_d0": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 1.5636010209479752,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 0,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 1.5893207747691234,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1_mid_exit": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 3.6471992036052248,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "mid",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "missing": 2,
+   "momentum_30_d0": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": -4.380884420413524,
+     "n": 11,
+     "se": 5.191673319958381,
+     "t": -0.843828983532547
+    },
+    "median_names_used": 498.0,
+    "median_round_trip_cost_bps": 3.6978268049693432,
+    "net_bps_per_rebalance": {
+     "mean": -10.56670548688515,
+     "n": 11,
+     "se": 5.201436963299474,
+     "t": -2.031497365332344
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 0,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": -0.13333889028332951,
+     "n": 11,
+     "se": 0.05279619472627649,
+     "t": -2.5255397851043835
+    },
+    "rebalances": 11,
+    "session_net_bps": -10.56670548688515
+   },
+   "momentum_30_d1": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": -3.275632158021122,
+     "n": 11,
+     "se": 4.904802731896348,
+     "t": -0.6678417740879583
+    },
+    "median_names_used": 498.0,
+    "median_round_trip_cost_bps": 3.7262581584579437,
+    "net_bps_per_rebalance": {
+     "mean": -9.510703203999988,
+     "n": 11,
+     "se": 4.888798229214893,
+     "t": -1.9454071855870683
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 1,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": -0.11545700454730472,
+     "n": 11,
+     "se": 0.051585290673134304,
+     "t": -2.238176872529186
+    },
+    "rebalances": 11,
+    "session_net_bps": -9.510703203999988
+   },
+   "names": 498,
+   "open_reversal_d0": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": 5.874868976041881,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 498.0,
+    "median_round_trip_cost_bps": 6.7910683440604025,
+    "net_bps_per_rebalance": {
+     "mean": -3.9704360116197797,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 0,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": 0.0686957794980392,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": -3.9704360116197797
+   },
+   "open_reversal_d1": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": 4.478103481102558,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 498.0,
+    "median_round_trip_cost_bps": 6.464466131298237,
+    "net_bps_per_rebalance": {
+     "mean": -4.914633608812903,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 1,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": 0.0330234402634614,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": -4.914633608812903
+   },
+   "overnight_gap_d1": {
+    "defined": false,
+    "family": "overnight_gap"
+   }
+  },
+  "2019-07-30": {
+   "closing_imbalance_d0": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 1.240156264457083,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 0,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 1.3280223959954323,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1_mid_exit": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 3.748130961991511,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "mid",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "missing": 10,
+   "momentum_30_d0": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": 4.151736696712959,
+     "n": 11,
+     "se": 2.3691252901734883,
+     "t": 1.7524344170117454
+    },
+    "median_names_used": 490.0,
+    "median_round_trip_cost_bps": 3.110125113566499,
+    "net_bps_per_rebalance": {
+     "mean": -1.3711014146137674,
+     "n": 11,
+     "se": 2.420075891623825,
+     "t": -0.5665530652816777
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 0,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": 0.061959511446708554,
+     "n": 11,
+     "se": 0.03728130023153726,
+     "t": 1.6619460979608036
+    },
+    "rebalances": 11,
+    "session_net_bps": -1.3711014146137674
+   },
+   "momentum_30_d1": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": 4.573732385582403,
+     "n": 11,
+     "se": 2.054290817847618,
+     "t": 2.2264288706574313
+    },
+    "median_names_used": 490.0,
+    "median_round_trip_cost_bps": 3.0882414627361894,
+    "net_bps_per_rebalance": {
+     "mean": -0.9016387547655981,
+     "n": 11,
+     "se": 2.198538173538157,
+     "t": -0.41010830087820155
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 1,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": 0.06721188381680142,
+     "n": 11,
+     "se": 0.03632551818387282,
+     "t": 1.8502663465552707
+    },
+    "rebalances": 11,
+    "session_net_bps": -0.9016387547655981
+   },
+   "names": 490,
+   "open_reversal_d0": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": 41.21979045974595,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 490.0,
+    "median_round_trip_cost_bps": 7.868148606175684,
+    "net_bps_per_rebalance": {
+     "mean": 29.265777128830223,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 0,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": 0.2554820421616207,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": 29.265777128830223
+   },
+   "open_reversal_d1": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": 39.11923099081489,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 490.0,
+    "median_round_trip_cost_bps": 7.565931462604095,
+    "net_bps_per_rebalance": {
+     "mean": 27.475652167499014,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 1,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": 0.2633725581117679,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": 27.475652167499014
+   },
+   "overnight_gap_d1": {
+    "defined": false,
+    "family": "overnight_gap"
+   }
+  },
+  "2019-08-30": {
+   "closing_imbalance_d0": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 1.7946974934627369,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 0,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 1.7115772102803926,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1_mid_exit": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 4.8804062786629565,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "mid",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "missing": 12,
+   "momentum_30_d0": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": -4.832169175084641,
+     "n": 11,
+     "se": 2.206547943492752,
+     "t": -2.189922584431039
+    },
+    "median_names_used": 488.0,
+    "median_round_trip_cost_bps": 4.01870990326278,
+    "net_bps_per_rebalance": {
+     "mean": -12.168507588455896,
+     "n": 11,
+     "se": 2.5379172636893,
+     "t": -4.794682538534323
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 0,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": -0.09109234921330076,
+     "n": 11,
+     "se": 0.03286511107415622,
+     "t": -2.771703677123187
+    },
+    "rebalances": 11,
+    "session_net_bps": -12.168507588455896
+   },
+   "momentum_30_d1": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": -4.086501175632907,
+     "n": 11,
+     "se": 2.235120645280009,
+     "t": -1.8283134667752854
+    },
+    "median_names_used": 488.0,
+    "median_round_trip_cost_bps": 4.096195751723859,
+    "net_bps_per_rebalance": {
+     "mean": -11.284679192593982,
+     "n": 11,
+     "se": 2.3728971299487864,
+     "t": -4.755654617373799
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 1,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": -0.0787839728797042,
+     "n": 11,
+     "se": 0.034658453816691207,
+     "t": -2.273153133039147
+    },
+    "rebalances": 11,
+    "session_net_bps": -11.284679192593982
+   },
+   "names": 488,
+   "open_reversal_d0": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": -7.012734898301301,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 488.0,
+    "median_round_trip_cost_bps": 8.838070057871072,
+    "net_bps_per_rebalance": {
+     "mean": -20.200592766035932,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 0,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": -0.10751420594238892,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": -20.200592766035932
+   },
+   "open_reversal_d1": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": -5.037337132510593,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 488.0,
+    "median_round_trip_cost_bps": 8.383364728523464,
+    "net_bps_per_rebalance": {
+     "mean": -18.809845577742593,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 1,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": -0.07484647297025405,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": -18.809845577742593
+   },
+   "overnight_gap_d1": {
+    "defined": false,
+    "family": "overnight_gap"
+   }
+  },
+  "2019-10-18": {
+   "closing_imbalance_d0": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 1.557680924639397,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 0,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 1.5843675732770004,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1_mid_exit": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 3.9274736054195762,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "mid",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "missing": 15,
+   "momentum_30_d0": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": 7.440761024956594,
+     "n": 11,
+     "se": 2.606798831990808,
+     "t": 2.854367177721227
+    },
+    "median_names_used": 485.0,
+    "median_round_trip_cost_bps": 3.8733754911824563,
+    "net_bps_per_rebalance": {
+     "mean": 1.2240638656920615,
+     "n": 11,
+     "se": 2.567487858249237,
+     "t": 0.47675546420178494
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 0,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": 0.0786881114644584,
+     "n": 11,
+     "se": 0.04614087128845818,
+     "t": 1.705388504099221
+    },
+    "rebalances": 11,
+    "session_net_bps": 1.2240638656920615
+   },
+   "momentum_30_d1": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": 7.690002969250276,
+     "n": 11,
+     "se": 3.328361913895427,
+     "t": 2.3104467507411477
+    },
+    "median_names_used": 485.0,
+    "median_round_trip_cost_bps": 4.057002989270189,
+    "net_bps_per_rebalance": {
+     "mean": 1.3715808090525266,
+     "n": 11,
+     "se": 3.267325072466524,
+     "t": 0.4197870669835468
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 1,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": 0.08248479286665496,
+     "n": 11,
+     "se": 0.04976975877336393,
+     "t": 1.6573275599398654
+    },
+    "rebalances": 11,
+    "session_net_bps": 1.3715808090525266
+   },
+   "names": 485,
+   "open_reversal_d0": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": -14.742458249020855,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 485.0,
+    "median_round_trip_cost_bps": 8.181297553792032,
+    "net_bps_per_rebalance": {
+     "mean": -27.54374728925523,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 0,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": -0.13547619084561516,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": -27.54374728925523
+   },
+   "open_reversal_d1": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": -17.384624661867996,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 485.0,
+    "median_round_trip_cost_bps": 7.093654125273929,
+    "net_bps_per_rebalance": {
+     "mean": -29.058728243008524,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 1,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": -0.13789930454892144,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": -29.058728243008524
+   },
+   "overnight_gap_d1": {
+    "defined": false,
+    "family": "overnight_gap"
+   }
+  },
+  "2019-10-30": {
+   "closing_imbalance_d0": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 2.6932399676811203,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 0,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 2.514258492238881,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1_mid_exit": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 5.158207801911547,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "mid",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "missing": 15,
+   "momentum_30_d0": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": 0.482996320160392,
+     "n": 11,
+     "se": 3.176908771011753,
+     "t": 0.15203342461942077
+    },
+    "median_names_used": 485.0,
+    "median_round_trip_cost_bps": 4.24188152895499,
+    "net_bps_per_rebalance": {
+     "mean": -7.9366125165616515,
+     "n": 11,
+     "se": 3.264333379428778,
+     "t": -2.4313118772049167
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 0,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": 0.003003443557341723,
+     "n": 11,
+     "se": 0.04002755412367137,
+     "t": 0.0750344012542489
+    },
+    "rebalances": 11,
+    "session_net_bps": -7.9366125165616515
+   },
+   "momentum_30_d1": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": 0.9548143993009837,
+     "n": 11,
+     "se": 2.9310207108669837,
+     "t": 0.32576173745921894
+    },
+    "median_names_used": 485.0,
+    "median_round_trip_cost_bps": 4.164681768408096,
+    "net_bps_per_rebalance": {
+     "mean": -7.143689653003807,
+     "n": 11,
+     "se": 2.813396031126272,
+     "t": -2.5391695921828723
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 1,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": 0.007635029143461203,
+     "n": 11,
+     "se": 0.03963132436181727,
+     "t": 0.1926513753049635
+    },
+    "rebalances": 11,
+    "session_net_bps": -7.143689653003807
+   },
+   "names": 485,
+   "open_reversal_d0": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": -3.871946602120996,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 485.0,
+    "median_round_trip_cost_bps": 9.178058349370172,
+    "net_bps_per_rebalance": {
+     "mean": -17.730331739546052,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 0,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": -0.06727860559317884,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": -17.730331739546052
+   },
+   "open_reversal_d1": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": -5.608363696312374,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 485.0,
+    "median_round_trip_cost_bps": 8.413973142187121,
+    "net_bps_per_rebalance": {
+     "mean": -19.78377675330742,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 1,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": -0.06873121000154706,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": -19.78377675330742
+   },
+   "overnight_gap_d1": {
+    "defined": false,
+    "family": "overnight_gap"
+   }
+  },
+  "2019-12-30": {
+   "closing_imbalance_d0": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 1.3361838588989845,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 0,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 1.352265043948614,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1_mid_exit": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 3.8769206821282225,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "mid",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "missing": 21,
+   "momentum_30_d0": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": -1.8974720620553853,
+     "n": 11,
+     "se": 1.5340082676683993,
+     "t": -1.236937311256757
+    },
+    "median_names_used": 479.0,
+    "median_round_trip_cost_bps": 3.376674691300994,
+    "net_bps_per_rebalance": {
+     "mean": -7.814879052468126,
+     "n": 11,
+     "se": 1.9265367933086335,
+     "t": -4.056439035896561
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 0,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": 0.001539173594456122,
+     "n": 11,
+     "se": 0.047320940739238766,
+     "t": 0.032526267872350884
+    },
+    "rebalances": 11,
+    "session_net_bps": -7.814879052468126
+   },
+   "momentum_30_d1": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": -1.557432380892621,
+     "n": 11,
+     "se": 1.402988730028264,
+     "t": -1.11008188986753
+    },
+    "median_names_used": 479.0,
+    "median_round_trip_cost_bps": 3.252826086093951,
+    "net_bps_per_rebalance": {
+     "mean": -7.481321805364217,
+     "n": 11,
+     "se": 1.7912722584770235,
+     "t": -4.176540874766291
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 1,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": 0.015007312562578047,
+     "n": 11,
+     "se": 0.04382641792222625,
+     "t": 0.3424261729354613
+    },
+    "rebalances": 11,
+    "session_net_bps": -7.481321805364217
+   },
+   "names": 479,
+   "open_reversal_d0": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": -16.286443183767073,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 479.0,
+    "median_round_trip_cost_bps": 8.539314353575422,
+    "net_bps_per_rebalance": {
+     "mean": -27.803443406884657,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 0,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": -0.11014531365256258,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": -27.803443406884657
+   },
+   "open_reversal_d1": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": -16.14532108331009,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 479.0,
+    "median_round_trip_cost_bps": 8.377580881373362,
+    "net_bps_per_rebalance": {
+     "mean": -28.304151558554825,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 1,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": -0.10467110364844467,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": -28.304151558554825
+   },
+   "overnight_gap_d1": {
+    "defined": false,
+    "family": "overnight_gap"
+   }
+  },
+  "2020-01-30": {
+   "closing_imbalance_d0": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 2.5400050800101597,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 0,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 2.538715410002539,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1_mid_exit": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 5.1460156402672155,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "mid",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "missing": 21,
+   "momentum_30_d0": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": 1.526546640356508,
+     "n": 11,
+     "se": 2.968434176838603,
+     "t": 0.5142598923929274
+    },
+    "median_names_used": 479.0,
+    "median_round_trip_cost_bps": 4.613078137701792,
+    "net_bps_per_rebalance": {
+     "mean": -5.883286856245118,
+     "n": 11,
+     "se": 3.132706750890578,
+     "t": -1.8780202949326792
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 0,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": 0.02847574012656591,
+     "n": 11,
+     "se": 0.04757312535531514,
+     "t": 0.5985677819963627
+    },
+    "rebalances": 11,
+    "session_net_bps": -5.883286856245118
+   },
+   "momentum_30_d1": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": 1.0428162907619052,
+     "n": 11,
+     "se": 2.622671308284573,
+     "t": 0.3976160823004491
+    },
+    "median_names_used": 479.0,
+    "median_round_trip_cost_bps": 4.555975803950105,
+    "net_bps_per_rebalance": {
+     "mean": -6.216991694956601,
+     "n": 11,
+     "se": 2.83192827411909,
+     "t": -2.1953210297638917
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 1,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": 0.02557244607023025,
+     "n": 11,
+     "se": 0.044045532557562626,
+     "t": 0.5805911425139405
+    },
+    "rebalances": 11,
+    "session_net_bps": -6.216991694956601
+   },
+   "names": 479,
+   "open_reversal_d0": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": 13.98943098245153,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 479.0,
+    "median_round_trip_cost_bps": 8.750675066635171,
+    "net_bps_per_rebalance": {
+     "mean": 0.43363749327057904,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 0,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": 0.11529186539693859,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": 0.43363749327057904
+   },
+   "open_reversal_d1": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": 16.03469703516482,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 479.0,
+    "median_round_trip_cost_bps": 8.369515065464237,
+    "net_bps_per_rebalance": {
+     "mean": 2.4203126822895116,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 1,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": 0.1365060480654141,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": 2.4203126822895116
+   },
+   "overnight_gap_d1": {
+    "defined": false,
+    "family": "overnight_gap"
+   }
+  },
+  "2021-07-13": {
+   "closing_imbalance_d0": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 1.7337031900138697,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 0,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 1.6550810989738498,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1_mid_exit": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 5.2815363797471795,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "mid",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "missing": 37,
+   "momentum_30_d0": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": -1.8864809473459372,
+     "n": 11,
+     "se": 4.035599624273012,
+     "t": -0.46745988774487873
+    },
+    "median_names_used": 463.0,
+    "median_round_trip_cost_bps": 4.193374618852649,
+    "net_bps_per_rebalance": {
+     "mean": -8.506793627948172,
+     "n": 11,
+     "se": 3.967397474775246,
+     "t": -2.144174785116554
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 0,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": 0.0009909369441553602,
+     "n": 11,
+     "se": 0.07972429754118887,
+     "t": 0.012429547512079378
+    },
+    "rebalances": 11,
+    "session_net_bps": -8.506793627948172
+   },
+   "momentum_30_d1": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": -1.8214917400385573,
+     "n": 11,
+     "se": 4.132697863138773,
+     "t": -0.4407512478192972
+    },
+    "median_names_used": 463.0,
+    "median_round_trip_cost_bps": 3.9009190898631534,
+    "net_bps_per_rebalance": {
+     "mean": -8.309151731980782,
+     "n": 11,
+     "se": 4.088756152946482,
+     "t": -2.0321954700069247
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 1,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": 0.007956465341270891,
+     "n": 11,
+     "se": 0.08322927303977937,
+     "t": 0.09559695826573067
+    },
+    "rebalances": 11,
+    "session_net_bps": -8.309151731980782
+   },
+   "names": 463,
+   "open_reversal_d0": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": 15.319451408770247,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 463.0,
+    "median_round_trip_cost_bps": 7.19926698019191,
+    "net_bps_per_rebalance": {
+     "mean": 3.0208033576794353,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 0,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": 0.13848721333795122,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": 3.0208033576794353
+   },
+   "open_reversal_d1": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": 9.42916232005053,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 463.0,
+    "median_round_trip_cost_bps": 7.852792822202626,
+    "net_bps_per_rebalance": {
+     "mean": -3.2314809033896643,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 1,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": 0.092346165792391,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": -3.2314809033896643
+   },
+   "overnight_gap_d1": {
+    "defined": false,
+    "family": "overnight_gap"
+   }
+  },
+  "2021-08-13": {
+   "closing_imbalance_d0": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 1.492725084959253,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 0,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 1.4659938463647477,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "cross",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "closing_imbalance_d1_mid_exit": {
+    "coverage": 0.0,
+    "family": "closing_imbalance",
+    "gross_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 0.0,
+    "median_round_trip_cost_bps": 5.00631550013859,
+    "names_with_score": 0,
+    "net_bps_per_rebalance": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 324,
+     "decision_ns": 53700000000000,
+     "delay": 1,
+     "exit": "mid",
+     "normaliser": "displayed volume bars 0..324"
+    },
+    "rank_ic": {
+     "mean": null,
+     "n": 0,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": null
+   },
+   "missing": 38,
+   "momentum_30_d0": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": 1.8633032467185742,
+     "n": 11,
+     "se": 1.551689404638997,
+     "t": 1.200822304481788
+    },
+    "median_names_used": 462.0,
+    "median_round_trip_cost_bps": 3.5029408707903458,
+    "net_bps_per_rebalance": {
+     "mean": -4.7618926821116325,
+     "n": 11,
+     "se": 1.7031517921093646,
+     "t": -2.7959297017290496
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 0,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": 0.023403237360028136,
+     "n": 11,
+     "se": 0.04029654657480037,
+     "t": 0.5807752611402055
+    },
+    "rebalances": 11,
+    "session_net_bps": -4.7618926821116325
+   },
+   "momentum_30_d1": {
+    "family": "momentum_30",
+    "gross_bps_per_rebalance": {
+     "mean": 2.3015741280026614,
+     "n": 11,
+     "se": 1.6650646547736903,
+     "t": 1.3822731275954465
+    },
+    "median_names_used": 462.0,
+    "median_round_trip_cost_bps": 3.478113652427219,
+    "net_bps_per_rebalance": {
+     "mean": -4.319061297074163,
+     "n": 11,
+     "se": 1.738992767068985,
+     "t": -2.4836568494495803
+    },
+    "params": {
+     "decile_q": 0.1,
+     "delay": 1,
+     "horizon": 30,
+     "lookback": 30,
+     "step": 30
+    },
+    "rank_ic": {
+     "mean": 0.039058649985544855,
+     "n": 11,
+     "se": 0.03881845673957519,
+     "t": 1.0061876042002666
+    },
+    "rebalances": 11,
+    "session_net_bps": -4.319061297074163
+   },
+   "names": 462,
+   "open_reversal_d0": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": -1.201213488862432,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 462.0,
+    "median_round_trip_cost_bps": 7.266381835846923,
+    "net_bps_per_rebalance": {
+     "mean": -13.932775347151201,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 0,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": -0.13441268124271946,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": -13.932775347151201
+   },
+   "open_reversal_d1": {
+    "family": "open_reversal",
+    "gross_bps_per_rebalance": {
+     "mean": 1.3852264795261269,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "median_names_used": 462.0,
+    "median_round_trip_cost_bps": 7.261594350258468,
+    "net_bps_per_rebalance": {
+     "mean": -11.334043216377856,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "params": {
+     "decile_q": 0.1,
+     "decision": 14,
+     "delay": 1,
+     "exit": 44,
+     "start": 0
+    },
+    "rank_ic": {
+     "mean": -0.11046481169851828,
+     "n": 1,
+     "se": null,
+     "t": null
+    },
+    "rebalances": 1,
+    "session_net_bps": -11.334043216377856
+   },
+   "overnight_gap_d1": {
+    "defined": false,
+    "family": "overnight_gap"
+   }
+  }
+ }
+}
