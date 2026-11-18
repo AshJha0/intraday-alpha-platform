@@ -6,7 +6,7 @@ import copy
 import json
 
 import pytest
-from iap.llm import injection_eval, verifier_eval
+from iap.llm import injection_eval, verifier_eval, verify
 from iap.llm.verifier_eval import wilson
 
 VCASES = json.loads(verifier_eval.CASES.read_text(encoding="utf-8"))
@@ -86,12 +86,41 @@ def test_verifier_runner_writes_result(tmp_path):
 _BY_ID = {c["id"]: c for c in VCASES["cases"]}
 
 
-@pytest.mark.parametrize("case_id", VRESULT["defects"])
-@pytest.mark.xfail(strict=True, reason="known verify.py defect, recorded in verifier_golden.json")
-def test_known_verifier_defects(tmp_path, case_id):
+_FIXED = sorted(c["id"] for c in VCASES["cases"] if "fixed_defect" in c)
+
+
+def test_twenty_four_defects_are_recorded_as_fixed():
+    assert len(_FIXED) == 24 and VRESULT["defects"] == []
+
+
+@pytest.mark.parametrize("case_id", _FIXED)
+def test_former_verifier_defects_now_pass(tmp_path, case_id):
     case = _BY_ID[case_id]
     verdict, _ = verifier_eval.judge(case, tmp_path)
     assert verdict == case["label"]
+
+
+def test_long_decimal_no_longer_crashes(tmp_path):
+    # v143: a precision beyond the 28-digit decimal context raised InvalidOperation
+    assert verify.matches("12345.600000000000000000000000", False, [12345.6])
+    assert not verify.matches("12345.600000000000000000000001", False, [12345.6])
+    assert not verify.matches("1.0e-400", False, [1e-300])
+    case = {**_BY_ID["v143"]}
+    assert verifier_eval.judge(case, tmp_path) == ("accept", [])
+
+
+def test_heldout_file_is_separate_and_gated():
+    held = verifier_eval.validate_cases(
+        json.loads(verifier_eval.HELDOUT.read_text(encoding="utf-8"))
+    )
+    assert len(held) >= 40
+    assert not {c["id"] for c in held} & set(_BY_ID)
+    assert {c["category"] for c in held} == {c["category"] for c in VCASES["cases"]}
+    h = VRESULT["heldout"]
+    assert h["unclassified"] == [] and h["defects"] == []
+    worse = copy.deepcopy(VRESULT)
+    worse["heldout"]["overall"]["false_reject"]["rate"] = 0.0
+    assert any(m.startswith("held-out") for m in verifier_eval.gate(VRESULT, worse))
 
 
 def test_injection_case_file_schema():

@@ -10,7 +10,7 @@ Two suites:
 
 | Suite | Guardrail under test | Cases | Result file |
 |---|---|---|---|
-| Verifier golden set | `iap.llm.verify.verify_finding` (numeric-claim check) | [verifier_golden.json](../research/agents/evals/verifier_golden.json) | [verifier_golden_result.json](../research/agents/evals/verifier_golden_result.json) |
+| Verifier golden set | `iap.llm.verify.verify_finding` (numeric-claim check) | [verifier_golden.json](../research/agents/evals/verifier_golden.json), held-out [verifier_heldout.json](../research/agents/evals/verifier_heldout.json) | [verifier_golden_result.json](../research/agents/evals/verifier_golden_result.json) |
 | Injection suite | `iap.governance.untrusted.injection_flags` (pattern flag) and `iap.llm.loop.run_tool_loop` (allowlist) | [injection_cases.json](../research/agents/evals/injection_cases.json) | [injection_result.json](../research/agents/evals/injection_result.json) |
 
 Run them with `PYTHONPATH=python/src`:
@@ -45,83 +45,102 @@ false-reject rate = #{c in A : verifier returns a problem or crashes} / |A|
 ```
 
 Worked example: case `v132` stores `ic = 0.41`, and the text says
-`IC −0.41` with a Unicode minus (U+2212). The regex does not read U+2212 as a
-sign, so it checks `0.41`, finds it, and accepts the finding. The finding says
-the opposite of the evidence, so this is a false accept.
+`IC −0.41` with a Unicode minus (U+2212). The first version of the verifier did
+not read U+2212 as a sign. It checked `0.41`, found it, and accepted a finding
+that says the opposite of the evidence: a false accept. The verifier now maps
+U+2212 to `-` before it reads any number, so it checks `-0.41`, does not find
+it, and rejects the finding.
 
-### Measured (146 cases, 18 categories)
+### Measured: before and after the verifier fixes
 
-| | rate | 95% Wilson |
+The first run of this suite found 24 defects in the verifier. The fix that followed
+changed how the verifier reads a number. The module docstring of `iap.llm.verify` now
+states the new reading rules, so the documented rule and the code agree.
+
+**Golden set** (146 cases, 18 categories):
+
+| | Before the fixes | After the fixes |
 |---|---|---|
-| False accept | 11 / 68 = 0.162 | [0.093, 0.267] |
-| False reject | 14 / 78 = 0.179 | [0.110, 0.279] |
-| False accept, net of the one mislabel | 11 / 69 = 0.159 | [0.091, 0.263] |
-| False reject, net of the one mislabel | 13 / 77 = 0.169 | [0.101, 0.268] |
+| False accept | 11 / 68 = 0.162, Wilson [0.093, 0.267] | 0 / 68, [0.000, 0.053] |
+| False reject | 14 / 78 = 0.179, Wilson [0.110, 0.279] | 1 / 78, [0.002, 0.069] |
+| Crashes | 1 (`v143`) | 0 |
 
-The cases target known edges, so these rates describe this adversarial set.
-They do not describe the error rate on real findings. In these categories the
-verifier never disagreed with the labels: exact matches, rounding at each
-precision, half-even and half-up edges, metadata-only numbers, numbers planted
-in prose fields, derived numbers, signs and negative zero, and scientific
-notation. The per-category table is in the result file.
+The remaining false reject is `v102`, a case whose label is disputed (below).
 
-### Every disagreement, classified
+**Held-out set.** The fixes were designed on the golden set, so they may fit it too
+closely. To check that, a second file of 55 new cases was written:
+[verifier_heldout.json](../research/agents/evals/verifier_heldout.json). It covers the
+same 18 categories with different numbers and phrasings. The author wrote and labelled it
+before running the fixed verifier on it. Its sha256 was recorded at that moment, and the
+"before" column below comes from the unfixed verifier.
 
-There are 25 disagreements: 24 are verifier defects and 1 is a mislabel. Each
-classification is stored with its case (`disagreement.kind`). `--check` fails
-on any disagreement that has no classification. Each defect is also an
-expected-failure test (`test_known_verifier_defects`, strict). When a defect is
-fixed, its test starts passing and fails as an unexpected pass, which forces
-someone to update this record.
+| | Before the fixes | After the fixes |
+|---|---|---|
+| False accept | 12 / 28 = 0.429, Wilson [0.265, 0.609] | 0 / 28, [0.000, 0.121] |
+| False reject | 12 / 27 = 0.444, Wilson [0.276, 0.627] | 1 / 27, [0.007, 0.183] |
+| Crashes | 1 (`h054`) | 0 |
 
-False accepts (an unsupported number gets through):
+The remaining held-out false reject is `h009`, also a disputed label.
 
-- `v037`: `0.53%` matches a stored 0.53. `matches()` also tries the unscaled
-  value. The docstring's rule is value × 100 only.
-- `v074`: `a pair of signals`. The list of number words is closed.
-  This one is a judgement call, because the docstring's list ends in "...".
-- `v098`: `1,234` passes against stored 1 and 234 separately. Thousands
-  separators are not parsed.
-- `v101`: `0.41-0.99`. A number after a hyphen glued to a digit is never
-  extracted.
-- `v106`: `1.2/1.5`. A number after `/` is never extracted.
-- `v107`: `IC:0.99`. A number after `:` is never extracted.
-- `v110`: `99bps`, and `v129`: `2x` in the title. Digits glued to letters are
-  skipped as identifiers, so a quantity with a unit is never checked. The
-  docstring describes this skip, but it lets quantities through.
-- `v132`, `v140`: a U+2212 minus, alone or hidden behind a zero-width space, is
-  dropped. The sign flips and the finding is still accepted.
-- `v135`: `O.41` (letter O). No number is extracted at all.
+Read the held-out result with one caveat. Its author had already diagnosed the golden-set
+defects, so the new cases probe the same failure families. The held-out set is evidence
+against fitting individual cases. It is not evidence of robustness to new kinds of
+evasion. With 27 or 28 cases per side, the upper bounds of the intervals are still 12 to
+18%.
 
-False rejects (fail closed; the agent has to rewrite the finding):
+The runner scores both files and records both in
+[verifier_golden_result.json](../research/agents/evals/verifier_golden_result.json):
+the held-out results sit under the `heldout` key. `--check` fails if any of these happens
+on either file:
 
-- `v038`: `53 %` with a space is read as the integer 53.
-- `v046`: the label `IC` does not match the field `information_coefficient`.
-  Label families match tokens of the field name only.
-- `v047`: `IC and t of 0.041 and 5.3`. A label binds to the nearest following
-  number, so 0.041 is checked as a t statistic.
-- `v075`: `half-life` is refused as a number word.
-- `v093`, `v095`, `v096`: thousands separators (`,` and no-break space).
-- `v111`, `v114`: `1.5x` and `0.99bps`. Regex backtracking extracts `1` and
-  `0`.
-- `v120`: the ticker `0700.HK` is read as the number 700.
-- `v131`: a U+2212 minus on a true negative.
-- `v137`: a zero-width space splits `0.41` into `0.4` and `1`.
-- `v143`: **crash**. A written precision beyond 28 significant digits
-  (`12345.600000000000000000000000`) makes `Decimal.quantize` raise
-  `InvalidOperation`. `verify_finding` then raises instead of returning a
-  problem. The eval counts this as a rejection.
+- the false-accept rate rises;
+- the false-reject rate rises;
+- a disagreement has no defect or mislabel classification.
 
-Mislabel:
+### The 24 defects, now fixed
 
-- `v102`: `IC 0.41–0.52`, where the evidence fields are named `lo` and `hi`.
-  By the documented labelled-statistic rule, a number labelled IC must match
-  an IC field. A careful reviewer applying the rule rejects this case, so the
-  `accept` label was wrong. The label was kept as first written. The
-  "net of mislabels" row scores this case under the corrected label.
+Each case that used to fail keeps its record (`fixed_defect` in the case file). It now
+runs as an ordinary passing test (`test_former_verifier_defects_now_pass`). The crash
+also has its own reproduction test.
 
-None of these defects was fixed here. This work measures the verifier and does
-not change it.
+| Defect | Cases | Rule now applied |
+|---|---|---|
+| Crash: written precision beyond 28 digits | v143 | decimal comparison in a 1000-digit context; an impossible quantize is "no match", never an exception |
+| `0.53%` matched a stored 0.53 | v037 | `%` matches value × 100; the raw value only for a field named `pct`/`percent` |
+| Numbers after `-`, `/`, `:` unread | v101, v106, v107 | read after `/`, after `:` following a letter or space, and after `-` following a digit (range end, positive) |
+| Glued units skipped | v110, v129, v111, v114 | `bp`, `bps`, `x`, `ms`, `us`, `ns` suffixes are quantities and are checked; regex backtracking removed (atomic match) |
+| Unicode minus dropped, invisible characters | v131, v132, v140, v137 | format characters removed, U+2212 mapped to `-`, NFKC folding |
+| Look-alike letters (`O.41`) | v135 | a decimal mixing digits with `O`/`o`/`l`/`I` is refused |
+| Thousands separators | v093, v095, v096, v098 | `1,234` and `1 234` (no-break space) are joined to 1234 |
+| `53 %` with a space | v038 | an optional space before `%`; `pct` suffix also read |
+| `information_coefficient` not in the IC family | v046 | the field tokens `information` + `coefficient` are in the IC family |
+| `IC and t of 0.041 and 5.3` | v047 | a list of labels binds the same number of numbers in order |
+| `a pair of` passed | v074 | the phrases `a pair of`, `a couple of`, `a brace of` are refused |
+| `half-life` refused | v075 | `half-life`/`half-lives`, `one-`/`two-sided` and `-tailed` are terms, not quantities |
+| `0700.HK` read as 700 | v120 | a number followed by `.` and a letter is an identifier |
+
+None of the defects was left unfixed.
+
+The fix kept some behaviours on purpose. `10s` is still an identifier, so `s` is not a
+unit. The existing tests pin that, and a bar label like `10s` is common in this
+repository. `percent` written as a word is still not read as `%`. A date such as
+`2026-11-18` is still read as numbers, so a finding that contains one is refused.
+
+### Disputed labels (left for the owner)
+
+The labels were not changed. Each disputed case carries a `note` with the reasoning.
+
+- `v102`, `IC 0.41–0.52` against fields `lo` and `hi`, labelled accept. The documented
+  rule says a number labelled IC must match an IC field, and these fields are not IC
+  fields. A careful reviewer applying that rule rejects the case. The verifier rejects
+  it, both before and after the fix.
+- `h009`, `x 0.25` against a stored 0.255, labelled accept. Half-even rounding of 0.255
+  to two places gives 0.26, because the kept digit 5 is odd. Half-up gives 0.26 too, so
+  0.25 matches neither rule. The verifier rejects the case, both before and after the
+  fix.
+
+The "net of mislabels" rows in the result file score these two cases under the corrected
+label. Under that scoring, both sets have zero disagreements.
 
 ## 2. Injection suite
 
