@@ -22,6 +22,8 @@ a docs-sync agent. They call a narrow tool allowlist; code computes every number
 number they write is checked against the artefact they cite (`iap.llm.verify.verify_finding`);
 text written by others reaches them wrapped as untrusted data; spend is capped at USD 30 a
 month before each call. Details and a runnable demo: [LLM_SAFETY.md](LLM_SAFETY.md).
+How the research memory, research graph, MCP server, verifier and skills fit together, with
+their measured numbers and limits: [AI_STACK.md](AI_STACK.md).
 
 ## Questions to check your understanding
 
