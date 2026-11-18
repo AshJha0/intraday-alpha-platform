@@ -145,3 +145,26 @@ line.
 `iap.llm.injection_eval`, which other sessions own. They were not in this tree
 and were not measured. When they merge they join their package's figure
 (`iap.llm` and `iap.governance`), so re-measure before raising those floors.
+## mypy, same review
+
+The mypy settings are in `python/pyproject.toml`, under `[tool.mypy]` and
+`[[tool.mypy.overrides]]`. This run used mypy 2.3.1, with
+`--python-executable` pointing at the CI-lock venv.
+
+| Package | Errors before | Errors after |
+|---|---|---|
+| `iap.llm` (13 files) | 0 | 0 |
+| `iap.governance` (17 files) | 0 | 0 |
+| `iap.research.pnl_power` | 0 | 0 |
+| `iap.research.breadth_bars` | 0 | 0 |
+| whole configured scope | 0 (129 files) | 0 (148 files) |
+
+The "before" and "after" columns use the repository's own configuration. Under
+the stricter checks now set for these packages (`disallow_untyped_defs`,
+`disallow_incomplete_defs`, `check_untyped_defs`, `warn_unused_ignores`),
+the "before" tree had 9 findings: `llm/budget.py` 1, `governance/citations.py`
+3, `governance/holdout_registry.py` 4 and `governance/mcp_server.py` 1.
+
+The first eight were fixed with annotations only. The `mcp_server.py` finding
+(line 203) is in a file another workstream owns. It carries a named exception
+in the overrides until it is annotated.

@@ -39,7 +39,7 @@ keeps the pinned v1.14 projection.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -74,7 +74,7 @@ class _PriceView(Mapping[str, tuple[float, float, float]]):
         p = _prices.load_prices().price(model)
         return (p.input, p.output, p.cache_read)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(_prices.load_prices().models)
 
     def __len__(self) -> int:
