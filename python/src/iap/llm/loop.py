@@ -184,6 +184,7 @@ def run_tool_loop(
     tool_log: list[dict[str, Any]] = []
     closing_text = ""
     finished: str | None = None
+    client_exc: Exception | None = None
     for turn in range(max_turns):
         try:
             budget.check_model_call(model)
@@ -200,7 +201,13 @@ def run_tool_loop(
         }
         if effort:
             kwargs["output_config"] = {"effort": effort}
-        resp = client.messages.create(**kwargs)
+        try:
+            resp = client.messages.create(**kwargs)
+        except Exception as exc:
+            # the summary is written below; the error is re-raised after it
+            status = "client_error"
+            client_exc = exc
+            break
         if getattr(resp, "model", None):
             served.add(str(resp.model))
         budget.charge(model, resp.usage)
@@ -225,9 +232,16 @@ def run_tool_loop(
         if resp.stop_reason == "refusal":
             status = "model_refusal"
             break
+        if resp.stop_reason == "pause_turn":
+            continue  # server paused a long turn: send the content back as is
+        if resp.stop_reason == "max_tokens":
+            # a tool_use block cut off by the output cap may carry a truncated
+            # input: never dispatch it
+            status = "max_tokens"
+            break
         uses = [b for b in content if getattr(b, "type", None) == "tool_use"]
         if not uses:
-            status = "end_turn" if resp.stop_reason != "max_tokens" else "max_tokens"
+            status = "end_turn"
             break
         results = []
         exhausted = False
@@ -261,6 +275,13 @@ def run_tool_loop(
                         "is_error": True,
                     }
                 )
+            except Exception as exc:  # a tool bug must not kill the session
+                msg = redact(f"tool error: {type(exc).__name__}: {exc}", secret)
+                rec["ok"] = False
+                rec["error"] = msg
+                results.append(
+                    {"type": "tool_result", "tool_use_id": b.id, "content": msg, "is_error": True}
+                )
             log.append("tool_log.jsonl", rec)
             tool_log.append(rec)
         messages.append({"role": "user", "content": results})
@@ -283,4 +304,6 @@ def run_tool_loop(
         out_dir=Path(out_dir),
     )
     log.write("session.json", result.as_dict())
+    if client_exc is not None:
+        raise client_exc
     return result
