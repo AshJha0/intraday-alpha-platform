@@ -140,3 +140,20 @@ def test_too_few_names_gives_no_book():
     panel = _panel(np.full((6, bb.BARS), 10.0))
     res = bb.run_study(panel, np.arange(6))
     assert res["scores"]["vwap_deviation"]["net_bps_per_rebalance"]["n"] == 0
+
+
+def test_rows_for_keeps_order_and_reports_missing_names():
+    panel = _panel(np.full((3, bb.BARS), 10.0))
+    rows, missing = bb.rows_for(panel, ["S002", "GONE", "S000"])
+    assert rows.tolist() == [2, 0] and missing == ["GONE"]
+
+
+def test_pool_sessions_is_a_session_level_t_test():
+    out = bb.pool_sessions([1.0, 2.0, 3.0, -1.0, math.nan])
+    assert out["n"] == 4 and out["positive_sessions"] == 3
+    mean, sd = 1.25, np.std([1.0, 2.0, 3.0, -1.0], ddof=1)
+    assert out["t"] == pytest.approx(mean / (sd / 2.0))
+    from scipy import stats
+
+    assert out["p_one_sided"] == pytest.approx(stats.t.sf(out["t"], 3))
+    assert math.isnan(bb.pool_sessions([1.0])["p_one_sided"])

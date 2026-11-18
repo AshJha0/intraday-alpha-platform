@@ -51,7 +51,9 @@ __all__ = [
     "Panel",
     "decision_bars",
     "load_panel",
+    "pool_sessions",
     "rank_ic",
+    "rows_for",
     "run_study",
     "scores_at",
     "select_universe",
@@ -255,4 +257,31 @@ def run_study(
             },
         }
     out["median_round_trip_cost_bps"] = float(np.median(costs) * bps) if costs else math.nan
+    return out
+
+
+def rows_for(panel: Panel, symbols: Sequence[str]) -> tuple[np.ndarray, list[str]]:
+    """Row indices of ``symbols`` in ``panel`` (in the given order) and the
+    symbols the panel does not have.  The universe is fixed on its selection
+    day; a name missing on another day is reported, never replaced."""
+    index = {s: i for i, s in enumerate(panel.symbols)}
+    rows = [index[s] for s in symbols if s in index]
+    missing = [s for s in symbols if s not in index]
+    return np.asarray(rows, dtype=np.intp), missing
+
+
+def pool_sessions(session_means: Sequence[float]) -> dict[str, float]:
+    """Session-level summary of one number per session (for example the mean
+    net bps per rebalance): mean, standard error and Student t across
+    sessions, the independent unit, with the one-sided p-value on
+    ``sessions - 1`` degrees of freedom."""
+    out = series_summary(session_means)
+    n, t = int(out["n"]), out["t"]
+    if n >= 2 and math.isfinite(t):
+        from scipy import stats
+
+        out["p_one_sided"] = float(stats.t.sf(t, n - 1))
+    else:
+        out["p_one_sided"] = math.nan
+    out["positive_sessions"] = int(sum(1 for v in session_means if math.isfinite(v) and v > 0))
     return out
