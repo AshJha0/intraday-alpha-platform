@@ -18,10 +18,13 @@ exits at bar ``x``; ``f = mid[x] / mid[e] - 1`` and ``c = hs[e] + hs[x]``.
   ``-(r - mean r)`` with ``r = mid[14] / mid[0] - 1``.  The overnight-gap
   version (``overnight_gap``) is defined only when the previous session's
   bars are given and that session is the previous weekday; it costs no look.
-* F3 ``closing_imbalance``: ``k = 324`` (15:55), score ``d * imbalance / V``
-  from the last closing NOII message at or before 15:55:00 (``d`` = +1 buy,
-  -1 sell, 0 none; ``O`` undefined) and ``V`` the displayed volume of bars
-  0..324; exit at the closing cross price, so ``c = hs[e]`` only.
+* F3 ``closing_imbalance`` (version 2, pre-specification section 8): score
+  ``d * imbalance / V`` from the last closing NOII message at or before
+  15:55:05.000000000 (``d`` = +1 buy, -1 sell, 0 none; ``O`` undefined) and
+  ``V`` the displayed volume of bars 0..384; the only entry is the quote at
+  the end of bar 385 (15:56:00); exit at the closing cross price, so
+  ``c = hs[385]`` only.  Version 1 used bar 324, which ends at 14:55, not
+  15:55; it ended with no look spent.
 
 The book and its cost are ``breadth_bars._book`` itself: long the top and short
 the bottom decile, ``net = g - (mean_long c + mean_short c) / 2``.  The primary
@@ -53,7 +56,8 @@ __all__ = [
     "F1_LOOKBACK",
     "F2_DECISION",
     "F2_EXIT",
-    "F3_DECISION",
+    "F3_ENTRY",
+    "F3_VOLUME_LAST",
     "F3_DECISION_NS",
     "FAMILIES",
     "closing_imbalance",
@@ -73,9 +77,9 @@ DECILE_Q = 0.1
 F1_LOOKBACK = F1_STEP = F1_HORIZON = 30
 F2_START, F2_DECISION, F2_EXIT = 0, 14, 44  # 09:31, 09:45, 10:15
 F2_GAP_FROM = 4  # bar ending 09:35
-F3_DECISION = 324  # bar ending 15:55
-OPEN_NS = (9 * 3600 + 30 * 60) * 1_000_000_000
-F3_DECISION_NS = OPEN_NS + (F3_DECISION + 1) * bb.MINUTE_NS  # 15:55:00 since midnight
+F3_VOLUME_LAST = 384  # bar ending 15:55:00 (bar m ends at 09:31 + m minutes)
+F3_ENTRY = 385  # bar ending 15:56:00, the only entry
+F3_DECISION_NS = 57_305 * 1_000_000_000  # 15:55:05.000000000 since midnight
 LAST_BAR = bb.BARS - 1
 BPS = 1e4
 
@@ -161,8 +165,8 @@ def load_auction(path: str | Path) -> pd.DataFrame:
 
 
 def f3_score(panel: bb.Panel, rows: np.ndarray, auction: pd.DataFrame) -> np.ndarray:
-    """F3 score at 15:55: signed imbalance shares of the last closing NOII
-    message at or before 15:55:00 over the displayed volume of bars 0..324."""
+    """F3 score: signed imbalance shares of the last closing NOII message at
+    or before 15:55:05.000000000 over the displayed volume of bars 0..384."""
     imb = auction[
         (auction["kind"] == "I")
         & (auction["cross_type"] == "C")
@@ -170,7 +174,7 @@ def f3_score(panel: bb.Panel, rows: np.ndarray, auction: pd.DataFrame) -> np.nda
     ].sort_values("ts_ns", kind="stable")
     last = imb.groupby("symbol", sort=False).tail(1).set_index("symbol")
     sign = {"B": 1.0, "S": -1.0, "N": 0.0}
-    vol = panel.vol[rows, : F3_DECISION + 1].sum(axis=1)
+    vol = panel.vol[rows, : F3_VOLUME_LAST + 1].sum(axis=1)
     out = np.full(len(rows), np.nan)
     for j, r in enumerate(rows):
         sym = panel.symbols[r]
@@ -316,12 +320,14 @@ def closing_imbalance(
     panel: bb.Panel,
     rows: np.ndarray,
     auction: pd.DataFrame,
-    delay: int = 1,
+    *,
     exit_at: str = "cross",
 ) -> dict:
-    """F3 on one session.  ``exit_at="cross"`` is the primary (exit at the
-    closing cross price, cost ``hs[e]``); ``"mid"`` is the diagnostic exit at
-    the 16:00 bar-end mid paying ``hs[e] + hs[389]``."""
+    """F3 version 2 on one session, entering at the bar-385 quote only (no
+    delay-0 version: the bar-384 quote precedes the message the score uses).
+    ``exit_at="cross"`` is the primary (exit at the closing cross price, cost
+    ``hs[385]``); ``"mid"`` is the diagnostic exit at the 16:00 bar-end mid
+    paying ``hs[385] + hs[389]``."""
     if exit_at not in ("cross", "mid"):
         raise ValueError("exit_at must be 'cross' or 'mid'")
     mid, hs = panel.mid[rows], panel.half_spread[rows]
@@ -337,14 +343,14 @@ def closing_imbalance(
     out = _run(
         "closing_imbalance",
         {
-            "decision": F3_DECISION,
+            "version": 2,
             "decision_ns": F3_DECISION_NS,
-            "delay": delay,
+            "entry": F3_ENTRY,
             "exit": exit_at,
-            "normaliser": "displayed volume bars 0..324",
+            "normaliser": "displayed volume bars 0..384",
             "decile_q": DECILE_Q,
         },
-        [(F3_DECISION, F3_DECISION + delay, LAST_BAR)],
+        [(F3_VOLUME_LAST, F3_ENTRY, LAST_BAR)],
         lambda k: score,
         fc,
     )

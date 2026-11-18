@@ -91,10 +91,10 @@ def main(argv: list[str] | None = None) -> dict:
         apath = auction_dir / f"auction_{date.replace('-', '')}.csv"
         if apath.exists():
             auction = bf.load_auction(apath)
-            for d in DELAYS:
-                s[f"closing_imbalance_d{d}"] = bf.closing_imbalance(panel, rows, auction, d)
+            # F3 version 2: one entry (bar 385), no delay-0 diagnostic
+            s["closing_imbalance_d1"] = bf.closing_imbalance(panel, rows, auction)
             s["closing_imbalance_d1_mid_exit"] = bf.closing_imbalance(
-                panel, rows, auction, 1, exit_at="mid"
+                panel, rows, auction, exit_at="mid"
             )
         for v in s.values():
             if isinstance(v, dict):
@@ -111,8 +111,9 @@ def main(argv: list[str] | None = None) -> dict:
     doc = {
         "prespec": "research/round1/FAMILIES_PRESPEC_2026-11-18.md",
         "primary": ["momentum_30_d1", "open_reversal_d1", "closing_imbalance_d1"],
-        "bonferroni_k": 7,
-        "one_sided_threshold": 0.025 / 7,
+        "f3_version": 2,
+        "bonferroni_k": 8,
+        "one_sided_threshold": 0.025 / 8,
         "sessions": sessions,
         "pooled": pooled,
     }
