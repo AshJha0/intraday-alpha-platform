@@ -21,10 +21,25 @@ SEC = 1_000_000_000
 T0 = 1_000_000_000_000
 
 
+def _canon(x):
+    """Integers exact, floats to nine decimals: sums such as the P&L lines
+    differ in their last bit between platforms (summation order), and a hash of
+    the raw float text is then not portable."""
+    if x is None or isinstance(x, (bool, str)):
+        return x
+    if isinstance(x, dict):
+        return {str(k): _canon(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [_canon(v) for v in x]
+    if isinstance(x, (int, np.integer)):
+        return int(x)
+    return format(float(x), ".9f")
+
+
 def digest(res) -> str:
-    h = hashlib.sha256(res.fills.to_csv(index=False).encode())
-    blob = {"pnl": res.pnl, "c": res.counters, "d": res.diagnostics}
-    h.update(json.dumps(blob, sort_keys=True, default=str).encode())
+    h = hashlib.sha256(res.fills.to_csv(index=False, float_format="%.9f").encode())
+    blob = _canon({"pnl": res.pnl, "c": res.counters, "d": res.diagnostics})
+    h.update(json.dumps(blob, sort_keys=True).encode())
     return h.hexdigest()
 
 
@@ -94,10 +109,13 @@ def scores_at(*ts) -> pd.DataFrame:
 # ---------------------------------------------------------------- byte-identity
 
 #: digests of the two runs below computed with the code BEFORE rule 10
-#: (git HEAD eb8405f3): the grid mode must reproduce them bit for bit
+#: (git HEAD eb8405f3) and the digest above: the grid mode must reproduce every
+#: fill, every counter and every P&L line (integers exactly, floats to nine
+#: decimals; a hash of the raw float text passed on Windows and failed on the
+#: Linux CI runners, where the same sums differ in the last bit)
 PINNED_GRID = {
-    "default": "5c8f477236107dbb0847bda681eeabf3f96e0dee595d2a1a48d56eeb7297db0f",
-    "v2_like": "a66b83ca5ce0510fd62dad608fcc4bff0083604aefd819f3b0d37b558df00789",
+    "default": "726294f3f0fdb5f7845a4b83cdfd14e291a14607511edaacd82fdc2d3efb06a7",
+    "v2_like": "dc9a3403309bc4a30ec5198be25c041f1965482ed7714645312f3f0ae8542efe",
 }
 
 
