@@ -1,0 +1,272 @@
+{
+  "missed_at_5": [
+    "led-07"
+  ],
+  "mrr": 0.9496,
+  "n_chunks": 3302,
+  "n_questions": 43,
+  "questions": [
+    {
+      "category": "negative_result",
+      "id": "neg-01",
+      "rank": 1,
+      "top1": "research/r7/AI4_CLOSED_v116.md:16-30"
+    },
+    {
+      "category": "negative_result",
+      "id": "neg-02",
+      "rank": 1,
+      "top1": "research/quoting_real/QUOTING_V2_RESULT.md:1-6"
+    },
+    {
+      "category": "negative_result",
+      "id": "neg-03",
+      "rank": 1,
+      "top1": "research/preregs/B7_CLOSED_v117.md:1-6"
+    },
+    {
+      "category": "negative_result",
+      "id": "neg-04",
+      "rank": 1,
+      "top1": "research/execution/b8/REPORT_oos6.md:1-5"
+    },
+    {
+      "category": "negative_result",
+      "id": "neg-05",
+      "rank": 1,
+      "top1": "research/v118/KNOWN_NULL_V2_RESULT.md:1-12"
+    },
+    {
+      "category": "negative_result",
+      "id": "neg-06",
+      "rank": 1,
+      "top1": "research/v118/known_null_v3_RESULT.md:1-22"
+    },
+    {
+      "category": "negative_result",
+      "id": "neg-07",
+      "rank": 1,
+      "top1": "research/v118/KNOWN_NULL_RESULT.md:1-13"
+    },
+    {
+      "category": "negative_result",
+      "id": "neg-08",
+      "rank": 1,
+      "top1": "docs/LEARN.md:340-363"
+    },
+    {
+      "category": "negative_result",
+      "id": "neg-09",
+      "rank": 1,
+      "top1": "research/v116/CAPACITY_CURVE.md:1-53"
+    },
+    {
+      "category": "negative_result",
+      "id": "neg-10",
+      "rank": 1,
+      "top1": "research/round1/BREADTH_BARS_20190130.md:1-9"
+    },
+    {
+      "category": "result",
+      "id": "res-01",
+      "rank": 1,
+      "top1": "research/r7/r7_confirm_result.md:1-12"
+    },
+    {
+      "category": "result",
+      "id": "res-02",
+      "rank": 1,
+      "top1": "research/r7/R7_DEVIATION_lot_size.md:1-20"
+    },
+    {
+      "category": "result",
+      "id": "res-03",
+      "rank": 1,
+      "top1": "research/r7/R7_DEVIATION_dsr_trials.md:1-28"
+    },
+    {
+      "category": "result",
+      "id": "res-04",
+      "rank": 1,
+      "top1": "research/execution/EXECUTION_REPORT.md:40-62"
+    },
+    {
+      "category": "protocol",
+      "id": "pro-01",
+      "rank": 1,
+      "top1": "research/round0/ROUND0_GATES.md:18-35"
+    },
+    {
+      "category": "protocol",
+      "id": "pro-02",
+      "rank": 1,
+      "top1": "research/round0/ROUND0_GATES.md:92-134"
+    },
+    {
+      "category": "protocol",
+      "id": "pro-03",
+      "rank": 1,
+      "top1": "research/v2/ML_PROTOCOL.md:84-116"
+    },
+    {
+      "category": "protocol",
+      "id": "pro-04",
+      "rank": 1,
+      "top1": "research/v2/ML_PROTOCOL.md:66-75"
+    },
+    {
+      "category": "protocol",
+      "id": "pro-05",
+      "rank": 1,
+      "top1": "research/v2/U13_CONFIRMATION_PROTOCOL.md:290-309"
+    },
+    {
+      "category": "protocol",
+      "id": "pro-06",
+      "rank": 1,
+      "top1": "research/v2/U13_CONFIRMATION_PROTOCOL.md:232-244"
+    },
+    {
+      "category": "protocol",
+      "id": "pro-07",
+      "rank": 1,
+      "top1": "research/v118/REL08_CONTINUATION_RULE.md:1-12"
+    },
+    {
+      "category": "protocol",
+      "id": "pro-08",
+      "rank": 1,
+      "top1": "research/breadth/UNIVERSE_RULE.md:1-31"
+    },
+    {
+      "category": "protocol",
+      "id": "pro-09",
+      "rank": 3,
+      "top1": "docs/DIAGRAMS.md:544-582"
+    },
+    {
+      "category": "protocol",
+      "id": "pro-10",
+      "rank": 2,
+      "top1": "docs/RESEARCH_VALIDITY.md:473-500"
+    },
+    {
+      "category": "protocol",
+      "id": "pro-11",
+      "rank": 1,
+      "top1": "docs/LLM_SAFETY.md:66-76"
+    },
+    {
+      "category": "protocol",
+      "id": "pro-12",
+      "rank": 1,
+      "top1": "docs/governance/OWNER_SIGNATURE_CHECKLIST.md:3-12"
+    },
+    {
+      "category": "family_spec",
+      "id": "fam-01",
+      "rank": 1,
+      "top1": "research/v2/families/D1_short_term_reversal.md:41-48"
+    },
+    {
+      "category": "family_spec",
+      "id": "fam-02",
+      "rank": 1,
+      "top1": "research/v2/families/D3_overnight_asymmetry.md:1-6"
+    },
+    {
+      "category": "family_spec",
+      "id": "fam-03",
+      "rank": 1,
+      "top1": "research/v2/families/D4_filing_date_drift.md:1-6"
+    },
+    {
+      "category": "family_spec",
+      "id": "fam-04",
+      "rank": 1,
+      "top1": "research/v2/families/D5_close_pressure.md:1-6"
+    },
+    {
+      "category": "family_spec",
+      "id": "fam-05",
+      "rank": 1,
+      "top1": "research/v2/families/H2_intraday_momentum.md:1-5"
+    },
+    {
+      "category": "family_spec",
+      "id": "fam-06",
+      "rank": 1,
+      "top1": "research/v2/families/H3_etf_lead_lag.md:1-5"
+    },
+    {
+      "category": "family_spec",
+      "id": "fam-07",
+      "rank": 1,
+      "top1": "research/v2/families/H4_order_flow_imbalance.md:1-5"
+    },
+    {
+      "category": "family_spec",
+      "id": "fam-08",
+      "rank": 1,
+      "top1": "research/v2/families/D2_residual_momentum.md:1-5"
+    },
+    {
+      "category": "ledger",
+      "id": "led-01",
+      "rank": 1,
+      "top1": "research/experiments.json#6c67a9e49570a25a1068200017c6791b67a49c8b7332fe9e6884896cafce4ff5"
+    },
+    {
+      "category": "ledger",
+      "id": "led-02",
+      "rank": 1,
+      "top1": "research/experiments.json#7df2fb8b9d5e9db58fa7d27752044e107a40a404889e9117c6bfd4325a036135"
+    },
+    {
+      "category": "ledger",
+      "id": "led-03",
+      "rank": 1,
+      "top1": "research/experiments.json#eb392d124dfd994470f2d8ccc8d177c79273c94c890a72133071d82c4f2563ad"
+    },
+    {
+      "category": "ledger",
+      "id": "led-04",
+      "rank": 1,
+      "top1": "research/experiments.json#3060ab238569f955e086a4d30267ddc5ec1fc7e9f84ea71efba9bc24454bdbff"
+    },
+    {
+      "category": "ledger",
+      "id": "led-05",
+      "rank": 1,
+      "top1": "research/experiments.json#c97761ddb1249acad44fec66af1339a2e0c28d865245881b09784f3c70b48d00"
+    },
+    {
+      "category": "ledger",
+      "id": "led-06",
+      "rank": 1,
+      "top1": "research/experiments.json#348c137c221e41a23fe2f541523ae21988e8b599578d0f9468a0c1bed3ad139d"
+    },
+    {
+      "category": "ledger",
+      "id": "led-07",
+      "rank": null,
+      "top1": "research/experiments.json#6ae24f8b8737134349a0e17bb7305e2fddc616ab417da4ada2d8fdf94d30d3f1"
+    },
+    {
+      "category": "ledger",
+      "id": "led-08",
+      "rank": 1,
+      "top1": "research/experiments.json#232923d4840cf6ddbd3c20b4013001fe1279f30e96d71aa5af54d87801b6e423"
+    },
+    {
+      "category": "ledger",
+      "id": "led-09",
+      "rank": 1,
+      "top1": "research/experiments.json#adb813f5abf77288edd09da075f782eb118fd78b39df27ab34b74996674e6413"
+    }
+  ],
+  "recall_at_1": 0.9302,
+  "recall_at_10": 0.9767,
+  "recall_at_5": 0.9767,
+  "recall_at_5_floor": 0.93
+}
