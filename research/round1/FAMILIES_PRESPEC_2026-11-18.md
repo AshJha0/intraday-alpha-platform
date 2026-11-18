@@ -275,3 +275,58 @@ half spread of 0.0005 (2 cents on 40.00) and a cross at 40.06, `f = 40.06 / 40.0
 15 bps` and the name's cost is `5 bps`. Over a book with mean long `f` of 6 bps, mean short
 `f` of -2 bps and mean cost 4 bps on each side, `g = (6 + 2) / 2 = 4 bps` and
 `net = 4 - (4 + 4) / 2 = 0 bps`: no edge, even though the move went the expected way.
+
+## 8. Erratum and F3 version 2 (2026-11-18, written after the coverage facts above and before any F3 return exists)
+
+Sections 0 to 7 stand as committed; this section does not rewrite them.
+
+**What was known when this was written.** Two coverage facts about the closing `I` messages,
+read before any F3 forward return was computed, as section 3's coverage rule allows:
+
+- On 2019-01-30, 2019-03-27, 2019-07-30, 2019-08-30, 2019-10-18 and 2019-10-30 the first
+  closing `I` message is at 15:55:00.0003 (between 57,300.000284 s and 57,300.000391 s after
+  midnight), so no universe name has a message at or before 15:55:00.000000000; every universe
+  name present has one within the following second (500, 498, 490, 488, 485 and 485 names).
+- On 2019-12-30, 2020-01-30, 2021-07-13 and 2021-08-13 dissemination starts at 15:50:00 (first
+  message near 57,000.001 s), and 479, 479, 463 and 462 universe names have a message at or
+  before 15:55:00.
+
+Also known: the pooled results of the two reversal scores and of F1 and F2 exist in the
+repository. Their author did not open them to write this section, and nothing in it depends
+on them. No F3 forward return has ever been computed: version 1 had zero names with a score
+on every session.
+
+**F3 version 1 ends.** As written, version 1 had fewer than 100 names with a score on a
+majority of sessions, so it ends under its own coverage rule with no look spent. It also
+carried a bar-index error. Bar `m` ends at 09:31 + m minutes, so bar 324 ends at 14:55:00, not
+15:55:00, and `F3_DECISION_NS` evaluated to 53,700 s (14:55), one hour early. The bar ending
+15:55:00 is index 384, 15:56:00 is 385, and the last bar, ending 16:00:00, is 389. Section 3's
+worked example and its 15:55/15:56 clock times describe the intent. The indices 324 and 325
+were wrong.
+
+**F3 version 2.** Every parameter has one value:
+
+- Decision instant: 15:55:05.000000000, that is 57,305 s after midnight (57,305,000,000,000 ns).
+  This is five seconds after the earliest dissemination observed, and it is the same instant on
+  every session. For each name, the last closing `I` message (cross type `C`) with a timestamp
+  at or before that instant is used. A name without one has no score.
+- Normaliser: `V_i` is the displayed volume over bars 0..384.
+- Score, direction handling (`B` +1, `S` -1, `N` 0, `O` undefined, `V_i = 0` undefined) and
+  ties (stable sort on the fixed universe order): unchanged.
+- Entry: the quote at the end of bar 385 (15:56:00). This is the only entry. **There is no
+  delay-0 diagnostic**, because the bar-384 quote (15:55:00) comes before the message the score
+  uses.
+- Exit: the closing cross price, with cost `hs[385]` only, as before. The declared mid-exit
+  diagnostic exits at the end of bar 389 and pays `hs[385] + hs[389]`.
+- Coverage rule: unchanged (the family ends with no look spent if fewer than 100 universe names
+  have a score on a majority of sessions), evaluated at 15:55:05.
+- Expected sign (positive), "ends the family", and the tradability caveats of section 3:
+  unchanged.
+
+**Multiplicity.** Version 1 counts although it spent no look, so K rises from 7 to **8**. The
+one-sided session-level threshold becomes 0.025 / 8 = **0.003125**, which is a session-level
+Student t above **3.55** on 9 degrees of freedom. From now on, the holdout selection rule of
+section 5 applies with this threshold to every candidate: the three families' primaries and
+the existing reversal scores alike.
+
+**Looks.** Ten for version 2: one primary statistic on each of the ten sessions.
