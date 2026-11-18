@@ -11,8 +11,9 @@ sources only.
 | # | decision | consequence |
 |---|---|---|
 | R0-1 | Live LLM API calls are off. The capped path (`configs/agents/llm.json`) stays in the code, unused | repeated agent evals run on a local open-weights model; any pass rate is labelled with that model, never with a pinned Claude model |
-| R0-2 | Tiingo free tier is a background lane; the owner creates the account and stops if a card is asked | the daily families do not block the intraday route |
+| R0-2 | superseded by R0-4 | - |
 | R0-3 | The research graph is written in-house and tested in CI; a LangGraph adapter is an optional extra outside the required lock | no new dependency on the trading or research path (PLATFORM_CONVENTIONS section 13.7 unchanged) |
+| R0-4 | Tiingo is dropped as well (owner, 2026-11-18, later the same day): no account is created | route C has no data source: Stooq failed DD1 and Tiingo is excluded. No free route in this repository can now confirm a Sharpe near 1 (section 2) |
 
 ## 2. Power gate (new): sessions needed against net Sharpe
 
@@ -137,5 +138,16 @@ note (D-22, `docs/DATA_SOURCES.md` section 13) is still an open owner item.
 |---|---|---|
 | A: cross-sectional intraday book | IEX HIST withdrawn from direct download (section 6, owner check 2026-11-18); development possible on the Nasdaq ITCH sample days at full breadth | owner may email IEX Market Operations; meanwhile a several-hundred-name book on the ITCH days; the native TOPS reader only once access is confirmed |
 | B: event-driven market making on Nasdaq ITCH sample days | method work only: too few sessions for any Sharpe claim (section 2) | re-ingest the sample days; event-driven quoter; markout curves |
-| C: daily families on Tiingo free tier | the only route powered for a Sharpe near 1; waits on the owner's sign-up | owner creates the account; DD1 tests on the first 500 symbols |
+| C: daily families | closed: no eligible free daily source (R0-4) | none; a forward paper log on public daily closes is the remaining zero-cost way to accrue independent sessions |
 | D: filing-text signal for D4 | waits on route C's universe and on EDGAR access from the owner's machine | local model, look-ahead control by filing date against model cut-off |
+
+## 8. Correction: how many free Nasdaq sessions there are (2026-11-18)
+
+Section 6 said the public listing's 46 entries were 46 sessions. They are not: the listing counts
+checksum files and folders too. The full-market ITCH 5.0 days are ten in-sample days
+(`research/breadth/candidates.json`: seven in 2019-20, 2019-10-18, 2021-07-13, 2021-08-13) and the
+nine 2025/26 sessions, which are the sealed breadth holdout for every name outside AAPL, MSFT and
+QQQ (`research/holdout_registry.json`). So the development sample is ten sessions and one
+pre-registered look at nine unread sessions is available. By section 2, ten sessions detect a net
+Sharpe of about 16 or more and nine about 17: this sample can reject or keep an idea for
+development; it cannot confirm a realistic Sharpe.
