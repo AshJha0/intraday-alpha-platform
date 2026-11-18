@@ -24,8 +24,7 @@ T0 = 1_000_000_000_000
 def digest(res) -> str:
     # lineterminator is fixed: pandas writes the platform's line ending by
     # default, which made this hash differ between Windows and Linux
-    h = hashlib.sha256(res.fills.to_csv(index=False, lineterminator="
-").encode())
+    h = hashlib.sha256(res.fills.to_csv(index=False, lineterminator="\n").encode())
     blob = {"pnl": res.pnl, "c": res.counters, "d": res.diagnostics}
     h.update(json.dumps(blob, sort_keys=True, default=str).encode())
     return h.hexdigest()
