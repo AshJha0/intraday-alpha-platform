@@ -11,7 +11,7 @@ sha256), the lower bound on the family's real-data search breadth that follows, 
 families that are DEPENDENT on it because they took looks on the same real dataset version
 (a selection on shared data: their looks count toward each other's selection history).
 
-The map is what ``iap.agents.prereg_gate.selection_history`` reads: the selection-history
+The map is what ``iap.governance.prereg_gate.selection_history`` reads: the selection-history
 fields it returns (``central_real_looks``, ``external_unmerged_looks``,
 ``real_looks_lower_bound``, ``dependent_families``, ``map_sha256``) are attached to the
 pre-registration entry ``prereg_gate.require`` returns and are the ``registry`` /

@@ -10,10 +10,10 @@ import subprocess
 import pytest
 from conftest import REPO_ROOT
 from iap.agents import anchor, signing
-from iap.agents.blackboard import Blackboard, digest, request_mac
-from iap.agents.broker import BrokerError, WriteBroker, sign
-from iap.agents.prereg_gate import PreregistrationError, require
-from iap.agents.reserve import ReserveError, ReserveEvaluator
+from iap.governance.blackboard import Blackboard, digest, request_mac
+from iap.governance.broker import BrokerError, WriteBroker, sign
+from iap.governance.prereg_gate import PreregistrationError, require
+from iap.governance.reserve import ReserveError, ReserveEvaluator
 from iap.validation.ledger import ExperimentLedger
 
 SEC = 10**9
@@ -303,7 +303,7 @@ def test_new_hmac_requests_refused_but_old_hmac_entries_verify(tmp_path, code):
 def test_v19_reader_still_verifies_a_signed_board(tmp_path, code):
     """The on-disk format stays v1.9-readable: the v1.9 verify algorithm
     (hash over every field but ``hash``) accepts entries carrying ``auth``."""
-    from iap.agents.blackboard import GENESIS
+    from iap.governance.blackboard import GENESIS
 
     b = _broker(tmp_path, code, pubkeys={"alice": PUB})
     b.post_task(
@@ -360,7 +360,7 @@ def _shared(tmp_path, code):
 
 
 def _record(tmp_path, prereg_id, outcome="confirmed", writer=None):
-    from iap.agents.workflow import OUTCOME_WRITER
+    from iap.governance.workflow import OUTCOME_WRITER
 
     b = WriteBroker(
         tmp_path, {"alice"}, trusted={writer or OUTCOME_WRITER}, clock=_CLOCK, fingerprinter=Code()
@@ -370,7 +370,7 @@ def _record(tmp_path, prereg_id, outcome="confirmed", writer=None):
 
 
 def test_closed_prereg_no_longer_blocks_on_code_or_deps(tmp_path, code):
-    from iap.agents.prereg_gate import is_closed
+    from iap.governance.prereg_gate import is_closed
 
     b = _shared(tmp_path, code)
     b.preregister("alice", "EQ01", "1s", "h", 1)
@@ -396,7 +396,7 @@ def test_outcome_for_another_prereg_does_not_close(tmp_path, code):
 
 def test_superseding_prereg_reopens_the_pair(tmp_path, code):
     """An outcome closes the prereg it names; a later superseding prereg is open."""
-    from iap.agents.prereg_gate import is_closed
+    from iap.governance.prereg_gate import is_closed
 
     b = _shared(tmp_path, code)
     b.preregister("alice", "EQ01", "1s", "h", 1)
@@ -414,7 +414,7 @@ def test_superseding_prereg_reopens_the_pair(tmp_path, code):
 
 def test_committed_r7_preregs_are_closed():
     """EQ10/1s and EQ05/1s: R7-CONFIRM-1 outcomes are on the committed board."""
-    from iap.agents.prereg_gate import is_closed
+    from iap.governance.prereg_gate import is_closed
 
     for alpha in ("EQ10", "EQ05"):
         e = require(REPO_ROOT, alpha, "1s", fingerprinter=lambda a: {"deps": {"numpy": "0"}})

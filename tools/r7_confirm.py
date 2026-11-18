@@ -26,7 +26,7 @@ in force; then prints the exact live command.  It computes no IC, runs no
 experiment and writes nothing.
 
 Live mode is the confirmatory run and is HUMAN-ONLY
-(``iap.agents.workflow.HUMAN_ONLY_OPS``: ``confirmatory_run``).  It re-runs every
+(``iap.governance.workflow.HUMAN_ONLY_OPS``: ``confirmatory_run``).  It re-runs every
 dry-run check (any failure aborts before the first look), then for EQ10 then
 EQ05 runs EXACTLY ONCE::
 
@@ -193,7 +193,7 @@ def verify_dataset(ds: Path, manifest: Mapping[str, Any], doc: Mapping[str, Any]
 
 def verify_gate(root: Path, doc: Mapping[str, Any]) -> dict[str, dict]:
     """``prereg_gate.require`` (read only) and the entry is the one the prereg names."""
-    from iap.agents.prereg_gate import PreregistrationError, require
+    from iap.governance.prereg_gate import PreregistrationError, require
 
     by_alpha = {e["alpha_id"]: e for e in doc["registration"]["entries"]}
     out = {}
@@ -910,7 +910,7 @@ def live(
     frames_loader=None,
     retry: int = 0,
 ) -> int:
-    from iap.agents.workflow import require_human
+    from iap.governance.workflow import require_human
 
     require_human("owner", "confirmatory_run", set())
     pre = preflight(root, ds, signed_ok, retry)  # raises before the first look

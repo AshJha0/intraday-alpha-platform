@@ -11,8 +11,8 @@ import subprocess
 import pytest
 from conftest import REPO_ROOT
 from iap.agents import anchor, signing, trust
-from iap.agents.blackboard import Blackboard
-from iap.agents.broker import BrokerError, WriteBroker, sign
+from iap.governance.blackboard import Blackboard
+from iap.governance.broker import BrokerError, WriteBroker, sign
 from iap.validation.ledger import (
     ExperimentLedger,
     LedgerIntegrityError,

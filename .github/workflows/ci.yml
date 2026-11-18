@@ -293,6 +293,10 @@ jobs:
       # v1.17 (F3), agents/llm/mvp/paper (config: python/pyproject.toml
       # [tool.mypy]); the error count goes to the job summary.  BLOCKING since
       # v1.16 (item 16): the count reached 0 (and is 0 on the F3 scope too).
+      # 2026-11-18 quality review: governance, research.pnl_power and
+      # research.breadth_bars joined the (blocking) scope, and llm, governance,
+      # pnl_power and breadth_bars run under the stricter per-package overrides
+      # in [[tool.mypy.overrides]]; every other package keeps the base settings.
       - name: mypy
         if: matrix.python-version == '3.12'
         working-directory: python
@@ -467,6 +471,20 @@ jobs:
           python -m coverage report --fail-under="$COV_FLOOR" > /dev/null
         env:
           COV_FLOOR: "92"
+      # 2026-11-18 review: a total can hold while one package loses its tests.
+      # Per-package line floors (tests/harness/coverage_floors.json, measured
+      # minus two points; docs/review/COVERAGE_BASELINE_2026-11-18.md) on the
+      # same combined data, so the same events (never pull requests).
+      - name: enforce per-package coverage floors
+        working-directory: python
+        run: |
+          python -m coverage json -o ../coverage-python.json
+          set +e
+          python ../tests/harness/check_coverage_floor.py ../coverage-python.json > /tmp/floors.txt
+          rc=$?
+          cat /tmp/floors.txt
+          { echo ""; echo "### Per-package coverage floors"; echo '```'; cat /tmp/floors.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
       - name: upload python coverage report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

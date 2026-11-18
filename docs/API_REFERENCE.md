@@ -4377,7 +4377,7 @@ alpha_id=None) -> ModelRecord`. Layout `<root>/<model_id>/{model.joblib,record.j
   Training metrics, the pre-registration link and the parent are recorded
   (covered by `record_hash`) but are not part of the identity.
 * `prereg` must be a blackboard entry of kind `prereg` (e.g.
-  `iap.agents.prereg_gate.require(...)`); its `hash` is recorded as
+  `iap.governance.prereg_gate.require(...)`); its `hash` is recorded as
   `prereg_hash`. Without one, registration raises `RegistryError` unless
   `exploratory=True` (recorded on the record).
 * Immutable: identical content is idempotent, different metadata under the
@@ -4798,12 +4798,12 @@ the controls and what they stop: [GOVERNANCE.md §2a-2d](GOVERNANCE.md).
 
 ### 1. Governance primitives (v1.10-v1.14)
 
-**`iap.agents.blackboard`** — `Blackboard(path)`: append-only, hash-chained
+**`iap.governance.blackboard`** — `Blackboard(path)`: append-only, hash-chained
 JSONL (`entries()`, `verify()`, `verify_signatures(pubkeys, legacy, board_id)`);
-`iap.agents.blackboard.digest(obj)` / `canonical(obj)` are the canonical-JSON
+`iap.governance.blackboard.digest(obj)` / `canonical(obj)` are the canonical-JSON
 hash every signature and citation uses; `GENESIS`, `KINDS`.
 
-**`iap.agents.broker`** — `WriteBroker(root, agents, *, pubkeys=, trusted=,
+**`iap.governance.broker`** — `WriteBroker(root, agents, *, pubkeys=, trusted=,
 fingerprinter=)`: the only writer. `post_task`, `claim`, `file_finding`,
 `release`, `preregister(agent, alpha_id, horizon, hypothesis, expected_sign,
 *, auth, ledger=, dataset_version=, supersede=, screen=)` (`screen`, v1.17 C6,
@@ -4812,7 +4812,7 @@ PASSED it under its model identity, else `BrokerError`; the screen's path, sha25
 and status are recorded on the entry — `docs/API_REFERENCE.md` section 1.10);
 `request_context()` gives the
 board head and id a signed request binds to (`ed25519-v2`);
-`iap.agents.broker.sign(private_key, agent, op, args, **context)` builds the
+`iap.governance.broker.sign(private_key, agent, op, args, **context)` builds the
 `auth` document; `board_id(root, board)`. Errors: `BrokerError`.
 
 **`iap.agents.signing`** — `generate_keypair() -> (private_hex, public_hex)`,
@@ -4821,33 +4821,33 @@ msg, sig_hex)`, `message(...)`. **`iap.agents.trust`** — the maintainer-signed
 registry: `sign_registry`, `verify_registry`, `read_roots(root, ref)`,
 `load_pubkeys(root)`, `trusted_pubkeys(root, ref)`; `TrustError`.
 
-**`iap.agents.prereg_gate`** — `require(repo_root, alpha_id, horizon, board=None,
+**`iap.governance.prereg_gate`** — `require(repo_root, alpha_id, horizon, board=None,
 fingerprinter=None, agents=None)`: the entry a run needs, or `PreregistrationError`;
 `board_path(repo_root)`, `is_closed(entry)`. **`iap.agents.fingerprint`** —
 `fingerprint(alpha_id)` (scheme 2: code + feature closure hash),
 `module_closure`, `closure_hash`, `check_registration_env` (CI-lock venv for
 registrations), `ci_lock_deps`, `compare_deps`.
 
-**`iap.agents.workflow`** — `Workflow(broker, *, ledger=None)`: `propose` (one look),
+**`iap.governance.workflow`** — `Workflow(broker, *, ledger=None)`: `propose` (one look),
 `draft_prereg`, `drafts()`, human-only `sign_off` / `record_outcome`
 (`HUMAN_ONLY_OPS`, `require_human`, `AgentAuthorityError`);
 `issue_signoff(approver, secret, draft_hash, reason)`, `hit_rate(entries)`,
-`proposal_id(...)`. **`iap.agents.approvals`** — single-use signed approvals
+`proposal_id(...)`. **`iap.governance.approvals`** — single-use signed approvals
 for the human lifecycle edges: `issue`, `verify`, `apply`, `new_secret`;
 `ACTIONS = ("retire", "reset")`.
 
 **`iap.agents.anchor`** — `anchors(repo, board)` and `verify(repo, board,
-anchor_file=None, ref=None)` (chain, git prefixes, anchors). **`iap.agents.reserve`** —
+anchor_file=None, ref=None)` (chain, git prefixes, anchors). **`iap.governance.reserve`** —
 `ReserveEvaluator(secret, broker, runner)` with `evaluate(agent, candidate)`
 (pass/fail only, `MAX_ATTEMPTS = 3`); `iap.agents.reserve_runner.make_runner`.
 
-**`iap.agents.citations`** — `resolve(ref, root)`, `unresolved(refs, root)`,
+**`iap.governance.citations`** — `resolve(ref, root)`, `unresolved(refs, root)`,
 `artefact(ref, root)` (the JSON a `report:<session>.<run>` or `board:<hash>`
-names), `report_path(root, ident)`. **`iap.agents.untrusted`** —
+names), `report_path(root, ident)`. **`iap.governance.untrusted`** —
 `sanitise(text, limit)`, `injection_flags(text)`, `wrap(text, source)`,
 `wrap_tree(value, source, keys)`: free text from anyone is data.
 
-**`iap.agents.mcp_server`** (read-only MCP over stdio: `Tools`, `tool_list()`,
+**`iap.governance.mcp_server`** (read-only MCP over stdio: `Tools`, `tool_list()`,
 `handle(tools, msg)`, `serve(root)`; `FREE_TEXT` names the free-text keys) and
 **`iap.agents.mcp_workflow`** (`WorkflowTools`, the signed proposal workflow
 over MCP; `FORBIDDEN_TOOL_NAMES`).

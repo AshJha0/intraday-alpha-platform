@@ -10,8 +10,8 @@ import json
 import sys
 
 import pytest
-from iap.agents import citations, mcp_server
-from iap.agents.blackboard import Blackboard
+from iap.governance import citations, mcp_server
+from iap.governance.blackboard import Blackboard
 from iap.llm import evals, verify
 from iap.llm.agent import SYSTEM_PROMPT, TOOL_NAMES, ToolRefused, open_session, run_session
 from iap.llm.budget import Budget, BudgetExceeded, usage_cost

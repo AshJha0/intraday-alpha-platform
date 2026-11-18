@@ -29,9 +29,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python" / "src"))
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey  # noqa: E402
-from iap.agents import prereg_gate, signing, trust  # noqa: E402
-from iap.agents.blackboard import canonical  # noqa: E402
-from iap.agents.broker import WriteBroker  # noqa: E402
+from iap.agents import signing, trust  # noqa: E402
+from iap.governance import prereg_gate
+from iap.governance.blackboard import canonical  # noqa: E402
+from iap.governance.broker import WriteBroker  # noqa: E402
 
 KEYFILE = Path("C:/Users/ashis/.iap_keys/maintainer.key")
 APPROVER = "ashjha0"
@@ -132,7 +133,7 @@ def main() -> int:
                 "draft_file": DRAFT,
                 "draft_sha256": dh,
                 "registered_utc": now,
-                "path": "iap.agents.broker.WriteBroker.preregister (human writer; one look each)",
+                "path": "iap.governance.broker.WriteBroker.preregister (human writer; one look each)",
                 "blackboard": "research/agents/blackboard.jsonl",
                 "entries": entries,
             },
@@ -147,7 +148,7 @@ def main() -> int:
         "maintainer": APPROVER,
         "public_key": pub,
         "trust_root": "research/agents/trust_roots.json",
-        "message": "iap.agents.blackboard.canonical(this document without 'signature')",
+        "message": "iap.governance.blackboard.canonical(this document without 'signature')",
         "message_sha256": hashlib.sha256(msg).hexdigest(),
         "sig": sig,
     }

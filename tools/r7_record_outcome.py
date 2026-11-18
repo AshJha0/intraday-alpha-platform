@@ -5,7 +5,7 @@
     python tools/r7_record_outcome.py --i-am-the-owner --prereg-id ID \
         --outcome confirmed|rejected --ref research/r7/r7_confirm_result.json#EQ10@1s
 
-Thin CLI over ``iap.agents.workflow.Workflow.record_outcome`` (actor ``ashjha0``,
+Thin CLI over ``iap.governance.workflow.Workflow.record_outcome`` (actor ``ashjha0``,
 writer ``outcomes``).  Refuses unless the outcome equals the verdict that
 ``tools/r7_confirm.py`` wrote for that prereg in research/r7/r7_confirm_result.json.
 """
@@ -33,8 +33,8 @@ def expected_verdict(root: Path, prereg_id: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    from iap.agents.broker import WriteBroker
-    from iap.agents.workflow import OUTCOME_WRITER, OUTCOMES, Workflow, registered_agents
+    from iap.governance.broker import WriteBroker
+    from iap.governance.workflow import OUTCOME_WRITER, OUTCOMES, Workflow, registered_agents
 
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--i-am-the-owner", action="store_true", required=True)

@@ -240,7 +240,7 @@ def cmd_sign(a: argparse.Namespace) -> int:
         raise Refused(str(exc)) from exc
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     from iap.agents import signing, trust
-    from iap.agents.blackboard import canonical
+    from iap.governance.blackboard import canonical
 
     key = json.loads(Path(a.keyfile).read_text(encoding="ascii"))[a.maintainer]
     pub = (trust.read_roots(root) or {}).get("maintainers", {}).get(a.maintainer)
@@ -260,7 +260,7 @@ def cmd_sign(a: argparse.Namespace) -> int:
         "maintainer": a.maintainer,
         "public_key": pub,
         "trust_root": "research/agents/trust_roots.json",
-        "message": "iap.agents.blackboard.canonical(this document without 'signature')",
+        "message": "iap.governance.blackboard.canonical(this document without 'signature')",
         "message_sha256": hashlib.sha256(msg).hexdigest(),
         "sig": sig,
     }
