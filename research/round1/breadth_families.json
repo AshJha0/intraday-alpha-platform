@@ -1,15 +1,25 @@
 {
- "bonferroni_k": 7,
- "one_sided_threshold": 0.0035714285714285718,
+ "bonferroni_k": 8,
+ "f3_version": 2,
+ "one_sided_threshold": 0.003125,
  "pooled": {
-  "closing_imbalance_d0": {
-   "sessions": 0
-  },
   "closing_imbalance_d1": {
-   "sessions": 0
+   "mean": 0.3151885385984347,
+   "n": 10,
+   "p_one_sided": 0.26791734133838746,
+   "positive_sessions": 4,
+   "se": 0.4896615034318677,
+   "sessions": 10,
+   "t": 0.6436865801975191
   },
   "closing_imbalance_d1_mid_exit": {
-   "sessions": 0
+   "mean": -3.4127445812504655,
+   "n": 10,
+   "p_one_sided": 0.9994911064503793,
+   "positive_sessions": 1,
+   "se": 0.7157155983886996,
+   "sessions": 10,
+   "t": -4.768297056727036
   },
   "momentum_30_d0": {
    "mean": -6.269798574522949,
@@ -59,110 +69,75 @@
  ],
  "sessions": {
   "2019-01-30": {
-   "closing_imbalance_d0": {
-    "coverage": 0.0,
-    "family": "closing_imbalance",
-    "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 1.9989661765380828,
-    "names_with_score": 0,
-    "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "params": {
-     "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 0,
-     "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
-    },
-    "rank_ic": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "rebalances": 1,
-    "session_net_bps": null
-   },
    "closing_imbalance_d1": {
-    "coverage": 0.0,
+    "coverage": 0.374,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 4.204199538820804,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 1.9132423633788818,
-    "names_with_score": 0,
+    "median_names_used": 187.0,
+    "median_round_trip_cost_bps": 1.2354831262670047,
+    "names_with_score": 187,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 2.476155654428209,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.09005040427210143,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": 2.476155654428209
    },
    "closing_imbalance_d1_mid_exit": {
-    "coverage": 0.0,
+    "coverage": 0.374,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 2.622329174117403,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 4.473057180753489,
-    "names_with_score": 0,
+    "median_names_used": 187.0,
+    "median_round_trip_cost_bps": 3.8304787846101473,
+    "names_with_score": 187,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -0.7360645380136415,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "mid",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.03408062236880874,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": -0.7360645380136415
    },
    "missing": 0,
    "momentum_30_d0": {
@@ -300,110 +275,75 @@
    }
   },
   "2019-03-27": {
-   "closing_imbalance_d0": {
-    "coverage": 0.0,
-    "family": "closing_imbalance",
-    "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 1.5636010209479752,
-    "names_with_score": 0,
-    "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "params": {
-     "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 0,
-     "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
-    },
-    "rank_ic": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "rebalances": 1,
-    "session_net_bps": null
-   },
    "closing_imbalance_d1": {
-    "coverage": 0.0,
+    "coverage": 0.3674698795180723,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 2.6102334025636846,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 1.5893207747691234,
-    "names_with_score": 0,
+    "median_names_used": 183.0,
+    "median_round_trip_cost_bps": 1.1453463394968428,
+    "names_with_score": 183,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 1.20787590189432,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.29135187871974144,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": 1.20787590189432
    },
    "closing_imbalance_d1_mid_exit": {
-    "coverage": 0.0,
+    "coverage": 0.3674698795180723,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 1.9980455360180733,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 3.6471992036052248,
-    "names_with_score": 0,
+    "median_names_used": 183.0,
+    "median_round_trip_cost_bps": 3.1867503463810447,
+    "names_with_score": 183,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -0.6485905990556131,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "mid",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.18746900900060012,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": -0.6485905990556131
    },
    "missing": 2,
    "momentum_30_d0": {
@@ -541,110 +481,75 @@
    }
   },
   "2019-07-30": {
-   "closing_imbalance_d0": {
-    "coverage": 0.0,
-    "family": "closing_imbalance",
-    "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 1.240156264457083,
-    "names_with_score": 0,
-    "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "params": {
-     "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 0,
-     "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
-    },
-    "rank_ic": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "rebalances": 1,
-    "session_net_bps": null
-   },
    "closing_imbalance_d1": {
-    "coverage": 0.0,
+    "coverage": 0.37142857142857144,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.25974552949926194,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 1.3280223959954323,
-    "names_with_score": 0,
+    "median_names_used": 182.0,
+    "median_round_trip_cost_bps": 1.0913088537376516,
+    "names_with_score": 182,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -0.9680748796603983,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.1055629062314268,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": -0.9680748796603983
    },
    "closing_imbalance_d1_mid_exit": {
-    "coverage": 0.0,
+    "coverage": 0.37142857142857144,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -1.3957089264336298,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 3.748130961991511,
-    "names_with_score": 0,
+    "median_names_used": 182.0,
+    "median_round_trip_cost_bps": 3.5457221958767002,
+    "names_with_score": 182,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -4.154101128518006,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "mid",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": -0.037212632009833366,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": -4.154101128518006
    },
    "missing": 10,
    "momentum_30_d0": {
@@ -782,110 +687,75 @@
    }
   },
   "2019-08-30": {
-   "closing_imbalance_d0": {
-    "coverage": 0.0,
-    "family": "closing_imbalance",
-    "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 1.7946974934627369,
-    "names_with_score": 0,
-    "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "params": {
-     "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 0,
-     "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
-    },
-    "rank_ic": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "rebalances": 1,
-    "session_net_bps": null
-   },
    "closing_imbalance_d1": {
-    "coverage": 0.0,
+    "coverage": 0.3668032786885246,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 1.9924769867523573,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 1.7115772102803926,
-    "names_with_score": 0,
+    "median_names_used": 179.0,
+    "median_round_trip_cost_bps": 1.376749624447874,
+    "names_with_score": 179,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.2381607429643827,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.15641119465957276,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": 0.2381607429643827
    },
    "closing_imbalance_d1_mid_exit": {
-    "coverage": 0.0,
+    "coverage": 0.3668032786885246,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.12921565908329144,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 4.8804062786629565,
-    "names_with_score": 0,
+    "median_names_used": 179.0,
+    "median_round_trip_cost_bps": 4.5219970855878495,
+    "names_with_score": 179,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -3.0934707068656855,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "mid",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.03226628493753959,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": -3.0934707068656855
    },
    "missing": 12,
    "momentum_30_d0": {
@@ -1023,110 +893,75 @@
    }
   },
   "2019-10-18": {
-   "closing_imbalance_d0": {
-    "coverage": 0.0,
-    "family": "closing_imbalance",
-    "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 1.557680924639397,
-    "names_with_score": 0,
-    "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "params": {
-     "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 0,
-     "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
-    },
-    "rank_ic": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "rebalances": 1,
-    "session_net_bps": null
-   },
    "closing_imbalance_d1": {
-    "coverage": 0.0,
+    "coverage": 0.3731958762886598,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 5.000372852849279,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 1.5843675732770004,
-    "names_with_score": 0,
+    "median_names_used": 181.0,
+    "median_round_trip_cost_bps": 1.2238404112103782,
+    "names_with_score": 181,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 3.2777025425229884,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.2529041645894463,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": 3.2777025425229884
    },
    "closing_imbalance_d1_mid_exit": {
-    "coverage": 0.0,
+    "coverage": 0.3731958762886598,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 3.5380838016462066,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 3.9274736054195762,
-    "names_with_score": 0,
+    "median_names_used": 181.0,
+    "median_round_trip_cost_bps": 3.629107663957756,
+    "names_with_score": 181,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.193049131510334,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "mid",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.1384001739395582,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": 0.193049131510334
    },
    "missing": 15,
    "momentum_30_d0": {
@@ -1264,110 +1099,75 @@
    }
   },
   "2019-10-30": {
-   "closing_imbalance_d0": {
-    "coverage": 0.0,
-    "family": "closing_imbalance",
-    "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 2.6932399676811203,
-    "names_with_score": 0,
-    "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "params": {
-     "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 0,
-     "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
-    },
-    "rank_ic": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "rebalances": 1,
-    "session_net_bps": null
-   },
    "closing_imbalance_d1": {
-    "coverage": 0.0,
+    "coverage": 0.3711340206185567,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 1.2502672593287585,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 2.514258492238881,
-    "names_with_score": 0,
+    "median_names_used": 180.0,
+    "median_round_trip_cost_bps": 1.2099213551119177,
+    "names_with_score": 180,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -0.5360948245345857,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.03925085509970251,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": -0.5360948245345857
    },
    "closing_imbalance_d1_mid_exit": {
-    "coverage": 0.0,
+    "coverage": 0.3711340206185567,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -1.7550019697669856,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 5.158207801911547,
-    "names_with_score": 0,
+    "median_names_used": 180.0,
+    "median_round_trip_cost_bps": 3.901340178525814,
+    "names_with_score": 180,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -5.932981608964383,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "mid",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": -0.14345058952510534,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": -5.932981608964383
    },
    "missing": 15,
    "momentum_30_d0": {
@@ -1505,110 +1305,75 @@
    }
   },
   "2019-12-30": {
-   "closing_imbalance_d0": {
-    "coverage": 0.0,
-    "family": "closing_imbalance",
-    "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 1.3361838588989845,
-    "names_with_score": 0,
-    "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "params": {
-     "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 0,
-     "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
-    },
-    "rank_ic": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "rebalances": 1,
-    "session_net_bps": null
-   },
    "closing_imbalance_d1": {
-    "coverage": 0.0,
+    "coverage": 0.48851774530271397,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.0049666934896230065,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 1.352265043948614,
-    "names_with_score": 0,
+    "median_names_used": 234.0,
+    "median_round_trip_cost_bps": 1.098297638660077,
+    "names_with_score": 234,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -1.6193260878353886,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.03775901325740147,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": -1.6193260878353886
    },
    "closing_imbalance_d1_mid_exit": {
-    "coverage": 0.0,
+    "coverage": 0.48851774530271397,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -2.206736715428766,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 3.8769206821282225,
-    "names_with_score": 0,
+    "median_names_used": 234.0,
+    "median_round_trip_cost_bps": 3.488958882319858,
+    "names_with_score": 234,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -5.584918575732127,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "mid",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": -0.1559097622786351,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": -5.584918575732127
    },
    "missing": 21,
    "momentum_30_d0": {
@@ -1746,110 +1511,75 @@
    }
   },
   "2020-01-30": {
-   "closing_imbalance_d0": {
-    "coverage": 0.0,
-    "family": "closing_imbalance",
-    "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 2.5400050800101597,
-    "names_with_score": 0,
-    "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "params": {
-     "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 0,
-     "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
-    },
-    "rank_ic": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "rebalances": 1,
-    "session_net_bps": null
-   },
    "closing_imbalance_d1": {
-    "coverage": 0.0,
+    "coverage": 0.3924843423799583,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 1.7917004005616837,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 2.538715410002539,
-    "names_with_score": 0,
+    "median_names_used": 188.0,
+    "median_round_trip_cost_bps": 1.46864444118079,
+    "names_with_score": 188,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -0.17365748884537316,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.14162845627913864,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": -0.17365748884537316
    },
    "closing_imbalance_d1_mid_exit": {
-    "coverage": 0.0,
+    "coverage": 0.3924843423799583,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -0.960556888988693,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 5.1460156402672155,
-    "names_with_score": 0,
+    "median_names_used": 188.0,
+    "median_round_trip_cost_bps": 4.2638667293609105,
+    "names_with_score": 188,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -4.582410754738836,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "mid",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.0038058197676295894,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": -4.582410754738836
    },
    "missing": 21,
    "momentum_30_d0": {
@@ -1987,110 +1717,75 @@
    }
   },
   "2021-07-13": {
-   "closing_imbalance_d0": {
-    "coverage": 0.0,
-    "family": "closing_imbalance",
-    "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 1.7337031900138697,
-    "names_with_score": 0,
-    "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "params": {
-     "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 0,
-     "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
-    },
-    "rank_ic": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "rebalances": 1,
-    "session_net_bps": null
-   },
    "closing_imbalance_d1": {
-    "coverage": 0.0,
+    "coverage": 0.8812095032397408,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 1.3797049241277977,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 1.6550810989738498,
-    "names_with_score": 0,
+    "median_names_used": 408.0,
+    "median_round_trip_cost_bps": 1.2436264146250466,
+    "names_with_score": 408,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -0.4835819454938184,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.03329127652778099,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": -0.4835819454938184
    },
    "closing_imbalance_d1_mid_exit": {
-    "coverage": 0.0,
+    "coverage": 0.8812095032397408,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -1.155489139149077,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 5.2815363797471795,
-    "names_with_score": 0,
+    "median_names_used": 408.0,
+    "median_round_trip_cost_bps": 4.998751561485176,
+    "names_with_score": 408,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -5.62772572350249,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "mid",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": -0.14204009073702334,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": -5.62772572350249
    },
    "missing": 37,
    "momentum_30_d0": {
@@ -2228,110 +1923,75 @@
    }
   },
   "2021-08-13": {
-   "closing_imbalance_d0": {
-    "coverage": 0.0,
-    "family": "closing_imbalance",
-    "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 1.492725084959253,
-    "names_with_score": 0,
-    "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "params": {
-     "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 0,
-     "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
-    },
-    "rank_ic": {
-     "mean": null,
-     "n": 0,
-     "se": null,
-     "t": null
-    },
-    "rebalances": 1,
-    "session_net_bps": null
-   },
    "closing_imbalance_d1": {
-    "coverage": 0.0,
+    "coverage": 0.8701298701298701,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": 1.316661210359213,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 1.4659938463647477,
-    "names_with_score": 0,
+    "median_names_used": 402.0,
+    "median_round_trip_cost_bps": 1.0738841646404194,
+    "names_with_score": 402,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -0.26727422945598833,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "cross",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": 0.1180803894113034,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": -0.26727422945598833
    },
    "closing_imbalance_d1_mid_exit": {
-    "coverage": 0.0,
+    "coverage": 0.8701298701298701,
     "family": "closing_imbalance",
     "gross_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -0.22380172075620042,
+     "n": 1,
      "se": null,
      "t": null
     },
-    "median_names_used": 0.0,
-    "median_round_trip_cost_bps": 5.00631550013859,
-    "names_with_score": 0,
+    "median_names_used": 402.0,
+    "median_round_trip_cost_bps": 4.7300189089549205,
+    "names_with_score": 402,
     "net_bps_per_rebalance": {
-     "mean": null,
-     "n": 0,
+     "mean": -3.9602313086242056,
+     "n": 1,
      "se": null,
      "t": null
     },
     "params": {
      "decile_q": 0.1,
-     "decision": 324,
-     "decision_ns": 53700000000000,
-     "delay": 1,
+     "decision_ns": 57305000000000,
+     "entry": 385,
      "exit": "mid",
-     "normaliser": "displayed volume bars 0..324"
+     "normaliser": "displayed volume bars 0..384",
+     "version": 2
     },
     "rank_ic": {
-     "mean": null,
-     "n": 0,
+     "mean": -0.01299088496275827,
+     "n": 1,
      "se": null,
      "t": null
     },
     "rebalances": 1,
-    "session_net_bps": null
+    "session_net_bps": -3.9602313086242056
    },
    "missing": 38,
    "momentum_30_d0": {
