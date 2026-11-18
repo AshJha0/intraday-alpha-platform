@@ -198,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--check", action="store_true", help="fail if a rate rose; do not write")
     a = ap.parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+        sys.stdout.reconfigure(encoding="utf-8")
     cases = validate_cases(json.loads(a.cases.read_text(encoding="utf-8")))
     res = evaluate(cases)
     if a.heldout is not None and a.heldout.name != "none":

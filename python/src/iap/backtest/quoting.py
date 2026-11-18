@@ -462,6 +462,8 @@ class QuotingBacktester:
             """Rule 10 (b): pull a touch quote at the front of a thin queue
             while the opposite touch dominates."""
             book = sim.venue_book(instrument_id, venue_id)
+            if book is None:
+                return False
             bb, ba = book.best_bid(), book.best_ask()
             own, opp = (bb, ba) if side == 0 else (ba, bb)
             if own is None or opp is None or price != own[0]:
@@ -778,10 +780,14 @@ class QuotingBacktester:
                     tq["total"] += dt
                     for side in (0, 1):
                         oid = live[side]
-                        o = None if oid is None else sim.orders[oid]
-                        if o is not None and o.resting and not o.is_terminal:
+                        resting_order = None if oid is None else sim.orders[oid]
+                        if (
+                            resting_order is not None
+                            and resting_order.resting
+                            and not resting_order.is_terminal
+                        ):
                             tq[f"quoted_{side}"] += dt
-                            if o.limit_ticks == bs[side]:
+                            if resting_order.limit_ticks == bs[side]:
                                 tq[f"touch_{side}"] += dt
                 tq["prev"] = t
             q_before = q[0]

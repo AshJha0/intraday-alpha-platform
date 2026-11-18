@@ -240,7 +240,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--check", action="store_true", help="fail on regression; do not write")
     a = ap.parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+        sys.stdout.reconfigure(encoding="utf-8")
     res = evaluate(validate_cases(json.loads(a.cases.read_text(encoding="utf-8"))))
     pf = res["pattern_flag"]
     for name, r in [("overall", pf["overall"]), *pf["per_category"].items()]:

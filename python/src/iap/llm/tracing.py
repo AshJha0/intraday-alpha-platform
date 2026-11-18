@@ -377,7 +377,7 @@ def to_otel(spans: Sequence[Span | Mapping[str, Any]], otel_tracer: Any = None) 
     original start and end times).  Needs ``opentelemetry`` installed; it is
     not a dependency of this project.  OpenTelemetry assigns its own ids."""
     try:
-        from opentelemetry import trace  # type: ignore[import-not-found]
+        from opentelemetry import trace
     except ImportError as exc:
         raise RuntimeError(
             "to_otel needs the 'opentelemetry-api' and 'opentelemetry-sdk' packages, "
