@@ -8,7 +8,7 @@ sealed holdout look, "Yes, you sign".
 
 This file lists every decision taken under that delegation, why, and how to reverse it. The
 delegation covers this round only and ends on the morning of 2026-11-19. Standing rules that
-stayed in force: no spend; no second review; no London Stock Exchange material; no sign-ups;
+stayed in force: no spend; no second review; no sign-ups; the standing exclusion of one named exchange group;
 no gate weakened to get a pass; no release on a failing or unfinished test run; negative results
 reported as found.
 
