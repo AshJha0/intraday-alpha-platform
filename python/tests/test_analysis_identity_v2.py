@@ -279,6 +279,8 @@ RUNNERS = {
     "python/src/iap/auction/rel08c_study.py": "environment_mismatches",
     # v2.0 CR1: the registered runner verifies the signed prereg's identity before any sealed request
     "tools/runner/verify.py": "verify_identity",
+    # round 1: the one look at the sealed breadth holdout on the bars path
+    "python/src/iap/research/breadth_holdout.py": "verify_identity",
 }
 # Consume a signed document but run no analysis: binders / signers / the
 # identity module itself / tools that only verify signatures.
@@ -331,6 +333,8 @@ def test_no_prereg_consumer_skips_the_identity_check():
         "python/src/iap/research/__main__.py",  # declares identity_actual -> prereg_gate
         "python/src/iap/research/known_null.py",  # identity_args helper
         "python/src/iap/research/rel08_screen.py",
+        # builds an UNSIGNED draft that carries the block; reads no signed document
+        "python/src/iap/graph/research_flow.py",
     }
     assert sorted(set(unknown) - passthrough) == [], (
         "a new file consumes signed preregs: add it to RUNNERS with its identity check"

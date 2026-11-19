@@ -98,7 +98,7 @@ repository:
 | Event bus / threading | - | - | `eventbus` crate (SPSC ring) | - |
 | Telemetry / metrics | `metrics` (the one deployed producer since v1.17, §8) | - | `telemetry` crate (sets the metric-name contract; format reference only) | `monitoring` + `api` (MetricsServer) |
 | Paper trading / platform loop | `paper` (forward paper trade §9.2; v1.18 order manager, feed guard, supervisor §22), `mvp` | - | - | `platform` (PaperTrading), `config`, `api` |
-| Research authorisation, holdout registry, ledger family (v1.18) | `agents.analysis_identity`, `agents.prereg_gate`, `research.holdout_registry`, `validation.ledger` (sole owner, §22) | - | - | - |
+| Research authorisation, holdout registry, ledger family (v1.18) | `agents.analysis_identity`, `governance.prereg_gate`, `research.holdout_registry`, `validation.ledger` (sole owner, §22) | - | - | - |
 | Monitoring policy, factor risk, portfolio limits, capacity (v1.18) | `monitoring`, `portfolio.factor_risk`, `risk.portfolio_limits`, `portfolio.enforced`, `portfolio.capacity` (sole owner, §22) | - | - | - |
 
 Notes on the realized shape (deviations from the spec's idealized matrix are
@@ -320,7 +320,7 @@ and by Java and Rust (the lifecycle ports). The harness
 (`tests/harness/run_all.sh`, with `run_golden.sh` as the golden-only alias)
 runs every suite with the canonical commands and prints the parity table; a
 main CI run 40015853764 (2026-10-23, commit 23b69fb2, the v1.18.0 tag commit)
-passes 4062/333/376 tests (217/74/75 golden) across python/cpp/rust (Java
+passes 4062/333/388 tests (217/74/75 golden) across python/cpp/rust (Java
 archived in v1.15, the git tag `archive/java-v1.14.0`), plus the repo-level `integration` (35)
 and `replay` (6) rows, the same counts the README parity table records.
 The python figure is the Python 3.11 `python` job plus the `python-slow` job:
@@ -883,13 +883,13 @@ core). Plan issue AG03 is closed on that basis, with the gaps recorded in it.
 
 | planned | epic / issue | why it comes before any agent | status (v1.11.0) |
 |---|---|---|---|
-| read-only MCP server over the ledger, reports, lifecycle log and traces | E24 AG01, E30 AL05 | resources only, no tool with a side effect; versioned schemas and golden outputs | built v1.7.0 (`iap.agents.mcp_server`, six tools, stdio only) |
+| read-only MCP server over the ledger, reports, lifecycle log and traces | E24 AG01, E30 AL05 | resources only, no tool with a side effect; versioned schemas and golden outputs | built v1.7.0 (`iap.governance.mcp_server`, six tools, stdio only) |
 | write broker and append-only blackboard | E30 AL01 | one attributable, replayable path to repository, ledger and lifecycle state | built v1.7.0; signed requests and git anchoring v1.10.0 |
 | hypothesis pre-registration | E30 AL02 | the hypothesis is committed before any data is read | built v1.7.0 (CLI gate); look debit and code fingerprint v1.10.0 |
 | reserve sessions on a hidden seed | E30 AL03 | a final evaluation the agents cannot have tuned to | built v1.7.0; cap keyed on (alpha, horizon, code hash) v1.10.0 |
 | authenticated HUMAN approvals | E30 AL04 | a lifecycle edge's `actor = HUMAN` was asserted by the caller, not verified | built v1.7.0 for the retire and reset edges |
 | agent evaluations | E30 AL06 | planted leak, seeded bug, shuffled-label null, citation resolution: each must fail when its control is removed | built v1.7.0 (`iap.agents.evals`) |
-| untrusted free-text handling | E30 AL07 | ledger text, report text and tool output are data, not instructions | built v1.7.0 (`iap.agents.untrusted`) |
+| untrusted free-text handling | E30 AL07 | ledger text, report text and tool output are data, not instructions | built v1.7.0 (`iap.governance.untrusted`) |
 | the research agent itself | AI1-AI4 (plan) | - | built v1.11.0: AI1 the agent (`iap.llm`), AI2 its behaviour evals, AI3 the model registry (`iap.mlops`); AI4 (deep order-book baselines) deferred |
 
 The ordering is the design. An agent given the goal "get an alpha promoted"
@@ -1105,7 +1105,7 @@ raw ITCH ──► Itch50Reader(noii=True) ──► auction stream dir ──�
 validation.methods "v3" ──► validation.sessions (calendar, sampling) + day-aligned splits
                             + instrument-mean gate IC + validity block (metrics: day-cluster, block bootstrap)
 
-agents.broker ──► agents.fingerprint (code/feature/deps hash) ──► ledger look debit ──► blackboard
+governance.broker ──► agents.fingerprint (code/feature/deps hash) ──► ledger look debit ──► blackboard
             └──► agents.signing (Ed25519 verify, public keys only)
 agents.anchor ──► git history + research/agents/anchors.json ──► cli verify-board
 ```
@@ -1123,7 +1123,7 @@ agents.anchor ──► git history + research/agents/anchors.json ──► cli
 | `iap.execution.volume_curve` | X3 | forecast intraday volume curve | `iap.execution.algos` VWAP |
 | `iap.validation.sessions`, `methods` (`v3`), `metrics`, `splits` | R1-R6 | event calendar, day sampling, day-aligned folds, day-clustered inference, validity block | the `v2` default bundle |
 | `iap.features` `--workers`, `--label-freshness` | E1, R5 | parallel day replay; causal label freshness | the serial build (byte-identical) |
-| `iap.agents.fingerprint`, `anchor`, `signing` | G1-G4 | code-bound prereg, git anchoring, Ed25519 identity | `iap.agents.broker`, `blackboard`, `prereg_gate` (v1.7.0) |
+| `iap.agents.fingerprint`, `anchor`, `signing` | G1-G4 | code-bound prereg, git anchoring, Ed25519 identity | `iap.governance.broker`, `blackboard`, `prereg_gate` (v1.7.0) |
 
 ### 15.2 Opt-in versus default
 
@@ -1279,7 +1279,7 @@ Each move put code in the package that owns what it reads or writes:
 | `marketdata <-> validation` | `iap.validation.sessions` wrote and read the dataset manifest | `record_day_sampling` and `book_scope_for_dataset` moved to `iap.marketdata.manifest_records` |
 
 Every old module path in `iap.agents` and `iap.research` still imports: the old module replaces
-itself in `sys.modules` with the new one, so `iap.agents.broker is iap.governance.broker` and a
+itself in `sys.modules` with the new one, so `iap.governance.broker is iap.governance.broker` and a
 monkeypatch on either name reaches the running code. The three single functions and the class above
 moved without an alias (an alias would be the same import edge); their callers were updated, and the
 v1.x root `COOKBOOK.md`, a frozen reference, still shows the old `iap.execution.AlphaUrgencySource`
@@ -1501,7 +1501,7 @@ artefact index is [release/RESULTS_INDEX.md](release/RESULTS_INDEX.md).
 | component | module / artefact | what it does |
 |---|---|---|
 | analysis identity (REL-02a) | `iap.agents.analysis_identity` (`build_identity`, `verify_identity`, `require_independent_runner`); [governance/ANALYSIS_IDENTITY.md](GOVERNANCE.md) | a signed pre-registration binds, in its signed body, the scripts, the whole `python/src/iap` tree, `configs/`, `data/reference/`, declared study inputs, the hashed lock and the installed package versions, the interpreter, the commit, the dataset versions, the hypothesis family, the metrics and the thresholds. A runner refuses on any mismatch; a signer may not be the runner (`IAP_RUN_ACTOR`). Preregs signed under identity v1 stay verifiable and are not re-signed |
-| pre-registration gate | `iap.agents.prereg_gate`, `tools/verify_signatures.py`, `tools/prereg_bind_identity.py` | the Ed25519 signature check the research runners call; a scan test fails if a new prereg consumer does not call the identity check |
+| pre-registration gate | `iap.governance.prereg_gate`, `tools/verify_signatures.py`, `tools/prereg_bind_identity.py` | the Ed25519 signature check the research runners call; a scan test fails if a new prereg consumer does not call the identity check |
 | trust root | `research/agents/trust_roots.json`; [governance/TRUST_ROOT.md](GOVERNANCE.md) | the maintainer key, a pinned trust-root version and its fingerprint, published outside the repository (PR #315) |
 | holdout registry (REL-02b) | `iap.research.holdout_registry`, `research/holdout_registry.json`; [governance/DATA_ACCESS_PATHS.md](GOVERNANCE.md) | every ingested dataset and every (session, symbol) scope of the 2025/26 holdout is `in_sample`, `spent` or `unread`, looked up by content hash and by scope, never by path string. `guard` fails closed (an unknown real dataset is refused) and decides before a data file is opened; `reader_guard` is a backstop in the low-level readers; every attempt is appended to a hash-chained, git-ignored access log. The registry is sealed with a body hash that CI pins; someone who edits and reseals it is stopped by review only |
 | one ledger family (REL-02c) | `iap.validation.ledger` (`data_family`), `tools/ledger_family_report.py`, `tools/migrate_ledger_rel02.py`, `research/v118/REL02_LEDGER_MIGRATION.md` | every entry of `research/experiments.json` is `real` or `synthetic`. After the owner-approved migration (2026-10-18): 640 distinct configurations and 6,826 looks, of which 256 configurations holding 1,132 of the looks are real-data (real-data N 24 -> 256). The tag is not part of the chained identity and the migration only appended. The PROMOTE gate still uses the total look count |

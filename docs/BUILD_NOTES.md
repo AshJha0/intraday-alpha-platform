@@ -28,7 +28,7 @@ cd python && PYTHONPATH=src python3 tools/make_golden.py   # regen goldens (deli
 ```
 
 - **Test counts.** The current per-language counts live in one place, the README parity
-  table (4062 python / 333 cpp / 376 rust, 217 / 74 / 75 golden, main CI run 40015853764 (2026-10-23, v1.18.0 at 23b69fb2); python is the fast job's 3,666 plus the slow job's 396 passed; at v1.17.1 it read 3208 python, run 39043729536; the same
+  table (4062 python / 333 cpp / 388 rust, 217 / 74 / 75 golden, main CI run 40015853764 (2026-10-23, v1.18.0 at 23b69fb2); python is the fast job's 3,666 plus the slow job's 396 passed; at v1.17.1 it read 3208 python, run 39043729536; the same
   numbers as docs/ARCHITECTURE.md §6; since v1.18 the deployment job derives them from the
   CI jobs' own artefacts, `tests/harness/parity_counts.py`, and warns when the table drifts); for anything newer see the latest `ci` run on main.
   Every other count in this file is **historical**, recorded with the release it was measured on.
@@ -97,7 +97,7 @@ golden group is `ctest --test-dir build -R Golden` (suites `*Golden`, including
 ## Rust
 
 ```bash
-cd rust && cargo test        # workspace (eleven crates, 376 `#[test]` functions of which 75 are in the golden targets; ~55 s after a full rebuild, a timing from an earlier release, not re-measured)
+cd rust && cargo test        # workspace (eleven crates, 388 `#[test]` functions of which 75 are in the golden targets; ~55 s after a full rebuild, a timing from an earlier release, not re-measured)
 ```
 
 Crates: `marketdata`, `orderbook`, `replay`, `eventbus`, `telemetry`, `features`,

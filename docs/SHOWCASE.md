@@ -31,7 +31,7 @@ negative ones first, is written down with the artefact that produced it.
 Every result carries an evidence class ([REPORT.md](REPORT.md) section 3.1; the results table is
 REPORT.md section 2): *independently confirmed*, *mechanically isolated*,
 *development-supported*, *exploratory*, *rejected*, *data-ineligible*, *pending*. **Nothing in this
-repository is in the first two classes** (v2.0.0, 2026-10-26): no registered run has been executed under
+repository is in the first two classes** (v2.2.0, checked 2026-11-18): no registered run has been executed under
 separated custody and no independent party has reproduced a result.
 
 **Development-supported, at most (pre-registered, one look, run by the developer).**
@@ -98,11 +98,19 @@ separated custody and no independent party has reproduced a result.
   one fails the net-P&L-after-costs gate.
   <!-- source: README.md "Headline numbers" (Promotion verdicts, Lifecycle registry rows) and docs/index.html "Results so far" -->
 
-**Current: v2.0.0 (2026-10-26), engineering-complete; no alpha is confirmed.** The free daily
+**Current: v2.2.0 (2026-11-19); no alpha is confirmed.** Both free routes to a
+confirmation sample are closed: IEX withdrew its intraday captures from direct download, and the
+daily route has no eligible free source. Ten free in-sample Nasdaq sessions remain, too few to
+confirm a realistic Sharpe. An event-driven quoter lost more than the grid quoter on its one
+development session. Pooled ten-session and family results: both reversal scores lose about 6.2 to 6.3 bps per rebalance after the spread (session-level t -11.7 and -9.3, 0 of 10 sessions positive); momentum -5.78 bps (t -4.71), opening reversal -10.57 (t -1.97), closing-auction imbalance +0.32 (t 0.64; positive before the spread in all ten sessions). The sealed holdout was not read.
+Source: [REPORT.md](REPORT.md) section 2, rows 12 to 18, and the
+[v2.2.0 release notes](release/v2.2.0_RELEASE_NOTES.md). v2.1.0 (2026-10-27) added no research
+claim ([notes](release/v2.1.0_RELEASE_NOTES.md)).
+
+**v2.0.0 (2026-10-26), engineering-complete; no alpha confirmed.** The free daily
 route fails all five DD1 data tests, so D1 to D4 are data-ineligible; exploratory D1 and D3 on the
-incomplete 2026 partition are negative after costs; the combined-book test PF-3 is rejected.
-Nothing on main is above development-supported. Source: [REPORT.md](REPORT.md) section 2 and the
-[v2.0.0 release notes](release/v2.0.0_RELEASE_NOTES.md). The entries below are the earlier
+incomplete 2026 partition are negative after costs; the combined-book test PF-3 is rejected
+([v2.0.0 release notes](release/v2.0.0_RELEASE_NOTES.md)). The entries below are the earlier
 releases, kept as history.
 
 **Released: v1.18.0 (2026-10-23), a measurement instrument and recorded negative results. No signal is promoted and no edge is claimed.**
@@ -147,7 +155,7 @@ reported as stale rather than failing).
 
 | what | number | artefact |
 |---|---|---|
-| Cross-language parity (CI counts, main CI run 40015853764, 2026-10-23, v1.18.0) | tests python 4062 / cpp 333 / rust 376; golden 217 / 74 / 75; integration 35, replay 6 | `tests/harness/run_all.sh` table in README.md |
+| Cross-language parity (CI counts, main CI run 40015853764, 2026-10-23, v1.18.0) | tests python 4062 / cpp 333 / rust 388; golden 217 / 74 / 75; integration 35, replay 6 | `tests/harness/run_all.sh` table in README.md |
 | MVP golden run (`python -m iap.mvp run`, seed 12345) | 15,805 events · 800 decisions · 231 parent orders · 163 fills · P&L −82.84 USD · digest `a7f1ee60…` | `tests/golden/expected_mvp.json` |
 | Registered features | 205 in 10 families | `data/reference/feature_registry.json` |
 | Flagship alphas | 24 (EQ01-EQ12, FX01-FX12); verdicts 0 PROMOTE / 12 ITERATE / 12 REJECT | `research/alpha_reports/REPORT.md` |

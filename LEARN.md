@@ -1497,7 +1497,7 @@ match**.
   regenerated only deliberately, with a MIGRATIONS.md entry.
 - **One command proves parity**: `tests/harness/run_all.sh` runs all three
   suites and prints the table (the counts from main CI run 40015853764 (2026-10-23, v1.18.0 at 23b69fb2): python 3,666 on
-  3.11 (3,654 on 3.12), cpp 333, rust 376 tests passed; golden groups 217/74/75 as in the README table; all
+  3.11 (3,654 on 3.12), cpp 333, rust 388 tests passed; golden groups 217/74/75 as in the README table; all
   PASS, plus `integration` (35) and `replay` (6) rows for the repo-level
   pytest suites, a `deployment` row — 29 structural checks passed in CI,
   where promtool and kubeconform are installed — and a `numbers` row that re-derives every headline
@@ -5746,7 +5746,7 @@ realism switches (`configs/prereg/v2.json`, `v3.json`, hashed into the
 registration), the statistic and its threshold, and the decision rule. A
 choice made after seeing a result is a new look, chosen by the result.
 
-**How the platform enforces it.** `iap.agents.prereg_gate.require` runs
+**How the platform enforces it.** `iap.governance.prereg_gate.require` runs
 before the research runner touches any data. It verifies the blackboard's
 hash chain, finds the pre-registration for (alpha, horizon), refuses one
 written by an agent id (agents may draft, a human signs off), and refuses
@@ -7668,7 +7668,7 @@ A verification failure of the closing text makes `python -m iap.agents
 research` exit 3: the drafts it wrote stand, the text does not.
 
 **Why free text is wrapped.** Tool results go through
-`iap.agents.untrusted`, which marks free text as data. Even so the controls
+`iap.governance.untrusted`, which marks free text as data. Even so the controls
 that matter are structural (§99): the verifier and the missing tools hold
 whether or not the model obeys.
 

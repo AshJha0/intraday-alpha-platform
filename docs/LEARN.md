@@ -9,12 +9,13 @@ none to claim: nothing on `main` is confirmed, the free daily route failed all f
 and was rejected ([REPORT.md](REPORT.md) section 2, row 1), and D1 to D4 are data-ineligible.
 
 The v1.x tutorial on the intraday engines is kept at [../LEARN.md](../LEARN.md) (frozen, 12,000
-lines). The vocabulary below is the one every current document uses; section 8 defines each term
+lines). The vocabulary below is the one every current document uses; section 12 defines each term
 once.
 
 Sections: 1 point-in-time data and sealed partitions · 2 counting every look · 3 the confirmatory
 gate · 4 why a profile needs its own domain · 5 from a forecast to net P&L · 6 the seven evidence
-classes · 7 negative results · 8 glossary.
+classes · 7 negative results · 8 bars from a full-market day · 9 a research flow that stops for a
+person · 10 searching the record before a look · 11 measuring the guardrails offline · 12 glossary.
 
 ---
 
@@ -361,7 +362,75 @@ run was negative, inconclusive or underpowered ([REVIEW_PACK.md](../archive/docs
 
 ---
 
-## 8. Glossary
+## 8. Bars from a full-market day, and why ten sessions are not enough
+
+**The idea.** A cross-sectional study needs the same minute for hundreds of names at once. A full
+Nasdaq ITCH day holds every order for every name; reducing it to one row per name per minute keeps
+what the study reads and lets the raw file (several GB) be deleted. The data is not the limit; the
+number of independent sessions is.
+
+**Formal statement.** `rust/itchbars` reads the decompressed ITCH 5.0 stream and writes one row per
+symbol per minute (end-of-minute bid, ask and sizes, time-weighted spread, volume, notional, trade
+count, hidden volume), and
+with `--auction` the closing-imbalance and cross rows. `tools/itch_bars_chain.py` runs it one
+in-sample day at a time and refuses 2025 or later. The study statistic is the session-level mean
+net P&L; its power is in `iap.research.pnl_power` ([research/PNL_POWER_TABLE.md](research/PNL_POWER_TABLE.md)).
+
+**Worked example.** The power table's floor falls like 1/sqrt(S). At 250 sessions and one test the
+smallest detectable net Sharpe is 2.82; ten sessions give about 16
+([../research/round0/ROUND0_GATES.md](../research/round0/ROUND0_GATES.md) section 8). So the ten
+free in-sample days can reject or keep an idea for development and cannot confirm a Sharpe of 1 to 3.
+Recipe: [COOKBOOK.md](COOKBOOK.md) recipe 14.
+
+## 9. A research flow that stops for a person
+
+**The idea.** The steps from an idea to a run (look for prior art, draft the pre-registration, get
+approval, run in sample, triage, write it up) are fixed. Writing them as a graph with a mandatory
+stop means no run starts without a person's decision, and every step leaves a checkable record.
+
+**Formal statement.** `iap.graph.research_flow.build_research_graph`, wired to the memory, the
+holdout registry and the number verifier by `iap.graph.wiring`; each step writes a hash-chained
+checkpoint and the `human_approval` node interrupts
+([RESEARCH_GRAPH.md](RESEARCH_GRAPH.md)). A hypothesis on a dataset the registry does not hold as
+`in_sample` is refused before the runner is called.
+
+**Worked example.** [COOKBOOK.md](COOKBOOK.md) recipe 15 runs a made-up hypothesis to the stop and
+rejects it: six checkpoints, outcome `rejected`, runner never called. Approval is a label, not a
+signature; the draft it approves is unsigned.
+
+## 10. Searching the record before a look
+
+**The idea.** Section 2 counts every look. The memory answers the question before it: has this test
+already been run? It is a search engine over the repository's own record, and every answer points at
+a file and line you can open.
+
+**Formal statement.** `iap.memory`: BM25 over Markdown chunks and ledger entries
+([RESEARCH_MEMORY.md](RESEARCH_MEMORY.md)). A prior hit stops the research flow only when one
+ledger entry has the same alpha, horizon and universe (`iap.graph.wiring.same_test`); text
+similarity alone never does.
+
+**Worked example.** On 43 hand-written questions, the right chunk is in the first five hits for
+0.9767 of them ([../research/memory/eval_result.json](../research/memory/eval_result.json)). Recipe:
+[COOKBOOK.md](COOKBOOK.md) recipe 16.
+
+## 11. Measuring the guardrails offline
+
+**The idea.** A rule such as "a model may only write numbers that appear in the evidence" is only as
+good as the checker that enforces it. The checker can be measured without any model: give it
+hand-labelled sentences and count its mistakes.
+
+**Formal statement.** `iap.llm.verifier_eval` scores `iap.llm.verify` on a golden set and a held-out
+set labelled before the fixes; `iap.llm.injection_eval` scores the injection pattern flag and the
+tool allowlist ([AGENT_EVALS.md](AGENT_EVALS.md)). Rates come with Wilson 95 % intervals.
+
+**Worked example.** Held-out set: 0 of 29 false accepts, Wilson upper bound 0.117
+([../research/agents/evals/verifier_golden_result.json](../research/agents/evals/verifier_golden_result.json)).
+Zero errors on 29 cases still allows a true rate near 12 %, which is why the interval is printed.
+The injection pattern flag catches 16 of 61 attacks; the allowlist refused all 1,191 off-list calls
+([../research/agents/evals/injection_result.json](../research/agents/evals/injection_result.json)).
+Recipe: [COOKBOOK.md](COOKBOOK.md) recipe 17.
+
+## 12. Glossary
 
 The terms every current document uses, defined once. British spelling throughout (artefact,
 neutralisation).

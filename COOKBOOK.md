@@ -1007,7 +1007,7 @@ bash tests/harness/run_all.sh --golden-only   # golden groups only (fast)
 
 Exit code 0 iff every language passed; logs land in a temp dir printed on
 the first line. The counts from main CI run 40015853764 (2026-10-23, v1.18.0 at 23b69fb2): python 4062 (3,666 in
-the fast job plus 396 in `python-slow`) / cpp 333 / rust 376 (the `#[test]` count in the source tree, which the
+the fast job plus 396 in `python-slow`) / cpp 333 / rust 388 (the `#[test]` count in the source tree, which the
 table reports; the CI rust job's own pass total is higher) tests passed
 (golden groups 217/74/75; Java archived in v1.15), plus
 `integration` (35) and `replay` (6) rows for the repo-level pytest suites, a
@@ -3323,7 +3323,7 @@ from pathlib import Path
 
 import numpy as np
 
-from iap.agents.blackboard import Blackboard, digest
+from iap.governance.blackboard import Blackboard, digest
 from iap.backtest.maker import MakerFilter
 from iap.mlops import ModelRegistry, ShadowRunner, monitor
 
@@ -5368,7 +5368,7 @@ their archived board (`PREREG_BOARD` in `iap.research.maker_real` and
 ```python
 import json
 from pathlib import Path
-from iap.agents.blackboard import Blackboard
+from iap.governance.blackboard import Blackboard
 
 for fork in ("maker-real", "step2"):
     d = Path("research/agents/forks") / fork
@@ -5849,7 +5849,7 @@ shows registration. Save as `python/recipe100.py` and run
 import tempfile
 from pathlib import Path
 import numpy as np
-from iap.agents.blackboard import Blackboard, digest
+from iap.governance.blackboard import Blackboard, digest
 from iap.backtest.maker import MakerFilter
 from iap.mlops import ModelRegistry
 from iap.mlops.registry import RegistryError

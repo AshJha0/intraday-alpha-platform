@@ -24,9 +24,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python" / "src"))
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from iap.agents import prereg_gate, signing, trust
-from iap.agents.blackboard import canonical
-from iap.agents.broker import WriteBroker
+from iap.agents import signing, trust
+from iap.governance import prereg_gate
+from iap.governance.blackboard import canonical
+from iap.governance.broker import WriteBroker
 
 KEYFILE = Path("C:/Users/ashis/.iap_keys/maintainer.key")
 APPROVER = "ashjha0"
@@ -152,7 +153,7 @@ def main() -> int:
                     "registered_utc": now,
                     "holdout_data_read": False,
                     "holdout_note": NOREAD,
-                    "path": "iap.agents.broker.WriteBroker.preregister (human writer, as the v1.8 "
+                    "path": "iap.governance.broker.WriteBroker.preregister (human writer, as the v1.8 "
                     "holdout preregs; one look debited each on research/experiments.json)",
                     "blackboard": "research/agents/blackboard.jsonl",
                     "entries": entries,
@@ -168,7 +169,7 @@ def main() -> int:
             "maintainer": APPROVER,
             "public_key": pub,
             "trust_root": "research/agents/trust_roots.json",
-            "message": "iap.agents.blackboard.canonical(this document without 'signature')",
+            "message": "iap.governance.blackboard.canonical(this document without 'signature')",
             "message_sha256": hashlib.sha256(msg).hexdigest(),
             "sig": sig,
         }

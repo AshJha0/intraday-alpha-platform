@@ -10,8 +10,8 @@ from pathlib import Path
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from iap.agents import signing
-from iap.agents.blackboard import canonical
-from iap.agents.broker import WriteBroker
+from iap.governance.blackboard import canonical
+from iap.governance.broker import WriteBroker
 from iap.research import quoting_real as qr
 
 ROOT = Path(__file__).resolve().parents[2]

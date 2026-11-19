@@ -1,0 +1,862 @@
+{
+ "schema": "iap.verifier_golden_result/1",
+ "what": "offline measurement of iap.llm.verify.verify_finding against hand labels; no model is involved",
+ "overall": {
+  "cases": 146,
+  "false_accept": {
+   "k": 0,
+   "n": 69,
+   "rate": 0.0,
+   "wilson95": [
+    0.0,
+    0.052737
+   ]
+  },
+  "false_reject": {
+   "k": 0,
+   "n": 77,
+   "rate": 0.0,
+   "wilson95": [
+    0.0,
+    0.047518
+   ]
+  }
+ },
+ "overall_net_of_mislabels": {
+  "cases": 146,
+  "false_accept": {
+   "k": 0,
+   "n": 69,
+   "rate": 0.0,
+   "wilson95": [
+    0.0,
+    0.052737
+   ]
+  },
+  "false_reject": {
+   "k": 0,
+   "n": 77,
+   "rate": 0.0,
+   "wilson95": [
+    0.0,
+    0.047518
+   ]
+  }
+ },
+ "per_category": {
+  "derived": {
+   "cases": 7,
+   "false_accept": {
+    "k": 0,
+    "n": 6,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.390334
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 1,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.793451
+    ]
+   }
+  },
+  "exact": {
+   "cases": 7,
+   "false_accept": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.65762
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.434482
+    ]
+   }
+  },
+  "free_text_evidence": {
+   "cases": 6,
+   "false_accept": {
+    "k": 0,
+    "n": 4,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.489891
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.65762
+    ]
+   }
+  },
+  "half_edge": {
+   "cases": 10,
+   "false_accept": {
+    "k": 0,
+    "n": 3,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.561497
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 7,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.35433
+    ]
+   }
+  },
+  "identifiers": {
+   "cases": 8,
+   "false_accept": {
+    "k": 0,
+    "n": 1,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.793451
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 7,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.35433
+    ]
+   }
+  },
+  "labelled_stat": {
+   "cases": 10,
+   "false_accept": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.434482
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.434482
+    ]
+   }
+  },
+  "long_decimal": {
+   "cases": 6,
+   "false_accept": {
+    "k": 0,
+    "n": 3,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.561497
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 3,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.561497
+    ]
+   }
+  },
+  "lookalike_digits": {
+   "cases": 10,
+   "false_accept": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.434482
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.434482
+    ]
+   }
+  },
+  "metadata": {
+   "cases": 6,
+   "false_accept": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.434482
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 1,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.793451
+    ]
+   }
+  },
+  "number_words": {
+   "cases": 8,
+   "false_accept": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.434482
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 3,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.561497
+    ]
+   }
+  },
+  "percent": {
+   "cases": 8,
+   "false_accept": {
+    "k": 0,
+    "n": 3,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.561497
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.434482
+    ]
+   }
+  },
+  "ranges_lists": {
+   "cases": 10,
+   "false_accept": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.324408
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.65762
+    ]
+   }
+  },
+  "rounding": {
+   "cases": 15,
+   "false_accept": {
+    "k": 0,
+    "n": 7,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.35433
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.324408
+    ]
+   }
+  },
+  "scientific": {
+   "cases": 7,
+   "false_accept": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.65762
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.434482
+    ]
+   }
+  },
+  "sign_zero": {
+   "cases": 8,
+   "false_accept": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.65762
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 6,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.390334
+    ]
+   }
+  },
+  "thousands": {
+   "cases": 6,
+   "false_accept": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.65762
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 4,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.489891
+    ]
+   }
+  },
+  "title": {
+   "cases": 6,
+   "false_accept": {
+    "k": 0,
+    "n": 4,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.489891
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.65762
+    ]
+   }
+  },
+  "units": {
+   "cases": 8,
+   "false_accept": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.65762
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 6,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.390334
+    ]
+   }
+  }
+ },
+ "errors": [],
+ "defects": [],
+ "mislabels": [],
+ "unclassified": [],
+ "disagreements": [],
+ "heldout": {
+  "schema": "iap.verifier_golden_result/1",
+  "what": "offline measurement of iap.llm.verify.verify_finding against hand labels; no model is involved",
+  "overall": {
+   "cases": 55,
+   "false_accept": {
+    "k": 0,
+    "n": 29,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.11697
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 26,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.128729
+    ]
+   }
+  },
+  "overall_net_of_mislabels": {
+   "cases": 55,
+   "false_accept": {
+    "k": 0,
+    "n": 29,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.11697
+    ]
+   },
+   "false_reject": {
+    "k": 0,
+    "n": 26,
+    "rate": 0.0,
+    "wilson95": [
+     0.0,
+     0.128729
+    ]
+   }
+  },
+  "per_category": {
+   "derived": {
+    "cases": 2,
+    "false_accept": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.65762
+     ]
+    },
+    "false_reject": {
+     "k": 0,
+     "n": 0,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      1.0
+     ]
+    }
+   },
+   "exact": {
+    "cases": 3,
+    "false_accept": {
+     "k": 0,
+     "n": 1,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.793451
+     ]
+    },
+    "false_reject": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.65762
+     ]
+    }
+   },
+   "free_text_evidence": {
+    "cases": 2,
+    "false_accept": {
+     "k": 0,
+     "n": 1,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.793451
+     ]
+    },
+    "false_reject": {
+     "k": 0,
+     "n": 1,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.793451
+     ]
+    }
+   },
+   "half_edge": {
+    "cases": 4,
+    "false_accept": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.65762
+     ]
+    },
+    "false_reject": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.65762
+     ]
+    }
+   },
+   "identifiers": {
+    "cases": 3,
+    "false_accept": {
+     "k": 0,
+     "n": 0,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      1.0
+     ]
+    },
+    "false_reject": {
+     "k": 0,
+     "n": 3,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.561497
+     ]
+    }
+   },
+   "labelled_stat": {
+    "cases": 4,
+    "false_accept": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.65762
+     ]
+    },
+    "false_reject": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.65762
+     ]
+    }
+   },
+   "long_decimal": {
+    "cases": 2,
+    "false_accept": {
+     "k": 0,
+     "n": 1,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.793451
+     ]
+    },
+    "false_reject": {
+     "k": 0,
+     "n": 1,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.793451
+     ]
+    }
+   },
+   "lookalike_digits": {
+    "cases": 4,
+    "false_accept": {
+     "k": 0,
+     "n": 3,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.561497
+     ]
+    },
+    "false_reject": {
+     "k": 0,
+     "n": 1,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.793451
+     ]
+    }
+   },
+   "metadata": {
+    "cases": 2,
+    "false_accept": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.65762
+     ]
+    },
+    "false_reject": {
+     "k": 0,
+     "n": 0,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      1.0
+     ]
+    }
+   },
+   "number_words": {
+    "cases": 4,
+    "false_accept": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.65762
+     ]
+    },
+    "false_reject": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.65762
+     ]
+    }
+   },
+   "percent": {
+    "cases": 4,
+    "false_accept": {
+     "k": 0,
+     "n": 1,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.793451
+     ]
+    },
+    "false_reject": {
+     "k": 0,
+     "n": 3,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.561497
+     ]
+    }
+   },
+   "ranges_lists": {
+    "cases": 4,
+    "false_accept": {
+     "k": 0,
+     "n": 3,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.561497
+     ]
+    },
+    "false_reject": {
+     "k": 0,
+     "n": 1,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.793451
+     ]
+    }
+   },
+   "rounding": {
+    "cases": 3,
+    "false_accept": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.65762
+     ]
+    },
+    "false_reject": {
+     "k": 0,
+     "n": 1,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.793451
+     ]
+    }
+   },
+   "scientific": {
+    "cases": 2,
+    "false_accept": {
+     "k": 0,
+     "n": 1,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.793451
+     ]
+    },
+    "false_reject": {
+     "k": 0,
+     "n": 1,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.793451
+     ]
+    }
+   },
+   "sign_zero": {
+    "cases": 3,
+    "false_accept": {
+     "k": 0,
+     "n": 1,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.793451
+     ]
+    },
+    "false_reject": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.65762
+     ]
+    }
+   },
+   "thousands": {
+    "cases": 3,
+    "false_accept": {
+     "k": 0,
+     "n": 1,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.793451
+     ]
+    },
+    "false_reject": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.65762
+     ]
+    }
+   },
+   "title": {
+    "cases": 2,
+    "false_accept": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.65762
+     ]
+    },
+    "false_reject": {
+     "k": 0,
+     "n": 0,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      1.0
+     ]
+    }
+   },
+   "units": {
+    "cases": 4,
+    "false_accept": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.65762
+     ]
+    },
+    "false_reject": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "wilson95": [
+      0.0,
+      0.65762
+     ]
+    }
+   }
+  },
+  "errors": [],
+  "defects": [],
+  "mislabels": [],
+  "unclassified": [],
+  "disagreements": []
+ }
+}

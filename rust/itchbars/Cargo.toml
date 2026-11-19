@@ -1,0 +1,10 @@
+[package]
+name = "itchbars"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Nasdaq TotalView-ITCH 5.0 stream -> one-minute top-of-book and trade bars for every symbol (no dependencies; reads the decompressed stream from stdin)"
+
+[dependencies]

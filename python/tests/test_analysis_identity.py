@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 from iap.agents import analysis_identity as ai
-from iap.agents.prereg_gate import PreregistrationError, require
+from iap.governance.prereg_gate import PreregistrationError, require
 
 KW = dict(
     data_versions=["v1"],
@@ -109,7 +109,7 @@ def test_prereg_gate_refuses_a_run_that_does_not_match_the_bound_identity(repo, 
     """The prereg-consuming path (prereg_gate.require) enforces the signed block."""
     board = tmp_path / "board.jsonl"
     # write a prereg entry carrying the block through the broker's body shape
-    from iap.agents import blackboard as bb
+    from iap.governance import blackboard as bb
 
     b = bb.Blackboard(board)
     pid = bb.digest({"alpha": "EQ10", "horizon": "1s"})[:16]

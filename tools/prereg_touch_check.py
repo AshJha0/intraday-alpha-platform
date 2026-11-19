@@ -22,9 +22,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "python" / "src"))
 
-from iap.agents.blackboard import Blackboard  # noqa: E402
 from iap.agents.fingerprint import fingerprint  # noqa: E402
-from iap.agents.prereg_gate import _closing_outcome  # noqa: E402
+from iap.governance.blackboard import Blackboard  # noqa: E402
+from iap.governance.prereg_gate import _closing_outcome  # noqa: E402
 
 KEYS = ("code_hash", "feature_hash")
 

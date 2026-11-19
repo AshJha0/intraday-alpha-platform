@@ -7,8 +7,8 @@ import json
 from pathlib import Path
 
 import pytest
-from iap.agents.blackboard import Blackboard
-from iap.agents.prereg_gate import PreregistrationError, require
+from iap.governance.blackboard import Blackboard
+from iap.governance.prereg_gate import PreregistrationError, require
 from iap.research import auction_real, maker_real, quoting_real
 
 ROOT = Path(__file__).resolve().parents[2]

@@ -5,8 +5,8 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-from iap.agents.blackboard import Blackboard
 from iap.agents.fingerprint import fingerprint
+from iap.governance.blackboard import Blackboard
 
 TOOL = Path(__file__).resolve().parents[2] / "tools" / "prereg_touch_check.py"
 spec = importlib.util.spec_from_file_location("prereg_touch_check", TOOL)

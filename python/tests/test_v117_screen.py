@@ -247,7 +247,7 @@ def test_require_screened_refuses_failed_and_unscreened_candidates(tmp_path):
 
 
 def test_breadth_book_and_prereg_flow_refuse_without_a_pass(tmp_path):
-    from iap.agents.broker import BrokerError, WriteBroker
+    from iap.governance.broker import BrokerError, WriteBroker
 
     class Clock:
         t = 1_000 * NS

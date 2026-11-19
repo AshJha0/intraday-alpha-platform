@@ -55,17 +55,49 @@ docstring in `python/src/iap/llm/verify.py`:
    because it would verify almost any small integer.
 3. A number written with a decimal point matches a stored value that rounds to it at the
    precision shown (`0.412` matches `0.41187`, `0.42` does not). A whole number must match
-   exactly. A trailing `%` matches the stored value times 100.
+   exactly. A `%` matches the stored value times 100. It matches the raw value only when
+   the field is named as a percentage, such as `turnover_pct`.
 4. A labelled statistic (`IC 0.041`, `t = 5.3`, `Sharpe 1.2`) must match a field of that
-   statistic, not just any number in the pool.
-5. Number words (`three`, `twice`, `half`) are refused, since they cannot be checked.
+   statistic, not just any number in the pool. A list of labels such as `IC and t of 0.041
+   and 5.3` binds the numbers in order.
+5. Number words (`three`, `twice`, `half`, `a pair of`) are refused, since they cannot be
+   checked. So are decimals disguised with look-alike letters (`O.41`).
+6. Before any number is read, the text is normalised. Invisible characters are removed,
+   full-width digits are folded, the Unicode minus is mapped to `-`, and thousands
+   separators are joined. Numbers after `/`, `:` and a range hyphen are read, and so are
+   numbers glued to a unit (`99bps`, `1.5x`).
 
 The same check covers pre-registration drafts, report drafts and the closing text of a
 session ([AGENTS.md §4](AGENTS.md)).
 
+**Measured, offline.** A hand-labelled golden set of 146 cases measures the rule above
+([AGENT_EVALS.md](AGENT_EVALS.md)). Before rule 6 and the other fixes:
+
+- false accepts were 11/68 (Wilson 95% [0.093, 0.267]);
+- false rejects were 14/78 ([0.110, 0.279]);
+- one input crashed the verifier.
+
+After them:
+
+- false accepts are 0/69 ([0, 0.053]);
+- false rejects are 0/77 ([0, 0.048]), after the owner relabelled one case as reject on 2026-11-18.
+
+The one remaining false reject is a case whose label the author now disputes.
+
+The author wrote and labelled 55 held-out cases before running the fixed verifier on
+them:
+
+| Held-out set | Before the fixes | After the fixes |
+|---|---|---|
+| False accepts | 12/28 ([0.265, 0.609]) | 0/29 ([0, 0.117]) |
+| False rejects | 12/27 ([0.276, 0.627]) | 0/26 ([0, 0.129]), after the owner relabelled one case as reject on 2026-11-18 |
+
+These numbers measure the verifier on adversarial edge cases written by one person. They
+say nothing about any model.
+
 ### 2.2 Untrusted data stays data
 
-`iap.agents.untrusted.wrap(text, source)` turns free text written by a person or another
+`iap.governance.untrusted.wrap(text, source)` turns free text written by a person or another
 agent into `{"untrusted": true, "source": ..., "text": ..., "flags": [...]}`: control
 characters removed, length capped at 4000 characters, likely injection phrases flagged.
 The module docstring is explicit that flagging is advisory. The real control is
@@ -75,6 +107,8 @@ an injected instruction has nothing to call. The live prompt-injection eval
 outside the allowlist ran, and no filed finding carries the injected numbers.
 
 ### 2.3 Spend is capped before the call, not after
+
+Since 2026-11-18 live model calls are off (owner decision R0-1); the cap below is in the code and unused.
 
 `configs/agents/llm.json` sets a monthly cap of USD 30, a per-run budget of USD 1 and an
 alert at 80 % of the month. `iap.llm.budget.Budget` projects the cost of the next call
@@ -91,6 +125,17 @@ Signing, registration and lifecycle promotion are commands a person runs
 (`python -m iap.agents.cli prereg`, `sign-registry`, `python -m iap.lifecycle`). The
 agent's own Ed25519 key signs its blackboard proposals so they can be attributed; it
 signs nothing that changes a gate.
+
+### 2.5 The tool loop survives bad turns
+
+Both loops (`iap.llm.loop.run_tool_loop` and `iap.llm.agent.run_session`) handle four
+cases the same way. A tool that raises an unexpected exception is returned to the model
+as an error result (exception type and text, key scrubbed) and logged with `ok: false`;
+the session goes on. If the API call itself raises, `session.json` is written with
+status `client_error` and the exception is then re-raised to the caller. A response cut
+off at `max_tokens` ends the session with status `max_tokens` and none of its tool calls
+run, because their inputs may be truncated; the turn is still in the transcript. A
+`pause_turn` response is sent back as is and the loop continues; it counts as a turn.
 
 ## 3. What this does not protect against
 

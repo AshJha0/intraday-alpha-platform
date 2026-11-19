@@ -6992,6 +6992,126 @@
         "decode": "not a dataset: a constant the migration stamped on pre-scope ledger entries; nothing to decode or check",
         "verdict": "placeholder (no data behind it; synthetic per the v1.18 baseline)"
       }
+    },
+    {
+      "dataset_version": "23aaa8918abbe2dfeeb1969dbc261e04168dfd79eb7921278a33d86af46333b0",
+      "kind": "derived-bars",
+      "provenance": "sha256 of the itchbars output for 2019-08-30 (08302019.NASDAQ_ITCH50.gz, vendor file sha256 2f6639a37487f377851883ed54171f5565f164556c1855a28abc8475ce408b47); research/round1/bars_manifest.json",
+      "evidence": {
+        "kind": "derived-bars",
+        "decode": "itchbars read 310317357 messages for 8826 symbols with 0 unknown order references and 0 short messages (tools/itch_bars_chain.py)",
+        "book_check": "no vendor oracle. The 2019-01-30 displayed volumes equal research/breadth/universe.json; the bars of eight sessions were built twice from separate downloads and were byte-identical",
+        "verdict": "derived (one-venue top-of-book bars; no vendor oracle; reproducible from the recorded vendor file)"
+      }
+    },
+    {
+      "dataset_version": "4cffde03c45d72c154af291f319d4a03fa6377c27017b5f9d38d21302e408b5f",
+      "kind": "derived-bars",
+      "provenance": "sha256 of the itchbars output for 2019-10-18 (S101819-v50.txt.gz, vendor file sha256 390acb4df5a01d3d8e6c34557858604ac7c655c8edc0a9e312da3c032c5d8da4); research/round1/bars_manifest.json",
+      "evidence": {
+        "kind": "derived-bars",
+        "decode": "itchbars read 302347067 messages for 8869 symbols with 0 unknown order references and 0 short messages (tools/itch_bars_chain.py)",
+        "book_check": "no vendor oracle. The 2019-01-30 displayed volumes equal research/breadth/universe.json; the bars of eight sessions were built twice from separate downloads and were byte-identical",
+        "verdict": "derived (one-venue top-of-book bars; no vendor oracle; reproducible from the recorded vendor file)"
+      }
+    },
+    {
+      "dataset_version": "7c8d7281dd720c8ebb56bc375484144d96ce998f9a46e64898a47659dbf960f0",
+      "kind": "derived-bars",
+      "provenance": "sha256 of the itchbars output for 2019-01-30 (01302019.NASDAQ_ITCH50.gz, vendor file sha256 8c97b5b13bc451c012c2466fb7e258da134dab29aa47b67fe7b0088c78e870be); research/round1/bars_manifest.json",
+      "evidence": {
+        "kind": "derived-bars",
+        "decode": "itchbars read 368366634 messages for 8695 symbols with 0 unknown order references and 0 short messages (tools/itch_bars_chain.py)",
+        "book_check": "no vendor oracle. The 2019-01-30 displayed volumes equal research/breadth/universe.json; the bars of eight sessions were built twice from separate downloads and were byte-identical",
+        "verdict": "derived (one-venue top-of-book bars; no vendor oracle; reproducible from the recorded vendor file)"
+      }
+    },
+    {
+      "dataset_version": "8c97b5b13bc451c012c2466fb7e258da134dab29aa47b67fe7b0088c78e870be",
+      "kind": "vendor-file",
+      "provenance": "sha256 of 01302019.NASDAQ_ITCH50.gz as recorded in research/breadth/universe.json; read by the round-1 quoter comparison through a three-name development ingest",
+      "evidence": {
+        "kind": "vendor-file",
+        "decode": "the development ingest's dataset is not committed or listed; this is the vendor file it read",
+        "verdict": "vendor file (development ingest of three names, not a listed dataset)"
+      }
+    },
+    {
+      "dataset_version": "8cc124cefab7642ef3fa3a92da38cf3d63aae5c3cff44e71deb6c9288734d96c",
+      "kind": "derived-bars",
+      "provenance": "sha256 of the itchbars output for 2019-07-30 (07302019.NASDAQ_ITCH50.gz, vendor file sha256 c65784c48c28735901ae442dc00e215834218a359bc12a139ab4eec209bc2d4a); research/round1/bars_manifest.json",
+      "evidence": {
+        "kind": "derived-bars",
+        "decode": "itchbars read 282229684 messages for 8841 symbols with 0 unknown order references and 0 short messages (tools/itch_bars_chain.py)",
+        "book_check": "no vendor oracle. The 2019-01-30 displayed volumes equal research/breadth/universe.json; the bars of eight sessions were built twice from separate downloads and were byte-identical",
+        "verdict": "derived (one-venue top-of-book bars; no vendor oracle; reproducible from the recorded vendor file)"
+      }
+    },
+    {
+      "dataset_version": "933ee8961f497fbd73fee726cec998cbd3f13c4bb9da7cc52c5a54e33dd7c3b3",
+      "kind": "derived-bars",
+      "provenance": "sha256 of the itchbars output for 2021-07-13 (S071321-v50.txt.gz, vendor file sha256 b39b72621a8bc3ff92601701e0e9bd93afbdf30fea2fd68cdbe83c6b0bfb8ccd); research/round1/bars_manifest.json",
+      "evidence": {
+        "kind": "derived-bars",
+        "decode": "itchbars read 459781103 messages for 10888 symbols with 0 unknown order references and 0 short messages (tools/itch_bars_chain.py)",
+        "book_check": "no vendor oracle. The 2019-01-30 displayed volumes equal research/breadth/universe.json; the bars of eight sessions were built twice from separate downloads and were byte-identical",
+        "verdict": "derived (one-venue top-of-book bars; no vendor oracle; reproducible from the recorded vendor file)"
+      }
+    },
+    {
+      "dataset_version": "986c3f228c6fc36f9bb7df0b5aa7d5657aa7ffcc5b23500c84016d775d52d397",
+      "kind": "derived-bars",
+      "provenance": "sha256 of the itchbars output for 2019-10-30 (10302019.NASDAQ_ITCH50.gz, vendor file sha256 0ad86b61a0eb7f1bce2cffca0e08c8658026451c68657ea6b06f61ff3710b999); research/round1/bars_manifest.json",
+      "evidence": {
+        "kind": "derived-bars",
+        "decode": "itchbars read 293989079 messages for 8872 symbols with 0 unknown order references and 0 short messages (tools/itch_bars_chain.py)",
+        "book_check": "no vendor oracle. The 2019-01-30 displayed volumes equal research/breadth/universe.json; the bars of eight sessions were built twice from separate downloads and were byte-identical",
+        "verdict": "derived (one-venue top-of-book bars; no vendor oracle; reproducible from the recorded vendor file)"
+      }
+    },
+    {
+      "dataset_version": "a625f462173f2b308a092ec620dc2e74dd23785e4714d6353d529c694364daed",
+      "kind": "derived-bars",
+      "provenance": "sha256 of the itchbars output for 2021-08-13 (S081321-v50.txt.gz, vendor file sha256 64f4f1b076164ee72971d87fb548ae73cb924e2e45a73de059cc77328bcde4e7); research/round1/bars_manifest.json",
+      "evidence": {
+        "kind": "derived-bars",
+        "decode": "itchbars read 367986583 messages for 11042 symbols with 0 unknown order references and 0 short messages (tools/itch_bars_chain.py)",
+        "book_check": "no vendor oracle. The 2019-01-30 displayed volumes equal research/breadth/universe.json; the bars of eight sessions were built twice from separate downloads and were byte-identical",
+        "verdict": "derived (one-venue top-of-book bars; no vendor oracle; reproducible from the recorded vendor file)"
+      }
+    },
+    {
+      "dataset_version": "a82d2e35be2b71a1fc3eeb8af16d8dba835396ef119290c65a5353b4c0e01dca",
+      "kind": "derived-bars",
+      "provenance": "sha256 of the itchbars output for 2019-03-27 (03272019.NASDAQ_ITCH50.gz, vendor file sha256 7997025b9e09dd6c2ecb0bfa48a856197e6e800711ab67367ee0f2ab724b9ba8); research/round1/bars_manifest.json",
+      "evidence": {
+        "kind": "derived-bars",
+        "decode": "itchbars read 422264305 messages for 8693 symbols with 0 unknown order references and 0 short messages (tools/itch_bars_chain.py)",
+        "book_check": "no vendor oracle. The 2019-01-30 displayed volumes equal research/breadth/universe.json; the bars of eight sessions were built twice from separate downloads and were byte-identical",
+        "verdict": "derived (one-venue top-of-book bars; no vendor oracle; reproducible from the recorded vendor file)"
+      }
+    },
+    {
+      "dataset_version": "a82fa837ef674944a674dc0e259ef3059082725c81f0dd39d76894d4f7722534",
+      "kind": "derived-bars",
+      "provenance": "sha256 of the itchbars output for 2019-12-30 (12302019.NASDAQ_ITCH50.gz, vendor file sha256 ef03df46a27e6bda4dead017f84c2e3979df7211f02c7868b51d53fceb99c689); research/round1/bars_manifest.json",
+      "evidence": {
+        "kind": "derived-bars",
+        "decode": "itchbars read 268744780 messages for 8892 symbols with 0 unknown order references and 0 short messages (tools/itch_bars_chain.py)",
+        "book_check": "no vendor oracle. The 2019-01-30 displayed volumes equal research/breadth/universe.json; the bars of eight sessions were built twice from separate downloads and were byte-identical",
+        "verdict": "derived (one-venue top-of-book bars; no vendor oracle; reproducible from the recorded vendor file)"
+      }
+    },
+    {
+      "dataset_version": "d741e9611b7dd4d392fb6cc91990c58b903a0521135c798b34819d0032bcb90e",
+      "kind": "derived-bars",
+      "provenance": "sha256 of the itchbars output for 2020-01-30 (01302020.NASDAQ_ITCH50.gz, vendor file sha256 8f5399155242f8d84338c36fdd78a47c0b0aa3df5707829b20c5158c258364c6); research/round1/bars_manifest.json",
+      "evidence": {
+        "kind": "derived-bars",
+        "decode": "itchbars read 423285709 messages for 8900 symbols with 0 unknown order references and 0 short messages (tools/itch_bars_chain.py)",
+        "book_check": "no vendor oracle. The 2019-01-30 displayed volumes equal research/breadth/universe.json; the bars of eight sessions were built twice from separate downloads and were byte-identical",
+        "verdict": "derived (one-venue top-of-book bars; no vendor oracle; reproducible from the recorded vendor file)"
+      }
     }
   ]
 }

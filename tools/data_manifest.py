@@ -105,6 +105,52 @@ NON_DISK: dict[str, dict] = {
     },
 }
 
+
+def _round1_bars() -> dict[str, dict]:
+    """Round 1 (2026-11-18): the one-minute bars ``rust/itchbars`` built from each
+    in-sample full-market ITCH day, and the vendor file of the one day a round-1
+    study read through the ingest.  They are listed from
+    ``research/round1/bars_manifest.json`` so that the round's looks ledger cites
+    only listed versions.  None is an ingested dataset: there is no vendor oracle
+    for them, and the verdict says so."""
+    path = ROOT / "research" / "round1" / "bars_manifest.json"
+    if not path.is_file():
+        return {}
+    out: dict[str, dict] = {}
+    sessions = json.loads(path.read_text(encoding="utf-8"))["sessions"]
+    for s in sessions:
+        out[s["bars_sha256"]] = {
+            "kind": "derived-bars",
+            "provenance": f"sha256 of the itchbars output for {s['date']} ({s['file']}, vendor "
+            f"file sha256 {s['raw_sha256']}); research/round1/bars_manifest.json",
+            "evidence": {
+                "kind": "derived-bars",
+                "decode": f"itchbars read {s['messages']} messages for {s['symbols']} symbols "
+                "with 0 unknown order references and 0 short messages (tools/itch_bars_chain.py)",
+                "book_check": "no vendor oracle. The 2019-01-30 displayed volumes equal "
+                "research/breadth/universe.json; the bars of eight sessions were built twice "
+                "from separate downloads and were byte-identical",
+                "verdict": "derived (one-venue top-of-book bars; no vendor oracle; "
+                "reproducible from the recorded vendor file)",
+            },
+        }
+    day = next(s for s in sessions if s["date"] == "2019-01-30")
+    out[day["raw_sha256"]] = {
+        "kind": "vendor-file",
+        "provenance": f"sha256 of {day['file']} as recorded in research/breadth/universe.json; "
+        "read by the round-1 quoter comparison through a three-name development ingest",
+        "evidence": {
+            "kind": "vendor-file",
+            "decode": "the development ingest's dataset is not committed or listed; this is the "
+            "vendor file it read",
+            "verdict": "vendor file (development ingest of three names, not a listed dataset)",
+        },
+    }
+    return out
+
+
+NON_DISK |= _round1_bars()
+
 #: Cited datasets whose ingest ``book_check`` is NOT clean, acknowledged as a
 #: disclosed limitation (defect register D-45) rather than cleared: the value
 #: is the counter block the acknowledgement was given for, so a re-ingest

@@ -288,7 +288,9 @@ def verify_access_log(path: Path | None = None) -> list[str]:
     return problems
 
 
-def refuse_unit_name(name: str, *, root: Path | None = None, registry=None) -> None:
+def refuse_unit_name(
+    name: str, *, root: Path | None = None, registry: Mapping[str, Any] | Path | str | None = None
+) -> None:
     """For callers that only hold a cache / unit NAME (``ds3_20190130_AAPL.X.npy``,
     ``r7_20251128``): refuse when it carries a session date (YYYYMMDD) or a dataset
     label that the registry does not hold in-sample.  A date the registry does not
@@ -427,7 +429,7 @@ def _authorised() -> frozenset[str]:
     return frozenset(_AUTHORISED_ROOTS)
 
 
-def _authorise(dataset_dir, rec: Mapping[str, Any]) -> None:
+def _authorise(dataset_dir: Path | str, rec: Mapping[str, Any]) -> None:
     if rec.get("state") == "synthetic":
         return
     _AUTHORISED_ROOTS.add(str(dataset_root(dataset_dir)))
@@ -469,7 +471,14 @@ _core_guard.register(reader_guard)
 
 
 def _decide(
-    dataset_dir, prereg_id, sessions, symbols, root, registry, rehash, rec
+    dataset_dir: Path | str,
+    prereg_id: str | None,
+    sessions: Sequence[str] | None,
+    symbols: Sequence[str] | None,
+    root: Path | None,
+    registry: Mapping[str, Any] | Path | None,
+    rehash: bool,
+    rec: dict[str, Any],
 ) -> dict[str, Any]:
     # decide from the manifest and the registry first: a refusal opens no data file
     ident = dataset_identity(dataset_dir, rehash=False)
@@ -560,7 +569,7 @@ def check_prereg_identity(prereg_id: str, dataset_version: str | None, root: Pat
         )
 
 
-def _verify_content(dataset_dir, rehash: bool, rec: dict[str, Any]) -> None:
+def _verify_content(dataset_dir: Path | str, rehash: bool, rec: dict[str, Any]) -> None:
     """Only after an allow: re-hash the files against the manifest (refuses a
     tampered tree whose manifest claims an in-sample identity)."""
     if rehash:

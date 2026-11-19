@@ -28,6 +28,8 @@ dbn = ["databento-dbn>=0.72.0,<1"]
 databento = ["databento>=0.89.0,<1"]
 # v1.15 AI4 deep LOB models (iap.models.deeplob_torch); CI does not install it, tests skip
 deep = ["torch>=2.15.0"]
+# v2.x official MCP SDK server (iap.governance.mcp_sdk_server, launched by iap.memory.mcp_server); CI does not install it, tests skip
+mcp = ["mcp>=2.3.0,<3"]
 dev = ["pytest>=9.1,<10", "pytest-cov>=7.1,<8", "pytest-xdist>=3.8,<4", "pyyaml>=6.0,<7"]
 
 [project.scripts]
@@ -38,7 +40,8 @@ iap-research = "iap.research.__main__:main"
 iap-lifecycle = "iap.lifecycle.__main__:main"
 iap-store = "iap.store.__main__:main"
 iap-mvp = "iap.mvp.__main__:main"
-iap-mcp = "iap.agents.mcp_server:main"
+iap-mcp = "iap.governance.mcp_server:main"
+iap-mcp-sdk = "iap.memory.mcp_server:main"
 iap-mcp-agent = "iap.agents.mcp_workflow:main"
 iap-agents = "iap.agents.cli:main"
 
@@ -51,9 +54,10 @@ markers = [
   "slow: long-running test file (the CI python-slow job runs these; the PR python job runs -m 'not slow')",
 ]
 
-# Advisory static typing (v1.13, E-P1-5).  CI runs `mypy` from python/ with
-# this config, continue-on-error, and puts the error count in the job
-# summary; the path to blocking is in CONTRIBUTING.md.
+# Static typing (v1.13, E-P1-5; advisory until v1.16).  CI runs `mypy` from
+# python/ with this config on the `files` below and FAILS on any error (the
+# `mypy` step of the `python` job, 3.12); the error count goes to the job
+# summary.  Packages outside `files` are not checked.
 [tool.mypy]
 python_version = "3.12"  # numpy 2.4 stubs use PEP 695 `type` statements
 mypy_path = "src"
@@ -68,7 +72,33 @@ files = [
   "src/iap/llm",
   "src/iap/mvp",
   "src/iap/paper",
+  # 2026-11-18 quality review: measured clean (0 errors) and added to the blocking scope
+  "src/iap/governance",
+  "src/iap/research/pnl_power.py",
+  "src/iap/research/breadth_bars.py",
 ]
 explicit_package_bases = true
 ignore_missing_imports = true
 follow_imports = "silent"
+
+# 2026-11-18 quality review: stricter per-package checks where the measurement
+# was clean (docs/review/COVERAGE_BASELINE_2026-11-18.md, mypy section).  The
+# rest of the scope keeps the base settings above.
+[[tool.mypy.overrides]]
+module = [
+  "iap.llm.*",
+  "iap.governance.*",
+  "iap.research.pnl_power",
+  "iap.research.breadth_bars",
+]
+check_untyped_defs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+warn_unused_ignores = true
+
+# One unannotated parameter (line 203) in a file another workstream owns;
+# lift this exception once it is annotated.
+[[tool.mypy.overrides]]
+module = ["iap.governance.mcp_server"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false

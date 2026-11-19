@@ -9,6 +9,13 @@ logged or persisted), charged to the shared spend ledger
 when it would pass the monthly cap. Tests and CI use the scripted client of
 `iap.llm.fake`: no network, no key, no spend.
 
+> **Since 2026-11-18 live model calls are off** (owner decision R0-1,
+> [ROUND0_GATES.md](../research/round0/ROUND0_GATES.md) section 1). The capped path below stays in the
+> code, unused; the guardrails are measured offline, with no model
+> ([AGENT_EVALS.md](AGENT_EVALS.md), [AI_STACK.md](AI_STACK.md)). The 2026-11-18 round added no LLM agent;
+> it fixed the tool loop (a tool crash, a client error, `max_tokens` and `pause_turn` no longer end a
+> session badly) and added tracing ([TRACING.md](TRACING.md)).
+
 ## 1. Roster
 
 | Agent | Since | Model (dated pin, `configs/agents/llm.json`) | Entry point | Writes | Never |
@@ -68,7 +75,7 @@ Model ids are explicit, never a floating alias; changing a pin is its own PR.
 | run holdout or confirmatory data | AI1 sessions accept only `synthetic:` datasets; E2 refuses every dataset matching `forbidden_datasets` of `configs/paper/paper_trade.json` (the R7 holdout, `holdout2026`) and `*holdout*`; every report says `confirmatory: false` |
 | touch the committed research ledger | E2 runs the research CLI with `--ledger` and `--out-dir` under a scratch directory; AI1 proposals cost one look each through the broker, capped per session |
 | edit a file, run code, apply a patch, merge | no such tool; the docs-sync output is a `.patch` a human applies; the ops output is a document |
-| follow instructions found in data | tool results are wrapped by `iap.agents.untrusted`; the system prompts say so; the structural controls above hold regardless |
+| follow instructions found in data | tool results are wrapped by `iap.governance.untrusted`; the system prompts say so; the structural controls above hold regardless |
 | spend past the caps | `iap.llm.budget.Budget` + `iap.llm.spend.SpendLedger`: refused before the call |
 | act unaudited | transcript, tool log and summary persisted per session; the API key scrubbed from anything written |
 
@@ -106,6 +113,13 @@ the docs-sync agent refuses a code-file edit and an ambiguous excerpt, writes a
 patch that applies cleanly and leaves the tree untouched. Every eval asserts
 that the (temporary) spend ledger holds one row per model call. The `docs` job
 (advisory) runs `tests/harness/check_docs.py` and lychee.
+
+## 7. Read-only MCP server (official SDK)
+
+`python -m iap.memory.mcp_server --root .` serves the read tools (plus the research-memory tools),
+resources and two prompts over stdio, built on the official `mcp` SDK (an
+optional extra; `.mcp.json` at the root launches it). Details, versions and
+the tests behind each security property: [MCP_SERVER.md](MCP_SERVER.md).
 
 Related: [GOVERNANCE.md §2a-2d](GOVERNANCE.md),
 [docs/RUNBOOKS.md](RUNBOOKS.md),

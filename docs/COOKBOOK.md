@@ -19,7 +19,8 @@ Recipes: 0 the environment · 1 the research loop on a family · 2 add a family 
 3 a forecast record and the engine on a fixture · 4 an E5 report · 5 a dataset's integrity evidence
 · 6 the leakage canaries · 7 a confirmation profile's domain · 8 the confirmatory gate's refusals ·
 9 dry-run the ingestion job · 10 verify the audit anchor and the signatures · 11 what the owner does
-(ingest, approve a run) · 12 reproduce a committed result · 13 the documentation checks.
+(ingest, approve a run) · 12 reproduce a committed result · 13 the documentation checks ·
+14 bars for one ITCH day · 15 the wired research flow · 16 search the research memory · 17 the offline evals.
 
 ---
 
@@ -419,3 +420,108 @@ Expected: `PASS` for `internal_links` (every relative link and every `#anchor` r
 `diagram_index`, `api_names` (every `iap.*` name in an API document imports), `status_freshness`,
 `release_truth` and `latency_claims`, then `0 failure(s), 0 stale status row(s)`. The `docs` CI job
 runs the same command; a dead link, a vanished symbol or an undated "pending" phrase fails it.
+
+## 14. Build one-minute bars for one in-sample ITCH day (v2.2)
+
+**Goal:** turn one full-market Nasdaq ITCH 5.0 sample day into one-minute bars per symbol, and the
+closing-auction rows beside them, without keeping the raw file. Diagram:
+[DIAGRAMS.md](DIAGRAMS.md) section 43.
+
+Build the binary once in WSL (the Windows toolchain is not used for it):
+
+```bash
+wsl -e bash -lc "cd /mnt/c/<path to repo>/rust && CARGO_TARGET_DIR=$HOME/iap-itchbars-target cargo build -p itchbars --release"
+```
+
+Then, with the owner's approval for the download recorded by the flag:
+
+```bash
+PYTHONPATH=python/src .venv-ci/bin/python tools/itch_bars_chain.py --i-have-approval --date 2019-03-27
+```
+
+The chain downloads the day (allowed hosts, size and sha256 checks), streams it through
+`itchbars --auction`, checks that the message count is positive and the bars file is not empty,
+writes `bars_<date>.csv` and `auction_<date>.csv`, appends one line to `chain_log.jsonl` and deletes the
+raw file it downloaded. It touches only days with role `insample` in
+`research/breadth/candidates.json` and refuses any date in 2025 or later (the sealed holdout). The
+binary alone: `gzip -dc <file>.NASDAQ_ITCH50.gz | itchbars [--auction auction.csv] > bars.csv`.
+
+**Not run for this recipe** (it downloads several GB of market data). Bars are market data and
+carry no evidence class; a study on them is classed by its own report. The Claude Code skill
+`itch-day-bars` wraps the same steps.
+
+## 15. Take a hypothesis through the wired research flow (v2.2)
+
+**Goal:** check prior art, get an unsigned pre-registration draft, and stop for a person's decision.
+Write the hypothesis (dataset labels come from `research/holdout_registry.json`; a label it does
+not hold as `in_sample` is refused):
+
+```json
+{"alpha_id": "DEMO_OFI", "horizon": "5m",
+ "universe": {"name": "three", "symbols": ["AAPL", "MSFT", "QQQ"], "datasets": ["ds3_20190130"]},
+ "expected_sign": 1,
+ "mechanism": "Order-flow imbalance at the touch precedes five-minute drift."}
+```
+
+```bash
+PYTHONPATH=python/src .venv-ci/bin/python -m iap.graph run --hypothesis hyp.json --out runs/demo_ofi
+PYTHONPATH=python/src .venv-ci/bin/python -m iap.graph resume runs/demo_ofi --reject --by <name>
+```
+
+Output on 2026-11-18 (Windows, `.venv-ci`), abridged:
+
+```
+  4  human_approval  interrupt -> -               in 7b1156c8ef97 out e6a76161dad3
+status: waiting at human_approval
+draft (unsigned):
+  ... "prior_art": ["LEARN.md:11076-11126", "research/v2/families/H4_order_flow_imbalance.md:11-16", "LEARN.md:308-334"],
+  "signed": false ...
+awaiting: human approval of the pre-registration draft
+...
+  6  rejected        terminal  -> -               in 83f5256babf2 out 7685e92b9cee
+status: done at rejected
+```
+
+The prior-art citations come from the research memory, so they move when the record changes. With
+`--approve` the flow runs the in-sample step; without `--runner module:function` that step is a stub
+returning fixed numbers, which are not results. An approved draft is not a pre-registration: nothing
+is signed or registered ([RESEARCH_GRAPH.md](RESEARCH_GRAPH.md)).
+
+## 16. Search the research memory before spending a look (v2.2)
+
+```bash
+PYTHONPATH=python/src .venv-ci/bin/python -m iap.memory search "closing auction imbalance" -k 3
+```
+
+Output on 2026-11-18 (first hit, abridged):
+
+```
+search: closing auction imbalance
+   1.  21.630  research/auction/rel08c/REPORT.md:1-12  [REL-08c closing-auction imbalance: result under the signed pre-declaration]
+```
+
+Every hit names a file and a line span; open the file to check it. For the same-test question use
+`python -m iap.memory prior-tests --alpha <ALPHA> --horizon <H> "<mechanism words>" --json`. Retrieval
+is lexical (BM25): a paraphrase can miss ([RESEARCH_MEMORY.md](RESEARCH_MEMORY.md)). Scores move as
+the record grows.
+
+## 17. Run the offline evals (v2.2)
+
+```bash
+PYTHONPATH=python/src .venv-ci/bin/python -m iap.llm.verifier_eval --check
+PYTHONPATH=python/src .venv-ci/bin/python -m iap.llm.injection_eval --check
+PYTHONPATH=python/src .venv-ci/bin/python -m iap.memory eval --check --no-write
+```
+
+Selected lines on 2026-11-18 (the verifier's held-out block, then the injection and memory summaries):
+
+```
+== held-out
+overall              n=55   false-accept 0/29 = 0.000 [0.000, 0.117]   false-reject 0/26 = 0.000 [0.000, 0.129]
+structural: 79 cases, 1191 attack calls, 1191 refused, 0 off-allowlist executed
+n=43 recall@1=0.9302 recall@5=0.9767 recall@10=0.9767 MRR=0.9496 floor@5=0.93
+```
+
+`--check` compares with the committed result files and rewrites nothing. No model is called: these
+measure the verifier and the guardrails on hand-labelled cases, not a model's behaviour
+([AGENT_EVALS.md](AGENT_EVALS.md)).

@@ -102,11 +102,44 @@ Pinned rules (``QuotingBacktester.run_instrument``):
    path as a cancel) replaces the cancel/new pair (``amends``).
    ``hidden_print_fills`` (X-P2-7) passes ``hidden_prints=True`` to the
    simulator. Their counters appear only when the option is on.
+10. **Event-driven decisions** (development, opt-in; the default run is
+   byte-identical). Under rules 2-9 a decision happens only at a score row
+   (the real-data driver uses about one row per second): between rows a
+   resting quote is never cancelled, whatever the book does.
+   ``trigger_mode="events"`` keeps every score-row decision and adds one
+   after each replayed event that changed the touch prices, filled one of
+   our quotes, or changed the guard state below, or after an event that
+   follows a decision left incomplete. An event decision at event time
+   ``t`` sees the book after that event and sends every message with
+   ``decision_ts = t + feed_latency_ns`` through the simulator's latency
+   path, exactly as a score-row decision does; it uses the ``er`` of the
+   last score row at or before ``t`` and does not update the sigma EWMA
+   (rule 2's EWMA stays a score-row quantity). In events mode every
+   decision also obeys: (a) the rule-2 / rule-8 prices and the rule-3
+   limit, recomputed from the current touch and inventory (so a touch
+   move away from or through a quote reprices it); (b) the **guard**: a
+   side whose wanted price is its own touch is not quoted while the
+   displayed size ahead of it (the resting order's ``ahead_qty``, or the
+   displayed level size for a new order) is ``<= ev_queue_ahead_max`` and
+   ``opp / (own + opp) >= ev_imbalance`` with ``own`` / ``opp`` the
+   displayed sizes at its own and the opposite touch; (c) **pacing**: an
+   order is not cancelled, repriced or amended before ``ev_min_rest_ns``
+   after its venue arrival (nor while still in flight), and no message is
+   sent that would make more than ``ev_max_msgs_per_s`` in the trailing
+   second; a side held back by either retries at the next event.
+   Counters ``ev_decisions``, ``ev_guard_pulls``, ``ev_deferred_rest``,
+   ``ev_deferred_rate`` appear only in events mode. ``dev_diagnostics``
+   (either mode) adds fill columns ``mid_<s>s`` (the rule-6 markout mid at
+   each ``dev_markout_ns``), ``messages`` and ``time_at_touch_{bid,ask}``
+   / ``time_quoted_{bid,ask}`` (share of replayed time from the first to
+   the last event before the flatten with a resting quote at the touch /
+   at any price).
 """
 
 from __future__ import annotations
 
 import math
+from collections import deque
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -170,8 +203,36 @@ class QuotingConfig:
     amend_size_down: bool = False
     #: X-P2-7: hidden (non-displayed) prints fill resting quotes
     hidden_print_fills: bool = False
+    # ---- rule 10 (development, opt-in; defaults = the grid quoter) ----
+    #: ``"grid"`` (default): decisions only at score rows. ``"events"``: also
+    #: after every book event that moves the touch, fills us, or flips the
+    #: adverse-selection guard (rule 10)
+    trigger_mode: str = "grid"
+    #: events mode: an order younger than this (since its arrival at the
+    #: venue) is never cancelled, repriced or amended
+    ev_min_rest_ns: int = 100_000_000
+    #: events mode: at most this many messages (submit, cancel, amend) in any
+    #: trailing one-second window; a decision that would exceed it waits
+    ev_max_msgs_per_s: int = 10
+    #: events mode guard: a side at its touch is pulled when the displayed
+    #: size ahead of it is at most this (shares) ...
+    ev_queue_ahead_max: int = 100
+    #: ... while the opposite touch holds at least this share of the two
+    #: touch sizes, ``opp / (own + opp)``
+    ev_imbalance: float = 0.8
+    #: development diagnostics (any mode; off = byte-identical): markout
+    #: columns ``mid_<s>s`` per fill at these horizons, time at the touch,
+    #: message counts (rule 10)
+    dev_diagnostics: bool = False
+    dev_markout_ns: tuple[int, ...] = (1_000_000_000, 10_000_000_000, 60_000_000_000)
 
     def __post_init__(self) -> None:
+        if self.trigger_mode not in ("grid", "events"):
+            raise ValueError("trigger_mode must be 'grid' or 'events'")
+        if self.ev_min_rest_ns < 0 or self.ev_max_msgs_per_s < 1:
+            raise ValueError("ev_min_rest_ns must be >= 0 and ev_max_msgs_per_s >= 1")
+        if self.ev_queue_ahead_max < 0 or not 0.0 < self.ev_imbalance <= 1.0:
+            raise ValueError("ev_queue_ahead_max must be >= 0 and 0 < ev_imbalance <= 1")
         if self.feed_latency_ns < 0:
             raise ValueError("feed_latency_ns must be >= 0")
         if self.flatten_route not in ("book", "sim"):
@@ -350,13 +411,19 @@ class QuotingBacktester:
             return 1e4 * venue.maker_rebate_per_share / mid
 
         def working(side: int) -> int:
-            return sum(
-                o.remaining
-                for o in sim.orders.values()
-                if o.side == side and not o.is_terminal and o.order_id in mine
-            )
+            # ``open_ids`` holds every non-terminal order of ours (a superset
+            # pruned here), so the sum equals the one over all of ``mine``
+            done = [o for o in open_ids if sim.orders[o].is_terminal]
+            open_ids.difference_update(done)
+            return sum(sim.orders[o].remaining for o in open_ids if sim.orders[o].side == side)
 
         mine: set[int] = set()
+        open_ids: set[int] = set()
+        evm = cfg.trigger_mode == "events"
+        msgs: deque[int] = deque()  # rule 10 (c): message times, trailing second
+        ev_state: dict[str, Any] = {"dirty": False, "touch": None, "guard": (False, False)}
+        if evm:
+            cx.update(ev_decisions=0, ev_guard_pulls=0, ev_deferred_rest=0, ev_deferred_rate=0)
         diag = {"decisions_quoted": 0, "skew_changed": 0}
         behind: list[int] = []
 
@@ -391,6 +458,41 @@ class QuotingBacktester:
                 1: max(math.ceil((res + h) / tick - 1e-9), bpx + 1),
             }
 
+        def guard_on(side: int, price: int, cur) -> bool:
+            """Rule 10 (b): pull a touch quote at the front of a thin queue
+            while the opposite touch dominates."""
+            book = sim.venue_book(instrument_id, venue_id)
+            if book is None:
+                return False
+            bb, ba = book.best_bid(), book.best_ask()
+            own, opp = (bb, ba) if side == 0 else (ba, bb)
+            if own is None or opp is None or price != own[0]:
+                return False
+            if cur is not None and cur.resting and cur.limit_ticks == price:
+                ahead = cur.ahead_qty
+            else:
+                ahead = own[1]
+            tot = own[1] + opp[1]
+            return ahead <= cfg.ev_queue_ahead_max and tot > 0 and opp[1] / tot >= cfg.ev_imbalance
+
+        def may_send(t: int) -> bool:
+            """Rule 10 (c): message-rate cap over the trailing second."""
+            while msgs and msgs[0] <= t - 1_000_000_000:
+                msgs.popleft()
+            if len(msgs) >= cfg.ev_max_msgs_per_s:
+                cx["ev_deferred_rate"] += 1
+                ev_state["dirty"] = True
+                return False
+            return True
+
+        def may_touch(cur, t: int) -> bool:
+            """Rule 10 (c): minimum resting time before a cancel / amend."""
+            if not cur.resting or t + feed < cur.arrival_ts + cfg.ev_min_rest_ns:
+                cx["ev_deferred_rest"] += 1
+                ev_state["dirty"] = True
+                return False
+            return may_send(t)
+
         def decide(r: int) -> None:
             c["decisions"] += 1
             t = int(ts[r])
@@ -404,15 +506,23 @@ class QuotingBacktester:
                 rate = (mid - vol["mid"]) ** 2 / ((t - vol["t"]) / 1e9)
                 vol["var"] += alpha_ewm * (rate - vol["var"])
             vol["mid"], vol["t"] = mid, t
-            s2 = cfg.sigma**2 if cfg.sigma is not None else vol["var"]
             e = er[r] if math.isfinite(er[r]) else 0.0
+            quote(t, e, bpx, apx, False)
+
+        def quote(t: int, e: float, bpx: int, apx: int, event: bool) -> None:
+            """Place / refresh both sides (rules 2-4, 7, 9; rule 10 in events mode)."""
+            mid = 0.5 * (bpx + apx) * tick
+            s2 = cfg.sigma**2 if cfg.sigma is not None else vol["var"]
             inv_units = q[0] / cfg.qty
             want = quote_prices(e, mid, s2, inv_units, bpx, apx)
-            base = quote_prices(0.0, mid, s2, inv_units, bpx, apx)
-            diag["decisions_quoted"] += 1
-            diag["skew_changed"] += int(want != base)
-            behind.append(bpx - want[0])
-            behind.append(want[1] - apx)
+            if not event:
+                base = quote_prices(0.0, mid, s2, inv_units, bpx, apx)
+                diag["decisions_quoted"] += 1
+                diag["skew_changed"] += int(want != base)
+                behind.append(bpx - want[0])
+                behind.append(want[1] - apx)
+            if evm:
+                ev_state["dirty"] = False
             act = None
             if fb is not None:
                 fb.advance(t, mid)
@@ -432,6 +542,9 @@ class QuotingBacktester:
                 size = max(0, min(cfg.qty, room))
                 if act is not None and not act.neutral:
                     size = min(size, act.size(cfg.qty))
+                guarded = evm and size > 0 and guard_on(side, want[side], cur)
+                if guarded:
+                    size = 0
                 if cur is not None and cur.limit_ticks == want[side]:
                     cur_size = (
                         sim.amend_target(cur.order_id) if cfg.amend_size_down else cur.remaining
@@ -441,25 +554,43 @@ class QuotingBacktester:
                     if (
                         cfg.amend_size_down
                         and 0 < size < cur_size
+                        and (not evm or may_touch(cur, t))
                         and sim.amend_down(cur.order_id, size, t + feed)
                     ):
                         cx["amends"] += 1  # X-P2-12: keeps its queue priority
+                        if evm:
+                            msgs.append(t)
                         continue
                 if cur is not None:
                     if cur.cancel_arrival_ts == 0:
+                        if evm and not may_touch(cur, t):
+                            continue  # rule 10 (c): retried at the next event
                         sim.cancel(cur.order_id, t + feed)
                         c["cancels"] += 1
+                        if evm:
+                            msgs.append(t)
+                            if guarded:
+                                cx["ev_guard_pulls"] += 1
                     # the in-flight order still counts toward working size
                     room -= cur.remaining
                     size = max(0, min(cfg.qty, room))
                     if act is not None and not act.neutral:
                         size = min(size, act.size(cfg.qty))
+                    if guarded:
+                        size = 0
                 live[side] = None
                 if size <= 0:
                     if act is not None and act.stand_down:
                         continue  # pulled by the feedback, not by the limit
-                    c["bid_blocked_by_limit" if side == 0 else "ask_blocked_by_limit"] += 1
+                    if guarded:
+                        continue  # pulled by the rule-10 guard, not by the limit
+                    if not event:
+                        c["bid_blocked_by_limit" if side == 0 else "ask_blocked_by_limit"] += 1
                     continue
+                if evm:
+                    if not may_send(t):
+                        continue
+                    msgs.append(t)
                 new = sim.submit(
                     ChildOrder(
                         instrument_id=instrument_id,
@@ -473,6 +604,7 @@ class QuotingBacktester:
                     )
                 )
                 mine.add(new)
+                open_ids.add(new)
                 live[side] = new
                 c["requotes"] += 1
                 c["bid_posted_qty" if side == 0 else "ask_posted_qty"] += size
@@ -559,6 +691,30 @@ class QuotingBacktester:
                 not sim.orders[o].is_terminal for o in flat_orders
             )
 
+        dev = cfg.dev_diagnostics
+        tq: dict[str, Any] = dict.fromkeys(
+            ("total", "quoted_0", "quoted_1", "touch_0", "touch_1"), 0
+        )
+        tq["prev"] = None
+
+        def on_book_event(t: int, filled: bool, e_last: float) -> None:
+            """Rule 10: an event decision when the touch, a fill or the guard changed."""
+            bs = book_state()
+            if bs is None:
+                return
+            g = []
+            for side in (0, 1):
+                oid = live[side]
+                cur = None if oid is None or sim.orders[oid].is_terminal else sim.orders[oid]
+                g.append(guard_on(side, bs[side], cur))
+            guard = (g[0], g[1])
+            trig = filled or bs != ev_state["touch"] or guard != ev_state["guard"]
+            ev_state["touch"], ev_state["guard"] = bs, guard
+            if not (trig or ev_state["dirty"]):
+                return
+            cx["ev_decisions"] += 1
+            quote(t, e_last if math.isfinite(e_last) else 0.0, bs[0], bs[1], True)
+
         last_t = evs[0].exchange_ts
         ref_ts: int | None = None
         ref_mid: float | None = None
@@ -618,6 +774,23 @@ class QuotingBacktester:
                 ref_ts = t
                 ref_mid = pre_mid
             maker_mid = ref_mid
+            if dev and not started and r > 0:
+                if tq["prev"] is not None and bs is not None:
+                    dt = t - tq["prev"]
+                    tq["total"] += dt
+                    for side in (0, 1):
+                        oid = live[side]
+                        resting_order = None if oid is None else sim.orders[oid]
+                        if (
+                            resting_order is not None
+                            and resting_order.resting
+                            and not resting_order.is_terminal
+                        ):
+                            tq[f"quoted_{side}"] += dt
+                            if resting_order.limit_ticks == bs[side]:
+                                tq[f"touch_{side}"] += dt
+                tq["prev"] = t
+            q_before = q[0]
             sim.on_event(ev)
             post = book_state()
             if post is not None:
@@ -637,6 +810,8 @@ class QuotingBacktester:
                     record(f, maker_mid if f.liquidity == Liquidity.MAKER else last_mid, False)
                     if fb is not None and f.liquidity == Liquidity.MAKER:
                         fb.on_fill(f.ts, f.side, f.price_ticks * tick)
+            if evm and not started and r > 0:
+                on_book_event(t, q[0] != q_before, er[r - 1])
         # ---- end of stream: sweep what is left, cross or mark the remainder
         sim.cancel_all()
         drain(last_mid)
@@ -707,6 +882,20 @@ class QuotingBacktester:
             "ticks_behind_touch_max": float(bh.max()) if bh.size else None,
             "frac_decisions_skew_changed_quote": diag["skew_changed"] / nq if nq else None,
         }
+        if dev:
+            for h in cfg.dev_markout_ns:
+                fdf[f"mid_{h // 1_000_000_000}s"] = [
+                    m if fl_ else mid_at(int(t) + h)
+                    for t, m, fl_ in zip(fdf["ts"], fdf["mid"], fdf["flatten"], strict=True)
+                ]
+            tot = tq["total"]
+            out.diagnostics.update(
+                messages=c["requotes"] + c["cancels"] + cx.get("amends", 0),
+                time_quoted_bid=tq["quoted_0"] / tot if tot else 0.0,
+                time_quoted_ask=tq["quoted_1"] / tot if tot else 0.0,
+                time_at_touch_bid=tq["touch_0"] / tot if tot else 0.0,
+                time_at_touch_ask=tq["touch_1"] / tot if tot else 0.0,
+            )
         return out
 
     def run_days(

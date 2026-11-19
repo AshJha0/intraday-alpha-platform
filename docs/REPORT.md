@@ -1,8 +1,8 @@
 # Intraday Alpha Platform: technical report
 
-Written 2026-10-26 for v2.1 (Track 0), on main after the v2.0.0 tag. Every number here is copied from
-the file named beside it; the evidence class of each result follows the seven classes of
-section 3. Nothing in this report is a new result.
+Written 2026-10-26 for v2.1 (Track 0), on main after the v2.0.0 tag; rows 12 to 18 of section 2 and
+the round's limitations added on 2026-11-18 for v2.2.0. Every number here is copied from the file
+named beside it; the evidence class of each result follows the seven classes of section 3.
 
 ## 1. What we built, and the question it answers
 
@@ -47,11 +47,25 @@ golden tests hold the three equal ([docs/POLYGLOT.md](POLYGLOT.md)).
 | 9 | Smart order routing against pinned Nasdaq: all six B8 v2 comparisons underpowered on 3 sessions | exploratory (underpowered) | [research/execution/b8v2/REPORT.md](../research/execution/b8v2/REPORT.md) |
 | 10 | The known-null calibration (v1.18) rejected about 4.3 % in two cells against a 2.5 % target, so no real-data error-rate control is claimed | rejected | [research/v118/](../research/v118/) |
 | 11 | On the bundled synthetic data, 0 of 24 alphas pass the net-of-cost promotion gate | rejected | [research/alpha_reports/REPORT.md](../research/alpha_reports/REPORT.md) |
+| 12 | Intraday breadth on IEX HIST: the captures are withdrawn from direct download (index 403 since 2026-11-14; owner's browser check 2026-11-18). The daily route has no eligible free source: Stooq failed DD1 (row 1) and Tiingo is dropped (R0-4) | data-ineligible | [ROUND0_GATES.md](../research/round0/ROUND0_GATES.md) §1, §6 |
+| 13 | Ten free in-sample Nasdaq ITCH sessions detect, with 80 % power at one test, only a net Sharpe of about 16 or more; a Sharpe near 1 needs about 1,980 sessions | limit of the sample, not a result | [ROUND0_GATES.md](../research/round0/ROUND0_GATES.md) §8, [PNL_POWER_TABLE.md](research/PNL_POWER_TABLE.md) |
+| 14 | Event-driven quoter against the grid quoter on 2019-01-30 (AAPL, MSFT, QQQ): net USD -11,201.51 against -10,155.22; 1 s markout -0.37 against -0.45 bps, spread captured 0.11 against 0.17 bps | exploratory (one session) | [QUOTER_EVENT_DRIVEN_DEV.md](../research/round1/QUOTER_EVENT_DRIVEN_DEV.md) §5, §6 |
+| 15 | Cross-sectional reversal on full-market bars, one session (2019-01-30, 500 names): all four cells negative net of spread; primary -8.90 bps per rebalance net, -1.07 gross | exploratory (one session) | [BREADTH_BARS_20190130.md](../research/round1/BREADTH_BARS_20190130.md) |
+| 16 | The same study pooled over ten in-sample sessions: net of the quoted spread at the primary 1-minute delay, VWAP deviation -6.24 bps per rebalance (session-level t -11.71, 0 of 10 sessions positive) and residual reversion -6.29 (t -9.33, 0 of 10); at delay 0, -6.33 (t -11.30) and -6.27 (t -8.90); before the spread, +0.66 and +0.59 bps at the primary delay (`research/round1/BREADTH_BARS_POOLED.md`) | exploratory | [BREADTH_BARS_POOLED.md](../research/round1/BREADTH_BARS_POOLED.md) |
+| 17 | Families F1 intraday momentum, F2 opening reversal, F3 closing-auction imbalance, pre-specified at K = 7, then K = 8 after the F3 erratum (one-sided p below 0.003125): net -5.78 bps per rebalance (session-level t -4.71, 1 of 10 sessions positive); net -10.57 bps (t -1.97, 2 of 10); version 1 had no score on any session (a bar-index error in the specification and a dissemination-start fact; erratum in the pre-specification, no look spent); version 2, registered before any F3 return existed and raising K to 8, net +0.32 bps (t 0.64, 4 of 10), with gross +1.98 bps (t 3.94) and rank IC 0.127 (t 4.53) positive in all ten sessions as diagnostics | exploratory | [FAMILIES_PRESPEC_2026-11-18.md](../research/round1/FAMILIES_PRESPEC_2026-11-18.md), [BREADTH_FAMILIES.md](../research/round1/BREADTH_FAMILIES.md) |
+| 18 | Sealed nine-session breadth holdout: not taken. No candidate met the rule fixed before the results (positive mean net, one-sided p below 0.003125, at least 7 of 10 sessions positive; `research/round1/BREADTH_FAMILIES.md`), so the nine sessions stay sealed and unread | pending | [HOLDOUT_LOOK_PROCEDURE.md](../research/round1/HOLDOUT_LOOK_PROCEDURE.md) |
 
 **What the negatives have in common.** Where a signal exists, it is smaller than the cost of
-trading it. Rows 5 to 8 show this four different ways on intraday data. Rows 1 to 3 show why
-we could not even ask the daily question honestly on free data: survivor-only prices make a
-reversal strategy look like it trades recoveries.
+trading it. Rows 5 to 8 show this four different ways on intraday data, and row 14 a fifth: making
+the quoter react to the book reduced adverse selection a little and cost more than it saved. Rows 1
+to 3 show why we could not even ask the daily question honestly on free data: survivor-only prices
+make a reversal strategy look like it trades recoveries. Rows 12 and 13 say what is left: ten free
+sessions, which can only reject or keep an idea for development.
+
+*Reading of row 10, added 2026-11-18.* With a correctly sized test, about one valid-null world in
+six shows as many rejections as A0 did, so A0 on seven sessions cannot tell a 2.5 % test from a
+4.3 % one; the FAIL is not evidence of over-rejection, and a pass would not have shown correct size
+([ROUND0_GATES.md](../research/round0/ROUND0_GATES.md) §4). The recorded verdict stands.
 
 ## 3. Method
 
@@ -119,7 +133,7 @@ digest ([docs/MVP.md](MVP.md)).
 
 **Three languages, one semantics.** Each ported component has golden vectors produced by
 the Python reference. The C++ and Rust copies must match them byte for byte. On the v1.18.0
-CI run the table counted 4,062 Python, 333 C++ and 376 Rust tests, with 217, 74 and 75 golden
+CI run the table counted 4,062 Python, 333 C++ and 388 Rust tests, with 217, 74 and 75 golden
 ([README.md](../README.md), parity table).
 
 ## 5. Engineering numbers
@@ -161,7 +175,10 @@ and injected clocks must advance.
   nothing can reach the top two classes.
 - The fill model is validated by deterministic replay only. No real orders or fills exist
   ([docs/SIM_TO_REAL.md](SIM_TO_REAL.md)).
-- Intraday results rest on a few sessions of three symbols (AAPL, MSFT, QQQ).
+- Intraday results rest on a few sessions of three symbols (AAPL, MSFT, QQQ); the bars path widens
+  the cross-section to several hundred names but not the session count (row 13).
+- The AI layer is measured offline only: no model API is called, so no number here describes a
+  real model's behaviour ([AI_STACK.md](AI_STACK.md)).
 - A survivorship-clean point-in-time daily source would change rows 1 to 3; we do not hold one.
 
 ## 9. Reproduce

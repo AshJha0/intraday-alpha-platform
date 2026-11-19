@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "iap-research": {
+      "command": "python",
+      "args": ["-m", "iap.memory.mcp_server", "--root", "."],
+      "env": {"PYTHONPATH": "python/src"}
+    }
+  }
+}

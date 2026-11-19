@@ -2,18 +2,7 @@
 
 One page for the public Python, Rust and C++ interfaces, by area. It merges the ten API_*.md pages that used to sit at the repository root (v2.1 Track 0).
 
-Former file → section:
-
-- `docs/API_REFERENCE.md`
-- `docs/API_REFERENCE.md`
-- `docs/API_REFERENCE.md`
-- `docs/API_REFERENCE.md`
-- `docs/API_REFERENCE.md`
-- `docs/API_REFERENCE.md`
-- `docs/API_REFERENCE.md`
-- `docs/API_REFERENCE.md`
-- `docs/API_REFERENCE.md`
-- `docs/API_REFERENCE.md`
+Former file → section: `API_CORE.md` → API_CORE; `API_FEATURES.md` → API_FEATURES; `API_ALPHA.md` → API_ALPHA; `API_PORTFOLIO_TCA.md` → API contract, Portfolio Optimizer & TCA; `API_TRADING.md` → API_TRADING; `API_ADAPTIVE.md` → API_ADAPTIVE; `API_CONTRACTS.md` → API_CONTRACTS; `API_PAPER.md` → API_PAPER; `API_AGENTS.md` → API_AGENTS; `API_LLM.md` → API_LLM. The v2.2 modules (research graph, research memory, tracing, offline evals, MCP SDK server, bars studies) are in API_V22 at the end.
 
 ## API_CORE — the contract every port must mirror
 
@@ -4377,7 +4366,7 @@ alpha_id=None) -> ModelRecord`. Layout `<root>/<model_id>/{model.joblib,record.j
   Training metrics, the pre-registration link and the parent are recorded
   (covered by `record_hash`) but are not part of the identity.
 * `prereg` must be a blackboard entry of kind `prereg` (e.g.
-  `iap.agents.prereg_gate.require(...)`); its `hash` is recorded as
+  `iap.governance.prereg_gate.require(...)`); its `hash` is recorded as
   `prereg_hash`. Without one, registration raises `RegistryError` unless
   `exploratory=True` (recorded on the record).
 * Immutable: identical content is idempotent, different metadata under the
@@ -4798,12 +4787,12 @@ the controls and what they stop: [GOVERNANCE.md §2a-2d](GOVERNANCE.md).
 
 ### 1. Governance primitives (v1.10-v1.14)
 
-**`iap.agents.blackboard`** — `Blackboard(path)`: append-only, hash-chained
+**`iap.governance.blackboard`** — `Blackboard(path)`: append-only, hash-chained
 JSONL (`entries()`, `verify()`, `verify_signatures(pubkeys, legacy, board_id)`);
-`iap.agents.blackboard.digest(obj)` / `canonical(obj)` are the canonical-JSON
+`iap.governance.blackboard.digest(obj)` / `canonical(obj)` are the canonical-JSON
 hash every signature and citation uses; `GENESIS`, `KINDS`.
 
-**`iap.agents.broker`** — `WriteBroker(root, agents, *, pubkeys=, trusted=,
+**`iap.governance.broker`** — `WriteBroker(root, agents, *, pubkeys=, trusted=,
 fingerprinter=)`: the only writer. `post_task`, `claim`, `file_finding`,
 `release`, `preregister(agent, alpha_id, horizon, hypothesis, expected_sign,
 *, auth, ledger=, dataset_version=, supersede=, screen=)` (`screen`, v1.17 C6,
@@ -4812,7 +4801,7 @@ PASSED it under its model identity, else `BrokerError`; the screen's path, sha25
 and status are recorded on the entry — `docs/API_REFERENCE.md` section 1.10);
 `request_context()` gives the
 board head and id a signed request binds to (`ed25519-v2`);
-`iap.agents.broker.sign(private_key, agent, op, args, **context)` builds the
+`iap.governance.broker.sign(private_key, agent, op, args, **context)` builds the
 `auth` document; `board_id(root, board)`. Errors: `BrokerError`.
 
 **`iap.agents.signing`** — `generate_keypair() -> (private_hex, public_hex)`,
@@ -4821,33 +4810,33 @@ msg, sig_hex)`, `message(...)`. **`iap.agents.trust`** — the maintainer-signed
 registry: `sign_registry`, `verify_registry`, `read_roots(root, ref)`,
 `load_pubkeys(root)`, `trusted_pubkeys(root, ref)`; `TrustError`.
 
-**`iap.agents.prereg_gate`** — `require(repo_root, alpha_id, horizon, board=None,
+**`iap.governance.prereg_gate`** — `require(repo_root, alpha_id, horizon, board=None,
 fingerprinter=None, agents=None)`: the entry a run needs, or `PreregistrationError`;
 `board_path(repo_root)`, `is_closed(entry)`. **`iap.agents.fingerprint`** —
 `fingerprint(alpha_id)` (scheme 2: code + feature closure hash),
 `module_closure`, `closure_hash`, `check_registration_env` (CI-lock venv for
 registrations), `ci_lock_deps`, `compare_deps`.
 
-**`iap.agents.workflow`** — `Workflow(broker, *, ledger=None)`: `propose` (one look),
+**`iap.governance.workflow`** — `Workflow(broker, *, ledger=None)`: `propose` (one look),
 `draft_prereg`, `drafts()`, human-only `sign_off` / `record_outcome`
 (`HUMAN_ONLY_OPS`, `require_human`, `AgentAuthorityError`);
 `issue_signoff(approver, secret, draft_hash, reason)`, `hit_rate(entries)`,
-`proposal_id(...)`. **`iap.agents.approvals`** — single-use signed approvals
+`proposal_id(...)`. **`iap.governance.approvals`** — single-use signed approvals
 for the human lifecycle edges: `issue`, `verify`, `apply`, `new_secret`;
 `ACTIONS = ("retire", "reset")`.
 
 **`iap.agents.anchor`** — `anchors(repo, board)` and `verify(repo, board,
-anchor_file=None, ref=None)` (chain, git prefixes, anchors). **`iap.agents.reserve`** —
+anchor_file=None, ref=None)` (chain, git prefixes, anchors). **`iap.governance.reserve`** —
 `ReserveEvaluator(secret, broker, runner)` with `evaluate(agent, candidate)`
 (pass/fail only, `MAX_ATTEMPTS = 3`); `iap.agents.reserve_runner.make_runner`.
 
-**`iap.agents.citations`** — `resolve(ref, root)`, `unresolved(refs, root)`,
+**`iap.governance.citations`** — `resolve(ref, root)`, `unresolved(refs, root)`,
 `artefact(ref, root)` (the JSON a `report:<session>.<run>` or `board:<hash>`
-names), `report_path(root, ident)`. **`iap.agents.untrusted`** —
+names), `report_path(root, ident)`. **`iap.governance.untrusted`** —
 `sanitise(text, limit)`, `injection_flags(text)`, `wrap(text, source)`,
 `wrap_tree(value, source, keys)`: free text from anyone is data.
 
-**`iap.agents.mcp_server`** (read-only MCP over stdio: `Tools`, `tool_list()`,
+**`iap.governance.mcp_server`** (read-only MCP over stdio: `Tools`, `tool_list()`,
 `handle(tools, msg)`, `serve(root)`; `FREE_TEXT` names the free-text keys) and
 **`iap.agents.mcp_workflow`** (`WorkflowTools`, the signed proposal workflow
 over MCP; `FORBIDDEN_TOOL_NAMES`).
@@ -5111,3 +5100,59 @@ from iap.llm.summary_check import check_summary, action_claims, clauses
 - `iap.llm.evals`: `SCENARIOS` (`p_hacking`, `prompt_injection`,
   `hallucinated_citation`, `task_success`), `run_scenario`, `run_all`,
   `fake_fingerprint`; mocked in CI, `--live` by the owner.
+
+## API_V22 — the 2026-11-18 round: graph, memory, tracing, evals, MCP SDK server, bars studies (Python)
+
+Every module below is offline: none calls a model API or the network. Narrative pages:
+[AI_STACK.md](AI_STACK.md), [RESEARCH_GRAPH.md](RESEARCH_GRAPH.md), [RESEARCH_MEMORY.md](RESEARCH_MEMORY.md),
+[TRACING.md](TRACING.md), [AGENT_EVALS.md](AGENT_EVALS.md), [MCP_SERVER.md](MCP_SERVER.md).
+
+### 1. Research graph, `iap.graph` (CLI `python -m iap.graph run | resume | verify-text`)
+
+- `iap.graph.core`: `Graph`, `execute`, `Interrupt` (the human approval stop), `RunResult`,
+  `GraphError`, `StepLimitError`, `state_sha256`.
+- `iap.graph.checkpoint`: `start`, `resume`, `verify_chain` (hash-chained checkpoints), `event_log`,
+  `CheckpointError`.
+- `iap.graph.research_flow`: `ResearchState`, `ResearchDeps`, `build_research_graph`,
+  `validate_hypothesis`, `triage`, `fallback_narrative`, `stub_deps`.
+- `iap.graph.wiring`: `build_wired_flow` and `wired_deps` (memory, holdout registry and verifier
+  behind the injected steps), `same_test`, `related_test`, `registry_is_holdout`,
+  `verify_narrative`, `stub_runner` (fixed numbers, not results), `load_runner`.
+- `iap.graph.tracing.traced_execute`; `iap.graph.langgraph_adapter.to_langgraph` (optional, untested
+  against an installed `langgraph`).
+
+### 2. Research memory, `iap.memory` (CLI `python -m iap.memory search | prior-tests | eval`)
+
+- `iap.memory.corpus`: `build_corpus`, `chunk_markdown`, `ledger_chunks`, `Chunk` (path and line span).
+- `iap.memory.bm25`: `BM25`, `tokenize`.
+- `iap.memory.search`: `Memory`, `default_memory`, `search`, `Hit`, `run_eval`.
+
+### 3. Tracing and offline evals, `iap.llm`
+
+- `iap.llm.tracing`: `Tracer`, `Span`, `JsonlExporter`, `session_tracer`, `load_spans`, `summarize`,
+  `to_otel` (OpenTelemetry GenAI field layout, no dependency).
+- `iap.llm.verifier_eval` (`python -m iap.llm.verifier_eval [--check]`): `evaluate`, `judge`,
+  `wilson`, `gate`.
+- `iap.llm.injection_eval` (`python -m iap.llm.injection_eval [--check]`): `evaluate`, `flagged`,
+  `structural`, `gate`.
+
+### 4. MCP server on the official SDK, `iap.governance.mcp_sdk_server`
+
+`build_server(root, providers=())`, `ProviderContext` and `main` (optional extra `mcp`); read-only
+tools through the same `Tools` class as `iap.governance.mcp_server`. Callers add tools as
+providers. `iap.memory.mcp_tools.MemoryTools` and `iap.memory.mcp_tools.register` add the
+two research-memory tools (capped at 20 hits and 500-character queries);
+`iap.memory.mcp_server.main` (entry point `iap-mcp-sdk`) serves both.
+
+### 5. Bars studies and power, `iap.research`
+
+- `iap.research.pnl_power`: `sessions_needed`, `mde_sharpe`, `power`, `critical_t`, `table`,
+  `render_markdown` (the source of [research/PNL_POWER_TABLE.md](research/PNL_POWER_TABLE.md)).
+- `iap.research.breadth_bars`: `load_panel`, `select_universe` (no return input), `run_study`,
+  `pool_sessions` (session-level t), `rank_ic`, `Panel`.
+- `iap.research.breadth_families`: `momentum_30` (F1), `open_reversal` (F2), `closing_imbalance`
+  (F3), `load_auction`, `FAMILIES`.
+- `iap.research.breadth_holdout`: `preflight`, `run_look`, `assemble`, `verdict`, `LookRefused`
+  (raised before any download when the registry does not permit the read).
+- Rust: `rust/itchbars` (binary `itchbars`): a decompressed ITCH 5.0 stream on standard input to
+  one-minute bars per symbol, with optional closing-auction rows.

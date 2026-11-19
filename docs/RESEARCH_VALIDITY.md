@@ -727,7 +727,7 @@ real and synthetic looks, the external per-dataset looks the central ledger does
 entries / 1,224 looks of section 4f, enumerated one by one; merging them is the owner-approved
 regenerate flow and is not done), the lower bound `real_looks_lower_bound` that follows, and the
 families dependent on it through looks on the same real dataset version (every EQ family on multi7 is
-dependent on every other). `iap.agents.prereg_gate.selection_history` reads the map and
+dependent on every other). `iap.governance.prereg_gate.selection_history` reads the map and
 `prereg_gate.require` attaches the fields (`central_real_looks`, `external_unmerged_looks`,
 `real_looks_lower_bound`, `dependent_families`, `dependent_real_looks_lower_bound`, `map_sha256`) to
 the pre-registration entry; a prereg that binds `ledger_family_map_sha256` is refused when the committed

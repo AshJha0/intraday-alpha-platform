@@ -1,0 +1,13 @@
+{
+  "_comment": "Per-package line-coverage floors read by tests/harness/check_coverage_floor.py. line_floor = measured_line - 2 (never above the measurement). Measurement, commands and uncovered code: docs/review/COVERAGE_BASELINE_2026-11-18.md. Raise a floor when coverage rises; never lower one without a CHANGELOG line.",
+  "measured_on": "2026-11-18",
+  "packages": {
+    "iap.agents": {"measured_line": 82.46, "line_floor": 80.46},
+    "iap.governance": {"measured_line": 87.78, "line_floor": 85.78},
+    "iap.llm": {"measured_line": 87.14, "line_floor": 85.14},
+    "iap.ml": {"measured_line": 96.26, "line_floor": 94.26},
+    "iap.models": {"measured_line": 80.38, "line_floor": 78.38},
+    "iap.research.breadth_bars": {"measured_line": 100.0, "line_floor": 98.0},
+    "iap.research.pnl_power": {"measured_line": 100.0, "line_floor": 98.0}
+  }
+}

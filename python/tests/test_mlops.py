@@ -6,8 +6,8 @@ import json
 
 import numpy as np
 import pytest
-from iap.agents.blackboard import Blackboard, digest
 from iap.backtest.maker import MakerFilter
+from iap.governance.blackboard import Blackboard, digest
 from iap.lifecycle.evidence import Evidence
 from iap.mlops import (
     ModelRegistry,

@@ -1,0 +1,162 @@
+{
+  "schema": "iap.prereg_draft/v1",
+  "kind": "breadth_bars_holdout",
+  "prereg_id": "research/preregs/breadth_bars_holdout_prereg.json",
+  "status": "DRAFT - NOT SIGNED, NOT REGISTERED. Fill every <FILL ...> from the family-choice rule of research/round1/FAMILIES_PRESPEC_2026-11-18.md; the runner refuses any document that still carries one.",
+  "signed": false,
+  "drafted": "2026-11-18",
+  "drafted_by": "Claude (session holdout-look-prep); preparation only: no 2025/26 data downloaded or read, nothing signed or registered",
+  "protocol": "research/preregs/drafts/breadth_bars_holdout_DRAFT.md",
+  "hypothesis": "On the nine sealed 2025/26 Nasdaq ITCH sessions, over the fixed 2019-01-30 bars universe minus AAPL, MSFT and QQQ, the registered family's decile book earns a positive mean return per rebalance net of the quoted spread, judged across sessions. A fail is a negative result for that family on these sessions only above the detectable Sharpe floor (see power).",
+  "holdout": {
+    "sessions": [
+      "2025-11-28",
+      "2025-12-08",
+      "2025-12-09",
+      "2025-12-10",
+      "2025-12-11",
+      "2025-12-12",
+      "2026-05-15",
+      "2026-05-18",
+      "2026-06-12"
+    ],
+    "source": "session keys of research/holdout_registry.json whose '*' scope is unread; raw-file names, sizes and sha256 copied from research/r7/r7_confirm_prereg.json (holdout_files) and research/data_manifest.json, recorded when the three-name datasets were ingested. No file was read for this draft.",
+    "raw_files": [
+      {
+        "date": "2025-11-28",
+        "file": "S112825-v50.txt.gz",
+        "bytes": 4735308661,
+        "sha256": "e965ea6f9779c1b5d7b74de4549836ffe29a5f6ff64bb7894186a6f6404baaa4",
+        "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S112825-v50.txt.gz"
+      },
+      {
+        "date": "2025-12-08",
+        "file": "S120825-v50.txt.gz",
+        "bytes": 8775891119,
+        "sha256": "3e3d43c0c827b3d589eee64631b5e5401a39f9c922f29b18bad4a055eb922aa0",
+        "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S120825-v50.txt.gz"
+      },
+      {
+        "date": "2025-12-09",
+        "file": "S120925-v50.txt.gz",
+        "bytes": 7929915419,
+        "sha256": "b6bf2f5dbd87445e37a58951c6119908ef0ea559ca373be80a0346ab73e14d66",
+        "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S120925-v50.txt.gz"
+      },
+      {
+        "date": "2025-12-10",
+        "file": "S121025-v50.txt.gz",
+        "bytes": 11557662295,
+        "sha256": "5a64714a79df1b5ea987b66e12d70005beeefe1cf6cea8c151d1adc842275741",
+        "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S121025-v50.txt.gz"
+      },
+      {
+        "date": "2025-12-11",
+        "file": "S121125-v50.txt.gz",
+        "bytes": 10471034001,
+        "sha256": "de9058d8c600a6510ce087a000cdd3f513197688b7c8ebcc0c7baad9a6796c17",
+        "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S121125-v50.txt.gz"
+      },
+      {
+        "date": "2025-12-12",
+        "file": "S121225-v50.txt.gz",
+        "bytes": 12551644054,
+        "sha256": "46f42fb12f0e659814416713c4e22985dba1b062b0c13097ea9b5b003d612798",
+        "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S121225-v50.txt.gz"
+      },
+      {
+        "date": "2026-05-15",
+        "file": "itch50_05_15.gz",
+        "bytes": 13047496628,
+        "sha256": "42bcd01d4fbad90bb9bf7910ac46f93004640fc83d6587868e5117e874a0915c",
+        "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/itch50_05_15.gz"
+      },
+      {
+        "date": "2026-05-18",
+        "file": "itch50_05_18.gz",
+        "bytes": 16150095810,
+        "sha256": "c6a3394e555806fd6a27e17aed992fbcc8fe8fb1dd50049e9b9935d6bddd05ec",
+        "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/itch50_05_18.gz"
+      },
+      {
+        "date": "2026-06-12",
+        "file": "S061226-v50.txt.gz",
+        "bytes": 17894268560,
+        "sha256": "1f9d35e12120ef37ea22df9f59dc5207fe51b075b6ccf1c9cdfd09fa566dc1d5",
+        "url": "https://emi.nasdaq.com/ITCH/Nasdaq%20ITCH/S061226-v50.txt.gz"
+      }
+    ],
+    "registry_scope": "per session: the '*' rule is unread; AAPL, MSFT, QQQ are spent (R7) and excluded",
+    "never": "no statistic on these sessions for any name outside AAPL / MSFT / QQQ before the one signed run"
+  },
+  "universe": {
+    "path": "research/round1/universe_20190130.json",
+    "sha256": "07b32400e244bcae7323b9ccdefb6574b6cb5c27b86b6dff1e90ced2f66b10fb",
+    "sha256_form": "sha256 of the LF-normalised file text (iap.research.breadth_holdout.file_sha256)",
+    "rule": "breadth_bars_universe/v1, fixed on 2019-01-30 by liquidity facts only (500 names)",
+    "excluded_symbols": [
+      "AAPL",
+      "MSFT",
+      "QQQ"
+    ],
+    "missing_names": "a name absent on a session is counted, never replaced (breadth_bars.rows_for)"
+  },
+  "family": {
+    "name": "<FILL: the one family the choice rule selects (vwap_deviation, residual_reversion, or a breadth_families name)>",
+    "choice_record": "<FILL: path and sha256 of the in-sample record that applied the choice rule>",
+    "parameters": {
+      "lookback": "<FILL: bars (round 1: 15)>",
+      "step": "<FILL: bars (round 1: 15)>",
+      "horizon": "<FILL: bars (round 1: 15)>",
+      "delay": "<FILL: bars (round 1: 1)>",
+      "decile_q": "<FILL: fraction (round 1: 0.1)>"
+    },
+    "implementation": "iap.research.breadth_bars.run_study for the two round-1 scores; iap.research.breadth_families.run_family otherwise (tools/breadth_bars_holdout.py default_study)"
+  },
+  "costs": {
+    "per_rebalance": "net = gross - (mean_long c + mean_short c) / 2 on unit gross; c = hs[entry] + hs[exit]; hs = quoted half spread over mid of the end-of-bar Nasdaq quote",
+    "in_sample_reference": "median round-trip spread cost 4.29 bps on 2019-01-30 (research/round1/BREADTH_BARS_20190130.md)",
+    "not_modelled": "fees, market impact, halts, short-sale constraints; one venue's quote overstates the consolidated spread (conservative)"
+  },
+  "statistic": {
+    "primary": "session_mean_net_bps_per_rebalance_one_sided_student_t",
+    "definition": "per session: mean net bps per rebalance of the registered family's decile book; across sessions: mean, standard error and one-sided Student t on n - 1 df (breadth_bars.pool_sessions). Sessions are the independent unit.",
+    "secondary_descriptive": "gross bps, rank IC, names used, positive sessions; descriptive only"
+  },
+  "decision": {
+    "alpha_one_sided": 0.025,
+    "min_sessions": 9,
+    "rule": "pass: all min_sessions sessions give a finite value, the mean is above zero and the one-sided p <= alpha_one_sided (t >= 2.306 on 8 df). incomplete: fewer sessions give a value (the look is still spent). fail: otherwise. Computed by iap.research.breadth_holdout.verdict.",
+    "status": "PROPOSED; the coordinator confirms before signing",
+    "reasoning": "0.025 one-sided is the repository's standard level (docs/research/PNL_POWER_TABLE.md); one family is registered, so K = 1 and nothing is split; requiring all nine sessions stops download failures from choosing the sample"
+  },
+  "multiplicity": {
+    "K": 1,
+    "statement": "One family, one parameter set, one statistic, one look. The family is chosen in-sample from several candidates by the pre-written rule; that selection is disclosed and the number of families screened is in the choice record. No second family may be run on these sessions after this look."
+  },
+  "power": {
+    "source": "docs/research/PNL_POWER_TABLE.md; research/round0/ROUND0_GATES.md section 8; iap.research.pnl_power.mde_sharpe(9) = 16.94 at K = 1",
+    "can_show": "with 80 % power, a true annualised net Sharpe of about 17 or more (K = 1, one-sided 0.025)",
+    "cannot_show": "anything about a realistic Sharpe (1 to 5): a fail or incomplete is not evidence against such a strategy; a pass would be a very large effect, to be checked for cost-model or data artefacts before belief",
+    "stop_rule": "ROUND0_GATES section 2 registers a confirmatory study only if its sealed session count reaches the table entry for the Sharpe it looks for; this registration states that it looks for a net Sharpe of 17 or more"
+  },
+  "bars_tool": {
+    "path": "rust/itchbars",
+    "commit": "<FILL: git rev-parse HEAD at bind>",
+    "tree_sha256": "<FILL: tree_sha256(rust/itchbars) at bind; at drafting 8a534cb262a9136a5a3e1d98eabf623d4e8b017a3e4a6ffa8986ca2528b547da>"
+  },
+  "runner": {
+    "tool": "tools/breadth_bars_holdout.py run --prereg research/preregs/breadth_bars_holdout_prereg.json --i-have-approval",
+    "actor": "IAP_RUN_ACTOR set to an id other than the signing maintainer; no key in the environment",
+    "result": "research/round1/holdout_look/breadth_bars_holdout_prereg_RESULT.json",
+    "registry_after": "the nine '*' scopes become spent, spent_by this document (resealed by the runner)"
+  },
+  "analysis_identity": "<FILL: written by tools/prereg_bind_identity.py bind; data_versions = the nine raw sha256 above>",
+  "dry_run": "<FILL: bound by tools/prereg_bind_identity.py bind --planted-dry-run>",
+  "open_for_owner": [
+    "release or extend the reservation of the nine sessions (now reserved for research/preregs/breadth_book_prereg.json); HOLDOUT_LOOK_PROCEDURE.md section 2",
+    "docs/governance/OWNER_SIGNATURE_CHECKLIST.md (U0 DR-2) reserves the owner key to the owner: either the owner signs, or the owner records a decision that changes DR-2 for this document",
+    "confirm alpha_one_sided 0.025 and min_sessions 9",
+    "image digest: --no-image-digest proposed (the bars tool runs in WSL, outside the reproduction image)"
+  ]
+}

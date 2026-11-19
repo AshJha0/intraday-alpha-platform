@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 _REF = re.compile(r"^(experiment|alpha|lifecycle|ledger|report|board):([A-Za-z0-9_.-]{1,128})$")
 
 
-def _json(path: Path):
+def _json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8", errors="replace"))
 
 
@@ -57,7 +59,7 @@ def resolve(ref: str, root: Path) -> bool:
         return False
 
 
-def unresolved(refs, root: Path) -> list[str]:
+def unresolved(refs: Iterable[str], root: Path) -> list[str]:
     """The references in ``refs`` that do not resolve."""
     return [r for r in refs if not resolve(r, root)]
 
@@ -74,7 +76,7 @@ def report_path(root: Path, ident: str) -> Path | None:
     return Path(root) / "research" / "agents" / "llm_sessions" / session / "reports" / f"{run}.json"
 
 
-def artefact(ref: str, root: Path):
+def artefact(ref: str, root: Path) -> Any:
     """The JSON a ``report:`` or ``board:`` reference names (a board entry as a
     whole dict), or None if it does not resolve."""
     m = _REF.match(ref) if isinstance(ref, str) else None
