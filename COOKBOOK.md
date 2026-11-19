@@ -12077,7 +12077,7 @@ spent day, no prereg id                REFUSED: <dir>\day_b: session 2030-01-03 
 spent day, prereg P2                   REFUSED: <dir>\day_b: prereg 'P2' is not listed for spent scope 2030-01-03/AAPL (allowed: ['P1'])
 day that was never registered          REFUSED: <dir>\day_c: session 2030-01-04 / AAPL is not in research/holdout_registry.json; register the datase
 spent day, copied to a new name        REFUSED: <dir>\renamed_copy: session 2030-01-03 / AAPL is SPENT in the holdout registry; a read needs a signe
-in-sample day, one byte changed        REFUSED: <dir>\day_a: eq_20300102.normalized.iap1 content differs from dataset.json (tampered or re-written); refusing
+in-sample day, one byte changed        REFUSED: <dir>\day_a: eq_20300102.normalized.iap1 content differs from dataset.json (tampered or re-written);
 log lines: 6 | problems: []
 BROKEN: line 4: prev_sha256 does not match the line before it
 exit 1
