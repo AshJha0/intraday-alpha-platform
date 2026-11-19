@@ -54,11 +54,12 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
   <div class="wrap">
     <h1>intraday-alpha-platform</h1>
     <p style="border:2px solid #b45309;border-radius:6px;padding:10px 14px;background:#fffbeb;color:#111827">
-       <strong>Status, v2.0.0 (26 Oct 2026):</strong> engineering-complete platform (Level A). <strong>No confirmed
-       alpha.</strong> The free daily data route was tested and shown <strong>data-ineligible</strong> (survivorship:
-       85&nbsp;% of index leavers missing against a 2&nbsp;% limit), so nothing on this page is above
-       <em>development-supported</em>. Earlier "confirmed" wording below is a historical record under the older rules.
-       <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/v2.0.0_RELEASE_NOTES.md">Release notes, negatives first</a>.
+       <strong>Status, v2.2.0 (19 Nov 2026):</strong> <strong>No confirmed alpha.</strong> Where a signal predicts,
+       it is smaller than the cost of trading it. Both free routes to a confirmation sample are closed: the free
+       daily data route was shown <strong>data-ineligible</strong> (survivorship: 85&nbsp;% of index leavers missing
+       against a 2&nbsp;% limit) and IEX withdrew its intraday captures from direct download (2026-11-18). Nothing on
+       this page is above <em>development-supported</em>. Earlier "confirmed" wording below is a historical record under the older rules.
+       <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/v2.2.0_RELEASE_NOTES.md">Release notes, negatives first</a>.
     </p>
     <p>An event-driven trading research platform for equities and FX, written in three
        languages on purpose: Python for research and the reference implementation, C++ for
@@ -69,7 +70,8 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
        deterministic replay → TCA → decision trace → 7-state promotion lifecycle. Cross-language
        golden tests hold it together, and one command (<code>python -m iap.mvp run</code>) runs
        the whole loop on one instrument. Its golden result loses money, and the page says so.</p>
-    <p>Seven real Nasdaq ITCH sessions and a two-day 2026 holdout have been studied. The free daily
+    <p>Ten in-sample Nasdaq ITCH sessions (full market since v2.2.0), the three-symbol R7 holdout and a
+       two-day 2026 holdout have been studied; nine sealed 2025/26 sessions stay unread. The free daily
        route failed its data tests; no result is above development-supported, and none pays its trading costs. Nothing is claimed to be profitable.</p>
     <nav>
       <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/HOW_IT_WORKS.md">How it works</a>
@@ -155,7 +157,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
     (owner's check, 2026-11-18) and the daily route has no eligible free source. Ten free in-sample Nasdaq sessions
     detect only a net Sharpe of about 16 or more, so they can develop an idea, not confirm one. An event-driven
     quoter lost more than the grid quoter on its one development session. Pooled and family results:
-    both reversal scores lose about 6.2 to 6.3 bps per rebalance after the spread (session-level t -11.7 and -9.3, 0 of 10 sessions positive); momentum -5.78 bps (t -4.71), opening reversal -10.57 (t -1.97), closing-auction imbalance +0.32 (t 0.64; positive before the spread in all ten sessions). The sealed holdout was not read.
+    both reversal scores lose about 6.2 to 6.3 bps per rebalance after the spread (session-level t -11.7 and -9.3, 0 of 10 sessions positive); momentum -5.78 bps (t -4.71), opening reversal -10.57 (t -1.97), closing-auction imbalance +0.32 (t 0.64; positive before the spread in all ten sessions). No candidate met the holdout rule (one-sided p below 0.003125 after the F3 erratum), so the sealed holdout was not read.
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/release/v2.2.0_RELEASE_NOTES.md">Release notes</a>,
     <a href="https://github.com/AshJha0/intraday-alpha-platform/blob/main/docs/AI_STACK.md">AI stack</a>.
     </div>
@@ -295,7 +297,7 @@ details.history summary{cursor:pointer;font-weight:600;color:var(--teal);padding
      net-of-cost screen passes 0 of 22, and the v1.16 monetisation study found no taker, capacity,
      quoting or DeepLOB edge. Real-data and synthetic-data looks are counted separately below.</p>
   <div class="numbers">
-    Cross-language parity&nbsp;&nbsp;&nbsp; python 4062&nbsp; · cpp 333&nbsp; · rust 388 tests, 4,783 green (main CI run 40015853764, 2026-10-23, v1.18.0); golden groups 217/74/75 (Java archived in v1.15)<br>
+    Cross-language parity&nbsp;&nbsp;&nbsp; python 4062&nbsp; · cpp 333&nbsp; · rust 388 tests (python and cpp from main CI run 40015853764, 2026-10-23, v1.18.0; rust counted from the source tree since the itchbars crate, 2026-11-18); golden groups 217/74/75 (Java archived in v1.15)<br>
     Golden suites&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; identical book states, byte-identical IAP1 SHA-256, features/alphas to 1e-9, byte-identical canonical JSON, trace digests, risk audit and lifecycle registry in python, cpp and rust (Java archived in v1.15)<br>
     C++ hot path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 2-CPU container (Intel Xeon 2.10 GHz, no pinning, steady_clock, cache-resident means; not colocation): IAP1 decode 184.1 ns/event (CRC-32 verified) · book update 26.4 ns · replay 27.2M events/s · 48-feature engine 514.1 ns/event · one decision trace 31.7 µs/trace off the event loop<br>
     Determinism&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; full dataset regeneration is byte-identical (sha256-verified); replays reproduce fills exactly; the MVP run twice and replayed from its capture reproduces its trace digest<br>

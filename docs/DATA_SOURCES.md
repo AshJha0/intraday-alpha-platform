@@ -29,7 +29,7 @@ is permitted for this non-commercial research; section 14 lists the licence ques
 | IEX HIST TOPS | top-of-book quotes and trades (`0x8003`) | `--tops FILE` on an IEX ingest | free, same host; used as an **oracle**, not as a book |
 | LOBSTER / Databento samples | free sample files used for the three-name datasets | see REAL_DATA.md sections 4.3-4.4 | free samples only |
 
-The 2019-2020 Nasdaq days are the in-sample set; `research/breadth/candidates.json`
+The 2019-2021 Nasdaq days are the in-sample set; `research/breadth/candidates.json`
 lists ten in-sample days (2019-01-30, 2019-03-27, 2019-07-30, 2019-08-30,
 2019-10-18, 2019-10-30, 2019-12-30, 2020-01-30, 2021-07-13, 2021-08-13) with the
 source URL, the file name and a note that the sha256 is recorded after download
@@ -41,6 +41,13 @@ removed after ingest and are re-downloads that wait for approval
 are not in that manifest; for AAPL, MSFT and QQQ they are spent in the holdout
 registry, for every other name unread (see
 [PORTFOLIO_BREADTH.md](PORTFOLIO_BREADTH.md) and REAL_DATA.md section 3.7).
+
+In v2.2.0 all ten in-sample days were reduced to one-minute full-market bars by
+`rust/itchbars` through `tools/itch_bars_chain.py`, which deletes the raw file after each
+day; the ten bars files are recorded in `research/round1/bars_manifest.json` and listed in
+`research/data_manifest.json` with the verdict "derived" and no vendor oracle. No 2025/26
+file was downloaded (decision 12 of
+[DECISIONS_2026-11-18_overnight.md](../research/round1/DECISIONS_2026-11-18_overnight.md)).
 
 Examples of size, from the committed record: the 2019-01-30 full-market file is
 368,366,634 messages (`research/breadth/UNIVERSE_2019-01-30.md`, with its
