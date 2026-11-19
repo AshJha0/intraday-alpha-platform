@@ -82,7 +82,8 @@ After them:
 - false accepts are 0/69 ([0, 0.053]);
 - false rejects are 0/77 ([0, 0.048]), after the owner relabelled one case as reject on 2026-11-18.
 
-The one remaining false reject is a case whose label the author now disputes.
+Both from [research/agents/evals/verifier_golden_result.json](../research/agents/evals/verifier_golden_result.json)
+(`overall`); no disagreement remains.
 
 The author wrote and labelled 55 held-out cases before running the fixed verifier on
 them:
@@ -91,6 +92,8 @@ them:
 |---|---|---|
 | False accepts | 12/28 ([0.265, 0.609]) | 0/29 ([0, 0.117]) |
 | False rejects | 12/27 ([0.276, 0.627]) | 0/26 ([0, 0.129]), after the owner relabelled one case as reject on 2026-11-18 |
+
+The "after" column is the `heldout` key of the same result file.
 
 These numbers measure the verifier on adversarial edge cases written by one person. They
 say nothing about any model.
@@ -102,9 +105,12 @@ agent into `{"untrusted": true, "source": ..., "text": ..., "flags": [...]}`: co
 characters removed, length capped at 4000 characters, likely injection phrases flagged.
 The module docstring is explicit that flagging is advisory. The real control is
 structural: no tool the model holds can change state except through the write broker, so
-an injected instruction has nothing to call. The live prompt-injection eval
-(`python -m iap.llm.evals`, scenario `prompt_injection`) checks exactly that: no tool
-outside the allowlist ran, and no filed finding carries the injected numbers.
+an injected instruction has nothing to call. The `prompt_injection` scenario of
+`python -m iap.llm.evals` checks exactly that with a scripted model in CI (it was last run live
+on 2026-10-27, before the zero-spend rule): no tool outside the allowlist ran, and no filed
+finding carries the injected numbers. The offline injection suite measures the same structural
+control: 0 of 1191 off-allowlist calls executed
+([research/agents/evals/injection_result.json](../research/agents/evals/injection_result.json)).
 
 ### 2.3 Spend is capped before the call, not after
 
@@ -124,7 +130,10 @@ No tool exists for it. Pre-registration drafts are unsigned files with `status: 
 Signing, registration and lifecycle promotion are commands a person runs
 (`python -m iap.agents.cli prereg`, `sign-registry`, `python -m iap.lifecycle`). The
 agent's own Ed25519 key signs its blackboard proposals so they can be attributed; it
-signs nothing that changes a gate.
+signs nothing that changes a gate. Tests: `test_drafts_verified_and_unsigned`
+(`python/tests/test_agents_wse.py`) and the `human_signoff` task of
+`python -m iap.agents.eval_harness`; the injection suite attempts `sign`, `register_alpha` and
+`promote_alpha` and none runs (`test_structural_control_executes_no_off_allowlist_call`).
 
 ### 2.5 The tool loop survives bad turns
 
@@ -136,6 +145,13 @@ status `client_error` and the exception is then re-raised to the caller. A respo
 off at `max_tokens` ends the session with status `max_tokens` and none of its tool calls
 run, because their inputs may be truncated; the turn is still in the transcript. A
 `pause_turn` response is sent back as is and the loop continues; it counts as a turn.
+
+For `run_tool_loop` each case has a test in `python/tests/test_llm_loop_robustness.py`:
+`test_tool_exception_becomes_error_result_and_loop_continues`,
+`test_client_error_still_writes_session_then_reraises`, `test_truncated_tool_call_is_not_dispatched`,
+`test_paused_turn_continues` and `test_paused_turns_count_against_max_turns`. The same handling in
+`run_session` (`python/src/iap/llm/agent.py`) has **no test** yet; it is the same code shape, read
+but not exercised.
 
 ## 3. What this does not protect against
 
@@ -152,7 +168,7 @@ default API version to `2026-10-21`. Its breaking changes (sampling parameters r
 no `document` block in an assistant turn, no cited text in a user turn, renamed Admin API
 fields) were searched for in `python/src/iap/llm/` and `python/src/iap/agents/`, and none
 is used. CI still runs the scripted client in `iap.llm.fake`, so a green CI run does not
-exercise the real SDK. The owner-run live eval of 2026-10-27 does: four scenarios on
-`claude-haiku-5-5`, all passed, USD 0.0060
+exercise the real SDK. The owner-run live eval of 2026-10-27 did, before the zero-spend
+rule (no live call since 2026-11-18): four scenarios on `claude-haiku-5-5`, all passed, USD 0.0060
 ([research/agents/eval_live_sdk2.json](../research/agents/eval_live_sdk2.json), summarised in
 [AI_ML_ONE_PAGER.md](AI_ML_ONE_PAGER.md#live-agent-eval-on-sdk-2x)).

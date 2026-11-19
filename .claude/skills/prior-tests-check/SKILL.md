@@ -13,7 +13,7 @@ Run from the repository root with the project interpreter and `PYTHONPATH=python
 
 ## Steps
 
-1. Get the alpha id, the horizon (one of `1m 5m 15m 30m 60m 1d`), the universe
+1. Get the alpha id, the horizon (one of `500ms 1s 5s 10s 30s 1m 5m 15m 30m 60m 1d`), the universe
    (name and symbols) and one line of mechanism from the person. Ask if any is missing.
 2. List the nearest ledger entries and result documents:
 

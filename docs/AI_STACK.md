@@ -17,7 +17,7 @@ flowchart TB
         MC["MCP client<br/>(.mcp.json)"]
     end
     subgraph mid["Read and decide (python/src/iap)"]
-        MS["MCP server<br/>governance.mcp_sdk_server<br/>+ memory.mcp_tools"]
+        MS["MCP server<br/>launched as memory.mcp_server:<br/>governance.mcp_sdk_server<br/>+ memory.mcp_tools"]
         GR["Research graph<br/>graph.research_flow + graph.wiring"]
         ME["Research memory<br/>memory (BM25)"]
         VE["Number verifier<br/>llm.verify"]
@@ -57,7 +57,7 @@ returns fixed numbers and a writer that copies facts into one sentence.
 | Wiring: narrative | Writer text stands only if every number matches the run's facts and the verdict is named; otherwise the code-written text is used | `test_narrative_verifier`, `test_wrong_number_falls_back_to_code_text` |
 | Number verifier ([AGENT_EVALS.md](AGENT_EVALS.md)) | Exact-decimal matching of every written number against cited evidence | `python -m iap.llm.verifier_eval --check` |
 | Untrusted text and tool allowlist ([AGENT_EVALS.md](AGENT_EVALS.md)) | Injected text is flagged by pattern (weak); off-allowlist calls are refused (structural) | `python -m iap.llm.injection_eval --check` |
-| MCP server ([MCP_SERVER.md](MCP_SERVER.md)) | Read-only tools with typed, bounded inputs; no write, subprocess or network path in its modules; memory tools (`iap.memory.mcp_tools`, served by `python -m iap.memory.mcp_server`) capped at 20 hits and 500-character queries; the governance module never imports memory | `python/tests/test_mcp_sdk_server.py` (end-to-end tests skip without the optional `mcp` extra) |
+| MCP server ([MCP_SERVER.md](MCP_SERVER.md)) | Read-only tools with typed, bounded inputs; no write, subprocess or network path in its modules; memory tools (`iap.memory.mcp_tools`, served by `python -m iap.memory.mcp_server`) capped at 20 hits and 500-character queries; the governance module never imports memory | `test_sdk_module_has_no_write_subprocess_or_network_path`, `test_memory_tools_are_bounded_and_wrap_snippets`, `test_governance_server_does_not_import_memory` in `python/tests/test_mcp_sdk_server.py` (the end-to-end test skips without the optional `mcp` extra) |
 | Skills ([.claude/skills/](../.claude/skills/)) | Each states its guardrails; every command it names exists | `python/tests/test_skills.py` |
 
 ### Skills
@@ -108,19 +108,22 @@ only the unit cases in `test_narrative_verifier`, not a labelled eval set.
 
 ## What is not there
 
-- **No live model evals.** Under the zero-spend rule no model API is called, so nothing
-  measures how often a real model's narrative passes the verifier or how a real model
-  behaves under injection. Every number above comes from fixed, hand-labelled files.
+- **No live model evals.** Under the zero-spend rule no model API was called in this round,
+  so nothing here measures how often a real model's narrative passes the verifier or how a
+  real model behaves under injection. Every number above comes from fixed, hand-labelled
+  files. The live results in [AI_ML_ONE_PAGER.md](AI_ML_ONE_PAGER.md) predate the rule.
 - **Lexical retrieval only.** The memory is BM25 over words. It does not match synonyms or
   paraphrases, and it cannot tell that two differently worded entries are the same test.
 - **The same-test rule reaches only part of the ledger.** No entry of
-  `research/experiments.json` records both a horizon and a symbol list, so the rule judges
-  an entry by the dataset it ran on (`dataset_version`, resolved through
-  `research/data_manifest.json`). Counted on 2026-11-18: of 640 entries, 205 record a
-  horizon and 158 of those a dataset version, so 158 can stop the flow as a duplicate. A
-  dataset version that is not in the manifest (older synthetic datasets) matches only when
-  the hypothesis names that version itself. The 435 entries with no horizon in their config
-  (execution studies, adaptive deployments, screens) never count. `python -m iap.graph run`
+  `research/experiments.json` records both a horizon and a symbol list or universe name, so
+  the rule judges an entry by the dataset it ran on (`dataset_version`, resolved through
+  `research/data_manifest.json`). Counted on 2026-11-19 from `research/experiments.json` with
+  the rule's own field lookup (`config.horizon`, else `config.candidate.horizon`): of 640
+  entries, 228 record a horizon and 181 of those a dataset version, so at most 181 can stop
+  the flow as a duplicate. Only 27 of the 181 dataset versions are in the manifest; the other
+  154 (older synthetic datasets among them) match only when the hypothesis names that version
+  itself. The 412 entries with no horizon in their config (execution studies, adaptive
+  deployments, screens) never count. `python -m iap.graph run`
   prints every entry with the same alpha and horizon on another or an unknown universe as
   `check by hand`, and the person decides at the approval step.
 - **The runner is a stub.** `python -m iap.graph run` returns fixed numbers unless a runner
