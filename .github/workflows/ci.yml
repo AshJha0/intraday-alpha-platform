@@ -793,7 +793,7 @@ jobs:
         with:
           toolchain: "1.99.1"      # == rust/rust-toolchain.toml (check_deployment.py enforces)
       - name: install cargo-audit + cargo-deny
-        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+        uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2.90.5
         with:
           tool: cargo-audit@0.22.2,cargo-deny@0.19.9
       - name: lockfile for rust/features_py (standalone package, not committed)
