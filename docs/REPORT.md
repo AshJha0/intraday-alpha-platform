@@ -53,7 +53,7 @@ golden tests hold the three equal ([docs/POLYGLOT.md](POLYGLOT.md)).
 | 15 | Cross-sectional reversal on full-market bars, one session (2019-01-30, 500 names): all four cells negative net of spread; primary -8.90 bps per rebalance net, -1.07 gross | exploratory (one session) | [BREADTH_BARS_20190130.md](../research/round1/BREADTH_BARS_20190130.md) |
 | 16 | The same study pooled over ten in-sample sessions: net of the quoted spread at the primary 1-minute delay, VWAP deviation -6.24 bps per rebalance (session-level t -11.71, 0 of 10 sessions positive) and residual reversion -6.29 (t -9.33, 0 of 10); at delay 0, -6.33 (t -11.30) and -6.27 (t -8.90); before the spread, +0.66 and +0.59 bps at the primary delay (`research/round1/BREADTH_BARS_POOLED.md`) | exploratory | [BREADTH_BARS_POOLED.md](../research/round1/BREADTH_BARS_POOLED.md) |
 | 17 | Families F1 intraday momentum, F2 opening reversal, F3 closing-auction imbalance, pre-specified at K = 7, then K = 8 after the F3 erratum (one-sided p below 0.003125): net -5.78 bps per rebalance (session-level t -4.71, 1 of 10 sessions positive); net -10.57 bps (t -1.97, 2 of 10); version 1 had no score on any session (a bar-index error in the specification and a dissemination-start fact; erratum in the pre-specification, no look spent); version 2, registered before any F3 return existed and raising K to 8, net +0.32 bps (t 0.64, 4 of 10), with gross +1.98 bps (t 3.94) and rank IC 0.127 (t 4.53) positive in all ten sessions as diagnostics | exploratory | [FAMILIES_PRESPEC_2026-11-18.md](../research/round1/FAMILIES_PRESPEC_2026-11-18.md), [BREADTH_FAMILIES.md](../research/round1/BREADTH_FAMILIES.md) |
-| 18 | Sealed nine-session breadth holdout: not taken. No candidate met the rule fixed before the results (positive mean net, one-sided p below 0.003125, at least 7 of 10 sessions positive; `research/round1/BREADTH_FAMILIES.md`), so the nine sessions stay sealed and unread | pending | [HOLDOUT_LOOK_PROCEDURE.md](../research/round1/HOLDOUT_LOOK_PROCEDURE.md) |
+| 18 | Sealed nine-session breadth holdout: not taken. No candidate met the rule fixed before the results (positive mean net, one-sided p below 0.003125, at least 7 of 10 sessions positive; `research/round1/BREADTH_FAMILIES.md`), so the nine sessions stay sealed and unread | not a result (no test was run) | [HOLDOUT_LOOK_PROCEDURE.md](../research/round1/HOLDOUT_LOOK_PROCEDURE.md) |
 
 **What the negatives have in common.** Where a signal exists, it is smaller than the cost of
 trading it. Rows 5 to 8 show this four different ways on intraday data, and row 14 a fifth: making
@@ -92,8 +92,11 @@ that D1 does or does not work.
 **The plain idea.** If you try 640 configurations, the best one will look good by luck. You have
 to know how many you tried.
 
-**The formal statement.** `research/experiments.json` records every look. It holds 6,826 looks
-over 640 distinct configurations. Under the null, the expected maximum |t| over that many
+**The formal statement.** `research/experiments.json` records every look up to v2.1. It holds 6,826 looks
+over 640 distinct configurations. The v2.2.0 round's 76 looks (40 reversal, 30 families, 6 quoter) are
+recorded in the same hash-chained format in `research/round1/looks_ledger.json`; the central ledger's
+denominator does not count them (decision 13 of
+[DECISIONS_2026-11-18_overnight.md](../research/round1/DECISIONS_2026-11-18_overnight.md)). Under the null, the expected maximum |t| over that many
 looks is 4.202, and a Bonferroni per-test bar is |t| >= 4.484 ([SHOWCASE.md](SHOWCASE.md),
 "Numbers a CI check re-derives"). The ledger is a lower bound: known gaps are listed in
 [research/v118/LEDGER_INVENTORY.md](../research/v118/LEDGER_INVENTORY.md).
@@ -132,8 +135,8 @@ routing, fills, TCA and a per-decision trace. The whole loop runs on one instrum
 digest ([docs/MVP.md](MVP.md)).
 
 **Three languages, one semantics.** Each ported component has golden vectors produced by
-the Python reference. The C++ and Rust copies must match them byte for byte. On the v1.18.0
-CI run the table counted 4,062 Python, 333 C++ and 388 Rust tests, with 217, 74 and 75 golden
+the Python reference. The C++ and Rust copies must match them byte for byte. The table counts 4,062 Python, 333 C++ and 388 Rust tests, with 217, 74 and 75 golden: Python and
+C++ from the v1.18.0 CI run, Rust from the source tree since the `itchbars` crate (2026-11-18)
 ([README.md](../README.md), parity table).
 
 ## 5. Engineering numbers

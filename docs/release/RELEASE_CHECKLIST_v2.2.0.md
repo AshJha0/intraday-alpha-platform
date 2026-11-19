@@ -14,18 +14,25 @@ is pushed; the tag builds the images and records their digests. The second pull 
 digests into the Kubernetes manifests and moves the compose tags, because the digests do not exist
 until the tag has been built.
 
+**Where it stands (2026-11-19).** The round and its release documents (changelog section, release
+notes, status lines, this checklist) went to `main` together through pull request 447, merge commit
+`f149af53` (2026-11-19 00:27 UTC), so steps 0 and 1 were met by that pull request rather than by a
+separate `release/v2.2.0` branch. Still to do: CI green on `f149af53` (step 2), the tag, GitHub
+release and `release.yml` run (step 3), the digest pull request (step 4) and the checks of step 5.
+No `v2.2.0` tag exists yet.
+
 Every command below runs from the repository root. Each step is marked **before merge** (can be done
 on a branch) or **after merge** (needs the merged commit on `main`, the tag, or the built images).
 
 ## 0. Preconditions (before merge)
 
-| # | check | command or file | status on 2026-11-18 |
-|---|---|---|---|
-| 0.1 | The round's work is on `main`: `round0-gates` merged by its own pull request | `git log --oneline main..round0-gates` prints nothing | not merged |
-| 0.2 | Every PENDING placeholder (double square brackets around `PENDING:` and a description) is replaced by a number copied from a committed artefact, or by a plain statement that the result does not exist | `git grep -n "\[\[PENDING:"` prints nothing | placeholders present (pooled result, three families, look counts, holdout outcome) |
-| 0.3 | The coordinator's experiment-ledger entries for the round are committed; every look count quoted in a document then equals `research/experiments.json` | `python tests/harness/check_headline_numbers.py` (`experiment_ledger` row) and `python tests/harness/check_docs.py --release` (`release_truth`) | the ledger still reads 6,826 looks; the round's looks are not entered yet |
-| 0.4 | The README parity table matches the tree. `itchbars` added Rust tests: the tree has 388 `#[test]` functions, the table says 376, so `check_headline_numbers.py` fails `parity_table_vs_source_tree` | update the README table and the prose counts in `docs/ARCHITECTURE.md` and `docs/BUILD_NOTES.md` from a `main` CI run of the merged round (CI derives them with `tests/harness/parity_counts.py`); do not type a count that no CI run printed | failing, pre-existing on `round0-gates` |
-| 0.5 | No signed document, ledger entry or holdout registry change is made by the release pull request | `git diff --stat main...release/v2.2.0` lists only docs, `CHANGELOG.md`, `README.md`, `docs/index.html` | |
+| # | check | command or file | status on 2026-11-18 | status on 2026-11-19 |
+|---|---|---|---|---|
+| 0.1 | The round's work is on `main`: `round0-gates` merged by its own pull request | `git log --oneline main..round0-gates` prints nothing | not merged | done: pull request 447, merge commit `f149af53` |
+| 0.2 | Every PENDING placeholder (double square brackets around `PENDING:` and a description) is replaced by a number copied from a committed artefact, or by a plain statement that the result does not exist | `git grep -n "\[\[PENDING:"` prints nothing | placeholders present (pooled result, three families, look counts, holdout outcome) | done: `git grep` finds the pattern only in this table |
+| 0.3 | The coordinator's experiment-ledger entries for the round are committed; every look count quoted in a document then equals `research/experiments.json` | `python tests/harness/check_headline_numbers.py` (`experiment_ledger` row) and `python tests/harness/check_docs.py --release` (`release_truth`) | the ledger still reads 6,826 looks; the round's looks are not entered yet | met differently: the round's 76 looks are in `research/round1/looks_ledger.json`, `research/experiments.json` is unchanged (decision 13 of `research/round1/DECISIONS_2026-11-18_overnight.md`); both checks pass |
+| 0.4 | The README parity table matches the tree. `itchbars` added Rust tests: the tree has 388 `#[test]` functions, the table says 376, so `check_headline_numbers.py` fails `parity_table_vs_source_tree` | update the README table and the prose counts in `docs/ARCHITECTURE.md` and `docs/BUILD_NOTES.md` from a `main` CI run of the merged round (CI derives them with `tests/harness/parity_counts.py`); do not type a count that no CI run printed | failing, pre-existing on `round0-gates` | check passes: the README row reads 388, counted from the source tree, not yet from a `main` CI run; confirming it from the CI run of `f149af53` is still to do |
+| 0.5 | No signed document, ledger entry or holdout registry change is made by the release pull request | `git diff --stat main...release/v2.2.0` lists only docs, `CHANGELOG.md`, `README.md`, `docs/index.html` | | not applicable: no separate release pull request; pull request 447 carried the round and the documents together |
 
 ## 1. The release pull request (before merge)
 

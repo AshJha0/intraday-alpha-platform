@@ -10,6 +10,14 @@ holdout registry. The 100-name 2019-01-30 day has been read once, by the v1.18
 REL-08 screen (one session, all 7 variants underpowered, no edge claimed; see
 "The first 100-name day" below). No signal is promoted.
 
+**Since v2.2.0 (2026-11-19).** A separate full-market path (one-minute bars from `rust/itchbars`,
+a 500-name universe fixed on 2019-01-30) studied cross-sectional reversal and families F1 to F3 on the ten in-sample sessions.
+Every candidate failed the rule fixed before the results (positive mean net, one-sided p below
+0.003125, at least 7 of 10 sessions positive), so the nine sealed 2025/26 sessions were not read and
+remain the holdout ([BREADTH_FAMILIES.md](../research/round1/BREADTH_FAMILIES.md),
+[BREADTH_BARS_POOLED.md](../research/round1/BREADTH_BARS_POOLED.md)). That path is described in
+[REPORT.md](REPORT.md) section 2, rows 15 to 18; this page describes the v1.17 book.
+
 ## The breadth universe (A3)
 
 The universe is fixed before any breadth statistic exists, by a written rule
