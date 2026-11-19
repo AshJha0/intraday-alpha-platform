@@ -4771,7 +4771,11 @@ Related v1.18 Python APIs, documented in their own documents: `iap.monitoring`
 
 ## API_AGENTS — the agent layer (`iap.agents`): governance, the WS-E agents, evals
 
-The package every agent acts through. Off the trading path by construction
+The package every agent acts through. The governance primitives of section 1 live in
+`iap.governance` (moved in v2.1); the v2.2.0 round removed the nine re-export shims
+`iap.agents` kept for them. `iap.agents.signing`, `iap.agents.trust`, `iap.agents.fingerprint`
+and `iap.agents.analysis_identity` remain as aliases of the `iap.governance` modules only
+because scripts bound by signed pre-registrations import them by that path. Off the trading path by construction
 (`python/tests/test_import_policy.py`); standard library plus `cryptography`
 (Ed25519). Every `iap.*` name below is checked by
 `tests/harness/check_docs.py` (`api_names`): it resolves by import or the
@@ -4804,15 +4808,15 @@ board head and id a signed request binds to (`ed25519-v2`);
 `iap.governance.broker.sign(private_key, agent, op, args, **context)` builds the
 `auth` document; `board_id(root, board)`. Errors: `BrokerError`.
 
-**`iap.agents.signing`** — `generate_keypair() -> (private_hex, public_hex)`,
+**`iap.governance.signing`** — `generate_keypair() -> (private_hex, public_hex)`,
 `public_of(private_hex)`, `sign(...)`, `verify(...)`, `verify_ed25519(public_hex,
-msg, sig_hex)`, `message(...)`. **`iap.agents.trust`** — the maintainer-signed
+msg, sig_hex)`, `message(...)`. **`iap.governance.trust`** — the maintainer-signed
 registry: `sign_registry`, `verify_registry`, `read_roots(root, ref)`,
 `load_pubkeys(root)`, `trusted_pubkeys(root, ref)`; `TrustError`.
 
 **`iap.governance.prereg_gate`** — `require(repo_root, alpha_id, horizon, board=None,
 fingerprinter=None, agents=None)`: the entry a run needs, or `PreregistrationError`;
-`board_path(repo_root)`, `is_closed(entry)`. **`iap.agents.fingerprint`** —
+`board_path(repo_root)`, `is_closed(entry)`. **`iap.governance.fingerprint`** —
 `fingerprint(alpha_id)` (scheme 2: code + feature closure hash),
 `module_closure`, `closure_hash`, `check_registration_env` (CI-lock venv for
 registrations), `ci_lock_deps`, `compare_deps`.
@@ -4837,7 +4841,8 @@ names), `report_path(root, ident)`. **`iap.governance.untrusted`** —
 `wrap_tree(value, source, keys)`: free text from anyone is data.
 
 **`iap.governance.mcp_server`** (read-only MCP over stdio: `Tools`, `tool_list()`,
-`handle(tools, msg)`, `serve(root)`; `FREE_TEXT` names the free-text keys) and
+`handle(tools, msg)`, `serve(root)`; `FREE_TEXT` names the free-text keys; its
+official-SDK sibling `iap.governance.mcp_sdk_server` is in API_V22 section 4) and
 **`iap.agents.mcp_workflow`** (`WorkflowTools`, the signed proposal workflow
 over MCP; `FORBIDDEN_TOOL_NAMES`).
 
@@ -4954,7 +4959,8 @@ Fixture helpers: `fake_dataset(root, name)`, `fake_paper_report(root, date,
 `iap.agents.evals.run_all(root)` — each non-LLM control must fail when
 removed (leak probe, P&L bug, null rejection, fabrication flag).
 `iap.llm.evals.run_all` / `run_scenario` — the LLM research agent's four
-scenarios (`SCENARIOS`), mocked in CI, `--live` by the owner
+scenarios (`SCENARIOS`), mocked in CI, `--live` by the owner (no live run since
+2026-11-18, owner decision R0-1)
 ([docs/API_REFERENCE.md §5](API_REFERENCE.md)).
 
 ### 4. v1.18 research authorisation (REL-02; Python only)
@@ -4964,7 +4970,7 @@ may read. Documented in [docs/GOVERNANCE.md](GOVERNANCE.md) and
 [archive/docs/REVIEW_PACK.md §2](../archive/docs/REVIEW_PACK.md); names are taken from the modules' definitions.
 
 ```python
-from iap.agents.analysis_identity import (build_identity, verify_identity, verify_signed_document, require_independent_runner,
+from iap.governance.analysis_identity import (build_identity, verify_identity, verify_signed_document, require_independent_runner,
                                           script_fingerprints, code_tree_sha256, IdentityError, SignatureError)
 from iap.research.holdout_registry import guard, load_registry, dataset_identity, verify_access_log, HoldoutRefused
 ```
@@ -4987,8 +4993,8 @@ uses `iap.llm.fake`. Names below are checked by `tests/harness/check_docs.py`.
 
 | what | where |
 |---|---|
-| Package | `python/src/iap/llm/{agent,loop,budget,prices,spend,envfile,fake,runners,verify,summary_check,evals}.py` |
-| CLIs | `python -m iap.llm --workspace WS --agent ID --keyfile K --task "..."` (AI1 session); `python -m iap.llm spend`; `python -m iap.llm.evals [--live]` |
+| Package | `python/src/iap/llm/{agent,loop,budget,prices,spend,envfile,fake,runners,verify,summary_check,evals,tracing,verifier_eval,injection_eval}.py` |
+| CLIs | `python -m iap.llm --workspace WS --agent ID --keyfile K --task "..."` (AI1 session); `python -m iap.llm spend`; `python -m iap.llm.evals [--live]`; `python -m iap.llm.tracing summarize DIR`; `python -m iap.llm.verifier_eval [--check]`; `python -m iap.llm.injection_eval [--check]` |
 | Config | `configs/agents/llm.json` (caps, dated pins), `configs/reference/llm_prices.json` |
 | Tests | `python/tests/test_llm_agent.py`, `test_llm_spend.py`, `test_agents_wse.py` |
 
@@ -4999,7 +5005,7 @@ from iap.llm.agent import Session, open_session, run_session, make_client, new_s
 
 session = open_session(workspace, agent, private_key, runner, budget, *, datasets=frozenset({"synthetic:planted-v1"}),
                        repo=None, fingerprinter=None, session_id=None, verify_findings=True)
-summary = run_session(client, session, task, *, model=DEFAULT_MODEL, effort="medium", max_turns=60, secret=None, clock=time.time)
+summary = run_session(client, session, task, *, model=DEFAULT_MODEL, effort="medium", max_turns=60, secret=None, clock=time.time, tracer=None)
 ```
 
 `Session` holds the eight tools (`list_alphas`, `list_features`,
@@ -5018,7 +5024,7 @@ client. Unchanged by v1.17 (the agent-evals baseline pins it).
 from iap.llm.loop import ToolSpec, ToolRefused, LoopResult, run_tool_loop, check_args, schema, wire_spend
 
 res = run_tool_loop(client, *, system, tools, dispatch, task, budget, model, out_dir, session_id,
-                    finish_tool="finish", effort="medium", max_turns=40, secret=None, clock=time.time)
+                    finish_tool="finish", effort="medium", max_turns=40, secret=None, clock=time.time, tracer=None)
 ```
 
 - `ToolSpec(name, description, properties={}, required=())` → `as_api()`;
@@ -5030,8 +5036,13 @@ res = run_tool_loop(client, *, system, tools, dispatch, task, budget, model, out
 - Each turn: `budget.check_model_call(model)` (monthly cap, per-run USD,
   tokens), the call, `budget.charge(model, usage)` (one ledger row), the tool
   calls (`budget.check_tool_call()` each). Stops with `status` `finished`
-  (the `finish_tool` returned), `end_turn`, `max_tokens`, `model_refusal`,
-  `budget_exhausted` or `max_turns`.
+  (the `finish_tool` returned), `end_turn`, `max_tokens` (no tool call of that
+  turn is dispatched), `model_refusal`, `budget_exhausted`, `max_turns` or
+  `client_error` (the summary is written, then the client's exception is
+  re-raised). A `pause_turn` response is sent back and counts as a turn; a tool
+  that raises is returned to the model as an error result and the loop goes on.
+  `tracer` (default: `spans.jsonl` in `out_dir`) is the span writer of
+  `iap.llm.tracing`. Tests: `python/tests/test_llm_loop_robustness.py`.
 - `LoopResult(status, model, pin, served_models, budget, tool_log,
   closing_text, finished, out_dir)`; `as_dict()` is the persisted
   `iap.llm.loop/1` summary (tool outputs omitted).
@@ -5107,7 +5118,7 @@ Every module below is offline: none calls a model API or the network. Narrative 
 [AI_STACK.md](AI_STACK.md), [RESEARCH_GRAPH.md](RESEARCH_GRAPH.md), [RESEARCH_MEMORY.md](RESEARCH_MEMORY.md),
 [TRACING.md](TRACING.md), [AGENT_EVALS.md](AGENT_EVALS.md), [MCP_SERVER.md](MCP_SERVER.md).
 
-### 1. Research graph, `iap.graph` (CLI `python -m iap.graph run | resume | verify-text`)
+### 1. Research graph, `iap.graph` (CLI `python -m iap.graph demo | run | resume | verify-text | diagram`)
 
 - `iap.graph.core`: `Graph`, `execute`, `Interrupt` (the human approval stop), `RunResult`,
   `GraphError`, `StepLimitError`, `state_sha256`.

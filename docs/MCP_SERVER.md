@@ -93,15 +93,21 @@ Tests are in `python/tests/test_mcp_sdk_server.py`.
 
 | Property | Test |
 |---|---|
-| No file opened for writing, no subprocess, no network import in the module; the SDK is imported lazily | `test_sdk_module_has_no_write_subprocess_or_network_path` (source scan, runs without the SDK) |
+| No file opened for writing, no subprocess, no network import in `iap.governance.mcp_sdk_server`, `iap.memory.mcp_tools` or `iap.memory.mcp_server`; the SDK is imported lazily | `test_sdk_module_has_no_write_subprocess_or_network_path` (source scan, once per module, runs without the SDK) |
+| The governance module never imports `iap.memory` | `test_governance_server_does_not_import_memory` |
+| Memory tools refuse more than 20 hits and queries over 500 characters, and wrap snippets as untrusted | `test_memory_tools_are_bounded_and_wrap_snippets`, and the refused memory calls in `test_end_to_end_over_stdio` |
 | Identifiers pass `_ident`; resolved paths must stay inside their directory; unknown rounds and file types refused | `test_resources_refuse_traversal_without_sdk`, and six refused reads in `test_end_to_end_over_stdio` |
 | Prompts carry the untrusted-data rule; the pre-registration prompt says the draft is unsigned | `test_prompts_state_untrusted_rule_and_refuse_bad_ids`, `test_end_to_end_over_stdio` |
 | Every tool is read-only-hinted and returns the hand-written server's payload | `test_end_to_end_over_stdio` |
 | A clear exit without the extra | `test_main_without_sdk_exits_with_hint` |
 
 The end-to-end test starts the server as a subprocess and uses the SDK's own
-client over stdio. It skips when the extra is not installed; the other four
-run everywhere. The SDK applies its own URI checks too (it rejects traversal,
+client over stdio. It skips when the extra is not installed; the other six
+test functions run everywhere. The SDK is not in the CI lock, so the review of
+2026-11-19 checked the launcher's import path and arguments by reading
+`python/src/iap/memory/mcp_server.py`, `.mcp.json` and the `iap-mcp-sdk` entry in
+`python/pyproject.toml`, and ran only the no-extra path (exit status 2 with the
+install line, for both launchers). The SDK applies its own URI checks too (it rejects traversal,
 absolute paths and null bytes in template parameters), but the server does not
 rely on them.
 

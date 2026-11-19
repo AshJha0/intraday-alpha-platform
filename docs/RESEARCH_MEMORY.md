@@ -78,7 +78,8 @@ python -m iap.memory search "known-null protocol v2 verdict" --kind research
 **Worked example.** On this tree, `prior-tests --alpha EQ10 --horizon 1s -k 3` returns, on the ledger side, the two
 `net_of_cost_screen` entries for `EQ10/1s/linear_z_v1` and `linear_z_v2` (both `status = fail`) and an `EQ10` prereg
 entry; on the documents side, `research/v116/CAPACITY_CURVE.md:1-53` (the taker capacity curve), then the R7-CONFIRM-1
-`EQ10@1s` section and the breadth book pre-registration draft. A person reading that output learns before spending
+`EQ10@1s` section (`research/r7/r7_confirm_result_crash1.md:12-17`) and the `prior-tests` section of this page, which
+quotes the same command (run on 2026-11-19). A person reading that output learns before spending
 anything that EQ10 at one second has failed the net-of-cost screen twice.
 
 **For an agent.** Use `--json`. Each hit's `snippet` and `heading` arrive wrapped by `iap.governance.untrusted.wrap`

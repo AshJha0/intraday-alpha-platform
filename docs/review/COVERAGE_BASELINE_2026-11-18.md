@@ -140,11 +140,14 @@ line.
 
 ## Out of scope
 
-`round0-gates` has since gained `iap.graph`, `iap.memory`,
-`iap.governance.mcp_sdk_server`, `iap.llm.verifier_eval` and
-`iap.llm.injection_eval`, which other sessions own. They were not in this tree
-and were not measured. When they merge they join their package's figure
-(`iap.llm` and `iap.governance`), so re-measure before raising those floors.
+`round0-gates` gained `iap.graph`, `iap.memory`,
+`iap.governance.mcp_sdk_server`, `iap.llm.verifier_eval`,
+`iap.llm.injection_eval` and `iap.llm.tracing`, and changed `iap.llm.loop` and
+`iap.llm.agent`. None of it was in this tree and none was measured. The branch
+merged to `main` on 2026-11-19 (merge commit f149af53). The `iap.llm` and
+`iap.governance` modules now count in those packages' CI figures, so
+re-measure before raising either floor. `iap.graph` and `iap.memory` are
+packages of their own and have no floor in `tests/harness/coverage_floors.json`.
 ## mypy, same review
 
 The mypy settings are in `python/pyproject.toml`, under `[tool.mypy]` and

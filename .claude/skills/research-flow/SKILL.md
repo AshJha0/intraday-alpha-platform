@@ -11,7 +11,7 @@ Run from the repository root with the project interpreter and `PYTHONPATH=python
 
 ## Steps
 
-1. Write the hypothesis to a JSON file with `alpha_id`, `horizon` (`1m 5m 15m 30m 60m 1d`),
+1. Write the hypothesis to a JSON file with `alpha_id`, `horizon` (`500ms 1s 5s 10s 30s 1m 5m 15m 30m 60m 1d`),
    `universe` (`name`, `symbols`, `datasets` = dataset labels from
    `research/holdout_registry.json`), `expected_sign` (`1` or `-1`) and `mechanism`
    (at least 20 characters). Ask the person for anything missing; do not invent it.
@@ -26,9 +26,11 @@ Run from the repository root with the project interpreter and `PYTHONPATH=python
 3. Read the output:
    - `prior art: same test already in ...` means the run stopped as a duplicate. Report the
      citation and stop.
-   - `check by hand: same alpha and horizon, universe not recorded` lists ledger entries
-     the rule cannot judge (most entries record no universe). Show them to the person and
-     ask whether any is the same test before going on.
+   - `check by hand: same alpha and horizon, universe differs: ...` and
+     `check by hand: same alpha and horizon, entry records no universe: ...` list ledger
+     entries with the same alpha and horizon that the rule does not count as the same test
+     (another dataset, or no universe or dataset recorded). Show them to the person and ask
+     whether any is the same test before going on.
    - `invalid` means the hypothesis failed validation. Report the errors and stop.
    - `awaiting: human approval` means the unsigned draft is printed. Show it to the person
      as printed, with the prior-art citations, and ask them to approve or reject.

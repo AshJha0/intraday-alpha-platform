@@ -209,12 +209,12 @@ a change with no id; the CI check for it is backlog issue L05.
 | Control | Enforced by | What it stops |
 |---|---|---|
 | A pre-registration debits one look on the ledger (`kind="prereg"`) | `WriteBroker.preregister` | unlimited free hypotheses |
-| The prereg body carries the alpha's code + feature fingerprint; a run with different code is refused | `iap.agents.fingerprint`, `prereg_gate.require` | changing the alpha after registering it |
+| The prereg body carries the alpha's code + feature fingerprint; a run with different code is refused | `iap.governance.fingerprint`, `prereg_gate.require` | changing the alpha after registering it |
 | Changed code needs `supersede=True` (a new look) | `WriteBroker.preregister` | silent re-registration |
 | Reserve attempts capped per (alpha, horizon, code hash); unknown candidate fields refused | `ReserveEvaluator` | resetting the cap with a dummy field |
 | Committed board versions must be prefixes of the current board; `research/agents/anchors.json` names the commit holding each entry | `iap.agents.anchor`, `python -m iap.agents.cli verify-board` | re-chaining the hash chain |
-| Agent writes signed with Ed25519 (over agent, op, args digest, single-use nonce); the broker and verifiers hold only public keys (`research/agents/agent_pubkeys.json`), private keys live outside the repo; new HMAC requests refused | `iap.agents.signing`, `WriteBroker(pubkeys=...)`, `Blackboard.verify_signatures`, `cli agent-keygen` / `verify-board` | impersonating an agent id, replay, forgery by a verifier |
-| v1.14 (G-P1-4): a non-empty agent key registry is trusted only with a maintainer signature (`research/agents/agent_pubkeys.sig.json`) by a key in `research/agents/trust_roots.json`, and CI reads the trust roots from `origin/main` | `iap.agents.trust`, `cli maintainer-keygen` / `sign-registry`, `check_agent_keys.py --trust-ref` | a self-attesting registry: adding a key and signing as that agent in one change |
+| Agent writes signed with Ed25519 (over agent, op, args digest, single-use nonce); the broker and verifiers hold only public keys (`research/agents/agent_pubkeys.json`), private keys live outside the repo; new HMAC requests refused | `iap.governance.signing`, `WriteBroker(pubkeys=...)`, `Blackboard.verify_signatures`, `cli agent-keygen` / `verify-board` | impersonating an agent id, replay, forgery by a verifier |
+| v1.14 (G-P1-4): a non-empty agent key registry is trusted only with a maintainer signature (`research/agents/agent_pubkeys.sig.json`) by a key in `research/agents/trust_roots.json`, and CI reads the trust roots from `origin/main` | `iap.governance.trust`, `cli maintainer-keygen` / `sign-registry`, `check_agent_keys.py --trust-ref` | a self-attesting registry: adding a key and signing as that agent in one change |
 | v1.14 (G-P1-4): new requests are `ed25519-v2`, binding the board head (`prev`) and board id; the broker refuses a stale head or another board; `prereg` refuses an unsigned write by a keyed agent; anchors and the board are verified against `origin/main` | `WriteBroker.authenticate` / `request_context`, `Blackboard.verify_signatures(board_id=)`, `anchor.verify(ref=)`, `verify-board --trust-ref` | replaying a signed request at another position or on another board; anchors that trust a rewritten local history |
 | v1.14 (G-P1-5): the multiple-testing ledger is hash-chained (`chain_head` over each entry's immutable identity, x-version 4); a ledger whose head does not match is refused on load, so Bonferroni never reads an edited ledger; every prereg records `ledger_head`; CI requires the head ledger to DESCEND from the base and every prereg head to be on the chain | `iap.validation.ledger.chain_heads`, `ExperimentLedger` (`LedgerIntegrityError`), `check_ledger_monotone.py` | dropping, reordering or editing looks to lower the Bonferroni denominator |
 | `--no-prereg` results carry an ineligibility reason | `ExperimentRunner(exploratory=True)` | exploratory runs used as promotion evidence |
@@ -234,7 +234,7 @@ Entries without `scheme` are the legacy `hmac-sha256` scheme of the first
 v1.10 draft: still verifiable with the shared key
 (`verify-board --legacy-hmac-keyfile`), never accepted for new writes.
 
-**What the code fingerprint covers** (`iap.agents.fingerprint`, scheme 2):
+**What the code fingerprint covers** (`iap.governance.fingerprint`, scheme 2; `iap.agents.fingerprint` is an alias kept for signed scripts):
 the source files of the alpha's defining module(s) and, transitively, every
 `iap.*` module they import explicitly (AST walk: top-level, function-local
 and relative imports), hashed per module in sorted order with line endings
@@ -397,6 +397,10 @@ it on read; `hallucinated_citation`, it filed 1 finding, which re-verified;
 `task_success`, it found the planted EQ02 / 1 s effect. The model behaved
 well, so the live run did not stress the controls; the mocked adversarial
 runs, with their ablations, are the evidence that the controls work.
+That live run is historical. Since 2026-11-18 live model calls are off (owner decision R0-1,
+[research/round0/ROUND0_GATES.md](../research/round0/ROUND0_GATES.md) section 1), and the v2.2.0
+round made none: its guardrail numbers are offline measurements with no model
+([AGENT_EVALS.md](AGENT_EVALS.md)).
 
 **Not covered.** The model's reasoning is not audited beyond the
 transcript; a finding can be true to its artefacts and still badly argued.
@@ -1192,7 +1196,7 @@ controls apart, each with its own mechanism and its own evidence class (U0 secti
 A result's class follows from which controls held when it was produced, never from the signature
 alone: *independently confirmed* needs execution separation under custody separate from the
 developer plus independent review; *mechanically isolated* is CR1 under the developer's custody;
-everything produced so far is at most *development-supported*. `iap.agents.analysis_identity.require_independent_runner`
+everything produced so far is at most *development-supported*. `iap.governance.analysis_identity.require_independent_runner`
 remains in the code as the tamper-evidence check it always was (the declared actor and the absence
 of a signing key in the runner's environment); it is not cited as an independence control anywhere
 in the documentation.
@@ -1272,7 +1276,7 @@ Commit the updated `agent_pubkeys.sig.json` with the registry change.
 
 Review finding 1 (outside reviewer, 2026-10-18): prove that a registration covers every input
 that can change a result, and that no entry point skips the check. Code:
-[`iap.agents.analysis_identity`](../python/src/iap/agents/analysis_identity.py); tests:
+[`iap.governance.analysis_identity`](../python/src/iap/governance/analysis_identity.py) (`iap.agents.analysis_identity` is an alias kept because scripts bound by signed pre-registrations import that path); tests:
 [`test_analysis_identity_v2.py`](../python/tests/test_analysis_identity_v2.py).
 
 ### Inputs that can change a result, and how each is bound (identity v2)
@@ -1389,6 +1393,7 @@ reader, so it is blocked even without its own guard.
 | `python -m iap.research run` / `combine` / `power-real` | dataset.json, features, normalized | `_guard_dataset` -> `guard(prereg_id=--holdout-prereg-id)` | yes |
 | `agents.research_assistant.run_in_sample` (agent tool) | dataset via the `iap.research run` subprocess | `guard(purpose="research_assistant")` | yes |
 | `governance.mcp_server` tools | ledger, reports, blackboard (no market data) | n.a. | n.a. |
+| `governance.mcp_sdk_server` tools and resources, and the memory tools served by `python -m iap.memory.mcp_server` | ledger, reports, blackboard, round notes, family specifications, Markdown under `docs/` and `research/` (no market data) | n.a. | n.a. |
 | `python -m iap.research.screen` | features | `assert_not_holdout` -> `guard` (`--allow-holdout` now lifts only the prereg's exclusion list; the registry still decides) | yes |
 | `python -m iap.research.breadth_book` | features | `guard(prereg_id)` | yes |
 | `research.two_venue.load_merged_session` | normalized iap1, two venues | `guard_session_label` (selected session) | yes |
@@ -1443,7 +1448,11 @@ and `tools/breadth_bars_pooled.py` refuses bars files dated 2025 or later. The o
 nine sealed 2025/26 sessions on bars is `iap.research.breadth_holdout` (`tools/breadth_bars_holdout.py`),
 which checks a signed, identity-bound pre-registration and the registry reservation before any download
 and marks the sessions spent afterwards. Its checks, their tests and what it cannot stop:
-[HOLDOUT_LOOK_PROCEDURE.md](../research/round1/HOLDOUT_LOOK_PROCEDURE.md) section 4.
+[HOLDOUT_LOOK_PROCEDURE.md](../research/round1/HOLDOUT_LOOK_PROCEDURE.md) section 4. The
+procedure was prepared and not used: in the v2.2.0 round no candidate met the pre-written rule,
+so the look was not taken, nothing was signed and no 2025/26 file was downloaded
+([DECISIONS_2026-11-18_overnight.md](../research/round1/DECISIONS_2026-11-18_overnight.md),
+decision 12; [BREADTH_FAMILIES.md](../research/round1/BREADTH_FAMILIES.md)).
 
 ### Unsupported routes
 
