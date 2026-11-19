@@ -382,6 +382,14 @@ smallest detectable net Sharpe is 2.82; ten sessions give about 16
 free in-sample days can reject or keep an idea for development and cannot confirm a Sharpe of 1 to 3.
 Recipe: [COOKBOOK.md](COOKBOOK.md) recipe 14.
 
+**What the v2.2 round found.** On the ten sessions, five candidates (three bar families and two
+reversal scores) were tested against K = 8 registered primaries. None had a positive net return
+clearing its threshold; the closing-auction imbalance had a gross effect and a rank IC positive in
+every session, and a net of about zero after the spread
+([../research/round1/BREADTH_FAMILIES.md](../research/round1/BREADTH_FAMILIES.md)). By the rule
+fixed beforehand nothing went forward, so the nine-session holdout was not read. The round's 76
+looks are in `research/round1/looks_ledger.json`. Recipe: [COOKBOOK.md](COOKBOOK.md) recipe 18.
+
 ## 9. A research flow that stops for a person
 
 **The idea.** The steps from an idea to a run (look for prior art, draft the pre-registration, get
