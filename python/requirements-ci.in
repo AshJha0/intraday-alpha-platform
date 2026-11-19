@@ -12,7 +12,7 @@ cloudpickle==3.1.2
 colorama==0.4.6
 coverage==7.17.0
 cryptography==50.0.2
-databento-dbn==0.72.0
+databento-dbn==0.73.0
 execnet==2.1.2
 hypothesis==6.170.13
 iniconfig==2.3.1
