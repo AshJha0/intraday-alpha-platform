@@ -97,7 +97,7 @@ golden group is `ctest --test-dir build -R Golden` (suites `*Golden`, including
 ## Rust
 
 ```bash
-cd rust && cargo test        # workspace (eleven crates, 388 `#[test]` functions of which 75 are in the golden targets; ~55 s after a full rebuild, a timing from an earlier release, not re-measured)
+cd rust && cargo test        # workspace (twelve crates, 388 `#[test]` functions of which 75 are in the golden targets; ~55 s after a full rebuild, a timing from an earlier release, not re-measured)
 ```
 
 Crates: `marketdata`, `orderbook`, `replay`, `eventbus`, `telemetry`, `features`,

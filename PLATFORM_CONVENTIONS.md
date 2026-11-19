@@ -53,10 +53,11 @@ intraday-alpha-platform/
                             emits traces) (+ header-only include/iap/util/ incl. sha256; no C++ risk
                             subsystem — Rust is the risk reference, Java and Python the ports, see
                             docs/ARCHITECTURE.md §2)
-  rust/                     cargo workspace (11 crates): marketdata, orderbook, eventbus, features, alpha,
+  rust/                     cargo workspace (12 crates): marketdata, orderbook, eventbus, features, alpha,
                             risk, venue, replay, telemetry, contracts (canonical JSON, SHA-256,
                             DecisionTrace, JSONL sink + digest, explain), lifecycle (the 7-state machine,
-                            gates, registry) — no Rust execution crate: the C++ simulator is the
+                            gates, registry), itchbars (v2.2: one-minute
+                            bars for a full Nasdaq ITCH day) — no Rust execution crate: the C++ simulator is the
                             execution reference, Java and Python the ports
   git tag archive/java-v1.14.0             (archived in v1.15, frozen at v1.14.0) javac build (build.sh/test.sh): com.iap.* — marketdata, orderbook, features,
                             alpha, portfolio, risk, execution, sor, tca, backtest, replay, config,

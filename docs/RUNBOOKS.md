@@ -514,6 +514,11 @@ dataset directory and its vendor file is deleted; the holdout sessions
 
 ### IEX HIST days: `process-iex-day` (v1.17, A4)
 
+**Status, 2026-11-18:** IEX HIST is no longer offered for direct download (the index answers HTTP
+403 and the IEX market-data page says historical PCAP data is not currently available), so this
+procedure cannot fetch new days; it still runs on a capture already on disk
+(`research/round0/ROUND0_GATES.md` section 6).
+
 An IEX day is two captures (TOPS = the BBO oracle, DEEP+ = the displayed
 orders; `--feed deep` takes the DEEP price-level feed instead) and the owner's
 rule is one vendor file on disk at a time, so the chain is: disk guard

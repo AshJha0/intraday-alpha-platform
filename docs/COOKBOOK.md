@@ -20,7 +20,8 @@ Recipes: 0 the environment · 1 the research loop on a family · 2 add a family 
 · 6 the leakage canaries · 7 a confirmation profile's domain · 8 the confirmatory gate's refusals ·
 9 dry-run the ingestion job · 10 verify the audit anchor and the signatures · 11 what the owner does
 (ingest, approve a run) · 12 reproduce a committed result · 13 the documentation checks ·
-14 bars for one ITCH day · 15 the wired research flow · 16 search the research memory · 17 the offline evals.
+14 bars for one ITCH day · 15 the wired research flow · 16 search the research memory · 17 the offline evals ·
+18 the pooled and family studies on the bars.
 
 ---
 
@@ -78,8 +79,9 @@ Expected: `refused: d5: the specification forbids a fit (status 'data-ineligible
 'ineligible'); no development run`, exit 2, and no ledger file.
 
 **Evidence class of the report: exploratory** (synthetic route, no claim; the report's
-`evidence_class` field says so). The same command on the real daily route, once ingested, produces
-at most *development-supported*.
+`evidence_class` field says so). The same command on a real daily route would produce at most
+*development-supported*; no free daily route is eligible after round 0
+([ROUND0_GATES.md](../research/round0/ROUND0_GATES.md) section 7).
 
 ---
 
@@ -427,7 +429,10 @@ runs the same command; a dead link, a vanished symbol or an undated "pending" ph
 closing-auction rows beside them, without keeping the raw file. Diagram:
 [DIAGRAMS.md](DIAGRAMS.md) section 43.
 
-Build the binary once in WSL (the Windows toolchain is not used for it):
+Build the binary once. On the Windows machine this recipe was written on, an Application Control
+policy blocks a freshly built `itchbars.exe`, so it is built and run inside WSL there; that is a note
+about that machine, not a requirement of the crate (on Linux, `cargo build -p itchbars --release`
+from `rust/` is enough):
 
 ```bash
 wsl -e bash -lc "cd /mnt/c/<path to repo>/rust && CARGO_TARGET_DIR=$HOME/iap-itchbars-target cargo build -p itchbars --release"
@@ -482,7 +487,9 @@ awaiting: human approval of the pre-registration draft
 status: done at rejected
 ```
 
-The prior-art citations come from the research memory, so they move when the record changes. With
+The prior-art citations come from the research memory, so they move when the record changes, and
+the checkpoint hashes move with them (a re-run on 2026-11-19 gave the same steps and outcome with
+different hashes). With
 `--approve` the flow runs the in-sample step; without `--runner module:function` that step is a stub
 returning fixed numbers, which are not results. An approved draft is not a pre-registration: nothing
 is signed or registered ([RESEARCH_GRAPH.md](RESEARCH_GRAPH.md)).
@@ -525,3 +532,28 @@ n=43 recall@1=0.9302 recall@5=0.9767 recall@10=0.9767 MRR=0.9496 floor@5=0.93
 `--check` compares with the committed result files and rewrites nothing. No model is called: these
 measure the verifier and the guardrails on hand-labelled cases, not a model's behaviour
 ([AGENT_EVALS.md](AGENT_EVALS.md)).
+
+## 18. Run the pooled and family studies on the bars (v2.2)
+
+**Goal:** turn the ten in-sample sessions of bars from recipe 14 into the round's two studies, and
+check that the committed results are current.
+
+```bash
+PYTHONPATH=python/src .venv-ci/bin/python tools/breadth_bars_pooled.py --bars-dir data/real/bars
+PYTHONPATH=python/src .venv-ci/bin/python tools/breadth_families_run.py --bars-dir data/real/bars --auction-dir data/real/bars --out research/round1/breadth_families.json
+PYTHONPATH=python/src .venv-ci/bin/python tools/breadth_families_report.py --check
+PYTHONPATH=python/src .venv-ci/bin/python tools/round1_looks_ledger.py --check
+```
+
+The first two read market data and are **not run for this recipe**; each run is a new look. The two
+`--check` commands need no data: each printed `current` on 2026-11-19, meaning the committed report
+and the hash-chained round ledger match what the scripts would write.
+
+Results, from the committed files: on 10 sessions, the pooled study's two reversal scores lose
+6.24 and 6.29 bps per rebalance net of the spread, net in 0 of 10 sessions
+([BREADTH_BARS_POOLED.md](../research/round1/BREADTH_BARS_POOLED.md)). The family study tests
+five candidates against K = 8 registered primaries (one-sided threshold 0.003125); none qualifies,
+so the nine-session holdout was not read
+([BREADTH_FAMILIES.md](../research/round1/BREADTH_FAMILIES.md)). The round's 76 looks are in
+`research/round1/looks_ledger.json`; the central ledger is unchanged. Class: exploratory, in-sample,
+no edge claim.

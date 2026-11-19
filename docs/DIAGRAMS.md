@@ -1793,6 +1793,11 @@ flowchart LR
     MAN -. "2025 or later refused" .-> DL
 ```
 
+The diagram's "K = 7" is the count first written in the pre-specification. Its erratum (section 8 of
+`research/round1/FAMILIES_PRESPEC_2026-11-18.md`) added F3 version 2, and the results were tested at
+K = 8, one-sided threshold 0.003125. No candidate qualified, so no arrow to the holdout was taken
+and the nine sessions stayed sealed ([BREADTH_FAMILIES.md](../research/round1/BREADTH_FAMILIES.md)).
+
 ## 44. Where to go deeper
 
 | topic | document |

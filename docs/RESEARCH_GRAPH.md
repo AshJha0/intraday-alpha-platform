@@ -47,7 +47,7 @@ flowchart TD
 
 | Node | What it does |
 |---|---|
-| `hypothesis` | Validates the record: `alpha_id`, `horizon`, `universe` (name and datasets), `expected_sign` (1 or -1), `mechanism` (at least 20 characters). Errors route to `invalid`. |
+| `hypothesis` | Validates the record: `alpha_id`, `horizon` (one of `500ms 1s 5s 10s 30s 1m 5m 15m 30m 60m 1d`, `HORIZONS` in `research_flow.py`), `universe` (name and a non-empty list of datasets), `expected_sign` (1 or -1), `mechanism` (at least 20 characters). Errors route to `invalid`. |
 | `prior_art` | Calls the injected `search_prior(hypothesis)`. A hit with `same_test: true` routes to `duplicate_stop`. |
 | `prereg_draft` | Builds an unsigned draft dict in the shape of `iap.governance.prereg_gate` (`prereg_id` = first 16 hex of `digest({alpha, horizon})`, `analysis_identity` with data versions, family, metrics, thresholds). Nothing is signed or written to the blackboard. |
 | `human_approval` | Returns `Interrupt`. The run stops with status `waiting`; `resume(..., decision={"approved": bool, ...})` continues. A rejection routes to `rejected`. |
