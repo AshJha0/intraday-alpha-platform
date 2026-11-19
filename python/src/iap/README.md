@@ -6,7 +6,7 @@ contracts and `tests/golden/`). Two packages run the other way — `risk/` and
 `execution/` are Python ports of the Rust and C++ references, proven by the
 same goldens (`/API_TRADING.md`). Everything deterministic is seeded via
 SplitMix64 only; no wall clock and no network or LLM client on any trading
-path (`PLATFORM_CONVENTIONS.md` §13.7). All 30 packages are listed below.
+path (`PLATFORM_CONVENTIONS.md` §13.7). All 38 packages are listed below.
 
 ```
 iap/
@@ -291,7 +291,11 @@ iap/
                    measured adverse selection, taker / mid / passive exit),
                    quoting.py (v1.10, M5, opt-in: QuotingBacktester,
                    QuotingConfig, sharpe_per_day; alpha-skewed two-sided
-                   quoting with inventory limit and flatten).
+                   quoting with inventory limit and flatten; decisions at
+                   score rows only by default, trigger_mode="grid"; v2.2
+                   adds the opt-in trigger_mode="events", which also
+                   decides on touch moves, own fills and guard changes,
+                   paced by ev_min_rest_ns and ev_max_msgs_per_s).
   adaptive/        The adaptability reference (docs/API_REFERENCE.md): drift.py (PSI,
                    two-sample KS, the rolling IC and its z: ic_z_method
                    "hac" by default since v1.5.0, "legacy" the z up to
@@ -566,23 +570,53 @@ iap/
     __main__.py    `python -m iap.mvp run [--config] [--seed] [--instrument]
                    [--out] [--repo-root] | replay --run <dir> [--repo-root] |
                    verify | explain --run <dir> ID`.
-  agents/          The agent-layer governance (v1.7.0; G1-G4 in v1.10.0), off the
-                   trading path: blackboard.py (append-only hash-chained JSONL),
-                   broker.py (WriteBroker: the only write path; preregister
-                   debits a look and stores the code fingerprint; Ed25519
-                   request verification with pubkeys), prereg_gate.py (the
-                   research-run gate), fingerprint.py (scheme 2 code / feature
-                   / dependency hash), signing.py (Ed25519 requests; HMAC
-                   legacy verify-only), anchor.py (git prefix check and
-                   research/agents/anchors.json), reserve.py / reserve_runner.py
-                   (hidden-seed evaluation), approvals.py (signed HUMAN
-                   approvals), evals.py, untrusted.py, citations.py,
-                   mcp_server.py (read-only MCP over stdio, `iap-mcp`),
+  agents/          The agent layer (v1.7.0; G1-G4 in v1.10.0), off the trading
+                   path. The governance primitives it uses live in
+                   governance/ (moved in v2.1; the iap.agents aliases for
+                   approvals, blackboard, broker, citations, mcp_server,
+                   prereg_gate, reserve, untrusted and workflow were removed
+                   in v2.2.0). What stays here: anchor.py (git prefix check
+                   and research/agents/anchors.json), reserve_runner.py
+                   (hidden-seed evaluation), evals.py, eval_harness.py,
                    mcp_workflow.py (v1.15 agent workflow over MCP: propose,
                    draft_prereg, hit_rate, regulatory_fee, list_drafts; no
-                   human-only op; `iap-mcp-agent`), cli.py
-                   (`iap-agents`: keygen, issue, apply, reserve, agent-keygen,
-                   prereg, anchor, verify-board).
+                   human-only op; `iap-mcp-agent`), cli.py (`iap-agents`:
+                   keygen, issue, apply, reserve, agent-keygen, prereg,
+                   anchor, verify-board), and the analysis_identity,
+                   fingerprint, signing and trust aliases (scripts bound by
+                   signed pre-registrations import them by this path).
+  governance/      Governance primitives shared by research, llm and agents:
+                   blackboard.py (append-only hash-chained JSONL), broker.py
+                   (WriteBroker: the only write path; preregister debits a
+                   look and stores the code fingerprint; Ed25519 request
+                   verification), prereg_gate.py (the research-run gate),
+                   fingerprint.py (scheme 2 code / feature / dependency
+                   hash), signing.py (Ed25519 requests; HMAC legacy
+                   verify-only), reserve.py, approvals.py (signed HUMAN
+                   approvals), untrusted.py, citations.py, claims.py,
+                   holdout_registry.py, screen_gate.py, workflow.py,
+                   mcp_server.py (read-only MCP over stdio, `iap-mcp`) and
+                   mcp_sdk_server.py (the same tools on the official MCP SDK).
+  memory/          (v2.2) Research memory: in-house BM25 over the repository's
+                   Markdown and the experiment ledger, every hit cited by
+                   file and line (docs/RESEARCH_MEMORY.md); mcp_server.py
+                   launches the official-SDK MCP server (`python -m
+                   iap.memory.mcp_server`, `iap-mcp-sdk`).
+  graph/           (v2.2) The research workflow as a tested state graph
+                   (docs/RESEARCH_GRAPH.md): core.py, checkpoint.py,
+                   research_flow.py, wiring.py, tracing.py, optional
+                   langgraph_adapter.py.
+  llm/             The LLM research agent (v1.11) behind the signed broker:
+                   verify.py (the number verifier), budget.py, spend.py,
+                   loop.py; v2.2 adds tracing.py, verifier_eval.py and
+                   injection_eval.py (the offline evals).
+  mlops/           (v1.11) Content-addressed model registry, drift and
+                   calibration monitoring, shadow mode; opt-in only.
+  monitoring/      REL-16 monitoring policy in code (docs/MONITORING_POLICY.md):
+                   ACTIVE / WATCH / REVIEW / HALT / UNKNOWN state machine.
+  paper/           (v1.16) Forward paper trade as infrastructure (`python -m
+                   iap.paper.daily --date YYYY-MM-DD`; docs/RUNBOOKS.md).
+  stats/           Pure statistics shared by backtest and validation (v2.1).
   auction/         (v1.10, A1, opt-in) Nasdaq NOII / cross stream: stream.py
                    (extract_auction_stream, AuctionStream), features.py,
                    targets.py, strategy.py (AUC01 backtest and purged
@@ -624,8 +658,8 @@ artefacts committed for v1.4.0 were produced by it in the manual
 
 Dependencies are declared in `python/pyproject.toml`: numpy, pandas,
 scipy, scikit-learn, pyarrow, jsonschema, referencing and, since v1.10.0,
-cryptography (Ed25519 for `iap.agents.signing` only); extras `ml`
+cryptography (Ed25519 for `iap.governance.signing` only); extras `ml`
 (xgboost, lightgbm) and `dev` (pytest, pytest-cov, pytest-xdist, pyyaml).
 Console entry points: `iap-marketdata`, `iap-features`, `iap-tca`,
 `iap-research`, `iap-lifecycle`, `iap-store`, `iap-mvp`, `iap-mcp`,
-`iap-mcp-agent`, `iap-agents`.
+`iap-mcp-sdk`, `iap-mcp-agent`, `iap-agents`.

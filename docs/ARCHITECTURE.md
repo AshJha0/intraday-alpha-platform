@@ -1278,9 +1278,12 @@ Each move put code in the package that owns what it reads or writes:
 | `backtest <-> validation` | the adaptive and quoting backtests imported `ic` and `pnl_sharpe` from validation | the pure statistics moved to a new `iap.stats` (no `iap` imports); `iap.validation.metrics` and `.deflated` re-export them |
 | `marketdata <-> validation` | `iap.validation.sessions` wrote and read the dataset manifest | `record_day_sampling` and `book_scope_for_dataset` moved to `iap.marketdata.manifest_records` |
 
-Every old module path in `iap.agents` and `iap.research` still imports: the old module replaces
-itself in `sys.modules` with the new one, so `iap.governance.broker is iap.governance.broker` and a
-monkeypatch on either name reaches the running code. The three single functions and the class above
+The old module paths in `iap.research` and the `iap.agents` aliases for the analysis identity,
+`fingerprint`, `signing` and `trust` still import: the old module replaces itself in `sys.modules`
+with the new one, so `iap.agents.fingerprint is iap.governance.fingerprint` and a monkeypatch on
+either name reaches the running code. The nine other `iap.agents` aliases (approvals, blackboard,
+broker, citations, mcp_server, prereg_gate, reserve, untrusted, workflow) were removed in v2.2.0;
+import them from `iap.governance`. The three single functions and the class above
 moved without an alias (an alias would be the same import edge); their callers were updated, and the
 v1.x root `COOKBOOK.md`, a frozen reference, still shows the old `iap.execution.AlphaUrgencySource`
 import.
@@ -1401,9 +1404,11 @@ places below.
   advisory lychee link check. mypy is a
   blocking step of the `python` job (scope: core/orderbook/execution/
   backtest/features since v1.16, item 16, plus agents/llm/mvp/paper since
-  v1.17, F3; 0 errors on both). `reproducible-build` (v1.17, F1) builds the
+  v1.17, F3, plus governance and `research/pnl_power.py` and
+  `research/breadth_bars.py` since v2.2; the `files` list in
+  `python/pyproject.toml` is the scope). `reproducible-build` (v1.17, F1) builds the
   wheel twice under a fixed SOURCE_DATE_EPOCH and fails on a sha256
-  mismatch; the `coverage` job enforces the whole-suite coverage floor of 92 % (fast + slow data combined, v1.18; not yet a required check).
+  mismatch; the `coverage` job enforces the whole-suite coverage floor of 92 % (fast + slow data combined, v1.18; not yet a required check) and, since v2.2, the per-package line floors in `tests/harness/coverage_floors.json` (seven packages, each its measurement minus two points; `tests/harness/check_coverage_floor.py`).
   The 17 required checks are listed in GOVERNANCE.md §0.
 - **Dependencies.** Python installs come from hashed lock files
   (`requirements-ci.txt`, `requirements-image.txt`) with

@@ -83,8 +83,21 @@ It is a spend decision for the owner, and v2.1 is scoped to legibility, not new 
 report says plainly that a clean source would change rows 1 to 3 ([REPORT.md](REPORT.md) section 8).
 
 **What would you do with one more month?**
-Get a point-in-time daily source, rerun DD1 on it, and run one registered D1 test with someone
-else holding the sealed data. That is the only path to the top two evidence classes.
+Written for v2.1, the answer was a point-in-time daily source, DD1 rerun on it, and one registered
+D1 test with someone else holding the sealed data. Round 0 of v2.2 closed that route under the
+owner's zero-spend rule: no eligible free daily source remains
+([research/round0/ROUND0_GATES.md](../research/round0/ROUND0_GATES.md), decision R0-4 and section 7),
+and IEX HIST is withdrawn from direct download (section 6). The free work left is development on
+the ten in-sample Nasdaq ITCH days and a forward paper log on public daily closes. That route still
+needs someone else holding sealed data to reach the top two evidence classes.
+
+**What did the v2.2 round find?**
+On the ten in-sample ITCH days, five candidates were tested against K = 8 registered primaries.
+None cleared its threshold after the spread, so by the rule fixed beforehand the nine-session
+holdout was not read ([research/round1/BREADTH_FAMILIES.md](../research/round1/BREADTH_FAMILIES.md)).
+The round's 76 looks are in `research/round1/looks_ledger.json`; the central ledger is unchanged at
+6,826 looks over 640 configurations. Ten sessions can only detect a net Sharpe of about 16 or more
+(ROUND0_GATES section 8), so this rejects ideas for development and confirms nothing.
 
 Technical drills: [QUANT_ONE_PAGER.md](QUANT_ONE_PAGER.md) (overfitting, multiple testing,
 survivorship, look-ahead, costs, deflated Sharpe) and [AI_ML_ONE_PAGER.md](AI_ML_ONE_PAGER.md).

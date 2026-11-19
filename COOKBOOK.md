@@ -2706,6 +2706,17 @@ toy score on a 2,000-event stream, not a result. The summary also carries
 price is inert, and `QuotingConfig(skew_mode="ticks", h_min_ticks=...)`
 (rule 8) prices the alpha and inventory skews in whole ticks from the touch.
 
+The quoter above decides only at score rows (`trigger_mode="grid"`, the
+default): between two rows the book replays and resting quotes fill, but
+nothing moves them. Since v2.2, `QuotingConfig(trigger_mode="events")`
+(rule 10 of `quoting.py`) also decides after each event that moves the
+touch, fills one of our quotes or changes the guard state, paced by
+`ev_min_rest_ns` (default 100 ms) and `ev_max_msgs_per_s` (default 10). On
+the one development session of `research/round1/QUOTER_EVENT_DRIVEN_DEV.md`
+it was less adversely selected but sent three times the messages and gave
+the gain back in spread and taker fees; that note is in-sample and makes no
+edge claim.
+
 How to read it. The five P&L terms add up to the gross exactly
 (`spread + markout + inventory + flatten`; the identity is tested), and the
 net adds rebates and subtracts taker fees and impact. On this vector the toy
@@ -5979,6 +5990,11 @@ git-ignored place for outputs you do not want to commit.
 
 ## 102. Ingest an IEX HIST DEEP+ day with the TOPS oracle (v1.17 A1, owner-run)
 
+**Status, 2026-11-18:** IEX HIST is no longer offered for direct download (the index answers HTTP
+403 and the IEX market-data page says historical PCAP data is not currently available), so this
+recipe cannot fetch new days; it still runs on a capture already on disk
+(`research/round0/ROUND0_GATES.md` section 6).
+
 **Goal:** turn one IEX HIST capture (free, daily, pcap/pcapng, IEX-TP v1) into
 a dataset the unchanged ITCH mapper, book, feature and execution code can
 read, with IEX's own TOPS best bid/offer as the book's oracle. `iex-deep-plus`
@@ -7358,6 +7374,9 @@ scope grew from `core`, `orderbook`, `execution`, `backtest`, `features` to also
 since v1.18 (REL-13) the floor is on the whole suite: the `python` (3.11) and
 `python-slow` jobs record coverage data and the `coverage` job combines them and
 enforces 92 % (measured 92.64 % on 2026-10-18; the slow files alone were 55 %).
+v2.2 added `governance`, `research/pnl_power.py` and `research/breadth_bars.py` to the
+mypy scope, and a second coverage step: per-package line floors from
+`tests/harness/coverage_floors.json`, checked by `tests/harness/check_coverage_floor.py`.
 
 ```bash
 cd python && python -m pip install mypy==2.3.1 && python -m mypy

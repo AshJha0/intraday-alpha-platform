@@ -1499,7 +1499,7 @@ automated researcher, human or model, has to go through. It was built before any
 | import-policy test | v1.3.0 | a guarded trading-path module that imports a network client or an LLM SDK fails CI | `python/tests/test_import_policy.py` |
 | write broker + blackboard | v1.7.0 | the only path for agent writes; append-only, hash-chained JSONL of tasks, claims, findings, pre-registrations | `iap.governance.broker`, `blackboard` |
 | pre-registration gate | v1.7.0 | `research run` refuses before reading data unless the (alpha, horizon) hypothesis is on the verified board | `iap.governance.prereg_gate` |
-| reserve on a hidden seed | v1.7.0 | final evaluation on a synthetic session the agent cannot see; pass/fail only; attempts capped | `iap.governance.reserve`, `reserve_runner` |
+| reserve on a hidden seed | v1.7.0 | final evaluation on a synthetic session the agent cannot see; pass/fail only; attempts capped | `iap.governance.reserve`, `iap.agents.reserve_runner` |
 | signed human approvals | v1.7.0 | retire / reset lifecycle edges need an expiring, single-use, signed approval | `iap.governance.approvals` |
 | read-only MCP server | v1.7.0 | six versioned read tools over stdio, no write path (AST-tested), no network listener | `iap.governance.mcp_server` (`iap-mcp --root .`) |
 | agent evaluations, untrusted text | v1.7.0 | planted leak, seeded bug, shuffled-label null, fabricated citation; free text returned wrapped and flagged | `iap.agents.evals`, `untrusted` |
