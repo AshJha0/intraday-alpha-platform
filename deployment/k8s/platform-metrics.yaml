@@ -83,7 +83,7 @@ spec:
         - name: metrics
           # Release step: `python tools/release.py publish` pins this by digest
           # from release-manifest.json (…-python:v1.17.0@sha256:…).
-          image: ghcr.io/ashjha0/intraday-alpha-platform-python:v2.1.0@sha256:d6d45c492f001615ec6e678d897102f117e5c25c4cd86a5c7e1398637356a160
+          image: ghcr.io/ashjha0/intraday-alpha-platform-python:v2.2.0@sha256:638cca84ede929b1d8b3c687dac9d94cc076ae15f4f4e63405c4cbb7cdfba13f
           imagePullPolicy: IfNotPresent
           # `command` REPLACES the image ENTRYPOINT (iap.marketdata).
           command: ["python3", "-m", "iap.metrics", "serve"]
@@ -144,7 +144,7 @@ spec:
             capabilities:
               drop: ["ALL"]
         - name: session
-          image: ghcr.io/ashjha0/intraday-alpha-platform-python:v2.1.0@sha256:d6d45c492f001615ec6e678d897102f117e5c25c4cd86a5c7e1398637356a160
+          image: ghcr.io/ashjha0/intraday-alpha-platform-python:v2.2.0@sha256:638cca84ede929b1d8b3c687dac9d94cc076ae15f4f4e63405c4cbb7cdfba13f
           imagePullPolicy: IfNotPresent
           command: ["python3", "-m", "iap.metrics", "run-session"]
           args:
